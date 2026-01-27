@@ -1,0 +1,6 @@
+services:
+  knockbox:
+    image: ${DOCKER_REGISTRY-}knockbox
+    build:
+      context: .
+      dockerfile: KnockBox/Dockerfile

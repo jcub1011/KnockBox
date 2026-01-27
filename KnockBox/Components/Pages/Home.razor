@@ -7,6 +7,7 @@
 @if (isLoaded)
 {
     <p>Welcome to your new app.</p>
+    <button @onclick="() => LoadStuff()">Click to load again.</button>
 }
 else
 {
@@ -14,12 +15,26 @@ else
 }
 
 @code {
+    private CancellationTokenSource? cts;
     private bool isLoaded = false;
 
     protected override async Task OnInitializedAsync()
     {
+        await LoadStuff();
+    }
+
+    protected async Task LoadStuff() 
+    {
+        if (cts is not null) 
+        {
+            cts.Cancel();
+            cts.Dispose();
+        }
+
+        cts = new CancellationTokenSource();
+        isLoaded = false;
         StateHasChanged();
-        await Task.Delay(5000);
+        await Task.Delay(2500, cts.Token);
         isLoaded = true;
         StateHasChanged();
     }
