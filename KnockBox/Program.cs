@@ -1,4 +1,6 @@
 using KnockBox.Components;
+using KnockBox.Data.DbContexts;
+using Microsoft.EntityFrameworkCore;
 
 namespace KnockBox
 {
@@ -11,6 +13,10 @@ namespace KnockBox
             // Add services to the container.
             builder.Services.AddRazorComponents()
                 .AddInteractiveServerComponents();
+
+            // Add dbcontext
+            builder.Services.AddDbContextFactory<ApplicationDbContext>(options =>
+                options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
             var app = builder.Build();
 
