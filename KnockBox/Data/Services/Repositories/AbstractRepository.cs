@@ -1,5 +1,6 @@
 ﻿
 using KnockBox.Data.DbContexts;
+using KnockBox.Extensions;
 using Microsoft.EntityFrameworkCore;
 
 namespace KnockBox.Data.Services.Repositories
@@ -14,7 +15,18 @@ namespace KnockBox.Data.Services.Repositories
 
         public async Task CreateAsync(IRepositoryOperation transaction, TModel model, CancellationToken ct)
         {
-            await TableSelector(transaction).AddAsync(model, ct);
+            try
+            {
+                await TableSelector(transaction).AddAsync(model, ct);
+            }
+            catch (Exception ex)
+            {
+                if (ex.TryGetCancellationException(out var oce))
+                {
+                    throw oce;
+                }
+                else throw;
+            }
         }
 
         public Task CreateAsync(IEnumerable<TModel> models, CancellationToken ct)

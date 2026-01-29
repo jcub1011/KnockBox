@@ -29,27 +29,27 @@ namespace KnockBox.Extensions
             return GetCancellationException(exception, 32);
         }
 
-        private static OperationCanceledException? GetCancellationException(Exception exception, int remainingDepth)
+        private static OperationCanceledException? GetCancellationException(Exception? exception, int remainingDepth)
         {
-            if (remainingDepth-- > 0) return null;
-            else if (exception is OperationCanceledException target)
+            if (remainingDepth-- <= 0 || exception is null) return null;
+            
+            if (exception is OperationCanceledException oce)
             {
-                return target;
+                return oce;
             }
-            else if (exception is AggregateException age)
+            
+            if (exception is AggregateException age)
             {
                 for (int i = 0; i < age.InnerExceptions.Count; i++)
                 {
-                    var oce = GetCancellationException(age.InnerExceptions[i], remainingDepth);
-                    if (oce is not null) return oce;
+                    var found = GetCancellationException(age.InnerExceptions[i], remainingDepth);
+                    if (found is not null) return found;
                 }
 
                 return null;
             }
-            else
-            {
-                return GetCancellationException(exception, remainingDepth);
-            }
+
+            return GetCancellationException(exception.InnerException, remainingDepth);
         }
     }
 }
