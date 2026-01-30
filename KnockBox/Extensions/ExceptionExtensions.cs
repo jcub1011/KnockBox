@@ -29,6 +29,22 @@ namespace KnockBox.Extensions
             return GetCancellationException(exception, 32);
         }
 
+        /// <summary>
+        /// Checks for an operation cancelled exception in all of the exceptions in the list.
+        /// </summary>
+        /// <param name="exceptions"></param>
+        /// <returns></returns>
+        public static OperationCanceledException? GetCancellationException(this IEnumerable<Exception> exceptions)
+        {
+            foreach (var exception in exceptions)
+            {
+                var result = exception.GetCancellationException();
+                if (result is not null) return result;
+            }
+
+            return null;
+        }
+
         private static OperationCanceledException? GetCancellationException(Exception? exception, int remainingDepth)
         {
             if (remainingDepth-- <= 0 || exception is null) return null;
