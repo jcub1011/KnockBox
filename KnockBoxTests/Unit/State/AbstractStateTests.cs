@@ -99,7 +99,7 @@ public sealed class AbstractStateTests
         Assert.IsFalse(dependentRan);
         Assert.AreEqual(PropertyUpdateResult.Errored, dict["Root"].Status);
         Assert.AreEqual(PropertyUpdateResult.Errored, dict["Leaf"].Status);
-        Assert.IsInstanceOfType(dict["Leaf"].Exception, typeof(AggregateException));
+        Assert.IsInstanceOfType<AggregateException>(dict["Leaf"].Exception);
         Assert.AreEqual(PropertyState.Errored, state.GetPropertyState("Root"));
         Assert.AreEqual(PropertyState.Errored, state.GetPropertyState("Leaf"));
     }
