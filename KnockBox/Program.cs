@@ -1,5 +1,7 @@
 using KnockBox.Components;
 using KnockBox.Data.DbContexts;
+using KnockBox.Services.Registrations.Repositories;
+using KnockBox.Services.Registrations.Validators;
 using Microsoft.EntityFrameworkCore;
 
 namespace KnockBox
@@ -17,6 +19,12 @@ namespace KnockBox
             // Add dbcontext
             builder.Services.AddDbContextFactory<ApplicationDbContext>(options =>
                 options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+            // Add repositories
+            builder.Services.AddRepositoryRegistrations();
+
+            // Add validators
+            builder.Services.RegisterValidators();
 
             var app = builder.Build();
 

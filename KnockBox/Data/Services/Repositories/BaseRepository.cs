@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace KnockBox.Data.Services.Repositories
 {
-    public abstract class AbstractRepository<TModel>(
+    public class BaseRepository<TModel>(
         IDbContextFactory<ApplicationDbContext> contextFactory, 
         IEntityKeyProvider<TModel, ApplicationDbContext> keyProvider) 
         : IRepository<TModel>
