@@ -22,7 +22,7 @@ namespace KnockBox
                 options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
             // Add repositories
-            builder.Services.AddRepositoryRegistrations();
+            builder.Services.RegisterRepositories();
 
             // Add validators
             builder.Services.RegisterValidators();

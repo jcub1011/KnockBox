@@ -8,7 +8,7 @@ namespace KnockBox.Services.Registrations.Repositories
 {
     public static class RepositoryRegistrations
     {
-        public static IServiceCollection AddRepositoryRegistrations(this IServiceCollection services)
+        public static IServiceCollection RegisterRepositories(this IServiceCollection services)
         {
             // Register entity key providers
             services.AddSingleton<IEntityKeyProvider<TestModel, ApplicationDbContext>, TestModelKeyProvider>();
