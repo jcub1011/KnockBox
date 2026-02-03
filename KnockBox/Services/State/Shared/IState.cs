@@ -101,7 +101,6 @@ namespace KnockBox.Services.State.Shared
         /// <summary>
         /// Updates the provided properties.
         /// </summary>
-        /// <param name="maxParallelUpdates"></param>
         /// <param name="ct"></param>
         /// <param name="propertiesToUpdate"></param>
         /// <returns></returns>

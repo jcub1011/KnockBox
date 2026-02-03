@@ -1,6 +1,7 @@
 using KnockBox.Components;
 using KnockBox.Data.DbContexts;
 using KnockBox.Services.Registrations.Repositories;
+using KnockBox.Services.Registrations.States;
 using KnockBox.Services.Registrations.Validators;
 using Microsoft.EntityFrameworkCore;
 
@@ -25,6 +26,9 @@ namespace KnockBox
 
             // Add validators
             builder.Services.RegisterValidators();
+
+            // Add states
+            builder.Services.RegisterStateServices();
 
             var app = builder.Build();
 
