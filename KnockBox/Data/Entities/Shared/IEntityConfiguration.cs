@@ -1,8 +1,8 @@
 ﻿using Microsoft.EntityFrameworkCore;
 
-namespace KnockBox.Data.Models.Shared
+namespace KnockBox.Data.Entities.Shared
 {
-    public interface IModelConfiguration
+    public interface IEntityConfiguration
     {
         /// <summary>
         /// Adds the configuration for this model to the model builder.

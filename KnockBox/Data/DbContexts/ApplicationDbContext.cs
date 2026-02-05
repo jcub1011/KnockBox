@@ -1,5 +1,5 @@
-﻿using KnockBox.Data.Models.Shared;
-using KnockBox.Data.Models.Testing;
+﻿using KnockBox.Data.Entities.Shared;
+using KnockBox.Data.Entities.Testing;
 using Microsoft.EntityFrameworkCore;
 
 namespace KnockBox.Data.DbContexts
@@ -8,14 +8,14 @@ namespace KnockBox.Data.DbContexts
     {
         #region Db Sets
 
-        public DbSet<TestModel> TestModel => Set<TestModel>();
+        public DbSet<TestEntity> TestEntity => Set<TestEntity>();
 
         #endregion
 
         #region Configurations
 
-        private static IModelConfiguration[] Configurations => [
-            new TestModelConfiguration()
+        private static IEntityConfiguration[] Configurations => [
+            new TestEntityConfiguration()
         ];
 
         #endregion

@@ -1,4 +1,4 @@
-﻿using KnockBox.Data.Models.Testing;
+﻿using KnockBox.Data.Entities.Testing;
 
 namespace KnockBox.Services.Registrations.Validators
 {
@@ -6,7 +6,7 @@ namespace KnockBox.Services.Registrations.Validators
     {
         public static IServiceCollection RegisterValidators(this IServiceCollection services)
         {
-            services.AddSingleton<TestModelValidator>();
+            services.AddSingleton<TestEntityValidator>();
 
             return services;
         }

@@ -1,6 +1,6 @@
 using KnockBox.Data.DbContexts;
-using KnockBox.Data.Models.Testing;
-using KnockBox.Data.Services.KeyProviders.TestModels;
+using KnockBox.Data.Entities.Testing;
+using KnockBox.Data.Services.KeyProviders.TestEntities;
 using KnockBox.Data.Services.Repositories;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -17,12 +17,12 @@ public sealed class BaseRepositoryTests
     public async Task CreateAsync_SingleModel_AddsEntity()
     {
         var (repo, factory) = CreateRepository();
-        var model = new TestModel { TestData = "single", TestDate = DateTime.UtcNow };
+        var model = new TestEntity { TestData = "single", TestDate = DateTime.UtcNow };
 
         await repo.CreateAsync(model, CancellationToken.None);
 
         await using var ctx = await factory.CreateDbContextAsync();
-        var stored = await ctx.TestModel.SingleAsync();
+        var stored = await ctx.TestEntity.SingleAsync();
         Assert.AreEqual("single", stored.TestData);
     }
 
@@ -32,14 +32,14 @@ public sealed class BaseRepositoryTests
         var (repo, factory) = CreateRepository();
         var models = new[]
         {
-            new TestModel { TestData = "one", TestDate = DateTime.UtcNow },
-            new TestModel { TestData = "two", TestDate = DateTime.UtcNow }
+            new TestEntity { TestData = "one", TestDate = DateTime.UtcNow },
+            new TestEntity { TestData = "two", TestDate = DateTime.UtcNow }
         };
 
         await repo.CreateAsync(models, CancellationToken.None);
 
         await using var ctx = await factory.CreateDbContextAsync();
-        var stored = await ctx.TestModel.OrderBy(m => m.TestData).ToArrayAsync();
+        var stored = await ctx.TestEntity.OrderBy(m => m.TestData).ToArrayAsync();
         Assert.HasCount(2, stored);
         Assert.AreEqual("one", stored[0].TestData);
         Assert.AreEqual("two", stored[1].TestData);
@@ -49,7 +49,7 @@ public sealed class BaseRepositoryTests
     public async Task CreateAsync_WithTransaction_AddsEntity()
     {
         var (repo, factory) = CreateRepository();
-        var model = new TestModel { TestData = "txn", TestDate = DateTime.UtcNow };
+        var model = new TestEntity { TestData = "txn", TestDate = DateTime.UtcNow };
 
         await repo.ExecuteInTransaction(async op =>
         {
@@ -57,7 +57,7 @@ public sealed class BaseRepositoryTests
         }, CancellationToken.None);
 
         await using var ctx = await factory.CreateDbContextAsync();
-        Assert.AreEqual(1, await ctx.TestModel.CountAsync());
+        Assert.AreEqual(1, await ctx.TestEntity.CountAsync());
     }
 
     #endregion
@@ -68,7 +68,7 @@ public sealed class BaseRepositoryTests
     public async Task GetAsync_ReturnsResultFromQuery()
     {
         var (repo, factory) = CreateRepository();
-        await SeedAsync(factory, new TestModel { TestData = "findme", TestDate = DateTime.UtcNow });
+        await SeedAsync(factory, new TestEntity { TestData = "findme", TestDate = DateTime.UtcNow });
 
         var result = await repo.GetAsync(q => q.SingleAsync(m => m.TestData == "findme"), CancellationToken.None);
 
@@ -79,7 +79,7 @@ public sealed class BaseRepositoryTests
     public async Task GetAsync_WithTransaction_ReturnsResult()
     {
         var (repo, factory) = CreateRepository();
-        await SeedAsync(factory, new TestModel { TestData = "txnFind", TestDate = DateTime.UtcNow });
+        await SeedAsync(factory, new TestEntity { TestData = "txnFind", TestDate = DateTime.UtcNow });
 
         var result = await repo.ExecuteInTransaction(async op =>
         {
@@ -97,7 +97,7 @@ public sealed class BaseRepositoryTests
     public async Task UpdateAsync_SingleModel_UpdatesEntity()
     {
         var (repo, factory) = CreateRepository();
-        var model = new TestModel { TestData = "original", TestDate = DateTime.UtcNow };
+        var model = new TestEntity { TestData = "original", TestDate = DateTime.UtcNow };
         await SeedAsync(factory, model);
 
         // Disconnected update
@@ -105,7 +105,7 @@ public sealed class BaseRepositoryTests
         await repo.UpdateAsync(model, CancellationToken.None);
 
         await using var ctx = await factory.CreateDbContextAsync();
-        var stored = await ctx.TestModel.SingleAsync();
+        var stored = await ctx.TestEntity.SingleAsync();
         Assert.AreEqual("updated", stored.TestData);
     }
 
@@ -113,8 +113,8 @@ public sealed class BaseRepositoryTests
     public async Task UpdateAsync_Range_UpdatesEntities()
     {
         var (repo, factory) = CreateRepository();
-        var m1 = new TestModel { TestData = "orig1", TestDate = DateTime.UtcNow };
-        var m2 = new TestModel { TestData = "orig2", TestDate = DateTime.UtcNow };
+        var m1 = new TestEntity { TestData = "orig1", TestDate = DateTime.UtcNow };
+        var m2 = new TestEntity { TestData = "orig2", TestDate = DateTime.UtcNow };
         await SeedAsync(factory, m1, m2);
 
         m1.TestData = "upd1";
@@ -122,7 +122,7 @@ public sealed class BaseRepositoryTests
         await repo.UpdateAsync(new[] { m1, m2 }, CancellationToken.None);
 
         await using var ctx = await factory.CreateDbContextAsync();
-        var stored = await ctx.TestModel.OrderBy(m => m.TestData).ToArrayAsync();
+        var stored = await ctx.TestEntity.OrderBy(m => m.TestData).ToArrayAsync();
         Assert.IsTrue(stored.Any(x => x.TestData == "upd1"));
         Assert.IsTrue(stored.Any(x => x.TestData == "upd2"));
     }
@@ -131,7 +131,7 @@ public sealed class BaseRepositoryTests
     public async Task UpdateAsync_BySingleQuery_UpdatesEntity()
     {
         var (repo, factory) = CreateRepository();
-        await SeedAsync(factory, new TestModel { TestData = "target", TestDate = DateTime.UtcNow });
+        await SeedAsync(factory, new TestEntity { TestData = "target", TestDate = DateTime.UtcNow });
 
         await repo.UpdateAsync(
             q => q.SingleAsync(m => m.TestData == "target"),
@@ -139,7 +139,7 @@ public sealed class BaseRepositoryTests
             CancellationToken.None);
 
         await using var ctx = await factory.CreateDbContextAsync();
-        var stored = await ctx.TestModel.SingleAsync();
+        var stored = await ctx.TestEntity.SingleAsync();
         Assert.AreEqual("hit", stored.TestData);
     }
 
@@ -148,9 +148,9 @@ public sealed class BaseRepositoryTests
     {
         var (repo, factory) = CreateRepository();
         await SeedAsync(factory,
-            new TestModel { TestData = "group", TestDate = DateTime.UtcNow },
-            new TestModel { TestData = "group", TestDate = DateTime.UtcNow },
-            new TestModel { TestData = "other", TestDate = DateTime.UtcNow });
+            new TestEntity { TestData = "group", TestDate = DateTime.UtcNow },
+            new TestEntity { TestData = "group", TestDate = DateTime.UtcNow },
+            new TestEntity { TestData = "other", TestDate = DateTime.UtcNow });
 
         await repo.UpdateAsync(
             q => q.Where(m => m.TestData == "group"),
@@ -158,7 +158,7 @@ public sealed class BaseRepositoryTests
             CancellationToken.None);
 
         await using var ctx = await factory.CreateDbContextAsync();
-        var count = await ctx.TestModel.CountAsync(m => m.TestData == "changed");
+        var count = await ctx.TestEntity.CountAsync(m => m.TestData == "changed");
         Assert.AreEqual(2, count);
     }
 
@@ -170,27 +170,27 @@ public sealed class BaseRepositoryTests
     public async Task DeleteAsync_SingleModel_RemovesEntity()
     {
         var (repo, factory) = CreateRepository();
-        var model = new TestModel { TestData = "delete-me", TestDate = DateTime.UtcNow };
+        var model = new TestEntity { TestData = "delete-me", TestDate = DateTime.UtcNow };
         await SeedAsync(factory, model);
 
         await repo.DeleteAsync(model, CancellationToken.None);
 
         await using var ctx = await factory.CreateDbContextAsync();
-        Assert.AreEqual(0, await ctx.TestModel.CountAsync());
+        Assert.AreEqual(0, await ctx.TestEntity.CountAsync());
     }
 
     [TestMethod]
     public async Task DeleteAsync_Range_RemovesEntities()
     {
         var (repo, factory) = CreateRepository();
-        var m1 = new TestModel { TestData = "del1", TestDate = DateTime.UtcNow };
-        var m2 = new TestModel { TestData = "del2", TestDate = DateTime.UtcNow };
+        var m1 = new TestEntity { TestData = "del1", TestDate = DateTime.UtcNow };
+        var m2 = new TestEntity { TestData = "del2", TestDate = DateTime.UtcNow };
         await SeedAsync(factory, m1, m2);
 
         await repo.DeleteAsync(new[] { m1, m2 }, CancellationToken.None);
 
         await using var ctx = await factory.CreateDbContextAsync();
-        Assert.AreEqual(0, await ctx.TestModel.CountAsync());
+        Assert.AreEqual(0, await ctx.TestEntity.CountAsync());
     }
 
     [TestMethod]
@@ -198,13 +198,13 @@ public sealed class BaseRepositoryTests
     {
         var (repo, factory) = CreateRepository();
         await SeedAsync(factory,
-            new TestModel { TestData = "remove", TestDate = DateTime.UtcNow },
-            new TestModel { TestData = "keep", TestDate = DateTime.UtcNow });
+            new TestEntity { TestData = "remove", TestDate = DateTime.UtcNow },
+            new TestEntity { TestData = "keep", TestDate = DateTime.UtcNow });
 
         await repo.DeleteAsync(q => q.Where(m => m.TestData == "remove"), CancellationToken.None);
 
         await using var ctx = await factory.CreateDbContextAsync();
-        var remaining = await ctx.TestModel.SingleAsync();
+        var remaining = await ctx.TestEntity.SingleAsync();
         Assert.AreEqual("keep", remaining.TestData);
     }
 
@@ -224,7 +224,7 @@ public sealed class BaseRepositoryTests
     public async Task ExecuteInTransaction_CallbackException_RollsBackChanges()
     {
         var (repo, factory) = CreateRepository();
-        var model = new TestModel { TestData = "should-rollback", TestDate = DateTime.UtcNow };
+        var model = new TestEntity { TestData = "should-rollback", TestDate = DateTime.UtcNow };
 
         await Assert.ThrowsAsync<InvalidOperationException>(async () =>
         {
@@ -236,7 +236,7 @@ public sealed class BaseRepositoryTests
         });
 
         await using var ctx = await factory.CreateDbContextAsync();
-        Assert.AreEqual(0, await ctx.TestModel.CountAsync(), "Entity should not be committed.");
+        Assert.AreEqual(0, await ctx.TestEntity.CountAsync(), "Entity should not be committed.");
     }
 
     [TestMethod]
@@ -247,24 +247,24 @@ public sealed class BaseRepositoryTests
         cts.Cancel();
 
         await Assert.ThrowsAsync<OperationCanceledException>(() =>
-            repo.CreateAsync(new TestModel(), cts.Token));
+            repo.CreateAsync(new TestEntity(), cts.Token));
     }
 
     #endregion
 
     #region Helpers
 
-    private static async Task SeedAsync(InMemoryContextFactory factory, params TestModel[] models)
+    private static async Task SeedAsync(InMemoryContextFactory factory, params TestEntity[] models)
     {
         await using var ctx = await factory.CreateDbContextAsync();
-        ctx.TestModel.AddRange(models);
+        ctx.TestEntity.AddRange(models);
         await ctx.SaveChangesAsync();
     }
 
-    private static (BaseRepository<TestModel> Repository, InMemoryContextFactory Factory) CreateRepository()
+    private static (BaseRepository<TestEntity> Repository, InMemoryContextFactory Factory) CreateRepository()
     {
         var factory = new InMemoryContextFactory();
-        var repo = new BaseRepository<TestModel>(factory, new TestModelKeyProvider());
+        var repo = new BaseRepository<TestEntity>(factory, new TestEntityKeyProvider());
         return (repo, factory);
     }
 

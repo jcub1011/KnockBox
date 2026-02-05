@@ -3,10 +3,10 @@ using Microsoft.EntityFrameworkCore;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
-namespace KnockBox.Data.Models.Testing
+namespace KnockBox.Data.Entities.Testing
 {
-    [Table(nameof(TestModel), Schema = DatabaseSchemas.Public)]
-    public record class TestModel
+    [Table(nameof(TestEntity), Schema = DatabaseSchemas.Public)]
+    public record class TestEntity
     {
         [Key]
         public int TestModalId { get; set; }
