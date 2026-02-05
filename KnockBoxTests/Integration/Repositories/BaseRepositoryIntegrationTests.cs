@@ -31,7 +31,6 @@ public sealed class BaseRepositoryIntegrationTests
         _repo = new BaseRepository<TestEntity>(_factory, new TestEntityKeyProvider());
 
         await using var ctx = await _factory.CreateDbContextAsync();
-        await ctx.Database.EnsureCreatedAsync();
         await TruncateTestEntityAsync(ctx);
     }
 
