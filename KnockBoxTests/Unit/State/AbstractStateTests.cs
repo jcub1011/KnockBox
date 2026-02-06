@@ -182,22 +182,157 @@ public sealed class AbstractStateTests
     }
 
     [TestMethod]
-    public async Task UpdatePropertiesAsync_WhenPropertyAlreadyUpdating_Throws()
+    public async Task UpdatePropertiesAsync_ConcurrentCallersShareInFlightUpdates()
     {
         using var state = new TestState();
-        var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var fooCount = 0;
+        var barCount = 0;
+        var zipCount = 0;
+        var barStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var barGate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        state.AddUpdater("A", async ct => await gate.Task.WaitAsync(ct));
+        state.AddUpdater("FOO", _ =>
+        {
+            Interlocked.Increment(ref fooCount);
+            return Task.CompletedTask;
+        });
 
-        var first = state.UpdatePropertiesAsync(default, "A");
-        await Task.Delay(20); // allow first call to lock the property
+        state.AddUpdater("BAR", async ct =>
+        {
+            Interlocked.Increment(ref barCount);
+            barStarted.TrySetResult();
+            await barGate.Task.WaitAsync(ct);
+        });
 
-        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => state.UpdatePropertiesAsync(default, "A"));
+        state.AddUpdater("ZIP", _ =>
+        {
+            Interlocked.Increment(ref zipCount);
+            return Task.CompletedTask;
+        });
 
-        gate.SetResult();
-        await first;
+        var callerA = state.UpdatePropertiesAsync(default, "FOO", "BAR");
+        await barStarted.Task;
 
-        StringAssert.Contains(ex.Message, "already being updated");
+        var callerB = state.UpdatePropertiesAsync(default, "BAR", "ZIP");
+
+        barGate.SetResult();
+        var results = await Task.WhenAll(callerA, callerB);
+
+        Assert.AreEqual(1, fooCount);
+        Assert.AreEqual(1, barCount);
+        Assert.AreEqual(1, zipCount);
+        Assert.IsTrue(results.SelectMany(r => r).All(r => r.Status == PropertyUpdateResult.Succeeded));
+    }
+
+    [TestMethod]
+    public async Task UpdatePropertiesAsync_ConcurrentCallersShareDependencyUpdates()
+    {
+        using var state = new TestState();
+        var fooCount = 0;
+        var zipCount = 0;
+        var fooStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var zipStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var fooGate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var zipGate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        state.AddUpdater("FOO", async ct =>
+        {
+            Interlocked.Increment(ref fooCount);
+            fooStarted.TrySetResult();
+            await fooGate.Task.WaitAsync(ct);
+        });
+
+        state.AddUpdater("ZIP", async ct =>
+        {
+            Interlocked.Increment(ref zipCount);
+            zipStarted.TrySetResult();
+            await zipGate.Task.WaitAsync(ct);
+        });
+
+        state.AddUpdater("BAR", _ => Task.CompletedTask, "ZIP");
+
+        var callerA = state.UpdatePropertiesAsync(default, "FOO", "BAR");
+        await Task.WhenAll(fooStarted.Task, zipStarted.Task);
+
+        var callerB = state.UpdatePropertiesAsync(default, "FOO", "ZIP");
+
+        fooGate.SetResult();
+        zipGate.SetResult();
+
+        await Task.WhenAll(callerA, callerB);
+
+        Assert.AreEqual(1, fooCount);
+        Assert.AreEqual(1, zipCount);
+    }
+
+    [TestMethod]
+    public async Task UpdatePropertiesAsync_ConcurrentCallersShareTransitiveDependencies()
+    {
+        using var state = new TestState();
+        var zagCount = 0;
+        var zagStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var zagGate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        state.AddUpdater("FOO", _ => Task.CompletedTask);
+        state.AddUpdater("ZIG", _ => Task.CompletedTask);
+
+        state.AddUpdater("ZAG", async ct =>
+        {
+            Interlocked.Increment(ref zagCount);
+            zagStarted.TrySetResult();
+            await zagGate.Task.WaitAsync(ct);
+        });
+
+        state.AddUpdater("BAR", _ => Task.CompletedTask, "ZAG");
+        state.AddUpdater("ZOP", _ => Task.CompletedTask, "ZAG");
+
+        var callerA = state.UpdatePropertiesAsync(default, "FOO", "BAR");
+        await zagStarted.Task;
+
+        var callerB = state.UpdatePropertiesAsync(default, "ZIG", "ZOP");
+
+        zagGate.SetResult();
+        await Task.WhenAll(callerA, callerB);
+
+        Assert.AreEqual(1, zagCount);
+    }
+
+    [TestMethod]
+    public async Task UpdatePropertiesAsync_CancelOneCaller_DoesNotCancelSharedUpdate()
+    {
+        using var state = new TestState();
+        var fooCount = 0;
+        var fooStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var fooGate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        state.AddUpdater("FOO", async ct =>
+        {
+            Interlocked.Increment(ref fooCount);
+            fooStarted.TrySetResult();
+            await fooGate.Task.WaitAsync(ct);
+        });
+
+        using var ctsA = new CancellationTokenSource();
+        using var ctsB = new CancellationTokenSource();
+
+        // Start B first so it's definitely registered.
+        var callerB = state.UpdatePropertiesAsync(ctsB.Token, "FOO");
+        await fooStarted.Task;
+
+        var callerA = state.UpdatePropertiesAsync(ctsA.Token, "FOO");
+        ctsA.Cancel();
+
+        fooGate.SetResult();
+
+        var results = await Task.WhenAll(callerA, callerB);
+
+        var aResult = results[0].Single(r => r.PropertyName == "FOO");
+        var bResult = results[1].Single(r => r.PropertyName == "FOO");
+
+        Assert.AreEqual(1, fooCount);
+        Assert.AreEqual(PropertyUpdateResult.Canceled, aResult.Status);
+        Assert.AreEqual(PropertyUpdateResult.Succeeded, bResult.Status);
+        Assert.AreEqual(PropertyState.Ready, state.GetPropertyState("FOO"));
     }
 
     private static void UpdateMax(ref int target, int value)

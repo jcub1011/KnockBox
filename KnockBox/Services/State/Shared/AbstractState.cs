@@ -10,14 +10,49 @@ namespace KnockBox.Services.State.Shared
 
         private sealed record class Registration(string PropertyName, Func<CancellationToken, Task> UpdateAction, string[]? Dependencies);
 
+        private sealed class SharedUpdate : IDisposable
+        {
+            private readonly CancellationTokenSource _executionCts = new();
+            private int _waiterCount;
+            private int _canceledWaiterCount;
+
+            public SharedUpdate(Func<CancellationToken, Task<UpdateResult>> factory)
+            {
+                Task = factory(_executionCts.Token);
+            }
+
+            public Task<UpdateResult> Task { get; }
+
+            public CancellationTokenRegistration RegisterWaiter(CancellationToken callerToken)
+            {
+                Interlocked.Increment(ref _waiterCount);
+
+                if (!callerToken.CanBeCanceled) return default;
+
+                return callerToken.Register(() =>
+                {
+                    if (Task.IsCompleted) return;
+
+                    var canceled = Interlocked.Increment(ref _canceledWaiterCount);
+                    var waiters = Volatile.Read(ref _waiterCount);
+
+                    if (canceled >= waiters)
+                    {
+                        _executionCts.Cancel();
+                    }
+                });
+            }
+
+            public void Dispose() => _executionCts.Dispose();
+        }
+
         #endregion
 
         #region Properties, Fields, and Events
 
         private readonly ConcurrentDictionary<string, Registration> _registrations = new(StringComparer.Ordinal);
         private readonly ConcurrentDictionary<string, PropertyState> _states = new(StringComparer.Ordinal);
-        private readonly HashSet<string> _lockedProperties = new(StringComparer.Ordinal);
-        private readonly Lock _lockGate = new();
+        private readonly ConcurrentDictionary<string, SharedUpdate> _inflightUpdates = new(StringComparer.Ordinal);
         private bool _disposed;
 
         public event IState<TSelf>.PropertyStateChangedDelegate? PropertyStateChanged;
@@ -50,107 +85,34 @@ namespace KnockBox.Services.State.Shared
 
             using var concurrencySemaphore = new SemaphoreSlim(maxParallelUpdates, maxParallelUpdates);
             var plan = BuildPlan(propertiesToUpdate);
-            var planSet = plan.ToHashSet(StringComparer.Ordinal);
-            LockProperties(planSet);
 
-            try
-            {
-                var tasks = new ConcurrentDictionary<string, Task<UpdateResult>>(StringComparer.Ordinal);
+            var tasks = new ConcurrentDictionary<string, Task<UpdateResult>>(StringComparer.Ordinal);
 
-                Task<UpdateResult> GetTask(string property) =>
-                    tasks.GetOrAdd(property, async p =>
+            Task<UpdateResult> GetTask(string property) =>
+                tasks.GetOrAdd(property, async p =>
+                {
+                    var shared = GetOrCreateSharedUpdate(p, concurrencySemaphore);
+                    using var registration = shared.RegisterWaiter(ct);
+
+                    try
                     {
-                        try
-                        {
-                            ct.ThrowIfCancellationRequested();
+                        return await shared.Task.WaitAsync(ct).ConfigureAwait(false);
+                    }
+                    catch (OperationCanceledException) when (ct.IsCancellationRequested)
+                    {
+                        return new UpdateResult(p, new OperationCanceledException(ct), PropertyUpdateResult.Canceled);
+                    }
+                });
 
-                            if (!_registrations.TryGetValue(p, out var reg))
-                            {
-                                SetPropertyStatus(p, PropertyState.Errored);
-                                return new UpdateResult(p, new InvalidOperationException($"No updater registered for property '{p}'."));
-                            }
+            // Kick off updates for requested roots, but return results for whole plan
+            var rootTasks = propertiesToUpdate.Distinct(StringComparer.Ordinal).Select(GetTask).ToArray();
+            await Task.WhenAll(rootTasks).ConfigureAwait(false);
 
-                            // 1) Await dependencies and capture their results
-                            var deps = reg.Dependencies ?? [];
-                            var depProps = deps.Where(planSet.Contains).Distinct(StringComparer.Ordinal).ToArray();
-
-                            if (depProps.Length > 0)
-                            {
-                                var depTasks = depProps.Select(GetTask).ToArray();
-                                var depResults = await Task.WhenAll(depTasks).ConfigureAwait(false);
-
-                                // 2) Propagate cancellation/errors from dependencies (and skip running this updater)
-                                // Cancellation wins over error (common policy).
-                                var depFailures = depResults.Where(r => r.Status != PropertyUpdateResult.Succeeded).ToArray();
-                                if (depFailures.Length > 0)
-                                {
-                                    PropertyUpdateResult status = depFailures.Any(r => r.Status == PropertyUpdateResult.Canceled) 
-                                        ? PropertyUpdateResult.Canceled 
-                                        : PropertyUpdateResult.Errored;
-
-                                    if (status == PropertyUpdateResult.Canceled)
-                                    {
-                                        SetPropertyStatus(p, PropertyState.Canceled);
-                                    }
-                                    else
-                                    {
-                                        SetPropertyStatus(p, PropertyState.Errored);
-                                    }
-
-                                    var exception = new AggregateException(
-                                        $"Update skipped because dependencies failed: [{string.Join(", ", depFailures.Select(r => $"{r.PropertyName} - {r.Status}"))}]", 
-                                        depFailures.Select(r => r.Exception));
-                                    return new UpdateResult(p, exception, status);
-                                }
-                            }
-
-                            // 3) Dependencies are good; now run this updater with concurrency limiting
-                            await concurrencySemaphore.WaitAsync(ct).ConfigureAwait(false);
-                            try
-                            {
-                                SetPropertyStatus(p, PropertyState.Updating);
-                                await reg.UpdateAction(ct).ConfigureAwait(false);
-                                SetPropertyStatus(p, PropertyState.Ready);
-                                return new UpdateResult(p);
-                            }
-                            finally
-                            {
-                                concurrencySemaphore.Release();
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            PropertyUpdateResult status;
-
-                            if (!ex.TryGetCancellationException(out _))
-                            {
-                                status = PropertyUpdateResult.Errored;
-                                SetPropertyStatus(p, PropertyState.Errored);
-                            }
-                            else
-                            {
-                                status = PropertyUpdateResult.Canceled;
-                                SetPropertyStatus(p, PropertyState.Canceled);
-                            }
-
-                            return new UpdateResult(p, ex, status);
-                        }
-                    });
-
-                // Kick off updates for requested roots, but return results for whole plan
-                var rootTasks = propertiesToUpdate.Distinct(StringComparer.Ordinal).Select(GetTask).ToArray();
-                await Task.WhenAll(rootTasks).ConfigureAwait(false);
-
-                // Collect results in a stable order (topological plan order)
-                var results = new List<UpdateResult>(plan.Count);
-                foreach (var p in plan)
-                    results.Add(await GetTask(p).ConfigureAwait(false));
-                return results;
-            }
-            finally
-            {
-                ReleaseProperties(planSet);
-            }
+            // Collect results in a stable order (topological plan order)
+            var results = new List<UpdateResult>(plan.Count);
+            foreach (var p in plan)
+                results.Add(await GetTask(p).ConfigureAwait(false));
+            return results;
         }
 
         /// <summary>
@@ -197,6 +159,111 @@ namespace KnockBox.Services.State.Shared
         }
 
         #region Helper Methods
+
+        private SharedUpdate GetOrCreateSharedUpdate(string propertyName, SemaphoreSlim concurrencySemaphore)
+        {
+            while (true)
+            {
+                if (_inflightUpdates.TryGetValue(propertyName, out var existing))
+                {
+                    if (!existing.Task.IsCompleted) return existing;
+
+                    _inflightUpdates.TryRemove(propertyName, out _);
+                    continue;
+                }
+
+                var created = new SharedUpdate(ct => RunUpdateAsync(propertyName, concurrencySemaphore, ct));
+
+                if (_inflightUpdates.TryAdd(propertyName, created))
+                {
+                    _ = created.Task.ContinueWith(_ =>
+                    {
+                        _inflightUpdates.TryRemove(propertyName, out var _);
+                        created.Dispose();
+                    }, TaskScheduler.Default);
+
+                    return created;
+                }
+            }
+        }
+
+        private async Task<UpdateResult> RunUpdateAsync(
+            string propertyName,
+            SemaphoreSlim concurrencySemaphore,
+            CancellationToken ct)
+        {
+            try
+            {
+                if (!_registrations.TryGetValue(propertyName, out var reg))
+                {
+                    SetPropertyStatus(propertyName, PropertyState.Errored);
+                    return new UpdateResult(propertyName, new InvalidOperationException($"No updater registered for property '{propertyName}'."));
+                }
+
+                // 1) Await dependencies and capture their results
+                var deps = reg.Dependencies ?? [];
+                if (deps.Length > 0)
+                {
+                    var depTasks = deps.Select(dep => GetOrCreateSharedUpdate(dep, concurrencySemaphore).Task).ToArray();
+                    var depResults = await Task.WhenAll(depTasks).ConfigureAwait(false);
+
+                    // 2) Propagate cancellation/errors from dependencies (and skip running this updater)
+                    // Cancellation wins over error (common policy).
+                    var depFailures = depResults.Where(r => r.Status != PropertyUpdateResult.Succeeded).ToArray();
+                    if (depFailures.Length > 0)
+                    {
+                        PropertyUpdateResult status = depFailures.Any(r => r.Status == PropertyUpdateResult.Canceled)
+                            ? PropertyUpdateResult.Canceled
+                            : PropertyUpdateResult.Errored;
+
+                        if (status == PropertyUpdateResult.Canceled)
+                        {
+                            SetPropertyStatus(propertyName, PropertyState.Canceled);
+                        }
+                        else
+                        {
+                            SetPropertyStatus(propertyName, PropertyState.Errored);
+                        }
+
+                        var exception = new AggregateException(
+                            $"Update skipped because dependencies failed: [{string.Join(", ", depFailures.Select(r => $"{r.PropertyName} - {r.Status}"))}]",
+                            depFailures.Select(r => r.Exception));
+                        return new UpdateResult(propertyName, exception, status);
+                    }
+                }
+
+                // 3) Dependencies are good; now run this updater with concurrency limiting
+                await concurrencySemaphore.WaitAsync(ct).ConfigureAwait(false);
+                try
+                {
+                    SetPropertyStatus(propertyName, PropertyState.Updating);
+                    await reg.UpdateAction(ct).ConfigureAwait(false);
+                    SetPropertyStatus(propertyName, PropertyState.Ready);
+                    return new UpdateResult(propertyName);
+                }
+                finally
+                {
+                    concurrencySemaphore.Release();
+                }
+            }
+            catch (Exception ex)
+            {
+                PropertyUpdateResult status;
+
+                if (!ex.TryGetCancellationException(out _))
+                {
+                    status = PropertyUpdateResult.Errored;
+                    SetPropertyStatus(propertyName, PropertyState.Errored);
+                }
+                else
+                {
+                    status = PropertyUpdateResult.Canceled;
+                    SetPropertyStatus(propertyName, PropertyState.Canceled);
+                }
+
+                return new UpdateResult(propertyName, ex, status);
+            }
+        }
 
         private List<string> BuildPlan(IEnumerable<string> roots)
         {
@@ -263,40 +330,6 @@ namespace KnockBox.Services.State.Shared
             if (changed) PropertyStateChanged?.Invoke(this, new(propertyName, newState));
         }
 
-        /// <summary>
-        /// Attempts to lock the properties, throwing an exception if any of the properties are already locked.
-        /// </summary>
-        /// <param name="propertyNames"></param>
-        private void LockProperties(IEnumerable<string> propertyNames)
-        {
-            using (_lockGate.EnterScope())
-            {
-                List<string> lockedProperties = [.. propertyNames.Where(_lockedProperties.Contains)];
-                if (lockedProperties.Count > 0)
-                    throw new InvalidOperationException($"Unable to update properties [{string.Join(", ", lockedProperties)}] as they are already being updated.");
-
-                foreach (var property in propertyNames)
-                {
-                    _lockedProperties.Add(property);
-                }
-            }
-        }
-
-        /// <summary>
-        /// Releases the lock on the properties.
-        /// </summary>
-        /// <param name="propertyNames"></param>
-        private void ReleaseProperties(IEnumerable<string> propertyNames)
-        {
-            using (_lockGate.EnterScope())
-            {
-                foreach (var property in propertyNames)
-                {
-                    _lockedProperties.Remove(property);
-                }
-            }
-        }
-
         #endregion
 
         #region Disposal
@@ -305,9 +338,12 @@ namespace KnockBox.Services.State.Shared
         {
             if (_disposed) return;
 
+            foreach (var update in _inflightUpdates.Values)
+                update.Dispose();
+
+            _inflightUpdates.Clear();
             _registrations.Clear();
             _states.Clear();
-            _lockedProperties.Clear();
 
             _disposed = true;
             GC.SuppressFinalize(this);
