@@ -91,7 +91,7 @@ namespace KnockBox.Services.State.Shared
             Task<UpdateResult> GetTask(string property) =>
                 tasks.GetOrAdd(property, async p =>
                 {
-                    var shared = GetOrCreateSharedUpdate(p, concurrencySemaphore);
+                    var shared = GetOrCreateSharedUpdate(p, concurrencySemaphore, GetTask);
                     using var registration = shared.RegisterWaiter(ct);
 
                     try
@@ -164,7 +164,10 @@ namespace KnockBox.Services.State.Shared
 
         #region Helper Methods
 
-        private SharedUpdate GetOrCreateSharedUpdate(string propertyName, SemaphoreSlim concurrencySemaphore)
+        private SharedUpdate GetOrCreateSharedUpdate(
+            string propertyName,
+            SemaphoreSlim concurrencySemaphore,
+            Func<string, Task<UpdateResult>> dependencyResolver)
         {
             while (true)
             {
@@ -176,7 +179,7 @@ namespace KnockBox.Services.State.Shared
                     continue;
                 }
 
-                var created = new SharedUpdate(ct => RunUpdateAsync(propertyName, concurrencySemaphore, ct));
+                var created = new SharedUpdate(ct => RunUpdateAsync(propertyName, concurrencySemaphore, ct, dependencyResolver));
 
                 if (_inflightUpdates.TryAdd(propertyName, created))
                 {
@@ -194,7 +197,8 @@ namespace KnockBox.Services.State.Shared
         private async Task<UpdateResult> RunUpdateAsync(
             string propertyName,
             SemaphoreSlim concurrencySemaphore,
-            CancellationToken ct)
+            CancellationToken ct,
+            Func<string, Task<UpdateResult>> dependencyResolver)
         {
             try
             {
@@ -208,7 +212,7 @@ namespace KnockBox.Services.State.Shared
                 var deps = reg.Dependencies ?? [];
                 if (deps.Length > 0)
                 {
-                    var depTasks = deps.Select(dep => GetOrCreateSharedUpdate(dep, concurrencySemaphore).Task).ToArray();
+                    var depTasks = deps.Select(dependencyResolver).ToArray();
                     var depResults = await Task.WhenAll(depTasks).ConfigureAwait(false);
 
                     // 2) Propagate cancellation/errors from dependencies (and skip running this updater)
