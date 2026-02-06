@@ -46,7 +46,7 @@ public sealed class AbstractStateTests
         var result = results.Single(r => r.PropertyName == "A");
         Assert.AreEqual(PropertyUpdateResult.Succeeded, result.Status);
         Assert.AreEqual(PropertyState.Ready, state.GetPropertyState("A"));
-        Assert.IsTrue(state.Changes.Any(c => c.PropertyName == "A" && c.State == PropertyState.Ready));
+        Assert.Contains(c => c.PropertyName == "A" && c.State == PropertyState.Ready, state.Changes);
     }
 
     [TestMethod]
@@ -151,6 +151,119 @@ public sealed class AbstractStateTests
     }
 
     [TestMethod]
+    public async Task UpdatePropertiesAsync_NoProperties_ReturnsEmpty()
+    {
+        using var state = new TestState();
+        state.AddUpdater("A", _ => Task.CompletedTask);
+
+        var empty = await state.UpdatePropertiesAsync(default);
+        var nullProps = await state.UpdatePropertiesAsync(default, null!);
+
+        Assert.IsEmpty(empty);
+        Assert.IsEmpty(nullProps);
+    }
+
+    [TestMethod]
+    public async Task UpdatePropertiesAsync_PreCanceledToken_Throws()
+    {
+        using var state = new TestState();
+        state.AddUpdater("A", _ => Task.CompletedTask);
+
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() => state.UpdatePropertiesAsync(cts.Token, "A"));
+    }
+
+    [TestMethod]
+    public async Task UpdatePropertiesAsync_InvalidMaxParallelUpdates_Throws()
+    {
+        using var state = new TestState();
+        state.AddUpdater("A", _ => Task.CompletedTask);
+
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
+            state.UpdatePropertiesAsync(0, CancellationToken.None, "A"));
+    }
+
+    [TestMethod]
+    public async Task UpdatePropertiesAsync_DuplicateProperties_RunOnce()
+    {
+        using var state = new TestState();
+        var callCount = 0;
+
+        state.AddUpdater("A", _ =>
+        {
+            Interlocked.Increment(ref callCount);
+            return Task.CompletedTask;
+        });
+
+        var results = await state.UpdatePropertiesAsync(default, "A", "A", "A");
+
+        Assert.AreEqual(1, callCount);
+        Assert.ContainsSingle(r => r.PropertyName == "A", results);
+    }
+
+    [TestMethod]
+    public async Task UpdatePropertiesAsync_SharedDependency_SingleCall_RunsOnce()
+    {
+        using var state = new TestState();
+        var depCount = 0;
+        var aCount = 0;
+        var bCount = 0;
+
+        state.AddUpdater("DEP", _ =>
+        {
+            Interlocked.Increment(ref depCount);
+            return Task.CompletedTask;
+        });
+
+        state.AddUpdater("A", _ =>
+        {
+            Interlocked.Increment(ref aCount);
+            return Task.CompletedTask;
+        }, "DEP");
+
+        state.AddUpdater("B", _ =>
+        {
+            Interlocked.Increment(ref bCount);
+            return Task.CompletedTask;
+        }, "DEP");
+
+        var results = await state.UpdatePropertiesAsync(default, "A", "B");
+
+        Assert.AreEqual(1, depCount);
+        Assert.AreEqual(1, aCount);
+        Assert.AreEqual(1, bCount);
+        Assert.IsTrue(results.All(r => r.Status == PropertyUpdateResult.Succeeded));
+    }
+
+    [TestMethod]
+    public async Task UpdatePropertiesAsync_ErrorRaisesStateChangedEvent()
+    {
+        using var state = new TestState();
+        state.AddUpdater("A", _ => throw new InvalidOperationException("boom"));
+
+        var results = await state.UpdatePropertiesAsync(default, "A");
+        var result = results.Single(r => r.PropertyName == "A");
+
+        Assert.AreEqual(PropertyUpdateResult.Errored, result.Status);
+        Assert.Contains(c => c.PropertyName == "A" && c.State == PropertyState.Errored, state.Changes);
+    }
+
+    [TestMethod]
+    public async Task UpdatePropertiesAsync_CancelRaisesStateChangedEvent()
+    {
+        using var state = new TestState();
+        state.AddUpdater("A", _ => throw new OperationCanceledException());
+
+        var results = await state.UpdatePropertiesAsync(default, "A");
+        var result = results.Single(r => r.PropertyName == "A");
+
+        Assert.AreEqual(PropertyUpdateResult.Canceled, result.Status);
+        Assert.Contains(c => c.PropertyName == "A" && c.State == PropertyState.Canceled, state.Changes);
+    }
+
+    [TestMethod]
     public async Task UpdatePropertiesAsync_MissingUpdater_ThrowsArgumentException()
     {
         using var state = new TestState();
@@ -158,6 +271,23 @@ public sealed class AbstractStateTests
         var ex = await Assert.ThrowsAsync<ArgumentException>(() => state.UpdatePropertiesAsync(default, "Unknown"));
 
         Assert.Contains("No updaters for properties", ex.Message);
+    }
+
+    [TestMethod]
+    public void RegisterUpdater_InvalidName_Throws()
+    {
+        using var state = new TestState();
+
+        Assert.Throws<ArgumentException>(() => state.AddUpdater("", _ => Task.CompletedTask));
+        Assert.Throws<ArgumentException>(() => state.AddUpdater("   ", _ => Task.CompletedTask));
+    }
+
+    [TestMethod]
+    public void RegisterUpdater_NullUpdater_Throws()
+    {
+        using var state = new TestState();
+
+        Assert.Throws<ArgumentNullException>(() => state.AddUpdater("A", null!));
     }
 
     [TestMethod]
@@ -418,9 +548,9 @@ public sealed class AbstractStateTests
 
         var agg = dict["Leaf"].Exception as AggregateException;
         Assert.IsNotNull(agg);
-        Assert.AreEqual(2, agg!.InnerExceptions.Count);
-        Assert.IsTrue(agg.InnerExceptions.Any(e => e.Message.Contains("A failed", StringComparison.Ordinal)));
-        Assert.IsTrue(agg.InnerExceptions.Any(e => e.Message.Contains("B failed", StringComparison.Ordinal)));
+        Assert.HasCount(2, agg!.InnerExceptions);
+        Assert.Contains(e => e.Message.Contains("A failed", StringComparison.Ordinal), agg.InnerExceptions);
+        Assert.Contains(e => e.Message.Contains("B failed", StringComparison.Ordinal), agg.InnerExceptions);
     }
 
     private static void UpdateMax(ref int target, int value)
