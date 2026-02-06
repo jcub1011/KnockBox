@@ -213,6 +213,23 @@
         /// <returns></returns>
         Task<TReturn> ExecuteInTransaction<TReturn>(Func<IRepositoryOperation, Task<TReturn>> action, CancellationToken ct);
 
+        /// <summary>
+        /// Executes the action within a single operation.
+        /// </summary>
+        /// <param name="action"></param>
+        /// <param name="ct"></param>
+        /// <returns></returns>
+        Task ExecuteInContext(Func<IRepositoryOperation, Task> action, CancellationToken ct);
+
+        /// <summary>
+        /// Executes the transaction within a single operation.
+        /// </summary>
+        /// <typeparam name="TReturn"></typeparam>
+        /// <param name="action"></param>
+        /// <param name="ct"></param>
+        /// <returns></returns>
+        Task<TReturn> ExecuteInContext<TReturn>(Func<IRepositoryOperation, Task<TReturn>> action, CancellationToken ct);
+
         #endregion
     }
 }

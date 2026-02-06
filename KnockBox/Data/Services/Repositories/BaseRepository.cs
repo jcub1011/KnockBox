@@ -272,11 +272,7 @@ namespace KnockBox.Data.Services.Repositories
             }
         }
 
-        #endregion
-
-        #region Helper Methods
-
-        protected virtual async Task ExecuteInContext(Func<IRepositoryOperation, Task> action, CancellationToken ct)
+        public async Task ExecuteInContext(Func<IRepositoryOperation, Task> action, CancellationToken ct)
         {
             try
             {
@@ -291,7 +287,7 @@ namespace KnockBox.Data.Services.Repositories
             }
         }
 
-        protected virtual async Task<TReturn> ExecuteInContext<TReturn>(Func<IRepositoryOperation, Task<TReturn>> action, CancellationToken ct)
+        public async Task<TReturn> ExecuteInContext<TReturn>(Func<IRepositoryOperation, Task<TReturn>> action, CancellationToken ct)
         {
             try
             {
@@ -307,6 +303,10 @@ namespace KnockBox.Data.Services.Repositories
                 else throw;
             }
         }
+
+        #endregion
+
+        #region Helper Methods
 
         protected virtual async Task<IRepositoryOperation> GetRepositoryContextAsync(CancellationToken ct)
         {
