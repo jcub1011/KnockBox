@@ -1,5 +1,6 @@
 ﻿using KnockBox.Extensions;
 using System.Collections.Concurrent;
+using System.Threading;
 
 namespace KnockBox.Services.State.Shared
 {
@@ -139,25 +140,28 @@ namespace KnockBox.Services.State.Shared
             using var concurrencySemaphore = new SemaphoreSlim(maxParallelUpdates, maxParallelUpdates);
             var plan = BuildPlan(propertiesToUpdate);
 
-            var tasks = new ConcurrentDictionary<string, Task<UpdateResult>>(StringComparer.Ordinal);
+            var tasks = new ConcurrentDictionary<string, Lazy<Task<UpdateResult>>>(StringComparer.Ordinal);
             var sharedTasks = new ConcurrentDictionary<string, Task<UpdateResult>>(StringComparer.Ordinal);
 
-            Task<UpdateResult> GetTask(string property) =>
-                tasks.GetOrAdd(property, async p =>
-                {
-                    var shared = GetOrCreateSharedUpdate(p, concurrencySemaphore, GetTask);
-                    _ = sharedTasks.TryAdd(p, shared.Task);
-                    using var waiter = shared.RegisterWaiter(ct);
+            async Task<UpdateResult> CreateTask(string p)
+            {
+                var shared = GetOrCreateSharedUpdate(p, concurrencySemaphore, GetTask);
+                _ = sharedTasks.TryAdd(p, shared.Task);
+                using var waiter = shared.RegisterWaiter(ct);
 
-                    try
-                    {
-                        return await shared.Task.WaitAsync(ct).ConfigureAwait(false);
-                    }
-                    catch (OperationCanceledException) when (ct.IsCancellationRequested)
-                    {
-                        return new UpdateResult(p, new OperationCanceledException(ct), PropertyUpdateResult.Canceled);
-                    }
-                });
+                try
+                {
+                    return await shared.Task.WaitAsync(ct).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException) when (ct.IsCancellationRequested)
+                {
+                    return new UpdateResult(p, new OperationCanceledException(ct), PropertyUpdateResult.Canceled);
+                }
+            }
+
+            Task<UpdateResult> GetTask(string property) =>
+                tasks.GetOrAdd(property, p =>
+                    new Lazy<Task<UpdateResult>>(() => CreateTask(p), LazyThreadSafetyMode.ExecutionAndPublication)).Value;
 
             // Ensure every property in the plan is cached so dependencies aren't re-run later.
             foreach (var p in plan)
