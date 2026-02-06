@@ -104,6 +104,10 @@ namespace KnockBox.Services.State.Shared
                     }
                 });
 
+            // Ensure every property in the plan is cached so dependencies aren't re-run later.
+            foreach (var p in plan)
+                _ = GetTask(p);
+
             // Kick off updates for requested roots, but return results for whole plan
             var rootTasks = propertiesToUpdate.Distinct(StringComparer.Ordinal).Select(GetTask).ToArray();
             await Task.WhenAll(rootTasks).ConfigureAwait(false);
