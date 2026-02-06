@@ -38,9 +38,6 @@
 
   <ItemGroup>
     <Folder Include="Data\Models\" />
-    <Folder Include="Games\SplitTheDeck\Components\Shared\" />
-    <Folder Include="Games\SplitTheDeck\Data\Models\" />
-    <Folder Include="Games\SplitTheDeck\Data\Services\" />
   </ItemGroup>
 
 </Project>
