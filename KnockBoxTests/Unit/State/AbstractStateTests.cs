@@ -335,6 +335,82 @@ public sealed class AbstractStateTests
         Assert.AreEqual(PropertyState.Ready, state.GetPropertyState("FOO"));
     }
 
+    [TestMethod]
+    public async Task UpdatePropertiesAsync_AllCallersCancel_CancelsSharedUpdate()
+    {
+        using var state = new TestState();
+        var fooStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        state.AddUpdater("FOO", async ct =>
+        {
+            fooStarted.TrySetResult();
+            await Task.Delay(Timeout.InfiniteTimeSpan, ct);
+        });
+
+        using var ctsA = new CancellationTokenSource();
+        using var ctsB = new CancellationTokenSource();
+
+        var callerA = state.UpdatePropertiesAsync(ctsA.Token, "FOO");
+        await fooStarted.Task;
+
+        var callerB = state.UpdatePropertiesAsync(ctsB.Token, "FOO");
+
+        ctsA.Cancel();
+        ctsB.Cancel();
+
+        var results = await Task.WhenAll(callerA, callerB);
+
+        var aResult = results[0].Single(r => r.PropertyName == "FOO");
+        var bResult = results[1].Single(r => r.PropertyName == "FOO");
+
+        Assert.AreEqual(PropertyUpdateResult.Canceled, aResult.Status);
+        Assert.AreEqual(PropertyUpdateResult.Canceled, bResult.Status);
+        Assert.AreEqual(PropertyState.Canceled, state.GetPropertyState("FOO"));
+    }
+
+    [TestMethod]
+    public async Task UpdatePropertiesAsync_SequentialCalls_UseFreshUpdates()
+    {
+        using var state = new TestState();
+        var callCount = 0;
+
+        state.AddUpdater("FOO", _ =>
+        {
+            Interlocked.Increment(ref callCount);
+            return Task.CompletedTask;
+        });
+
+        var first = await state.UpdatePropertiesAsync(default, "FOO");
+        var second = await state.UpdatePropertiesAsync(default, "FOO");
+
+        Assert.AreEqual(2, callCount);
+        Assert.IsTrue(first.All(r => r.Status == PropertyUpdateResult.Succeeded));
+        Assert.IsTrue(second.All(r => r.Status == PropertyUpdateResult.Succeeded));
+    }
+
+    [TestMethod]
+    public async Task UpdatePropertiesAsync_MultipleDependenciesFail_AggregatesExceptions()
+    {
+        using var state = new TestState();
+
+        state.AddUpdater("A", _ => throw new InvalidOperationException("A failed"));
+        state.AddUpdater("B", _ => throw new InvalidOperationException("B failed"));
+        state.AddUpdater("Leaf", _ => Task.CompletedTask, "A", "B");
+
+        var results = await state.UpdatePropertiesAsync(default, "Leaf");
+        var dict = results.ToDictionary(r => r.PropertyName);
+
+        Assert.AreEqual(PropertyUpdateResult.Errored, dict["A"].Status);
+        Assert.AreEqual(PropertyUpdateResult.Errored, dict["B"].Status);
+        Assert.AreEqual(PropertyUpdateResult.Errored, dict["Leaf"].Status);
+
+        var agg = dict["Leaf"].Exception as AggregateException;
+        Assert.IsNotNull(agg);
+        Assert.AreEqual(2, agg!.InnerExceptions.Count);
+        Assert.IsTrue(agg.InnerExceptions.Any(e => e.Message.Contains("A failed", StringComparison.Ordinal)));
+        Assert.IsTrue(agg.InnerExceptions.Any(e => e.Message.Contains("B failed", StringComparison.Ordinal)));
+    }
+
     private static void UpdateMax(ref int target, int value)
     {
         int current;
