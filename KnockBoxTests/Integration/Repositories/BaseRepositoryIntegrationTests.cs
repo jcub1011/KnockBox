@@ -97,6 +97,45 @@ public sealed class BaseRepositoryIntegrationTests
         Assert.AreEqual(0, await ctx.TestEntity.CountAsync());
     }
 
+    [TestMethod]
+    public async Task ExecuteInContext_PersistsChanges()
+    {
+        var model = new TestEntity { TestData = "inte-context", TestDate = DateTime.UtcNow };
+
+        await _repo.ExecuteInContext(async op =>
+        {
+            await _repo.CreateAsync(op, model, CancellationToken.None);
+        }, CancellationToken.None);
+
+        await using var ctx = await _factory.CreateDbContextAsync();
+        Assert.AreEqual(1, await ctx.TestEntity.CountAsync());
+    }
+
+    [TestMethod]
+    public async Task ExecuteInContext_ReturnsValue()
+    {
+        var result = await _repo.ExecuteInContext(op => Task.FromResult(42), CancellationToken.None);
+        Assert.AreEqual(42, result);
+    }
+
+    [TestMethod]
+    public async Task ExecuteInContext_Exception_DoesNotPersistChanges()
+    {
+        var model = new TestEntity { TestData = "inte-context-fail", TestDate = DateTime.UtcNow };
+
+        await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+        {
+            await _repo.ExecuteInContext(async op =>
+            {
+                await _repo.CreateAsync(op, model, CancellationToken.None);
+                throw new InvalidOperationException("boom");
+            }, CancellationToken.None);
+        });
+
+        await using var ctx = await _factory.CreateDbContextAsync();
+        Assert.AreEqual(0, await ctx.TestEntity.CountAsync());
+    }
+
     private static string? ResolveConnectionString()
     {
         var config = new ConfigurationBuilder()
