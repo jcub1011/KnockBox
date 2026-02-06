@@ -1,6 +1,5 @@
 ﻿using KnockBox.Extensions;
 using System.Collections.Concurrent;
-using System.Threading;
 
 namespace KnockBox.Services.State.Shared
 {
