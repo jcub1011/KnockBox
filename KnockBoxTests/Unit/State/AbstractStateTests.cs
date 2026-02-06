@@ -340,11 +340,20 @@ public sealed class AbstractStateTests
     {
         using var state = new TestState();
         var fooStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var fooCanceled = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
         state.AddUpdater("FOO", async ct =>
         {
             fooStarted.TrySetResult();
-            await Task.Delay(Timeout.InfiniteTimeSpan, ct);
+            try
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan, ct);
+            }
+            finally
+            {
+                if (ct.IsCancellationRequested)
+                    fooCanceled.TrySetResult();
+            }
         });
 
         using var ctsA = new CancellationTokenSource();
@@ -359,6 +368,9 @@ public sealed class AbstractStateTests
         ctsB.Cancel();
 
         var results = await Task.WhenAll(callerA, callerB);
+
+        var completed = await Task.WhenAny(fooCanceled.Task, Task.Delay(TimeSpan.FromSeconds(2)));
+        Assert.AreSame(fooCanceled.Task, completed, "Expected shared update to observe cancellation.");
 
         var aResult = results[0].Single(r => r.PropertyName == "FOO");
         var bResult = results[1].Single(r => r.PropertyName == "FOO");

@@ -13,7 +13,7 @@ namespace KnockBox.Services.State.Shared
         private sealed class SharedUpdate : IDisposable
         {
             private readonly CancellationTokenSource _executionCts = new();
-            private int _waiterCount;
+            private int _activeWaiterCount;
             private int _canceledWaiterCount;
 
             public SharedUpdate(Func<CancellationToken, Task<UpdateResult>> factory)
@@ -23,27 +23,80 @@ namespace KnockBox.Services.State.Shared
 
             public Task<UpdateResult> Task { get; }
 
-            public CancellationTokenRegistration RegisterWaiter(CancellationToken callerToken)
+            public IDisposable RegisterWaiter(CancellationToken callerToken)
             {
-                Interlocked.Increment(ref _waiterCount);
+                Interlocked.Increment(ref _activeWaiterCount);
+                return new WaiterHandle(this, callerToken);
+            }
 
-                if (!callerToken.CanBeCanceled) return default;
+            private void NotifyCanceled(ref int canceledNotified)
+            {
+                if (Interlocked.Exchange(ref canceledNotified, 1) == 1) return;
 
-                return callerToken.Register(() =>
+                var canceled = Interlocked.Increment(ref _canceledWaiterCount);
+                var active = Volatile.Read(ref _activeWaiterCount);
+
+                if (!Task.IsCompleted && canceled >= active)
                 {
-                    if (Task.IsCompleted) return;
+                    _executionCts.Cancel();
+                }
+            }
 
-                    var canceled = Interlocked.Increment(ref _canceledWaiterCount);
-                    var waiters = Volatile.Read(ref _waiterCount);
+            private void NotifyCompleted(bool wasCanceled)
+            {
+                if (wasCanceled)
+                {
+                    Interlocked.Decrement(ref _canceledWaiterCount);
+                }
 
-                    if (canceled >= waiters)
+                var active = Interlocked.Decrement(ref _activeWaiterCount);
+
+                if (!Task.IsCompleted)
+                {
+                    var canceled = Volatile.Read(ref _canceledWaiterCount);
+                    if (canceled >= active)
                     {
                         _executionCts.Cancel();
                     }
-                });
+                }
             }
 
             public void Dispose() => _executionCts.Dispose();
+
+            private sealed class WaiterHandle : IDisposable
+            {
+                private readonly SharedUpdate _owner;
+                private readonly CancellationToken _token;
+                private CancellationTokenRegistration _registration;
+                private int _disposed;
+                private int _canceledNotified;
+
+                public WaiterHandle(SharedUpdate owner, CancellationToken token)
+                {
+                    _owner = owner;
+                    _token = token;
+
+                    if (token.CanBeCanceled)
+                    {
+                        _registration = token.Register(() => _owner.NotifyCanceled(ref _canceledNotified));
+                    }
+                }
+
+                public void Dispose()
+                {
+                    if (Interlocked.Exchange(ref _disposed, 1) == 1) return;
+
+                    _registration.Dispose();
+
+                    if (_token.IsCancellationRequested)
+                    {
+                        _owner.NotifyCanceled(ref _canceledNotified);
+                    }
+
+                    var wasCanceled = Volatile.Read(ref _canceledNotified) == 1;
+                    _owner.NotifyCompleted(wasCanceled);
+                }
+            }
         }
 
         #endregion
@@ -73,8 +126,8 @@ namespace KnockBox.Services.State.Shared
         }
 
         public async Task<List<UpdateResult>> UpdatePropertiesAsync(
-            int maxParallelUpdates, 
-            CancellationToken ct = default, 
+            int maxParallelUpdates,
+            CancellationToken ct = default,
             params string[] propertiesToUpdate)
         {
             ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxParallelUpdates);
@@ -87,12 +140,14 @@ namespace KnockBox.Services.State.Shared
             var plan = BuildPlan(propertiesToUpdate);
 
             var tasks = new ConcurrentDictionary<string, Task<UpdateResult>>(StringComparer.Ordinal);
+            var sharedTasks = new ConcurrentDictionary<string, Task<UpdateResult>>(StringComparer.Ordinal);
 
             Task<UpdateResult> GetTask(string property) =>
                 tasks.GetOrAdd(property, async p =>
                 {
                     var shared = GetOrCreateSharedUpdate(p, concurrencySemaphore, GetTask);
-                    using var registration = shared.RegisterWaiter(ct);
+                    _ = sharedTasks.TryAdd(p, shared.Task);
+                    using var waiter = shared.RegisterWaiter(ct);
 
                     try
                     {
@@ -116,6 +171,10 @@ namespace KnockBox.Services.State.Shared
             var results = new List<UpdateResult>(plan.Count);
             foreach (var p in plan)
                 results.Add(await GetTask(p).ConfigureAwait(false));
+
+            // Ensure shared updates finish before disposing the semaphore
+            await Task.WhenAll(sharedTasks.Values).ConfigureAwait(false);
+
             return results;
         }
 
