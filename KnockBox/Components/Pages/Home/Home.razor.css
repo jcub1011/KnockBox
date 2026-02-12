@@ -1,1 +1,22 @@
-﻿
+﻿.game-grid {
+    display: flex;
+    flex-direction: row;
+    gap: 12px;
+    padding: 12px;
+}
+
+.game {
+    flex: 1;
+    max-width: 300px;
+    min-width: 200px;
+    aspect-ratio: 4 / 3;
+    border: none;
+    background: white;
+    transition: all ease 0.2s;
+    border-radius: 8px;
+    background-color: lightgray;
+}
+
+.game:hover {
+    background-color: gray;
+}

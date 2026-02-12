@@ -1,6 +1,7 @@
 body {
     font-family: "Lexend", sans-serif;
     font-optical-sizing: auto;
+    box-sizing: border-box;
 }
 
 h1:focus {

@@ -1,8 +1,16 @@
 ﻿@page "/"
 @page "/home"
 
+@using KnockBox.Services.Navigation.Games
+
 @inherits DisposableComponent
 
 <PageTitle>Knockbox Games</PageTitle>
 
 <h3>Home</h3>
+
+<div class="game-grid">
+    <button class="game" aria-label="Split the Deck" @onclick="() => NavigateToGame(GameType.SplitTheDeck)">
+        Split the Deck
+    </button>
+</div>
