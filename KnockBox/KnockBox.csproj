@@ -46,6 +46,7 @@
 
   <ItemGroup>
     <Folder Include="Data\Models\" />
+    <Folder Include="Services\State\Games\SplitTheDeck\" />
   </ItemGroup>
 
 </Project>
