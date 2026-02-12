@@ -16,6 +16,10 @@
 	<DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
 	<DockerComposeProjectPath>..\docker-compose.dcproj</DockerComposeProjectPath>
   </PropertyGroup>
+	
+  <ItemGroup>
+    <None Remove="Data\Statics\Profanities\English.txt" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="FluentValidation" Version="12.1.1" />
@@ -34,6 +38,10 @@
 
   <ItemGroup>
     <ContainerPort Include="8081" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Data\Statics\Profanities\English.txt" />
   </ItemGroup>
 
   <ItemGroup>

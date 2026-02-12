@@ -1,6 +1,7 @@
 using KnockBox.Components;
 using KnockBox.Data.DbContexts;
 using KnockBox.Services.Navigation;
+using KnockBox.Services.Registrations.Logic;
 using KnockBox.Services.Registrations.Repositories;
 using KnockBox.Services.Registrations.States;
 using KnockBox.Services.Registrations.Validators;
@@ -30,6 +31,9 @@ namespace KnockBox
 
             // Add states
             builder.Services.RegisterStateServices();
+
+            // Add logic
+            builder.Services.RegisterLogic();
 
             // Add navigation
             builder.Services.AddScoped<INavigationService, NavigationService>();

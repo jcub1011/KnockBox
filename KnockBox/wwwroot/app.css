@@ -1,7 +1,22 @@
+:root {
+    --font-primary: "Lexend", sans-serif;
+    --font-mono: "Google Sans Code", monospace;
+}
+
 body {
-    font-family: "Lexend", sans-serif;
+    font-family: var(--font-primary);
     font-optical-sizing: auto;
     box-sizing: border-box;
+}
+
+button {
+    font-family: var(--font-primary);
+    font-optical-sizing: auto;
+}
+
+input {
+    font-family: var(--font-primary);
+    font-optical-sizing: auto;
 }
 
 h1:focus {
