@@ -2,7 +2,8 @@
 
 namespace KnockBox.Services.State.Games.Lobbies
 {
-    public abstract class GameLobby
+    public abstract class GameLobby<TLobby>
+        where TLobby : GameLobby<TLobby>
     {
         private readonly Lock _lock = new();
         private readonly ILogger _logger;
@@ -10,7 +11,7 @@ namespace KnockBox.Services.State.Games.Lobbies
         /// <summary>
         /// Invoked when this lobby is closed.
         /// </summary>
-        public event Func<GameLobby, Task>? LobbyClosed;
+        public event Func<TLobby, Task>? LobbyClosed;
 
         /// <summary>
         /// The unique key for this lobby.
@@ -56,11 +57,11 @@ namespace KnockBox.Services.State.Games.Lobbies
 
         protected async Task NotifyLobbyClosureAsync()
         {
-            async Task NotifyHandlerAsync(Func<GameLobby, Task> handler)
+            async Task NotifyHandlerAsync(Func<TLobby, Task> handler)
             {
                 try
                 {
-                    await handler.Invoke(this);
+                    await handler.Invoke((TLobby)this);
                 }
                 catch (Exception ex)
                 {
@@ -69,7 +70,7 @@ namespace KnockBox.Services.State.Games.Lobbies
             }
 
             var tasks = LobbyClosed?.GetInvocationList()
-                .Cast<Func<GameLobby, Task>>()
+                .Cast<Func<TLobby, Task>>()
                 .Select(NotifyHandlerAsync) ?? [];
 
             await Task.WhenAll(tasks);

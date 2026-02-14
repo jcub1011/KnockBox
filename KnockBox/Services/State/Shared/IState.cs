@@ -1,4 +1,4 @@
-﻿using KnockBox.Extensions;
+﻿using KnockBox.Extensions.Exceptions;
 
 namespace KnockBox.Services.State.Shared
 {
