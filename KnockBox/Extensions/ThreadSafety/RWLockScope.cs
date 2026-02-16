@@ -1,54 +1,67 @@
 ﻿namespace KnockBox.Extensions.ThreadSafety
 {
-    public abstract class RWLockScope : IDisposable
+    [Flags]
+    public enum LockPermissions
     {
-        public abstract bool Valid { get; }
-        protected readonly ReaderWriterLockSlim Lock;
+        Read = 1,
+        Write = 2,
+    }
 
-        public RWLockScope(ReaderWriterLockSlim rwLock)
+    /// <summary>
+    /// An object that automatically aquires and releases the lock for <see cref="ReaderWriterLockSlim"/>.
+    /// </summary>
+    public interface IRWLockScope : IDisposable
+    {
+        /// <summary>
+        /// If this thread has the lock from the scope.
+        /// </summary>
+        public bool Valid { get; }
+
+        /// <summary>
+        /// The permissions this scope has.
+        /// </summary>
+        public LockPermissions Permissions { get; }
+    }
+
+    /// <summary>
+    /// A lock scope with read only permissions.
+    /// </summary>
+    public sealed class ReadLockScope : IRWLockScope
+    {
+        private readonly ReaderWriterLockSlim _lock;
+        public bool Valid => _lock.IsReadLockHeld;
+        public LockPermissions Permissions => LockPermissions.Read;
+
+        public ReadLockScope(ReaderWriterLockSlim rwLock)
         {
-            Lock = rwLock;
-            EnterLock();
+            _lock = rwLock;
+            _lock.EnterReadLock();
         }
 
         public void Dispose()
         {
-            if (!Valid) return;
-            ExitLock();
-            GC.SuppressFinalize(this);
-        }
-
-        protected abstract void EnterLock();
-        protected abstract void ExitLock();
-    }
-
-    public sealed class ReadLockScope(ReaderWriterLockSlim rwLock) : RWLockScope(rwLock)
-    {
-        public override bool Valid => Lock.IsReadLockHeld;
-
-        protected override void EnterLock()
-        {
-            Lock.EnterReadLock();
-        }
-
-        protected override void ExitLock()
-        {
-            Lock.ExitReadLock();
+            if (Valid) _lock.ExitReadLock();
         }
     }
 
-    public sealed class WriteLockScope(ReaderWriterLockSlim rwLock) : RWLockScope(rwLock)
+    /// <summary>
+    /// A lock scope with read and write permissions.
+    /// </summary>
+    public sealed class WriteLockScope : IRWLockScope
     {
-        public override bool Valid => Lock.IsWriteLockHeld;
+        private readonly ReaderWriterLockSlim _lock;
+        public bool Valid => _lock.IsWriteLockHeld;
+        public LockPermissions Permissions => LockPermissions.Read | LockPermissions.Write;
 
-        protected override void EnterLock()
+        public WriteLockScope(ReaderWriterLockSlim rwLock)
         {
-            Lock.EnterWriteLock();
+            _lock = rwLock;
+            _lock.EnterWriteLock();
         }
 
-        protected override void ExitLock()
+        public void Dispose()
         {
-            Lock.ExitWriteLock();
+            if (Valid) _lock.ExitWriteLock();
         }
     }
 }

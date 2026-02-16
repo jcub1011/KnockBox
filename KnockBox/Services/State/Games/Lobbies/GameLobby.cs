@@ -1,11 +1,12 @@
-﻿using KnockBox.Services.Navigation.Games;
+﻿using KnockBox.Extensions.ThreadSafety;
+using KnockBox.Services.Navigation.Games;
 
 namespace KnockBox.Services.State.Games.Lobbies
 {
     public abstract class GameLobby<TLobby>
         where TLobby : GameLobby<TLobby>
     {
-        private readonly Lock _lock = new();
+        private readonly ReaderWriterLockSlim _lock = new();
         private readonly ILogger _logger;
 
         /// <summary>
@@ -25,12 +26,12 @@ namespace KnockBox.Services.State.Games.Lobbies
         {
             get
             {
-                using var scope = _lock.EnterScope();
+                using var scope = _lock.EnterReadScope();
                 return field;
             }
             set
             {
-                using var scope = _lock.EnterScope();
+                using var scope = _lock.EnterWriteScope();
                 if (value == field) return;
                 field = value;
 
@@ -42,8 +43,8 @@ namespace KnockBox.Services.State.Games.Lobbies
         {
             get 
             {
-                using var scope = _lock.EnterScope();
-                return _connectedUsers.ToArray();
+                using var scope = _lock.EnterReadScope();
+                return [.. _connectedUsers];
             }
         }
 
@@ -69,7 +70,13 @@ namespace KnockBox.Services.State.Games.Lobbies
                 }
             }
 
-            var tasks = LobbyClosed?.GetInvocationList()
+            Delegate[]? recipients;
+            using (var scope = _lock.EnterReadScope())
+            {
+                recipients = LobbyClosed?.GetInvocationList();
+            }
+
+            var tasks = recipients?
                 .Cast<Func<TLobby, Task>>()
                 .Select(NotifyHandlerAsync) ?? [];
 
@@ -78,13 +85,13 @@ namespace KnockBox.Services.State.Games.Lobbies
 
         public void RegisterUser(Guid user)
         {
-            using var scope = _lock.EnterScope();
+            using var scope = _lock.EnterWriteScope();
             _connectedUsers.Add(user);
         }
 
         public void UnregisterUser(Guid user)
         {
-            using var scope = _lock.EnterScope();
+            using var scope = _lock.EnterWriteScope();
             _connectedUsers.Remove(user);
         }
     }
