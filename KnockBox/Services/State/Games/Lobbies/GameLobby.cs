@@ -1,9 +1,14 @@
 ﻿using KnockBox.Extensions.ThreadSafety;
+using KnockBox.Extensions.Collections;
 using KnockBox.Services.Navigation.Games;
+using KnockBox.Services.State.Users;
 
 namespace KnockBox.Services.State.Games.Lobbies
 {
-    public abstract class GameLobby<TLobby>
+    public record class UserRegistration(string Name, Guid Id);
+
+    public abstract class GameLobby<TLobby> 
+        : IDisposable
         where TLobby : GameLobby<TLobby>
     {
         private readonly ReaderWriterLockSlim _lock = new();
@@ -38,8 +43,8 @@ namespace KnockBox.Services.State.Games.Lobbies
             }
         }
 
-        private readonly List<Guid> _connectedUsers;
-        public IReadOnlyList<Guid> ConnectedUsers
+        private readonly List<UserRegistration> _connectedUsers;
+        public IReadOnlyList<UserRegistration> ConnectedUsers
         {
             get 
             {
@@ -83,16 +88,25 @@ namespace KnockBox.Services.State.Games.Lobbies
             await Task.WhenAll(tasks);
         }
 
-        public void RegisterUser(Guid user)
+        public void RegisterUser(IUserService user)
         {
             using var scope = _lock.EnterWriteScope();
-            _connectedUsers.Add(user);
+
+            if (!_connectedUsers.Any(u => u.Id == user.UserId))
+                _connectedUsers.Add(new(user.UserName, user.UserId));
         }
 
-        public void UnregisterUser(Guid user)
+        public void UnregisterUser(IUserService user)
         {
             using var scope = _lock.EnterWriteScope();
-            _connectedUsers.Remove(user);
+
+            _connectedUsers.Remove(u => u.Id == user.UserId);
+        }
+
+        public void Dispose()
+        {
+            _lock.Dispose();
+            GC.SuppressFinalize(this);
         }
     }
 }
