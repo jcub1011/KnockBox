@@ -8,6 +8,4 @@
 
     public class LobbyNotFoundException(string lobbyCode)
         : LobbyServiceException($"Lobby with code [{lobbyCode}] not found.", null) { }
-
-
 }
