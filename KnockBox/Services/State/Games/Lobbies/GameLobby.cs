@@ -1,28 +1,26 @@
 ﻿using KnockBox.Extensions.ThreadSafety;
-using KnockBox.Extensions.Collections;
 using KnockBox.Services.Navigation.Games;
-using KnockBox.Services.State.Users;
+using System.Collections.Concurrent;
+using KnockBox.Extensions.Returns;
+using KnockBox.Services.Logic.Games.Lobbies;
 
 namespace KnockBox.Services.State.Games.Lobbies
 {
-    public record class UserRegistration(string Name, Guid Id);
-
     public abstract class GameLobby<TLobby> 
-        : IDisposable
+        : IGameLobby<TLobby>, IAsyncDisposable
         where TLobby : GameLobby<TLobby>
     {
         private readonly ReaderWriterLockSlim _lock = new();
         private readonly ILogger _logger;
+        private readonly ILobbyCodeService _lobbyCodeService;
+        private bool _closed = false;
+        private bool _disposed = false;
 
-        /// <summary>
-        /// Invoked when this lobby is closed.
-        /// </summary>
         public event Func<TLobby, Task>? LobbyClosed;
 
-        /// <summary>
-        /// The unique key for this lobby.
-        /// </summary>
-        public readonly string RoomCode;
+        public string LobbyCode { get; private set; }
+
+        public bool IsInitialized => string.IsNullOrEmpty(LobbyCode);
 
         /// <summary>
         /// Null when a game isn't selected.
@@ -43,26 +41,41 @@ namespace KnockBox.Services.State.Games.Lobbies
             }
         }
 
-        private readonly List<UserRegistration> _connectedUsers;
-        public IReadOnlyList<UserRegistration> ConnectedUsers
+        private readonly ConcurrentDictionary<Guid, UserRegistration> _connectedUsers = [];
+        public IEnumerable<UserRegistration> ConnectedUsers => _connectedUsers.Values;
+        public int UserCount => _connectedUsers.Count;
+
+        public GameLobby(ILogger logger, ILobbyCodeService lobbyCodeService)
         {
-            get 
+            _lobbyCodeService = lobbyCodeService;
+            _logger = logger;
+            LobbyCode = string.Empty;
+            GameType = null;
+        }
+
+        public virtual async ValueTask<Result> InitializeRoomAsync(CancellationToken ct = default)
+        {
+            if (ValidateLobbyOpen().TryGetError(out var error)) return Result.FromError(error);
+            if (IsInitialized)
+                return Result.FromError(new InvalidOperationException($"Lobby [{LobbyCode}] is already initialized."));
+
+            var result = await _lobbyCodeService.IssueLobbyCodeAsync(ct);
+            if (result.TryGetValue(out var lobbyCode))
             {
-                using var scope = _lock.EnterReadScope();
-                return [.. _connectedUsers];
+                LobbyCode = lobbyCode;
+                return Result.Success;
+            }
+            else
+            {
+                _logger.LogError(result.Error, "Error initializing lobby.");
+                return Result.FromError(result.Error);
             }
         }
 
-        public GameLobby(string roomCode, ILogger logger)
+        protected async Task<Result> NotifyLobbyClosureAsync()
         {
-            RoomCode = roomCode;
-            GameType = null;
-            _logger = logger;
-            _connectedUsers = [];
-        }
+            if (ValidateLobbyOpen().TryGetError(out _)) return Result.Success;
 
-        protected async Task NotifyLobbyClosureAsync()
-        {
             async Task NotifyHandlerAsync(Func<TLobby, Task> handler)
             {
                 try
@@ -75,38 +88,98 @@ namespace KnockBox.Services.State.Games.Lobbies
                 }
             }
 
-            Delegate[]? recipients;
-            using (var scope = _lock.EnterReadScope())
+            try
             {
-                recipients = LobbyClosed?.GetInvocationList();
+                Delegate[]? recipients;
+                using (var scope = _lock.EnterReadScope())
+                {
+                    recipients = LobbyClosed?.GetInvocationList();
+                }
+
+                var tasks = recipients?
+                    .Cast<Func<TLobby, Task>>()
+                    .Select(NotifyHandlerAsync) ?? [];
+
+                await Task.WhenAll(tasks);
+
+                _closed = true;
+                return Result.Success;
             }
-
-            var tasks = recipients?
-                .Cast<Func<TLobby, Task>>()
-                .Select(NotifyHandlerAsync) ?? [];
-
-            await Task.WhenAll(tasks);
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error notifying subscribers of lobby closure.");
+                return Result.FromError(ex);
+            }
         }
 
-        public void RegisterUser(IUserService user)
+        public Result ConnectUser(UserRegistration userRegistration)
         {
-            using var scope = _lock.EnterWriteScope();
+            if (ValidateLobbyOpen().TryGetError(out var error)) return Result.FromError(error);
+            if (ValidateLobbyInitialized().TryGetError(out error)) return Result.FromError(error);
 
-            if (!_connectedUsers.Any(u => u.Id == user.UserId))
-                _connectedUsers.Add(new(user.UserName, user.UserId));
+            if (userRegistration.Id == Guid.Empty)
+                return Result.FromError(
+                    new InvalidDataException($"User id [{userRegistration.Id}] is not valid."));
+
+            if (_connectedUsers.TryAdd(userRegistration.Id, userRegistration))
+            {
+                return Result.Success;
+            }
+            else
+            {
+                return Result.FromError(
+                    new InvalidOperationException($"User [{userRegistration.Id}] is already registered."));
+            }
         }
 
-        public void UnregisterUser(IUserService user)
+        public Result DisconnectUser(UserRegistration userRegistration)
         {
-            using var scope = _lock.EnterWriteScope();
+            if (ValidateLobbyOpen().TryGetError(out var error)) return Result.FromError(error);
+            if (ValidateLobbyInitialized().TryGetError(out error)) return Result.FromError(error);
 
-            _connectedUsers.Remove(u => u.Id == user.UserId);
+            if (_connectedUsers.TryRemove(userRegistration.Id, out _))
+            {
+                return Result.Success;
+            }
+            else
+            {
+                return Result.FromError(
+                    new InvalidOperationException($"User [{userRegistration.Id}] is not registered."));
+            }
         }
 
-        public void Dispose()
+        public async ValueTask DisposeAsync()
         {
-            _lock.Dispose();
-            GC.SuppressFinalize(this);
+            if (_disposed) return;
+
+            try
+            {
+                await NotifyLobbyClosureAsync();
+            }
+            finally
+            {
+                _lock.Dispose();
+                _disposed = true;
+                GC.SuppressFinalize(this);
+            }
+        }
+
+        protected Result ValidateLobbyInitialized()
+        {
+            if (!IsInitialized)
+                return Result.FromError(new InvalidOperationException($"Lobby [{LobbyCode}] is not initialized."));
+
+            return Result.Success;
+        }
+
+        protected Result ValidateLobbyOpen()
+        {
+            if (_closed)
+                return Result.FromError(new InvalidOperationException($"Lobby [{LobbyCode}] is closed."));
+            if (_disposed)
+                return Result.FromError(new ObjectDisposedException($"Lobby [{LobbyCode}] is disposed."));
+
+            return Result.Success;
         }
     }
 }

@@ -7,25 +7,27 @@ namespace KnockBox.Services.State.Games.Lobbies
     /// </summary>
     /// <typeparam name="TLobby"></typeparam>
     public interface IGameLobbyService<TLobby>
-        where TLobby : GameLobby<TLobby>
+        where TLobby : IGameLobby<TLobby>
     {
         /// <summary>
         /// Creates a new lobby for the game.
         /// </summary>
+        /// <param name="userId">The id of the user creating the lobby.</param>
         /// <returns></returns>
-        public Task<Result<TLobby>> CreateLobbyAsync();
+        public ValueTask<Result<TLobby>> CreateLobbyAsync(Guid userId);
 
         /// <summary>
         /// Closes a lobby, ending the session.
         /// </summary>
+        /// <param name="userId">The id of the user closing the lobby.</param>
         /// <returns></returns>
-        public Task<Result> CloseLobbyAsync();
+        public ValueTask<Result> CloseLobbyAsync(Guid userId);
 
         /// <summary>
         /// Joins the lobby.
         /// </summary>
         /// <param name="lobbyCode"></param>
         /// <returns></returns>
-        public Task<Result<TLobby>> JoinLobbyAsync(string lobbyCode);
+        public ValueTask<Result<TLobby>> JoinLobbyAsync(string lobbyCode, UserRegistration registration);
     }
 }

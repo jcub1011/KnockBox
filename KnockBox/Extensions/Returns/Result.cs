@@ -4,19 +4,29 @@ namespace KnockBox.Extensions.Returns
 {
     public sealed class Result : Result<int, Exception>
     {
+        /// <summary>
+        /// A shared successful result instance.
+        /// </summary>
+        public static readonly Result Success = FromValue();
+
         public Result() : base(0) { }
         public Result(Exception error) : base(error) { }
 
-        public new static Result FromError(Exception error) => new(error);
+        public static Result FromError(Exception error) => new(error);
+        public static Result<TValue> FromError<TValue>(Exception error) => new(error);
+        public static Result<TValue, TError> FromError<TValue, TError>(TError error)
+            where TError : notnull => new(error);
+
+        public static Result FromValue() => new();
+        public static Result<TValue> FromValue<TValue>(TValue value) => new(value);
+        public static Result<TValue, TError> FromError<TValue, TError>(TValue value)
+            where TError : notnull => new(value);
     }
 
     public sealed class Result<TValue> : Result<TValue, Exception>
     {
         public Result(TValue value) : base(value) { }
-        private Result(Exception error) : base(error) { }
-
-        public new static Result<TValue> FromValue(TValue value) => new(value);
-        public new static Result<TValue> FromError(Exception error) => new(error);
+        internal Result(Exception error) : base(error) { }
     }
 
     public class Result<TValue, TError>
@@ -101,26 +111,12 @@ namespace KnockBox.Extensions.Returns
         /// Creates an error result.
         /// </summary>
         /// <param name="error"></param>
-        protected Result(TError error)
+        internal Result(TError error)
         {
             ArgumentNullException.ThrowIfNull(error);
             IsSuccess = false;
             _value = default!;
             _error = error;
         }
-
-        /// <summary>
-        /// Creates a successful result.
-        /// </summary>
-        /// <param name="value"></param>
-        /// <returns></returns>
-        public static Result<TValue, TError> FromValue(TValue value) => new(value);
-
-        /// <summary>
-        /// Creates an error result.
-        /// </summary>
-        /// <param name="error"></param>
-        /// <returns></returns>
-        public static Result<TValue, TError> FromError(TError error) => new(error);
     }
 }
