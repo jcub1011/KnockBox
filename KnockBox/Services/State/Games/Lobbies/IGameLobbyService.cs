@@ -14,20 +14,20 @@ namespace KnockBox.Services.State.Games.Lobbies
         /// </summary>
         /// <param name="userId">The id of the user creating the lobby.</param>
         /// <returns></returns>
-        public ValueTask<Result<TLobby>> CreateLobbyAsync(Guid userId);
+        public ValueTask<Result<TLobby>> CreateLobbyAsync(Guid userId, CancellationToken ct = default);
 
         /// <summary>
         /// Closes a lobby, ending the session.
         /// </summary>
         /// <param name="userId">The id of the user closing the lobby.</param>
         /// <returns></returns>
-        public ValueTask<Result> CloseLobbyAsync(Guid userId);
+        public ValueTask<Result> CloseLobbyAsync(Guid userId, CancellationToken ct = default);
 
         /// <summary>
         /// Joins the lobby.
         /// </summary>
         /// <param name="lobbyCode"></param>
         /// <returns></returns>
-        public ValueTask<Result<TLobby>> JoinLobbyAsync(string lobbyCode, UserRegistration registration);
+        public ValueTask<Result<TLobby>> JoinLobbyAsync(string lobbyCode, UserRegistration registration, CancellationToken ct = default);
     }
 }
