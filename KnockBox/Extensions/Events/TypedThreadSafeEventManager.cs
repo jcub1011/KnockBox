@@ -1,0 +1,133 @@
+using KnockBox.Extensions.Collections;
+using System.Collections.Concurrent;
+
+namespace KnockBox.Extensions.Events
+{
+    public sealed class TypedThreadSafeEventManager : ITypedThreadSafeEventManager, IDisposable
+    {
+        private readonly ConcurrentDictionary<string, ConcurrentDictionary<Type, ThreadSafeList<Delegate>>> _groups = new(StringComparer.Ordinal);
+        private int _disposed;
+
+        public void Subscribe<TType>(string group, Func<TType, ValueTask> callback)
+        {
+            ObjectDisposedException.ThrowIf(_disposed == 1, this);
+            if (string.IsNullOrWhiteSpace(group)) throw new ArgumentException("Group can't be null or whitespace.", nameof(group));
+            ArgumentNullException.ThrowIfNull(callback);
+
+            var typeMap = _groups.GetOrAdd(group, _ => new ConcurrentDictionary<Type, ThreadSafeList<Delegate>>());
+            var list = typeMap.GetOrAdd(typeof(TType), _ => []);
+
+            list.Add(callback);
+        }
+
+        public void Unsubscribe<TType>(string group, Func<TType, ValueTask> callback)
+        {
+            ObjectDisposedException.ThrowIf(_disposed == 1, this);
+            if (string.IsNullOrWhiteSpace(group)) throw new ArgumentException("Group can't be null or whitespace.", nameof(group));
+            ArgumentNullException.ThrowIfNull(callback);
+
+            if (!_groups.TryGetValue(group, out var typeMap)) return;
+            if (!typeMap.TryGetValue(typeof(TType), out var list)) return;
+
+            _ = list.Remove(callback);
+
+            if (list.Count == 0)
+            {
+                _ = typeMap.TryRemove(typeof(TType), out _);
+
+                if (typeMap.IsEmpty)
+                {
+                    _ = _groups.TryRemove(group, out _);
+                }
+            }
+        }
+
+        public Task NotifyAsync<TType>(string group, TType args)
+        {
+            ObjectDisposedException.ThrowIf(_disposed == 1, this);
+            if (string.IsNullOrWhiteSpace(group)) throw new ArgumentException("Group can't be null or whitespace.", nameof(group));
+
+            if (!_groups.TryGetValue(group, out var typeMap)) return Task.CompletedTask;
+            if (!typeMap.TryGetValue(typeof(TType), out var list)) return Task.CompletedTask;
+
+            var callbacks = Snapshot(list);
+            if (callbacks.Length == 0) return Task.CompletedTask;
+
+            var tasks = new Task[callbacks.Length];
+            var taskCount = 0;
+
+            for (var i = 0; i < callbacks.Length; i++)
+            {
+                if (callbacks[i] is Func<TType, ValueTask> typedCallback)
+                {
+                    var task = SafeInvokeAsync(typedCallback, args);
+                    if (!task.IsCompletedSuccessfully)
+                    {
+                        tasks[taskCount++] = task;
+                    }
+                }
+            }
+
+            if (taskCount == 0) return Task.CompletedTask;
+            if (taskCount == 1) return tasks[0];
+
+            if (taskCount != tasks.Length)
+            {
+                Array.Resize(ref tasks, taskCount);
+            }
+
+            return Task.WhenAll(tasks);
+        }
+
+        public void Dispose()
+        {
+            if (Interlocked.Exchange(ref _disposed, 1) == 1) return;
+
+            foreach (var group in _groups.Values)
+            {
+                foreach (var list in group.Values)
+                {
+                    list.Dispose();
+                }
+            }
+
+            _groups.Clear();
+            GC.SuppressFinalize(this);
+        }
+
+        private static Delegate[] Snapshot(ThreadSafeList<Delegate> list)
+        {
+            return [.. list];
+        }
+
+        private static Task SafeInvokeAsync<TType>(Func<TType, ValueTask> callback, TType args)
+        {
+            try
+            {
+                var valueTask = callback(args);
+                if (valueTask.IsCompletedSuccessfully)
+                {
+                    return Task.CompletedTask;
+                }
+
+                return AwaitValueTaskAsync(valueTask);
+            }
+            catch
+            {
+                return Task.CompletedTask;
+            }
+        }
+
+        private static async Task AwaitValueTaskAsync(ValueTask valueTask)
+        {
+            try
+            {
+                await valueTask.ConfigureAwait(false);
+            }
+            catch
+            {
+                // intentionally ignored
+            }
+        }
+    }
+}
