@@ -3,66 +3,68 @@ using KnockBox.Services.Navigation.Games;
 using System.Collections.Concurrent;
 using KnockBox.Extensions.Returns;
 using KnockBox.Services.Logic.Games.Lobbies;
+using KnockBox.Extensions.Events;
 
 namespace KnockBox.Services.State.Games.Lobbies
 {
-    public abstract class GameLobby<TLobby> 
+    public enum LobbyState
+    {
+        /// <summary>
+        /// The lobby is not initialized.
+        /// </summary>
+        Uninitialized,
+        /// <summary>
+        /// The lobby is open for players to join.
+        /// </summary>
+        Open,
+        /// <summary>
+        /// The lobby has a game active and cannot add players.
+        /// </summary>
+        Active,
+        /// <summary>
+        /// The lobby is closed and cannot add players.
+        /// </summary>
+        Closed
+    }
+
+    public abstract class GameLobby<TLobby>(ILogger logger, ILobbyCodeService lobbyCodeService)
         : IGameLobby<TLobby>, IAsyncDisposable
         where TLobby : GameLobby<TLobby>
     {
+        private const string USER_CONNECTION_GROUP = "UserConnection";
+        private const string LOBBY_STATE_GROUP = "LobbyState";
         private readonly ReaderWriterLockSlim _lock = new();
-        private readonly ILogger _logger;
-        private readonly ILobbyCodeService _lobbyCodeService;
-        private bool _closed = false;
+        private readonly TypedThreadSafeEventManager _eventManager = new();
+        private readonly ILobbyCodeService _lobbyCodeService = lobbyCodeService;
+        private readonly ILogger _logger = logger;
+        private LobbyState _state = LobbyState.Uninitialized;
         private bool _disposed = false;
 
-        public event Func<TLobby, Task>? LobbyClosed;
+        public event Func<TLobby, Task>? LobbyStateChanged;
 
-        public string LobbyCode { get; private set; }
+        public string LobbyCode { get; private set; } = string.Empty;
 
-        public bool IsInitialized => string.IsNullOrEmpty(LobbyCode);
-
-        /// <summary>
-        /// Null when a game isn't selected.
-        /// </summary>
-        public GameType? GameType
+        public LobbyState State
         {
-            get
-            {
-                using var scope = _lock.EnterReadScope();
-                return field;
-            }
-            set
-            {
-                using var scope = _lock.EnterWriteScope();
-                if (value == field) return;
-                field = value;
-
-            }
+            get => _lock.Read(in _state);
+            protected set => _lock.Exchange(ref _state, value);
         }
 
         private readonly ConcurrentDictionary<Guid, UserRegistration> _connectedUsers = [];
         public IEnumerable<UserRegistration> ConnectedUsers => _connectedUsers.Values;
         public int UserCount => _connectedUsers.Count;
 
-        public GameLobby(ILogger logger, ILobbyCodeService lobbyCodeService)
-        {
-            _lobbyCodeService = lobbyCodeService;
-            _logger = logger;
-            LobbyCode = string.Empty;
-            GameType = null;
-        }
-
         public virtual async ValueTask<Result> InitializeRoomAsync(CancellationToken ct = default)
         {
             if (ValidateLobbyOpen().TryGetError(out var error)) return Result.FromError(error);
-            if (IsInitialized)
+            if (State != LobbyState.Uninitialized)
                 return Result.FromError(new InvalidOperationException($"Lobby [{LobbyCode}] is already initialized."));
 
             var result = await _lobbyCodeService.IssueLobbyCodeAsync(ct);
             if (result.TryGetValue(out var lobbyCode))
             {
                 LobbyCode = lobbyCode;
+                State = LobbyState.Open;
                 return Result.Success;
             }
             else
@@ -76,33 +78,11 @@ namespace KnockBox.Services.State.Games.Lobbies
         {
             if (ValidateLobbyOpen().TryGetError(out _)) return Result.Success;
 
-            async Task NotifyHandlerAsync(Func<TLobby, Task> handler)
-            {
-                try
-                {
-                    await handler.Invoke((TLobby)this);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Error notifying subscriber of lobby closure.");
-                }
-            }
-
             try
             {
-                Delegate[]? recipients;
-                using (var scope = _lock.EnterReadScope())
-                {
-                    recipients = LobbyClosed?.GetInvocationList();
-                }
-
-                var tasks = recipients?
-                    .Cast<Func<TLobby, Task>>()
-                    .Select(NotifyHandlerAsync) ?? [];
-
-                await Task.WhenAll(tasks);
-
-                _closed = true;
+                var previousState = _lock.Exchange(ref _state, LobbyState.Closed);
+                var args = new LobbyStateChangeArgs<IGameLobby<TLobby>>(this, previousState, LobbyState.Closed);
+                await _eventManager.NotifyAsync(LOBBY_STATE_GROUP, args);
                 return Result.Success;
             }
             catch (Exception ex)
@@ -166,7 +146,7 @@ namespace KnockBox.Services.State.Games.Lobbies
 
         protected Result ValidateLobbyInitialized()
         {
-            if (!IsInitialized)
+            if (State == LobbyState.Uninitialized)
                 return Result.FromError(new InvalidOperationException($"Lobby [{LobbyCode}] is not initialized."));
 
             return Result.Success;
@@ -174,12 +154,60 @@ namespace KnockBox.Services.State.Games.Lobbies
 
         protected Result ValidateLobbyOpen()
         {
-            if (_closed)
-                return Result.FromError(new InvalidOperationException($"Lobby [{LobbyCode}] is closed."));
+            if (_state == LobbyState.Open)
+                return Result.FromError(new InvalidOperationException($"Lobby [{LobbyCode}] is {_state}."));
             if (_disposed)
                 return Result.FromError(new ObjectDisposedException($"Lobby [{LobbyCode}] is disposed."));
 
             return Result.Success;
+        }
+
+        public void Subscribe<TType>(string evt, Func<TType, ValueTask> callback)
+        {
+            _eventManager.Subscribe(evt, callback);
+        }
+
+        public void Unsubscribe<TType>(string evt, Func<TType, ValueTask> callback)
+        {
+            _eventManager.Unsubscribe(evt, callback);
+        }
+
+        public async ValueTask<Result> StartRoomAsync(CancellationToken ct = default)
+        {
+            var previousState = _lock.Exchange(ref _state, LobbyState.Active);
+            var args = new LobbyStateChangeArgs<IGameLobby<TLobby>>(this, previousState, LobbyState.Active);
+
+            try
+            {
+                await _eventManager.NotifyAsync(LOBBY_STATE_GROUP, args);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error notifying subscribers that room has become active.");
+                return Result.FromError(ex);
+            }
+
+            return Result.Success;
+        }
+
+        public void SubscribeToLobbyStateChanges(Func<LobbyStateChangeArgs<TLobby>, ValueTask> callback)
+        {
+            _eventManager.Subscribe(LOBBY_STATE_GROUP, callback);
+        }
+
+        public void UnsubscribeFromLobbyStateChanges(Func<LobbyStateChangeArgs<TLobby>, ValueTask> callback)
+        {
+            _eventManager.Unsubscribe(LOBBY_STATE_GROUP, callback);
+        }
+
+        public void SubscribeToUserConnection(Func<UserConnectionArgs<TLobby>, ValueTask> callback)
+        {
+            _eventManager.Subscribe(USER_CONNECTION_GROUP, callback);
+        }
+
+        public void UnsubscribeFromUserConnection(Func<UserConnectionArgs<TLobby>, ValueTask> callback)
+        {
+            _eventManager.Unsubscribe(USER_CONNECTION_GROUP, callback);
         }
     }
 }

@@ -1,4 +1,6 @@
-﻿using KnockBox.Services.State.Games.Lobbies;
+﻿using KnockBox.Services.State.Games.DiceSimulator;
+using KnockBox.Services.State.Games.Lobbies;
+using KnockBox.Services.State.Games.SplitTheDeck;
 
 namespace KnockBox.Services.Registrations.States
 {
@@ -8,8 +10,8 @@ namespace KnockBox.Services.Registrations.States
         {
             // Add states
             services.AddSingleton(typeof(IGameLobbyService<>), typeof(BaseGameLobbyService<>));
-            services.AddTransient(typeof(GameLobby<>));
-
+            services.AddTransient<DiceSimulatorLobby>();
+            services.AddTransient<SplitTheDeckLobby>();
             return services;
         }
     }

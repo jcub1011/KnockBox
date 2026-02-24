@@ -3,6 +3,9 @@ using System.Collections.Concurrent;
 
 namespace KnockBox.Extensions.Events
 {
+    /// <summary>
+    /// An event manager used to notify large numbers of listeners quickly.
+    /// </summary>
     public sealed class TypedThreadSafeEventManager : ITypedThreadSafeEventManager, IDisposable
     {
         private readonly ConcurrentDictionary<string, ConcurrentDictionary<Type, ThreadSafeList<Delegate>>> _groups = new(StringComparer.Ordinal);

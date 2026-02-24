@@ -6,6 +6,7 @@ using KnockBox.Services.Registrations.Repositories;
 using KnockBox.Services.Registrations.States;
 using KnockBox.Services.Registrations.Validators;
 using Microsoft.EntityFrameworkCore;
+using Serilog;
 
 namespace KnockBox
 {
@@ -14,6 +15,12 @@ namespace KnockBox
         public static void Main(string[] args)
         {
             var builder = WebApplication.CreateBuilder(args);
+
+            builder.Host.UseSerilog((context, services, loggerConfig) =>
+                loggerConfig
+                    .ReadFrom.Configuration(context.Configuration)
+                    .ReadFrom.Services(services)
+                    .Enrich.FromLogContext());
 
             // Add services to the container.
             builder.Services.AddRazorComponents()

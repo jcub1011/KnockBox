@@ -1,5 +1,6 @@
 ﻿using KnockBox.Services.Logic.Filtering;
 using KnockBox.Services.Logic.Games.Lobbies;
+using KnockBox.Services.Logic.RandomGeneration;
 
 namespace KnockBox.Services.Registrations.Logic
 {
@@ -9,6 +10,7 @@ namespace KnockBox.Services.Registrations.Logic
         {
             services.AddSingleton<IProfanityFilter, ProfanityFilter>();
             services.AddSingleton<ILobbyCodeService, LobbyCodeService>();
+            services.AddSingleton<IRandomNumberService, RandomNumberService>();
 
             return services;
         }
