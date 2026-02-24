@@ -6,7 +6,7 @@ namespace KnockBox.Extensions.Events
     /// <summary>
     /// An event manager used to notify large numbers of listeners quickly.
     /// </summary>
-    public sealed class TypedThreadSafeEventManager : ITypedThreadSafeEventManager, IDisposable
+    public sealed class TypedThreadSafeEventManager(ILogger? logger = null) : ITypedThreadSafeEventManager, IDisposable
     {
         private readonly ConcurrentDictionary<string, ConcurrentDictionary<Type, ThreadSafeList<Delegate>>> _groups = new(StringComparer.Ordinal);
         private int _disposed;
@@ -82,6 +82,26 @@ namespace KnockBox.Extensions.Events
             return Task.WhenAll(tasks);
         }
 
+        public void Notify<TType>(string group, TType args)
+        {
+            async Task ExecuteNotifyAsync(string group, TType args)
+            {
+                try
+                {
+                    await NotifyAsync(group, args);
+                }
+                catch (Exception ex)
+                {
+                    logger?.LogError(ex, "Error notifying subscribers of group [{group}] with args [{args}].", group, args);
+                }
+            }
+
+            ObjectDisposedException.ThrowIf(_disposed == 1, this);
+            if (string.IsNullOrWhiteSpace(group)) throw new ArgumentException("Group can't be null or whitespace.", nameof(group));
+
+            _ = Task.Run(() => ExecuteNotifyAsync(group, args));
+        }
+
         public void Dispose()
         {
             if (Interlocked.Exchange(ref _disposed, 1) == 1) return;
@@ -103,7 +123,7 @@ namespace KnockBox.Extensions.Events
             return [.. list];
         }
 
-        private static Task SafeInvokeAsync<TType>(Func<TType, ValueTask> callback, TType args)
+        private Task SafeInvokeAsync<TType>(Func<TType, ValueTask> callback, TType args)
         {
             try
             {
@@ -121,15 +141,15 @@ namespace KnockBox.Extensions.Events
             }
         }
 
-        private static async Task AwaitValueTaskAsync(ValueTask valueTask)
+        private async Task AwaitValueTaskAsync(ValueTask valueTask)
         {
             try
             {
                 await valueTask.ConfigureAwait(false);
             }
-            catch
+            catch (Exception ex)
             {
-                // intentionally ignored
+                logger?.LogError(ex, "Error notifying subscriber.");
             }
         }
     }
