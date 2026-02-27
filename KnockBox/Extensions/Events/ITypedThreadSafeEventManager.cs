@@ -1,6 +1,6 @@
 ﻿namespace KnockBox.Extensions.Events
 {
-    public interface ITypedThreadSafeEventManager
+    public interface ITypedThreadSafeEventManager : IDisposable
     {
         /// <summary>
         /// Subscribes to events of the specified group.

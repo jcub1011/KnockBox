@@ -7,7 +7,7 @@ namespace KnockBox.Extensions.Events
     /// <summary>
     /// An event manager used to notify large numbers of listeners quickly.
     /// </summary>
-    public sealed class TypedThreadSafeEventManager(ILogger? logger = null) : ITypedThreadSafeEventManager, IDisposable
+    public sealed class TypedThreadSafeEventManager(ILogger? logger = null) : ITypedThreadSafeEventManager
     {
         private readonly ConcurrentDictionary<string, ConcurrentDictionary<Type, ThreadSafeList<Delegate>>> _groups = new(StringComparer.Ordinal);
         private int _disposed;

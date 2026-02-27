@@ -2,7 +2,7 @@ using System.Security.Cryptography;
 using KnockBox.Extensions.Returns;
 using KnockBox.Services.Logic.Filtering;
 
-namespace KnockBox.Services.Logic.Games.Lobbies
+namespace KnockBox.Services.Logic.Games.Shared
 {
     public class LobbyCodeService(IProfanityFilter profanityFilter) : ILobbyCodeService
     {

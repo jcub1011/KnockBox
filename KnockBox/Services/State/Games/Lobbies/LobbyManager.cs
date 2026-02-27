@@ -1,5 +1,5 @@
 ﻿using KnockBox.Extensions.Returns;
-using KnockBox.Services.Logic.Games.Lobbies;
+using KnockBox.Services.Logic.Games.Shared;
 using KnockBox.Services.Navigation.Games;
 
 namespace KnockBox.Services.State.Games.Lobbies

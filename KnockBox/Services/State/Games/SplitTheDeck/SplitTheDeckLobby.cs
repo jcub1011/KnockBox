@@ -1,4 +1,4 @@
-﻿using KnockBox.Services.Logic.Games.Lobbies;
+﻿using KnockBox.Services.Logic.Games.Shared;
 using KnockBox.Services.State.Games.Lobbies;
 
 namespace KnockBox.Services.State.Games.SplitTheDeck

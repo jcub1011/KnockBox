@@ -2,8 +2,8 @@
 using KnockBox.Services.Navigation.Games;
 using System.Collections.Concurrent;
 using KnockBox.Extensions.Returns;
-using KnockBox.Services.Logic.Games.Lobbies;
 using KnockBox.Extensions.Events;
+using KnockBox.Services.Logic.Games.Shared;
 
 namespace KnockBox.Services.State.Games.Lobbies
 {

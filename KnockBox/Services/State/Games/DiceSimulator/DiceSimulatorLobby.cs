@@ -1,4 +1,4 @@
-﻿using KnockBox.Services.Logic.Games.Lobbies;
+﻿using KnockBox.Services.Logic.Games.Shared;
 using KnockBox.Services.Logic.RandomGeneration;
 using KnockBox.Services.State.Games.DiceSimulator.Data;
 using KnockBox.Services.State.Games.Lobbies;
