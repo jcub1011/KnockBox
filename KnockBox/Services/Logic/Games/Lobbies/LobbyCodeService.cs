@@ -40,6 +40,10 @@ namespace KnockBox.Services.Logic.Games.Lobbies
                 return Result.FromError<string>(
                     new InvalidOperationException("Unable to generate a unique lobby code."));
             }
+            catch (OperationCanceledException oce)
+            {
+                return Result.FromError<string>(oce);
+            }
             catch (Exception ex)
             {
                 return Result.FromError<string>(
@@ -65,6 +69,10 @@ namespace KnockBox.Services.Logic.Games.Lobbies
                             new InvalidOperationException("Lobby code was not issued."));
                     }
                 }
+            }
+            catch (OperationCanceledException oce)
+            {
+                return Result.FromError(oce);
             }
             catch (Exception ex)
             {
