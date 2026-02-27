@@ -53,14 +53,17 @@ namespace KnockBox.Services.Logic.Games.Lobbies
             {
                 ct.ThrowIfCancellationRequested();
 
-                if (_issuedCodes.Remove(lobbyCode))
+                lock (_lock)
                 {
-                    return Result.Success;
-                }
-                else
-                {
-                    return Result.FromError(
-                        new InvalidOperationException("Lobby code was not issued."));
+                    if (_issuedCodes.Remove(lobbyCode))
+                    {
+                        return Result.Success;
+                    }
+                    else
+                    {
+                        return Result.FromError(
+                            new InvalidOperationException("Lobby code was not issued."));
+                    }
                 }
             }
             catch (Exception ex)
