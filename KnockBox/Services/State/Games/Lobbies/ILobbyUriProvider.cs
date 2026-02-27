@@ -3,19 +3,22 @@ using KnockBox.Services.Navigation.Games;
 
 namespace KnockBox.Services.State.Games.Lobbies
 {
+    /// <param name="Uri">Formatted as "/room/{gameType}/{obfuscatedRoomCode}".</param>
+    /// <param name="Unsubscriber">Unregisters the associated lobby when disposed.</param>
+    public record class LobbyRegistration(string Uri, IDisposable Unsubscriber);
+
     public interface ILobbyUriProvider
     {
         /// <summary>
         /// Registers the lobby and assigns it a unique lobby url.
         /// </summary>
         /// <remarks>
-        /// Lobby Uris are formatted as "/room/{gameType}/{obfuscatedRoomCode}".
+        /// Lobby uris are formatted as "/room/{gameType}/{obfuscatedRoomCode}".
         /// </remarks>
         /// <param name="lobbyCode"></param>
         /// <param name="gameType"></param>
-        /// <param name="lobbyUrl"></param>
-        /// <returns>A <see cref="IDisposable"/> object that unregisters the lobby code when disposed.</returns>
-        Result<IDisposable> RegisterLobby(string lobbyCode, GameType gameType, out string lobbyUrl);
+        /// <returns>A <see cref="LobbyRegistration"/> object that unregisters the lobby when the Unsubscriber is disposed.</returns>
+        Result<LobbyRegistration> RegisterLobby(string lobbyCode, GameType gameType);
 
         /// <summary>
         /// Gets the url assigned to the lobby code.

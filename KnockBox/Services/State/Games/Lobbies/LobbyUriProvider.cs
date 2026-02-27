@@ -23,23 +23,21 @@ namespace KnockBox.Services.State.Games.Lobbies
             }
         }
 
-        public Result<IDisposable> RegisterLobby(string lobbyCode, GameType gameType, out string lobbyUri)
+        public Result<LobbyRegistration> RegisterLobby(string lobbyCode, GameType gameType)
         {
-            lobbyUri = string.Empty;
-
             if (string.IsNullOrWhiteSpace(lobbyCode))
             {
-                return Result.FromError<IDisposable>(new ArgumentException("Lobby code is empty.", nameof(lobbyCode)));
+                return Result.FromError<LobbyRegistration>(new ArgumentException("Lobby code is empty.", nameof(lobbyCode)));
             }
             if (!gameType.TryGetNavigationString(out var navigationString))
-                return Result.FromError<IDisposable>(new ArgumentException($"Navigation string attribute not set for game type [{gameType}]."));
+                return Result.FromError<LobbyRegistration>(new ArgumentException($"Navigation string attribute not set for game type [{gameType}]."));
 
             lobbyCode = NormalizeLobbyCode(lobbyCode);
 
             lock (_lock)
             {
                 if (_registrations.ContainsKey(lobbyCode))
-                    return Result.FromError<IDisposable>(new InvalidOperationException($"Lobby with code [{lobbyCode}] is already registered."));
+                    return Result.FromError<LobbyRegistration>(new InvalidOperationException($"Lobby with code [{lobbyCode}] is already registered."));
 
                 int remainingAttempts = 10;
                 while (remainingAttempts-- > 0)
@@ -49,21 +47,20 @@ namespace KnockBox.Services.State.Games.Lobbies
                     var bytes = randomNumberService.GetRandomBytes(16, RandomType.Secure);
                     var obfuscatedRoomCode = Base64UrlTextEncoder.Encode(bytes);
 
-                    // Extra variable is required because anonymous functions don't allow referencing in/out parameters
                     var uri = $"/room/{navigationString}/{obfuscatedRoomCode}";
-                    lobbyUri = uri;
-                    if (_activeUris.Add(lobbyUri))
+                    if (_activeUris.Add(uri))
                     {
                         _registrations[lobbyCode] = uri;
 
-                        return Result.FromValue<IDisposable>(new DisposableAction(() =>
-                        {
-                            lock (_lock)
+                        return Result.FromValue(new LobbyRegistration(uri,
+                            new DisposableAction(() =>
                             {
-                                _activeUris.Remove(uri);
-                                _registrations.Remove(lobbyCode);
-                            }
-                        }));
+                                lock (_lock)
+                                {
+                                    _activeUris.Remove(uri);
+                                    _registrations.Remove(lobbyCode);
+                                }
+                            })));
                     }
                     else
                     {
@@ -73,8 +70,7 @@ namespace KnockBox.Services.State.Games.Lobbies
             }
 
             logger.LogError("Generating an obfuscated lobby code for [{lobbyCode}] failed 10 consecutive times. Something is fatally wrong.", lobbyCode);
-            lobbyUri = string.Empty;
-            return Result.FromError<IDisposable>(new InvalidOperationException($"Error generating an obfuscated uri for lobby code [{lobbyCode}]."));
+            return Result.FromError<LobbyRegistration>(new InvalidOperationException($"Error generating an obfuscated uri for lobby code [{lobbyCode}]."));
         }
 
         private static string NormalizeLobbyCode(string lobbyCode)
