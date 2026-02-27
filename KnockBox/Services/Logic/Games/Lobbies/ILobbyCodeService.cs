@@ -8,7 +8,7 @@ namespace KnockBox.Services.Logic.Games.Lobbies
     public interface ILobbyCodeService
     {
         /// <summary>
-        /// Issues a unique lobby code.
+        /// Issues a unique lobby code. Lobby codes are always Upper Invariant.
         /// </summary>
         /// <param name="ct"></param>
         /// <returns></returns>
