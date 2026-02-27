@@ -12,7 +12,7 @@ namespace KnockBox.Services.Logic.Games.Shared
         public readonly string LobbyCode = lobbyCode;
 
         /// <summary>
-        /// The uri for this lobby.
+        /// The uri for this lobby. Formatted as "/room/{gameType}/{obfuscatedRoomCode}".
         /// </summary>
         public readonly string LobbyUri = lobbyUri;
 

@@ -1,12 +1,9 @@
 ﻿using KnockBox.Extensions.Returns;
+using KnockBox.Services.Logic.Games.Shared;
 using KnockBox.Services.Navigation.Games;
 
 namespace KnockBox.Services.State.Games.Lobbies
 {
-    /// <param name="Uri">Formatted as "/room/{gameType}/{obfuscatedRoomCode}".</param>
-    /// <param name="Unsubscriber">Unregisters the associated lobby when disposed.</param>
-    public record class LobbyRegistration(string Uri, IDisposable Unsubscriber);
-
     public interface ILobbyUriProvider
     {
         /// <summary>
