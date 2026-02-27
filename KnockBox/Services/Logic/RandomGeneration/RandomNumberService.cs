@@ -1,4 +1,5 @@
-﻿using System.Security.Cryptography;
+﻿using KnockBox.Extensions.RandomGeneration;
+using System.Security.Cryptography;
 
 namespace KnockBox.Services.Logic.RandomGeneration
 {
@@ -19,6 +20,17 @@ namespace KnockBox.Services.Logic.RandomGeneration
             {
                 RandomType.Secure => RandomNumberGenerator.GetInt32(inclusiveMin, exclusiveMax),
                 _ => Random.Shared.Next(inclusiveMin, exclusiveMax)
+            };
+        }
+
+        public byte[] GetRandomBytes(int length, RandomType type = RandomType.Fast)
+        {
+            ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(length, 0, nameof(length));
+
+            return type switch
+            {
+                RandomType.Secure => RandomNumberGenerator.GetBytes(length),
+                _ => Random.Shared.GetBytes(length)
             };
         }
     }

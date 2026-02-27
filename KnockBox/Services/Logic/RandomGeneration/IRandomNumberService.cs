@@ -28,5 +28,13 @@
         /// <param name="type"></param>
         /// <returns></returns>
         int GetRandomInt(int inclusiveMin, int exclusiveMax, RandomType type = RandomType.Fast);
+
+        /// <summary>
+        /// Gets an array of bytes populated with random values.
+        /// </summary>
+        /// <param name="length"></param>
+        /// <param name="type"></param>
+        /// <returns></returns>
+        byte[] GetRandomBytes(int length, RandomType type = RandomType.Fast);
     }
 }

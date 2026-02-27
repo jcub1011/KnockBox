@@ -1,4 +1,5 @@
-﻿using System.Reflection;
+﻿using System.Diagnostics.CodeAnalysis;
+using System.Reflection;
 
 namespace KnockBox.Services.Navigation.Games
 {
@@ -18,6 +19,15 @@ namespace KnockBox.Services.Navigation.Games
             var field = value.GetType().GetField(value.ToString());
             var attribute = field?.GetCustomAttribute<NavigationString>();
             return attribute?.Uri;
+        }
+    }
+
+    public static class NavigationStringExtensions 
+    {
+        public static bool TryGetNavigationString(this GameType gameType, [NotNullWhen(true)] out string? navigationString)
+        {
+            navigationString = NavigationString.GetNavigationStringAttribute(gameType);
+            return navigationString is not null;
         }
     }
 }
