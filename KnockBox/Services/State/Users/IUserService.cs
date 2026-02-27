@@ -44,9 +44,9 @@
     public interface IUserService
     {
         /// <summary>
-        /// The user information for this circuit.
+        /// The user information for this circuit. Null if not initialized.
         /// </summary>
-        User CurrentUser { get; }
+        User? CurrentUser { get; }
 
         /// <summary>
         /// Initializes the current user.

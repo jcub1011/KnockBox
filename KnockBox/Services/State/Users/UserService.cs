@@ -1,22 +1,13 @@
-﻿using static KnockBox.Services.State.Users.IUserService;
-
-namespace KnockBox.Services.State.Users
+﻿namespace KnockBox.Services.State.Users
 {
     public class UserService : IUserService
     {
-        public string UserName { get; private set; } = string.Empty;
+        public User? CurrentUser { get; private set; }
 
-        public event UserNameChangedDelegate? UserNameChanged;
-
-        public Guid UserId { get; } = Guid.NewGuid();
-
-        public void SetUserName(string userName)
+        public Task InitializeCurrentUserAsync(CancellationToken ct = default)
         {
-            if (UserName == userName) return;
-
-            string prev = UserName;
-            UserName = userName;
-            UserNameChanged?.Invoke(prev, userName);
+            CurrentUser = new("Not Set", Guid.CreateVersion7().ToString());
+            return Task.CompletedTask;
         }
     }
 }
