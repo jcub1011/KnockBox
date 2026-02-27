@@ -1,4 +1,5 @@
 using KnockBox.Extensions.Collections;
+using KnockBox.Extensions.Disposable;
 using System.Collections.Concurrent;
 
 namespace KnockBox.Extensions.Events
@@ -11,7 +12,7 @@ namespace KnockBox.Extensions.Events
         private readonly ConcurrentDictionary<string, ConcurrentDictionary<Type, ThreadSafeList<Delegate>>> _groups = new(StringComparer.Ordinal);
         private int _disposed;
 
-        public void Subscribe<TType>(string group, Func<TType, ValueTask> callback)
+        public IDisposable Subscribe<TType>(string group, Func<TType, ValueTask> callback)
         {
             ObjectDisposedException.ThrowIf(_disposed == 1, this);
             if (string.IsNullOrWhiteSpace(group)) throw new ArgumentException("Group can't be null or whitespace.", nameof(group));
@@ -21,28 +22,7 @@ namespace KnockBox.Extensions.Events
             var list = typeMap.GetOrAdd(typeof(TType), _ => []);
 
             list.Add(callback);
-        }
-
-        public void Unsubscribe<TType>(string group, Func<TType, ValueTask> callback)
-        {
-            ObjectDisposedException.ThrowIf(_disposed == 1, this);
-            if (string.IsNullOrWhiteSpace(group)) throw new ArgumentException("Group can't be null or whitespace.", nameof(group));
-            ArgumentNullException.ThrowIfNull(callback);
-
-            if (!_groups.TryGetValue(group, out var typeMap)) return;
-            if (!typeMap.TryGetValue(typeof(TType), out var list)) return;
-
-            _ = list.Remove(callback);
-
-            if (list.Count == 0)
-            {
-                _ = typeMap.TryRemove(typeof(TType), out _);
-
-                if (typeMap.IsEmpty)
-                {
-                    _ = _groups.TryRemove(group, out _);
-                }
-            }
+            return new DisposableAction(() => list.Remove(callback));
         }
 
         public Task NotifyAsync<TType>(string group, TType args)

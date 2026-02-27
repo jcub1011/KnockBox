@@ -33,25 +33,6 @@ public sealed class TypedThreadSafeEventManagerTests
 
     [TestMethod]
     [DynamicData(nameof(InvalidGroups))]
-    public void Unsubscribe_InvalidGroup_Throws(string? group)
-    {
-        using var manager = new TypedThreadSafeEventManager();
-
-        Assert.Throws<ArgumentException>(() =>
-            manager.Unsubscribe<string>(group!, _ => ValueTask.CompletedTask));
-    }
-
-    [TestMethod]
-    public void Unsubscribe_NullCallback_Throws()
-    {
-        using var manager = new TypedThreadSafeEventManager();
-
-        Assert.Throws<ArgumentNullException>(() =>
-            manager.Unsubscribe<string>("group", null!));
-    }
-
-    [TestMethod]
-    [DynamicData(nameof(InvalidGroups))]
     public async Task NotifyAsync_InvalidGroup_Throws(string? group)
     {
         using var manager = new TypedThreadSafeEventManager();
@@ -117,7 +98,7 @@ public sealed class TypedThreadSafeEventManagerTests
     }
 
     [TestMethod]
-    public async Task Unsubscribe_RemovesCallback()
+    public async Task Subscribe_Dispose_RemovesCallback()
     {
         using var manager = new TypedThreadSafeEventManager();
         var called = 0;
@@ -128,8 +109,29 @@ public sealed class TypedThreadSafeEventManagerTests
             return ValueTask.CompletedTask;
         }
 
-        manager.Subscribe("group", (Func<string, ValueTask>)callback);
-        manager.Unsubscribe("group", (Func<string, ValueTask>)callback);
+        var subscription = manager.Subscribe("group", (Func<string, ValueTask>)callback);
+        subscription.Dispose();
+
+        await manager.NotifyAsync("group", "ping");
+
+        Assert.AreEqual(0, called);
+    }
+
+    [TestMethod]
+    public async Task Subscribe_Dispose_IsIdempotent()
+    {
+        using var manager = new TypedThreadSafeEventManager();
+        var called = 0;
+
+        ValueTask callback(string _)
+        {
+            Interlocked.Increment(ref called);
+            return ValueTask.CompletedTask;
+        }
+
+        var subscription = manager.Subscribe("group", (Func<string, ValueTask>)callback);
+        subscription.Dispose();
+        subscription.Dispose();
 
         await manager.NotifyAsync("group", "ping");
 
@@ -179,9 +181,6 @@ public sealed class TypedThreadSafeEventManagerTests
 
         Assert.Throws<ObjectDisposedException>(() =>
             manager.Subscribe<string>("group", _ => ValueTask.CompletedTask));
-
-        Assert.Throws<ObjectDisposedException>(() =>
-            manager.Unsubscribe<string>("group", _ => ValueTask.CompletedTask));
 
         await Assert.ThrowsAsync<ObjectDisposedException>(() =>
             manager.NotifyAsync("group", "payload"));
