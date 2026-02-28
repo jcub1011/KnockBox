@@ -1,4 +1,5 @@
-﻿using KnockBox.Services.Navigation.Games;
+﻿using KnockBox.Extensions.Returns;
+using KnockBox.Services.Logic.Games.Shared;
 
 namespace KnockBox.Services.Navigation
 {
@@ -12,14 +13,14 @@ namespace KnockBox.Services.Navigation
         /// <summary>
         /// Returns the absolute uri for the provided game lobby.
         /// </summary>
-        /// <param name="gameType"></param>
+        /// <param name="lobbyRegistration"></param>
         /// <returns></returns>
-        string GetGameUri(GameType gameType);
+        string GetGameUri(LobbyRegistration lobbyRegistration);
 
         /// <summary>
         /// Navigates to the lobby of the provided game.
         /// </summary>
-        /// <param name="gameType"></param>
-        void ToGame(GameType gameType);
+        /// <param name="lobbyRegistration"></param>
+        void ToGame(LobbyRegistration lobbyRegistration);
     }
 }

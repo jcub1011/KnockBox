@@ -9,8 +9,23 @@
 
 <h1>Home</h1>
 
+<div class="join-form">
+    <div class="join-form-room-code">
+        <h2>
+            Room Code:
+        </h2>
+        <input placeholder="KN0CK3OX" 
+               type="text" maxlength="8" name="room-code" 
+               @bind="LobbyCode"/>
+    </div>
+    <button @onclick="() => JoinLobby(LobbyCode)">Join</button>
+</div>
+
 <div class="game-grid">
-    <button class="game" aria-label="Split the Deck" @onclick="() => NavigateToGame(GameType.SplitTheDeck)">
+    <button class="game" aria-label="Split the Deck" @onclick="() => CreateLobby(GameType.SplitTheDeck)">
         Split the Deck
+    </button>
+    <button class="game" aria-label="Card Counter" @onclick="() => CreateLobby(GameType.CardCounter)">
+        Card Counter
     </button>
 </div>

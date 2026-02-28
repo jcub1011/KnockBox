@@ -6,7 +6,9 @@ namespace KnockBox.Services.Navigation.Games
     public enum GameType
     {
         [NavigationString("split-the-deck")]
-        SplitTheDeck
+        SplitTheDeck,
+        [NavigationString("card-counter")]
+        CardCounter,
     }
 
     [AttributeUsage(AttributeTargets.Field, Inherited = false)]

@@ -35,9 +35,11 @@ namespace KnockBox.Services.Logic.Games.Shared
             GameType gameType, 
             CancellationToken ct = default)
         {
+            // TODO: Create implementations of these engines
             AbstractGameEngine? engine = gameType switch
             {
                 GameType.SplitTheDeck => null,
+                GameType.CardCounter => null,
                 _ => null
             };
 
@@ -102,7 +104,7 @@ namespace KnockBox.Services.Logic.Games.Shared
 
             string lobbyId = $"{guidA}-{guidB}";
 
-            return Result.FromValue($"/room/{navigationString}/{lobbyId}");
+            return Result.FromValue($"room/{navigationString}/{lobbyId}");
         }
     }
 }

@@ -1,4 +1,4 @@
-﻿using KnockBox.Services.Navigation.Games;
+﻿using KnockBox.Services.Logic.Games.Shared;
 using Microsoft.AspNetCore.Components;
 
 namespace KnockBox.Services.Navigation
@@ -8,17 +8,14 @@ namespace KnockBox.Services.Navigation
     {
         public string GameBaseRoute => "games";
 
-        public string GetGameUri(GameType gameType)
+        public string GetGameUri(LobbyRegistration lobbyRegistration)
         {
-            string gameNavString = NavigationString.GetNavigationStringAttribute(gameType)
-                ?? throw new NavigationException($"{nameof(NavigationString)} not found for {nameof(GameType)} '{gameType}'.");
-
-            return $"{navigationManager.BaseUri}{GameBaseRoute}/{gameNavString}/lobby";
+            return $"{navigationManager.BaseUri}{lobbyRegistration.Uri}";
         }
 
-        public void ToGame(GameType gameType)
+        public void ToGame(LobbyRegistration lobbyRegistration)
         {
-            navigationManager.NavigateTo(GetGameUri(gameType));
+            navigationManager.NavigateTo(GetGameUri(lobbyRegistration));
         }
     }
 }
