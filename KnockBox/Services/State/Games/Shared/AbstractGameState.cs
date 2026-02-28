@@ -3,6 +3,7 @@ using KnockBox.Extensions.Events;
 using KnockBox.Extensions.Returns;
 using KnockBox.Services.State.Users;
 using System.Collections.Concurrent;
+using System.Diagnostics.CodeAnalysis;
 
 namespace KnockBox.Services.State.Games.Shared
 {
@@ -14,6 +15,8 @@ namespace KnockBox.Services.State.Games.Shared
         private readonly Lock _scheduledLock = new();
         private readonly List<CancellationTokenSource> _scheduledCallbacks = [];
         private readonly ConcurrentDictionary<User, IDisposable> _players = [];
+        private readonly CancellationTokenSource _disposeCts = new();
+        private int _disposed;
 
         /// <summary>
         /// The event manager for this game state.
@@ -44,6 +47,9 @@ namespace KnockBox.Services.State.Games.Shared
         /// <returns></returns>
         public Result<IDisposable> RegisterPlayer(User player)
         {
+            if (TryGetDisposeError(out var ode))
+                return Result.FromError<IDisposable>(ode);
+
             if (Host == player)
                 return Result.FromError<IDisposable>(new InvalidOperationException($"Host cannot be a player in the game."));
 
@@ -75,6 +81,7 @@ namespace KnockBox.Services.State.Games.Shared
             if (isJoinable != IsJoinable)
             {
                 IsJoinable = isJoinable;
+                NotifyStateChanged();
             }
         }
 
@@ -86,11 +93,14 @@ namespace KnockBox.Services.State.Games.Shared
         /// </remarks>
         /// <param name="handler"></param>
         /// <returns></returns>
-        public IDisposable SubscribeToStateChanged(Func<ValueTask> handler)
+        public Result<IDisposable> SubscribeToStateChanged(Func<ValueTask> handler)
         {
+            if (TryGetDisposeError(out var ode))
+                return Result.FromError<IDisposable>(ode);
+
             ValueTask HandlerWrapper(int unusedInput) => handler();
 
-            return EventManager.Subscribe<int>(STATE_CHANGED_GROUP, HandlerWrapper);
+            return Result.FromValue(EventManager.Subscribe<int>(STATE_CHANGED_GROUP, HandlerWrapper));
         }
 
         /// <summary>
@@ -101,6 +111,9 @@ namespace KnockBox.Services.State.Games.Shared
         /// <returns></returns>
         public async ValueTask<Result> ExecuteAsync(Func<ValueTask> action, CancellationToken ct = default)
         {
+            if (TryGetDisposeError(out var ode))
+                return Result.FromError(ode);
+
             try
             {
                 ct.ThrowIfCancellationRequested();
@@ -130,6 +143,9 @@ namespace KnockBox.Services.State.Games.Shared
         /// <returns></returns>
         public Result Execute(Action action)
         {
+            if (TryGetDisposeError(out var ode))
+                return Result.FromError(ode);
+
             try
             {
                 _executeLock.Wait();
@@ -158,6 +174,9 @@ namespace KnockBox.Services.State.Games.Shared
         /// <returns></returns>
         public async ValueTask<Result> WithExclusiveReadAsync(Func<ValueTask> action, CancellationToken ct = default)
         {
+            if (TryGetDisposeError(out var ode))
+                return Result.FromError(ode);
+
             try
             {
                 ct.ThrowIfCancellationRequested();
@@ -186,6 +205,9 @@ namespace KnockBox.Services.State.Games.Shared
         /// <returns></returns>
         public Result WithExclusiveRead(Action action)
         {
+            if (TryGetDisposeError(out var ode))
+                return Result.FromError(ode);
+
             try
             {
                 _executeLock.Wait();
@@ -221,9 +243,15 @@ namespace KnockBox.Services.State.Games.Shared
         /// <returns>
         /// A <see cref="CancellationTokenSource"/> whose token can be cancelled to discard the callback.
         /// </returns>
-        public CancellationTokenSource ScheduleCallback(TimeSpan delay, Func<Task> action)
+        public Result<CancellationTokenSource> ScheduleCallback(TimeSpan delay, Func<Task> action)
         {
-            var cts = new CancellationTokenSource();
+            if (TryGetDisposeError(out var ode))
+            {
+                logger.LogError(ode, "Error scheduling callback.");
+                return Result.FromError<CancellationTokenSource>(ode);
+            }
+
+            var cts = CancellationTokenSource.CreateLinkedTokenSource(_disposeCts.Token);
 
             lock (_scheduledLock)
             {
@@ -235,15 +263,15 @@ namespace KnockBox.Services.State.Games.Shared
                 try
                 {
                     await Task.Delay(delay, cts.Token);
+
+                    if (_disposeCts.IsCancellationRequested)
+                        return;
+
                     await ExecuteAsync(async () => await action(), cts.Token);
                 }
                 catch (OperationCanceledException)
                 {
                     // Silently discard if cancelled before or during execution.
-                }
-                catch (ObjectDisposedException)
-                {
-                    // State was disposed before the callback could acquire the lock.
                 }
                 catch (Exception ex)
                 {
@@ -259,11 +287,15 @@ namespace KnockBox.Services.State.Games.Shared
                 }
             });
 
-            return cts;
+            return Result.FromValue(cts);
         }
 
         public void Dispose()
         {
+            if (Interlocked.Exchange(ref _disposed, 1) == 1) return;
+
+            _disposeCts.Cancel();
+
             CancellationTokenSource[] pendingCallbacks;
 
             lock (_scheduledLock)
@@ -273,12 +305,20 @@ namespace KnockBox.Services.State.Games.Shared
             }
 
             foreach (var cts in pendingCallbacks)
-                cts.Cancel();
+            {
+                try
+                {
+                    cts.Cancel();
+                    cts.Dispose();
+                }
+                catch { } // Ignore canceled and disposed exceptions
+            }
 
             lock (_disposeLock)
             {
                 EventManager.Dispose();
                 _executeLock.Dispose();
+                _disposeCts.Dispose();
             }
 
             GC.SuppressFinalize(this);
@@ -286,7 +326,29 @@ namespace KnockBox.Services.State.Games.Shared
 
         private void NotifyStateChanged()
         {
-            EventManager.Notify(STATE_CHANGED_GROUP, 1);
+            if (_disposed == 1) return;
+
+            try
+            {
+                EventManager.Notify(STATE_CHANGED_GROUP, 1);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Error notifying subscribers of state change.");
+            }
+        }
+
+        private bool TryGetDisposeError([NotNullWhen(true)] out ObjectDisposedException? disposeError)
+        {
+            disposeError = null;
+
+            if (_disposed == 1)
+            {
+                disposeError = new ObjectDisposedException(GetType().Name);
+                return true;
+            }
+
+            return false;
         }
     }
 }
