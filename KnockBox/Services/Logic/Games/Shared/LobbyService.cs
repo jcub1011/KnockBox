@@ -1,17 +1,12 @@
 ﻿using KnockBox.Extensions.Returns;
 using KnockBox.Services.Logic.Games.Engines.Shared;
-using KnockBox.Services.Logic.RandomGeneration;
 using KnockBox.Services.Navigation.Games;
-using KnockBox.Services.State.Games.Lobbies;
 using KnockBox.Services.State.Users;
 using System.Collections.Concurrent;
 
 namespace KnockBox.Services.Logic.Games.Shared
 {
-    public class LobbyService(
-        ILobbyCodeService lobbyCodeService,
-        IRandomNumberService random,
-        ILobbyUriProvider uriProvider) : ILobbyService
+    public class LobbyService(ILobbyCodeService lobbyCodeService) : ILobbyService
     {
         private readonly ConcurrentDictionary<string, LobbyRegistration> _lobbies = [];
 
@@ -20,11 +15,17 @@ namespace KnockBox.Services.Logic.Games.Shared
             LobbyRegistration registration, 
             CancellationToken ct = default)
         {
-            if (!_lobbies.TryRemove(registration.LobbyCode, out _))
-            {
+            if (user.Id != registration.State.Host.Id)
                 return Result.FromError(
-                    new KeyNotFoundException($"Unable to find lobby with code [{registration.LobbyCode}]."));
-            }
+                    new InvalidOperationException($"User [{user.Name}] is not the host of the lobby and cannot close it."));
+
+            if (!_lobbies.TryRemove(NormalizeLobbyCode(registration.Code), out _))
+                return Result.FromError(
+                    new KeyNotFoundException($"Unable to find lobby with code [{registration.Code}]."));
+
+            var releaseResult = await lobbyCodeService.ReleaseLobbyCodeAsync(registration.Code, ct);
+            if (releaseResult.TryGetError(out var error))
+                return Result.FromError(error);
 
             return Result.Success;
         }
@@ -43,42 +44,65 @@ namespace KnockBox.Services.Logic.Games.Shared
             if (engine is null)
                 return Result.FromError<LobbyRegistration>(new Exception($"Game engine for [{gameType}] not registered."));
 
-            var lobbyCodeResult = await lobbyCodeService.IssueLobbyCodeAsync(ct);
-            if (!lobbyCodeResult.TryGetValue(out var lobbyCode))
-                return Result.FromError<LobbyRegistration>(lobbyCodeResult.Error);
-
-            var stateResult = await engine.CreateStateAsync(ct);
+            var stateResult = await engine.CreateStateAsync(host, ct);
             if (!stateResult.TryGetValue(out var gameState))
                 return Result.FromError<LobbyRegistration>(stateResult.Error);
 
-            var registration = new LobbyRegistration();
-            var state = stateResult.Value;
-            
+            var lobbyUriResult = CreateLobbyUri(gameType);
+            if (!lobbyUriResult.TryGetValue(out var lobbyUri))
+                return Result.FromError<LobbyRegistration>(lobbyUriResult.Error);
+
+            var lobbyCodeResult = await lobbyCodeService.IssueLobbyCodeAsync(ct);
+            if (!lobbyCodeResult.TryGetValue(out var lobbyCode)) // Service garauntees that lobby code is normalized
+                return Result.FromError<LobbyRegistration>(lobbyCodeResult.Error);
+
+            var lobbyRegistration = new LobbyRegistration(lobbyCode, lobbyUri, gameType, gameState);
+            if (!_lobbies.TryAdd(lobbyCode, lobbyRegistration))
+                return Result.FromError<LobbyRegistration>(new InvalidOperationException($"Game with lobby code [{lobbyCode}] already exists."));
+
+            return Result.FromValue(lobbyRegistration);
         }
 
-        public Task<Result<LobbyRegistration>> JoinLobbyAsync(
+        public async Task<Result<UserRegistration>> JoinLobbyAsync(
             User user, 
             string lobbyCode, 
             CancellationToken ct = default)
         {
-            throw new NotImplementedException();
+            if (!_lobbies.TryGetValue(NormalizeLobbyCode(lobbyCode), out var registration))
+                return Result.FromError<UserRegistration>(new KeyNotFoundException($"Unable to find lobby with code [{lobbyCode}]."));
+
+            Result<IDisposable> registrationResult = null!;
+            var executionResult = registration.State.Execute(() =>
+            {
+                registrationResult = registration.State.RegisterPlayer(user);
+            });
+
+            if (executionResult.TryGetError(out var error))
+                return Result.FromError<UserRegistration>(error);
+
+            if (!registrationResult.TryGetValue(out var unsubscriber))
+                return Result.FromError<UserRegistration>(registrationResult.Error);
+
+            var userRegistration = new UserRegistration(user, unsubscriber, registration);
+            return Result.FromValue(userRegistration);
         }
 
-        public Task<Result> LeaveLobbyAsync(
-            User user, 
-            LobbyRegistration registration, 
-            CancellationToken ct = default)
+        private static string NormalizeLobbyCode(string lobbyCode)
         {
-            throw new NotImplementedException();
+            return lobbyCode.Trim().ToUpperInvariant();
         }
 
-        public Task<Result> ReassignHostAsync(
-            User previousHost, 
-            User newHost, 
-            LobbyRegistration registration, 
-            CancellationToken ct = default)
+        private static Result<string> CreateLobbyUri(GameType gameType)
         {
-            throw new NotImplementedException();
+            if (!gameType.TryGetNavigationString(out var navigationString))
+                return Result.FromError<string>(new ArgumentException($"Game type [{gameType}] does not have a defined navigation string attribute."));
+
+            var guidA = Guid.NewGuid();
+            var guidB = Guid.NewGuid();
+
+            string lobbyId = $"{guidA}-{guidB}";
+
+            return Result.FromValue($"/room/{navigationString}/{lobbyId}");
         }
     }
 }

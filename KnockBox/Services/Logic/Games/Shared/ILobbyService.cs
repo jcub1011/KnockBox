@@ -1,20 +1,21 @@
 ﻿using KnockBox.Extensions.Returns;
 using KnockBox.Services.Navigation.Games;
+using KnockBox.Services.State.Games.Shared;
 using KnockBox.Services.State.Users;
 
 namespace KnockBox.Services.Logic.Games.Shared
 {
-    public class LobbyRegistration(string lobbyCode, string lobbyUri, GameType gameType, User host)
+    public class LobbyRegistration(string lobbyCode, string lobbyUri, GameType gameType, AbstractGameState state)
     {
         /// <summary>
-        /// The lobby code for this lobby.
+        /// The code for this lobby.
         /// </summary>
-        public readonly string LobbyCode = lobbyCode;
+        public readonly string Code = lobbyCode;
 
         /// <summary>
         /// The uri for this lobby. Formatted as "/room/{gameType}/{obfuscatedRoomCode}".
         /// </summary>
-        public readonly string LobbyUri = lobbyUri;
+        public readonly string Uri = lobbyUri;
 
         /// <summary>
         /// The type of the lobby.
@@ -22,9 +23,14 @@ namespace KnockBox.Services.Logic.Games.Shared
         public readonly GameType GameType = gameType;
 
         /// <summary>
-        /// The host for the lobby.
+        /// The game state for this lobby.
         /// </summary>
-        public User Host { get; set; } = host;
+        public readonly AbstractGameState State = state;
+    }
+
+    public record class UserRegistration(User User, IDisposable UnregistrationToken, LobbyRegistration LobbyRegistration) : IDisposable
+    {
+        public void Dispose() => UnregistrationToken.Dispose();
     }
 
     public interface ILobbyService
@@ -54,25 +60,6 @@ namespace KnockBox.Services.Logic.Games.Shared
         /// <param name="lobbyCode">The code for the lobby to join.</param>
         /// <param name="ct"></param>
         /// <returns></returns>
-        Task<Result<LobbyRegistration>> JoinLobbyAsync(User user, string lobbyCode, CancellationToken ct = default);
-
-        /// <summary>
-        /// Leaves the lobby.
-        /// </summary>
-        /// <param name="user">The user to leave. Cannot be the host.</param>
-        /// <param name="registration"></param>
-        /// <param name="ct"></param>
-        /// <returns></returns>
-        Task<Result> LeaveLobbyAsync(User user, LobbyRegistration registration, CancellationToken ct = default);
-
-        /// <summary>
-        /// Reassigns the host for the lobby.
-        /// </summary>
-        /// <param name="previousHost"></param>
-        /// <param name="newHost"></param>
-        /// <param name="registration"></param>
-        /// <param name="ct"></param>
-        /// <returns></returns>
-        Task<Result> ReassignHostAsync(User previousHost, User newHost, LobbyRegistration registration, CancellationToken ct = default);
+        Task<Result<UserRegistration>> JoinLobbyAsync(User user, string lobbyCode, CancellationToken ct = default);
     }
 }
