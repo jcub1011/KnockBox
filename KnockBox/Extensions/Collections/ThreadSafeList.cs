@@ -8,9 +8,19 @@ namespace KnockBox.Extensions.Collections
         private bool _disposed;
         private readonly ReaderWriterLockSlim _lock = new(LockRecursionPolicy.SupportsRecursion);
         private readonly List<TElement> _list = [];
+        public bool IsDisposed => _disposed;
 
-        public ReadLockScope EnterReadLockScope() => new(_lock);
-        public WriteLockScope EnterWriteLockScope() => new(_lock);
+        public ReadLockScope EnterReadLockScope()
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            return new(_lock);
+        }
+
+        public WriteLockScope EnterWriteLockScope()
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            return new(_lock);
+        }
 
         public int Count => GetCount();
 
@@ -20,10 +30,12 @@ namespace KnockBox.Extensions.Collections
         {
             get
             {
+                ObjectDisposedException.ThrowIf(_disposed, this);
                 return At(index);
             }
             set
             {
+                ObjectDisposedException.ThrowIf(_disposed, this);
                 using var scope = EnterWriteLockScope();
                 _list[index] = value;
             }
@@ -31,6 +43,7 @@ namespace KnockBox.Extensions.Collections
 
         public int GetCount()
         {
+            ObjectDisposedException.ThrowIf(_disposed, this);
             using var scope = EnterReadLockScope();
             return GetCount(scope);
         }
@@ -43,6 +56,7 @@ namespace KnockBox.Extensions.Collections
 
         public TElement At(int index)
         {
+            ObjectDisposedException.ThrowIf(_disposed, this);
             using var scope = EnterReadLockScope();
             return At(index, scope);
         }
@@ -55,6 +69,7 @@ namespace KnockBox.Extensions.Collections
 
         public int IndexOf(TElement item)
         {
+            ObjectDisposedException.ThrowIf(_disposed, this);
             using var scope = EnterReadLockScope();
             return IndexOf(item, scope);
         }
@@ -67,6 +82,7 @@ namespace KnockBox.Extensions.Collections
 
         public void Insert(int index, TElement item)
         {
+            ObjectDisposedException.ThrowIf(_disposed, this);
             using var scope = EnterWriteLockScope();
             Insert(index, item, scope);
         }
@@ -79,6 +95,7 @@ namespace KnockBox.Extensions.Collections
 
         public void RemoveAt(int index)
         {
+            ObjectDisposedException.ThrowIf(_disposed, this);
             using var scope = EnterWriteLockScope();
             RemoveAt(index, scope);
         }
@@ -91,6 +108,7 @@ namespace KnockBox.Extensions.Collections
 
         public void Add(TElement item)
         {
+            ObjectDisposedException.ThrowIf(_disposed, this);
             using var scope = EnterWriteLockScope();
             Add(item, scope);
         }
@@ -103,6 +121,7 @@ namespace KnockBox.Extensions.Collections
 
         public void Clear()
         {
+            ObjectDisposedException.ThrowIf(_disposed, this);
             using var scope = EnterWriteLockScope();
             Clear(scope);
         }
@@ -115,6 +134,7 @@ namespace KnockBox.Extensions.Collections
 
         public bool Contains(TElement item)
         {
+            ObjectDisposedException.ThrowIf(_disposed, this);
             using var scope = EnterReadLockScope();
             return Contains(item, scope);
         }
@@ -127,6 +147,7 @@ namespace KnockBox.Extensions.Collections
 
         public void CopyTo(TElement[] array, int arrayIndex)
         {
+            ObjectDisposedException.ThrowIf(_disposed, this);
             using var scope = EnterReadLockScope();
             CopyTo(array, arrayIndex, scope);
         }
@@ -139,6 +160,7 @@ namespace KnockBox.Extensions.Collections
 
         public bool Remove(TElement item)
         {
+            ObjectDisposedException.ThrowIf(_disposed, this);
             using var scope = EnterWriteLockScope();
             return Remove(item, scope);
         }
@@ -151,6 +173,7 @@ namespace KnockBox.Extensions.Collections
 
         public IEnumerator<TElement> GetEnumerator()
         {
+            ObjectDisposedException.ThrowIf(_disposed, this);
             using var scope = EnterReadLockScope();
             return GetEnumerator(scope);
         }
@@ -193,6 +216,7 @@ namespace KnockBox.Extensions.Collections
 
         IEnumerator IEnumerable.GetEnumerator()
         {
+            ObjectDisposedException.ThrowIf(_disposed, this);
             return GetEnumerator();
         }
     }

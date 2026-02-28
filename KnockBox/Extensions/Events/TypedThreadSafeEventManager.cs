@@ -22,7 +22,17 @@ namespace KnockBox.Extensions.Events
             var list = typeMap.GetOrAdd(typeof(TType), _ => []);
 
             list.Add(callback);
-            return new DisposableAction(() => list.Remove(callback));
+            return new DisposableAction(() =>
+            {
+                try
+                {
+                    if (!list.IsDisposed)
+                    {
+                        list.Remove(callback);
+                    }
+                }
+                catch (ObjectDisposedException) { } // Ignore
+            });
         }
 
         public Task NotifyAsync<TType>(string group, TType args)

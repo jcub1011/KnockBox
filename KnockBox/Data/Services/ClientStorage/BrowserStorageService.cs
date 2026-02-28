@@ -80,10 +80,17 @@ namespace KnockBox.Data.Services.ClientStorage
 
         public async ValueTask DisposeAsync()
         {
-            if (!_moduleTask.IsValueCreated) return;
+            try
+            {
+                if (!_moduleTask.IsValueCreated) return;
 
-            var module = await _moduleTask.Value.ConfigureAwait(false);
-            await module.DisposeAsync().ConfigureAwait(false);
+                var module = await _moduleTask.Value.ConfigureAwait(false);
+                await module.DisposeAsync().ConfigureAwait(false);
+            }
+            catch (JSDisconnectedException)
+            {
+                // Ignore circuit break
+            }
 
             GC.SuppressFinalize(this);
         }
