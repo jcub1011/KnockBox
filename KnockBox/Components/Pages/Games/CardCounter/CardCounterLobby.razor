@@ -1,0 +1,149 @@
+@page "/room/card-counter/{ObfuscatedRoomCode}"
+
+@inherits DisposableComponent
+@using KnockBox.Services.State.Games.CardCounter.Data
+@using KnockBox.Services.State.Users
+
+<PageTitle>Card Counter</PageTitle>
+
+@if (GameState == null)
+{
+    <div>Loading...</div>
+}
+else
+{
+    <div class="d-flex align-items-center mb-3">
+        <h3 class="mb-0 me-3">Card Counter Lobby</h3>
+        <button class="btn btn-sm btn-outline-secondary" @onclick="ToggleRoomCode">
+            @(IsRoomCodeVisible ? "Hide Room Code" : "Show Room Code")
+        </button>
+        @if (IsRoomCodeVisible)
+        {
+            <span class="ms-2 user-select-all fw-bold fs-5">@RoomCode</span>
+        }
+    </div>
+
+    @if (GameState.IsJoinable)
+    {
+        <div>
+            <h4>Players</h4>
+            <ul>
+                @foreach (var player in GameState.Players)
+                {
+                    <li>@player.Name @(player.Id == GameState.Host.Id ? "(Host)" : "")</li>
+                }
+            </ul>
+            @if (UserService.CurrentUser?.Id == GameState.Host.Id)
+            {
+                <button class="btn btn-primary" @onclick="StartGame">Start Session</button>
+            }
+        </div>
+    }
+    else
+    {
+        <h4>Game Started</h4>
+        <div class="game-info">
+            <p>Phase: @GameState.Phase</p>
+        </div>
+
+        @if (GameState.Phase == GamePhase.BuyIn)
+        {
+            var myPlayer = GetMyPlayer();
+            if (myPlayer != null && !myPlayer.HasSetBuyIn)
+            {
+                <p>Buy-in Roll: @(myPlayer.BuyInRoll * 8)</p>
+                <button class="btn btn-success" @onclick="() => SetBuyIn(false)">Positive</button>
+                <button class="btn btn-danger" @onclick="() => SetBuyIn(true)">Negative</button>
+            }
+        }
+        else if (GameState.Phase == GamePhase.Playing)
+        {
+            var activeId = GameState.TurnOrder.Count > 0 ? GameState.TurnOrder[GameState.CurrentPlayerIndex] : "";
+            <p>Active Player: @(GameState.GamePlayers.TryGetValue(activeId, out var activePlayer) ? activePlayer.DisplayName : "")</p>
+            <p>Shoe Index: @GameState.ShoeIndex</p>
+            <p>Cards in Shoe: Number(@GameState.ShoeCardCounts.GetValueOrDefault(CardType.Number)), Operator(@GameState.ShoeCardCounts.GetValueOrDefault(CardType.Operator))</p>
+            <div class="row">
+                @foreach (var p in GameState.GamePlayers.Values)
+                {
+                    <div class="col-md-4">
+                        <div class="card p-3 mb-3">
+                            <h5>@p.DisplayName</h5>
+                            <p>Balance: @p.Balance</p>
+                            <p>Pot: @string.Join("", p.Pot) (@p.PotValue)</p>
+                            <p>Passes: @p.PassesRemaining</p>
+                            @if (p.PlayerId == UserService.CurrentUser?.Id)
+                            {
+                                <p>Action Cards: @p.ActionHand.Count</p>
+                                @if (p.ActionHand.Any())
+                                {
+                                    <div class="mb-2">
+                                        @for (int i = 0; i < p.ActionHand.Count; i++)
+                                        {
+                                            var index = i;
+                                            var card = p.ActionHand[i];
+                                            <button class="btn btn-sm btn-info me-1 mb-1" 
+                                                    disabled="@(activeId != p.PlayerId || p.PrivateReveal != null)" 
+                                                    @onclick="() => PlayActionCard(index)">
+                                                @card.Action
+                                            </button>
+                                        }
+                                    </div>
+                                }
+
+                                @if (p.PrivateReveal != null)
+                                {
+                                    <div class="alert alert-warning">
+                                        <h6>Reorder Top Cards</h6>
+                                        <p>Click cards in the order you want them placed back on top of the shoe (first clicked will be top card).</p>
+                                        <div class="d-flex mb-2 flex-wrap">
+                                        @for (int i = 0; i < p.PrivateReveal.Count; i++)
+                                        {
+                                            var index = i;
+                                            var revealCard = p.PrivateReveal[i];
+                                            bool isSelected = SelectedReorderIndices.Contains(index);
+                                            <button class="btn @(isSelected ? "btn-secondary" : "btn-outline-primary") me-1 mb-1" 
+                                                    @onclick="() => ToggleReorderIndex(index)"
+                                                    disabled="@isSelected">
+                                                @(revealCard is NumberCard nc ? $"Number: {nc.Value}" : revealCard is OperatorCard oc ? $"Operator: {oc.Op}" : "Card")
+                                                @(isSelected ? $" ({SelectedReorderIndices.IndexOf(index) + 1})" : "")
+                                            </button>
+                                        }
+                                        </div>
+                                        <button class="btn btn-success" 
+                                                disabled="@(SelectedReorderIndices.Count != p.PrivateReveal.Count)" 
+                                                @onclick="SubmitReorder">
+                                            Confirm Order
+                                        </button>
+                                        <button class="btn btn-danger ms-2" @onclick="ResetReorder">Reset</button>
+                                    </div>
+                                }
+
+                                @if (activeId == p.PlayerId && p.PrivateReveal == null)
+                                {
+                                    <button class="btn btn-primary" @onclick="DrawCard">Draw</button>
+                                    @if (p.PassesRemaining > 0)
+                                    {
+                                        <button class="btn btn-warning" @onclick="PassTurn">Pass</button>
+                                        <button class="btn btn-secondary" @onclick="FoldPot">Fold</button>
+                                    }
+                                }
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+        else if (GameState.Phase == GamePhase.GameOver)
+        {
+            <h3>Game Over!</h3>
+            @foreach (var p in GameState.GamePlayers.Values.OrderBy(x => Math.Abs(x.Balance)))
+            {
+                <p>@p.DisplayName : @p.Balance</p>
+            }
+            @if (UserService.CurrentUser?.Id == GameState.Host.Id)
+            {
+                <p>No restart logic yet...</p>
+            }
+        }
+    }
+}

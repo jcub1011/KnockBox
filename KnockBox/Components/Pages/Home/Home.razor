@@ -34,7 +34,10 @@
     <button class="game" aria-label="Split the Deck" disabled="@(!CanJoinOrCreate)" @onclick="() => CreateLobby(GameType.SplitTheDeck)">
         Split the Deck
     </button>
-    <button class="game" aria-label="Card Counter" disabled="@(!CanJoinOrCreate)" @onclick="() => CreateLobby(GameType.DiceSimulator)">
+    <button class="game" aria-label="Card Counter" disabled="@(!CanJoinOrCreate)" @onclick="() => CreateLobby(GameType.CardCounter)">
+        Card Counter
+    </button>
+    <button class="game" aria-label="Dice Simulator" disabled="@(!CanJoinOrCreate)" @onclick="() => CreateLobby(GameType.DiceSimulator)">
         Dice Simulator
     </button>
 </div>

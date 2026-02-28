@@ -2,6 +2,7 @@
 using KnockBox.Services.Logic.Games.Engines.Shared;
 using KnockBox.Services.Navigation.Games;
 using KnockBox.Services.Navigation.Games.DiceSimulator;
+using KnockBox.Services.Navigation.Games.CardCounter;
 using KnockBox.Services.State.Users;
 using System.Collections.Concurrent;
 
@@ -43,6 +44,7 @@ namespace KnockBox.Services.Logic.Games.Shared
             {
                 GameType.SplitTheDeck => null,
                 GameType.DiceSimulator => serviceProvider.GetService<DiceSimulatorGameEngine>(),
+                GameType.CardCounter => serviceProvider.GetService<CardCounterGameEngine>(),
                 _ => null
             };
 

@@ -97,12 +97,12 @@ namespace KnockBox.Components.Pages.Games.DiceSimulator
 
         protected void RollDice()
         {
-            GameState.RollDice(UserService.CurrentUser!, RollAction);
+            GameEngine.RollDice(UserService.CurrentUser!, GameState, RollAction);
         }
 
         protected void ClearHistory()
         {
-            GameState.ClearHistory(UserService.CurrentUser!);
+            GameEngine.ClearHistory(UserService.CurrentUser!, GameState);
         }
 
         protected async Task ExportCsv()

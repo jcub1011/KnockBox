@@ -9,6 +9,8 @@ namespace KnockBox.Services.Navigation.Games
         SplitTheDeck,
         [NavigationString("dice-simulator")]
         DiceSimulator,
+        [NavigationString("card-counter")]
+        CardCounter,
     }
 
     [AttributeUsage(AttributeTargets.Field, Inherited = false)]
