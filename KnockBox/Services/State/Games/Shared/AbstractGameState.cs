@@ -62,6 +62,7 @@ namespace KnockBox.Services.State.Games.Shared
             if (_players.TryAdd(player, unsubscriber))
             {
                 wasAdded = true;
+                logger.LogInformation("User [{userId}] entered game [{type}] hosted by user [{hostId}].", player.Id, GetType().Name, Host.Id);
                 return Result.FromValue<IDisposable>(unsubscriber);
             }
             else
@@ -320,6 +321,8 @@ namespace KnockBox.Services.State.Games.Shared
                 _executeLock.Dispose();
                 _disposeCts.Dispose();
             }
+
+            logger.LogInformation("Game state [{type}] ended with host [{id}].", GetType().Name, Host.Id);
 
             GC.SuppressFinalize(this);
         }

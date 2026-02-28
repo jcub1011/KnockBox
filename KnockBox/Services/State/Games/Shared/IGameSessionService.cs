@@ -24,6 +24,6 @@ namespace KnockBox.Services.State.Games.Shared
         /// Leaves the current session the user is a part of. Automatically navigates to the home page.
         /// </summary>
         /// <returns></returns>
-        Result LeaveCurrentSession();
+        Result LeaveCurrentSession(bool navigateHome = true);
     }
 }

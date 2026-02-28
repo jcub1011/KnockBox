@@ -20,7 +20,8 @@ namespace KnockBox
                 loggerConfig
                     .ReadFrom.Configuration(context.Configuration)
                     .ReadFrom.Services(services)
-                    .Enrich.FromLogContext());
+                    .Enrich.FromLogContext()
+                    .WriteTo.Console());
 
             // Add services to the container.
             builder.Services.AddRazorComponents()

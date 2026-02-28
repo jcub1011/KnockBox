@@ -14,7 +14,11 @@ namespace KnockBox.Services.Navigation.Games.DiceSimulator
     {
         public override async Task<Result<AbstractGameState>> CreateStateAsync(User host, CancellationToken ct = default)
         {
+            if (host is null)
+                return Result.FromError<AbstractGameState>(new ArgumentNullException(nameof(host)));
+
             var gameState = new DiceSimulatorGameState(host, stateLogger, randomNumberservice);
+            logger.LogInformation("Created gameState with user [{userId}] as host.", host.Id);
             return Result.FromValue<AbstractGameState>(gameState);
         }
 
@@ -22,6 +26,9 @@ namespace KnockBox.Services.Navigation.Games.DiceSimulator
         {
             if (state is not DiceSimulatorGameState gameState)
                 return Result.FromError(new InvalidCastException($"Game state of type [{state.GetType().Name}] couldn't be cast to type [{nameof(DiceSimulatorGameState)}]."));
+
+            if (host != gameState.Host)
+                return Result.FromError(new InvalidOperationException($"Only the host can start the game."));
 
             var executeResult = state.Execute(() =>
             {
