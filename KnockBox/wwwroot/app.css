@@ -1,12 +1,16 @@
 :root {
     --font-primary: "Lexend", sans-serif;
     --font-mono: "Google Sans Code", monospace;
+    --bg-color: #A9CEF4;
+    --accent-color: #FF0055;
+    --trietary-color: #21897E;
 }
 
 body {
     font-family: var(--font-primary);
     font-optical-sizing: auto;
     box-sizing: border-box;
+    background-color: #A9CEF4;
 }
 
 button {
