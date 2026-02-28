@@ -55,15 +55,36 @@ namespace KnockBox.Components.Pages.Games.DiceSimulator
             }
 
             GameState = (DiceSimulatorGameState)session.LobbyRegistration.State;
+
+            if (GameState.IsDisposed)
+            {
+                NavigationService.ToHome();
+                return;
+            }
+
+            GameState.OnStateDisposed += HandleStateDisposed;
+
             RoomCode = session.LobbyRegistration.Code;
             _stateSubscription = GameState.SubscribeToStateChanged(async () => await InvokeAsync(StateHasChanged)).Value;
 
             await base.OnInitializedAsync();
         }
 
+        private void HandleStateDisposed()
+        {
+            InvokeAsync(() =>
+            {
+                NavigationService.ToHome();
+            });
+        }
+
         public override void Dispose()
         {
             base.Dispose();
+            if (GameState is not null)
+            {
+                GameState.OnStateDisposed -= HandleStateDisposed;
+            }
             _stateSubscription?.Dispose();
             GameSessionService.LeaveCurrentSession(false);
         }

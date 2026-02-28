@@ -19,6 +19,16 @@ namespace KnockBox.Services.State.Games.Shared
         private int _disposed;
 
         /// <summary>
+        /// True if this state has been disposed.
+        /// </summary>
+        public bool IsDisposed => _disposed == 1;
+
+        /// <summary>
+        /// Fired when the state is disposed.
+        /// </summary>
+        public event Action? OnStateDisposed;
+
+        /// <summary>
         /// The event manager for this game state.
         /// </summary>
         public ITypedThreadSafeEventManager EventManager { get; private set; }
@@ -297,6 +307,15 @@ namespace KnockBox.Services.State.Games.Shared
         public void Dispose()
         {
             if (Interlocked.Exchange(ref _disposed, 1) == 1) return;
+
+            try
+            {
+                OnStateDisposed?.Invoke();
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Error invoking OnStateDisposed.");
+            }
 
             _disposeCts.Cancel();
 

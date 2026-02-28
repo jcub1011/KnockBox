@@ -100,6 +100,7 @@ namespace KnockBox.Components.Pages.Home
             {
                 // Close the lobby when the host leaves
                 lobby.State.Dispose();
+                _ = LobbyService.CloseLobbyAsync(user, lobby, CancellationToken.None);
             });
 
             GameSessionService.SetCurrentSession(new UserRegistration(user, disposeAction, createResult.Value));
