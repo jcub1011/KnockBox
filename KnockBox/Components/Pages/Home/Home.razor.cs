@@ -19,6 +19,24 @@ namespace KnockBox.Components.Pages.Home
 
         private string? LobbyCode { get; set; }
 
+        private string? _playerName;
+        private string? PlayerName
+        {
+            get => _playerName ?? (UserService.CurrentUser?.Name == "Not Set" ? "" : UserService.CurrentUser?.Name);
+            set
+            {
+                _playerName = value;
+                if (UserService.CurrentUser is not null)
+                {
+                    UserService.CurrentUser.Name = string.IsNullOrWhiteSpace(value) ? "Not Set" : value.Trim();
+                }
+            }
+        }
+
+        private bool CanJoinOrCreate => UserService.CurrentUser is not null 
+            && !string.IsNullOrWhiteSpace(UserService.CurrentUser.Name) 
+            && UserService.CurrentUser.Name != "Not Set";
+
         protected override async Task OnInitializedAsync()
         {
             try
@@ -35,6 +53,8 @@ namespace KnockBox.Components.Pages.Home
 
         private async Task JoinLobby(string lobbyCode)
         {
+            if (!CanJoinOrCreate) return;
+
             if (string.IsNullOrWhiteSpace(lobbyCode))
             {
                 // TODO: Notify user their code is invalid
@@ -60,6 +80,8 @@ namespace KnockBox.Components.Pages.Home
 
         private async Task CreateLobby(GameType gameType)
         {
+            if (!CanJoinOrCreate) return;
+
             var user = UserService.CurrentUser;
             if (user is null)
             {

@@ -50,6 +50,9 @@ namespace KnockBox.Services.State.Games.Shared
             if (TryGetDisposeError(out var ode))
                 return Result.FromError<IDisposable>(ode);
 
+            if (!IsJoinable)
+                return Result.FromError<IDisposable>(new InvalidOperationException($"The game is not currently joinable."));
+
             if (Host == player)
                 return Result.FromError<IDisposable>(new InvalidOperationException($"Host cannot be a player in the game."));
 

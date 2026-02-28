@@ -1,9 +1,12 @@
 ﻿using KnockBox.Components.Shared;
 using KnockBox.Services.Navigation;
 using KnockBox.Services.Navigation.Games.DiceSimulator;
+using KnockBox.Services.State.Games.DiceSimulator;
+using KnockBox.Services.State.Games.DiceSimulator.Data;
 using KnockBox.Services.State.Games.Shared;
 using KnockBox.Services.State.Users;
 using Microsoft.AspNetCore.Components;
+using Microsoft.JSInterop;
 using System.Diagnostics.CodeAnalysis;
 
 namespace KnockBox.Components.Pages.Games.DiceSimulator
@@ -20,7 +23,11 @@ namespace KnockBox.Components.Pages.Games.DiceSimulator
 
         [Inject] protected ILogger<DiceSimulatorLobby> Logger { get; set; } = default!;
 
+        [Inject] protected Microsoft.JSInterop.IJSRuntime JSRuntime { get; set; } = default!;
+
         [Parameter] public string ObfuscatedRoomCode { get; set; } = default!;
+
+        private IDisposable? _stateSubscription;
 
         protected override async Task OnInitializedAsync()
         {
@@ -47,12 +54,17 @@ namespace KnockBox.Components.Pages.Games.DiceSimulator
                 return;
             }
 
+            GameState = (DiceSimulatorGameState)session.LobbyRegistration.State;
+            RoomCode = session.LobbyRegistration.Code;
+            _stateSubscription = GameState.SubscribeToStateChanged(async () => await InvokeAsync(StateHasChanged)).Value;
+
             await base.OnInitializedAsync();
         }
 
         public override void Dispose()
         {
             base.Dispose();
+            _stateSubscription?.Dispose();
             GameSessionService.LeaveCurrentSession(false);
         }
 
@@ -66,6 +78,40 @@ namespace KnockBox.Components.Pages.Games.DiceSimulator
                 obfuscatedRoomCode = split[^1];
                 return true;
             }
+        }
+
+        protected DiceSimulatorGameState GameState { get; set; } = default!;
+        protected DiceRollAction RollAction { get; set; } = new();
+        protected string RoomCode { get; set; } = string.Empty;
+        protected bool IsRoomCodeVisible { get; set; } = false;
+
+        protected void ToggleRoomCode()
+        {
+            IsRoomCodeVisible = !IsRoomCodeVisible;
+        }
+
+        protected async Task StartGame()
+        {
+            await GameEngine.StartAsync(UserService.CurrentUser!, GameState);
+        }
+
+        protected void RollDice()
+        {
+            GameState.RollDice(UserService.CurrentUser!, RollAction);
+        }
+
+        protected void ClearHistory()
+        {
+            GameState.ClearHistory(UserService.CurrentUser!);
+        }
+
+        protected async Task ExportCsv()
+        {
+            var csvBytes = KnockBox.Services.Logic.Games.DiceSimulator.CsvExportService.GenerateCsv(GameState.RollHistory);
+            var base64 = Convert.ToBase64String(csvBytes);
+            var timestamp = DateTimeOffset.UtcNow.ToString("yyyyMMddTHHmmssZ");
+            var filename = $"DnD-Rolls-{ObfuscatedRoomCode}-{timestamp}.csv";
+            await JSRuntime.InvokeVoidAsync("downloadCsvFile", filename, base64);
         }
     }
 }

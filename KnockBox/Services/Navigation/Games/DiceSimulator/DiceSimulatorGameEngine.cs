@@ -18,6 +18,7 @@ namespace KnockBox.Services.Navigation.Games.DiceSimulator
                 return Result.FromError<AbstractGameState>(new ArgumentNullException(nameof(host)));
 
             var gameState = new DiceSimulatorGameState(host, stateLogger, randomNumberservice);
+            gameState.UpdateJoinableStatus(true);
             logger.LogInformation("Created gameState with user [{userId}] as host.", host.Id);
             return Result.FromValue<AbstractGameState>(gameState);
         }

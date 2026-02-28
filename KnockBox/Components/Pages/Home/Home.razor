@@ -9,6 +9,15 @@
 
 <h1>Home</h1>
 
+<div class="join-form" style="margin-bottom: 24px;">
+    <div class="join-form-room-code text-start">
+        <h2>Player Name:</h2>
+        <input placeholder="Enter name" 
+               type="text" maxlength="20" name="player-name" 
+               @bind="PlayerName" @bind:event="oninput" style="text-transform: none;"/>
+    </div>
+</div>
+
 <div class="join-form">
     <div class="join-form-room-code">
         <h2>
@@ -18,14 +27,14 @@
                type="text" maxlength="8" name="room-code" 
                @bind="LobbyCode"/>
     </div>
-    <button @onclick="() => JoinLobby(LobbyCode)">Join</button>
+    <button disabled="@(!CanJoinOrCreate)" @onclick="() => JoinLobby(LobbyCode ?? string.Empty)">Join</button>
 </div>
 
 <div class="game-grid">
-    <button class="game" aria-label="Split the Deck" @onclick="() => CreateLobby(GameType.SplitTheDeck)">
+    <button class="game" aria-label="Split the Deck" disabled="@(!CanJoinOrCreate)" @onclick="() => CreateLobby(GameType.SplitTheDeck)">
         Split the Deck
     </button>
-    <button class="game" aria-label="Card Counter" @onclick="() => CreateLobby(GameType.DiceSimulator)">
+    <button class="game" aria-label="Card Counter" disabled="@(!CanJoinOrCreate)" @onclick="() => CreateLobby(GameType.DiceSimulator)">
         Dice Simulator
     </button>
 </div>
