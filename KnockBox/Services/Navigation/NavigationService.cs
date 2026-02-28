@@ -8,6 +8,16 @@ namespace KnockBox.Services.Navigation
     {
         public string GameBaseRoute => "games";
 
+        public string GetHomeUri()
+        {
+            return $"{navigationManager.BaseUri}home";
+        }
+
+        public void ToHome()
+        {
+            navigationManager.NavigateTo(GetHomeUri());
+        }
+
         public string GetGameUri(LobbyRegistration lobbyRegistration)
         {
             return $"{navigationManager.BaseUri}{lobbyRegistration.Uri}";

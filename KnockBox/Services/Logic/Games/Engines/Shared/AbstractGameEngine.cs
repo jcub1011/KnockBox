@@ -30,7 +30,7 @@ namespace KnockBox.Services.Logic.Games.Engines.Shared
         /// <param name="host"></param>
         /// <param name="state"></param>
         /// <returns></returns>
-        public abstract Task StartAsync(User host, AbstractGameState state, CancellationToken ct = default);
+        public abstract Task<Result> StartAsync(User host, AbstractGameState state, CancellationToken ct = default);
 
         /// <summary>
         /// Checks if the game state is good to start.

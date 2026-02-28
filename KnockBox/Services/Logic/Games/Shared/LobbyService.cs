@@ -1,12 +1,15 @@
 ﻿using KnockBox.Extensions.Returns;
 using KnockBox.Services.Logic.Games.Engines.Shared;
 using KnockBox.Services.Navigation.Games;
+using KnockBox.Services.Navigation.Games.DiceSimulator;
 using KnockBox.Services.State.Users;
 using System.Collections.Concurrent;
 
 namespace KnockBox.Services.Logic.Games.Shared
 {
-    public class LobbyService(ILobbyCodeService lobbyCodeService) : ILobbyService
+    public class LobbyService(
+        IServiceProvider serviceProvider,
+        ILobbyCodeService lobbyCodeService) : ILobbyService
     {
         private readonly ConcurrentDictionary<string, LobbyRegistration> _lobbies = [];
 
@@ -39,7 +42,7 @@ namespace KnockBox.Services.Logic.Games.Shared
             AbstractGameEngine? engine = gameType switch
             {
                 GameType.SplitTheDeck => null,
-                GameType.CardCounter => null,
+                GameType.DiceSimulator => serviceProvider.GetService<DiceSimulatorGameEngine>(),
                 _ => null
             };
 

@@ -11,6 +11,17 @@ namespace KnockBox.Services.Navigation
         string GameBaseRoute { get; }
 
         /// <summary>
+        /// Gets the absolute uri for the home page.
+        /// </summary>
+        /// <returns></returns>
+        string GetHomeUri();
+
+        /// <summary>
+        /// Navigates to the home page.
+        /// </summary>
+        void ToHome();
+
+        /// <summary>
         /// Returns the absolute uri for the provided game lobby.
         /// </summary>
         /// <param name="lobbyRegistration"></param>

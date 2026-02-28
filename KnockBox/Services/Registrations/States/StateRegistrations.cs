@@ -1,4 +1,5 @@
 ﻿using KnockBox.Services.Logic.Games.Shared;
+using KnockBox.Services.State.Games.Shared;
 using KnockBox.Services.State.Users;
 
 namespace KnockBox.Services.Registrations.States
@@ -9,6 +10,7 @@ namespace KnockBox.Services.Registrations.States
         {
             // Add states
             services.AddScoped<IUserService, UserService>();
+            services.AddScoped<IGameSessionService, GameSessionService>();
             services.AddSingleton<ILobbyService, LobbyService>();
             return services;
         }
