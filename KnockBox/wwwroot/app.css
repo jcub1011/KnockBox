@@ -4,10 +4,12 @@
     --bg-color: #A9CEF4;
     --accent-color: #FF0055;
     --trietary-color: #21897E;
-    /* A vibrant, multi-stop gradient mixing cream, yellow, and warm orange */
-    --bg-gradient: linear-gradient(-45deg, #FFF9D2, #FFCF33, #FFB900, #FFBB5C);
+    
+    /* Mirrored the colors at the end so it loops seamlessly back to the start */
+    --bg-gradient: linear-gradient(-45deg, #FFF9D2, #FFCF33, #FFB900, #FFBB5C, var(--accent-color), #FF4D85, var(--accent-color), #FFBB5C, #FFB900, #FFCF33, #FFF9D2);
+    
     /* SVG Noise generated via feTurbulence for a grainy visual texture */
-    --noise: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.15'/%3E%3C/svg%3E");
+    --noise: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.20'/%3E%3C/svg%3E");
 }
 
 body {
@@ -16,27 +18,31 @@ body {
     box-sizing: border-box;
     padding: 0px;
     margin: 0px;
-    min-height: 100vh; /* Ensures the gradient always covers the whole screen */
+    height: 100vh;
+    width: 100vw;
     
     /* Layer the noise on top, gradient on the bottom */
-    background: var(--noise), var(--bg-gradient);
+    background: url("content/backgrounds/yellow-vertical_loop_crop.png") repeat;
     
     /* 200px tiles the noise, 400% stretches the gradient out */
-    background-size: 200px 200px, 400% 400%; 
+    /*background-size: 200px 200px, 400% 400%;*/ 
     
-    animation: partyGradient 12s ease infinite; /* Animates the position smoothy */
+    /* 'linear' removes the slow-down at the edges, keeping it sweeping endlessly */
+    animation: partyGradient 12s linear infinite; 
 }
 
-/* Keyframes to smoothly pan ONLY the gradient, keeping the grain static */
+/* Apply border-box globally to all elements and pseudo-elements */
+*, *::before, *::after {
+    box-sizing: border-box;
+}
+
+/* Keyframes smoothly pan ONLY the gradient continually in one direction */
 @keyframes partyGradient {
     0% {
         background-position: 0 0, 0% 50%;
     }
-    50% {
-        background-position: 0 0, 100% 50%;
-    }
     100% {
-        background-position: 0 0, 0% 50%;
+        background-position: 0 0, 100% 50%;
     }
 }
 
