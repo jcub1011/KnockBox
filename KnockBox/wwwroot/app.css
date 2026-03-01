@@ -4,12 +4,6 @@
     --bg-color: #A9CEF4;
     --accent-color: #FF0055;
     --trietary-color: #21897E;
-    
-    /* Repeating the entire color sequence twice. This creates identical "halves" */
-    --bg-gradient: linear-gradient(-45deg, #FFF9D2, #FFCF33, #FFB900, #FFBB5C, var(--accent-color), #FF4D85, #FFF9D2, #FFCF33, #FFB900, #FFBB5C, var(--accent-color), #FF4D85);
-    
-    /* SVG Noise generated via feTurbulence for a grainy visual texture */
-    --noise: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.20'/%3E%3C/svg%3E");
 }
 
 /* Apply border-box globally to all elements and pseudo-elements */
@@ -25,27 +19,27 @@ body {
     height: 100vh;
     width: 100vw;
     
-    /* 1. Dark Tint (Optional), 2. Static Grain effect, 3. The newly fixed looping gradient */
-    background: linear-gradient(rgba(0, 0, 0, 0.05), rgba(0, 0, 0, 0.05)), var(--noise), var(--bg-gradient);
+    /* Layer the dark tint over the vertical looping image tile */
+    background: linear-gradient(rgba(0, 0, 0, 0.05), rgba(0, 0, 0, 0.05)), url("content/backgrounds/yellow-vertical_loop_crop.png") repeat;
     
     /* 
-       IMPORTANT: The noise is tiled at 200px, but the gradient is EXACTLY 200%. 
-       Because the colors repeat twice, shifting from 0% to 100% pans exactly across one set of colors. 
+       Tint covers everything (auto), Image is scaled proportionally with a strict 400px height.
+       Change 400px to perfectly scale your texture to whatever size looks best.
     */
-    background-size: auto auto, 200px 200px, 200% 200%; 
+    background-size: auto, auto 400px; 
     
     animation: partyGradient 12s linear infinite; 
 }
 
-/* Keyframes seamlessly panning the linear gradient across exactly one repetition */
+/* Keyframes smoothly pan ONLY the image tile vertically across exactly one repetition */
 @keyframes partyGradient {
     0% {
-        /* [Tint X Y], [Noise X Y], [Gradient X Y] */
-        background-position: 0 0, 0 0, 0% 50%;
+        /* [Tint X Y], [Image X Y] */
+        background-position: 0 0, 0 0;
     }
     100% {
-        /* Moving exactly to 100% visually matches 0% now, forming a perfect endless loop */
-        background-position: 0 0, 0 0, 100% 50%;
+        /* Panning up exactly 400px matches the forced 400px tile height, rendering the jump invisible */
+        background-position: 0 0, 0 -400px;
     }
 }
 
