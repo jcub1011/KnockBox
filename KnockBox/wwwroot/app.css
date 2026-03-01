@@ -19,26 +19,43 @@ body {
     height: 100vh;
     width: 100vw;
     
-    /* Layer the dark tint over the vertical looping image tile */
-    background: linear-gradient(rgba(0, 0, 0, 0.05), rgba(0, 0, 0, 0.05)), url("content/backgrounds/yellow-vertical_loop_crop.png") repeat;
-    
-    /* 
-       Tint covers everything (auto), Image is scaled proportionally with a strict 400px height.
-       Change 400px to perfectly scale your texture to whatever size looks best.
-    */
-    background-size: auto, auto 400px; 
-    
-    animation: partyGradient 12s linear infinite; 
+    /* We will use a pseudo-element to handle the diagonal rotation to preserve the aspect ratio cleanly */
+    /* Remove background from body so the hidden pseudo-element is fully visible */
+    background-color: transparent;
+    overflow-x: hidden; /* Prevent horizontal scrollbars if pseudo-element corners poke out */
 }
 
-/* Keyframes smoothly pan ONLY the image tile vertically across exactly one repetition */
+/* Apply the background to a rotated fixed pseudo-element so the native aspect ratio easily sweeps at an angle */
+body::before {
+    content: "";
+    position: fixed;
+    top: -50vh;
+    left: -50vw;
+    width: 200vw;
+    height: 200vh;
+    z-index: -1; /* Keep it behind all body content */
+
+    /* Apply background-color here beneath the image and tint */
+    background-color: var(--bg-color);
+    background-image: linear-gradient(rgba(0, 0, 0, 0.05), rgba(0, 0, 0, 0.05)), url("content/backgrounds/yellow-vertical_loop_crop.png");
+    background-repeat: repeat;
+
+    /* Lock the height to 400px again so it retains its correct, undistorted aspect ratio */
+    background-size: auto, auto 400px;
+
+    /* Rotate the entire background canvas 45 degrees */
+    transform: rotate(45deg);
+
+    /* Animate purely along the Y axis of the rotated canvas! */
+    animation: partyGradient 12s linear infinite;
+}
+
+/* Keyframes smoothly panning the image along the rotated Y axis, matching the exactly forced 400px height */
 @keyframes partyGradient {
     0% {
-        /* [Tint X Y], [Image X Y] */
         background-position: 0 0, 0 0;
     }
     100% {
-        /* Panning up exactly 400px matches the forced 400px tile height, rendering the jump invisible */
         background-position: 0 0, 0 -400px;
     }
 }
