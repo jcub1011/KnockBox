@@ -4,18 +4,40 @@
     --bg-color: #A9CEF4;
     --accent-color: #FF0055;
     --trietary-color: #21897E;
-    --bg-gradient: linear-gradient(135deg, #FFF9D2 0%, #FFCF33 100%);
+    /* A vibrant, multi-stop gradient mixing cream, yellow, and warm orange */
+    --bg-gradient: linear-gradient(-45deg, #FFF9D2, #FFCF33, #FFB900, #FFBB5C);
+    /* SVG Noise generated via feTurbulence for a grainy visual texture */
+    --noise: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.15'/%3E%3C/svg%3E");
 }
 
 body {
     font-family: var(--font-primary);
     font-optical-sizing: auto;
     box-sizing: border-box;
-    background: var(--bg-gradient);
-    /*background-color: var(--bg-color);*/
     padding: 0px;
     margin: 0px;
-    /*background-image: url("content/backgrounds/yellow-pattern-cropped.png");*/
+    min-height: 100vh; /* Ensures the gradient always covers the whole screen */
+    
+    /* Layer the noise on top, gradient on the bottom */
+    background: var(--noise), var(--bg-gradient);
+    
+    /* 200px tiles the noise, 400% stretches the gradient out */
+    background-size: 200px 200px, 400% 400%; 
+    
+    animation: partyGradient 12s ease infinite; /* Animates the position smoothy */
+}
+
+/* Keyframes to smoothly pan ONLY the gradient, keeping the grain static */
+@keyframes partyGradient {
+    0% {
+        background-position: 0 0, 0% 50%;
+    }
+    50% {
+        background-position: 0 0, 100% 50%;
+    }
+    100% {
+        background-position: 0 0, 0% 50%;
+    }
 }
 
 button {
@@ -50,9 +72,9 @@ h1:focus {
     color: white;
 }
 
-    .blazor-error-boundary::after {
-        content: "An error has occurred."
-    }
+.blazor-error-boundary::after {
+    content: "An error has occurred."
+}
 
 .darker-border-checkbox.form-check-input {
     border-color: #929292;
