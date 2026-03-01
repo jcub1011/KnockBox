@@ -4,15 +4,18 @@
     --bg-color: #A9CEF4;
     --accent-color: #FF0055;
     --trietary-color: #21897E;
+    --bg-gradient: linear-gradient(135deg, #FFF9D2 0%, #FFCF33 100%);
 }
 
 body {
     font-family: var(--font-primary);
     font-optical-sizing: auto;
     box-sizing: border-box;
-    background-color: var(--bg-color);
+    background: var(--bg-gradient);
+    /*background-color: var(--bg-color);*/
     padding: 0px;
     margin: 0px;
+    /*background-image: url("content/backgrounds/yellow-pattern-cropped.png");*/
 }
 
 button {
