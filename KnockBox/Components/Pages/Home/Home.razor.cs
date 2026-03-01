@@ -41,6 +41,8 @@ namespace KnockBox.Components.Pages.Home
         {
             try
             {
+                // Ensures the user isn't left in a session
+                GameSessionService.LeaveCurrentSession(false);
                 await UserService.InitializeCurrentUserAsync(ComponentDetached);
                 await base.OnInitializedAsync();
             }

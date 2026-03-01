@@ -1,9 +1,56 @@
-﻿@inherits LayoutComponentBase
+﻿@using KnockBox.Services.Navigation.Games
+@using KnockBox.Services.State.Games.Shared
 
-@Body
+@inherits LayoutComponentBase
 
-<div id="blazor-error-ui" data-nosnippet>
-    An unhandled error has occurred.
-    <a href="." class="reload">Reload</a>
-    <span class="dismiss">🗙</span>
+<div class="main">
+    <header>
+        @if (GameSessionService.TryGetCurrentSession(out var currentSession))
+        {
+                <span>@(currentSession.LobbyRegistration.GameType.TryGetDescription(out var description)
+                    ? description : currentSession.LobbyRegistration.GameType.ToString())</span>
+                <span class="room-code">
+                    Join Code: 
+                    <button class="room-code-btn"
+                            @onclick="ToggleRoomCode" 
+                            @oncontextmenu="@(() => CopyRoomCodeAsync(currentSession.LobbyRegistration.Code))" 
+                            @oncontextmenu:preventDefault="true"
+                            title="Click to reveal. Right-click/Long-press to copy.">
+                        @(_isRoomCodeRevealed ? currentSession.LobbyRegistration.Code : "••••••")
+                    </button>
+                </span>
+            }
+        else
+        {
+            <span>Knockbox</span>
+        }
+    </header>
+    <content>
+        @Body
+        <div id="blazor-error-ui" data-nosnippet>
+            An unhandled error has occurred.
+            <a href="." class="reload">Reload</a>
+            <span class="dismiss">🗙</span>
+        </div>
+    </content>
 </div>
+
+@code {
+    [Inject] IGameSessionService GameSessionService { get; set; } = default!;
+    [Inject] IJSRuntime JSRuntime { get; set; } = default!;
+
+    private bool _isRoomCodeRevealed;
+
+    private void ToggleRoomCode() => _isRoomCodeRevealed = !_isRoomCodeRevealed;
+
+    private async Task CopyRoomCodeAsync(string code)
+    {
+        await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", code);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender);
+
+    }
+}

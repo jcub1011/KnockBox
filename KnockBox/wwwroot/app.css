@@ -10,7 +10,9 @@ body {
     font-family: var(--font-primary);
     font-optical-sizing: auto;
     box-sizing: border-box;
-    background-color: #A9CEF4;
+    background-color: var(--bg-color);
+    padding: 0px;
+    margin: 0px;
 }
 
 button {

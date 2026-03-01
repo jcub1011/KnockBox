@@ -1,14 +1,18 @@
-﻿using System.Diagnostics.CodeAnalysis;
+﻿using System.ComponentModel;
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 
 namespace KnockBox.Services.Navigation.Games
 {
     public enum GameType
     {
+        [Description("Split The Deck")]
         [NavigationString("split-the-deck")]
         SplitTheDeck,
+        [Description("Dice Simulator")]
         [NavigationString("dice-simulator")]
         DiceSimulator,
+        [Description("Card Counter")]
         [NavigationString("card-counter")]
         CardCounter,
     }
@@ -32,6 +36,17 @@ namespace KnockBox.Services.Navigation.Games
         {
             navigationString = NavigationString.GetNavigationStringAttribute(gameType);
             return navigationString is not null;
+        }
+    }
+
+    public static class DescriptionExtensions 
+    {
+        public static bool TryGetDescription(this Enum value, [NotNullWhen(true)] out string? description)
+        {
+            var field = value.GetType().GetField(value.ToString());
+            var attribute = field?.GetCustomAttribute<DescriptionAttribute>();
+            description = attribute?.Description;
+            return description is not null;
         }
     }
 }

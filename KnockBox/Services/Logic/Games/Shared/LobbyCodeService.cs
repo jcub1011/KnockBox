@@ -6,7 +6,7 @@ namespace KnockBox.Services.Logic.Games.Shared
 {
     public class LobbyCodeService(IProfanityFilter profanityFilter) : ILobbyCodeService
     {
-        private const int CodeLength = 8;
+        private const int CodeLength = 6;
         private const int MaxAttempts = 1024;
         private static readonly char[] AllowedChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789".ToCharArray();
 
