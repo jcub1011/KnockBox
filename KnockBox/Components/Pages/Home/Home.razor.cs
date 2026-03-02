@@ -2,7 +2,6 @@
 using KnockBox.Extensions.Disposable;
 using KnockBox.Extensions.Exceptions;
 using KnockBox.Services.Logic.Games.Shared;
-using KnockBox.Services.Navigation;
 using KnockBox.Services.Navigation.Games;
 using KnockBox.Services.State.Games.Shared;
 using KnockBox.Services.State.Users;
@@ -25,11 +24,16 @@ namespace KnockBox.Components.Pages.Home
             get => _playerName ?? (UserService.CurrentUser?.Name == "Not Set" ? "" : UserService.CurrentUser?.Name);
             set
             {
-                _playerName = value;
-                if (UserService.CurrentUser is not null)
+                // Cap to 12 characters
+                value = value?.Trim();
+
+                if (value is not null && value.Length > 12)
                 {
-                    UserService.CurrentUser.Name = string.IsNullOrWhiteSpace(value) ? "Not Set" : value.Trim();
+                    value = value[..12];
                 }
+
+                _playerName = value;
+                UserService.CurrentUser?.Name = string.IsNullOrWhiteSpace(value) ? "Not Set" : value.Trim();
             }
         }
 

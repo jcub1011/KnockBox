@@ -10,13 +10,16 @@
     public class User(string name, string id)
     {
         /// <summary>
-        /// The name of the user.
+        /// The name of the user. Capped to 12 characters.
         /// </summary>
         public string Name 
         { 
             get => field;
             set
             {
+                // Limit to 12 characters
+                value = value.Trim();
+                if (value.Length > 12) value = value[..12];
                 if (field == value) return;
 
                 string previousName = field;
