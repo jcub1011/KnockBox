@@ -17,12 +17,18 @@ else
         {
             <div class="joinable-state">
                 <h4>Players</h4>
-                <ul class="player-list">
+                <div class="player-list">
+                    @foreach (var player in GameState.Players)
+                    {
+                        <button @onclick="() => GameState.KickPlayer(player)">@player.Name @(player.Id == GameState.Host.Id ? "(Host)" : "")</button>
+                    }
+                </div>
+                @* <ul class="player-list">
                     @foreach (var player in GameState.Players)
                     {
                         <li>@player.Name @(player.Id == GameState.Host.Id ? "(Host)" : "")</li>
                     }
-                </ul>
+                </ul> *@
                 @if (UserService.CurrentUser?.Id == GameState.Host.Id)
                 {
                     <button class="btn btn-primary start-btn mt-3" @onclick="StartGame">Start Session</button>

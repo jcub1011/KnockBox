@@ -2,7 +2,6 @@ using KnockBox.Extensions.Disposable;
 using KnockBox.Extensions.Events;
 using KnockBox.Extensions.Returns;
 using KnockBox.Services.State.Users;
-using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
 
 namespace KnockBox.Services.State.Games.Shared
@@ -14,7 +13,9 @@ namespace KnockBox.Services.State.Games.Shared
         private readonly SemaphoreSlim _executeLock = new(1, 1);
         private readonly Lock _scheduledLock = new();
         private readonly List<CancellationTokenSource> _scheduledCallbacks = [];
-        private readonly ConcurrentDictionary<User, IDisposable> _players = [];
+        private readonly Lock _playerLock = new();
+        private readonly Dictionary<User, IDisposable> _players = [];
+        private readonly HashSet<User> _kickedPlayers = [];
         private readonly CancellationTokenSource _disposeCts = new();
         private int _disposed;
 
@@ -48,7 +49,26 @@ namespace KnockBox.Services.State.Games.Shared
         /// <summary>
         /// The players in this game.
         /// </summary>
-        public IReadOnlyList<User> Players => [.. _players.Keys];
+        public IReadOnlyList<User> Players
+        {
+            get
+            {
+                using var scope = _playerLock.EnterScope();
+                return [.. _players.Keys];
+            }
+        }
+
+        /// <summary>
+        /// Players that have been kicked from this game.
+        /// </summary>
+        public IReadOnlyList<User> KickedPlayers
+        {
+            get
+            {
+                using var scope = _playerLock.EnterScope();
+                return [.. _kickedPlayers];
+            }
+        }
 
         /// <summary>
         /// Registers the player. Unregisters the player when the <see cref="IDisposable"/> is disposed.
@@ -69,10 +89,16 @@ namespace KnockBox.Services.State.Games.Shared
             bool wasAdded = false;
             var unsubscriber = new DisposableAction(() => Execute(() =>
             {
-                if (wasAdded) _players.TryRemove(player, out _);
+                using var scope = _playerLock.EnterScope();
+                if (wasAdded) _players.Remove(player);
             }));
 
-            if (_players.TryAdd(player, unsubscriber))
+            using var scope = _playerLock.EnterScope();
+            if (_kickedPlayers.Contains(player))
+            {
+                return Result.FromError<IDisposable>(new InvalidOperationException($"Player [{player.Name}] was kicked and cannot rejoin."));
+            }
+            else if (_players.TryAdd(player, unsubscriber))
             {
                 wasAdded = true;
                 logger.LogInformation("User [{userId}] entered game [{type}] hosted by user [{hostId}].", player.Id, GetType().Name, Host.Id);
@@ -84,6 +110,25 @@ namespace KnockBox.Services.State.Games.Shared
                 unsubscriber.Dispose();
                 return Result.FromError<IDisposable>(new InvalidOperationException($"Player [{player.Name}] is already registered."));
             }
+        }
+
+        /// <summary>
+        /// Kicks the player.
+        /// </summary>
+        /// <param name="player"></param>
+        /// <returns></returns>
+        public Result KickPlayer(User player)
+        {
+            using var scope = _playerLock.EnterScope();
+            if (_players.TryGetValue(player, out var leaveToken))
+            {
+                _kickedPlayers.Add(player);
+                leaveToken.Dispose();
+                return Result.Success;
+            }
+
+            return Result.FromError(
+                new InvalidOperationException("User is not in this game."));
         }
 
         /// <summary>

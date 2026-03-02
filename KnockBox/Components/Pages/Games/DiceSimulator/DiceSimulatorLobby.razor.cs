@@ -70,6 +70,16 @@ namespace KnockBox.Components.Pages.Games.DiceSimulator
             await base.OnInitializedAsync();
         }
 
+        protected override void OnAfterRender(bool firstRender)
+        {
+            if (GameState.KickedPlayers.Contains(UserService.CurrentUser))
+            {
+                GameSessionService.LeaveCurrentSession();
+            }
+
+            base.OnAfterRender(firstRender);
+        }
+
         private void HandleStateDisposed()
         {
             InvokeAsync(() =>
