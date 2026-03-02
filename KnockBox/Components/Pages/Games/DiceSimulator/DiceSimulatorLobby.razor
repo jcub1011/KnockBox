@@ -89,7 +89,7 @@ else
         <div class="leaderboard-panel card">
             <h4>Leaderboard</h4>
             <div class="table-responsive">
-                <table class="table table-sm table-striped jackbox-table">
+                <table class="table table-sm table-striped table">
                     <thead>
                         <tr>
                             <th>Player</th>
@@ -149,7 +149,7 @@ else
                     </div>
                     @if (isExpanded)
                     {
-                        <div class="player-roll-history jackbox-list">
+                        <div class="player-roll-history list">
                             @foreach (var roll in GameState.RollHistory.Where(r => r.PlayerId == player.Id).Reverse().Take(200))
                             {
                                 <div class="list-group-item flex-column align-items-start">
