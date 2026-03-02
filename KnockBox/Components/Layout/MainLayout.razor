@@ -1,4 +1,5 @@
-﻿@using KnockBox.Services.Navigation.Games
+﻿@using KnockBox.Services.Navigation
+@using KnockBox.Services.Navigation.Games
 @using KnockBox.Services.State.Games.Shared
 
 @inherits LayoutComponentBase
@@ -7,8 +8,9 @@
     <header>
         @if (GameSessionService.TryGetCurrentSession(out var currentSession))
         {
-                <span>@(currentSession.LobbyRegistration.GameType.TryGetDescription(out var description)
-                    ? description : currentSession.LobbyRegistration.GameType.ToString())</span>
+            <a href="@NavigationService.GetHomeUri()" title="Click to return home">
+                @(currentSession.LobbyRegistration.GameType.TryGetDescription(out var description)
+                    ? description : currentSession.LobbyRegistration.GameType.ToString())</a>
                 <span class="room-code">
                     Join Code: 
                     <button class="room-code-btn"
@@ -36,6 +38,7 @@
 </div>
 
 @code {
+    [Inject] INavigationService NavigationService { get; set; } = default!;
     [Inject] IGameSessionService GameSessionService { get; set; } = default!;
     [Inject] IJSRuntime JSRuntime { get; set; } = default!;
 
