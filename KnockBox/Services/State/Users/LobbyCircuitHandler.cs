@@ -38,7 +38,11 @@ namespace KnockBox.Services.State.Users
             {
                 try
                 {
-                    await Task.Delay(DisconnectGracePeriod, _disconnectCts.Token);
+                    if (_disconnectCts is not null)
+                    {
+                        await Task.Delay(DisconnectGracePeriod, _disconnectCts.Token);
+                    }
+
                     SafeLeaveSession();
                 }
                 catch (OperationCanceledException) { }

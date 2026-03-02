@@ -45,6 +45,25 @@ namespace KnockBox.Extensions.Exceptions
             return null;
         }
 
+        /// <summary>
+        /// Attempts to get an exception message formatted for users to see. Provides the normal message if not found.
+        /// </summary>
+        /// <param name="exception"></param>
+        /// <returns></returns>
+        public static bool TryGetFormattedExceptionMessage(this Exception exception, out string publicMessage)
+        {
+            if (exception is FormattedException fex)
+            {
+                publicMessage = fex.PublicMessage;
+                return true;
+            }
+            else
+            {
+                publicMessage = exception.Message;
+                return false;
+            }
+        }
+
         private static OperationCanceledException? GetCancellationException(Exception? exception, int remainingDepth)
         {
             if (remainingDepth-- <= 0 || exception is null) return null;

@@ -76,7 +76,7 @@ namespace KnockBox.Services.Logic.Games.Shared
             CancellationToken ct = default)
         {
             if (!_lobbies.TryGetValue(NormalizeLobbyCode(lobbyCode), out var registration))
-                return Result.FromError<UserRegistration>(new KeyNotFoundException($"Unable to find lobby with code [{lobbyCode}]."));
+                return Result.FromError<UserRegistration>(new KeyNotFoundException($"Lobby with code [{lobbyCode}] not found."));
 
             Result<IDisposable> registrationResult = null!;
             var executionResult = registration.State.Execute(() =>

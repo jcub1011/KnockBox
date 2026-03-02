@@ -1,7 +1,7 @@
 .content {
     display: flex;
     flex: 1;
-    background-color: yellow;
+    background-color: gold;
     padding: 16px;
     justify-content: center;
 }
@@ -19,6 +19,12 @@
     box-shadow: 10px 10px 0px #000;
     max-width: 1000px;
     width: 100%;
+}
+
+.joinable-state {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
 }
 
 .controls-panel {
@@ -60,6 +66,7 @@ h6 {
     box-shadow: 4px 4px 0px #000;
     transition: transform 0.1s, box-shadow 0.1s;
     color: #000;
+    cursor: pointer;
 }
 
 .btn:hover:not(:disabled) {
@@ -101,6 +108,8 @@ h6 {
 .btn-danger {
     background-color: #e50000 !important;
     color: #fff !important;
+    font-size: 1.5rem;
+    padding: 12px;
 }
 
 .btn-outline-secondary {
@@ -251,6 +260,7 @@ label {
     font-family: var(--font-mono);
     font-weight: 700;
     margin-top: 1rem;
+    padding: 12px;
 }
 
 .expression-preview {
@@ -282,7 +292,7 @@ label {
     gap: 12px;
 }
 
-.player-list li {
+.player-list button {
     background-color: #ff0055;
     color: #fff;
     padding: 12px 24px;
@@ -297,6 +307,10 @@ label {
 .start-btn {
     font-size: 1.5rem !important;
     padding: 12px 24px !important;
+}
+
+.flex-1 {
+    flex: 1;
 }
 
 .row > .col-md-4,

@@ -37,4 +37,47 @@
     /// <param name="action"></param>
     public class UnauthorizedUserException(Guid userId, string action)
         : KnockboxException($"User [{userId}] does not have authorization to perform this action: {action}", null);
+
+    /// <summary>
+    /// An exception with a user facing component.
+    /// </summary>
+    public class FormattedException : Exception
+    {
+        /// <summary>
+        /// The message to display to the user.
+        /// </summary>
+        public string PublicMessage { get; protected set; }
+
+        /// <summary>
+        /// Sets both the public and normal message to the provided message.
+        /// </summary>
+        /// <param name="sharedMessage"></param>
+        public FormattedException(string sharedMessage)
+            : base(sharedMessage)
+        {
+            PublicMessage = sharedMessage;
+        }
+
+        /// <summary>
+        /// Sets the public and normal message separately.
+        /// </summary>
+        /// <param name="publicMessage"></param>
+        /// <param name="message"></param>
+        public FormattedException(string publicMessage, string message)
+            : base(message)
+        {
+            PublicMessage = publicMessage;
+        }
+
+        /// <summary>
+        /// Sets the public message and uses the inner exception for the normal message.
+        /// </summary>
+        /// <param name="publicMessage"></param>
+        /// <param name="innerException"></param>
+        public FormattedException(string publicMessage, Exception innerException)
+            : base(innerException.Message, innerException)
+        {
+            PublicMessage = publicMessage;
+        }
+    }
 }
