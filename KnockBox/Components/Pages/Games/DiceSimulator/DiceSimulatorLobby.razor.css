@@ -1,3 +1,10 @@
+.content {
+    width: 100%;
+    flex: 1;
+    background-color: yellow;
+    padding: 16px;
+}
+
 .jackbox-lobby {
     font-family: var(--font-primary);
     background-color: #4a154b;
@@ -7,7 +14,6 @@
     border: 5px solid #000;
     box-shadow: 10px 10px 0px #000;
     max-width: 1200px;
-    margin: 0 auto;
 }
 
 .jackbox-lobby h3, 
