@@ -1,14 +1,23 @@
 .content {
     display: flex;
     flex: 1;
+    flex-direction: column;
     background-color: gold;
     padding: 16px;
     justify-content: center;
+    gap: 16px;
 }
 
-.jackbox-lobby {
+@media(min-width: 1024px) {
+    .content {
+        flex-direction: row;
+    }
+}
+
+.card {
     display: flex;
     flex-direction: column;
+    align-content: start;
     gap: 12px;
     font-family: var(--font-primary);
     background-color: #4a154b;
@@ -22,12 +31,6 @@
 }
 
 .joinable-state {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-}
-
-.controls-panel {
     display: flex;
     flex-direction: column;
     gap: 12px;
@@ -259,7 +262,6 @@ label {
     color: #000;
     font-family: var(--font-mono);
     font-weight: 700;
-    margin-top: 1rem;
     padding: 12px;
 }
 
