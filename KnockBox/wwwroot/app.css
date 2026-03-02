@@ -24,42 +24,6 @@ body {
     overflow-x: hidden; /* Prevent horizontal scrollbars if pseudo-element corners poke out */
 }
 
-/* Apply the background to a rotated fixed pseudo-element so the native aspect ratio easily sweeps at an angle */
-body::before {
-    content: "";
-    position: fixed;
-    /* Use vmax to create a massive anchored square, guaranteeing the corners are perfectly covered across ANY screen aspect ratio */
-    top: calc(50vh - 150vmax);
-    left: calc(50vw - 150vmax);
-    width: 300vmax;
-    height: 300vmax;
-    z-index: -1; /* Keep it behind all body content */
-
-    /* Apply background-color here beneath the image and tint */
-    background-color: var(--bg-color);
-    background-image: linear-gradient(rgba(0, 0, 0, 0.05), rgba(0, 0, 0, 0.05)), url("content/backgrounds/yellow-vertical_loop_crop.png");
-    background-repeat: repeat;
-
-    /* Lock the height to 400px again so it retains its correct, undistorted aspect ratio */
-    background-size: auto, auto 400px;
-
-    /* Rotate the entire background canvas 45 degrees */
-    transform: rotate(45deg);
-
-    /* Animate purely along the Y axis of the rotated canvas! */
-    animation: partyGradient 12s linear infinite;
-}
-
-/* Keyframes smoothly panning the image along the rotated Y axis, matching the exactly forced 400px height */
-@keyframes partyGradient {
-    0% {
-        background-position: 0 0, 0 0;
-    }
-    100% {
-        background-position: 0 0, 0 -400px;
-    }
-}
-
 button {
     font-family: var(--font-primary);
     font-optical-sizing: auto;
