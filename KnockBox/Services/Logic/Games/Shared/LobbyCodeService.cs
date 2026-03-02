@@ -13,6 +13,8 @@ namespace KnockBox.Services.Logic.Games.Shared
         private readonly Lock _lock = new();
         private readonly HashSet<string> _issuedCodes = new(StringComparer.Ordinal);
 
+        public int LobbyCodeLength => CodeLength;
+
         public async ValueTask<Result<string>> IssueLobbyCodeAsync(CancellationToken ct = default)
         {
             try

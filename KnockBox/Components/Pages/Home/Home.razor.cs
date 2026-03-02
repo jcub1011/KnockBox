@@ -12,6 +12,7 @@ namespace KnockBox.Components.Pages.Home
     public partial class Home : DisposableComponent
     {
         [Inject] ILobbyService LobbyService { get; set; } = default!;
+        [Inject] ILobbyCodeService LobbyCodeService { get; set; } = default!;
         [Inject] IUserService UserService { get; set; } = default!;
         [Inject] IGameSessionService GameSessionService { get; set; } = default!;
         [Inject] ILogger<Home> Logger { get; set; } = default!;

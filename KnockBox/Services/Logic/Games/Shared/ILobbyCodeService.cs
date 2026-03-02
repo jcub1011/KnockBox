@@ -8,6 +8,11 @@ namespace KnockBox.Services.Logic.Games.Shared
     public interface ILobbyCodeService
     {
         /// <summary>
+        /// The length of lobby codes.
+        /// </summary>
+        public int LobbyCodeLength { get; }
+
+        /// <summary>
         /// Issues a unique lobby code. Lobby codes are always Upper Invariant and never have whitespace.
         /// </summary>
         /// <param name="ct"></param>

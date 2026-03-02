@@ -25,21 +25,18 @@
                 Room Code:
             </h2>
             <input placeholder="KN0CK3OX" 
-                   type="text" maxlength="8" name="room-code" 
+                   type="text" maxlength="@LobbyCodeService.LobbyCodeLength" name="room-code" 
                    @bind="LobbyCode"/>
         </div>
         <button disabled="@(!CanJoinOrCreate)" @onclick="() => JoinLobby(LobbyCode ?? string.Empty)">Join</button>
     </div>
 
     <div class="game-grid">
-        <button class="game" aria-label="Split the Deck" disabled="@(!CanJoinOrCreate)" @onclick="() => CreateLobby(GameType.SplitTheDeck)">
-            Split the Deck
+        <button class="game" aria-label="Dice Simulator" disabled="@(!CanJoinOrCreate)" @onclick="() => CreateLobby(GameType.DiceSimulator)">
+            Dice Simulator
         </button>
         <button class="game" aria-label="Card Counter" disabled="@(!CanJoinOrCreate)" @onclick="() => CreateLobby(GameType.CardCounter)">
             Card Counter
-        </button>
-        <button class="game" aria-label="Dice Simulator" disabled="@(!CanJoinOrCreate)" @onclick="() => CreateLobby(GameType.DiceSimulator)">
-            Dice Simulator
         </button>
     </div>
 </div>
