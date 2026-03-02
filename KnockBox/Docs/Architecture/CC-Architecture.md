@@ -2,50 +2,67 @@
 
 ## Overview
 
-Card Counter is a multiplayer card game implemented as a game module within the multi-game room platform. Players manipulate a numeric balance through card draws, using concatenation, arithmetic operators, and action cards to steer their balance as close to zero as possible. This document describes how the game's rules, state, and UI map onto the platform's `IGameEngine` plugin system.
+Card Counter is a multiplayer card game implemented as a game module within the multi-game room platform. Players manipulate a numeric balance through card draws, using concatenation, arithmetic operators, and action cards to steer their balance as close to zero as possible. This document describes how the game's rules, state, and UI map onto the platform's `AbstractGameEngine` base class and `AbstractGameState` subclass system.
 
 ---
 
 ## Integration Point
 
-Card Counter registers as a single `IGameEngine` implementation. The engine ID is `"cardcounter"`, and all game pages live under `/room/cardcounter/{Code}`.
+Card Counter registers as a singleton `AbstractGameEngine` subclass. All game UI lives on a single Razor page at `/room/card-counter/{ObfuscatedRoomCode}`.
 
 ```
- ┌──────────────────────────────────────────────┐
- │            Platform (Existing)                │
- │                                               │
- │  RoomManager ──► Room ──► GameState           │
- │                    │                          │
- │                    ▼                          │
- │  IGameEngine Registry                         │
- │  ┌──────────┐ ┌──────────────┐ ┌───────────┐ │
- │  │ Trivia   │ │ Card Counter │ │ Future... │ │
- │  └──────────┘ └──────┬───────┘ └───────────┘ │
- │                      │                        │
- └──────────────────────┼────────────────────────┘
-                        │
-        ┌───────────────┼───────────────┐
-        ▼               ▼               ▼
-  Lobby Phase     Gameplay Phase   Results Phase
-  (Razor Page)    (Razor Page)     (Razor Page)
+ ┌──────────────────────────────────────────────────────────┐
+ │                  Platform (Shared)                       │
+ │                                                          │
+ │  LobbyService ──► LobbyRegistration ──► AbstractGameState│
+ │                                                          │
+ │  Game Engines (Singleton / DI)                           │
+ │  ┌──────────────────┐ ┌──────────────────┐ ┌──────────┐ │
+ │  │ DiceSimulator    │ │ CardCounter      │ │ Future...│ │
+ │  └──────────────────┘ └────────┬─────────┘ └──────────┘ │
+ │                                │                         │
+ └────────────────────────────────┼─────────────────────────┘
+                                  │
+                   ┌──────────────┼──────────────┐
+                   ▼              ▼              ▼
+             Lobby View    Gameplay View   Results View
+             (single Razor page, phase-switched)
 ```
 
 ### Registration
 
 ```csharp
-builder.Services.AddSingleton<IGameEngine, CardCounterGameEngine>();
+// In LogicRegistrations.RegisterLogic()
+services.AddSingleton<CardCounterGameEngine>();
+```
+
+The engine is resolved by `LobbyService.CreateLobbyAsync` via a `GameType` switch:
+
+```csharp
+GameType.CardCounter => serviceProvider.GetService<CardCounterGameEngine>(),
 ```
 
 ---
 
 ## Game State Model
 
-All mutable state lives in the `Room.GameState` data dictionary. The `CardCounterGameEngine` reads and writes this state through typed accessors on an internal `CardCounterState` class that wraps the dictionary. No state is held on the engine itself.
+All mutable state lives on `CardCounterGameState : AbstractGameState` as strongly-typed properties. The engine reads and writes this state through `state.Execute()`. No state is held on the engine itself.
 
-### CardCounterState
+### CardCounterGameState
 
 ```
-CardCounterState
+CardCounterGameState : AbstractGameState
+│
+│  Inherited from AbstractGameState:
+│  ├── Host               : User
+│  ├── Players             : IReadOnlyList<User>
+│  ├── IsJoinable          : bool
+│  ├── EventManager        : IThreadSafeEventManager<int>
+│  ├── Execute()           : serialized mutation + notify
+│  ├── ScheduleCallback()  : delayed state transitions
+│  └── SubscribeToStateChanged() : IDisposable subscription
+│
+│  Game-specific properties:
 ├── Phase                    : GamePhase (BuyIn, Playing, RoundEnd, GameOver)
 ├── MainDeck                 : List<Card>           // Full shuffled deck, built once
 ├── CurrentShoe              : List<Card>           // Active shoe (subset of deck)
@@ -55,29 +72,26 @@ CardCounterState
 ├── ActionDeck               : List<ActionCard>     // Separate action card draw pile
 ├── CurrentPlayerIndex       : int                  // Index into TurnOrder
 ├── TurnOrder                : List<string>         // Player IDs in clockwise order
+├── CurrentPendingAction     : PendingAction?       // Tracks targeted action card responses
 ├── PendingChain             : ForcedDrawChain?     // Tracks "Feeling Lucky?" chain
+├── Config                   : GameConfig           // Playtesting-tunable values
 │
-├── Players : Dictionary<string, PlayerState>
-│   └── PlayerState
-│       ├── PlayerId         : string
-│       ├── DisplayName      : string
-│       ├── Balance          : int
-│       ├── Pot              : List<int>            // Ordered digit list
-│       ├── PotValue         : int                  // Computed: ignores leading zeros
-│       ├── ActionHand       : List<ActionCard>     // Hidden from other players
-│       ├── PassesRemaining  : int
-│       └── IsHost           : bool
-│
-└── Config : GameConfig
-    ├── DeckSize             : int       // Default: 52
-    ├── NumberToOperatorRatio : float    // Default: 4:1
-    ├── AddSubToMulDivRatio  : float    // Default: 4:1
-    ├── ActionsDealtPerRound : int       // Default: 3
-    ├── ActionHandLimit      : int       // Default: 6
-    ├── TotalPassesPerPlayer : int       // TBD via playtesting
-    ├── MinShoeSize          : int       // Default: 12
-    └── MaxShoeSize          : int       // Default: 20
+└── GamePlayers : ConcurrentDictionary<string, PlayerState>
+    └── PlayerState
+        ├── PlayerId         : string
+        ├── DisplayName      : string
+        ├── Balance          : int
+        ├── Pot              : List<int>            // Ordered digit list
+        ├── PotValue         : int                  // Computed: ignores leading zeros
+        ├── ActionHand       : List<ActionCard>     // Hidden from other players
+        ├── PassesRemaining  : int
+        ├── IsHost           : bool
+        ├── HasSetBuyIn      : bool
+        ├── BuyInRoll        : int                  // Server-generated die result
+        └── PrivateReveal    : List<Card>?          // Make My Luck top-3 reveal
 ```
+
+The state class has **no mutation methods** — only properties, computed properties (e.g., `PotValue`), and data accessor methods. All mutation logic lives on the engine.
 
 ### Card Representation
 
@@ -101,6 +115,66 @@ public enum ActionType
     Launder         // Swap pots
 }
 ```
+
+### Supporting Types
+
+```csharp
+public class ForcedDrawChain
+{
+    public string OriginatorId { get; set; }
+    public string CurrentTargetId { get; set; }
+    public List<string> ChainParticipants { get; set; }
+}
+
+public class PendingAction
+{
+    public string SourcePlayerId { get; set; }
+    public string TargetPlayerId { get; set; }
+    public ActionCard CardPlayed { get; set; }
+    public ActionCard? CounteredBy { get; set; }
+    public CancellationTokenSource? TimeoutCts { get; set; }
+}
+```
+
+---
+
+## Control Flow
+
+The following diagram shows the lifecycle of a single player action during gameplay. The Razor page calls a method on the game engine (resolved via DI), the engine calls `state.Execute` which acquires the lock, runs the mutation, releases the lock, and then notifies all subscribers to re-render.
+
+```
+  Player A (Razor Page)          CardCounterGameEngine    CardCounterGameState     Player B (Razor Page)
+  ─────────────────────          ─────────────────────    ────────────────────     ─────────────────────
+          │                               │                        │                        │
+          │  engine.DrawCard(             │                        │                        │
+          │    player, state)             │                        │                        │
+          │ ─────────────────────────────>│                        │                        │
+          │                               │                        │                        │
+          │                               │  state.Execute(() =>   │                        │
+          │                               │    { ... })            │                        │
+          │                               │ ──────────────────────>│                        │
+          │                               │                        │                        │
+          │                               │               ┌────────────────────┐             │
+          │                               │               │  Acquire lock      │             │
+          │                               │               │  Run mutation      │             │
+          │                               │               │  Release lock      │             │
+          │                               │               │  NotifyChanged()   │             │
+          │                               │               └────────────────────┘             │
+          │                               │                        │                        │
+          │                 Result         │                        │                        │
+          │ <─────────────────────────────│                        │                        │
+          │                               │                        │                        │
+          │                callback: re-render with updated state   │                        │
+          │ <──────────────────────────────────────────────────────│                        │
+          │                               │                        │                        │
+          │                               │                        │  callback: re-render   │
+          │                               │                        │  with updated state    │
+          │                               │                        │ ──────────────────────>│
+          │                               │                        │                        │
+       [UI updates]                       │                        │                  [UI updates]
+```
+
+Key points: the `LobbyService` is not involved during gameplay. The Razor page injects `CardCounterGameEngine` via DI and holds a reference to `CardCounterGameState` obtained when joining the lobby. `Execute` acquires the lock, runs the mutation, releases the lock, and *then* notifies subscribers — keeping the lock held for the minimum duration and preventing reentrant deadlocks from listener callbacks. All fallible operations return `Result` or `Result<T>` rather than throwing exceptions.
 
 ---
 
@@ -130,11 +204,11 @@ The engine uses a `GamePhase` enum to drive state transitions. The Razor page re
 
 ### BuyIn Phase
 
-Each player rolls a virtual 6-sided die (server-generated random), sees the result multiplied by 8, and chooses positive or negative as their starting balance. The engine waits for all players to submit their buy-in before transitioning to `Playing`.
+Each player rolls a virtual 6-sided die (server-generated via `IRandomNumberService`), sees the result multiplied by 8, and chooses positive or negative as their starting balance. The engine waits for all players to submit their buy-in via `SetBuyIn` before transitioning to `Playing`.
 
 ### Playing Phase
 
-The active phase where turns execute sequentially. Each turn is a sequence of player actions submitted via `HandleActionAsync`.
+The active phase where turns execute sequentially. Each turn is a sequence of direct engine method calls from the active player's Razor page.
 
 ### RoundEnd Phase
 
@@ -146,44 +220,49 @@ Triggered when the final shoe is exhausted and the last card has been drawn. Bal
 
 ---
 
-## IGameEngine Implementation
+## Engine Methods
 
-### InitializeAsync
+`CardCounterGameEngine` extends `AbstractGameEngine` and exposes game-specific methods that the Razor page calls directly. Each method receives a `User` and `CardCounterGameState` reference, performs validation, and calls `state.Execute()` to mutate. This follows the same pattern as `DiceSimulatorGameEngine`.
 
-1. Build the main deck according to `GameConfig` ratios.
-2. Shuffle the main deck using Fisher-Yates.
-3. Build the action deck.
-4. Partition the first shoe from the main deck.
-5. Compute and store `ShoeCardCounts` for the first shoe.
-6. Deal initial action cards (3 per player) from the action deck.
-7. Assign turn order (clockwise, host goes first).
-8. Set phase to `BuyIn`.
-9. Return the initial `GameState`.
+### Lifecycle Methods (inherited contract)
 
-### HandleActionAsync
+```csharp
+public override Task<Result<AbstractGameState>> CreateStateAsync(User host, CancellationToken ct = default)
+```
+Creates a `CardCounterGameState`, sets `IsJoinable = true`. The state is returned to the `LobbyService` which stores it in the `LobbyRegistration`.
 
-Receives a `PlayerAction` and dispatches based on `ActionKind`:
+```csharp
+public override Task<Result> StartAsync(User host, AbstractGameState state, CancellationToken ct = default)
+```
+Validates the caller is the host, casts to `CardCounterGameState`, then calls `state.Execute()` to set `IsJoinable = false` and initialize the game (build decks, deal cards, set phase to `BuyIn`).
 
-| ActionKind | Phase | Behavior |
-|---|---|---|
-| `SetBuyIn` | BuyIn | Validates die roll, records signed balance. Transitions to `Playing` when all set. |
-| `PlayActionCard` | Playing | Validates it's the player's turn (or a response to a chain), removes card from hand, executes effect. |
-| `DiscardExcess` | Playing / RoundEnd | Player discards action cards down to hand limit of 6. |
-| `Fold` | Playing | Validates passes remaining > 0, clears pot, decrements passes. Does not end turn. |
-| `Draw` | Playing | Draws top card from shoe, applies number/operator logic. Ends turn. |
-| `Pass` | Playing | Validates passes remaining > 0, decrements passes. Ends turn. |
-| `ChooseBuyInSign` | BuyIn | Player selects positive or negative for their starting balance. |
+### Game-Specific Methods
 
-After every action, the engine checks:
+Each method calls `state.Execute()` internally to acquire the lock, mutate, release, and notify:
 
-- Is the shoe empty? → Transition to `RoundEnd`, deal action cards, deal next shoe (or `GameOver` if deck is exhausted).
-- Has the turn ended? → Advance `CurrentPlayerIndex`.
+| Method | Parameters | Phase | Behavior |
+|---|---|---|---|
+| `SetBuyIn` | `User player, CardCounterGameState state, bool isNegative` | BuyIn | Records signed balance from server-generated die roll. Transitions to `Playing` when all players have set. |
+| `DrawCard` | `User player, CardCounterGameState state` | Playing | Draws top card from shoe, applies number/operator logic. Ends turn. |
+| `PassTurn` | `User player, CardCounterGameState state` | Playing | Validates passes remaining > 0, decrements passes. Ends turn. |
+| `FoldPot` | `User player, CardCounterGameState state` | Playing | Validates passes remaining > 0, clears pot, decrements passes. Does not end turn. |
+| `PlayActionCard` | `User player, CardCounterGameState state, int cardIndex, string? targetPlayerId = null` | Playing | Validates card in hand, removes card, executes effect. May set `CurrentPendingAction`. |
+| `SubmitReorder` | `User player, CardCounterGameState state, int[] reorderedIndices` | Playing | Resolves Make My Luck reveal — reorders top cards of shoe. |
+| `DiscardExcess` | `User player, CardCounterGameState state, int[] discardIndices` | Playing / RoundEnd | Discards action cards down to hand limit of 6. |
+| `AcceptPending` | `User player, CardCounterGameState state` | Playing | Target accepts a pending action (does not block). |
 
-The engine returns the updated `GameState`, and the platform's `Room.NotifyStateChanged` pushes it to all connected clients.
+### Internal Helper Methods
 
-### IsGameOver
+These are private methods on the engine, called within `state.Execute()` closures:
 
-Returns `true` when `Phase == GamePhase.GameOver`.
+- `InitializeGame` — sets phase, assigns turn order, creates `PlayerState` entries, builds decks, deals initial shoe
+- `BuildMainDeck` — constructs number and operator cards per `GameConfig` ratios
+- `BuildActionDeck` — constructs action card draw pile
+- `DealActionCards` — deals action cards to each player (up to per-round count)
+- `DealNextShoe` — partitions next shoe from the main deck, updates `ShoeCardCounts`
+- `EndTurn` — advances `CurrentPlayerIndex`, triggers shoe/round transitions if shoe is exhausted
+- `Shuffle` — Fisher-Yates shuffle using `IRandomNumberService`
+- `RecalculateShoeCounts` — recomputes visible card type counts for current shoe
 
 ---
 
@@ -224,6 +303,12 @@ Returns `true` when `Phase == GamePhase.GameOver`.
                        Clear pot
 ```
 
+The Razor page calls the corresponding engine method for each action:
+- Play action card → `engine.PlayActionCard(user, state, cardIndex, targetPlayerId)`
+- Fold → `engine.FoldPot(user, state)`
+- Draw → `engine.DrawCard(user, state)`
+- Pass → `engine.PassTurn(user, state)`
+
 ---
 
 ## Action Card Resolution
@@ -234,11 +319,12 @@ Action cards introduce targeted interactions between players. The engine resolve
 
 Cards that are marked **Blockable** in the design can be countered by the target playing `Comp'd`. The engine handles this with a **pending action** pattern:
 
-1. Player A submits `PlayActionCard` targeting Player B.
-2. Engine sets a `PendingAction` on the state with a target player ID and a short response window.
-3. Player B may respond with `PlayActionCard(Compd)` to block.
-4. If blocked, the action is negated (with special bounce-back logic for `Not My Money`).
-5. If not blocked (Player B draws or plays a non-block card, or the response window expires), the action resolves.
+1. Player A calls `engine.PlayActionCard(user, state, cardIndex, targetPlayerId)`.
+2. Engine calls `state.Execute()` to set `CurrentPendingAction` on the state with the target player ID.
+3. Engine calls `state.ScheduleCallback()` to set a response timeout, storing the returned `CancellationTokenSource` on the `PendingAction`.
+4. Player B may respond with `engine.PlayActionCard(user, state, compdIndex)` to block.
+5. If blocked, the action is negated (with special bounce-back logic for `Not My Money`). The timeout is cancelled.
+6. If not blocked (Player B calls `engine.AcceptPending(user, state)` or the timeout fires), the action resolves.
 
 ### Feeling Lucky? Chain
 
@@ -257,11 +343,11 @@ Each target may respond with their own `FeelingLucky` (pushing it to the next pl
 
 ### Make My Luck (Alter the Future)
 
-The engine reveals the top 3 cards of the shoe to the acting player only. This is handled by including a `PrivateReveal` field in the game state keyed to the player ID, which the Razor page reads during rendering. The player submits a reorder action, and the engine replaces the top 3 cards accordingly.
+The engine reveals the top 3 cards of the shoe to the acting player only. This is handled by setting `PrivateReveal` on the player's `PlayerState`, which the Razor page reads during rendering and only renders for the matching player. The player calls `engine.SubmitReorder(user, state, reorderedIndices)`, and the engine replaces the top 3 cards accordingly within `state.Execute()`.
 
 ### Division by Zero
 
-When a player draws a ÷ operator with a pot value of 0, the engine selects one of four outcomes at random (uniform distribution):
+When a player draws a ÷ operator with a pot value of 0, the engine selects one of four outcomes at random (uniform distribution via `IRandomNumberService`):
 
 1. `PassesRemaining += 1`
 2. `PassesRemaining -= 1` (floored at 0)
@@ -274,7 +360,7 @@ When a player draws a ÷ operator with a pot value of 0, the engine selects one 
 
 ### Deck Construction
 
-The main deck is built at `InitializeAsync` based on config ratios:
+The main deck is built inside `InitializeGame` (called from `StartAsync`) based on config ratios:
 
 ```
 Total cards: DeckSize (default 52)
@@ -290,20 +376,15 @@ Operator cards: DeckSize - NumberCardCount
   → Add vs Subtract and Multiply vs Divide split evenly within each group
 ```
 
-The deck is shuffled once. It is not reshuffled between shoes.
+The deck is shuffled once using Fisher-Yates via `IRandomNumberService`. It is not reshuffled between shoes.
 
 ### Shoe Partitioning
 
 Shoes are sliced sequentially from the shuffled deck:
 
 ```csharp
-while (remainingCards.Count > 0)
-{
-    int shoeSize = Random.Shared.Next(config.MinShoeSize, config.MaxShoeSize + 1);
-    shoeSize = Math.Min(shoeSize, remainingCards.Count);
-    shoes.Add(remainingCards.Take(shoeSize).ToList());
-    remainingCards = remainingCards.Skip(shoeSize).ToList();
-}
+int shoeSize = _random.GetRandomInt(config.MinShoeSize, config.MaxShoeSize + 1, RandomType.Secure);
+shoeSize = Math.Min(shoeSize, remainingCards.Count);
 ```
 
 If the remaining cards for the final shoe are fewer than `MinShoeSize`, they form the last shoe as-is.
@@ -316,10 +397,62 @@ At shoe start, the engine computes a frequency map of card types in the shoe and
 
 ## Razor Page Structure
 
-Card Counter uses a single routable page that switches rendered content based on `GamePhase`. This keeps all game UI in one component tree and simplifies state subscriptions.
+Card Counter uses a single routable page (`CardCounterLobby.razor`) that switches rendered content based on `GamePhase`. This keeps all game UI in one component tree and simplifies state subscriptions.
+
+### Page Setup
+
+```csharp
+@page "/room/card-counter/{ObfuscatedRoomCode}"
+
+public partial class CardCounterLobby : DisposableComponent
+{
+    [Inject] protected CardCounterGameEngine GameEngine { get; set; } = default!;
+    [Inject] protected IGameSessionService GameSessionService { get; set; } = default!;
+    [Inject] protected INavigationService NavigationService { get; set; } = default!;
+    [Inject] protected IUserService UserService { get; set; } = default!;
+
+    [Parameter] public string ObfuscatedRoomCode { get; set; } = default!;
+
+    private IDisposable? _stateSubscription;
+    protected CardCounterGameState? GameState { get; set; }
+}
+```
+
+### Session Validation
+
+In `OnInitializedAsync`, the page validates the user has an active session via `IGameSessionService` and that the state is `CardCounterGameState`. If either check fails, the user is redirected home.
+
+### Subscribe / Dispose
+
+```csharp
+// OnInitializedAsync:
+_stateSubscription = GameState
+    .SubscribeToStateChanged(async () => await InvokeAsync(StateHasChanged))
+    .Value;
+
+// Dispose():
+_stateSubscription?.Dispose();
+```
+
+### Direct Engine Method Calls
+
+The Razor page calls engine methods directly with typed parameters — no unified action class or dictionary payloads:
+
+```csharp
+GameEngine.SetBuyIn(UserService.CurrentUser!, GameState, isNegative);
+GameEngine.DrawCard(UserService.CurrentUser!, GameState);
+GameEngine.PassTurn(UserService.CurrentUser!, GameState);
+GameEngine.FoldPot(UserService.CurrentUser!, GameState);
+GameEngine.PlayActionCard(UserService.CurrentUser!, GameState, cardIndex, targetPlayerId);
+GameEngine.SubmitReorder(UserService.CurrentUser!, GameState, reorderedIndices);
+GameEngine.DiscardExcess(UserService.CurrentUser!, GameState, discardIndices);
+GameEngine.AcceptPending(UserService.CurrentUser!, GameState);
+```
+
+### Phase-Switched UI
 
 ```
-/room/cardcounter/{Code}
+/room/card-counter/{ObfuscatedRoomCode}
 │
 ├── @phase == BuyIn
 │   ├── Die roll animation / result
@@ -338,9 +471,9 @@ Card Counter uses a single routable page that switches rendered content based on
 │   │   ├── Draw button
 │   │   └── Pass button (if passes > 0)
 │   │
-│   ├── Target Response View (when PendingAction targets you)
+│   ├── Target Response View (when CurrentPendingAction targets you)
 │   │   ├── Block (Comp'd) button
-│   │   └── Accept / Draw button
+│   │   └── Accept button
 │   │
 │   └── Spectating View (non-active players)
 │       └── Action card hand (display only, no play buttons)
@@ -365,48 +498,59 @@ The `Make My Luck` reveal is rendered conditionally when `PrivateReveal` contain
 
 ---
 
-## Player Action Payloads
+## Action Payloads
 
-All player interactions route through `RoomManager.HandleActionAsync` with a `PlayerAction`. The `Data` dictionary carries action-specific parameters.
+Card Counter does **not** use a unified `PlayerAction` class or `Dictionary<string, object>` payloads. Each engine method takes exactly the parameters it needs, following the same pattern as `DiceSimulatorGameEngine.RollDice(User, DiceSimulatorGameState, DiceRollAction)`.
 
-| ActionKind | Data Keys | Description |
+| Old ActionKind | New Engine Method | Parameters |
 |---|---|---|
-| `SetBuyIn` | `DieRoll: int`, `IsNegative: bool` | Server validates die roll matches the generated value |
-| `PlayActionCard` | `CardIndex: int`, `TargetPlayerId: string?`, `SwapPosition: int?`, `ReorderIndices: int[]?` | Varies by action card type |
-| `DiscardExcess` | `DiscardIndices: int[]` | Indices of action cards to discard |
-| `Fold` | *(none)* | Clears pot, costs a pass |
-| `Draw` | *(none)* | Draws top card of shoe |
-| `Pass` | *(none)* | Skips draw, costs a pass |
+| `SetBuyIn` | `engine.SetBuyIn(...)` | `User player, CardCounterGameState state, bool isNegative` |
+| `Draw` | `engine.DrawCard(...)` | `User player, CardCounterGameState state` |
+| `Pass` | `engine.PassTurn(...)` | `User player, CardCounterGameState state` |
+| `Fold` | `engine.FoldPot(...)` | `User player, CardCounterGameState state` |
+| `PlayActionCard` | `engine.PlayActionCard(...)` | `User player, CardCounterGameState state, int cardIndex, string? targetPlayerId` |
+| `ReorderMakeMyLuck` | `engine.SubmitReorder(...)` | `User player, CardCounterGameState state, int[] reorderedIndices` |
+| `DiscardExcess` | `engine.DiscardExcess(...)` | `User player, CardCounterGameState state, int[] discardIndices` |
+| `AcceptPending` | `engine.AcceptPending(...)` | `User player, CardCounterGameState state` |
 
 ---
 
-## Concurrency Considerations
+## Concurrency Model
 
-The platform's per-room lock serializes all calls to `HandleActionAsync` for a given room. This means Card Counter's engine does not need its own locking — the room lock guarantees that only one action mutates state at a time.
+### State Lock
 
-The `PendingAction` / `PendingChain` pattern for action card responses relies on this serialization. When a blocking opportunity arises, the engine sets the pending state and returns. Subsequent `HandleActionAsync` calls from the target player resolve the pending action before any other mutations occur.
+`AbstractGameState._executeLock` (`SemaphoreSlim(1, 1)`) serializes all mutations. Every engine method calls `state.Execute(() => { ... })` — the lock is acquired, the mutation runs, the lock is released, and `NotifyStateChanged()` fans out to all subscribers. The lock is never held during notification.
 
-### Timeout Handling
+### Scheduled Callbacks
 
-If a target player does not respond to a `PendingAction` within a configurable timeout (e.g., 15 seconds), the Razor page submits an automatic "accept" action on their behalf. This is driven client-side by a timer in the Razor component, keeping the engine itself stateless with respect to wall-clock time.
+Pending action timeouts use `state.ScheduleCallback(TimeSpan, Func<Task>)` rather than client-side timers. This returns a `CancellationTokenSource` stored on the `PendingAction` so the timeout can be cancelled when the target responds. The scheduled callback executes via `ExecuteAsync` when the delay elapses, following the same locking and notification semantics as any player-driven mutation. All scheduled callbacks are automatically cancelled when the state is disposed.
+
+### Subscriber Notification
+
+`ThreadSafeEventManager<int>` manages the subscriber list with a copy-on-write array. `NotifyAsync` snapshots listeners and fans out concurrently via `Task.WhenAll`. Errors in individual listeners are swallowed and logged, providing error isolation.
+
+### Thread-Safe Collections
+
+`GamePlayers` uses `ConcurrentDictionary<string, PlayerState>` for safe concurrent access to player data.
 
 ---
 
 ## Validation Rules
 
-The engine validates every action before applying it. Invalid actions return an error result without mutating state.
+The engine validates every action before calling `state.Execute()`. Invalid actions return `Result.FromError(...)` without mutating state.
 
 | Rule | Enforcement |
 |---|---|
-| Player must be in the room | Room-level check (platform) |
+| Player must be in the game | Engine checks `GamePlayers` contains the user's ID |
 | Action must match current phase | Engine rejects mismatched phases |
-| Draw/Pass/Fold only on your turn | Engine checks `CurrentPlayerIndex` |
+| Draw/Pass/Fold only on your turn | Engine checks `CurrentPlayerIndex` against `TurnOrder` |
 | Pass/Fold requires passes > 0 | Engine checks `PassesRemaining` |
-| Action card must be in hand | Engine checks `ActionHand` contains the card |
-| Target player must exist in room | Engine validates `TargetPlayerId` |
-| Comp'd only against blockable cards | Engine checks `PendingAction` target and card type |
+| Action card must be in hand | Engine checks `ActionHand` contains the card at the given index |
+| Target player must exist in game | Engine validates `targetPlayerId` against `GamePlayers` |
+| Comp'd only against blockable cards | Engine checks `CurrentPendingAction` target and card type |
 | Hand limit discard must bring count ≤ 6 | Engine validates post-discard count |
-| Buy-in die roll must match server-generated value | Engine compares against stored roll |
+| Buy-in die roll matches server value | Engine compares against stored `BuyInRoll` on `PlayerState` |
+| Make My Luck reorder valid | Engine validates indices match `PrivateReveal` count and are distinct |
 
 ---
 
@@ -434,35 +578,31 @@ public class GameConfig
 ## File Structure
 
 ```
-Games/
-└── CardCounter/
-    ├── CardCounterGameEngine.cs        // IGameEngine implementation
-    ├── CardCounterState.cs             // Typed wrapper over GameState dictionary
-    ├── Models/
-    │   ├── Card.cs                     // Card, NumberCard, OperatorCard records
-    │   ├── ActionCard.cs               // ActionCard record and ActionType enum
-    │   ├── PlayerState.cs              // Per-player mutable state
-    │   ├── GameConfig.cs               // Playtesting-tunable configuration
-    │   └── ForcedDrawChain.cs          // Feeling Lucky? chain tracking
-    ├── Services/
-    │   ├── DeckBuilder.cs              // Deck construction and shoe partitioning
-    │   ├── ActionResolver.cs           // Action card effect execution
-    │   └── ScoringService.cs           // Final balance comparison and tiebreakers
-    └── Pages/
-        └── CardCounterRoom.razor       // Single routable page for all phases
-            └── CardCounterRoom.razor.cs // Code-behind
+Components/Pages/Games/CardCounter/
+├── CardCounterLobby.razor
+├── CardCounterLobby.razor.cs
+└── CardCounterLobby.razor.css
+
+Services/Navigation/Games/CardCounter/
+└── CardCounterGameEngine.cs
+
+Services/State/Games/CardCounter/
+├── CardCounterGameState.cs
+└── Data/Models.cs
 ```
 
 ---
 
 ## Constraints & Trade-offs
 
-**Single page vs. multi-page.** Card Counter uses a single Razor page for all phases. The game flow is linear and phase transitions happen frequently (every shoe), so a single component tree avoids redundant state subscription setup. If the UI grows significantly more complex (e.g., team modes), splitting into sub-pages is a straightforward refactor.
+**Single page vs. multi-page.** Card Counter uses a single Razor page (`CardCounterLobby.razor`) for all phases. The game flow is linear and phase transitions happen frequently (every shoe), so a single component tree avoids redundant state subscription setup. If the UI grows significantly more complex (e.g., team modes), splitting into sub-pages is a straightforward refactor.
 
-**Client-driven timeouts.** Action card response timeouts are enforced by client-side timers, not server-side background tasks. This keeps the engine purely reactive and avoids coordinating timers across the engine and the platform's `BackgroundService`. The trade-off is that a disconnected client won't auto-resolve — the platform's circuit disconnect handler should trigger a default resolution for any pending actions involving the disconnected player.
+**Server-side timeouts via ScheduleCallback.** Action card response timeouts use `state.ScheduleCallback()` rather than client-side timers. This ensures pending actions resolve even if the target player's circuit is disconnected. The `CancellationTokenSource` returned by `ScheduleCallback` is stored on the `PendingAction` and cancelled when the target responds, preventing stale timeouts from firing.
 
-**Private state in shared GameState.** The `PrivateReveal` and `ActionHand` fields exist in the shared `GameState` dictionary. The Razor page is responsible for only rendering a player's own private data. This is secure in Blazor Server because all rendering happens server-side — the client never receives other players' private state in the HTML. If the platform ever migrates to Blazor WebAssembly, private state would need to be segregated into per-circuit state or fetched via API.
+**Disconnect handling via LobbyCircuitHandler.** When a player's circuit drops, `LobbyCircuitHandler` starts a 30-second grace period. If the circuit reconnects within 30 seconds, the timer is cancelled. If it expires or the circuit closes permanently, the player is removed from the game state. Any `CurrentPendingAction` targeting the disconnected player should be resolved by the timeout callback.
 
-**Action card complexity.** The `Feeling Lucky?` chain and the `PendingAction` blocking pattern add interaction complexity. The resolution logic is centralized in `ActionResolver` to keep `HandleActionAsync` clean. Each action card type is a discrete handler method, making it straightforward to add or modify cards during playtesting.
+**Private state in shared GameState.** The `PrivateReveal` and `ActionHand` fields exist on the shared `CardCounterGameState`. The Razor page is responsible for only rendering a player's own private data. This is secure in Blazor Server because all rendering happens server-side — the client never receives other players' private state in the HTML.
 
-**Randomness.** All random decisions (die rolls, deck shuffle, division-by-zero outcomes) use server-side `Random.Shared`. The client never generates random values. Die roll results are stored in state and validated on submission to prevent tampering.
+**Action card complexity.** The `Feeling Lucky?` chain and the `PendingAction` blocking pattern add interaction complexity. Each action card type is resolved by discrete logic within the engine's `PlayActionCard` method, keeping resolution centralized and straightforward to modify during playtesting.
+
+**Randomness.** All random decisions (die rolls, deck shuffle, division-by-zero outcomes) use `IRandomNumberService` server-side. The client never generates random values. Die roll results are stored in `PlayerState.BuyInRoll` and validated on submission to prevent tampering.
