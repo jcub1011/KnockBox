@@ -8,7 +8,6 @@ namespace KnockBox.Services.State.Games.Shared
 {
     public abstract class AbstractGameState(User host, ILogger logger) : IDisposable
     {
-        private const string STATE_CHANGED_GROUP = "StateChanged";
         private readonly Lock _disposeLock = new();
         private readonly SemaphoreSlim _executeLock = new(1, 1);
         private readonly Lock _scheduledLock = new();
@@ -32,8 +31,8 @@ namespace KnockBox.Services.State.Games.Shared
         /// <summary>
         /// The event manager for this game state.
         /// </summary>
-        public ITypedThreadSafeEventManager EventManager { get; private set; }
-            = new TypedThreadSafeEventManager();
+        public IThreadSafeEventManager<int> EventManager { get; private set; }
+            = new ThreadSafeEventManager<int>();
 
         /// <summary>
         /// If this lobby is open for players to join. 
@@ -159,7 +158,7 @@ namespace KnockBox.Services.State.Games.Shared
 
             ValueTask HandlerWrapper(int unusedInput) => handler();
 
-            return Result.FromValue(EventManager.Subscribe<int>(STATE_CHANGED_GROUP, HandlerWrapper));
+            return Result.FromValue(EventManager.Subscribe(HandlerWrapper));
         }
 
         /// <summary>
@@ -384,7 +383,6 @@ namespace KnockBox.Services.State.Games.Shared
 
             lock (_disposeLock)
             {
-                EventManager.Dispose();
                 _executeLock.Dispose();
                 _disposeCts.Dispose();
             }
@@ -400,7 +398,7 @@ namespace KnockBox.Services.State.Games.Shared
 
             try
             {
-                EventManager.Notify(STATE_CHANGED_GROUP, 1);
+                EventManager.Notify(1);
             }
             catch (Exception ex)
             {
