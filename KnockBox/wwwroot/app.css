@@ -16,12 +16,11 @@ body {
     font-optical-sizing: auto;
     padding: 0px;
     margin: 0px;
-    height: 100vh;
+    height: 100vh;  
     width: 100vw;
     
     /* We will use a pseudo-element to handle the diagonal rotation to preserve the aspect ratio cleanly */
-    /* Remove background from body so the hidden pseudo-element is fully visible */
-    background-color: transparent;
+    background-color: var(--bg-color); /* Restoring this limits any blank space flashes */
     overflow-x: hidden; /* Prevent horizontal scrollbars if pseudo-element corners poke out */
 }
 
@@ -29,10 +28,11 @@ body {
 body::before {
     content: "";
     position: fixed;
-    top: -50vh;
-    left: -50vw;
-    width: 200vw;
-    height: 200vh;
+    /* Use vmax to create a massive anchored square, guaranteeing the corners are perfectly covered across ANY screen aspect ratio */
+    top: calc(50vh - 150vmax);
+    left: calc(50vw - 150vmax);
+    width: 300vmax;
+    height: 300vmax;
     z-index: -1; /* Keep it behind all body content */
 
     /* Apply background-color here beneath the image and tint */
