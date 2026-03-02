@@ -31,57 +31,60 @@ else
         }
         else
         {
-            <div class="row g-4">
-                <div class="col-md-4">
-                    <div class="controls-panel">
-                        <h4>Roll Controls</h4>
-                        <div class="mb-3">
-                            <label>Dice</label>
-                            <div>
-                                @foreach (var type in Enum.GetValues<DiceType>())
-                                {
-                                    <button class="btn @(RollAction.DiceType == type ? "btn-primary" : "btn-outline-primary") me-1 mb-1" @onclick="() => RollAction.DiceType = type">d@((int)type)</button>
-                                }
-                            </div>
-                        </div>
-                        <div class="mb-3">
-                            <label>Count: @RollAction.DiceCount</label>
-                            <input type="number" class="form-control" min="1" max="99" @bind="RollAction.DiceCount" />
-                        </div>
-                        <div class="mb-3">
-                            <label>Modifier: @(RollAction.Modifier >= 0 ? "+" : "")@RollAction.Modifier</label>
-                            <input type="number" class="form-control" @bind="RollAction.Modifier" />
-                        </div>
-                        <div class="mb-3">
-                            <label>Expression Preview:</label>
-                            <div class="expression-preview border p-2 bg-light">
-                                @RollAction.DiceCount@("d")@((int)RollAction.DiceType)@(RollAction.Modifier == 0 ? "" : (RollAction.Modifier > 0 ? $"+{RollAction.Modifier}" : RollAction.Modifier.ToString()))
-                            </div>
-                        </div>
-                        <div class="mb-3">
-                            <label>Mode</label>
-                            <select class="form-control" @bind="RollAction.Mode">
-                                @foreach (var mode in Enum.GetValues<RollMode>())
-                                {
-                                    <option value="@mode">@mode</option>
-                                }
-                            </select>
-                        </div>
-                        <button class="btn btn-success w-100 mb-3" @onclick="RollDice">ROLL!</button>
-                        <div class="mb-3">
-                            @if (GameState.RollHistory.Where(r => r.PlayerId == UserService.CurrentUser?.Id).LastOrDefault() is { } lastRoll)
-                            {
-                                <div class="alert alert-info">
-                                    <strong>Last Roll:</strong> @lastRoll.Expression = @lastRoll.Result <br/>
-                                    <small>Mode: @lastRoll.Mode | Rolled: @string.Join(", ", lastRoll.RawRolls)</small>
-                                </div>
-                            }
-                        </div>
-                        @if (UserService.CurrentUser?.Id == GameState.Host.Id)
+            <div class="controls-panel">
+                <h3>Roll Controls</h3>
+                <div class="labeled-input">
+                    <label>Dice</label>
+                    <div class="dice-options">
+                        @foreach (var type in Enum.GetValues<DiceType>())
                         {
-                            <button class="btn btn-danger w-100" @onclick="ClearHistory">Clear History (Host)</button>
+                            <button class="btn @(RollAction.DiceType == type ? "btn-primary" : "btn-outline-primary")" @onclick="() => RollAction.DiceType = type">d@((int)type)</button>
                         }
                     </div>
+                </div>
+                <div class="input-row">
+                    <div class="labeled-input">
+                        <label>Count: @RollAction.DiceCount</label>
+                        <input type="number" class="form-control" min="1" max="99" @bind="RollAction.DiceCount" />
+                    </div>
+                    <div class="labeled-input">
+                        <label>Modifier: @(RollAction.Modifier >= 0 ? "+" : "")@RollAction.Modifier</label>
+                        <input type="number" class="form-control" @bind="RollAction.Modifier" />
+                    </div>
+                    <div class="labeled-input">
+                        <label>Expression Preview:</label>
+                        <div class="expression-preview form-control">
+                            @RollAction.DiceCount@("d")@((int)RollAction.DiceType)@(RollAction.Modifier == 0 ? "" : (RollAction.Modifier > 0 ? $"+{RollAction.Modifier}" : RollAction.Modifier.ToString()))
+                        </div>
+                    </div>
+                </div>
+                <div class="labeled-input">
+                    <label>Mode</label>
+                    <select class="form-control" @bind="RollAction.Mode">
+                        @foreach (var mode in Enum.GetValues<RollMode>())
+                        {
+                            <option value="@mode">@mode</option>
+                        }
+                    </select>
+                </div>
+                <button class="btn btn-success" @onclick="RollDice">ROLL!</button>
+                <div class="">
+                    @if (GameState.RollHistory.Where(r => r.PlayerId == UserService.CurrentUser?.Id).LastOrDefault() is { } lastRoll)
+                    {
+                        <div class="alert alert-info">
+                            <strong>Last Roll:</strong> @lastRoll.Expression = @lastRoll.Result <br/>
+                            <small>Mode: @lastRoll.Mode | Rolled: @string.Join(", ", lastRoll.RawRolls)</small>
+                        </div>
+                    }
+                </div>
+                @if (UserService.CurrentUser?.Id == GameState.Host.Id)
+                {
+                    <button class="btn btn-danger w-100" @onclick="ClearHistory">Clear History (Host)</button>
+                }
+            </div>
+
+            <div class="row g-4">
+                <div class="col-md-4">
                 </div>
                 <div class="col-md-8">
                     <div class="leaderboard-panel mb-4">
@@ -127,10 +130,10 @@ else
                                 {
                                     <div class="list-group-item flex-column align-items-start">
                                         <div class="d-flex w-100 justify-content-between">
-                                            <h6 class="mb-1">@roll.PlayerName</h6>
+                                            <h6 class="">@roll.PlayerName</h6>
                                             <small>@((DateTimeOffset.UtcNow - roll.Timestamp).TotalSeconds < 60 ? "Just now" : $"{(int)(DateTimeOffset.UtcNow - roll.Timestamp).TotalMinutes}m ago")</small>
                                         </div>
-                                        <p class="mb-1">
+                                        <p class="">
                                             @roll.Expression = <strong>@roll.Result</strong> 
                                             @if (roll.Mode != RollMode.Normal && roll.AltRolls != null)
                                             {

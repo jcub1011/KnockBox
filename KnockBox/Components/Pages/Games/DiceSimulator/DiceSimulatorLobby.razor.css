@@ -1,31 +1,56 @@
 .content {
-    width: 100%;
+    display: flex;
     flex: 1;
     background-color: yellow;
     padding: 16px;
+    justify-content: center;
 }
 
 .jackbox-lobby {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
     font-family: var(--font-primary);
     background-color: #4a154b;
     color: #fff;
-    padding: 2rem;
+    padding: 12px 24px;
     border-radius: 12px;
     border: 5px solid #000;
     box-shadow: 10px 10px 0px #000;
     max-width: 1200px;
+    min-width: 0px;
 }
 
-.jackbox-lobby h3, 
-.jackbox-lobby h4 {
+.controls-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.labeled-input {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+}
+
+h3, 
+h4 {
     font-weight: 900;
     text-transform: uppercase;
     text-shadow: 3px 3px 0 #000;
     color: #f7d547;
-    margin-bottom: 1rem;
+    font-size: 32px;
+    padding: 0px;
+    margin: 0px;
 }
 
-.jackbox-lobby .btn {
+h6 {
+    margin: 0px;
+    padding: 0px;
+}
+
+.btn {
     font-family: var(--font-primary);
     font-size: 1rem;
     font-weight: 800;
@@ -37,53 +62,53 @@
     color: #000;
 }
 
-.jackbox-lobby .btn:hover:not(:disabled) {
+.btn:hover:not(:disabled) {
     transform: translate(-2px, -2px);
     box-shadow: 6px 6px 0px #000;
 }
 
-.jackbox-lobby .btn:active:not(:disabled) {
+.btn:active:not(:disabled) {
     transform: translate(2px, 2px);
     box-shadow: 2px 2px 0px #000;
 }
 
-.jackbox-lobby .btn:disabled {
+.btn:disabled {
     opacity: 0.6;
     box-shadow: none;
     transform: none;
     cursor: not-allowed;
 }
 
-.jackbox-lobby .btn-primary {
+.btn-primary {
     background-color: #00d2ff !important;
 }
 
-.jackbox-lobby .btn-outline-primary {
+.btn-outline-primary {
     background-color: #fff !important;
 }
 
-.jackbox-lobby .btn-outline-primary.btn-primary {
+.btn-outline-primary.btn-primary {
     background-color: #00d2ff !important;
 }
 
-.jackbox-lobby .btn-success {
+.btn-success {
     background-color: #26b050 !important;
     color: #fff !important;
     font-size: 1.5rem;
     padding: 12px;
 }
 
-.jackbox-lobby .btn-danger {
+.btn-danger {
     background-color: #e50000 !important;
     color: #fff !important;
 }
 
-.jackbox-lobby .btn-outline-secondary {
+.btn-outline-secondary {
     background-color: #fff !important;
     color: #000 !important;
 }
 
-.jackbox-lobby .form-control {
+.form-control {
     font-family: var(--font-mono);
     font-size: 1.2rem;
     font-weight: 700;
@@ -95,7 +120,7 @@
     background-color: #fff;
 }
 
-.jackbox-lobby input[type="number"] {
+input[type="number"] {
     font-family: var(--font-mono);
     font-size: 1.2rem;
     font-weight: 700;
@@ -106,9 +131,27 @@
     color: #000;
     background-color: #fff;
     width: 100%;
+    min-width: 100px;
 }
 
-.jackbox-lobby select {
+.dice-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.dice-options button {
+    padding: 2px 6px;
+    font-size: 20px;
+}
+
+.input-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+select {
     font-family: var(--font-primary);
     font-size: 1.2rem;
     font-weight: 800;
@@ -128,21 +171,22 @@
     background-size: 1em;
 }
 
-.jackbox-lobby select:focus {
+select:focus {
     outline: none;
     box-shadow: 6px 6px 0px #000;
 }
 
-.jackbox-lobby select option {
+select option {
     font-weight: 800;
     color: #000;
+    margin: 6px;
+    padding: 6px;
 }
 
-.jackbox-lobby label {
+label {
     font-weight: 800;
     text-transform: uppercase;
     color: #fff;
-    margin-bottom: 4px;
     font-size: 0.9rem;
 }
 
