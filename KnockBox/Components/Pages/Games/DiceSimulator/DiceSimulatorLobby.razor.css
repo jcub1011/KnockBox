@@ -327,6 +327,13 @@ label {
     padding-top: 1rem;
 }
 
+.right-column {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    flex: 1;
+}
+
 .player-rolls-list {
     display: flex;
     flex-direction: column;

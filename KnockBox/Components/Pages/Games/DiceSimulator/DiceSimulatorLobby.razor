@@ -86,92 +86,99 @@ else
                 }
             </div>
         </div>
-        <div class="leaderboard-panel card">
-            <h4>Leaderboard</h4>
-            <div class="table-responsive">
-                <table class="table table-sm table-striped table">
-                    <thead>
-                        <tr>
-                            <th>Player</th>
-                            <th>Rolls</th>
-                            <th>Dice Rolled</th>
-                            <th>Nat 20s</th>
-                            <th>Nat 1s</th>
-                            <th>Highest</th>
-                            <th>Cumulative</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var stats in GameState.PlayerStats.Values.OrderByDescending(s => s.TotalRolls))
-                        {
+        <div class="right-column">
+            <div class="leaderboard-panel card">
+                <h4>Leaderboard</h4>
+                <div class="table-responsive">
+                    <table class="table table-sm table-striped table">
+                        <thead>
                             <tr>
-                                <td>@stats.PlayerName</td>
-                                <td>@stats.TotalRolls</td>
-                                <td>@stats.TotalDiceRolled</td>
-                                <td>@stats.NatTwentyCount</td>
-                                <td>@stats.NatOneCount</td>
-                                <td>@stats.HighestResult (@stats.HighestResultExpression)</td>
-                                <td>@stats.CumulativeTotal</td>
+                                <th>Player</th>
+                                <th>Rolls</th>
+                                <th>Dice Rolled</th>
+                                <th>Nat 20s</th>
+                                <th>Nat 1s</th>
+                                <th>Highest</th>
+                                <th>Cumulative</th>
                             </tr>
-                        }
-                    </tbody>
-                </table>
-            </div>
-        </div>
-        <div class="card">
-            <div class="d-flex justify-content-between align-items-center">
-                <h4>Player Rolls</h4>
-                <button class="btn btn-sm btn-outline-secondary export-btn" @onclick="ExportCsv">Export CSV ▼</button>
-            </div>
-            <div class="player-rolls-list">
-                @foreach (var player in Enumerable.Repeat(GameState.Host, 1).Concat(GameState.Players))
-                {
-                    var playerLastRoll = GameState.RollHistory.LastOrDefault(r => r.PlayerId == player.Id);
-                    var isExpanded = IsPlayerExpanded(player.Id);
-                    <div class="player-roll-row" @onclick="() => TogglePlayerHistory(player.Id)">
-                        <div class="player-roll-summary">
-                            <span class="player-roll-name">@player.Name</span>
-                            @if (playerLastRoll is not null)
+                        </thead>
+                        <tbody>
+                            @foreach (var stats in GameState.PlayerStats.Values.OrderByDescending(s => s.TotalRolls))
                             {
-                                <span class="player-roll-result">@playerLastRoll.Expression = <strong>@playerLastRoll.Result</strong></span>
-                                <span class="player-roll-time">
-                                    @((DateTimeOffset.UtcNow - playerLastRoll.Timestamp).TotalSeconds < 60
-                                        ? "Just now"
-                                        : $"{(int)(DateTimeOffset.UtcNow - playerLastRoll.Timestamp).TotalMinutes}m ago")
-                                </span>
+                                <tr>
+                                    <td>@stats.PlayerName</td>
+                                    <td>@stats.TotalRolls</td>
+                                    <td>@stats.TotalDiceRolled</td>
+                                    <td>@stats.NatTwentyCount</td>
+                                    <td>@stats.NatOneCount</td>
+                                    <td>@stats.HighestResult (@stats.HighestResultExpression)</td>
+                                    <td>@stats.CumulativeTotal</td>
+                                </tr>
                             }
-                            else
-                            {
-                                <span class="player-roll-empty">No rolls yet</span>
-                            }
-                            <span class="player-roll-toggle">@(isExpanded ? "▲" : "▼")</span>
-                        </div>
-                    </div>
-                    @if (isExpanded)
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="card">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h4>Player Rolls</h4>
+                    <button class="btn btn-sm btn-outline-secondary export-btn" @onclick="ExportCsv">Export CSV ▼</button>
+                </div>
+                <div class="player-rolls-list">
+                    @foreach (var player in Enumerable.Repeat(GameState.Host, 1).Concat(GameState.Players))
                     {
-                        <div class="player-roll-history list">
-                            @foreach (var roll in GameState.RollHistory.Where(r => r.PlayerId == player.Id).Reverse().Take(200))
-                            {
-                                <div class="list-group-item flex-column align-items-start">
-                                    <div class="d-flex w-100 justify-content-between">
-                                        <h6>@roll.Expression = @roll.Result</h6>
-                                        <small>@((DateTimeOffset.UtcNow - roll.Timestamp).TotalSeconds < 60 ? "Just now" : $"{(int)(DateTimeOffset.UtcNow - roll.Timestamp).TotalMinutes}m ago")</small>
-                                    </div>
-                                    <p>
-                                        @if (roll.Mode != RollMode.Normal && roll.AltRolls != null)
-                                        {
-                                            <span>(@roll.Mode &mdash; kept: @(roll.RawRolls.Sum()) [@string.Join(",", roll.RawRolls)] | alt: @roll.AltTotal [@string.Join(",", roll.AltRolls)])</span>
-                                        }
-                                        else
-                                        {
-                                            <span>(rolls: @string.Join(",", roll.RawRolls) @(roll.Modifier != 0 ? (roll.Modifier > 0 ? $"+ {roll.Modifier}" : $"- {Math.Abs(roll.Modifier)}") : ""))</span>
-                                        }
-                                    </p>
-                                </div>
-                            }
+                        var playerLastRoll = GameState.RollHistory.LastOrDefault(r => r.PlayerId == player.Id);
+                        var playerRollCount = GameState.RollHistory.Count(r => r.PlayerId == player.Id);
+                        var isExpanded = IsPlayerExpanded(player.Id);
+                        <div class="player-roll-row" @onclick="() => TogglePlayerHistory(player.Id)">
+                            <div class="player-roll-summary">
+                                <span class="player-roll-name">@player.Name</span>
+                                @if (playerLastRoll is not null)
+                                {
+                                    <span class="player-roll-result">#@playerRollCount &mdash; @playerLastRoll.Expression = <strong>@playerLastRoll.Result</strong></span>
+                                    <span class="player-roll-time">
+                                        @((DateTimeOffset.UtcNow - playerLastRoll.Timestamp).TotalSeconds < 60
+                                            ? "Just now"
+                                            : $"{(int)(DateTimeOffset.UtcNow - playerLastRoll.Timestamp).TotalMinutes}m ago")
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span class="player-roll-empty">No rolls yet</span>
+                                }
+                                <span class="player-roll-toggle">@(isExpanded ? "▲" : "▼")</span>
+                            </div>
                         </div>
+                        @if (isExpanded)
+                        {
+                            var playerRolls = GameState.RollHistory.Where(r => r.PlayerId == player.Id).ToList();
+                            var displayRolls = playerRolls.AsEnumerable().Reverse().Take(200).ToList();
+                            <div class="player-roll-history list">
+                                @for (int i = 0; i < displayRolls.Count; i++)
+                                {
+                                    var roll = displayRolls[i];
+                                    var rollNumber = playerRolls.Count - i;
+                                    <div class="list-group-item flex-column align-items-start">
+                                        <div class="d-flex w-100 justify-content-between">
+                                            <h6>#@rollNumber &mdash; @roll.Expression = @roll.Result</h6>
+                                            <small>@((DateTimeOffset.UtcNow - roll.Timestamp).TotalSeconds < 60 ? "Just now" : $"{(int)(DateTimeOffset.UtcNow - roll.Timestamp).TotalMinutes}m ago")</small>
+                                        </div>
+                                        <p>
+                                            @if (roll.Mode != RollMode.Normal && roll.AltRolls != null)
+                                            {
+                                                <span>(@roll.Mode &mdash; kept: @(roll.RawRolls.Sum()) [@string.Join(",", roll.RawRolls)] | alt: @roll.AltTotal [@string.Join(",", roll.AltRolls)])</span>
+                                            }
+                                            else
+                                            {
+                                                <span>(rolls: @string.Join(",", roll.RawRolls) @(roll.Modifier != 0 ? (roll.Modifier > 0 ? $"+ {roll.Modifier}" : $"- {Math.Abs(roll.Modifier)}") : ""))</span>
+                                            }
+                                        </p>
+                                    </div>
+                                }
+                            </div>
+                        }
                     }
-                }
+                </div>
             </div>
         </div>
     }
