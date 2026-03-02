@@ -12,17 +12,6 @@
 else
 {
     <div class="jackbox-lobby">
-        <div class="d-flex align-items-center mb-3">
-            <h3 class="mb-0 me-3">Dice Simulator Lobby</h3>
-            <button class="btn btn-sm btn-outline-secondary" @onclick="ToggleRoomCode">
-                @(IsRoomCodeVisible ? "Hide Room Code" : "Show Room Code")
-            </button>
-            @if (IsRoomCodeVisible)
-            {
-                <span class="ms-2 user-select-all fw-bold fs-5 room-code-display">@RoomCode</span>
-            }
-        </div>
-
         @if (GameState.IsJoinable)
         {
             <div class="joinable-state">

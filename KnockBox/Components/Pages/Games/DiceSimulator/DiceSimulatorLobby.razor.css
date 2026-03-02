@@ -1,4 +1,4 @@
-::deep .jackbox-lobby {
+.jackbox-lobby {
     font-family: var(--font-primary);
     background-color: #4a154b;
     color: #fff;
@@ -10,8 +10,8 @@
     margin: 0 auto;
 }
 
-::deep .jackbox-lobby h3, 
-::deep .jackbox-lobby h4 {
+.jackbox-lobby h3, 
+.jackbox-lobby h4 {
     font-weight: 900;
     text-transform: uppercase;
     text-shadow: 3px 3px 0 #000;
@@ -19,7 +19,7 @@
     margin-bottom: 1rem;
 }
 
-::deep .jackbox-lobby .btn {
+.jackbox-lobby .btn {
     font-family: var(--font-primary);
     font-size: 1rem;
     font-weight: 800;
@@ -31,53 +31,53 @@
     color: #000;
 }
 
-::deep .jackbox-lobby .btn:hover:not(:disabled) {
+.jackbox-lobby .btn:hover:not(:disabled) {
     transform: translate(-2px, -2px);
     box-shadow: 6px 6px 0px #000;
 }
 
-::deep .jackbox-lobby .btn:active:not(:disabled) {
+.jackbox-lobby .btn:active:not(:disabled) {
     transform: translate(2px, 2px);
     box-shadow: 2px 2px 0px #000;
 }
 
-::deep .jackbox-lobby .btn:disabled {
+.jackbox-lobby .btn:disabled {
     opacity: 0.6;
     box-shadow: none;
     transform: none;
     cursor: not-allowed;
 }
 
-::deep .jackbox-lobby .btn-primary {
+.jackbox-lobby .btn-primary {
     background-color: #00d2ff !important;
 }
 
-::deep .jackbox-lobby .btn-outline-primary {
+.jackbox-lobby .btn-outline-primary {
     background-color: #fff !important;
 }
 
-::deep .jackbox-lobby .btn-outline-primary.btn-primary {
+.jackbox-lobby .btn-outline-primary.btn-primary {
     background-color: #00d2ff !important;
 }
 
-::deep .jackbox-lobby .btn-success {
+.jackbox-lobby .btn-success {
     background-color: #26b050 !important;
     color: #fff !important;
     font-size: 1.5rem;
     padding: 12px;
 }
 
-::deep .jackbox-lobby .btn-danger {
+.jackbox-lobby .btn-danger {
     background-color: #e50000 !important;
     color: #fff !important;
 }
 
-::deep .jackbox-lobby .btn-outline-secondary {
+.jackbox-lobby .btn-outline-secondary {
     background-color: #fff !important;
     color: #000 !important;
 }
 
-::deep .jackbox-lobby .form-control {
+.jackbox-lobby .form-control {
     font-family: var(--font-mono);
     font-size: 1.2rem;
     font-weight: 700;
@@ -89,7 +89,7 @@
     background-color: #fff;
 }
 
-::deep .jackbox-lobby input[type="number"] {
+.jackbox-lobby input[type="number"] {
     font-family: var(--font-mono);
     font-size: 1.2rem;
     font-weight: 700;
@@ -102,7 +102,7 @@
     width: 100%;
 }
 
-::deep .jackbox-lobby select {
+.jackbox-lobby select {
     font-family: var(--font-primary);
     font-size: 1.2rem;
     font-weight: 800;
@@ -122,17 +122,17 @@
     background-size: 1em;
 }
 
-::deep .jackbox-lobby select:focus {
+.jackbox-lobby select:focus {
     outline: none;
     box-shadow: 6px 6px 0px #000;
 }
 
-::deep .jackbox-lobby select option {
+.jackbox-lobby select option {
     font-weight: 800;
     color: #000;
 }
 
-::deep .jackbox-lobby label {
+.jackbox-lobby label {
     font-weight: 800;
     text-transform: uppercase;
     color: #fff;
@@ -140,7 +140,7 @@
     font-size: 0.9rem;
 }
 
-::deep .jackbox-table {
+.jackbox-table {
     background-color: #fff;
     border: 4px solid #000;
     border-radius: 8px;
@@ -148,7 +148,7 @@
     color: #000;
 }
 
-::deep .jackbox-table thead th {
+.jackbox-table thead th {
     background-color: #f7d547;
     font-weight: 800;
     text-transform: uppercase;
@@ -157,14 +157,14 @@
     color: #000;
 }
 
-::deep .jackbox-table tbody td {
+.jackbox-table tbody td {
     border-bottom: 2px solid #ddd;
     font-weight: 600;
     padding: 10px;
     color: #333;
 }
 
-::deep .jackbox-list .list-group-item {
+.jackbox-list .list-group-item {
     border: 4px solid #000;
     border-radius: 8px !important;
     margin-bottom: 12px;
@@ -173,26 +173,26 @@
     color: #000;
 }
 
-::deep .jackbox-list .list-group-item h6 {
+.jackbox-list .list-group-item h6 {
     font-weight: 900;
     font-size: 1.2rem;
     color: #ff0055;
     text-transform: uppercase;
 }
 
-::deep .jackbox-list .list-group-item p {
+.jackbox-list .list-group-item p {
     font-family: var(--font-mono);
     font-size: 1rem;
     font-weight: 700;
     margin-top: 8px;
 }
 
-::deep .jackbox-list .list-group-item small {
+.jackbox-list .list-group-item small {
     font-weight: 600;
     color: #666;
 }
 
-::deep .alert-info {
+.alert-info {
     background-color: #f7d547;
     border: 4px solid #000;
     border-radius: 8px;
@@ -203,7 +203,7 @@
     margin-top: 1rem;
 }
 
-::deep .expression-preview {
+.expression-preview {
     border: 4px solid #000 !important;
     border-radius: 8px;
     box-shadow: inset 2px 2px 0px rgba(0,0,0,0.1);
@@ -215,7 +215,7 @@
     text-align: center;
 }
 
-::deep .room-code-display {
+.room-code-display {
     background-color: #ff0055;
     color: #fff;
     padding: 4px 12px;
@@ -224,7 +224,7 @@
     box-shadow: 3px 3px 0px #000;
 }
 
-::deep .player-list {
+.player-list {
     list-style: none;
     padding: 0;
     display: flex;
@@ -232,7 +232,7 @@
     gap: 12px;
 }
 
-::deep .player-list li {
+.player-list li {
     background-color: #ff0055;
     color: #fff;
     padding: 12px 24px;
@@ -244,12 +244,12 @@
     text-transform: uppercase;
 }
 
-::deep .start-btn {
+.start-btn {
     font-size: 1.5rem !important;
     padding: 12px 24px !important;
 }
 
-::deep .row > .col-md-4,
-::deep .row > .col-md-8 {
+.row > .col-md-4,
+.row > .col-md-8 {
     padding-top: 1rem;
 }
