@@ -117,13 +117,14 @@ else
                     </tbody>
                 </table>
             </div>
-                        
+        </div>
+        <div class="card">
             <div class="feed-panel">
                 <div class="d-flex justify-content-between align-items-center mb-2">
                     <h4>Recent Rolls Feed</h4>
                     <button class="btn btn-sm btn-outline-secondary export-btn" @onclick="ExportCsv">Export CSV ▼</button>
                 </div>
-                            
+
                 <div class="list-group jackbox-list" style="max-height: 400px; overflow-y: auto;">
                     @foreach (var roll in Enumerable.Reverse(GameState.RollHistory).Take(200))
                     {
@@ -133,7 +134,7 @@ else
                                 <small>@((DateTimeOffset.UtcNow - roll.Timestamp).TotalSeconds < 60 ? "Just now" : $"{(int)(DateTimeOffset.UtcNow - roll.Timestamp).TotalMinutes}m ago")</small>
                             </div>
                             <p class="">
-                                @roll.Expression = <strong>@roll.Result</strong> 
+                                @roll.Expression = <strong>@roll.Result</strong>
                                 @if (roll.Mode != RollMode.Normal && roll.AltRolls != null)
                                 {
                                     <span>(@roll.Mode &mdash; kept: @(roll.RawRolls.Sum()) [@string.Join(",", roll.RawRolls)] | alt: @roll.AltTotal [@string.Join(",", roll.AltRolls)])</span>
