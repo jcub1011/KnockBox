@@ -116,6 +116,16 @@ namespace KnockBox.Components.Pages.Games.DiceSimulator
         protected string RoomCode { get; set; } = string.Empty;
         protected bool IsRoomCodeVisible { get; set; } = false;
 
+        private HashSet<string> _expandedPlayerIds = new();
+
+        protected void TogglePlayerHistory(string playerId)
+        {
+            if (!_expandedPlayerIds.Add(playerId))
+                _expandedPlayerIds.Remove(playerId);
+        }
+
+        protected bool IsPlayerExpanded(string playerId) => _expandedPlayerIds.Contains(playerId);
+
         protected void ToggleRoomCode()
         {
             IsRoomCodeVisible = !IsRoomCodeVisible;
