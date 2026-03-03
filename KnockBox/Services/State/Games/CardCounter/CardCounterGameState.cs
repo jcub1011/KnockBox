@@ -1,6 +1,7 @@
+using KnockBox.Extensions.Events;
+using KnockBox.Extensions.Returns;
 using KnockBox.Services.State.Games.Shared;
 using KnockBox.Services.State.Users;
-using KnockBox.Extensions.Returns;
 
 namespace KnockBox.Services.State.Games.CardCounter
 {
@@ -9,6 +10,35 @@ namespace KnockBox.Services.State.Games.CardCounter
         ILogger<CardCounterGameState> logger)
         : AbstractGameState(host, logger)
     {
+        #region Events and Callbacks
+
+        /// <summary>
+        /// The event manager for the action cards dealt event.
+        /// </summary>
+        public readonly ThreadSafeEventManager ActionCardsDealtEventManager = new();
+
+        /// <summary>
+        /// The callback used to handle the action card played event.
+        /// </summary>
+        public Func<ActionCardPlayedArgs, Task>? ActionCardPlayedCallback { get; set; }
+
+        /// <summary>
+        /// The callback used to handle the shoe deal event.
+        /// </summary>
+        public Func<Task>? ShoeDealCallback { get; set; }
+
+        /// <summary>
+        /// The callback used to handle the game start event.
+        /// </summary>
+        public Func<Task>? GameStartCallback { get; set; }
+
+        /// <summary>
+        /// The callback used to handle the turn change event.
+        /// </summary>
+        public Func<Task>? TurnEndedCallback { get; set; }
+
+        #endregion
+
         /// <summary>
         /// The current phase of the game.
         /// </summary>
@@ -126,6 +156,10 @@ namespace KnockBox.Services.State.Games.CardCounter
     public record class NumberCard(long Value, string Description) : BaseCard(Description);
 
     public record class ActionCard(ActionType Action, string Description) : BaseCard(Description);
+
+    /// <param name="Card">The card that was played.</param>
+    /// <param name="User">The user that played the action card.</param>
+    public record class ActionCardPlayedArgs(ActionCard Card, User User);
 
     public class Player(User user)
     {

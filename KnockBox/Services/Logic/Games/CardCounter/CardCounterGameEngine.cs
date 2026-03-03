@@ -55,16 +55,6 @@ namespace KnockBox.Services.Logic.Games.CardCounter
             return _actionCardMap.Values.ElementAt(randomCardIndex);
         }
 
-        /// <summary>
-        /// Handles the action cards dealt event.
-        /// </summary>
-        public readonly ThreadSafeEventManager ActionCardsDealtEventManager = new();
-
-        /// <summary>
-        /// Handles the shoe deal event.
-        /// </summary>
-        public readonly ThreadSafeEventManager ShoeDealEventManager = new();
-
         public override async Task<ValueResult<AbstractGameState>> CreateStateAsync(User host, CancellationToken ct = default)
         {
             if (host is null)
@@ -155,13 +145,24 @@ namespace KnockBox.Services.Logic.Games.CardCounter
             return Result.Success;
         }
 
+        /// <summary>
+        /// Deals the next shoe. Completes when the shoe has been dealt.
+        /// </summary>
+        /// <param name="state"></param>
+        /// <param name="ct"></param>
+        /// <returns></returns>
         public async Task<Result> DealNextShoeAsync(CardCounterGameState state, CancellationToken ct = default)
         {
             if (ct.IsCancellationRequested) return Result.Canceled;
 
             state.Execute(() =>
             {
-                foreach (var)
+                state.CurrentShoe.Clear();
+                if (state.MainDeck.Count == 0)
+                {
+                    state.GamePhase = GamePhase.GameEnd;
+                    return;
+                }
             });
         }
 
