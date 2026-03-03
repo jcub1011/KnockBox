@@ -85,33 +85,25 @@ namespace KnockBox.Components.Pages.Games.CardCounter
         protected void SetBuyIn(bool isNegative)
         {
             if (GameState == null || UserService.CurrentUser == null) return;
-            var action = new PlayerAction { ActionKind = ActionKind.SetBuyIn, Data = new Dictionary<string, object> { { "IsNegative", isNegative } } };
-            GameState.HandleAction(UserService.CurrentUser, action);
+            GameEngine.SetBuyIn(UserService.CurrentUser, GameState, isNegative);
         }
 
         protected void DrawCard()
         {
             if (GameState == null || UserService.CurrentUser == null) return;
-            var action = new PlayerAction { ActionKind = ActionKind.Draw };
-            GameState.HandleAction(UserService.CurrentUser, action);
+            GameEngine.DrawCard(UserService.CurrentUser, GameState);
         }
 
         protected void PlayActionCard(int cardIndex)
         {
             if (GameState == null || UserService.CurrentUser == null) return;
-            var action = new PlayerAction 
-            { 
-                ActionKind = ActionKind.PlayActionCard, 
-                Data = new Dictionary<string, object> { { "CardIndex", cardIndex } } 
-            };
-            GameState.HandleAction(UserService.CurrentUser, action);
+            GameEngine.PlayActionCard(UserService.CurrentUser, GameState, cardIndex);
         }
 
         protected void PassTurn()
         {
             if (GameState == null || UserService.CurrentUser == null) return;
-            var action = new PlayerAction { ActionKind = ActionKind.Pass };
-            GameState.HandleAction(UserService.CurrentUser, action);
+            GameEngine.PassTurn(UserService.CurrentUser, GameState);
         }
 
         protected List<int> SelectedReorderIndices = new();
@@ -137,12 +129,7 @@ namespace KnockBox.Components.Pages.Games.CardCounter
 
             if (SelectedReorderIndices.Count == player.PrivateReveal.Count)
             {
-                var action = new PlayerAction 
-                { 
-                    ActionKind = ActionKind.ReorderMakeMyLuck, 
-                    Data = new Dictionary<string, object> { { "ReorderedIndices", SelectedReorderIndices.ToArray() } } 
-                };
-                GameState.HandleAction(UserService.CurrentUser, action);
+                GameEngine.SubmitReorder(UserService.CurrentUser, GameState, SelectedReorderIndices.ToArray());
                 SelectedReorderIndices.Clear();
             }
         }
@@ -150,8 +137,7 @@ namespace KnockBox.Components.Pages.Games.CardCounter
         protected void FoldPot()
         {
             if (GameState == null || UserService.CurrentUser == null) return;
-            var action = new PlayerAction { ActionKind = ActionKind.Fold };
-            GameState.HandleAction(UserService.CurrentUser, action);
+            GameEngine.FoldPot(UserService.CurrentUser, GameState);
         }
     }
 }
