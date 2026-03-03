@@ -7,7 +7,7 @@ namespace KnockBox.Extensions.Events
         /// Unsubscribes automatically when the <see cref="IDisposable"/> is disposed.
         /// </summary>
         /// <param name="callback"></param>
-        IDisposable Subscribe(Action<ValueTask> callback);
+        IDisposable Subscribe(Func<ValueTask> callback);
 
         /// <summary>
         /// Notifies all subscribers. Waits for all subscribers to receive the message.

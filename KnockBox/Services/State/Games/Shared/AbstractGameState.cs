@@ -29,10 +29,10 @@ namespace KnockBox.Services.State.Games.Shared
         public event Action? OnStateDisposed;
 
         /// <summary>
-        /// The event manager for this game state.
+        /// Raises when any state changes.
         /// </summary>
-        public IThreadSafeEventManager<int> EventManager { get; private set; }
-            = new ThreadSafeEventManager<int>();
+        public readonly IThreadSafeEventManager StateChangedEventManager
+            = new ThreadSafeEventManager(logger);
 
         /// <summary>
         /// If this lobby is open for players to join. 
@@ -138,26 +138,8 @@ namespace KnockBox.Services.State.Games.Shared
             if (isJoinable != IsJoinable)
             {
                 IsJoinable = isJoinable;
-                NotifyStateChanged();
+                StateChangedEventManager.Notify();
             }
-        }
-
-        /// <summary>
-        /// Subscribes to state has changed events.
-        /// </summary>
-        /// <remarks>
-        /// Automatically unsubscribes when the <see cref="IDisposable"/> is disposed.
-        /// </remarks>
-        /// <param name="handler"></param>
-        /// <returns></returns>
-        public ValueResult<IDisposable> SubscribeToStateChanged(Func<ValueTask> handler)
-        {
-            if (TryGetDisposeError(out var ode))
-                return ValueResult<IDisposable>.FromError("Unable to subscribe to state change events.", ode.ToString());
-
-            ValueTask HandlerWrapper(int unusedInput) => handler();
-
-            return ValueResult<IDisposable>.FromValue(EventManager.Subscribe(HandlerWrapper));
         }
 
         /// <summary>
@@ -184,7 +166,7 @@ namespace KnockBox.Services.State.Games.Shared
                 finally
                 {
                     _executeLock.Release();
-                    NotifyStateChanged();
+                    StateChangedEventManager.Notify();
                 }
             }
             catch (OperationCanceledException)
@@ -218,7 +200,7 @@ namespace KnockBox.Services.State.Games.Shared
                 finally
                 {
                     _executeLock.Release();
-                    NotifyStateChanged();
+                    StateChangedEventManager.Notify();
                 }
             }
             catch (OperationCanceledException)
@@ -402,20 +384,6 @@ namespace KnockBox.Services.State.Games.Shared
             logger.LogInformation("Game state [{type}] ended with host [{id}].", GetType().Name, Host.Id);
 
             GC.SuppressFinalize(this);
-        }
-
-        private void NotifyStateChanged()
-        {
-            if (_disposed == 1) return;
-
-            try
-            {
-                EventManager.Notify(1);
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "Error notifying subscribers of state change.");
-            }
         }
 
         private bool TryGetDisposeError([NotNullWhen(true)] out ObjectDisposedException? disposeError)

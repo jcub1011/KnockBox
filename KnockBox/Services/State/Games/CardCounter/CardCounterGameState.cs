@@ -1,6 +1,5 @@
 using KnockBox.Services.State.Games.Shared;
 using KnockBox.Services.State.Users;
-using System.Collections.Concurrent;
 using KnockBox.Extensions.Returns;
 
 namespace KnockBox.Services.State.Games.CardCounter
@@ -54,11 +53,6 @@ namespace KnockBox.Services.State.Games.CardCounter
         /// The discard pile for the whole game.
         /// </summary>
         public readonly Stack<BaseCard> DiscardPile = [];
-
-        /// <summary>
-        /// The deck for action cards.
-        /// </summary>
-        public readonly Stack<ActionCard> ActionDeck = [];
 
         /// <summary>
         /// The force drawn players. The bottom of the stack is the player that initiated the force draw chain.

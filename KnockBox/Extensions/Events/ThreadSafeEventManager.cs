@@ -3,6 +3,7 @@ using KnockBox.Extensions.Disposable;
 namespace KnockBox.Extensions.Events
 {
     public sealed class ThreadSafeEventManager(ILogger? logger = null)
+        : IThreadSafeEventManager
     {
         private readonly Lock _lock = new();
         private Func<ValueTask>[] _listeners = [];

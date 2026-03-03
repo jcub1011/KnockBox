@@ -1,10 +1,13 @@
 using KnockBox.Extensions.Collections;
+using KnockBox.Extensions.Events;
 using KnockBox.Extensions.Returns;
 using KnockBox.Services.Logic.Games.Engines.Shared;
 using KnockBox.Services.Logic.RandomGeneration;
 using KnockBox.Services.State.Games.CardCounter;
 using KnockBox.Services.State.Games.Shared;
 using KnockBox.Services.State.Users;
+using Microsoft.AspNetCore.Mvc.TagHelpers;
+using System;
 
 namespace KnockBox.Services.Logic.Games.CardCounter
 {
@@ -40,6 +43,23 @@ namespace KnockBox.Services.Logic.Games.CardCounter
             { ActionType.Launder, new ActionCard(ActionType.Launder,
                 "Swap your entire pot with a different player's pot.") }
         };
+
+        private ValueResult<ActionCard> GetRandomActionCard()
+        {
+            if (_actionCardMap.Count == 0)
+            {
+                logger.LogCritical("Action card map is empty. Unable to generate action card deck.");
+                return ValueResult<ActionCard>.FromError("No action cards are defined.");
+            }
+
+            int randomCardIndex = randomNumberService.GetRandomInt(0, _actionCardMap.Count, RandomType.Secure);
+            return _actionCardMap.Values.ElementAt(randomCardIndex);
+        }
+
+        /// <summary>
+        /// The parameter is ignored on this event manager.
+        /// </summary>
+        public readonly ThreadSafeEventManager ActionCardsDealtEventManager = new();
 
         public override async Task<ValueResult<AbstractGameState>> CreateStateAsync(User host, CancellationToken ct = default)
         {
@@ -97,6 +117,32 @@ namespace KnockBox.Services.Logic.Games.CardCounter
 
                 DealActionCards(state);
                 DealNextShoe(state);
+            });
+        }
+
+        public async Task<Result> DealActionCardsAsync(CardCounterGameState state, CancellationToken ct = default)
+        {
+            if (ct.IsCancellationRequested) return Result.Canceled;
+
+            // Distribute cards
+            state.Execute(() => 
+            {
+                foreach (var playerState in state.PlayerStates.Values)
+                {
+                    for (int i = 0; i < state.Config.ActionsDealtPerRound; i++)
+                    {
+                        var cardResult = GetRandomActionCard();
+                        if (cardResult.TryGetSuccess(out var card))
+                        {
+                            playerState.ActionCards.Add(card);
+                        }
+                        else
+                        {
+                            logger.LogError("Error selecting random action card: {msg}",
+                                cardResult.Error.Error.InternalMessage);
+                        }
+                    }
+                }
             });
         }
 
@@ -179,13 +225,18 @@ namespace KnockBox.Services.Logic.Games.CardCounter
 
         private void DealActionCards(CardCounterGameState state)
         {
-            foreach (var p in state.GamePlayers.Values)
+            foreach (var playerState in state.PlayerStates.Values)
             {
                 for (int i = 0; i < state.Config.ActionsDealtPerRound && state.ActionDeck.Count > 0; i++)
                 {
-                    var card = state.ActionDeck[0];
-                    state.ActionDeck.RemoveAt(0);
-                    p.ActionHand.Add(card);
+                    if (state.ActionDeck.TryPop(out var card))
+                    {
+                        playerState.ActionCards.Add(card);
+                    }
+                    else
+                    {
+                        logger.LogError("Action card deck has run empty.");
+                    }
                 }
             }
         }
@@ -195,7 +246,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter
             state.CurrentShoe.Clear();
             if (state.MainDeck.Count == 0)
             {
-                 state.GamePhase = GamePhase.GameOver;
+                 state.GamePhase = GamePhase.GameEnd;
                  return;
             }
 
