@@ -1,5 +1,4 @@
 using KnockBox.Extensions.Collections;
-using KnockBox.Extensions.Events;
 using KnockBox.Extensions.Returns;
 using KnockBox.Services.Logic.Games.Engines.Shared;
 using KnockBox.Services.Logic.RandomGeneration;
@@ -7,6 +6,7 @@ using KnockBox.Services.State.Games.CardCounter;
 using KnockBox.Services.State.Games.Shared;
 using KnockBox.Services.State.Users;
 using Microsoft.AspNetCore.Mvc.TagHelpers;
+using System.Resources;
 
 namespace KnockBox.Services.Logic.Games.CardCounter
 {
@@ -81,6 +81,19 @@ namespace KnockBox.Services.Logic.Games.CardCounter
             });
 
             if (executeResult.IsFailure) return executeResult;
+            if (gameState.GameStartCallback is not null)
+            {
+                try
+                {
+                    await gameState.GameStartCallback();
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Error handling game start callback.");
+                    return Result.FromError("Error starting game.", $"Error starting game: {ex}");
+                }
+            }
+
             return Result.Success;
         }
 
@@ -107,62 +120,6 @@ namespace KnockBox.Services.Logic.Games.CardCounter
                 }
 
                 BuildMainDeck(state);
-            });
-        }
-
-        /// <summary>
-        /// Deals action cards to all players and completes when all players have selected their action cards.
-        /// </summary>
-        /// <param name="state"></param>
-        /// <param name="ct"></param>
-        /// <returns></returns>
-        public async Task<Result> DealActionCardsAsync(CardCounterGameState state, CancellationToken ct = default)
-        {
-            if (ct.IsCancellationRequested) return Result.Canceled;
-
-            // Distribute cards
-            state.Execute(() => 
-            {
-                foreach (var playerState in state.PlayerStates.Values)
-                {
-                    for (int i = 0; i < state.Config.ActionsDealtPerRound; i++)
-                    {
-                        var cardResult = GetRandomActionCard();
-                        if (cardResult.TryGetSuccess(out var card))
-                        {
-                            playerState.ActionCards.Add(card);
-                        }
-                        else
-                        {
-                            logger.LogError("Error selecting random action card: {msg}",
-                                cardResult.Error.Error.InternalMessage);
-                        }
-                    }
-                }
-            });
-
-            await ActionCardsDealtEventManager.NotifyAsync();
-            return Result.Success;
-        }
-
-        /// <summary>
-        /// Deals the next shoe. Completes when the shoe has been dealt.
-        /// </summary>
-        /// <param name="state"></param>
-        /// <param name="ct"></param>
-        /// <returns></returns>
-        public async Task<Result> DealNextShoeAsync(CardCounterGameState state, CancellationToken ct = default)
-        {
-            if (ct.IsCancellationRequested) return Result.Canceled;
-
-            state.Execute(() =>
-            {
-                state.CurrentShoe.Clear();
-                if (state.MainDeck.Count == 0)
-                {
-                    state.GamePhase = GamePhase.GameEnd;
-                    return;
-                }
             });
         }
 
@@ -213,35 +170,141 @@ namespace KnockBox.Services.Logic.Games.CardCounter
             state.MainDeck.PushRange(cards);
         }
 
-        private void DealNextShoe(CardCounterGameState state)
+        /// <summary>
+        /// Deals action cards to all players and completes when all players have selected their action cards.
+        /// </summary>
+        /// <param name="state"></param>
+        /// <param name="ct"></param>
+        /// <returns></returns>
+        public async Task<Result> DealActionCardsAsync(CardCounterGameState state, CancellationToken ct = default)
         {
-            state.CurrentShoe.Clear();
-            if (state.MainDeck.Count == 0)
+            if (ct.IsCancellationRequested) return Result.Canceled;
+
+            // Distribute cards
+            state.Execute(() => 
             {
-                 state.GamePhase = GamePhase.GameEnd;
-                 return;
-            }
+                foreach (var playerState in state.PlayerStates.Values)
+                {
+                    for (int i = 0; i < state.Config.ActionsDealtPerRound; i++)
+                    {
+                        var cardResult = GetRandomActionCard();
+                        if (cardResult.TryGetSuccess(out var card))
+                        {
+                            playerState.ActionCards.Add(card);
+                        }
+                        else
+                        {
+                            logger.LogError("Error selecting random action card: {msg}",
+                                cardResult.Error.Error.InternalMessage);
+                        }
+                    }
+                }
+            });
 
-            int shoeSize = _random.GetRandomInt(state.Config.MinShoeSize, state.Config.MaxShoeSize + 1, RandomType.Secure);
-            if (state.MainDeck.Count <= state.Config.MinShoeSize * 2) 
-                 shoeSize = state.MainDeck.Count;
-
-            shoeSize = Math.Min(shoeSize, state.MainDeck.Count);
-
-            for (int i = 0; i < shoeSize; i++)
-            {
-                state.CurrentShoe.Add(state.MainDeck[0]);
-                state.MainDeck.RemoveAt(0);
-            }
-
-            state.ShoeIndex++;
-            RecalculateShoeCounts(state);
+            await state.ActionCardsDealtEventManager.NotifyAsync();
+            return Result.Success;
         }
 
-        private void RecalculateShoeCounts(CardCounterGameState state)
+        /// <summary>
+        /// Deals the next shoe.
+        /// </summary>
+        /// <param name="state"></param>
+        /// <param name="ct"></param>
+        /// <returns></returns>
+        public async Task<Result> DealNextShoeAsync(CardCounterGameState state, CancellationToken ct = default)
         {
-            state.ShoeCardCounts[CardType.Number] = state.CurrentShoe.Count(c => c.Type == CardType.Number);
-            state.ShoeCardCounts[CardType.Operator] = state.CurrentShoe.Count(c => c.Type == CardType.Operator);
+            if (ct.IsCancellationRequested) return Result.Canceled;
+
+            var executeResult = await state.ExecuteAsync(async () =>
+            {
+                state.CurrentShoe.Clear();
+                if (state.MainDeck.Count == 0)
+                {
+                    state.GamePhase = GamePhase.GameEnd;
+                    return;
+                }
+
+                state.ShoeIndex++;
+                int shoeSize = randomNumberService.GetRandomInt(state.Config.MinShoeSize, state.Config.MaxShoeSize + 1, RandomType.Secure);
+
+                if (state.MainDeck.Count < state.Config.MinShoeSize)
+                {
+                    shoeSize = state.MainDeck.Count;
+                }
+                else if (state.MainDeck.Count - shoeSize < state.Config.MinShoeSize)
+                {
+                    int remainder = state.MainDeck.Count - state.Config.MinShoeSize;
+
+                    if (remainder < state.Config.MinShoeSize)
+                    {
+                        shoeSize = state.MainDeck.Count;
+                    }
+                    else
+                    {
+                        int maxAllowed = Math.Min(state.MainDeck.Count - state.Config.MinShoeSize, state.Config.MaxShoeSize);
+                        shoeSize = randomNumberService.GetRandomInt(state.Config.MinShoeSize, maxAllowed + 1, RandomType.Secure);
+                    }
+                }
+
+                state.CurrentShoe.PushRange(state.MainDeck.PopRange(shoeSize));
+                RecalculateShoeCounts(state);
+            }, ct);
+
+            if (!executeResult.IsSuccess) return executeResult;
+
+            if (state.ShoeDealCallback is not null) await state.ShoeDealCallback();
+            return Result.Success;
+        }
+
+        private static void RecalculateShoeCounts(CardCounterGameState state)
+        {
+            state.OperatorCounts.Clear();
+            state.ValueCounts.Clear();
+
+            RecalculateShoeCounts(state, state.CurrentShoe, []);
+        }
+
+        private static void RecalculateShoeCounts(CardCounterGameState state, 
+            IEnumerable<BaseCard> added, IEnumerable<BaseCard> removed)
+        {
+            foreach (var newCard in added)
+            {
+                if (newCard is OperatorCard op)
+                {
+                    IncrementCount(state.OperatorCounts, op.Operator);
+                }
+                else if (newCard is NumberCard num)
+                {
+                    IncrementCount(state.ValueCounts, num.Value);
+                }
+            }
+
+            foreach (var oldCard in removed)
+            {
+                if (oldCard is OperatorCard op)
+                {
+                    DecrementCount(state.OperatorCounts, op.Operator);
+                }
+                else if (oldCard is NumberCard num)
+                {
+                    DecrementCount(state.ValueCounts, num.Value);
+                }
+            }
+        }
+
+        private static void IncrementCount<TKey>(Dictionary<TKey, int> counts, TKey key)
+            where TKey : notnull
+        {
+            counts.TryGetValue(key, out int current);
+            counts[key] = current + 1;
+        }
+
+        private static void DecrementCount<TKey>(Dictionary<TKey, int> counts, TKey key)
+            where TKey : notnull
+        {
+            counts.TryGetValue(key, out int current);
+            if (current <= 1) counts.Remove(key);
+            else counts[key] = current - 1;
         }
 
         private void Shuffle(List<BaseCard> list)
@@ -253,6 +316,69 @@ namespace KnockBox.Services.Logic.Games.CardCounter
                 int k = randomNumberService.GetRandomInt(0, n + 1, RandomType.Secure);
                 (list[n], list[k]) = (list[k], list[n]);
             }
+        }
+
+        public async Task<Result> SkipTurnAsync(CardCounterGameState state, User player)
+        {
+            var executeResult = state.Execute(() =>
+            {
+                string currentPlayerId = state.TurnOrder[state.CurrentPlayerIndex];
+
+                if (player.Id != currentPlayerId)
+                {
+                    return Result.FromError("You can only skip when it is your turn.");
+                }
+
+                if (!state.PlayerStates.TryGetValue(currentPlayerId, out var playerState))
+                {
+                    return Result.FromError("Error skipping turn.",
+                        $"Player state missing for player [{currentPlayerId}].");
+                }
+
+                if (playerState.RemainingPasses <= 0)
+                {
+                    return Result.FromError("You have no passes remaining.");
+                }
+
+                state.CurrentPlayerIndex = (state.CurrentPlayerIndex + 1) % state.TurnOrder.Count;
+                return Result.Success;
+            });
+
+            if (executeResult.TryGetSuccess(out var result))
+            {
+                if (result.TryGetFailure(out var error)) return error;
+                return Result.Canceled;
+            }
+
+            if (!result.IsSuccess)
+            {
+                if (result.TryGetFailure(out var error)) return error;
+                return Result.Canceled;
+            }
+
+            try
+            {
+                if (state.TurnEndedCallback is not null) await state.TurnEndedCallback();
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Error handling turn ended callback.");
+            }
+
+            return Result.Success;
+        }
+
+        public Result DrawCard(CardCounterGameState state, User player)
+        {
+            var executeResult = state.Execute(() =>
+            {
+                string currentPlayerId = state.TurnOrder[state.CurrentPlayerIndex];
+
+                if (player.Id != currentPlayerId)
+                {
+
+                }
+            });
         }
 
         private void EndTurn(CardCounterGameState state)

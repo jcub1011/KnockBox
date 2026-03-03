@@ -214,6 +214,40 @@ namespace KnockBox.Services.State.Games.Shared
         }
 
         /// <summary>
+        /// Executes the provided action sync with return.
+        /// </summary>
+        /// <typeparam name="TReturn"></typeparam>
+        /// <param name="action"></param>
+        /// <returns></returns>
+        public ValueResult<TReturn> Execute<TReturn>(Func<TReturn> action)
+        {
+            if (TryGetDisposeError(out var ode)) return ValueResult<TReturn>.FromError("Unable to execute action.", ode.ToString());
+
+            try
+            {
+                _executeLock.Wait();
+
+                try
+                {
+                    return action();
+                }
+                finally
+                {
+                    _executeLock.Release();
+                    StateChangedEventManager.Notify();
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                return ValueResult<TReturn>.FromCancellation();
+            }
+            catch (Exception ex)
+            {
+                return ValueResult<TReturn>.FromError("Error executing action.", ex.ToString());
+            }
+        }
+
+        /// <summary>
         /// Executes the action with exclusive read access to the game state.
         /// </summary>
         /// <param name="action"></param>

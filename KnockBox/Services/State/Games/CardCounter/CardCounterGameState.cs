@@ -77,7 +77,7 @@ namespace KnockBox.Services.State.Games.CardCounter
         /// <summary>
         /// The count of value cards in this round.
         /// </summary>
-        public readonly Dictionary<int, int> ValueCounts = [];
+        public readonly Dictionary<long, int> ValueCounts = [];
 
         /// <summary>
         /// The discard pile for the whole game.
