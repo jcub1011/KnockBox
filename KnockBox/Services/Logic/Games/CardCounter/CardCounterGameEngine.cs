@@ -1,3 +1,4 @@
+using KnockBox.Extensions.Collections;
 using KnockBox.Extensions.Returns;
 using KnockBox.Services.Logic.Games.Engines.Shared;
 using KnockBox.Services.Logic.RandomGeneration;
@@ -12,6 +13,34 @@ namespace KnockBox.Services.Logic.Games.CardCounter
         ILogger<CardCounterGameEngine> logger,
         ILogger<CardCounterGameState> stateLogger) : AbstractGameEngine
     {
+        private readonly Dictionary<Operator, OperatorCard> _operatorCardMap = new()
+        {
+            { Operator.Add, new OperatorCard(Operator.Add, "Adds the player pot to their balance, clearing the pot.") },
+            { Operator.Subtract, new OperatorCard(Operator.Subtract, "Subtracts the player pot from their balance, clearing the pot.") },
+            { Operator.Multiply, new OperatorCard(Operator.Multiply, "Multiplies the player pot with their balance, clearing the pot.") },
+            { Operator.Divide, new OperatorCard(Operator.Divide, "Divides the player balance with their pot, clearing the pot.") },
+        };
+
+        private readonly Dictionary<ActionType, ActionCard> _actionCardMap = new()
+        {
+            { ActionType.FeelingLucky, new ActionCard(ActionType.FeelingLucky, 
+                "Forces the next player to draw a card. The player who initially plays this card does not have their turn skipped. The round will continue from them.") }
+            { ActionType.MakeMyLuck, new ActionCard(ActionType.MakeMyLuck, 
+                "View the top 3 cards of the current shoe and reorder them.") },
+            { ActionType.Skim, new ActionCard(ActionType.Skim,
+                "Swap any digit in your pot with a digit in a different player's pot.") },
+            { ActionType.Burn, new ActionCard(ActionType.Burn,
+                "Discard the top card in the current shoe. The discarded card will be revealed to all players.") },
+            { ActionType.TurnTheTable, new ActionCard(ActionType.TurnTheTable,
+                "Reverse the digit order of a player's pot. Can be used on yourself.") },
+            { ActionType.Compd, new ActionCard(ActionType.Compd,
+                "Negate the effect of any aciton card that targets you.") },
+            { ActionType.NotMyMoney, new ActionCard(ActionType.NotMyMoney,
+                "Redirects an operator to a different player. Uses that player's pot and balanace.") },
+            { ActionType.Launder, new ActionCard(ActionType.Launder,
+                "Swap your entire pot with a different player's pot.") }
+        };
+
         public override async Task<ValueResult<AbstractGameState>> CreateStateAsync(User host, CancellationToken ct = default)
         {
             if (host is null)
@@ -43,37 +72,46 @@ namespace KnockBox.Services.Logic.Games.CardCounter
 
         private void InitializeGame(CardCounterGameState state)
         {
-            state.GamePhase = GamePhase.BuyIn;
-            state.TurnOrder = state.Players.Select(p => p.Id).ToList();
-
-            foreach (var p in state.Players)
+            state.Execute(() =>
             {
-                int buyInRoll = _random.GetRandomInt(1, 7, RandomType.Secure);
-                state.GamePlayers.TryAdd(p.Id, new PlayerState { 
-                    PlayerId = p.Id, 
-                    DisplayName = p.Name,
-                    IsHost = p.Id == state.Host.Id,
-                    PassesRemaining = state.Config.TotalPassesPerPlayer,
-                    BuyInRoll = buyInRoll
-                });
-            }
+                state.GamePhase = GamePhase.BuyIn;
+                state.RoundPhase = RoundPhase.AwardActionCards;
+                state.PlayerStates.Clear();
+                state.TurnOrder.Clear();
+                state.TurnOrder.AddRange(state.Players.Select(p => p.Id));
 
-            BuildMainDeck(state);
-            BuildActionDeck(state);
+                foreach (var user in state.Players)
+                {
+                    // Host does not participate
+                    if (state.Host == user) continue;
 
-            DealActionCards(state);
-            DealNextShoe(state);
+                    var playerState = new Player(user);
+                    state.PlayerStates[user.Id] = playerState;
+
+                    playerState.RemainingPasses = state.Config.TotalPassesPerPlayer;
+                    playerState.BuyInRoll = randomNumberService.GetRandomInt(1, 7, RandomType.Fast);
+                }
+
+                BuildMainDeck(state);
+                BuildActionDeck(state);
+
+                DealActionCards(state);
+                DealNextShoe(state);
+            });
         }
 
         private void BuildMainDeck(CardCounterGameState state)
         {
+            List<BaseCard> cards = new(state.Config.DeckSize);
             state.MainDeck.Clear();
+
             int numNumberCards = (int)(state.Config.DeckSize * (state.Config.NumberToOperatorRatio / (state.Config.NumberToOperatorRatio + 1)));
             int numOpCards = state.Config.DeckSize - numNumberCards;
 
             for (int i = 0; i < numNumberCards; i++)
             {
-                state.MainDeck.Add(new NumberCard(i % 10));
+                long cardValue = i % 10;
+                state.MainDeck.Push(new NumberCard(cardValue, $"A card with a value of {cardValue}."));
             }
 
             int addSubCards = (int)(numOpCards * (state.Config.AddSubToMulDivRatio / (state.Config.AddSubToMulDivRatio + 1)));
@@ -81,24 +119,61 @@ namespace KnockBox.Services.Logic.Games.CardCounter
 
             for (int i = 0; i < addSubCards; i++)
             {
-                state.MainDeck.Add(new OperatorCard(i % 2 == 0 ? Operator.Add : Operator.Subtract));
+                var opp = i % 2 == 0 ? Operator.Add : Operator.Subtract;
+
+                if (!_operatorCardMap.TryGetValue(opp, out var card))
+                {
+                    logger.LogError("No card is mapped for operator [{opp}]. Defaulting to add operator.", opp);
+                    card = new OperatorCard(Operator.Add, "Adds the player pot to their balance, clearing the pot.");
+                }
+
+                state.MainDeck.Push(card);
             }
 
             for (int i = 0; i < mulDivCards; i++)
             {
-                state.MainDeck.Add(new OperatorCard(i % 2 == 0 ? Operator.Multiply : Operator.Divide));
+                var opp = i % 2 == 0 ? Operator.Multiply : Operator.Divide;
+
+                if (!_operatorCardMap.TryGetValue(opp, out var card))
+                {
+                    logger.LogError("No card is mapped for operator [{opp}]. Defaulting to Multiply operator.", opp);
+                    card = new OperatorCard(Operator.Multiply, "Multiplies the player pot with their balance, clearing the pot.");
+                }
+
+                state.MainDeck.Push(card);
             }
 
-            Shuffle(state.MainDeck);
+            Shuffle(cards);
+            state.MainDeck.PushRange(cards);
         }
 
         private void BuildActionDeck(CardCounterGameState state)
         {
             state.ActionDeck.Clear();
             var types = Enum.GetValues<ActionType>();
-            for (int i = 0; i < 50; i++)
+            if (types.Length == 0)
             {
-                 state.ActionDeck.Add(new ActionCard(types[_random.GetRandomInt(0, types.Length, RandomType.Secure)]));
+                logger.LogCritical($"{nameof(ActionType)} enum is empty. Unable to generate action card deck.");
+                return;
+            }
+            if (_actionCardMap.Count == 0)
+            {
+                logger.LogCritical("Action card map is empty. Unable to generate action card deck.");
+                return;
+            }
+
+            for (int i = 0; i < 100; i++)
+            {
+                var actionType = types[randomNumberService.GetRandomInt(0, types.Length, RandomType.Secure)];
+                if (_actionCardMap.TryGetValue(actionType, out var card))
+                {
+                    state.ActionDeck.Push(card);
+                }
+                else
+                {
+                    logger.LogError("No card is defined for action card type [{type}], skipping.", actionType);
+                    continue;
+                }
             }
         }
 
@@ -146,16 +221,14 @@ namespace KnockBox.Services.Logic.Games.CardCounter
             state.ShoeCardCounts[CardType.Operator] = state.CurrentShoe.Count(c => c.Type == CardType.Operator);
         }
 
-        private void Shuffle<T>(IList<T> list)
+        private void Shuffle(List<BaseCard> list)
         {
             int n = list.Count;
             while (n > 1)
             {
                 n--;
-                int k = _random.GetRandomInt(0, n + 1, RandomType.Secure);
-                T value = list[k];
-                list[k] = list[n];
-                list[n] = value;
+                int k = randomNumberService.GetRandomInt(0, n + 1, RandomType.Secure);
+                (list[n], list[k]) = (list[k], list[n]);
             }
         }
 

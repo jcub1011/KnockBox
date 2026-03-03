@@ -21,6 +21,11 @@ namespace KnockBox.Services.State.Games.CardCounter
         public RoundPhase RoundPhase { get; set; }
 
         /// <summary>
+        /// The states for all the players.
+        /// </summary>
+        public readonly Dictionary<string, Player> PlayerStates = [];
+
+        /// <summary>
         /// The cards in the main deck.
         /// </summary>
         public readonly Stack<BaseCard> MainDeck = [];
@@ -74,18 +79,12 @@ namespace KnockBox.Services.State.Games.CardCounter
         /// The configuration for the game.
         /// </summary>
         public GameConfig Config { get; set; } = new();
-
-        /// <summary>
-        /// The states for all the players.
-        /// </summary>
-        public ConcurrentDictionary<string, Player> PlayerStates { get; set; } = new();
     }
 
     #region Enums
 
     public enum GamePhase
     {
-        GameStart,
         BuyIn,
         Playing,
         GameEnd
@@ -139,16 +138,26 @@ namespace KnockBox.Services.State.Games.CardCounter
         public readonly User User = user;
         public readonly List<NumberCard> Pot = [];
         public readonly List<ActionCard> ActionCards = [];
-        public long Balance { get; set; } = 0L;
-        public long PotValue 
-        { 
-            get
-            {
-                if (Pot.Count == 0) return 0L;
-                return long.TryParse(string.Join("", Pot.Select(p => p.Value)), out var result) ? result : 0L;
-            } 
-        }
 
+        /// <summary>
+        /// The buy in roll this player started with.
+        /// </summary>
+        public long BuyInRoll { get; set; } = 0L;
+
+        /// <summary>
+        /// The current balance of this player. Includes the <see cref="BuyInRoll"/>.
+        /// </summary>
+        public long Balance { get; set; } = 0L;
+
+        /// <summary>
+        /// The number of passes this player has left.
+        /// </summary>
+        public int RemainingPasses { get; set; } = 0;
+
+        /// <summary>
+        /// Gets the concatenated value of the pot.
+        /// </summary>
+        /// <returns></returns>
         public ValueResult<long> GetPotValue()
         {
             if (Pot.Count == 0) return 0L;
@@ -156,6 +165,17 @@ namespace KnockBox.Services.State.Games.CardCounter
             string concatenated = string.Join("", Pot.Select(p => p.Value));
             return long.TryParse(concatenated, out var result)
                 ? result : ValueResult<long>.FromError("Error parsing pot value.");
+        }
+
+        /// <summary>
+        /// Resets all the values in this player.
+        /// </summary>
+        public void Reset()
+        {
+            Pot.Clear();
+            ActionCards.Clear();
+            Balance = 0L;
+            BuyInRoll = 0L;
         }
     }
 
