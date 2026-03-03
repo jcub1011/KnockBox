@@ -6,6 +6,7 @@ using KnockBox.Services.State.Games.CardCounter;
 using KnockBox.Services.State.Games.Shared;
 using KnockBox.Services.State.Users;
 using Microsoft.AspNetCore.Mvc.TagHelpers;
+using System.Threading.Tasks;
 
 namespace KnockBox.Services.Logic.Games.CardCounter
 {
@@ -391,21 +392,39 @@ namespace KnockBox.Services.Logic.Games.CardCounter
             return Result.Success;
         }
 
-        public Result SetBuyIn(User player, CardCounterGameState state, bool isNegative)
+        public async Task<Result> SetAllPlayerBuyIns(CardCounterGameState state)
         {
-            return state.Execute(() =>
+            state.BuyInStageCompleteEventManager.Notify();
+        }
+
+        public async Task<Result> SetBuyIn(CardCounterGameState state, User player, int buyInRoll)
+        {
+            var executeResult = state.Execute(() =>
             {
-                if (!state.GamePlayers.TryGetValue(player.Id, out var statePlayer)) return;
-                if (state.GamePhase != GamePhase.BuyIn) return;
+                if (state.GamePhase != GamePhase.BuyIn)
+                    return Result.FromError("Can't set buy in outside of the buy in stage.");
 
-                statePlayer.Balance = statePlayer.BuyInRoll * 8 * (isNegative ? -1 : 1);
-                statePlayer.HasSetBuyIn = true;
+                if (!state.PlayerStates.TryGetValue(player.Id, out var playerState))
+                    return Result.FromError("Unable to set buy in.",
+                        $"Player state is not set for player [{player.Id}].");
 
-                if (state.GamePlayers.Values.All(p => p.HasSetBuyIn))
-                {
-                    state.GamePhase = GamePhase.Playing;
-                }
+                playerState.BuyInRoll = buyInRoll;
+                playerState.Balance = buyInRoll * 8;
+                return Result.Success;
             });
+
+            if (!executeResult.TryGetSuccess(out var result))
+            {
+                if (result.TryGetFailure(out var error)) return error;
+                return Result.Canceled;
+            }
+
+            if (!result.IsSuccess)
+            {
+                if (result.TryGetFailure(out var error)) return error;
+                return Result.Canceled;
+            }
+
         }
 
         public Result DrawCard(User player, CardCounterGameState state)

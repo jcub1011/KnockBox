@@ -42,6 +42,11 @@ namespace KnockBox.Services.State.Games.CardCounter
         /// </summary>
         public readonly ThreadSafeEventManager TurnChangeEventManager = new();
 
+        /// <summary>
+        /// The event manager for the buy in stage complete event.
+        /// </summary>
+        public readonly ThreadSafeEventManager BuyInStageCompleteEventManager = new();
+
         #endregion
 
         /// <summary>
