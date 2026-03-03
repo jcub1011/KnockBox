@@ -7,33 +7,41 @@ namespace KnockBox.Components.Shared
     /// </summary>
     public class DisposableComponent : ComponentBase, IDisposable
     {
+        private readonly Lock _lock = new();
+        private bool _disposed;
         private CancellationTokenSource? _cts;
+        private CancellationTokenSource CTS
+        {
+            get
+            {
+                lock (_lock)
+                {
+                    ObjectDisposedException.ThrowIf(_disposed, this);
+                    _cts ??= new();
+                    return _cts;
+                }
+            }
+        }
 
         /// <summary>
         /// Cancels when the user leaves this page.
         /// </summary>
-        protected CancellationToken ComponentDetached
-        {
-            get
-            {
-                _cts ??= new();
-                return _cts.Token;
-            }
-        }
+        protected CancellationToken ComponentDetached => CTS.Token;
 
         public virtual void Dispose()
         {
-            try
+            lock (_lock)
             {
-                if (_cts is null) return;
+                if (_disposed) return;
 
-                _cts.Cancel();
-                _cts.Dispose();
-                _cts = null;
-            }
-            finally
-            {
-                GC.SuppressFinalize(this);
+                _disposed = true;
+
+                if (_cts is not null)
+                {
+                    _cts.Cancel();
+                    _cts.Dispose();
+                    _cts = null;
+                }
             }
         }
     }

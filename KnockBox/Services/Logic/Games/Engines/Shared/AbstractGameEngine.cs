@@ -22,7 +22,7 @@ namespace KnockBox.Services.Logic.Games.Engines.Shared
         /// <param name="host"></param>
         /// <param name="ct"></param>
         /// <returns></returns>
-        public abstract Task<Result<AbstractGameState>> CreateStateAsync(User host, CancellationToken ct = default);
+        public abstract Task<ValueResult<AbstractGameState>> CreateStateAsync(User host, CancellationToken ct = default);
 
         /// <summary>
         /// Starts the game state. Only the host can start the game.
