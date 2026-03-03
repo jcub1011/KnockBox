@@ -1,8 +1,6 @@
-using KnockBox.Services.State.Games.CardCounter.Data;
 using KnockBox.Services.State.Games.Shared;
 using KnockBox.Services.State.Users;
 using System.Collections.Concurrent;
-using KnockBox.Extensions;
 using KnockBox.Extensions.Returns;
 
 namespace KnockBox.Services.State.Games.CardCounter
@@ -12,24 +10,80 @@ namespace KnockBox.Services.State.Games.CardCounter
         ILogger<CardCounterGameState> logger)
         : AbstractGameState(host, logger)
     {
+        /// <summary>
+        /// The current phase of the game.
+        /// </summary>
         public GamePhase Phase { get; set; }
-        public List<Card> MainDeck { get; set; } = new();
-        public List<Card> CurrentShoe { get; set; } = new();
+
+        /// <summary>
+        /// The cards in the main deck.
+        /// </summary>
+        public readonly Stack<BaseCard> MainDeck = [];
+
+        /// <summary>
+        /// The cards in this round.
+        /// </summary>
+        public readonly Stack<BaseCard> CurrentShoe = [];
+
+        /// <summary>
+        /// The current round index.
+        /// </summary>
         public int ShoeIndex { get; set; }
-        public Dictionary<CardType, int> ShoeCardCounts { get; set; } = new();
-        public List<Card> DiscardPile { get; set; } = new();
-        public List<ActionCard> ActionDeck { get; set; } = new();
+        
+        /// <summary>
+        /// The count of operators in this round.
+        /// </summary>
+        public readonly Dictionary<Operator, int> OperatorCounts = [];
+
+        /// <summary>
+        /// The count of value cards in this round.
+        /// </summary>
+        public readonly Dictionary<int, int> ValueCounts = [];
+
+        /// <summary>
+        /// The discard pile for the whole game.
+        /// </summary>
+        public readonly Stack<BaseCard> DiscardPile = [];
+
+        /// <summary>
+        /// The deck for action cards.
+        /// </summary>
+        public readonly Stack<ActionCard> ActionDeck = [];
+
+        /// <summary>
+        /// The force drawn players. The bottom of the stack is the player that initiated the force draw chain.
+        /// </summary>
+        public readonly Stack<string> ForceDrawStack = [];
+
+        /// <summary>
+        /// The players in turn order.
+        /// </summary>
+        public readonly List<string> TurnOrder = [];
+
+        /// <summary>
+        /// The current player turn.
+        /// </summary>
         public int CurrentPlayerIndex { get; set; }
-        public List<string> TurnOrder { get; set; } = new();
+
+        /// <summary>
+        /// The configuration for the game.
+        /// </summary>
         public GameConfig Config { get; set; } = new();
 
-        public ConcurrentDictionary<string, PlayerState> GamePlayers { get; set; } = new();
-
-        public PendingAction? CurrentPendingAction { get; set; }
-        public ForcedDrawChain? PendingChain { get; set; }
+        /// <summary>
+        /// The states for all the players.
+        /// </summary>
+        public ConcurrentDictionary<string, Player> PlayerStates { get; set; } = new();
     }
 
     #region Enums
+
+    public enum GamePhase
+    {
+        GameStart,
+        Playing,
+        GameEnd
+    }
 
     public enum Operator
     {
@@ -90,6 +144,19 @@ namespace KnockBox.Services.State.Games.CardCounter
             return long.TryParse(concatenated, out var result)
                 ? result : ValueResult<long>.FromError("Error parsing pot value.");
         }
+    }
+
+    public class GameConfig
+    {
+        public int DeckSize { get; set; } = 52;
+        public float NumberToOperatorRatio { get; set; } = 4.0f;
+        public float AddSubToMulDivRatio { get; set; } = 4.0f;
+        public int ActionsDealtPerRound { get; set; } = 3;
+        public int ActionHandLimit { get; set; } = 6;
+        public int TotalPassesPerPlayer { get; set; } = 3;
+        public int MinShoeSize { get; set; } = 12;
+        public int MaxShoeSize { get; set; } = 20;
+        public int ActionResponseTimeoutMs { get; set; } = 15000;
     }
 
     #endregion
