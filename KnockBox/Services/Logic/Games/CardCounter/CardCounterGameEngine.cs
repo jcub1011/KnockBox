@@ -7,7 +7,6 @@ using KnockBox.Services.State.Games.CardCounter;
 using KnockBox.Services.State.Games.Shared;
 using KnockBox.Services.State.Users;
 using Microsoft.AspNetCore.Mvc.TagHelpers;
-using System;
 
 namespace KnockBox.Services.Logic.Games.CardCounter
 {
@@ -57,7 +56,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter
         }
 
         /// <summary>
-        /// The parameter is ignored on this event manager.
+        /// Handles the action cards dealt event.
         /// </summary>
         public readonly ThreadSafeEventManager ActionCardsDealtEventManager = new();
 
@@ -120,6 +119,12 @@ namespace KnockBox.Services.Logic.Games.CardCounter
             });
         }
 
+        /// <summary>
+        /// Deals action cards to all players and completes when all players have selected their action cards.
+        /// </summary>
+        /// <param name="state"></param>
+        /// <param name="ct"></param>
+        /// <returns></returns>
         public async Task<Result> DealActionCardsAsync(CardCounterGameState state, CancellationToken ct = default)
         {
             if (ct.IsCancellationRequested) return Result.Canceled;
@@ -144,6 +149,14 @@ namespace KnockBox.Services.Logic.Games.CardCounter
                     }
                 }
             });
+
+            await ActionCardsDealtEventManager.NotifyAsync();
+            return Result.Success;
+        }
+
+        public async Task<Result> DealNextShoeAsync(CardCounterGameState state, CancellationToken ct = default)
+        {
+            if (ct.IsCancellationRequested) return Result.Canceled;
         }
 
         private void BuildMainDeck(CardCounterGameState state)
