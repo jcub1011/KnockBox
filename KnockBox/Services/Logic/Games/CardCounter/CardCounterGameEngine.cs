@@ -6,7 +6,6 @@ using KnockBox.Services.State.Games.CardCounter;
 using KnockBox.Services.State.Games.Shared;
 using KnockBox.Services.State.Users;
 using Microsoft.AspNetCore.Mvc.TagHelpers;
-using System.Resources;
 
 namespace KnockBox.Services.Logic.Games.CardCounter
 {
@@ -26,7 +25,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter
         private readonly Dictionary<ActionType, ActionCard> _actionCardMap = new()
         {
             { ActionType.FeelingLucky, new ActionCard(ActionType.FeelingLucky, 
-                "Forces the next player to draw a card. The player who initially plays this card does not have their turn skipped. The round will continue from them.") }
+                "Forces the next player to draw a card. The player who initially plays this card does not have their turn skipped. The round will continue from them.") },
             { ActionType.MakeMyLuck, new ActionCard(ActionType.MakeMyLuck, 
                 "View the top 3 cards of the current shoe and reorder them.") },
             { ActionType.Skim, new ActionCard(ActionType.Skim,
@@ -81,18 +80,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter
             });
 
             if (executeResult.IsFailure) return executeResult;
-            if (gameState.GameStartCallback is not null)
-            {
-                try
-                {
-                    await gameState.GameStartCallback();
-                }
-                catch (Exception ex)
-                {
-                    logger.LogError(ex, "Error handling game start callback.");
-                    return Result.FromError("Error starting game.", $"Error starting game: {ex}");
-                }
-            }
+            await gameState.GameStartEventManager.NotifyAsync();
 
             return Result.Success;
         }
@@ -251,8 +239,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter
             }, ct);
 
             if (!executeResult.IsSuccess) return executeResult;
-
-            if (state.ShoeDealCallback is not null) await state.ShoeDealCallback();
+            await state.ShoeDealEventManager.NotifyAsync();
             return Result.Success;
         }
 
@@ -356,19 +343,12 @@ namespace KnockBox.Services.Logic.Games.CardCounter
                 return Result.Canceled;
             }
 
-            try
-            {
-                if (state.TurnEndedCallback is not null) await state.TurnEndedCallback();
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "Error handling turn ended callback.");
-            }
+            await state.TurnChangeEventManager.NotifyAsync();
 
             return Result.Success;
         }
 
-        public Result DrawCard(CardCounterGameState state, User player)
+        public async Task<Result> DrawCard(CardCounterGameState state, User player)
         {
             var executeResult = state.Execute(() =>
             {
@@ -376,19 +356,39 @@ namespace KnockBox.Services.Logic.Games.CardCounter
 
                 if (player.Id != currentPlayerId)
                 {
-
+                    return ValueResult<BaseCard>.FromError("You can only draw when it is your turn.");
                 }
-            });
-        }
 
-        private void EndTurn(CardCounterGameState state)
-        {
-            state.CurrentPlayerIndex = (state.CurrentPlayerIndex + 1) % state.TurnOrder.Count;
-            if (state.CurrentShoe.Count == 0)
+                if (!state.PlayerStates.TryGetValue(currentPlayerId, out var playerState))
+                {
+                    return ValueResult<BaseCard>.FromError("Error skipping turn.",
+                        $"Player state missing for player [{currentPlayerId}].");
+                }
+
+                if (!state.MainDeck.TryPop(out var card))
+                {
+                    return ValueResult<BaseCard>.FromError("There are no cards to draw.");
+                }
+
+                state.CurrentPlayerIndex = (state.CurrentPlayerIndex + 1) % state.TurnOrder.Count;
+                return ValueResult<BaseCard>.FromValue(card);
+            });
+
+            if (executeResult.TryGetSuccess(out var result))
             {
-                 DealActionCards(state);
-                 DealNextShoe(state);
+                if (result.TryGetFailure(out var error)) return error;
+                return Result.Canceled;
             }
+
+            if (!result.TryGetSuccess(out var drawnCard))
+            {
+                if (result.TryGetFailure(out var error)) return error;
+                return Result.Canceled;
+            }
+
+            await state.TurnChangeEventManager.NotifyAsync();
+
+            return Result.Success;
         }
 
         public Result SetBuyIn(User player, CardCounterGameState state, bool isNegative)

@@ -18,24 +18,29 @@ namespace KnockBox.Services.State.Games.CardCounter
         public readonly ThreadSafeEventManager ActionCardsDealtEventManager = new();
 
         /// <summary>
-        /// The callback used to handle the action card played event.
+        /// The event manager for the action card played event.
         /// </summary>
-        public Func<ActionCardPlayedArgs, Task>? ActionCardPlayedCallback { get; set; }
+        public readonly ThreadSafeEventManager<ActionCardPlayedArgs> ActionCardPlayedEventManager = new();
 
         /// <summary>
-        /// The callback used to handle the shoe deal event.
+        /// The event manager for the draw card event.
         /// </summary>
-        public Func<Task>? ShoeDealCallback { get; set; }
+        public readonly ThreadSafeEventManager<NumberCardDrawnArgs> CardDrawnEventManager = new();
 
         /// <summary>
-        /// The callback used to handle the game start event.
+        /// The event manager for the shoe deal event.
         /// </summary>
-        public Func<Task>? GameStartCallback { get; set; }
+        public readonly ThreadSafeEventManager ShoeDealEventManager = new();
 
         /// <summary>
-        /// The callback used to handle the turn change event.
+        /// The event manager for the shoe deal event.
         /// </summary>
-        public Func<Task>? TurnEndedCallback { get; set; }
+        public readonly ThreadSafeEventManager GameStartEventManager = new();
+
+        /// <summary>
+        /// The event manager for the turn change event.
+        /// </summary>
+        public readonly ThreadSafeEventManager TurnChangeEventManager = new();
 
         #endregion
 
@@ -160,6 +165,10 @@ namespace KnockBox.Services.State.Games.CardCounter
     /// <param name="Card">The card that was played.</param>
     /// <param name="User">The user that played the action card.</param>
     public record class ActionCardPlayedArgs(ActionCard Card, User User);
+
+    /// <param name="Card">The card that was drawn.</param>
+    /// <param name="User">The user that drew the card.</param>
+    public record class NumberCardDrawnArgs(NumberCard Card, User User);
 
     public class Player(User user)
     {
