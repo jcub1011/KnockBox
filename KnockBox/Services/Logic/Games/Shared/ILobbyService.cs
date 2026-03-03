@@ -42,7 +42,7 @@ namespace KnockBox.Services.Logic.Games.Shared
         /// <param name="gameType"></param>
         /// <param name="ct"></param>
         /// <returns></returns>
-        Task<Result<LobbyRegistration>> CreateLobbyAsync(User host, GameType gameType, CancellationToken ct = default);
+        Task<ValueResult<LobbyRegistration>> CreateLobbyAsync(User host, GameType gameType, CancellationToken ct = default);
 
         /// <summary>
         /// Closes the lobby.
@@ -60,6 +60,6 @@ namespace KnockBox.Services.Logic.Games.Shared
         /// <param name="lobbyCode">The code for the lobby to join.</param>
         /// <param name="ct"></param>
         /// <returns></returns>
-        Task<Result<UserRegistration>> JoinLobbyAsync(User user, string lobbyCode, CancellationToken ct = default);
+        Task<ValueResult<UserRegistration>> JoinLobbyAsync(User user, string lobbyCode, CancellationToken ct = default);
     }
 }

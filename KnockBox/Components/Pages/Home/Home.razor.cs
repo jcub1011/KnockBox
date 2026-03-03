@@ -77,7 +77,7 @@ namespace KnockBox.Components.Pages.Home
             }
 
             var joinResult = await LobbyService.JoinLobbyAsync(user, lobbyCode, ComponentDetached);
-            if (!joinResult.TryGetValue(out var registration))
+            if (!joinResult.TryGetSuccess(out var registration))
             {
                 // TODO: Notify user join failed
                 return;
@@ -98,7 +98,7 @@ namespace KnockBox.Components.Pages.Home
             }
 
             var createResult = await LobbyService.CreateLobbyAsync(user, gameType, ComponentDetached);
-            if (!createResult.TryGetValue(out var lobby))
+            if (!createResult.TryGetSuccess(out var lobby))
             {
                 // TODO: Notify user lobby creation failed
                 return;

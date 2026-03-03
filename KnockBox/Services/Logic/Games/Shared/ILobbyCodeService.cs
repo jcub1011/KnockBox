@@ -17,7 +17,7 @@ namespace KnockBox.Services.Logic.Games.Shared
         /// </summary>
         /// <param name="ct"></param>
         /// <returns></returns>
-        public ValueTask<Result<string>> IssueLobbyCodeAsync(CancellationToken ct = default);
+        public ValueTask<ValueResult<string>> IssueLobbyCodeAsync(CancellationToken ct = default);
 
         /// <summary>
         /// Makes the lobby code available for re-use.

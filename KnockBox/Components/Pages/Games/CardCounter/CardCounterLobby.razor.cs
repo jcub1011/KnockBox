@@ -70,9 +70,13 @@ namespace KnockBox.Components.Pages.Games.CardCounter
         {
             if (GameState == null || UserService.CurrentUser == null) return;
             var result = await GameEngine.StartAsync(UserService.CurrentUser, GameState);
-            if (result.IsFailure)
+            if (result.IsCanceled)
             {
-                Logger.LogError("Failed to start game: {Error}", result.Error?.Message);
+                // Ignore cancellation
+            }
+            if (result.TryGetFailure(out var error))
+            {
+                Logger.LogError("Failed to start game: {Error}", error);
             }
         }
 

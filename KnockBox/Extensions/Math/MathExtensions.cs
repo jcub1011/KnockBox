@@ -1,6 +1,4 @@
-﻿using System.Numerics;
-
-namespace KnockBox.Extensions
+﻿namespace KnockBox.Extensions.Math
 {
     public static class MathExtensions
     {

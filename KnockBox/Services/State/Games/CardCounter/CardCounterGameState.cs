@@ -82,13 +82,13 @@ namespace KnockBox.Services.State.Games.CardCounter
             } 
         }
 
-        public Result<long, string> GetPotValue()
+        public ValueResult<long> GetPotValue()
         {
-            if (Pot.Count == 0) return new Result<long, string>(0L);
+            if (Pot.Count == 0) return 0L;
 
             string concatenated = string.Join("", Pot.Select(p => p.Value));
             return long.TryParse(concatenated, out var result)
-                ? new Result<long, string>(result) : new Result<long, string>("Unable to parse pot value.");
+                ? result : ValueResult<long>.FromError("Error parsing pot value.");
         }
     }
 

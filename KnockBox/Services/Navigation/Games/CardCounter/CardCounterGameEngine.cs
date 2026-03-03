@@ -15,24 +15,24 @@ namespace KnockBox.Services.Navigation.Games.CardCounter
     {
         private readonly IRandomNumberService _random = randomNumberService;
 
-        public override async Task<Result<AbstractGameState>> CreateStateAsync(User host, CancellationToken ct = default)
+        public override async Task<ValueResult<AbstractGameState>> CreateStateAsync(User host, CancellationToken ct = default)
         {
             if (host is null)
-                return Result.FromError<AbstractGameState>(new ArgumentNullException(nameof(host)));
+                return ValueResult<AbstractGameState>.FromError("Failed to create game state.", $"Parameter {nameof(host)} was null.");
 
-            var gameState = new CardCounterGameState(host, stateLogger, randomNumberService);
+            var gameState = new CardCounterGameState(host, stateLogger);
             gameState.UpdateJoinableStatus(true);
             logger.LogInformation("Created gameState with user [{userId}] as host.", host.Id);
-            return Result.FromValue<AbstractGameState>(gameState);
+            return gameState;
         }
 
         public override async Task<Result> StartAsync(User host, AbstractGameState state, CancellationToken ct = default)
         {
             if (state is not CardCounterGameState gameState)
-                return Result.FromError(new InvalidCastException($"Game state of type [{state.GetType().Name}] couldn't be cast to type [{nameof(CardCounterGameState)}]."));
+                return Result.FromError("Error starting game.", $"Game state of type [{state.GetType().Name}] couldn't be cast to type [{nameof(CardCounterGameState)}].");
 
             if (host != gameState.Host)
-                return Result.FromError(new InvalidOperationException($"Only the host can start the game."));
+                return Result.FromError("Only the host can start the game.");
 
             var executeResult = state.Execute(() =>
             {

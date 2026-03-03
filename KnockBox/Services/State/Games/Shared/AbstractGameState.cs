@@ -74,16 +74,16 @@ namespace KnockBox.Services.State.Games.Shared
         /// </summary>
         /// <param name="player"></param>
         /// <returns></returns>
-        public Result<IDisposable> RegisterPlayer(User player)
+        public ValueResult<IDisposable> RegisterPlayer(User player)
         {
             if (TryGetDisposeError(out var ode))
-                return Result.FromError<IDisposable>(ode);
+                return ValueResult<IDisposable>.FromError("Error registering player.", ode.ToString());
 
             if (!IsJoinable)
-                return Result.FromError<IDisposable>(new InvalidOperationException($"The game is not currently joinable."));
+                return ValueResult<IDisposable>.FromError("The game is not currently joinable.");
 
             if (Host == player)
-                return Result.FromError<IDisposable>(new InvalidOperationException($"Host cannot be a player in the game."));
+                return ValueResult<IDisposable>.FromError("Host cannot be a player in the game.");
 
             bool wasAdded = false;
             var unsubscriber = new DisposableAction(() => Execute(() =>
@@ -95,19 +95,19 @@ namespace KnockBox.Services.State.Games.Shared
             using var scope = _playerLock.EnterScope();
             if (_kickedPlayers.Contains(player))
             {
-                return Result.FromError<IDisposable>(new InvalidOperationException($"Player [{player.Name}] was kicked and cannot rejoin."));
+                return ValueResult<IDisposable>.FromError("You have been kicked from this lobby and cannot rejoin.", $"Player [{player.Name}] was kicked and cannot rejoin.");
             }
             else if (_players.TryAdd(player, unsubscriber))
             {
                 wasAdded = true;
                 logger.LogInformation("User [{userId}] entered game [{type}] hosted by user [{hostId}].", player.Id, GetType().Name, Host.Id);
-                return Result.FromValue<IDisposable>(unsubscriber);
+                return unsubscriber;
             }
             else
             {
                 wasAdded = false;
                 unsubscriber.Dispose();
-                return Result.FromError<IDisposable>(new InvalidOperationException($"Player [{player.Name}] is already registered."));
+                return ValueResult<IDisposable>.FromError("You are already in this lobby.", $"Player [{player.Name}] is already registered.");
             }
         }
 
@@ -126,8 +126,7 @@ namespace KnockBox.Services.State.Games.Shared
                 return Result.Success;
             }
 
-            return Result.FromError(
-                new InvalidOperationException("User is not in this game."));
+            return Result.FromError("User is not in this game.");
         }
 
         /// <summary>
@@ -151,14 +150,14 @@ namespace KnockBox.Services.State.Games.Shared
         /// </remarks>
         /// <param name="handler"></param>
         /// <returns></returns>
-        public Result<IDisposable> SubscribeToStateChanged(Func<ValueTask> handler)
+        public ValueResult<IDisposable> SubscribeToStateChanged(Func<ValueTask> handler)
         {
             if (TryGetDisposeError(out var ode))
-                return Result.FromError<IDisposable>(ode);
+                return ValueResult<IDisposable>.FromError("Unable to subscribe to state change events.", ode.ToString());
 
             ValueTask HandlerWrapper(int unusedInput) => handler();
 
-            return Result.FromValue(EventManager.Subscribe(HandlerWrapper));
+            return ValueResult<IDisposable>.FromValue(EventManager.Subscribe(HandlerWrapper));
         }
 
         /// <summary>
@@ -170,7 +169,7 @@ namespace KnockBox.Services.State.Games.Shared
         public async ValueTask<Result> ExecuteAsync(Func<ValueTask> action, CancellationToken ct = default)
         {
             if (TryGetDisposeError(out var ode))
-                return Result.FromError(ode);
+                return Result.FromError("Unable to subscribe to state change events.", ode.ToString());
 
             try
             {
@@ -188,9 +187,13 @@ namespace KnockBox.Services.State.Games.Shared
                     NotifyStateChanged();
                 }
             }
+            catch (OperationCanceledException)
+            {
+                return Result.FromCancellation();
+            }
             catch (Exception ex)
             {
-                return Result.FromError(ex);
+                return Result.FromError("Error executing action.", ex.ToString());
             }
         }
 
@@ -201,8 +204,7 @@ namespace KnockBox.Services.State.Games.Shared
         /// <returns></returns>
         public Result Execute(Action action)
         {
-            if (TryGetDisposeError(out var ode))
-                return Result.FromError(ode);
+            if (TryGetDisposeError(out var ode)) return Result.FromError("Unable to execute action.", ode.ToString());
 
             try
             {
@@ -219,9 +221,13 @@ namespace KnockBox.Services.State.Games.Shared
                     NotifyStateChanged();
                 }
             }
+            catch (OperationCanceledException)
+            {
+                return Result.FromCancellation();
+            }
             catch (Exception ex)
             {
-                return Result.FromError(ex);
+                return Result.FromError("Error executing action.", ex.ToString());
             }
         }
 
@@ -232,8 +238,7 @@ namespace KnockBox.Services.State.Games.Shared
         /// <returns></returns>
         public async ValueTask<Result> WithExclusiveReadAsync(Func<ValueTask> action, CancellationToken ct = default)
         {
-            if (TryGetDisposeError(out var ode))
-                return Result.FromError(ode);
+            if (TryGetDisposeError(out var ode)) return Result.FromError("Unable to read values.", ode.ToString());
 
             try
             {
@@ -250,9 +255,13 @@ namespace KnockBox.Services.State.Games.Shared
                     _executeLock.Release();
                 }
             }
+            catch (OperationCanceledException)
+            {
+                return Result.FromCancellation();
+            }
             catch (Exception ex)
             {
-                return Result.FromError(ex);
+                return Result.FromError("Error executing read.", ex.ToString());
             }
         }
 
@@ -263,8 +272,7 @@ namespace KnockBox.Services.State.Games.Shared
         /// <returns></returns>
         public Result WithExclusiveRead(Action action)
         {
-            if (TryGetDisposeError(out var ode))
-                return Result.FromError(ode);
+            if (TryGetDisposeError(out var ode)) return Result.FromError("Unable to read values.", ode.ToString());
 
             try
             {
@@ -280,9 +288,13 @@ namespace KnockBox.Services.State.Games.Shared
                     _executeLock.Release();
                 }
             }
+            catch (OperationCanceledException)
+            {
+                return Result.FromCancellation();
+            }
             catch (Exception ex)
             {
-                return Result.FromError(ex);
+                return Result.FromError("Error executing read.", ex.ToString());
             }
         }
 
@@ -301,12 +313,12 @@ namespace KnockBox.Services.State.Games.Shared
         /// <returns>
         /// A <see cref="CancellationTokenSource"/> whose token can be cancelled to discard the callback.
         /// </returns>
-        public Result<CancellationTokenSource> ScheduleCallback(TimeSpan delay, Func<Task> action)
+        public ValueResult<CancellationTokenSource> ScheduleCallback(TimeSpan delay, Func<Task> action)
         {
             if (TryGetDisposeError(out var ode))
             {
                 logger.LogError(ode, "Error scheduling callback.");
-                return Result.FromError<CancellationTokenSource>(ode);
+                return ValueResult<CancellationTokenSource>.FromError("Unable to schedule callback.", ode.ToString());
             }
 
             var cts = CancellationTokenSource.CreateLinkedTokenSource(_disposeCts.Token);
@@ -345,7 +357,7 @@ namespace KnockBox.Services.State.Games.Shared
                 }
             });
 
-            return Result.FromValue(cts);
+            return cts;
         }
 
         public void Dispose()

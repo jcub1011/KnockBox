@@ -41,12 +41,12 @@ namespace KnockBox.Services.State.Games.Shared
         public Result SetCurrentSession(UserRegistration session)
         {
             if (session is null)
-                return Result.FromError(new ArgumentNullException(nameof(session), "Session cannot be null."));
+                return Result.FromError("Unable to join session.", "Session cannot be null.");
 
             var previousSession = Interlocked.CompareExchange(ref _currentSession, session, null);
 
             if (previousSession is not null)
-                return Result.FromError(new InvalidOperationException("Leave the current session before setting a new one."));
+                return Result.FromError("Leave the current session before setting a new one.");
 
             logger.LogInformation("User [{userId}] entered session [{sessionId}].", userService.CurrentUser?.Id ?? "Unknown", previousSession?.LobbyRegistration.Uri);
 

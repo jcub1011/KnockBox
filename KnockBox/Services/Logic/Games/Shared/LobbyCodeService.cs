@@ -15,7 +15,7 @@ namespace KnockBox.Services.Logic.Games.Shared
 
         public int LobbyCodeLength => CodeLength;
 
-        public async ValueTask<Result<string>> IssueLobbyCodeAsync(CancellationToken ct = default)
+        public async ValueTask<ValueResult<string>> IssueLobbyCodeAsync(CancellationToken ct = default)
         {
             try
             {
@@ -32,24 +32,19 @@ namespace KnockBox.Services.Logic.Games.Shared
 
                     lock (_lock)
                     {
-                        if (_issuedCodes.Add(code))
-                        {
-                            return Result.FromValue(code);
-                        }
+                        if (_issuedCodes.Add(code)) return code;
                     }
                 }
 
-                return Result.FromError<string>(
-                    new InvalidOperationException("Unable to generate a unique lobby code."));
+                return ValueResult<string>.FromError("Error occured while generating error code.");
             }
-            catch (OperationCanceledException oce)
+            catch (OperationCanceledException)
             {
-                return Result.FromError<string>(oce);
+                return ValueResult<string>.FromCancellation();
             }
             catch (Exception ex)
             {
-                return Result.FromError<string>(
-                    new InvalidOperationException("Unable to generate a unique lobby code.", ex));
+                return ValueResult<string>.FromError("Error generating lobby code.", $"Error generating lobby code: {ex}");
             }
         }
 
@@ -67,19 +62,17 @@ namespace KnockBox.Services.Logic.Games.Shared
                     }
                     else
                     {
-                        return Result.FromError(
-                            new InvalidOperationException("Lobby code was not issued."));
+                        return Result.FromError("Lobby code was not issued.");
                     }
                 }
             }
-            catch (OperationCanceledException oce)
+            catch (OperationCanceledException)
             {
-                return Result.FromError(oce);
+                return Result.FromCancellation();
             }
             catch (Exception ex)
             {
-                return Result.FromError(
-                    new InvalidOperationException("Unable to release lobby code.", ex));
+                return Result.FromError("Unable to release lobby code.", $"Error releasing lobby code: {ex}");
             }
         }
 

@@ -1,24 +1,84 @@
 ﻿using System.Diagnostics.CodeAnalysis;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace KnockBox.Extensions.Returns
 {
+    /// <summary>
+    /// A wrapper used to discern between failures and cancellations.
+    /// </summary>
+    /// <typeparam name="TError"></typeparam>
+    /// <param name="Error"></param>
+    /// <param name="IsCancellationError"></param>
+    public readonly struct ErrorWrapper<TError>
+    {
+        public readonly bool IsCancellationError;
+        public readonly TError Error;
+
+        private ErrorWrapper(TError error)
+        {
+            Error = error;
+            IsCancellationError = false;
+        }
+
+        private ErrorWrapper(int _)
+        {
+            Error = default!;
+            IsCancellationError = true;
+        }
+
+        /// <summary>
+        /// Attempts to get the cancellation error, failing if it is a cancellation error.
+        /// </summary>
+        /// <param name="error"></param>
+        /// <returns></returns>
+        public bool TryGetError([MaybeNullWhen(true)] out TError error)
+        {
+            if (IsCancellationError)
+            {
+                error = default!;
+                return false;
+            }
+            else
+            {
+                error = Error;
+                return true;
+            }
+        }
+
+        public static ErrorWrapper<TError> FromError(TError error) => new(error);
+        public static ErrorWrapper<TError> FromCancellation() => new(0);
+
+        public static implicit operator ErrorWrapper<TError>(TError error) => new(error);
+        public static implicit operator ErrorWrapper<TError>(OperationCanceledException _) => new(0);
+    }
+
     /// <summary>
     /// A result with a value and a custom error type.
     /// </summary>
     /// <typeparam name="TValue"></typeparam>
     /// <typeparam name="TError"></typeparam>
-    public readonly record struct ValueResult<TValue, TError>
+    public readonly struct ValueResult<TValue, TError>
         where TError : notnull
     {
+        /// <summary>
+        /// A shared instance that represents a canceled result.
+        /// </summary>
+        public static readonly ValueResult<TValue, TError> Canceled = FromCancellation();
+
         /// <summary>
         /// If this is a success result.
         /// </summary>
         public readonly bool IsSuccess;
 
         /// <summary>
-        /// If this is a failure result.
+        /// If this is a cancellation result.
         /// </summary>
-        public bool IsFailure => !IsSuccess;
+        public bool IsCanceled => Error.IsCancellationError;
+
+        /// <summary>
+        /// If this is a failure result. Not true when canceled.
+        /// </summary>
+        public bool IsFailure => !IsSuccess && !IsCanceled;
 
         /// <summary>
         /// The success value.
@@ -28,18 +88,18 @@ namespace KnockBox.Extensions.Returns
         /// <summary>
         /// The error value.
         /// </summary>
-        public readonly TError Error;
+        public readonly ErrorWrapper<TError> Error;
 
         /// <summary>
         /// Attempts to retrieve the value, failing if the result is a failure.
         /// </summary>
         /// <param name="value"></param>
         /// <returns></returns>
-        public bool TryGetSuccess([MaybeNullWhen(true)] out TValue value)
+        public bool TryGetSuccess([NotNullWhen(true)] out TValue value)
         {
             if (IsSuccess)
             {
-                value = Value;
+                value = Value!;
                 return true;
             }
             else
@@ -54,11 +114,11 @@ namespace KnockBox.Extensions.Returns
         /// </summary>
         /// <param name="error"></param>
         /// <returns></returns>
-        public bool TryGetFailure([MaybeNullWhen(true)] out TError error)
+        public bool TryGetFailure([NotNullWhen(true)] out TError error)
         {
             if (IsFailure)
             {
-                error = Error;
+                error = Error.Error;
                 return true;
             }
             else
@@ -82,6 +142,13 @@ namespace KnockBox.Extensions.Returns
             Error = error;
         }
 
+        private ValueResult(int _)
+        {
+            IsSuccess = false;
+            Value = default!;
+            Error = ErrorWrapper<TError>.FromCancellation();
+        }
+
         public static ValueResult<TValue, TError> FromValue(TValue value)
         {
             return new ValueResult<TValue, TError>(value);
@@ -92,6 +159,11 @@ namespace KnockBox.Extensions.Returns
             return new ValueResult<TValue, TError>(error);
         }
 
+        public static ValueResult<TValue, TError> FromCancellation()
+        {
+            return new ValueResult<TValue, TError>(0);
+        }
+
         public static implicit operator ValueResult<TValue, TError>(TValue value) => new(value);
         public static implicit operator ValueResult<TValue, TError>(TError error) => new(error);
     }
@@ -100,17 +172,27 @@ namespace KnockBox.Extensions.Returns
     /// A result with a value and the default <see cref="ResultError"/> error type.
     /// </summary>
     /// <typeparam name="TValue"></typeparam>
-    public readonly record struct ValueResult<TValue>
+    public readonly struct ValueResult<TValue>
     {
+        /// <summary>
+        /// A shared instance that represents a canceled result.
+        /// </summary>
+        public static readonly ValueResult<TValue> Canceled = FromCancellation();
+
         /// <summary>
         /// If this is a success result.
         /// </summary>
         public readonly bool IsSuccess;
 
         /// <summary>
-        /// If this is a failure result.
+        /// If this is a cancellation result.
         /// </summary>
-        public bool IsFailure => !IsSuccess;
+        public bool IsCanceled => Error.IsCancellationError;
+
+        /// <summary>
+        /// If this is a failure result. Not true when canceled.
+        /// </summary>
+        public bool IsFailure => !IsSuccess && !IsCanceled;
 
         /// <summary>
         /// The success value.
@@ -120,18 +202,18 @@ namespace KnockBox.Extensions.Returns
         /// <summary>
         /// The error value.
         /// </summary>
-        public readonly ResultError Error;
+        public readonly ErrorWrapper<ResultError> Error;
 
         /// <summary>
         /// Attempts to retrieve the value, failing if the result is a failure.
         /// </summary>
         /// <param name="value"></param>
         /// <returns></returns>
-        public bool TryGetSuccess([MaybeNullWhen(true)] out TValue value)
+        public bool TryGetSuccess([NotNullWhen(true)] out TValue value)
         {
             if (IsSuccess)
             {
-                value = Value;
+                value = Value!;
                 return true;
             }
             else
@@ -146,11 +228,11 @@ namespace KnockBox.Extensions.Returns
         /// </summary>
         /// <param name="error"></param>
         /// <returns></returns>
-        public bool TryGetFailure([MaybeNullWhen(true)] out ResultError error)
+        public bool TryGetFailure([NotNullWhen(true)] out ResultError error)
         {
             if (IsFailure)
             {
-                error = Error;
+                error = Error.Error;
                 return true;
             }
             else
@@ -174,6 +256,13 @@ namespace KnockBox.Extensions.Returns
             Error = error;
         }
 
+        private ValueResult(int _)
+        {
+            IsSuccess = false;
+            Value = default!;
+            Error = ErrorWrapper<ResultError>.FromCancellation();
+        }
+
         public static ValueResult<TValue> FromValue(TValue value)
         {
             return new ValueResult<TValue>(value);
@@ -194,6 +283,11 @@ namespace KnockBox.Extensions.Returns
             return new ValueResult<TValue>(new ResultError(publicMessage, internalMessage));
         }
 
+        public static ValueResult<TValue> FromCancellation()
+        {
+            return new ValueResult<TValue>(0);
+        }
+
         public static implicit operator ValueResult<TValue>(TValue value) => new(value);
         public static implicit operator ValueResult<TValue>(ResultError error) => new(error);
     }
@@ -202,10 +296,18 @@ namespace KnockBox.Extensions.Returns
     /// A result with no value type and a custom error type.
     /// </summary>
     /// <typeparam name="TError"></typeparam>
-    public readonly record struct Result<TError>
+    public readonly struct Result<TError>
         where TError : notnull
     {
+        /// <summary>
+        /// A shared instance that represents a successful result.
+        /// </summary>
         public static readonly Result<TError> Success = new(true);
+
+        /// <summary>
+        /// A shared instance that represents a canceled result.
+        /// </summary>
+        public static readonly Result<TError> Canceled = FromCancellation();
 
         /// <summary>
         /// If this is a success result.
@@ -213,25 +315,30 @@ namespace KnockBox.Extensions.Returns
         public readonly bool IsSuccess;
 
         /// <summary>
-        /// If this is a failure result.
+        /// If this is a cancellation result.
         /// </summary>
-        public bool IsFailure => !IsSuccess;
+        public bool IsCanceled => Error.IsCancellationError;
+
+        /// <summary>
+        /// If this is a failure result. Not true when canceled.
+        /// </summary>
+        public bool IsFailure => !IsSuccess && !IsCanceled;
 
         /// <summary>
         /// The error value.
         /// </summary>
-        public readonly TError Error;
+        public readonly ErrorWrapper<TError> Error;
 
         /// <summary>
         /// Attempts to retrieve the error, failing if the result is a success.
         /// </summary>
         /// <param name="error"></param>
         /// <returns></returns>
-        public bool TryGetFailure([MaybeNullWhen(true)] out TError error)
+        public bool TryGetFailure([NotNullWhen(true)] out TError error)
         {
             if (IsFailure)
             {
-                error = Error;
+                error = Error.Error;
                 return true;
             }
             else
@@ -257,9 +364,20 @@ namespace KnockBox.Extensions.Returns
             Error = error;
         }
 
+        private Result(int _)
+        {
+            IsSuccess = false;
+            Error = ErrorWrapper<TError>.FromCancellation();
+        }
+
         public static Result<TError> FromError(TError error)
         {
             return new Result<TError>(error);
+        }
+
+        public static Result<TError> FromCancellation()
+        {
+            return new Result<TError>(0);
         }
 
         public static implicit operator Result<TError>(TError error) => new(error);
@@ -268,9 +386,17 @@ namespace KnockBox.Extensions.Returns
     /// <summary>
     /// A result with no value and the default <see cref="ResultError"/> error type.
     /// </summary>
-    public readonly record struct Result
+    public readonly struct Result
     {
+        /// <summary>
+        /// A shared instance that represents a successful result.
+        /// </summary>
         public static readonly Result Success = new(true);
+
+        /// <summary>
+        /// A shared instance that represents a canceled result.
+        /// </summary>
+        public static readonly Result Canceled = FromCancellation();
 
         /// <summary>
         /// If this is a success result.
@@ -278,25 +404,30 @@ namespace KnockBox.Extensions.Returns
         public readonly bool IsSuccess;
 
         /// <summary>
-        /// If this is a failure result.
+        /// If this is a cancellation result.
         /// </summary>
-        public bool IsFailure => !IsSuccess;
+        public bool IsCanceled => Error.IsCancellationError;
+
+        /// <summary>
+        /// If this is a failure result. Not true when canceled.
+        /// </summary>
+        public bool IsFailure => !IsSuccess && !IsCanceled;
 
         /// <summary>
         /// The error value.
         /// </summary>
-        public readonly ResultError Error;
+        public readonly ErrorWrapper<ResultError> Error;
 
         /// <summary>
         /// Attempts to retrieve the error, failing if the result is a success.
         /// </summary>
         /// <param name="error"></param>
         /// <returns></returns>
-        public bool TryGetFailure([MaybeNullWhen(true)] out ResultError error)
+        public bool TryGetFailure([NotNullWhen(true)] out ResultError error)
         {
             if (IsFailure)
             {
-                error = Error;
+                error = Error.Error;
                 return true;
             }
             else
@@ -322,6 +453,12 @@ namespace KnockBox.Extensions.Returns
             Error = error;
         }
 
+        private Result(int _)
+        {
+            IsSuccess = false;
+            Error = ErrorWrapper<ResultError>.FromCancellation();
+        }
+
         public static Result FromError(ResultError error)
         {
             return new Result(error);
@@ -335,6 +472,11 @@ namespace KnockBox.Extensions.Returns
         public static Result FromError(string publicMessage, string internalMessage)
         {
             return new Result(new ResultError(publicMessage, internalMessage));
+        }
+
+        public static Result FromCancellation()
+        {
+            return new Result(0);
         }
 
         public static implicit operator Result(ResultError error) => new(error);
