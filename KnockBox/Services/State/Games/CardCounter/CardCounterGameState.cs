@@ -13,7 +13,12 @@ namespace KnockBox.Services.State.Games.CardCounter
         /// <summary>
         /// The current phase of the game.
         /// </summary>
-        public GamePhase Phase { get; set; }
+        public GamePhase GamePhase { get; set; }
+
+        /// <summary>
+        /// The current phase of the round.
+        /// </summary>
+        public RoundPhase RoundPhase { get; set; }
 
         /// <summary>
         /// The cards in the main deck.
@@ -81,8 +86,16 @@ namespace KnockBox.Services.State.Games.CardCounter
     public enum GamePhase
     {
         GameStart,
+        BuyIn,
         Playing,
         GameEnd
+    }
+
+    public enum RoundPhase
+    {
+        AwardActionCards,
+        PopulateShoe,
+        Play,
     }
 
     public enum Operator

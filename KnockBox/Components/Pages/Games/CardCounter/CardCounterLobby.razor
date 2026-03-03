@@ -42,10 +42,10 @@ else
     {
         <h4>Game Started</h4>
         <div class="game-info">
-            <p>Phase: @GameState.Phase</p>
+            <p>Phase: @GameState.GamePhase</p>
         </div>
 
-        @if (GameState.Phase == GamePhase.BuyIn)
+        @if (GameState.GamePhase == GamePhase.BuyIn)
         {
             var myPlayer = GetMyPlayer();
             if (myPlayer != null && !myPlayer.HasSetBuyIn)
@@ -55,7 +55,7 @@ else
                 <button class="btn btn-danger" @onclick="() => SetBuyIn(true)">Negative</button>
             }
         }
-        else if (GameState.Phase == GamePhase.Playing)
+        else if (GameState.GamePhase == GamePhase.Playing)
         {
             var activeId = GameState.TurnOrder.Count > 0 ? GameState.TurnOrder[GameState.CurrentPlayerIndex] : "";
             <p>Active Player: @(GameState.GamePlayers.TryGetValue(activeId, out var activePlayer) ? activePlayer.DisplayName : "")</p>
@@ -132,7 +132,7 @@ else
                 }
             </div>
         }
-        else if (GameState.Phase == GamePhase.GameOver)
+        else if (GameState.GamePhase == GamePhase.GameOver)
         {
             <h3>Game Over!</h3>
             @foreach (var p in GameState.GamePlayers.Values.OrderBy(x => Math.Abs(x.Balance)))

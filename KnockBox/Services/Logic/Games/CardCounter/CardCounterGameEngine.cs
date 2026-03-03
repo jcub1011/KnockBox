@@ -12,8 +12,6 @@ namespace KnockBox.Services.Logic.Games.CardCounter
         ILogger<CardCounterGameEngine> logger,
         ILogger<CardCounterGameState> stateLogger) : AbstractGameEngine
     {
-        private readonly IRandomNumberService _random = randomNumberService;
-
         public override async Task<ValueResult<AbstractGameState>> CreateStateAsync(User host, CancellationToken ct = default)
         {
             if (host is null)
@@ -45,7 +43,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter
 
         private void InitializeGame(CardCounterGameState state)
         {
-            state.Phase = GamePhase.BuyIn;
+            state.GamePhase = GamePhase.BuyIn;
             state.TurnOrder = state.Players.Select(p => p.Id).ToList();
 
             foreach (var p in state.Players)
@@ -122,7 +120,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter
             state.CurrentShoe.Clear();
             if (state.MainDeck.Count == 0)
             {
-                 state.Phase = GamePhase.GameOver;
+                 state.GamePhase = GamePhase.GameOver;
                  return;
             }
 
@@ -176,14 +174,14 @@ namespace KnockBox.Services.Logic.Games.CardCounter
             return state.Execute(() =>
             {
                 if (!state.GamePlayers.TryGetValue(player.Id, out var statePlayer)) return;
-                if (state.Phase != GamePhase.BuyIn) return;
+                if (state.GamePhase != GamePhase.BuyIn) return;
 
                 statePlayer.Balance = statePlayer.BuyInRoll * 8 * (isNegative ? -1 : 1);
                 statePlayer.HasSetBuyIn = true;
 
                 if (state.GamePlayers.Values.All(p => p.HasSetBuyIn))
                 {
-                    state.Phase = GamePhase.Playing;
+                    state.GamePhase = GamePhase.Playing;
                 }
             });
         }
@@ -193,7 +191,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter
             return state.Execute(() =>
             {
                 if (!state.GamePlayers.TryGetValue(player.Id, out var statePlayer)) return;
-                if (state.Phase != GamePhase.Playing) return;
+                if (state.GamePhase != GamePhase.Playing) return;
 
                 string activePlayerId = state.TurnOrder[state.CurrentPlayerIndex];
                 if (player.Id != activePlayerId) return;
@@ -240,7 +238,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter
             return state.Execute(() =>
             {
                 if (!state.GamePlayers.TryGetValue(player.Id, out var statePlayer)) return;
-                if (state.Phase != GamePhase.Playing) return;
+                if (state.GamePhase != GamePhase.Playing) return;
 
                 string activePlayerId = state.TurnOrder[state.CurrentPlayerIndex];
                 if (player.Id != activePlayerId) return;
@@ -259,7 +257,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter
             return state.Execute(() =>
             {
                 if (!state.GamePlayers.TryGetValue(player.Id, out var statePlayer)) return;
-                if (state.Phase != GamePhase.Playing) return;
+                if (state.GamePhase != GamePhase.Playing) return;
 
                 string activePlayerId = state.TurnOrder[state.CurrentPlayerIndex];
                 if (player.Id != activePlayerId) return;
@@ -278,7 +276,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter
             return state.Execute(() =>
             {
                 if (!state.GamePlayers.TryGetValue(player.Id, out var statePlayer)) return;
-                if (state.Phase != GamePhase.Playing) return;
+                if (state.GamePhase != GamePhase.Playing) return;
 
                 string activePlayerId = state.TurnOrder[state.CurrentPlayerIndex];
                 if (player.Id != activePlayerId) return;
@@ -325,7 +323,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter
             return state.Execute(() =>
             {
                 if (!state.GamePlayers.TryGetValue(player.Id, out var statePlayer)) return;
-                if (state.Phase != GamePhase.Playing) return;
+                if (state.GamePhase != GamePhase.Playing) return;
 
                 if (statePlayer.PrivateReveal != null)
                 {
