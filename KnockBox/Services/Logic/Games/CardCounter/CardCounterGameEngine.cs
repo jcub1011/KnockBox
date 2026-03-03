@@ -60,6 +60,11 @@ namespace KnockBox.Services.Logic.Games.CardCounter
         /// </summary>
         public readonly ThreadSafeEventManager ActionCardsDealtEventManager = new();
 
+        /// <summary>
+        /// Handles the shoe deal event.
+        /// </summary>
+        public readonly ThreadSafeEventManager ShoeDealEventManager = new();
+
         public override async Task<ValueResult<AbstractGameState>> CreateStateAsync(User host, CancellationToken ct = default)
         {
             if (host is null)
@@ -112,10 +117,6 @@ namespace KnockBox.Services.Logic.Games.CardCounter
                 }
 
                 BuildMainDeck(state);
-                BuildActionDeck(state);
-
-                DealActionCards(state);
-                DealNextShoe(state);
             });
         }
 
@@ -157,6 +158,11 @@ namespace KnockBox.Services.Logic.Games.CardCounter
         public async Task<Result> DealNextShoeAsync(CardCounterGameState state, CancellationToken ct = default)
         {
             if (ct.IsCancellationRequested) return Result.Canceled;
+
+            state.Execute(() =>
+            {
+                foreach (var)
+            });
         }
 
         private void BuildMainDeck(CardCounterGameState state)
@@ -204,54 +210,6 @@ namespace KnockBox.Services.Logic.Games.CardCounter
 
             Shuffle(cards);
             state.MainDeck.PushRange(cards);
-        }
-
-        private void BuildActionDeck(CardCounterGameState state)
-        {
-            state.ActionDeck.Clear();
-            var types = Enum.GetValues<ActionType>();
-            if (types.Length == 0)
-            {
-                logger.LogCritical($"{nameof(ActionType)} enum is empty. Unable to generate action card deck.");
-                return;
-            }
-            if (_actionCardMap.Count == 0)
-            {
-                logger.LogCritical("Action card map is empty. Unable to generate action card deck.");
-                return;
-            }
-
-            for (int i = 0; i < 100; i++)
-            {
-                var actionType = types[randomNumberService.GetRandomInt(0, types.Length, RandomType.Secure)];
-                if (_actionCardMap.TryGetValue(actionType, out var card))
-                {
-                    state.ActionDeck.Push(card);
-                }
-                else
-                {
-                    logger.LogError("No card is defined for action card type [{type}], skipping.", actionType);
-                    continue;
-                }
-            }
-        }
-
-        private void DealActionCards(CardCounterGameState state)
-        {
-            foreach (var playerState in state.PlayerStates.Values)
-            {
-                for (int i = 0; i < state.Config.ActionsDealtPerRound && state.ActionDeck.Count > 0; i++)
-                {
-                    if (state.ActionDeck.TryPop(out var card))
-                    {
-                        playerState.ActionCards.Add(card);
-                    }
-                    else
-                    {
-                        logger.LogError("Action card deck has run empty.");
-                    }
-                }
-            }
         }
 
         private void DealNextShoe(CardCounterGameState state)
