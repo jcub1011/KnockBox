@@ -6,7 +6,7 @@ using KnockBox.Services.State.Games.CardCounter;
 using KnockBox.Services.State.Games.Shared;
 using KnockBox.Services.State.Users;
 using Microsoft.AspNetCore.Mvc.TagHelpers;
-using System.Threading.Tasks;
+using System.Reflection.Metadata.Ecma335;
 
 namespace KnockBox.Services.Logic.Games.CardCounter
 {
@@ -332,9 +332,9 @@ namespace KnockBox.Services.Logic.Games.CardCounter
                 return Result.Success;
             });
 
-            if (executeResult.TryGetSuccess(out var result))
+            if (!executeResult.TryGetSuccess(out var result))
             {
-                if (result.TryGetFailure(out var error)) return error;
+                if (executeResult.TryGetFailure(out var error)) return error;
                 return Result.Canceled;
             }
 
@@ -349,7 +349,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter
             return Result.Success;
         }
 
-        public async Task<Result> DrawCard(CardCounterGameState state, User player)
+        public async Task<Result> DrawCardAsync(CardCounterGameState state, User player)
         {
             var executeResult = state.Execute(() =>
             {
@@ -375,9 +375,9 @@ namespace KnockBox.Services.Logic.Games.CardCounter
                 return ValueResult<BaseCard>.FromValue(card);
             });
 
-            if (executeResult.TryGetSuccess(out var result))
+            if (!executeResult.TryGetSuccess(out var result))
             {
-                if (result.TryGetFailure(out var error)) return error;
+                if (executeResult.TryGetFailure(out var error)) return error;
                 return Result.Canceled;
             }
 
@@ -392,12 +392,100 @@ namespace KnockBox.Services.Logic.Games.CardCounter
             return Result.Success;
         }
 
-        public async Task<Result> SetAllPlayerBuyIns(CardCounterGameState state)
+        public async Task<Result> ApplyNumberCardAsync(CardCounterGameState state, User target, NumberCard card)
         {
-            state.BuyInStageCompleteEventManager.Notify();
+            var executeResult = state.Execute(() =>
+            {
+                if (!state.PlayerStates.TryGetValue(target.Id, out var playerState))
+                    return Result.FromError("Unable to apply number to player.", 
+                        $"Player [{target.Id}] does not have a player state registered.");
+
+                playerState.Pot.Add(card);
+                return Result.Success;
+            });
+
+            if (!executeResult.TryGetSuccess(out var result))
+            {
+                if (executeResult.TryGetFailure(out var error)) return error;
+                return Result.Canceled;
+            }
+
+            if (!result.IsSuccess)
+            {
+                if (result.TryGetFailure(out var error)) return error;
+                return Result.Canceled;
+            }
+
+            await state.NumberCardAppliedEventManager.NotifyAsync(new(card, target));
+            return Result.Success;
         }
 
-        public async Task<Result> SetBuyIn(CardCounterGameState state, User player, int buyInRoll)
+        public async Task<Result> ApplyOperatorCardAsync(CardCounterGameState state, User target, OperatorCard card)
+        {
+            var executeResult = state.Execute(() =>
+            {
+                if (!state.PlayerStates.TryGetValue(target.Id, out var playerState))
+                    return Result.FromError("Unable to apply number to player.", 
+                        $"Player [{target.Id}] does not have a player state registered.");
+
+                var potValueResult = playerState.GetPotValue();
+
+                if (!potValueResult.TryGetSuccess(out var potValue))
+                    return Result.FromError(potValueResult.Error.Error);
+
+                playerState.Balance = card.Operator switch
+                {
+                    Operator.Divide => playerState.Balance / potValue,
+                    Operator.Multiply => playerState.Balance * potValue,
+                    Operator.Subtract => playerState.Balance - potValue,
+                    Operator.Add or _ => playerState.Balance + potValue
+                };
+
+                return Result.Success;
+            });
+
+            if (!executeResult.TryGetSuccess(out var result))
+            {
+                if (executeResult.TryGetFailure(out var error)) return error;
+                return Result.Canceled;
+            }
+
+            if (!result.IsSuccess)
+            {
+                if (result.TryGetFailure(out var error)) return error;
+                return Result.Canceled;
+            }
+
+            await state.NumberCardAppliedEventManager.NotifyAsync(new(card, target));
+            return Result.Success;
+        }
+
+        public async Task<Result> SetAllPlayerBuyInsAsync(CardCounterGameState state)
+        {
+            var executeResult = state.Execute(() =>
+            {
+                if (state.GamePhase != GamePhase.BuyIn)
+                    return Result.FromError("Can't set buy in outside of the buy in stage.");
+                return Result.Success;
+            });
+
+            if (!executeResult.TryGetSuccess(out var result))
+            {
+                if (executeResult.TryGetFailure(out var error)) return error;
+                return Result.Canceled;
+            }
+
+            if (!result.IsSuccess)
+            {
+                if (result.TryGetFailure(out var error)) return error;
+                return Result.Canceled;
+            }
+
+            await state.BuyInStageCompleteEventManager.NotifyAsync();
+            return Result.Success;
+        }
+
+        public async Task<Result> SetBuyInAsync(CardCounterGameState state, User player, int buyInRoll)
         {
             var executeResult = state.Execute(() =>
             {
@@ -409,7 +497,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter
                         $"Player state is not set for player [{player.Id}].");
 
                 playerState.BuyInRoll = buyInRoll;
-                playerState.Balance = buyInRoll * 8;
+                playerState.Balance = RollToBalance(buyInRoll);
                 return Result.Success;
             });
 
@@ -425,7 +513,10 @@ namespace KnockBox.Services.Logic.Games.CardCounter
                 return Result.Canceled;
             }
 
+            return Result.Success;
         }
+
+        public int RollToBalance(int roll) => roll * 8;
 
         public Result DrawCard(User player, CardCounterGameState state)
         {
