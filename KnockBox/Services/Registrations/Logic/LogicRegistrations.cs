@@ -1,8 +1,8 @@
 ﻿using KnockBox.Services.Logic.Filtering;
 using KnockBox.Services.Logic.Games.Shared;
 using KnockBox.Services.Logic.RandomGeneration;
-using KnockBox.Services.Navigation.Games.DiceSimulator;
-using KnockBox.Services.Navigation.Games.CardCounter;
+using KnockBox.Services.Logic.Games.CardCounter;
+using KnockBox.Services.Logic.Games.DiceSimulator;
 
 namespace KnockBox.Services.Registrations.Logic
 {

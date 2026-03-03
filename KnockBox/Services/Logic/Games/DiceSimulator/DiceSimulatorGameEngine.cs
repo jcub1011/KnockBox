@@ -6,7 +6,7 @@ using KnockBox.Services.State.Games.DiceSimulator.Data;
 using KnockBox.Services.State.Games.Shared;
 using KnockBox.Services.State.Users;
 
-namespace KnockBox.Services.Navigation.Games.DiceSimulator
+namespace KnockBox.Services.Logic.Games.DiceSimulator
 {
     public class DiceSimulatorGameEngine(
         IRandomNumberService randomNumberService,

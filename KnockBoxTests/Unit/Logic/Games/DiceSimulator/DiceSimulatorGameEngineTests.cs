@@ -1,6 +1,6 @@
 using KnockBox.Extensions.Returns;
+using KnockBox.Services.Logic.Games.DiceSimulator;
 using KnockBox.Services.Logic.RandomGeneration;
-using KnockBox.Services.Navigation.Games.DiceSimulator;
 using KnockBox.Services.State.Games.DiceSimulator;
 using KnockBox.Services.State.Games.DiceSimulator.Data;
 using KnockBox.Services.State.Users;

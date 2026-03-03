@@ -2,11 +2,10 @@ using KnockBox.Extensions.Returns;
 using KnockBox.Services.Logic.Games.Engines.Shared;
 using KnockBox.Services.Logic.RandomGeneration;
 using KnockBox.Services.State.Games.CardCounter;
-using KnockBox.Services.State.Games.CardCounter.Data;
 using KnockBox.Services.State.Games.Shared;
 using KnockBox.Services.State.Users;
 
-namespace KnockBox.Services.Navigation.Games.CardCounter
+namespace KnockBox.Services.Logic.Games.CardCounter
 {
     public class CardCounterGameEngine(
         IRandomNumberService randomNumberService,

@@ -1,6 +1,6 @@
 using KnockBox.Components.Shared;
+using KnockBox.Services.Logic.Games.CardCounter;
 using KnockBox.Services.Navigation;
-using KnockBox.Services.Navigation.Games.CardCounter;
 using KnockBox.Services.State.Games.CardCounter;
 using KnockBox.Services.State.Games.CardCounter.Data;
 using KnockBox.Services.State.Games.Shared;

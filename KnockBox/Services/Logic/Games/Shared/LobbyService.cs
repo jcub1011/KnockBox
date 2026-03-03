@@ -1,10 +1,10 @@
 ﻿using KnockBox.Extensions.Returns;
 using KnockBox.Services.Logic.Games.Engines.Shared;
 using KnockBox.Services.Navigation.Games;
-using KnockBox.Services.Navigation.Games.DiceSimulator;
-using KnockBox.Services.Navigation.Games.CardCounter;
 using KnockBox.Services.State.Users;
 using System.Collections.Concurrent;
+using KnockBox.Services.Logic.Games.CardCounter;
+using KnockBox.Services.Logic.Games.DiceSimulator;
 
 namespace KnockBox.Services.Logic.Games.Shared
 {
