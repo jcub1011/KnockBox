@@ -2,6 +2,11 @@
 
 namespace KnockBox.Extensions.Returns
 {
+    /// <summary>
+    /// A result with a value and a custom error type.
+    /// </summary>
+    /// <typeparam name="TValue"></typeparam>
+    /// <typeparam name="TError"></typeparam>
     public readonly record struct ValueResult<TValue, TError>
         where TError : notnull
     {
@@ -63,33 +68,38 @@ namespace KnockBox.Extensions.Returns
             }
         }
 
-        public ValueResult(TValue value)
+        private ValueResult(TValue value)
         {
             IsSuccess = true;
             Value = value;
             Error = default!;
         }
 
-        public ValueResult(TError error)
+        private ValueResult(TError error)
         {
             IsSuccess = false;
             Value = default!;
             Error = error;
         }
 
-        public static ValueResult<TVal, TErr> FromValue<TVal, TErr>(TVal value)
-            where TErr : notnull
+        public static ValueResult<TValue, TError> FromValue(TValue value)
         {
-            return new ValueResult<TVal, TErr>(value);
+            return new ValueResult<TValue, TError>(value);
         }
 
-        public static ValueResult<TVal, TErr> FromError<TVal, TErr>(TErr error)
-            where TErr : notnull
+        public static ValueResult<TValue, TError> FromError(TError error)
         {
-            return new ValueResult<TVal, TErr>(error);
+            return new ValueResult<TValue, TError>(error);
         }
+
+        public static implicit operator ValueResult<TValue, TError>(TValue value) => new(value);
+        public static implicit operator ValueResult<TValue, TError>(TError error) => new(error);
     }
 
+    /// <summary>
+    /// A result with a value and the default <see cref="ResultError"/> error type.
+    /// </summary>
+    /// <typeparam name="TValue"></typeparam>
     public readonly record struct ValueResult<TValue>
     {
         /// <summary>
@@ -150,45 +160,52 @@ namespace KnockBox.Extensions.Returns
             }
         }
 
-        public ValueResult(TValue value)
+        private ValueResult(TValue value)
         {
             IsSuccess = true;
             Value = value;
             Error = default!;
         }
 
-        public ValueResult(ResultError error)
+        private ValueResult(ResultError error)
         {
             IsSuccess = false;
             Value = default!;
             Error = error;
         }
 
-        public static ValueResult<TVal> FromValue<TVal>(TVal value)
+        public static ValueResult<TValue> FromValue(TValue value)
         {
-            return new ValueResult<TVal>(value);
+            return new ValueResult<TValue>(value);
         }
 
-        public static ValueResult<TVal> FromError<TVal>(ResultError error)
+        public static ValueResult<TValue> FromError(ResultError error)
         {
-            return new ValueResult<TVal>(error);
+            return new ValueResult<TValue>(error);
         }
 
-        public static ValueResult<TVal> FromError<TVal>(string errorMessage)
+        public static ValueResult<TValue> FromError(string errorMessage)
         {
-            return new ValueResult<TVal>(new ResultError(errorMessage));
+            return new ValueResult<TValue>(new ResultError(errorMessage));
         }
 
-        public static ValueResult<TVal> FromError<TVal>(string publicMessage, string internalMessage)
+        public static ValueResult<TValue> FromError(string publicMessage, string internalMessage)
         {
-            return new ValueResult<TVal>(new ResultError(publicMessage, internalMessage));
+            return new ValueResult<TValue>(new ResultError(publicMessage, internalMessage));
         }
+
+        public static implicit operator ValueResult<TValue>(TValue value) => new(value);
+        public static implicit operator ValueResult<TValue>(ResultError error) => new(error);
     }
 
+    /// <summary>
+    /// A result with no value type and a custom error type.
+    /// </summary>
+    /// <typeparam name="TError"></typeparam>
     public readonly record struct Result<TError>
         where TError : notnull
     {
-        public static readonly Result<TError> Success = new();
+        public static readonly Result<TError> Success = new(true);
 
         /// <summary>
         /// If this is a success result.
@@ -224,28 +241,36 @@ namespace KnockBox.Extensions.Returns
             }
         }
 
-        public Result()
+        /// <summary>
+        /// Parameterless constructors can't be private in structs, hence this.
+        /// </summary>
+        /// <param name="_">Ignored</param>
+        private Result(bool _)
         {
             IsSuccess = true;
             Error = default!;
         }
 
-        public Result(TError error)
+        private Result(TError error)
         {
             IsSuccess = false;
             Error = error;
         }
 
-        public static Result<TErr> FromError<TErr>(TErr error)
-            where TErr : notnull
+        public static Result<TError> FromError(TError error)
         {
-            return new Result<TErr>(error);
+            return new Result<TError>(error);
         }
+
+        public static implicit operator Result<TError>(TError error) => new(error);
     }
 
+    /// <summary>
+    /// A result with no value and the default <see cref="ResultError"/> error type.
+    /// </summary>
     public readonly record struct Result
     {
-        public static readonly Result Success = new();
+        public static readonly Result Success = new(true);
 
         /// <summary>
         /// If this is a success result.
@@ -281,13 +306,17 @@ namespace KnockBox.Extensions.Returns
             }
         }
 
-        public Result()
+        /// <summary>
+        /// Parameterless constructors can't be private in structs, hence this.
+        /// </summary>
+        /// <param name="_">Ignored</param>
+        private Result(bool _)
         {
             IsSuccess = true;
             Error = default!;
         }
 
-        public Result(ResultError error)
+        private Result(ResultError error)
         {
             IsSuccess = false;
             Error = error;
@@ -307,5 +336,7 @@ namespace KnockBox.Extensions.Returns
         {
             return new Result(new ResultError(publicMessage, internalMessage));
         }
+
+        public static implicit operator Result(ResultError error) => new(error);
     }
 }
