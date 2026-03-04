@@ -79,7 +79,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter
             });
 
             if (executeResult.IsFailure) return executeResult;
-            await gameState.GameStartEventManager.NotifyAsync();
+            gameState.EventManager.Notify(new GameStartArgs());
 
             return Result.Success;
         }
@@ -163,7 +163,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter
         /// <param name="state"></param>
         /// <param name="ct"></param>
         /// <returns></returns>
-        public async Task<Result> DealActionCardsAsync(CardCounterGameState state, CancellationToken ct = default)
+        public Result DealActionCards(CardCounterGameState state, CancellationToken ct = default)
         {
             if (ct.IsCancellationRequested) return Result.Canceled;
 
@@ -188,7 +188,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter
                 }
             });
 
-            await state.ActionCardsDealtEventManager.NotifyAsync();
+            state.EventManager.Notify(new ActionCardsDealtArgs());
             return Result.Success;
         }
 
@@ -198,11 +198,11 @@ namespace KnockBox.Services.Logic.Games.CardCounter
         /// <param name="state"></param>
         /// <param name="ct"></param>
         /// <returns></returns>
-        public async Task<Result> DealNextShoeAsync(CardCounterGameState state, CancellationToken ct = default)
+        public Result DealNextShoe(CardCounterGameState state, CancellationToken ct = default)
         {
             if (ct.IsCancellationRequested) return Result.Canceled;
 
-            var executeResult = await state.ExecuteAsync(async () =>
+            var executeResult = state.Execute(() =>
             {
                 state.CurrentShoe.Clear();
                 if (state.MainDeck.Count == 0)
@@ -235,10 +235,10 @@ namespace KnockBox.Services.Logic.Games.CardCounter
 
                 state.CurrentShoe.PushRange(state.MainDeck.PopRange(shoeSize));
                 RecalculateShoeCounts(state);
-            }, ct);
+            });
 
             if (!executeResult.IsSuccess) return executeResult;
-            await state.ShoeDealEventManager.NotifyAsync();
+            state.EventManager.Notify(new ShoeDealtArgs());
             return Result.Success;
         }
 
@@ -304,7 +304,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter
             }
         }
 
-        public async Task<Result> SkipTurnAsync(CardCounterGameState state, User player)
+        public Result SkipTurn(CardCounterGameState state, User player)
         {
             var executeResult = state.Execute(() =>
             {
@@ -342,12 +342,12 @@ namespace KnockBox.Services.Logic.Games.CardCounter
                 return Result.Canceled;
             }
 
-            await state.TurnChangeEventManager.NotifyAsync();
+            state.EventManager.Notify(new TurnChangeArgs());
 
             return Result.Success;
         }
 
-        public async Task<ValueResult<BaseCard>> DrawCardAsync(CardCounterGameState state, User player)
+        public ValueResult<BaseCard> DrawCard(CardCounterGameState state, User player)
         {
             var executeResult = state.Execute(() =>
             {
@@ -380,11 +380,11 @@ namespace KnockBox.Services.Logic.Games.CardCounter
                 return result;
             }
 
-            await state.CardDrawnEventManager.NotifyAsync(new(result.Value, player));
+            state.EventManager.Notify(new CardDrawnArgs(result.Value, player));
             return result;
         }
 
-        public async Task<Result> EndTurnAsync(CardCounterGameState state, User player)
+        public Result EndTurn(CardCounterGameState state, User player)
         {
             var executeResult = state.Execute(() =>
             {
@@ -398,11 +398,11 @@ namespace KnockBox.Services.Logic.Games.CardCounter
                 return Result.Success;
             });
 
-            await state.TurnChangeEventManager.NotifyAsync();
+            state.EventManager.Notify(new TurnChangeArgs());
             return Result.Success;
         }
 
-        public async Task<Result> ApplyNumberCardAsync(CardCounterGameState state, User target, NumberCard card)
+        public Result ApplyNumberCard(CardCounterGameState state, User target, NumberCard card)
         {
             var executeResult = state.Execute(() =>
             {
@@ -426,11 +426,11 @@ namespace KnockBox.Services.Logic.Games.CardCounter
                 return Result.Canceled;
             }
 
-            await state.NumberCardAppliedEventManager.NotifyAsync(new(card, target));
+            state.EventManager.Notify(new NumberCardAppliedArgs(card, target));
             return Result.Success;
         }
 
-        public async Task<Result> ApplyOperatorCardAsync(CardCounterGameState state, User target, OperatorCard card)
+        public Result ApplyOperatorCard(CardCounterGameState state, User target, OperatorCard card)
         {
             var executeResult = state.Execute(() =>
             {
@@ -466,11 +466,11 @@ namespace KnockBox.Services.Logic.Games.CardCounter
                 return Result.Canceled;
             }
 
-            await state.OperatorCardAppliedEventManager.NotifyAsync(new(card, target));
+            state.EventManager.Notify(new OperatorCardAppliedArgs(card, target));
             return Result.Success;
         }
 
-        public async Task<Result> SetAllPlayerBuyInsAsync(CardCounterGameState state)
+        public Result RequestAllPlayerBuyIns(CardCounterGameState state)
         {
             var executeResult = state.Execute(() =>
             {
@@ -491,11 +491,11 @@ namespace KnockBox.Services.Logic.Games.CardCounter
                 return Result.Canceled;
             }
 
-            await state.BuyInStageCompleteEventManager.NotifyAsync();
+            state.EventManager.Notify(new RequestBuyInArgs());
             return Result.Success;
         }
 
-        public async Task<Result> SetBuyInAsync(CardCounterGameState state, User player, int buyInRoll)
+        public Result SetBuyIn(CardCounterGameState state, User player, int buyInRoll)
         {
             var executeResult = state.Execute(() =>
             {
@@ -523,12 +523,13 @@ namespace KnockBox.Services.Logic.Games.CardCounter
                 return Result.Canceled;
             }
 
+            state.EventManager.Notify(new BuyInSetArgs(player));
             return Result.Success;
         }
 
         public int RollToBalance(int roll) => roll * 8;
 
-        public async Task<Result> PassTurnAsync(CardCounterGameState state, User player)
+        public Result PassTurn(CardCounterGameState state, User player)
         {
             var executeResult = state.Execute(() =>
             {
@@ -557,31 +558,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter
 
             if (!result.IsSuccess) return result;
 
-            await state.TurnChangeEventManager.NotifyAsync();
-            return result;
-        }
-
-        public Result FoldPot(CardCounterGameState state, User player)
-        {
-            var executeResult = state.Execute(() =>
-            {
-                if (state.TurnOrder[state.CurrentPlayerIndex] != player.Id)
-                    return Result.FromError("You can't pass outside of your turn.");
-
-                if (!state.PlayerStates.TryGetValue(player.Id, out var playerState))
-                    return Result.FromError("Unable to set buy in.",
-                        $"Player state is not set for player [{player.Id}].");
-
-                playerState.Pot.Clear();
-                return Result.Success;
-            });
-
-            if (!executeResult.TryGetSuccess(out var result))
-            {
-                if (result.TryGetFailure(out var error)) return error;
-                return Result.Canceled;
-            }
-
+            state.EventManager.Notify(new TurnChangeArgs());
             return result;
         }
 
@@ -625,7 +602,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter
                 return Result.Canceled;
             }
 
-            await state.ActionCardPlayedEventManager.NotifyAsync(new(card, player));
+            state.EventManager.Notify(new ActionCardPlayedArgs(card, player));
             return Result.Success;
         }
 

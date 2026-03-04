@@ -10,54 +10,11 @@ namespace KnockBox.Services.State.Games.CardCounter
         ILogger<CardCounterGameState> logger)
         : AbstractGameState(host, logger)
     {
-        #region Events and Callbacks
-
         /// <summary>
-        /// The event manager for the action cards dealt event.
+        /// The event manager for all events.
         /// </summary>
-        public readonly ThreadSafeEventManager ActionCardsDealtEventManager = new();
-
-        /// <summary>
-        /// The event manager for the action card played event.
-        /// </summary>
-        public readonly ThreadSafeEventManager<ActionCardPlayedArgs> ActionCardPlayedEventManager = new();
-
-        /// <summary>
-        /// The event manager for the draw card event.
-        /// </summary>
-        public readonly ThreadSafeEventManager<CardDrawnArgs> CardDrawnEventManager = new();
-
-        /// <summary>
-        /// The event manager for the number card applied event.
-        /// </summary>
-        public readonly ThreadSafeEventManager<NumberCardAppliedArgs> NumberCardAppliedEventManager = new();
-
-        /// <summary>
-        /// The event manager for the operator card applied event.
-        /// </summary>
-        public readonly ThreadSafeEventManager<OperatorCardAppliedArgs> OperatorCardAppliedEventManager = new();
-
-        /// <summary>
-        /// The event manager for the shoe deal event.
-        /// </summary>
-        public readonly ThreadSafeEventManager ShoeDealEventManager = new();
-
-        /// <summary>
-        /// The event manager for the game start event.
-        /// </summary>
-        public readonly ThreadSafeEventManager GameStartEventManager = new();
-
-        /// <summary>
-        /// The event manager for the turn change event.
-        /// </summary>
-        public readonly ThreadSafeEventManager TurnChangeEventManager = new();
-
-        /// <summary>
-        /// The event manager for the buy in stage complete event.
-        /// </summary>
-        public readonly ThreadSafeEventManager BuyInStageCompleteEventManager = new();
-
-        #endregion
+        public readonly IThreadSafeEventManager<GameEventArgs> EventManager
+            = new ThreadSafeEventManager<GameEventArgs>();
 
         /// <summary>
         /// The current phase of the game.
@@ -177,17 +134,35 @@ namespace KnockBox.Services.State.Games.CardCounter
 
     public record class ActionCard(ActionType Action, string Description) : BaseCard(Description);
 
+    public abstract record GameEventArgs;
+
+    public record class GameStartArgs() : GameEventArgs;
+
+    public record class ActionCardsDealtArgs() : GameEventArgs;
+
+    public record class ShoeDealtArgs() : GameEventArgs;
+
+    public record class TurnChangeArgs() : GameEventArgs;
+
+    public record class RequestBuyInArgs() : GameEventArgs;
+
+    public record class BuyInSetArgs(User User) : GameEventArgs;
+
     /// <param name="Card">The card that was played.</param>
     /// <param name="User">The user that played the action card.</param>
-    public record class ActionCardPlayedArgs(ActionCard Card, User User);
+    public record class ActionCardPlayedArgs(ActionCard Card, User User) : GameEventArgs;
 
     /// <param name="Card">The card that was drawn.</param>
     /// <param name="User">The user that drew the card.</param>
-    public record class CardDrawnArgs(BaseCard Card, User User);
+    public record class CardDrawnArgs(BaseCard Card, User User) : GameEventArgs;
 
-    public record class NumberCardAppliedArgs(NumberCard Card, User User);
+    /// <param name="Card"></param>
+    /// <param name="User">The user to apply the number to.</param>
+    public record class NumberCardAppliedArgs(NumberCard Card, User User) : GameEventArgs;
 
-    public record class OperatorCardAppliedArgs(OperatorCard Card, User User);
+    /// <param name="Card"></param>
+    /// <param name="User">The user to apply the operator to.</param>
+    public record class OperatorCardAppliedArgs(OperatorCard Card, User User) : GameEventArgs;
 
     public class Player(User user)
     {
