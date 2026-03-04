@@ -9,142 +9,605 @@
 
 @if (GameState == null)
 {
-    <div>Loading...</div>
+    <div class="cc-loading">
+        <span class="cc-loading-icon">🃏</span>
+        <span>Loading table...</span>
+    </div>
 }
 else
 {
-    <div class="d-flex align-items-center mb-3">
-        <h3 class="mb-0 me-3">Card Counter Lobby</h3>
-        <button class="btn btn-sm btn-outline-secondary" @onclick="ToggleRoomCode">
-            @(IsRoomCodeVisible ? "Hide Room Code" : "Show Room Code")
-        </button>
-        @if (IsRoomCodeVisible)
-        {
-            <span class="ms-2 user-select-all fw-bold fs-5">@RoomCode</span>
-        }
-    </div>
+    <div class="cc-page">
 
-    @if (GameState.IsJoinable)
-    {
-        <div>
-            <h4>Players</h4>
-            <ul>
-                @foreach (var player in GameState.Players)
+        @* ── Header ── *@
+        <div class="cc-header">
+            <div class="cc-header-left">
+                <span class="cc-game-title">♠ CARD COUNTER ♠</span>
+                <button class="cc-btn cc-btn-ghost cc-btn-sm" @onclick="ToggleRoomCode" title="Toggle room code">
+                    🔑 @(IsRoomCodeVisible ? "Hide Code" : "Show Code")
+                </button>
+                @if (IsRoomCodeVisible)
                 {
-                    <li>@player.Name @(player.Id == GameState.Host.Id ? "(Host)" : "")</li>
+                    <span class="cc-room-code user-select-all" title="Share this code to invite players">@RoomCode</span>
                 }
-            </ul>
-            @if (UserService.CurrentUser?.Id == GameState.Host.Id)
-            {
-                <button class="btn btn-primary" @onclick="StartGame">Start Session</button>
-            }
-        </div>
-    }
-    else
-    {
-        <h4>Game Started</h4>
-        <div class="game-info">
-            <p>Phase: @GameState.GamePhase</p>
-        </div>
-
-        @if (GameState.GamePhase == GamePhase.BuyIn)
-        {
-            var myPlayer = GetMyPlayer();
-            if (myPlayer != null && !myPlayer.HasSetBuyIn)
-            {
-                <p>Buy-in Roll: @(myPlayer.BuyInRoll * 8)</p>
-                <button class="btn btn-success" @onclick="() => SetBuyIn(false)">Positive</button>
-                <button class="btn btn-danger" @onclick="() => SetBuyIn(true)">Negative</button>
-            }
-        }
-        else if (GameState.GamePhase == GamePhase.Playing)
-        {
-            var activeId = GameState.TurnOrder.Count > 0 ? GameState.TurnOrder[GameState.CurrentPlayerIndex] : "";
-            <p>Active Player: @(GameState.GamePlayers.TryGetValue(activeId, out var activePlayer) ? activePlayer.DisplayName : "")</p>
-            <p>Shoe Index: @GameState.ShoeIndex</p>
-            <p>Cards in Shoe: Number(@GameState.ShoeCardCounts.GetValueOrDefault(CardType.Number)), Operator(@GameState.ShoeCardCounts.GetValueOrDefault(CardType.Operator))</p>
-            <div class="row">
-                @foreach (var p in GameState.GamePlayers.Values)
+            </div>
+            <div class="cc-header-right">
+                @if (!GameState.IsJoinable)
                 {
-                    <div class="col-md-4">
-                        <div class="card p-3 mb-3">
-                            <h5>@p.DisplayName</h5>
-                            <p>Balance: @p.Balance</p>
-                            <p>Pot: @string.Join("", p.Pot) (@p.PotValue)</p>
-                            <p>Passes: @p.PassesRemaining</p>
-                            @if (p.PlayerId == UserService.CurrentUser?.Id)
+                    <span class="cc-phase-badge cc-phase-@GameState.GamePhase.ToString().ToLower()">
+                        @GetPhaseLabel()
+                    </span>
+                    @if (GameState.GamePhase == GamePhase.Playing && GameState.TurnOrder.Count > 0)
+                    {
+                        var activeId = GameState.TurnOrder[GameState.CurrentPlayerIndex];
+                        if (GameState.GamePlayers.TryGetValue(activeId, out var activePl))
+                        {
+                            <span class="cc-turn-indicator">
+                                🎴 @activePl.DisplayName's turn
+                            </span>
+                        }
+                    }
+                }
+            </div>
+        </div>
+
+        @* ── Last Action Notification ── *@
+        @if (GameState.LastPlayedAction is { } lastAction)
+        {
+            <div class="cc-action-notification">
+                <span class="cc-notif-icon">@GetActionCardIcon(lastAction.Action)</span>
+                <div class="cc-notif-text">
+                    <strong>@lastAction.PlayerName</strong>
+                    played
+                    <strong>@GetActionCardName(lastAction.Action)</strong>
+                    @if (lastAction.TargetName != null)
+                    {
+                        <span> on <strong>@lastAction.TargetName</strong></span>
+                    }
+                </div>
+            </div>
+        }
+
+        @* ── Lobby Phase ── *@
+        @if (GameState.IsJoinable)
+        {
+            <div class="cc-lobby">
+                <div class="cc-lobby-table">
+                    <div class="cc-lobby-felt">
+                        <h2 class="cc-lobby-title">♠ WAITING FOR PLAYERS ♥</h2>
+                        <div class="cc-lobby-players">
+                            @foreach (var player in Enumerable.Repeat(GameState.Host, 1).Concat(GameState.Players))
                             {
-                                <p>Action Cards: @p.ActionHand.Count</p>
-                                @if (p.ActionHand.Any())
-                                {
-                                    <div class="mb-2">
-                                        @for (int i = 0; i < p.ActionHand.Count; i++)
-                                        {
-                                            var index = i;
-                                            var card = p.ActionHand[i];
-                                            <button class="btn btn-sm btn-info me-1 mb-1" 
-                                                    disabled="@(activeId != p.PlayerId || p.PrivateReveal != null)" 
-                                                    @onclick="() => PlayActionCard(index)">
-                                                @card.Action
-                                            </button>
-                                        }
-                                    </div>
-                                }
-
-                                @if (p.PrivateReveal != null)
-                                {
-                                    <div class="alert alert-warning">
-                                        <h6>Reorder Top Cards</h6>
-                                        <p>Click cards in the order you want them placed back on top of the shoe (first clicked will be top card).</p>
-                                        <div class="d-flex mb-2 flex-wrap">
-                                        @for (int i = 0; i < p.PrivateReveal.Count; i++)
-                                        {
-                                            var index = i;
-                                            var revealCard = p.PrivateReveal[i];
-                                            bool isSelected = SelectedReorderIndices.Contains(index);
-                                            <button class="btn @(isSelected ? "btn-secondary" : "btn-outline-primary") me-1 mb-1" 
-                                                    @onclick="() => ToggleReorderIndex(index)"
-                                                    disabled="@isSelected">
-                                                @(revealCard is NumberCard nc ? $"Number: {nc.Value}" : revealCard is OperatorCard oc ? $"Operator: {oc.Op}" : "Card")
-                                                @(isSelected ? $" ({SelectedReorderIndices.IndexOf(index) + 1})" : "")
-                                            </button>
-                                        }
-                                        </div>
-                                        <button class="btn btn-success" 
-                                                disabled="@(SelectedReorderIndices.Count != p.PrivateReveal.Count)" 
-                                                @onclick="SubmitReorder">
-                                            Confirm Order
-                                        </button>
-                                        <button class="btn btn-danger ms-2" @onclick="ResetReorder">Reset</button>
-                                    </div>
-                                }
-
-                                @if (activeId == p.PlayerId && p.PrivateReveal == null)
-                                {
-                                    <button class="btn btn-primary" @onclick="DrawCard">Draw</button>
-                                    @if (p.PassesRemaining > 0)
+                                bool isHost = player.Id == GameState.Host.Id;
+                                bool isMe = player.Id == UserService.CurrentUser?.Id;
+                                <div class="cc-lobby-player @(isMe ? "cc-lobby-player-me" : "")">
+                                    <span class="cc-player-avatar">@(isHost ? "👑" : "🃏")</span>
+                                    <span class="cc-player-lobbyname">@player.Name</span>
+                                    @if (isHost)
                                     {
-                                        <button class="btn btn-warning" @onclick="PassTurn">Pass</button>
-                                        <button class="btn btn-secondary" @onclick="FoldPot">Fold</button>
+                                        <span class="cc-host-badge">HOST</span>
                                     }
-                                }
+                                </div>
                             }
                         </div>
+                        @if (UserService.CurrentUser?.Id == GameState.Host.Id)
+                        {
+                            <button class="cc-btn cc-btn-primary cc-btn-lg" @onclick="StartGame">
+                                🃏 DEAL CARDS
+                            </button>
+                        }
+                        else
+                        {
+                            <p class="cc-waiting-text">Waiting for host to start...</p>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+
+        @* ── Buy-In Phase ── *@
+        else if (GameState.GamePhase == GamePhase.BuyIn)
+        {
+            var myPlayer = GetMyPlayer();
+            <div class="cc-buyin-area">
+                <div class="cc-buyin-panel">
+                    <h3 class="cc-panel-title">♦ CHOOSE YOUR SIDE ♦</h3>
+                    <p class="cc-buyin-subtitle">Will you play it safe or go all in?</p>
+
+                    <div class="cc-buyin-players">
+                        @foreach (var p in GameState.GamePlayers.Values)
+                        {
+                            <div class="cc-buyin-player-row">
+                                <span class="cc-buyin-player-name">@p.DisplayName</span>
+                                @if (p.HasSetBuyIn)
+                                {
+                                    <span class="cc-buyin-status cc-buyin-done">✅ Ready</span>
+                                }
+                                else
+                                {
+                                    <span class="cc-buyin-status cc-buyin-pending">⏳ Choosing...</span>
+                                }
+                            </div>
+                        }
+                    </div>
+
+                    @if (myPlayer != null && !myPlayer.HasSetBuyIn)
+                    {
+                        <div class="cc-buyin-roll">
+                            <span class="cc-buyin-roll-label">🎲 Your roll</span>
+                            <span class="cc-buyin-roll-value">×8 = @(myPlayer.BuyInRoll * 8)</span>
+                        </div>
+                        <p class="cc-buyin-choice-label">Choose your starting balance:</p>
+                        <div class="cc-buyin-buttons">
+                            <button class="cc-btn cc-btn-positive cc-btn-lg" @onclick="() => SetBuyIn(false)">
+                                ➕ +@(myPlayer.BuyInRoll * 8)
+                            </button>
+                            <button class="cc-btn cc-btn-negative cc-btn-lg" @onclick="() => SetBuyIn(true)">
+                                ➖ -@(myPlayer.BuyInRoll * 8)
+                            </button>
+                        </div>
+                    }
+                    else if (myPlayer != null && myPlayer.HasSetBuyIn)
+                    {
+                        <div class="cc-buyin-waiting">
+                            <span>Your starting balance: </span>
+                            <span class="cc-balance @(myPlayer.Balance >= 0 ? "cc-positive" : "cc-negative")">@FormatBalance(myPlayer.Balance)</span>
+                            <br />
+                            <span class="cc-waiting-text">Waiting for other players...</span>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+
+        @* ── Playing Phase ── *@
+        else if (GameState.GamePhase == GamePhase.Playing)
+        {
+            var myPlayer = GetMyPlayer();
+            var myId = UserService.CurrentUser?.Id ?? "";
+            var activeId = GameState.TurnOrder.Count > 0 ? GameState.TurnOrder[GameState.CurrentPlayerIndex] : "";
+            var opponents = GameState.GamePlayers.Values.Where(p => p.PlayerId != myId).ToList();
+
+            @* ── Discard Overlay ── *@
+            @if (myPlayer != null && IsOverHandLimit())
+            {
+                <div class="cc-discard-overlay">
+                    <div class="cc-discard-panel">
+                        <h3 class="cc-discard-title">⚠️ TOO MANY CARDS</h3>
+                        <p class="cc-discard-subtitle">
+                            You have <strong>@myPlayer.ActionHand.Count</strong> cards
+                            (limit: <strong>@GameState.Config.ActionHandLimit</strong>).
+                            Select <strong>@DiscardNeeded()</strong> card(s) to discard.
+                        </p>
+                        <div class="cc-discard-hand">
+                            @for (int i = 0; i < myPlayer.ActionHand.Count; i++)
+                            {
+                                var idx = i;
+                                var card = myPlayer.ActionHand[i];
+                                bool isSelectedDiscard = _selectedDiscardIndices.Contains(idx);
+                                <div class="cc-action-card @GetActionCardColor(card.Action) @(isSelectedDiscard ? "cc-card-discard-selected" : "")"
+                                     title="@GetActionCardDescription(card.Action)"
+                                     @onclick="() => ToggleDiscardSelection(idx)">
+                                    <div class="cc-card-corner cc-card-corner-tl">
+                                        <span class="cc-card-suit">@GetActionCardIcon(card.Action)</span>
+                                    </div>
+                                    <div class="cc-card-center-icon">@GetActionCardIcon(card.Action)</div>
+                                    <div class="cc-card-name-label">@GetActionCardName(card.Action)</div>
+                                    <div class="cc-card-corner cc-card-corner-br">
+                                        <span class="cc-card-suit cc-card-suit-flipped">@GetActionCardIcon(card.Action)</span>
+                                    </div>
+                                    @if (isSelectedDiscard)
+                                    {
+                                        <div class="cc-card-discard-mark">✕</div>
+                                    }
+                                </div>
+                            }
+                        </div>
+                        <button class="cc-btn cc-btn-danger cc-btn-lg"
+                                disabled="@(!CanConfirmDiscard())"
+                                @onclick="ConfirmDiscard">
+                            🗑️ DISCARD SELECTED (@_selectedDiscardIndices.Count / @DiscardNeeded() needed)
+                        </button>
+                    </div>
+                </div>
+            }
+
+            @* ── Reaction Prompt (Feeling Lucky target) ── *@
+            @if (myPlayer != null && GameState.FeelingLuckyTargetId == myId)
+            {
+                <div class="cc-reaction-banner cc-banner-lucky">
+                    <span class="cc-banner-icon">🎲</span>
+                    <div class="cc-banner-text">
+                        <strong>Feeling Lucky!</strong> You must draw a card — or play <strong>Comp'd</strong> to block it, or chain your own <strong>Feeling Lucky</strong>.
+                    </div>
+                    <button class="cc-btn cc-btn-warning" @onclick="DrawCard">Draw Now</button>
+                </div>
+            }
+
+            @* ── Reaction Prompt (Blockable action target) ── *@
+            @if (myPlayer != null && GameState.PendingReaction is { } reaction && reaction.TargetId == myId)
+            {
+                <div class="cc-reaction-banner cc-banner-block">
+                    <span class="cc-banner-icon">⚔️</span>
+                    <div class="cc-banner-text">
+                        <strong>@reaction.SourceName</strong> played
+                        <strong>@GetActionCardName(reaction.PlayedCard.Action)</strong> on you!
+                        Play <strong>Comp'd</strong> to block it, or accept the effect.
+                    </div>
+                    <button class="cc-btn cc-btn-secondary" @onclick="AcceptPending">Accept</button>
+                </div>
+            }
+
+            @* ── Poker Table Area ── *@
+            <div class="cc-table-area">
+
+                @* ── Opponents (top of table) ── *@
+                <div class="cc-opponents-row">
+                    @foreach (var opp in opponents)
+                    {
+                        bool isActive = opp.PlayerId == activeId;
+                        bool isFeelingLuckyTarget = GameState.FeelingLuckyTargetId == opp.PlayerId;
+                        bool isReactionTarget = GameState.PendingReaction?.TargetId == opp.PlayerId;
+                        <div class="cc-opponent-card @(isActive ? "cc-opponent-active" : "") @(isFeelingLuckyTarget || isReactionTarget ? "cc-opponent-targeted" : "")"
+                             @onclick="() => SelectTarget(opp.PlayerId)"
+                             title="@opp.DisplayName">
+                            <div class="cc-opp-header">
+                                @if (isActive)
+                                {
+                                    <span class="cc-active-marker" title="Active player">🎴</span>
+                                }
+                                @if (isFeelingLuckyTarget)
+                                {
+                                    <span class="cc-targeted-marker" title="Feeling Lucky target">🎲</span>
+                                }
+                                @if (isReactionTarget)
+                                {
+                                    <span class="cc-targeted-marker" title="Awaiting reaction">⚔️</span>
+                                }
+                                <span class="cc-opp-name">@opp.DisplayName</span>
+                                @if (_selectedTargetId == opp.PlayerId)
+                                {
+                                    <span class="cc-target-selected-mark">🎯</span>
+                                }
+                            </div>
+                            <div class="cc-opp-stats">
+                                <div class="cc-opp-stat" title="Balance">
+                                    <span class="cc-stat-icon">💰</span>
+                                    <span class="cc-stat-val @(opp.Balance >= 0 ? "cc-positive" : "cc-negative")">@FormatBalance(opp.Balance)</span>
+                                </div>
+                                <div class="cc-opp-stat" title="Pot">
+                                    <span class="cc-stat-icon">🎰</span>
+                                    <span class="cc-stat-val">
+                                        @if (opp.Pot.Count > 0)
+                                        {
+                                            @string.Join("", opp.Pot)
+                                            <span class="cc-pot-value"> (@opp.PotValue)</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="cc-empty-pot">—</span>
+                                        }
+                                    </span>
+                                </div>
+                                <div class="cc-opp-stat" title="Passes remaining">
+                                    <span class="cc-stat-icon">🎫</span>
+                                    <span class="cc-stat-val">@opp.PassesRemaining</span>
+                                </div>
+                            </div>
+                            <div class="cc-opp-cards" title="@opp.ActionHand.Count action card(s)">
+                                @for (int i = 0; i < Math.Min(opp.ActionHand.Count, 8); i++)
+                                {
+                                    <span class="cc-mini-card">🂠</span>
+                                }
+                                @if (opp.ActionHand.Count > 8)
+                                {
+                                    <span class="cc-mini-card-more">+@(opp.ActionHand.Count - 8)</span>
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+
+                @* ── Table Felt ── *@
+                <div class="cc-table-felt">
+                    @* ── Main Deck ── *@
+                    <div class="cc-deck-pile cc-main-deck-pile" title="Main Deck — @GameState.MainDeck.Count cards remaining">
+                        <div class="cc-pile-stack">
+                            <span class="cc-pile-card">🂠</span>
+                            <span class="cc-pile-card cc-pile-card-2">🂠</span>
+                            <span class="cc-pile-card cc-pile-card-3">🂠</span>
+                        </div>
+                        <div class="cc-pile-label">DECK</div>
+                        <div class="cc-pile-count">@GameState.MainDeck.Count</div>
+                    </div>
+
+                    @* ── Center Info (Shoe stats) ── *@
+                    <div class="cc-shoe-stats">
+                        <div class="cc-shoe-stat-row">
+                            <div class="cc-shoe-stat" title="Number cards in shoe">
+                                <span class="cc-stat-icon">🔢</span>
+                                <span class="cc-stat-label">Numbers</span>
+                                <span class="cc-stat-num">@GameState.ShoeCardCounts.GetValueOrDefault(CardType.Number)</span>
+                            </div>
+                            <div class="cc-shoe-stat" title="Operator cards in shoe">
+                                <span class="cc-stat-icon">➕</span>
+                                <span class="cc-stat-label">Operators</span>
+                                <span class="cc-stat-num">@GameState.ShoeCardCounts.GetValueOrDefault(CardType.Operator)</span>
+                            </div>
+                        </div>
+                        <div class="cc-shoe-badge">SHOE #@GameState.ShoeIndex</div>
+                    </div>
+
+                    @* ── Current Shoe ── *@
+                    <div class="cc-deck-pile cc-shoe-pile" title="Current Shoe — @GameState.CurrentShoe.Count cards remaining">
+                        @if (GameState.CurrentShoe.Count > 0)
+                        {
+                            <div class="cc-pile-stack">
+                                <span class="cc-pile-card">🂠</span>
+                                @if (GameState.CurrentShoe.Count > 1)
+                                {
+                                    <span class="cc-pile-card cc-pile-card-2">🂠</span>
+                                }
+                                @if (GameState.CurrentShoe.Count > 2)
+                                {
+                                    <span class="cc-pile-card cc-pile-card-3">🂠</span>
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="cc-pile-empty">
+                                <span class="cc-pile-empty-icon">📭</span>
+                            </div>
+                        }
+                        <div class="cc-pile-label">SHOE</div>
+                        <div class="cc-pile-count">@GameState.CurrentShoe.Count</div>
+                    </div>
+                </div>
+
+                @* ── My Player Panel ── *@
+                @if (myPlayer != null)
+                {
+                    <div class="cc-my-panel @(activeId == myId ? "cc-my-panel-active" : "")">
+                        <div class="cc-my-panel-stats">
+                            <div class="cc-my-stat" title="Your balance">
+                                <span class="cc-stat-icon">💰</span>
+                                <span class="cc-stat-label">Balance</span>
+                                <span class="cc-stat-val @(myPlayer.Balance >= 0 ? "cc-positive" : "cc-negative")">
+                                    @FormatBalance(myPlayer.Balance)
+                                </span>
+                            </div>
+                            <div class="cc-my-stat" title="Your pot">
+                                <span class="cc-stat-icon">🎰</span>
+                                <span class="cc-stat-label">Pot</span>
+                                <span class="cc-stat-val">
+                                    @if (myPlayer.Pot.Count > 0)
+                                    {
+                                        @string.Join("", myPlayer.Pot)
+                                        <span class="cc-pot-value"> (@myPlayer.PotValue)</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="cc-empty-pot">empty</span>
+                                    }
+                                </span>
+                            </div>
+                            <div class="cc-my-stat" title="Passes remaining">
+                                <span class="cc-stat-icon">🎫</span>
+                                <span class="cc-stat-label">Passes</span>
+                                <span class="cc-stat-val">@myPlayer.PassesRemaining</span>
+                            </div>
+                        </div>
+
+                        @* ── Action Buttons ── *@
+                        @if (activeId == myId && myPlayer.PrivateReveal == null && !IsOverHandLimit())
+                        {
+                            <div class="cc-action-buttons">
+                                <button class="cc-btn cc-btn-draw" @onclick="DrawCard" title="Draw the top card from the shoe">
+                                    🃏 Draw
+                                </button>
+                                @if (myPlayer.PassesRemaining > 0)
+                                {
+                                    <button class="cc-btn cc-btn-pass" @onclick="PassTurn"
+                                            title="Skip your draw (costs 1 pass, @myPlayer.PassesRemaining remaining)">
+                                        ⏭️ Pass (@myPlayer.PassesRemaining)
+                                    </button>
+                                    <button class="cc-btn cc-btn-fold" @onclick="FoldPot"
+                                            title="Clear your pot and continue (costs 1 pass)">
+                                        🗑️ Fold Pot
+                                    </button>
+                                }
+                            </div>
+                        }
+                        else if (activeId != myId && myPlayer.PrivateReveal == null && !IsOverHandLimit())
+                        {
+                            var activeName = GameState.GamePlayers.TryGetValue(activeId, out var ap) ? ap.DisplayName : "...";
+                            <div class="cc-waiting-turn">
+                                <span>⌛ Waiting for <strong>@activeName</strong></span>
+                            </div>
+                        }
+
+                        @* ── Make My Luck Reorder ── *@
+                        @if (myPlayer.PrivateReveal != null)
+                        {
+                            <div class="cc-reorder-panel">
+                                <h4 class="cc-reorder-title">⭐ MAKE MY LUCK — Reorder the Top Cards</h4>
+                                <p class="cc-reorder-subtitle">Click cards in the order you want them placed on top (first clicked = top card).</p>
+                                <div class="cc-reorder-cards">
+                                    @for (int i = 0; i < myPlayer.PrivateReveal.Count; i++)
+                                    {
+                                        var idx = i;
+                                        var revealCard = myPlayer.PrivateReveal[i];
+                                        bool isSelected = SelectedReorderIndices.Contains(idx);
+                                        int selPos = SelectedReorderIndices.IndexOf(idx);
+                                        string cardLabel = revealCard switch
+                                        {
+                                            NumberCard nc => $"# {nc.Value}",
+                                            OperatorCard oc => GetOperatorSymbol(oc.Op),
+                                            _ => "?"
+                                        };
+                                        <div class="cc-reveal-card @(isSelected ? "cc-reveal-selected" : "")"
+                                             @onclick="() => ToggleReorderIndex(idx)"
+                                             disabled="@isSelected">
+                                            @if (isSelected)
+                                            {
+                                                <span class="cc-reveal-pos">@(selPos + 1)</span>
+                                            }
+                                            <span class="cc-reveal-label">@cardLabel</span>
+                                        </div>
+                                    }
+                                </div>
+                                <div class="cc-reorder-buttons">
+                                    <button class="cc-btn cc-btn-primary"
+                                            disabled="@(SelectedReorderIndices.Count != myPlayer.PrivateReveal.Count)"
+                                            @onclick="SubmitReorder">
+                                        ✅ Confirm Order
+                                    </button>
+                                    <button class="cc-btn cc-btn-ghost" @onclick="ResetReorder">↩️ Reset</button>
+                                </div>
+                            </div>
+                        }
                     </div>
                 }
             </div>
+
+            @* ── Target Select UI ── *@
+            @if (_pendingActionCardIndex.HasValue)
+            {
+                var me = GetMyPlayer();
+                var card = me?.ActionHand.ElementAtOrDefault(_pendingActionCardIndex.Value);
+                <div class="cc-target-select">
+                    <div class="cc-target-select-header">
+                        <span class="cc-target-icon">@(card != null ? GetActionCardIcon(card.Action) : "🃏")</span>
+                        <span>Select a target for <strong>@(card != null ? GetActionCardName(card.Action) : "card")</strong></span>
+                        <button class="cc-btn cc-btn-ghost cc-btn-sm" @onclick="CancelTargetSelect">✕</button>
+                    </div>
+                    <p class="cc-target-hint">Click a player above to select them as your target, then confirm.</p>
+                    <div class="cc-target-confirm">
+                        @if (_selectedTargetId != null && GameState.GamePlayers.TryGetValue(_selectedTargetId, out var targetPl))
+                        {
+                            <span class="cc-target-name">🎯 @targetPl.DisplayName</span>
+                        }
+                        <button class="cc-btn cc-btn-primary"
+                                disabled="@(_selectedTargetId == null)"
+                                @onclick="ConfirmPlayWithTarget">
+                            ▶ Play Card
+                        </button>
+                        <button class="cc-btn cc-btn-ghost" @onclick="CancelTargetSelect">Cancel</button>
+                    </div>
+                </div>
+            }
+
+            @* ── My Hand ── *@
+            @if (myPlayer != null)
+            {
+                <div class="cc-hand-area">
+                    <div class="cc-hand-header">
+                        <span class="cc-hand-title">🃏 Your Hand</span>
+                        <span class="cc-hand-count @(IsOverHandLimit() ? "cc-over-limit" : "")">
+                            @myPlayer.ActionHand.Count / @GameState.Config.ActionHandLimit
+                            @if (IsOverHandLimit())
+                            {
+                                <span class="cc-over-limit-badge">⚠️ OVER LIMIT</span>
+                            }
+                        </span>
+                    </div>
+                    @if (myPlayer.ActionHand.Count == 0)
+                    {
+                        <div class="cc-hand-empty">No action cards. More will be dealt next round.</div>
+                    }
+                    else
+                    {
+                        @* Group by type, sort by name *@
+                        var groupedCards = myPlayer.ActionHand
+                            .Select((card, idx) => (card, idx))
+                            .GroupBy(x => x.card.Action)
+                            .OrderBy(g => GetActionCardName(g.Key))
+                            .ToList();
+
+                        <div class="cc-hand-cards">
+                            @foreach (var group in groupedCards)
+                            {
+                                foreach (var (card, cardIdx) in group)
+                                {
+                                    var idx = cardIdx;
+                                    bool isPending = _pendingActionCardIndex == idx;
+                                    bool isDiscardSelected = _selectedDiscardIndices.Contains(idx);
+                                    bool canPlay = activeId == myId
+                                        && myPlayer.PrivateReveal == null
+                                        && !IsOverHandLimit()
+                                        && (GameState.PendingReaction == null || GameState.PendingReaction.TargetId == myId)
+                                        && (GameState.FeelingLuckyTargetId == null || GameState.FeelingLuckyTargetId == myId);
+
+                                    <div class="cc-action-card @GetActionCardColor(card.Action)
+                                                @(isPending ? "cc-card-pending" : "")
+                                                @(isDiscardSelected ? "cc-card-discard-selected" : "")
+                                                @(!canPlay && !IsOverHandLimit() ? "cc-card-disabled" : "")"
+                                         title="@GetActionCardDescription(card.Action)"
+                                         @onclick="() => OnActionCardClick(idx)">
+                                        <div class="cc-card-corner cc-card-corner-tl">
+                                            <span class="cc-card-suit">@GetActionCardIcon(card.Action)</span>
+                                        </div>
+                                        <div class="cc-card-center-icon">@GetActionCardIcon(card.Action)</div>
+                                        <div class="cc-card-name-label">@GetActionCardName(card.Action)</div>
+                                        <div class="cc-card-corner cc-card-corner-br">
+                                            <span class="cc-card-suit cc-card-suit-flipped">@GetActionCardIcon(card.Action)</span>
+                                        </div>
+                                        @if (RequiresTarget(card.Action))
+                                        {
+                                            <div class="cc-card-requires-target" title="Requires a target player">🎯</div>
+                                        }
+                                    </div>
+                                }
+                            }
+                        </div>
+                    }
+                </div>
+            }
         }
+
+        @* ── Game Over Phase ── *@
         else if (GameState.GamePhase == GamePhase.GameOver)
         {
-            <h3>Game Over!</h3>
-            @foreach (var p in GameState.GamePlayers.Values.OrderBy(x => Math.Abs(x.Balance)))
-            {
-                <p>@p.DisplayName : @p.Balance</p>
-            }
-            @if (UserService.CurrentUser?.Id == GameState.Host.Id)
-            {
-                <p>No restart logic yet...</p>
-            }
+            <div class="cc-gameover-area">
+                <div class="cc-gameover-panel">
+                    <h2 class="cc-gameover-title">♠ GAME OVER ♠</h2>
+                    <p class="cc-gameover-subtitle">Closest to zero wins!</p>
+                    <div class="cc-leaderboard">
+                        @{
+                            var ranked = GameState.GamePlayers.Values
+                                .OrderBy(p => Math.Abs(p.Balance))
+                                .ToList();
+                        }
+                        @for (int i = 0; i < ranked.Count; i++)
+                        {
+                            var p = ranked[i];
+                            string medal = i switch { 0 => "🥇", 1 => "🥈", 2 => "🥉", _ => $"#{i + 1}" };
+                            bool isMe = p.PlayerId == UserService.CurrentUser?.Id;
+                            <div class="cc-leaderboard-row @(isMe ? "cc-leaderboard-me" : "") @(i == 0 ? "cc-leaderboard-winner" : "")">
+                                <span class="cc-rank">@medal</span>
+                                <span class="cc-player-result-name">@p.DisplayName</span>
+                                <span class="cc-player-result-balance @(p.Balance >= 0 ? "cc-positive" : "cc-negative")">
+                                    @FormatBalance(p.Balance)
+                                </span>
+                                <span class="cc-player-result-abs">
+                                    (Δ @Math.Abs(p.Balance) from 0)
+                                </span>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
         }
-    }
+
+    </div>
+}
+
+@code {
+    private string GetPhaseLabel() => GameState?.GamePhase switch
+    {
+        GamePhase.BuyIn => "🎲 Buy In",
+        GamePhase.Playing => "🃏 Playing",
+        GamePhase.GameOver => "🏆 Game Over",
+        _ => "…"
+    };
 }

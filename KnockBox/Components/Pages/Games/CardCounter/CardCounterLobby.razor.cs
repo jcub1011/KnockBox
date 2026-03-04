@@ -43,7 +43,11 @@ namespace KnockBox.Components.Pages.Games.CardCounter
             GameState = gameState;
             RoomCode = session.LobbyRegistration.Code;
 
-            _stateSubscription = GameState.StateChangedEventManager.Subscribe(async () => await InvokeAsync(StateHasChanged));
+            _stateSubscription = GameState.StateChangedEventManager.Subscribe(async () =>
+            {
+                ClearTransientUiState();
+                await InvokeAsync(StateHasChanged);
+            });
 
             await base.OnInitializedAsync();
         }
@@ -59,31 +63,71 @@ namespace KnockBox.Components.Pages.Games.CardCounter
         protected string RoomCode { get; set; } = string.Empty;
         protected bool IsRoomCodeVisible { get; set; } = false;
 
+        // ── Target selection state ────────────────────────────────────────────
+        private int? _pendingActionCardIndex;
+        private string? _selectedTargetId;
+
+        // ── Reorder state ─────────────────────────────────────────────────────
+        protected List<int> SelectedReorderIndices = new();
+
+        // ── Discard state ─────────────────────────────────────────────────────
+        private HashSet<int> _selectedDiscardIndices = new();
+
+        // ── Helpers ───────────────────────────────────────────────────────────
+
         protected void ToggleRoomCode() => IsRoomCodeVisible = !IsRoomCodeVisible;
 
-        protected void ReturnToHome()
-        {
-            NavigationService.ToHome();
-        }
-
-        protected async Task StartGame()
-        {
-            if (GameState == null || UserService.CurrentUser == null) return;
-            var result = await GameEngine.StartAsync(UserService.CurrentUser, GameState);
-            if (result.IsCanceled)
-            {
-                // Ignore cancellation
-            }
-            if (result.TryGetFailure(out var error))
-            {
-                Logger.LogError("Failed to start game: {Error}", error);
-            }
-        }
+        protected void ReturnToHome() => NavigationService.ToHome();
 
         protected PlayerState? GetMyPlayer()
         {
             if (GameState == null || UserService.CurrentUser == null) return null;
             return GameState.GamePlayers.TryGetValue(UserService.CurrentUser.Id, out var state) ? state : null;
+        }
+
+        protected bool IsActivePlayer()
+        {
+            if (GameState == null || UserService.CurrentUser == null) return false;
+            return GameState.TurnOrder.Count > 0 &&
+                   GameState.TurnOrder[GameState.CurrentPlayerIndex] == UserService.CurrentUser.Id;
+        }
+
+        protected bool IsOverHandLimit()
+        {
+            var me = GetMyPlayer();
+            return me != null && GameState != null && me.ActionHand.Count > GameState.Config.ActionHandLimit;
+        }
+
+        protected int DiscardNeeded()
+        {
+            var me = GetMyPlayer();
+            if (me == null || GameState == null) return 0;
+            return Math.Max(0, me.ActionHand.Count - GameState.Config.ActionHandLimit);
+        }
+
+        protected bool CanConfirmDiscard()
+        {
+            var me = GetMyPlayer();
+            if (me == null || GameState == null) return false;
+            int afterDiscard = me.ActionHand.Count - _selectedDiscardIndices.Count;
+            return afterDiscard <= GameState.Config.ActionHandLimit && _selectedDiscardIndices.Count > 0;
+        }
+
+        private void ClearTransientUiState()
+        {
+            _pendingActionCardIndex = null;
+            _selectedTargetId = null;
+            _selectedDiscardIndices.Clear();
+        }
+
+        // ── Actions ───────────────────────────────────────────────────────────
+
+        protected async Task StartGame()
+        {
+            if (GameState == null || UserService.CurrentUser == null) return;
+            var result = await GameEngine.StartAsync(UserService.CurrentUser, GameState);
+            if (result.TryGetFailure(out var error))
+                Logger.LogError("Failed to start game: {Error}", error);
         }
 
         protected void SetBuyIn(bool isNegative)
@@ -98,26 +142,80 @@ namespace KnockBox.Components.Pages.Games.CardCounter
             GameEngine.DrawCard(UserService.CurrentUser, GameState);
         }
 
-        protected void PlayActionCard(int cardIndex)
-        {
-            if (GameState == null || UserService.CurrentUser == null) return;
-            GameEngine.PlayActionCard(UserService.CurrentUser, GameState, cardIndex);
-        }
-
         protected void PassTurn()
         {
             if (GameState == null || UserService.CurrentUser == null) return;
             GameEngine.PassTurn(UserService.CurrentUser, GameState);
         }
 
-        protected List<int> SelectedReorderIndices = new();
+        protected void FoldPot()
+        {
+            if (GameState == null || UserService.CurrentUser == null) return;
+            GameEngine.FoldPot(UserService.CurrentUser, GameState);
+        }
+
+        protected void AcceptPending()
+        {
+            if (GameState == null || UserService.CurrentUser == null) return;
+            GameEngine.AcceptPending(UserService.CurrentUser, GameState);
+        }
+
+        protected void OnActionCardClick(int cardIndex)
+        {
+            if (GameState == null || UserService.CurrentUser == null) return;
+            var me = GetMyPlayer();
+            if (me == null || cardIndex < 0 || cardIndex >= me.ActionHand.Count) return;
+
+            var card = me.ActionHand[cardIndex];
+            if (RequiresTarget(card.Action))
+            {
+                _pendingActionCardIndex = cardIndex;
+                _selectedTargetId = null;
+            }
+            else
+            {
+                GameEngine.PlayActionCard(UserService.CurrentUser, GameState, cardIndex);
+            }
+        }
+
+        protected void SelectTarget(string playerId)
+        {
+            _selectedTargetId = playerId;
+        }
+
+        protected void ConfirmPlayWithTarget()
+        {
+            if (GameState == null || UserService.CurrentUser == null) return;
+            if (_pendingActionCardIndex == null || _selectedTargetId == null) return;
+            GameEngine.PlayActionCard(UserService.CurrentUser, GameState, _pendingActionCardIndex.Value, _selectedTargetId);
+            _pendingActionCardIndex = null;
+            _selectedTargetId = null;
+        }
+
+        protected void CancelTargetSelect()
+        {
+            _pendingActionCardIndex = null;
+            _selectedTargetId = null;
+        }
+
+        protected void ToggleDiscardSelection(int index)
+        {
+            if (!_selectedDiscardIndices.Remove(index))
+                _selectedDiscardIndices.Add(index);
+        }
+
+        protected void ConfirmDiscard()
+        {
+            if (GameState == null || UserService.CurrentUser == null) return;
+            if (!CanConfirmDiscard()) return;
+            GameEngine.DiscardActionCards(UserService.CurrentUser, GameState, _selectedDiscardIndices.ToArray());
+            _selectedDiscardIndices.Clear();
+        }
 
         protected void ToggleReorderIndex(int index)
         {
             if (!SelectedReorderIndices.Contains(index))
-            {
                 SelectedReorderIndices.Add(index);
-            }
         }
 
         protected void ResetReorder()
@@ -130,7 +228,6 @@ namespace KnockBox.Components.Pages.Games.CardCounter
             if (GameState == null || UserService.CurrentUser == null) return;
             var player = GetMyPlayer();
             if (player == null || player.PrivateReveal == null) return;
-
             if (SelectedReorderIndices.Count == player.PrivateReveal.Count)
             {
                 GameEngine.SubmitReorder(UserService.CurrentUser, GameState, SelectedReorderIndices.ToArray());
@@ -138,10 +235,88 @@ namespace KnockBox.Components.Pages.Games.CardCounter
             }
         }
 
-        protected void FoldPot()
+        // ── Static helpers ────────────────────────────────────────────────────
+
+        protected static bool RequiresTarget(ActionType action) => action switch
         {
-            if (GameState == null || UserService.CurrentUser == null) return;
-            GameEngine.FoldPot(UserService.CurrentUser, GameState);
+            ActionType.Skim => true,
+            ActionType.TurnTheTable => true,
+            ActionType.Launder => true,
+            _ => false
+        };
+
+        protected static string GetActionCardName(ActionType action) => action switch
+        {
+            ActionType.FeelingLucky => "Feeling Lucky",
+            ActionType.MakeMyLuck => "Make My Luck",
+            ActionType.Skim => "Skim",
+            ActionType.Burn => "Burn",
+            ActionType.TurnTheTable => "Turn The Table",
+            ActionType.Compd => "Comp'd",
+            ActionType.NotMyMoney => "Not My Money",
+            ActionType.Launder => "Launder",
+            _ => action.ToString()
+        };
+
+        protected static string GetActionCardIcon(ActionType action) => action switch
+        {
+            ActionType.FeelingLucky => "🎲",
+            ActionType.MakeMyLuck => "⭐",
+            ActionType.Skim => "✂️",
+            ActionType.Burn => "🔥",
+            ActionType.TurnTheTable => "🔄",
+            ActionType.Compd => "🛡️",
+            ActionType.NotMyMoney => "💸",
+            ActionType.Launder => "🧺",
+            _ => "🃏"
+        };
+
+        protected static string GetActionCardDescription(ActionType action) => action switch
+        {
+            ActionType.FeelingLucky =>
+                "Force the next player to draw a card from the shoe. They may chain it with their own Feeling Lucky or block with Comp'd.",
+            ActionType.MakeMyLuck =>
+                "Peek at the top 3 cards in the shoe and rearrange them in any order you choose.",
+            ActionType.Skim =>
+                "Swap the last digit in your pot with the last digit in a chosen opponent's pot. Target required. Blockable with Comp'd.",
+            ActionType.Burn =>
+                "Discard the top card of the shoe without drawing it. Useful for removing dangerous cards.",
+            ActionType.TurnTheTable =>
+                "Reverse the digit order of a chosen opponent's pot. Target required. Blockable with Comp'd.",
+            ActionType.Compd =>
+                "Block a card played against you (Feeling Lucky, Skim, Turn The Table, or Launder). Hold until needed.",
+            ActionType.NotMyMoney =>
+                "Redirect the next card you draw to another player instead of keeping it yourself.",
+            ActionType.Launder =>
+                "Swap your entire pot with a chosen opponent's pot. Target required. Blockable with Comp'd.",
+            _ => action.ToString()
+        };
+
+        protected static string GetActionCardColor(ActionType action) => action switch
+        {
+            ActionType.FeelingLucky => "cc-card-lucky",
+            ActionType.MakeMyLuck => "cc-card-luck",
+            ActionType.Skim => "cc-card-skim",
+            ActionType.Burn => "cc-card-burn",
+            ActionType.TurnTheTable => "cc-card-turn",
+            ActionType.Compd => "cc-card-compd",
+            ActionType.NotMyMoney => "cc-card-money",
+            ActionType.Launder => "cc-card-launder",
+            _ => ""
+        };
+
+        protected static string GetOperatorSymbol(Operator op) => op switch
+        {
+            Operator.Add => "+",
+            Operator.Subtract => "−",
+            Operator.Multiply => "×",
+            Operator.Divide => "÷",
+            _ => "?"
+        };
+
+        protected static string FormatBalance(long balance)
+        {
+            return balance >= 0 ? $"+{balance:N0}" : $"{balance:N0}";
         }
     }
 }

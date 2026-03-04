@@ -58,6 +58,22 @@ namespace KnockBox.Services.State.Games.CardCounter
         public readonly Stack<string> ForceDrawStack = new();
 
         /// <summary>
+        /// Information about the most recently played action card (for all-player notification).
+        /// Cleared at the start of the next player's turn.
+        /// </summary>
+        public LastPlayedActionInfo? LastPlayedAction { get; set; }
+
+        /// <summary>
+        /// Set while a blockable action (Skim, TurnTheTable, Launder) is pending a reaction.
+        /// </summary>
+        public PendingReactionInfo? PendingReaction { get; set; }
+
+        /// <summary>
+        /// Set during a Feeling Lucky chain to indicate which player must respond.
+        /// </summary>
+        public string? FeelingLuckyTargetId { get; set; }
+
+        /// <summary>
         /// Game configuration (tunable playtesting values).
         /// </summary>
         public GameConfig Config { get; set; } = new();
@@ -119,6 +135,21 @@ namespace KnockBox.Services.State.Games.CardCounter
     #endregion
 
     #region Supporting Types
+
+    /// <summary>Information about the most recently played action card, shown to all players.</summary>
+    public record LastPlayedActionInfo(
+        string PlayerId,
+        string PlayerName,
+        ActionType Action,
+        string? TargetId,
+        string? TargetName);
+
+    /// <summary>Information about a pending blockable reaction (Skim, TurnTheTable, Launder).</summary>
+    public record PendingReactionInfo(
+        string SourceId,
+        string SourceName,
+        string TargetId,
+        ActionCard PlayedCard);
 
     public class GameConfig
     {

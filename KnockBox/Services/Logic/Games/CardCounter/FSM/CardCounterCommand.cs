@@ -24,4 +24,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM
 
     /// <summary>Targeted player accepts a pending blockable action without playing Comp'd.</summary>
     public record AcceptPendingCommand(string PlayerId) : CardCounterCommand(PlayerId);
+
+    /// <summary>Player discards action cards from their hand when over the hand limit.</summary>
+    public record DiscardActionCardsCommand(string PlayerId, int[] CardIndices) : CardCounterCommand(PlayerId);
 }
