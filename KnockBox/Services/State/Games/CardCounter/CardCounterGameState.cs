@@ -1,7 +1,8 @@
-using KnockBox.Extensions.Events;
-using KnockBox.Extensions.Returns;
+using KnockBox.Services.Logic.Games.CardCounter.FSM;
+using KnockBox.Services.State.Games.CardCounter.Data;
 using KnockBox.Services.State.Games.Shared;
 using KnockBox.Services.State.Users;
+using System.Collections.Concurrent;
 
 namespace KnockBox.Services.State.Games.CardCounter
 {
@@ -11,10 +12,9 @@ namespace KnockBox.Services.State.Games.CardCounter
         : AbstractGameState(host, logger)
     {
         /// <summary>
-        /// The event manager for all events.
+        /// The FSM context for this game instance. Set when the game starts.
         /// </summary>
-        public readonly IThreadSafeEventManager<GameEventArgs> EventManager
-            = new ThreadSafeEventManager<GameEventArgs>();
+        public CardCounterGameContext? Context { get; internal set; }
 
         /// <summary>
         /// The current phase of the game.
@@ -22,62 +22,43 @@ namespace KnockBox.Services.State.Games.CardCounter
         public GamePhase GamePhase { get; set; }
 
         /// <summary>
-        /// The current phase of the round.
-        /// </summary>
-        public RoundPhase RoundPhase { get; set; }
-
-        /// <summary>
-        /// The states for all the players.
-        /// </summary>
-        public readonly Dictionary<string, Player> PlayerStates = [];
-
-        /// <summary>
-        /// The cards in the main deck.
-        /// </summary>
-        public readonly Stack<BaseCard> MainDeck = [];
-
-        /// <summary>
-        /// The cards in this round.
-        /// </summary>
-        public readonly Stack<BaseCard> CurrentShoe = [];
-
-        /// <summary>
-        /// The current round index.
-        /// </summary>
-        public int ShoeIndex { get; set; }
-        
-        /// <summary>
-        /// The count of operators in this round.
-        /// </summary>
-        public readonly Dictionary<Operator, int> OperatorCounts = [];
-
-        /// <summary>
-        /// The count of value cards in this round.
-        /// </summary>
-        public readonly Dictionary<long, int> ValueCounts = [];
-
-        /// <summary>
-        /// The discard pile for the whole game.
-        /// </summary>
-        public readonly Stack<BaseCard> DiscardPile = [];
-
-        /// <summary>
-        /// The force drawn players. The bottom of the stack is the player that initiated the force draw chain.
-        /// </summary>
-        public readonly Stack<string> ForceDrawStack = [];
-
-        /// <summary>
-        /// The players in turn order.
+        /// Players in turn order (by player ID).
         /// </summary>
         public readonly List<string> TurnOrder = [];
 
         /// <summary>
-        /// The current player turn.
+        /// Index into <see cref="TurnOrder"/> identifying the active player.
         /// </summary>
         public int CurrentPlayerIndex { get; set; }
 
         /// <summary>
-        /// The configuration for the game.
+        /// All player states, keyed by player ID.
+        /// </summary>
+        public readonly ConcurrentDictionary<string, PlayerState> GamePlayers = new();
+
+        /// <summary>
+        /// Current shoe index (incremented each time a new shoe is dealt).
+        /// </summary>
+        public int ShoeIndex { get; set; }
+
+        /// <summary>
+        /// Visible card-type counts for the current shoe, updated as cards are drawn.
+        /// </summary>
+        public readonly Dictionary<CardType, int> ShoeCardCounts = [];
+
+        // ── Internal deck data (managed by engine / FSM states) ──────────────
+
+        public readonly Stack<BaseCard> MainDeck = new();
+        public readonly Stack<BaseCard> CurrentShoe = new();
+        public readonly Stack<BaseCard> DiscardPile = new();
+
+        /// <summary>
+        /// Tracks the Feeling Lucky chain: bottom entry is the originator.
+        /// </summary>
+        public readonly Stack<string> ForceDrawStack = new();
+
+        /// <summary>
+        /// Game configuration (tunable playtesting values).
         /// </summary>
         public GameConfig Config { get; set; } = new();
     }
@@ -88,14 +69,16 @@ namespace KnockBox.Services.State.Games.CardCounter
     {
         BuyIn,
         Playing,
-        GameEnd
+        GameOver
     }
 
-    public enum RoundPhase
+    /// <summary>
+    /// Distinguishes the two card types tracked in <see cref="CardCounterGameState.ShoeCardCounts"/>.
+    /// </summary>
+    public enum CardType
     {
-        AwardActionCards,
-        PopulateShoe,
-        Play,
+        Number,
+        Operator
     }
 
     public enum Operator
@@ -120,95 +103,22 @@ namespace KnockBox.Services.State.Games.CardCounter
 
     #endregion
 
-    #region Data Containers
+    #region Cards
 
-    /// <summary>
-    /// The base class for cards.
-    /// </summary>
-    /// <param name="Description"></param>
-    public record class BaseCard(string Description);
+    public abstract record BaseCard;
 
-    public record class OperatorCard(Operator Operator, string Description) : BaseCard(Description);
+    /// <summary>A number card (digit 0–9) drawn into the player's pot.</summary>
+    public record NumberCard(int Value) : BaseCard;
 
-    public record class NumberCard(long Value, string Description) : BaseCard(Description);
+    /// <summary>An operator card that applies arithmetic to the player's pot and balance.</summary>
+    public record OperatorCard(Operator Op) : BaseCard;
 
-    public record class ActionCard(ActionType Action, string Description) : BaseCard(Description);
+    /// <summary>An action card drawn from the separate action deck.</summary>
+    public record ActionCard(ActionType Action) : BaseCard;
 
-    public abstract record GameEventArgs;
+    #endregion
 
-    public record class GameStartArgs() : GameEventArgs;
-
-    public record class ActionCardsDealtArgs() : GameEventArgs;
-
-    public record class ShoeDealtArgs() : GameEventArgs;
-
-    public record class TurnChangeArgs() : GameEventArgs;
-
-    public record class RequestBuyInArgs() : GameEventArgs;
-
-    public record class BuyInSetArgs(User User) : GameEventArgs;
-
-    /// <param name="Card">The card that was played.</param>
-    /// <param name="User">The user that played the action card.</param>
-    public record class ActionCardPlayedArgs(ActionCard Card, User User) : GameEventArgs;
-
-    /// <param name="Card">The card that was drawn.</param>
-    /// <param name="User">The user that drew the card.</param>
-    public record class CardDrawnArgs(BaseCard Card, User User) : GameEventArgs;
-
-    /// <param name="Card"></param>
-    /// <param name="User">The user to apply the number to.</param>
-    public record class NumberCardAppliedArgs(NumberCard Card, User User) : GameEventArgs;
-
-    /// <param name="Card"></param>
-    /// <param name="User">The user to apply the operator to.</param>
-    public record class OperatorCardAppliedArgs(OperatorCard Card, User User) : GameEventArgs;
-
-    public class Player(User user)
-    {
-        public readonly User User = user;
-        public readonly List<NumberCard> Pot = [];
-        public readonly List<ActionCard> ActionCards = [];
-
-        /// <summary>
-        /// The buy in roll this player started with.
-        /// </summary>
-        public long BuyInRoll { get; set; } = 0L;
-
-        /// <summary>
-        /// The current balance of this player. Includes the <see cref="BuyInRoll"/>.
-        /// </summary>
-        public long Balance { get; set; } = 0L;
-
-        /// <summary>
-        /// The number of passes this player has left.
-        /// </summary>
-        public int RemainingPasses { get; set; } = 0;
-
-        /// <summary>
-        /// Gets the concatenated value of the pot.
-        /// </summary>
-        /// <returns></returns>
-        public ValueResult<long> GetPotValue()
-        {
-            if (Pot.Count == 0) return 0L;
-
-            string concatenated = string.Join("", Pot.Select(p => p.Value));
-            return long.TryParse(concatenated, out var result)
-                ? result : ValueResult<long>.FromError("Error parsing pot value.");
-        }
-
-        /// <summary>
-        /// Resets all the values in this player.
-        /// </summary>
-        public void Reset()
-        {
-            Pot.Clear();
-            ActionCards.Clear();
-            Balance = 0L;
-            BuyInRoll = 0L;
-        }
-    }
+    #region Supporting Types
 
     public class GameConfig
     {

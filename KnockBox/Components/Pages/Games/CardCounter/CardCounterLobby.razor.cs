@@ -43,7 +43,7 @@ namespace KnockBox.Components.Pages.Games.CardCounter
             GameState = gameState;
             RoomCode = session.LobbyRegistration.Code;
 
-            _stateSubscription = GameState.SubscribeToStateChanged(async () => await InvokeAsync(StateHasChanged)).Value;
+            _stateSubscription = GameState.StateChangedEventManager.Subscribe(async () => await InvokeAsync(StateHasChanged));
 
             await base.OnInitializedAsync();
         }
