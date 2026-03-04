@@ -135,6 +135,13 @@ namespace KnockBox.Services.Logic.Games.CardCounter
             return ProcessCommand(ctx, new PlayActionCardCommand(player.Id, cardIndex, targetPlayerId));
         }
 
+        /// <summary>Targeted player accepts a pending blockable action without playing Comp'd.</summary>
+        public Result AcceptPending(User player, CardCounterGameState state)
+        {
+            if (!TryGetContext(state, out var ctx, out var err)) return err;
+            return ProcessCommand(ctx, new AcceptPendingCommand(player.Id));
+        }
+
         /// <summary>
         /// Player submits their chosen card order after a Make My Luck reveal.
         /// </summary>
@@ -142,6 +149,15 @@ namespace KnockBox.Services.Logic.Games.CardCounter
         {
             if (!TryGetContext(state, out var ctx, out var err)) return err;
             return ProcessCommand(ctx, new SubmitReorderCommand(player.Id, reorderedIndices));
+        }
+
+        /// <summary>
+        /// Player discards action cards from their hand when over the hand limit.
+        /// </summary>
+        public Result DiscardActionCards(User player, CardCounterGameState state, int[] cardIndices)
+        {
+            if (!TryGetContext(state, out var ctx, out var err)) return err;
+            return ProcessCommand(ctx, new DiscardActionCardsCommand(player.Id, cardIndices));
         }
 
         // ── Initialisation helpers ────────────────────────────────────────────

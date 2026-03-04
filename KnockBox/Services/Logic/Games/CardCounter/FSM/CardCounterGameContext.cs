@@ -79,18 +79,15 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM
         }
 
         /// <summary>
-        /// Deals up to <see cref="GameConfig.ActionsDealtPerRound"/> action cards to every player,
-        /// respecting the <see cref="GameConfig.ActionHandLimit"/>.
+        /// Deals <see cref="GameConfig.ActionsDealtPerRound"/> action cards to every player.
+        /// Cards are always dealt; players with more than <see cref="GameConfig.ActionHandLimit"/>
+        /// cards afterward must discard via <see cref="CardCounterCommand.DiscardActionCardsCommand"/>.
         /// </summary>
         public void DealActionCards()
         {
             foreach (var player in GamePlayers.Values)
             {
-                int toAdd = Math.Min(
-                    Config.ActionsDealtPerRound,
-                    Config.ActionHandLimit - player.ActionHand.Count);
-
-                for (int i = 0; i < toAdd; i++)
+                for (int i = 0; i < Config.ActionsDealtPerRound; i++)
                     player.ActionHand.Add(GetRandomActionCard());
             }
         }

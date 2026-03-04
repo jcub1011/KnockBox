@@ -10,6 +10,8 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
         public void OnEnter(CardCounterGameContext context)
         {
             context.State.GamePhase = GamePhase.Playing;
+            context.State.PendingReaction = null;
+            context.State.FeelingLuckyTargetId = null;
             context.Logger.LogInformation(
                 "FSM → PlayerTurnState (active: {id})", context.CurrentPlayerId);
         }
@@ -22,6 +24,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
                 PassTurnCommand cmd => HandlePass(context, cmd),
                 FoldPotCommand cmd => HandleFold(context, cmd),
                 PlayActionCardCommand cmd => HandlePlayActionCard(context, cmd),
+                DiscardActionCardsCommand cmd => HandleDiscard(context, cmd),
                 _ => null
             };
         }
@@ -135,6 +138,12 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
             var player = context.GetPlayer(cmd.PlayerId);
             if (player is null) return null;
 
+            if (player.ActionHand.Count > context.Config.ActionHandLimit)
+            {
+                context.Logger.LogWarning("PlayAction: player [{id}] must discard before playing.", cmd.PlayerId);
+                return null;
+            }
+
             if (cmd.CardIndex < 0 || cmd.CardIndex >= player.ActionHand.Count)
             {
                 context.Logger.LogWarning("PlayAction: invalid card index {i} for player [{id}].", cmd.CardIndex, cmd.PlayerId);
@@ -146,6 +155,13 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
 
             context.Logger.LogInformation(
                 "Player [{id}] played action card [{action}].", cmd.PlayerId, card.Action);
+
+            context.State.LastPlayedAction = new LastPlayedActionInfo(
+                cmd.PlayerId,
+                player.DisplayName,
+                card.Action,
+                cmd.TargetPlayerId,
+                cmd.TargetPlayerId is not null ? context.GetPlayer(cmd.TargetPlayerId)?.DisplayName : null);
 
             return card.Action switch
             {
@@ -159,6 +175,44 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
                 ActionType.Compd => null,      // Only valid as a response
                 _ => null
             };
+        }
+
+        // ── Discard ───────────────────────────────────────────────────────────
+
+        private static ICardCounterGameState? HandleDiscard(CardCounterGameContext context, DiscardActionCardsCommand cmd)
+        {
+            var player = context.GetPlayer(cmd.PlayerId);
+            if (player is null) return null;
+
+            if (player.ActionHand.Count <= context.Config.ActionHandLimit)
+            {
+                context.Logger.LogWarning("Discard: player [{id}] is not over the action hand limit.", cmd.PlayerId);
+                return null;
+            }
+
+            // Validate indices: must be distinct, in range, and discard enough to be at or under limit
+            var indices = cmd.CardIndices;
+            if (indices.Length == 0 || indices.Distinct().Count() != indices.Length
+                || indices.Any(i => i < 0 || i >= player.ActionHand.Count))
+            {
+                context.Logger.LogWarning("Discard: invalid card indices from player [{id}].", cmd.PlayerId);
+                return null;
+            }
+
+            int afterDiscard = player.ActionHand.Count - indices.Length;
+            if (afterDiscard > context.Config.ActionHandLimit)
+            {
+                context.Logger.LogWarning("Discard: player [{id}] must discard enough to reach the hand limit.", cmd.PlayerId);
+                return null;
+            }
+
+            // Remove in descending index order to preserve correctness
+            foreach (var idx in indices.OrderByDescending(i => i))
+                player.ActionHand.RemoveAt(idx);
+
+            context.Logger.LogInformation(
+                "Player [{id}] discarded {n} action cards.", cmd.PlayerId, indices.Length);
+            return null;
         }
 
         private static ICardCounterGameState? HandleFeelingLucky(CardCounterGameContext context, string sourceId)
