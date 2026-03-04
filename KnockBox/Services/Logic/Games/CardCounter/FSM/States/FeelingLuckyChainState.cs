@@ -66,6 +66,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
             {
                 // Block — the player before them in the chain must still draw or pass.
                 target.ActionHand.RemoveAt(cmd.CardIndex);
+                context.RecordActionCardPlay(target, card);
                 context.Logger.LogInformation("FeelingLucky: [{id}] blocked with Comp'd.", _currentTargetId);
                 // Chain is resolved — return to originator's turn
                 return ReturnToOriginator(context);
@@ -75,6 +76,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
             {
                 // Pass the force to the next player in turn order
                 target.ActionHand.RemoveAt(cmd.CardIndex);
+                context.RecordActionCardPlay(target, card);
                 int currentIdx = context.TurnOrder.IndexOf(_currentTargetId);
                 int nextIdx = (currentIdx + 1) % context.TurnOrder.Count;
                 string nextTarget = context.TurnOrder[nextIdx];
@@ -109,6 +111,8 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
                         context.ApplyNumberCard(target, nc);
                     else if (card is OperatorCard oc)
                         context.ApplyOperatorCard(target, oc);
+
+                    context.RecordDraw(target, card);
 
                     context.Logger.LogInformation(
                         "FeelingLucky: [{id}] force-drew [{card}].", _currentTargetId, card);

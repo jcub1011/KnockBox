@@ -91,9 +91,15 @@ else
                         </div>
                         @if (UserService.CurrentUser?.Id == GameState.Host.Id)
                         {
-                            <button class="cc-btn cc-btn-primary cc-btn-lg" @onclick="StartGame">
+                            bool canStart = GameState.Players.Count > 0;
+                            <button class="cc-btn cc-btn-primary cc-btn-lg" @onclick="StartGame" disabled="@(!canStart)"
+                                    title="@(!canStart ? "Need at least 1 more player to start" : "Deal cards and start the game")">
                                 🃏 DEAL CARDS
                             </button>
+                            @if (!canStart)
+                            {
+                                <p class="cc-lobby-min-players">⚠️ Need at least 1 more player to start</p>
+                            }
                         }
                         else
                         {
@@ -211,6 +217,65 @@ else
                 </div>
             }
 
+            @* ── Discard History Overlay ── *@
+            @if (_showDiscardOverlay)
+            {
+                <div class="cc-discard-history-overlay" @onclick="ToggleDiscardOverlay">
+                    <div class="cc-discard-history-panel" @onclick:stopPropagation="true">
+                        <div class="cc-discard-history-header">
+                            <span class="cc-discard-history-title">📋 DISCARD PILE HISTORY</span>
+                            <button class="cc-btn cc-btn-ghost cc-btn-sm" @onclick="ToggleDiscardOverlay">✕ Close</button>
+                        </div>
+                        @if (GameState.DiscardHistory.Count == 0)
+                        {
+                            <div class="cc-discard-history-empty">No cards discarded yet.</div>
+                        }
+                        else
+                        {
+                            <div class="cc-discard-history-list">
+                                @for (int i = GameState.DiscardHistory.Count - 1; i >= 0; i--)
+                                {
+                                    var entry = GameState.DiscardHistory[i];
+                                    <div class="cc-discard-history-entry @(entry.IsActionCard ? "cc-history-action" : "cc-history-draw")">
+                                        <span class="cc-history-symbol">@entry.Symbol</span>
+                                        <div class="cc-history-info">
+                                            <span class="cc-history-desc">@entry.Description</span>
+                                            @if (entry.PlayerName != null)
+                                            {
+                                                <span class="cc-history-player">by @entry.PlayerName</span>
+                                            }
+                                        </div>
+                                        <span class="cc-history-badge @(entry.IsActionCard ? "cc-badge-action" : "cc-badge-draw")">
+                                            @(entry.IsActionCard ? "ACTION" : "DRAW")
+                                        </span>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+
+            @* ── Shoe Transition Animation ── *@
+            @if (_isAnimatingShoe)
+            {
+                <div class="cc-shoe-animation-overlay">
+                    <div class="cc-shoe-animation-content">
+                        <div class="cc-shoe-anim-cards">
+                            <span class="cc-shoe-anim-card cc-shoe-anim-card-1">🂠</span>
+                            <span class="cc-shoe-anim-card cc-shoe-anim-card-2">🂠</span>
+                            <span class="cc-shoe-anim-card cc-shoe-anim-card-3">🂠</span>
+                            <span class="cc-shoe-anim-card cc-shoe-anim-card-4">🂠</span>
+                            <span class="cc-shoe-anim-card cc-shoe-anim-card-5">🂠</span>
+                        </div>
+                        <div class="cc-shoe-anim-text">
+                            <span class="cc-shoe-anim-title">NEW SHOE BEING DEALT</span>
+                            <span class="cc-shoe-anim-subtitle">♠ Shoe #@GameState.ShoeIndex — Action Cards Distributed ♥</span>
+                        </div>
+                    </div>
+                </div>
+            }
+
             @* ── Reaction Prompt (Feeling Lucky target) ── *@
             @if (myPlayer != null && GameState.FeelingLuckyTargetId == myId)
             {
@@ -309,6 +374,28 @@ else
 
                 @* ── Table Felt ── *@
                 <div class="cc-table-felt">
+                    @* ── Discard Pile (left of main deck) ── *@
+                    <div class="cc-deck-pile cc-discard-pile @(GameState.DiscardHistory.Count > 0 ? "cc-discard-pile-active" : "")"
+                         title="Discard Pile — click to view history"
+                         @onclick="ToggleDiscardOverlay">
+                        @if (GameState.DiscardHistory.Count > 0)
+                        {
+                            var topEntry = GameState.DiscardHistory[^1];
+                            <div class="cc-discard-top">
+                                <span class="cc-discard-top-symbol">@topEntry.Symbol</span>
+                                <span class="cc-discard-top-desc">@topEntry.Description</span>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="cc-pile-empty">
+                                <span class="cc-pile-empty-icon">📋</span>
+                            </div>
+                        }
+                        <div class="cc-pile-label">DISCARD</div>
+                        <div class="cc-pile-count">@GameState.DiscardHistory.Count</div>
+                    </div>
+
                     @* ── Main Deck ── *@
                     <div class="cc-deck-pile cc-main-deck-pile" title="Main Deck — @GameState.MainDeck.Count cards remaining">
                         <div class="cc-pile-stack">

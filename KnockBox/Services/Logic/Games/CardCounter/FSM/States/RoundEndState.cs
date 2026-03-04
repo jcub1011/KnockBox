@@ -17,6 +17,9 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
 
             bool hasShoe = context.DealNextShoe();
 
+            if (hasShoe)
+                context.State.IsNewShoe = true;
+
             // Immediately transition — this state is fully resolved on enter.
             var next = hasShoe ? (ICardCounterGameState)new PlayerTurnState() : new GameOverState();
             context.CurrentFsmState = next;

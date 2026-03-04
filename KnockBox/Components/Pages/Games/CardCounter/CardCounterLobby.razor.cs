@@ -45,8 +45,24 @@ namespace KnockBox.Components.Pages.Games.CardCounter
 
             _stateSubscription = GameState.StateChangedEventManager.Subscribe(async () =>
             {
+                bool isNewShoe = GameState?.IsNewShoe == true;
+
+                if (isNewShoe && GameState != null)
+                {
+                    GameState.IsNewShoe = false;
+                    _prevShoeIndex = GameState.ShoeIndex;
+                    _isAnimatingShoe = true;
+                }
+
                 ClearTransientUiState();
                 await InvokeAsync(StateHasChanged);
+
+                if (isNewShoe)
+                {
+                    await Task.Delay(ShoeAnimationDurationMs);
+                    _isAnimatingShoe = false;
+                    await InvokeAsync(StateHasChanged);
+                }
             });
 
             await base.OnInitializedAsync();
@@ -63,6 +79,14 @@ namespace KnockBox.Components.Pages.Games.CardCounter
         protected string RoomCode { get; set; } = string.Empty;
         protected bool IsRoomCodeVisible { get; set; } = false;
 
+        // ── Discard history overlay ───────────────────────────────────────────
+        private bool _showDiscardOverlay = false;
+
+        // ── Shoe animation ────────────────────────────────────────────────────
+        private const int ShoeAnimationDurationMs = 2500;
+        private int _prevShoeIndex = -1;
+        private bool _isAnimatingShoe = false;
+
         // ── Target selection state ────────────────────────────────────────────
         private int? _pendingActionCardIndex;
         private string? _selectedTargetId;
@@ -76,6 +100,8 @@ namespace KnockBox.Components.Pages.Games.CardCounter
         // ── Helpers ───────────────────────────────────────────────────────────
 
         protected void ToggleRoomCode() => IsRoomCodeVisible = !IsRoomCodeVisible;
+
+        protected void ToggleDiscardOverlay() => _showDiscardOverlay = !_showDiscardOverlay;
 
         protected void ReturnToHome() => NavigationService.ToHome();
 
