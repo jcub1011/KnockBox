@@ -349,7 +349,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter
             return Result.Success;
         }
 
-        public async Task<Result> DrawCardAsync(CardCounterGameState state, User player)
+        public async Task<ValueResult<BaseCard>> DrawCardAsync(CardCounterGameState state, User player)
         {
             var executeResult = state.Execute(() =>
             {
@@ -366,27 +366,24 @@ namespace KnockBox.Services.Logic.Games.CardCounter
                     return ValueResult<BaseCard>.FromError("Unable to get player state.",
                         $"No player state is registered for player [{player.Id}].");
 
-                if (!state.CurrentShoe.TryPop(out var card))
-                {
-                    return ValueResult<BaseCard>.FromError("There are no cards to draw.");
-                }
-
+                var card = state.CurrentShoe.Pop();
+                RecalculateShoeCounts(state, [], [card]);
                 return ValueResult<BaseCard>.FromValue(card);
             });
 
             if (!executeResult.TryGetSuccess(out var result))
             {
-                if (executeResult.TryGetFailure(out var error)) return error;
-                return Result.Canceled;
-            }
-
-            if (!result.TryGetSuccess(out var drawnCard))
-            {
                 if (result.TryGetFailure(out var error)) return error;
-                return Result.Canceled;
+                return ValueResult<BaseCard>.Canceled;
             }
 
-            return Result.Success;
+            if (!result.IsSuccess)
+            {
+                return result;
+            }
+
+            await state.CardDrawnEventManager.NotifyAsync(new(result.Value, player));
+            return result;
         }
 
         public async Task<Result> EndTurnAsync(CardCounterGameState state, User player)
@@ -533,60 +530,47 @@ namespace KnockBox.Services.Logic.Games.CardCounter
 
         public int RollToBalance(int roll) => roll * 8;
 
-        public async Task<ValueResult<BaseCard>> DrawCardAsync(User player, CardCounterGameState state)
+        public async Task<Result> PassTurnAsync(CardCounterGameState state, User player)
         {
             var executeResult = state.Execute(() =>
             {
                 if (state.GamePhase != GamePhase.Playing)
-                    return ValueResult<BaseCard>.FromError("Unable to draw a card outside the play stage.");
+                    return Result.FromError("Unable to pass turn outside the play stage.");
 
                 if (state.TurnOrder[state.CurrentPlayerIndex] != player.Id)
-                    return ValueResult<BaseCard>.FromError("You can't draw a card outside of your turn.");
-
-                if (state.CurrentShoe.Count == 0)
-                    return ValueResult<BaseCard>.FromError("There are no cards left to draw.");
+                    return Result.FromError("You can't pass outside of your turn.");
 
                 if (!state.PlayerStates.TryGetValue(player.Id, out var playerState))
-                    return ValueResult<BaseCard>.FromError("Unable to get player state.",
-                        $"No player state is registered for player [{player.Id}].");
+                    return Result.FromError("Unable to set buy in.",
+                        $"Player state is not set for player [{player.Id}].");
 
-                var card = state.CurrentShoe.Pop();
-                RecalculateShoeCounts(state, [], [card]);
-                return ValueResult<BaseCard>.FromValue(card);
+                if (playerState.RemainingPasses <= 0)
+                    return Result.FromError("You have no remaining passes.");
+
+                playerState.RemainingPasses--;
+                return Result.Success;
             });
 
             if (!executeResult.TryGetSuccess(out var result))
             {
                 if (result.TryGetFailure(out var error)) return error;
-                return ValueResult<BaseCard>.Canceled;
+                return Result.Canceled;
             }
 
-            if (!result.IsSuccess)
-            {
-                return result;
-            }
+            if (!result.IsSuccess) return result;
 
-            await state.CardDrawnEventManager.NotifyAsync(new(result.Value, player));
+            await state.TurnChangeEventManager.NotifyAsync();
             return result;
         }
 
-        public Result PassTurn(User player, CardCounterGameState state)
+        public async Task<Result> FoldPotAsync(CardCounterGameState state, User player)
         {
-            return state.Execute(() =>
+            var executeState = state.Execute(() =>
             {
-                if (!state.GamePlayers.TryGetValue(player.Id, out var statePlayer)) return;
-                if (state.GamePhase != GamePhase.Playing) return;
 
-                string activePlayerId = state.TurnOrder[state.CurrentPlayerIndex];
-                if (player.Id != activePlayerId) return;
-                if (statePlayer.PrivateReveal != null) return;
-
-                if (statePlayer.PassesRemaining > 0)
-                {
-                    statePlayer.PassesRemaining--;
-                    EndTurn(state);
-                }
             });
+
+            state.
         }
 
         public Result FoldPot(User player, CardCounterGameState state)
