@@ -25,15 +25,15 @@ namespace KnockBox.Services.State.Games.CardCounter
         /// <summary>
         /// The event manager for the draw card event.
         /// </summary>
-        public readonly ThreadSafeEventManager<NumberCardDrawnArgs> CardDrawnEventManager = new();
+        public readonly ThreadSafeEventManager<CardDrawnArgs> CardDrawnEventManager = new();
 
         /// <summary>
-        /// The event manager for the draw card event.
+        /// The event manager for the number card applied event.
         /// </summary>
         public readonly ThreadSafeEventManager<NumberCardAppliedArgs> NumberCardAppliedEventManager = new();
 
         /// <summary>
-        /// The event manager for the draw card event.
+        /// The event manager for the operator card applied event.
         /// </summary>
         public readonly ThreadSafeEventManager<OperatorCardAppliedArgs> OperatorCardAppliedEventManager = new();
 
@@ -43,7 +43,7 @@ namespace KnockBox.Services.State.Games.CardCounter
         public readonly ThreadSafeEventManager ShoeDealEventManager = new();
 
         /// <summary>
-        /// The event manager for the shoe deal event.
+        /// The event manager for the game start event.
         /// </summary>
         public readonly ThreadSafeEventManager GameStartEventManager = new();
 
@@ -183,7 +183,7 @@ namespace KnockBox.Services.State.Games.CardCounter
 
     /// <param name="Card">The card that was drawn.</param>
     /// <param name="User">The user that drew the card.</param>
-    public record class NumberCardDrawnArgs(NumberCard Card, User User);
+    public record class CardDrawnArgs(BaseCard Card, User User);
 
     public record class NumberCardAppliedArgs(NumberCard Card, User User);
 

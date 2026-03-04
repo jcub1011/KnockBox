@@ -353,25 +353,24 @@ namespace KnockBox.Services.Logic.Games.CardCounter
         {
             var executeResult = state.Execute(() =>
             {
-                string currentPlayerId = state.TurnOrder[state.CurrentPlayerIndex];
+                if (state.GamePhase != GamePhase.Playing)
+                    return ValueResult<BaseCard>.FromError("Unable to draw a card outside the play stage.");
 
-                if (player.Id != currentPlayerId)
-                {
-                    return ValueResult<BaseCard>.FromError("You can only draw when it is your turn.");
-                }
+                if (state.TurnOrder[state.CurrentPlayerIndex] != player.Id)
+                    return ValueResult<BaseCard>.FromError("You can't draw a card outside of your turn.");
 
-                if (!state.PlayerStates.TryGetValue(currentPlayerId, out var playerState))
-                {
-                    return ValueResult<BaseCard>.FromError("Error skipping turn.",
-                        $"Player state missing for player [{currentPlayerId}].");
-                }
+                if (state.CurrentShoe.Count == 0)
+                    return ValueResult<BaseCard>.FromError("There are no cards left to draw.");
 
-                if (!state.MainDeck.TryPop(out var card))
+                if (!state.PlayerStates.TryGetValue(player.Id, out var playerState))
+                    return ValueResult<BaseCard>.FromError("Unable to get player state.",
+                        $"No player state is registered for player [{player.Id}].");
+
+                if (!state.CurrentShoe.TryPop(out var card))
                 {
                     return ValueResult<BaseCard>.FromError("There are no cards to draw.");
                 }
 
-                state.CurrentPlayerIndex = (state.CurrentPlayerIndex + 1) % state.TurnOrder.Count;
                 return ValueResult<BaseCard>.FromValue(card);
             });
 
@@ -387,8 +386,24 @@ namespace KnockBox.Services.Logic.Games.CardCounter
                 return Result.Canceled;
             }
 
-            await state.TurnChangeEventManager.NotifyAsync();
+            return Result.Success;
+        }
 
+        public async Task<Result> EndTurnAsync(CardCounterGameState state, User player)
+        {
+            var executeResult = state.Execute(() =>
+            {
+                if (state.GamePhase != GamePhase.Playing)
+                    return Result.FromError("Unable end turn outside the play stage.");
+
+                if (state.TurnOrder[state.CurrentPlayerIndex] != player.Id)
+                    return Result.FromError("You can't end your turn when it is not your turn.");
+
+                state.CurrentPlayerIndex = (state.CurrentPlayerIndex + 1) % state.TurnOrder.Count;
+                return Result.Success;
+            });
+
+            await state.TurnChangeEventManager.NotifyAsync();
             return Result.Success;
         }
 
@@ -456,7 +471,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter
                 return Result.Canceled;
             }
 
-            await state.NumberCardAppliedEventManager.NotifyAsync(new(card, target));
+            await state.OperatorCardAppliedEventManager.NotifyAsync(new(card, target));
             return Result.Success;
         }
 
@@ -518,51 +533,41 @@ namespace KnockBox.Services.Logic.Games.CardCounter
 
         public int RollToBalance(int roll) => roll * 8;
 
-        public Result DrawCard(User player, CardCounterGameState state)
+        public async Task<ValueResult<BaseCard>> DrawCardAsync(User player, CardCounterGameState state)
         {
-            return state.Execute(() =>
+            var executeResult = state.Execute(() =>
             {
-                if (!state.GamePlayers.TryGetValue(player.Id, out var statePlayer)) return;
-                if (state.GamePhase != GamePhase.Playing) return;
+                if (state.GamePhase != GamePhase.Playing)
+                    return ValueResult<BaseCard>.FromError("Unable to draw a card outside the play stage.");
 
-                string activePlayerId = state.TurnOrder[state.CurrentPlayerIndex];
-                if (player.Id != activePlayerId) return;
-                if (statePlayer.PrivateReveal != null) return;
-                if (state.CurrentShoe.Count == 0) return;
+                if (state.TurnOrder[state.CurrentPlayerIndex] != player.Id)
+                    return ValueResult<BaseCard>.FromError("You can't draw a card outside of your turn.");
 
-                var card = state.CurrentShoe[0];
-                state.CurrentShoe.RemoveAt(0);
-                RecalculateShoeCounts(state);
+                if (state.CurrentShoe.Count == 0)
+                    return ValueResult<BaseCard>.FromError("There are no cards left to draw.");
 
-                if (card is NumberCard num)
-                {
-                    statePlayer.Pot.Add(num.Value);
-                }
-                else if (card is OperatorCard opCard)
-                {
-                    if (statePlayer.Pot.Count > 0)
-                    {
-                         if (statePlayer.PotValue == 0 && opCard.Op == Operator.Divide)
-                         {
-                              statePlayer.PassesRemaining++;
-                         }
-                         else
-                         {
-                             int potVal = statePlayer.PotValue;
-                             float newVal = statePlayer.Balance;
-                             if (opCard.Op == Operator.Add) newVal += potVal;
-                             if (opCard.Op == Operator.Subtract) newVal -= potVal;
-                             if (opCard.Op == Operator.Multiply) newVal *= potVal;
-                             if (opCard.Op == Operator.Divide) newVal /= potVal;
+                if (!state.PlayerStates.TryGetValue(player.Id, out var playerState))
+                    return ValueResult<BaseCard>.FromError("Unable to get player state.",
+                        $"No player state is registered for player [{player.Id}].");
 
-                             statePlayer.Balance = (int)Math.Round(newVal);
-                         }
-                         statePlayer.Pot.Clear();
-                    }
-                }
-
-                EndTurn(state);
+                var card = state.CurrentShoe.Pop();
+                RecalculateShoeCounts(state, [], [card]);
+                return ValueResult<BaseCard>.FromValue(card);
             });
+
+            if (!executeResult.TryGetSuccess(out var result))
+            {
+                if (result.TryGetFailure(out var error)) return error;
+                return ValueResult<BaseCard>.Canceled;
+            }
+
+            if (!result.IsSuccess)
+            {
+                return result;
+            }
+
+            await state.CardDrawnEventManager.NotifyAsync(new(result.Value, player));
+            return result;
         }
 
         public Result PassTurn(User player, CardCounterGameState state)
