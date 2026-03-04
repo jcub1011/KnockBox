@@ -5,8 +5,6 @@ using KnockBox.Services.Logic.RandomGeneration;
 using KnockBox.Services.State.Games.CardCounter;
 using KnockBox.Services.State.Games.Shared;
 using KnockBox.Services.State.Users;
-using Microsoft.AspNetCore.Mvc.TagHelpers;
-using System.Reflection.Metadata.Ecma335;
 
 namespace KnockBox.Services.Logic.Games.CardCounter
 {
@@ -563,116 +561,109 @@ namespace KnockBox.Services.Logic.Games.CardCounter
             return result;
         }
 
-        public async Task<Result> FoldPotAsync(CardCounterGameState state, User player)
+        public Result FoldPot(CardCounterGameState state, User player)
         {
-            var executeState = state.Execute(() =>
+            var executeResult = state.Execute(() =>
             {
+                if (state.TurnOrder[state.CurrentPlayerIndex] != player.Id)
+                    return Result.FromError("You can't pass outside of your turn.");
 
+                if (!state.PlayerStates.TryGetValue(player.Id, out var playerState))
+                    return Result.FromError("Unable to set buy in.",
+                        $"Player state is not set for player [{player.Id}].");
+
+                playerState.Pot.Clear();
+                return Result.Success;
             });
 
-            state.
-        }
-
-        public Result FoldPot(User player, CardCounterGameState state)
-        {
-            return state.Execute(() =>
+            if (!executeResult.TryGetSuccess(out var result))
             {
-                if (!state.GamePlayers.TryGetValue(player.Id, out var statePlayer)) return;
-                if (state.GamePhase != GamePhase.Playing) return;
+                if (result.TryGetFailure(out var error)) return error;
+                return Result.Canceled;
+            }
 
-                string activePlayerId = state.TurnOrder[state.CurrentPlayerIndex];
-                if (player.Id != activePlayerId) return;
-                if (statePlayer.PrivateReveal != null) return;
-
-                if (statePlayer.PassesRemaining > 0)
-                {
-                    statePlayer.PassesRemaining--;
-                    statePlayer.Pot.Clear();
-                }
-            });
+            return result;
         }
 
-        public Result PlayActionCard(User player, CardCounterGameState state, int cardIndex, string? targetPlayerId = null)
+        #region Action Implementations
+
+        /// <summary>
+        /// Invokes the Feeling Lucky card action.
+        /// </summary>
+        /// <param name="state"></param>
+        /// <param name="player">The player that played this card.</param>
+        /// <returns></returns>
+        public async Task<Result> PlayFeelingLuckyAsync(CardCounterGameState state, User player)
         {
-            return state.Execute(() =>
+            var executeResult = state.Execute(() =>
             {
-                if (!state.GamePlayers.TryGetValue(player.Id, out var statePlayer)) return;
-                if (state.GamePhase != GamePhase.Playing) return;
+                if (!state.PlayerStates.TryGetValue(player.Id, out var playerState))
+                    return ValueResult<ActionCard>.FromError("Unable to set buy in.",
+                        $"Player state is not set for player [{player.Id}].");
 
-                string activePlayerId = state.TurnOrder[state.CurrentPlayerIndex];
-                if (player.Id != activePlayerId) return;
-                if (statePlayer.PrivateReveal != null) return;
+                if (!_actionCardMap.TryGetValue(ActionType.FeelingLucky, out var card))
+                    return ValueResult<ActionCard>.FromError("Unable to play card.",
+                        $"No action card is registered for [{ActionType.FeelingLucky}].");
 
-                if (cardIndex >= 0 && cardIndex < statePlayer.ActionHand.Count)
-                {
-                    var card = statePlayer.ActionHand[cardIndex];
-                    statePlayer.ActionHand.RemoveAt(cardIndex);
+                if (!playerState.ActionCards.Remove(card))
+                    return ValueResult<ActionCard>.FromError("You don't have this card.");
 
-                    if (card.Action == ActionType.Burn)
-                    {
-                        if (state.CurrentShoe.Count > 0)
-                        {
-                            var burnedCard = state.CurrentShoe[0];
-                            state.CurrentShoe.RemoveAt(0);
-                            state.DiscardPile.Add(burnedCard);
-                            RecalculateShoeCounts(state);
+                state.ForceDrawStack.Push(player.Id);
 
-                            if (state.CurrentShoe.Count == 0)
-                            {
-                                DealActionCards(state);
-                                DealNextShoe(state);
-                            }
-                        }
-                    }
-                    else if (card.Action == ActionType.MakeMyLuck)
-                    {
-                        int cardsToReveal = Math.Min(3, state.CurrentShoe.Count);
-                        if (cardsToReveal > 0)
-                        {
-                            statePlayer.PrivateReveal = state.CurrentShoe.Take(cardsToReveal).ToList();
-                            state.CurrentShoe.RemoveRange(0, cardsToReveal);
-                            RecalculateShoeCounts(state);
-                        }
-                    }
-                    // Other actions unimplemented in dummy
-                }
+                return ValueResult<ActionCard>.FromValue(card);
             });
+
+            if (!executeResult.TryGetSuccess(out var result))
+            {
+                if (result.TryGetFailure(out var error)) return error;
+                return Result.Canceled;
+            }
+
+            if (!result.TryGetSuccess(out var card))
+            {
+                if (result.TryGetFailure(out var error)) return error;
+                return Result.Canceled;
+            }
+
+            await state.ActionCardPlayedEventManager.NotifyAsync(new(card, player));
+            return Result.Success;
         }
 
-        public Result SubmitReorder(User player, CardCounterGameState state, int[] reorderedIndices)
+        public async Task<Result> PlayMakeMyLuckAsync(CardCounterGameState state)
         {
-            return state.Execute(() =>
-            {
-                if (!state.GamePlayers.TryGetValue(player.Id, out var statePlayer)) return;
-                if (state.GamePhase != GamePhase.Playing) return;
-
-                if (statePlayer.PrivateReveal != null)
-                {
-                    if (reorderedIndices.Length == statePlayer.PrivateReveal.Count && reorderedIndices.Distinct().Count() == reorderedIndices.Length && reorderedIndices.All(i => i >= 0 && i < statePlayer.PrivateReveal.Count))
-                    {
-                        var reorderedCards = reorderedIndices.Select(i => statePlayer.PrivateReveal[i]).ToList();
-                        state.CurrentShoe.InsertRange(0, reorderedCards);
-                        statePlayer.PrivateReveal = null;
-                        RecalculateShoeCounts(state);
-                    }
-                }
-            });
+            throw new NotImplementedException();
         }
 
-        public Result DiscardExcess(User player, CardCounterGameState state, int[] discardIndices)
+        public async Task<Result> PlaySkimAsync(CardCounterGameState state)
         {
-            return state.Execute(() =>
-            {
-                // Unimplemented dummy
-            });
+            throw new NotImplementedException();
         }
 
-        public Result AcceptPending(User player, CardCounterGameState state)
+        public async Task<Result> PlayBurnAsync(CardCounterGameState state)
         {
-            return state.Execute(() =>
-            {
-                // Unimplemented dummy
-            });
+            throw new NotImplementedException();
         }
+
+        public async Task<Result> PlayTurnTheTableAsync(CardCounterGameState state)
+        {
+            throw new NotImplementedException();
+        }
+
+        public async Task<Result> PlayCompdAsync(CardCounterGameState state)
+        {
+            throw new NotImplementedException();
+        }
+
+        public async Task<Result> PlayNotMyMoneyAsync(CardCounterGameState state)
+        {
+            throw new NotImplementedException();
+        }
+
+        public async Task<Result> PlayLaunderAsync(CardCounterGameState state)
+        {
+            throw new NotImplementedException();
+        }
+
+        #endregion
     }
 }
