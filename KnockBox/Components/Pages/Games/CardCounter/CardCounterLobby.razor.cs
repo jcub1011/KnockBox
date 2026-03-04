@@ -212,7 +212,7 @@ namespace KnockBox.Components.Pages.Games.CardCounter
             _selectedDiscardIndices.Clear();
         }
 
-        protected void ToggleReorderIndex(int index)
+        protected void SelectForReorder(int index)
         {
             if (!SelectedReorderIndices.Contains(index))
                 SelectedReorderIndices.Add(index);

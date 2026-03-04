@@ -75,7 +75,7 @@ else
                     <div class="cc-lobby-felt">
                         <h2 class="cc-lobby-title">♠ WAITING FOR PLAYERS ♥</h2>
                         <div class="cc-lobby-players">
-                            @foreach (var player in Enumerable.Repeat(GameState.Host, 1).Concat(GameState.Players))
+                            @foreach (var player in GameState.Players.Prepend(GameState.Host))
                             {
                                 bool isHost = player.Id == GameState.Host.Id;
                                 bool isMe = player.Id == UserService.CurrentUser?.Id;
@@ -446,7 +446,7 @@ else
                                             _ => "?"
                                         };
                                         <div class="cc-reveal-card @(isSelected ? "cc-reveal-selected" : "")"
-                                             @onclick="() => ToggleReorderIndex(idx)"
+                                             @onclick="() => SelectForReorder(idx)"
                                              disabled="@isSelected">
                                             @if (isSelected)
                                             {
