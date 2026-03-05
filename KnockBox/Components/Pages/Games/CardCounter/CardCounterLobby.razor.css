@@ -355,9 +355,13 @@
 .cc-table-area {
     display: flex;
     flex-direction: column;
+    height: 100%;
+    width: 100%;
+    justify-content: center;
     align-items: center;
-    gap: 0;
-    flex: 1;
+    gap: 16px;
+    overflow-y: auto;
+    margin: auto;
     padding: 16px;
 }
 
@@ -368,8 +372,6 @@
     flex-wrap: wrap;
     gap: 10px;
     justify-content: center;
-    padding: 0 8px 8px;
-    max-width: 1000px;
     width: 100%;
 }
 
@@ -530,22 +532,19 @@
 /* ── Table Felt (center deck area) ───────────────────────────────────────── */
 
 .cc-table-felt {
-    background: radial-gradient(ellipse at center, #1e7a40 0%, #155a2e 60%, #0e3d1f 100%);
-    border-radius: 50%;
-    border: 14px solid #5c3411;
-    box-shadow: 
-        inset 0 0 80px rgba(0,0,0,0.4),
-        0 8px 40px rgba(0,0,0,0.6),
-        inset 0 0 20px rgba(255,255,255,0.02);
-    width: 100%;
-    max-width: 800px;
-    aspect-ratio: 2/1;
     display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    background: radial-gradient(ellipse at center, #1e7a40 0%, #155a2e 60%, #0e3d1f 100%);
+    border-radius: 26px;
+    border: 14px solid #5c3411;
+    box-shadow: inset 0 0 80px rgba(0,0,0,0.4), 0 8px 40px rgba(0,0,0,0.6), inset 0 0 20px rgba(255,255,255,0.02);
+    margin: 0 auto;
+    padding: 36px;
     align-items: center;
     justify-content: center;
     gap: 32px;
     position: relative;
-    padding: 20px;
 }
 
 /* ── Deck Piles ────────────────────────────────────────────────────────────── */
@@ -671,15 +670,14 @@
 /* ── My Player Panel ──────────────────────────────────────────────────────── */
 
 .cc-my-panel {
-    width: 100%;
-    max-width: 800px;
+    display: flex;
     background: rgba(0,0,0,0.4);
     border: 2px solid rgba(255,255,255,0.15);
     border-radius: 12px;
     padding: 14px 20px;
-    display: flex;
     flex-direction: column;
     gap: 12px;
+    margin: 0 auto;
     transition: border-color 0.3s, box-shadow 0.3s;
 }
 
@@ -690,8 +688,9 @@
 
 .cc-my-panel-stats {
     display: flex;
-    gap: 16px;
     flex-wrap: wrap;
+    flex-direction: row;
+    gap: 16px;
 }
 
 .cc-my-stat {
@@ -1619,7 +1618,7 @@
 
 /* ── Responsive ────────────────────────────────────────────────────────────── */
 
-@media (max-width: 600px) {
+/*@media (max-width: 600px) {
     .cc-table-felt {
         aspect-ratio: auto;
         min-height: 160px;
@@ -1735,11 +1734,11 @@
     .cc-hand-cards {
         gap: 6px;
     }
-}
+}*/
 
 /* ── Laptop+ layout: player list to the left of the table ─────────────────── */
 
-@media (min-width: 1024px) {
+/*@media (min-width: 1024px) {
     .cc-table-area {
         flex-direction: row;
         align-items: flex-start;
@@ -1761,7 +1760,7 @@
         max-width: 100%;
         min-width: 160px;
     }
-}
+}*/
 
 /* ── Drawn Card Overlay ────────────────────────────────────────────────────── */
 
