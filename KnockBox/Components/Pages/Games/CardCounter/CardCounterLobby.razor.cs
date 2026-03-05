@@ -435,6 +435,30 @@ namespace KnockBox.Components.Pages.Games.CardCounter
                 Logger.LogError("Failed to reset game: {Error}", error);
         }
 
+        protected string GetDrawEventAnimationClass(LastDrawnCardInfo drawnCard)
+        {
+            string currentUserId = UserService.CurrentUser?.Id ?? "";
+            return drawnCard.DrawerId == currentUserId
+                ? "cc-card-event-draw cc-card-event-to-me"
+                : "cc-card-event-draw cc-card-event-to-opponent";
+        }
+
+        protected string GetActionEventAnimationClass(LastPlayedActionInfo actionInfo)
+        {
+            string currentUserId = UserService.CurrentUser?.Id ?? "";
+            bool fromMe = actionInfo.PlayerId == currentUserId;
+
+            if (actionInfo.TargetId is not null)
+            {
+                bool toMe = actionInfo.TargetId == currentUserId;
+                return $"{(fromMe ? "cc-card-event-from-me" : "cc-card-event-from-opponent")} {(toMe ? "cc-card-event-to-me" : "cc-card-event-to-opponent")}";
+            }
+
+            return fromMe
+                ? "cc-card-event-from-me cc-card-event-to-discard"
+                : "cc-card-event-from-opponent cc-card-event-to-discard";
+        }
+
         // ── Static helpers ────────────────────────────────────────────────────
 
         protected static bool RequiresTarget(ActionType action) => action switch
@@ -541,4 +565,3 @@ namespace KnockBox.Components.Pages.Games.CardCounter
         };
     }
 }
-

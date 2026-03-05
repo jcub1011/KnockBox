@@ -43,36 +43,51 @@ else
             </div>
         </div>
 
-        @* ── Last Action / Drawn Card Notification ── *@
+        @* ── Last Action / Drawn Card Animation ── *@
         @if (GameState.LastPlayedAction is { } lastAction)
         {
-            <div class="cc-action-notification">
-                <span class="cc-notif-icon">@GetActionCardIcon(lastAction.Action)</span>
-                <div class="cc-notif-text">
-                    <strong>@lastAction.PlayerName</strong>
-                    played
-                    <strong>@GetActionCardName(lastAction.Action)</strong>
+            <div class="cc-card-event-overlay">
+                <div class="cc-card-event-summary">
+                    <strong>@lastAction.PlayerName</strong> played <strong>@GetActionCardName(lastAction.Action)</strong>
                     @if (lastAction.TargetName != null)
                     {
                         <span> on <strong>@lastAction.TargetName</strong></span>
                     }
                 </div>
+                <div class="cc-card-event-stage">
+                    <div class="cc-card-event-card @GetActionEventAnimationClass(lastAction)">
+                        <div class="cc-card-event-card-inner">
+                            <div class="cc-card-event-card-face cc-card-event-card-back">🂠</div>
+                            <div class="cc-card-event-card-face cc-card-event-card-front cc-card-event-card-front-action">
+                                <span class="cc-card-event-icon">@GetActionCardIcon(lastAction.Action)</span>
+                                <span class="cc-card-event-label">@GetActionCardName(lastAction.Action)</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         }
         else if (GameState.LastDrawnCard is { } drawnCard)
         {
-            <div class="cc-action-notification cc-draw-notification">
-                <span class="cc-notif-draw-value @(drawnCard.Card is OperatorCard ? "cc-notif-draw-operator" : "cc-notif-draw-number")">
-                    @FormatBaseCardDisplay(drawnCard.Card)
-                </span>
-                <div class="cc-notif-text">
-                    <strong>@drawnCard.DrawerName</strong>
-                    drew a <strong>@GetBaseCardTypeLabel(drawnCard.Card).ToLowerInvariant()</strong>
+            <div class="cc-card-event-overlay">
+                <div class="cc-card-event-summary">
+                    <strong>@drawnCard.DrawerName</strong> drew <strong>@GetBaseCardTypeLabel(drawnCard.Card).ToLowerInvariant()</strong>
                     (<strong>@FormatBaseCardDisplay(drawnCard.Card)</strong>)
                     @if (drawnCard.RedirectTargetName != null)
                     {
                         <span> — applied to <strong>@drawnCard.RedirectTargetName</strong></span>
                     }
+                </div>
+                <div class="cc-card-event-stage">
+                    <div class="cc-card-event-card @GetDrawEventAnimationClass(drawnCard)">
+                        <div class="cc-card-event-card-inner">
+                            <div class="cc-card-event-card-face cc-card-event-card-back">🂠</div>
+                            <div class="cc-card-event-card-face cc-card-event-card-front @(drawnCard.Card is OperatorCard ? "cc-card-event-card-front-operator" : "cc-card-event-card-front-number")">
+                                <span class="cc-card-event-value">@FormatBaseCardDisplay(drawnCard.Card)</span>
+                                <span class="cc-card-event-label">@GetBaseCardTypeLabel(drawnCard.Card)</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         }

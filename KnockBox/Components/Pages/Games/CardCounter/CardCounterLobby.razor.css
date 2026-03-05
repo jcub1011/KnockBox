@@ -109,16 +109,30 @@
     border: 1px solid rgba(247, 213, 71, 0.4);
 }
 
-/* ── Last Action Notification ─────────────────────────────────────────────── */
+/* ── Draw / Action Card Event Animation ───────────────────────────────────── */
 
-.cc-action-notification {
+.cc-card-event-overlay {
+    position: fixed;
+    top: 88px;
+    left: 0;
+    right: 0;
+    z-index: 240;
     display: flex;
+    flex-direction: column;
     align-items: center;
-    gap: 12px;
-    padding: 10px 20px;
-    background: rgba(247, 213, 71, 0.15);
-    border-bottom: 2px solid #f7d547;
-    animation: slideIn 0.3s ease-out;
+    gap: 10px;
+    pointer-events: none;
+}
+
+.cc-card-event-summary {
+    font-size: 1rem;
+    color: #f7d547;
+    background: rgba(9, 12, 18, 0.92);
+    border: 1px solid rgba(247, 213, 71, 0.45);
+    border-radius: 12px;
+    padding: 8px 16px;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.45);
+    animation: slideIn 0.25s ease-out;
 }
 
 @keyframes slideIn {
@@ -126,13 +140,139 @@
     to { opacity: 1; transform: translateY(0); }
 }
 
-.cc-notif-icon {
-    font-size: 1.8rem;
+.cc-card-event-stage {
+    position: relative;
+    width: min(680px, 94vw);
+    height: 270px;
 }
 
-.cc-notif-text {
-    font-size: 1rem;
-    color: #f7d547;
+.cc-card-event-card {
+    --start-x: 0px;
+    --start-y: 0px;
+    --end-x: 0px;
+    --end-y: 0px;
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 112px;
+    height: 156px;
+    transform: translate(-50%, -50%);
+    transform-style: preserve-3d;
+    perspective: 700px;
+    animation: cardTravel 1.15s ease-in-out forwards;
+}
+
+.cc-card-event-card-inner {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    transform-style: preserve-3d;
+    animation: cardFlipReveal 0.48s ease-out 0.28s forwards;
+}
+
+.cc-card-event-card-face {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    border-radius: 10px;
+    backface-visibility: hidden;
+    border: 3px solid #f7d547;
+    box-shadow: 0 8px 18px rgba(0,0,0,0.55);
+}
+
+.cc-card-event-card-back {
+    font-size: 3rem;
+    background: linear-gradient(145deg, #162447, #1f4068);
+}
+
+.cc-card-event-card-front {
+    transform: rotateY(180deg);
+    background: linear-gradient(145deg, #112341, #1a3d66);
+    color: #e6f2ff;
+}
+
+.cc-card-event-card-front-number {
+    background: linear-gradient(145deg, #123c71, #1565c0);
+}
+
+.cc-card-event-card-front-operator {
+    background: linear-gradient(145deg, #5b1e1e, #a93226);
+}
+
+.cc-card-event-card-front-action {
+    background: linear-gradient(145deg, #4a235a, #7d3c98);
+}
+
+.cc-card-event-value {
+    font-size: 2rem;
+    font-weight: 900;
+    line-height: 1;
+}
+
+.cc-card-event-icon {
+    font-size: 2.2rem;
+    line-height: 1;
+}
+
+.cc-card-event-label {
+    font-size: 0.74rem;
+    letter-spacing: 0.7px;
+    text-transform: uppercase;
+    font-weight: 800;
+    text-align: center;
+    padding: 0 8px;
+}
+
+.cc-card-event-draw {
+    --start-x: 0px;
+    --start-y: 0px;
+}
+
+.cc-card-event-from-me {
+    --start-x: 0px;
+    --start-y: 100px;
+}
+
+.cc-card-event-from-opponent {
+    --start-x: 0px;
+    --start-y: -100px;
+}
+
+.cc-card-event-to-me {
+    --end-x: 0px;
+    --end-y: 102px;
+}
+
+.cc-card-event-to-opponent {
+    --end-x: 0px;
+    --end-y: -102px;
+}
+
+.cc-card-event-to-discard {
+    --end-x: -250px;
+    --end-y: 20px;
+}
+
+@keyframes cardFlipReveal {
+    from { transform: rotateY(0deg); }
+    to { transform: rotateY(180deg); }
+}
+
+@keyframes cardTravel {
+    0% {
+        transform: translate(calc(-50% + var(--start-x)), calc(-50% + var(--start-y))) scale(0.92);
+    }
+    35% {
+        transform: translate(-50%, -50%) scale(1);
+    }
+    100% {
+        transform: translate(calc(-50% + var(--end-x)), calc(-50% + var(--end-y))) scale(0.96);
+        opacity: 0.96;
+    }
 }
 
 /* ── Lobby Phase ──────────────────────────────────────────────────────────── */
@@ -2016,5 +2156,4 @@
     justify-content: center;
     margin-top: 8px;
 }
-
 
