@@ -19,6 +19,11 @@ namespace KnockBox.Services.State.Games.Shared
         private int _disposed;
 
         /// <summary>
+        /// The UTC time when this state was created.
+        /// </summary>
+        public DateTime CreatedAt { get; } = DateTime.UtcNow;
+
+        /// <summary>
         /// True if this state has been disposed.
         /// </summary>
         public bool IsDisposed => _disposed == 1;

@@ -24,6 +24,8 @@ namespace KnockBox.Components.Pages.Games.CardCounter
         [Parameter] public string ObfuscatedRoomCode { get; set; } = default!;
 
         private IDisposable? _stateSubscription;
+        private PeriodicTimer? _timer;
+        private CancellationTokenSource? _timerCts;
 
         protected override async Task OnInitializedAsync()
         {
@@ -41,7 +43,6 @@ namespace KnockBox.Components.Pages.Games.CardCounter
             }
 
             GameState = gameState;
-            RoomCode = session.LobbyRegistration.Code;
 
             GameState.OnStateDisposed += HandleGameStateDisposed;
 
@@ -67,11 +68,30 @@ namespace KnockBox.Components.Pages.Games.CardCounter
                 }
             });
 
+            _timerCts = new CancellationTokenSource();
+            _timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
+            _ = StartTimerAsync();
+
             await base.OnInitializedAsync();
+        }
+
+        private async Task StartTimerAsync()
+        {
+            try
+            {
+                while (await _timer!.WaitForNextTickAsync(_timerCts!.Token))
+                {
+                    await InvokeAsync(StateHasChanged);
+                }
+            }
+            catch (OperationCanceledException) { }
         }
 
         public override void Dispose()
         {
+            _timerCts?.Cancel();
+            _timerCts?.Dispose();
+            _timer?.Dispose();
             if (GameState != null)
                 GameState.OnStateDisposed -= HandleGameStateDisposed;
             _stateSubscription?.Dispose();
@@ -95,8 +115,8 @@ namespace KnockBox.Components.Pages.Games.CardCounter
         }
 
         protected CardCounterGameState? GameState { get; set; }
-        protected string RoomCode { get; set; } = string.Empty;
-        protected bool IsRoomCodeVisible { get; set; } = false;
+
+        protected TimeSpan GameTime => GameState != null ? DateTime.UtcNow - GameState.CreatedAt : TimeSpan.Zero;
 
         // ── Discard history overlay ───────────────────────────────────────────
         private bool _showDiscardOverlay = false;
@@ -124,8 +144,6 @@ namespace KnockBox.Components.Pages.Games.CardCounter
         private HashSet<int> _selectedDiscardIndices = new();
 
         // ── Helpers ───────────────────────────────────────────────────────────
-
-        protected void ToggleRoomCode() => IsRoomCodeVisible = !IsRoomCodeVisible;
 
         protected void ToggleDiscardOverlay() => _showDiscardOverlay = !_showDiscardOverlay;
 

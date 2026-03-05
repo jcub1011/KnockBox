@@ -59,26 +59,17 @@
     gap: 12px;
 }
 
-.cc-game-title {
-    font-size: 1.4rem;
+.cc-game-timer {
+    font-size: 1.2rem;
     font-weight: 900;
-    color: #f7d547;
-    text-shadow: 2px 2px 0 #000, -1px -1px 0 #8B6914;
-    letter-spacing: 2px;
-    text-transform: uppercase;
-}
-
-.cc-room-code {
-    background: #8B4513;
-    color: #f7d547;
     font-family: var(--font-mono);
-    font-weight: 900;
-    font-size: 1.1rem;
+    color: #f7d547;
+    text-shadow: 2px 2px 0 #000;
+    letter-spacing: 2px;
+    background: rgba(0, 0, 0, 0.4);
     padding: 4px 12px;
-    border: 3px solid #f7d547;
     border-radius: 6px;
-    cursor: pointer;
-    letter-spacing: 3px;
+    border: 2px solid #8B6914;
 }
 
 .cc-phase-badge {

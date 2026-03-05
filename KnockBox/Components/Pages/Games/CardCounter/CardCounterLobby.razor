@@ -21,14 +21,7 @@ else
         @* ── Header ── *@
         <div class="cc-header">
             <div class="cc-header-left">
-                <span class="cc-game-title">♠ CARD COUNTER ♠</span>
-                <button class="cc-btn cc-btn-ghost cc-btn-sm" @onclick="ToggleRoomCode" title="Toggle room code">
-                    🔑 @(IsRoomCodeVisible ? "Hide Code" : "Show Code")
-                </button>
-                @if (IsRoomCodeVisible)
-                {
-                    <span class="cc-room-code user-select-all" title="Share this code to invite players">@RoomCode</span>
-                }
+                <span class="cc-game-timer">⏱ @GameTime.ToString(@"hh\:mm\:ss")</span>
             </div>
             <div class="cc-header-right">
                 @if (!GameState.IsJoinable)
