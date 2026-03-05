@@ -19,6 +19,16 @@
 	
   <ItemGroup>
     <None Remove="Data\Statics\Profanities\English.txt" />
+    <Compile Remove="Extensions\**\*.cs" />
+    <Compile Remove="Services\Logic\Games\CardCounter\**\*.cs" />
+    <Compile Remove="Services\Logic\Games\DiceSimulator\**\*.cs" />
+    <Compile Remove="Services\Logic\Games\Engines\Shared\**\*.cs" />
+    <Compile Remove="Services\Logic\RandomGeneration\**\*.cs" />
+    <Compile Remove="Services\State\Games\CardCounter\**\*.cs" />
+    <Compile Remove="Services\State\Games\DiceSimulator\**\*.cs" />
+    <Compile Remove="Services\State\Shared\**\*.cs" />
+    <Compile Remove="Services\State\Games\Shared\AbstractGameState.cs" />
+    <Compile Remove="Services\State\Users\IUserService.cs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -46,6 +56,12 @@
   <ItemGroup>
     <Folder Include="Data\Models\" />
     <Folder Include="wwwroot\css\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\KnockBox.CardCounter\KnockBox.CardCounter.csproj" />
+    <ProjectReference Include="..\KnockBox.Core\KnockBox.Core.csproj" />
+    <ProjectReference Include="..\KnockBox.DiceSimulator\KnockBox.DiceSimulator.csproj" />
   </ItemGroup>
 
 </Project>

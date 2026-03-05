@@ -1,4 +1,10 @@
 <Solution>
+  <Project Path="KnockBox.CardCounter/KnockBox.CardCounter.csproj" />
+  <Project Path="KnockBox.CardCounterTests/KnockBox.CardCounterTests.csproj" />
+  <Project Path="KnockBox.Core/KnockBox.Core.csproj" />
+  <Project Path="KnockBox.CoreTests/KnockBox.CoreTests.csproj" />
+  <Project Path="KnockBox.DiceSimulator/KnockBox.DiceSimulator.csproj" />
+  <Project Path="KnockBox.DiceSimulatorTests/KnockBox.DiceSimulatorTests.csproj" />
   <Project Path="docker-compose.dcproj">
     <Build />
   </Project>
