@@ -109,30 +109,122 @@
     border: 1px solid rgba(247, 213, 71, 0.4);
 }
 
-/* ── Last Action Notification ─────────────────────────────────────────────── */
+/* ── Draw / Action Card Event Animation ───────────────────────────────────── */
 
-.cc-action-notification {
+.cc-shoe-pile {
+    position: static;
+}
+
+.cc-shoe-event-card-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    pointer-events: none;
+    min-width: 116px;
+}
+
+.cc-last-event-panel {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 10px 20px;
-    background: rgba(247, 213, 71, 0.15);
-    border-bottom: 2px solid #f7d547;
-    animation: slideIn 0.3s ease-out;
+    justify-content: center;
 }
 
-@keyframes slideIn {
-    from { opacity: 0; transform: translateY(-10px); }
-    to { opacity: 1; transform: translateY(0); }
+.cc-card-event-card {
+    --card-flip-perspective: 700px;
+    width: 112px;
+    height: 156px;
+    transform-style: preserve-3d;
+    perspective: var(--card-flip-perspective);
+    animation: cardEventAppear 0.2s ease-out;
 }
 
-.cc-notif-icon {
-    font-size: 1.8rem;
+.cc-card-event-card-inner {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    transform-style: preserve-3d;
+    animation: cardFlipReveal 0.48s ease-out 0.28s forwards;
 }
 
-.cc-notif-text {
-    font-size: 1rem;
+.cc-card-event-card-face {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    border-radius: 10px;
+    backface-visibility: hidden;
+    border: 3px solid #f7d547;
+    box-shadow: 0 8px 18px rgba(0,0,0,0.55);
+}
+
+.cc-card-event-card-back {
+    font-size: 3rem;
+    background: linear-gradient(145deg, #162447, #1f4068);
+}
+
+.cc-card-event-card-front {
+    transform: rotateY(180deg);
+    background: linear-gradient(145deg, #112341, #1a3d66);
+    color: #e6f2ff;
+}
+
+.cc-card-event-card-front-number {
+    background: linear-gradient(145deg, #123c71, #1565c0);
+}
+
+.cc-card-event-card-front-operator {
+    background: linear-gradient(145deg, #5b1e1e, #a93226);
+}
+
+.cc-card-event-card-front-action {
+    background: linear-gradient(145deg, #4a235a, #7d3c98);
+}
+
+.cc-card-event-value {
+    font-size: 2rem;
+    font-weight: 900;
+    line-height: 1;
+}
+
+.cc-card-event-icon {
+    font-size: 2.2rem;
+    line-height: 1;
+}
+
+.cc-card-event-label {
+    font-size: 0.74rem;
+    letter-spacing: 0.7px;
+    text-transform: uppercase;
+    font-weight: 800;
+    text-align: center;
+    padding: 0 8px;
+}
+
+@keyframes cardFlipReveal {
+    from { transform: rotateY(0deg); }
+    to { transform: rotateY(180deg); }
+}
+
+@keyframes cardEventAppear {
+    from { opacity: 0; transform: scale(0.94); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+.cc-shoe-event-caption {
     color: #f7d547;
+    font-size: 0.76rem;
+    font-weight: 700;
+    text-align: center;
+    background: rgba(0,0,0,0.72);
+    border: 1px solid rgba(247, 213, 71, 0.4);
+    border-radius: 8px;
+    padding: 4px 8px;
+    min-width: 132px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
 }
 
 /* ── Lobby Phase ──────────────────────────────────────────────────────────── */
@@ -348,12 +440,19 @@
     flex-direction: column;
     height: 100%;
     width: 100%;
-    justify-content: center;
-    align-items: center;
     gap: 16px;
     overflow-y: auto;
     margin: auto;
     padding: 16px;
+}
+
+.cc-table-center-wrap {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 16px;
+    width: 100%;
 }
 
 /* ── Opponents Row ─────────────────────────────────────────────────────────── */
@@ -530,7 +629,7 @@
     border-radius: 26px;
     border: 14px solid #5c3411;
     box-shadow: inset 0 0 80px rgba(0,0,0,0.4), 0 8px 40px rgba(0,0,0,0.6), inset 0 0 20px rgba(255,255,255,0.02);
-    margin: 0 auto;
+    margin: 0;
     padding: 36px;
     align-items: center;
     justify-content: center;
@@ -1774,31 +1873,6 @@
     }
 }*/
 
-.cc-draw-notification {
-    background: rgba(100, 180, 255, 0.12);
-    border-bottom-color: rgba(100, 180, 255, 0.5);
-}
-
-.cc-notif-draw-value {
-    font-size: 1.6rem;
-    font-weight: 900;
-    line-height: 1;
-    min-width: 36px;
-    text-align: center;
-    border-radius: 6px;
-    padding: 2px 8px;
-}
-
-.cc-notif-draw-number {
-    background: rgba(21, 101, 192, 0.35);
-    color: #90caf9;
-}
-
-.cc-notif-draw-operator {
-    background: rgba(198, 40, 40, 0.35);
-    color: #ef9a9a;
-}
-
 /* ── Skim Digit Selection Overlay ─────────────────────────────────────────── */
 
 .cc-skim-select-overlay {
@@ -2016,5 +2090,3 @@
     justify-content: center;
     margin-top: 8px;
 }
-
-

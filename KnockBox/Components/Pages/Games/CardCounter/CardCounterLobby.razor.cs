@@ -541,4 +541,3 @@ namespace KnockBox.Components.Pages.Games.CardCounter
         };
     }
 }
-

@@ -86,8 +86,8 @@ namespace KnockBox.Services.State.Games.CardCounter
         public string? FeelingLuckyTargetId { get; set; }
 
         /// <summary>
-        /// The most recently drawn shoe card, shown to all players as a full-screen overlay
-        /// immediately after it is drawn. Cleared once acknowledged or on next turn.
+        /// The most recently drawn shoe card, shown to all players as the latest draw event.
+        /// Remains visible until superseded by another draw/action event.
         /// </summary>
         public LastDrawnCardInfo? LastDrawnCard { get; set; }
 

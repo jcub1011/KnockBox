@@ -158,10 +158,14 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM
 
         /// <summary>
         /// Applies an operator card to the target player: computes the new balance from
-        /// the pot, then clears the pot. Handles division by zero with a random event.
+        /// the pot, then clears the pot. If the pot is empty, this is a no-op.
+        /// Handles division by zero with a random event.
         /// </summary>
         public void ApplyOperatorCard(PlayerState player, OperatorCard card)
         {
+            if (player.Pot.Count == 0)
+                return;
+
             long potValue = player.PotValue;
             player.Pot.Clear();
 
@@ -208,7 +212,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM
         {
             string desc = FormatBaseCard(card);
             string symbol = GetBaseCardSymbol(card);
-            State.DiscardHistory.Add(new DiscardHistoryEntry($"{desc} (Burned)", "🔥", null, false));
+            State.DiscardHistory.Add(new DiscardHistoryEntry($"{desc} (Burned)", "🔥", null, true));
         }
 
         /// <summary>Records an action card played by a player into the discard history.</summary>
