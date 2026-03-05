@@ -43,6 +43,8 @@ namespace KnockBox.Components.Pages.Games.CardCounter
             GameState = gameState;
             RoomCode = session.LobbyRegistration.Code;
 
+            GameState.OnStateDisposed += HandleGameStateDisposed;
+
             _stateSubscription = GameState.StateChangedEventManager.Subscribe(async () =>
             {
                 bool isNewShoe = GameState?.IsNewShoe == true;
@@ -70,9 +72,26 @@ namespace KnockBox.Components.Pages.Games.CardCounter
 
         public override void Dispose()
         {
+            if (GameState != null)
+                GameState.OnStateDisposed -= HandleGameStateDisposed;
             _stateSubscription?.Dispose();
             GameSessionService.LeaveCurrentSession(false);
             base.Dispose();
+        }
+
+        private void HandleGameStateDisposed()
+        {
+            try
+            {
+                // The host left and the game state was torn down. Navigate remaining players home.
+                _ = InvokeAsync(ReturnToHome).ContinueWith(
+                    t => Logger.LogError(t.Exception, "Error navigating home after game state was disposed."),
+                    System.Threading.Tasks.TaskContinuationOptions.OnlyOnFaulted);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Error handling game state disposal in lobby.");
+            }
         }
 
         protected CardCounterGameState? GameState { get; set; }

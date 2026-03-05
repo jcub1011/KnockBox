@@ -33,6 +33,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter
 
             var gameState = new CardCounterGameState(host, stateLogger);
             gameState.UpdateJoinableStatus(true);
+            gameState.PlayerUnregistered += player => HandlePlayerLeft(player, gameState);
             logger.LogInformation("Created CardCounter state with host [{id}].", host.Id);
             return gameState;
         }
@@ -220,6 +221,77 @@ namespace KnockBox.Services.Logic.Games.CardCounter
                 state.ForceDrawStack.Clear();
                 InitializeGame(context);
                 TransitionTo(context, new BuyInState());
+            });
+        }
+
+        // ── Player-leave handling ─────────────────────────────────────────────
+
+        /// <summary>
+        /// Called whenever a player unregisters from the game (disconnect, tab close, or kick).
+        /// Removes the player from the turn order and player table. If the leaving player was
+        /// the active player the FSM is immediately advanced to the next player's turn. If no
+        /// players remain the game transitions to <see cref="GameOverState"/>.
+        /// </summary>
+        internal void HandlePlayerLeft(User player, CardCounterGameState state)
+        {
+            // If the game hasn't been started yet (no context) there is no turn order to fix.
+            if (state.Context is null || state.IsDisposed) return;
+
+            var context = state.Context;
+
+            state.Execute(() =>
+            {
+                int leftIndex = state.TurnOrder.IndexOf(player.Id);
+                if (leftIndex < 0) return; // Not in turn order; nothing to adjust.
+
+                // Remember whether the leaving player was the one currently taking their turn.
+                bool wasActiveTurn = leftIndex == state.CurrentPlayerIndex
+                                     && state.GamePhase == GamePhase.Playing;
+
+                state.TurnOrder.RemoveAt(leftIndex);
+                state.GamePlayers.TryRemove(player.Id, out _);
+
+                logger.LogInformation(
+                    "Player [{id}] left the game. TurnOrder now has {n} player(s).",
+                    player.Id, state.TurnOrder.Count);
+
+                // If no players remain, end the game immediately.
+                if (state.TurnOrder.Count == 0)
+                {
+                    TransitionTo(context, new GameOverState());
+                    return;
+                }
+
+                // Adjust CurrentPlayerIndex to stay pointed at the correct next player.
+                if (leftIndex < state.CurrentPlayerIndex)
+                {
+                    // A player before the current one was removed; shift the index left.
+                    state.CurrentPlayerIndex--;
+                }
+                else if (leftIndex == state.CurrentPlayerIndex
+                         && state.CurrentPlayerIndex >= state.TurnOrder.Count)
+                {
+                    // The removed player was last in the list; wrap to the first player.
+                    state.CurrentPlayerIndex = 0;
+                }
+                // else: removed player was after the current one — index is unaffected.
+
+                // If the active player left while a turn was in progress, immediately start
+                // the next player's turn so the game doesn't stall waiting for a response
+                // from a player that is no longer connected.
+                if (wasActiveTurn)
+                {
+                    TransitionTo(context, new PlayerTurnState());
+                    return;
+                }
+
+                // During BuyIn, check whether all remaining players have now committed
+                // their buy-in (the leaving player may have been the only one outstanding).
+                if (state.GamePhase == GamePhase.BuyIn
+                    && state.GamePlayers.Values.All(p => p.HasSetBuyIn))
+                {
+                    TransitionTo(context, new RoundEndState());
+                }
             });
         }
 

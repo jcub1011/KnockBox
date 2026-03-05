@@ -8,6 +8,8 @@ using KnockBox.Services.Registrations.Validators;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 
+[assembly: System.Runtime.CompilerServices.InternalsVisibleTo("KnockBoxTests")]
+
 namespace KnockBox
 {
     public class Program

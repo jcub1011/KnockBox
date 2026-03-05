@@ -29,6 +29,12 @@ namespace KnockBox.Services.State.Games.Shared
         public event Action? OnStateDisposed;
 
         /// <summary>
+        /// Fired after a player is successfully removed from this game (disconnected, left, or kicked).
+        /// Raised outside the execute lock so subscribers may safely call <see cref="Execute"/>.
+        /// </summary>
+        public event Action<User>? PlayerUnregistered;
+
+        /// <summary>
         /// Raises when any state changes.
         /// </summary>
         public readonly IThreadSafeEventManager StateChangedEventManager
@@ -86,11 +92,16 @@ namespace KnockBox.Services.State.Games.Shared
                 return ValueResult<IDisposable>.FromError("Host cannot be a player in the game.");
 
             bool wasAdded = false;
-            var unsubscriber = new DisposableAction(() => Execute(() =>
+            var unsubscriber = new DisposableAction(() =>
             {
-                using var scope = _playerLock.EnterScope();
-                if (wasAdded) _players.Remove(player);
-            }));
+                Execute(() =>
+                {
+                    using var scope = _playerLock.EnterScope();
+                    if (wasAdded) _players.Remove(player);
+                });
+                // Fire outside the execute lock so subscribers can safely call Execute.
+                if (wasAdded) PlayerUnregistered?.Invoke(player);
+            });
 
             using var scope = _playerLock.EnterScope();
             if (_kickedPlayers.Contains(player))
