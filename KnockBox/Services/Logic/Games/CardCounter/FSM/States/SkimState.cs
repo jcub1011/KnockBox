@@ -50,6 +50,12 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
 
                 // Target blocked with Comp'd — cancel the skim
                 target.ActionHand.RemoveAt(playCmd.CardIndex);
+                context.State.LastPlayedAction = new LastPlayedActionInfo(
+                    target.PlayerId,
+                    target.DisplayName,
+                    responseCard.Action,
+                    null,
+                    null);
                 context.RecordActionCardPlay(target, responseCard);
                 context.Logger.LogInformation("Player [{id}] blocked Skim with Comp'd.", _targetId);
                 return new PlayerTurnState();
