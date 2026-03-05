@@ -1,8 +1,27 @@
-# Multi-Game Room Platform — Architecture Overview
+# KnockBox — Game Host Platform Architecture
 
 ## Vision
 
 A Blazor Server web application that hosts multiple browser-based party games under a single platform. Players create or join lobbies using short lobby codes, similar to Jackbox-style party games. The architecture treats lobby management as shared infrastructure and individual games as pluggable modules, allowing new games to be added with minimal changes to the core platform.
+
+---
+
+## Solution Structure
+
+The solution is split into four main projects plus their corresponding test projects:
+
+| Project | Type | Purpose |
+|---|---|---|
+| `KnockBox` | ASP.NET Core Web App (Blazor Server) | Entry point: Razor pages, routing, DI bootstrapping, database, middleware |
+| `KnockBox.Core` | Class Library | Shared platform infrastructure: extensions, `AbstractGameState`, `AbstractGameEngine`, `IRandomNumberService`, result types, thread-safety utilities |
+| `KnockBox.CardCounter` | Class Library | Card Counter game logic and state |
+| `KnockBox.DiceSimulator` | Class Library | Dice Simulator game logic and state |
+| `KnockBox.CoreTests` | MSTest | Unit tests for `KnockBox.Core` |
+| `KnockBox.CardCounterTests` | MSTest | Unit tests for `KnockBox.CardCounter` |
+| `KnockBox.DiceSimulatorTests` | MSTest | Unit and integration tests for `KnockBox.DiceSimulator` |
+| `KnockBoxTests` | MSTest | Integration tests for the main `KnockBox` project (repository layer, etc.) |
+
+`KnockBox` references all three class libraries. `KnockBox.CardCounter` and `KnockBox.DiceSimulator` each reference `KnockBox.Core`.
 
 ---
 
@@ -40,13 +59,14 @@ All users connect to a single Blazor Server instance. Each browser tab maintains
  │                                       │
  │  ┌─────────────────────────────────┐  │
  │  │  Game Engines (Singleton / DI)  │  │
- │  │  DiceSimulator │ CardCounter    │  │
+ │  │  DiceSimulatorGameEngine        │  │
+ │  │  CardCounterGameEngine          │  │
  │  └─────────────────────────────────┘  │
  │                                       │
  │  ┌─────────────────────────────────┐  │
  │  │  Support Services (Singleton)   │  │
  │  │  LobbyCodeService │ Profanity   │  │
- │  │  RandomNumber                   │  │
+ │  │  RandomNumberService            │  │
  │  └─────────────────────────────────┘  │
  └───────────────────────────────────────┘
 ```
@@ -77,7 +97,7 @@ The following diagram shows the lifecycle of a single player action during gamep
           │                           │               │  NotifyChanged()   │             │
           │                           │               └────────────────────┘             │
           │                           │                        │                        │
-          │           Result<T>       │                        │                        │
+          │           Result          │                        │                        │
           │ <─────────────────────────│                        │                        │
           │                           │                        │                        │
           │              callback: re-render with updated state│                        │
@@ -90,7 +110,7 @@ The following diagram shows the lifecycle of a single player action during gamep
        [UI updates]                   │                        │                  [UI updates]
 ```
 
-Key points: the `LobbyService` is not involved during gameplay. The Razor page injects the game engine via DI and holds a reference to the game state obtained when joining the lobby. `Execute`/`ExecuteAsync` acquires the lock, runs the mutation, releases the lock, and *then* notifies subscribers — keeping the lock held for the minimum duration and preventing reentrant deadlocks from listener callbacks. Listeners are invoked with error isolation so a failing subscriber cannot break notification for others. All fallible operations return `Result<T>` rather than throwing exceptions.
+Key points: the `LobbyService` is not involved during gameplay. The Razor page injects the game engine via DI and holds a reference to the game state obtained when joining the lobby. `Execute`/`ExecuteAsync` acquires the lock, runs the mutation, releases the lock, and *then* notifies subscribers — keeping the lock held for the minimum duration and preventing reentrant deadlocks from listener callbacks. Listeners are invoked with error isolation so a failing subscriber cannot break notification for others. All fallible operations return `Result` or `ValueResult<T>` rather than throwing exceptions.
 
 ---
 
@@ -105,8 +125,8 @@ Game engine resolution uses `IServiceProvider.GetService<T>()` with a `GameType`
 ```csharp
 public interface ILobbyService
 {
-    Task<Result<LobbyRegistration>> CreateLobbyAsync(User host, GameType gameType, CancellationToken ct = default);
-    Task<Result<UserRegistration>> JoinLobbyAsync(User user, string lobbyCode, CancellationToken ct = default);
+    Task<ValueResult<LobbyRegistration>> CreateLobbyAsync(User host, GameType gameType, CancellationToken ct = default);
+    Task<ValueResult<UserRegistration>> JoinLobbyAsync(User user, string lobbyCode, CancellationToken ct = default);
     Task<Result> CloseLobbyAsync(User user, LobbyRegistration registration, CancellationToken ct = default);
 }
 ```
@@ -154,9 +174,9 @@ public record class UserRegistration(
 
 ### AbstractGameEngine
 
-An abstract base class that every game extends. Defines player limits (`MaxPlayerCount`, `MinPlayerCount`), an async factory method for creating the game's concrete state, a `StartAsync` lifecycle method, and a `CanStartAsync` validation predicate. Each concrete engine exposes **game-specific methods** (e.g., `RollDice`, `ClearHistory`) that the game's Razor pages call directly. These methods receive a reference to the game state, mutate it via `state.Execute`/`state.ExecuteAsync`, and return `Result` or `Result<T>`.
+An abstract base class that every game extends. Defines player limits (`MaxPlayerCount`, `MinPlayerCount`), an async factory method for creating the game's concrete state, a `StartAsync` lifecycle method, and a `CanStartAsync` validation predicate. Each concrete engine exposes **game-specific methods** (e.g., `RollDice`, `DrawCard`) that the game's Razor pages call directly. These methods receive a reference to the game state, mutate it via `state.Execute`/`state.ExecuteAsync`, and return `Result` or `ValueResult<T>`.
 
-Game engines are **singletons** registered in DI. They hold no per-room state — all mutable data lives on the `AbstractGameState`. Razor pages inject their concrete engine directly (e.g., `@inject DiceSimulatorGameEngine Engine`) rather than receiving it from the lobby, keeping the engine resolution simple and testable.
+Game engines are **singletons** registered in DI. They hold no per-room state — all mutable data lives on the `AbstractGameState`. Razor pages inject their concrete engine directly (e.g., `@inject DiceSimulatorGameEngine Engine`).
 
 ```csharp
 public abstract class AbstractGameEngine
@@ -164,7 +184,7 @@ public abstract class AbstractGameEngine
     public int MaxPlayerCount { get; }
     public int MinPlayerCount { get; }
 
-    public abstract Task<Result<AbstractGameState>> CreateStateAsync(User host, CancellationToken ct = default);
+    public abstract Task<ValueResult<AbstractGameState>> CreateStateAsync(User host, CancellationToken ct = default);
     public abstract Task<Result> StartAsync(User host, AbstractGameState state, CancellationToken ct = default);
 
     public virtual Task<bool> CanStartAsync(AbstractGameState state)
@@ -177,19 +197,19 @@ public abstract class AbstractGameEngine
 }
 ```
 
-`AbstractGameEngine` is purely server-side, concerned only with game logic and state transitions. It has no knowledge of UI components. All rendering decisions are owned by each game's Razor pages.
+`AbstractGameEngine` is purely server-side, concerned only with game logic and state transitions. It has no knowledge of UI components.
 
 ### AbstractGameState
 
-An abstract base class that defines the minimal contract shared across all games — the host, the player list, joinability status, a concurrency lock, a built-in event dispatcher, and a scheduled callback mechanism. Each game implements its own concrete subclass with strongly-typed properties for that game's specific state.
+An abstract base class that defines the minimal contract shared across all games — the host, the player list, joinability status, a concurrency lock, a built-in event manager, and a scheduled callback mechanism. Each game implements its own concrete subclass with strongly-typed properties for that game's specific state.
 
 The game state instance is created when the lobby is created via the engine's `CreateStateAsync()` factory method, and the same instance is used from lobby through gameplay. Players join and subscribe to this state immediately. When the host starts the game, `StartAsync` mutates the existing state in place — there is no state replacement or re-subscription required.
 
-All state mutations go through `Execute` (sync) or `ExecuteAsync` (async), which acquire a per-state `SemaphoreSlim(1, 1)`, execute the mutation, release the lock, and then notify all subscribers. Notification happens *after* the lock is released to keep lock duration minimal and to prevent reentrant deadlocks if a listener callback triggers another mutation. Each listener is invoked with error isolation so that a failing subscriber does not prevent others from being notified. `NotifyStateChanged` is private; the only way to trigger it is through `Execute`/`ExecuteAsync` and `UpdateJoinableStatus`.
+All state mutations go through `Execute` (sync) or `ExecuteAsync` (async), which acquire a per-state `SemaphoreSlim(1, 1)`, execute the mutation, release the lock, and then notify all subscribers. Notification happens *after* the lock is released to keep lock duration minimal and to prevent reentrant deadlocks if a listener callback triggers another mutation. Each listener is invoked with error isolation so that a failing subscriber does not prevent others from being notified.
 
-Subscriptions return an `IDisposable` via `SubscribeToStateChanged`. Razor components store the subscription and dispose it when the component is detached, preventing dead callbacks from accumulating. This disposable subscription pattern is the standard for all event subscriptions across the application. The subscriber list is thread-safe via `ThreadSafeEventManager<int>`.
+Subscriptions are obtained via `state.StateChangedEventManager.Subscribe(Func<ValueTask>)`, which returns an `IDisposable`. Razor components store the subscription and dispose it when the component is detached, preventing dead callbacks from accumulating.
 
-The state also manages player registration and kicking. `RegisterPlayer` adds a player and returns an `IDisposable` unregistration token (backed by `DisposableAction`) that removes the player when disposed. `KickPlayer` adds the player to a kicked set, preventing them from rejoining.
+The `PlayerUnregistered` event is fired after a player is successfully removed from the game (disconnected, left, or kicked). It is raised *outside* the execute lock so subscribers may safely call `Execute` in response.
 
 #### Exclusive Read Access
 
@@ -197,31 +217,30 @@ The state exposes `WithExclusiveRead` and `WithExclusiveReadAsync` for non-mutat
 
 #### Scheduled Callbacks
 
-The state exposes a `ScheduleCallback` method that allows game engines to schedule delayed state transitions. `ScheduleCallback` accepts a `TimeSpan` delay and a `Func<Task>` action, and returns a `Result<CancellationTokenSource>` that the caller can use to cancel the scheduled callback before it fires. Internally, the scheduled action is executed via `ExecuteAsync` when the delay elapses, ensuring it follows the same locking and notification semantics as any player-driven mutation.
-
-All scheduled callbacks are linked to a dispose-scoped `CancellationTokenSource`, so they are automatically cancelled when the state is disposed. The state is responsible for disposing the token source; the caller must not call `Dispose()` on it.
+The state exposes a `ScheduleCallback` method that allows game engines to schedule delayed state transitions. `ScheduleCallback` accepts a `TimeSpan` delay and a `Func<Task>` action, and returns a `ValueResult<CancellationTokenSource>` that the caller can use to cancel the scheduled callback before it fires. Internally, the scheduled action is executed via `ExecuteAsync` when the delay elapses, ensuring it follows the same locking and notification semantics as any player-driven mutation. All outstanding callbacks are automatically cancelled when the state is disposed.
 
 ```csharp
 public abstract class AbstractGameState(User host, ILogger logger) : IDisposable
 {
     public bool IsDisposed { get; }
     public event Action? OnStateDisposed;
-    public IThreadSafeEventManager<int> EventManager { get; }
+    public event Action<User>? PlayerUnregistered;
+    public IThreadSafeEventManager StateChangedEventManager { get; }
     public bool IsJoinable { get; }
     public User Host => host;
     public IReadOnlyList<User> Players { get; }
     public IReadOnlyList<User> KickedPlayers { get; }
 
-    public Result<IDisposable> RegisterPlayer(User player);
+    public ValueResult<IDisposable> RegisterPlayer(User player);
     public Result KickPlayer(User player);
     public void UpdateJoinableStatus(bool isJoinable);
-    public Result<IDisposable> SubscribeToStateChanged(Func<ValueTask> handler);
 
     public ValueTask<Result> ExecuteAsync(Func<ValueTask> action, CancellationToken ct = default);
     public Result Execute(Action action);
+    public ValueResult<TReturn> Execute<TReturn>(Func<TReturn> action);
     public ValueTask<Result> WithExclusiveReadAsync(Func<ValueTask> action, CancellationToken ct = default);
     public Result WithExclusiveRead(Action action);
-    public Result<CancellationTokenSource> ScheduleCallback(TimeSpan delay, Func<Task> action);
+    public ValueResult<CancellationTokenSource> ScheduleCallback(TimeSpan delay, Func<Task> action);
 }
 ```
 
@@ -281,17 +300,26 @@ public class DisposableComponent : ComponentBase, IDisposable
 }
 ```
 
-### ThreadSafeEventManager\<T\>
+### ThreadSafeEventManager
 
-The primary component communication mechanism. Each `AbstractGameState` owns one instance typed as `ThreadSafeEventManager<int>` (the int payload acts as a signal).
+The primary component communication mechanism. `AbstractGameState` owns one `ThreadSafeEventManager` (non-generic) instance as its `StateChangedEventManager`. It is also available as a generic `ThreadSafeEventManager<TEventArgs>` for typed payloads.
 
 Key design decisions:
 - Listeners are stored as a **copy-on-write array**. Subscribe/unsubscribe both clone the array under a `Lock`, so notification never needs the lock.
 - `Subscribe` returns an `IDisposable` (`DisposableAction`) that removes the callback when disposed — enabling clean scoped subscriptions.
-- `NotifyAsync` takes a snapshot of listeners, then fans out to all of them concurrently via `Task.WhenAll`. Already-completed `ValueTask`s skip allocation. Errors in individual listeners are swallowed and logged.
-- `Notify` (fire-and-forget) spawns `Task.Run` and delegates to `NotifyAsync`. Used by `AbstractGameState.NotifyStateChanged()`.
+- `NotifyAsync` takes a snapshot of listeners, then fans out to all of them concurrently. Already-completed `ValueTask`s skip allocation. Errors in individual listeners are swallowed and logged.
+- `Notify` (fire-and-forget) spawns `Task.Run` and delegates to `NotifyAsync`. Used by `AbstractGameState` after releasing the execute lock.
 
 ```csharp
+// Non-generic version (used by AbstractGameState.StateChangedEventManager):
+public interface IThreadSafeEventManager
+{
+    IDisposable Subscribe(Func<ValueTask> callback);
+    Task NotifyAsync();
+    void Notify();
+}
+
+// Generic version (available for typed event payloads):
 public interface IThreadSafeEventManager<TEventArgs>
 {
     IDisposable Subscribe(Func<TEventArgs, ValueTask> callback);
@@ -304,22 +332,22 @@ public interface IThreadSafeEventManager<TEventArgs>
 
 ## Cross-Cutting Patterns
 
-### Result\<T\> Railway Error Handling
+### Result / ValueResult Railway Error Handling
 
-All fallible service operations return `Result`, `Result<TValue>`, or `Result<TValue, TError>` rather than throwing exceptions for control flow. Callers use `TryGetValue(out value)` / `TryGetError(out error)` to discriminate success from failure. `Result.Success` is a shared static instance for void success cases. This pattern is used throughout `LobbyService`, `AbstractGameEngine`, `AbstractGameState`, `GameSessionService`, and all game engine methods.
+All fallible service operations return `Result`, `ValueResult<TValue>`, or `ValueResult<TValue, TError>` rather than throwing exceptions for control flow. Callers use `TryGetSuccess(out value)` / `TryGetFailure(out error)` / `IsCanceled` to discriminate outcomes. `Result.Success` is a shared static instance for void success cases. This pattern is used throughout `LobbyService`, `AbstractGameEngine`, `AbstractGameState`, `GameSessionService`, and all game engine methods.
 
 ### Disposable Subscription Pattern
 
-All event subscriptions return an `IDisposable`. When the disposable is disposed, the subscription is automatically removed. This is enforced by `ThreadSafeEventManager<T>` and backed by `DisposableAction` — a helper that invokes an `Action` exactly once when disposed, using `Interlocked.Exchange` to prevent double invocation. Player registrations also follow this pattern: `RegisterPlayer` returns an `IDisposable` that removes the player when disposed.
+All event subscriptions return an `IDisposable`. When the disposable is disposed, the subscription is automatically removed. This is enforced by `ThreadSafeEventManager` and backed by `DisposableAction` — a helper that invokes an `Action` exactly once when disposed, using `Interlocked.Exchange` to prevent double invocation. Player registrations also follow this pattern: `RegisterPlayer` returns an `IDisposable` that removes the player when disposed.
 
 ### Threading Utilities
 
 Thread safety is first-class throughout the application:
-- **`Lock`** (C# 13 `System.Threading.Lock`): Used in `ThreadSafeEventManager`, `LobbyCodeService`, `AbstractGameState` (dispose, scheduled callbacks, player management), and `DiceSimulatorGameState` (roll history).
+- **`Lock`** (C# 13 `System.Threading.Lock`): Used in `ThreadSafeEventManager`, `LobbyCodeService`, `AbstractGameState` (dispose, scheduled callbacks, player management).
 - **`SemaphoreSlim(1, 1)`**: Used as an async mutex in `AbstractGameState._executeLock`. All game mutations are serialized through this.
-- **`ConcurrentDictionary`**: Used in `LobbyService._lobbies`, `DiceSimulatorGameState._playerStats`.
+- **`ConcurrentDictionary`**: Used in `LobbyService._lobbies`, `DiceSimulatorGameState._playerStats`, `CardCounterGameState.GamePlayers`.
 - **`Interlocked`**: Used for atomic flag swaps in `AbstractGameState._disposed`, `GameSessionService._currentSession`, and `DisposableAction._disposeAction`.
-- **`ThreadSafeList<T>`**: A full `IList<T>` implementation backed by `List<T>` + `ReaderWriterLockSlim` with scoped lock helpers (`ReadLockScope`, `WriteLockScope`).
+- **`ThreadSafeList<T>`**: A full `IList<T>` implementation backed by `List<T>` + `ReaderWriterLockSlim`.
 - **`CancellationTokenSource` patterns**: `AbstractGameState._disposeCts` (linked into all scheduled callbacks), `LobbyCircuitHandler._disconnectCts` (grace period timer), `DisposableComponent._cts` (component detach token).
 
 ---
@@ -345,7 +373,7 @@ public enum GameType
 }
 ```
 
-Game pages declare matching `@page` directives, e.g., `@page "/room/dice-simulator/{ObfuscatedRoomCode}"`. The `NavigationString` attribute value must match the route segment used in the game's page directive. A mismatch will result in a 404 at navigation time.
+Game pages declare matching `@page` directives, e.g., `@page "/room/dice-simulator/{ObfuscatedRoomCode}"`. The `NavigationString` attribute value must match the route segment used in the game's page directive.
 
 Each game controls its full user experience: the lobby layout, gameplay phases, transitions, and any game-specific sub-flows. The platform imposes no UI constraints on games.
 
@@ -372,7 +400,7 @@ The following diagram shows the complete lifecycle from a player joining an exis
         │                      │                    │    RegisterPlayer()) │                      │
         │                      │                    │ ────────────────────>│                      │
         │                      │                    │                      │                      │
-        │                      │  Result<           │                      │                      │
+        │                      │  ValueResult<      │                      │                      │
         │                      │    UserRegistration│                      │                      │
         │                      │    >               │                      │                      │
         │                      │ <──────────────────│                      │                      │
@@ -421,7 +449,7 @@ The following diagram shows the complete lifecycle from a player joining an exis
 ### Create Lobby
 
 1. Player selects a game type from the home page.
-2. `LobbyService.CreateLobbyAsync` resolves the selected game's `AbstractGameEngine` from DI via `IServiceProvider`, calls `engine.CreateStateAsync(host)` to obtain the concrete game state (which returns `Result<AbstractGameState>`), generates a unique 6-character lobby code via `ILobbyCodeService` (cryptographically random, profanity-filtered), constructs an obfuscated lobby URI (`room/{gameType}/{guidA}-{guidB}`), creates a `LobbyRegistration`, and stores it in the `ConcurrentDictionary`.
+2. `LobbyService.CreateLobbyAsync` resolves the selected game's `AbstractGameEngine` from DI via `IServiceProvider`, calls `engine.CreateStateAsync(host)` to obtain the concrete game state, generates a unique 6-character lobby code via `ILobbyCodeService` (cryptographically random, profanity-filtered), constructs an obfuscated lobby URI (`room/{gameType}/{guidA}-{guidB}`), creates a `LobbyRegistration`, and stores it in the `ConcurrentDictionary`.
 3. The host's `GameSessionService.SetCurrentSession` stores the `LobbyRegistration` reference and navigates to the game page.
 4. The game page loads, subscribes to the state, and renders the lobby view.
 
@@ -438,22 +466,22 @@ Players cannot join a lobby once the game state's `IsJoinable` is set to `false`
 ### Start Game
 
 1. Host clicks start in the game's lobby view.
-2. The game engine's `StartAsync(host, state)` is called. It verifies the caller is the host, then calls `state.Execute(() => state.UpdateJoinableStatus(false))` to close the lobby and transition to gameplay.
-3. The state notifies all subscribers, causing all circuits to re-render. The game's page reads state properties to determine what to display.
+2. The game engine's `StartAsync(host, state)` is called. It verifies the caller is the host, then calls `state.Execute(...)` to initialize game data and close the lobby (`UpdateJoinableStatus(false)`).
+3. The state notifies all subscribers, causing all circuits to re-render.
 
 ### Gameplay
 
-1. A player performs an action (e.g., rolls dice).
+1. A player performs an action (e.g., rolls dice, draws a card).
 2. The game's Razor page calls a method on the injected game engine (e.g., `engine.RollDice(player, state, action)`).
-3. The engine method calls `state.Execute(() => { ... })`, which acquires the lock, runs the mutation (generates the roll, updates history and stats), releases the lock, and then notifies all subscribers.
+3. The engine method calls `state.Execute(() => { ... })`, which acquires the lock, runs the mutation, releases the lock, and then notifies all subscribers.
 4. All subscribed Razor components re-render with the updated state via `InvokeAsync(StateHasChanged)`.
 
 ### Player Disconnect
 
 1. A player's browser tab closes or their circuit drops.
 2. `LobbyCircuitHandler.OnConnectionDownAsync` starts a 30-second grace period timer.
-3. If the circuit reconnects within 30 seconds (`OnConnectionUpAsync`), the timer is cancelled and the player remains in the game.
-4. If the timer expires or the circuit closes permanently (`OnCircuitClosedAsync`), `GameSessionService.LeaveCurrentSession(navigateHome: false)` is called, which disposes the `UserRegistration`. The unregistration token disposes, calling `state.Execute(() => _players.Remove(player))`, removing the player from the game state and notifying subscribers.
+3. If the circuit reconnects within 30 seconds (`OnConnectionUpAsync`), the timer is cancelled.
+4. If the timer expires or the circuit closes permanently (`OnCircuitClosedAsync`), `GameSessionService.LeaveCurrentSession(navigateHome: false)` is called, which disposes the `UserRegistration`. The unregistration token disposes, removing the player from the game state and notifying subscribers. The `PlayerUnregistered` event is also fired, allowing game engines to react (e.g., `CardCounterGameEngine` uses this to advance the turn order).
 5. The host is fixed — there is no host transfer on disconnect.
 
 ---
@@ -462,11 +490,11 @@ Players cannot join a lobby once the game state's `IsJoinable` is set to `false`
 
 Adding a game requires these steps:
 
-1. **Subclass `AbstractGameState`** — define a concrete state class with the strongly-typed properties your game needs (scores, current turn, card deck, etc.). The host, player list, lock, subscription, notification, and scheduled callback infrastructure is inherited. Accept `User host` and `ILogger` in the primary constructor and forward to the base.
+1. **Subclass `AbstractGameState`** — define a concrete state class with the strongly-typed properties your game needs. The host, player list, lock, subscription, notification, and scheduled callback infrastructure is inherited.
 
-2. **Subclass `AbstractGameEngine`** — implement `CreateStateAsync(User host)` to return the concrete state instance (wrapped in `Result`), implement `StartAsync(User host, AbstractGameState state)` (which mutates the existing state to begin gameplay), and add game-specific action methods. Each method calls `state.Execute`/`state.ExecuteAsync` with its mutation logic — locking and notification are handled automatically. Use `state.ScheduleCallback` for time-based transitions.
+2. **Subclass `AbstractGameEngine`** — implement `CreateStateAsync(User host)` to return the concrete state instance (wrapped in `ValueResult`), implement `StartAsync(User host, AbstractGameState state)` to begin gameplay, and add game-specific action methods. Each method calls `state.Execute`/`state.ExecuteAsync` — locking and notification are handled automatically.
 
-3. **Create Razor page(s)** — add one or more pages inheriting `DisposableComponent` with `@page "/room/{navigation-string}/{ObfuscatedRoomCode}"`. Inject the concrete engine via DI, subscribe to the state (storing the `IDisposable`), validate the session in `OnInitializedAsync`, and dispose the subscription in `Dispose()`.
+3. **Create Razor page(s)** — add one or more pages inheriting `DisposableComponent` with `@page "/room/{navigation-string}/{ObfuscatedRoomCode}"`. Inject the concrete engine via DI, subscribe to `state.StateChangedEventManager`, validate the session in `OnInitializedAsync`, and dispose the subscription in `Dispose()`.
 
 4. **Add the `GameType` enum value** — add an entry to the `GameType` enum with `[Description("...")]` and `[NavigationString("...")]` attributes.
 
@@ -486,7 +514,7 @@ No changes to the lobby service interface, join flow, navigation infrastructure,
 
 ## DI Registration
 
-DI is organized into four extension method registration classes called from `Program.cs`, plus a few direct registrations:
+DI is organized into registration extension methods called from `Program.cs`:
 
 ### RegisterLogic() — Singletons
 
@@ -541,17 +569,16 @@ DI is organized into four extension method registration classes called from `Pro
 State changes propagate through the system as follows:
 
 1. `AbstractGameState.Execute()` acquires the `SemaphoreSlim`, runs the mutation, releases the lock.
-2. `NotifyStateChanged()` calls `EventManager.Notify(1)` (fire-and-forget).
+2. `StateChangedEventManager.Notify()` is called (fire-and-forget).
 3. `ThreadSafeEventManager.Notify` spawns `Task.Run` which calls `NotifyAsync`.
-4. `NotifyAsync` snapshots the listener array, then invokes all listeners concurrently via `Task.WhenAll`.
+4. `NotifyAsync` snapshots the listener array, then invokes all listeners concurrently.
 5. Each subscribed component's callback calls `InvokeAsync(StateHasChanged)` to marshal the re-render onto the Blazor synchronization context.
 6. The component re-renders, reading the latest state.
 
 ```csharp
 // In a game page's OnInitializedAsync:
-_stateSubscription = GameState
-    .SubscribeToStateChanged(async () => await InvokeAsync(StateHasChanged))
-    .Value;
+_stateSubscription = GameState.StateChangedEventManager.Subscribe(
+    async () => await InvokeAsync(StateHasChanged));
 
 // In Dispose():
 _stateSubscription?.Dispose();
@@ -565,17 +592,15 @@ _stateSubscription?.Dispose();
 
 **No persistence during gameplay.** If the server restarts, all active lobbies are lost. This is acceptable for short-lived party game sessions. The PostgreSQL database and repository layer exist as infrastructure scaffolding for future persistent features (game history, leaderboards, user accounts).
 
-**Thread safety is per-state.** The `ConcurrentDictionary` protects lobby creation and lookup. Each `AbstractGameState` instance owns a `SemaphoreSlim` lock, and all mutations go through `Execute`/`ExecuteAsync`, which acquires the lock, runs the mutation, releases the lock, and then notifies subscribers. The subscriber list is independently thread-safe via the copy-on-write array in `ThreadSafeEventManager`. Because each lobby has its own state instance, contention is minimal; actions in one lobby never block another.
+**Thread safety is per-state.** The `ConcurrentDictionary` protects lobby creation and lookup. Each `AbstractGameState` instance owns a `SemaphoreSlim` lock, and all mutations go through `Execute`/`ExecuteAsync`. The subscriber list is independently thread-safe via the copy-on-write array in `ThreadSafeEventManager`.
 
-**Notification after lock release.** Subscriber notification happens after the lock is released. This means a listener that reads the state could theoretically see a subsequent mutation's result if another `Execute` call completes between lock release and notification. In practice, this is acceptable for UI rendering — the component will simply render the latest state. The benefit is that listener callbacks cannot deadlock the state, and lock hold times are minimized.
+**Notification after lock release.** Subscriber notification happens after the lock is released. This means a listener that reads the state could theoretically see a subsequent mutation's result if another `Execute` call completes between lock release and notification. In practice this is acceptable for UI rendering — the component renders the latest state. The benefit is that listener callbacks cannot deadlock the state, and lock hold times are minimized.
 
-**Fixed host.** The host is the player who created the lobby and is set at creation time. There is no host transfer if the host disconnects — the lobby remains tied to the original host. Authorization checks (e.g., only the host can start the game or clear history) are enforced at the engine level.
+**Fixed host.** The host is the player who created the lobby and is set at creation time. There is no host transfer if the host disconnects.
 
-**30-second disconnect grace period.** When a circuit drops, the player is not immediately removed. `LobbyCircuitHandler` waits 30 seconds before cleaning up, allowing brief network interruptions without losing the player's session. If the circuit is permanently closed, cleanup happens immediately.
+**30-second disconnect grace period.** When a circuit drops, the player is not immediately removed. `LobbyCircuitHandler` waits 30 seconds before cleaning up.
 
-**No late joining by default.** The `IsJoinable` flag is set to `false` when the host starts the game. `RegisterPlayer` checks this flag and rejects join attempts when false. Games that want to support late joining could add logic to re-enable `IsJoinable`.
-
-**JS interop for client storage and file export.** Browser `localStorage` is used for persisting the user's display name across sessions, and a JS module handles CSV file downloads. These are the only JavaScript interop points in the application.
+**JS interop for client storage and file export.** Browser `localStorage` is used for persisting the user's display name across sessions, and a JS module handles CSV file downloads for the Dice Simulator.
 
 **Route convention is runtime-enforced.** The `NavigationString` attribute on the `GameType` enum must match the route segment used in the game's Razor page `@page` directive. A mismatch will result in a 404 at navigation time.
 
@@ -587,7 +612,7 @@ _stateSubscription?.Dispose();
 |---|---|
 | Framework | ASP.NET Core / .NET 10 |
 | Frontend | Blazor Server (Interactive Server render mode, prerender disabled) |
-| Real-time updates | `IDisposable` event subscriptions via `ThreadSafeEventManager<T>` |
+| Real-time updates | `IDisposable` event subscriptions via `ThreadSafeEventManager` |
 | State storage | In-memory (`ConcurrentDictionary`, per-state `SemaphoreSlim` locking) |
 | Scheduled transitions | `ScheduleCallback` on `AbstractGameState` (returns `CancellationTokenSource`) |
 | Game plugin system | .NET dependency injection (`AbstractGameEngine` subclasses) |
