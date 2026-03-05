@@ -970,6 +970,18 @@
     flex-shrink: 0;
     padding: 4px;
     overflow: hidden;
+    animation: actionCardSlideFadeIn 0.3s ease-out;
+}
+
+@keyframes actionCardSlideFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 .cc-action-card:hover:not(.cc-card-disabled) {
@@ -1535,8 +1547,15 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    animation: fadeIn 0.3s ease-out;
+    animation: shoeOverlayFadeInOut 2.5s ease-out forwards;
     pointer-events: none;
+}
+
+@keyframes shoeOverlayFadeInOut {
+    0% { opacity: 0; }
+    12% { opacity: 1; }
+    85% { opacity: 1; }
+    100% { opacity: 0; }
 }
 
 .cc-shoe-animation-content {

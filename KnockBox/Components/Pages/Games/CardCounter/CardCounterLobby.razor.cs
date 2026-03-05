@@ -44,15 +44,17 @@ namespace KnockBox.Components.Pages.Games.CardCounter
 
             GameState = gameState;
 
+            _prevShoeIndex = GameState.ShoeIndex;
+
             GameState.OnStateDisposed += HandleGameStateDisposed;
 
             _stateSubscription = GameState.StateChangedEventManager.Subscribe(async () =>
             {
-                bool isNewShoe = GameState?.IsNewShoe == true;
+                bool isNewShoe = false;
 
-                if (isNewShoe && GameState != null)
+                if (GameState != null && GameState.ShoeIndex > _prevShoeIndex)
                 {
-                    GameState.IsNewShoe = false;
+                    isNewShoe = true;
                     _prevShoeIndex = GameState.ShoeIndex;
                     _isAnimatingShoe = true;
                 }
