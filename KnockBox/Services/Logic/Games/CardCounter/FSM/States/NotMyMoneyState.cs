@@ -59,15 +59,13 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
                             target.PlayerId,
                             target.DisplayName);
                     }
-                    context.RecordRedirectedDraw(drawer, target, _operatorCard);
                 }
 
-                context.ApplyOperatorCard(target, _operatorCard);
-                context.Logger.LogInformation(
-                    "NotMyMoney: operator [{op}] redirected from [{src}] to [{tgt}].",
-                    _operatorCard.Op, _playerId, selectCmd.TargetPlayerId);
+                // Transition to reaction state where target can block
+                context.State.IsNotMyMoneySelecting = false;
+                context.State.PendingNotMyMoneyOperator = null;
 
-                return FinishTurn(context);
+                return new WaitingForReactionState(_playerId, target.PlayerId, new ActionCard(ActionType.NotMyMoney), _operatorCard);
             }
 
             if (command is NotMyMoneyCancelCommand cancelCmd && cancelCmd.PlayerId == _playerId)

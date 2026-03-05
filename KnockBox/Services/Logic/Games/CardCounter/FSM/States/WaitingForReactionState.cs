@@ -12,13 +12,15 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
         private readonly string _sourceId;
         private readonly string _targetId;
         private readonly ActionCard _pendingCard;
+        private readonly OperatorCard? _notMyMoneyOperator;
         private DateTimeOffset _expiresAt;
 
-        public WaitingForReactionState(string sourceId, string targetId, ActionCard pendingCard)
+        public WaitingForReactionState(string sourceId, string targetId, ActionCard pendingCard, OperatorCard? notMyMoneyOperator = null)
         {
             _sourceId = sourceId;
             _targetId = targetId;
             _pendingCard = pendingCard;
+            _notMyMoneyOperator = notMyMoneyOperator;
         }
 
         public void OnEnter(CardCounterGameContext context)
@@ -77,7 +79,44 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
             if (!blocked)
             {
                 ApplyEffect(context);
+
+                if (_pendingCard.Action == ActionType.NotMyMoney && _notMyMoneyOperator != null)
+                {
+                    return FinishTurn(context);
+                }
             }
+            else
+            {
+                if (_pendingCard.Action == ActionType.NotMyMoney && _notMyMoneyOperator != null)
+                {
+                    var source = context.GetPlayer(_sourceId);
+                    if (source != null)
+                    {
+                        if (source.ActionHand.Any(c => c.Action == ActionType.NotMyMoney))
+                        {
+                            return new NotMyMoneyState(_sourceId, _notMyMoneyOperator);
+                        }
+                        else
+                        {
+                            // Could not play another Not My Money, so the player eats the operator
+                            context.RecordDraw(source, _notMyMoneyOperator);
+                            context.ApplyOperatorCard(source, _notMyMoneyOperator);
+                            return FinishTurn(context);
+                        }
+                    }
+                }
+            }
+
+            return new PlayerTurnState();
+        }
+
+        private ICardCounterGameState FinishTurn(CardCounterGameContext context)
+        {
+            context.AdvanceTurn();
+
+            if (context.CurrentShoe.Count == 0)
+                return new RoundEndState();
+
             return new PlayerTurnState();
         }
 
@@ -99,6 +138,14 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
                     source.Pot.AddRange(target.Pot);
                     target.Pot.Clear();
                     target.Pot.AddRange(tempPot);
+                    break;
+
+                case ActionType.NotMyMoney:
+                    if (_notMyMoneyOperator != null)
+                    {
+                        context.RecordRedirectedDraw(source, target, _notMyMoneyOperator);
+                        context.ApplyOperatorCard(target, _notMyMoneyOperator);
+                    }
                     break;
             }
 
