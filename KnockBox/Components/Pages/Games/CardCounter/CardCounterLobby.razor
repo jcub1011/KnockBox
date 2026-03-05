@@ -783,18 +783,18 @@ else
                                     bool isFeelingLuckyCompd = GameState.FeelingLuckyTargetId == myId
                                         && (card.Action == ActionType.Compd || card.Action == ActionType.FeelingLucky);
 
-                                    bool isNotMyMoneyPlayable = activeId == myId
-                                        && myPlayer.PrivateReveal == null
-                                        && !IsOverHandLimit()
-                                        && card.Action == ActionType.NotMyMoney
-                                        && CanPlayNotMyMoney()
-                                        && GameState.FeelingLuckyTargetId == null
-                                        && GameState.PendingReaction == null;
+                                    bool canPlay = isMyTurn || isReactionCompd || isFeelingLuckyCompd;
 
-                                    bool canPlay = isMyTurn || isReactionCompd || isFeelingLuckyCompd || isNotMyMoneyPlayable;
+                                    // Comp'd can only be played as a reaction
+                                    if (card.Action == ActionType.Compd)
+                                        canPlay = isReactionCompd || isFeelingLuckyCompd;
 
                                     // Skim has extra restrictions: cannot play with empty pot
                                     if (card.Action == ActionType.Skim && !CanPlaySkim())
+                                        canPlay = false;
+
+                                    // Not My Money cannot be clicked normally. It triggers automatically.
+                                    if (card.Action == ActionType.NotMyMoney)
                                         canPlay = false;
 
                                     <div class="cc-action-card @GetActionCardColor(card.Action)

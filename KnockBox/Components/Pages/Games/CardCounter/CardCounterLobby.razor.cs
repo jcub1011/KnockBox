@@ -205,12 +205,6 @@ namespace KnockBox.Components.Pages.Games.CardCounter
             return me != null && target.Pot.Count > 0 && target.PlayerId != me.PlayerId;
         }
 
-        /// <summary>Returns whether the Not My Money card is currently playable (before drawing, not already pending).</summary>
-        protected bool CanPlayNotMyMoney()
-        {
-            return false;
-        }
-
         private void ClearTransientUiState()
         {
             _pendingActionCardIndex = null;
