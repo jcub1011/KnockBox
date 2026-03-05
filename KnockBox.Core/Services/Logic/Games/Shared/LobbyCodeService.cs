@@ -36,7 +36,7 @@ namespace KnockBox.Services.Logic.Games.Shared
                     }
                 }
 
-                return ValueResult<string>.FromError("Error occured while generating error code.");
+                return ValueResult<string>.FromError("Error occurred while generating error code.");
             }
             catch (OperationCanceledException)
             {

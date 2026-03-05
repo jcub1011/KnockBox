@@ -48,7 +48,7 @@ namespace KnockBox.Services.State.Games.Shared
             if (previousSession is not null)
                 return Result.FromError("Leave the current session before setting a new one.");
 
-            logger.LogInformation("User [{userId}] entered session [{sessionId}].", userService.CurrentUser?.Id ?? "Unknown", previousSession?.LobbyRegistration.Uri);
+            logger.LogInformation("User [{userId}] entered session [{sessionId}].", userService.CurrentUser?.Id ?? "Unknown", session.LobbyRegistration.Uri);
 
             try
             {
