@@ -1762,94 +1762,29 @@
     }
 }*/
 
-/* ── Drawn Card Overlay ────────────────────────────────────────────────────── */
-
-.cc-drawn-card-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0,0,0,0.85);
-    z-index: 300;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 20px;
-    animation: fadeIn 0.2s ease-out;
+.cc-draw-notification {
+    background: rgba(100, 180, 255, 0.12);
+    border-bottom-color: rgba(100, 180, 255, 0.5);
 }
 
-.cc-drawn-card-panel {
-    background: linear-gradient(135deg, #1a3a1a, #0d1f0d);
-    border: 4px solid #f7d547;
-    border-radius: 20px;
-    box-shadow: 0 8px 60px rgba(0,0,0,0.8), 0 0 40px rgba(247,213,71,0.3);
-    padding: 32px 48px;
-    max-width: 380px;
-    width: 100%;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 16px;
-    animation: slideUp 0.3s ease-out;
-}
-
-.cc-drawn-card-header {
-    font-size: 0.85rem;
-    font-weight: 700;
-    letter-spacing: 3px;
-    text-transform: uppercase;
-    color: rgba(255,255,255,0.5);
-}
-
-.cc-drawn-card-value {
-    font-size: 5rem;
+.cc-notif-draw-value {
+    font-size: 1.6rem;
     font-weight: 900;
     line-height: 1;
+    min-width: 36px;
     text-align: center;
-    min-width: 120px;
-    min-height: 120px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 16px;
-    border: 3px solid rgba(255,255,255,0.2);
-    padding: 12px 24px;
+    border-radius: 6px;
+    padding: 2px 8px;
 }
 
-.cc-drawn-number {
-    background: linear-gradient(135deg, #1565c0, #0d47a1);
-    color: #fff;
-    box-shadow: 0 4px 20px rgba(21,101,192,0.5);
+.cc-notif-draw-number {
+    background: rgba(21, 101, 192, 0.35);
+    color: #90caf9;
 }
 
-.cc-drawn-operator {
-    background: linear-gradient(135deg, #c62828, #b71c1c);
-    color: #fff;
-    box-shadow: 0 4px 20px rgba(198,40,40,0.5);
-}
-
-.cc-drawn-card-type {
-    font-size: 0.8rem;
-    font-weight: 700;
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    color: rgba(255,255,255,0.5);
-}
-
-.cc-drawn-card-player {
-    font-size: 1rem;
-    color: rgba(255,255,255,0.8);
-    text-align: center;
-}
-
-.cc-drawn-redirect {
-    color: #f7d547;
-}
-
-.cc-drawn-dismiss {
-    margin-top: 8px;
-    width: 100%;
+.cc-notif-draw-operator {
+    background: rgba(198, 40, 40, 0.35);
+    color: #ef9a9a;
 }
 
 /* ── Skim Digit Selection Overlay ─────────────────────────────────────────── */
@@ -2066,9 +2001,4 @@
     margin-top: 8px;
 }
 
-/* ── Animation helpers ────────────────────────────────────────────────────── */
 
-@keyframes slideUp {
-    from { transform: translateY(30px); opacity: 0; }
-    to { transform: translateY(0); opacity: 1; }
-}

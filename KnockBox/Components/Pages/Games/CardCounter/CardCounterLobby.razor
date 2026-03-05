@@ -50,7 +50,7 @@ else
             </div>
         </div>
 
-        @* ── Last Action Notification ── *@
+        @* ── Last Action / Drawn Card Notification ── *@
         @if (GameState.LastPlayedAction is { } lastAction)
         {
             <div class="cc-action-notification">
@@ -62,6 +62,23 @@ else
                     @if (lastAction.TargetName != null)
                     {
                         <span> on <strong>@lastAction.TargetName</strong></span>
+                    }
+                </div>
+            </div>
+        }
+        else if (GameState.LastDrawnCard is { } drawnCard)
+        {
+            <div class="cc-action-notification cc-draw-notification">
+                <span class="cc-notif-draw-value @(drawnCard.Card is OperatorCard ? "cc-notif-draw-operator" : "cc-notif-draw-number")">
+                    @FormatBaseCardDisplay(drawnCard.Card)
+                </span>
+                <div class="cc-notif-text">
+                    <strong>@drawnCard.DrawerName</strong>
+                    drew a <strong>@GetBaseCardTypeLabel(drawnCard.Card).ToLowerInvariant()</strong>
+                    (<strong>@FormatBaseCardDisplay(drawnCard.Card)</strong>)
+                    @if (drawnCard.RedirectTargetName != null)
+                    {
+                        <span> — applied to <strong>@drawnCard.RedirectTargetName</strong></span>
                     }
                 </div>
             </div>
@@ -174,32 +191,6 @@ else
             var isHost = IsHost();
             // Show all game players in the player list (including self; host has no player state)
             var allPlayers = GameState.GamePlayers.Values.ToList();
-
-            @* ── Drawn Card Full-Screen Overlay ── *@
-            @if (!_isAnimatingShoe && GameState.LastDrawnCard is { } drawnCard && !IsOverHandLimit())
-            {
-                <div class="cc-drawn-card-overlay" @onclick="() => { }">
-                    <div class="cc-drawn-card-panel" @onclick:stopPropagation="true">
-                        <div class="cc-drawn-card-header">
-                            <span class="cc-drawn-card-label">CARD DRAWN</span>
-                        </div>
-                        <div class="cc-drawn-card-value @(drawnCard.Card is OperatorCard ? "cc-drawn-operator" : "cc-drawn-number")">
-                            @FormatBaseCardDisplay(drawnCard.Card)
-                        </div>
-                        <div class="cc-drawn-card-type">@GetBaseCardTypeLabel(drawnCard.Card)</div>
-                        <div class="cc-drawn-card-player">
-                            @drawnCard.DrawerName drew this card
-                            @if (drawnCard.RedirectTargetName != null)
-                            {
-                                <span class="cc-drawn-redirect"> → applied to <strong>@drawnCard.RedirectTargetName</strong></span>
-                            }
-                        </div>
-                        <button class="cc-btn cc-btn-primary cc-btn-lg cc-drawn-dismiss" @onclick="() => { if (GameState != null) GameState.LastDrawnCard = null; StateHasChanged(); }">
-                            ✓ Got it
-                        </button>
-                    </div>
-                </div>
-            }
 
             @* ── Discard Overlay ── *@
             @if (myPlayer != null && IsOverHandLimit())
