@@ -518,7 +518,7 @@ else
                         {
                             var topEntry = GameState.DiscardHistory[^1];
                             <div class="cc-discard-top">
-                                <span class="cc-discard-top-value">@topEntry.Description</span>
+                                <span class="cc-discard-top-value">@(topEntry.IsActionCard ? topEntry.Symbol : topEntry.Description)</span>
                             </div>
                         }
                         else
