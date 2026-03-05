@@ -216,7 +216,6 @@ namespace KnockBox.Services.Logic.Games.CardCounter
                 state.LastDrawnCard = null;
                 state.PendingReaction = null;
                 state.FeelingLuckyTargetId = null;
-                state.NotMyMoneyPending = false;
                 state.IsNotMyMoneySelecting = false;
                 state.ForceDrawStack.Clear();
                 InitializeGame(context);

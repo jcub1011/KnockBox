@@ -208,8 +208,7 @@ namespace KnockBox.Components.Pages.Games.CardCounter
         /// <summary>Returns whether the Not My Money card is currently playable (before drawing, not already pending).</summary>
         protected bool CanPlayNotMyMoney()
         {
-            if (GameState == null) return false;
-            return !GameState.NotMyMoneyPending;
+            return false;
         }
 
         private void ClearTransientUiState()
@@ -269,6 +268,19 @@ namespace KnockBox.Components.Pages.Games.CardCounter
             if (me == null || cardIndex < 0 || cardIndex >= me.ActionHand.Count) return;
 
             var card = me.ActionHand[cardIndex];
+
+            // These cards cannot be played as standard targeted/untargeted actions during normal turn
+            // Comp'd is only for reactions, and Not My Money is only prompted on operator draw.
+            if (card.Action == ActionType.NotMyMoney || card.Action == ActionType.Compd)
+            {
+                // However, Comp'd can be played if responding to a reaction/feeling lucky!
+                bool isReaction = GameState.PendingReaction?.TargetId == UserService.CurrentUser.Id || GameState.FeelingLuckyTargetId == UserService.CurrentUser.Id;
+                if (!isReaction) return;
+
+                // Not My Money cannot be clicked from hand at all now.
+                if (card.Action == ActionType.NotMyMoney) return;
+            }
+
             if (RequiresTarget(card.Action))
             {
                 _pendingActionCardIndex = cardIndex;

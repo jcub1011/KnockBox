@@ -43,7 +43,23 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
                 // Apply the operator to the target instead of the drawer
                 var drawer = context.GetPlayer(_playerId);
                 if (drawer is not null)
+                {
+                    var cardIndex = drawer.ActionHand.FindIndex(c => c.Action == ActionType.NotMyMoney);
+                    if (cardIndex != -1)
+                    {
+                        var card = drawer.ActionHand[cardIndex];
+                        drawer.ActionHand.RemoveAt(cardIndex);
+                        context.RecordActionCardPlay(drawer, card);
+
+                        context.State.LastPlayedAction = new LastPlayedActionInfo(
+                            _playerId,
+                            drawer.DisplayName,
+                            card.Action,
+                            target.PlayerId,
+                            target.DisplayName);
+                    }
                     context.RecordRedirectedDraw(drawer, target, _operatorCard);
+                }
 
                 context.ApplyOperatorCard(target, _operatorCard);
                 context.Logger.LogInformation(
@@ -90,7 +106,6 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
 
         private ICardCounterGameState FinishTurn(CardCounterGameContext context)
         {
-            context.State.NotMyMoneyPending = false;
             context.State.IsNotMyMoneySelecting = false;
             context.AdvanceTurn();
 

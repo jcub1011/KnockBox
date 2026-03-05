@@ -92,12 +92,6 @@ namespace KnockBox.Services.State.Games.CardCounter
         public LastDrawnCardInfo? LastDrawnCard { get; set; }
 
         /// <summary>
-        /// Set when the active player has played Not My Money and must now choose a target
-        /// to receive the next operator card they draw.
-        /// </summary>
-        public bool NotMyMoneyPending { get; set; }
-
-        /// <summary>
         /// Set when the active player has drawn an operator and must choose a target for the
         /// Not My Money redirect. The UI should show target selection while this is true.
         /// </summary>
