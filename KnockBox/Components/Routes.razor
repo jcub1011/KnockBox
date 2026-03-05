@@ -1,4 +1,9 @@
-﻿<Router AppAssembly="typeof(Program).Assembly" NotFoundPage="typeof(Pages.NotFound)">
+﻿@using KnockBox.Components.Pages.Games.CardCounter
+@using KnockBox.Components.Pages.Games.DiceSimulator
+
+<Router AppAssembly="typeof(Program).Assembly" 
+        AdditionalAssemblies="new[] { typeof(CardCounterLobby).Assembly, typeof(DiceSimulatorLobby).Assembly }"
+        NotFoundPage="typeof(Pages.NotFound)">
     <Found Context="routeData">
         <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)" />
         <FocusOnNavigate RouteData="routeData" Selector="h1" />

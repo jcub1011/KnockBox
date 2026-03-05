@@ -65,7 +65,10 @@ namespace KnockBox
 
             app.MapStaticAssets();
             app.MapRazorComponents<App>()
-                .AddInteractiveServerRenderMode();
+                .AddInteractiveServerRenderMode()
+                .AddAdditionalAssemblies(
+                    typeof(KnockBox.Components.Pages.Games.CardCounter.CardCounterLobby).Assembly,
+                    typeof(KnockBox.Components.Pages.Games.DiceSimulator.DiceSimulatorLobby).Assembly);
 
             app.Run();
         }

@@ -5,10 +5,15 @@
     <LangVersion>latest</LangVersion>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <UserSecretsId>48c186f8-1929-42a9-8f55-2cfdbac0facb</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Moq" Version="4.20.72" />
+    <PackageReference Include="Moq.AutoMock" Version="3.6.1" />
     <PackageReference Include="MSTest" Version="4.1.0" />
   </ItemGroup>
 
@@ -17,7 +22,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\KnockBox\KnockBox.csproj" />
+    <ProjectReference Include="..\KnockBox.Core\KnockBox.Core.csproj" />
+    <ProjectReference Include="..\KnockBox.CardCounter\KnockBox.CardCounter.csproj" />
   </ItemGroup>
 
 </Project>

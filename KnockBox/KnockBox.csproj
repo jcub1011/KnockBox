@@ -16,21 +16,9 @@
 	<DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
 	<DockerComposeProjectPath>..\docker-compose.dcproj</DockerComposeProjectPath>
   </PropertyGroup>
-	
-  <ItemGroup>
-    <None Remove="Data\Statics\Profanities\English.txt" />
-  </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="FluentValidation" Version="12.1.1" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.3" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Analyzers" Version="10.0.3" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.3">
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-    </PackageReference>
     <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.23.0" />
-    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.0" />
     <PackageReference Include="Serilog" Version="4.3.1" />
     <PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
   </ItemGroup>
@@ -40,12 +28,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <EmbeddedResource Include="Data\Statics\Profanities\English.txt" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Folder Include="Data\Models\" />
-    <Folder Include="wwwroot\css\" />
+    <ProjectReference Include="..\KnockBox.Core\KnockBox.Core.csproj" />
+    <ProjectReference Include="..\KnockBox.CardCounter\KnockBox.CardCounter.csproj" />
+    <ProjectReference Include="..\KnockBox.DiceSimulator\KnockBox.DiceSimulator.csproj" />
   </ItemGroup>
 
 </Project>
