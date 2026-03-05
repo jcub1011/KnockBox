@@ -50,6 +50,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
 
                 // Target blocked with Comp'd
                 target.ActionHand.RemoveAt(playCmd.CardIndex);
+                context.RecordActionCardPlay(target, responseCard);
                 context.Logger.LogInformation("Player [{id}] blocked with Comp'd.", _targetId);
                 return ResolveEffect(context, blocked: true);
             }

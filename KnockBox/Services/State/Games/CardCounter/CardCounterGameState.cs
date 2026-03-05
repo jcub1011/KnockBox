@@ -53,6 +53,18 @@ namespace KnockBox.Services.State.Games.CardCounter
         public readonly Stack<BaseCard> DiscardPile = new();
 
         /// <summary>
+        /// Ordered history of cards drawn or action cards played, for the discard pile display.
+        /// Append-only; newest entry is at the end.
+        /// </summary>
+        public readonly List<DiscardHistoryEntry> DiscardHistory = [];
+
+        /// <summary>
+        /// True during the brief window when a new shoe has just been dealt.
+        /// Used by the UI to trigger the shoe-dealing animation.
+        /// </summary>
+        public bool IsNewShoe { get; set; }
+
+        /// <summary>
         /// Tracks the Feeling Lucky chain: bottom entry is the originator.
         /// </summary>
         public readonly Stack<string> ForceDrawStack = new();
@@ -150,6 +162,13 @@ namespace KnockBox.Services.State.Games.CardCounter
         string SourceName,
         string TargetId,
         ActionCard PlayedCard);
+
+    /// <summary>A single entry in the visible discard pile history.</summary>
+    public record DiscardHistoryEntry(
+        string Description,
+        string Symbol,
+        string? PlayerName,
+        bool IsActionCard);
 
     public class GameConfig
     {

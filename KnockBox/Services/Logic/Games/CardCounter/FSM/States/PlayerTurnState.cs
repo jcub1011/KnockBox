@@ -63,6 +63,8 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
                 context.ApplyOperatorCard(player, oc);
             }
 
+            context.RecordDraw(player, card);
+
             context.AdvanceTurn();
 
             // End of shoe → deal next shoe / end game
@@ -163,6 +165,8 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
                 cmd.TargetPlayerId,
                 cmd.TargetPlayerId is not null ? context.GetPlayer(cmd.TargetPlayerId)?.DisplayName : null);
 
+            context.RecordActionCardPlay(player, card);
+
             return card.Action switch
             {
                 ActionType.FeelingLucky => HandleFeelingLucky(context, cmd.PlayerId),
@@ -250,6 +254,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
             var top = context.CurrentShoe.Pop();
             context.DiscardPile.Push(top);
             context.DecrementShoeCount(top);
+            context.RecordBurn(top);
             return null;
         }
 

@@ -48,6 +48,9 @@ namespace KnockBox.Services.Logic.Games.CardCounter
             if (host != gameState.Host)
                 return Result.FromError("Only the host can start the game.");
 
+            if (gameState.Players.Count == 0)
+                return Result.FromError("At least one other player must join before starting the game.");
+
             var context = new CardCounterGameContext(gameState, randomNumberService, logger);
 
             var executeResult = gameState.Execute(() =>

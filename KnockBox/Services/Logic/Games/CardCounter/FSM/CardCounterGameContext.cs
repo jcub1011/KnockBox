@@ -183,6 +183,86 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM
             };
         }
 
+        // ── Discard history helpers ───────────────────────────────────────────
+
+        /// <summary>Records a shoe card drawn by a player into the discard history.</summary>
+        public void RecordDraw(PlayerState player, BaseCard card)
+        {
+            string desc = FormatBaseCard(card);
+            string symbol = GetBaseCardSymbol(card);
+            State.DiscardHistory.Add(new DiscardHistoryEntry(desc, symbol, player.DisplayName, false));
+        }
+
+        /// <summary>Records a shoe card burned (discarded without being drawn) into the discard history.</summary>
+        public void RecordBurn(BaseCard card)
+        {
+            string desc = FormatBaseCard(card);
+            string symbol = GetBaseCardSymbol(card);
+            State.DiscardHistory.Add(new DiscardHistoryEntry($"{desc} (Burned)", "🔥", null, false));
+        }
+
+        /// <summary>Records an action card played by a player into the discard history.</summary>
+        public void RecordActionCardPlay(PlayerState player, ActionCard card)
+        {
+            string name = GetActionCardName(card.Action);
+            string symbol = GetActionCardSymbol(card.Action);
+            State.DiscardHistory.Add(new DiscardHistoryEntry(name, symbol, player.DisplayName, true));
+        }
+
+        private static string FormatBaseCard(BaseCard card) => card switch
+        {
+            NumberCard nc => $"# {nc.Value}",
+            OperatorCard oc => oc.Op switch
+            {
+                Operator.Add => "+",
+                Operator.Subtract => "−",
+                Operator.Multiply => "×",
+                Operator.Divide => "÷",
+                _ => "?"
+            },
+            _ => "?"
+        };
+
+        private static string GetBaseCardSymbol(BaseCard card) => card switch
+        {
+            NumberCard => "🔢",
+            OperatorCard oc => oc.Op switch
+            {
+                Operator.Add => "➕",
+                Operator.Subtract => "➖",
+                Operator.Multiply => "✖️",
+                Operator.Divide => "➗",
+                _ => "➕"
+            },
+            _ => "🃏"
+        };
+
+        private static string GetActionCardName(ActionType action) => action switch
+        {
+            ActionType.FeelingLucky => "Feeling Lucky",
+            ActionType.MakeMyLuck => "Make My Luck",
+            ActionType.Skim => "Skim",
+            ActionType.Burn => "Burn",
+            ActionType.TurnTheTable => "Turn The Table",
+            ActionType.Compd => "Comp'd",
+            ActionType.NotMyMoney => "Not My Money",
+            ActionType.Launder => "Launder",
+            _ => action.ToString()
+        };
+
+        private static string GetActionCardSymbol(ActionType action) => action switch
+        {
+            ActionType.FeelingLucky => "🎲",
+            ActionType.MakeMyLuck => "⭐",
+            ActionType.Skim => "✂️",
+            ActionType.Burn => "🔥",
+            ActionType.TurnTheTable => "🔄",
+            ActionType.Compd => "🛡️",
+            ActionType.NotMyMoney => "💸",
+            ActionType.Launder => "🧺",
+            _ => "🃏"
+        };
+
         private void HandleDivisionByZero(PlayerState player)
         {
             int roll = Rng.GetRandomInt(0, 4, RandomType.Secure);
