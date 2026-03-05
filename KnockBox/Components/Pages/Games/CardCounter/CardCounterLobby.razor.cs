@@ -437,20 +437,18 @@ namespace KnockBox.Components.Pages.Games.CardCounter
 
         protected string GetDrawEventAnimationClass(LastDrawnCardInfo drawnCard)
         {
-            string currentUserId = UserService.CurrentUser?.Id ?? "";
-            return drawnCard.DrawerId == currentUserId
+            return string.Equals(drawnCard.DrawerId, CurrentUserId, StringComparison.Ordinal)
                 ? "cc-card-event-draw cc-card-event-to-me"
                 : "cc-card-event-draw cc-card-event-to-opponent";
         }
 
         protected string GetActionEventAnimationClass(LastPlayedActionInfo actionInfo)
         {
-            string currentUserId = UserService.CurrentUser?.Id ?? "";
-            bool fromMe = actionInfo.PlayerId == currentUserId;
+            bool fromMe = string.Equals(actionInfo.PlayerId, CurrentUserId, StringComparison.Ordinal);
 
             if (actionInfo.TargetId is not null)
             {
-                bool toMe = actionInfo.TargetId == currentUserId;
+                bool toMe = string.Equals(actionInfo.TargetId, CurrentUserId, StringComparison.Ordinal);
                 return $"{(fromMe ? "cc-card-event-from-me" : "cc-card-event-from-opponent")} {(toMe ? "cc-card-event-to-me" : "cc-card-event-to-opponent")}";
             }
 
@@ -458,6 +456,8 @@ namespace KnockBox.Components.Pages.Games.CardCounter
                 ? "cc-card-event-from-me cc-card-event-to-discard"
                 : "cc-card-event-from-opponent cc-card-event-to-discard";
         }
+
+        private string? CurrentUserId => UserService.CurrentUser?.Id;
 
         // ── Static helpers ────────────────────────────────────────────────────
 

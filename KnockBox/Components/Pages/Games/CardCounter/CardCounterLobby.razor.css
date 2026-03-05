@@ -112,8 +112,9 @@
 /* ── Draw / Action Card Event Animation ───────────────────────────────────── */
 
 .cc-card-event-overlay {
+    --event-overlay-top: 88px; /* aligns below the game header bar */
     position: fixed;
-    top: 88px;
+    top: var(--event-overlay-top);
     left: 0;
     right: 0;
     z-index: 240;
@@ -147,6 +148,8 @@
 }
 
 .cc-card-event-card {
+    --discard-offset-x: -250px; /* visually aligns end position with discard pile */
+    --card-flip-perspective: 700px;
     --start-x: 0px;
     --start-y: 0px;
     --end-x: 0px;
@@ -158,7 +161,7 @@
     height: 156px;
     transform: translate(-50%, -50%);
     transform-style: preserve-3d;
-    perspective: 700px;
+    perspective: var(--card-flip-perspective);
     animation: cardTravel 1.15s ease-in-out forwards;
 }
 
@@ -253,7 +256,7 @@
 }
 
 .cc-card-event-to-discard {
-    --end-x: -250px;
+    --end-x: var(--discard-offset-x);
     --end-y: 20px;
 }
 
@@ -2156,4 +2159,3 @@
     justify-content: center;
     margin-top: 8px;
 }
-
