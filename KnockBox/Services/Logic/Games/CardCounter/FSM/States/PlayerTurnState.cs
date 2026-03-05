@@ -12,7 +12,6 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
             context.State.GamePhase = GamePhase.Playing;
             context.State.PendingReaction = null;
             context.State.FeelingLuckyTargetId = null;
-            context.State.LastDrawnCard = null;
             context.State.IsNotMyMoneySelecting = false;
             context.State.PendingNotMyMoneyOperator = null;
             context.Logger.LogInformation(

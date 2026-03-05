@@ -111,12 +111,6 @@
 
 /* ── Draw / Action Card Event Animation ───────────────────────────────────── */
 
-.cc-shoe-event-area {
-    display: flex;
-    align-items: flex-start;
-    gap: 10px;
-}
-
 .cc-shoe-pile {
     position: static;
 }
@@ -128,6 +122,12 @@
     gap: 8px;
     pointer-events: none;
     min-width: 116px;
+}
+
+.cc-last-event-panel {
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .cc-card-event-card {
@@ -446,6 +446,15 @@
     overflow-y: auto;
     margin: auto;
     padding: 16px;
+}
+
+.cc-table-center-wrap {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 16px;
+    width: 100%;
 }
 
 /* ── Opponents Row ─────────────────────────────────────────────────────────── */

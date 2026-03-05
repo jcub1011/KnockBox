@@ -486,59 +486,70 @@ else
                     }
                 </div>
 
-                @* ── Table Felt ── *@
-                <div class="cc-table-felt">
-                    @* ── Discard Pile (left of main deck) ── *@
-                    <div class="cc-deck-pile cc-discard-pile @(GameState.DiscardHistory.Count > 1 ? "cc-discard-pile-active" : "")"
-                         title="Discard Pile — click to view history"
-                         @onclick="ToggleDiscardOverlay">
-                        @if (GameState.DiscardHistory.Count > 1)
-                        {
-                            var topEntry = GameState.DiscardHistory[^2];
-                            <div class="cc-discard-top">
-                                <span class="cc-discard-top-value">@(topEntry.IsActionCard ? topEntry.Symbol : topEntry.Description)</span>
-                            </div>
-                        }
-                        else
-                        {
-                            <div class="cc-pile-empty">
-                                <span class="cc-pile-empty-icon">📋</span>
-                            </div>
-                        }
-                        <div class="cc-pile-label">DISCARD</div>
-                        <div class="cc-pile-count">@GameState.DiscardHistory.Count</div>
-                    </div>
-
-                    @* ── Main Deck ── *@
-                    <div class="cc-deck-pile cc-main-deck-pile" title="Main Deck — @GameState.MainDeck.Count cards remaining">
-                        <div class="cc-pile-stack">
-                            <span class="cc-pile-card">🂠</span>
-                            <span class="cc-pile-card cc-pile-card-2">🂠</span>
-                            <span class="cc-pile-card cc-pile-card-3">🂠</span>
-                        </div>
-                        <div class="cc-pile-label">DECK</div>
-                        <div class="cc-pile-count">@GameState.MainDeck.Count</div>
-                    </div>
-
-                    @* ── Center Info (Shoe stats) ── *@
-                    <div class="cc-shoe-stats">
-                        <div class="cc-shoe-stat-row">
-                            <div class="cc-shoe-stat" title="Number cards in shoe">
-                                <span class="cc-stat-icon">🔢</span>
-                                <span class="cc-stat-label">Numbers</span>
-                                <span class="cc-stat-num">@GameState.ShoeCardCounts.GetValueOrDefault(CardType.Number)</span>
-                            </div>
-                            <div class="cc-shoe-stat" title="Operator cards in shoe">
-                                <span class="cc-stat-icon">➕</span>
-                                <span class="cc-stat-label">Operators</span>
-                                <span class="cc-stat-num">@GameState.ShoeCardCounts.GetValueOrDefault(CardType.Operator)</span>
+                <div class="cc-table-center-wrap">
+                    @if (GameState.DiscardHistory.Count > 0 && GameState.DiscardHistory[^1].IsActionCard && GameState.LastPlayedAction is { } lastAction)
+                    {
+                        <div class="cc-last-event-panel">
+                            <div class="cc-shoe-event-card-wrap" @key="@($"action-{GameState.DiscardHistory.Count}")">
+                                <div class="cc-card-event-card">
+                                    <div class="cc-card-event-card-inner">
+                                        <div class="cc-card-event-card-face cc-card-event-card-back">🂠</div>
+                                        <div class="cc-card-event-card-face cc-card-event-card-front cc-card-event-card-front-action">
+                                            <span class="cc-card-event-icon">@GetActionCardIcon(lastAction.Action)</span>
+                                            <span class="cc-card-event-label">@GetActionCardName(lastAction.Action)</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="cc-shoe-event-caption">
+                                    <strong>@lastAction.PlayerName</strong> played <strong>@GetActionCardName(lastAction.Action)</strong>
+                                </div>
                             </div>
                         </div>
-                        <div class="cc-shoe-badge">SHOE #@GameState.ShoeIndex</div>
-                    </div>
+                    }
+                    else if (GameState.DiscardHistory.Count > 0 && !GameState.DiscardHistory[^1].IsActionCard && GameState.LastDrawnCard is { } drawnCard)
+                    {
+                        <div class="cc-last-event-panel">
+                            <div class="cc-shoe-event-card-wrap" @key="@($"draw-{GameState.DiscardHistory.Count}")">
+                                <div class="cc-card-event-card">
+                                    <div class="cc-card-event-card-inner">
+                                        <div class="cc-card-event-card-face cc-card-event-card-back">🂠</div>
+                                        <div class="cc-card-event-card-face cc-card-event-card-front @(drawnCard.Card is OperatorCard ? "cc-card-event-card-front-operator" : "cc-card-event-card-front-number")">
+                                            <span class="cc-card-event-value">@FormatBaseCardDisplay(drawnCard.Card)</span>
+                                            <span class="cc-card-event-label">@GetBaseCardTypeLabel(drawnCard.Card)</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="cc-shoe-event-caption">
+                                    <strong>@drawnCard.DrawerName</strong> drew <strong>@FormatBaseCardDisplay(drawnCard.Card)</strong>
+                                </div>
+                            </div>
+                        </div>
+                    }
 
-                    @* ── Current Shoe + Most Recent Card Event ── *@
-                    <div class="cc-shoe-event-area">
+                    @* ── Table Felt ── *@
+                    <div class="cc-table-felt">
+                        @* ── Discard Pile (left of shoe) ── *@
+                        <div class="cc-deck-pile cc-discard-pile @(GameState.DiscardHistory.Count > 1 ? "cc-discard-pile-active" : "")"
+                             title="Discard Pile — click to view history"
+                             @onclick="ToggleDiscardOverlay">
+                            @if (GameState.DiscardHistory.Count > 1)
+                            {
+                                var topEntry = GameState.DiscardHistory[^2];
+                                <div class="cc-discard-top">
+                                    <span class="cc-discard-top-value">@(topEntry.IsActionCard ? topEntry.Symbol : topEntry.Description)</span>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="cc-pile-empty">
+                                    <span class="cc-pile-empty-icon">📋</span>
+                                </div>
+                            }
+                            <div class="cc-pile-label">DISCARD</div>
+                            <div class="cc-pile-count">@GameState.DiscardHistory.Count</div>
+                        </div>
+
+                        @* ── Current Shoe ── *@
                         <div class="cc-deck-pile cc-shoe-pile" title="Current Shoe — @GameState.CurrentShoe.Count cards remaining">
                             @if (GameState.CurrentShoe.Count > 0)
                             {
@@ -564,40 +575,33 @@ else
                             <div class="cc-pile-count">@GameState.CurrentShoe.Count</div>
                         </div>
 
-                        @if (GameState.DiscardHistory.Count > 0 && GameState.DiscardHistory[^1].IsActionCard && GameState.LastPlayedAction is { } lastAction)
-                        {
-                            <div class="cc-shoe-event-card-wrap" @key="@($"action-{GameState.DiscardHistory.Count}")">
-                                <div class="cc-card-event-card">
-                                    <div class="cc-card-event-card-inner">
-                                        <div class="cc-card-event-card-face cc-card-event-card-back">🂠</div>
-                                        <div class="cc-card-event-card-face cc-card-event-card-front cc-card-event-card-front-action">
-                                            <span class="cc-card-event-icon">@GetActionCardIcon(lastAction.Action)</span>
-                                            <span class="cc-card-event-label">@GetActionCardName(lastAction.Action)</span>
-                                        </div>
-                                    </div>
+                        @* ── Center Info (Shoe stats) ── *@
+                        <div class="cc-shoe-stats">
+                            <div class="cc-shoe-stat-row">
+                                <div class="cc-shoe-stat" title="Number cards in shoe">
+                                    <span class="cc-stat-icon">🔢</span>
+                                    <span class="cc-stat-label">Numbers</span>
+                                    <span class="cc-stat-num">@GameState.ShoeCardCounts.GetValueOrDefault(CardType.Number)</span>
                                 </div>
-                                <div class="cc-shoe-event-caption">
-                                    <strong>@lastAction.PlayerName</strong> played <strong>@GetActionCardName(lastAction.Action)</strong>
+                                <div class="cc-shoe-stat" title="Operator cards in shoe">
+                                    <span class="cc-stat-icon">➕</span>
+                                    <span class="cc-stat-label">Operators</span>
+                                    <span class="cc-stat-num">@GameState.ShoeCardCounts.GetValueOrDefault(CardType.Operator)</span>
                                 </div>
                             </div>
-                        }
-                        else if (GameState.DiscardHistory.Count > 0 && !GameState.DiscardHistory[^1].IsActionCard && GameState.LastDrawnCard is { } drawnCard)
-                        {
-                            <div class="cc-shoe-event-card-wrap" @key="@($"draw-{GameState.DiscardHistory.Count}")">
-                                <div class="cc-card-event-card">
-                                    <div class="cc-card-event-card-inner">
-                                        <div class="cc-card-event-card-face cc-card-event-card-back">🂠</div>
-                                        <div class="cc-card-event-card-face cc-card-event-card-front @(drawnCard.Card is OperatorCard ? "cc-card-event-card-front-operator" : "cc-card-event-card-front-number")">
-                                            <span class="cc-card-event-value">@FormatBaseCardDisplay(drawnCard.Card)</span>
-                                            <span class="cc-card-event-label">@GetBaseCardTypeLabel(drawnCard.Card)</span>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="cc-shoe-event-caption">
-                                    <strong>@drawnCard.DrawerName</strong> drew <strong>@FormatBaseCardDisplay(drawnCard.Card)</strong>
-                                </div>
+                            <div class="cc-shoe-badge">SHOE #@GameState.ShoeIndex</div>
+                        </div>
+
+                        @* ── Main Deck ── *@
+                        <div class="cc-deck-pile cc-main-deck-pile" title="Main Deck — @GameState.MainDeck.Count cards remaining">
+                            <div class="cc-pile-stack">
+                                <span class="cc-pile-card">🂠</span>
+                                <span class="cc-pile-card cc-pile-card-2">🂠</span>
+                                <span class="cc-pile-card cc-pile-card-3">🂠</span>
                             </div>
-                        }
+                            <div class="cc-pile-label">DECK</div>
+                            <div class="cc-pile-count">@GameState.MainDeck.Count</div>
+                        </div>
                     </div>
                 </div>
 
