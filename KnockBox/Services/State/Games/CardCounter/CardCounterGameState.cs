@@ -86,6 +86,24 @@ namespace KnockBox.Services.State.Games.CardCounter
         public string? FeelingLuckyTargetId { get; set; }
 
         /// <summary>
+        /// The most recently drawn shoe card, shown to all players as a full-screen overlay
+        /// immediately after it is drawn. Cleared once acknowledged or on next turn.
+        /// </summary>
+        public LastDrawnCardInfo? LastDrawnCard { get; set; }
+
+        /// <summary>
+        /// Set when the active player has played Not My Money and must now choose a target
+        /// to receive the next operator card they draw.
+        /// </summary>
+        public bool NotMyMoneyPending { get; set; }
+
+        /// <summary>
+        /// Set when the active player has drawn an operator and must choose a target for the
+        /// Not My Money redirect. The UI should show target selection while this is true.
+        /// </summary>
+        public bool IsNotMyMoneySelecting { get; set; }
+
+        /// <summary>
         /// Game configuration (tunable playtesting values).
         /// </summary>
         public GameConfig Config { get; set; } = new();
@@ -162,6 +180,16 @@ namespace KnockBox.Services.State.Games.CardCounter
         string SourceName,
         string TargetId,
         ActionCard PlayedCard);
+
+    /// <summary>
+    /// Information about the most recently drawn shoe card, shown to all players as an overlay.
+    /// </summary>
+    public record LastDrawnCardInfo(
+        string DrawerId,
+        string DrawerName,
+        BaseCard Card,
+        string? RedirectTargetId = null,
+        string? RedirectTargetName = null);
 
     /// <summary>A single entry in the visible discard pile history.</summary>
     public record DiscardHistoryEntry(

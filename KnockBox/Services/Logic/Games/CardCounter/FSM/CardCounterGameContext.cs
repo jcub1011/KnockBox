@@ -191,6 +191,16 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM
             string desc = FormatBaseCard(card);
             string symbol = GetBaseCardSymbol(card);
             State.DiscardHistory.Add(new DiscardHistoryEntry(desc, symbol, player.DisplayName, false));
+            State.LastDrawnCard = new LastDrawnCardInfo(player.PlayerId, player.DisplayName, card);
+        }
+
+        /// <summary>Records a shoe card drawn by a player (redirected by Not My Money) into the discard history.</summary>
+        public void RecordRedirectedDraw(PlayerState drawer, PlayerState target, BaseCard card)
+        {
+            string desc = FormatBaseCard(card);
+            string symbol = GetBaseCardSymbol(card);
+            State.DiscardHistory.Add(new DiscardHistoryEntry(desc, symbol, drawer.DisplayName, false));
+            State.LastDrawnCard = new LastDrawnCardInfo(drawer.PlayerId, drawer.DisplayName, card, target.PlayerId, target.DisplayName);
         }
 
         /// <summary>Records a shoe card burned (discarded without being drawn) into the discard history.</summary>

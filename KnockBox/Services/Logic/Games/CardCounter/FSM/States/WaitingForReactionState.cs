@@ -89,17 +89,6 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
 
             switch (_pendingCard.Action)
             {
-                case ActionType.Skim:
-                    // A full Skim needs digit-position info from the original command.
-                    // For now we swap the last digit of each pot if available.
-                    if (source.Pot.Count > 0 && target.Pot.Count > 0)
-                    {
-                        int si = source.Pot.Count - 1;
-                        int ti = target.Pot.Count - 1;
-                        (source.Pot[si], target.Pot[ti]) = (target.Pot[ti], source.Pot[si]);
-                    }
-                    break;
-
                 case ActionType.TurnTheTable:
                     target.Pot.Reverse();
                     break;

@@ -163,6 +163,66 @@ namespace KnockBox.Services.Logic.Games.CardCounter
             return ProcessCommand(ctx, new DiscardActionCardsCommand(player.Id, cardIndices));
         }
 
+        /// <summary>
+        /// Active player selects which digits to swap during a Skim action.
+        /// </summary>
+        public Result SkimSelect(User player, CardCounterGameState state, int sourceDigitIndex, int targetDigitIndex)
+        {
+            if (!TryGetContext(state, out var ctx, out var err)) return err;
+            return ProcessCommand(ctx, new SkimSelectCommand(player.Id, sourceDigitIndex, targetDigitIndex));
+        }
+
+        /// <summary>
+        /// Active player selects the target for a Not My Money operator redirect.
+        /// </summary>
+        public Result NotMyMoneySelectTarget(User player, CardCounterGameState state, string targetPlayerId)
+        {
+            if (!TryGetContext(state, out var ctx, out var err)) return err;
+            return ProcessCommand(ctx, new NotMyMoneySelectTargetCommand(player.Id, targetPlayerId));
+        }
+
+        /// <summary>
+        /// Active player cancels a pending Not My Money redirect (operator applies to self).
+        /// </summary>
+        public Result NotMyMoneyCancel(User player, CardCounterGameState state)
+        {
+            if (!TryGetContext(state, out var ctx, out var err)) return err;
+            return ProcessCommand(ctx, new NotMyMoneyCancelCommand(player.Id));
+        }
+
+        /// <summary>
+        /// Resets the game so another round can be played with the same players.
+        /// Only the host can trigger a reset.
+        /// </summary>
+        public Result ResetGame(User host, CardCounterGameState state)
+        {
+            if (state.Host.Id != host.Id)
+                return Result.FromError("Only the host can reset the game.");
+
+            if (state.GamePhase != GamePhase.GameOver)
+                return Result.FromError("Can only reset after the game is over.");
+
+            return state.Execute(() =>
+            {
+                // Create a fresh context and re-run initialization
+                var context = new CardCounterGameContext(state, randomNumberService, logger);
+                state.Context = context;
+                state.DiscardHistory.Clear();
+                state.MainDeck.Clear();
+                state.CurrentShoe.Clear();
+                state.DiscardPile.Clear();
+                state.LastPlayedAction = null;
+                state.LastDrawnCard = null;
+                state.PendingReaction = null;
+                state.FeelingLuckyTargetId = null;
+                state.NotMyMoneyPending = false;
+                state.IsNotMyMoneySelecting = false;
+                state.ForceDrawStack.Clear();
+                InitializeGame(context);
+                TransitionTo(context, new BuyInState());
+            });
+        }
+
         // ── Initialisation helpers ────────────────────────────────────────────
 
         private void InitializeGame(CardCounterGameContext context)
