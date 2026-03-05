@@ -384,19 +384,31 @@ else
             {
                 <div class="cc-not-my-money-overlay">
                     <div class="cc-not-my-money-panel">
-                        <h3 class="cc-nmm-title">💸 NOT MY MONEY — Choose who gets this operator</h3>
-                        <p class="cc-nmm-subtitle">Select a player to apply the operator to their pot, or cancel to apply it to yourself.</p>
+                        <h3 class="cc-nmm-title">
+                            💸 NOT MY MONEY
+                            @if (GameState.PendingNotMyMoneyOperator.HasValue)
+                            {
+                                <span>[<strong>@GetOperatorSymbol(GameState.PendingNotMyMoneyOperator.Value)</strong>]</span>
+                            }
+                        </h3>
+                        <p class="cc-nmm-subtitle">Select a player to apply this operator to their pot, or cancel to apply it to yourself.</p>
                         <div class="cc-nmm-players">
                             @foreach (var pl in GameState.GamePlayers.Values)
                             {
+                                bool isMe = pl.PlayerId == myId;
                                 bool isNmmTarget = _notMyMoneyTargetId == pl.PlayerId;
                                 <div class="cc-nmm-player @(isNmmTarget ? "cc-nmm-player-selected" : "")"
-                                     @onclick="() => SelectNotMyMoneyTarget(pl.PlayerId)">
-                                    <span class="cc-nmm-player-name">@pl.DisplayName</span>
-                                    <span class="cc-nmm-player-pot">
+                                     style="@(isMe ? "opacity: 0.5; pointer-events: none; cursor: default;" : "")"
+                                     @onclick="() => { if (!isMe) SelectNotMyMoneyTarget(pl.PlayerId); }">
+                                    <span class="cc-nmm-player-name">@pl.DisplayName @(isMe ? "(you)" : "")</span>
+                                    <span class="cc-nmm-player-balance" title="Balance" style="width: 70px; text-align: right;">
+                                        <span class="cc-stat-val @(pl.Balance >= 0 ? "cc-positive" : "cc-negative")">@FormatBalance(pl.Balance)</span>
+                                    </span>
+                                    <span class="cc-nmm-player-pot" title="Pot" style="width: 80px; text-align: right;">
                                         @if (pl.Pot.Count > 0)
                                         {
                                             @string.Join("", pl.Pot)
+                                            <span class="cc-pot-value"> (@pl.PotValue)</span>
                                         }
                                         else
                                         {

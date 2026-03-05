@@ -98,6 +98,11 @@ namespace KnockBox.Services.State.Games.CardCounter
         public bool IsNotMyMoneySelecting { get; set; }
 
         /// <summary>
+        /// The operator card currently being redirected by Not My Money.
+        /// </summary>
+        public Operator? PendingNotMyMoneyOperator { get; set; }
+
+        /// <summary>
         /// Game configuration (tunable playtesting values).
         /// </summary>
         public GameConfig Config { get; set; } = new();

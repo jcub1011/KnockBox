@@ -23,6 +23,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
         {
             _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.Config.ActionResponseTimeoutMs);
             context.State.IsNotMyMoneySelecting = true;
+            context.State.PendingNotMyMoneyOperator = _operatorCard.Op;
             context.Logger.LogInformation(
                 "FSM → NotMyMoneyState: [{id}] redirecting operator [{op}]. Expires {exp}.",
                 _playerId, _operatorCard.Op, _expiresAt);
@@ -107,6 +108,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
         private ICardCounterGameState FinishTurn(CardCounterGameContext context)
         {
             context.State.IsNotMyMoneySelecting = false;
+            context.State.PendingNotMyMoneyOperator = null;
             context.AdvanceTurn();
 
             if (context.CurrentShoe.Count == 0)

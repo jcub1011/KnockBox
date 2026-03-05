@@ -217,6 +217,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter
                 state.PendingReaction = null;
                 state.FeelingLuckyTargetId = null;
                 state.IsNotMyMoneySelecting = false;
+                state.PendingNotMyMoneyOperator = null;
                 state.ForceDrawStack.Clear();
                 InitializeGame(context);
                 TransitionTo(context, new BuyInState());
