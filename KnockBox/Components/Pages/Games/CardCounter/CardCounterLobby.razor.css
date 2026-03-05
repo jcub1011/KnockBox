@@ -1200,6 +1200,8 @@
 .cc-leaderboard-row {
     display: flex;
     align-items: center;
+    flex-direction: row;
+    flex-wrap: wrap;
     gap: 12px;
     background: rgba(255,255,255,0.05);
     border: 2px solid rgba(255,255,255,0.1);
