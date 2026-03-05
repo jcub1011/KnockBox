@@ -78,5 +78,21 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             Assert.IsTrue(state.DiscardHistory[0].IsActionCard);
             Assert.AreEqual("Comp'd", state.DiscardHistory[0].Description);
         }
+
+        [TestMethod]
+        public void RecordBurn_UsesBurnIconForDiscardTopEntry()
+        {
+            var host = new User("Host", "host-id");
+            using var state = new CardCounterGameState(host, _stateLoggerMock.Object);
+            var context = new CardCounterGameContext(state, _randomMock.Object, _loggerMock.Object);
+
+            context.RecordBurn(new NumberCard(7));
+
+            Assert.AreEqual(1, state.DiscardHistory.Count);
+            var burnEntry = state.DiscardHistory[0];
+            Assert.IsTrue(burnEntry.IsActionCard);
+            Assert.AreEqual("🔥", burnEntry.Symbol);
+            Assert.AreEqual("# 7 (Burned)", burnEntry.Description);
+        }
     }
 }
