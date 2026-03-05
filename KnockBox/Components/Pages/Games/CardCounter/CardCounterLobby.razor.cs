@@ -25,7 +25,6 @@ namespace KnockBox.Components.Pages.Games.CardCounter
 
         private IDisposable? _stateSubscription;
         private PeriodicTimer? _timer;
-        private CancellationTokenSource? _timerCts;
 
         protected override async Task OnInitializedAsync()
         {
@@ -70,7 +69,6 @@ namespace KnockBox.Components.Pages.Games.CardCounter
                 }
             });
 
-            _timerCts = new CancellationTokenSource();
             _timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
             _ = StartTimerAsync();
 
@@ -81,9 +79,13 @@ namespace KnockBox.Components.Pages.Games.CardCounter
         {
             try
             {
-                while (await _timer!.WaitForNextTickAsync(_timerCts!.Token))
+                while (await _timer!.WaitForNextTickAsync(ComponentDetached))
                 {
-                    await InvokeAsync(StateHasChanged);
+                    try
+                    {
+                        await InvokeAsync(StateHasChanged);
+                    }
+                    catch (ObjectDisposedException) { break; }
                 }
             }
             catch (OperationCanceledException) { }
@@ -91,8 +93,6 @@ namespace KnockBox.Components.Pages.Games.CardCounter
 
         public override void Dispose()
         {
-            _timerCts?.Cancel();
-            _timerCts?.Dispose();
             _timer?.Dispose();
             if (GameState != null)
                 GameState.OnStateDisposed -= HandleGameStateDisposed;
