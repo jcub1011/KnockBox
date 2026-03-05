@@ -212,7 +212,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM
         {
             string desc = FormatBaseCard(card);
             string symbol = GetBaseCardSymbol(card);
-            State.DiscardHistory.Add(new DiscardHistoryEntry($"{desc} (Burned)", "🔥", null, false));
+            State.DiscardHistory.Add(new DiscardHistoryEntry($"{desc} (Burned)", "🔥", null, true));
         }
 
         /// <summary>Records an action card played by a player into the discard history.</summary>
