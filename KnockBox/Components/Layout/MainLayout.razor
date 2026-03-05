@@ -41,6 +41,7 @@
     [Inject] INavigationService NavigationService { get; set; } = default!;
     [Inject] IGameSessionService GameSessionService { get; set; } = default!;
     [Inject] IJSRuntime JSRuntime { get; set; } = default!;
+    [Inject] ILogger<MainLayout> Logger { get; set; } = default!;
 
     private bool _isRoomCodeRevealed;
 
@@ -48,7 +49,14 @@
 
     private async Task CopyRoomCodeAsync(string code)
     {
-        await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", code);
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", code);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error copying lobby code.");
+        }
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
