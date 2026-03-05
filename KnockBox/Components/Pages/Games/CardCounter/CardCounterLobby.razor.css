@@ -39,10 +39,9 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 10px 20px;
-    background: rgba(0,0,0,0.5);
-    border-bottom: 3px solid #8B6914;
+    padding: 10px;
     gap: 12px;
+    background: linear-gradient();
     flex-wrap: wrap;
 }
 
@@ -438,6 +437,7 @@
 .cc-table-area {
     display: flex;
     flex-direction: column;
+    justify-content: safe center;
     height: 100%;
     width: 100%;
     gap: 16px;
@@ -780,6 +780,7 @@
     display: flex;
     flex-wrap: wrap;
     flex-direction: row;
+    justify-content: safe center;
     gap: 16px;
 }
 
@@ -809,6 +810,7 @@
     display: flex;
     gap: 10px;
     flex-wrap: wrap;
+    justify-content: safe center;
 }
 
 .cc-waiting-turn {

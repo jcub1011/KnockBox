@@ -18,31 +18,6 @@ else
 {
     <div class="cc-page">
 
-        @* ── Header ── *@
-        <div class="cc-header">
-            <div class="cc-header-left">
-                <span class="cc-game-timer">⏱ @GameTime.ToString(@"hh\:mm\:ss")</span>
-            </div>
-            <div class="cc-header-right">
-                @if (!GameState.IsJoinable)
-                {
-                    <span class="cc-phase-badge cc-phase-@GameState.GamePhase.ToString().ToLower()">
-                        @GetPhaseLabel()
-                    </span>
-                    @if (GameState.GamePhase == GamePhase.Playing && GameState.TurnOrder.Count > 0)
-                    {
-                        var activeId = GameState.TurnOrder[GameState.CurrentPlayerIndex];
-                        if (GameState.GamePlayers.TryGetValue(activeId, out var activePl))
-                        {
-                            <span class="cc-turn-indicator">
-                                🎴 @activePl.DisplayName's turn
-                            </span>
-                        }
-                    }
-                }
-            </div>
-        </div>
-
         @* ── Lobby Phase ── *@
         @if (GameState.IsJoinable)
         {
@@ -737,6 +712,30 @@ else
                     </div>
                 </div>
             }
+
+            @* ── Header ── *@
+            <div class="cc-header">
+                <div class="cc-header-left">
+                    <span class="cc-game-timer">⏱ @GameTime.ToString(@"hh\:mm\:ss")</span>
+                </div>
+                <div class="cc-header-right">
+                    @if (!GameState.IsJoinable)
+                    {
+                        <span class="cc-phase-badge cc-phase-@GameState.GamePhase.ToString().ToLower()">
+                            @GetPhaseLabel()
+                        </span>
+                        @if (GameState.GamePhase == GamePhase.Playing && GameState.TurnOrder.Count > 0)
+                        {
+                            if (GameState.GamePlayers.TryGetValue(activeId, out var activePl))
+                            {
+                                <span class="cc-turn-indicator">
+                                    🎴 @activePl.DisplayName's turn
+                                </span>
+                            }
+                        }
+                    }
+                </div>
+            </div>
 
             @* ── My Hand ── *@
             @if (myPlayer != null)
