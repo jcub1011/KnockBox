@@ -111,58 +111,30 @@
 
 /* ── Draw / Action Card Event Animation ───────────────────────────────────── */
 
-.cc-card-event-overlay {
-    --event-overlay-top: 88px; /* aligns below the game header bar */
-    position: fixed;
-    top: var(--event-overlay-top);
-    left: 0;
-    right: 0;
-    z-index: 240;
+.cc-shoe-pile {
+    position: relative;
+}
+
+.cc-shoe-event-card-wrap {
+    position: absolute;
+    left: 50%;
+    top: 52%;
+    transform: translate(-50%, -50%);
+    z-index: 4;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
     pointer-events: none;
 }
 
-.cc-card-event-summary {
-    font-size: 1rem;
-    color: #f7d547;
-    background: rgba(9, 12, 18, 0.92);
-    border: 1px solid rgba(247, 213, 71, 0.45);
-    border-radius: 12px;
-    padding: 8px 16px;
-    box-shadow: 0 4px 14px rgba(0,0,0,0.45);
-    animation: slideIn 0.25s ease-out;
-}
-
-@keyframes slideIn {
-    from { opacity: 0; transform: translateY(-10px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-
-.cc-card-event-stage {
-    position: relative;
-    width: min(680px, 94vw);
-    height: 270px;
-}
-
 .cc-card-event-card {
-    --discard-offset-x: -250px; /* visually aligns end position with discard pile */
     --card-flip-perspective: 700px;
-    --start-x: 0px;
-    --start-y: 0px;
-    --end-x: 0px;
-    --end-y: 0px;
-    position: absolute;
-    left: 50%;
-    top: 50%;
     width: 112px;
     height: 156px;
-    transform: translate(-50%, -50%);
     transform-style: preserve-3d;
     perspective: var(--card-flip-perspective);
-    animation: cardTravel 1.15s ease-in-out forwards;
+    animation: cardEventAppear 0.2s ease-out;
 }
 
 .cc-card-event-card-inner {
@@ -230,52 +202,27 @@
     padding: 0 8px;
 }
 
-.cc-card-event-draw {
-    --start-x: 0px;
-    --start-y: 0px;
-}
-
-.cc-card-event-from-me {
-    --start-x: 0px;
-    --start-y: 100px;
-}
-
-.cc-card-event-from-opponent {
-    --start-x: 0px;
-    --start-y: -100px;
-}
-
-.cc-card-event-to-me {
-    --end-x: 0px;
-    --end-y: 102px;
-}
-
-.cc-card-event-to-opponent {
-    --end-x: 0px;
-    --end-y: -102px;
-}
-
-.cc-card-event-to-discard {
-    --end-x: var(--discard-offset-x);
-    --end-y: 20px;
-}
-
 @keyframes cardFlipReveal {
     from { transform: rotateY(0deg); }
     to { transform: rotateY(180deg); }
 }
 
-@keyframes cardTravel {
-    0% {
-        transform: translate(calc(-50% + var(--start-x)), calc(-50% + var(--start-y))) scale(0.92);
-    }
-    35% {
-        transform: translate(-50%, -50%) scale(1);
-    }
-    100% {
-        transform: translate(calc(-50% + var(--end-x)), calc(-50% + var(--end-y))) scale(0.96);
-        opacity: 0.96;
-    }
+@keyframes cardEventAppear {
+    from { opacity: 0; transform: scale(0.94); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+.cc-shoe-event-caption {
+    color: #f7d547;
+    font-size: 0.76rem;
+    font-weight: 700;
+    text-align: center;
+    background: rgba(0,0,0,0.72);
+    border: 1px solid rgba(247, 213, 71, 0.4);
+    border-radius: 8px;
+    padding: 4px 8px;
+    min-width: 132px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
 }
 
 /* ── Lobby Phase ──────────────────────────────────────────────────────────── */
@@ -1916,31 +1863,6 @@
         min-width: 160px;
     }
 }*/
-
-.cc-draw-notification {
-    background: rgba(100, 180, 255, 0.12);
-    border-bottom-color: rgba(100, 180, 255, 0.5);
-}
-
-.cc-notif-draw-value {
-    font-size: 1.6rem;
-    font-weight: 900;
-    line-height: 1;
-    min-width: 36px;
-    text-align: center;
-    border-radius: 6px;
-    padding: 2px 8px;
-}
-
-.cc-notif-draw-number {
-    background: rgba(21, 101, 192, 0.35);
-    color: #90caf9;
-}
-
-.cc-notif-draw-operator {
-    background: rgba(198, 40, 40, 0.35);
-    color: #ef9a9a;
-}
 
 /* ── Skim Digit Selection Overlay ─────────────────────────────────────────── */
 

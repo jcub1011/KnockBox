@@ -43,55 +43,6 @@ else
             </div>
         </div>
 
-        @* ── Last Action / Drawn Card Animation ── *@
-        @if (GameState.LastPlayedAction is { } lastAction)
-        {
-            <div class="cc-card-event-overlay">
-                <div class="cc-card-event-summary">
-                    <strong>@lastAction.PlayerName</strong> played <strong>@GetActionCardName(lastAction.Action)</strong>
-                    @if (lastAction.TargetName != null)
-                    {
-                        <span> on <strong>@lastAction.TargetName</strong></span>
-                    }
-                </div>
-                <div class="cc-card-event-stage">
-                    <div class="cc-card-event-card @GetActionEventAnimationClass(lastAction)">
-                        <div class="cc-card-event-card-inner">
-                            <div class="cc-card-event-card-face cc-card-event-card-back">🂠</div>
-                            <div class="cc-card-event-card-face cc-card-event-card-front cc-card-event-card-front-action">
-                                <span class="cc-card-event-icon">@GetActionCardIcon(lastAction.Action)</span>
-                                <span class="cc-card-event-label">@GetActionCardName(lastAction.Action)</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        }
-        else if (GameState.LastDrawnCard is { } drawnCard)
-        {
-            <div class="cc-card-event-overlay">
-                <div class="cc-card-event-summary">
-                    <strong>@drawnCard.DrawerName</strong> drew <strong>@GetBaseCardTypeLabel(drawnCard.Card).ToLowerInvariant()</strong>
-                    (<strong>@FormatBaseCardDisplay(drawnCard.Card)</strong>)
-                    @if (drawnCard.RedirectTargetName != null)
-                    {
-                        <span> — applied to <strong>@drawnCard.RedirectTargetName</strong></span>
-                    }
-                </div>
-                <div class="cc-card-event-stage">
-                    <div class="cc-card-event-card @GetDrawEventAnimationClass(drawnCard)">
-                        <div class="cc-card-event-card-inner">
-                            <div class="cc-card-event-card-face cc-card-event-card-back">🂠</div>
-                            <div class="cc-card-event-card-face cc-card-event-card-front @(drawnCard.Card is OperatorCard ? "cc-card-event-card-front-operator" : "cc-card-event-card-front-number")">
-                                <span class="cc-card-event-value">@FormatBaseCardDisplay(drawnCard.Card)</span>
-                                <span class="cc-card-event-label">@GetBaseCardTypeLabel(drawnCard.Card)</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        }
-
         @* ── Lobby Phase ── *@
         @if (GameState.IsJoinable)
         {
@@ -606,6 +557,40 @@ else
                         {
                             <div class="cc-pile-empty">
                                 <span class="cc-pile-empty-icon">📭</span>
+                            </div>
+                        }
+                        @if (GameState.LastPlayedAction is { } lastAction)
+                        {
+                            <div class="cc-shoe-event-card-wrap" @key="@($"action-{GameState.DiscardHistory.Count}")">
+                                <div class="cc-card-event-card">
+                                    <div class="cc-card-event-card-inner">
+                                        <div class="cc-card-event-card-face cc-card-event-card-back">🂠</div>
+                                        <div class="cc-card-event-card-face cc-card-event-card-front cc-card-event-card-front-action">
+                                            <span class="cc-card-event-icon">@GetActionCardIcon(lastAction.Action)</span>
+                                            <span class="cc-card-event-label">@GetActionCardName(lastAction.Action)</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="cc-shoe-event-caption">
+                                    <strong>@lastAction.PlayerName</strong> played <strong>@GetActionCardName(lastAction.Action)</strong>
+                                </div>
+                            </div>
+                        }
+                        else if (GameState.LastDrawnCard is { } drawnCard)
+                        {
+                            <div class="cc-shoe-event-card-wrap" @key="@($"draw-{GameState.DiscardHistory.Count}")">
+                                <div class="cc-card-event-card">
+                                    <div class="cc-card-event-card-inner">
+                                        <div class="cc-card-event-card-face cc-card-event-card-back">🂠</div>
+                                        <div class="cc-card-event-card-face cc-card-event-card-front @(drawnCard.Card is OperatorCard ? "cc-card-event-card-front-operator" : "cc-card-event-card-front-number")">
+                                            <span class="cc-card-event-value">@FormatBaseCardDisplay(drawnCard.Card)</span>
+                                            <span class="cc-card-event-label">@GetBaseCardTypeLabel(drawnCard.Card)</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="cc-shoe-event-caption">
+                                    <strong>@drawnCard.DrawerName</strong> drew <strong>@FormatBaseCardDisplay(drawnCard.Card)</strong>
+                                </div>
                             </div>
                         }
                         <div class="cc-pile-label">SHOE</div>

@@ -435,30 +435,6 @@ namespace KnockBox.Components.Pages.Games.CardCounter
                 Logger.LogError("Failed to reset game: {Error}", error);
         }
 
-        protected string GetDrawEventAnimationClass(LastDrawnCardInfo drawnCard)
-        {
-            return string.Equals(drawnCard.DrawerId, CurrentUserId, StringComparison.Ordinal)
-                ? "cc-card-event-draw cc-card-event-to-me"
-                : "cc-card-event-draw cc-card-event-to-opponent";
-        }
-
-        protected string GetActionEventAnimationClass(LastPlayedActionInfo actionInfo)
-        {
-            bool fromMe = string.Equals(actionInfo.PlayerId, CurrentUserId, StringComparison.Ordinal);
-
-            if (actionInfo.TargetId is not null)
-            {
-                bool toMe = string.Equals(actionInfo.TargetId, CurrentUserId, StringComparison.Ordinal);
-                return $"{(fromMe ? "cc-card-event-from-me" : "cc-card-event-from-opponent")} {(toMe ? "cc-card-event-to-me" : "cc-card-event-to-opponent")}";
-            }
-
-            return fromMe
-                ? "cc-card-event-from-me cc-card-event-to-discard"
-                : "cc-card-event-from-opponent cc-card-event-to-discard";
-        }
-
-        private string? CurrentUserId => UserService.CurrentUser?.Id;
-
         // ── Static helpers ────────────────────────────────────────────────────
 
         protected static bool RequiresTarget(ActionType action) => action switch
