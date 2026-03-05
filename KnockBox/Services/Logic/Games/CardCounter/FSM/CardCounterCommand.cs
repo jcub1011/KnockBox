@@ -27,4 +27,22 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM
 
     /// <summary>Player discards action cards from their hand when over the hand limit.</summary>
     public record DiscardActionCardsCommand(string PlayerId, int[] CardIndices) : CardCounterCommand(PlayerId);
+
+    /// <summary>
+    /// Player selects which digit indices to swap during a Skim action.
+    /// <paramref name="SourceDigitIndex"/> is the index in the player's own pot;
+    /// <paramref name="TargetDigitIndex"/> is the index in the opponent's pot.
+    /// </summary>
+    public record SkimSelectCommand(string PlayerId, int SourceDigitIndex, int TargetDigitIndex) : CardCounterCommand(PlayerId);
+
+    /// <summary>Player dismisses the last-drawn-card overlay.</summary>
+    public record DismissDrawnCardCommand(string PlayerId) : CardCounterCommand(PlayerId);
+
+    /// <summary>
+    /// Active player selects the target for a Not My Money redirect after drawing an operator.
+    /// </summary>
+    public record NotMyMoneySelectTargetCommand(string PlayerId, string TargetPlayerId) : CardCounterCommand(PlayerId);
+
+    /// <summary>Active player cancels a pending Not My Money redirect.</summary>
+    public record NotMyMoneyCancelCommand(string PlayerId) : CardCounterCommand(PlayerId);
 }

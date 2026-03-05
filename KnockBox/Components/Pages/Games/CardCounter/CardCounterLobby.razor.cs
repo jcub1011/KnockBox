@@ -43,6 +43,8 @@ namespace KnockBox.Components.Pages.Games.CardCounter
             GameState = gameState;
             RoomCode = session.LobbyRegistration.Code;
 
+            GameState.OnStateDisposed += HandleGameStateDisposed;
+
             _stateSubscription = GameState.StateChangedEventManager.Subscribe(async () =>
             {
                 bool isNewShoe = GameState?.IsNewShoe == true;
@@ -70,9 +72,26 @@ namespace KnockBox.Components.Pages.Games.CardCounter
 
         public override void Dispose()
         {
+            if (GameState != null)
+                GameState.OnStateDisposed -= HandleGameStateDisposed;
             _stateSubscription?.Dispose();
             GameSessionService.LeaveCurrentSession(false);
             base.Dispose();
+        }
+
+        private void HandleGameStateDisposed()
+        {
+            try
+            {
+                // The host left and the game state was torn down. Navigate remaining players home.
+                _ = InvokeAsync(ReturnToHome).ContinueWith(
+                    t => Logger.LogError(t.Exception, "Error navigating home after game state was disposed."),
+                    System.Threading.Tasks.TaskContinuationOptions.OnlyOnFaulted);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Error handling game state disposal in lobby.");
+            }
         }
 
         protected CardCounterGameState? GameState { get; set; }
@@ -91,6 +110,13 @@ namespace KnockBox.Components.Pages.Games.CardCounter
         private int? _pendingActionCardIndex;
         private string? _selectedTargetId;
 
+        // ── Skim digit selection state ────────────────────────────────────────
+        private int? _pendingSkimSourceDigit;
+        private int? _pendingSkimTargetDigit;
+
+        // ── Not My Money target selection state ───────────────────────────────
+        private string? _notMyMoneyTargetId;
+
         // ── Reorder state ─────────────────────────────────────────────────────
         protected List<int> SelectedReorderIndices = new();
 
@@ -104,6 +130,12 @@ namespace KnockBox.Components.Pages.Games.CardCounter
         protected void ToggleDiscardOverlay() => _showDiscardOverlay = !_showDiscardOverlay;
 
         protected void ReturnToHome() => NavigationService.ToHome();
+
+        protected bool IsHost()
+        {
+            if (GameState == null || UserService.CurrentUser == null) return false;
+            return GameState.Host.Id == UserService.CurrentUser.Id;
+        }
 
         protected PlayerState? GetMyPlayer()
         {
@@ -139,11 +171,35 @@ namespace KnockBox.Components.Pages.Games.CardCounter
             return afterDiscard <= GameState.Config.ActionHandLimit && _selectedDiscardIndices.Count > 0;
         }
 
+        /// <summary>Returns whether the Skim card can be played by the current player.</summary>
+        protected bool CanPlaySkim()
+        {
+            var me = GetMyPlayer();
+            return me != null && me.Pot.Count > 0;
+        }
+
+        /// <summary>Returns whether a given player can be targeted by Skim (non-empty pot, not self).</summary>
+        protected bool CanSkimTarget(PlayerState target)
+        {
+            var me = GetMyPlayer();
+            return me != null && target.Pot.Count > 0 && target.PlayerId != me.PlayerId;
+        }
+
+        /// <summary>Returns whether the Not My Money card is currently playable (before drawing, not already pending).</summary>
+        protected bool CanPlayNotMyMoney()
+        {
+            if (GameState == null) return false;
+            return !GameState.NotMyMoneyPending;
+        }
+
         private void ClearTransientUiState()
         {
             _pendingActionCardIndex = null;
             _selectedTargetId = null;
             _selectedDiscardIndices.Clear();
+            _pendingSkimSourceDigit = null;
+            _pendingSkimTargetDigit = null;
+            _notMyMoneyTargetId = null;
         }
 
         // ── Actions ───────────────────────────────────────────────────────────
@@ -197,6 +253,8 @@ namespace KnockBox.Components.Pages.Games.CardCounter
             {
                 _pendingActionCardIndex = cardIndex;
                 _selectedTargetId = null;
+                _pendingSkimSourceDigit = null;
+                _pendingSkimTargetDigit = null;
             }
             else
             {
@@ -206,6 +264,7 @@ namespace KnockBox.Components.Pages.Games.CardCounter
 
         protected void SelectTarget(string playerId)
         {
+            if (IsHost()) return; // host cannot target
             _selectedTargetId = playerId;
         }
 
@@ -213,16 +272,93 @@ namespace KnockBox.Components.Pages.Games.CardCounter
         {
             if (GameState == null || UserService.CurrentUser == null) return;
             if (_pendingActionCardIndex == null || _selectedTargetId == null) return;
+            var me = GetMyPlayer();
+            if (me == null) return;
+            var card = me.ActionHand.ElementAtOrDefault(_pendingActionCardIndex.Value);
+            if (card == null) return;
+
+            // For Skim, validation happens in the engine; we just send the card play command
             GameEngine.PlayActionCard(UserService.CurrentUser, GameState, _pendingActionCardIndex.Value, _selectedTargetId);
             _pendingActionCardIndex = null;
             _selectedTargetId = null;
+            _pendingSkimSourceDigit = null;
+            _pendingSkimTargetDigit = null;
         }
 
         protected void CancelTargetSelect()
         {
             _pendingActionCardIndex = null;
             _selectedTargetId = null;
+            _pendingSkimSourceDigit = null;
+            _pendingSkimTargetDigit = null;
         }
+
+        // ── Skim digit selection ──────────────────────────────────────────────
+
+        protected bool IsInSkimDigitSelect()
+        {
+            if (GameState == null || UserService.CurrentUser == null) return false;
+            return GameState.PendingReaction?.PlayedCard.Action == ActionType.Skim
+                   && GameState.PendingReaction.SourceId == UserService.CurrentUser.Id;
+        }
+
+        protected void SelectSkimSourceDigit(int index)
+        {
+            _pendingSkimSourceDigit = index;
+        }
+
+        protected void SelectSkimTargetDigit(int index)
+        {
+            _pendingSkimTargetDigit = index;
+        }
+
+        protected void ConfirmSkimSwap()
+        {
+            if (GameState == null || UserService.CurrentUser == null) return;
+            if (_pendingSkimSourceDigit == null || _pendingSkimTargetDigit == null) return;
+            GameEngine.SkimSelect(UserService.CurrentUser, GameState, _pendingSkimSourceDigit.Value, _pendingSkimTargetDigit.Value);
+            _pendingSkimSourceDigit = null;
+            _pendingSkimTargetDigit = null;
+        }
+
+        protected void CancelSkimSelect()
+        {
+            _pendingSkimSourceDigit = null;
+            _pendingSkimTargetDigit = null;
+        }
+
+        // ── Not My Money target selection ─────────────────────────────────────
+
+        protected bool IsInNotMyMoneySelect()
+        {
+            if (GameState == null || UserService.CurrentUser == null) return false;
+            // Show Not My Money target selection to the active player when the state is waiting for their choice
+            if (!GameState.IsNotMyMoneySelecting) return false;
+            var activeId = GameState.TurnOrder.Count > 0 ? GameState.TurnOrder[GameState.CurrentPlayerIndex] : "";
+            return activeId == UserService.CurrentUser.Id;
+        }
+
+        protected void SelectNotMyMoneyTarget(string playerId)
+        {
+            _notMyMoneyTargetId = playerId;
+        }
+
+        protected void ConfirmNotMyMoneyTarget()
+        {
+            if (GameState == null || UserService.CurrentUser == null) return;
+            if (_notMyMoneyTargetId == null) return;
+            GameEngine.NotMyMoneySelectTarget(UserService.CurrentUser, GameState, _notMyMoneyTargetId);
+            _notMyMoneyTargetId = null;
+        }
+
+        protected void CancelNotMyMoney()
+        {
+            if (GameState == null || UserService.CurrentUser == null) return;
+            GameEngine.NotMyMoneyCancel(UserService.CurrentUser, GameState);
+            _notMyMoneyTargetId = null;
+        }
+
+        // ── Discard ───────────────────────────────────────────────────────────
 
         protected void ToggleDiscardSelection(int index)
         {
@@ -237,6 +373,8 @@ namespace KnockBox.Components.Pages.Games.CardCounter
             GameEngine.DiscardActionCards(UserService.CurrentUser, GameState, _selectedDiscardIndices.ToArray());
             _selectedDiscardIndices.Clear();
         }
+
+        // ── Reorder ───────────────────────────────────────────────────────────
 
         protected void SelectForReorder(int index)
         {
@@ -259,6 +397,16 @@ namespace KnockBox.Components.Pages.Games.CardCounter
                 GameEngine.SubmitReorder(UserService.CurrentUser, GameState, SelectedReorderIndices.ToArray());
                 SelectedReorderIndices.Clear();
             }
+        }
+
+        // ── Game reset ────────────────────────────────────────────────────────
+
+        protected void ResetGame()
+        {
+            if (GameState == null || UserService.CurrentUser == null) return;
+            var result = GameEngine.ResetGame(UserService.CurrentUser, GameState);
+            if (result.TryGetFailure(out var error))
+                Logger.LogError("Failed to reset game: {Error}", error);
         }
 
         // ── Static helpers ────────────────────────────────────────────────────
@@ -304,7 +452,7 @@ namespace KnockBox.Components.Pages.Games.CardCounter
             ActionType.MakeMyLuck =>
                 "Peek at the top 3 cards in the shoe and rearrange them in any order you choose.",
             ActionType.Skim =>
-                "Swap the last digit in your pot with the last digit in a chosen opponent's pot. Target required. Blockable with Comp'd.",
+                "Swap any digit in your pot with any digit in a chosen opponent's pot. Cannot be played or target players with empty pots. Blockable with Comp'd.",
             ActionType.Burn =>
                 "Discard the top card of the shoe without drawing it. Useful for removing dangerous cards.",
             ActionType.TurnTheTable =>
@@ -312,7 +460,7 @@ namespace KnockBox.Components.Pages.Games.CardCounter
             ActionType.Compd =>
                 "Block a card played against you (Feeling Lucky, Skim, Turn The Table, or Launder). Hold until needed.",
             ActionType.NotMyMoney =>
-                "Redirect the next card you draw to another player instead of keeping it yourself.",
+                "When you draw an operator card, redirect it to apply to another player's pot instead.",
             ActionType.Launder =>
                 "Swap your entire pot with a chosen opponent's pot. Target required. Blockable with Comp'd.",
             _ => action.ToString()
@@ -344,5 +492,27 @@ namespace KnockBox.Components.Pages.Games.CardCounter
         {
             return balance >= 0 ? $"+{balance:N0}" : $"{balance:N0}";
         }
+
+        protected static string FormatBaseCardDisplay(BaseCard card) => card switch
+        {
+            NumberCard nc => $"{nc.Value}",
+            OperatorCard oc => oc.Op switch
+            {
+                Operator.Add => "+",
+                Operator.Subtract => "−",
+                Operator.Multiply => "×",
+                Operator.Divide => "÷",
+                _ => "?"
+            },
+            _ => "?"
+        };
+
+        protected static string GetBaseCardTypeLabel(BaseCard card) => card switch
+        {
+            NumberCard => "NUMBER",
+            OperatorCard => "OPERATOR",
+            _ => "CARD"
+        };
     }
 }
+

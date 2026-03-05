@@ -12,6 +12,9 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
             context.State.GamePhase = GamePhase.Playing;
             context.State.PendingReaction = null;
             context.State.FeelingLuckyTargetId = null;
+            context.State.LastDrawnCard = null;
+            context.State.NotMyMoneyPending = false;
+            context.State.IsNotMyMoneySelecting = false;
             context.Logger.LogInformation(
                 "FSM → PlayerTurnState (active: {id})", context.CurrentPlayerId);
         }
@@ -54,13 +57,21 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
             context.DiscardPile.Push(card);
             context.DecrementShoeCount(card);
 
+            // If Not My Money is pending and this is an operator, enter the redirect state
+            if (context.State.NotMyMoneyPending && card is OperatorCard oc)
+            {
+                context.State.NotMyMoneyPending = false;
+                // Record the draw for the discard history (will be finalised in NotMyMoneyState)
+                return new NotMyMoneyState(cmd.PlayerId, oc);
+            }
+
             if (card is NumberCard nc)
             {
                 context.ApplyNumberCard(player, nc);
             }
-            else if (card is OperatorCard oc)
+            else if (card is OperatorCard operatorCard)
             {
-                context.ApplyOperatorCard(player, oc);
+                context.ApplyOperatorCard(player, operatorCard);
             }
 
             context.RecordDraw(player, card);
@@ -172,10 +183,10 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
                 ActionType.FeelingLucky => HandleFeelingLucky(context, cmd.PlayerId),
                 ActionType.MakeMyLuck => HandleMakeMyLuck(context, cmd.PlayerId),
                 ActionType.Burn => HandleBurn(context),
-                ActionType.Skim => HandleBlockable(context, cmd, card),
+                ActionType.Skim => HandleSkim(context, cmd),
                 ActionType.TurnTheTable => HandleBlockable(context, cmd, card),
                 ActionType.Launder => HandleBlockable(context, cmd, card),
-                ActionType.NotMyMoney => null, // Played on draw — not handled here
+                ActionType.NotMyMoney => HandleNotMyMoney(context, cmd.PlayerId),
                 ActionType.Compd => null,      // Only valid as a response
                 _ => null
             };
@@ -275,6 +286,50 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
             }
 
             return new WaitingForReactionState(cmd.PlayerId, cmd.TargetPlayerId, card);
+        }
+
+        private static ICardCounterGameState? HandleSkim(
+            CardCounterGameContext context, PlayActionCardCommand cmd)
+        {
+            if (string.IsNullOrEmpty(cmd.TargetPlayerId))
+            {
+                context.Logger.LogWarning("Skim requires a target.");
+                return null;
+            }
+
+            var source = context.GetPlayer(cmd.PlayerId);
+            var target = context.GetPlayer(cmd.TargetPlayerId);
+
+            if (source is null || target is null)
+            {
+                context.Logger.LogWarning("Skim: source or target not found.");
+                return null;
+            }
+
+            if (source.Pot.Count == 0)
+            {
+                context.Logger.LogWarning("Skim: [{id}] cannot play Skim with an empty pot.", cmd.PlayerId);
+                return null;
+            }
+
+            if (target.Pot.Count == 0)
+            {
+                context.Logger.LogWarning("Skim: target [{id}] has an empty pot; cannot target them.", cmd.TargetPlayerId);
+                return null;
+            }
+
+            // Build the SkimState which lets the source choose digit indices
+            return new SkimState(cmd.PlayerId, cmd.TargetPlayerId, new ActionCard(ActionType.Skim));
+        }
+
+        private static ICardCounterGameState? HandleNotMyMoney(
+            CardCounterGameContext context, string playerId)
+        {
+            // Mark as pending — the effect triggers when the player next draws an operator
+            context.State.NotMyMoneyPending = true;
+            context.Logger.LogInformation(
+                "NotMyMoney: [{id}] activated; effect will trigger on next operator draw.", playerId);
+            return null; // stay in PlayerTurnState
         }
     }
 }

@@ -33,6 +33,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter
 
             var gameState = new CardCounterGameState(host, stateLogger);
             gameState.UpdateJoinableStatus(true);
+            gameState.PlayerUnregistered += player => HandlePlayerLeft(player, gameState);
             logger.LogInformation("Created CardCounter state with host [{id}].", host.Id);
             return gameState;
         }
@@ -161,6 +162,137 @@ namespace KnockBox.Services.Logic.Games.CardCounter
         {
             if (!TryGetContext(state, out var ctx, out var err)) return err;
             return ProcessCommand(ctx, new DiscardActionCardsCommand(player.Id, cardIndices));
+        }
+
+        /// <summary>
+        /// Active player selects which digits to swap during a Skim action.
+        /// </summary>
+        public Result SkimSelect(User player, CardCounterGameState state, int sourceDigitIndex, int targetDigitIndex)
+        {
+            if (!TryGetContext(state, out var ctx, out var err)) return err;
+            return ProcessCommand(ctx, new SkimSelectCommand(player.Id, sourceDigitIndex, targetDigitIndex));
+        }
+
+        /// <summary>
+        /// Active player selects the target for a Not My Money operator redirect.
+        /// </summary>
+        public Result NotMyMoneySelectTarget(User player, CardCounterGameState state, string targetPlayerId)
+        {
+            if (!TryGetContext(state, out var ctx, out var err)) return err;
+            return ProcessCommand(ctx, new NotMyMoneySelectTargetCommand(player.Id, targetPlayerId));
+        }
+
+        /// <summary>
+        /// Active player cancels a pending Not My Money redirect (operator applies to self).
+        /// </summary>
+        public Result NotMyMoneyCancel(User player, CardCounterGameState state)
+        {
+            if (!TryGetContext(state, out var ctx, out var err)) return err;
+            return ProcessCommand(ctx, new NotMyMoneyCancelCommand(player.Id));
+        }
+
+        /// <summary>
+        /// Resets the game so another round can be played with the same players.
+        /// Only the host can trigger a reset.
+        /// </summary>
+        public Result ResetGame(User host, CardCounterGameState state)
+        {
+            if (state.Host.Id != host.Id)
+                return Result.FromError("Only the host can reset the game.");
+
+            if (state.GamePhase != GamePhase.GameOver)
+                return Result.FromError("Can only reset after the game is over.");
+
+            return state.Execute(() =>
+            {
+                // Create a fresh context and re-run initialization
+                var context = new CardCounterGameContext(state, randomNumberService, logger);
+                state.Context = context;
+                state.DiscardHistory.Clear();
+                state.MainDeck.Clear();
+                state.CurrentShoe.Clear();
+                state.DiscardPile.Clear();
+                state.LastPlayedAction = null;
+                state.LastDrawnCard = null;
+                state.PendingReaction = null;
+                state.FeelingLuckyTargetId = null;
+                state.NotMyMoneyPending = false;
+                state.IsNotMyMoneySelecting = false;
+                state.ForceDrawStack.Clear();
+                InitializeGame(context);
+                TransitionTo(context, new BuyInState());
+            });
+        }
+
+        // ── Player-leave handling ─────────────────────────────────────────────
+
+        /// <summary>
+        /// Called whenever a player unregisters from the game (disconnect, tab close, or kick).
+        /// Removes the player from the turn order and player table. If the leaving player was
+        /// the active player the FSM is immediately advanced to the next player's turn. If no
+        /// players remain the game transitions to <see cref="GameOverState"/>.
+        /// </summary>
+        internal void HandlePlayerLeft(User player, CardCounterGameState state)
+        {
+            // If the game hasn't been started yet (no context) there is no turn order to fix.
+            if (state.Context is null || state.IsDisposed) return;
+
+            var context = state.Context;
+
+            state.Execute(() =>
+            {
+                int leftIndex = state.TurnOrder.IndexOf(player.Id);
+                if (leftIndex < 0) return; // Not in turn order; nothing to adjust.
+
+                // Remember whether the leaving player was the one currently taking their turn.
+                bool wasActiveTurn = leftIndex == state.CurrentPlayerIndex
+                                     && state.GamePhase == GamePhase.Playing;
+
+                state.TurnOrder.RemoveAt(leftIndex);
+                state.GamePlayers.TryRemove(player.Id, out _);
+
+                logger.LogInformation(
+                    "Player [{id}] left the game. TurnOrder now has {n} player(s).",
+                    player.Id, state.TurnOrder.Count);
+
+                // If no players remain, end the game immediately.
+                if (state.TurnOrder.Count == 0)
+                {
+                    TransitionTo(context, new GameOverState());
+                    return;
+                }
+
+                // Adjust CurrentPlayerIndex to stay pointed at the correct next player.
+                if (leftIndex < state.CurrentPlayerIndex)
+                {
+                    // A player before the current one was removed; shift the index left.
+                    state.CurrentPlayerIndex--;
+                }
+                else if (leftIndex == state.CurrentPlayerIndex
+                         && state.CurrentPlayerIndex >= state.TurnOrder.Count)
+                {
+                    // The removed player was last in the list; wrap to the first player.
+                    state.CurrentPlayerIndex = 0;
+                }
+                // else: removed player was after the current one — index is unaffected.
+
+                // If the active player left while a turn was in progress, immediately start
+                // the next player's turn so the game doesn't stall waiting for a response
+                // from a player that is no longer connected.
+                if (wasActiveTurn)
+                {
+                    TransitionTo(context, new PlayerTurnState());
+                    return;
+                }
+
+                // During BuyIn, check whether all remaining players have now committed
+                // their buy-in (the leaving player may have been the only one outstanding).
+                if (state.GamePhase == GamePhase.BuyIn
+                    && state.GamePlayers.Values.All(p => p.HasSetBuyIn))
+                {
+                    TransitionTo(context, new RoundEndState());
+                }
+            });
         }
 
         // ── Initialisation helpers ────────────────────────────────────────────
