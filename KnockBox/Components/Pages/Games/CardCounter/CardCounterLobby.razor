@@ -821,17 +821,6 @@ else
                                 <button class="cc-btn cc-btn-draw" @onclick="DrawCard" title="Draw the top card from the shoe">
                                     🃏 Draw
                                 </button>
-                                @if (myPlayer.PassesRemaining > 0)
-                                {
-                                    <button class="cc-btn cc-btn-pass" @onclick="PassTurn"
-                                            title="Skip your draw (costs 1 pass, @myPlayer.PassesRemaining remaining)">
-                                        ⏭️ Pass (@myPlayer.PassesRemaining)
-                                    </button>
-                                    <button class="cc-btn cc-btn-fold" @onclick="FoldPot"
-                                            title="Clear your pot and continue (costs 1 pass)">
-                                        🗑️ Fold Pot
-                                    </button>
-                                }
                             </div>
                         }
                         else if (activeId != myId && myPlayer.PrivateReveal == null && !IsOverHandLimit())
@@ -1007,8 +996,8 @@ else
                                                 @(isPending ? "cc-card-pending" : "")
                                                 @(isDiscardSelected ? "cc-card-discard-selected" : "")
                                                 @(!canPlay && !IsOverHandLimit() ? "cc-card-disabled" : "")"
-                                         title="@GetActionCardDescription(card.Action)"
                                          @onclick="() => OnActionCardClick(idx)">
+                                        <div class="cc-card-tooltip">@GetActionCardDescription(card.Action)</div>
                                         <div class="cc-card-corner cc-card-corner-tl">
                                             <span class="cc-card-suit">@GetActionCardIcon(card.Action)</span>
                                         </div>
