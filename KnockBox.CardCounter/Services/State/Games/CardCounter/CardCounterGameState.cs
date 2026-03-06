@@ -224,6 +224,7 @@ namespace KnockBox.Services.State.Games.CardCounter
         public int BuyInTimeoutMs { get; set; } = 20000;
         public int RoundEndTimeoutMs { get; set; } = 20000;
         public bool ShowMakeMyMoneyOperator { get; set; } = true;
+        public bool FlipWinCondition { get; set; } = false;
     }
 
     #endregion

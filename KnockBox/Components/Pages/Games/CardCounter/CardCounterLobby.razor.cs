@@ -225,6 +225,11 @@ namespace KnockBox.Components.Pages.Games.CardCounter
                 Logger.LogError("Failed to start game: {Error}", error);
         }
 
+        protected void NotifyConfigChanged()
+        {
+            GameState?.StateChangedEventManager.Notify();
+        }
+
         protected void SetBuyIn(bool isNegative)
         {
             if (GameState == null || UserService.CurrentUser == null) return;
