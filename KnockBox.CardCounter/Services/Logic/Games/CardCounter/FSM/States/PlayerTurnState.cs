@@ -23,8 +23,8 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
             return command switch
             {
                 DrawCardCommand cmd => HandleDraw(context, cmd),
-                PassTurnCommand cmd => HandlePass(context, cmd),
-                FoldPotCommand cmd => HandleFold(context, cmd),
+                //PassTurnCommand cmd => HandlePass(context, cmd), // disabled
+                //FoldPotCommand cmd => HandleFold(context, cmd), // disabled
                 PlayActionCardCommand cmd => HandlePlayActionCard(context, cmd),
                 _ => null
             };

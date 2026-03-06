@@ -12,6 +12,10 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
         private readonly string _targetId;
         private readonly ActionCard _pendingCard;
         private DateTimeOffset _expiresAt;
+        private bool _targetAccepted;
+        private bool _sourceSelected;
+        private int _selectedSourceDigit = -1;
+        private int _selectedTargetDigit = -1;
 
         public SkimState(string sourceId, string targetId, ActionCard pendingCard)
         {
@@ -64,14 +68,25 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
             // Target may also explicitly accept
             if (command is AcceptPendingCommand acceptCmd && acceptCmd.PlayerId == _targetId)
             {
-                // Acceptance without digit choice — fall through to source selection
+                _targetAccepted = true;
+                if (_sourceSelected)
+                {
+                    return ResolveEffect(context, _selectedSourceDigit, _selectedTargetDigit);
+                }
                 return null;
             }
 
             // Source selects digit indices to swap
             if (command is SkimSelectCommand skimCmd && skimCmd.PlayerId == _sourceId)
             {
-                return ResolveEffect(context, skimCmd.SourceDigitIndex, skimCmd.TargetDigitIndex);
+                _sourceSelected = true;
+                _selectedSourceDigit = skimCmd.SourceDigitIndex;
+                _selectedTargetDigit = skimCmd.TargetDigitIndex;
+                if (_targetAccepted)
+                {
+                    return ResolveEffect(context, _selectedSourceDigit, _selectedTargetDigit);
+                }
+                return null;
             }
 
             return null;
@@ -84,7 +99,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
                 context.Logger.LogInformation(
                     "Skim: timeout; auto-applying last-digit swap for [{src}].", _sourceId);
                 // On timeout swap last digits of each pot (default behaviour)
-                return ResolveEffect(context, -1, -1);
+                return ResolveEffect(context, _sourceSelected ? _selectedSourceDigit : -1, _sourceSelected ? _selectedTargetDigit : -1);
             }
             return null;
         }
