@@ -22,100 +22,105 @@ else
         @if (GameState.IsJoinable)
         {
             <div class="cc-lobby">
-                <div class="cc-lobby-table">
-                    <div class="cc-lobby-felt">
-                        <h2 class="cc-lobby-title">♠ WAITING FOR PLAYERS ♥</h2>
-                        <div class="cc-lobby-players">
-                            @foreach (var player in GameState.Players.Prepend(GameState.Host))
+                <div class="cc-lobby-table-container">
+                    <div class="cc-lobby-table">
+                        <div class="cc-lobby-felt">
+                            <h2 class="cc-lobby-title">♠ WAITING FOR PLAYERS ♥</h2>
+                            <div class="cc-lobby-players">
+                                @foreach (var player in GameState.Players.Prepend(GameState.Host))
+                                {
+                                    bool isHost = player.Id == GameState.Host.Id;
+                                    bool isMe = player.Id == UserService.CurrentUser?.Id;
+                                    <div class="cc-lobby-player @(isMe ? "cc-lobby-player-me" : "")">
+                                        <span class="cc-player-avatar">@(isHost ? "👑" : "🃏")</span>
+                                        <span class="cc-player-lobbyname">@player.Name</span>
+                                        @if (isHost)
+                                        {
+                                            <span class="cc-host-badge">HOST</span>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                            @if (UserService.CurrentUser?.Id == GameState.Host.Id)
                             {
-                                bool isHost = player.Id == GameState.Host.Id;
-                                bool isMe = player.Id == UserService.CurrentUser?.Id;
-                                <div class="cc-lobby-player @(isMe ? "cc-lobby-player-me" : "")">
-                                    <span class="cc-player-avatar">@(isHost ? "👑" : "🃏")</span>
-                                    <span class="cc-player-lobbyname">@player.Name</span>
-                                    @if (isHost)
-                                    {
-                                        <span class="cc-host-badge">HOST</span>
-                                    }
-                                </div>
+                                bool canStart = GameState.Players.Count > 0;
+                                <button class="cc-btn cc-btn-primary cc-btn-lg" @onclick="StartGame" disabled="@(!canStart)"
+                                        title="@(!canStart ? "Need at least 1 more player to start" : "Deal cards and start the game")">
+                                    🃏 DEAL CARDS
+                                </button>
+                                @if (!canStart)
+                                {
+                                    <p class="cc-lobby-min-players">⚠️ Need at least 1 more player to start</p>
+                                }
+                            }
+                            else
+                            {
+                                <p class="cc-waiting-text">Waiting for host to start...</p>
                             }
                         </div>
-                        @if (UserService.CurrentUser?.Id == GameState.Host.Id)
-                        {
-                            bool canStart = GameState.Players.Count > 0;
-                            <button class="cc-btn cc-btn-primary cc-btn-lg" @onclick="StartGame" disabled="@(!canStart)"
-                                    title="@(!canStart ? "Need at least 1 more player to start" : "Deal cards and start the game")">
-                                🃏 DEAL CARDS
-                            </button>
-                            @if (!canStart)
-                            {
-                                <p class="cc-lobby-min-players">⚠️ Need at least 1 more player to start</p>
-                            }
-
-                            <div class="cc-config-panel" style="margin-top: 2rem; padding: 1rem; background: rgba(0,0,0,0.5); border-radius: 8px;">
-                                <h3 style="margin-bottom: 1rem;">⚙️ Game Settings</h3>
-
-                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; text-align: left;">
-                                    <label>
-                                        Deck Size:
-                                        <input type="number" class="cc-input" @bind="GameState.Config.DeckSize" @bind:after="NotifyConfigChanged" />
-                                    </label>
-                                    <label>
-                                        Number to Operator Ratio:
-                                        <input type="number" step="0.1" class="cc-input" @bind="GameState.Config.NumberToOperatorRatio" @bind:after="NotifyConfigChanged" />
-                                    </label>
-                                    <label>
-                                        Add/Sub to Mul/Div Ratio:
-                                        <input type="number" step="0.1" class="cc-input" @bind="GameState.Config.AddSubToMulDivRatio" @bind:after="NotifyConfigChanged" />
-                                    </label>
-                                    <label>
-                                        Actions Dealt Per Round:
-                                        <input type="number" class="cc-input" @bind="GameState.Config.ActionsDealtPerRound" @bind:after="NotifyConfigChanged" />
-                                    </label>
-                                    <label>
-                                        Action Hand Limit:
-                                        <input type="number" class="cc-input" @bind="GameState.Config.ActionHandLimit" @bind:after="NotifyConfigChanged" />
-                                    </label>
-                                    <label>
-                                        Passes Per Player:
-                                        <input type="number" class="cc-input" @bind="GameState.Config.TotalPassesPerPlayer" @bind:after="NotifyConfigChanged" />
-                                    </label>
-                                    <label>
-                                        Min Shoe Size:
-                                        <input type="number" class="cc-input" @bind="GameState.Config.MinShoeSize" @bind:after="NotifyConfigChanged" />
-                                    </label>
-                                    <label>
-                                        Max Shoe Size:
-                                        <input type="number" class="cc-input" @bind="GameState.Config.MaxShoeSize" @bind:after="NotifyConfigChanged" />
-                                    </label>
-                                    <label>
-                                        Action Timeout (ms):
-                                        <input type="number" class="cc-input" @bind="GameState.Config.ActionResponseTimeoutMs" @bind:after="NotifyConfigChanged" />
-                                    </label>
-                                    <label>
-                                        Buy-in Timeout (ms):
-                                        <input type="number" class="cc-input" @bind="GameState.Config.BuyInTimeoutMs" @bind:after="NotifyConfigChanged" />
-                                    </label>
-                                    <label>
-                                        Round End Timeout (ms):
-                                        <input type="number" class="cc-input" @bind="GameState.Config.RoundEndTimeoutMs" @bind:after="NotifyConfigChanged" />
-                                    </label>
-                                    <label title="Highest absolute score wins rather than closest to 0">
-                                        Flip Win Condition:
-                                        <input type="checkbox" @bind="GameState.Config.FlipWinCondition" @bind:after="NotifyConfigChanged" />
-                                    </label>
-                                    <label>
-                                        Show NMM Operator:
-                                        <input type="checkbox" @bind="GameState.Config.ShowMakeMyMoneyOperator" @bind:after="NotifyConfigChanged" />
-                                    </label>
-                                </div>
-                            </div>
-                        }
-                        else
-                        {
-                            <p class="cc-waiting-text">Waiting for host to start...</p>
-                        }
                     </div>
+
+                    @if (UserService.CurrentUser?.Id == GameState.Host.Id)
+                    {
+                        <div class="cc-config-panel">
+                            <h3 class="cc-config-title">⚙️ Game Settings</h3>
+
+                            <div class="cc-config-grid">
+                                <label class="cc-config-label">
+                                    Deck Size:
+                                    <input type="number" class="cc-config-input" @bind="GameState.Config.DeckSize" @bind:after="NotifyConfigChanged" />
+                                </label>
+                                <label class="cc-config-label">
+                                    Number to Operator Ratio:
+                                    <input type="number" step="0.1" class="cc-config-input" @bind="GameState.Config.NumberToOperatorRatio" @bind:after="NotifyConfigChanged" />
+                                </label>
+                                <label class="cc-config-label">
+                                    Add/Sub to Mul/Div Ratio:
+                                    <input type="number" step="0.1" class="cc-config-input" @bind="GameState.Config.AddSubToMulDivRatio" @bind:after="NotifyConfigChanged" />
+                                </label>
+                                <label class="cc-config-label">
+                                    Actions Dealt Per Round:
+                                    <input type="number" class="cc-config-input" @bind="GameState.Config.ActionsDealtPerRound" @bind:after="NotifyConfigChanged" />
+                                </label>
+                                <label class="cc-config-label">
+                                    Action Hand Limit:
+                                    <input type="number" class="cc-config-input" @bind="GameState.Config.ActionHandLimit" @bind:after="NotifyConfigChanged" />
+                                </label>
+                                <label class="cc-config-label">
+                                    Passes Per Player:
+                                    <input type="number" class="cc-config-input" @bind="GameState.Config.TotalPassesPerPlayer" @bind:after="NotifyConfigChanged" />
+                                </label>
+                                <label class="cc-config-label">
+                                    Min Shoe Size:
+                                    <input type="number" class="cc-config-input" @bind="GameState.Config.MinShoeSize" @bind:after="NotifyConfigChanged" />
+                                </label>
+                                <label class="cc-config-label">
+                                    Max Shoe Size:
+                                    <input type="number" class="cc-config-input" @bind="GameState.Config.MaxShoeSize" @bind:after="NotifyConfigChanged" />
+                                </label>
+                                <label class="cc-config-label">
+                                    Action Timeout (ms):
+                                    <input type="number" class="cc-config-input" @bind="GameState.Config.ActionResponseTimeoutMs" @bind:after="NotifyConfigChanged" />
+                                </label>
+                                <label class="cc-config-label">
+                                    Buy-in Timeout (ms):
+                                    <input type="number" class="cc-config-input" @bind="GameState.Config.BuyInTimeoutMs" @bind:after="NotifyConfigChanged" />
+                                </label>
+                                <label class="cc-config-label">
+                                    Round End Timeout (ms):
+                                    <input type="number" class="cc-config-input" @bind="GameState.Config.RoundEndTimeoutMs" @bind:after="NotifyConfigChanged" />
+                                </label>
+                                <label class="cc-config-label cc-config-label-row" title="Highest absolute score wins rather than closest to 0">
+                                    <span>Flip Win Condition:</span>
+                                    <input type="checkbox" class="cc-config-checkbox" @bind="GameState.Config.FlipWinCondition" @bind:after="NotifyConfigChanged" />
+                                </label>
+                                <label class="cc-config-label cc-config-label-row">
+                                    <span>Show NMM Operator:</span>
+                                    <input type="checkbox" class="cc-config-checkbox" @bind="GameState.Config.ShowMakeMyMoneyOperator" @bind:after="NotifyConfigChanged" />
+                                </label>
+                            </div>
+                        </div>
+                    }
                 </div>
             </div>
         }

@@ -231,14 +231,23 @@
 .cc-lobby {
     flex: 1;
     display: flex;
-    align-items: center;
-    justify-content: center;
+    justify-content: safe center;
     padding: 24px;
+    overflow-y: auto;
 }
 
 .cc-lobby-table {
-    width: 100%;
+    flex: 1;
     max-width: 700px;
+    margin: auto;
+}
+
+.cc-lobby-table-container {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 32px;
+    justify-content: safe center;
 }
 
 .cc-lobby-felt {
@@ -261,6 +270,7 @@
     text-transform: uppercase;
     letter-spacing: 2px;
     margin: 0;
+    text-align: center;
 }
 
 .cc-lobby-players {
@@ -311,6 +321,87 @@
     font-style: italic;
     font-size: 0.95rem;
     margin: 0;
+}
+
+/* ── Lobby Config Panel ───────────────────────────────────────────────────── */
+
+.cc-config-panel {
+    margin-top: 32px;
+    padding: 24px;
+    background: rgba(0,0,0,0.5);
+    border: 3px solid #8B6914;
+    border-radius: 12px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+    flex: 1;
+    margin: auto;
+    max-width: 600px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.cc-config-title {
+    font-size: 1.4rem;
+    font-weight: 900;
+    color: #f7d547;
+    margin-bottom: 20px;
+    text-transform: uppercase;
+    text-shadow: 2px 2px 0 #000;
+}
+
+.cc-config-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    width: 100%;
+    text-align: left;
+}
+
+.cc-config-label {
+    display: flex;
+    flex-direction: column;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: rgba(255,255,255,0.85);
+    gap: 6px;
+}
+
+.cc-config-label-row {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.cc-config-input {
+    background: rgba(0,0,0,0.4);
+    border: 2px solid #8B6914;
+    border-radius: 6px;
+    color: #fff;
+    padding: 8px 12px;
+    font-size: 1rem;
+    font-family: var(--font-primary);
+    width: 100%;
+    transition: border-color 0.2s;
+    box-sizing: border-box;
+}
+
+.cc-config-input:focus {
+    outline: none;
+    border-color: #f7d547;
+    background: rgba(0,0,0,0.6);
+}
+
+.cc-config-checkbox {
+    width: 20px;
+    height: 20px;
+    accent-color: #f7d547;
+    cursor: pointer;
+}
+
+@media (max-width: 600px) {
+    .cc-config-grid {
+        grid-template-columns: 1fr;
+    }
 }
 
 /* ── Buy-In Phase ─────────────────────────────────────────────────────────── */
