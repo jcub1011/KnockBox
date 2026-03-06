@@ -394,8 +394,9 @@ else
                                         @for (int i = 0; i < srcPlayer.Pot.Count; i++)
                                         {
                                             var di = i;
-                                            bool sel = _pendingSkimSourceDigit == di;
+                                            bool sel = _pendingSkimSourceDigit == di || skimSrc.SourceDigitIndex == di;
                                             <button class="cc-skim-digit @(sel ? "cc-skim-digit-selected" : "")"
+                                                    disabled="@(skimSrc.SourceDigitIndex != null)"
                                                     @onclick="() => SelectSkimSourceDigit(di)">
                                                 @srcPlayer.Pot[di]
                                             </button>
@@ -409,8 +410,9 @@ else
                                         @for (int i = 0; i < tgtPlayer.Pot.Count; i++)
                                         {
                                             var di = i;
-                                            bool sel = _pendingSkimTargetDigit == di;
+                                            bool sel = _pendingSkimTargetDigit == di || skimSrc.TargetDigitIndex == di;
                                             <button class="cc-skim-digit @(sel ? "cc-skim-digit-selected" : "")"
+                                                    disabled="@(skimSrc.TargetDigitIndex != null)"
                                                     @onclick="() => SelectSkimTargetDigit(di)">
                                                 @tgtPlayer.Pot[di]
                                             </button>
@@ -419,11 +421,20 @@ else
                                 </div>
                             </div>
                             <div class="cc-skim-actions">
-                                <button class="cc-btn cc-btn-primary"
-                                        disabled="@(_pendingSkimSourceDigit == null || _pendingSkimTargetDigit == null)"
-                                        @onclick="ConfirmSkimSwap">
-                                    ✅ Confirm Swap
-                                </button>
+                                @if (skimSrc.SourceDigitIndex != null && skimSrc.TargetDigitIndex != null)
+                                {
+                                    <button class="cc-btn cc-btn-primary" disabled>
+                                        ⏳ Waiting for target to accept...
+                                    </button>
+                                }
+                                else
+                                {
+                                    <button class="cc-btn cc-btn-primary"
+                                            disabled="@(_pendingSkimSourceDigit == null || _pendingSkimTargetDigit == null)"
+                                            @onclick="ConfirmSkimSwap">
+                                        ✅ Confirm Swap
+                                    </button>
+                                }
                             </div>
                         }
                     </div>

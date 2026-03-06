@@ -343,8 +343,6 @@ namespace KnockBox.Components.Pages.Games.CardCounter
             if (GameState == null || UserService.CurrentUser == null) return;
             if (_pendingSkimSourceDigit == null || _pendingSkimTargetDigit == null) return;
             GameEngine.SkimSelect(UserService.CurrentUser, GameState, _pendingSkimSourceDigit.Value, _pendingSkimTargetDigit.Value);
-            _pendingSkimSourceDigit = null;
-            _pendingSkimTargetDigit = null;
         }
 
         protected void CancelSkimSelect()
