@@ -16,11 +16,11 @@
 }
 else
 {
-    var isMyTurn = GameState.GamePhase == GamePhase.Playing
+    var isActivePlayer = GameState.GamePhase == GamePhase.Playing
         && GameState.TurnOrder.Count > 0
         && GameState.TurnOrder[GameState.CurrentPlayerIndex] == (UserService.CurrentUser?.Id ?? "");
 
-    <div class="cc-page @(isMyTurn ? "cc-page-my-turn" : "")">
+    <div class="cc-page @(isActivePlayer ? "cc-page-my-turn" : "")">
 
         @* ── Lobby Phase ── *@
         @if (GameState.IsJoinable)
