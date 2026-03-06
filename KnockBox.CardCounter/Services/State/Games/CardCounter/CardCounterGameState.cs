@@ -159,7 +159,8 @@ namespace KnockBox.Services.State.Games.CardCounter
         TurnTheTable,
         Compd,
         NotMyMoney,
-        Launder
+        Launder,
+        Tilt
     }
 
     #endregion

@@ -11,8 +11,21 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM
     /// </summary>
     public class CardCounterGameContext
     {
+        /// <summary>
+        /// One <see cref="ActionCard"/> per <see cref="ActionType"/>. Rarity is enforced via
+        /// <see cref="GetActionCardWeight"/> instead of by duplicating entries in this array,
+        /// so no extra memory is allocated per draw.
+        /// </summary>
         private static readonly ActionCard[] ActionCardPool =
             Enum.GetValues<ActionType>().Select(t => new ActionCard(t)).ToArray();
+
+        /// <summary>
+        /// Returns the relative draw weight for <paramref name="card"/>.
+        /// <see cref="ActionType.Tilt"/> has weight 1; every other type has weight 10,
+        /// making Tilt exactly 10× rarer than any other card.
+        /// </summary>
+        private static int GetActionCardWeight(ActionCard card) =>
+            card.Action == ActionType.Tilt ? 1 : 10;
 
         public CardCounterGameContext(
             CardCounterGameState state,
@@ -71,12 +84,9 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM
 
         // ── Card / deck helpers ───────────────────────────────────────────────
 
-        /// <summary>Returns a random action card from the pool.</summary>
-        public ActionCard GetRandomActionCard()
-        {
-            int index = Rng.GetRandomInt(0, ActionCardPool.Length, RandomType.Secure);
-            return ActionCardPool[index];
-        }
+        /// <summary>Returns a random action card from the pool, weighted so Tilt is 10× rarer.</summary>
+        public ActionCard GetRandomActionCard() =>
+            ActionCardPool.GetRandomWeightedItem(GetActionCardWeight, Rng, RandomType.Secure);
 
         /// <summary>
         /// Deals <see cref="GameConfig.ActionsDealtPerRound"/> action cards to every player.
@@ -267,6 +277,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM
             ActionType.Compd => "Comp'd",
             ActionType.NotMyMoney => "Not My Money",
             ActionType.Launder => "Launder",
+            ActionType.Tilt => "Tilt",
             _ => action.ToString()
         };
 
@@ -280,6 +291,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM
             ActionType.Compd => "🛡️",
             ActionType.NotMyMoney => "💸",
             ActionType.Launder => "🧺",
+            ActionType.Tilt => "🎰",
             _ => "🃏"
         };
 

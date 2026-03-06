@@ -1,3 +1,4 @@
+using KnockBox.Services.Logic.RandomGeneration;
 using KnockBox.Services.State.Games.CardCounter;
 
 namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
@@ -189,6 +190,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
                 ActionType.Skim => HandleSkim(context, cmd),
                 ActionType.TurnTheTable => HandleBlockable(context, cmd, card),
                 ActionType.Launder => HandleBlockable(context, cmd, card),
+                ActionType.Tilt => HandleTilt(context, cmd.PlayerId),
                 _ => null
             };
         }
@@ -273,6 +275,51 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
             }
 
             return new WaitingForReactionState(cmd.PlayerId, cmd.TargetPlayerId, card);
+        }
+
+        private static ICardCounterGameState? HandleTilt(CardCounterGameContext context, string sourceId)
+        {
+            // Collect all number cards from all players' pots into one pool
+            var allDigits = new List<int>();
+            foreach (var id in context.TurnOrder)
+            {
+                if (context.GetPlayer(id) is { } p)
+                    allDigits.AddRange(p.Pot);
+            }
+
+            // Shuffle the pool
+            for (int i = allDigits.Count - 1; i > 0; i--)
+            {
+                int j = context.Rng.GetRandomInt(0, i + 1, RandomType.Secure);
+                (allDigits[i], allDigits[j]) = (allDigits[j], allDigits[i]);
+            }
+
+            int playerCount = context.TurnOrder.Count;
+            int baseCount = playerCount > 0 ? allDigits.Count / playerCount : 0;
+            int extras = playerCount > 0 ? allDigits.Count % playerCount : 0;
+
+            // Distribute evenly — extras go to players starting from the source player in turn order
+            int sourceIndex = context.TurnOrder.IndexOf(sourceId);
+            if (sourceIndex < 0) sourceIndex = 0;
+
+            int digitIndex = 0;
+            for (int i = 0; i < playerCount; i++)
+            {
+                int idx = (sourceIndex + i) % playerCount;
+                var playerId = context.TurnOrder[idx];
+                if (context.GetPlayer(playerId) is not { } player) continue;
+
+                player.Pot.Clear();
+                int count = baseCount + (i < extras ? 1 : 0);
+                for (int d = 0; d < count; d++)
+                    player.Pot.Add(allDigits[digitIndex++]);
+            }
+
+            context.Logger.LogInformation(
+                "Tilt: [{id}] shuffled and redistributed {total} digits across {players} players.",
+                sourceId, allDigits.Count, playerCount);
+
+            return null; // stay in PlayerTurnState
         }
 
         private static ICardCounterGameState? HandleSkim(

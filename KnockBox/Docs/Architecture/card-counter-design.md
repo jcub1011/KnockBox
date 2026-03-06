@@ -64,6 +64,7 @@ Action cards come from a separate deck and are **not** part of the main deck. Pl
 | **Comp'd** (Shield) | Negate the effect of any action card that targets you. Cannot be used against cards that do not target you (e.g., Burn). |
 | **Not My Money** (Redirect) | Played when you draw an operator card. Redirect the operator to a different player, applying it to **that player's** pot and balance instead. If blocked, the operator applies to the drawing player as normal. Can be played against players with an empty pot (resulting in a no-op for the target). Blockable. |
 | **Launder** (Swap Pots) | Swap your entire pot with a different player's pot. Can be used when either or both pots are empty. Blockable. |
+| **Tilt** (Redistribute) | Combine all number cards from every player's pot into a single pool, shuffle them, and redistribute them evenly. Any extra cards (i.e., total cards mod player count) are dealt one at a time in turn order starting from the player who played Tilt. |
 
 #### Interaction Example
 

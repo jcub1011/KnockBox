@@ -484,6 +484,7 @@ namespace KnockBox.Components.Pages.Games.CardCounter
             ActionType.Compd => "Comp'd",
             ActionType.NotMyMoney => "Not My Money",
             ActionType.Launder => "Launder",
+            ActionType.Tilt => "Tilt",
             _ => action.ToString()
         };
 
@@ -497,6 +498,7 @@ namespace KnockBox.Components.Pages.Games.CardCounter
             ActionType.Compd => "🛡️",
             ActionType.NotMyMoney => "💸",
             ActionType.Launder => "🧺",
+            ActionType.Tilt => "🎰",
             _ => "🃏"
         };
 
@@ -518,6 +520,8 @@ namespace KnockBox.Components.Pages.Games.CardCounter
                 "When you draw an operator card, redirect it to apply to another player's pot instead.",
             ActionType.Launder =>
                 "Swap your entire pot with a chosen opponent's pot. Target required. Blockable with Comp'd.",
+            ActionType.Tilt =>
+                "Shuffle all number cards from every player's pot into one pool, then redistribute them evenly. Extra cards are dealt one at a time starting from you, in turn order.",
             _ => action.ToString()
         };
 
@@ -531,6 +535,7 @@ namespace KnockBox.Components.Pages.Games.CardCounter
             ActionType.Compd => "cc-card-compd",
             ActionType.NotMyMoney => "cc-card-money",
             ActionType.Launder => "cc-card-launder",
+            ActionType.Tilt => "cc-card-tilt",
             _ => ""
         };
 

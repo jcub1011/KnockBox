@@ -1339,6 +1339,7 @@
 .cc-card-compd { background: linear-gradient(135deg, #fff 60%, #e0f2f1); }
 .cc-card-money { background: linear-gradient(135deg, #fff 60%, #f1f8e9); }
 .cc-card-launder { background: linear-gradient(135deg, #fff 60%, #fff8e1); }
+.cc-card-tilt { background: linear-gradient(135deg, #fff 60%, #fce8d5); }
 
 /* ── Discard Overlay ──────────────────────────────────────────────────────── */
 

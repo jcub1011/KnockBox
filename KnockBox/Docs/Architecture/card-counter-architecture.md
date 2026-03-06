@@ -221,7 +221,8 @@ public enum ActionType
     TurnTheTable,   // Flip pot — reverses the digit order in target's pot
     Compd,          // Shield / Block — counters a blockable action
     NotMyMoney,     // Redirect operator — redirects a drawn operator to a target
-    Launder         // Swap pots — exchanges pot contents between two players
+    Launder,        // Swap pots — exchanges pot contents between two players
+    Tilt            // Redistribute — shuffles and evenly redistributes all pots
 }
 ```
 
