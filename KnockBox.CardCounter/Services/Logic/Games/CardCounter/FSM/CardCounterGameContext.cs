@@ -11,8 +11,25 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM
     /// </summary>
     public class CardCounterGameContext
     {
-        private static readonly ActionCard[] ActionCardPool =
-            Enum.GetValues<ActionType>().Select(t => new ActionCard(t)).ToArray();
+        /// <summary>
+        /// Weighted action-card pool used by <see cref="GetRandomActionCard"/>.
+        /// Every non-Tilt card type appears 10 times while <see cref="ActionType.Tilt"/> appears
+        /// once, making Tilt 10× rarer than any other card type.
+        /// </summary>
+        private static readonly ActionCard[] ActionCardPool = BuildActionCardPool();
+
+        private static ActionCard[] BuildActionCardPool()
+        {
+            const int tiltRarityMultiplier = 10;
+            var pool = new List<ActionCard>();
+            foreach (var type in Enum.GetValues<ActionType>())
+            {
+                int count = type == ActionType.Tilt ? 1 : tiltRarityMultiplier;
+                for (int i = 0; i < count; i++)
+                    pool.Add(new ActionCard(type));
+            }
+            return pool.ToArray();
+        }
 
         public CardCounterGameContext(
             CardCounterGameState state,

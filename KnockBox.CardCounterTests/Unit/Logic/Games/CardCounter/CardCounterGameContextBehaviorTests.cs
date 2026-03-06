@@ -323,5 +323,52 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             Assert.IsTrue(state.DiscardHistory[0].IsActionCard);
             Assert.AreEqual("Tilt", state.DiscardHistory[0].Description);
         }
+
+        [TestMethod]
+        public void GetRandomActionCard_TiltIsDrawnAtExpectedRarity()
+        {
+            // Verify that the action card pool is weighted so Tilt appears exactly
+            // once for every 10 copies of each other card type.
+            // We do this by exhausting the pool (index 0 → pool.Length-1) and
+            // counting how many times each ActionType is returned.
+            var host = new User("Host", "host-id");
+            using var state = new CardCounterGameState(host, _stateLoggerMock.Object);
+
+            int callCount = 0;
+            int poolSize = 0;
+
+            // First call: record the pool size from the exclusiveMax argument
+            _randomMock.Setup(r => r.GetRandomInt(It.IsAny<int>(), It.IsAny<int>(), RandomType.Secure))
+                .Returns<int, int, RandomType>((_, exclusiveMax, _) =>
+                {
+                    if (poolSize == 0) poolSize = exclusiveMax;
+                    return callCount++ % exclusiveMax;
+                });
+
+            var context = new CardCounterGameContext(state, _randomMock.Object, _loggerMock.Object);
+
+            // Draw enough cards to cycle through every slot in the pool once
+            // (we need one draw first to capture poolSize, then draw the rest)
+            var counts = new Dictionary<ActionType, int>();
+            _ = context.GetRandomActionCard(); // first draw to capture poolSize
+            callCount = 0; // reset so we cycle cleanly from index 0
+
+            for (int i = 0; i < poolSize; i++)
+            {
+                var card = context.GetRandomActionCard();
+                counts.TryGetValue(card.Action, out int c);
+                counts[card.Action] = c + 1;
+            }
+
+            // Every non-Tilt type should appear 10× as often as Tilt
+            Assert.IsTrue(counts.ContainsKey(ActionType.Tilt), "Tilt must appear in the pool");
+            int tiltCount = counts[ActionType.Tilt];
+            foreach (var (action, count) in counts)
+            {
+                if (action == ActionType.Tilt) continue;
+                Assert.AreEqual(tiltCount * 10, count,
+                    $"{action} should appear {tiltCount * 10} times but appeared {count} times");
+            }
+        }
     }
 }
