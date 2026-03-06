@@ -1031,13 +1031,22 @@ else
                             var ranked = GameState.Config.FlipWinCondition
                                 ? GameState.GamePlayers.Values.OrderByDescending(p => Math.Abs(p.Balance)).ToList()
                                 : GameState.GamePlayers.Values.OrderBy(p => Math.Abs(p.Balance)).ToList();
+                            // Standard competition ranking: tied players share the same rank.
+                            var ranks = new int[ranked.Count];
+                            for (int r = 0; r < ranked.Count; r++)
+                            {
+                                bool tiedWithPrevious = r > 0 && Math.Abs(ranked[r].Balance) == Math.Abs(ranked[r - 1].Balance);
+                                ranks[r] = tiedWithPrevious ? ranks[r - 1] : r + 1;
+                            }
                         }
                         @for (int i = 0; i < ranked.Count; i++)
                         {
                             var p = ranked[i];
-                            string medal = i switch { 0 => "🥇", 1 => "🥈", 2 => "🥉", _ => $"#{i + 1}" };
+                            int rank = ranks[i];
+                            string medal = rank switch { 1 => "🥇", 2 => "🥈", 3 => "🥉", _ => $"#{rank}" };
                             bool isMe = p.PlayerId == UserService.CurrentUser?.Id;
-                            <div class="cc-leaderboard-row @(isMe ? "cc-leaderboard-me" : "") @(i == 0 ? "cc-leaderboard-winner" : "")">
+                            bool isWinner = rank == 1;
+                            <div class="cc-leaderboard-row @(isMe ? "cc-leaderboard-me" : "") @(isWinner ? "cc-leaderboard-winner" : "")">
                                 <span class="cc-rank">@medal</span>
                                 <span class="cc-player-result-name">@p.DisplayName</span>
                                 <span class="cc-player-result-balance @(p.Balance >= 0 ? "cc-positive" : "cc-negative")">
