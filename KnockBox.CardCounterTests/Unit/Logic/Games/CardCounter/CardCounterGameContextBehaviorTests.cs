@@ -327,48 +327,29 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
         [TestMethod]
         public void GetRandomActionCard_TiltIsDrawnAtExpectedRarity()
         {
-            // Verify that the action card pool is weighted so Tilt appears exactly
-            // once for every 10 copies of each other card type.
-            // We do this by exhausting the pool (index 0 → pool.Length-1) and
-            // counting how many times each ActionType is returned.
+            // The weighted selection draws a single roll in [0, totalWeight).
+            // totalWeight = (actionTypeCount - 1) * 10 + 1  (Tilt weight=1, others weight=10).
+            // We verify that:
+            //   • roll=0   → first non-Tilt type (weight covers [0,10))
+            //   • roll in the Tilt band → ActionType.Tilt
             var host = new User("Host", "host-id");
             using var state = new CardCounterGameState(host, _stateLoggerMock.Object);
 
-            int callCount = 0;
-            int poolSize = 0;
+            int totalTypes = Enum.GetValues<ActionType>().Length; // includes Tilt
+            int nonTiltTypes = totalTypes - 1;
+            int totalWeight = nonTiltTypes * 10 + 1;              // Tilt weight = 1
 
-            // First call: record the pool size from the exclusiveMax argument
-            _randomMock.Setup(r => r.GetRandomInt(It.IsAny<int>(), It.IsAny<int>(), RandomType.Secure))
-                .Returns<int, int, RandomType>((_, exclusiveMax, _) =>
-                {
-                    if (poolSize == 0) poolSize = exclusiveMax;
-                    return callCount++ % exclusiveMax;
-                });
-
+            // roll=0 → hits the first non-Tilt card
+            _randomMock.Setup(r => r.GetRandomInt(0, totalWeight, RandomType.Secure)).Returns(0);
             var context = new CardCounterGameContext(state, _randomMock.Object, _loggerMock.Object);
+            var firstCard = context.GetRandomActionCard();
+            Assert.AreNotEqual(ActionType.Tilt, firstCard.Action, "roll=0 must not return Tilt");
 
-            // Draw enough cards to cycle through every slot in the pool once
-            // (we need one draw first to capture poolSize, then draw the rest)
-            var counts = new Dictionary<ActionType, int>();
-            _ = context.GetRandomActionCard(); // first draw to capture poolSize
-            callCount = 0; // reset so we cycle cleanly from index 0
-
-            for (int i = 0; i < poolSize; i++)
-            {
-                var card = context.GetRandomActionCard();
-                counts.TryGetValue(card.Action, out int c);
-                counts[card.Action] = c + 1;
-            }
-
-            // Every non-Tilt type should appear 10× as often as Tilt
-            Assert.IsTrue(counts.ContainsKey(ActionType.Tilt), "Tilt must appear in the pool");
-            int tiltCount = counts[ActionType.Tilt];
-            foreach (var (action, count) in counts)
-            {
-                if (action == ActionType.Tilt) continue;
-                Assert.AreEqual(tiltCount * 10, count,
-                    $"{action} should appear {tiltCount * 10} times but appeared {count} times");
-            }
+            // roll = totalWeight-1 → last slot in the weight range → Tilt (weight 1 at the end)
+            _randomMock.Setup(r => r.GetRandomInt(0, totalWeight, RandomType.Secure)).Returns(totalWeight - 1);
+            var tiltCard = context.GetRandomActionCard();
+            Assert.AreEqual(ActionType.Tilt, tiltCard.Action,
+                $"roll={totalWeight - 1} (last slot) must return Tilt");
         }
     }
 }
