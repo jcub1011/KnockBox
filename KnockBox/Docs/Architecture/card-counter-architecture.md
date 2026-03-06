@@ -192,12 +192,12 @@ Note: `RoundEndState` is an internal FSM transition state only — it is not a u
 PlayerState
 ├── PlayerId          : string
 ├── DisplayName       : string
-├── Balance           : long
+├── Balance           : double
 ├── Pot               : List<int>         // ordered digit list
-├── PotValue          : long              // computed: concatenated digits, ignoring leading zeros
+├── PotValue          : double             // computed: concatenated digits, ignoring leading zeros
 ├── PassesRemaining   : int
 ├── HasSetBuyIn       : bool
-├── BuyInRoll         : long              // server-generated die result (1–6)
+├── BuyInRoll         : int               // server-generated die result (1–6)
 ├── ActionHand        : List<ActionCard>  // player's hidden action cards
 └── PrivateReveal     : List<BaseCard>?   // Make My Luck top-3 reveal (non-null during reorder)
 ```

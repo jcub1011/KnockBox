@@ -12,7 +12,7 @@ namespace KnockBox.Services.State.Games.CardCounter.Data
         public string DisplayName { get; set; } = string.Empty;
 
         /// <summary>Current balance (can be negative).</summary>
-        public long Balance { get; set; }
+        public double Balance { get; set; }
 
         /// <summary>
         /// Ordered digit list that forms the pot through concatenation.
@@ -23,15 +23,15 @@ namespace KnockBox.Services.State.Games.CardCounter.Data
         /// <summary>
         /// Concatenated numeric value of <see cref="Pot"/>, ignoring leading zeros.
         /// Returns 0 when the pot is empty or when the concatenated value overflows
-        /// <see cref="long.MaxValue"/> (19+ digits).
+        /// <see cref="double.MaxValue"/> (too many digits).
         /// </summary>
-        public long PotValue
+        public double PotValue
         {
             get
             {
                 if (Pot.Count == 0) return 0;
                 string concatenated = string.Join("", Pot);
-                return long.TryParse(concatenated, out long val) ? val : 0;
+                return double.TryParse(concatenated, out double val) ? val : 0;
             }
         }
 
@@ -42,7 +42,7 @@ namespace KnockBox.Services.State.Games.CardCounter.Data
         public bool HasSetBuyIn { get; set; }
 
         /// <summary>Server-generated die roll (1–6) used to compute the initial balance.</summary>
-        public long BuyInRoll { get; set; }
+        public int BuyInRoll { get; set; }
 
         /// <summary>Action cards currently held in the player's hidden hand.</summary>
         public List<ActionCard> ActionHand { get; set; } = [];
