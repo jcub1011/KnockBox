@@ -231,6 +231,11 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
             context.DiscardPile.Push(top);
             context.DecrementShoeCount(top);
             context.RecordBurn(top);
+
+            // If the burn exhausted the shoe, end the round (and potentially the game)
+            if (context.CurrentShoe.Count == 0)
+                return new RoundEndState();
+
             return null;
         }
 

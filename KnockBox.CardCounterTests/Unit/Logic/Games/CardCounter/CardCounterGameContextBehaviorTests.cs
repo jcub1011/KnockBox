@@ -94,5 +94,67 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             Assert.AreEqual("🔥", burnEntry.Symbol);
             Assert.AreEqual("# 7 (Burned)", burnEntry.Description);
         }
+
+        [TestMethod]
+        public void Burn_LastCardInShoe_TransitionsToRoundEndState()
+        {
+            // Arrange: one player, one card in the shoe, main deck empty
+            var host = new User("Host", "host-id");
+            using var state = new CardCounterGameState(host, _stateLoggerMock.Object);
+            var context = new CardCounterGameContext(state, _randomMock.Object, _loggerMock.Object);
+
+            var player = new PlayerState { PlayerId = "p1", DisplayName = "Player 1" };
+            player.ActionHand.Add(new ActionCard(ActionType.Burn));
+            state.GamePlayers[player.PlayerId] = player;
+            state.TurnOrder.Add(player.PlayerId);
+            state.CurrentPlayerIndex = 0;
+
+            // Place exactly one card in the shoe; main deck stays empty
+            state.CurrentShoe.Push(new NumberCard(5));
+
+            var fsmState = new PlayerTurnState();
+            fsmState.OnEnter(context);
+
+            // Act: play the Burn action card
+            var next = fsmState.HandleCommand(context, new PlayActionCardCommand(player.PlayerId, 0));
+
+            // Assert: shoe is empty so the game must advance to RoundEndState
+            Assert.IsNotNull(next);
+            Assert.IsInstanceOfType(next, typeof(RoundEndState));
+            Assert.AreEqual(0, state.CurrentShoe.Count);
+        }
+
+        [TestMethod]
+        public void Burn_LastCardInShoeAndMainDeck_TransitionsToGameOver()
+        {
+            // Arrange: one player, one card in the shoe, main deck empty
+            var host = new User("Host", "host-id");
+            using var state = new CardCounterGameState(host, _stateLoggerMock.Object);
+            var context = new CardCounterGameContext(state, _randomMock.Object, _loggerMock.Object);
+
+            var player = new PlayerState { PlayerId = "p1", DisplayName = "Player 1" };
+            player.ActionHand.Add(new ActionCard(ActionType.Burn));
+            state.GamePlayers[player.PlayerId] = player;
+            state.TurnOrder.Add(player.PlayerId);
+            state.CurrentPlayerIndex = 0;
+
+            // One card in shoe, main deck is empty
+            state.CurrentShoe.Push(new NumberCard(5));
+            // MainDeck is already empty by default
+
+            var fsmState = new PlayerTurnState();
+            fsmState.OnEnter(context);
+
+            // Act: play the Burn action card (transitions to RoundEndState)
+            var next = fsmState.HandleCommand(context, new PlayActionCardCommand(player.PlayerId, 0));
+            Assert.IsNotNull(next);
+            Assert.IsInstanceOfType(next, typeof(RoundEndState));
+
+            // RoundEndState.OnEnter immediately transitions to GameOverState when main deck is empty
+            context.CurrentFsmState = next;
+            next.OnEnter(context);
+
+            Assert.AreEqual(GamePhase.GameOver, state.GamePhase);
+        }
     }
 }
