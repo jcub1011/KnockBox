@@ -2267,7 +2267,7 @@
     width: 100%;
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 32px;
     align-items: center;
     max-height: 90vh;
     overflow-y: auto;
@@ -2280,6 +2280,7 @@
     margin: 0;
     text-transform: uppercase;
     text-shadow: 2px 2px 0 #000;
+    text-align: center;
 }
 
 .cc-reaction-subtitle {
@@ -2290,9 +2291,11 @@
 
 .cc-reaction-actors {
     display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 24px;
     justify-content: space-around;
     align-items: center;
-    margin-bottom: 40px;
     width: 100%;
 }
 
@@ -2325,6 +2328,8 @@
 
 .cc-reaction-options {
     display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
     justify-content: center;
     gap: 40px;
     align-items: stretch;
