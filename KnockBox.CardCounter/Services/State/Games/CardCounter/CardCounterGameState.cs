@@ -188,7 +188,9 @@ namespace KnockBox.Services.State.Games.CardCounter
         string SourceId,
         string SourceName,
         string TargetId,
-        ActionCard PlayedCard);
+        ActionCard PlayedCard,
+        int? SourceDigitIndex = null,
+        int? TargetDigitIndex = null);
 
     /// <summary>
     /// Information about the most recently drawn shoe card, shown to all players as an overlay.

@@ -228,42 +228,152 @@ else
                 </div>
             }
 
-            @* ── Reaction Prompt (Feeling Lucky target) ── *@
-            @if (myPlayer != null && GameState.FeelingLuckyTargetId == myId)
+            @* ── Reaction Overlay (Unified full-screen prompt) ── *@
+            @if ((myPlayer != null && (GameState.FeelingLuckyTargetId == myId || (GameState.PendingReaction is { TargetId: var targetId } && targetId == myId))) || (IsHost() && (GameState.FeelingLuckyTargetId != null || GameState.PendingReaction != null)))
             {
-                <div class="cc-reaction-banner cc-banner-lucky">
-                    <span class="cc-banner-icon">🎲</span>
-                    <div class="cc-banner-text">
-                        <strong>Feeling Lucky!</strong> You must draw a card — or play <strong>Comp'd</strong> to block it, or chain your own <strong>Feeling Lucky</strong>.
-                    </div>
-                    <button class="cc-btn cc-btn-warning" @onclick="DrawCard">Draw Now</button>
-                </div>
-            }
+                bool isAnyFeelingLucky = GameState.FeelingLuckyTargetId != null;
+                bool isAnyPendingReaction = GameState.PendingReaction != null;
+                bool isMyReaction = myPlayer != null && (GameState.FeelingLuckyTargetId == myId || (GameState.PendingReaction is { TargetId: var targetId2 } && targetId2 == myId));
 
-            @* ── Reaction Prompt (Blockable action target) ── *@
-            @if (myPlayer != null && GameState.PendingReaction is { } reaction && reaction.TargetId == myId && reaction.PlayedCard.Action != ActionType.Skim)
-            {
-                <div class="cc-reaction-banner cc-banner-block">
-                    <span class="cc-banner-icon">⚔️</span>
-                    <div class="cc-banner-text">
-                        <strong>@reaction.SourceName</strong> played
-                        <strong>@GetActionCardName(reaction.PlayedCard.Action)</strong> on you!
-                        Play <strong>Comp'd</strong> to block it, or accept the effect.
-                    </div>
-                    <button class="cc-btn cc-btn-secondary" @onclick="AcceptPending">Accept</button>
-                </div>
-            }
+                bool isFeelingLucky = isAnyFeelingLucky;
+                bool isPendingReaction = !isFeelingLucky && isAnyPendingReaction;
+                bool isSkim = isPendingReaction && GameState.PendingReaction?.PlayedCard.Action == ActionType.Skim;
 
-            @* ── Skim Reaction Prompt (target can block while source selects digits) ── *@
-            @if (myPlayer != null && GameState.PendingReaction is { } skimReaction && skimReaction.PlayedCard.Action == ActionType.Skim && skimReaction.TargetId == myId)
-            {
-                <div class="cc-reaction-banner cc-banner-block">
-                    <span class="cc-banner-icon">✂️</span>
-                    <div class="cc-banner-text">
-                        <strong>@skimReaction.SourceName</strong> is playing <strong>Skim</strong> on you!
-                        Play <strong>Comp'd</strong> to block it, or wait for them to select digits.
+                string sourceId = isFeelingLucky 
+                    ? (GameState.ForceDrawStack.Count > 0 ? GameState.ForceDrawStack.Peek() : GameState.LastPlayedAction?.PlayerId ?? "") 
+                    : (GameState.PendingReaction?.SourceId ?? "");
+
+                string theTargetId = isFeelingLucky ? (GameState.FeelingLuckyTargetId ?? "") : (GameState.PendingReaction?.TargetId ?? "");
+
+                var sourcePlayer = GameState.GamePlayers.TryGetValue(sourceId, out var sp) ? sp : null;
+                var targetPlayer = GameState.GamePlayers.TryGetValue(theTargetId, out var tp2) ? tp2 : null;
+
+                var actionName = isFeelingLucky ? "Feeling Lucky" : GetActionCardName(GameState.PendingReaction!.PlayedCard.Action);
+                var icon = isFeelingLucky ? "🎲" : (isSkim ? "✂️" : "⚔️");
+                var attackTitle = isFeelingLucky ? "🎲 FEELING LUCKY! 🎲" : (isSkim ? "✂️ SKIM ATTACK ✂️" : "⚔️ INCOMING ATTACK ⚔️");
+
+                var compdOption = isMyReaction && myPlayer != null ? myPlayer.ActionHand
+                    .Select((card, index) => new { Card = card, Index = index })
+                    .FirstOrDefault(x => x.Card.Action == ActionType.Compd || (isFeelingLucky && x.Card.Action == ActionType.FeelingLucky)) : null;
+
+                <div class="cc-reaction-overlay">
+                    <div class="cc-reaction-panel">
+                        <h3 class="cc-reaction-title">@attackTitle</h3>
+
+                        <div class="cc-reaction-subtitle">
+                            <strong>@(sourcePlayer?.DisplayName ?? "Someone")</strong> played <strong>@actionName</strong> on <strong>@(isMyReaction ? "you" : (targetPlayer?.DisplayName ?? "Someone"))</strong>!
+                        </div>
+
+                        <div class="cc-reaction-actors">
+                            @* Attacker Card *@
+                            @if (sourcePlayer != null)
+                            {
+                                <div class="cc-reaction-actor-col">
+                                    <h4 class="cc-reaction-actor-title-attacker">Attacker</h4>
+                                    <div class="cc-opponent-card cc-opponent-active cc-reaction-actor-card">
+                                        <div class="cc-opp-header">
+                                            <span class="cc-opp-name">@sourcePlayer.DisplayName</span>
+                                        </div>
+                                        <div class="cc-opp-stats">
+                                            <div class="cc-opp-stat"><span class="cc-stat-icon">💰</span><span class="cc-stat-val @(sourcePlayer.Balance >= 0 ? "cc-positive" : "cc-negative")">@FormatBalance(sourcePlayer.Balance)</span></div>
+                                            <div class="cc-opp-stat"><span class="cc-stat-icon">🎰</span><span class="cc-stat-val">
+                                                @if (isSkim && GameState.PendingReaction?.SourceDigitIndex is int sdi && sourcePlayer.Pot.Count > 0)
+                                                {
+                                                    @for (int i = 0; i < sourcePlayer.Pot.Count; i++)
+                                                    {
+                                                        if (i == sdi) { <span class="cc-skim-highlight">@sourcePlayer.Pot[i]</span> }
+                                                        else { @sourcePlayer.Pot[i] }
+                                                    }
+                                                }
+                                                else
+                                                {
+                                                    @sourcePlayer.PotValue
+                                                }
+                                            </span></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+
+                            <div class="cc-reaction-icon">@icon</div>
+
+                            @* Target Card *@
+                            @if (targetPlayer != null)
+                            {
+                                <div class="cc-reaction-actor-col">
+                                    <h4 class="cc-reaction-actor-title-target">Target @(isMyReaction ? "(You)" : "")</h4>
+                                    <div class="cc-opponent-card cc-opponent-targeted cc-reaction-actor-card">
+                                        <div class="cc-opp-header">
+                                            <span class="cc-opp-name">@targetPlayer.DisplayName</span>
+                                        </div>
+                                        <div class="cc-opp-stats">
+                                            <div class="cc-opp-stat"><span class="cc-stat-icon">💰</span><span class="cc-stat-val @(targetPlayer.Balance >= 0 ? "cc-positive" : "cc-negative")">@FormatBalance(targetPlayer.Balance)</span></div>
+                                            <div class="cc-opp-stat"><span class="cc-stat-icon">🎰</span><span class="cc-stat-val">
+                                                @if (isSkim && GameState.PendingReaction?.TargetDigitIndex is int tdi && targetPlayer.Pot.Count > 0)
+                                                {
+                                                    @for (int i = 0; i < targetPlayer.Pot.Count; i++)
+                                                    {
+                                                        if (i == tdi) { <span class="cc-skim-highlight">@targetPlayer.Pot[i]</span> }
+                                                        else { @targetPlayer.Pot[i] }
+                                                    }
+                                                }
+                                                else
+                                                {
+                                                    @targetPlayer.PotValue
+                                                }
+                                            </span></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+
+                        @if (isMyReaction)
+                        {
+                            <div class="cc-reaction-options">
+                                @if (compdOption != null)
+                                {
+                                    <div class="cc-reaction-option-col">
+                                        <span class="cc-reaction-play-label">Play to @(isFeelingLucky ? "Block/Chain" : "Block"):</span>
+                                        <div class="cc-reaction-card-wrap">
+                                            <div class="cc-action-card @GetActionCardColor(compdOption.Card.Action)"
+                                                 @onclick="() => OnActionCardClick(compdOption.Index)">
+                                                <div class="cc-card-corner cc-card-corner-tl"><span class="cc-card-suit">@GetActionCardIcon(compdOption.Card.Action)</span></div>
+                                                <div class="cc-card-center-icon">@GetActionCardIcon(compdOption.Card.Action)</div>
+                                                <div class="cc-card-name-label">@GetActionCardName(compdOption.Card.Action)</div>
+                                                <div class="cc-card-corner cc-card-corner-br"><span class="cc-card-suit cc-card-suit-flipped">@GetActionCardIcon(compdOption.Card.Action)</span></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="cc-reaction-no-card">
+                                        (You do not have a card to play)
+                                    </div>
+                                }
+
+                                <div class="cc-reaction-accept-col">
+                                    @if (isSkim && GameState.PendingReaction?.SourceDigitIndex == null)
+                                    {
+                                        <span class="cc-reaction-accept-hint">or wait for them to select digits...</span>
+                                    }
+                                    <button class="cc-btn cc-btn-danger cc-btn-lg cc-reaction-accept-btn" 
+                                            @onclick="@(isFeelingLucky ? DrawCard : AcceptPending)">
+                                        @(isFeelingLucky ? "Accept (Draw)" : "Accept Effect")
+                                    </button>
+                                </div>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="cc-reaction-options">
+                                <div class="cc-reaction-no-card">
+                                    Waiting for reaction...
+                                </div>
+                            </div>
+                        }
                     </div>
-                    <button class="cc-btn cc-btn-secondary" @onclick="AcceptPending">Accept</button>
                 </div>
             }
 
@@ -338,14 +448,13 @@ else
                             {
                                 bool isMe = pl.PlayerId == myId;
                                 bool isNmmTarget = _notMyMoneyTargetId == pl.PlayerId;
-                                <div class="cc-nmm-player @(isNmmTarget ? "cc-nmm-player-selected" : "")"
-                                     style="@(isMe ? "opacity: 0.5; pointer-events: none; cursor: default;" : "")"
+                                <div class="cc-nmm-player @(isNmmTarget ? "cc-nmm-player-selected" : "") @(isMe ? "cc-nmm-player-me-disabled" : "")"
                                      @onclick="() => { if (!isMe) SelectNotMyMoneyTarget(pl.PlayerId); }">
                                     <span class="cc-nmm-player-name">@pl.DisplayName @(isMe ? "(you)" : "")</span>
-                                    <span class="cc-nmm-player-balance" title="Balance" style="width: 70px; text-align: right;">
+                                    <span class="cc-nmm-player-balance" title="Balance">
                                         <span class="cc-stat-val @(pl.Balance >= 0 ? "cc-positive" : "cc-negative")">@FormatBalance(pl.Balance)</span>
                                     </span>
-                                    <span class="cc-nmm-player-pot" title="Pot" style="width: 80px; text-align: right;">
+                                    <span class="cc-nmm-player-pot" title="Pot">
                                         @if (pl.Pot.Count > 0)
                                         {
                                             @string.Join("", pl.Pot)

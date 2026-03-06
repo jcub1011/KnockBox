@@ -82,6 +82,16 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
                 _sourceSelected = true;
                 _selectedSourceDigit = skimCmd.SourceDigitIndex;
                 _selectedTargetDigit = skimCmd.TargetDigitIndex;
+
+                if (context.State.PendingReaction != null)
+                {
+                    context.State.PendingReaction = context.State.PendingReaction with 
+                    { 
+                        SourceDigitIndex = _selectedSourceDigit, 
+                        TargetDigitIndex = _selectedTargetDigit 
+                    };
+                }
+
                 if (_targetAccepted)
                 {
                     return ResolveEffect(context, _selectedSourceDigit, _selectedTargetDigit);
