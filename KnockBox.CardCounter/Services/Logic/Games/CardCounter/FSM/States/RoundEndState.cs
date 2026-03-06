@@ -1,5 +1,3 @@
-using KnockBox.Services.State.Games.CardCounter;
-
 namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
 {
     /// <summary>
@@ -10,24 +8,98 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
     /// </summary>
     public sealed class RoundEndState : ICardCounterGameState
     {
+        private DateTimeOffset _expirationTime;
+
         public void OnEnter(CardCounterGameContext context)
         {
+            _expirationTime = DateTimeOffset.Now;
             context.Logger.LogInformation("FSM → RoundEndState (shoe {n} exhausted).", context.State.ShoeIndex);
+
+            var hasShoe = context.DealNextShoe();
+            if (!hasShoe)
+            {
+                // Immediately transition if game end
+                context.CurrentFsmState = new GameOverState();
+                context.CurrentFsmState.OnEnter(context);
+                return;
+            }
+
+            context.State.IsNewShoe = true;
             context.DealActionCards();
 
-            bool hasShoe = context.DealNextShoe();
-
-            if (hasShoe)
-                context.State.IsNewShoe = true;
-
-            // Immediately transition — this state is fully resolved on enter.
-            var next = hasShoe ? (ICardCounterGameState)new PlayerTurnState() : new GameOverState();
-            context.CurrentFsmState = next;
-            next.OnEnter(context);
+            // Immediately transition if all players are under limit
+            if (!context.GamePlayers.Values.Any(state => state.ActionHand.Count > context.Config.ActionHandLimit))
+            {
+                context.CurrentFsmState = new PlayerTurnState();
+                context.CurrentFsmState.OnEnter(context);
+                return;
+            }
         }
 
-        public ICardCounterGameState? HandleCommand(CardCounterGameContext context, CardCounterCommand command) => null;
+        public ICardCounterGameState? HandleCommand(CardCounterGameContext context, CardCounterCommand command)
+        {
+            if (command is not DiscardActionCardsCommand discardCommand) return null;
+            var state = context.GetPlayer(discardCommand.PlayerId);
+            if (state is null) return null;
 
-        public ICardCounterGameState? Tick(CardCounterGameContext context, DateTimeOffset now) => null;
+            HandleDiscard(context, discardCommand);
+
+            // Don't leave state if not all players have discarded extra cards
+            if (context.GamePlayers.Values.Any(state => state.ActionHand.Count > context.Config.ActionHandLimit))
+                return null;
+
+            return new PlayerTurnState();
+        }
+
+        public ICardCounterGameState? Tick(CardCounterGameContext context, DateTimeOffset now)
+        {
+            if (now < _expirationTime) return null;
+
+            int actionHandLimit = context.Config.ActionHandLimit;
+
+            // Discard last cards automatically
+            foreach (var (id, state) in context.GamePlayers.Where(state => state.Value.ActionHand.Count > context.Config.ActionHandLimit))
+            {
+                int excessCards = state.ActionHand.Count - actionHandLimit;
+                HandleDiscard(context, new DiscardActionCardsCommand(id, [.. Enumerable.Range(actionHandLimit, excessCards)]));
+            }
+
+            return new PlayerTurnState();
+        }
+
+        private static void HandleDiscard(CardCounterGameContext context, DiscardActionCardsCommand cmd)
+        {
+            var player = context.GetPlayer(cmd.PlayerId);
+            if (player is null) return;
+
+            if (player.ActionHand.Count <= context.Config.ActionHandLimit)
+            {
+                context.Logger.LogWarning("Discard: player [{id}] is not over the action hand limit.", cmd.PlayerId);
+                return;
+            }
+
+            // Validate indices: must be distinct, in range, and discard enough to be at or under limit
+            var indices = cmd.CardIndices;
+            if (indices.Length == 0 || indices.Distinct().Count() != indices.Length
+                || indices.Any(i => i < 0 || i >= player.ActionHand.Count))
+            {
+                context.Logger.LogWarning("Discard: invalid card indices from player [{id}].", cmd.PlayerId);
+                return;
+            }
+
+            int afterDiscard = player.ActionHand.Count - indices.Length;
+            if (afterDiscard > context.Config.ActionHandLimit)
+            {
+                context.Logger.LogWarning("Discard: player [{id}] must discard enough to reach the hand limit.", cmd.PlayerId);
+                return;
+            }
+
+            // Remove in descending index order to preserve correctness
+            foreach (var idx in indices.OrderByDescending(i => i))
+                player.ActionHand.RemoveAt(idx);
+
+            context.Logger.LogInformation(
+                "Player [{id}] discarded {n} action cards.", cmd.PlayerId, indices.Length);
+        }
     }
 }

@@ -1,13 +1,16 @@
 <Solution>
+  <Project Path="docker-compose.dcproj">
+    <BuildDependency Project="KnockBox.CardCounter/KnockBox.CardCounter.csproj" />
+    <BuildDependency Project="KnockBox.Core/KnockBox.Core.csproj" />
+    <BuildDependency Project="KnockBox.DiceSimulator/KnockBox.DiceSimulator.csproj" />
+    <Build />
+  </Project>
   <Project Path="KnockBox.CardCounter/KnockBox.CardCounter.csproj" />
   <Project Path="KnockBox.CardCounterTests/KnockBox.CardCounterTests.csproj" />
   <Project Path="KnockBox.Core/KnockBox.Core.csproj" />
   <Project Path="KnockBox.CoreTests/KnockBox.CoreTests.csproj" />
   <Project Path="KnockBox.DiceSimulator/KnockBox.DiceSimulator.csproj" />
   <Project Path="KnockBox.DiceSimulatorTests/KnockBox.DiceSimulatorTests.csproj" />
-  <Project Path="docker-compose.dcproj">
-    <Build />
-  </Project>
   <Project Path="KnockBox/KnockBox.csproj" />
   <Project Path="KnockBoxTests/KnockBoxTests.csproj" Id="98d86df0-167f-4cde-a3a1-59954fc72bb6" />
 </Solution>

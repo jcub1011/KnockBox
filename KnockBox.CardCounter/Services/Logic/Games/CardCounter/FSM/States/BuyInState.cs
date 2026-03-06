@@ -9,8 +9,11 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
     /// </summary>
     public sealed class BuyInState : ICardCounterGameState
     {
+        private DateTimeOffset _expirationTime;
+
         public void OnEnter(CardCounterGameContext context)
         {
+            _expirationTime = DateTimeOffset.Now.AddMilliseconds(context.Config.BuyInTimeoutMs);
             context.State.GamePhase = GamePhase.BuyIn;
             context.Logger.LogInformation("FSM → BuyInState");
         }
@@ -45,6 +48,19 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
             return allSet ? new RoundEndState() : null;
         }
 
-        public ICardCounterGameState? Tick(CardCounterGameContext context, DateTimeOffset now) => null;
+        public ICardCounterGameState? Tick(CardCounterGameContext context, DateTimeOffset now)
+        {
+            if (now < _expirationTime) return null;
+
+            // Default unselected players to positive buy-in
+            foreach (var player in context.GamePlayers.Values.Where(state => !state.HasSetBuyIn))
+            {
+                long balance = player.BuyInRoll * 8;
+                player.Balance = balance;
+                player.HasSetBuyIn = true;
+            }
+
+            return new RoundEndState();
+        }
     }
 }

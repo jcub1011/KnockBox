@@ -32,6 +32,16 @@ namespace KnockBox.Services.State.Games.CardCounter
         public int CurrentPlayerIndex { get; set; }
 
         /// <summary>
+        /// Gets the id of the current player in the turn order.
+        /// </summary>
+        public string CurrentPlayer => TurnOrder[CurrentPlayerIndex];
+
+        /// <summary>
+        /// Gets the player state of the current player in the turn order. Null when the current player does not have a state defined.
+        /// </summary>
+        public PlayerState? CurrentPlayerState => GamePlayers.TryGetValue(CurrentPlayer, out var state) ? state : null;
+
+        /// <summary>
         /// All player states, keyed by player ID.
         /// </summary>
         public readonly ConcurrentDictionary<string, PlayerState> GamePlayers = new();
@@ -207,7 +217,9 @@ namespace KnockBox.Services.State.Games.CardCounter
         public int TotalPassesPerPlayer { get; set; } = 3;
         public int MinShoeSize { get; set; } = 12;
         public int MaxShoeSize { get; set; } = 20;
-        public int ActionResponseTimeoutMs { get; set; } = 15000;
+        public int ActionResponseTimeoutMs { get; set; } = 12000;
+        public int BuyInTimeoutMs { get; set; } = 20000;
+        public int RoundEndTimeoutMs { get; set; } = 20000;
     }
 
     #endregion
