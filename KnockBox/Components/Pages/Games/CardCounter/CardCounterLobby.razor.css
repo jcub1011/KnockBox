@@ -9,6 +9,22 @@
     font-family: var(--font-primary);
     position: relative;
     overflow: hidden;
+    transition: box-shadow 0.5s ease;
+}
+
+.cc-page-my-turn {
+    box-shadow: inset 0 0 80px rgba(247,213,71,0.18), inset 0 0 200px rgba(247,213,71,0.08);
+    background: radial-gradient(ellipse at center, #1a5c2e 0%, #0a2210 100%);
+    animation: pageGlow 2.5s ease-in-out infinite alternate;
+}
+
+@keyframes pageGlow {
+    from {
+        box-shadow: inset 0 0 60px rgba(247,213,71,0.15), inset 0 0 150px rgba(247,213,71,0.06);
+    }
+    to {
+        box-shadow: inset 0 0 100px rgba(247,213,71,0.28), inset 0 0 250px rgba(247,213,71,0.12);
+    }
 }
 
 .cc-loading {
