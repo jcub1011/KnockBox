@@ -700,10 +700,10 @@ else
                                         }
                                     </span>
                                 </div>
-                                <div class="cc-opp-stat" title="Passes remaining">
+                                @* <div class="cc-opp-stat" title="Passes remaining">
                                     <span class="cc-stat-icon">🎫</span>
                                     <span class="cc-stat-val">@pl.PassesRemaining</span>
-                                </div>
+                                </div> *@
                             </div>
                             <div class="cc-opp-cards" title="@pl.ActionHand.Count action card(s)">
                                 @for (int i = 0; i < Math.Min(pl.ActionHand.Count, 8); i++)
@@ -865,11 +865,11 @@ else
                                     }
                                 </span>
                             </div>
-                            <div class="cc-my-stat" title="Passes remaining">
+                            @* <div class="cc-my-stat" title="Passes remaining">
                                 <span class="cc-stat-icon">🎫</span>
                                 <span class="cc-stat-label">Passes</span>
                                 <span class="cc-stat-val">@myPlayer.PassesRemaining</span>
-                            </div>
+                            </div> *@
                         </div>
 
                         @* ── Action Buttons ── *@
