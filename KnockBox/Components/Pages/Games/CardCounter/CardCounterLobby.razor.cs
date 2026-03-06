@@ -58,6 +58,13 @@ namespace KnockBox.Components.Pages.Games.CardCounter
                     _isAnimatingShoe = true;
                 }
 
+                // Reset the operator overlay dismissed flag when a new operator result arrives.
+                if (GameState?.LastOperatorResult != _cachedOperatorResult)
+                {
+                    _cachedOperatorResult = GameState?.LastOperatorResult;
+                    _operatorResultDismissed = false;
+                }
+
                 ClearTransientUiState();
                 await InvokeAsync(StateHasChanged);
 
@@ -83,6 +90,9 @@ namespace KnockBox.Components.Pages.Games.CardCounter
                 {
                     try
                     {
+                        if (GameState?.Context != null && GameState.GamePhase == GamePhase.Playing && IsHost())
+                            GameEngine.Tick(GameState.Context, DateTimeOffset.UtcNow);
+
                         await InvokeAsync(StateHasChanged);
                     }
                     catch (ObjectDisposedException) { break; }
@@ -138,6 +148,10 @@ namespace KnockBox.Components.Pages.Games.CardCounter
 
         // ── Not My Money target selection state ───────────────────────────────
         private string? _notMyMoneyTargetId;
+
+        // ── Operator result overlay state ─────────────────────────────────────
+        private OperatorResultInfo? _cachedOperatorResult;
+        private bool _operatorResultDismissed;
 
         // ── Reorder state ─────────────────────────────────────────────────────
         protected List<int> SelectedReorderIndices = new();
@@ -385,6 +399,11 @@ namespace KnockBox.Components.Pages.Games.CardCounter
             if (GameState == null || UserService.CurrentUser == null) return;
             GameEngine.NotMyMoneyCancel(UserService.CurrentUser, GameState);
             _notMyMoneyTargetId = null;
+        }
+
+        protected void DismissOperatorResult()
+        {
+            _operatorResultDismissed = true;
         }
 
         // ── Discard ───────────────────────────────────────────────────────────

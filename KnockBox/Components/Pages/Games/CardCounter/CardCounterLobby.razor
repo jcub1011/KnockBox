@@ -577,6 +577,64 @@ else
                 </div>
             }
 
+            @* ── Operator Result Overlay ── *@
+            @if (myPlayer != null && !_operatorResultDismissed && GameState.LastOperatorResult is { } opResult && opResult.PlayerId == myId)
+            {
+                string opSymbol = GetOperatorSymbol(opResult.Op);
+                string opName = opResult.Op switch
+                {
+                    Operator.Add => "Add",
+                    Operator.Subtract => "Subtract",
+                    Operator.Multiply => "Multiply",
+                    Operator.Divide => "Divide",
+                    _ => "?"
+                };
+                double opDelta = opResult.BalanceAfter - opResult.BalanceBefore;
+                <div class="cc-operator-result-overlay">
+                    <div class="cc-operator-result-panel">
+                        <h3 class="cc-operator-result-title">⚡ OPERATOR APPLIED</h3>
+                        <div class="cc-operator-result-op">
+                            <span class="cc-operator-result-symbol">@opSymbol</span>
+                            <span class="cc-operator-result-opname">@opName</span>
+                        </div>
+                        <div class="cc-operator-result-balances">
+                            <div class="cc-operator-result-balance-row">
+                                <span class="cc-operator-result-label">Before:</span>
+                                <span class="cc-operator-result-val @(opResult.BalanceBefore >= 0 ? "cc-positive" : "cc-negative")">
+                                    @FormatBalance(opResult.BalanceBefore)
+                                </span>
+                            </div>
+                            <div class="cc-operator-result-arrow">→</div>
+                            <div class="cc-operator-result-balance-row">
+                                <span class="cc-operator-result-label">After:</span>
+                                <span class="cc-operator-result-val @(opResult.BalanceAfter >= 0 ? "cc-positive" : "cc-negative")">
+                                    @FormatBalance(opResult.BalanceAfter)
+                                </span>
+                            </div>
+                        </div>
+                        @if (opDelta > 0)
+                        {
+                            <div class="cc-operator-result-delta cc-operator-result-gain">
+                                ▲ +@(opDelta.ToString("N0")) from operation
+                            </div>
+                        }
+                        else if (opDelta < 0)
+                        {
+                            <div class="cc-operator-result-delta cc-operator-result-loss">
+                                ▼ −@(Math.Abs(opDelta).ToString("N0")) from operation
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="cc-operator-result-delta">No change in balance</div>
+                        }
+                        <button class="cc-btn cc-btn-primary cc-btn-lg" @onclick="DismissOperatorResult">
+                            ✓ Got it
+                        </button>
+                    </div>
+                </div>
+            }
+
             @* ── Poker Table Area ── *@
             <div class="cc-table-area">
 
@@ -874,6 +932,31 @@ else
                     </div>
                 }
             </div>
+
+            @* ── Host Leaderboard ── *@
+            @if (isHost && GameState.GamePlayers.Count > 0)
+            {
+                var leaderboardRanked = GameState.Config.FlipWinCondition
+                    ? GameState.GamePlayers.Values.OrderByDescending(p => Math.Abs(p.Balance)).ToList()
+                    : GameState.GamePlayers.Values.OrderBy(p => Math.Abs(p.Balance)).ToList();
+                <div class="cc-host-leaderboard">
+                    <div class="cc-host-leaderboard-title">🏆 Standings</div>
+                    <div class="cc-host-leaderboard-rows">
+                        @for (int i = 0; i < leaderboardRanked.Count; i++)
+                        {
+                            var lp = leaderboardRanked[i];
+                            string lMedal = i switch { 0 => "🥇", 1 => "🥈", 2 => "🥉", _ => $"#{i + 1}" };
+                            <div class="cc-host-leaderboard-row @(i == 0 ? "cc-host-leaderboard-leader" : "")">
+                                <span class="cc-host-lb-rank">@lMedal</span>
+                                <span class="cc-host-lb-name">@lp.DisplayName</span>
+                                <span class="cc-host-lb-balance @(lp.Balance >= 0 ? "cc-positive" : "cc-negative")">
+                                    @FormatBalance(lp.Balance)
+                                </span>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
 
             @* ── Target Select UI ── *@
             @if (_pendingActionCardIndex.HasValue)

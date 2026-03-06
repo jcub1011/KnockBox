@@ -113,6 +113,12 @@ namespace KnockBox.Services.State.Games.CardCounter
         public Operator? PendingNotMyMoneyOperator { get; set; }
 
         /// <summary>
+        /// Records the most recent operator application for the affected player to review.
+        /// Set each time an operator card is applied to a player's balance.
+        /// </summary>
+        public OperatorResultInfo? LastOperatorResult { get; set; }
+
+        /// <summary>
         /// Game configuration (tunable playtesting values).
         /// </summary>
         public GameConfig Config { get; set; } = new();
@@ -209,6 +215,17 @@ namespace KnockBox.Services.State.Games.CardCounter
         string Symbol,
         string? PlayerName,
         bool IsActionCard);
+
+    /// <summary>
+    /// Records the result of an operator card being applied to a player's balance.
+    /// Used to show the affected player an overlay with before/after balance.
+    /// </summary>
+    public record OperatorResultInfo(
+        string PlayerId,
+        string PlayerName,
+        Operator Op,
+        double BalanceBefore,
+        double BalanceAfter);
 
     public class GameConfig
     {
