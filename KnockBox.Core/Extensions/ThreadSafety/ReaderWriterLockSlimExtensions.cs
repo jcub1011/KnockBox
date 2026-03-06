@@ -55,7 +55,7 @@ namespace KnockBox.Extensions.ThreadSafety
             }
             finally
             {
-                rwLock.ExitReadLock();
+                rwLock.ExitWriteLock();
             }
         }
 
@@ -78,7 +78,7 @@ namespace KnockBox.Extensions.ThreadSafety
             }
             finally
             {
-                rwLock.ExitReadLock();
+                rwLock.ExitWriteLock();
             }
         }
 
@@ -103,7 +103,7 @@ namespace KnockBox.Extensions.ThreadSafety
             }
             finally
             {
-                rwLock.ExitReadLock();
+                rwLock.ExitWriteLock();
             }
         }
     }
