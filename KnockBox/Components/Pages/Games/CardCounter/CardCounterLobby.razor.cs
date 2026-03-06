@@ -51,6 +51,12 @@ namespace KnockBox.Components.Pages.Games.CardCounter
             {
                 bool isNewShoe = false;
 
+                if (GameState != null && GameState.ShoeIndex < _prevShoeIndex)
+                {
+                    // Game was restarted — ShoeIndex reset to 0; sync baseline so future increments are detected.
+                    _prevShoeIndex = GameState.ShoeIndex;
+                }
+
                 if (GameState != null && GameState.ShoeIndex > _prevShoeIndex)
                 {
                     isNewShoe = true;
