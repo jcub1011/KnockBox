@@ -517,7 +517,7 @@ namespace KnockBox.Components.Pages.Games.CardCounter
             _ => "?"
         };
 
-        protected static string FormatBalance(long balance)
+        protected static string FormatBalance(double balance)
         {
             return balance >= 0 ? $"+{balance:N0}" : $"{balance:N0}";
         }

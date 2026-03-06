@@ -36,7 +36,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
                 return null;
             }
 
-            long balance = player.BuyInRoll * 8;
+            double balance = player.BuyInRoll * 8;
             player.Balance = cmd.IsNegative ? -balance : balance;
             player.HasSetBuyIn = true;
 
@@ -55,7 +55,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
             // Default unselected players to positive buy-in
             foreach (var player in context.GamePlayers.Values.Where(state => !state.HasSetBuyIn))
             {
-                long balance = player.BuyInRoll * 8;
+                double balance = player.BuyInRoll * 8;
                 player.Balance = balance;
                 player.HasSetBuyIn = true;
             }

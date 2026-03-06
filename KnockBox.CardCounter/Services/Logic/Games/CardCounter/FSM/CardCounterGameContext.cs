@@ -166,7 +166,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM
             if (player.Pot.Count == 0)
                 return;
 
-            long potValue = player.PotValue;
+            double potValue = player.PotValue;
             player.Pot.Clear();
 
             if (potValue == 0 && card.Op == Operator.Divide)
@@ -179,10 +179,10 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM
             {
                 Operator.Add => player.Balance + potValue,
                 Operator.Subtract => player.Balance - potValue,
-                Operator.Multiply => player.Balance * potValue,
+                Operator.Multiply => Math.Round(player.Balance * potValue, MidpointRounding.AwayFromZero),
                 Operator.Divide => potValue == 0
                     ? player.Balance
-                    : (long)Math.Round((double)player.Balance / potValue),
+                    : Math.Round(player.Balance / potValue, MidpointRounding.AwayFromZero),
                 _ => player.Balance + potValue
             };
         }

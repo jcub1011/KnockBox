@@ -42,7 +42,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
 
                 context.ApplyOperatorCard(player, new OperatorCard(op));
 
-                Assert.AreEqual(42L, player.Balance);
+                Assert.AreEqual(42.0, player.Balance);
                 Assert.AreEqual(0, player.Pot.Count);
             }
         }
