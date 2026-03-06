@@ -30,7 +30,8 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
                 _sourceId,
                 context.GetPlayer(_sourceId)?.DisplayName ?? _sourceId,
                 _targetId,
-                _pendingCard);
+                _pendingCard,
+                NotMyMoneyOperator: _notMyMoneyOperator?.Op);
             context.Logger.LogInformation(
                 "FSM → WaitingForReactionState: [{src}] played [{card}] on [{tgt}]. Expires {exp}.",
                 _sourceId, _pendingCard.Action, _targetId, _expiresAt);

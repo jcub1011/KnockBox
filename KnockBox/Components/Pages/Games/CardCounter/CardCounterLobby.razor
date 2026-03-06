@@ -169,6 +169,17 @@ else
                     </div>
                 </div>
             }
+            else if (GameState.GamePlayers.Values.Any(p => p.ActionHand.Count > GameState.Config.ActionHandLimit))
+            {
+                <div class="cc-discard-overlay">
+                    <div class="cc-discard-panel">
+                        <h3 class="cc-discard-title">⏳ WAITING ON OTHER PLAYERS</h3>
+                        <p class="cc-discard-subtitle">
+                            Waiting for all players to finish discarding their action cards.
+                        </p>
+                    </div>
+                </div>
+            }
 
             @* ── Discard History Overlay ── *@
             @if (_showDiscardOverlay)
@@ -249,8 +260,13 @@ else
                 var targetPlayer = GameState.GamePlayers.TryGetValue(theTargetId, out var tp2) ? tp2 : null;
 
                 var actionName = isFeelingLucky ? "Feeling Lucky" : GetActionCardName(GameState.PendingReaction!.PlayedCard.Action);
-                var icon = isFeelingLucky ? "🎲" : (isSkim ? "✂️" : "⚔️");
-                var attackTitle = isFeelingLucky ? "🎲 FEELING LUCKY! 🎲" : (isSkim ? "✂️ SKIM ATTACK ✂️" : "⚔️ INCOMING ATTACK ⚔️");
+                if (isPendingReaction && GameState.PendingReaction?.PlayedCard.Action == ActionType.NotMyMoney && GameState.Config.ShowMakeMyMoneyOperator && GameState.PendingReaction?.NotMyMoneyOperator is { } op)
+                {
+                    actionName += $" [{GetOperatorSymbol(op)}]";
+                }
+                var isNotMyMoney = isPendingReaction && GameState.PendingReaction?.PlayedCard.Action == ActionType.NotMyMoney;
+                var icon = isFeelingLucky ? "🎲" : (isSkim ? "✂️" : (isNotMyMoney ? "💸" : "⚔️"));
+                var attackTitle = isFeelingLucky ? "🎲 FEELING LUCKY! 🎲" : (isSkim ? "✂️ SKIM ATTACK ✂️" : (isNotMyMoney ? "💸 NOT MY MONEY 💸" : "⚔️ INCOMING ATTACK ⚔️"));
 
                 var compdOption = isMyReaction && myPlayer != null ? myPlayer.ActionHand
                     .Select((card, index) => new { Card = card, Index = index })

@@ -190,7 +190,8 @@ namespace KnockBox.Services.State.Games.CardCounter
         string TargetId,
         ActionCard PlayedCard,
         int? SourceDigitIndex = null,
-        int? TargetDigitIndex = null);
+        int? TargetDigitIndex = null,
+        Operator? NotMyMoneyOperator = null);
 
     /// <summary>
     /// Information about the most recently drawn shoe card, shown to all players as an overlay.
@@ -222,6 +223,7 @@ namespace KnockBox.Services.State.Games.CardCounter
         public int ActionResponseTimeoutMs { get; set; } = 12000;
         public int BuyInTimeoutMs { get; set; } = 20000;
         public int RoundEndTimeoutMs { get; set; } = 20000;
+        public bool ShowMakeMyMoneyOperator { get; set; } = true;
     }
 
     #endregion
