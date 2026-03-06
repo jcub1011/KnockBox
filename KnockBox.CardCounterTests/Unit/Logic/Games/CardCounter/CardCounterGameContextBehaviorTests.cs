@@ -125,36 +125,203 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
         }
 
         [TestMethod]
-        public void Burn_LastCardInShoeAndMainDeck_TransitionsToGameOver()
+        public void Tilt_EvenDistribution_DistributesDigitsEvenly()
         {
-            // Arrange: one player, one card in the shoe, main deck empty
+            // Arrange: 3 players with pots that together have 6 digits (evenly divisible by 3)
             var host = new User("Host", "host-id");
             using var state = new CardCounterGameState(host, _stateLoggerMock.Object);
+
+            // Mock RNG to return deterministic shuffle (identity permutation: each call returns i for index i)
+            int shuffleCall = 0;
+            _randomMock.Setup(r => r.GetRandomInt(It.IsAny<int>(), It.IsAny<int>(), RandomType.Secure))
+                .Returns(() => shuffleCall++); // 0, 1, 2, 3, 4, 5 — identity shuffle
+
             var context = new CardCounterGameContext(state, _randomMock.Object, _loggerMock.Object);
 
-            var player = new PlayerState { PlayerId = "p1", DisplayName = "Player 1" };
-            player.ActionHand.Add(new ActionCard(ActionType.Burn));
-            state.GamePlayers[player.PlayerId] = player;
-            state.TurnOrder.Add(player.PlayerId);
-            state.CurrentPlayerIndex = 0;
+            var p1 = new PlayerState { PlayerId = "p1", DisplayName = "P1" };
+            var p2 = new PlayerState { PlayerId = "p2", DisplayName = "P2" };
+            var p3 = new PlayerState { PlayerId = "p3", DisplayName = "P3" };
 
-            // One card in shoe, main deck is empty
-            state.CurrentShoe.Push(new NumberCard(5));
-            // MainDeck is already empty by default
+            p1.Pot.AddRange([1, 2]);
+            p2.Pot.AddRange([3, 4]);
+            p3.Pot.AddRange([5, 6]);
+
+            p1.ActionHand.Add(new ActionCard(ActionType.Tilt));
+
+            state.GamePlayers[p1.PlayerId] = p1;
+            state.GamePlayers[p2.PlayerId] = p2;
+            state.GamePlayers[p3.PlayerId] = p3;
+            state.TurnOrder.Add(p1.PlayerId);
+            state.TurnOrder.Add(p2.PlayerId);
+            state.TurnOrder.Add(p3.PlayerId);
+            state.CurrentPlayerIndex = 0;
 
             var fsmState = new PlayerTurnState();
             fsmState.OnEnter(context);
 
-            // Act: play the Burn action card (transitions to RoundEndState)
-            var next = fsmState.HandleCommand(context, new PlayActionCardCommand(player.PlayerId, 0));
-            Assert.IsNotNull(next);
-            Assert.IsInstanceOfType(next, typeof(RoundEndState));
+            // Act
+            var next = fsmState.HandleCommand(context, new PlayActionCardCommand(p1.PlayerId, 0));
 
-            // RoundEndState.OnEnter immediately transitions to GameOverState when main deck is empty
-            context.CurrentFsmState = next;
-            next.OnEnter(context);
+            // Assert: returns null (stays in PlayerTurnState) and each player gets exactly 2 digits
+            Assert.IsNull(next);
+            Assert.AreEqual(2, p1.Pot.Count, "P1 should have 2 digits");
+            Assert.AreEqual(2, p2.Pot.Count, "P2 should have 2 digits");
+            Assert.AreEqual(2, p3.Pot.Count, "P3 should have 2 digits");
+            // Total digit count preserved
+            Assert.AreEqual(6, p1.Pot.Count + p2.Pot.Count + p3.Pot.Count);
+        }
 
-            Assert.AreEqual(GamePhase.GameOver, state.GamePhase);
+        [TestMethod]
+        public void Tilt_UnevenDistribution_ExtraCardsGoToSourcePlayerFirst()
+        {
+            // Arrange: 3 players with 7 total digits (7 / 3 = 2 base, 1 extra)
+            // The extra card should go to the player who played Tilt (p1 at index 0)
+            var host = new User("Host", "host-id");
+            using var state = new CardCounterGameState(host, _stateLoggerMock.Object);
+
+            // Use identity shuffle so results are predictable
+            int shuffleCall = 0;
+            _randomMock.Setup(r => r.GetRandomInt(It.IsAny<int>(), It.IsAny<int>(), RandomType.Secure))
+                .Returns(() => shuffleCall++);
+
+            var context = new CardCounterGameContext(state, _randomMock.Object, _loggerMock.Object);
+
+            var p1 = new PlayerState { PlayerId = "p1", DisplayName = "P1" };
+            var p2 = new PlayerState { PlayerId = "p2", DisplayName = "P2" };
+            var p3 = new PlayerState { PlayerId = "p3", DisplayName = "P3" };
+
+            p1.Pot.AddRange([1, 2, 3]);
+            p2.Pot.AddRange([4, 5]);
+            p3.Pot.AddRange([6, 7]);
+
+            p1.ActionHand.Add(new ActionCard(ActionType.Tilt));
+
+            state.GamePlayers[p1.PlayerId] = p1;
+            state.GamePlayers[p2.PlayerId] = p2;
+            state.GamePlayers[p3.PlayerId] = p3;
+            state.TurnOrder.Add(p1.PlayerId);
+            state.TurnOrder.Add(p2.PlayerId);
+            state.TurnOrder.Add(p3.PlayerId);
+            state.CurrentPlayerIndex = 0;
+
+            var fsmState = new PlayerTurnState();
+            fsmState.OnEnter(context);
+
+            // Act
+            var next = fsmState.HandleCommand(context, new PlayActionCardCommand(p1.PlayerId, 0));
+
+            // Assert: 7 total digits, 3 players → base 2, 1 extra → p1 gets 3, p2 gets 2, p3 gets 2
+            Assert.IsNull(next);
+            Assert.AreEqual(3, p1.Pot.Count, "P1 (card player) should get the extra digit");
+            Assert.AreEqual(2, p2.Pot.Count);
+            Assert.AreEqual(2, p3.Pot.Count);
+            Assert.AreEqual(7, p1.Pot.Count + p2.Pot.Count + p3.Pot.Count);
+        }
+
+        [TestMethod]
+        public void Tilt_ExtraCardsInTurnOrder_StartingFromSourcePlayer()
+        {
+            // Arrange: 3 players, 8 total digits (8 / 3 = 2 base, 2 extras)
+            // Source player is p2 (index 1), so extras go to p2 then p3
+            var host = new User("Host", "host-id");
+            using var state = new CardCounterGameState(host, _stateLoggerMock.Object);
+
+            int shuffleCall = 0;
+            _randomMock.Setup(r => r.GetRandomInt(It.IsAny<int>(), It.IsAny<int>(), RandomType.Secure))
+                .Returns(() => shuffleCall++);
+
+            var context = new CardCounterGameContext(state, _randomMock.Object, _loggerMock.Object);
+
+            var p1 = new PlayerState { PlayerId = "p1", DisplayName = "P1" };
+            var p2 = new PlayerState { PlayerId = "p2", DisplayName = "P2" };
+            var p3 = new PlayerState { PlayerId = "p3", DisplayName = "P3" };
+
+            p1.Pot.AddRange([1, 2]);
+            p2.Pot.AddRange([3, 4, 5]);
+            p3.Pot.AddRange([6, 7, 8]);
+
+            p2.ActionHand.Add(new ActionCard(ActionType.Tilt));
+
+            state.GamePlayers[p1.PlayerId] = p1;
+            state.GamePlayers[p2.PlayerId] = p2;
+            state.GamePlayers[p3.PlayerId] = p3;
+            state.TurnOrder.Add(p1.PlayerId);
+            state.TurnOrder.Add(p2.PlayerId);
+            state.TurnOrder.Add(p3.PlayerId);
+            state.CurrentPlayerIndex = 1; // p2 is the active player
+
+            var fsmState = new PlayerTurnState();
+            fsmState.OnEnter(context);
+
+            // Act
+            var next = fsmState.HandleCommand(context, new PlayActionCardCommand(p2.PlayerId, 0));
+
+            // Assert: 8 total, 3 players → base 2, 2 extras → p2 gets 3, p3 gets 3, p1 gets 2
+            Assert.IsNull(next);
+            Assert.AreEqual(2, p1.Pot.Count, "P1 should get the base amount (no extra)");
+            Assert.AreEqual(3, p2.Pot.Count, "P2 (card player) gets first extra");
+            Assert.AreEqual(3, p3.Pot.Count, "P3 gets second extra");
+            Assert.AreEqual(8, p1.Pot.Count + p2.Pot.Count + p3.Pot.Count);
+        }
+
+        [TestMethod]
+        public void Tilt_AllEmptyPots_ResultsInAllEmptyPots()
+        {
+            // Arrange: all players have empty pots — Tilt should be a no-op
+            var host = new User("Host", "host-id");
+            using var state = new CardCounterGameState(host, _stateLoggerMock.Object);
+            _randomMock.Setup(r => r.GetRandomInt(It.IsAny<int>(), It.IsAny<int>(), RandomType.Secure)).Returns(0);
+
+            var context = new CardCounterGameContext(state, _randomMock.Object, _loggerMock.Object);
+
+            var p1 = new PlayerState { PlayerId = "p1", DisplayName = "P1" };
+            var p2 = new PlayerState { PlayerId = "p2", DisplayName = "P2" };
+
+            p1.ActionHand.Add(new ActionCard(ActionType.Tilt));
+
+            state.GamePlayers[p1.PlayerId] = p1;
+            state.GamePlayers[p2.PlayerId] = p2;
+            state.TurnOrder.Add(p1.PlayerId);
+            state.TurnOrder.Add(p2.PlayerId);
+            state.CurrentPlayerIndex = 0;
+
+            var fsmState = new PlayerTurnState();
+            fsmState.OnEnter(context);
+
+            // Act
+            var next = fsmState.HandleCommand(context, new PlayActionCardCommand(p1.PlayerId, 0));
+
+            // Assert: stays in PlayerTurnState, all pots still empty
+            Assert.IsNull(next);
+            Assert.AreEqual(0, p1.Pot.Count);
+            Assert.AreEqual(0, p2.Pot.Count);
+        }
+
+        [TestMethod]
+        public void Tilt_RecordsActionCardPlay()
+        {
+            var host = new User("Host", "host-id");
+            using var state = new CardCounterGameState(host, _stateLoggerMock.Object);
+            _randomMock.Setup(r => r.GetRandomInt(It.IsAny<int>(), It.IsAny<int>(), RandomType.Secure)).Returns(0);
+
+            var context = new CardCounterGameContext(state, _randomMock.Object, _loggerMock.Object);
+
+            var p1 = new PlayerState { PlayerId = "p1", DisplayName = "P1" };
+            p1.Pot.AddRange([1, 2]);
+            p1.ActionHand.Add(new ActionCard(ActionType.Tilt));
+
+            state.GamePlayers[p1.PlayerId] = p1;
+            state.TurnOrder.Add(p1.PlayerId);
+            state.CurrentPlayerIndex = 0;
+
+            var fsmState = new PlayerTurnState();
+            fsmState.OnEnter(context);
+
+            fsmState.HandleCommand(context, new PlayActionCardCommand(p1.PlayerId, 0));
+
+            Assert.AreEqual(1, state.DiscardHistory.Count);
+            Assert.IsTrue(state.DiscardHistory[0].IsActionCard);
+            Assert.AreEqual("Tilt", state.DiscardHistory[0].Description);
         }
     }
 }

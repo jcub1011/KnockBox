@@ -267,6 +267,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM
             ActionType.Compd => "Comp'd",
             ActionType.NotMyMoney => "Not My Money",
             ActionType.Launder => "Launder",
+            ActionType.Tilt => "Tilt",
             _ => action.ToString()
         };
 
@@ -280,6 +281,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM
             ActionType.Compd => "🛡️",
             ActionType.NotMyMoney => "💸",
             ActionType.Launder => "🧺",
+            ActionType.Tilt => "🎰",
             _ => "🃏"
         };
 
