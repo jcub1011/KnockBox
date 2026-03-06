@@ -167,11 +167,14 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM
                 return;
 
             double potValue = player.PotValue;
+            double balanceBefore = player.Balance;
             player.Pot.Clear();
 
             if (potValue == 0 && card.Op == Operator.Divide)
             {
                 HandleDivisionByZero(player);
+                State.LastOperatorResult = new OperatorResultInfo(
+                    player.PlayerId, player.DisplayName, card.Op, balanceBefore, player.Balance);
                 return;
             }
 
@@ -185,6 +188,9 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM
                     : Math.Round(player.Balance / potValue, MidpointRounding.AwayFromZero),
                 _ => player.Balance + potValue
             };
+
+            State.LastOperatorResult = new OperatorResultInfo(
+                player.PlayerId, player.DisplayName, card.Op, balanceBefore, player.Balance);
         }
 
         // ── Discard history helpers ───────────────────────────────────────────

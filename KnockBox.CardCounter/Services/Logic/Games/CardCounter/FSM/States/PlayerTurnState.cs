@@ -255,6 +255,23 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
                 return null;
             }
 
+            // Self-targeting: apply the effect immediately without a reaction window.
+            if (cmd.PlayerId == cmd.TargetPlayerId)
+            {
+                context.Logger.LogInformation(
+                    "Blockable action [{a}]: self-targeted by [{id}]; applying immediately.", card.Action, cmd.PlayerId);
+                switch (card.Action)
+                {
+                    case ActionType.TurnTheTable:
+                        target.Pot.Reverse();
+                        break;
+                    case ActionType.Launder:
+                        // Self-launder: swapping the pot with itself is a no-op.
+                        break;
+                }
+                return new PlayerTurnState();
+            }
+
             return new WaitingForReactionState(cmd.PlayerId, cmd.TargetPlayerId, card);
         }
 
