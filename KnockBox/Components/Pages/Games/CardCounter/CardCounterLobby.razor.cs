@@ -90,8 +90,9 @@ namespace KnockBox.Components.Pages.Games.CardCounter
                 {
                     try
                     {
-                        if (GameState?.Context != null && GameState.GamePhase == GamePhase.Playing && IsHost())
-                            GameEngine.Tick(GameState.Context, DateTimeOffset.UtcNow);
+                        // TODO: Complete Timeout Migration
+                        // if (GameState?.Context != null && GameState.GamePhase == GamePhase.Playing && IsHost())
+                        //     GameEngine.Tick(GameState.Context, DateTimeOffset.UtcNow);
 
                         await InvokeAsync(StateHasChanged);
                     }
