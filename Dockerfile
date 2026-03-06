@@ -3,6 +3,9 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
 COPY KnockBox/KnockBox.csproj KnockBox/
+COPY KnockBox.Core/KnockBox.Core.csproj KnockBox.Core/
+COPY KnockBox.CardCounter/KnockBox.CardCounter.csproj KnockBox.CardCounter/
+COPY KnockBox.DiceSimulator/KnockBox.DiceSimulator.csproj KnockBox.DiceSimulator/
 RUN dotnet restore KnockBox/KnockBox.csproj
 
 COPY . .
