@@ -2462,8 +2462,9 @@
 .cc-operator-result-balances {
     display: flex;
     flex-direction: row;
+    flex-wrap: wrap;
     align-items: center;
-    justify-content: center;
+    justify-content: safe center;
     gap: 16px;
     width: 100%;
 }
