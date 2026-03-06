@@ -1097,6 +1097,7 @@
     flex-direction: column;
     gap: 10px;
     flex-shrink: 0;
+    overflow: visible;
 }
 
 .cc-hand-header {
@@ -1150,8 +1151,10 @@
 
 .cc-hand-cards {
     display: flex;
+    flex-direction: row;
     flex-wrap: wrap;
     gap: 10px;
+    padding: 0 24px;
 }
 
 /* ── Action Cards ─────────────────────────────────────────────────────────── */
@@ -1211,10 +1214,10 @@
     color: #f0f0f0;
     border: 1px solid rgba(247,213,71,0.6);
     border-radius: 8px;
-    padding: 8px 12px;
+    padding: 6px 8px;
     font-size: 0.78rem;
     font-weight: 500;
-    width: 200px;
+    width: 160px;
     text-align: center;
     white-space: normal;
     line-height: 1.45;
@@ -2280,6 +2283,7 @@
     margin: 0;
     text-transform: uppercase;
     text-shadow: 2px 2px 0 #000;
+    text-align: center;
     text-align: center;
 }
 
