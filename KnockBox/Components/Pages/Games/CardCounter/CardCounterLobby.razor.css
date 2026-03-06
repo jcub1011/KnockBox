@@ -578,8 +578,14 @@
 
 .cc-opponent-active {
     border-color: #f7d547 !important;
-    box-shadow: 0 0 20px rgba(247,213,71,0.4), 0 4px 12px rgba(0,0,0,0.4);
-    background: rgba(247,213,71,0.1);
+    box-shadow: 0 0 30px rgba(247,213,71,0.6), 0 4px 12px rgba(0,0,0,0.4);
+    background: rgba(247,213,71,0.12);
+    animation: opponentActiveGlow 2s ease-in-out infinite alternate;
+}
+
+@keyframes opponentActiveGlow {
+    from { box-shadow: 0 0 20px rgba(247,213,71,0.5), 0 4px 12px rgba(0,0,0,0.4); }
+    to   { box-shadow: 0 0 40px rgba(247,213,71,0.8), 0 4px 12px rgba(0,0,0,0.4); }
 }
 
 .cc-opponent-targeted {
@@ -864,7 +870,14 @@
 
 .cc-my-panel-active {
     border-color: #f7d547;
-    box-shadow: 0 0 20px rgba(247,213,71,0.3);
+    box-shadow: 0 0 30px rgba(247,213,71,0.5), 0 0 60px rgba(247,213,71,0.2);
+    background: rgba(247,213,71,0.07);
+    animation: activePanelGlow 2s ease-in-out infinite alternate;
+}
+
+@keyframes activePanelGlow {
+    from { box-shadow: 0 0 20px rgba(247,213,71,0.4), 0 0 40px rgba(247,213,71,0.15); }
+    to   { box-shadow: 0 0 40px rgba(247,213,71,0.7), 0 0 80px rgba(247,213,71,0.3); }
 }
 
 .cc-my-panel-stats {
@@ -1161,7 +1174,7 @@
     user-select: none;
     flex-shrink: 0;
     padding: 4px;
-    overflow: hidden;
+    overflow: visible;
     animation: actionCardSlideFadeIn 0.3s ease-out;
 }
 
@@ -1185,6 +1198,46 @@
 .cc-action-card:active:not(.cc-card-disabled) {
     transform: translate(0, 0);
     box-shadow: 2px 2px 0 rgba(0,0,0,0.7);
+}
+
+/* ── Card Tooltip ─────────────────────────────────────────────────────────── */
+
+.cc-card-tooltip {
+    position: absolute;
+    bottom: calc(100% + 10px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(15, 15, 25, 0.97);
+    color: #f0f0f0;
+    border: 1px solid rgba(247,213,71,0.6);
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 0.78rem;
+    font-weight: 500;
+    width: 200px;
+    text-align: center;
+    white-space: normal;
+    line-height: 1.45;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+    z-index: 100;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.6);
+}
+
+.cc-card-tooltip::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 7px solid transparent;
+    border-top-color: rgba(247,213,71,0.6);
+    border-bottom: 0;
+}
+
+.cc-action-card:hover .cc-card-tooltip {
+    opacity: 1;
 }
 
 .cc-card-disabled {
