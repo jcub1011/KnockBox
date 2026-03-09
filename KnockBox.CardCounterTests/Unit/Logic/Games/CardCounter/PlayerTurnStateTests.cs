@@ -45,6 +45,54 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             _state.CurrentPlayerIndex = index;
         }
 
+        // ── EnablePlayerTurnTimer = false ─────────────────────────────────────
+
+        [TestMethod]
+        public void Tick_WhenTimerDisabled_DoesNotAutoDraw()
+        {
+            var p1 = AddPlayer("p1", "Player 1");
+            var p2 = AddPlayer("p2", "Player 2");
+            SetCurrentPlayer(0);
+            _state.CurrentShoe.Push(new NumberCard(7));
+            _state.Config.EnablePlayerTurnTimer = false;
+
+            var fsmState = new PlayerTurnState();
+            fsmState.OnEnter(_context);
+
+            // Simulate well past the configured timeout
+            var far = DateTimeOffset.UtcNow.AddHours(1);
+            var next = fsmState.Tick(_context, far);
+
+            Assert.IsNull(next, "Tick should be a no-op when the player turn timer is disabled.");
+            Assert.AreEqual(0, p1.Pot.Count, "No card should be auto-drawn when the timer is disabled.");
+        }
+
+        [TestMethod]
+        public void IsTimerVisible_WhenTimerEnabled_ReturnsTrue()
+        {
+            AddPlayer("p1", "Player 1");
+            SetCurrentPlayer(0);
+            _state.Config.EnablePlayerTurnTimer = true;
+
+            var fsmState = new PlayerTurnState();
+            fsmState.OnEnter(_context);
+
+            Assert.IsTrue(fsmState.IsTimerVisible(_context));
+        }
+
+        [TestMethod]
+        public void IsTimerVisible_WhenTimerDisabled_ReturnsFalse()
+        {
+            AddPlayer("p1", "Player 1");
+            SetCurrentPlayer(0);
+            _state.Config.EnablePlayerTurnTimer = false;
+
+            var fsmState = new PlayerTurnState();
+            fsmState.OnEnter(_context);
+
+            Assert.IsFalse(fsmState.IsTimerVisible(_context));
+        }
+
         // ── DrawCard ──────────────────────────────────────────────────────────
 
         [TestMethod]

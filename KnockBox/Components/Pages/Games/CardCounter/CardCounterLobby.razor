@@ -19,7 +19,7 @@ else
 {
     <div class="cc-page">
 
-        @if (GameState.Context?.CurrentFsmState is ITimedCardCounterGameState timedState)
+        @if (GameState.Context?.CurrentFsmState is ITimedCardCounterGameState timedState && timedState.IsTimerVisible(GameState.Context))
         {
             var remaining = timedState.GetRemainingTime(GameState.Context, DateTimeOffset.UtcNow);
             var seconds = (int)Math.Ceiling(remaining.TotalSeconds);
@@ -136,6 +136,10 @@ else
                                 <label class="cc-config-label">
                                     Player Turn Timeout (ms):
                                     <input type="number" class="cc-config-input" @bind="GameState.Config.PlayerTurnTimeoutMs" @bind:after="NotifyConfigChanged" />
+                                </label>
+                                <label class="cc-config-label cc-config-label-row">
+                                    <span>Enable Player Turn Timer:</span>
+                                    <input type="checkbox" class="cc-config-checkbox" @bind="GameState.Config.EnablePlayerTurnTimer" @bind:after="NotifyConfigChanged" />
                                 </label>
                                 <label class="cc-config-label">
                                     Buy-in Timeout (ms):
