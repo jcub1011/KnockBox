@@ -238,6 +238,7 @@ namespace KnockBox.Services.State.Games.CardCounter
         public int TotalPassesPerPlayer { get; set; } = 3;
         public int MinShoeSize { get; set; } = 12;
         public int MaxShoeSize { get; set; } = 20;
+        public int PlayerTurnTimeoutMs { get; set; } = 15000;
         public int BuyInTimeoutMs { get; set; } = 20000;
         public int RoundEndTimeoutMs { get; set; } = 20000;
         public int FeelingLuckyChainTimeoutMs { get; set; } = 12000;

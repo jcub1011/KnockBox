@@ -6,10 +6,13 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
     /// <summary>
     /// Active play phase: the current player may play action cards, fold, draw, or pass.
     /// </summary>
-    public sealed class PlayerTurnState : ICardCounterGameState
+    public sealed class PlayerTurnState : ITimedCardCounterGameState
     {
+        private DateTimeOffset _expiresAt;
+
         public void OnEnter(CardCounterGameContext context)
         {
+            _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.Config.PlayerTurnTimeoutMs);
             context.State.GamePhase = GamePhase.Playing;
             context.State.PendingReaction = null;
             context.State.FeelingLuckyTargetId = null;
@@ -30,6 +33,17 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
                 _ => null
             };
         }
+
+        public ICardCounterGameState? Tick(CardCounterGameContext context, DateTimeOffset now)
+        {
+            if (now < _expiresAt) return null;
+            var currentPlayerId = context.CurrentPlayerId;
+            if (currentPlayerId is null) return null;
+            context.Logger.LogInformation("PlayerTurn: auto-drawing for [{id}] after timeout.", currentPlayerId);
+            return HandleDraw(context, new DrawCardCommand(currentPlayerId));
+        }
+
+        public TimeSpan GetRemainingTime(CardCounterGameContext context, DateTimeOffset now) => _expiresAt - now;
 
         // ── Draw ──────────────────────────────────────────────────────────────
 

@@ -134,6 +134,10 @@ else
                                     <input type="number" class="cc-config-input" @bind="GameState.Config.WaitingForReactionTimeoutMs" @bind:after="NotifyConfigChanged" />
                                 </label>
                                 <label class="cc-config-label">
+                                    Player Turn Timeout (ms):
+                                    <input type="number" class="cc-config-input" @bind="GameState.Config.PlayerTurnTimeoutMs" @bind:after="NotifyConfigChanged" />
+                                </label>
+                                <label class="cc-config-label">
                                     Buy-in Timeout (ms):
                                     <input type="number" class="cc-config-input" @bind="GameState.Config.BuyInTimeoutMs" @bind:after="NotifyConfigChanged" />
                                 </label>
