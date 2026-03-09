@@ -290,7 +290,7 @@ public interface INavigationService
 
 ### IDBackedCircuitHandler
 
-A scoped `CircuitHandler` that bridges Blazor circuit lifecycle events to `IIDBackedServiceProvider`. On `OnConnectionUpAsync` it calls `NotifyCircuitActive`, and on `OnCircuitClosedAsync` it calls `NotifyCircuitClosed`, using the id from `IUserService.CurrentUser`. When all circuits for a user close, `IIDBackedServiceProvider` starts its 5-minute disposal timer; if the user reconnects within that window the timer is cancelled and the per-user services (including `GameSessionState`) are retained.
+A scoped `CircuitHandler` that bridges Blazor circuit lifecycle events to `IIDBackedServiceProvider`. On `OnConnectionUpAsync` it calls `NotifyCircuitActive`, and on `OnCircuitClosedAsync` it calls `NotifyCircuitClosed`, using the id from `IUserService.CurrentUser`. When all circuits for a user close, `IIDBackedServiceProvider` starts its 1-minute disposal timer; if the user reconnects within that window the timer is cancelled and the per-user services (including `GameSessionState`) are retained.
 
 ### DisposableComponent
 
@@ -483,8 +483,8 @@ Players cannot join a lobby once the game state's `IsJoinable` is set to `false`
 ### Player Disconnect
 
 1. A player's browser tab closes or their circuit drops.
-2. `IDBackedCircuitHandler.OnCircuitClosedAsync` calls `NotifyCircuitClosed`, which starts `IIDBackedServiceProvider`'s 5-minute grace period timer for the user's id.
-3. If the user reconnects within 5 minutes (new circuit with the same session id), `NotifyCircuitActive` cancels the timer and the `GameSessionState` is retained — the player rejoins the game lobby seamlessly.
+2. `IDBackedCircuitHandler.OnCircuitClosedAsync` calls `NotifyCircuitClosed`, which starts `IIDBackedServiceProvider`'s 1-minute grace period timer for the user's id.
+3. If the user reconnects within 1 minute (new circuit with the same session id), `NotifyCircuitActive` cancels the timer and the `GameSessionState` is retained — the player rejoins the game lobby seamlessly.
 4. If the timer expires, `IDBackedServiceProvider` disposes all cached services for that id, including `GameSessionState`. `GameSessionState.Dispose()` calls `TakeCurrentSession()?.Dispose()`, which disposes the `UserRegistration`. The unregistration token disposes, removing the player from the game state and notifying subscribers. The `PlayerUnregistered` event is also fired, allowing game engines to react (e.g., `CardCounterGameEngine` uses this to advance the turn order).
 5. The host is fixed — there is no host transfer on disconnect.
 
@@ -605,7 +605,7 @@ _stateSubscription?.Dispose();
 
 **Fixed host.** The host is the player who created the lobby and is set at creation time. There is no host transfer if the host disconnects.
 
-**5-minute disconnect grace period.** When a circuit drops, the player is not immediately removed. `IIDBackedServiceProvider` starts a 5-minute timer before disposing the user's cached services (including `GameSessionState`). If the user reconnects within that window their session is preserved seamlessly.
+**1-minute disconnect grace period.** When a circuit drops, the player is not immediately removed. `IIDBackedServiceProvider` starts a 1-minute timer before disposing the user's cached services (including `GameSessionState`). If the user reconnects within that window their session is preserved seamlessly.
 
 **JS interop for client storage and file export.** Browser `localStorage` is used for persisting the user's display name across sessions, and a JS module handles CSV file downloads for the Dice Simulator.
 

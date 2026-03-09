@@ -46,12 +46,8 @@ namespace KnockBox.Components.Pages.Home
         {
             try
             {
-                // Initialize the user first so the session service can resolve the user id
-                // before clearing any lingering session.
                 if (UserService.CurrentUser is null)
                     await UserService.InitializeCurrentUserAsync(ComponentDetached);
-                // Ensures the user isn't left in a session when navigating home
-                GameSessionService.LeaveCurrentSession(false);
                 await base.OnInitializedAsync();
             }
             catch (Exception ex)
@@ -85,6 +81,8 @@ namespace KnockBox.Components.Pages.Home
                 return;
             }
 
+            // Leave any prior session before claiming the new slot.
+            GameSessionService.LeaveCurrentSession(navigateHome: false);
             GameSessionService.SetCurrentSession(registration);
         }
 
@@ -113,6 +111,8 @@ namespace KnockBox.Components.Pages.Home
                 _ = LobbyService.CloseLobbyAsync(user, lobby, CancellationToken.None);
             });
 
+            // Leave any prior session before claiming the new slot.
+            GameSessionService.LeaveCurrentSession(navigateHome: false);
             GameSessionService.SetCurrentSession(new UserRegistration(user, disposeAction, createResult.Value));
         }
     }

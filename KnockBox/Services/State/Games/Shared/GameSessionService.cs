@@ -13,7 +13,7 @@ namespace KnockBox.Services.State.Games.Shared
     /// <see cref="GameSessionState"/> instance that is cached by
     /// <see cref="IIDBackedServiceProvider"/> under the current user's id, so the state
     /// survives Blazor circuit breaks (temporary disconnects or page refreshes) for up to
-    /// the provider's configured disposal grace period (default 5 minutes).
+    /// the provider's configured disposal grace period (default 1 minute).
     /// </para>
     /// <para>
     /// Navigation remains here because <see cref="INavigationService"/> is circuit-scoped and

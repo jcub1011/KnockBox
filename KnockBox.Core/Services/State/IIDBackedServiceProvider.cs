@@ -3,7 +3,7 @@ namespace KnockBox.Services.State
     /// <summary>
     /// A singleton service that wraps <see cref="IServiceProvider"/> and caches resolved services
     /// by a caller-supplied string identifier. Services are shared across all circuits that present
-    /// the same id, and are only disposed 5 minutes after the last circuit for that id has closed.
+    /// the same id, and are only disposed 1 minute after the last circuit for that id has closed.
     /// </summary>
     public interface IIDBackedServiceProvider
     {
@@ -28,7 +28,7 @@ namespace KnockBox.Services.State
         /// <summary>
         /// Notifies that the circuit identified by <paramref name="circuitId"/> has permanently closed
         /// for the given <paramref name="id"/>. When the last active circuit for an id is removed a
-        /// 5-minute disposal timer is started; if a new request arrives within that window the timer
+        /// 1-minute disposal timer is started; if a new request arrives within that window the timer
         /// is cancelled and the services are retained.
         /// </summary>
         /// <param name="id">The caller-supplied identifier.</param>

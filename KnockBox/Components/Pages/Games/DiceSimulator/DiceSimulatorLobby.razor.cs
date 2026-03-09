@@ -31,6 +31,12 @@ namespace KnockBox.Components.Pages.Games.DiceSimulator
 
         protected override async Task OnInitializedAsync()
         {
+            // Ensure the user is initialized so GameSessionService can look up the
+            // ID-backed session — required for page-refresh rejoins where the user
+            // service starts uninitialized on the fresh circuit.
+            if (UserService.CurrentUser is null)
+                await UserService.InitializeCurrentUserAsync(ComponentDetached);
+
             if (!GameSessionService.TryGetCurrentSession(out var session))
             {
                 Logger.LogWarning("User [{userId}] attempted to enter room [{code}] without a session set.", UserService.CurrentUser?.Id ?? "Unknown", ObfuscatedRoomCode);
