@@ -116,7 +116,6 @@ namespace KnockBox.Components.Pages.Games.CardCounter
             if (GameState != null)
                 GameState.OnStateDisposed -= HandleGameStateDisposed;
             _stateSubscription?.Dispose();
-            GameSessionService.LeaveCurrentSession(false);
             base.Dispose();
         }
 

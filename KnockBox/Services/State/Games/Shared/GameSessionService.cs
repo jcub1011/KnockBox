@@ -6,25 +6,56 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace KnockBox.Services.State.Games.Shared
 {
+    /// <summary>
+    /// Scoped (per-circuit) implementation of <see cref="IGameSessionService"/>.
+    /// <para>
+    /// Acts as a thin proxy: all persistent session state lives in a
+    /// <see cref="GameSessionState"/> instance that is cached by
+    /// <see cref="IIDBackedServiceProvider"/> under the current user's id, so the state
+    /// survives Blazor circuit breaks (temporary disconnects or page refreshes) for up to
+    /// the provider's configured disposal grace period (default 5 minutes).
+    /// </para>
+    /// <para>
+    /// Navigation remains here because <see cref="INavigationService"/> is circuit-scoped and
+    /// must not be captured inside the long-lived <see cref="GameSessionState"/>.
+    /// </para>
+    /// </summary>
     public class GameSessionService(
-        INavigationService navigationService, 
+        IIDBackedServiceProvider idBackedServiceProvider,
+        INavigationService navigationService,
         IUserService userService,
         ILogger<GameSessionService> logger) : IGameSessionService
     {
-        private UserRegistration? _currentSession = null;
+        /// <summary>
+        /// Returns the <see cref="GameSessionState"/> cached for the current user, or
+        /// <see langword="null"/> when the user identity has not yet been initialized.
+        /// </summary>
+        private GameSessionState? GetSessionState() =>
+            userService.CurrentUser?.Id is string id
+                ? idBackedServiceProvider.GetService<GameSessionState>(id)
+                : null;
 
         public bool TryGetCurrentSession([NotNullWhen(true)] out UserRegistration? currentSession)
         {
-            currentSession = _currentSession;
-            return _currentSession is not null;
+            var state = GetSessionState();
+            if (state is null)
+            {
+                currentSession = null;
+                return false;
+            }
+
+            return state.TryGetCurrentSession(out currentSession);
         }
 
         public Result LeaveCurrentSession(bool navigateHome = true)
         {
-            var previousSession = Interlocked.Exchange(ref _currentSession, null);
-            previousSession?.Dispose(); // Leaves the lobby
+            var previousSession = GetSessionState()?.TakeCurrentSession();
+            previousSession?.Dispose(); // Removes the user from the game state
 
-            logger.LogInformation("User [{userId}] left session [{sessionId}].", userService.CurrentUser?.Id ?? "Unknown", previousSession?.LobbyRegistration.Uri);
+            logger.LogInformation(
+                "User [{userId}] left session [{sessionId}].",
+                userService.CurrentUser?.Id ?? "Unknown",
+                previousSession?.LobbyRegistration.Uri);
 
             try
             {
@@ -43,12 +74,17 @@ namespace KnockBox.Services.State.Games.Shared
             if (session is null)
                 return Result.FromError("Unable to join session.", "Session cannot be null.");
 
-            var previousSession = Interlocked.CompareExchange(ref _currentSession, session, null);
+            var state = GetSessionState();
+            if (state is null)
+                return Result.FromError("Unable to join session.", "User identity not yet initialized.");
 
-            if (previousSession is not null)
+            if (!state.TrySetCurrentSession(session))
                 return Result.FromError("Leave the current session before setting a new one.");
 
-            logger.LogInformation("User [{userId}] entered session [{sessionId}].", userService.CurrentUser?.Id ?? "Unknown", previousSession?.LobbyRegistration.Uri);
+            logger.LogInformation(
+                "User [{userId}] entered session [{sessionId}].",
+                userService.CurrentUser?.Id ?? "Unknown",
+                session.LobbyRegistration.Uri);
 
             try
             {

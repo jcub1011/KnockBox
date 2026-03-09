@@ -74,7 +74,7 @@ namespace KnockBox.Components.Pages.Games.DiceSimulator
         {
             if (GameState.KickedPlayers.Contains(UserService.CurrentUser))
             {
-                GameSessionService.LeaveCurrentSession();
+                GameSessionService.LeaveCurrentSession(navigateHome: true);
             }
 
             base.OnAfterRender(firstRender);
@@ -96,7 +96,6 @@ namespace KnockBox.Components.Pages.Games.DiceSimulator
                 GameState.OnStateDisposed -= HandleStateDisposed;
             }
             _stateSubscription?.Dispose();
-            GameSessionService.LeaveCurrentSession(false);
         }
 
         private static bool TryExtractObfuscatedRoomCode(string uri, [NotNullWhen(true)] out string? obfuscatedRoomCode)
