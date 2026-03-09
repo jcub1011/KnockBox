@@ -4,6 +4,7 @@
 @using KnockBox.Services.State.Users
 @using KnockBox.Services.State.Games.CardCounter
 @using KnockBox.Services.State.Games.CardCounter.Data
+@using KnockBox.Services.Logic.Games.CardCounter.FSM
 
 <PageTitle>Card Counter</PageTitle>
 
@@ -17,6 +18,20 @@
 else
 {
     <div class="cc-page">
+
+        @if (GameState.Config.EnableActionTimer && GameState.Context?.CurrentFsmState is ITimedCardCounterGameState timedState)
+        {
+            var remaining = timedState.GetRemainingTime(GameState.Context, DateTimeOffset.UtcNow);
+            var seconds = (int)Math.Ceiling(remaining.TotalSeconds);
+            if (seconds >= 0)
+            {
+                <div class="cc-timer-container">
+                    <div class="cc-timer-card @(seconds < 5 ? "cc-timer-urgent" : "")">
+                        ⏳ @seconds
+                    </div>
+                </div>
+            }
+        }
 
         @* ── Lobby Phase ── *@
         @if (GameState.IsJoinable)
@@ -99,8 +114,32 @@ else
                                     <input type="number" class="cc-config-input" @bind="GameState.Config.MaxShoeSize" @bind:after="NotifyConfigChanged" />
                                 </label>
                                 <label class="cc-config-label">
-                                    Action Timeout (ms):
-                                    <input type="number" class="cc-config-input" @bind="GameState.Config.ActionResponseTimeoutMs" @bind:after="NotifyConfigChanged" />
+                                    Feeling Lucky Timeout (ms):
+                                    <input type="number" class="cc-config-input" @bind="GameState.Config.FeelingLuckyChainTimeoutMs" @bind:after="NotifyConfigChanged" />
+                                </label>
+                                <label class="cc-config-label">
+                                    Make My Luck Timeout (ms):
+                                    <input type="number" class="cc-config-input" @bind="GameState.Config.MakeMyLuckTimeoutMs" @bind:after="NotifyConfigChanged" />
+                                </label>
+                                <label class="cc-config-label">
+                                    Not My Money Timeout (ms):
+                                    <input type="number" class="cc-config-input" @bind="GameState.Config.NotMyMoneyTimeoutMs" @bind:after="NotifyConfigChanged" />
+                                </label>
+                                <label class="cc-config-label">
+                                    Skim Timeout (ms):
+                                    <input type="number" class="cc-config-input" @bind="GameState.Config.SkimTimeoutMs" @bind:after="NotifyConfigChanged" />
+                                </label>
+                                <label class="cc-config-label">
+                                    Reaction Timeout (ms):
+                                    <input type="number" class="cc-config-input" @bind="GameState.Config.WaitingForReactionTimeoutMs" @bind:after="NotifyConfigChanged" />
+                                </label>
+                                <label class="cc-config-label">
+                                    Player Turn Timeout (ms):
+                                    <input type="number" class="cc-config-input" @bind="GameState.Config.PlayerTurnTimeoutMs" @bind:after="NotifyConfigChanged" />
+                                </label>
+                                <label class="cc-config-label cc-config-label-row">
+                                    <span>Enable Action Timer:</span>
+                                    <input type="checkbox" class="cc-config-checkbox" @bind="GameState.Config.EnableActionTimer" @bind:after="NotifyConfigChanged" />
                                 </label>
                                 <label class="cc-config-label">
                                     Buy-in Timeout (ms):

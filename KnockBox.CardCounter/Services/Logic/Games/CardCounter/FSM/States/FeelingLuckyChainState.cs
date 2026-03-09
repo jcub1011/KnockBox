@@ -7,7 +7,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
     /// pass the force to the next player with another Feeling Lucky card, or play Comp'd.
     /// Once resolved the game resumes from the originator.
     /// </summary>
-    public sealed class FeelingLuckyChainState : ICardCounterGameState
+    public sealed class FeelingLuckyChainState : ITimedCardCounterGameState
     {
         private readonly string _originatorId;
         private string _currentTargetId;
@@ -21,7 +21,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
 
         public void OnEnter(CardCounterGameContext context)
         {
-            _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.Config.ActionResponseTimeoutMs);
+            _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.Config.FeelingLuckyChainTimeoutMs);
             context.State.FeelingLuckyTargetId = _currentTargetId;
             context.Logger.LogInformation(
                 "FSM → FeelingLuckyChainState: originator [{orig}], target [{tgt}].",
@@ -52,6 +52,8 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
             }
             return null;
         }
+
+        public TimeSpan GetRemainingTime(CardCounterGameContext context, DateTimeOffset now) => _expiresAt - now;
 
         private ICardCounterGameState? HandleTargetAction(
             CardCounterGameContext context, PlayActionCardCommand cmd)
@@ -101,7 +103,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
                     "FeelingLucky: chain passed from [{from}] to [{to}].", _currentTargetId, nextTarget);
                 _currentTargetId = nextTarget;
                 context.State.FeelingLuckyTargetId = _currentTargetId;
-                _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.Config.ActionResponseTimeoutMs);
+                _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.Config.FeelingLuckyChainTimeoutMs);
                 return null; // stay in this state, target changed
             }
 

@@ -238,9 +238,15 @@ namespace KnockBox.Services.State.Games.CardCounter
         public int TotalPassesPerPlayer { get; set; } = 3;
         public int MinShoeSize { get; set; } = 12;
         public int MaxShoeSize { get; set; } = 20;
-        public int ActionResponseTimeoutMs { get; set; } = 12000;
+        public int PlayerTurnTimeoutMs { get; set; } = 15000;
         public int BuyInTimeoutMs { get; set; } = 20000;
         public int RoundEndTimeoutMs { get; set; } = 20000;
+        public int FeelingLuckyChainTimeoutMs { get; set; } = 12000;
+        public int MakeMyLuckTimeoutMs { get; set; } = 12000;
+        public int NotMyMoneyTimeoutMs { get; set; } = 12000;
+        public int SkimTimeoutMs { get; set; } = 12000;
+        public int WaitingForReactionTimeoutMs { get; set; } = 12000;
+        public bool EnableActionTimer { get; set; } = true;
         public bool ShowMakeMyMoneyOperator { get; set; } = true;
         public bool FlipWinCondition { get; set; } = false;
     }

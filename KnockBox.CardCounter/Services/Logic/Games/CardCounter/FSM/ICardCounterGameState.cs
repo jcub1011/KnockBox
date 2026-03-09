@@ -18,6 +18,17 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM
         /// or <c>null</c> if the state should remain unchanged.
         /// </summary>
         ICardCounterGameState? HandleCommand(CardCounterGameContext context, CardCounterCommand command);
+    }
+
+    public interface ITimedCardCounterGameState : ICardCounterGameState
+    {
+        /// <summary>
+        /// Gets the time remaining in this state before timeout.
+        /// </summary>
+        /// <param name="context"></param>
+        /// <param name="now"></param>
+        /// <returns></returns>
+        TimeSpan GetRemainingTime(CardCounterGameContext context, DateTimeOffset now);
 
         /// <summary>
         /// Called periodically to handle time-based transitions (e.g., action-response timeouts).

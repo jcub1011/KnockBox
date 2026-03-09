@@ -7,7 +7,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
     /// Transitions to <see cref="RoundEndState"/> (which deals action cards and the first shoe)
     /// once all players have set their buy-in.
     /// </summary>
-    public sealed class BuyInState : ICardCounterGameState
+    public sealed class BuyInState : ITimedCardCounterGameState
     {
         private DateTimeOffset _expirationTime;
 
@@ -62,5 +62,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
 
             return new RoundEndState();
         }
+
+        public TimeSpan GetRemainingTime(CardCounterGameContext context, DateTimeOffset now) => _expirationTime - now;
     }
 }

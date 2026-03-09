@@ -5,7 +5,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
     /// The player sees the top-3 shoe cards in <see cref="PlayerState.PrivateReveal"/> and
     /// must select an order via <see cref="SubmitReorderCommand"/>.
     /// </summary>
-    public sealed class MakeMyLuckState : ICardCounterGameState
+    public sealed class MakeMyLuckState : ITimedCardCounterGameState
     {
         private readonly string _playerId;
         private DateTimeOffset _expiresAt;
@@ -17,7 +17,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
 
         public void OnEnter(CardCounterGameContext context)
         {
-            _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.Config.ActionResponseTimeoutMs);
+            _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.Config.MakeMyLuckTimeoutMs);
             context.Logger.LogInformation(
                 "FSM → MakeMyLuckState for [{id}]. Expires {exp}.", _playerId, _expiresAt);
         }
@@ -69,6 +69,8 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
             var player = context.GetPlayer(_playerId);
             return ResolveDefault(context, player);
         }
+
+        public TimeSpan GetRemainingTime(CardCounterGameContext context, DateTimeOffset now) => _expiresAt - now;
 
         private static PlayerTurnState ResolveDefault(CardCounterGameContext context, State.Games.CardCounter.Data.PlayerState? player)
         {
