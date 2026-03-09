@@ -12,7 +12,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
 
         public void OnEnter(CardCounterGameContext context)
         {
-            _expirationTime = DateTimeOffset.Now;
+            _expirationTime = DateTimeOffset.Now.AddMilliseconds(context.Config.RoundEndTimeoutMs);
             context.Logger.LogInformation("FSM → RoundEndState (shoe {n} exhausted).", context.State.ShoeIndex);
 
             var hasShoe = context.DealNextShoe();

@@ -114,8 +114,24 @@ else
                                     <input type="number" class="cc-config-input" @bind="GameState.Config.MaxShoeSize" @bind:after="NotifyConfigChanged" />
                                 </label>
                                 <label class="cc-config-label">
-                                    Action Timeout (ms):
-                                    <input type="number" class="cc-config-input" @bind="GameState.Config.ActionResponseTimeoutMs" @bind:after="NotifyConfigChanged" />
+                                    Feeling Lucky Timeout (ms):
+                                    <input type="number" class="cc-config-input" @bind="GameState.Config.FeelingLuckyChainTimeoutMs" @bind:after="NotifyConfigChanged" />
+                                </label>
+                                <label class="cc-config-label">
+                                    Make My Luck Timeout (ms):
+                                    <input type="number" class="cc-config-input" @bind="GameState.Config.MakeMyLuckTimeoutMs" @bind:after="NotifyConfigChanged" />
+                                </label>
+                                <label class="cc-config-label">
+                                    Not My Money Timeout (ms):
+                                    <input type="number" class="cc-config-input" @bind="GameState.Config.NotMyMoneyTimeoutMs" @bind:after="NotifyConfigChanged" />
+                                </label>
+                                <label class="cc-config-label">
+                                    Skim Timeout (ms):
+                                    <input type="number" class="cc-config-input" @bind="GameState.Config.SkimTimeoutMs" @bind:after="NotifyConfigChanged" />
+                                </label>
+                                <label class="cc-config-label">
+                                    Reaction Timeout (ms):
+                                    <input type="number" class="cc-config-input" @bind="GameState.Config.WaitingForReactionTimeoutMs" @bind:after="NotifyConfigChanged" />
                                 </label>
                                 <label class="cc-config-label">
                                     Buy-in Timeout (ms):

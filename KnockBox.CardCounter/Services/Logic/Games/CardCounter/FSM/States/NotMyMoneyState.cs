@@ -21,7 +21,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
 
         public void OnEnter(CardCounterGameContext context)
         {
-            _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.Config.ActionResponseTimeoutMs);
+            _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.Config.NotMyMoneyTimeoutMs);
             context.State.IsNotMyMoneySelecting = true;
             context.State.PendingNotMyMoneyOperator = _operatorCard.Op;
             context.Logger.LogInformation(
