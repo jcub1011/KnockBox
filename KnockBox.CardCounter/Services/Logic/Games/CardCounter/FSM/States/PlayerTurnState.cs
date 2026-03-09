@@ -40,7 +40,10 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
             var currentPlayerId = context.CurrentPlayerId;
             if (currentPlayerId is null) return null;
             context.Logger.LogInformation("PlayerTurn: auto-drawing for [{id}] after timeout.", currentPlayerId);
-            return HandleDraw(context, new DrawCardCommand(currentPlayerId));
+            // Always return a state so the engine calls TransitionTo, which invokes OnEnter
+            // and resets _expiresAt for the next player's turn. If the draw itself triggers a
+            // state change (e.g. RoundEndState), pass that through; otherwise start a fresh turn.
+            return HandleDraw(context, new DrawCardCommand(currentPlayerId)) ?? new PlayerTurnState();
         }
 
         public TimeSpan GetRemainingTime(CardCounterGameContext context, DateTimeOffset now) => _expiresAt - now;
