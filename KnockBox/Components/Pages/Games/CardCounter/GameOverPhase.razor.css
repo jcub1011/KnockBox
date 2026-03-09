@@ -1,0 +1,103 @@
+/* ── Game Over ────────────────────────────────────────────────────────────── */
+
+.cc-gameover-area {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+}
+
+.cc-gameover-panel {
+    background: rgba(0,0,0,0.5);
+    border: 3px solid #f7d547;
+    border-radius: 16px;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.6);
+    padding: 32px 48px;
+    max-width: 600px;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    align-items: center;
+}
+
+.cc-gameover-title {
+    font-size: 2.2rem;
+    font-weight: 900;
+    color: #f7d547;
+    text-shadow: 3px 3px 0 #000;
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    margin: 0;
+}
+
+.cc-gameover-subtitle {
+    color: rgba(255,255,255,0.6);
+    font-style: italic;
+    margin: 0;
+    font-size: 0.95rem;
+}
+
+.cc-leaderboard {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.cc-leaderboard-row {
+    display: flex;
+    align-items: center;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 12px;
+    background: rgba(255,255,255,0.05);
+    border: 2px solid rgba(255,255,255,0.1);
+    border-radius: 10px;
+    padding: 12px 18px;
+    transition: background 0.2s;
+}
+
+.cc-leaderboard-winner {
+    background: rgba(247,213,71,0.12);
+    border-color: #f7d547;
+    box-shadow: 0 0 16px rgba(247,213,71,0.25);
+}
+
+.cc-leaderboard-me {
+    border-color: #27ae60;
+    background: rgba(39,174,96,0.08);
+}
+
+.cc-rank {
+    font-size: 1.4rem;
+    min-width: 32px;
+    text-align: center;
+}
+
+.cc-player-result-name {
+    flex: 1;
+    font-weight: 800;
+    font-size: 1rem;
+    color: #fff;
+}
+
+.cc-player-result-balance {
+    font-family: var(--font-mono);
+    font-weight: 900;
+    font-size: 1.2rem;
+}
+
+.cc-player-result-abs {
+    font-size: 0.8rem;
+    color: rgba(255,255,255,0.4);
+    font-family: var(--font-mono);
+}
+
+.cc-gameover-actions {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
