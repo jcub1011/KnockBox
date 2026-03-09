@@ -31,8 +31,6 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
             };
         }
 
-        public ICardCounterGameState? Tick(CardCounterGameContext context, DateTimeOffset now) => null;
-
         // ── Draw ──────────────────────────────────────────────────────────────
 
         private ICardCounterGameState? HandleDraw(CardCounterGameContext context, DrawCardCommand cmd)

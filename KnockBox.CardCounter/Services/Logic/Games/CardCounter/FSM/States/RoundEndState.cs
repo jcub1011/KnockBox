@@ -6,7 +6,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
     /// Transitions to <see cref="PlayerTurnState"/> if a shoe was dealt, or
     /// <see cref="GameOverState"/> if the main deck is now empty.
     /// </summary>
-    public sealed class RoundEndState : ICardCounterGameState
+    public sealed class RoundEndState : ITimedCardCounterGameState
     {
         private DateTimeOffset _expirationTime;
 
@@ -66,6 +66,8 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
 
             return new PlayerTurnState();
         }
+
+        public TimeSpan GetRemainingTime(CardCounterGameContext context, DateTimeOffset now) => _expirationTime - now;
 
         private static void HandleDiscard(CardCounterGameContext context, DiscardActionCardsCommand cmd)
         {

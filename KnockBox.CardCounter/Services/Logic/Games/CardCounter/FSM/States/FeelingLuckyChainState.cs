@@ -7,7 +7,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
     /// pass the force to the next player with another Feeling Lucky card, or play Comp'd.
     /// Once resolved the game resumes from the originator.
     /// </summary>
-    public sealed class FeelingLuckyChainState : ICardCounterGameState
+    public sealed class FeelingLuckyChainState : ITimedCardCounterGameState
     {
         private readonly string _originatorId;
         private string _currentTargetId;
@@ -52,6 +52,8 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
             }
             return null;
         }
+
+        public TimeSpan GetRemainingTime(CardCounterGameContext context, DateTimeOffset now) => _expiresAt - now;
 
         private ICardCounterGameState? HandleTargetAction(
             CardCounterGameContext context, PlayActionCardCommand cmd)

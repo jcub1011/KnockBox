@@ -15,7 +15,5 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
         }
 
         public ICardCounterGameState? HandleCommand(CardCounterGameContext context, CardCounterCommand command) => null;
-
-        public ICardCounterGameState? Tick(CardCounterGameContext context, DateTimeOffset now) => null;
     }
 }

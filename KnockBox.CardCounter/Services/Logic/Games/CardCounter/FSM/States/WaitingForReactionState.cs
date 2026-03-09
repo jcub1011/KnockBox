@@ -7,7 +7,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
     /// to respond. The target may play Comp'd to negate the effect or accept it.
     /// A server-side timeout causes automatic acceptance.
     /// </summary>
-    public sealed class WaitingForReactionState : ICardCounterGameState
+    public sealed class WaitingForReactionState : ITimedCardCounterGameState
     {
         private readonly string _sourceId;
         private readonly string _targetId;
@@ -80,6 +80,8 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
             }
             return null;
         }
+
+        public TimeSpan GetRemainingTime(CardCounterGameContext context, DateTimeOffset now) => _expiresAt - now;
 
         private ICardCounterGameState ResolveEffect(CardCounterGameContext context, bool blocked)
         {

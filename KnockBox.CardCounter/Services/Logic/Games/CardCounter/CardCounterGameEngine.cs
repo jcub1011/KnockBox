@@ -91,7 +91,9 @@ namespace KnockBox.Services.Logic.Games.CardCounter
         {
             return context.State.Execute(() =>
             {
-                var next = context.CurrentFsmState.Tick(context, now);
+                if (context.CurrentFsmState is not ITimedCardCounterGameState timedState) return;
+
+                var next = timedState.Tick(context, now);
                 if (next is not null) TransitionTo(context, next);
             });
         }

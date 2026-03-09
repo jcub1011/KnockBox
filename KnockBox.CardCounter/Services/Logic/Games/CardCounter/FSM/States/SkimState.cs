@@ -6,7 +6,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
     /// Waiting for the Skim source player to select which digit in their pot to swap
     /// with a digit in the target's pot. The target may still block with Comp'd.
     /// </summary>
-    public sealed class SkimState : ICardCounterGameState
+    public sealed class SkimState : ITimedCardCounterGameState
     {
         private readonly string _sourceId;
         private readonly string _targetId;
@@ -113,6 +113,8 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
             }
             return null;
         }
+
+        public TimeSpan GetRemainingTime(CardCounterGameContext context, DateTimeOffset now) => _expiresAt - now;
 
         private ICardCounterGameState ResolveEffect(CardCounterGameContext context, int sourceDigitIndex, int targetDigitIndex)
         {
