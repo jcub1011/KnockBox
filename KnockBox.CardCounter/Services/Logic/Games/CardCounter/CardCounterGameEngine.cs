@@ -86,11 +86,13 @@ namespace KnockBox.Services.Logic.Games.CardCounter
         /// <summary>
         /// Drives time-based transitions (e.g., action-response timeouts).
         /// Call periodically from a timer or background service.
+        /// Does nothing when <see cref="GameConfig.EnableActionTimer"/> is <c>false</c>.
         /// </summary>
         public Result Tick(CardCounterGameContext context, DateTimeOffset now)
         {
             return context.State.Execute(() =>
             {
+                if (!context.Config.EnableActionTimer) return;
                 if (context.CurrentFsmState is not ITimedCardCounterGameState timedState) return;
 
                 var next = timedState.Tick(context, now);

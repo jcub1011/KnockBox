@@ -11,6 +11,19 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
         public void OnEnter(CardCounterGameContext context)
         {
             context.State.GamePhase = GamePhase.GameOver;
+
+            foreach (var player in context.GamePlayers.Values)
+            {
+                if (player.Pot.Count == 0)
+                    continue;
+
+                double potValue = player.PotValue;
+                player.Pot.Clear();
+                player.Balance = player.Balance < 0
+                    ? player.Balance - potValue
+                    : player.Balance + potValue;
+            }
+
             context.Logger.LogInformation("FSM → GameOverState. Game ended.");
         }
 

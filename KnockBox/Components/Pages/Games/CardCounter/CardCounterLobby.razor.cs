@@ -71,7 +71,16 @@ namespace KnockBox.Components.Pages.Games.CardCounter
                     _operatorResultDismissed = false;
                 }
 
-                ClearTransientUiState();
+                // Only clear transient UI state (pending card, selected target, etc.) when the
+                // game phase or active player actually changes — not on every tick notification.
+                var currentPhase = GameState?.GamePhase;
+                var currentPlayerIndex = GameState?.CurrentPlayerIndex ?? -1;
+                if (currentPhase != _lastKnownPhase || currentPlayerIndex != _lastKnownPlayerIndex)
+                {
+                    _lastKnownPhase = currentPhase;
+                    _lastKnownPlayerIndex = currentPlayerIndex;
+                    ClearTransientUiState();
+                }
                 await InvokeAsync(StateHasChanged);
 
                 if (isNewShoe)
@@ -96,7 +105,7 @@ namespace KnockBox.Components.Pages.Games.CardCounter
                 {
                     try
                     {
-                        if (GameState?.Context != null && GameState.GamePhase == GamePhase.Playing && IsHost())
+                        if (GameState?.Context != null && IsHost())
                             GameEngine.Tick(GameState.Context, DateTimeOffset.UtcNow);
 
                         await InvokeAsync(StateHasChanged);
@@ -151,6 +160,10 @@ namespace KnockBox.Components.Pages.Games.CardCounter
         private const int ShoeAnimationDurationMs = 2500;
         private int _prevShoeIndex = -1;
         private bool _isAnimatingShoe = false;
+
+        // ── Game state change tracking (for clearing transient UI state) ──────
+        private GamePhase? _lastKnownPhase;
+        private int _lastKnownPlayerIndex = -1;
 
         // ── Target selection state ────────────────────────────────────────────
         private int? _pendingActionCardIndex;

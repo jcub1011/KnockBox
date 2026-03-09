@@ -21,7 +21,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
 
         public void OnEnter(CardCounterGameContext context)
         {
-            _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.Config.ActionResponseTimeoutMs);
+            _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.Config.FeelingLuckyChainTimeoutMs);
             context.State.FeelingLuckyTargetId = _currentTargetId;
             context.Logger.LogInformation(
                 "FSM → FeelingLuckyChainState: originator [{orig}], target [{tgt}].",
@@ -103,7 +103,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
                     "FeelingLucky: chain passed from [{from}] to [{to}].", _currentTargetId, nextTarget);
                 _currentTargetId = nextTarget;
                 context.State.FeelingLuckyTargetId = _currentTargetId;
-                _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.Config.ActionResponseTimeoutMs);
+                _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.Config.FeelingLuckyChainTimeoutMs);
                 return null; // stay in this state, target changed
             }
 

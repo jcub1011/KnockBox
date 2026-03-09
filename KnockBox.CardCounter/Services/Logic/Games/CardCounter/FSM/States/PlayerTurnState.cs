@@ -6,10 +6,13 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
     /// <summary>
     /// Active play phase: the current player may play action cards, fold, draw, or pass.
     /// </summary>
-    public sealed class PlayerTurnState : ICardCounterGameState
+    public sealed class PlayerTurnState : ITimedCardCounterGameState
     {
+        private DateTimeOffset _expiresAt;
+
         public void OnEnter(CardCounterGameContext context)
         {
+            _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.Config.PlayerTurnTimeoutMs);
             context.State.GamePhase = GamePhase.Playing;
             context.State.PendingReaction = null;
             context.State.FeelingLuckyTargetId = null;
@@ -30,6 +33,20 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
                 _ => null
             };
         }
+
+        public ICardCounterGameState? Tick(CardCounterGameContext context, DateTimeOffset now)
+        {
+            if (now < _expiresAt) return null;
+            var currentPlayerId = context.CurrentPlayerId;
+            if (currentPlayerId is null) return null;
+            context.Logger.LogInformation("PlayerTurn: auto-drawing for [{id}] after timeout.", currentPlayerId);
+            // Always return a state so the engine calls TransitionTo, which invokes OnEnter
+            // and resets _expiresAt for the next player's turn. If the draw itself triggers a
+            // state change (e.g. RoundEndState), pass that through; otherwise start a fresh turn.
+            return HandleDraw(context, new DrawCardCommand(currentPlayerId)) ?? new PlayerTurnState();
+        }
+
+        public TimeSpan GetRemainingTime(CardCounterGameContext context, DateTimeOffset now) => _expiresAt - now;
 
         // ── Draw ──────────────────────────────────────────────────────────────
 
@@ -78,7 +95,8 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
             if (context.CurrentShoe.Count == 0)
                 return new RoundEndState();
 
-            return null; // stay in PlayerTurnState
+            // Return a new instance so OnEnter is called, which resets the draw timer for the next player.
+            return new PlayerTurnState();
         }
 
         // ── Pass ─────────────────────────────────────────────────────────────

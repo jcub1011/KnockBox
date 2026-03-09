@@ -45,6 +45,27 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             _state.CurrentPlayerIndex = index;
         }
 
+        // ── EnableActionTimer = false ─────────────────────────────────────────
+
+        [TestMethod]
+        public void Tick_WhenActionTimerEnabled_AutoDrawsAfterTimeout()
+        {
+            var p1 = AddPlayer("p1", "Player 1");
+            AddPlayer("p2", "Player 2");
+            SetCurrentPlayer(0);
+            _state.CurrentShoe.Push(new NumberCard(3)); // stays after draw
+            _state.CurrentShoe.Push(new NumberCard(7)); // auto-drawn
+            _state.Config.EnableActionTimer = true;
+
+            var fsmState = new PlayerTurnState();
+            fsmState.OnEnter(_context);
+
+            var next = fsmState.Tick(_context, DateTimeOffset.UtcNow.AddHours(1));
+
+            Assert.IsNotNull(next, "Tick should return a state transition after timeout when timer is enabled.");
+            Assert.AreEqual(1, p1.Pot.Count, "Card should be auto-drawn after timeout.");
+        }
+
         // ── DrawCard ──────────────────────────────────────────────────────────
 
         [TestMethod]
@@ -196,7 +217,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             fsmState.OnEnter(_context);
             var next = fsmState.HandleCommand(_context, new DrawCardCommand("p1"));
 
-            Assert.IsNull(next, "Drawing a number card should NOT trigger NotMyMoney state.");
+            Assert.IsInstanceOfType<PlayerTurnState>(next, "Drawing a number card should transition to a fresh PlayerTurnState (resetting the timer).");
             Assert.AreEqual(1, p1.Pot.Count, "Number card digit should still be added to pot.");
         }
 
