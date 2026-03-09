@@ -4,6 +4,7 @@
 @using KnockBox.Services.State.Users
 @using KnockBox.Services.State.Games.CardCounter
 @using KnockBox.Services.State.Games.CardCounter.Data
+@using KnockBox.Services.Logic.Games.CardCounter.FSM
 
 <PageTitle>Card Counter</PageTitle>
 
@@ -17,6 +18,20 @@
 else
 {
     <div class="cc-page">
+
+        @if (GameState.Context?.CurrentFsmState is ITimedCardCounterGameState timedState)
+        {
+            var remaining = timedState.GetRemainingTime(GameState.Context, DateTimeOffset.UtcNow);
+            var seconds = (int)Math.Ceiling(remaining.TotalSeconds);
+            if (seconds >= 0)
+            {
+                <div class="cc-timer-container">
+                    <div class="cc-timer-card @(seconds < 5 ? "cc-timer-urgent" : "")">
+                        ⏳ @seconds
+                    </div>
+                </div>
+            }
+        }
 
         @* ── Lobby Phase ── *@
         @if (GameState.IsJoinable)
