@@ -74,12 +74,6 @@ namespace KnockBox.Components.Pages.Home
                 return;
             }
 
-            // Leave any prior session first so the player's ID is removed from the old
-            // game's registration list before the new join attempt.  Without this the
-            // RegisterPlayer guard ("You are already in this lobby.") rejects the rejoin
-            // even though the player is no longer on the game page.
-            GameSessionService.LeaveCurrentSession(navigateHome: false);
-
             var joinResult = await LobbyService.JoinLobbyAsync(user, lobbyCode, ComponentDetached);
             if (!joinResult.TryGetSuccess(out var registration))
             {
@@ -87,6 +81,10 @@ namespace KnockBox.Components.Pages.Home
                 return;
             }
 
+            // Leave any prior session before claiming the new slot.  If the player is
+            // re-joining the same lobby, RegisterPlayer has already issued a fresh token;
+            // this only clears GameSessionState so SetCurrentSession can succeed.
+            GameSessionService.LeaveCurrentSession(navigateHome: false);
             GameSessionService.SetCurrentSession(registration);
         }
 
