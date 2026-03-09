@@ -95,7 +95,8 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
             if (context.CurrentShoe.Count == 0)
                 return new RoundEndState();
 
-            return null; // stay in PlayerTurnState
+            // Return a new instance so OnEnter is called, which resets the draw timer for the next player.
+            return new PlayerTurnState();
         }
 
         // ── Pass ─────────────────────────────────────────────────────────────

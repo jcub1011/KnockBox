@@ -196,7 +196,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             fsmState.OnEnter(_context);
             var next = fsmState.HandleCommand(_context, new DrawCardCommand("p1"));
 
-            Assert.IsNull(next, "Drawing a number card should NOT trigger NotMyMoney state.");
+            Assert.IsInstanceOfType<PlayerTurnState>(next, "Drawing a number card should transition to a fresh PlayerTurnState (resetting the timer).");
             Assert.AreEqual(1, p1.Pot.Count, "Number card digit should still be added to pot.");
         }
 
