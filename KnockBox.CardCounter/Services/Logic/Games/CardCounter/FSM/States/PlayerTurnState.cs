@@ -36,7 +36,6 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
 
         public ICardCounterGameState? Tick(CardCounterGameContext context, DateTimeOffset now)
         {
-            if (!context.Config.EnablePlayerTurnTimer) return null;
             if (now < _expiresAt) return null;
             var currentPlayerId = context.CurrentPlayerId;
             if (currentPlayerId is null) return null;
@@ -48,8 +47,6 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
         }
 
         public TimeSpan GetRemainingTime(CardCounterGameContext context, DateTimeOffset now) => _expiresAt - now;
-
-        public bool IsTimerVisible(CardCounterGameContext context) => context.Config.EnablePlayerTurnTimer;
 
         // ── Draw ──────────────────────────────────────────────────────────────
 

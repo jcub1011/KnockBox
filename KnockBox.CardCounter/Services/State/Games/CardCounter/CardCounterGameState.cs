@@ -246,7 +246,7 @@ namespace KnockBox.Services.State.Games.CardCounter
         public int NotMyMoneyTimeoutMs { get; set; } = 12000;
         public int SkimTimeoutMs { get; set; } = 12000;
         public int WaitingForReactionTimeoutMs { get; set; } = 12000;
-        public bool EnablePlayerTurnTimer { get; set; } = true;
+        public bool EnableActionTimer { get; set; } = true;
         public bool ShowMakeMyMoneyOperator { get; set; } = true;
         public bool FlipWinCondition { get; set; } = false;
     }

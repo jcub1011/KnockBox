@@ -35,11 +35,5 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM
         /// Returns the next state, or <c>null</c> to stay in the current state.
         /// </summary>
         ICardCounterGameState? Tick(CardCounterGameContext context, DateTimeOffset now);
-
-        /// <summary>
-        /// Returns <c>true</c> if the countdown timer should be displayed in the UI for this state.
-        /// Defaults to <c>true</c>; override to suppress the timer when a config option disables it.
-        /// </summary>
-        bool IsTimerVisible(CardCounterGameContext context) => true;
     }
 }

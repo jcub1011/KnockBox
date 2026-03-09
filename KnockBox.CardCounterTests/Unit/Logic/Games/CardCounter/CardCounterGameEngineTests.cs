@@ -1,7 +1,9 @@
 using KnockBox.Services.Logic.Games.CardCounter;
+using KnockBox.Services.Logic.Games.CardCounter.FSM;
 using KnockBox.Services.Logic.Games.CardCounter.FSM.States;
 using KnockBox.Services.Logic.RandomGeneration;
 using KnockBox.Services.State.Games.CardCounter;
+using KnockBox.Services.State.Games.CardCounter.Data;
 using KnockBox.Services.State.Users;
 using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -183,6 +185,30 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             var result = _engine.FoldPot(_player1, state);
 
             Assert.IsTrue(result.IsFailure);
+        }
+
+        // ── EnableActionTimer ─────────────────────────────────────────────────
+
+        [TestMethod]
+        public async Task Tick_WhenActionTimerDisabled_DoesNotAdvanceFsmState()
+        {
+            using var state = await CreateStartedGameAsync(_player1);
+
+            var context = state.Context!;
+            state.Config.EnableActionTimer = false;
+            var p1 = state.GamePlayers.Values.First();
+            state.CurrentShoe.Push(new NumberCard(3));
+            state.CurrentShoe.Push(new NumberCard(7));
+
+            var playerTurnState = new PlayerTurnState();
+            playerTurnState.OnEnter(context);
+            context.CurrentFsmState = playerTurnState;
+            var potBefore = p1.Pot.Count;
+
+            _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
+
+            Assert.AreEqual(potBefore, p1.Pot.Count, "No card should be auto-drawn when the action timer is disabled.");
+            Assert.AreSame(playerTurnState, context.CurrentFsmState, "FSM state should not change when action timer is disabled.");
         }
 
         // ── ResetGame ─────────────────────────────────────────────────────────
