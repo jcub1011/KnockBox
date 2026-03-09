@@ -15,6 +15,10 @@ namespace KnockBox.Services.Registrations.States
             services.AddSingleton<IIDBackedServiceProvider, IDBackedServiceProvider>();
             services.AddScoped<IUserService, UserService>();
             services.AddScoped<IGameSessionService, GameSessionService>();
+
+            // Multiple CircuitHandler registrations under the same service type are intentional.
+            // Blazor Server resolves all of them via IEnumerable<CircuitHandler> and invokes
+            // each handler at every circuit lifecycle event — there is no conflict.
             services.AddScoped<CircuitHandler, LobbyCircuitHandler>();
             services.AddScoped<CircuitHandler, IDBackedCircuitHandler>();
 

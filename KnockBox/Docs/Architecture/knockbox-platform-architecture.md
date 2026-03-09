@@ -288,6 +288,18 @@ public interface INavigationService
 
 A scoped `CircuitHandler` that manages player cleanup on disconnect. When the SignalR connection drops (`OnConnectionDownAsync`), starts a 30-second grace period timer. If the connection is restored within the grace period (`OnConnectionUpAsync`), the timer is cancelled. If the circuit closes (`OnCircuitClosedAsync`) or the timer expires, calls `GameSessionService.LeaveCurrentSession(navigateHome: false)` to remove the player from the game state. This ensures players are properly cleaned up even on unexpected disconnects (network drops, browser closes) while allowing brief reconnections.
 
+### IIDBackedServiceProvider / IDBackedServiceProvider
+
+A singleton service that wraps `IServiceProvider` and caches resolved services in a `ConcurrentDictionary` keyed by `(userId, serviceType)`. It emulates scoped service lifetime but the instances survive Blazor circuit reconnections for the same user session id.
+
+- `GetService<T>(string id)` — returns the cached instance for that id/type pair, resolving from the inner `IServiceProvider` on first access. Also cancels any pending disposal timer.
+- `NotifyCircuitActive(string id, string circuitId)` — registers a circuit as active for the id and cancels any pending disposal timer.
+- `NotifyCircuitClosed(string id, string circuitId)` — removes the circuit. When the last active circuit for an id closes, a **5-minute disposal timer** starts. If any new request (`GetService<T>`) or new circuit (`NotifyCircuitActive`) arrives before the timer expires it is cancelled and the services are retained.
+
+### IDBackedCircuitHandler
+
+A scoped `CircuitHandler` that bridges Blazor circuit lifecycle events to `IIDBackedServiceProvider`. On `OnConnectionUpAsync` it calls `NotifyCircuitActive`, and on `OnCircuitClosedAsync` it calls `NotifyCircuitClosed`, using the id from `IUserService.CurrentUser`. Both handlers are registered under the `CircuitHandler` service type alongside `LobbyCircuitHandler`; Blazor invokes **all** registered circuit handlers at each lifecycle event (resolving them via `IEnumerable<CircuitHandler>`), so there is no conflict.
+
 ### DisposableComponent
 
 A base class for all Blazor pages and components. Extends `ComponentBase` and implements `IDisposable`. Provides a `ComponentDetached` `CancellationToken` that cancels when the component is removed from the render tree. All game lobby pages and the home page inherit from this class.
@@ -531,9 +543,13 @@ DI is organized into registration extension methods called from `Program.cs`:
 | Interface | Implementation | Lifetime | Purpose |
 |---|---|---|---|
 | `ILobbyService` | `LobbyService` | Singleton | Lobby registry |
+| `IIDBackedServiceProvider` | `IDBackedServiceProvider` | Singleton | ID-keyed persistent service cache |
 | `IUserService` | `UserService` | Scoped | Per-circuit user identity |
 | `IGameSessionService` | `GameSessionService` | Scoped | Per-circuit session tracking |
 | `CircuitHandler` | `LobbyCircuitHandler` | Scoped | Disconnect grace period |
+| `CircuitHandler` | `IDBackedCircuitHandler` | Scoped | Notifies `IIDBackedServiceProvider` of circuit lifecycle |
+
+> **Note:** Both `CircuitHandler` registrations under the same service type are intentional. Blazor Server resolves all registered `CircuitHandler` implementations via `IEnumerable<CircuitHandler>` and invokes every handler at each circuit lifecycle event — there is no conflict between them.
 
 ### RegisterRepositories() — Mixed
 
@@ -558,8 +574,8 @@ DI is organized into registration extension methods called from `Program.cs`:
 | `IDbContextFactory<ApplicationDbContext>` | EF Core + Npgsql | Factory | Database context creation |
 
 **Lifetime rules:**
-- Lobby state (`LobbyService`, game engines, lobby code service) is **Singleton** — all users share the same active lobby registrations and engine instances.
-- Per-user concerns (`UserService`, `GameSessionService`, `LobbyCircuitHandler`, `NavigationService`, client storage) are **Scoped** (per Blazor circuit / browser connection).
+- Lobby state (`LobbyService`, `IDBackedServiceProvider`, game engines, lobby code service) is **Singleton** — all users share the same active lobby registrations, engine instances, and ID-backed service cache.
+- Per-user concerns (`UserService`, `GameSessionService`, `LobbyCircuitHandler`, `IDBackedCircuitHandler`, `NavigationService`, client storage) are **Scoped** (per Blazor circuit / browser connection).
 - Infrastructure (repositories, key providers) are **Singleton** because `IDbContextFactory` handles per-operation context lifetime.
 
 ---
