@@ -170,6 +170,28 @@ public sealed class AbstractGameStateTests
     }
 
     [TestMethod]
+    public void RegisterPlayer_AfterUnregister_CanRejoin()
+    {
+        // Simulates the grace-period rejoin flow: player navigates to the home page
+        // (old unsubscriber disposed), then re-enters the lobby code on the home page.
+        using var state = MakeState();
+        state.UpdateJoinableStatus(true);
+        var player = MakeUser();
+
+        var firstReg = state.RegisterPlayer(player);
+        Assert.IsTrue(firstReg.TryGetSuccess(out var firstToken));
+
+        // Player leaves the game page (LeaveCurrentSession disposes the token).
+        firstToken.Dispose();
+        Assert.AreEqual(0, state.Players.Count, "Player should be removed after unregistering.");
+
+        // Player rejoins from the home page.
+        var secondReg = state.RegisterPlayer(player);
+        Assert.IsTrue(secondReg.IsSuccess, "Player should be able to rejoin after unregistering.");
+        Assert.AreEqual(1, state.Players.Count, "Player should be back in the lobby after rejoining.");
+    }
+
+    [TestMethod]
     public void RegisterPlayer_Dispose_RemovesPlayer()
     {
         using var state = MakeState();
