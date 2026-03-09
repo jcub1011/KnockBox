@@ -2,13 +2,14 @@
 {
     using KnockBox.Data.Services.ClientStorage;
 
-    public class UserService(ILocalStorageService localStorageService, ILogger<UserService> logger) : IUserService
+    public class UserService(ILocalStorageService localStorageService, ISessionStorageService sessionStorageService, ILogger<UserService> logger) : IUserService
     {
         public User? CurrentUser { get; private set; }
 
         public async Task InitializeCurrentUserAsync(CancellationToken ct = default)
         {
             string name = "Not Set";
+            string id = Guid.CreateVersion7().ToString();
             try
             {
                 var storedName = await localStorageService.GetAsync<string>("user", "name", ct);
@@ -16,13 +17,23 @@
                 {
                     name = storedName;
                 }
+
+                var storedId = await sessionStorageService.GetAsync<string>("user", "id", ct);
+                if (!string.IsNullOrWhiteSpace(storedId))
+                {
+                    id = storedId;
+                }
+                else
+                {
+                    await sessionStorageService.SetAsync("user", "id", id, ct);
+                }
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Error inititalizing current user service.");
+                logger.LogError(ex, "Error initializing current user service.");
             }
 
-            CurrentUser = new(name, Guid.CreateVersion7().ToString());
+            CurrentUser = new(name, id);
             CurrentUser.NameChanged += OnNameChanged;
         }
 
