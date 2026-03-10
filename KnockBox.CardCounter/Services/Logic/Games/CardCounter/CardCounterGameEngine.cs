@@ -239,7 +239,21 @@ namespace KnockBox.Services.Logic.Games.CardCounter
                 state.PendingNotMyMoneyOperator = null;
                 state.ForceDrawStack.Clear();
                 InitializeGame(context);
-                TransitionTo(context, new BuyInState());
+
+                // Respect Active Operator Mode on reset: same logic as StartAsync.
+                if (state.Config.ActiveOperatorMode)
+                {
+                    foreach (var ps in context.State.GamePlayers.Values)
+                    {
+                        ps.Balance = 10;
+                        ps.HasSetBuyIn = true;
+                    }
+                    TransitionTo(context, new RoundEndState());
+                }
+                else
+                {
+                    TransitionTo(context, new BuyInState());
+                }
             });
         }
 

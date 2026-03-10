@@ -49,7 +49,9 @@ namespace KnockBox.Components.Pages.Games.CardCounter
         protected override void OnParametersSet()
         {
             // Reset the operator overlay dismissed flag when a new operator result arrives.
-            if (GameState?.LastOperatorResult != _cachedOperatorResult)
+            // Use reference equality so that two consecutive draws with identical values
+            // (same before/after balance) each trigger the toast independently.
+            if (!ReferenceEquals(GameState?.LastOperatorResult, _cachedOperatorResult))
             {
                 _cachedOperatorResult = GameState?.LastOperatorResult;
                 _operatorResultDismissed = false;

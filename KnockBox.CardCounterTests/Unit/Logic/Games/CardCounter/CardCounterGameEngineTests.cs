@@ -353,5 +353,34 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             // After reset, deck should be rebuilt and BuyIn state sets up shoe via RoundEnd
             Assert.AreEqual(GamePhase.BuyIn, state.GamePhase);
         }
+
+        [TestMethod]
+        public async Task ResetGame_ActiveOperatorMode_SkipsBuyInPhase()
+        {
+            using var state = await CreateStartedActiveOperatorGameAsync(_player1);
+            state.GamePhase = GamePhase.GameOver;
+
+            var result = _engine.ResetGame(_host, state);
+
+            Assert.IsTrue((bool)result.IsSuccess);
+            Assert.AreEqual(GamePhase.Playing, state.GamePhase,
+                "Active Operator Mode reset should skip BuyIn and go straight to Playing.");
+        }
+
+        [TestMethod]
+        public async Task ResetGame_ActiveOperatorMode_SetsAllBalancesToTen()
+        {
+            using var state = await CreateStartedActiveOperatorGameAsync(_player1);
+            // Simulate players having earned/lost balance during the game
+            foreach (var ps in state.GamePlayers.Values)
+                ps.Balance = 999;
+            state.GamePhase = GamePhase.GameOver;
+
+            _engine.ResetGame(_host, state);
+
+            foreach (var ps in state.GamePlayers.Values)
+                Assert.AreEqual(10.0, ps.Balance,
+                    $"Player [{ps.PlayerId}] should be reset to balance 10 in Active Operator Mode.");
+        }
     }
 }
