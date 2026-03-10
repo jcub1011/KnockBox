@@ -89,7 +89,7 @@
     letter-spacing: 1px;
 }
 
-/* ── Settings Gear Button ─────────────────────────────────────────────────── */
+/* ── Settings Button ──────────────────────────────────────────────────────── */
 
 .cc-settings-gear-btn {
     position: absolute;
@@ -113,13 +113,13 @@
 .cc-settings-gear-btn:hover {
     background: rgba(139,105,20,0.4);
     border-color: #f7d547;
-    transform: rotate(30deg);
+    transform: scale(1.12);
 }
 
 /* ── Settings Backdrop ────────────────────────────────────────────────────── */
 
 .cc-settings-backdrop {
-    position: fixed;
+    position: absolute;
     inset: 0;
     background: rgba(0,0,0,0.45);
     z-index: 300;
@@ -128,12 +128,12 @@
 /* ── Settings Drawer ──────────────────────────────────────────────────────── */
 
 .cc-settings-drawer {
-    position: fixed;
+    position: absolute;
     top: 0;
     right: 0;
     height: 100%;
     width: 420px;
-    max-width: 95vw;
+    max-width: 95%;
     background: #0d2e17;
     border-left: 3px solid #8B6914;
     box-shadow: -4px 0 32px rgba(0,0,0,0.7);
@@ -273,7 +273,7 @@
     }
 
     .cc-settings-drawer {
-        width: 100vw;
+        width: 100%;
     }
 }
 

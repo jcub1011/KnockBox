@@ -5,7 +5,7 @@
     @if (UserService.CurrentUser?.Id == GameState.Host.Id)
     {
         <button class="cc-settings-gear-btn" @onclick="ToggleSettings" title="House Rules">
-            ⚙️
+            🎰
         </button>
     }
 
@@ -56,7 +56,7 @@
         }
         <div class="cc-settings-drawer @(SettingsOpen ? "cc-settings-drawer-open" : "")">
             <div class="cc-settings-drawer-header">
-                <h3 class="cc-config-title">⚙️ House Rules</h3>
+                <h3 class="cc-config-title">🎰 House Rules</h3>
                 <button class="cc-settings-close-btn" @onclick="ToggleSettings" title="Close settings">✕</button>
             </div>
             <div class="cc-settings-drawer-body">
