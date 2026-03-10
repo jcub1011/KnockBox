@@ -496,6 +496,14 @@ else if (GameState.GamePlayers.Values.Any(p => p.ActionHand.Count > GameState.Co
                     {
                         <span class="cc-targeted-marker" title="Choosing Skim digits">✂️</span>
                     }
+                    @if (pl.ExtraTurns > 0)
+                    {
+                        <span class="cc-extra-turns-badge" title="@pl.ExtraTurns extra turn(s) queued (Let It Ride)">🔁 +@pl.ExtraTurns</span>
+                    }
+                    @if (GameState.HedgeYourBetPlayerId == pl.PlayerId)
+                    {
+                        <span class="cc-hedge-badge" title="Next drawn card will be converted to an operator (Hedge Your Bet)">🎯</span>
+                    }
                     <span class="cc-opp-name">@pl.DisplayName @(isMe ? "(you)" : "")</span>
                     @if (_selectedTargetId == pl.PlayerId)
                     {
@@ -686,6 +694,14 @@ else if (GameState.GamePlayers.Values.Any(p => p.ActionHand.Count > GameState.Co
                         }
                     </span>
                 </div>
+                @if (myPlayer.ExtraTurns > 0)
+                {
+                    <div class="cc-my-stat cc-extra-turns-stat" title="Extra turns queued from Let It Ride">
+                        <span class="cc-stat-icon">🔁</span>
+                        <span class="cc-stat-label">Extra Turns</span>
+                        <span class="cc-stat-val cc-positive">+@myPlayer.ExtraTurns</span>
+                    </div>
+                }
                 @* <div class="cc-my-stat" title="Passes remaining">
                     <span class="cc-stat-icon">🎫</span>
                     <span class="cc-stat-label">Passes</span>
@@ -823,6 +839,17 @@ else if (GameState.GamePlayers.Values.Any(p => p.ActionHand.Count > GameState.Co
                 {
                     <span class="cc-turn-indicator">
                         🎴 @activePl.DisplayName's turn
+                        @if (activePl.ExtraTurns > 0)
+                        {
+                            <span class="cc-extra-turns-indicator" title="@activePl.ExtraTurns extra turn(s) queued">🔁 +@activePl.ExtraTurns</span>
+                        }
+                    </span>
+                }
+                @if (GameState.HedgeYourBetPlayerId is { } hedgeId
+                     && GameState.GamePlayers.TryGetValue(hedgeId, out var hedgePl))
+                {
+                    <span class="cc-hedge-indicator" title="Next drawn card will be converted (Hedge Your Bet)">
+                        🎯 @hedgePl.DisplayName hedged next draw
                     </span>
                 }
             }
@@ -890,6 +917,10 @@ else if (GameState.GamePlayers.Values.Any(p => p.ActionHand.Count > GameState.Co
 
                         // Skim has extra restrictions: cannot play with empty pot
                         if (card.Action == ActionType.Skim && !CanPlaySkim())
+                            canPlay = false;
+
+                        // Hedge Your Bet requires at least one card in the shoe
+                        if (card.Action == ActionType.HedgeYourBet && !CanPlayHedgeYourBet())
                             canPlay = false;
 
                         // Not My Money cannot be clicked normally. It triggers automatically.

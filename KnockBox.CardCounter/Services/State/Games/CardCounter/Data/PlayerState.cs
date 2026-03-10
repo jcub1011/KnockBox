@@ -38,6 +38,13 @@ namespace KnockBox.Services.State.Games.CardCounter.Data
         /// <summary>Number of passes this player has remaining for the whole game.</summary>
         public int PassesRemaining { get; set; }
 
+        /// <summary>
+        /// Number of additional turns this player has queued up (from Let It Ride cards).
+        /// After their current turn ends, they will take this many extra turns before play
+        /// advances to the next player. Stacks: each Let It Ride card adds 1.
+        /// </summary>
+        public int ExtraTurns { get; set; }
+
         /// <summary>True once the player has chosen positive or negative for their buy-in balance.</summary>
         public bool HasSetBuyIn { get; set; }
 

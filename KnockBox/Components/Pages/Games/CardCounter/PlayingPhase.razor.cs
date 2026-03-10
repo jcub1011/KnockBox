@@ -111,6 +111,12 @@ namespace KnockBox.Components.Pages.Games.CardCounter
             return me != null && me.Pot.Count > 0;
         }
 
+        /// <summary>Returns whether the Hedge Your Bet card can be played (shoe must have cards).</summary>
+        protected bool CanPlayHedgeYourBet()
+        {
+            return GameState != null && GameState.CurrentShoe.Count > 0;
+        }
+
         private void ClearTransientUiState()
         {
             _pendingActionCardIndex = null;
@@ -323,6 +329,8 @@ namespace KnockBox.Components.Pages.Games.CardCounter
             ActionType.NotMyMoney => "Not My Money",
             ActionType.Launder => "Launder",
             ActionType.Tilt => "Tilt",
+            ActionType.HedgeYourBet => "Hedge Your Bet",
+            ActionType.LetItRide => "Let It Ride",
             _ => action.ToString()
         };
 
@@ -337,6 +345,8 @@ namespace KnockBox.Components.Pages.Games.CardCounter
             ActionType.NotMyMoney => "💸",
             ActionType.Launder => "🧺",
             ActionType.Tilt => "🎰",
+            ActionType.HedgeYourBet => "🎯",
+            ActionType.LetItRide => "🔁",
             _ => "🃏"
         };
 
@@ -360,6 +370,10 @@ namespace KnockBox.Components.Pages.Games.CardCounter
                 "Swap your entire pot with a chosen opponent's pot. Target required. Blockable with Comp'd.",
             ActionType.Tilt =>
                 "Shuffle all number cards from every player's pot into one pool, then redistribute them evenly. Extra cards are dealt one at a time starting from you, in turn order.",
+            ActionType.HedgeYourBet =>
+                "Convert the next card drawn from the shoe into a + if your balance is negative, or a − if your balance is zero or positive. Does not draw immediately. Only playable when the shoe is not empty.",
+            ActionType.LetItRide =>
+                "Grant yourself an extra turn after your current turn ends. Can be stacked: each card played adds one additional turn.",
             _ => action.ToString()
         };
 
@@ -374,6 +388,8 @@ namespace KnockBox.Components.Pages.Games.CardCounter
             ActionType.NotMyMoney => "cc-card-money",
             ActionType.Launder => "cc-card-launder",
             ActionType.Tilt => "cc-card-tilt",
+            ActionType.HedgeYourBet => "cc-card-hedge",
+            ActionType.LetItRide => "cc-card-letitride",
             _ => ""
         };
 

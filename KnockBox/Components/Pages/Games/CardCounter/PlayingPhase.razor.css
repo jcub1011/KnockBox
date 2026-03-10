@@ -310,6 +310,48 @@
     font-size: 0.9rem;
 }
 
+.cc-extra-turns-badge {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #26c6da;
+    background: rgba(38, 198, 218, 0.15);
+    border: 1px solid rgba(38, 198, 218, 0.4);
+    border-radius: 8px;
+    padding: 1px 5px;
+}
+
+.cc-hedge-badge {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #7c4dff;
+    background: rgba(124, 77, 255, 0.15);
+    border: 1px solid rgba(124, 77, 255, 0.4);
+    border-radius: 8px;
+    padding: 1px 5px;
+}
+
+.cc-extra-turns-indicator {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #26c6da;
+    margin-left: 6px;
+}
+
+.cc-hedge-indicator {
+    font-size: 0.85rem;
+    color: #b39ddb;
+    font-weight: 700;
+    background: rgba(179, 157, 219, 0.15);
+    padding: 4px 10px;
+    border-radius: 12px;
+    border: 1px solid rgba(179, 157, 219, 0.4);
+    margin-left: 6px;
+}
+
+.cc-extra-turns-stat {
+    border-color: rgba(38, 198, 218, 0.4) !important;
+}
+
 .cc-target-selected-mark {
     font-size: 1rem;
     animation: bounce 0.5s ease-in-out infinite alternate;
@@ -1007,6 +1049,8 @@
 .cc-card-money { background: linear-gradient(135deg, #fff 60%, #f1f8e9); }
 .cc-card-launder { background: linear-gradient(135deg, #fff 60%, #fff8e1); }
 .cc-card-tilt { background: linear-gradient(135deg, #fff 60%, #fce8d5); }
+.cc-card-hedge { background: linear-gradient(135deg, #fff 60%, #e8eaf6); }
+.cc-card-letitride { background: linear-gradient(135deg, #fff 60%, #e0f7fa); }
 
 /* ── Discard Overlay ──────────────────────────────────────────────────────── */
 
