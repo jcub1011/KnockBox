@@ -405,8 +405,9 @@ else if (GameState.GamePlayers.Values.Any(p => p.ActionHand.Count > GameState.Co
     @if (GameState.Config.ActiveOperatorMode)
     {
         @* Non-blocking balance-change animation that auto-dismisses *@
-        <div class="cc-balance-change-toast @(opDelta > 0 ? "cc-balance-change-gain" : opDelta < 0 ? "cc-balance-change-loss" : "")"
-             @animationend="DismissOperatorResult">
+        <div @key="_toastKey"
+             class="cc-balance-change-toast @(opDelta > 0 ? "cc-balance-change-gain" : opDelta < 0 ? "cc-balance-change-loss" : "")"
+             @onanimationend="DismissOperatorResult">
             <div class="cc-balance-change-row">
                 <span class="cc-balance-change-before @(opResult.BalanceBefore >= 0 ? "cc-positive" : "cc-negative")">
                     @FormatBalance(opResult.BalanceBefore)

@@ -37,6 +37,7 @@ namespace KnockBox.Components.Pages.Games.CardCounter
         // ── Operator result overlay state ─────────────────────────────────────
         private OperatorResultInfo? _cachedOperatorResult;
         private bool _operatorResultDismissed;
+        private int _toastKey;
 
         // ── Reorder state ─────────────────────────────────────────────────────
         protected List<int> SelectedReorderIndices = new();
@@ -55,6 +56,7 @@ namespace KnockBox.Components.Pages.Games.CardCounter
             {
                 _cachedOperatorResult = GameState?.LastOperatorResult;
                 _operatorResultDismissed = false;
+                _toastKey++;
             }
 
             // Only clear transient UI state (pending card, selected target, etc.) when the
