@@ -125,6 +125,61 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             Assert.IsFalse(state.IsJoinable, "Game should not be joinable after starting.");
         }
 
+        // ── ActiveOperatorMode start ──────────────────────────────────────────
+
+        private async Task<CardCounterGameState> CreateStartedActiveOperatorGameAsync(params User[] players)
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (CardCounterGameState)stateResult.Value!;
+            state.Config.ActiveOperatorMode = true;
+            foreach (var p in players)
+                state.RegisterPlayer(p);
+            await _engine.StartAsync(_host, state);
+            return state;
+        }
+
+        [TestMethod]
+        public async Task StartAsync_ActiveOperatorMode_SkipsBuyInPhase()
+        {
+            using var state = await CreateStartedActiveOperatorGameAsync(_player1);
+
+            // Active Operator Mode skips the buy-in phase; game should be in Playing state
+            Assert.AreEqual(GamePhase.Playing, state.GamePhase,
+                "Active Operator Mode should skip BuyIn and go straight to Playing.");
+        }
+
+        [TestMethod]
+        public async Task StartAsync_ActiveOperatorMode_SetsAllBalancesToTen()
+        {
+            using var state = await CreateStartedActiveOperatorGameAsync(_player1);
+
+            foreach (var ps in state.GamePlayers.Values)
+                Assert.AreEqual(10.0, ps.Balance,
+                    $"Player [{ps.PlayerId}] should start with balance 10 in Active Operator Mode.");
+        }
+
+        [TestMethod]
+        public async Task StartAsync_ActiveOperatorMode_SetsHasSetBuyInForAllPlayers()
+        {
+            using var state = await CreateStartedActiveOperatorGameAsync(_player1);
+
+            foreach (var ps in state.GamePlayers.Values)
+                Assert.IsTrue(ps.HasSetBuyIn,
+                    $"Player [{ps.PlayerId}] should have HasSetBuyIn=true after Active Operator Mode start.");
+        }
+
+        [TestMethod]
+        public async Task StartAsync_ActiveOperatorMode_MultiplePlayersAllGetBalanceTen()
+        {
+            var player2 = new User("Player2", "p2-id");
+            using var state = await CreateStartedActiveOperatorGameAsync(_player1, player2);
+
+            Assert.AreEqual(2, state.GamePlayers.Count);
+            foreach (var ps in state.GamePlayers.Values)
+                Assert.AreEqual(10.0, ps.Balance,
+                    $"All players should start with balance 10 in Active Operator Mode.");
+        }
+
         // ── Player command routing before game start ───────────────────────────
 
         [TestMethod]

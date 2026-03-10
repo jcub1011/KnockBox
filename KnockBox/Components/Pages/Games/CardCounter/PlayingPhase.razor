@@ -398,62 +398,85 @@ else if (GameState.GamePlayers.Values.Any(p => p.ActionHand.Count > GameState.Co
     </div>
 }
 
-@* ── Operator Result Overlay ── *@
+@* ── Operator Result Overlay / Balance Change Toast ── *@
 @if (myPlayer != null && !_operatorResultDismissed && GameState.LastOperatorResult is { } opResult && opResult.PlayerId == myId)
 {
-    string opSymbol = GetOperatorSymbol(opResult.Op);
-    string opName = opResult.Op switch
-    {
-        Operator.Add => "Add",
-        Operator.Subtract => "Subtract",
-        Operator.Multiply => "Multiply",
-        Operator.Divide => "Divide",
-        _ => "?"
-    };
     double opDelta = opResult.BalanceAfter - opResult.BalanceBefore;
-    <div class="cc-operator-result-overlay">
-        <div class="cc-operator-result-panel">
-            <h3 class="cc-operator-result-title">⚡ OPERATOR APPLIED</h3>
-            <div class="cc-operator-result-op">
-                <span class="cc-operator-result-symbol">@opSymbol</span>
-                <span class="cc-operator-result-opname">@opName</span>
+    @if (GameState.Config.ActiveOperatorMode)
+    {
+        @* Non-blocking balance-change animation that auto-dismisses *@
+        <div class="cc-balance-change-toast @(opDelta > 0 ? "cc-balance-change-gain" : opDelta < 0 ? "cc-balance-change-loss" : "")"
+             @animationend="DismissOperatorResult">
+            <div class="cc-balance-change-row">
+                <span class="cc-balance-change-before @(opResult.BalanceBefore >= 0 ? "cc-positive" : "cc-negative")">
+                    @FormatBalance(opResult.BalanceBefore)
+                </span>
+                <span class="cc-balance-change-arrow">→</span>
+                <span class="cc-balance-change-after @(opResult.BalanceAfter >= 0 ? "cc-positive" : "cc-negative")">
+                    @FormatBalance(opResult.BalanceAfter)
+                </span>
             </div>
-            <div class="cc-operator-result-balances">
-                <div class="cc-operator-result-balance-row">
-                    <span class="cc-operator-result-label">Before:</span>
-                    <span class="cc-operator-result-val @(opResult.BalanceBefore >= 0 ? "cc-positive" : "cc-negative")">
-                        @FormatBalance(opResult.BalanceBefore)
-                    </span>
-                </div>
-                <div class="cc-operator-result-arrow">→</div>
-                <div class="cc-operator-result-balance-row">
-                    <span class="cc-operator-result-label">After:</span>
-                    <span class="cc-operator-result-val @(opResult.BalanceAfter >= 0 ? "cc-positive" : "cc-negative")">
-                        @FormatBalance(opResult.BalanceAfter)
-                    </span>
-                </div>
-            </div>
-            @if (opDelta > 0)
-            {
-                <div class="cc-operator-result-delta cc-operator-result-gain">
-                    ▲ +@(opDelta.ToString("N0")) from operation
-                </div>
-            }
-            else if (opDelta < 0)
-            {
-                <div class="cc-operator-result-delta cc-operator-result-loss">
-                    ▼ −@(Math.Abs(opDelta).ToString("N0")) from operation
-                </div>
-            }
-            else
-            {
-                <div class="cc-operator-result-delta">No change in balance</div>
-            }
-            <button class="cc-btn cc-btn-primary cc-btn-lg" @onclick="DismissOperatorResult">
-                ✓ Got it
-            </button>
+            <span class="cc-balance-change-delta @(opDelta > 0 ? "cc-positive" : opDelta < 0 ? "cc-negative" : "")">
+                @(opDelta > 0 ? "▲ +" + opDelta.ToString("N0") : opDelta < 0 ? "▼ −" + Math.Abs(opDelta).ToString("N0") : "No change")
+            </span>
         </div>
-    </div>
+    }
+    else
+    {
+        @* Full blocking operator applied overlay (normal mode) *@
+        string opSymbol = GetOperatorSymbol(opResult.Op);
+        string opName = opResult.Op switch
+        {
+            Operator.Add => "Add",
+            Operator.Subtract => "Subtract",
+            Operator.Multiply => "Multiply",
+            Operator.Divide => "Divide",
+            _ => "?"
+        };
+        <div class="cc-operator-result-overlay">
+            <div class="cc-operator-result-panel">
+                <h3 class="cc-operator-result-title">⚡ OPERATOR APPLIED</h3>
+                <div class="cc-operator-result-op">
+                    <span class="cc-operator-result-symbol">@opSymbol</span>
+                    <span class="cc-operator-result-opname">@opName</span>
+                </div>
+                <div class="cc-operator-result-balances">
+                    <div class="cc-operator-result-balance-row">
+                        <span class="cc-operator-result-label">Before:</span>
+                        <span class="cc-operator-result-val @(opResult.BalanceBefore >= 0 ? "cc-positive" : "cc-negative")">
+                            @FormatBalance(opResult.BalanceBefore)
+                        </span>
+                    </div>
+                    <div class="cc-operator-result-arrow">→</div>
+                    <div class="cc-operator-result-balance-row">
+                        <span class="cc-operator-result-label">After:</span>
+                        <span class="cc-operator-result-val @(opResult.BalanceAfter >= 0 ? "cc-positive" : "cc-negative")">
+                            @FormatBalance(opResult.BalanceAfter)
+                        </span>
+                    </div>
+                </div>
+                @if (opDelta > 0)
+                {
+                    <div class="cc-operator-result-delta cc-operator-result-gain">
+                        ▲ +@(opDelta.ToString("N0")) from operation
+                    </div>
+                }
+                else if (opDelta < 0)
+                {
+                    <div class="cc-operator-result-delta cc-operator-result-loss">
+                        ▼ −@(Math.Abs(opDelta).ToString("N0")) from operation
+                    </div>
+                }
+                else
+                {
+                    <div class="cc-operator-result-delta">No change in balance</div>
+                }
+                <button class="cc-btn cc-btn-primary cc-btn-lg" @onclick="DismissOperatorResult">
+                    ✓ Got it
+                </button>
+            </div>
+        </div>
+    }
 }
 
 @* ── Poker Table Area ── *@
