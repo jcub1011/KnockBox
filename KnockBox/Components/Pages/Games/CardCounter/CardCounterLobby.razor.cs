@@ -31,6 +31,12 @@ namespace KnockBox.Components.Pages.Games.CardCounter
 
         protected override async Task OnInitializedAsync()
         {
+            // Ensure the user is initialized so GameSessionService can look up the
+            // ID-backed session — required for page-refresh rejoins where the user
+            // service starts uninitialized on the fresh circuit.
+            if (UserService.CurrentUser is null)
+                await UserService.InitializeCurrentUserAsync(ComponentDetached);
+
             if (!GameSessionService.TryGetCurrentSession(out var session))
             {
                 ReturnToHome();
@@ -116,7 +122,6 @@ namespace KnockBox.Components.Pages.Games.CardCounter
             if (GameState != null)
                 GameState.OnStateDisposed -= HandleGameStateDisposed;
             _stateSubscription?.Dispose();
-            GameSessionService.LeaveCurrentSession(false);
             base.Dispose();
         }
 

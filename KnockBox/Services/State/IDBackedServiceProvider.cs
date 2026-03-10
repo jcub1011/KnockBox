@@ -8,7 +8,7 @@ namespace KnockBox.Services.State
     /// Services are stored in a <see cref="ConcurrentDictionary{TKey,TValue}"/> keyed by
     /// <c>(id, Type)</c> pairs. Multiple Blazor circuits that share the same user-session id
     /// share the same service instances. Services are disposed after <paramref name="disposalDelay"/>
-    /// (default 5 minutes) once the last active circuit for an id closes, unless a new request
+    /// (default 1 minute) once the last active circuit for an id closes, unless a new request
     /// arrives first.
     /// </para>
     /// </summary>
@@ -17,7 +17,7 @@ namespace KnockBox.Services.State
         ILogger<IDBackedServiceProvider> logger,
         TimeSpan? disposalDelay = null) : IIDBackedServiceProvider
     {
-        private readonly TimeSpan _disposalDelay = disposalDelay ?? TimeSpan.FromMinutes(5);
+        private readonly TimeSpan _disposalDelay = disposalDelay ?? TimeSpan.FromMinutes(1);
 
         // Key is (userId, serviceType) → cached service instance
         private readonly ConcurrentDictionary<(string Id, Type Type), object> _services = new();

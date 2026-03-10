@@ -46,8 +46,6 @@ namespace KnockBox.Components.Pages.Home
         {
             try
             {
-                // Ensures the user isn't left in a session
-                GameSessionService.LeaveCurrentSession(false);
                 if (UserService.CurrentUser is null)
                     await UserService.InitializeCurrentUserAsync(ComponentDetached);
                 await base.OnInitializedAsync();
@@ -83,6 +81,10 @@ namespace KnockBox.Components.Pages.Home
                 return;
             }
 
+            // Leave any prior session before claiming the new slot.  If the player is
+            // re-joining the same lobby, RegisterPlayer has already issued a fresh token;
+            // this only clears GameSessionState so SetCurrentSession can succeed.
+            GameSessionService.LeaveCurrentSession(navigateHome: false);
             GameSessionService.SetCurrentSession(registration);
         }
 
@@ -111,6 +113,8 @@ namespace KnockBox.Components.Pages.Home
                 _ = LobbyService.CloseLobbyAsync(user, lobby, CancellationToken.None);
             });
 
+            // Leave any prior session before claiming the new slot.
+            GameSessionService.LeaveCurrentSession(navigateHome: false);
             GameSessionService.SetCurrentSession(new UserRegistration(user, disposeAction, createResult.Value));
         }
     }

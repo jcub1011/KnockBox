@@ -156,7 +156,7 @@ public sealed class AbstractGameStateTests
     }
 
     [TestMethod]
-    public void RegisterPlayer_AlreadyRegistered_ReturnsFailure()
+    public void RegisterPlayer_AlreadyRegistered_Succeeds_WithoutDuplicating()
     {
         using var state = MakeState();
         state.UpdateJoinableStatus(true);
@@ -165,8 +165,83 @@ public sealed class AbstractGameStateTests
         state.RegisterPlayer(player);
         var result = state.RegisterPlayer(player);
 
-        Assert.IsTrue(result.IsFailure);
-        Assert.AreEqual(1, state.Players.Count);
+        Assert.IsTrue(result.IsSuccess, "Re-registering a player already in the lobby should succeed.");
+        Assert.AreEqual(1, state.Players.Count, "Player should not be duplicated in the player list.");
+    }
+
+    [TestMethod]
+    public void RegisterPlayer_Rejoin_OldTokenBecomesStale()
+    {
+        // Simulates: player still registered (grace period active), re-joins from home page.
+        // The old token held by GameSessionState should become a no-op on dispose so the
+        // player is not accidentally removed from the lobby by the eviction of the stale session.
+        using var state = MakeState();
+        state.UpdateJoinableStatus(true);
+        var player = MakeUser();
+
+        var firstReg = state.RegisterPlayer(player);
+        Assert.IsTrue(firstReg.TryGetSuccess(out var oldToken));
+
+        // Player re-joins — this replaces the token in the dictionary.
+        var secondReg = state.RegisterPlayer(player);
+        Assert.IsTrue(secondReg.IsSuccess);
+
+        // The old token (still held by the previous UserRegistration) is now stale.
+        oldToken.Dispose();
+
+        Assert.AreEqual(1, state.Players.Count, "Disposing the stale token should not remove the player.");
+    }
+
+    [TestMethod]
+    public void RegisterPlayer_Rejoin_NewTokenRemovesPlayer()
+    {
+        using var state = MakeState();
+        state.UpdateJoinableStatus(true);
+        var player = MakeUser();
+
+        state.RegisterPlayer(player);
+        var secondReg = state.RegisterPlayer(player);
+        Assert.IsTrue(secondReg.TryGetSuccess(out var newToken));
+
+        newToken.Dispose();
+
+        Assert.AreEqual(0, state.Players.Count, "Disposing the current token should properly remove the player.");
+    }
+
+    [TestMethod]
+    public void RegisterPlayer_Rejoin_PlayerUnregisteredNotFiredForStaleToken()
+    {
+        using var state = MakeState();
+        state.UpdateJoinableStatus(true);
+        var player = MakeUser();
+        int eventCount = 0;
+        state.PlayerUnregistered += _ => eventCount++;
+
+        var firstReg = state.RegisterPlayer(player);
+        Assert.IsTrue(firstReg.TryGetSuccess(out var oldToken));
+        state.RegisterPlayer(player); // supersedes oldToken
+
+        oldToken.Dispose(); // stale — should not fire PlayerUnregistered
+
+        Assert.AreEqual(0, eventCount, "PlayerUnregistered should not fire when a stale token is disposed.");
+    }
+
+    [TestMethod]
+    public void RegisterPlayer_Rejoin_PlayerUnregisteredFiredForNewToken()
+    {
+        using var state = MakeState();
+        state.UpdateJoinableStatus(true);
+        var player = MakeUser();
+        User? unregisteredPlayer = null;
+        state.PlayerUnregistered += u => unregisteredPlayer = u;
+
+        state.RegisterPlayer(player); // oldToken — will be superseded
+        var secondReg = state.RegisterPlayer(player);
+        Assert.IsTrue(secondReg.TryGetSuccess(out var newToken));
+
+        newToken.Dispose();
+
+        Assert.AreSame(player, unregisteredPlayer, "PlayerUnregistered should fire when the current token is disposed.");
     }
 
     [TestMethod]
