@@ -318,7 +318,8 @@ namespace KnockBox.Services.Logic.Games.CardCounter
                     PlayerId = user.Id,
                     DisplayName = user.Name,
                     PassesRemaining = state.Config.TotalPassesPerPlayer,
-                    BuyInRoll = randomNumberService.GetRandomInt(1, 7, RandomType.Fast)
+                    BuyInRoll = randomNumberService.GetRandomInt(1, 7, RandomType.Fast),
+                    ActiveOperator = state.Config.ActiveOperatorMode ? Operator.Add : null
                 };
 
                 state.GamePlayers[user.Id] = ps;

@@ -59,5 +59,12 @@ namespace KnockBox.Services.State.Games.CardCounter.Data
         /// Non-null only while the player is choosing a reorder.
         /// </summary>
         public List<BaseCard>? PrivateReveal { get; set; }
+
+        /// <summary>
+        /// In Active Operator Mode, the operator the player currently uses to apply number cards
+        /// to their balance. Starts as <see cref="Operator.Add"/> and is replaced when the player
+        /// draws an operator card. Null when Active Operator Mode is not in effect.
+        /// </summary>
+        public Operator? ActiveOperator { get; set; }
     }
 }

@@ -259,6 +259,14 @@ namespace KnockBox.Services.State.Games.CardCounter
         public bool EnableActionTimer { get; set; } = true;
         public bool ShowMakeMyMoneyOperator { get; set; } = true;
         public bool FlipWinCondition { get; set; } = false;
+
+        /// <summary>
+        /// When true, players have no pot. Drawing a number card applies it directly to the
+        /// player's balance using their Active Operator. Drawing an operator card replaces the
+        /// player's Active Operator. Skim and Turn The Table are not distributed in this mode;
+        /// Turn The Table is repurposed to reverse balance digits when played.
+        /// </summary>
+        public bool ActiveOperatorMode { get; set; } = false;
     }
 
     #endregion

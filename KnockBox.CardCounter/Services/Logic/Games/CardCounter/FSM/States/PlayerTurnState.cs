@@ -311,10 +311,13 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
                 switch (card.Action)
                 {
                     case ActionType.TurnTheTable:
-                        target.Pot.Reverse();
+                        if (context.State.Config.ActiveOperatorMode)
+                            target.Balance = CardCounterGameContext.ReverseBalanceDigits(target.Balance);
+                        else
+                            target.Pot.Reverse();
                         break;
                     case ActionType.Launder:
-                        // Self-launder: swapping the pot with itself is a no-op.
+                        // Self-launder: swapping the pot/balance with itself is a no-op.
                         break;
                 }
                 return new PlayerTurnState();

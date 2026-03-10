@@ -20,6 +20,19 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM
             Enum.GetValues<ActionType>().Select(t => new ActionCard(t)).ToArray();
 
         /// <summary>
+        /// Filtered pool used when Active Operator Mode is enabled: excludes
+        /// <see cref="ActionType.Skim"/> and <see cref="ActionType.TurnTheTable"/> from the
+        /// deal pool since those cards operate on the pot, which does not exist in Active
+        /// Operator Mode. Note: TurnTheTable is still handled if played and will reverse the
+        /// target's balance digits instead of reversing a pot.
+        /// </summary>
+        private static readonly ActionCard[] ActionCardPoolActiveOperator =
+            Enum.GetValues<ActionType>()
+                .Where(t => t != ActionType.Skim && t != ActionType.TurnTheTable)
+                .Select(t => new ActionCard(t))
+                .ToArray();
+
+        /// <summary>
         /// Returns the relative draw weight for <paramref name="card"/>.
         /// <see cref="ActionType.Tilt"/> has weight 1; every other type has weight 10,
         /// making Tilt exactly 10× rarer than any other card.
@@ -84,9 +97,14 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM
 
         // ── Card / deck helpers ───────────────────────────────────────────────
 
-        /// <summary>Returns a random action card from the pool, weighted so Tilt is 10× rarer.</summary>
-        public ActionCard GetRandomActionCard() =>
-            ActionCardPool.GetRandomWeightedItem(GetActionCardWeight, Rng, RandomType.Secure);
+        /// <summary>Returns a random action card from the pool, weighted so Tilt is 10× rarer.
+        /// When <see cref="GameConfig.ActiveOperatorMode"/> is enabled, Skim and Turn The Table
+        /// are excluded from the pool.</summary>
+        public ActionCard GetRandomActionCard()
+        {
+            var pool = State.Config.ActiveOperatorMode ? ActionCardPoolActiveOperator : ActionCardPool;
+            return pool.GetRandomWeightedItem(GetActionCardWeight, Rng, RandomType.Secure);
+        }
 
         /// <summary>
         /// Deals <see cref="GameConfig.ActionsDealtPerRound"/> action cards to every player.
@@ -162,17 +180,60 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM
 
         // ── Card application ──────────────────────────────────────────────────
 
-        /// <summary>Appends a number card digit to the target player's pot.</summary>
-        public void ApplyNumberCard(PlayerState player, NumberCard card) =>
+        /// <summary>
+        /// In normal mode, appends a number card digit to the target player's pot.
+        /// In Active Operator Mode, applies the number card value directly to the player's
+        /// balance using their <see cref="PlayerState.ActiveOperator"/>.
+        /// </summary>
+        public void ApplyNumberCard(PlayerState player, NumberCard card)
+        {
+            if (State.Config.ActiveOperatorMode && player.ActiveOperator.HasValue)
+            {
+                double cardValue = card.Value;
+                double balanceBefore = player.Balance;
+
+                if (cardValue == 0 && player.ActiveOperator.Value == Operator.Divide)
+                {
+                    HandleDivisionByZero(player);
+                    State.LastOperatorResult = new OperatorResultInfo(
+                        player.PlayerId, player.DisplayName, player.ActiveOperator.Value, balanceBefore, player.Balance);
+                    return;
+                }
+
+                player.Balance = player.ActiveOperator.Value switch
+                {
+                    Operator.Add => player.Balance + cardValue,
+                    Operator.Subtract => player.Balance - cardValue,
+                    Operator.Multiply => Math.Round(player.Balance * cardValue, MidpointRounding.AwayFromZero),
+                    Operator.Divide => Math.Round(player.Balance / cardValue, MidpointRounding.AwayFromZero),
+                    _ => player.Balance + cardValue
+                };
+
+                State.LastOperatorResult = new OperatorResultInfo(
+                    player.PlayerId, player.DisplayName, player.ActiveOperator.Value, balanceBefore, player.Balance);
+                return;
+            }
+
             player.Pot.Add(card.Value);
+        }
 
         /// <summary>
-        /// Applies an operator card to the target player: computes the new balance from
-        /// the pot, then clears the pot. If the pot is empty, this is a no-op.
+        /// In normal mode, applies an operator card to the target player: computes the new
+        /// balance from the pot, then clears the pot. If the pot is empty, this is a no-op.
         /// Handles division by zero with a random event.
+        /// In Active Operator Mode, replaces the player's <see cref="PlayerState.ActiveOperator"/>
+        /// with the drawn operator instead.
         /// </summary>
         public void ApplyOperatorCard(PlayerState player, OperatorCard card)
         {
+            if (State.Config.ActiveOperatorMode)
+            {
+                player.ActiveOperator = card.Op;
+                Logger.LogInformation(
+                    "ActiveOperatorMode: [{id}] set active operator to [{op}].", player.PlayerId, card.Op);
+                return;
+            }
+
             if (player.Pot.Count == 0)
                 return;
 
@@ -204,6 +265,21 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM
         }
 
         // ── Discard history helpers ───────────────────────────────────────────
+
+        /// <summary>
+        /// Reverses the digit order of a balance value, preserving its sign.
+        /// Used by Turn The Table in Active Operator Mode.
+        /// E.g., 123 → 321, -42 → -24, 0 → 0.
+        /// </summary>
+        public static double ReverseBalanceDigits(double balance)
+        {
+            if (balance == 0) return 0;
+            double sign = balance < 0 ? -1 : 1;
+            string digits = ((long)Math.Abs(balance)).ToString();
+            char[] arr = digits.ToCharArray();
+            Array.Reverse(arr);
+            return sign * long.Parse(new string(arr));
+        }
 
         /// <summary>Records a shoe card drawn by a player into the discard history.</summary>
         public void RecordDraw(PlayerState player, BaseCard card)

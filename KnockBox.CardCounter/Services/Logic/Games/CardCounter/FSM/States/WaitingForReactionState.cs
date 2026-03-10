@@ -138,15 +138,27 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
             switch (_pendingCard.Action)
             {
                 case ActionType.TurnTheTable:
-                    target.Pot.Reverse();
+                    if (context.State.Config.ActiveOperatorMode)
+                        target.Balance = CardCounterGameContext.ReverseBalanceDigits(target.Balance);
+                    else
+                        target.Pot.Reverse();
                     break;
 
                 case ActionType.Launder:
-                    var tempPot = new List<int>(source.Pot);
-                    source.Pot.Clear();
-                    source.Pot.AddRange(target.Pot);
-                    target.Pot.Clear();
-                    target.Pot.AddRange(tempPot);
+                    if (context.State.Config.ActiveOperatorMode)
+                    {
+                        double temp = source.Balance;
+                        source.Balance = target.Balance;
+                        target.Balance = temp;
+                    }
+                    else
+                    {
+                        var tempPot = new List<int>(source.Pot);
+                        source.Pot.Clear();
+                        source.Pot.AddRange(target.Pot);
+                        target.Pot.Clear();
+                        target.Pot.AddRange(tempPot);
+                    }
                     break;
 
                 case ActionType.NotMyMoney:
