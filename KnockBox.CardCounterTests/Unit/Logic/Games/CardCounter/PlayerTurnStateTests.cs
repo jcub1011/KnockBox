@@ -564,5 +564,328 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
 
             Assert.AreEqual(GamePhase.Playing, _state.GamePhase);
         }
+
+        // ── PlayActionCard – HedgeYourBet ─────────────────────────────────────
+
+        [TestMethod]
+        public void PlayActionCard_HedgeYourBet_WhenShoeNotEmpty_SetsHedgeFlag()
+        {
+            var p1 = AddPlayer("p1", "Player 1");
+            p1.ActionHand.Add(new ActionCard(ActionType.HedgeYourBet));
+            SetCurrentPlayer(0);
+            _state.CurrentShoe.Push(new NumberCard(5));
+
+            var fsmState = new PlayerTurnState();
+            fsmState.OnEnter(_context);
+            var next = fsmState.HandleCommand(_context, new PlayActionCardCommand("p1", 0));
+
+            Assert.IsNull(next, "HedgeYourBet should stay in PlayerTurnState (return null).");
+            Assert.AreEqual("p1", _state.HedgeYourBetPlayerId, "HedgeYourBetPlayerId should be set to the playing player.");
+            Assert.AreEqual(0, p1.ActionHand.Count, "Card should be consumed from hand.");
+        }
+
+        [TestMethod]
+        public void PlayActionCard_HedgeYourBet_WhenShoeEmpty_IsNoOpAndSetsNoFlag()
+        {
+            var p1 = AddPlayer("p1", "Player 1");
+            p1.ActionHand.Add(new ActionCard(ActionType.HedgeYourBet));
+            SetCurrentPlayer(0);
+            // No cards in shoe
+
+            var fsmState = new PlayerTurnState();
+            fsmState.OnEnter(_context);
+            var next = fsmState.HandleCommand(_context, new PlayActionCardCommand("p1", 0));
+
+            Assert.IsNull(next, "HedgeYourBet with empty shoe should be a no-op.");
+            Assert.IsNull(_state.HedgeYourBetPlayerId, "HedgeYourBetPlayerId should not be set when shoe is empty.");
+        }
+
+        [TestMethod]
+        public void HedgeYourBet_WhenBalanceNegative_NextDrawBecomesAddOperator()
+        {
+            var p1 = AddPlayer("p1", "Player 1");
+            var p2 = AddPlayer("p2", "Player 2");
+            p1.Balance = -50; // negative balance → hedge produces Add operator
+            p1.Pot.Add(5);    // non-empty pot so operator actually applies to balance
+            SetCurrentPlayer(0);
+
+            // Push two cards: p1 will draw the top (NumberCard(7)) but it should become Add
+            _state.CurrentShoe.Push(new NumberCard(1)); // stays in shoe after p1's draw
+            _state.CurrentShoe.Push(new NumberCard(7)); // p1 draws this, should become + operator
+
+            _state.HedgeYourBetPlayerId = "p1";
+
+            var fsmState = new PlayerTurnState();
+            fsmState.OnEnter(_context);
+            fsmState.HandleCommand(_context, new DrawCardCommand("p1"));
+
+            Assert.IsNull(_state.HedgeYourBetPlayerId, "HedgeYourBetPlayerId should be cleared after the draw.");
+            Assert.IsNotNull(_state.LastOperatorResult, "An operator should have been applied.");
+            Assert.AreEqual(Operator.Add, _state.LastOperatorResult!.Op, "Balance < 0 should produce Add operator.");
+        }
+
+        [TestMethod]
+        public void HedgeYourBet_WhenBalanceZero_NextDrawBecomesSubtractOperator()
+        {
+            var p1 = AddPlayer("p1", "Player 1");
+            var p2 = AddPlayer("p2", "Player 2");
+            p1.Balance = 0; // zero balance → hedge produces Subtract operator
+            p1.Pot.Add(3);  // non-empty pot so operator applies
+            SetCurrentPlayer(0);
+
+            _state.CurrentShoe.Push(new NumberCard(1));
+            _state.CurrentShoe.Push(new NumberCard(3)); // will become Subtract
+
+            _state.HedgeYourBetPlayerId = "p1";
+
+            var fsmState = new PlayerTurnState();
+            fsmState.OnEnter(_context);
+            fsmState.HandleCommand(_context, new DrawCardCommand("p1"));
+
+            Assert.IsNull(_state.HedgeYourBetPlayerId, "HedgeYourBetPlayerId should be cleared after the draw.");
+            Assert.IsNotNull(_state.LastOperatorResult);
+            Assert.AreEqual(Operator.Subtract, _state.LastOperatorResult!.Op, "Balance >= 0 should produce Subtract operator.");
+        }
+
+        [TestMethod]
+        public void HedgeYourBet_WhenBalancePositive_NextDrawBecomesSubtractOperator()
+        {
+            var p1 = AddPlayer("p1", "Player 1");
+            var p2 = AddPlayer("p2", "Player 2");
+            p1.Balance = 100; // positive balance → hedge produces Subtract operator
+            p1.Pot.Add(2);    // non-empty pot so operator applies
+            SetCurrentPlayer(0);
+
+            _state.CurrentShoe.Push(new NumberCard(1));
+            _state.CurrentShoe.Push(new OperatorCard(Operator.Multiply)); // any card, will be replaced
+
+            _state.HedgeYourBetPlayerId = "p1";
+
+            var fsmState = new PlayerTurnState();
+            fsmState.OnEnter(_context);
+            fsmState.HandleCommand(_context, new DrawCardCommand("p1"));
+
+            Assert.IsNull(_state.HedgeYourBetPlayerId);
+            Assert.IsNotNull(_state.LastOperatorResult);
+            Assert.AreEqual(Operator.Subtract, _state.LastOperatorResult!.Op, "Balance > 0 should produce Subtract operator.");
+        }
+
+        [TestMethod]
+        public void HedgeYourBet_OnlyAffectsNextDraw_ClearedAfterOneDraw()
+        {
+            var p1 = AddPlayer("p1", "Player 1");
+            var p2 = AddPlayer("p2", "Player 2");
+            p1.Balance = -10;
+            SetCurrentPlayer(0);
+
+            // Three cards in shoe: p1 draws one, then p2 draws one
+            _state.CurrentShoe.Push(new NumberCard(9)); // p2's draw (not affected by hedge)
+            _state.CurrentShoe.Push(new NumberCard(5)); // p2's draw after advance... wait
+            _state.CurrentShoe.Push(new NumberCard(7)); // p1 draws this first (becomes Add)
+
+            _state.HedgeYourBetPlayerId = "p1";
+
+            var fsmState = new PlayerTurnState();
+            fsmState.OnEnter(_context);
+            // p1 draws
+            fsmState.HandleCommand(_context, new DrawCardCommand("p1"));
+
+            // Hedge should be cleared
+            Assert.IsNull(_state.HedgeYourBetPlayerId, "Hedge flag should be cleared after first draw.");
+
+            // p2 is now active; their draw should NOT be affected
+            var p2LastResult = _state.LastOperatorResult;
+            var fsmState2 = new PlayerTurnState();
+            fsmState2.OnEnter(_context);
+            fsmState2.HandleCommand(_context, new DrawCardCommand("p2"));
+
+            // p2 drew a NumberCard(5) naturally — no operator result from hedge
+            // The operator result should still be the same from p1's draw (not a new operator from hedge on p2)
+            Assert.AreEqual(p2LastResult, _state.LastOperatorResult,
+                "Second draw should not be affected by hedge (hedge should be cleared after first draw).");
+        }
+
+        [TestMethod]
+        public void HedgeYourBet_AffectsAnyCardType_IncludingExistingOperators()
+        {
+            var p1 = AddPlayer("p1", "Player 1");
+            var p2 = AddPlayer("p2", "Player 2");
+            p1.Balance = -20;
+            p1.Pot.Add(4); // non-empty pot so the resulting Add operator applies
+            SetCurrentPlayer(0);
+
+            // Push an existing Multiply operator — it should become Add due to hedge
+            _state.CurrentShoe.Push(new NumberCard(1));
+            _state.CurrentShoe.Push(new OperatorCard(Operator.Multiply));
+
+            _state.HedgeYourBetPlayerId = "p1";
+
+            var fsmState = new PlayerTurnState();
+            fsmState.OnEnter(_context);
+            fsmState.HandleCommand(_context, new DrawCardCommand("p1"));
+
+            Assert.IsNotNull(_state.LastOperatorResult);
+            Assert.AreEqual(Operator.Add, _state.LastOperatorResult!.Op,
+                "Hedge should replace any existing card type, including other operators.");
+        }
+
+        [TestMethod]
+        public void HedgeYourBet_RecordsLastPlayedAction()
+        {
+            var p1 = AddPlayer("p1", "Player 1");
+            p1.ActionHand.Add(new ActionCard(ActionType.HedgeYourBet));
+            SetCurrentPlayer(0);
+            _state.CurrentShoe.Push(new NumberCard(1));
+
+            var fsmState = new PlayerTurnState();
+            fsmState.OnEnter(_context);
+            fsmState.HandleCommand(_context, new PlayActionCardCommand("p1", 0));
+
+            Assert.IsNotNull(_state.LastPlayedAction);
+            Assert.AreEqual(ActionType.HedgeYourBet, _state.LastPlayedAction!.Action);
+            Assert.AreEqual("p1", _state.LastPlayedAction.PlayerId);
+        }
+
+        // ── PlayActionCard – LetItRide ────────────────────────────────────────
+
+        [TestMethod]
+        public void PlayActionCard_LetItRide_IncrementsExtraTurns()
+        {
+            var p1 = AddPlayer("p1", "Player 1");
+            p1.ActionHand.Add(new ActionCard(ActionType.LetItRide));
+            SetCurrentPlayer(0);
+
+            var fsmState = new PlayerTurnState();
+            fsmState.OnEnter(_context);
+            var next = fsmState.HandleCommand(_context, new PlayActionCardCommand("p1", 0));
+
+            Assert.IsNull(next, "LetItRide should stay in PlayerTurnState (return null).");
+            Assert.AreEqual(1, p1.ExtraTurns, "ExtraTurns should be incremented by 1.");
+            Assert.AreEqual(0, p1.ActionHand.Count, "Card should be consumed from hand.");
+        }
+
+        [TestMethod]
+        public void PlayActionCard_LetItRide_IsStackable()
+        {
+            var p1 = AddPlayer("p1", "Player 1");
+            p1.ActionHand.Add(new ActionCard(ActionType.LetItRide));
+            p1.ActionHand.Add(new ActionCard(ActionType.LetItRide));
+            SetCurrentPlayer(0);
+
+            var fsmState = new PlayerTurnState();
+            fsmState.OnEnter(_context);
+            // Play first Let It Ride
+            fsmState.HandleCommand(_context, new PlayActionCardCommand("p1", 0));
+            // Play second Let It Ride
+            fsmState.HandleCommand(_context, new PlayActionCardCommand("p1", 0));
+
+            Assert.AreEqual(2, p1.ExtraTurns, "Playing two Let It Ride cards should bank 2 extra turns.");
+        }
+
+        [TestMethod]
+        public void LetItRide_PlayerDoesNotAdvanceTurnWhenExtraTurnsRemain()
+        {
+            var p1 = AddPlayer("p1", "Player 1");
+            var p2 = AddPlayer("p2", "Player 2");
+            p1.ExtraTurns = 1;
+            SetCurrentPlayer(0);
+
+            _state.CurrentShoe.Push(new NumberCard(1)); // stays in shoe
+            _state.CurrentShoe.Push(new NumberCard(7)); // p1 draws this
+
+            var fsmState = new PlayerTurnState();
+            fsmState.OnEnter(_context);
+            fsmState.HandleCommand(_context, new DrawCardCommand("p1"));
+
+            // p1 should still be the active player (extra turn consumed, not advancing)
+            Assert.AreEqual(0, _state.CurrentPlayerIndex, "Player should not advance when ExtraTurns > 0.");
+            Assert.AreEqual(0, p1.ExtraTurns, "ExtraTurns should be decremented by 1 after draw.");
+        }
+
+        [TestMethod]
+        public void LetItRide_AfterExtraTurnsExhausted_AdvancesToNextPlayer()
+        {
+            var p1 = AddPlayer("p1", "Player 1");
+            var p2 = AddPlayer("p2", "Player 2");
+            p1.ExtraTurns = 0; // no extra turns
+            SetCurrentPlayer(0);
+
+            _state.CurrentShoe.Push(new NumberCard(1)); // stays
+            _state.CurrentShoe.Push(new NumberCard(7)); // p1 draws this
+
+            var fsmState = new PlayerTurnState();
+            fsmState.OnEnter(_context);
+            fsmState.HandleCommand(_context, new DrawCardCommand("p1"));
+
+            Assert.AreEqual(1, _state.CurrentPlayerIndex, "Turn should advance to next player when ExtraTurns is 0.");
+        }
+
+        [TestMethod]
+        public void LetItRide_TwoExtraTurns_PlayerPlaysTwiceMoreBeforeAdvancing()
+        {
+            var p1 = AddPlayer("p1", "Player 1");
+            var p2 = AddPlayer("p2", "Player 2");
+            p1.ExtraTurns = 2;
+            SetCurrentPlayer(0);
+
+            _state.CurrentShoe.Push(new NumberCard(1));
+            _state.CurrentShoe.Push(new NumberCard(2));
+            _state.CurrentShoe.Push(new NumberCard(3));
+            _state.CurrentShoe.Push(new NumberCard(4)); // p1 draws first
+
+            var fsmState = new PlayerTurnState();
+            fsmState.OnEnter(_context);
+
+            // First draw: 2 extra turns → consume 1, stay at p1
+            fsmState.HandleCommand(_context, new DrawCardCommand("p1"));
+            Assert.AreEqual(0, _state.CurrentPlayerIndex, "After first extra-turn draw, still p1's turn.");
+            Assert.AreEqual(1, p1.ExtraTurns);
+
+            // Second draw: 1 extra turn → consume 1, stay at p1
+            var fsmState2 = new PlayerTurnState();
+            fsmState2.OnEnter(_context);
+            fsmState2.HandleCommand(_context, new DrawCardCommand("p1"));
+            Assert.AreEqual(0, _state.CurrentPlayerIndex, "After second extra-turn draw, still p1's turn.");
+            Assert.AreEqual(0, p1.ExtraTurns);
+
+            // Third draw: 0 extra turns → advance to p2
+            var fsmState3 = new PlayerTurnState();
+            fsmState3.OnEnter(_context);
+            fsmState3.HandleCommand(_context, new DrawCardCommand("p1"));
+            Assert.AreEqual(1, _state.CurrentPlayerIndex, "After third draw (no extra turns), turn advances to p2.");
+        }
+
+        [TestMethod]
+        public void PlayActionCard_LetItRide_RecordsLastPlayedAction()
+        {
+            var p1 = AddPlayer("p1", "Player 1");
+            p1.ActionHand.Add(new ActionCard(ActionType.LetItRide));
+            SetCurrentPlayer(0);
+
+            var fsmState = new PlayerTurnState();
+            fsmState.OnEnter(_context);
+            fsmState.HandleCommand(_context, new PlayActionCardCommand("p1", 0));
+
+            Assert.IsNotNull(_state.LastPlayedAction);
+            Assert.AreEqual(ActionType.LetItRide, _state.LastPlayedAction!.Action);
+            Assert.AreEqual("p1", _state.LastPlayedAction.PlayerId);
+        }
+
+        [TestMethod]
+        public void PlayActionCard_LetItRide_OnlyPlayableByCurrentPlayer()
+        {
+            var p1 = AddPlayer("p1", "Player 1");
+            var p2 = AddPlayer("p2", "Player 2");
+            p2.ActionHand.Add(new ActionCard(ActionType.LetItRide));
+            SetCurrentPlayer(0); // p1 is active
+
+            var fsmState = new PlayerTurnState();
+            fsmState.OnEnter(_context);
+            // p2 tries to play while it's p1's turn
+            var next = fsmState.HandleCommand(_context, new PlayActionCardCommand("p2", 0));
+
+            Assert.IsNull(next);
+            Assert.AreEqual(0, p2.ExtraTurns, "ExtraTurns should not be incremented when it is not the player's turn.");
+        }
     }
 }

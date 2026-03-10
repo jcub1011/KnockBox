@@ -1,0 +1,50 @@
+@using KnockBox.Services.State.Users
+@using KnockBox.Services.State.Games.CardCounter
+
+<div class="cc-gameover-area">
+    <div class="cc-gameover-panel">
+        <h2 class="cc-gameover-title">♠ GAME OVER ♠</h2>
+        <p class="cc-gameover-subtitle">@(GameState.Config.FlipWinCondition ? "Highest magnitude wins!" : "Closest to zero wins!")</p>
+        <div class="cc-leaderboard">
+            @{
+                var ranked = GameState.Config.FlipWinCondition
+                    ? GameState.GamePlayers.Values.OrderByDescending(p => Math.Abs(p.Balance)).ToList()
+                    : GameState.GamePlayers.Values.OrderBy(p => Math.Abs(p.Balance)).ToList();
+                // Standard competition ranking: tied players share the same rank.
+                var ranks = new int[ranked.Count];
+                for (int r = 0; r < ranked.Count; r++)
+                {
+                    bool tiedWithPrevious = r > 0 && Math.Abs(ranked[r].Balance) == Math.Abs(ranked[r - 1].Balance);
+                    ranks[r] = tiedWithPrevious ? ranks[r - 1] : r + 1;
+                }
+            }
+            @for (int i = 0; i < ranked.Count; i++)
+            {
+                var p = ranked[i];
+                int rank = ranks[i];
+                string medal = rank switch { 1 => "🥇", 2 => "🥈", 3 => "🥉", _ => $"#{rank}" };
+                bool isMe = p.PlayerId == UserService.CurrentUser?.Id;
+                bool isWinner = rank == 1;
+                <div class="cc-leaderboard-row @(isMe ? "cc-leaderboard-me" : "") @(isWinner ? "cc-leaderboard-winner" : "")">
+                    <span class="cc-rank">@medal</span>
+                    <span class="cc-player-result-name">@p.DisplayName</span>
+                    <span class="cc-player-result-balance @(p.Balance >= 0 ? "cc-positive" : "cc-negative")">
+                        @FormatBalance(p.Balance)
+                    </span>
+                    <span class="cc-player-result-abs">
+                        (Δ @Math.Abs(p.Balance) from 0)
+                    </span>
+                </div>
+            }
+        </div>
+        @if (IsHost())
+        {
+            <div class="cc-gameover-actions">
+                <button class="cc-btn cc-btn-primary cc-btn-lg" @onclick="ResetGame"
+                        title="Reset the game and play again with the same players">
+                    🔄 Play Again
+                </button>
+            </div>
+        }
+    </div>
+</div>

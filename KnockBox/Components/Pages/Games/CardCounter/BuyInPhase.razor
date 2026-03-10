@@ -1,0 +1,56 @@
+@using KnockBox.Services.State.Users
+@using KnockBox.Services.State.Games.CardCounter
+
+@{
+    var myPlayer = GetMyPlayer();
+}
+
+<div class="cc-buyin-area">
+    <div class="cc-buyin-panel">
+        <h3 class="cc-panel-title">♦ CHOOSE YOUR SIDE ♦</h3>
+        <p class="cc-buyin-subtitle">Will you play it safe or go all in?</p>
+
+        <div class="cc-buyin-players">
+            @foreach (var p in GameState.GamePlayers.Values)
+            {
+                <div class="cc-buyin-player-row">
+                    <span class="cc-buyin-player-name">@p.DisplayName</span>
+                    @if (p.HasSetBuyIn)
+                    {
+                        <span class="cc-buyin-status cc-buyin-done">✅ Ready</span>
+                    }
+                    else
+                    {
+                        <span class="cc-buyin-status cc-buyin-pending">⏳ Choosing...</span>
+                    }
+                </div>
+            }
+        </div>
+
+        @if (myPlayer != null && !myPlayer.HasSetBuyIn)
+        {
+            <div class="cc-buyin-roll">
+                <span class="cc-buyin-roll-label">🎲 Your roll</span>
+                <span class="cc-buyin-roll-value">×8 = @(myPlayer.BuyInRoll * 8)</span>
+            </div>
+            <p class="cc-buyin-choice-label">Choose your starting balance:</p>
+            <div class="cc-buyin-buttons">
+                <button class="cc-btn cc-btn-positive cc-btn-lg" @onclick="() => SetBuyIn(false)">
+                    ➕ +@(myPlayer.BuyInRoll * 8)
+                </button>
+                <button class="cc-btn cc-btn-negative cc-btn-lg" @onclick="() => SetBuyIn(true)">
+                    ➖ -@(myPlayer.BuyInRoll * 8)
+                </button>
+            </div>
+        }
+        else if (myPlayer != null && myPlayer.HasSetBuyIn)
+        {
+            <div class="cc-buyin-waiting">
+                <span>Your starting balance: </span>
+                <span class="cc-balance @(myPlayer.Balance >= 0 ? "cc-positive" : "cc-negative")">@FormatBalance(myPlayer.Balance)</span>
+                <br />
+                <span class="cc-waiting-text">Waiting for other players...</span>
+            </div>
+        }
+    </div>
+</div>

@@ -96,35 +96,48 @@ namespace KnockBox.Services.State.Games.Shared
             if (Host == player)
                 return ValueResult<IDisposable>.FromError("Host cannot be a player in the game.");
 
-            bool wasAdded = false;
-            var unsubscriber = new DisposableAction(() =>
-            {
-                Execute(() =>
-                {
-                    using var scope = _playerLock.EnterScope();
-                    if (wasAdded) _players.Remove(player);
-                });
-                // Fire outside the execute lock so subscribers can safely call Execute.
-                if (wasAdded) PlayerUnregistered?.Invoke(player);
-            });
-
             using var scope = _playerLock.EnterScope();
             if (_kickedPlayers.Contains(player))
             {
                 return ValueResult<IDisposable>.FromError("You have been kicked from this lobby and cannot rejoin.", $"Player [{player.Name}] was kicked and cannot rejoin.");
             }
-            else if (_players.TryAdd(player, unsubscriber))
+
+            bool isNew = !_players.ContainsKey(player);
+
+            // Self-reference allows the dispose closure to verify that this is still the
+            // authoritative token for this player.  If the player re-registers before
+            // disposing (e.g. re-joining from the home page during the grace period), the
+            // old token is superseded and its dispose becomes a no-op, so the player is
+            // not accidentally removed from the lobby.
+            //
+            // The variable must be declared nullable and assigned on the next line so that
+            // the closure can capture the variable itself (not a value) and still see the
+            // final reference once the constructor completes — a standard C# self-referential
+            // closure pattern.
+            DisposableAction? unsubscriber = null;
+            unsubscriber = new DisposableAction(() =>
             {
-                wasAdded = true;
+                bool shouldFire = false;
+                Execute(() =>
+                {
+                    using var innerScope = _playerLock.EnterScope();
+                    if (_players.TryGetValue(player, out var current) && ReferenceEquals(current, unsubscriber))
+                    {
+                        _players.Remove(player);
+                        shouldFire = true;
+                    }
+                });
+                if (shouldFire) PlayerUnregistered?.Invoke(player);
+            });
+
+            _players[player] = unsubscriber;
+
+            if (isNew)
                 logger.LogInformation("User [{userId}] entered game [{type}] hosted by user [{hostId}].", player.Id, GetType().Name, Host.Id);
-                return unsubscriber;
-            }
             else
-            {
-                wasAdded = false;
-                unsubscriber.Dispose();
-                return ValueResult<IDisposable>.FromError("You are already in this lobby.", $"Player [{player.Name}] is already registered.");
-            }
+                logger.LogInformation("User [{userId}] rejoined game [{type}] hosted by user [{hostId}].", player.Id, GetType().Name, Host.Id);
+
+            return unsubscriber;
         }
 
         /// <summary>

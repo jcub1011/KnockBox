@@ -68,8 +68,24 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
             if (player is null) return null;
 
             var card = context.CurrentShoe.Pop();
-            context.DiscardPile.Push(card);
             context.DecrementShoeCount(card);
+
+            // Apply Hedge Your Bet effect: replace the drawn card with the appropriate operator
+            if (context.State.HedgeYourBetPlayerId is { } hedgePlayerId)
+            {
+                context.State.HedgeYourBetPlayerId = null;
+                var hedger = context.GetPlayer(hedgePlayerId);
+                if (hedger is not null)
+                {
+                    var op = hedger.Balance < 0 ? Operator.Add : Operator.Subtract;
+                    card = new OperatorCard(op);
+                    context.Logger.LogInformation(
+                        "HedgeYourBet: [{hedgeId}] converted drawn card to [{op}] operator.",
+                        hedgePlayerId, op);
+                }
+            }
+
+            context.DiscardPile.Push(card);
 
             // If the player holds Not My Money and this is an operator, enter the redirect state
             if (card is OperatorCard oc && player.ActionHand.Any(c => c.Action == ActionType.NotMyMoney))
@@ -89,7 +105,19 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
 
             context.RecordDraw(player, card);
 
-            context.AdvanceTurn();
+            // Let It Ride: if the current player has extra turns banked, consume one instead of
+            // advancing to the next player.
+            if (player.ExtraTurns > 0)
+            {
+                player.ExtraTurns--;
+                context.Logger.LogInformation(
+                    "LetItRide: [{id}] takes an extra turn ({remaining} remaining).",
+                    player.PlayerId, player.ExtraTurns);
+            }
+            else
+            {
+                context.AdvanceTurn();
+            }
 
             // End of shoe → deal next shoe / end game
             if (context.CurrentShoe.Count == 0)
@@ -207,6 +235,8 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
                 ActionType.TurnTheTable => HandleBlockable(context, cmd, card),
                 ActionType.Launder => HandleBlockable(context, cmd, card),
                 ActionType.Tilt => HandleTilt(context, cmd.PlayerId),
+                ActionType.HedgeYourBet => HandleHedgeYourBet(context, cmd.PlayerId),
+                ActionType.LetItRide => HandleLetItRide(context, cmd.PlayerId),
                 _ => null
             };
         }
@@ -370,6 +400,32 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
 
             // Build the SkimState which lets the source choose digit indices
             return new SkimState(cmd.PlayerId, cmd.TargetPlayerId, new ActionCard(ActionType.Skim));
+        }
+
+        private static ICardCounterGameState? HandleHedgeYourBet(CardCounterGameContext context, string sourceId)
+        {
+            if (context.CurrentShoe.Count == 0)
+            {
+                context.Logger.LogWarning("HedgeYourBet: shoe is empty; cannot hedge.");
+                return null;
+            }
+
+            context.State.HedgeYourBetPlayerId = sourceId;
+            context.Logger.LogInformation(
+                "HedgeYourBet: [{id}] has hedged the next drawn card.", sourceId);
+            return null; // stay in PlayerTurnState
+        }
+
+        private static ICardCounterGameState? HandleLetItRide(CardCounterGameContext context, string sourceId)
+        {
+            var player = context.GetPlayer(sourceId);
+            if (player is null) return null;
+
+            player.ExtraTurns++;
+            context.Logger.LogInformation(
+                "LetItRide: [{id}] gains an extra turn ({total} total extra turns banked).",
+                sourceId, player.ExtraTurns);
+            return null; // stay in PlayerTurnState
         }
     }
 }

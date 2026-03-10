@@ -329,9 +329,8 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
         {
             // The weighted selection draws a single roll in [0, totalWeight).
             // totalWeight = (actionTypeCount - 1) * 10 + 1  (Tilt weight=1, others weight=10).
-            // We verify that:
-            //   • roll=0   → first non-Tilt type (weight covers [0,10))
-            //   • roll in the Tilt band → ActionType.Tilt
+            // Tilt is at enum index 8; the 8 cards before it each have weight 10, so Tilt
+            // occupies the single roll slot equal to 8 * 10 = 80.
             var host = new User("Host", "host-id");
             using var state = new CardCounterGameState(host, _stateLoggerMock.Object);
 
@@ -345,11 +344,14 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             var firstCard = context.GetRandomActionCard();
             Assert.AreNotEqual(ActionType.Tilt, firstCard.Action, "roll=0 must not return Tilt");
 
-            // roll = totalWeight-1 → last slot in the weight range → Tilt (weight 1 at the end)
-            _randomMock.Setup(r => r.GetRandomInt(0, totalWeight, RandomType.Secure)).Returns(totalWeight - 1);
+            // Compute the roll that lands on Tilt: sum of weights for all cards before Tilt in enum order.
+            // Tilt is at index 8, so 8 non-Tilt cards × weight 10 each = 80.
+            int tiltIndex = Array.IndexOf(Enum.GetValues<ActionType>(), ActionType.Tilt);
+            int tiltRoll = tiltIndex * 10; // each non-Tilt card before Tilt contributes weight 10
+            _randomMock.Setup(r => r.GetRandomInt(0, totalWeight, RandomType.Secure)).Returns(tiltRoll);
             var tiltCard = context.GetRandomActionCard();
             Assert.AreEqual(ActionType.Tilt, tiltCard.Action,
-                $"roll={totalWeight - 1} (last slot) must return Tilt");
+                $"roll={tiltRoll} must land on Tilt (index {tiltIndex} in enum)");
         }
     }
 }
