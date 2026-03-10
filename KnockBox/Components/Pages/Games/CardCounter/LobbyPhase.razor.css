@@ -163,6 +163,19 @@
     cursor: pointer;
 }
 
+.cc-config-section-title {
+    font-size: 1rem;
+    font-weight: 800;
+    color: rgba(247, 213, 71, 0.85);
+    margin: 20px 0 12px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    width: 100%;
+    text-align: left;
+    border-bottom: 1px solid rgba(139, 105, 20, 0.5);
+    padding-bottom: 6px;
+}
+
 @media (max-width: 600px) {
     .cc-config-grid {
         grid-template-columns: 1fr;

@@ -2055,3 +2055,129 @@
     font-family: var(--font-mono);
     text-align: right;
 }
+
+/* ── Balance Change Toast (Active Operator Mode) ──────────────────────────── */
+
+.cc-balance-change-toast {
+    position: fixed;
+    top: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 2100;
+    background: #1a1a1a;
+    border: 3px solid #f7d547;
+    border-radius: 16px;
+    padding: 18px 32px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    min-width: 220px;
+    text-align: center;
+    pointer-events: none;
+    animation: balanceChangeFade 3s ease-in-out forwards;
+}
+
+.cc-balance-change-gain {
+    border-color: #2ecc71;
+}
+
+.cc-balance-change-loss {
+    border-color: #e74c3c;
+}
+
+.cc-balance-change-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 1.4rem;
+    font-weight: 900;
+    font-family: var(--font-mono);
+}
+
+.cc-balance-change-before {
+    opacity: 0.6;
+}
+
+.cc-balance-change-arrow {
+    color: rgba(255,255,255,0.4);
+    font-size: 1.1rem;
+}
+
+.cc-balance-change-after {
+    font-size: 1.6rem;
+}
+
+.cc-balance-change-delta {
+    font-size: 1.05rem;
+    font-weight: 700;
+    font-family: var(--font-mono);
+    color: rgba(255,255,255,0.85);
+}
+
+@keyframes balanceChangeFade {
+    0%   { opacity: 0; transform: translateX(-50%) translateY(-16px); }
+    12%  { opacity: 1; transform: translateX(-50%) translateY(0); }
+    75%  { opacity: 1; transform: translateX(-50%) translateY(0); }
+    100% { opacity: 0; transform: translateX(-50%) translateY(-16px); }
+}
+
+/* ── Operator Change Toast (Active Operator Mode) ─────────────────────────── */
+
+.cc-op-change-toast {
+    position: fixed;
+    top: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 2100;
+    background: #1a1a1a;
+    border: 3px solid #f7d547;
+    border-radius: 16px;
+    padding: 16px 32px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    min-width: 200px;
+    text-align: center;
+    pointer-events: none;
+    animation: balanceChangeFade 3s ease-in-out forwards;
+}
+
+.cc-op-change-label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: #f7d547;
+}
+
+.cc-op-change-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    font-size: 2rem;
+    font-weight: 900;
+    font-family: var(--font-mono);
+}
+
+.cc-op-change-prev {
+    opacity: 0.45;
+    color: rgba(255,255,255,0.7);
+}
+
+.cc-op-change-none {
+    font-size: 1.2rem;
+    opacity: 0.3;
+}
+
+.cc-op-change-arrow {
+    font-size: 1.2rem;
+    color: rgba(255,255,255,0.35);
+}
+
+.cc-op-change-new {
+    font-size: 2.4rem;
+    color: #f7d547;
+    text-shadow: 0 0 12px rgba(247,213,71,0.6);
+}

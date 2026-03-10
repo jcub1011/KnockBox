@@ -6,6 +6,8 @@
     {
         public User? CurrentUser { get; private set; }
 
+        public event Action? UserInitialized;
+
         public async Task InitializeCurrentUserAsync(CancellationToken ct = default)
         {
             string name = "Not Set";
@@ -35,6 +37,7 @@
 
             CurrentUser = new(name, id);
             CurrentUser.NameChanged += OnNameChanged;
+            UserInitialized?.Invoke();
         }
 
         private async void OnNameChanged(UserNameChangedArgs args)

@@ -119,6 +119,12 @@ namespace KnockBox.Services.State.Games.CardCounter
         public OperatorResultInfo? LastOperatorResult { get; set; }
 
         /// <summary>
+        /// Records the most recent operator card draw in Active Operator Mode.
+        /// Set each time a player's active operator changes due to drawing an operator card.
+        /// </summary>
+        public OperatorChangeInfo? LastOperatorChange { get; set; }
+
+        /// <summary>
         /// Set when a Hedge Your Bet card has been played. Contains the ID of the player who
         /// played it; the next card drawn from the shoe will be converted to an Add operator
         /// if that player's balance is negative, or a Subtract operator otherwise.
@@ -238,6 +244,16 @@ namespace KnockBox.Services.State.Games.CardCounter
         double BalanceBefore,
         double BalanceAfter);
 
+    /// <summary>
+    /// Records a change to a player's active operator in Active Operator Mode.
+    /// Used to show the affected player a toast with the previous and new operator.
+    /// </summary>
+    public record OperatorChangeInfo(
+        string PlayerId,
+        string PlayerName,
+        Operator? PreviousOperator,
+        Operator NewOperator);
+
     public class GameConfig
     {
         public int DeckSize { get; set; } = 52;
@@ -259,6 +275,29 @@ namespace KnockBox.Services.State.Games.CardCounter
         public bool EnableActionTimer { get; set; } = true;
         public bool ShowMakeMyMoneyOperator { get; set; } = true;
         public bool FlipWinCondition { get; set; } = false;
+
+        /// <summary>
+        /// When true, players have no pot. Drawing a number card applies it directly to the
+        /// player's balance using their Active Operator. Drawing an operator card replaces the
+        /// player's Active Operator. Skim and Turn The Table are not distributed in this mode;
+        /// Turn The Table is repurposed to reverse balance digits when played.
+        /// </summary>
+        public bool ActiveOperatorMode { get; set; } = false;
+
+        // ── Action card deal-weights ─────────────────────────────────────────
+        // Higher value → more likely to be dealt. 0 removes the card from the deal pool entirely.
+
+        public int FeelingLuckyWeight { get; set; } = 10;
+        public int MakeMyLuckWeight { get; set; } = 10;
+        public int SkimWeight { get; set; } = 10;
+        public int BurnWeight { get; set; } = 10;
+        public int TurnTheTableWeight { get; set; } = 10;
+        public int CompdWeight { get; set; } = 10;
+        public int NotMyMoneyWeight { get; set; } = 10;
+        public int LaunderWeight { get; set; } = 10;
+        public int TiltWeight { get; set; } = 1;
+        public int HedgeYourBetWeight { get; set; } = 10;
+        public int LetItRideWeight { get; set; } = 10;
     }
 
     #endregion
