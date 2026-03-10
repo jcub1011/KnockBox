@@ -278,6 +278,8 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM
             ActionType.NotMyMoney => "Not My Money",
             ActionType.Launder => "Launder",
             ActionType.Tilt => "Tilt",
+            ActionType.HedgeYourBet => "Hedge Your Bet",
+            ActionType.LetItRide => "Let It Ride",
             _ => action.ToString()
         };
 
@@ -292,6 +294,8 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM
             ActionType.NotMyMoney => "💸",
             ActionType.Launder => "🧺",
             ActionType.Tilt => "🎰",
+            ActionType.HedgeYourBet => "🎯",
+            ActionType.LetItRide => "🔁",
             _ => "🃏"
         };
 

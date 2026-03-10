@@ -119,6 +119,14 @@ namespace KnockBox.Services.State.Games.CardCounter
         public OperatorResultInfo? LastOperatorResult { get; set; }
 
         /// <summary>
+        /// Set when a Hedge Your Bet card has been played. Contains the ID of the player who
+        /// played it; the next card drawn from the shoe will be converted to an Add operator
+        /// if that player's balance is negative, or a Subtract operator otherwise.
+        /// Cleared as soon as the next card is drawn.
+        /// </summary>
+        public string? HedgeYourBetPlayerId { get; set; }
+
+        /// <summary>
         /// Game configuration (tunable playtesting values).
         /// </summary>
         public GameConfig Config { get; set; } = new();
@@ -160,7 +168,9 @@ namespace KnockBox.Services.State.Games.CardCounter
         Compd,
         NotMyMoney,
         Launder,
-        Tilt
+        Tilt,
+        HedgeYourBet,
+        LetItRide
     }
 
     #endregion
