@@ -15,6 +15,10 @@ namespace KnockBox.Components.Pages.Games.CardCounter
 
         [Parameter] public CardCounterGameState GameState { get; set; } = default!;
 
+        protected bool SettingsOpen { get; private set; } = false;
+
+        protected void ToggleSettings() => SettingsOpen = !SettingsOpen;
+
         protected async Task StartGame()
         {
             if (UserService.CurrentUser == null) return;
