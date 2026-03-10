@@ -122,6 +122,58 @@
                         <span>Show NMM Operator:</span>
                         <input type="checkbox" class="cc-config-checkbox" @bind="GameState.Config.ShowMakeMyMoneyOperator" @bind:after="NotifyConfigChanged" />
                     </label>
+                    <label class="cc-config-label cc-config-label-row" title="Number cards apply directly to balance using a player's active operator instead of building a pot">
+                        <span>Active Operator Mode:</span>
+                        <input type="checkbox" class="cc-config-checkbox" @bind="GameState.Config.ActiveOperatorMode" @bind:after="NotifyConfigChanged" />
+                    </label>
+                </div>
+
+                <h4 class="cc-config-section-title">Action Card Rarities</h4>
+                <div class="cc-config-grid">
+                    <label class="cc-config-label">
+                        Feeling Lucky Weight:
+                        <input type="number" min="0" class="cc-config-input" @bind="GameState.Config.FeelingLuckyWeight" @bind:after="NotifyConfigChanged" />
+                    </label>
+                    <label class="cc-config-label">
+                        Make My Luck Weight:
+                        <input type="number" min="0" class="cc-config-input" @bind="GameState.Config.MakeMyLuckWeight" @bind:after="NotifyConfigChanged" />
+                    </label>
+                    <label class="cc-config-label">
+                        Skim Weight:
+                        <input type="number" min="0" class="cc-config-input" @bind="GameState.Config.SkimWeight" @bind:after="NotifyConfigChanged" />
+                    </label>
+                    <label class="cc-config-label">
+                        Burn Weight:
+                        <input type="number" min="0" class="cc-config-input" @bind="GameState.Config.BurnWeight" @bind:after="NotifyConfigChanged" />
+                    </label>
+                    <label class="cc-config-label">
+                        Turn The Table Weight:
+                        <input type="number" min="0" class="cc-config-input" @bind="GameState.Config.TurnTheTableWeight" @bind:after="NotifyConfigChanged" />
+                    </label>
+                    <label class="cc-config-label">
+                        Comp'd Weight:
+                        <input type="number" min="0" class="cc-config-input" @bind="GameState.Config.CompdWeight" @bind:after="NotifyConfigChanged" />
+                    </label>
+                    <label class="cc-config-label">
+                        Not My Money Weight:
+                        <input type="number" min="0" class="cc-config-input" @bind="GameState.Config.NotMyMoneyWeight" @bind:after="NotifyConfigChanged" />
+                    </label>
+                    <label class="cc-config-label">
+                        Launder Weight:
+                        <input type="number" min="0" class="cc-config-input" @bind="GameState.Config.LaunderWeight" @bind:after="NotifyConfigChanged" />
+                    </label>
+                    <label class="cc-config-label">
+                        Tilt Weight:
+                        <input type="number" min="0" class="cc-config-input" @bind="GameState.Config.TiltWeight" @bind:after="NotifyConfigChanged" />
+                    </label>
+                    <label class="cc-config-label">
+                        Hedge Your Bet Weight:
+                        <input type="number" min="0" class="cc-config-input" @bind="GameState.Config.HedgeYourBetWeight" @bind:after="NotifyConfigChanged" />
+                    </label>
+                    <label class="cc-config-label">
+                        Let It Ride Weight:
+                        <input type="number" min="0" class="cc-config-input" @bind="GameState.Config.LetItRideWeight" @bind:after="NotifyConfigChanged" />
+                    </label>
                 </div>
             </div>
         }

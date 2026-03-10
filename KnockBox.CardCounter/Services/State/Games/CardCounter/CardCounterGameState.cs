@@ -267,6 +267,21 @@ namespace KnockBox.Services.State.Games.CardCounter
         /// Turn The Table is repurposed to reverse balance digits when played.
         /// </summary>
         public bool ActiveOperatorMode { get; set; } = false;
+
+        // ── Action card deal-weights ─────────────────────────────────────────
+        // Higher value → more likely to be dealt. 0 removes the card from the deal pool entirely.
+
+        public int FeelingLuckyWeight { get; set; } = 10;
+        public int MakeMyLuckWeight { get; set; } = 10;
+        public int SkimWeight { get; set; } = 10;
+        public int BurnWeight { get; set; } = 10;
+        public int TurnTheTableWeight { get; set; } = 10;
+        public int CompdWeight { get; set; } = 10;
+        public int NotMyMoneyWeight { get; set; } = 10;
+        public int LaunderWeight { get; set; } = 10;
+        public int TiltWeight { get; set; } = 1;
+        public int HedgeYourBetWeight { get; set; } = 10;
+        public int LetItRideWeight { get; set; } = 10;
     }
 
     #endregion

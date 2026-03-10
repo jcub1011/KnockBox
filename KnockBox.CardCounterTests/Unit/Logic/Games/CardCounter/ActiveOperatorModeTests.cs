@@ -205,6 +205,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             // Full pool has 11 types (total weight 101); filtered pool has 9 (total weight 81)
             Assert.AreEqual(81, capturedMax,
                 "Active Operator Mode pool (9 cards, weight=81) should be used, not the full pool.");
+            Assert.IsNotNull(card, "A card should be returned when weights are non-zero.");
             Assert.AreNotEqual(ActionType.Skim, card.Action, "Skim must not be in the pool.");
             Assert.AreNotEqual(ActionType.TurnTheTable, card.Action, "TurnTheTable must not be in the pool.");
         }
@@ -239,6 +240,98 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             // 8 with weight=10, Tilt with weight=1 → total=81
             Assert.AreEqual(81, capturedMax,
                 "Active Operator Mode pool should exclude Skim and TurnTheTable (total weight=81).");
+        }
+
+        // ── Zero-weight card exclusion ────────────────────────────────────────
+
+        [TestMethod]
+        public void GetRandomActionCard_ZeroWeightCard_IsExcludedFromPool()
+        {
+            _state.Config.ActiveOperatorMode = false;
+            _state.Config.TiltWeight = 0; // exclude Tilt from pool
+
+            int capturedMax = -1;
+            _randomMock.Setup(r => r.GetRandomInt(0, It.IsAny<int>(), RandomType.Secure))
+                .Callback<int, int, RandomType>((_, max, _) => capturedMax = max)
+                .Returns(0);
+
+            var card = _context.GetRandomActionCard();
+
+            // 11 types total; Tilt removed (weight=0) → 10 types × weight=10 each = total weight 100
+            Assert.AreEqual(100, capturedMax,
+                "Zero-weight Tilt should be excluded; total weight should be 10×10=100.");
+            Assert.IsNotNull(card, "A card should still be returned.");
+            Assert.AreNotEqual(ActionType.Tilt, card.Action, "Tilt must not be returned when its weight is 0.");
+        }
+
+        [TestMethod]
+        public void GetRandomActionCard_AllWeightsZero_ReturnsNull()
+        {
+            _state.Config.ActiveOperatorMode = false;
+            // Set all weights to 0
+            _state.Config.FeelingLuckyWeight = 0;
+            _state.Config.MakeMyLuckWeight = 0;
+            _state.Config.SkimWeight = 0;
+            _state.Config.BurnWeight = 0;
+            _state.Config.TurnTheTableWeight = 0;
+            _state.Config.CompdWeight = 0;
+            _state.Config.NotMyMoneyWeight = 0;
+            _state.Config.LaunderWeight = 0;
+            _state.Config.TiltWeight = 0;
+            _state.Config.HedgeYourBetWeight = 0;
+            _state.Config.LetItRideWeight = 0;
+
+            var card = _context.GetRandomActionCard();
+
+            Assert.IsNull(card, "Should return null when all action card weights are 0.");
+        }
+
+        [TestMethod]
+        public void DealActionCards_ZeroWeightCard_NeverDealtToPlayer()
+        {
+            _state.Config.ActiveOperatorMode = false;
+            // Set all weights to 0 except Burn
+            _state.Config.FeelingLuckyWeight = 0;
+            _state.Config.MakeMyLuckWeight = 0;
+            _state.Config.SkimWeight = 0;
+            _state.Config.BurnWeight = 10;
+            _state.Config.TurnTheTableWeight = 0;
+            _state.Config.CompdWeight = 0;
+            _state.Config.NotMyMoneyWeight = 0;
+            _state.Config.LaunderWeight = 0;
+            _state.Config.TiltWeight = 0;
+            _state.Config.HedgeYourBetWeight = 0;
+            _state.Config.LetItRideWeight = 0;
+
+            _randomMock.Setup(r => r.GetRandomInt(0, It.IsAny<int>(), RandomType.Secure)).Returns(0);
+
+            var p1 = MakePlayer("p1", "P1");
+            _context.DealActionCards();
+
+            Assert.IsTrue(p1.ActionHand.All(c => c.Action == ActionType.Burn),
+                "Only Burn should appear since all other weights are 0.");
+        }
+
+        [TestMethod]
+        public void DealActionCards_AllWeightsZero_NothingDealt()
+        {
+            _state.Config.ActiveOperatorMode = false;
+            _state.Config.FeelingLuckyWeight = 0;
+            _state.Config.MakeMyLuckWeight = 0;
+            _state.Config.SkimWeight = 0;
+            _state.Config.BurnWeight = 0;
+            _state.Config.TurnTheTableWeight = 0;
+            _state.Config.CompdWeight = 0;
+            _state.Config.NotMyMoneyWeight = 0;
+            _state.Config.LaunderWeight = 0;
+            _state.Config.TiltWeight = 0;
+            _state.Config.HedgeYourBetWeight = 0;
+            _state.Config.LetItRideWeight = 0;
+
+            var p1 = MakePlayer("p1", "P1");
+            _context.DealActionCards();
+
+            Assert.AreEqual(0, p1.ActionHand.Count, "No cards should be dealt when all weights are 0.");
         }
 
         // ── PlayerState.ActiveOperator initialization ─────────────────────────

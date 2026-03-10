@@ -33,12 +33,25 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM
                 .ToArray();
 
         /// <summary>
-        /// Returns the relative draw weight for <paramref name="card"/>.
-        /// <see cref="ActionType.Tilt"/> has weight 1; every other type has weight 10,
-        /// making Tilt exactly 10× rarer than any other card.
+        /// Returns the relative draw weight for <paramref name="card"/> from the game config.
+        /// Higher weight → more likely to be dealt. All weights default to 10 except
+        /// <see cref="ActionType.Tilt"/> which defaults to 1 (10× rarer).
         /// </summary>
-        private static int GetActionCardWeight(ActionCard card) =>
-            card.Action == ActionType.Tilt ? 1 : 10;
+        private int GetActionCardWeight(ActionCard card) => card.Action switch
+        {
+            ActionType.FeelingLucky => State.Config.FeelingLuckyWeight,
+            ActionType.MakeMyLuck   => State.Config.MakeMyLuckWeight,
+            ActionType.Skim         => State.Config.SkimWeight,
+            ActionType.Burn         => State.Config.BurnWeight,
+            ActionType.TurnTheTable => State.Config.TurnTheTableWeight,
+            ActionType.Compd        => State.Config.CompdWeight,
+            ActionType.NotMyMoney   => State.Config.NotMyMoneyWeight,
+            ActionType.Launder      => State.Config.LaunderWeight,
+            ActionType.Tilt         => State.Config.TiltWeight,
+            ActionType.HedgeYourBet => State.Config.HedgeYourBetWeight,
+            ActionType.LetItRide    => State.Config.LetItRideWeight,
+            _                       => 10
+        };
 
         public CardCounterGameContext(
             CardCounterGameState state,
@@ -97,12 +110,20 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM
 
         // ── Card / deck helpers ───────────────────────────────────────────────
 
-        /// <summary>Returns a random action card from the pool, weighted so Tilt is 10× rarer.
+        /// <summary>Returns a random action card from the pool using configurable per-card weights.
+        /// Cards whose weight is 0 are excluded from the pool.
         /// When <see cref="GameConfig.ActiveOperatorMode"/> is enabled, Skim and Turn The Table
-        /// are excluded from the pool.</summary>
-        public ActionCard GetRandomActionCard()
+        /// are also excluded from the pool.
+        /// Returns <c>null</c> if no cards remain after filtering (all weights are 0).</summary>
+        public ActionCard? GetRandomActionCard()
         {
-            var pool = State.Config.ActiveOperatorMode ? ActionCardPoolActiveOperator : ActionCardPool;
+            var basePool = State.Config.ActiveOperatorMode ? ActionCardPoolActiveOperator : ActionCardPool;
+            var pool = basePool.Where(c => GetActionCardWeight(c) > 0).ToArray();
+            if (pool.Length == 0)
+            {
+                Logger.LogWarning("GetRandomActionCard: all action cards have weight 0; no card dealt.");
+                return null;
+            }
             return pool.GetRandomWeightedItem(GetActionCardWeight, Rng, RandomType.Secure);
         }
 
@@ -116,7 +137,10 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM
             foreach (var player in GamePlayers.Values)
             {
                 for (int i = 0; i < Config.ActionsDealtPerRound; i++)
-                    player.ActionHand.Add(GetRandomActionCard());
+                {
+                    var card = GetRandomActionCard();
+                    if (card is not null) player.ActionHand.Add(card);
+                }
             }
         }
 
@@ -390,7 +414,10 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM
                     break;
                 case 2:
                     if (player.ActionHand.Count < Config.ActionHandLimit)
-                        player.ActionHand.Add(GetRandomActionCard());
+                    {
+                        var card = GetRandomActionCard();
+                        if (card is not null) player.ActionHand.Add(card);
+                    }
                     Logger.LogInformation("Div/0: player [{id}] gains an action card.", player.PlayerId);
                     break;
                 case 3:
