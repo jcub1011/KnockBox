@@ -65,6 +65,8 @@ Action cards come from a separate deck and are **not** part of the main deck. Pl
 | **Not My Money** (Redirect) | Played when you draw an operator card. Redirect the operator to a different player, applying it to **that player's** pot and balance instead. If blocked, the operator applies to the drawing player as normal. Can be played against players with an empty pot (resulting in a no-op for the target). Blockable. |
 | **Launder** (Swap Pots) | Swap your entire pot with a different player's pot. Can be used when either or both pots are empty. Blockable. |
 | **Tilt** (Redistribute) | Combine all number cards from every player's pot into a single pool, shuffle them, and redistribute them evenly. Any extra cards (i.e., total cards mod player count) are dealt one at a time in turn order starting from the player who played Tilt. |
+| **Hedge Your Bet** (Convert Next Draw) | Convert the next card drawn from the shoe into an operator: **+** if your balance is negative, **−** if your balance is zero or positive. The conversion applies to the very next draw by any player, regardless of whose turn it is. This card does **not** automatically draw — you may still play other cards (such as Make My Luck) before drawing. Only playable when the shoe is not empty. |
+| **Let It Ride** (Extra Turn) | Grant yourself one additional turn after your current turn ends. This card **stacks**: playing two Let It Ride cards in a single turn queues two extra turns. Extra turns are consumed one at a time after each draw, before play advances to the next player. |
 
 #### Interaction Example
 
