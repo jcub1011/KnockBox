@@ -97,10 +97,16 @@ namespace KnockBox.Components.Pages.Games.CardCounter
                 {
                     try
                     {
-                        if (GameState?.Context != null && IsHost())
-                            GameEngine.Tick(GameState.Context, DateTimeOffset.UtcNow);
-
-                        await InvokeAsync(StateHasChanged);
+                        // Run Tick and StateHasChanged together on the Blazor dispatcher thread so
+                        // that state mutations (ActionHand.Add/Remove etc.) are never concurrent
+                        // with the render, preventing InvalidOperationException from List<T>'s
+                        // version-check during LINQ enumeration.
+                        await InvokeAsync(() =>
+                        {
+                            if (GameState?.Context != null && IsHost())
+                                GameEngine.Tick(GameState.Context, DateTimeOffset.UtcNow);
+                            StateHasChanged();
+                        });
                     }
                     catch (ObjectDisposedException) { break; }
                     catch (Exception ex)

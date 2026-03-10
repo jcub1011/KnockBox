@@ -62,6 +62,9 @@ namespace KnockBox.Components.Pages.Games.CardCounter
                 _cachedOperatorResult = GameState?.LastOperatorResult;
                 _operatorResultDismissed = false;
                 _toastKey++;
+                // Dismiss the operator-change toast when a new balance result arrives so the
+                // two toasts never overlap.
+                _operatorChangeDismissed = true;
             }
 
             if (!ReferenceEquals(GameState?.LastOperatorChange, _cachedOperatorChange))
@@ -69,6 +72,9 @@ namespace KnockBox.Components.Pages.Games.CardCounter
                 _cachedOperatorChange = GameState?.LastOperatorChange;
                 _operatorChangeDismissed = false;
                 _opChangeToastKey++;
+                // Dismiss the balance-change toast when the operator changes so the
+                // two toasts never overlap.
+                _operatorResultDismissed = true;
             }
 
             // Only clear transient UI state (pending card, selected target, etc.) when the
