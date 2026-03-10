@@ -480,6 +480,28 @@ else if (GameState.GamePlayers.Values.Any(p => p.ActionHand.Count > GameState.Co
     }
 }
 
+@* ── Operator Change Toast (Active Operator Mode — operator card drawn) ── *@
+@if (myPlayer != null && !_operatorChangeDismissed && GameState.LastOperatorChange is { } opChange && opChange.PlayerId == myId && GameState.Config.ActiveOperatorMode)
+{
+    <div @key="_opChangeToastKey"
+         class="cc-op-change-toast"
+         @onanimationend="DismissOperatorChange">
+        <span class="cc-op-change-label">⚡ OPERATOR CHANGED</span>
+        <div class="cc-op-change-row">
+            @if (opChange.PreviousOperator.HasValue)
+            {
+                <span class="cc-op-change-prev">@GetOperatorSymbol(opChange.PreviousOperator.Value)</span>
+            }
+            else
+            {
+                <span class="cc-op-change-prev cc-op-change-none">—</span>
+            }
+            <span class="cc-op-change-arrow">→</span>
+            <span class="cc-op-change-new">@GetOperatorSymbol(opChange.NewOperator)</span>
+        </div>
+    </div>
+}
+
 @* ── Poker Table Area ── *@
 <div class="cc-table-area">
 

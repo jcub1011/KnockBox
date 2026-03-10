@@ -252,9 +252,12 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM
         {
             if (State.Config.ActiveOperatorMode)
             {
+                var previousOperator = player.ActiveOperator;
                 player.ActiveOperator = card.Op;
                 Logger.LogInformation(
                     "ActiveOperatorMode: [{id}] set active operator to [{op}].", player.PlayerId, card.Op);
+                State.LastOperatorChange = new OperatorChangeInfo(
+                    player.PlayerId, player.DisplayName, previousOperator, card.Op);
                 return;
             }
 

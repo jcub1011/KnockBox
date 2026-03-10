@@ -39,6 +39,11 @@ namespace KnockBox.Components.Pages.Games.CardCounter
         private bool _operatorResultDismissed;
         private int _toastKey;
 
+        // ── Operator change toast state (Active Operator Mode) ────────────────
+        private OperatorChangeInfo? _cachedOperatorChange;
+        private bool _operatorChangeDismissed;
+        private int _opChangeToastKey;
+
         // ── Reorder state ─────────────────────────────────────────────────────
         protected List<int> SelectedReorderIndices = new();
 
@@ -57,6 +62,13 @@ namespace KnockBox.Components.Pages.Games.CardCounter
                 _cachedOperatorResult = GameState?.LastOperatorResult;
                 _operatorResultDismissed = false;
                 _toastKey++;
+            }
+
+            if (!ReferenceEquals(GameState?.LastOperatorChange, _cachedOperatorChange))
+            {
+                _cachedOperatorChange = GameState?.LastOperatorChange;
+                _operatorChangeDismissed = false;
+                _opChangeToastKey++;
             }
 
             // Only clear transient UI state (pending card, selected target, etc.) when the
@@ -269,6 +281,11 @@ namespace KnockBox.Components.Pages.Games.CardCounter
         protected void DismissOperatorResult()
         {
             _operatorResultDismissed = true;
+        }
+
+        protected void DismissOperatorChange()
+        {
+            _operatorChangeDismissed = true;
         }
 
         // ── Discard ───────────────────────────────────────────────────────────
