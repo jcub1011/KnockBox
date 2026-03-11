@@ -841,6 +841,88 @@ else if (GameState.GamePlayers.Values.Any(p => p.ActionHand.Count > GameState.Co
                 </div>
             }
         </div>
+        @* ── My Hand ── *@
+        <div class="cc-hand-area">
+            @if (myPlayer.ActionHand.Count == 0)
+            {
+                <div class="cc-hand-empty">No action cards. More will be dealt next round.</div>
+            }
+            else
+            {
+                @* Group by type, sort by name *@
+                var groupedCards = myPlayer.ActionHand
+                .Select((card, idx) => (card, idx))
+                .GroupBy(x => x.card.Action)
+                .OrderBy(g => GetActionCardName(g.Key))
+                .ToList();
+
+                <div class="cc-hand-cards">
+                    @foreach (var group in groupedCards)
+                    {
+                        foreach (var (card, cardIdx) in group)
+                        {
+                            var idx = cardIdx;
+                            bool isPending = _pendingActionCardIndex == idx;
+                            bool isDiscardSelected = _selectedDiscardIndices.Contains(idx);
+
+                            // The card can be played when:
+                            // (a) It is the player's turn (active) with no blocking conditions, OR
+                            // (b) The player is the target of a pending blockable reaction and the card is Comp'd
+                            bool isMyTurn = activeId == myId
+                            && myPlayer.PrivateReveal == null
+                            && !IsOverHandLimit()
+                            && GameState.FeelingLuckyTargetId == null
+                            && GameState.PendingReaction == null
+                            && !GameState.IsNotMyMoneySelecting;
+
+                            bool isReactionCompd = GameState.PendingReaction?.TargetId == myId
+                            && card.Action == ActionType.Compd;
+
+                            bool isFeelingLuckyCompd = GameState.FeelingLuckyTargetId == myId
+                            && (card.Action == ActionType.Compd || card.Action == ActionType.FeelingLucky);
+
+                            bool canPlay = isMyTurn || isReactionCompd || isFeelingLuckyCompd;
+
+                            // Comp'd can only be played as a reaction
+                            if (card.Action == ActionType.Compd)
+                                canPlay = isReactionCompd || isFeelingLuckyCompd;
+
+                            // Skim has extra restrictions: cannot play with empty pot
+                            if (card.Action == ActionType.Skim && !CanPlaySkim())
+                                canPlay = false;
+
+                            // Hedge Your Bet requires at least one card in the shoe
+                            if (card.Action == ActionType.HedgeYourBet && !CanPlayHedgeYourBet())
+                                canPlay = false;
+
+                            // Not My Money cannot be clicked normally. It triggers automatically.
+                            if (card.Action == ActionType.NotMyMoney)
+                                canPlay = false;
+
+                            <div class="cc-action-card @GetActionCardColor(card.Action)
+                                                                                            @(isPending ? "cc-card-pending" : "")
+                                                                                            @(isDiscardSelected ? "cc-card-discard-selected" : "")
+                                                                                            @(!canPlay && !IsOverHandLimit() ? "cc-card-disabled" : "")"
+                                 @onclick="() => OnActionCardClick(idx)">
+                                <div class="cc-card-tooltip">@GetActionCardDescription(card.Action)</div>
+                                <div class="cc-card-corner cc-card-corner-tl">
+                                    <span class="cc-card-suit">@GetActionCardIcon(card.Action)</span>
+                                </div>
+                                <div class="cc-card-center-icon">@GetActionCardIcon(card.Action)</div>
+                                <div class="cc-card-name-label">@GetActionCardName(card.Action)</div>
+                                <div class="cc-card-corner cc-card-corner-br">
+                                    <span class="cc-card-suit cc-card-suit-flipped">@GetActionCardIcon(card.Action)</span>
+                                </div>
+                                @if (RequiresTarget(card.Action))
+                                {
+                                    <div class="cc-card-requires-target" title="Requires a target player">🎯</div>
+                                }
+                            </div>
+                        }
+                    }
+                </div>
+            }
+        </div>
     }
 </div>
 
@@ -930,102 +1012,6 @@ else if (GameState.GamePlayers.Values.Any(p => p.ActionHand.Count > GameState.Co
         }
     </div>
 </div>
-
-@* ── My Hand ── *@
-@if (myPlayer != null)
-{
-    <div class="cc-hand-area">
-        <div class="cc-hand-header">
-            <span class="cc-hand-title">🃏 Your Hand</span>
-            <span class="cc-hand-count @(IsOverHandLimit() ? "cc-over-limit" : "")">
-                @myPlayer.ActionHand.Count / @GameState.Config.ActionHandLimit
-                @if (IsOverHandLimit())
-                {
-                    <span class="cc-over-limit-badge">⚠️ OVER LIMIT</span>
-                }
-            </span>
-        </div>
-        @if (myPlayer.ActionHand.Count == 0)
-        {
-            <div class="cc-hand-empty">No action cards. More will be dealt next round.</div>
-        }
-        else
-        {
-            @* Group by type, sort by name *@
-            var groupedCards = myPlayer.ActionHand
-                .Select((card, idx) => (card, idx))
-                .GroupBy(x => x.card.Action)
-                .OrderBy(g => GetActionCardName(g.Key))
-                .ToList();
-
-            <div class="cc-hand-cards">
-                @foreach (var group in groupedCards)
-                {
-                    foreach (var (card, cardIdx) in group)
-                    {
-                        var idx = cardIdx;
-                        bool isPending = _pendingActionCardIndex == idx;
-                        bool isDiscardSelected = _selectedDiscardIndices.Contains(idx);
-
-                        // The card can be played when:
-                        // (a) It is the player's turn (active) with no blocking conditions, OR
-                        // (b) The player is the target of a pending blockable reaction and the card is Comp'd
-                        bool isMyTurn = activeId == myId
-                            && myPlayer.PrivateReveal == null
-                            && !IsOverHandLimit()
-                            && GameState.FeelingLuckyTargetId == null
-                            && GameState.PendingReaction == null
-                            && !GameState.IsNotMyMoneySelecting;
-
-                        bool isReactionCompd = GameState.PendingReaction?.TargetId == myId
-                            && card.Action == ActionType.Compd;
-
-                        bool isFeelingLuckyCompd = GameState.FeelingLuckyTargetId == myId
-                            && (card.Action == ActionType.Compd || card.Action == ActionType.FeelingLucky);
-
-                        bool canPlay = isMyTurn || isReactionCompd || isFeelingLuckyCompd;
-
-                        // Comp'd can only be played as a reaction
-                        if (card.Action == ActionType.Compd)
-                            canPlay = isReactionCompd || isFeelingLuckyCompd;
-
-                        // Skim has extra restrictions: cannot play with empty pot
-                        if (card.Action == ActionType.Skim && !CanPlaySkim())
-                            canPlay = false;
-
-                        // Hedge Your Bet requires at least one card in the shoe
-                        if (card.Action == ActionType.HedgeYourBet && !CanPlayHedgeYourBet())
-                            canPlay = false;
-
-                        // Not My Money cannot be clicked normally. It triggers automatically.
-                        if (card.Action == ActionType.NotMyMoney)
-                            canPlay = false;
-
-                        <div class="cc-action-card @GetActionCardColor(card.Action)
-                                    @(isPending ? "cc-card-pending" : "")
-                                    @(isDiscardSelected ? "cc-card-discard-selected" : "")
-                                    @(!canPlay && !IsOverHandLimit() ? "cc-card-disabled" : "")"
-                             @onclick="() => OnActionCardClick(idx)">
-                            <div class="cc-card-tooltip">@GetActionCardDescription(card.Action)</div>
-                            <div class="cc-card-corner cc-card-corner-tl">
-                                <span class="cc-card-suit">@GetActionCardIcon(card.Action)</span>
-                            </div>
-                            <div class="cc-card-center-icon">@GetActionCardIcon(card.Action)</div>
-                            <div class="cc-card-name-label">@GetActionCardName(card.Action)</div>
-                            <div class="cc-card-corner cc-card-corner-br">
-                                <span class="cc-card-suit cc-card-suit-flipped">@GetActionCardIcon(card.Action)</span>
-                            </div>
-                            @if (RequiresTarget(card.Action))
-                            {
-                                <div class="cc-card-requires-target" title="Requires a target player">🎯</div>
-                            }
-                        </div>
-                    }
-                }
-            </div>
-        }
-    </div>
-}
 
 @code {
     private string GetPhaseLabel() => GameState?.GamePhase switch
