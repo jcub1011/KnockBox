@@ -439,28 +439,35 @@
     padding: 36px;
     align-items: center;
     justify-content: center;
-    gap: 32px;
+    gap: 24px;
     position: relative;
 }
 
 /* ── Deck Piles ────────────────────────────────────────────────────────────── */
+
+.cc-table-stats {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 12px;
+    flex: 1;
+}
 
 .cc-deck-pile {
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 6px;
+    flex: 1;
     cursor: default;
 }
 
 .cc-pile-stack {
-    position: relative;
-    width: 60px;
-    height: 84px;
+    display: flex;
+    justify-content: center;
 }
 
 .cc-pile-card {
-    position: absolute;
     font-size: 3.5rem;
     line-height: 1;
     filter: drop-shadow(2px 2px 3px rgba(0,0,0,0.5));
@@ -520,6 +527,7 @@
     border: 2px solid rgba(247,213,71,0.3);
     border-radius: 10px;
     padding: 14px 20px;
+    width: 100%;
     min-width: 130px;
 }
 
@@ -567,11 +575,13 @@
 
 .cc-my-panel {
     display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: safe center;
     background: rgba(0,0,0,0.4);
     border: 2px solid rgba(255,255,255,0.15);
     border-radius: 12px;
     padding: 14px 20px;
-    flex-direction: column;
     gap: 12px;
     margin: 0 auto;
     transition: border-color 0.3s, box-shadow 0.3s;
@@ -650,7 +660,7 @@
     background: linear-gradient(145deg, #5b1e1e, #a93226);
     border: 2px solid #f7d547;
     border-radius: 10px;
-    width: 68px;
+    width: 76px;
     height: 80px;
     box-shadow: 0 4px 14px rgba(0,0,0,0.55);
     gap: 2px;
@@ -672,6 +682,7 @@
     letter-spacing: 1.5px;
     color: rgba(255,255,255,0.65);
     text-transform: uppercase;
+    text-align: center;
 }
 
 /* ── Reorder Panel ─────────────────────────────────────────────────────────── */
