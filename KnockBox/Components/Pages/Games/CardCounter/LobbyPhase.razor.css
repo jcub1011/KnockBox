@@ -5,6 +5,7 @@
     display: flex;
     justify-content: safe center;
     padding: 24px;
+    overflow-x: hidden; /* prevent horizontal scroll when settings drawer slides off-screen */
     overflow-y: auto;
     position: relative;
 }

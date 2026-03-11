@@ -354,7 +354,14 @@ else if (GameState.GamePlayers.Values.Any(p => p.ActionHand.Count > GameState.Co
                     <span>[<strong>@GetOperatorSymbol(GameState.PendingNotMyMoneyOperator.Value)</strong>]</span>
                 }
             </h3>
-            <p class="cc-nmm-subtitle">Select a player to apply this operator to their pot, or cancel to apply it to yourself.</p>
+            @if (GameState.Config.ActiveOperatorMode)
+            {
+                <p class="cc-nmm-subtitle">Select a player to apply this operator as their active operator, or cancel to apply it to yourself.</p>
+            }
+            else
+            {
+                <p class="cc-nmm-subtitle">Select a player to apply this operator to their pot, or cancel to apply it to yourself.</p>
+            }
             <div class="cc-nmm-players">
                 @foreach (var pl in GameState.GamePlayers.Values)
                 {
@@ -366,17 +373,33 @@ else if (GameState.GamePlayers.Values.Any(p => p.ActionHand.Count > GameState.Co
                         <span class="cc-nmm-player-balance" title="Balance">
                             <span class="cc-stat-val @(pl.Balance >= 0 ? "cc-positive" : "cc-negative")">@FormatBalance(pl.Balance)</span>
                         </span>
-                        <span class="cc-nmm-player-pot" title="Pot">
-                            @if (pl.Pot.Count > 0)
-                            {
-                                @string.Join("", pl.Pot)
-                                <span class="cc-pot-value"> (@pl.PotValue)</span>
-                            }
-                            else
-                            {
-                                <span>—</span>
-                            }
-                        </span>
+                        @if (GameState.Config.ActiveOperatorMode)
+                        {
+                            <span class="cc-nmm-player-pot" title="Active Operator">
+                                @if (pl.ActiveOperator.HasValue)
+                                {
+                                    <span>⚡ @GetOperatorSymbol(pl.ActiveOperator.Value)</span>
+                                }
+                                else
+                                {
+                                    <span>—</span>
+                                }
+                            </span>
+                        }
+                        else
+                        {
+                            <span class="cc-nmm-player-pot" title="Pot">
+                                @if (pl.Pot.Count > 0)
+                                {
+                                    @string.Join("", pl.Pot)
+                                    <span class="cc-pot-value"> (@pl.PotValue)</span>
+                                }
+                                else
+                                {
+                                    <span>—</span>
+                                }
+                            </span>
+                        }
                         @if (isNmmTarget)
                         {
                             <span class="cc-target-selected-mark">🎯</span>
@@ -561,20 +584,39 @@ else if (GameState.GamePlayers.Values.Any(p => p.ActionHand.Count > GameState.Co
                         <span class="cc-stat-icon">💰</span>
                         <span class="cc-stat-val @(pl.Balance >= 0 ? "cc-positive" : "cc-negative")">@FormatBalance(pl.Balance)</span>
                     </div>
-                    <div class="cc-opp-stat" title="Pot">
-                        <span class="cc-stat-icon">🎰</span>
-                        <span class="cc-stat-val">
-                            @if (pl.Pot.Count > 0)
-                            {
-                                @string.Join("", pl.Pot)
-                                <span class="cc-pot-value"> (@pl.PotValue)</span>
-                            }
-                            else
-                            {
-                                <span class="cc-empty-pot">—</span>
-                            }
-                        </span>
-                    </div>
+                    @if (GameState.Config.ActiveOperatorMode)
+                    {
+                        <div class="cc-opp-stat" title="Active Operator">
+                            <span class="cc-stat-icon">⚡</span>
+                            <span class="cc-stat-val">
+                                @if (pl.ActiveOperator.HasValue)
+                                {
+                                    @GetOperatorSymbol(pl.ActiveOperator.Value)
+                                }
+                                else
+                                {
+                                    <span class="cc-empty-pot">—</span>
+                                }
+                            </span>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="cc-opp-stat" title="Pot">
+                            <span class="cc-stat-icon">🎰</span>
+                            <span class="cc-stat-val">
+                                @if (pl.Pot.Count > 0)
+                                {
+                                    @string.Join("", pl.Pot)
+                                    <span class="cc-pot-value"> (@pl.PotValue)</span>
+                                }
+                                else
+                                {
+                                    <span class="cc-empty-pot">—</span>
+                                }
+                            </span>
+                        </div>
+                    }
                     @* <div class="cc-opp-stat" title="Passes remaining">
                         <span class="cc-stat-icon">🎫</span>
                         <span class="cc-stat-val">@pl.PassesRemaining</span>
@@ -725,21 +767,24 @@ else if (GameState.GamePlayers.Values.Any(p => p.ActionHand.Count > GameState.Co
                         @FormatBalance(myPlayer.Balance)
                     </span>
                 </div>
-                <div class="cc-my-stat" title="Your pot">
-                    <span class="cc-stat-icon">🎰</span>
-                    <span class="cc-stat-label">Pot</span>
-                    <span class="cc-stat-val">
-                        @if (myPlayer.Pot.Count > 0)
-                        {
-                            @string.Join("", myPlayer.Pot)
-                            <span class="cc-pot-value"> (@myPlayer.PotValue)</span>
-                        }
-                        else
-                        {
-                            <span class="cc-empty-pot">empty</span>
-                        }
-                    </span>
-                </div>
+                @if (!GameState.Config.ActiveOperatorMode)
+                {
+                    <div class="cc-my-stat" title="Your pot">
+                        <span class="cc-stat-icon">🎰</span>
+                        <span class="cc-stat-label">Pot</span>
+                        <span class="cc-stat-val">
+                            @if (myPlayer.Pot.Count > 0)
+                            {
+                                @string.Join("", myPlayer.Pot)
+                                <span class="cc-pot-value"> (@myPlayer.PotValue)</span>
+                            }
+                            else
+                            {
+                                <span class="cc-empty-pot">empty</span>
+                            }
+                        </span>
+                    </div>
+                }
                 @if (myPlayer.ExtraTurns > 0)
                 {
                     <div class="cc-my-stat cc-extra-turns-stat" title="Extra turns queued from Let It Ride">
@@ -756,21 +801,39 @@ else if (GameState.GamePlayers.Values.Any(p => p.ActionHand.Count > GameState.Co
             </div>
 
             @* ── Action Buttons ── *@
-            @if (activeId == myId && myPlayer.PrivateReveal == null && !IsOverHandLimit())
-            {
-                <div class="cc-action-buttons">
-                    <button class="cc-btn cc-btn-draw" @onclick="DrawCard" title="Draw the top card from the shoe">
-                        🃏 Draw
-                    </button>
-                </div>
-            }
-            else if (activeId != myId && myPlayer.PrivateReveal == null && !IsOverHandLimit())
-            {
-                var activeName = GameState.GamePlayers.TryGetValue(activeId, out var ap) ? ap.DisplayName : "...";
-                <div class="cc-waiting-turn">
-                    <span>⌛ Waiting for <strong>@activeName</strong></span>
-                </div>
-            }
+            <div class="cc-action-row">
+                @if (activeId == myId && myPlayer.PrivateReveal == null && !IsOverHandLimit())
+                {
+                    <div class="cc-action-buttons">
+                        <button class="cc-btn cc-btn-draw" @onclick="DrawCard" title="Draw the top card from the shoe">
+                            🃏 Draw
+                        </button>
+                    </div>
+                }
+                else if (activeId != myId && myPlayer.PrivateReveal == null && !IsOverHandLimit())
+                {
+                    var activeName = GameState.GamePlayers.TryGetValue(activeId, out var ap) ? ap.DisplayName : "...";
+                    <div class="cc-waiting-turn">
+                        <span>⌛ Waiting for <strong>@activeName</strong></span>
+                    </div>
+                }
+                @if (GameState.Config.ActiveOperatorMode)
+                {
+                    <div class="cc-active-op-card" title="Your active operator">
+                        <span class="cc-active-op-symbol">
+                            @if (myPlayer.ActiveOperator.HasValue)
+                            {
+                                @GetOperatorSymbol(myPlayer.ActiveOperator.Value)
+                            }
+                            else
+                            {
+                                <span class="cc-empty-pot">—</span>
+                            }
+                        </span>
+                        <span class="cc-active-op-label">ACTIVE OP</span>
+                    </div>
+                }
+            </div>
 
             @* ── Make My Luck Reorder ── *@
             @if (myPlayer.PrivateReveal != null)

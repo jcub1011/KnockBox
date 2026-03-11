@@ -626,10 +626,52 @@
     justify-content: safe center;
 }
 
+.cc-action-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    justify-content: safe center;
+}
+
 .cc-waiting-turn {
     font-size: 0.95rem;
     color: rgba(255,255,255,0.6);
     font-style: italic;
+}
+
+/* ── Active Operator Card (Active Operator Mode) ──────────────────────────── */
+
+.cc-active-op-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(145deg, #5b1e1e, #a93226);
+    border: 2px solid #f7d547;
+    border-radius: 10px;
+    width: 68px;
+    height: 80px;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.55);
+    gap: 2px;
+    flex-shrink: 0;
+}
+
+.cc-active-op-symbol {
+    font-size: 2rem;
+    font-weight: 900;
+    color: #fff;
+    line-height: 1;
+    font-family: var(--font-mono);
+    text-shadow: 0 2px 4px rgba(0,0,0,0.6);
+}
+
+.cc-active-op-label {
+    font-size: 0.55rem;
+    font-weight: 800;
+    letter-spacing: 1.5px;
+    color: rgba(255,255,255,0.65);
+    text-transform: uppercase;
 }
 
 /* ── Reorder Panel ─────────────────────────────────────────────────────────── */
