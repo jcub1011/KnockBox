@@ -147,6 +147,12 @@
     background: linear-gradient(145deg, #4a235a, #7d3c98);
 }
 
+.cc-card-event-card-icon {
+    font-size: 5rem;
+    padding: 0px;
+    line-height: 0;
+}
+
 .cc-card-event-value {
     font-size: 2rem;
     font-weight: 900;
@@ -198,7 +204,7 @@
     justify-content: safe center;
     height: 100%;
     width: 100%;
-    gap: 16px;
+    gap: 24px;
     overflow-y: auto;
     margin: auto;
     padding: 16px;
@@ -436,31 +442,39 @@
     border: 14px solid #5c3411;
     box-shadow: inset 0 0 80px rgba(0,0,0,0.4), 0 8px 40px rgba(0,0,0,0.6), inset 0 0 20px rgba(255,255,255,0.02);
     margin: 0;
-    padding: 36px;
+    padding: 16px 24px;
     align-items: center;
     justify-content: center;
-    gap: 32px;
+    gap: 24px;
     position: relative;
 }
 
 /* ── Deck Piles ────────────────────────────────────────────────────────────── */
+
+.cc-table-stats {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 12px;
+    flex: 3;
+    min-width: 250px;
+}
 
 .cc-deck-pile {
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 6px;
+    flex: 1;
     cursor: default;
 }
 
 .cc-pile-stack {
-    position: relative;
-    width: 60px;
-    height: 84px;
+    display: flex;
+    justify-content: center;
 }
 
 .cc-pile-card {
-    position: absolute;
     font-size: 3.5rem;
     line-height: 1;
     filter: drop-shadow(2px 2px 3px rgba(0,0,0,0.5));
@@ -509,17 +523,22 @@
     opacity: 0.5;
 }
 
-/* ── Shoe Stats (center panel on table) ─────────────────────────────────── */
+.cc-main-shoe-pile {
+    gap: 12px;
+}
 
+.cc-deck-pile {
+    gap: 12px;
+}
+
+/* ── Shoe Stats (center panel on table) ─────────────────────────────────── */
 .cc-shoe-stats {
     display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 10px;
-    background: rgba(0,0,0,0.35);
-    border: 2px solid rgba(247,213,71,0.3);
-    border-radius: 10px;
-    padding: 14px 20px;
+    flex-direction: row;
+    justify-content: safe center;
+    gap: 12px;
+    width: 100%;
+    max-width: 500px;
     min-width: 130px;
 }
 
@@ -552,7 +571,9 @@
 }
 
 .cc-shoe-badge {
-    font-size: 0.7rem;
+    display: flex;
+    justify-content: center;
+    font-size: 0.8rem;
     font-weight: 800;
     color: #f7d547;
     text-transform: uppercase;
@@ -563,15 +584,20 @@
     border: 1px solid rgba(247,213,71,0.3);
 }
 
-/* ── My Player Panel ──────────────────────────────────────────────────────── */
+.cc-shoe-badge span {
+    margin: auto;
+}
 
+/* ── My Player Panel ──────────────────────────────────────────────────────── */
 .cc-my-panel {
     display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: safe center;
     background: rgba(0,0,0,0.4);
     border: 2px solid rgba(255,255,255,0.15);
     border-radius: 12px;
     padding: 14px 20px;
-    flex-direction: column;
     gap: 12px;
     margin: 0 auto;
     transition: border-color 0.3s, box-shadow 0.3s;
@@ -626,10 +652,53 @@
     justify-content: safe center;
 }
 
+.cc-action-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    justify-content: safe center;
+}
+
 .cc-waiting-turn {
     font-size: 0.95rem;
     color: rgba(255,255,255,0.6);
     font-style: italic;
+}
+
+/* ── Active Operator Card (Active Operator Mode) ──────────────────────────── */
+
+.cc-active-op-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(145deg, #5b1e1e, #a93226);
+    border: 2px solid #f7d547;
+    border-radius: 10px;
+    width: 76px;
+    height: 80px;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.55);
+    gap: 2px;
+    flex-shrink: 0;
+}
+
+.cc-active-op-symbol {
+    font-size: 2rem;
+    font-weight: 900;
+    color: #fff;
+    line-height: 1;
+    font-family: var(--font-mono);
+    text-shadow: 0 2px 4px rgba(0,0,0,0.6);
+}
+
+.cc-active-op-label {
+    font-size: 0.55rem;
+    font-weight: 800;
+    letter-spacing: 1.5px;
+    color: rgba(255,255,255,0.65);
+    text-transform: uppercase;
+    text-align: center;
 }
 
 /* ── Reorder Panel ─────────────────────────────────────────────────────────── */
@@ -799,9 +868,9 @@
 
 .cc-hand-area {
     width: 100%;
-    background: rgba(0,0,0,0.5);
+    /*background: rgba(0,0,0,0.5);
     border-top: 3px solid #8B6914;
-    padding: 12px 16px 16px;
+    padding: 12px 16px 16px;*/
     display: flex;
     flex-direction: column;
     gap: 10px;
@@ -862,8 +931,9 @@
     display: flex;
     flex-direction: row;
     flex-wrap: wrap;
+    justify-content: safe center;
     gap: 10px;
-    padding: 0 24px;
+    /*padding: 0 24px;*/
 }
 
 /* ── Action Cards ─────────────────────────────────────────────────────────── */
@@ -1117,6 +1187,7 @@
 .cc-discard-pile {
     cursor: pointer;
     transition: transform 0.15s, filter 0.15s;
+    flex: 2;
 }
 
 .cc-discard-pile:hover {
@@ -1364,6 +1435,8 @@
 }
 
 .cc-shoe-anim-subtitle {
+    display: flex;
+    flex-direction: column;
     font-size: 1rem;
     color: rgba(255,255,255,0.7);
     font-style: italic;
@@ -2054,4 +2127,130 @@
     font-weight: 700;
     font-family: var(--font-mono);
     text-align: right;
+}
+
+/* ── Balance Change Toast (Active Operator Mode) ──────────────────────────── */
+
+.cc-balance-change-toast {
+    position: fixed;
+    top: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 2100;
+    background: #1a1a1a;
+    border: 3px solid #f7d547;
+    border-radius: 16px;
+    padding: 18px 32px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    min-width: 220px;
+    text-align: center;
+    pointer-events: none;
+    animation: balanceChangeFade 3s ease-in-out forwards;
+}
+
+.cc-balance-change-gain {
+    border-color: #2ecc71;
+}
+
+.cc-balance-change-loss {
+    border-color: #e74c3c;
+}
+
+.cc-balance-change-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 1.4rem;
+    font-weight: 900;
+    font-family: var(--font-mono);
+}
+
+.cc-balance-change-before {
+    opacity: 0.6;
+}
+
+.cc-balance-change-arrow {
+    color: rgba(255,255,255,0.4);
+    font-size: 1.1rem;
+}
+
+.cc-balance-change-after {
+    font-size: 1.6rem;
+}
+
+.cc-balance-change-delta {
+    font-size: 1.05rem;
+    font-weight: 700;
+    font-family: var(--font-mono);
+    color: rgba(255,255,255,0.85);
+}
+
+@keyframes balanceChangeFade {
+    0%   { opacity: 0; transform: translateX(-50%) translateY(-16px); }
+    12%  { opacity: 1; transform: translateX(-50%) translateY(0); }
+    75%  { opacity: 1; transform: translateX(-50%) translateY(0); }
+    100% { opacity: 0; transform: translateX(-50%) translateY(-16px); }
+}
+
+/* ── Operator Change Toast (Active Operator Mode) ─────────────────────────── */
+
+.cc-op-change-toast {
+    position: fixed;
+    top: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 2100;
+    background: #1a1a1a;
+    border: 3px solid #f7d547;
+    border-radius: 16px;
+    padding: 16px 32px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    min-width: 200px;
+    text-align: center;
+    pointer-events: none;
+    animation: balanceChangeFade 3s ease-in-out forwards;
+}
+
+.cc-op-change-label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: #f7d547;
+}
+
+.cc-op-change-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    font-size: 2rem;
+    font-weight: 900;
+    font-family: var(--font-mono);
+}
+
+.cc-op-change-prev {
+    opacity: 0.45;
+    color: rgba(255,255,255,0.7);
+}
+
+.cc-op-change-none {
+    font-size: 1.2rem;
+    opacity: 0.3;
+}
+
+.cc-op-change-arrow {
+    font-size: 1.2rem;
+    color: rgba(255,255,255,0.35);
+}
+
+.cc-op-change-new {
+    font-size: 2.4rem;
+    color: #f7d547;
+    text-shadow: 0 0 12px rgba(247,213,71,0.6);
 }

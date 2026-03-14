@@ -52,6 +52,13 @@
         User? CurrentUser { get; }
 
         /// <summary>
+        /// Raised once when <see cref="InitializeCurrentUserAsync"/> completes and
+        /// <see cref="CurrentUser"/> becomes non-null. Subscribers can call
+        /// <c>StateHasChanged()</c> to refresh UI that depends on the current user.
+        /// </summary>
+        event Action? UserInitialized;
+
+        /// <summary>
         /// Initializes the current user.
         /// </summary>
         /// <param name="ct"></param>

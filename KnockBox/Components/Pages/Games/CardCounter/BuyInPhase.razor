@@ -1,3 +1,4 @@
+@using KnockBox.CardCounter.Services.Logic.Formatting
 @using KnockBox.Services.State.Users
 @using KnockBox.Services.State.Games.CardCounter
 
@@ -47,7 +48,7 @@
         {
             <div class="cc-buyin-waiting">
                 <span>Your starting balance: </span>
-                <span class="cc-balance @(myPlayer.Balance >= 0 ? "cc-positive" : "cc-negative")">@FormatBalance(myPlayer.Balance)</span>
+                <span class="cc-balance @(myPlayer.Balance >= 0 ? "cc-positive" : "cc-negative")">@myPlayer.Balance.FormatBalance()</span>
                 <br />
                 <span class="cc-waiting-text">Waiting for other players...</span>
             </div>

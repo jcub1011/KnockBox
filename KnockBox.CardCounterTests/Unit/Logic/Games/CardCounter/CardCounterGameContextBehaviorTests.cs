@@ -342,6 +342,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             _randomMock.Setup(r => r.GetRandomInt(0, totalWeight, RandomType.Secure)).Returns(0);
             var context = new CardCounterGameContext(state, _randomMock.Object, _loggerMock.Object);
             var firstCard = context.GetRandomActionCard();
+            Assert.IsNotNull(firstCard, "roll=0 must return a card");
             Assert.AreNotEqual(ActionType.Tilt, firstCard.Action, "roll=0 must not return Tilt");
 
             // Compute the roll that lands on Tilt: sum of weights for all cards before Tilt in enum order.
@@ -350,6 +351,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             int tiltRoll = tiltIndex * 10; // each non-Tilt card before Tilt contributes weight 10
             _randomMock.Setup(r => r.GetRandomInt(0, totalWeight, RandomType.Secure)).Returns(tiltRoll);
             var tiltCard = context.GetRandomActionCard();
+            Assert.IsNotNull(tiltCard, "tiltRoll must return a card");
             Assert.AreEqual(ActionType.Tilt, tiltCard.Action,
                 $"roll={tiltRoll} must land on Tilt (index {tiltIndex} in enum)");
         }

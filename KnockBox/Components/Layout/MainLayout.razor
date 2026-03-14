@@ -1,12 +1,15 @@
 ﻿@using KnockBox.Services.Navigation
 @using KnockBox.Services.Navigation.Games
 @using KnockBox.Services.State.Games.Shared
+@using KnockBox.Services.State.Users
+@using Microsoft.AspNetCore.Components.Routing
 
 @inherits LayoutComponentBase
+@implements IDisposable
 
 <div class="main">
     <header>
-        @if (GameSessionService.TryGetCurrentSession(out var currentSession))
+        @if (!_isOnHomePage && GameSessionService.TryGetCurrentSession(out var currentSession))
         {
             <a href="@NavigationService.GetHomeUri()" title="Click to return home">
                 @(currentSession.LobbyRegistration.GameType.TryGetDescription(out var description)
@@ -40,10 +43,49 @@
 @code {
     [Inject] INavigationService NavigationService { get; set; } = default!;
     [Inject] IGameSessionService GameSessionService { get; set; } = default!;
+    [Inject] IUserService UserService { get; set; } = default!;
+    [Inject] NavigationManager NavigationManager { get; set; } = default!;
     [Inject] IJSRuntime JSRuntime { get; set; } = default!;
     [Inject] ILogger<MainLayout> Logger { get; set; } = default!;
 
     private bool _isRoomCodeRevealed;
+    private bool _isOnHomePage;
+
+    protected override void OnInitialized()
+    {
+        _isOnHomePage = IsHomePage();
+        NavigationManager.LocationChanged += OnLocationChanged;
+        UserService.UserInitialized += OnUserInitialized;
+    }
+
+    private bool IsHomePage()
+    {
+        var relPath = NavigationManager.ToBaseRelativePath(NavigationManager.Uri).TrimEnd('/');
+        return relPath is "" or "home";
+    }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        _isOnHomePage = IsHomePage();
+        // Reset the room-code reveal state when the user navigates away from/to a room.
+        _isRoomCodeRevealed = false;
+        _ = InvokeAsync(StateHasChanged).ContinueWith(
+            t => Logger.LogError(t.Exception, "Error refreshing layout after navigation."),
+            TaskContinuationOptions.OnlyOnFaulted);
+    }
+
+    private void OnUserInitialized()
+    {
+        _ = InvokeAsync(StateHasChanged).ContinueWith(
+            t => Logger.LogError(t.Exception, "Error refreshing layout after user initialization."),
+            TaskContinuationOptions.OnlyOnFaulted);
+    }
+
+    public void Dispose()
+    {
+        NavigationManager.LocationChanged -= OnLocationChanged;
+        UserService.UserInitialized -= OnUserInitialized;
+    }
 
     private void ToggleRoomCode() => _isRoomCodeRevealed = !_isRoomCodeRevealed;
 
@@ -57,11 +99,5 @@
         {
             Logger.LogError(ex, "Error copying lobby code.");
         }
-    }
-
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        await base.OnAfterRenderAsync(firstRender);
-
     }
 }

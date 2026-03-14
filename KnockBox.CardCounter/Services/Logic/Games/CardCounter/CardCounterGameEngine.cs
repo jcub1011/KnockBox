@@ -63,8 +63,22 @@ namespace KnockBox.Services.Logic.Games.CardCounter
 
             if (executeResult.IsFailure) return executeResult;
 
-            // Transition into the initial FSM state (BuyIn)
-            TransitionTo(context, new BuyInState());
+            // Transition into the initial FSM state.
+            // In Active Operator Mode the buy-in step is skipped: every player starts with a
+            // balance of 10 and the game goes straight to the first round.
+            if (gameState.Config.ActiveOperatorMode)
+            {
+                foreach (var ps in context.State.GamePlayers.Values)
+                {
+                    ps.Balance = 10;
+                    ps.HasSetBuyIn = true;
+                }
+                TransitionTo(context, new RoundEndState());
+            }
+            else
+            {
+                TransitionTo(context, new BuyInState());
+            }
             return Result.Success;
         }
 
@@ -225,7 +239,21 @@ namespace KnockBox.Services.Logic.Games.CardCounter
                 state.PendingNotMyMoneyOperator = null;
                 state.ForceDrawStack.Clear();
                 InitializeGame(context);
-                TransitionTo(context, new BuyInState());
+
+                // Respect Active Operator Mode on reset: same logic as StartAsync.
+                if (state.Config.ActiveOperatorMode)
+                {
+                    foreach (var ps in context.State.GamePlayers.Values)
+                    {
+                        ps.Balance = 10;
+                        ps.HasSetBuyIn = true;
+                    }
+                    TransitionTo(context, new RoundEndState());
+                }
+                else
+                {
+                    TransitionTo(context, new BuyInState());
+                }
             });
         }
 
@@ -318,7 +346,8 @@ namespace KnockBox.Services.Logic.Games.CardCounter
                     PlayerId = user.Id,
                     DisplayName = user.Name,
                     PassesRemaining = state.Config.TotalPassesPerPlayer,
-                    BuyInRoll = randomNumberService.GetRandomInt(1, 7, RandomType.Fast)
+                    BuyInRoll = randomNumberService.GetRandomInt(1, 7, RandomType.Fast),
+                    ActiveOperator = state.Config.ActiveOperatorMode ? Operator.Add : null
                 };
 
                 state.GamePlayers[user.Id] = ps;

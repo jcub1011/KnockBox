@@ -1,3 +1,4 @@
+@using KnockBox.CardCounter.Services.Logic.Formatting
 @using KnockBox.Services.State.Users
 @using KnockBox.Services.State.Games.CardCounter
 
@@ -29,10 +30,7 @@
                     <span class="cc-rank">@medal</span>
                     <span class="cc-player-result-name">@p.DisplayName</span>
                     <span class="cc-player-result-balance @(p.Balance >= 0 ? "cc-positive" : "cc-negative")">
-                        @FormatBalance(p.Balance)
-                    </span>
-                    <span class="cc-player-result-abs">
-                        (Δ @Math.Abs(p.Balance) from 0)
+                        @p.Balance.FormatBalance()
                     </span>
                 </div>
             }

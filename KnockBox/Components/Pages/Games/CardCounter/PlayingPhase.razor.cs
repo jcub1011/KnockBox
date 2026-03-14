@@ -37,6 +37,12 @@ namespace KnockBox.Components.Pages.Games.CardCounter
         // ── Operator result overlay state ─────────────────────────────────────
         private OperatorResultInfo? _cachedOperatorResult;
         private bool _operatorResultDismissed;
+        private int _toastKey;
+
+        // ── Operator change toast state (Active Operator Mode) ────────────────
+        private OperatorChangeInfo? _cachedOperatorChange;
+        private bool _operatorChangeDismissed;
+        private int _opChangeToastKey;
 
         // ── Reorder state ─────────────────────────────────────────────────────
         protected List<int> SelectedReorderIndices = new();
@@ -49,10 +55,26 @@ namespace KnockBox.Components.Pages.Games.CardCounter
         protected override void OnParametersSet()
         {
             // Reset the operator overlay dismissed flag when a new operator result arrives.
-            if (GameState?.LastOperatorResult != _cachedOperatorResult)
+            // Use reference equality so that two consecutive draws with identical values
+            // (same before/after balance) each trigger the toast independently.
+            if (!ReferenceEquals(GameState?.LastOperatorResult, _cachedOperatorResult))
             {
                 _cachedOperatorResult = GameState?.LastOperatorResult;
                 _operatorResultDismissed = false;
+                _toastKey++;
+                // Dismiss the operator-change toast when a new balance result arrives so the
+                // two toasts never overlap.
+                _operatorChangeDismissed = true;
+            }
+
+            if (!ReferenceEquals(GameState?.LastOperatorChange, _cachedOperatorChange))
+            {
+                _cachedOperatorChange = GameState?.LastOperatorChange;
+                _operatorChangeDismissed = false;
+                _opChangeToastKey++;
+                // Dismiss the balance-change toast when the operator changes so the
+                // two toasts never overlap.
+                _operatorResultDismissed = true;
             }
 
             // Only clear transient UI state (pending card, selected target, etc.) when the
@@ -267,6 +289,11 @@ namespace KnockBox.Components.Pages.Games.CardCounter
             _operatorResultDismissed = true;
         }
 
+        protected void DismissOperatorChange()
+        {
+            _operatorChangeDismissed = true;
+        }
+
         // ── Discard ───────────────────────────────────────────────────────────
 
         protected void ToggleDiscardSelection(int index)
@@ -401,11 +428,6 @@ namespace KnockBox.Components.Pages.Games.CardCounter
             Operator.Divide => "÷",
             _ => "?"
         };
-
-        protected static string FormatBalance(double balance)
-        {
-            return balance >= 0 ? $"+{balance:N0}" : $"{balance:N0}";
-        }
 
         protected static string FormatBaseCardDisplay(BaseCard card) => card switch
         {
