@@ -21,14 +21,18 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM
 
         /// <summary>
         /// Filtered pool used when Active Operator Mode is enabled: excludes
-        /// <see cref="ActionType.Skim"/> and <see cref="ActionType.TurnTheTable"/> from the
+        /// <see cref="ActionType.Skim"/>, <see cref="ActionType.TurnTheTable"/>,
+        /// <see cref="ActionType.Launder"/>, and <see cref="ActionType.NotMyMoney"/> from the
         /// deal pool since those cards operate on the pot, which does not exist in Active
         /// Operator Mode. Note: TurnTheTable is still handled if played and will reverse the
         /// target's balance digits instead of reversing a pot.
         /// </summary>
         private static readonly ActionCard[] ActionCardPoolActiveOperator =
             Enum.GetValues<ActionType>()
-                .Where(t => t != ActionType.Skim && t != ActionType.TurnTheTable)
+                .Where(t => t != ActionType.Skim
+                         && t != ActionType.TurnTheTable
+                         && t != ActionType.Launder
+                         && t != ActionType.NotMyMoney)
                 .Select(t => new ActionCard(t))
                 .ToArray();
 
@@ -112,8 +116,8 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM
 
         /// <summary>Returns a random action card from the pool using configurable per-card weights.
         /// Cards whose weight is 0 are excluded from the pool.
-        /// When <see cref="GameConfig.ActiveOperatorMode"/> is enabled, Skim and Turn The Table
-        /// are also excluded from the pool.
+        /// When <see cref="GameConfig.ActiveOperatorMode"/> is enabled, Skim, Turn The Table,
+        /// Launder, and Not My Money are also excluded from the pool.
         /// Returns <c>null</c> if no cards remain after filtering (all weights are 0).</summary>
         public ActionCard? GetRandomActionCard()
         {

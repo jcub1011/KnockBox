@@ -429,11 +429,6 @@ namespace KnockBox.Components.Pages.Games.CardCounter
             _ => "?"
         };
 
-        protected static string FormatBalance(double balance)
-        {
-            return balance >= 0 ? $"+{balance:N0}" : $"{balance:N0}";
-        }
-
         protected static string FormatBaseCardDisplay(BaseCard card) => card switch
         {
             NumberCard nc => $"{nc.Value}",

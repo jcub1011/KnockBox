@@ -13,7 +13,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
     /// <summary>
     /// Tests for Active Operator Mode rules: number cards apply directly to balance using
     /// the player's active operator, operator cards replace the active operator, and
-    /// Skim/TurnTheTable are excluded from the action card pool.
+    /// Skim/TurnTheTable/Launder/NotMyMoney are excluded from the action card pool.
     /// </summary>
     [TestClass]
     public class ActiveOperatorModeTests
@@ -188,10 +188,11 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
         // ── Action card pool filtering ────────────────────────────────────────
 
         [TestMethod]
-        public void GetRandomActionCard_ActiveOperatorMode_ExcludesSkimAndTurnTheTableFromPool()
+        public void GetRandomActionCard_ActiveOperatorMode_ExcludesSkimTurnTheTableLaunderAndNotMyMoneyFromPool()
         {
-            // Verify by inspecting the pool weight: Active Operator Mode excludes Skim and
-            // TurnTheTable, so the RNG upper bound should differ from the full pool.
+            // Verify by inspecting the pool weight: Active Operator Mode excludes Skim,
+            // TurnTheTable, Launder, and NotMyMoney, so the RNG upper bound should differ
+            // from the full pool.
             // We cover the behavior by checking what action types can be returned when the
             // RNG always rolls the first card in the pool.
             int capturedMax = -1;
@@ -202,12 +203,14 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             // The returned card when roll=0 is the first in the filtered pool
             var card = _context.GetRandomActionCard();
 
-            // Full pool has 11 types (total weight 101); filtered pool has 9 (total weight 81)
-            Assert.AreEqual(81, capturedMax,
-                "Active Operator Mode pool (9 cards, weight=81) should be used, not the full pool.");
+            // Full pool has 11 types (total weight 101); filtered pool has 7 (total weight 61)
+            Assert.AreEqual(61, capturedMax,
+                "Active Operator Mode pool (7 cards, weight=61) should be used, not the full pool.");
             Assert.IsNotNull(card, "A card should be returned when weights are non-zero.");
             Assert.AreNotEqual(ActionType.Skim, card.Action, "Skim must not be in the pool.");
             Assert.AreNotEqual(ActionType.TurnTheTable, card.Action, "TurnTheTable must not be in the pool.");
+            Assert.AreNotEqual(ActionType.Launder, card.Action, "Launder must not be in the pool.");
+            Assert.AreNotEqual(ActionType.NotMyMoney, card.Action, "NotMyMoney must not be in the pool.");
         }
 
         [TestMethod]
@@ -236,10 +239,10 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
 
             _context.GetRandomActionCard();
 
-            // Active Operator Mode: 9 action types (Skim + TurnTheTable excluded),
-            // 8 with weight=10, Tilt with weight=1 → total=81
-            Assert.AreEqual(81, capturedMax,
-                "Active Operator Mode pool should exclude Skim and TurnTheTable (total weight=81).");
+            // Active Operator Mode: 7 action types (Skim, TurnTheTable, Launder, NotMyMoney excluded),
+            // 6 with weight=10, Tilt with weight=1 → total=61
+            Assert.AreEqual(61, capturedMax,
+                "Active Operator Mode pool should exclude Skim, TurnTheTable, Launder, and NotMyMoney (total weight=61).");
         }
 
         // ── Zero-weight card exclusion ────────────────────────────────────────
