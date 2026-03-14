@@ -147,6 +147,12 @@
     background: linear-gradient(145deg, #4a235a, #7d3c98);
 }
 
+.cc-card-event-card-icon {
+    font-size: 5rem;
+    padding: 0px;
+    line-height: 0;
+}
+
 .cc-card-event-value {
     font-size: 2rem;
     font-weight: 900;
@@ -198,7 +204,7 @@
     justify-content: safe center;
     height: 100%;
     width: 100%;
-    gap: 16px;
+    gap: 24px;
     overflow-y: auto;
     margin: auto;
     padding: 16px;
@@ -436,7 +442,7 @@
     border: 14px solid #5c3411;
     box-shadow: inset 0 0 80px rgba(0,0,0,0.4), 0 8px 40px rgba(0,0,0,0.6), inset 0 0 20px rgba(255,255,255,0.02);
     margin: 0;
-    padding: 36px;
+    padding: 16px 24px;
     align-items: center;
     justify-content: center;
     gap: 24px;
@@ -450,7 +456,8 @@
     flex-direction: row;
     flex-wrap: wrap;
     gap: 12px;
-    flex: 1;
+    flex: 3;
+    min-width: 250px;
 }
 
 .cc-deck-pile {
@@ -516,18 +523,22 @@
     opacity: 0.5;
 }
 
-/* ── Shoe Stats (center panel on table) ─────────────────────────────────── */
+.cc-main-shoe-pile {
+    gap: 12px;
+}
 
+.cc-deck-pile {
+    gap: 12px;
+}
+
+/* ── Shoe Stats (center panel on table) ─────────────────────────────────── */
 .cc-shoe-stats {
     display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 10px;
-    background: rgba(0,0,0,0.35);
-    border: 2px solid rgba(247,213,71,0.3);
-    border-radius: 10px;
-    padding: 14px 20px;
+    flex-direction: row;
+    justify-content: safe center;
+    gap: 12px;
     width: 100%;
+    max-width: 500px;
     min-width: 130px;
 }
 
@@ -560,7 +571,9 @@
 }
 
 .cc-shoe-badge {
-    font-size: 0.7rem;
+    display: flex;
+    justify-content: center;
+    font-size: 0.8rem;
     font-weight: 800;
     color: #f7d547;
     text-transform: uppercase;
@@ -571,8 +584,11 @@
     border: 1px solid rgba(247,213,71,0.3);
 }
 
-/* ── My Player Panel ──────────────────────────────────────────────────────── */
+.cc-shoe-badge span {
+    margin: auto;
+}
 
+/* ── My Player Panel ──────────────────────────────────────────────────────── */
 .cc-my-panel {
     display: flex;
     flex-direction: row;
@@ -1171,6 +1187,7 @@
 .cc-discard-pile {
     cursor: pointer;
     transition: transform 0.15s, filter 0.15s;
+    flex: 2;
 }
 
 .cc-discard-pile:hover {
@@ -1418,6 +1435,8 @@
 }
 
 .cc-shoe-anim-subtitle {
+    display: flex;
+    flex-direction: column;
     font-size: 1rem;
     color: rgba(255,255,255,0.7);
     font-style: italic;

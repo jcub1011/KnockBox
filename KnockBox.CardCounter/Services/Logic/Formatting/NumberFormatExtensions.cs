@@ -4,7 +4,7 @@
     {
         public static string FormatBalance(this double balance)
         {
-            if (balance < 1000000.0)
+            if (Math.Abs(balance) < 1000000.0)
             {
                 return balance >= 0 ? $"+{balance:N0}" : $"{balance:N0}";
             }
