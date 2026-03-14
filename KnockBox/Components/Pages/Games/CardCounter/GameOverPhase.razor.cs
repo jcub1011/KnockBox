@@ -28,10 +28,5 @@ namespace KnockBox.Components.Pages.Games.CardCounter
             if (result.TryGetFailure(out var error))
                 Logger.LogError("Failed to reset game: {Error}", error);
         }
-
-        protected static string FormatBalance(double balance)
-        {
-            return balance >= 0 ? $"+{balance:N0}" : $"{balance:N0}";
-        }
     }
 }

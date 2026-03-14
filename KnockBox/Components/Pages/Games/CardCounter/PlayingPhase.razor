@@ -1,3 +1,4 @@
+@using KnockBox.CardCounter.Services.Logic.Formatting
 @using KnockBox.Services.State.Users
 @using KnockBox.Services.State.Games.CardCounter
 @using KnockBox.Services.State.Games.CardCounter.Data
@@ -176,7 +177,7 @@ else if (GameState.GamePlayers.Values.Any(p => p.ActionHand.Count > GameState.Co
                                 <span class="cc-opp-name">@sourcePlayer.DisplayName</span>
                             </div>
                             <div class="cc-opp-stats">
-                                <div class="cc-opp-stat"><span class="cc-stat-icon">💰</span><span class="cc-stat-val @(sourcePlayer.Balance >= 0 ? "cc-positive" : "cc-negative")">@FormatBalance(sourcePlayer.Balance)</span></div>
+                                <div class="cc-opp-stat"><span class="cc-stat-icon">💰</span><span class="cc-stat-val @(sourcePlayer.Balance >= 0 ? "cc-positive" : "cc-negative")">@sourcePlayer.Balance.FormatBalance()</span></div>
                                 <div class="cc-opp-stat"><span class="cc-stat-icon">🎰</span><span class="cc-stat-val">
                                     @if (isSkim && GameState.PendingReaction?.SourceDigitIndex is int sdi && sourcePlayer.Pot.Count > 0)
                                     {
@@ -208,7 +209,7 @@ else if (GameState.GamePlayers.Values.Any(p => p.ActionHand.Count > GameState.Co
                                 <span class="cc-opp-name">@targetPlayer.DisplayName</span>
                             </div>
                             <div class="cc-opp-stats">
-                                <div class="cc-opp-stat"><span class="cc-stat-icon">💰</span><span class="cc-stat-val @(targetPlayer.Balance >= 0 ? "cc-positive" : "cc-negative")">@FormatBalance(targetPlayer.Balance)</span></div>
+                                <div class="cc-opp-stat"><span class="cc-stat-icon">💰</span><span class="cc-stat-val @(targetPlayer.Balance >= 0 ? "cc-positive" : "cc-negative")">@targetPlayer.Balance.FormatBalance()</span></div>
                                 <div class="cc-opp-stat"><span class="cc-stat-icon">🎰</span><span class="cc-stat-val">
                                     @if (isSkim && GameState.PendingReaction?.TargetDigitIndex is int tdi && targetPlayer.Pot.Count > 0)
                                     {
@@ -371,7 +372,7 @@ else if (GameState.GamePlayers.Values.Any(p => p.ActionHand.Count > GameState.Co
                          @onclick="() => { if (!isMe) SelectNotMyMoneyTarget(pl.PlayerId); }">
                         <span class="cc-nmm-player-name">@pl.DisplayName @(isMe ? "(you)" : "")</span>
                         <span class="cc-nmm-player-balance" title="Balance">
-                            <span class="cc-stat-val @(pl.Balance >= 0 ? "cc-positive" : "cc-negative")">@FormatBalance(pl.Balance)</span>
+                            <span class="cc-stat-val @(pl.Balance >= 0 ? "cc-positive" : "cc-negative")">@pl.Balance.FormatBalance()</span>
                         </span>
                         @if (GameState.Config.ActiveOperatorMode)
                         {
@@ -433,11 +434,11 @@ else if (GameState.GamePlayers.Values.Any(p => p.ActionHand.Count > GameState.Co
              @onanimationend="DismissOperatorResult">
             <div class="cc-balance-change-row">
                 <span class="cc-balance-change-before @(opResult.BalanceBefore >= 0 ? "cc-positive" : "cc-negative")">
-                    @FormatBalance(opResult.BalanceBefore)
+                    @opResult.BalanceBefore.FormatBalance()
                 </span>
                 <span class="cc-balance-change-arrow">→</span>
                 <span class="cc-balance-change-after @(opResult.BalanceAfter >= 0 ? "cc-positive" : "cc-negative")">
-                    @FormatBalance(opResult.BalanceAfter)
+                    @opResult.BalanceAfter.FormatBalance()
                 </span>
             </div>
             <span class="cc-balance-change-delta @(opDelta > 0 ? "cc-positive" : opDelta < 0 ? "cc-negative" : "")">
@@ -468,14 +469,14 @@ else if (GameState.GamePlayers.Values.Any(p => p.ActionHand.Count > GameState.Co
                     <div class="cc-operator-result-balance-row">
                         <span class="cc-operator-result-label">Before:</span>
                         <span class="cc-operator-result-val @(opResult.BalanceBefore >= 0 ? "cc-positive" : "cc-negative")">
-                            @FormatBalance(opResult.BalanceBefore)
+                            @opResult.BalanceBefore.FormatBalance()
                         </span>
                     </div>
                     <div class="cc-operator-result-arrow">→</div>
                     <div class="cc-operator-result-balance-row">
                         <span class="cc-operator-result-label">After:</span>
                         <span class="cc-operator-result-val @(opResult.BalanceAfter >= 0 ? "cc-positive" : "cc-negative")">
-                            @FormatBalance(opResult.BalanceAfter)
+                            @opResult.BalanceAfter.FormatBalance()
                         </span>
                     </div>
                 </div>
@@ -582,7 +583,7 @@ else if (GameState.GamePlayers.Values.Any(p => p.ActionHand.Count > GameState.Co
                 <div class="cc-opp-stats">
                     <div class="cc-opp-stat" title="Balance">
                         <span class="cc-stat-icon">💰</span>
-                        <span class="cc-stat-val @(pl.Balance >= 0 ? "cc-positive" : "cc-negative")">@FormatBalance(pl.Balance)</span>
+                        <span class="cc-stat-val @(pl.Balance >= 0 ? "cc-positive" : "cc-negative")">@pl.Balance.FormatBalance()</span>
                     </div>
                     @if (GameState.Config.ActiveOperatorMode)
                     {
@@ -734,7 +735,7 @@ else if (GameState.GamePlayers.Values.Any(p => p.ActionHand.Count > GameState.Co
                     <span class="cc-stat-icon">💰</span>
                     <span class="cc-stat-label">Balance</span>
                     <span class="cc-stat-val @(myPlayer.Balance >= 0 ? "cc-positive" : "cc-negative")">
-                        @FormatBalance(myPlayer.Balance)
+                        @myPlayer.Balance.FormatBalance()
                     </span>
                 </div>
                 @if (!GameState.Config.ActiveOperatorMode)
@@ -943,7 +944,7 @@ else if (GameState.GamePlayers.Values.Any(p => p.ActionHand.Count > GameState.Co
                     <span class="cc-host-lb-rank">@lMedal</span>
                     <span class="cc-host-lb-name">@lp.DisplayName</span>
                     <span class="cc-host-lb-balance @(lp.Balance >= 0 ? "cc-positive" : "cc-negative")">
-                        @FormatBalance(lp.Balance)
+                        @lp.Balance.FormatBalance()
                     </span>
                 </div>
             }

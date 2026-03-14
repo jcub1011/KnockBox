@@ -25,10 +25,5 @@ namespace KnockBox.Components.Pages.Games.CardCounter
             if (UserService.CurrentUser == null) return;
             GameEngine.SetBuyIn(UserService.CurrentUser, GameState, isNegative);
         }
-
-        protected static string FormatBalance(double balance)
-        {
-            return balance >= 0 ? $"+{balance:N0}" : $"{balance:N0}";
-        }
     }
 }
