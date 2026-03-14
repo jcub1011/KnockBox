@@ -699,15 +699,14 @@ else if (GameState.GamePlayers.Values.Any(p => p.ActionHand.Count > GameState.Co
 
             <div class="cc-table-stats">
                 @* ── Current Shoe ── *@
-                <div class="cc-deck-pile cc-shoe-pile" title="Current Shoe — @GameState.CurrentShoe.Count cards remaining">
+                <div class="cc-deck-pile cc-shoe-pile @(CanDrawCard() ? "cc-shoe-pile-active" : "")"
+                     title="@(CanDrawCard() ? "Click to draw a card from the shoe" : $"Current Shoe — {GameState.CurrentShoe.Count} cards remaining")"
+                     @onclick="OnShoeClick">
                     @if (GameState.CurrentShoe.Count > 0)
                     {
                         <div class="cc-pile-stack">
-                            <div class="cc-card-event-card">
-                                <div class="cc-card-event-card-inner">
-                                    <div class="cc-card-event-card-face cc-card-event-card-back"></div>
-                                    <div class="cc-card-event-card-face cc-card-event-card-front cc-card-event-card-icon">🂠</div>
-                                </div>
+                            <div class="cc-shoe-card">
+                                <div class="cc-shoe-card-back">🂠</div>
                             </div>
                         </div>
                     }
@@ -723,11 +722,8 @@ else if (GameState.GamePlayers.Values.Any(p => p.ActionHand.Count > GameState.Co
                 @* ── Main Deck ── *@
                 <div class="cc-deck-pile cc-main-deck-pile" title="Main Deck — @GameState.MainDeck.Count cards remaining">
                     <div class="cc-pile-stack">
-                        <div class="cc-card-event-card">
-                            <div class="cc-card-event-card-inner">
-                                <div class="cc-card-event-card-face cc-card-event-card-back"></div>
-                                <div class="cc-card-event-card-face cc-card-event-card-front cc-card-event-card-icon">🂠</div>
-                            </div>
+                        <div class="cc-main-deck-card">
+                            <div class="cc-main-deck-card-back">🂠</div>
                         </div>
                     </div>
                     <div class="cc-pile-label">DECK</div>
@@ -779,12 +775,11 @@ else if (GameState.GamePlayers.Values.Any(p => p.ActionHand.Count > GameState.Co
 
             @* ── Action Buttons ── *@
             <div class="cc-action-row">
-                @if (activeId == myId && myPlayer.PrivateReveal == null && !IsOverHandLimit())
+                @if (activeId == myId && myPlayer.PrivateReveal == null && !IsOverHandLimit()
+                     && GameState.FeelingLuckyTargetId == null && GameState.PendingReaction == null && !GameState.IsNotMyMoneySelecting)
                 {
-                    <div class="cc-action-buttons">
-                        <button class="cc-btn cc-btn-draw" @onclick="DrawCard" title="Draw the top card from the shoe">
-                            🃏 Draw
-                        </button>
+                    <div class="cc-your-turn-hint">
+                        🃏 Click the <strong>SHOE</strong> to draw a card
                     </div>
                 }
                 else if (activeId != myId && myPlayer.PrivateReveal == null && !IsOverHandLimit())

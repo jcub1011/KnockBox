@@ -531,6 +531,103 @@
     gap: 12px;
 }
 
+/* ── Shoe Pile Card ──────────────────────────────────────────────────────── */
+
+.cc-shoe-card {
+    width: 72px;
+    height: 100px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(145deg, #0d3b66, #1565c0);
+    border: 3px solid #4da6ff;
+    border-radius: 10px;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.6), inset 0 0 12px rgba(77,166,255,0.15);
+    position: relative;
+}
+
+.cc-shoe-card-back {
+    font-size: 3.5rem;
+    line-height: 1;
+    color: rgba(77,166,255,0.7);
+    text-shadow: 0 0 10px rgba(77,166,255,0.5);
+}
+
+/* Active (player's turn) shoe pile highlighting */
+
+.cc-shoe-pile {
+    cursor: default;
+    transition: transform 0.15s, filter 0.15s;
+}
+
+.cc-shoe-pile-active {
+    cursor: pointer;
+}
+
+.cc-shoe-pile-active .cc-shoe-card {
+    border-color: #f7d547;
+    box-shadow: 0 0 0 3px rgba(247,213,71,0.4), 0 6px 18px rgba(0,0,0,0.6), inset 0 0 12px rgba(247,213,71,0.15);
+    animation: shoeGlow 1.4s ease-in-out infinite;
+}
+
+.cc-shoe-pile-active:hover {
+    transform: translateY(-4px);
+    filter: brightness(1.2);
+}
+
+.cc-shoe-pile-active .cc-pile-label {
+    color: #f7d547;
+}
+
+@keyframes shoeGlow {
+    0%, 100% { box-shadow: 0 0 0 3px rgba(247,213,71,0.4), 0 6px 18px rgba(0,0,0,0.6); }
+    50% { box-shadow: 0 0 0 6px rgba(247,213,71,0.65), 0 8px 24px rgba(247,213,71,0.25); }
+}
+
+/* ── Main Deck Card ──────────────────────────────────────────────────────── */
+
+.cc-main-deck-pile {
+    cursor: default;
+}
+
+.cc-main-deck-card {
+    width: 72px;
+    height: 100px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(145deg, #4a1a1a, #8b2020);
+    border: 3px solid #c0392b;
+    border-radius: 10px;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.6), inset 0 0 12px rgba(192,57,43,0.15);
+    position: relative;
+}
+
+.cc-main-deck-card-back {
+    font-size: 3.5rem;
+    line-height: 1;
+    color: rgba(192,57,43,0.7);
+    text-shadow: 0 0 10px rgba(192,57,43,0.5);
+}
+
+/* ── Your Turn Hint ──────────────────────────────────────────────────────── */
+
+.cc-your-turn-hint {
+    font-size: 0.95rem;
+    color: #f7d547;
+    font-weight: 700;
+    background: rgba(247,213,71,0.1);
+    border: 1px solid rgba(247,213,71,0.35);
+    border-radius: 8px;
+    padding: 6px 14px;
+    animation: hintPulse 2s ease-in-out infinite;
+}
+
+@keyframes hintPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.65; }
+}
+
 /* ── Shoe Stats (center panel on table) ─────────────────────────────────── */
 .cc-shoe-stats {
     display: flex;

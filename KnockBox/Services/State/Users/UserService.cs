@@ -2,7 +2,7 @@
 {
     using KnockBox.Data.Services.ClientStorage;
 
-    public class UserService(ILocalStorageService localStorageService, ISessionStorageService sessionStorageService, ILogger<UserService> logger) : IUserService
+    public class UserService(ILocalStorageService localStorageService, ISessionStorageService sessionStorageService, ILogger<UserService> logger) : IUserService, IDisposable
     {
         public User? CurrentUser { get; private set; }
 
@@ -35,6 +35,10 @@
                 logger.LogError(ex, "Error initializing current user service.");
             }
 
+            // Unsubscribe from the previous user (if re-initializing) before replacing it.
+            if (CurrentUser is not null)
+                CurrentUser.NameChanged -= OnNameChanged;
+
             CurrentUser = new(name, id);
             CurrentUser.NameChanged += OnNameChanged;
             UserInitialized?.Invoke();
@@ -50,6 +54,12 @@
             {
                 logger.LogError(ex, "Error saving user name.");
             }
+        }
+
+        public void Dispose()
+        {
+            if (CurrentUser is not null)
+                CurrentUser.NameChanged -= OnNameChanged;
         }
     }
 }
