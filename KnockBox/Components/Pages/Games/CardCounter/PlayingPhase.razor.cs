@@ -139,6 +139,29 @@ namespace KnockBox.Components.Pages.Games.CardCounter
             return GameState != null && GameState.CurrentShoe.Count > 0;
         }
 
+        /// <summary>Returns true when the current user can draw from the shoe on this turn.</summary>
+        protected bool CanDrawCard()
+        {
+            if (GameState == null || UserService.CurrentUser == null) return false;
+            var me = GetMyPlayer();
+            if (me == null) return false;
+            if (GameState.TurnOrder.Count == 0 || GameState.CurrentPlayerIndex >= GameState.TurnOrder.Count) return false;
+            var activeId = GameState.TurnOrder[GameState.CurrentPlayerIndex];
+            return activeId == UserService.CurrentUser.Id
+                && me.PrivateReveal == null
+                && !IsOverHandLimit()
+                && GameState.FeelingLuckyTargetId == null
+                && GameState.PendingReaction == null
+                && !GameState.IsNotMyMoneySelecting
+                && GameState.CurrentShoe.Count > 0;
+        }
+
+        /// <summary>Handles a click on the shoe pile — draws a card if the current user is allowed to.</summary>
+        protected void OnShoeClick()
+        {
+            if (CanDrawCard()) DrawCard();
+        }
+
         private void ClearTransientUiState()
         {
             _pendingActionCardIndex = null;

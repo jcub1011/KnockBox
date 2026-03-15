@@ -90,6 +90,9 @@ namespace KnockBox.Components.Pages.Games.DiceSimulator
         {
             InvokeAsync(() =>
             {
+                // Clear the player's session so the disposed game state is not retained
+                // in GameSessionState after the game ends.
+                GameSessionService.LeaveCurrentSession(navigateHome: false);
                 NavigationService.ToHome();
             });
         }

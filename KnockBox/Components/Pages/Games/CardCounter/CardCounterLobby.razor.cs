@@ -135,8 +135,13 @@ namespace KnockBox.Components.Pages.Games.CardCounter
         {
             try
             {
-                // The host left and the game state was torn down. Navigate remaining players home.
-                _ = InvokeAsync(ReturnToHome).ContinueWith(
+                _ = InvokeAsync(() =>
+                {
+                    // Clear the player's session so the disposed game state is not retained
+                    // in GameSessionState after the game ends.
+                    GameSessionService.LeaveCurrentSession(navigateHome: false);
+                    ReturnToHome();
+                }).ContinueWith(
                     t => Logger.LogError(t.Exception, "Error navigating home after game state was disposed."),
                     System.Threading.Tasks.TaskContinuationOptions.OnlyOnFaulted);
             }

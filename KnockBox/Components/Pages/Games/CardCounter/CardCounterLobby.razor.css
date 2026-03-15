@@ -163,11 +163,6 @@
     transform: none;
 }
 
-::deep .cc-btn-draw {
-    background: #27ae60;
-    color: #fff;
-}
-
 ::deep .cc-btn-pass {
     background: #f7d547;
     color: #000;

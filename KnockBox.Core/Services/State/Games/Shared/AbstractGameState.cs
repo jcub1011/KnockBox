@@ -417,6 +417,14 @@ namespace KnockBox.Services.State.Games.Shared
             {
                 logger.LogError(ex, "Error invoking OnStateDisposed.");
             }
+            finally
+            {
+                // Null out event fields after firing so that delegate chains (which may hold
+                // references to Blazor components or engine closures) are released promptly
+                // rather than waiting for GC to detect the cycle.
+                OnStateDisposed = null;
+                PlayerUnregistered = null;
+            }
 
             _disposeCts.Cancel();
 
