@@ -382,5 +382,113 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
                 Assert.AreEqual(10.0, ps.Balance,
                     $"Player [{ps.PlayerId}] should be reset to balance 10 in Active Operator Mode.");
         }
+
+        // ── ReturnToLobby ─────────────────────────────────────────────────────
+
+        [TestMethod]
+        public async Task ReturnToLobby_ByNonHost_ReturnsError()
+        {
+            using var state = await CreateStartedGameAsync(_player1);
+            state.GamePhase = GamePhase.GameOver;
+
+            var nonHost = new User("NotHost", "nothost-id");
+            var result = _engine.ReturnToLobby(nonHost, state);
+
+            Assert.IsTrue(result.IsFailure, "Non-host should not be able to return to the lobby.");
+        }
+
+        [TestMethod]
+        public async Task ReturnToLobby_DuringActiveGame_ReturnsError()
+        {
+            using var state = await CreateStartedGameAsync(_player1);
+            state.GamePhase = GamePhase.Playing;
+
+            var result = _engine.ReturnToLobby(_host, state);
+
+            Assert.IsTrue(result.IsFailure, "Return to lobby should only be allowed after the game is over.");
+        }
+
+        [TestMethod]
+        public async Task ReturnToLobby_DuringBuyIn_ReturnsError()
+        {
+            using var state = await CreateStartedGameAsync(_player1);
+            // GamePhase is already BuyIn after start
+
+            var result = _engine.ReturnToLobby(_host, state);
+
+            Assert.IsTrue(result.IsFailure, "Return to lobby should only be allowed after the game is over.");
+        }
+
+        [TestMethod]
+        public async Task ReturnToLobby_AfterGameOver_MakesStateJoinable()
+        {
+            using var state = await CreateStartedGameAsync(_player1);
+            state.GamePhase = GamePhase.GameOver;
+
+            var result = _engine.ReturnToLobby(_host, state);
+
+            Assert.IsTrue((bool)result.IsSuccess);
+            Assert.IsTrue(state.IsJoinable, "State should be joinable after returning to lobby.");
+        }
+
+        [TestMethod]
+        public async Task ReturnToLobby_AfterGameOver_ClearsContext()
+        {
+            using var state = await CreateStartedGameAsync(_player1);
+            state.GamePhase = GamePhase.GameOver;
+
+            _engine.ReturnToLobby(_host, state);
+
+            Assert.IsNull(state.Context, "Context should be cleared when returning to the lobby.");
+        }
+
+        [TestMethod]
+        public async Task ReturnToLobby_AfterGameOver_ClearsGamePlayers()
+        {
+            using var state = await CreateStartedGameAsync(_player1);
+            state.GamePhase = GamePhase.GameOver;
+
+            _engine.ReturnToLobby(_host, state);
+
+            Assert.AreEqual(0, state.GamePlayers.Count, "GamePlayers should be cleared when returning to the lobby.");
+        }
+
+        [TestMethod]
+        public async Task ReturnToLobby_AfterGameOver_ClearsDiscardHistory()
+        {
+            using var state = await CreateStartedGameAsync(_player1);
+            state.DiscardHistory.Add(new DiscardHistoryEntry("# 5", "🔢", "Player", false));
+            state.GamePhase = GamePhase.GameOver;
+
+            _engine.ReturnToLobby(_host, state);
+
+            Assert.AreEqual(0, state.DiscardHistory.Count, "Discard history should be cleared when returning to the lobby.");
+        }
+
+        [TestMethod]
+        public async Task ReturnToLobby_AfterGameOver_ClearsLastPlayedAction()
+        {
+            using var state = await CreateStartedGameAsync(_player1);
+            state.LastPlayedAction = new LastPlayedActionInfo("p1", "P1", ActionType.Burn, null, null);
+            state.GamePhase = GamePhase.GameOver;
+
+            _engine.ReturnToLobby(_host, state);
+
+            Assert.IsNull(state.LastPlayedAction, "LastPlayedAction should be cleared when returning to the lobby.");
+        }
+
+        [TestMethod]
+        public async Task ReturnToLobby_AfterReturnToLobby_CanStartAgain()
+        {
+            using var state = await CreateStartedGameAsync(_player1);
+            state.GamePhase = GamePhase.GameOver;
+            _engine.ReturnToLobby(_host, state);
+
+            // After returning to lobby, the game should be startable again
+            var result = await _engine.StartAsync(_host, state);
+
+            Assert.IsTrue((bool)result.IsSuccess, "Should be able to start the game again after returning to the lobby.");
+            Assert.IsFalse(state.IsJoinable, "State should not be joinable once the game has started.");
+        }
     }
 }

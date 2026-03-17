@@ -210,6 +210,44 @@ namespace KnockBox.Services.Logic.Games.CardCounter
         }
 
         /// <summary>
+        /// Returns the game to the lobby so players can join/leave and settings can be changed.
+        /// Only the host can trigger this, and only after the game has ended.
+        /// </summary>
+        public Result ReturnToLobby(User host, CardCounterGameState state)
+        {
+            if (state.Host.Id != host.Id)
+                return Result.FromError("Only the host can return the game to the lobby.");
+
+            if (state.GamePhase != GamePhase.GameOver)
+                return Result.FromError("Can only return to the lobby after the game is over.");
+
+            return state.Execute(() =>
+            {
+                state.Context = null;
+                state.GamePlayers.Clear();
+                state.TurnOrder.Clear();
+                state.CurrentPlayerIndex = 0;
+                state.ShoeIndex = 0;
+                state.DiscardHistory.Clear();
+                state.MainDeck.Clear();
+                state.CurrentShoe.Clear();
+                state.DiscardPile.Clear();
+                state.LastPlayedAction = null;
+                state.LastDrawnCard = null;
+                state.LastOperatorResult = null;
+                state.LastOperatorChange = null;
+                state.PendingReaction = null;
+                state.FeelingLuckyTargetId = null;
+                state.IsNotMyMoneySelecting = false;
+                state.PendingNotMyMoneyOperator = null;
+                state.ForceDrawStack.Clear();
+                state.IsNewShoe = false;
+                state.HedgeYourBetPlayerId = null;
+                state.UpdateJoinableStatus(true);
+            });
+        }
+
+        /// <summary>
         /// Resets the game so another round can be played with the same players.
         /// Only the host can trigger a reset.
         /// </summary>
