@@ -14,6 +14,16 @@ namespace KnockBox.Core.Services.State.Games.Shared
     public interface IFininteStateMachine<TContext, TCommand>
     {
         /// <summary>
+        /// The event manager responsible for handling state change events.
+        /// </summary>
+        IThreadSafeEventManager<StateChangeArgs<TContext, TCommand>> StateChangedManager { get; }
+
+        /// <summary>
+        /// The current state of this state machine.
+        /// </summary>
+        IGameState<TContext, TCommand>? CurrentState { get; }
+
+        /// <summary>
         /// Forces a transition to the provided state.
         /// </summary>
         /// <param name="context"></param>
@@ -35,11 +45,6 @@ namespace KnockBox.Core.Services.State.Games.Shared
         /// <param name="context"></param>
         /// <returns>The state that was transitioned to or null if the state was unchanged.</returns>
         ValueResult<IGameState<TContext, TCommand>?> Tick(TContext context, DateTimeOffset now);
-
-        /// <summary>
-        /// The event manager responsible for handling state change events.
-        /// </summary>
-        IThreadSafeEventManager<StateChangeArgs<TContext, TCommand>> StateChangedManager { get; }
     }
 
     /// <summary>
