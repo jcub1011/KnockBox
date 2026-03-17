@@ -11,40 +11,57 @@
 
     <div class="cc-lobby-table-container">
         <div class="cc-lobby-table">
-            <div class="cc-lobby-felt">
-                <h2 class="cc-lobby-title">♠ WAITING FOR PLAYERS ♥</h2>
-                <div class="cc-lobby-players">
-                    @foreach (var player in GameState.Players.Prepend(GameState.Host))
+            <h2 class="cc-lobby-title">♠ WAITING FOR PLAYERS ♥</h2>
+            <div class="cc-lobby-players">
+                @{
+                    bool isUserHost = GameState.Host.Id == UserService.CurrentUser?.Id;
+                }
+
+                @foreach (var player in GameState.Players.Prepend(GameState.Host))
+                {
+                    bool isHost = player.Id == GameState.Host.Id;
+                    bool isMe = player.Id == UserService.CurrentUser?.Id;
+                    @if (isHost)
                     {
-                        bool isHost = player.Id == GameState.Host.Id;
-                        bool isMe = player.Id == UserService.CurrentUser?.Id;
                         <div class="cc-lobby-player @(isMe ? "cc-lobby-player-me" : "")">
-                            <span class="cc-player-avatar">@(isHost ? "👑" : "🃏")</span>
+                            <span class="cc-player-avatar">👑</span>
                             <span class="cc-player-lobbyname">@player.Name</span>
-                            @if (isHost)
-                            {
-                                <span class="cc-host-badge">HOST</span>
-                            }
+                            <span class="cc-host-badge">HOST</span>
                         </div>
                     }
-                </div>
-                @if (UserService.CurrentUser?.Id == GameState.Host.Id)
-                {
-                    bool canStart = GameState.Players.Count > 0;
-                    <button class="cc-btn cc-btn-primary cc-btn-lg" @onclick="StartGame" disabled="@(!canStart)"
-                            title="@(!canStart ? "Need at least 1 more player to start" : "Deal cards and start the game")">
-                        🃏 DEAL CARDS
-                    </button>
-                    @if (!canStart)
+                    else if (isUserHost)
                     {
-                        <p class="cc-lobby-min-players">⚠️ Need at least 1 more player to start</p>
+                        <button class="cc-lobby-player @(isMe ? "cc-lobby-player-me" : "")" 
+                                @onclick="() => KickPlayer(player.Id)" title="Click to kick player">
+                            <span class="cc-player-avatar">🃏</span>
+                            <span class="cc-player-lobbyname">@player.Name</span>
+                        </button>
+                    }
+                    else
+                    {
+                        <div class="cc-lobby-player @(isMe ? "cc-lobby-player-me" : "")">
+                            <span class="cc-player-avatar">🃏</span>
+                            <span class="cc-player-lobbyname">@player.Name</span>
+                        </div>
                     }
                 }
-                else
-                {
-                    <p class="cc-waiting-text">Waiting for host to start...</p>
-                }
             </div>
+            @if (UserService.CurrentUser?.Id == GameState.Host.Id)
+            {
+                bool canStart = GameState.Players.Count > 0;
+                <button class="cc-btn cc-btn-primary cc-btn-lg" @onclick="StartGame" disabled="@(!canStart)"
+                        title="@(!canStart ? "Need at least 1 more player to start" : "Deal cards and start the game")">
+                    🃏 DEAL CARDS
+                </button>
+                @if (!canStart)
+                {
+                    <p class="cc-lobby-min-players">⚠️ Need at least 1 more player to start</p>
+                }
+            }
+            else
+            {
+                <p class="cc-waiting-text">Waiting for host to start...</p>
+            }
         </div>
     </div>
 

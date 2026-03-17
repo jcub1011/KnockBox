@@ -14,6 +14,9 @@
     flex: 1;
     max-width: 700px;
     margin: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
 }
 
 .cc-lobby-table-container {
@@ -294,3 +297,11 @@
     to { opacity: 1; }
 }
 
+.cc-btn-primary {
+    max-width: 250px;
+    margin: 0 auto;
+}
+
+button.cc-lobby-player:hover {
+    cursor: pointer;
+}
