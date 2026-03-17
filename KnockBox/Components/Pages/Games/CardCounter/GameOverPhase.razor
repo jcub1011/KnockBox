@@ -38,6 +38,10 @@
         @if (IsHost())
         {
             <div class="cc-gameover-actions">
+                <button class="cc-btn cc-btn-secondary cc-btn-lg" @onclick="ReturnToLobby"
+                        title="Return to the lobby to adjust settings or let players join and leave">
+                    🏠 Return to Lobby
+                </button>
                 <button class="cc-btn cc-btn-primary cc-btn-lg" @onclick="ResetGame"
                         title="Reset the game and play again with the same players">
                     🔄 Play Again

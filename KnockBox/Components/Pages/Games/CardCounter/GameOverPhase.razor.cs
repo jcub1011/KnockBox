@@ -28,5 +28,13 @@ namespace KnockBox.Components.Pages.Games.CardCounter
             if (result.TryGetFailure(out var error))
                 Logger.LogError("Failed to reset game: {Error}", error);
         }
+
+        protected void ReturnToLobby()
+        {
+            if (UserService.CurrentUser == null) return;
+            var result = GameEngine.ReturnToLobby(UserService.CurrentUser, GameState);
+            if (result.TryGetFailure(out var error))
+                Logger.LogError("Failed to return to lobby: {Error}", error);
+        }
     }
 }
