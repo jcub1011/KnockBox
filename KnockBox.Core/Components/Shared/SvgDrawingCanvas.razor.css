@@ -31,12 +31,12 @@
     border-radius: 0.75rem;
     box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
     background: #ffffff;
+    touch-action: none;
+    cursor: crosshair;
 }
 
 .svg-drawing-canvas__svg {
     display: block;
     width: 100%;
     height: 100%;
-    touch-action: none;
-    cursor: crosshair;
 }

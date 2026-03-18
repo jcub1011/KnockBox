@@ -42,17 +42,17 @@
 
     <div class="svg-drawing-canvas__surface"
          style="@BuildSurfaceStyle()"
-         @ref="_surfaceReference">
+         @ref="_surfaceReference"
+         @onpointerdown="HandlePointerDownAsync"
+         @onpointermove="HandlePointerMove"
+         @onpointerup="HandlePointerUpAsync"
+         @onpointercancel="HandlePointerCancelAsync"
+         @onpointerleave="HandlePointerLeaveAsync"
+         @onpointerdown:preventDefault="true"
+         @onpointermove:preventDefault="true">
         <svg class="svg-drawing-canvas__svg"
              viewBox="0 0 @_canvasWidth @_canvasHeight"
-             preserveAspectRatio="none"
-             @onpointerdown="HandlePointerDownAsync"
-             @onpointermove="HandlePointerMove"
-             @onpointerup="HandlePointerUpAsync"
-             @onpointercancel="HandlePointerCancelAsync"
-             @onpointerleave="HandlePointerLeaveAsync"
-             @onpointerdown:preventDefault="true"
-             @onpointermove:preventDefault="true">
+             preserveAspectRatio="none">
             <rect width="100%" height="100%" fill="@_backgroundColor" />
 
             @foreach (var stroke in _document.Strokes)
