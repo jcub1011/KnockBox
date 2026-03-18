@@ -4,9 +4,20 @@
 <div class="svg-drawing-canvas" style="width: @Width; height: @Height;">
     <div class="svg-canvas-toolbar">
         <div class="toolbar-group">
-            <label class="toolbar-label" for="@_colorInputId">Color</label>
+            <label class="toolbar-label">Colors</label>
+            <div class="toolbar-swatches">
+                @foreach (var swatch in _colorSwatches)
+                {
+                    var isActive = string.Equals(swatch, _currentColor, StringComparison.OrdinalIgnoreCase);
+                    <button class="toolbar-swatch @(isActive ? "toolbar-swatch-active" : "")"
+                            style="background-color: @swatch;"
+                            title="@swatch"
+                            @onclick="() => OnSwatchClickedAsync(swatch)"></button>
+                }
+            </div>
             <input id="@_colorInputId" type="color" class="toolbar-color"
-                   value="@_currentColor" @onchange="OnColorChangedAsync" />
+                   value="@_currentColor" @onchange="OnColorChangedAsync"
+                   title="Custom color" />
         </div>
         <div class="toolbar-group">
             <label class="toolbar-label" for="@_sizeInputId">Size: @_currentStrokeWidth</label>

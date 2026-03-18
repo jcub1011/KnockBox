@@ -37,6 +37,14 @@ namespace KnockBox.Core.Components.Shared
         private double _currentStrokeWidth = 3;
         private int _strokeCount;
 
+        // Preset color palette shown as swatches in the toolbar.
+        private static readonly string[] _colorSwatches =
+        [
+            "#000000", "#ffffff", "#ef4444", "#f97316",
+            "#eab308", "#22c55e", "#3b82f6", "#8b5cf6",
+            "#ec4899", "#6b7280", "#92400e", "#164e63",
+        ];
+
         protected override void OnInitialized()
         {
             _currentColor = StrokeColor;
@@ -69,6 +77,13 @@ namespace KnockBox.Core.Components.Shared
         private async Task OnColorChangedAsync(ChangeEventArgs e)
         {
             _currentColor = e.Value?.ToString() ?? _currentColor;
+            if (_jsModule is not null)
+                await _jsModule.InvokeVoidAsync("setColor", _svgId, _currentColor);
+        }
+
+        private async Task OnSwatchClickedAsync(string color)
+        {
+            _currentColor = color;
             if (_jsModule is not null)
                 await _jsModule.InvokeVoidAsync("setColor", _svgId, _currentColor);
         }

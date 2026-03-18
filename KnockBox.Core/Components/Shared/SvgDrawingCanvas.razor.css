@@ -39,7 +39,37 @@
     border-radius: 4px;
     cursor: pointer;
     background: none;
+    flex-shrink: 0;
 }
+
+.toolbar-swatches {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    max-width: 200px;
+}
+
+.toolbar-swatch {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 2px solid rgba(0, 0, 0, 0.2);
+    cursor: pointer;
+    padding: 0;
+    flex-shrink: 0;
+    transition: transform 0.1s, border-color 0.1s;
+}
+
+    .toolbar-swatch:hover {
+        transform: scale(1.2);
+        border-color: rgba(0, 0, 0, 0.5);
+    }
+
+    .toolbar-swatch.toolbar-swatch-active {
+        border: 3px solid #333;
+        box-shadow: 0 0 0 2px #fff, 0 0 0 4px #333;
+        transform: scale(1.1);
+    }
 
 .toolbar-size {
     width: 100px;
