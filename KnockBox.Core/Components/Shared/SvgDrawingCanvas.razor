@@ -1,0 +1,21 @@
+@namespace KnockBox.Core.Components.Shared
+@using Microsoft.JSInterop
+
+<div class="svg-drawing-canvas" style="width: @Width; height: @Height;">
+    <div class="svg-canvas-toolbar">
+        <div class="toolbar-group">
+            <label class="toolbar-label" for="@_colorInputId">Color</label>
+            <input id="@_colorInputId" type="color" class="toolbar-color"
+                   value="@_currentColor" @onchange="OnColorChangedAsync" />
+        </div>
+        <div class="toolbar-group">
+            <label class="toolbar-label" for="@_sizeInputId">Size: @_currentStrokeWidth</label>
+            <input id="@_sizeInputId" type="range" class="toolbar-size"
+                   min="1" max="30" step="1"
+                   value="@_currentStrokeWidth" @onchange="OnStrokeWidthChangedAsync" />
+        </div>
+        <button class="toolbar-btn" @onclick="UndoAsync" disabled="@(_strokeCount == 0)">↩ Undo</button>
+        <button class="toolbar-btn toolbar-btn-export" @onclick="ExportSvgAsync">⬇ Export SVG</button>
+    </div>
+    <svg id="@_svgId" class="svg-canvas-surface" style="background-color: @BackgroundColor;"></svg>
+</div>
