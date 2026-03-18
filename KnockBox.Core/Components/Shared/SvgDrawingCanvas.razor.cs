@@ -74,13 +74,6 @@ namespace KnockBox.Core.Components.Shared
             InvokeAsync(StateHasChanged);
         }
 
-        private async Task OnColorChangedAsync(ChangeEventArgs e)
-        {
-            _currentColor = e.Value?.ToString() ?? _currentColor;
-            if (_jsModule is not null)
-                await _jsModule.InvokeVoidAsync("setColor", _svgId, _currentColor);
-        }
-
         private async Task OnSwatchClickedAsync(string color)
         {
             _currentColor = color;
@@ -88,15 +81,20 @@ namespace KnockBox.Core.Components.Shared
                 await _jsModule.InvokeVoidAsync("setColor", _svgId, _currentColor);
         }
 
-        private async Task OnStrokeWidthChangedAsync(ChangeEventArgs e)
+        /// <summary>Called from JavaScript when the custom color picker value changes.</summary>
+        [JSInvokable]
+        public void OnColorChanged(string color)
         {
-            if (double.TryParse(e.Value?.ToString(), out var width))
-            {
-                _currentStrokeWidth = width;
-                if (_jsModule is not null)
-                    await _jsModule.InvokeVoidAsync("setStrokeWidth", _svgId, _currentStrokeWidth);
-                StateHasChanged();
-            }
+            _currentColor = color;
+            InvokeAsync(StateHasChanged);
+        }
+
+        /// <summary>Called from JavaScript when the stroke-width slider moves.</summary>
+        [JSInvokable]
+        public void OnStrokeWidthChanged(double width)
+        {
+            _currentStrokeWidth = width;
+            InvokeAsync(StateHasChanged);
         }
 
         /// <summary>Removes the most recently drawn stroke.</summary>

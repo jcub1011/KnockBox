@@ -83,6 +83,27 @@ export function initialize(svgId, dotNetRef, initialColor, initialStrokeWidth) {
         }
     }
 
+    const colorInput = container?.querySelector('.toolbar-color');
+    if (colorInput) {
+        colorInput.addEventListener('change', (e) => {
+            state.color = e.target.value;
+            state.dotNetRef.invokeMethodAsync('OnColorChanged', e.target.value)
+                .catch(() => { /* Component may have been disposed; ignore. */ });
+        });
+    }
+
+    const sizeInput = container?.querySelector('.toolbar-size');
+    if (sizeInput) {
+        sizeInput.addEventListener('input', (e) => {
+            const width = parseFloat(e.target.value);
+            if (!isNaN(width)) {
+                state.strokeWidth = width;
+                state.dotNetRef.invokeMethodAsync('OnStrokeWidthChanged', width)
+                    .catch(() => { /* Component may have been disposed; ignore. */ });
+            }
+        });
+    }
+
     // Mouse events
     svg.addEventListener('mousedown', (e) => {
         if (e.button !== 0) return;
@@ -134,7 +155,11 @@ function buildPath(points) {
  */
 export function setColor(svgId, color) {
     const state = instances.get(svgId);
-    if (state) state.color = color;
+    if (state) {
+        state.color = color;
+        const colorInput = state.svg.closest('.svg-drawing-canvas')?.querySelector('.toolbar-color');
+        if (colorInput) colorInput.value = color;
+    }
 }
 
 /**

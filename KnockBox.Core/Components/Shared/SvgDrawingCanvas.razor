@@ -16,14 +16,14 @@
                 }
             </div>
             <input id="@_colorInputId" type="color" class="toolbar-color"
-                   value="@_currentColor" @onchange="OnColorChangedAsync"
+                   value="@_currentColor"
                    title="Custom color" />
         </div>
         <div class="toolbar-group">
             <label class="toolbar-label" for="@_sizeInputId">Size: @_currentStrokeWidth</label>
             <input id="@_sizeInputId" type="range" class="toolbar-size"
                    min="1" max="30" step="1"
-                   value="@_currentStrokeWidth" @onchange="OnStrokeWidthChangedAsync" />
+                   value="@_currentStrokeWidth" />
         </div>
         <button class="toolbar-btn" @onclick="UndoAsync" disabled="@(_strokeCount == 0)">↩ Undo</button>
         <button class="toolbar-btn toolbar-btn-export" @onclick="ExportSvgAsync">⬇ Export SVG</button>
