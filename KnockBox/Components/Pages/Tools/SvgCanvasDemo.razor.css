@@ -1,0 +1,11 @@
+.svg-canvas-demo {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    width: min(100%, 60rem);
+}
+
+.svg-canvas-demo p {
+    margin: 0;
+    line-height: 1.6;
+}
