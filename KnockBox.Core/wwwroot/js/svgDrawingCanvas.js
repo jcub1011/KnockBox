@@ -83,6 +83,8 @@ export function initialize(svgId, dotNetRef, initialColor, initialStrokeWidth) {
         }
     }
 
+    const container = svg.closest('.svg-drawing-canvas');
+
     const colorInput = container?.querySelector('.toolbar-color');
     if (colorInput) {
         colorInput.addEventListener('change', (e) => {
