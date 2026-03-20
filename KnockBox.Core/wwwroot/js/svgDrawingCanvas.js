@@ -87,7 +87,7 @@ export function initialize(svgId, dotNetRef, initialColor, initialStrokeWidth) {
 
     const colorInput = container?.querySelector('.toolbar-color');
     if (colorInput) {
-        colorInput.addEventListener('change', (e) => {
+        colorInput.addEventListener('input', (e) => {
             state.color = e.target.value;
             state.dotNetRef.invokeMethodAsync('OnColorChanged', e.target.value)
                 .catch(() => { /* Component may have been disposed; ignore. */ });
@@ -236,8 +236,10 @@ export function downloadSvg(svgId, fileName, backgroundColor) {
     a.download = fileName;
     document.body.appendChild(a);
     a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }, 100);
 }
 
 /**
