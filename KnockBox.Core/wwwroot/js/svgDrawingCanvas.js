@@ -8,8 +8,14 @@ const instances = new Map();
  * @param {number} initialStrokeWidth - The initial stroke width in pixels.
  */
 export function initialize(svgId, dotNetRef, initialColor, initialStrokeWidth) {
+    console.log(`[SVGCanvas] initialize called — svgId="${svgId}", initialColor="${initialColor}", initialStrokeWidth=${initialStrokeWidth}`);
+
     const svg = document.getElementById(svgId);
-    if (!svg) return;
+    if (!svg) {
+        console.error(`[SVGCanvas] initialize: SVG element with id "${svgId}" not found in the DOM.`);
+        return;
+    }
+    console.log(`[SVGCanvas] initialize: SVG element found.`, svg);
 
     const state = {
         svg,
@@ -23,6 +29,7 @@ export function initialize(svgId, dotNetRef, initialColor, initialStrokeWidth) {
     };
 
     instances.set(svgId, state);
+    console.log(`[SVGCanvas] initialize: State registered. Total instances: ${instances.size}`);
 
     const svgPoint = svg.createSVGPoint();
 
@@ -39,6 +46,7 @@ export function initialize(svgId, dotNetRef, initialColor, initialStrokeWidth) {
         state.isDrawing = true;
         const { x, y } = getSvgCoords(clientX, clientY);
         state.currentPoints = [{ x, y }];
+        console.log(`[SVGCanvas] startStroke: color="${state.color}", strokeWidth=${state.strokeWidth}, svgCoords={x:${x.toFixed(1)}, y:${y.toFixed(1)}}`);
 
         const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
         path.setAttribute('stroke', state.color);
@@ -78,32 +86,47 @@ export function initialize(svgId, dotNetRef, initialColor, initialStrokeWidth) {
             }
             state.currentPath = null;
             state.currentPoints = [];
+            console.log(`[SVGCanvas] endStroke: stroke committed. Total strokes: ${state.paths.length}. Notifying .NET...`);
             state.dotNetRef.invokeMethodAsync('OnStrokeCompleted', state.paths.length)
-                .catch(() => { /* Component may have been disposed; ignore. */ });
+                .then(() => console.log(`[SVGCanvas] endStroke: OnStrokeCompleted(.NET) returned successfully.`))
+                .catch((err) => console.error(`[SVGCanvas] endStroke: OnStrokeCompleted(.NET) call failed.`, err));
         }
     }
 
     const container = svg.closest('.svg-drawing-canvas');
+    console.log(`[SVGCanvas] initialize: container element:`, container);
 
     const colorInput = container?.querySelector('.toolbar-color');
+    console.log(`[SVGCanvas] initialize: colorInput element:`, colorInput);
     if (colorInput) {
         colorInput.addEventListener('input', (e) => {
+            console.log(`[SVGCanvas] colorInput 'input' event: value="${e.target.value}". Updating state.color and notifying .NET...`);
             state.color = e.target.value;
             state.dotNetRef.invokeMethodAsync('OnColorChanged', e.target.value)
-                .catch(() => { /* Component may have been disposed; ignore. */ });
+                .then(() => console.log(`[SVGCanvas] colorInput: OnColorChanged(.NET) returned successfully.`))
+                .catch((err) => console.error(`[SVGCanvas] colorInput: OnColorChanged(.NET) call failed.`, err));
         });
+    } else {
+        console.warn(`[SVGCanvas] initialize: colorInput (.toolbar-color) not found inside container. Color picker will not work.`);
     }
 
     const sizeInput = container?.querySelector('.toolbar-size');
+    console.log(`[SVGCanvas] initialize: sizeInput element:`, sizeInput);
     if (sizeInput) {
         sizeInput.addEventListener('input', (e) => {
             const width = parseFloat(e.target.value);
+            console.log(`[SVGCanvas] sizeInput 'input' event: raw="${e.target.value}", parsed=${width}`);
             if (!isNaN(width)) {
                 state.strokeWidth = width;
                 state.dotNetRef.invokeMethodAsync('OnStrokeWidthChanged', width)
-                    .catch(() => { /* Component may have been disposed; ignore. */ });
+                    .then(() => console.log(`[SVGCanvas] sizeInput: OnStrokeWidthChanged(.NET) returned successfully.`))
+                    .catch((err) => console.error(`[SVGCanvas] sizeInput: OnStrokeWidthChanged(.NET) call failed.`, err));
+            } else {
+                console.warn(`[SVGCanvas] sizeInput: parsed width is NaN, ignoring.`);
             }
         });
+    } else {
+        console.warn(`[SVGCanvas] initialize: sizeInput (.toolbar-size) not found inside container. Brush size slider will not work.`);
     }
 
     // Mouse events
@@ -133,6 +156,8 @@ export function initialize(svgId, dotNetRef, initialColor, initialStrokeWidth) {
         e.preventDefault();
         endStroke();
     }, { passive: false });
+
+    console.log(`[SVGCanvas] initialize: all event listeners attached. Canvas is ready.`);
 }
 
 function buildPath(points) {
@@ -156,11 +181,19 @@ function buildPath(points) {
  * @param {string} color
  */
 export function setColor(svgId, color) {
+    console.log(`[SVGCanvas] setColor called — svgId="${svgId}", color="${color}"`);
     const state = instances.get(svgId);
-    if (state) {
-        state.color = color;
-        const colorInput = state.svg.closest('.svg-drawing-canvas')?.querySelector('.toolbar-color');
-        if (colorInput) colorInput.value = color;
+    if (!state) {
+        console.warn(`[SVGCanvas] setColor: no state found for svgId="${svgId}".`);
+        return;
+    }
+    state.color = color;
+    const colorInput = state.svg.closest('.svg-drawing-canvas')?.querySelector('.toolbar-color');
+    if (colorInput) {
+        colorInput.value = color;
+        console.log(`[SVGCanvas] setColor: colorInput synced to "${color}".`);
+    } else {
+        console.warn(`[SVGCanvas] setColor: colorInput not found, could not sync picker UI.`);
     }
 }
 
@@ -170,8 +203,13 @@ export function setColor(svgId, color) {
  * @param {number} width
  */
 export function setStrokeWidth(svgId, width) {
+    console.log(`[SVGCanvas] setStrokeWidth called — svgId="${svgId}", width=${width}`);
     const state = instances.get(svgId);
-    if (state) state.strokeWidth = width;
+    if (!state) {
+        console.warn(`[SVGCanvas] setStrokeWidth: no state found for svgId="${svgId}".`);
+        return;
+    }
+    state.strokeWidth = width;
 }
 
 /**
@@ -180,10 +218,20 @@ export function setStrokeWidth(svgId, width) {
  * @returns {number}
  */
 export function undo(svgId) {
+    console.log(`[SVGCanvas] undo called — svgId="${svgId}"`);
     const state = instances.get(svgId);
-    if (!state || state.paths.length === 0) return 0;
+    if (!state) {
+        console.warn(`[SVGCanvas] undo: no state found for svgId="${svgId}".`);
+        return 0;
+    }
+    console.log(`[SVGCanvas] undo: current stroke count = ${state.paths.length}`);
+    if (state.paths.length === 0) {
+        console.log(`[SVGCanvas] undo: nothing to undo.`);
+        return 0;
+    }
     const last = state.paths.pop();
     last.remove();
+    console.log(`[SVGCanvas] undo: stroke removed. Remaining stroke count = ${state.paths.length}`);
     return state.paths.length;
 }
 
@@ -192,12 +240,18 @@ export function undo(svgId) {
  * @param {string} svgId
  */
 export function clear(svgId) {
+    console.log(`[SVGCanvas] clear called — svgId="${svgId}"`);
     const state = instances.get(svgId);
-    if (!state) return;
+    if (!state) {
+        console.warn(`[SVGCanvas] clear: no state found for svgId="${svgId}".`);
+        return;
+    }
+    console.log(`[SVGCanvas] clear: removing ${state.paths.length} stroke(s).`);
     for (const path of state.paths) {
         path.remove();
     }
     state.paths = [];
+    console.log(`[SVGCanvas] clear: done.`);
 }
 
 /**
@@ -207,13 +261,18 @@ export function clear(svgId) {
  * @param {string} backgroundColor
  */
 export function downloadSvg(svgId, fileName, backgroundColor) {
+    console.log(`[SVGCanvas] downloadSvg called — svgId="${svgId}", fileName="${fileName}", backgroundColor="${backgroundColor}"`);
     const state = instances.get(svgId);
-    if (!state) return;
+    if (!state) {
+        console.warn(`[SVGCanvas] downloadSvg: no state found for svgId="${svgId}".`);
+        return;
+    }
 
     const svgEl = state.svg;
     const rect = svgEl.getBoundingClientRect();
     const width = Math.round(rect.width);
     const height = Math.round(rect.height);
+    console.log(`[SVGCanvas] downloadSvg: SVG bounding rect — width=${width}, height=${height}`);
 
     const clone = svgEl.cloneNode(true);
     clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
@@ -229,8 +288,12 @@ export function downloadSvg(svgId, fileName, backgroundColor) {
     clone.insertBefore(bg, clone.firstChild);
 
     const content = new XMLSerializer().serializeToString(clone);
+    console.log(`[SVGCanvas] downloadSvg: serialized SVG length = ${content.length} chars`);
+
     const blob = new Blob([content], { type: 'image/svg+xml;charset=utf-8' });
     const url = URL.createObjectURL(blob);
+    console.log(`[SVGCanvas] downloadSvg: blob URL created — "${url}". Triggering download...`);
+
     const a = document.createElement('a');
     a.href = url;
     a.download = fileName;
@@ -239,6 +302,7 @@ export function downloadSvg(svgId, fileName, backgroundColor) {
     setTimeout(() => {
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
+        console.log(`[SVGCanvas] downloadSvg: blob URL revoked and anchor removed.`);
     }, 100);
 }
 
@@ -247,5 +311,7 @@ export function downloadSvg(svgId, fileName, backgroundColor) {
  * @param {string} svgId
  */
 export function dispose(svgId) {
+    console.log(`[SVGCanvas] dispose called — svgId="${svgId}"`);
     instances.delete(svgId);
+    console.log(`[SVGCanvas] dispose: instance removed. Remaining instances: ${instances.size}`);
 }
