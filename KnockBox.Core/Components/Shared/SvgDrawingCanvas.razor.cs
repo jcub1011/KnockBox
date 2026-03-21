@@ -61,13 +61,20 @@ namespace KnockBox.Core.Components.Shared
             {
                 Logger.LogInformation("[SVGCanvas] OnAfterRenderAsync (firstRender) — importing JS module for svgId={SvgId}", _svgId);
                 _dotNetRef = DotNetObjectReference.Create(this);
-                _jsModule = await JSRuntime.InvokeAsync<IJSObjectReference>(
-                    "import", "/_content/KnockBox.Core/js/svgDrawingCanvas.js");
-                Logger.LogInformation("[SVGCanvas] JS module imported successfully. Calling initialize for svgId={SvgId}, color={Color}, strokeWidth={Width}",
-                    _svgId, _currentColor, _currentStrokeWidth);
-                await _jsModule.InvokeVoidAsync(
-                    "initialize", _svgId, _dotNetRef, _currentColor, _currentStrokeWidth);
-                Logger.LogInformation("[SVGCanvas] initialize JS call completed for svgId={SvgId}", _svgId);
+                try
+                {
+                    _jsModule = await JSRuntime.InvokeAsync<IJSObjectReference>(
+                        "import", "/_content/KnockBox.Core/js/svgDrawingCanvas.js");
+                    Logger.LogInformation("[SVGCanvas] JS module imported successfully. Calling initialize for svgId={SvgId}, color={Color}, strokeWidth={Width}",
+                        _svgId, _currentColor, _currentStrokeWidth);
+                    await _jsModule.InvokeVoidAsync(
+                        "initialize", _svgId, _dotNetRef, _currentColor, _currentStrokeWidth);
+                    Logger.LogInformation("[SVGCanvas] initialize JS call completed for svgId={SvgId}", _svgId);
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError(ex, "[SVGCanvas] Failed to import or initialize JS module for svgId={SvgId}. JS-dependent features (drawing, undo, export) will not work.", _svgId);
+                }
             }
         }
 
@@ -96,6 +103,45 @@ namespace KnockBox.Core.Components.Shared
             else
             {
                 Logger.LogWarning("[SVGCanvas] OnSwatchClickedAsync: _jsModule is null, cannot call setColor.");
+            }
+        }
+
+        private async Task OnColorInputAsync(ChangeEventArgs e)
+        {
+            var color = e.Value?.ToString();
+            if (string.IsNullOrEmpty(color))
+            {
+                Logger.LogWarning("[SVGCanvas] OnColorInputAsync (Blazor): received empty color value, ignoring.");
+                return;
+            }
+            Logger.LogInformation("[SVGCanvas] OnColorInputAsync (Blazor) — svgId={SvgId}, color={Color}", _svgId, color);
+            _currentColor = color;
+            if (_jsModule is not null)
+            {
+                await _jsModule.InvokeVoidAsync("setColor", _svgId, _currentColor);
+            }
+            else
+            {
+                Logger.LogWarning("[SVGCanvas] OnColorInputAsync: _jsModule is null — color updated in C# state only, canvas stroke color unchanged.");
+            }
+        }
+
+        private async Task OnSizeInputAsync(ChangeEventArgs e)
+        {
+            if (!double.TryParse(e.Value?.ToString(), out var width))
+            {
+                Logger.LogWarning("[SVGCanvas] OnSizeInputAsync (Blazor): could not parse stroke width from value '{Value}', ignoring.", e.Value);
+                return;
+            }
+            Logger.LogInformation("[SVGCanvas] OnSizeInputAsync (Blazor) — svgId={SvgId}, width={Width}", _svgId, width);
+            _currentStrokeWidth = width;
+            if (_jsModule is not null)
+            {
+                await _jsModule.InvokeVoidAsync("setStrokeWidth", _svgId, _currentStrokeWidth);
+            }
+            else
+            {
+                Logger.LogWarning("[SVGCanvas] OnSizeInputAsync: _jsModule is null — stroke width updated in C# state only, canvas stroke width unchanged.");
             }
         }
 
