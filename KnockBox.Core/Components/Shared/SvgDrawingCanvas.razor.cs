@@ -74,6 +74,12 @@ namespace KnockBox.Core.Components.Shared
                 catch (Exception ex)
                 {
                     Logger.LogError(ex, "[SVGCanvas] Failed to import or initialize JS module for svgId={SvgId}. JS-dependent features (drawing, undo, export) will not work.", _svgId);
+                    try
+                    {
+                        await JSRuntime.InvokeVoidAsync("console.error",
+                            $"[SVGCanvas] Failed to load JS module for svgId={_svgId}. Drawing, undo, and export will not work. Error: {ex.Message}");
+                    }
+                    catch { /* ignore secondary failure */ }
                 }
             }
         }
@@ -96,9 +102,16 @@ namespace KnockBox.Core.Components.Shared
             _currentColor = color;
             if (_jsModule is not null)
             {
-                Logger.LogInformation("[SVGCanvas] Calling JS setColor — svgId={SvgId}, color={Color}", _svgId, color);
-                await _jsModule.InvokeVoidAsync("setColor", _svgId, _currentColor);
-                Logger.LogInformation("[SVGCanvas] JS setColor completed — svgId={SvgId}", _svgId);
+                try
+                {
+                    Logger.LogInformation("[SVGCanvas] Calling JS setColor — svgId={SvgId}, color={Color}", _svgId, color);
+                    await _jsModule.InvokeVoidAsync("setColor", _svgId, _currentColor);
+                    Logger.LogInformation("[SVGCanvas] JS setColor completed — svgId={SvgId}", _svgId);
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError(ex, "[SVGCanvas] OnSwatchClickedAsync: JS setColor threw an exception — svgId={SvgId}", _svgId);
+                }
             }
             else
             {
@@ -118,7 +131,14 @@ namespace KnockBox.Core.Components.Shared
             _currentColor = color;
             if (_jsModule is not null)
             {
-                await _jsModule.InvokeVoidAsync("setColor", _svgId, _currentColor);
+                try
+                {
+                    await _jsModule.InvokeVoidAsync("setColor", _svgId, _currentColor);
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError(ex, "[SVGCanvas] OnColorInputAsync: JS setColor threw an exception — svgId={SvgId}", _svgId);
+                }
             }
             else
             {
@@ -137,7 +157,14 @@ namespace KnockBox.Core.Components.Shared
             _currentStrokeWidth = width;
             if (_jsModule is not null)
             {
-                await _jsModule.InvokeVoidAsync("setStrokeWidth", _svgId, _currentStrokeWidth);
+                try
+                {
+                    await _jsModule.InvokeVoidAsync("setStrokeWidth", _svgId, _currentStrokeWidth);
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError(ex, "[SVGCanvas] OnSizeInputAsync: JS setStrokeWidth threw an exception — svgId={SvgId}", _svgId);
+                }
             }
             else
             {
@@ -169,9 +196,16 @@ namespace KnockBox.Core.Components.Shared
             Logger.LogInformation("[SVGCanvas] UndoAsync — svgId={SvgId}, currentStrokeCount={StrokeCount}", _svgId, _strokeCount);
             if (_jsModule is not null)
             {
-                _strokeCount = await _jsModule.InvokeAsync<int>("undo", _svgId);
-                Logger.LogInformation("[SVGCanvas] UndoAsync: JS undo returned strokeCount={StrokeCount}", _strokeCount);
-                StateHasChanged();
+                try
+                {
+                    _strokeCount = await _jsModule.InvokeAsync<int>("undo", _svgId);
+                    Logger.LogInformation("[SVGCanvas] UndoAsync: JS undo returned strokeCount={StrokeCount}", _strokeCount);
+                    StateHasChanged();
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError(ex, "[SVGCanvas] UndoAsync: JS undo threw an exception — svgId={SvgId}", _svgId);
+                }
             }
             else
             {
@@ -202,12 +236,19 @@ namespace KnockBox.Core.Components.Shared
             Logger.LogInformation("[SVGCanvas] ExportSvgAsync — svgId={SvgId}, backgroundColor={BgColor}", _svgId, BackgroundColor);
             if (_jsModule is not null)
             {
-                var timestamp = DateTimeOffset.UtcNow.ToString("yyyyMMdd-HHmmss");
-                var fileName = $"drawing-{timestamp}.svg";
-                Logger.LogInformation("[SVGCanvas] ExportSvgAsync: calling JS downloadSvg — fileName={FileName}", fileName);
-                await _jsModule.InvokeVoidAsync(
-                    "downloadSvg", _svgId, fileName, BackgroundColor);
-                Logger.LogInformation("[SVGCanvas] ExportSvgAsync: JS downloadSvg completed.");
+                try
+                {
+                    var timestamp = DateTimeOffset.UtcNow.ToString("yyyyMMdd-HHmmss");
+                    var fileName = $"drawing-{timestamp}.svg";
+                    Logger.LogInformation("[SVGCanvas] ExportSvgAsync: calling JS downloadSvg — fileName={FileName}", fileName);
+                    await _jsModule.InvokeVoidAsync(
+                        "downloadSvg", _svgId, fileName, BackgroundColor);
+                    Logger.LogInformation("[SVGCanvas] ExportSvgAsync: JS downloadSvg completed.");
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError(ex, "[SVGCanvas] ExportSvgAsync: JS downloadSvg threw an exception — svgId={SvgId}", _svgId);
+                }
             }
             else
             {
