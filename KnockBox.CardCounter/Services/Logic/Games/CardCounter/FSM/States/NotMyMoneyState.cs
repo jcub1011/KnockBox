@@ -1,3 +1,5 @@
+using KnockBox.Core.Services.State.Games.Shared;
+using KnockBox.Extensions.Returns;
 using KnockBox.Services.State.Games.CardCounter;
 
 namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
@@ -19,7 +21,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
             _operatorCard = operatorCard;
         }
 
-        public void OnEnter(CardCounterGameContext context)
+        public ValueResult<IGameState<CardCounterGameContext, CardCounterCommand>?> OnEnter(CardCounterGameContext context)
         {
             _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.Config.NotMyMoneyTimeoutMs);
             context.State.IsNotMyMoneySelecting = true;
@@ -27,9 +29,12 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
             context.Logger.LogInformation(
                 "FSM → NotMyMoneyState: [{id}] redirecting operator [{op}]. Expires {exp}.",
                 _playerId, _operatorCard.Op, _expiresAt);
+            return null;
         }
 
-        public ICardCounterGameState? HandleCommand(CardCounterGameContext context, CardCounterCommand command)
+        public Result OnExit(CardCounterGameContext context) => Result.Success;
+
+        public ValueResult<IGameState<CardCounterGameContext, CardCounterCommand>?> HandleCommand(CardCounterGameContext context, CardCounterCommand command)
         {
             if (command is NotMyMoneySelectTargetCommand selectCmd && selectCmd.PlayerId == _playerId)
             {
@@ -86,7 +91,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
             return null;
         }
 
-        public ICardCounterGameState? Tick(CardCounterGameContext context, DateTimeOffset now)
+        public ValueResult<IGameState<CardCounterGameContext, CardCounterCommand>?> Tick(CardCounterGameContext context, DateTimeOffset now)
         {
             if (now >= _expiresAt)
             {
@@ -103,9 +108,9 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
             return null;
         }
 
-        public TimeSpan GetRemainingTime(CardCounterGameContext context, DateTimeOffset now) => _expiresAt - now;
+        public ValueResult<TimeSpan> GetRemainingTime(CardCounterGameContext context, DateTimeOffset now) => _expiresAt - now;
 
-        private ICardCounterGameState FinishTurn(CardCounterGameContext context)
+        private ValueResult<IGameState<CardCounterGameContext, CardCounterCommand>?> FinishTurn(CardCounterGameContext context)
         {
             context.State.IsNotMyMoneySelecting = false;
             context.State.PendingNotMyMoneyOperator = null;

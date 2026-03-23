@@ -1,3 +1,5 @@
+using KnockBox.Core.Services.State.Games.Shared;
+using KnockBox.Extensions.Returns;
 using KnockBox.Services.State.Games.CardCounter;
 
 namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
@@ -19,16 +21,19 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
             _currentTargetId = firstTargetId;
         }
 
-        public void OnEnter(CardCounterGameContext context)
+        public ValueResult<IGameState<CardCounterGameContext, CardCounterCommand>?> OnEnter(CardCounterGameContext context)
         {
             _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.Config.FeelingLuckyChainTimeoutMs);
             context.State.FeelingLuckyTargetId = _currentTargetId;
             context.Logger.LogInformation(
                 "FSM → FeelingLuckyChainState: originator [{orig}], target [{tgt}].",
                 _originatorId, _currentTargetId);
+            return null;
         }
 
-        public ICardCounterGameState? HandleCommand(CardCounterGameContext context, CardCounterCommand command)
+        public Result OnExit(CardCounterGameContext context) => Result.Success;
+
+        public ValueResult<IGameState<CardCounterGameContext, CardCounterCommand>?> HandleCommand(CardCounterGameContext context, CardCounterCommand command)
         {
             if (command.PlayerId != _currentTargetId)
                 return null;
@@ -42,7 +47,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
             return null;
         }
 
-        public ICardCounterGameState? Tick(CardCounterGameContext context, DateTimeOffset now)
+        public ValueResult<IGameState<CardCounterGameContext, CardCounterCommand>?> Tick(CardCounterGameContext context, DateTimeOffset now)
         {
             if (now >= _expiresAt)
             {
@@ -53,9 +58,9 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
             return null;
         }
 
-        public TimeSpan GetRemainingTime(CardCounterGameContext context, DateTimeOffset now) => _expiresAt - now;
+        public ValueResult<TimeSpan> GetRemainingTime(CardCounterGameContext context, DateTimeOffset now) => _expiresAt - now;
 
-        private ICardCounterGameState? HandleTargetAction(
+        private ValueResult<IGameState<CardCounterGameContext, CardCounterCommand>?> HandleTargetAction(
             CardCounterGameContext context, PlayActionCardCommand cmd)
         {
             var target = context.GetPlayer(_currentTargetId);
@@ -110,7 +115,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
             return null;
         }
 
-        private ICardCounterGameState ForceTargetDraw(CardCounterGameContext context)
+        private ValueResult<IGameState<CardCounterGameContext, CardCounterCommand>?> ForceTargetDraw(CardCounterGameContext context)
         {
             if (context.CurrentShoe.Count > 0)
             {
@@ -136,7 +141,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
             return ReturnToOriginator(context);
         }
 
-        private ICardCounterGameState ReturnToOriginator(CardCounterGameContext context)
+        private ValueResult<IGameState<CardCounterGameContext, CardCounterCommand>?> ReturnToOriginator(CardCounterGameContext context)
         {
             // Restore turn pointer to the originator
             int idx = context.TurnOrder.IndexOf(_originatorId);

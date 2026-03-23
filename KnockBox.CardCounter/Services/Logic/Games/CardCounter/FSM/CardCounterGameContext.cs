@@ -1,3 +1,4 @@
+using KnockBox.Core.Services.State.Games.Shared;
 using KnockBox.Extensions.Collections;
 using KnockBox.Services.Logic.RandomGeneration;
 using KnockBox.Services.State.Games.CardCounter;
@@ -75,8 +76,8 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM
         public IRandomNumberService Rng { get; }
         public ILogger Logger { get; }
 
-        /// <summary>The currently active FSM state. Set before entering the first state.</summary>
-        public ICardCounterGameState CurrentFsmState { get; set; } = null!;
+        /// <summary>The FSM that manages state transitions for this game.</summary>
+        public IFininteStateMachine<CardCounterGameContext, CardCounterCommand> Fsm { get; set; } = null!;
 
         /// <summary>
         /// Resolution stack used for multi-step interactions such as the Feeling Lucky chain

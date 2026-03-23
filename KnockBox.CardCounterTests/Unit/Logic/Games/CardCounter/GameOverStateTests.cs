@@ -46,7 +46,6 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
         public void OnEnter_SetsGamePhaseToGameOver()
         {
             var gameOver = new GameOverState();
-            _context.CurrentFsmState = gameOver;
 
             gameOver.OnEnter(_context);
 
@@ -61,7 +60,6 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             p1.Pot.AddRange([5, 3]); // pot = 53
 
             var gameOver = new GameOverState();
-            _context.CurrentFsmState = gameOver;
             gameOver.OnEnter(_context);
 
             Assert.AreEqual(63, p1.Balance, "Pot value 53 should be added to positive balance 10.");
@@ -75,7 +73,6 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             p1.Pot.AddRange([2, 0]); // pot = 20
 
             var gameOver = new GameOverState();
-            _context.CurrentFsmState = gameOver;
             gameOver.OnEnter(_context);
 
             Assert.AreEqual(20, p1.Balance, "Pot value 20 should be added to zero balance.");
@@ -89,7 +86,6 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             p1.Pot.AddRange([5, 3]); // pot = 53
 
             var gameOver = new GameOverState();
-            _context.CurrentFsmState = gameOver;
             gameOver.OnEnter(_context);
 
             Assert.AreEqual(-63, p1.Balance, "Pot value 53 should be subtracted from negative balance -10.");
@@ -103,7 +99,6 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             // Pot is empty
 
             var gameOver = new GameOverState();
-            _context.CurrentFsmState = gameOver;
             gameOver.OnEnter(_context);
 
             Assert.AreEqual(42, p1.Balance, "Empty pot should leave balance unchanged.");
@@ -117,7 +112,6 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             p1.Pot.AddRange([1, 2]); // pot = 12
 
             var gameOver = new GameOverState();
-            _context.CurrentFsmState = gameOver;
             gameOver.OnEnter(_context);
 
             Assert.AreEqual(0, p1.Pot.Count, "Pot should be cleared after applying to balance.");
@@ -139,7 +133,6 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             // empty pot → balance unchanged
 
             var gameOver = new GameOverState();
-            _context.CurrentFsmState = gameOver;
             gameOver.OnEnter(_context);
 
             Assert.AreEqual(125, p1.Balance, "Player 1 (positive balance) should have pot added.");

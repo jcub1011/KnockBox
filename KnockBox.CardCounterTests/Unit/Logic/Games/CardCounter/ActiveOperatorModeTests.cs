@@ -392,8 +392,8 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
 
             var next = fsmState.HandleCommand(_context, new AcceptPendingCommand("tgt"));
 
-            Assert.IsNotNull(next);
-            Assert.IsInstanceOfType(next, typeof(PlayerTurnState));
+            Assert.IsNotNull(next.Value);
+            Assert.IsInstanceOfType(next.Value, typeof(PlayerTurnState));
             Assert.AreEqual(123.0, target.Balance, "TurnTheTable in Active Operator Mode should reverse balance digits.");
         }
 
@@ -486,8 +486,8 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             var next = fsmState.HandleCommand(_context,
                 new PlayActionCardCommand("p1", 0, TargetPlayerId: "p1"));
 
-            Assert.IsNotNull(next);
-            Assert.IsInstanceOfType(next, typeof(PlayerTurnState));
+            Assert.IsNotNull(next.Value);
+            Assert.IsInstanceOfType(next.Value, typeof(PlayerTurnState));
             Assert.AreEqual(123.0, p1.Balance,
                 "Self-targeted TurnTheTable in Active Operator Mode should reverse own balance digits.");
         }
