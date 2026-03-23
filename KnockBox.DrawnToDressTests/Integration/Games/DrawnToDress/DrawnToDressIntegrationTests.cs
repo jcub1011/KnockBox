@@ -92,6 +92,7 @@ namespace KnockBoxTests.Integration.Games.DrawnToDress
             Assert.AreEqual(GamePhase.OutfitCustomization, state.CurrentPhase);
 
             // ── Customization phase ────────────────────────────────────────
+            // Players name their outfit and optionally attach a sketch overlay (separate from drawings)
             foreach (var player in allPlayers)
             {
                 var submitResult = engine.SubmitOutfit(player, state, $"{player.Name}'s Outfit", "<svg sketch/>");
