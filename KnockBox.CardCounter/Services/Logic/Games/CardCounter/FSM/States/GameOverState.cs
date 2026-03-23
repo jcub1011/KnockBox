@@ -1,3 +1,5 @@
+using KnockBox.Core.Services.State.Games.Shared;
+using KnockBox.Extensions.Returns;
 using KnockBox.Services.State.Games.CardCounter;
 
 namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
@@ -8,7 +10,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
     /// </summary>
     public sealed class GameOverState : ICardCounterGameState
     {
-        public void OnEnter(CardCounterGameContext context)
+        public ValueResult<IGameState<CardCounterGameContext, CardCounterCommand>?> OnEnter(CardCounterGameContext context)
         {
             context.State.GamePhase = GamePhase.GameOver;
 
@@ -25,8 +27,11 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
             }
 
             context.Logger.LogInformation("FSM → GameOverState. Game ended.");
+            return null;
         }
 
-        public ICardCounterGameState? HandleCommand(CardCounterGameContext context, CardCounterCommand command) => null;
+        public Result OnExit(CardCounterGameContext context) => Result.Success;
+
+        public ValueResult<IGameState<CardCounterGameContext, CardCounterCommand>?> HandleCommand(CardCounterGameContext context, CardCounterCommand command) => null;
     }
 }

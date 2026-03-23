@@ -1,3 +1,5 @@
+using KnockBox.Core.Services.State.Games.Shared;
+using KnockBox.Extensions.Returns;
 using KnockBox.Services.State.Games.CardCounter;
 
 namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
@@ -11,14 +13,17 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
     {
         private DateTimeOffset _expirationTime;
 
-        public void OnEnter(CardCounterGameContext context)
+        public ValueResult<IGameState<CardCounterGameContext, CardCounterCommand>?> OnEnter(CardCounterGameContext context)
         {
             _expirationTime = DateTimeOffset.Now.AddMilliseconds(context.Config.BuyInTimeoutMs);
             context.State.GamePhase = GamePhase.BuyIn;
             context.Logger.LogInformation("FSM → BuyInState");
+            return null;
         }
 
-        public ICardCounterGameState? HandleCommand(CardCounterGameContext context, CardCounterCommand command)
+        public Result OnExit(CardCounterGameContext context) => Result.Success;
+
+        public ValueResult<IGameState<CardCounterGameContext, CardCounterCommand>?> HandleCommand(CardCounterGameContext context, CardCounterCommand command)
         {
             if (command is not SetBuyInCommand cmd)
                 return null;
@@ -48,7 +53,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
             return allSet ? new RoundEndState() : null;
         }
 
-        public ICardCounterGameState? Tick(CardCounterGameContext context, DateTimeOffset now)
+        public ValueResult<IGameState<CardCounterGameContext, CardCounterCommand>?> Tick(CardCounterGameContext context, DateTimeOffset now)
         {
             if (now < _expirationTime) return null;
 
@@ -63,6 +68,6 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
             return new RoundEndState();
         }
 
-        public TimeSpan GetRemainingTime(CardCounterGameContext context, DateTimeOffset now) => _expirationTime - now;
+        public ValueResult<TimeSpan> GetRemainingTime(CardCounterGameContext context, DateTimeOffset now) => _expirationTime - now;
     }
 }

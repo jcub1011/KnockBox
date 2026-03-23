@@ -1,3 +1,6 @@
+using KnockBox.Core.Services.State.Games.Shared;
+using KnockBox.Extensions.Returns;
+
 namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
 {
     /// <summary>
@@ -10,33 +13,28 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
     {
         private DateTimeOffset _expirationTime;
 
-        public void OnEnter(CardCounterGameContext context)
+        public ValueResult<IGameState<CardCounterGameContext, CardCounterCommand>?> OnEnter(CardCounterGameContext context)
         {
             _expirationTime = DateTimeOffset.Now.AddMilliseconds(context.Config.RoundEndTimeoutMs);
             context.Logger.LogInformation("FSM → RoundEndState (shoe {n} exhausted).", context.State.ShoeIndex);
 
             var hasShoe = context.DealNextShoe();
             if (!hasShoe)
-            {
-                // Immediately transition if game end
-                context.CurrentFsmState = new GameOverState();
-                context.CurrentFsmState.OnEnter(context);
-                return;
-            }
+                return new GameOverState();
 
             context.State.IsNewShoe = true;
             context.DealActionCards();
 
             // Immediately transition if all players are under limit
             if (!context.GamePlayers.Values.Any(state => state.ActionHand.Count > context.Config.ActionHandLimit))
-            {
-                context.CurrentFsmState = new PlayerTurnState();
-                context.CurrentFsmState.OnEnter(context);
-                return;
-            }
+                return new PlayerTurnState();
+
+            return null;
         }
 
-        public ICardCounterGameState? HandleCommand(CardCounterGameContext context, CardCounterCommand command)
+        public Result OnExit(CardCounterGameContext context) => Result.Success;
+
+        public ValueResult<IGameState<CardCounterGameContext, CardCounterCommand>?> HandleCommand(CardCounterGameContext context, CardCounterCommand command)
         {
             if (command is not DiscardActionCardsCommand discardCommand) return null;
             var state = context.GetPlayer(discardCommand.PlayerId);
@@ -51,7 +49,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
             return new PlayerTurnState();
         }
 
-        public ICardCounterGameState? Tick(CardCounterGameContext context, DateTimeOffset now)
+        public ValueResult<IGameState<CardCounterGameContext, CardCounterCommand>?> Tick(CardCounterGameContext context, DateTimeOffset now)
         {
             if (now < _expirationTime) return null;
 
@@ -67,7 +65,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
             return new PlayerTurnState();
         }
 
-        public TimeSpan GetRemainingTime(CardCounterGameContext context, DateTimeOffset now) => _expirationTime - now;
+        public ValueResult<TimeSpan> GetRemainingTime(CardCounterGameContext context, DateTimeOffset now) => _expirationTime - now;
 
         private static void HandleDiscard(CardCounterGameContext context, DiscardActionCardsCommand cmd)
         {

@@ -62,7 +62,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
 
             var next = fsmState.Tick(_context, DateTimeOffset.UtcNow.AddHours(1));
 
-            Assert.IsNotNull(next, "Tick should return a state transition after timeout when timer is enabled.");
+            Assert.IsNotNull(next.Value, "Tick should return a state transition after timeout when timer is enabled.");
             Assert.AreEqual(1, p1.Pot.Count, "Card should be auto-drawn after timeout.");
         }
 
@@ -118,7 +118,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             fsmState.OnEnter(_context);
             var result = fsmState.HandleCommand(_context, new DrawCardCommand("p1"));
 
-            Assert.IsNull(result);
+            Assert.IsNull(result.Value);
             Assert.AreEqual(0, p1.Pot.Count);
         }
 
@@ -151,8 +151,8 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             fsmState.OnEnter(_context);
             var next = fsmState.HandleCommand(_context, new DrawCardCommand("p1"));
 
-            Assert.IsNotNull(next);
-            Assert.IsInstanceOfType(next, typeof(RoundEndState));
+            Assert.IsNotNull(next.Value);
+            Assert.IsInstanceOfType(next.Value, typeof(RoundEndState));
         }
 
         [TestMethod]
@@ -199,8 +199,8 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             fsmState.OnEnter(_context);
             var next = fsmState.HandleCommand(_context, new DrawCardCommand("p1"));
 
-            Assert.IsNotNull(next);
-            Assert.IsInstanceOfType(next, typeof(NotMyMoneyState));
+            Assert.IsNotNull(next.Value);
+            Assert.IsInstanceOfType(next.Value, typeof(NotMyMoneyState));
         }
 
         [TestMethod]
@@ -217,7 +217,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             fsmState.OnEnter(_context);
             var next = fsmState.HandleCommand(_context, new DrawCardCommand("p1"));
 
-            Assert.IsInstanceOfType<PlayerTurnState>(next, "Drawing a number card should transition to a fresh PlayerTurnState (resetting the timer).");
+            Assert.IsInstanceOfType<PlayerTurnState>(next.Value, "Drawing a number card should transition to a fresh PlayerTurnState (resetting the timer).");
             Assert.AreEqual(1, p1.Pot.Count, "Number card digit should still be added to pot.");
         }
 
@@ -236,7 +236,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             fsmState.OnEnter(_context);
             var next = fsmState.HandleCommand(_context, new PlayActionCardCommand("p2", 0));
 
-            Assert.IsNull(next);
+            Assert.IsNull(next.Value);
             Assert.AreEqual(1, p2.ActionHand.Count, "Action card should not be consumed.");
         }
 
@@ -251,7 +251,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             fsmState.OnEnter(_context);
             var next = fsmState.HandleCommand(_context, new PlayActionCardCommand("p1", 0));
 
-            Assert.IsNull(next);
+            Assert.IsNull(next.Value);
             Assert.AreEqual(1, p1.ActionHand.Count, "Comp'd should remain in hand.");
         }
 
@@ -266,7 +266,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             fsmState.OnEnter(_context);
             var next = fsmState.HandleCommand(_context, new PlayActionCardCommand("p1", 0));
 
-            Assert.IsNull(next);
+            Assert.IsNull(next.Value);
             Assert.AreEqual(1, p1.ActionHand.Count, "Not My Money should remain in hand.");
         }
 
@@ -282,7 +282,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             fsmState.OnEnter(_context);
             var next = fsmState.HandleCommand(_context, new PlayActionCardCommand("p1", 99));
 
-            Assert.IsNull(next);
+            Assert.IsNull(next.Value);
             Assert.AreEqual(1, p1.ActionHand.Count);
         }
 
@@ -300,8 +300,8 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             fsmState.OnEnter(_context);
             var next = fsmState.HandleCommand(_context, new PlayActionCardCommand("p1", 0));
 
-            Assert.IsNotNull(next);
-            Assert.IsInstanceOfType(next, typeof(FeelingLuckyChainState));
+            Assert.IsNotNull(next.Value);
+            Assert.IsInstanceOfType(next.Value, typeof(FeelingLuckyChainState));
         }
 
         [TestMethod]
@@ -315,7 +315,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             fsmState.OnEnter(_context);
             var next = fsmState.HandleCommand(_context, new PlayActionCardCommand("p1", 0));
 
-            Assert.IsNull(next, "Feeling Lucky with only one player should be a no-op.");
+            Assert.IsNull(next.Value, "Feeling Lucky with only one player should be a no-op.");
         }
 
         // ── PlayActionCard – MakeMyLuck ───────────────────────────────────────
@@ -334,8 +334,8 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             fsmState.OnEnter(_context);
             var next = fsmState.HandleCommand(_context, new PlayActionCardCommand("p1", 0));
 
-            Assert.IsNotNull(next);
-            Assert.IsInstanceOfType(next, typeof(MakeMyLuckState));
+            Assert.IsNotNull(next.Value);
+            Assert.IsInstanceOfType(next.Value, typeof(MakeMyLuckState));
             Assert.IsNotNull(p1.PrivateReveal, "PrivateReveal should be set for Make My Luck.");
         }
 
@@ -351,7 +351,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             fsmState.OnEnter(_context);
             var next = fsmState.HandleCommand(_context, new PlayActionCardCommand("p1", 0));
 
-            Assert.IsNull(next);
+            Assert.IsNull(next.Value);
         }
 
         // ── PlayActionCard – Burn ─────────────────────────────────────────────
@@ -388,8 +388,8 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             fsmState.OnEnter(_context);
             var next = fsmState.HandleCommand(_context, new PlayActionCardCommand("p1", 0, TargetPlayerId: "p2"));
 
-            Assert.IsNotNull(next);
-            Assert.IsInstanceOfType(next, typeof(WaitingForReactionState));
+            Assert.IsNotNull(next.Value);
+            Assert.IsInstanceOfType(next.Value, typeof(WaitingForReactionState));
         }
 
         [TestMethod]
@@ -419,7 +419,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             var next = fsmState.HandleCommand(_context, new PlayActionCardCommand("p1", 0));
 
             // The card is consumed but no blockable effect is applied (no target specified).
-            Assert.IsNull(next);
+            Assert.IsNull(next.Value);
         }
 
         // ── PlayActionCard – Launder ──────────────────────────────────────────
@@ -436,8 +436,8 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             fsmState.OnEnter(_context);
             var next = fsmState.HandleCommand(_context, new PlayActionCardCommand("p1", 0, TargetPlayerId: "p2"));
 
-            Assert.IsNotNull(next);
-            Assert.IsInstanceOfType(next, typeof(WaitingForReactionState));
+            Assert.IsNotNull(next.Value);
+            Assert.IsInstanceOfType(next.Value, typeof(WaitingForReactionState));
         }
 
         [TestMethod]
@@ -453,8 +453,8 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             var next = fsmState.HandleCommand(_context, new PlayActionCardCommand("p1", 0, TargetPlayerId: "p1"));
 
             // Self-launder is a no-op but still transitions to PlayerTurnState
-            Assert.IsNotNull(next);
-            Assert.IsInstanceOfType(next, typeof(PlayerTurnState));
+            Assert.IsNotNull(next.Value);
+            Assert.IsInstanceOfType(next.Value, typeof(PlayerTurnState));
             CollectionAssert.AreEqual(new[] { 1, 2, 3 }, p1.Pot, "Self-launder should not change the pot.");
         }
 
@@ -474,8 +474,8 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             fsmState.OnEnter(_context);
             var next = fsmState.HandleCommand(_context, new PlayActionCardCommand("p1", 0, TargetPlayerId: "p2"));
 
-            Assert.IsNotNull(next);
-            Assert.IsInstanceOfType(next, typeof(SkimState));
+            Assert.IsNotNull(next.Value);
+            Assert.IsInstanceOfType(next.Value, typeof(SkimState));
         }
 
         [TestMethod]
@@ -493,7 +493,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             var next = fsmState.HandleCommand(_context, new PlayActionCardCommand("p1", 0, TargetPlayerId: "p2"));
 
             // Card is consumed but no SkimState transition occurs (empty source pot).
-            Assert.IsNull(next);
+            Assert.IsNull(next.Value);
             Assert.AreEqual(0, p1.Pot.Count, "Source pot should remain empty.");
         }
 
@@ -512,7 +512,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             var next = fsmState.HandleCommand(_context, new PlayActionCardCommand("p1", 0, TargetPlayerId: "p2"));
 
             // Card is consumed but no SkimState transition occurs (empty target pot).
-            Assert.IsNull(next);
+            Assert.IsNull(next.Value);
             Assert.AreEqual(0, p2.Pot.Count, "Target pot should remain empty.");
         }
 
@@ -579,7 +579,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             fsmState.OnEnter(_context);
             var next = fsmState.HandleCommand(_context, new PlayActionCardCommand("p1", 0));
 
-            Assert.IsNull(next, "HedgeYourBet should stay in PlayerTurnState (return null).");
+            Assert.IsNull(next.Value, "HedgeYourBet should stay in PlayerTurnState (return null).");
             Assert.AreEqual("p1", _state.HedgeYourBetPlayerId, "HedgeYourBetPlayerId should be set to the playing player.");
             Assert.AreEqual(0, p1.ActionHand.Count, "Card should be consumed from hand.");
         }
@@ -596,7 +596,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             fsmState.OnEnter(_context);
             var next = fsmState.HandleCommand(_context, new PlayActionCardCommand("p1", 0));
 
-            Assert.IsNull(next, "HedgeYourBet with empty shoe should be a no-op.");
+            Assert.IsNull(next.Value, "HedgeYourBet with empty shoe should be a no-op.");
             Assert.IsNull(_state.HedgeYourBetPlayerId, "HedgeYourBetPlayerId should not be set when shoe is empty.");
         }
 
@@ -759,7 +759,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             fsmState.OnEnter(_context);
             var next = fsmState.HandleCommand(_context, new PlayActionCardCommand("p1", 0));
 
-            Assert.IsNull(next, "LetItRide should stay in PlayerTurnState (return null).");
+            Assert.IsNull(next.Value, "LetItRide should stay in PlayerTurnState (return null).");
             Assert.AreEqual(1, p1.ExtraTurns, "ExtraTurns should be incremented by 1.");
             Assert.AreEqual(0, p1.ActionHand.Count, "Card should be consumed from hand.");
         }
@@ -884,7 +884,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             // p2 tries to play while it's p1's turn
             var next = fsmState.HandleCommand(_context, new PlayActionCardCommand("p2", 0));
 
-            Assert.IsNull(next);
+            Assert.IsNull(next.Value);
             Assert.AreEqual(0, p2.ExtraTurns, "ExtraTurns should not be incremented when it is not the player's turn.");
         }
     }

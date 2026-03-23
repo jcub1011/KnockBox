@@ -1,3 +1,5 @@
+using KnockBox.Core.Services.State.Games.Shared;
+using KnockBox.Extensions.Returns;
 using KnockBox.Services.State.Games.CardCounter;
 
 namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
@@ -23,7 +25,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
             _notMyMoneyOperator = notMyMoneyOperator;
         }
 
-        public void OnEnter(CardCounterGameContext context)
+        public ValueResult<IGameState<CardCounterGameContext, CardCounterCommand>?> OnEnter(CardCounterGameContext context)
         {
             _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.Config.WaitingForReactionTimeoutMs);
             context.State.PendingReaction = new PendingReactionInfo(
@@ -35,9 +37,12 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
             context.Logger.LogInformation(
                 "FSM → WaitingForReactionState: [{src}] played [{card}] on [{tgt}]. Expires {exp}.",
                 _sourceId, _pendingCard.Action, _targetId, _expiresAt);
+            return null;
         }
 
-        public ICardCounterGameState? HandleCommand(CardCounterGameContext context, CardCounterCommand command)
+        public Result OnExit(CardCounterGameContext context) => Result.Success;
+
+        public ValueResult<IGameState<CardCounterGameContext, CardCounterCommand>?> HandleCommand(CardCounterGameContext context, CardCounterCommand command)
         {
             if (command is PlayActionCardCommand playCmd && playCmd.PlayerId == _targetId)
             {
@@ -70,7 +75,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
             return null;
         }
 
-        public ICardCounterGameState? Tick(CardCounterGameContext context, DateTimeOffset now)
+        public ValueResult<IGameState<CardCounterGameContext, CardCounterCommand>?> Tick(CardCounterGameContext context, DateTimeOffset now)
         {
             if (now >= _expiresAt)
             {
@@ -81,9 +86,9 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
             return null;
         }
 
-        public TimeSpan GetRemainingTime(CardCounterGameContext context, DateTimeOffset now) => _expiresAt - now;
+        public ValueResult<TimeSpan> GetRemainingTime(CardCounterGameContext context, DateTimeOffset now) => _expiresAt - now;
 
-        private ICardCounterGameState ResolveEffect(CardCounterGameContext context, bool blocked)
+        private ValueResult<IGameState<CardCounterGameContext, CardCounterCommand>?> ResolveEffect(CardCounterGameContext context, bool blocked)
         {
             if (!blocked)
             {
@@ -119,7 +124,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
             return new PlayerTurnState();
         }
 
-        private ICardCounterGameState FinishTurn(CardCounterGameContext context)
+        private ValueResult<IGameState<CardCounterGameContext, CardCounterCommand>?> FinishTurn(CardCounterGameContext context)
         {
             context.AdvanceTurn();
 

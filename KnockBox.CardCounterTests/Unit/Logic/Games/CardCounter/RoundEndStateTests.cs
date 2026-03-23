@@ -57,7 +57,6 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             // Push enough cards for the minimum shoe size
             PushCardsToMainDeck(_state.Config.MinShoeSize);
 
-            _context.CurrentFsmState = new PlayerTurnState(); // placeholder
             var fsmState = new RoundEndState();
             fsmState.OnEnter(_context);
 
@@ -70,11 +69,10 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             AddPlayer("p1", "Player 1");
             // Main deck is empty
 
-            _context.CurrentFsmState = new RoundEndState();
             var fsmState = new RoundEndState();
-            fsmState.OnEnter(_context);
+            var next = fsmState.OnEnter(_context);
 
-            Assert.AreEqual(GamePhase.GameOver, _state.GamePhase, "Empty deck should trigger GameOver.");
+            Assert.IsInstanceOfType(next.Value, typeof(GameOverState), "Empty deck should trigger a transition to GameOverState.");
         }
 
         [TestMethod]
@@ -83,7 +81,6 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             AddPlayer("p1", "Player 1");
             PushCardsToMainDeck(_state.Config.MinShoeSize + 5);
 
-            _context.CurrentFsmState = new PlayerTurnState();
             var fsmState = new RoundEndState();
             fsmState.OnEnter(_context);
 
@@ -96,7 +93,6 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             var p1 = AddPlayer("p1", "Player 1");
             PushCardsToMainDeck(_state.Config.MinShoeSize);
 
-            _context.CurrentFsmState = new PlayerTurnState();
             var fsmState = new RoundEndState();
             fsmState.OnEnter(_context);
 
@@ -105,17 +101,16 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
         }
 
         [TestMethod]
-        public void OnEnter_AllPlayersUnderHandLimit_SetsCurrentFsmStateToPlayerTurnState()
+        public void OnEnter_AllPlayersUnderHandLimit_ReturnsPlayerTurnState()
         {
             AddPlayer("p1", "Player 1");
             PushCardsToMainDeck(_state.Config.MinShoeSize);
 
-            _context.CurrentFsmState = new PlayerTurnState();
             var fsmState = new RoundEndState();
-            fsmState.OnEnter(_context);
+            var next = fsmState.OnEnter(_context);
 
-            // When no player exceeds the limit, the state should immediately be PlayerTurnState
-            Assert.IsInstanceOfType(_context.CurrentFsmState, typeof(PlayerTurnState));
+            // When no player exceeds the limit, OnEnter should return PlayerTurnState immediately
+            Assert.IsInstanceOfType(next.Value, typeof(PlayerTurnState));
         }
 
         [TestMethod]
@@ -130,7 +125,6 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
                 p1.ActionHand.Add(new ActionCard(ActionType.Burn));
 
             // Manually set state since OnEnter auto-transitions when nobody is over limit
-            _context.CurrentFsmState = new RoundEndState();
 
             var fsmState = new RoundEndState();
 
@@ -220,8 +214,8 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             var fsmState = new RoundEndState();
             var next = fsmState.HandleCommand(_context, new DiscardActionCardsCommand("p1", [limit]));
 
-            Assert.IsNotNull(next);
-            Assert.IsInstanceOfType(next, typeof(PlayerTurnState), "When all players are under limit, transition to PlayerTurnState.");
+            Assert.IsNotNull(next.Value);
+            Assert.IsInstanceOfType(next.Value, typeof(PlayerTurnState), "When all players are under limit, transition to PlayerTurnState.");
         }
 
         [TestMethod]
@@ -232,7 +226,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
 
             var next = fsmState.HandleCommand(_context, new DrawCardCommand("p1"));
 
-            Assert.IsNull(next, "Non-discard commands should be ignored in RoundEndState.");
+            Assert.IsNull(next.Value, "Non-discard commands should be ignored in RoundEndState.");
         }
     }
 }

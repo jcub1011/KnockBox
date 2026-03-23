@@ -69,8 +69,8 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
 
             var next = fsmState.HandleCommand(_context, new NotMyMoneySelectTargetCommand("p1", "p2"));
 
-            Assert.IsNotNull(next);
-            Assert.IsInstanceOfType(next, typeof(WaitingForReactionState));
+            Assert.IsNotNull(next.Value);
+            Assert.IsInstanceOfType(next.Value, typeof(WaitingForReactionState));
         }
 
         [TestMethod]
@@ -116,7 +116,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
 
             var next = fsmState.HandleCommand(_context, new NotMyMoneySelectTargetCommand("p1", "unknown"));
 
-            Assert.IsNull(next, "Selecting an unknown target should be rejected.");
+            Assert.IsNull(next.Value, "Selecting an unknown target should be rejected.");
         }
 
         [TestMethod]
@@ -184,8 +184,8 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
 
             var next = fsmState.HandleCommand(_context, new NotMyMoneyCancelCommand("p1"));
 
-            Assert.IsNotNull(next);
-            Assert.IsInstanceOfType(next, typeof(PlayerTurnState));
+            Assert.IsNotNull(next.Value);
+            Assert.IsInstanceOfType(next.Value, typeof(PlayerTurnState));
         }
 
         [TestMethod]
@@ -201,8 +201,8 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
 
             var next = fsmState.HandleCommand(_context, new NotMyMoneyCancelCommand("p1"));
 
-            Assert.IsNotNull(next);
-            Assert.IsInstanceOfType(next, typeof(RoundEndState));
+            Assert.IsNotNull(next.Value);
+            Assert.IsInstanceOfType(next.Value, typeof(RoundEndState));
         }
 
         [TestMethod]
@@ -217,7 +217,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
 
             var next = fsmState.HandleCommand(_context, new NotMyMoneyCancelCommand("other"));
 
-            Assert.IsNull(next, "Commands from other players should be ignored.");
+            Assert.IsNull(next.Value, "Commands from other players should be ignored.");
         }
 
         [TestMethod]

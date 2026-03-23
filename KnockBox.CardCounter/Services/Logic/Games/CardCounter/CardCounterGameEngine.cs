@@ -1,3 +1,4 @@
+using KnockBox.Core.Services.State.Games.Shared;
 using KnockBox.Extensions.Collections;
 using KnockBox.Extensions.Returns;
 using KnockBox.Services.Logic.Games.CardCounter.FSM;
@@ -53,6 +54,8 @@ namespace KnockBox.Services.Logic.Games.CardCounter
                 return Result.FromError("At least one other player must join before starting the game.");
 
             var context = new CardCounterGameContext(gameState, randomNumberService, logger);
+            var fsm = new FiniteStateMachine<CardCounterGameContext, CardCounterCommand>(logger);
+            context.Fsm = fsm;
 
             var executeResult = gameState.Execute(() =>
             {
@@ -73,11 +76,11 @@ namespace KnockBox.Services.Logic.Games.CardCounter
                     ps.Balance = 10;
                     ps.HasSetBuyIn = true;
                 }
-                TransitionTo(context, new RoundEndState());
+                context.Fsm.TransitionTo(context, new RoundEndState());
             }
             else
             {
-                TransitionTo(context, new BuyInState());
+                context.Fsm.TransitionTo(context, new BuyInState());
             }
             return Result.Success;
         }
@@ -92,8 +95,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter
         {
             return context.State.Execute(() =>
             {
-                var next = context.CurrentFsmState.HandleCommand(context, command);
-                if (next is not null) TransitionTo(context, next);
+                context.Fsm.HandleCommand(context, command);
             });
         }
 
@@ -107,17 +109,13 @@ namespace KnockBox.Services.Logic.Games.CardCounter
             return context.State.Execute(() =>
             {
                 if (!context.Config.EnableActionTimer) return;
-                if (context.CurrentFsmState is not ITimedCardCounterGameState timedState) return;
-
-                var next = timedState.Tick(context, now);
-                if (next is not null) TransitionTo(context, next);
+                context.Fsm.Tick(context, now);
             });
         }
 
-        private static void TransitionTo(CardCounterGameContext context, ICardCounterGameState next)
+        private static void TransitionTo(CardCounterGameContext context, IGameState<CardCounterGameContext, CardCounterCommand> next)
         {
-            context.CurrentFsmState = next;
-            next.OnEnter(context);
+            context.Fsm.TransitionTo(context, next);
         }
 
         // ── Public UI-facing methods ─────────────────────────────────────────
@@ -263,6 +261,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter
             {
                 // Create a fresh context and re-run initialization
                 var context = new CardCounterGameContext(state, randomNumberService, logger);
+                context.Fsm = new FiniteStateMachine<CardCounterGameContext, CardCounterCommand>(logger);
                 state.Context = context;
                 state.DiscardHistory.Clear();
                 state.MainDeck.Clear();
