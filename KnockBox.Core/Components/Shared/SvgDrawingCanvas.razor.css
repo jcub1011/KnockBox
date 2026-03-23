@@ -108,6 +108,53 @@
     margin-left: auto;
 }
 
+.toolbar-share-display {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: #ecfdf5;
+    border: 1px solid #86efac;
+    border-radius: 6px;
+    padding: 3px 8px;
+    font-size: 0.82rem;
+    color: #166534;
+    white-space: nowrap;
+}
+
+.toolbar-share-label {
+    user-select: none;
+}
+
+.toolbar-share-code {
+    font-family: monospace;
+    font-weight: 700;
+    font-size: 1rem;
+    letter-spacing: 3px;
+    color: #15803d;
+}
+
+.toolbar-paste-group {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.toolbar-paste-input {
+    width: 84px;
+    padding: 4px 6px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    font-family: monospace;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+}
+
+    .toolbar-paste-input.toolbar-paste-input-error {
+        border-color: #ef4444;
+        background: #fee2e2;
+    }
+
 .svg-canvas-surface {
     flex: 1;
     width: 100%;

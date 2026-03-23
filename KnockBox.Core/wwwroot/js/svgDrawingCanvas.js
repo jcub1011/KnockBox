@@ -237,6 +237,67 @@ export function initialize(svgId, dotNetRef, initialColor, initialStrokeWidth, i
                 const pad = n => String(n).padStart(2, '0');
                 const ts = `${now.getUTCFullYear()}${pad(now.getUTCMonth() + 1)}${pad(now.getUTCDate())}-${pad(now.getUTCHours())}${pad(now.getUTCMinutes())}${pad(now.getUTCSeconds())}`;
                 triggerSvgDownload(state, `drawing-${ts}.svg`);
+                return;
+            }
+
+            // Copy — serializes the drawing server-side and displays the share code.
+            if (e.target.closest('.toolbar-btn-copy')) {
+                state.dotNetRef.invokeMethodAsync('OnCopyRequestedAsync')
+                    .then(code => {
+                        if (!code) return;
+                        const display = container.querySelector('.toolbar-share-display');
+                        const codeSpan = container.querySelector('.toolbar-share-code');
+                        if (display && codeSpan) {
+                            codeSpan.textContent = code;
+                            display.style.display = '';
+                        }
+                    })
+                    .catch(err => console.error('[SVGCanvas] Copy failed.', err));
+                return;
+            }
+
+            // Dismiss the share code display.
+            if (e.target.closest('.toolbar-btn-share-dismiss')) {
+                const display = container.querySelector('.toolbar-share-display');
+                if (display) display.style.display = 'none';
+                return;
+            }
+
+            // Paste — toggles the share code input group.
+            if (e.target.closest('.toolbar-btn-paste')) {
+                const group = container.querySelector('.toolbar-paste-group');
+                if (group) group.style.display = group.style.display === 'none' ? '' : 'none';
+                return;
+            }
+
+            // Apply paste — retrieves drawing for the entered code and loads it.
+            if (e.target.closest('.toolbar-btn-paste-apply')) {
+                const input = container.querySelector('.toolbar-paste-input');
+                const code = input?.value?.trim().toUpperCase();
+                if (!code) return;
+                state.dotNetRef.invokeMethodAsync('OnPasteRequestedAsync', code)
+                    .then(success => {
+                        if (success) {
+                            const group = container.querySelector('.toolbar-paste-group');
+                            if (group) group.style.display = 'none';
+                            if (input) input.value = '';
+                        } else {
+                            if (input) {
+                                input.classList.add('toolbar-paste-input-error');
+                                setTimeout(() => input.classList.remove('toolbar-paste-input-error'), 2000);
+                            }
+                        }
+                    })
+                    .catch(err => console.error('[SVGCanvas] Paste failed.', err));
+                return;
+            }
+
+            // Cancel paste input.
+            if (e.target.closest('.toolbar-btn-paste-cancel')) {
+                const group = container.querySelector('.toolbar-paste-group');
+                if (group) group.style.display = 'none';
+                const input = container.querySelector('.toolbar-paste-input');
+                if (input) input.value = '';
             }
         });
     }
@@ -327,6 +388,98 @@ export function downloadSvg(svgId, fileName, backgroundColor) {
     const state = instances.get(svgId);
     if (!state) return;
     triggerSvgDownload(state, fileName, backgroundColor);
+}
+
+// Allowlist of SVG element tags and attributes produced by this canvas.
+// Used during copy and paste to strip any injected content (scripts, event handlers, etc.)
+// that a user could add to the DOM via browser developer tools before sharing.
+const ALLOWED_STROKE_TAGS = new Set(['path', 'circle']);
+const ALLOWED_STROKE_ATTRS = new Set([
+    'd', 'stroke', 'stroke-width', 'fill', 'stroke-linecap', 'stroke-linejoin',
+    'cx', 'cy', 'r',
+]);
+
+/**
+ * Creates a sanitized copy of a stroke element (path or circle) containing only
+ * the attributes this canvas ever sets, discarding event handlers and foreign content.
+ * @param {Element} el - Source SVG element from state.paths or parsed content.
+ * @returns {Element|null} A fresh, clean element, or null if the tag is not allowed.
+ */
+function sanitizeStrokeElement(el) {
+    const tag = el.tagName.toLowerCase();
+    if (!ALLOWED_STROKE_TAGS.has(tag)) return null;
+    const clean = document.createElementNS('http://www.w3.org/2000/svg', tag);
+    for (const attr of ALLOWED_STROKE_ATTRS) {
+        const val = el.getAttribute(attr);
+        if (val !== null) clean.setAttribute(attr, val);
+    }
+    return clean;
+}
+
+/**
+ * Serializes the current drawing as a string used by the server-side copy/paste flow.
+ * Only elements tracked in state.paths are included, and each is rebuilt from an
+ * attribute allowlist to prevent injected DOM content from being captured.
+ * @param {string} svgId
+ * @returns {string} Sanitized SVG inner markup, or an empty string if the canvas is empty.
+ */
+export function getSvgContent(svgId) {
+    const state = instances.get(svgId);
+    if (!state || state.paths.length === 0) return '';
+
+    // Rebuild from state.paths (our own array, not innerHTML) with an attribute allowlist.
+    const tmp = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    for (const el of state.paths) {
+        const clean = sanitizeStrokeElement(el);
+        if (clean) tmp.appendChild(clean);
+    }
+    return tmp.innerHTML;
+}
+
+/**
+ * Clears the current drawing and loads SVG markup produced by {@link getSvgContent}.
+ * Parsed elements are re-sanitized through the allowlist before DOM insertion so that
+ * any content tampered with after storage cannot execute in the recipient's browser.
+ * All loaded strokes are added to the undo stack.
+ * @param {string} svgId
+ * @param {string} svgContent - SVG inner markup to load.
+ * @returns {number} The number of strokes loaded.
+ */
+export function loadSvgContent(svgId, svgContent) {
+    const state = instances.get(svgId);
+    if (!state) return 0;
+
+    // Clear existing strokes.
+    for (const p of state.paths) p.remove();
+    state.paths = [];
+    state.currentPath = null;
+    state.currentPoints = [];
+
+    const container = state.svg.closest('.svg-drawing-canvas');
+
+    if (!svgContent) {
+        setUndoDisabled(container, true);
+        return 0;
+    }
+
+    // DOMParser requires a root element; wrap the markup in a temporary <svg>.
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(
+        `<svg xmlns="http://www.w3.org/2000/svg">${svgContent}</svg>`,
+        'image/svg+xml'
+    );
+
+    for (const child of [...doc.documentElement.childNodes]) {
+        if (child.nodeType !== Node.ELEMENT_NODE) continue;
+        // Re-sanitize through the allowlist before inserting into the live DOM.
+        const clean = sanitizeStrokeElement(child);
+        if (!clean) continue;
+        state.svg.appendChild(clean);
+        state.paths.push(clean);
+    }
+
+    setUndoDisabled(container, state.paths.length === 0);
+    return state.paths.length;
 }
 
 /**

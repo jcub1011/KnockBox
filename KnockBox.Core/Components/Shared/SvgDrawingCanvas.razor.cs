@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Logging;
 using Microsoft.JSInterop;
+using KnockBox.Core.Services.Drawing;
 
 namespace KnockBox.Core.Components.Shared
 {
@@ -12,6 +13,7 @@ namespace KnockBox.Core.Components.Shared
     {
         [Inject] private IJSRuntime JSRuntime { get; set; } = default!;
         [Inject] private ILogger<SvgDrawingCanvas> Logger { get; set; } = default!;
+        [Inject] private ISvgClipboardService ClipboardService { get; set; } = default!;
 
         /// <summary>CSS width of the canvas container (e.g. "100%", "800px").</summary>
         [Parameter] public string Width { get; set; } = "100%";
@@ -27,6 +29,13 @@ namespace KnockBox.Core.Components.Shared
 
         /// <summary>Initial stroke width in pixels.</summary>
         [Parameter] public double StrokeWidth { get; set; } = 3;
+
+        /// <summary>
+        /// When <c>true</c>, displays "📋 Copy" and "📥 Paste" buttons in the toolbar.
+        /// Copy serializes the drawing to a server-side share code; Paste loads a drawing
+        /// from a code produced by another user on any device.
+        /// </summary>
+        [Parameter] public bool EnableSharing { get; set; } = false;
 
         private IJSObjectReference? _jsModule;
         private DotNetObjectReference<SvgDrawingCanvas>? _dotNetRef;
@@ -92,6 +101,52 @@ namespace KnockBox.Core.Components.Shared
         public void OnStrokeWidthChanged(double width)
         {
             _currentStrokeWidth = width;
+        }
+
+        /// <summary>
+        /// Called from JavaScript when the Copy toolbar button is clicked.
+        /// Serializes the current drawing and stores it server-side, returning a share code
+        /// that another user can enter on a different device to paste the drawing.
+        /// Returns <c>null</c> when the canvas is empty or serialization fails.
+        /// </summary>
+        [JSInvokable]
+        public async Task<string?> OnCopyRequestedAsync()
+        {
+            if (_jsModule is null) return null;
+            try
+            {
+                var content = await _jsModule.InvokeAsync<string>("getSvgContent", _svgId);
+                if (string.IsNullOrEmpty(content)) return null;
+                return ClipboardService.Store(content);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "[SVGCanvas] OnCopyRequestedAsync failed — svgId={SvgId}", _svgId);
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Called from JavaScript when the user submits a share code via the Paste toolbar input.
+        /// Retrieves the stored drawing content for <paramref name="shareCode"/> and loads it
+        /// into this canvas. Returns <c>false</c> if the code is unknown or expired.
+        /// </summary>
+        [JSInvokable]
+        public async Task<bool> OnPasteRequestedAsync(string shareCode)
+        {
+            if (_jsModule is null) return false;
+            try
+            {
+                var content = ClipboardService.Retrieve(shareCode);
+                if (content is null) return false;
+                _strokeCount = await _jsModule.InvokeAsync<int>("loadSvgContent", _svgId, content);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "[SVGCanvas] OnPasteRequestedAsync failed — svgId={SvgId}", _svgId);
+                return false;
+            }
         }
 
         /// <summary>Removes the most recently drawn stroke.</summary>

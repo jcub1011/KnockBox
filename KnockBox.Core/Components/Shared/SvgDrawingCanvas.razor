@@ -26,6 +26,21 @@
         </div>
         <button class="toolbar-btn toolbar-btn-undo toolbar-btn-disabled">↩ Undo</button>
         <button class="toolbar-btn toolbar-btn-export">⬇ Export SVG</button>
+        @if (EnableSharing)
+        {
+            <button class="toolbar-btn toolbar-btn-copy">📋 Copy</button>
+            <div class="toolbar-share-display" style="display:none">
+                <span class="toolbar-share-label">Code:</span>
+                <span class="toolbar-share-code"></span>
+                <button class="toolbar-btn toolbar-btn-share-dismiss">✕</button>
+            </div>
+            <button class="toolbar-btn toolbar-btn-paste">📥 Paste</button>
+            <div class="toolbar-paste-group" style="display:none">
+                <input type="text" class="toolbar-paste-input" placeholder="Enter code" maxlength="6" />
+                <button class="toolbar-btn toolbar-btn-paste-apply">Apply</button>
+                <button class="toolbar-btn toolbar-btn-paste-cancel">✕</button>
+            </div>
+        }
     </div>
     <svg id="@_svgId" class="svg-canvas-surface" style="background-color: @BackgroundColor;"></svg>
 </div>
