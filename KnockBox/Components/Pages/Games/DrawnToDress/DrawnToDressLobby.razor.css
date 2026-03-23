@@ -1,0 +1,328 @@
+.content {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1rem;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+/* ── Phase cards ─────────────────────────────────────────────────────────── */
+
+.phase-card {
+    padding: 1.5rem;
+}
+
+.phase-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+}
+
+.phase-header h3 {
+    margin: 0;
+}
+
+.type-badge,
+.theme-badge,
+.progress-badge {
+    display: inline-block;
+    padding: 0.25rem 0.6rem;
+    border-radius: 999px;
+    font-size: 0.85rem;
+}
+
+.type-badge { background: #e3f2fd; color: #1565c0; }
+.theme-badge { background: #f3e5f5; color: #6a1b9a; }
+.progress-badge { background: #e8f5e9; color: #2e7d32; }
+
+/* ── Lobby ───────────────────────────────────────────────────────────────── */
+
+.joinable-state {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.player-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.host-badge {
+    background: #fff3e0;
+    border: 1px solid #ff9800;
+    cursor: default;
+}
+
+.settings-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.settings-row label {
+    min-width: 60px;
+    font-weight: 600;
+}
+
+/* ── Drawing phase ───────────────────────────────────────────────────────── */
+
+.drawing-info {
+    margin-bottom: 1rem;
+}
+
+.drawings-count {
+    font-size: 0.9rem;
+    color: #666;
+}
+
+.drawing-canvas-area {
+    border: 2px dashed #ccc;
+    border-radius: 8px;
+    padding: 0.5rem;
+    min-height: 300px;
+}
+
+.canvas-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+/* ── Outfit building ─────────────────────────────────────────────────────── */
+
+.outfit-building-layout {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+@media (max-width: 768px) {
+    .outfit-building-layout {
+        grid-template-columns: 1fr;
+    }
+}
+
+.outfit-slots {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.outfit-slot {
+    border: 2px solid #ccc;
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    min-height: 56px;
+}
+
+.outfit-slot.filled {
+    border-color: #4caf50;
+    background: #f1f8e9;
+}
+
+.outfit-slot.empty {
+    border-style: dashed;
+}
+
+.slot-label {
+    font-weight: 600;
+    min-width: 60px;
+    color: #555;
+}
+
+.slot-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex: 1;
+}
+
+.item-name {
+    flex: 1;
+}
+
+.slot-empty-hint {
+    color: #999;
+    font-style: italic;
+    font-size: 0.9rem;
+}
+
+/* Pool */
+
+.pool-card {
+    padding: 1rem;
+    max-height: 600px;
+    overflow-y: auto;
+}
+
+.pool-type-group {
+    margin-bottom: 1rem;
+}
+
+.pool-type-group h6 {
+    font-weight: 700;
+    color: #444;
+    margin-bottom: 0.4rem;
+}
+
+.pool-items {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
+.pool-item {
+    font-size: 0.85rem;
+    padding: 0.3rem 0.6rem;
+}
+
+/* ── Customization ───────────────────────────────────────────────────────── */
+
+.outfit-display {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+.outfit-item-display {
+    display: flex;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+}
+
+.item-type {
+    font-weight: 600;
+    min-width: 60px;
+    color: #555;
+}
+
+.customization-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    max-width: 420px;
+}
+
+/* ── Voting ──────────────────────────────────────────────────────────────── */
+
+.matchup-card {
+    border: 1px solid #e0e0e0;
+    border-radius: 12px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    background: #fafafa;
+}
+
+.matchup-outfits {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 1rem;
+    align-items: start;
+}
+
+.matchup-vs {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.4rem;
+    font-weight: 800;
+    color: #888;
+    padding-top: 1rem;
+}
+
+.matchup-side {
+    padding: 0.75rem;
+    border-radius: 8px;
+    background: #fff;
+    border: 1px solid #e0e0e0;
+}
+
+.matchup-side h5 {
+    margin: 0 0 0.25rem;
+}
+
+.outfit-player {
+    color: #777;
+    font-size: 0.85rem;
+    margin-bottom: 0.5rem;
+}
+
+.voting-criteria {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+}
+
+.criterion-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.criterion-label {
+    font-weight: 600;
+    min-width: 160px;
+}
+
+/* ── Results ─────────────────────────────────────────────────────────────── */
+
+.leaderboard {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.leaderboard-row {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    background: #f5f5f5;
+    border: 1px solid #e0e0e0;
+}
+
+.leaderboard-row.winner-row {
+    background: #fff8e1;
+    border-color: #ffc107;
+    font-weight: 700;
+    font-size: 1.1rem;
+}
+
+.rank {
+    min-width: 40px;
+    font-size: 1.2rem;
+}
+
+.player-name {
+    flex: 1;
+}
+
+.player-points {
+    font-weight: 600;
+    color: #1565c0;
+}
+
+/* ── Host controls ───────────────────────────────────────────────────────── */
+
+.host-controls {
+    border-top: 1px solid #eee;
+    padding-top: 0.75rem;
+}
+
+/* ── Shared ──────────────────────────────────────────────────────────────── */
+
+.start-btn {
+    align-self: flex-start;
+}

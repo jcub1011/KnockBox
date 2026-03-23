@@ -167,6 +167,25 @@ namespace KnockBox.Core.Components.Shared
             }
         }
 
+        /// <summary>Returns the current SVG drawing content as a serialized string, or an empty string if the canvas is empty.</summary>
+        public async Task<string> GetSvgContentAsync()
+        {
+            if (_jsModule is null)
+            {
+                Logger.LogWarning("[SVGCanvas] GetSvgContentAsync: JS module not initialized — svgId={SvgId}", _svgId);
+                return string.Empty;
+            }
+            try
+            {
+                return await _jsModule.InvokeAsync<string>("getSvgContent", _svgId) ?? string.Empty;
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "[SVGCanvas] GetSvgContentAsync failed — svgId={SvgId}", _svgId);
+                return string.Empty;
+            }
+        }
+
         /// <summary>Removes all strokes from the canvas.</summary>
         public async Task ClearAsync()
         {

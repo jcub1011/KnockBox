@@ -1,0 +1,333 @@
+@page "/room/drawn-to-dress/{ObfuscatedRoomCode}"
+
+@inherits DisposableComponent
+@using KnockBox.Services.State.Games.DrawnToDress.Data
+
+<PageTitle>Drawn to Dress</PageTitle>
+
+<div class="content">
+    @if (GameState == null)
+    {
+        <div>Loading...</div>
+    }
+    else
+    {
+        @switch (GameState.CurrentPhase)
+        {
+            case GamePhase.Lobby:
+                <div class="card">
+                    <div class="joinable-state">
+                        <h4>Drawn to Dress</h4>
+                        <p class="theme-badge">@(GameState.Settings.Theme is not null ? $"Theme: {GameState.Settings.Theme}" : "No theme set")</p>
+                        <h5>Players (@(GameState.Players.Count + 1) / requires @GameState.Settings.MinPlayers+)</h5>
+                        <div class="player-list">
+                            <button class="btn host-badge">@GameState.Host.Name (Host)</button>
+                            @foreach (var player in GameState.Players)
+                            {
+                                <button class="btn" title="Click to kick player."
+                                        @onclick="() => GameState.KickPlayer(player)">@player.Name</button>
+                            }
+                        </div>
+                        @if (IsHost)
+                        {
+                            <div class="settings-row">
+                                <label>Theme:</label>
+                                <input class="form-control" placeholder="e.g. Disco Cowboy"
+                                       @bind="ThemeInput" @bind:event="oninput" maxlength="50" />
+                                <button class="btn btn-outline-secondary" @onclick="SetTheme">Set</button>
+                            </div>
+                            <button class="btn btn-primary start-btn mt-3"
+                                    disabled="@(GameState.Players.Count < GameState.Settings.MinPlayers - 1)"
+                                    @onclick="StartGame">
+                                Start Game
+                            </button>
+                            @if (GameState.Players.Count < GameState.Settings.MinPlayers - 1)
+                            {
+                                <p class="text-muted mt-1 small">Need @(GameState.Settings.MinPlayers - 1 - GameState.Players.Count) more player(s) to start.</p>
+                            }
+                        }
+                    </div>
+                </div>
+                break;
+
+            case GamePhase.Drawing:
+                <div class="card phase-card">
+                    <div class="phase-header">
+                        <h3>✏️ Drawing Phase</h3>
+                        <span class="type-badge">Draw: <strong>@GameState.CurrentDrawingType.ToString().ToUpper()</strong></span>
+                        @if (GameState.Settings.Theme is not null)
+                        {
+                            <span class="theme-badge">Theme: @GameState.Settings.Theme</span>
+                        }
+                        <span class="progress-badge">
+                            Round @(GameState.CurrentDrawingTypeIndex + 1) / @GameState.Settings.ClothingTypes.Count
+                        </span>
+                    </div>
+                    <div class="drawing-info">
+                        <p>Draw your best <strong>@GameState.CurrentDrawingType</strong>! You can draw up to @GameState.Settings.MaxItemsPerType items.</p>
+                        <p class="drawings-count">
+                            Your drawings this round:
+                            <strong>@MyDrawingsThisType</strong> / @GameState.Settings.MaxItemsPerType
+                        </p>
+                    </div>
+                    <div class="drawing-canvas-area">
+                        <KnockBox.Core.Components.Shared.SvgDrawingCanvas @ref="_canvas" />
+                        <div class="canvas-actions">
+                            <button class="btn btn-success" @onclick="SubmitDrawing"
+                                    disabled="@(MyDrawingsThisType >= GameState.Settings.MaxItemsPerType)">
+                                Submit Drawing
+                            </button>
+                        </div>
+                        @if (!string.IsNullOrEmpty(DrawingFeedback))
+                        {
+                            <div class="alert alert-info mt-2">@DrawingFeedback</div>
+                        }
+                    </div>
+                    @if (IsHost)
+                    {
+                        <div class="host-controls mt-3">
+                            <button class="btn btn-warning" @onclick="AdvanceDrawingRound">
+                                @(GameState.IsLastDrawingType ? "End Drawing Phase →" : $"Next Type: {NextDrawingType} →")
+                            </button>
+                        </div>
+                    }
+                </div>
+                break;
+
+            case GamePhase.OutfitBuilding:
+                <div class="outfit-building-layout">
+                    <div class="card phase-card">
+                        <div class="phase-header">
+                            <h3>👗 Outfit Building — Round @GameState.CurrentOutfitRound</h3>
+                            @if (GameState.Settings.Theme is not null)
+                            {
+                                <span class="theme-badge">Theme: @GameState.Settings.Theme</span>
+                            }
+                        </div>
+                        <div class="outfit-slots">
+                            @foreach (var type in GameState.Settings.ClothingTypes)
+                            {
+                                var slotItem = MyCurrentOutfit?.Items[type];
+                                <div class="outfit-slot @(slotItem != null ? "filled" : "empty")">
+                                    <div class="slot-label">@type</div>
+                                    @if (slotItem != null)
+                                    {
+                                        <div class="slot-item">
+                                            <span class="item-name">✓ @slotItem.CreatorName's @type</span>
+                                            @if (!IsOutfitLocked)
+                                            {
+                                                <button class="btn btn-sm btn-outline-danger" @onclick="() => ReturnItem(slotItem, type)">✕</button>
+                                            }
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <div class="slot-empty-hint">Pick a @type from the pool →</div>
+                                    }
+                                </div>
+                            }
+                        </div>
+                        @if (!IsOutfitLocked)
+                        {
+                            <button class="btn btn-success mt-3"
+                                    disabled="@(!IsMyOutfitComplete)"
+                                    @onclick="LockOutfit">
+                                Lock In Outfit ✓
+                            </button>
+                        }
+                        else
+                        {
+                            <div class="alert alert-success mt-3">Outfit locked! Waiting for others...</div>
+                        }
+                        @if (!string.IsNullOrEmpty(BuildingFeedback))
+                        {
+                            <div class="alert alert-danger mt-2">@BuildingFeedback</div>
+                        }
+                        @if (IsHost)
+                        {
+                            <div class="host-controls mt-3">
+                                <button class="btn btn-warning" @onclick="EndOutfitBuilding">End Outfit Building Phase →</button>
+                            </div>
+                        }
+                    </div>
+                    <div class="card pool-card">
+                        <h4>Clothing Pool</h4>
+                        <p class="text-muted small">@GameState.AvailablePool.Count items available. Click to claim.</p>
+                        @foreach (var type in GameState.Settings.ClothingTypes)
+                        {
+                            var typeItems = GameState.AvailablePool
+                                .Where(i => i.Type == type && i.CreatorId != UserService.CurrentUser?.Id)
+                                .ToList();
+                            <div class="pool-type-group">
+                                <h6>@type (@typeItems.Count)</h6>
+                                <div class="pool-items">
+                                    @foreach (var item in typeItems)
+                                    {
+                                        <button class="btn btn-outline-secondary pool-item"
+                                                disabled="@IsOutfitLocked"
+                                                @onclick="() => ClaimItem(item.Id)">
+                                            @item.CreatorName's @item.Type
+                                        </button>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+                break;
+
+            case GamePhase.OutfitCustomization:
+                <div class="card phase-card">
+                    <div class="phase-header">
+                        <h3>🎨 Outfit Customization — Round @GameState.CurrentOutfitRound</h3>
+                    </div>
+                    <div class="outfit-display">
+                        @foreach (var type in GameState.Settings.ClothingTypes)
+                        {
+                            var item = MyCurrentOutfit?.Items[type];
+                            <div class="outfit-item-display">
+                                <span class="item-type">@type:</span>
+                                <span class="item-value">@(item != null ? $"{item.CreatorName}'s {item.Type}" : "Empty")</span>
+                            </div>
+                        }
+                    </div>
+                    @if (MyCurrentOutfit?.IsSubmitted == false)
+                    {
+                        <div class="customization-form mt-3">
+                            <label><strong>Outfit Name:</strong></label>
+                            <input class="form-control" placeholder="Give your outfit a name (1–5 words)"
+                                   @bind="OutfitName" @bind:event="oninput" maxlength="60" />
+                            <button class="btn btn-success mt-2"
+                                    disabled="@string.IsNullOrWhiteSpace(OutfitName)"
+                                    @onclick="SubmitOutfit">
+                                Submit Outfit @GameState.CurrentOutfitRound ✓
+                            </button>
+                            @if (!string.IsNullOrEmpty(CustomizationFeedback))
+                            {
+                                <div class="alert alert-danger mt-2">@CustomizationFeedback</div>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="alert alert-success mt-3">
+                            Outfit "@MyCurrentOutfit?.Name" submitted! Waiting for others...
+                        </div>
+                    }
+                    @if (IsHost)
+                    {
+                        <div class="host-controls mt-3">
+                            <button class="btn btn-warning" @onclick="EndCustomizationPhase">End Customization Phase →</button>
+                        </div>
+                    }
+                </div>
+                break;
+
+            case GamePhase.Voting:
+                <div class="card phase-card">
+                    <div class="phase-header">
+                        <h3>🗳️ Voting — Round @GameState.CurrentVotingRound / @GameState.TotalVotingRounds</h3>
+                    </div>
+                    @foreach (var matchup in GameState.CurrentRoundMatchups)
+                    {
+                        var outfitA = GameState.Outfits.GetValueOrDefault(matchup.OutfitAId);
+                        var outfitB = GameState.Outfits.GetValueOrDefault(matchup.OutfitBId);
+                        bool isCreator = outfitA?.PlayerId == UserService.CurrentUser?.Id ||
+                                         outfitB?.PlayerId == UserService.CurrentUser?.Id;
+                        bool alreadyVoted = matchup.VotedPlayerIds.Contains(UserService.CurrentUser?.Id ?? "");
+
+                        <div class="matchup-card">
+                            <div class="matchup-outfits">
+                                <div class="matchup-side outfit-a">
+                                    <h5>@outfitA?.Name</h5>
+                                    <p class="outfit-player">by @outfitA?.PlayerName</p>
+                                    @foreach (var type in GameState.Settings.ClothingTypes)
+                                    {
+                                        var item = outfitA?.Items[type];
+                                        <div class="outfit-item-display"><span>@type: @(item?.CreatorName ?? "—")'s @(item?.Type.ToString() ?? "")</span></div>
+                                    }
+                                </div>
+                                <div class="matchup-vs">VS</div>
+                                <div class="matchup-side outfit-b">
+                                    <h5>@outfitB?.Name</h5>
+                                    <p class="outfit-player">by @outfitB?.PlayerName</p>
+                                    @foreach (var type in GameState.Settings.ClothingTypes)
+                                    {
+                                        var item = outfitB?.Items[type];
+                                        <div class="outfit-item-display"><span>@type: @(item?.CreatorName ?? "—")'s @(item?.Type.ToString() ?? "")</span></div>
+                                    }
+                                </div>
+                            </div>
+                            @if (!isCreator && !alreadyVoted && !matchup.IsComplete)
+                            {
+                                <div class="voting-criteria mt-3">
+                                    @foreach (var criterion in GameState.Settings.VotingCriteria)
+                                    {
+                                        <div class="criterion-row">
+                                            <span class="criterion-label">@criterion:</span>
+                                            <button class="btn @(GetVoteSelection(matchup.Id, criterion) == true ? "btn-primary" : "btn-outline-primary")"
+                                                    @onclick="() => SetVote(matchup.Id, criterion, true)">
+                                                A: @outfitA?.Name
+                                            </button>
+                                            <button class="btn @(GetVoteSelection(matchup.Id, criterion) == false ? "btn-secondary" : "btn-outline-secondary")"
+                                                    @onclick="() => SetVote(matchup.Id, criterion, false)">
+                                                B: @outfitB?.Name
+                                            </button>
+                                        </div>
+                                    }
+                                    <button class="btn btn-success mt-2"
+                                            disabled="@(!CanSubmitVote(matchup.Id))"
+                                            @onclick="() => SubmitVote(matchup.Id)">
+                                        Submit Vote ✓
+                                    </button>
+                                </div>
+                            }
+                            else if (isCreator)
+                            {
+                                <div class="alert alert-info mt-2">You cannot vote on your own outfit.</div>
+                            }
+                            else if (alreadyVoted || matchup.IsComplete)
+                            {
+                                <div class="alert alert-success mt-2">Vote submitted! Waiting for others...</div>
+                            }
+                        </div>
+                    }
+                    @if (IsHost)
+                    {
+                        <div class="host-controls mt-3">
+                            <button class="btn btn-warning" @onclick="FinalizeVotingRound">
+                                @(GameState.CurrentVotingRound >= GameState.TotalVotingRounds ? "Finalize & Show Results →" : "Advance to Next Round →")
+                            </button>
+                        </div>
+                    }
+                </div>
+                break;
+
+            case GamePhase.Results:
+                <div class="card phase-card">
+                    <div class="phase-header">
+                        <h3>🏆 Results</h3>
+                    </div>
+                    <div class="leaderboard">
+                        @{
+                            var ranked = GameState.PlayerScores.Values
+                                .OrderByDescending(s => s.TotalPoints)
+                                .ToList();
+                            int rank = 1;
+                        }
+                        @foreach (var score in ranked)
+                        {
+                            bool isWinner = rank == 1;
+                            <div class="leaderboard-row @(isWinner ? "winner-row" : "")">
+                                <span class="rank">@(isWinner ? "👑" : $"#{rank}")</span>
+                                <span class="player-name">@score.PlayerName</span>
+                                <span class="player-points">@score.TotalPoints pts</span>
+                            </div>
+                            rank++;
+                        }
+                    </div>
+                </div>
+                break;
+        }
+    }
+</div>
