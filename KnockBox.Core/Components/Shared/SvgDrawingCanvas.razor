@@ -1,0 +1,46 @@
+@namespace KnockBox.Core.Components.Shared
+
+<div class="svg-drawing-canvas" style="width: @Width; height: @Height;">
+    <div class="svg-canvas-toolbar">
+        <div class="toolbar-group">
+            <label class="toolbar-label">Colors</label>
+            <div class="toolbar-swatches">
+                @foreach (var swatch in _colorSwatches)
+                {
+                    var isActive = string.Equals(swatch, _currentColor, StringComparison.OrdinalIgnoreCase);
+                    <button class="toolbar-swatch @(isActive ? "toolbar-swatch-active" : "")"
+                            style="background-color: @swatch;"
+                            data-color="@swatch"
+                            title="@swatch"></button>
+                }
+            </div>
+            <input id="@_colorInputId" type="color" class="toolbar-color"
+                   value="@_currentColor"
+                   title="Custom color" />
+        </div>
+        <div class="toolbar-group">
+            <label class="toolbar-label" for="@_sizeInputId">Size: @_currentStrokeWidth</label>
+            <input id="@_sizeInputId" type="range" class="toolbar-size"
+                   min="1" max="30" step="1"
+                   value="@_currentStrokeWidth" />
+        </div>
+        <button class="toolbar-btn toolbar-btn-undo toolbar-btn-disabled">↩ Undo</button>
+        <button class="toolbar-btn toolbar-btn-export">⬇ Export SVG</button>
+        @if (EnableSharing)
+        {
+            <button class="toolbar-btn toolbar-btn-copy">📋 Copy</button>
+            <div class="toolbar-share-display" style="display:none">
+                <span class="toolbar-share-label">Code:</span>
+                <span class="toolbar-share-code"></span>
+                <button class="toolbar-btn toolbar-btn-share-dismiss">✕</button>
+            </div>
+            <button class="toolbar-btn toolbar-btn-paste">📥 Paste</button>
+            <div class="toolbar-paste-group" style="display:none">
+                <input type="text" class="toolbar-paste-input" placeholder="Enter code" maxlength="6" />
+                <button class="toolbar-btn toolbar-btn-paste-apply">Apply</button>
+                <button class="toolbar-btn toolbar-btn-paste-cancel">✕</button>
+            </div>
+        }
+    </div>
+    <svg id="@_svgId" class="svg-canvas-surface" style="background-color: @BackgroundColor;"></svg>
+</div>

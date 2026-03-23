@@ -1,0 +1,30 @@
+<PageTitle>Canvas Demo</PageTitle>
+
+<div class="demo-container">
+    <h2>SVG Drawing Canvas — Demo</h2>
+    <p class="demo-hint">
+        Draw freely using mouse or touch. Use the color swatches or the custom color picker to change colors.
+        Strokes already on the canvas keep their original color when you switch colors.
+        Use <strong>↩ Undo</strong> to remove the last stroke, <strong>⬇ Export SVG</strong> to download your
+        drawing, <strong>📋 Copy</strong> to generate a share code, or <strong>📥 Paste</strong> to load a
+        drawing from a code produced on another device.
+    </p>
+
+    <div class="demo-canvases">
+        <section>
+            <h3>White background (default)</h3>
+            <SvgDrawingCanvas Height="420px" EnableSharing="true" />
+        </section>
+
+        <section>
+            <h3>Dark background</h3>
+            <SvgDrawingCanvas Height="420px"
+                              BackgroundColor="#1e1e2e"
+                              StrokeColor="#ffffff"
+                              StrokeWidth="2"
+                              EnableSharing="true" />
+        </section>
+    </div>
+
+    <p class="demo-debug-badge">⚠ DEBUG build only — this page is excluded from release builds.</p>
+</div>
