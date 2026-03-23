@@ -1,3 +1,4 @@
+using KnockBox.Services.Logic.Games.DrawnToDress.FSM;
 using KnockBox.Services.State.Games.DrawnToDress.Data;
 using KnockBox.Services.State.Games.Shared;
 using KnockBox.Services.State.Users;
@@ -24,6 +25,16 @@ namespace KnockBox.Services.State.Games.DrawnToDress
         // ------------------------------------------------------------------
 
         public DrawnToDressSettings Settings { get; } = settings ?? new DrawnToDressSettings();
+
+        // ------------------------------------------------------------------
+        // FSM context (null until the game has started)
+        // ------------------------------------------------------------------
+
+        /// <summary>
+        /// The per-session FSM context. Null before <see cref="DrawnToDressGameEngine.StartAsync"/> is called.
+        /// All FSM state transitions and helpers operate through this object.
+        /// </summary>
+        public DrawnToDressGameContext? Context { get; internal set; }
 
         // ------------------------------------------------------------------
         // Phase tracking

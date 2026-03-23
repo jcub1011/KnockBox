@@ -204,14 +204,7 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
         protected void ReturnItem(ClothingItem item, ClothingType type)
         {
             if (GameState is null) return;
-            var outfit = MyCurrentOutfit;
-            if (outfit is null || outfit.IsLocked) return;
-
-            GameState.Execute(() =>
-            {
-                outfit.Items[type] = null;
-                GameState.ReturnItem(item);
-            });
+            GameEngine.ReturnItem(UserService.CurrentUser!, GameState, item.Id, type);
         }
 
         protected void LockOutfit()
