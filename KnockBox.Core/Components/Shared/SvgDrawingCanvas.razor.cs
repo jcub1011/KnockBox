@@ -68,7 +68,7 @@ namespace KnockBox.Core.Components.Shared
                     Logger.LogInformation("[SVGCanvas] JS module imported successfully. Calling initialize for svgId={SvgId}, color={Color}, strokeWidth={Width}",
                         _svgId, _currentColor, _currentStrokeWidth);
                     await _jsModule.InvokeVoidAsync(
-                        "initialize", _svgId, _dotNetRef, _currentColor, _currentStrokeWidth);
+                        "initialize", _svgId, _dotNetRef, _currentColor, _currentStrokeWidth, BackgroundColor);
                     Logger.LogInformation("[SVGCanvas] initialize JS call completed for svgId={SvgId}", _svgId);
                 }
                 catch (Exception ex)
@@ -86,14 +86,15 @@ namespace KnockBox.Core.Components.Shared
 
         /// <summary>
         /// Called from JavaScript whenever a stroke is completed.
-        /// Updates the undo button enabled state.
+        /// Updates internal stroke count (no re-render needed — undo button state is managed in JS).
         /// </summary>
         [JSInvokable]
         public void OnStrokeCompleted(int strokeCount)
         {
             Logger.LogInformation("[SVGCanvas] OnStrokeCompleted received — svgId={SvgId}, strokeCount={StrokeCount}", _svgId, strokeCount);
             _strokeCount = strokeCount;
-            InvokeAsync(StateHasChanged);
+            // JS manages the undo button disabled state directly via setUndoDisabled();
+            // we do NOT call StateHasChanged here to avoid Blazor overwriting JS DOM changes.
         }
 
         private async Task OnSwatchClickedAsync(string color)
@@ -178,7 +179,7 @@ namespace KnockBox.Core.Components.Shared
         {
             Logger.LogInformation("[SVGCanvas] OnColorChanged received from JS — svgId={SvgId}, color={Color}", _svgId, color);
             _currentColor = color;
-            InvokeAsync(StateHasChanged);
+            // JS updates the active swatch class directly; no re-render needed.
         }
 
         /// <summary>Called from JavaScript when the stroke-width slider moves.</summary>
@@ -187,7 +188,7 @@ namespace KnockBox.Core.Components.Shared
         {
             Logger.LogInformation("[SVGCanvas] OnStrokeWidthChanged received from JS — svgId={SvgId}, width={Width}", _svgId, width);
             _currentStrokeWidth = width;
-            InvokeAsync(StateHasChanged);
+            // JS updates the size label text directly; no re-render needed.
         }
 
         /// <summary>Removes the most recently drawn stroke.</summary>
@@ -200,7 +201,7 @@ namespace KnockBox.Core.Components.Shared
                 {
                     _strokeCount = await _jsModule.InvokeAsync<int>("undo", _svgId);
                     Logger.LogInformation("[SVGCanvas] UndoAsync: JS undo returned strokeCount={StrokeCount}", _strokeCount);
-                    StateHasChanged();
+                    // JS manages the undo button disabled state via setUndoDisabled(); no re-render needed.
                 }
                 catch (Exception ex)
                 {
@@ -219,10 +220,17 @@ namespace KnockBox.Core.Components.Shared
             Logger.LogInformation("[SVGCanvas] ClearAsync — svgId={SvgId}", _svgId);
             if (_jsModule is not null)
             {
-                await _jsModule.InvokeVoidAsync("clear", _svgId);
-                _strokeCount = 0;
-                Logger.LogInformation("[SVGCanvas] ClearAsync: JS clear completed.");
-                StateHasChanged();
+                try
+                {
+                    await _jsModule.InvokeVoidAsync("clear", _svgId);
+                    _strokeCount = 0;
+                    Logger.LogInformation("[SVGCanvas] ClearAsync: JS clear completed.");
+                    // JS manages the undo button disabled state via setUndoDisabled(); no re-render needed.
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError(ex, "[SVGCanvas] ClearAsync: JS clear threw an exception — svgId={SvgId}", _svgId);
+                }
             }
             else
             {

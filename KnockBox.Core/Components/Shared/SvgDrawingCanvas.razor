@@ -11,8 +11,8 @@
                     var isActive = string.Equals(swatch, _currentColor, StringComparison.OrdinalIgnoreCase);
                     <button class="toolbar-swatch @(isActive ? "toolbar-swatch-active" : "")"
                             style="background-color: @swatch;"
-                            title="@swatch"
-                            @onclick="() => OnSwatchClickedAsync(swatch)"></button>
+                            data-color="@swatch"
+                            title="@swatch"></button>
                 }
             </div>
             <input id="@_colorInputId" type="color" class="toolbar-color"
@@ -27,8 +27,8 @@
                    value="@_currentStrokeWidth"
                    @oninput="OnSizeInputAsync" />
         </div>
-        <button class="toolbar-btn" @onclick="UndoAsync" disabled="@(_strokeCount == 0)">↩ Undo</button>
-        <button class="toolbar-btn toolbar-btn-export" @onclick="ExportSvgAsync">⬇ Export SVG</button>
+        <button class="toolbar-btn toolbar-btn-undo toolbar-btn-disabled">↩ Undo</button>
+        <button class="toolbar-btn toolbar-btn-export">⬇ Export SVG</button>
     </div>
     <svg id="@_svgId" class="svg-canvas-surface" style="background-color: @BackgroundColor;"></svg>
 </div>

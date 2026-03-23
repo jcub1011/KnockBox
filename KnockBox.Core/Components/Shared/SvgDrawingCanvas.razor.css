@@ -93,9 +93,15 @@
         border-color: #aaa;
     }
 
-    .toolbar-btn:disabled {
+    .toolbar-btn:disabled,
+    .toolbar-btn.toolbar-btn-disabled {
         opacity: 0.4;
         cursor: not-allowed;
+    }
+
+    .toolbar-btn.toolbar-btn-disabled:hover {
+        background: #fff;
+        border-color: #ccc;
     }
 
 .toolbar-btn-export {
