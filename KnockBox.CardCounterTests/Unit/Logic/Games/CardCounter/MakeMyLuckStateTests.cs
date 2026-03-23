@@ -63,8 +63,8 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             // Player wants order: [card1, card2, card3] (indices 2, 1, 0 of the reveal)
             var next = fsmState.HandleCommand(_context, new SubmitReorderCommand("p1", [2, 1, 0]));
 
-            Assert.IsNotNull(next);
-            Assert.IsInstanceOfType(next, typeof(PlayerTurnState));
+            Assert.IsNotNull(next.Value);
+            Assert.IsInstanceOfType(next.Value, typeof(PlayerTurnState));
 
             // New top of shoe should be card1 (the reordered[0])
             Assert.AreEqual(card1, _state.CurrentShoe.Peek(), "New top of shoe should be the first element of the submitted order.");
@@ -86,7 +86,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
 
             var next = fsmState.HandleCommand(_context, new SubmitReorderCommand("p2", [0]));
 
-            Assert.IsNull(next, "Commands from the wrong player should be ignored.");
+            Assert.IsNull(next.Value, "Commands from the wrong player should be ignored.");
             Assert.AreEqual(card, _state.CurrentShoe.Peek(), "Shoe should be unchanged.");
         }
 
@@ -108,7 +108,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             // Duplicate index 0
             var next = fsmState.HandleCommand(_context, new SubmitReorderCommand("p1", [0, 0]));
 
-            Assert.IsNull(next, "Duplicate indices should be rejected.");
+            Assert.IsNull(next.Value, "Duplicate indices should be rejected.");
         }
 
         [TestMethod]
@@ -126,7 +126,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
 
             var next = fsmState.HandleCommand(_context, new SubmitReorderCommand("p1", [99]));
 
-            Assert.IsNull(next, "Out-of-range index should be rejected.");
+            Assert.IsNull(next.Value, "Out-of-range index should be rejected.");
         }
 
         [TestMethod]
@@ -147,7 +147,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             // Wrong count: only 1 index for 2-card reveal
             var next = fsmState.HandleCommand(_context, new SubmitReorderCommand("p1", [0]));
 
-            Assert.IsNull(next, "Wrong number of indices should be rejected.");
+            Assert.IsNull(next.Value, "Wrong number of indices should be rejected.");
         }
 
         [TestMethod]
@@ -183,8 +183,8 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
 
             var next = fsmState.HandleCommand(_context, new SubmitReorderCommand("p1", [0]));
 
-            Assert.IsNotNull(next);
-            Assert.IsInstanceOfType(next, typeof(PlayerTurnState));
+            Assert.IsNotNull(next.Value);
+            Assert.IsInstanceOfType(next.Value, typeof(PlayerTurnState));
         }
 
         [TestMethod]
@@ -202,7 +202,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
 
             var next = fsmState.HandleCommand(_context, new DrawCardCommand("p1"));
 
-            Assert.IsNull(next);
+            Assert.IsNull(next.Value);
         }
     }
 }

@@ -1,3 +1,5 @@
+using KnockBox.Core.Services.State.Games.Shared;
+using KnockBox.Extensions.Returns;
 using KnockBox.Services.State.Games.CardCounter;
 
 namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
@@ -24,7 +26,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
             _pendingCard = pendingCard;
         }
 
-        public void OnEnter(CardCounterGameContext context)
+        public ValueResult<IGameState<CardCounterGameContext, CardCounterCommand>?> OnEnter(CardCounterGameContext context)
         {
             _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.Config.SkimTimeoutMs);
             context.State.PendingReaction = new PendingReactionInfo(
@@ -35,9 +37,12 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
             context.Logger.LogInformation(
                 "FSM → SkimState: [{src}] selecting digit to swap with [{tgt}]. Expires {exp}.",
                 _sourceId, _targetId, _expiresAt);
+            return null;
         }
 
-        public ICardCounterGameState? HandleCommand(CardCounterGameContext context, CardCounterCommand command)
+        public Result OnExit(CardCounterGameContext context) => Result.Success;
+
+        public ValueResult<IGameState<CardCounterGameContext, CardCounterCommand>?> HandleCommand(CardCounterGameContext context, CardCounterCommand command)
         {
             // Target may block with Comp'd
             if (command is PlayActionCardCommand playCmd && playCmd.PlayerId == _targetId)
@@ -102,7 +107,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
             return null;
         }
 
-        public ICardCounterGameState? Tick(CardCounterGameContext context, DateTimeOffset now)
+        public ValueResult<IGameState<CardCounterGameContext, CardCounterCommand>?> Tick(CardCounterGameContext context, DateTimeOffset now)
         {
             if (now >= _expiresAt)
             {
@@ -114,9 +119,9 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
             return null;
         }
 
-        public TimeSpan GetRemainingTime(CardCounterGameContext context, DateTimeOffset now) => _expiresAt - now;
+        public ValueResult<TimeSpan> GetRemainingTime(CardCounterGameContext context, DateTimeOffset now) => _expiresAt - now;
 
-        private ICardCounterGameState ResolveEffect(CardCounterGameContext context, int sourceDigitIndex, int targetDigitIndex)
+        private ValueResult<IGameState<CardCounterGameContext, CardCounterCommand>?> ResolveEffect(CardCounterGameContext context, int sourceDigitIndex, int targetDigitIndex)
         {
             var source = context.GetPlayer(_sourceId);
             var target = context.GetPlayer(_targetId);

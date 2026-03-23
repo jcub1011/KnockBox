@@ -69,8 +69,8 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
 
             var next = fsmState.HandleCommand(context, new PlayActionCardCommand(target.PlayerId, 0));
 
-            Assert.IsNotNull(next);
-            Assert.IsInstanceOfType(next, typeof(PlayerTurnState));
+            Assert.IsNotNull(next.Value);
+            Assert.IsInstanceOfType(next.Value, typeof(PlayerTurnState));
             Assert.IsNotNull(state.LastPlayedAction);
             Assert.AreEqual(target.PlayerId, state.LastPlayedAction.PlayerId);
             Assert.AreEqual(ActionType.Compd, state.LastPlayedAction.Action);
@@ -119,8 +119,8 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             var next = fsmState.HandleCommand(context, new PlayActionCardCommand(player.PlayerId, 0));
 
             // Assert: shoe is empty so the game must advance to RoundEndState
-            Assert.IsNotNull(next);
-            Assert.IsInstanceOfType(next, typeof(RoundEndState));
+            Assert.IsNotNull(next.Value);
+            Assert.IsInstanceOfType(next.Value, typeof(RoundEndState));
             Assert.AreEqual(0, state.CurrentShoe.Count);
         }
 
@@ -163,7 +163,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             var next = fsmState.HandleCommand(context, new PlayActionCardCommand(p1.PlayerId, 0));
 
             // Assert: returns null (stays in PlayerTurnState) and each player gets exactly 2 digits
-            Assert.IsNull(next);
+            Assert.IsNull(next.Value);
             Assert.AreEqual(2, p1.Pot.Count, "P1 should have 2 digits");
             Assert.AreEqual(2, p2.Pot.Count, "P2 should have 2 digits");
             Assert.AreEqual(2, p3.Pot.Count, "P3 should have 2 digits");
@@ -211,7 +211,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             var next = fsmState.HandleCommand(context, new PlayActionCardCommand(p1.PlayerId, 0));
 
             // Assert: 7 total digits, 3 players → base 2, 1 extra → p1 gets 3, p2 gets 2, p3 gets 2
-            Assert.IsNull(next);
+            Assert.IsNull(next.Value);
             Assert.AreEqual(3, p1.Pot.Count, "P1 (card player) should get the extra digit");
             Assert.AreEqual(2, p2.Pot.Count);
             Assert.AreEqual(2, p3.Pot.Count);
@@ -257,7 +257,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             var next = fsmState.HandleCommand(context, new PlayActionCardCommand(p2.PlayerId, 0));
 
             // Assert: 8 total, 3 players → base 2, 2 extras → p2 gets 3, p3 gets 3, p1 gets 2
-            Assert.IsNull(next);
+            Assert.IsNull(next.Value);
             Assert.AreEqual(2, p1.Pot.Count, "P1 should get the base amount (no extra)");
             Assert.AreEqual(3, p2.Pot.Count, "P2 (card player) gets first extra");
             Assert.AreEqual(3, p3.Pot.Count, "P3 gets second extra");
@@ -292,7 +292,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             var next = fsmState.HandleCommand(context, new PlayActionCardCommand(p1.PlayerId, 0));
 
             // Assert: stays in PlayerTurnState, all pots still empty
-            Assert.IsNull(next);
+            Assert.IsNull(next.Value);
             Assert.AreEqual(0, p1.Pot.Count);
             Assert.AreEqual(0, p2.Pot.Count);
         }

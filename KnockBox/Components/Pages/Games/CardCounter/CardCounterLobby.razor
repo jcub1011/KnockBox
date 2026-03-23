@@ -3,6 +3,7 @@
 @inherits DisposableComponent
 @using KnockBox.Services.State.Games.CardCounter
 @using KnockBox.Services.Logic.Games.CardCounter.FSM
+@using KnockBox.Core.Services.State.Games.Shared
 
 <PageTitle>Card Counter</PageTitle>
 
@@ -17,10 +18,10 @@ else
 {
     <div class="cc-page">
 
-        @if (GameState.Config.EnableActionTimer && GameState.Context?.CurrentFsmState is ITimedCardCounterGameState timedState)
+        @if (GameState.Config.EnableActionTimer && GameState.Context?.Fsm?.CurrentState is ITimedGameState<CardCounterGameContext, CardCounterCommand> timedState)
         {
-            var remaining = timedState.GetRemainingTime(GameState.Context, DateTimeOffset.UtcNow);
-            var seconds = (int)Math.Ceiling(remaining.TotalSeconds);
+            var remaining = timedState.GetRemainingTime(GameState.Context!, DateTimeOffset.UtcNow);
+            var seconds = (int)Math.Ceiling(remaining.Value.TotalSeconds);
             if (seconds >= 0)
             {
                 <div class="cc-timer-container">

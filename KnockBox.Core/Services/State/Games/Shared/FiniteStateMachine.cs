@@ -23,12 +23,15 @@ namespace KnockBox.Core.Services.State.Games.Shared
                 return new ResultError("Error handling command.", "Unable to handle state as CurrentState is null.");
 
             var result = CurrentState.HandleCommand(context, command);
-            if (!result.TryGetSuccess(out var nextState))
-                return result.Error.Error;
+            if (!result.IsSuccess) return result.Error.Error;
+
+            var nextState = result.Value;
+            if (nextState is null)
+                return null;
 
             var transitionResult = TransitionTo(context, nextState);
             if (transitionResult.TryGetFailure(out var error)) return error;
-            return ValueResult<IGameState<TContext, TCommand>?>.FromValue(nextState);
+            return ValueResult<IGameState<TContext, TCommand>?>.FromValue(CurrentState);
         }
 
         public ValueResult<IGameState<TContext, TCommand>?> Tick(TContext context, DateTimeOffset now)
@@ -40,12 +43,15 @@ namespace KnockBox.Core.Services.State.Games.Shared
                 return null;
 
             var result = timedState.Tick(context, now);
-            if (!result.TryGetSuccess(out var nextState))
-                return result.Error.Error;
+            if (!result.IsSuccess) return result.Error.Error;
+
+            var nextState = result.Value;
+            if (nextState is null)
+                return null;
 
             var transitionResult = TransitionTo(context, nextState);
             if (transitionResult.TryGetFailure(out var error)) return error;
-            return ValueResult<IGameState<TContext, TCommand>?>.FromValue(nextState);
+            return ValueResult<IGameState<TContext, TCommand>?>.FromValue(CurrentState);
         }
 
         public Result TransitionTo(TContext context, IGameState<TContext, TCommand> state)
@@ -63,23 +69,29 @@ namespace KnockBox.Core.Services.State.Games.Shared
                 }
             }
 
-            try
-            {
-                if (state is not null)
-                {
-                    if (state.OnEnter(context).TryGetFailure(out var error))
-                    {
-                        // Don't rollback state change
-                        return error;
-                    }
-                }
-            }
-            finally
+            while (true)
             {
                 StateChangedManager.Notify(new(previousState, state));
-            }
 
-            return Result.Success;
+                if (state is null)
+                    return Result.Success;
+
+                var enterResult = state.OnEnter(context);
+                if (enterResult.TryGetFailure(out var enterError))
+                    return enterError;
+
+                var chainedState = enterResult.Value;
+                if (chainedState is null)
+                    return Result.Success;
+
+                // OnEnter requested a chained transition — exit the current state and enter the next
+                if (state.OnExit(context).TryGetFailure(out var exitError))
+                    return exitError;
+
+                previousState = state;
+                state = chainedState;
+                CurrentState = state;
+            }
         }
     }
 }

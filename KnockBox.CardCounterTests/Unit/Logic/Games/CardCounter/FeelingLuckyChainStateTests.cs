@@ -69,8 +69,8 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
 
             var next = fsmState.HandleCommand(_context, new DrawCardCommand("tgt"));
 
-            Assert.IsNotNull(next);
-            Assert.IsInstanceOfType(next, typeof(PlayerTurnState));
+            Assert.IsNotNull(next.Value);
+            Assert.IsInstanceOfType(next.Value, typeof(PlayerTurnState));
             Assert.AreEqual(1, target.Pot.Count, "Target should have received the drawn digit.");
             Assert.AreEqual(9, target.Pot[0]);
         }
@@ -110,8 +110,8 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
 
             var next = fsmState.HandleCommand(_context, new PlayActionCardCommand("tgt", 0));
 
-            Assert.IsNotNull(next);
-            Assert.IsInstanceOfType(next, typeof(PlayerTurnState));
+            Assert.IsNotNull(next.Value);
+            Assert.IsInstanceOfType(next.Value, typeof(PlayerTurnState));
             Assert.AreEqual(0, target.ActionHand.Count, "Comp'd should be consumed.");
             Assert.AreEqual(0, target.Pot.Count, "Target should not have been forced to draw.");
         }
@@ -149,7 +149,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             var next = fsmState.HandleCommand(_context, new PlayActionCardCommand("tgt1", 0));
 
             // Chain should pass to tgt2 (no state transition yet — stays in FeelingLuckyChainState)
-            Assert.IsNull(next, "Chain should continue; not yet resolved.");
+            Assert.IsNull(next.Value, "Chain should continue; not yet resolved.");
             Assert.AreEqual("tgt2", _state.FeelingLuckyTargetId, "Next target should be tgt2.");
         }
 
@@ -170,7 +170,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             // tgt1 plays FeelingLucky → next target would be orig (wraps) → triggers force draw on tgt1
             var next = fsmState.HandleCommand(_context, new PlayActionCardCommand("tgt1", 0));
 
-            Assert.IsNotNull(next, "Force draw should resolve the chain.");
+            Assert.IsNotNull(next.Value, "Force draw should resolve the chain.");
             // Target should have drawn a card (pot or balance updated)
         }
 
@@ -188,7 +188,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
 
             var next = fsmState.HandleCommand(_context, new DrawCardCommand("other"));
 
-            Assert.IsNull(next, "Commands from unrelated players should be ignored.");
+            Assert.IsNull(next.Value, "Commands from unrelated players should be ignored.");
             Assert.AreEqual(0, other.Pot.Count);
         }
 
@@ -205,7 +205,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
 
             var next = fsmState.HandleCommand(_context, new DrawCardCommand("tgt"));
 
-            Assert.IsNotNull(next);
+            Assert.IsNotNull(next.Value);
             // When shoe is empty after the forced draw, it should transition to RoundEndState
         }
 

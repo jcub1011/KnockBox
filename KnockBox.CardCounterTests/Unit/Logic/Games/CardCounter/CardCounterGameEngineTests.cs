@@ -256,14 +256,13 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             state.CurrentShoe.Push(new NumberCard(7));
 
             var playerTurnState = new PlayerTurnState();
-            playerTurnState.OnEnter(context);
-            context.CurrentFsmState = playerTurnState;
+            context.Fsm.TransitionTo(context, playerTurnState);
             var potBefore = p1.Pot.Count;
 
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
 
             Assert.AreEqual(potBefore, p1.Pot.Count, "No card should be auto-drawn when the action timer is disabled.");
-            Assert.AreSame(playerTurnState, context.CurrentFsmState, "FSM state should not change when action timer is disabled.");
+            Assert.AreSame(playerTurnState, context.Fsm.CurrentState, "FSM state should not change when action timer is disabled.");
         }
 
         // ── ResetGame ─────────────────────────────────────────────────────────

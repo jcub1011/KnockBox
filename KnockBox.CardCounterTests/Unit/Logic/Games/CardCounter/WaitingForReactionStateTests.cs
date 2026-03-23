@@ -56,8 +56,8 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
 
             var next = fsmState.HandleCommand(_context, new AcceptPendingCommand("tgt"));
 
-            Assert.IsNotNull(next);
-            Assert.IsInstanceOfType(next, typeof(PlayerTurnState));
+            Assert.IsNotNull(next.Value);
+            Assert.IsInstanceOfType(next.Value, typeof(PlayerTurnState));
             CollectionAssert.AreEqual(new[] { 3, 2, 1 }, target.Pot, "Target pot should be reversed.");
         }
 
@@ -75,8 +75,8 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
 
             var next = fsmState.HandleCommand(_context, new PlayActionCardCommand("tgt", 0));
 
-            Assert.IsNotNull(next);
-            Assert.IsInstanceOfType(next, typeof(PlayerTurnState));
+            Assert.IsNotNull(next.Value);
+            Assert.IsInstanceOfType(next.Value, typeof(PlayerTurnState));
             CollectionAssert.AreEqual(new[] { 1, 2, 3 }, target.Pot, "Blocked: pot should NOT be reversed.");
             Assert.AreEqual(0, target.ActionHand.Count, "Comp'd card should be consumed.");
         }
@@ -156,7 +156,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             // Other player tries to accept
             var next = fsmState.HandleCommand(_context, new AcceptPendingCommand("other"));
 
-            Assert.IsNull(next);
+            Assert.IsNull(next.Value);
             CollectionAssert.AreEqual(new[] { 1, 2, 3 }, target.Pot, "Pot should not change when unrelated player sends accept.");
         }
 
@@ -196,8 +196,8 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             var next = fsmState.HandleCommand(_context, new AcceptPendingCommand("tgt"));
 
             // TurnTheTable goes to PlayerTurnState regardless of shoe count
-            Assert.IsNotNull(next);
-            Assert.IsInstanceOfType(next, typeof(PlayerTurnState));
+            Assert.IsNotNull(next.Value);
+            Assert.IsInstanceOfType(next.Value, typeof(PlayerTurnState));
         }
 
         // ── Non-Compd response cards are ignored ──────────────────────────────
@@ -216,7 +216,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
 
             var next = fsmState.HandleCommand(_context, new PlayActionCardCommand("tgt", 0));
 
-            Assert.IsNull(next, "A non-Comp'd response should be ignored.");
+            Assert.IsNull(next.Value, "A non-Comp'd response should be ignored.");
             Assert.AreEqual(1, target.ActionHand.Count, "Non-Comp'd card should not be consumed.");
         }
     }

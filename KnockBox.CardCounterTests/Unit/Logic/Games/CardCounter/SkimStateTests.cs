@@ -56,13 +56,13 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
 
             // Source selects index 1 ↔ target index 2 (2 ↔ 6)
             var afterSelect = fsmState.HandleCommand(_context, new SkimSelectCommand("src", 1, 2));
-            Assert.IsNull(afterSelect, "Should not resolve yet; target hasn't accepted.");
+            Assert.IsNull(afterSelect.Value, "Should not resolve yet; target hasn't accepted.");
 
             // Target accepts
             var next = fsmState.HandleCommand(_context, new AcceptPendingCommand("tgt"));
 
-            Assert.IsNotNull(next);
-            Assert.IsInstanceOfType(next, typeof(PlayerTurnState));
+            Assert.IsNotNull(next.Value);
+            Assert.IsInstanceOfType(next.Value, typeof(PlayerTurnState));
             Assert.AreEqual(6, source.Pot[1], "Source digit[1] should be 6 (swapped from target[2]).");
             Assert.AreEqual(2, target.Pot[2], "Target digit[2] should be 2 (swapped from source[1]).");
         }
@@ -82,13 +82,13 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
 
             // Target accepts first
             var afterAccept = fsmState.HandleCommand(_context, new AcceptPendingCommand("tgt"));
-            Assert.IsNull(afterAccept, "Should not resolve yet; source hasn't selected.");
+            Assert.IsNull(afterAccept.Value, "Should not resolve yet; source hasn't selected.");
 
             // Source selects index 0 ↔ target index 1 (7 ↔ 10)
             var next = fsmState.HandleCommand(_context, new SkimSelectCommand("src", 0, 1));
 
-            Assert.IsNotNull(next);
-            Assert.IsInstanceOfType(next, typeof(PlayerTurnState));
+            Assert.IsNotNull(next.Value);
+            Assert.IsInstanceOfType(next.Value, typeof(PlayerTurnState));
             Assert.AreEqual(10, source.Pot[0], "Source digit[0] should be 10 (swapped from target[1]).");
             Assert.AreEqual(7, target.Pot[1], "Target digit[1] should be 7 (swapped from source[0]).");
         }
@@ -108,8 +108,8 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
 
             var next = fsmState.HandleCommand(_context, new PlayActionCardCommand("tgt", 0));
 
-            Assert.IsNotNull(next);
-            Assert.IsInstanceOfType(next, typeof(PlayerTurnState));
+            Assert.IsNotNull(next.Value);
+            Assert.IsInstanceOfType(next.Value, typeof(PlayerTurnState));
             CollectionAssert.AreEqual(new[] { 1, 2 }, source.Pot, "Source pot should be unchanged after Comp'd block.");
             CollectionAssert.AreEqual(new[] { 3, 4 }, target.Pot, "Target pot should be unchanged after Comp'd block.");
             Assert.AreEqual(0, target.ActionHand.Count, "Comp'd card should be consumed.");
@@ -166,7 +166,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             fsmState.HandleCommand(_context, new SkimSelectCommand("src", 99, 0));
             var next = fsmState.HandleCommand(_context, new AcceptPendingCommand("tgt"));
 
-            Assert.IsNotNull(next);
+            Assert.IsNotNull(next.Value);
             // The out-of-range index defaults to last digit (2→index 2, value=3) swapping with target[0] (value=4)
             Assert.AreEqual(4, source.Pot[2], "Out-of-range source index should default to last digit.");
             Assert.AreEqual(3, target.Pot[0], "Out-of-range index swap should use target[0].");

@@ -95,7 +95,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             fsmState.OnEnter(_context);
             var result = fsmState.HandleCommand(_context, new SetBuyInCommand("unknown-player", IsNegative: false));
 
-            Assert.IsNull(result, "Unknown player command should return null (stay in BuyInState).");
+            Assert.IsNull(result.Value, "Unknown player command should return null (stay in BuyInState).");
         }
 
         [TestMethod]
@@ -119,8 +119,8 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             // p1 sets buy-in — now all players have set buy-in
             var next = fsmState.HandleCommand(_context, new SetBuyInCommand("p1", IsNegative: false));
 
-            Assert.IsNotNull(next);
-            Assert.IsInstanceOfType(next, typeof(RoundEndState));
+            Assert.IsNotNull(next.Value);
+            Assert.IsInstanceOfType(next.Value, typeof(RoundEndState));
         }
 
         [TestMethod]
@@ -135,7 +135,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             // Only p1 sets buy-in; p2 has not yet
             var next = fsmState.HandleCommand(_context, new SetBuyInCommand("p1", IsNegative: false));
 
-            Assert.IsNull(next, "Should stay in BuyInState while not all players have set buy-in.");
+            Assert.IsNull(next.Value, "Should stay in BuyInState while not all players have set buy-in.");
         }
 
         [TestMethod]
@@ -149,7 +149,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             // DrawCardCommand should be ignored in BuyIn state
             var next = fsmState.HandleCommand(_context, new DrawCardCommand("p1"));
 
-            Assert.IsNull(next);
+            Assert.IsNull(next.Value);
         }
     }
 }
