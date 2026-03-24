@@ -21,7 +21,13 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
         [Parameter] public string ObfuscatedRoomCode { get; set; } = default!;
 
         private IDisposable? _stateSubscription;
+        private PeriodicTimer? _timer;
         private KnockBox.Core.Components.Shared.SvgDrawingCanvas? _canvas;
+
+        // Track drawing sub-round to clear stale feedback when the type changes
+        private int _prevDrawingTypeIndex = -1;
+        // Track outfit round to clear stale feedback when the round changes
+        private int _prevOutfitRound = -1;
 
         // ------------------------------------------------------------------
         // Lifecycle
@@ -65,12 +71,58 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
             }
 
             GameState.OnStateDisposed += HandleStateDisposed;
-            _stateSubscription = GameState.StateChangedEventManager.Subscribe(
-                async () => await InvokeAsync(StateHasChanged));
+            _stateSubscription = GameState.StateChangedEventManager.Subscribe(async () =>
+            {
+                // Clear stale drawing feedback when the host advances to a new clothing type
+                if (GameState.CurrentDrawingTypeIndex != _prevDrawingTypeIndex)
+                {
+                    _prevDrawingTypeIndex = GameState.CurrentDrawingTypeIndex;
+                    DrawingFeedback = string.Empty;
+                }
+
+                // Clear stale building feedback when a new outfit round starts
+                if (GameState.CurrentOutfitRound != _prevOutfitRound)
+                {
+                    _prevOutfitRound = GameState.CurrentOutfitRound;
+                    BuildingFeedback = string.Empty;
+                }
+
+                await InvokeAsync(StateHasChanged);
+            });
 
             ThemeInput = GameState.Settings.Theme ?? string.Empty;
 
+            // Start the 1-second countdown/tick timer
+            _timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
+            _ = RunTimerAsync();
+
             await base.OnInitializedAsync();
+        }
+
+        private async Task RunTimerAsync()
+        {
+            var timer = _timer;
+            if (timer is null) return;
+            try
+            {
+                while (await timer.WaitForNextTickAsync(ComponentDetached))
+                {
+                    try
+                    {
+                        // All clients update the countdown display; the FSM deadline check
+                        // ensures the auto-advance fires exactly once regardless of which
+                        // client reaches it first.
+                        GameEngine.Tick(GameState, DateTimeOffset.UtcNow);
+                        await InvokeAsync(StateHasChanged);
+                    }
+                    catch (ObjectDisposedException) { break; }
+                    catch (Exception ex)
+                    {
+                        Logger.LogError(ex, "Error ticking DrawnToDress game.");
+                    }
+                }
+            }
+            catch (OperationCanceledException) { }
         }
 
         protected override void OnAfterRender(bool firstRender)
@@ -93,6 +145,7 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
         public override void Dispose()
         {
             base.Dispose();
+            _timer?.Dispose();
             if (GameState is not null)
                 GameState.OnStateDisposed -= HandleStateDisposed;
             _stateSubscription?.Dispose();
@@ -135,6 +188,26 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
                 return types[GameState.CurrentDrawingTypeIndex + 1].ToString();
             }
         }
+
+        /// <summary>Returns the time remaining in the current timed phase, or null when no timer is active.</summary>
+        protected TimeSpan? PhaseTimeRemaining
+        {
+            get
+            {
+                if (GameState?.PhaseDeadlineUtc is null) return null;
+                var remaining = GameState.PhaseDeadlineUtc.Value - DateTimeOffset.UtcNow;
+                return remaining < TimeSpan.Zero ? TimeSpan.Zero : remaining;
+            }
+        }
+
+        protected static string FormatCountdown(TimeSpan? span)
+        {
+            if (span is null) return string.Empty;
+            return $"{(int)span.Value.TotalMinutes}:{span.Value.Seconds:D2}";
+        }
+
+        /// <summary>Seconds remaining at which the countdown badge switches to the "urgent" (pulsing red) style.</summary>
+        protected const int CountdownUrgentThresholdSeconds = 10;
 
         // ------------------------------------------------------------------
         // Lobby actions

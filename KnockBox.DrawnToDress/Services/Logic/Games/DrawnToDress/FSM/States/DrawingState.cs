@@ -6,21 +6,56 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
 {
     /// <summary>
     /// Drawing phase: players submit drawings for the current clothing type, and the host
-    /// advances through each type in sequence.
-    /// Transitions to <see cref="OutfitBuildingState"/> when the host advances past the last type.
+    /// (or the per-sub-round countdown timer) advances through each type in sequence.
+    /// Transitions to <see cref="OutfitBuildingState"/> when the last drawing type is done.
     /// </summary>
-    public sealed class DrawingState : IDrawnToDressGameState
+    public sealed class DrawingState
+        : IDrawnToDressGameState,
+          ITimedGameState<DrawnToDressGameContext, DrawnToDressCommand>
     {
         public ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?> OnEnter(
             DrawnToDressGameContext context)
         {
             context.State.SetPhase(GamePhase.Drawing);
             context.State.ResetDrawingTypeIndex();
-            context.Logger.LogInformation("FSM → DrawingState (first type: {type})", context.State.CurrentDrawingType);
+            context.State.SetPhaseDeadline(
+                DateTimeOffset.UtcNow.AddSeconds(context.Settings.DrawingTimePerRound));
+            context.Logger.LogInformation(
+                "FSM → DrawingState (first type: {type}, deadline: {dl})",
+                context.State.CurrentDrawingType, context.State.PhaseDeadlineUtc);
             return null;
         }
 
-        public Result OnExit(DrawnToDressGameContext context) => Result.Success;
+        public Result OnExit(DrawnToDressGameContext context)
+        {
+            context.State.ClearPhaseDeadline();
+            return Result.Success;
+        }
+
+        // ── ITimedGameState ───────────────────────────────────────────────────
+
+        public ValueResult<TimeSpan> GetRemainingTime(DrawnToDressGameContext context, DateTimeOffset now)
+        {
+            if (!context.State.PhaseDeadlineUtc.HasValue)
+                return TimeSpan.Zero;
+            var remaining = context.State.PhaseDeadlineUtc.Value - now;
+            return remaining < TimeSpan.Zero ? TimeSpan.Zero : remaining;
+        }
+
+        public ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?> Tick(
+            DrawnToDressGameContext context, DateTimeOffset now)
+        {
+            if (!context.State.PhaseDeadlineUtc.HasValue || now < context.State.PhaseDeadlineUtc.Value)
+                return null;
+
+            context.Logger.LogInformation(
+                "DrawingState: timer expired for type {type}, auto-advancing.",
+                context.State.CurrentDrawingType);
+
+            return AdvanceRound(context);
+        }
+
+        // ── Commands ──────────────────────────────────────────────────────────
 
         public ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?> HandleCommand(
             DrawnToDressGameContext context, DrawnToDressCommand command)
@@ -64,6 +99,15 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
             if (!context.IsHost(cmd.PlayerId))
                 return new ResultError("Only the host can advance the drawing round.");
 
+            return AdvanceRound(context);
+        }
+
+        /// <summary>
+        /// Shared advance logic used by both host command and timer expiry.
+        /// </summary>
+        private static ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?> AdvanceRound(
+            DrawnToDressGameContext context)
+        {
             if (context.State.IsLastDrawingType)
             {
                 // All clothing types done → start outfit 1 building
@@ -74,8 +118,12 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
             }
 
             context.State.AdvanceDrawingType();
+            // Reset the per-sub-round deadline for the new clothing type
+            context.State.SetPhaseDeadline(
+                DateTimeOffset.UtcNow.AddSeconds(context.Settings.DrawingTimePerRound));
             context.Logger.LogInformation(
-                "DrawingState: advanced to type {type}.", context.State.CurrentDrawingType);
+                "DrawingState: advanced to type {type}, new deadline {dl}.",
+                context.State.CurrentDrawingType, context.State.PhaseDeadlineUtc);
             return null;
         }
     }

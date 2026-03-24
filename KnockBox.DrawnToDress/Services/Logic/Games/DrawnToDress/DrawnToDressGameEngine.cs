@@ -91,6 +91,31 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress
             return Result.Success;
         }
 
+        /// <summary>
+        /// Advances time-based transitions (drawing sub-round timer, outfit-building timer).
+        /// Should be called periodically (e.g. every second) from any connected client.
+        /// The FSM's internal deadline check ensures the auto-advance fires exactly once.
+        /// </summary>
+        public Result Tick(DrawnToDressGameState state, DateTimeOffset now)
+        {
+            if (state.Context is null) return Result.Success;
+            var context = state.Context;
+
+            ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?> fsmResult = default;
+
+            var executeResult = context.State.Execute(() =>
+            {
+                fsmResult = context.Fsm.Tick(context, now);
+            });
+
+            if (executeResult.IsFailure) return executeResult;
+
+            if (fsmResult.IsFailure && fsmResult.TryGetFailure(out var fsmError))
+                return Result.FromError(fsmError);
+
+            return Result.Success;
+        }
+
         // ── Public UI-facing methods ──────────────────────────────────────────
 
         // Drawing phase

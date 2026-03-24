@@ -62,6 +62,12 @@
                         <span class="progress-badge">
                             Round @(GameState.CurrentDrawingTypeIndex + 1) / @GameState.Settings.ClothingTypes.Count
                         </span>
+                        @if (PhaseTimeRemaining.HasValue)
+                        {
+                            <span class="countdown-badge @(PhaseTimeRemaining.Value.TotalSeconds <= CountdownUrgentThresholdSeconds ? "countdown-urgent" : "")">
+                                ⏱ @FormatCountdown(PhaseTimeRemaining)
+                            </span>
+                        }
                     </div>
                     <div class="drawing-info">
                         <p>Draw your best <strong>@GameState.CurrentDrawingType</strong>! You can draw up to @GameState.Settings.MaxItemsPerType items.</p>
@@ -103,6 +109,12 @@
                             {
                                 <span class="theme-badge">Theme: @GameState.Settings.Theme</span>
                             }
+                            @if (PhaseTimeRemaining.HasValue)
+                            {
+                                <span class="countdown-badge @(PhaseTimeRemaining.Value.TotalSeconds <= CountdownUrgentThresholdSeconds ? "countdown-urgent" : "")">
+                                    ⏱ @FormatCountdown(PhaseTimeRemaining)
+                                </span>
+                            }
                         </div>
                         <div class="outfit-slots">
                             @foreach (var type in GameState.Settings.ClothingTypes)
@@ -113,7 +125,11 @@
                                     @if (slotItem != null)
                                     {
                                         <div class="slot-item">
-                                            <span class="item-name">✓ @slotItem.CreatorName's @type</span>
+                                            <div class="item-preview">
+                                                <img class="svg-thumbnail"
+                                                     src="data:image/svg+xml;charset=utf-8,@Uri.EscapeDataString(slotItem.SvgData)"
+                                                     alt="@type drawing" />
+                                            </div>
                                             @if (!IsOutfitLocked)
                                             {
                                                 <button class="btn btn-sm btn-outline-danger" @onclick="() => ReturnItem(slotItem, type)">✕</button>
@@ -156,17 +172,25 @@
                         @foreach (var type in GameState.Settings.ClothingTypes)
                         {
                             var typeItems = GameState.AvailablePool
-                                .Where(i => i.Type == type && i.CreatorId != UserService.CurrentUser?.Id)
+                                .Where(i => i.Type == type)
                                 .ToList();
                             <div class="pool-type-group">
-                                <h6>@type (@typeItems.Count)</h6>
+                                <h6>@type (@typeItems.Count(i => i.CreatorId != UserService.CurrentUser?.Id) available)</h6>
                                 <div class="pool-items">
                                     @foreach (var item in typeItems)
                                     {
-                                        <button class="btn btn-outline-secondary pool-item"
-                                                disabled="@IsOutfitLocked"
+                                        bool isOwn = item.CreatorId == UserService.CurrentUser?.Id;
+                                        <button class="btn pool-item @(isOwn ? "pool-item-own" : "btn-outline-secondary")"
+                                                disabled="@(IsOutfitLocked || isOwn)"
+                                                title="@(isOwn ? "You drew this item and cannot use it." : $"Claim this {item.Type}")"
                                                 @onclick="() => ClaimItem(item.Id)">
-                                            @item.CreatorName's @item.Type
+                                            <img class="svg-thumbnail"
+                                                 src="data:image/svg+xml;charset=utf-8,@Uri.EscapeDataString(item.SvgData)"
+                                                 alt="@type drawing" />
+                                            @if (isOwn)
+                                            {
+                                                <span class="own-label">Yours</span>
+                                            }
                                         </button>
                                     }
                                 </div>
@@ -187,7 +211,16 @@
                             var item = MyCurrentOutfit?.Items[type];
                             <div class="outfit-item-display">
                                 <span class="item-type">@type:</span>
-                                <span class="item-value">@(item != null ? $"{item.CreatorName}'s {item.Type}" : "Empty")</span>
+                                @if (item is not null)
+                                {
+                                    <img class="svg-thumbnail"
+                                         src="data:image/svg+xml;charset=utf-8,@Uri.EscapeDataString(item.SvgData)"
+                                         alt="@type drawing" />
+                                }
+                                else
+                                {
+                                    <span class="item-value">Empty</span>
+                                }
                             </div>
                         }
                     </div>
@@ -244,7 +277,15 @@
                                     @foreach (var type in GameState.Settings.ClothingTypes)
                                     {
                                         var item = outfitA?.Items[type];
-                                        <div class="outfit-item-display"><span>@type: @(item?.CreatorName ?? "—")'s @(item?.Type.ToString() ?? "")</span></div>
+                                        <div class="outfit-item-display">
+                                            <span class="item-type">@type:</span>
+                                            @if (item is not null)
+                                            {
+                                                <img class="svg-thumbnail"
+                                                     src="data:image/svg+xml;charset=utf-8,@Uri.EscapeDataString(item.SvgData)"
+                                                     alt="@type drawing" />
+                                            }
+                                        </div>
                                     }
                                 </div>
                                 <div class="matchup-vs">VS</div>
@@ -254,7 +295,15 @@
                                     @foreach (var type in GameState.Settings.ClothingTypes)
                                     {
                                         var item = outfitB?.Items[type];
-                                        <div class="outfit-item-display"><span>@type: @(item?.CreatorName ?? "—")'s @(item?.Type.ToString() ?? "")</span></div>
+                                        <div class="outfit-item-display">
+                                            <span class="item-type">@type:</span>
+                                            @if (item is not null)
+                                            {
+                                                <img class="svg-thumbnail"
+                                                     src="data:image/svg+xml;charset=utf-8,@Uri.EscapeDataString(item.SvgData)"
+                                                     alt="@type drawing" />
+                                            }
+                                        </div>
                                     }
                                 </div>
                             </div>

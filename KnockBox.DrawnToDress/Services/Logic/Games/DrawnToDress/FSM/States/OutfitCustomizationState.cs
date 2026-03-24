@@ -50,10 +50,19 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
                 return new ResultError("Outfit has already been submitted.");
 
             // Distinctness check for Outfit 2+
-            if (context.State.CurrentOutfitRound >= 2 && !context.State.IsDistinctFromAllOutfit1s(outfit))
-                return new ResultError(
-                    "Your second outfit is too similar to another player's first outfit. " +
-                    "Please swap at least 2 items.");
+            if (context.State.CurrentOutfitRound >= 2)
+            {
+                var (isDistinct, conflicting, sharedCount) = context.State.CheckDistinctnessWithDetails(outfit);
+                if (!isDistinct && conflicting is not null)
+                {
+                    string conflictingOwner = conflicting.PlayerId == cmd.PlayerId
+                        ? "your"
+                        : $"{conflicting.PlayerName}'s";
+                    return new ResultError(
+                        $"Too similar to {conflictingOwner} first outfit ({sharedCount} matching items). " +
+                        $"Swap at least {context.State.Settings.OutfitDistinctnessRule} items.");
+                }
+            }
 
             outfit.Name = cmd.Name.Trim();
             outfit.SketchData = cmd.SketchData;
@@ -68,6 +77,18 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
             context.Logger.LogInformation(
                 "OutfitCustomizationState: player [{id}] submitted outfit '{name}'.",
                 cmd.PlayerId, outfit.Name);
+
+            // Auto-advance when all participants have submitted their outfit
+            bool allSubmitted = context.AllParticipants.All(p =>
+                context.State.GetPlayerOutfit(p.Id, context.State.CurrentOutfitRound)?.IsSubmitted == true);
+
+            if (allSubmitted)
+            {
+                context.Logger.LogInformation(
+                    "OutfitCustomizationState: all players submitted — auto-advancing.");
+                return DoEndCustomization(context);
+            }
+
             return null;
         }
 
@@ -77,6 +98,12 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
             if (!context.IsHost(cmd.PlayerId))
                 return new ResultError("Only the host can advance the game phase.");
 
+            return DoEndCustomization(context);
+        }
+
+        private static ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?> DoEndCustomization(
+            DrawnToDressGameContext context)
+        {
             if (context.State.CurrentOutfitRound < context.Settings.NumOutfitRounds)
             {
                 // Advance to the next outfit round

@@ -46,6 +46,12 @@ namespace KnockBox.Services.State.Games.DrawnToDress
         public int CurrentVotingRound { get; private set; } = 0;
         public int TotalVotingRounds { get; private set; } = 0;
 
+        /// <summary>
+        /// UTC deadline for the current timed phase (Drawing sub-round or OutfitBuilding).
+        /// Null when no timer is active (e.g. Lobby, Customization, Voting, Results).
+        /// </summary>
+        public DateTimeOffset? PhaseDeadlineUtc { get; private set; }
+
         public ClothingType CurrentDrawingType =>
             Settings.ClothingTypes[CurrentDrawingTypeIndex];
 
@@ -129,6 +135,10 @@ namespace KnockBox.Services.State.Games.DrawnToDress
         public void SetTotalVotingRounds(int rounds) => TotalVotingRounds = rounds;
 
         public void AdvanceVotingRound() => CurrentVotingRound++;
+
+        public void SetPhaseDeadline(DateTimeOffset deadline) => PhaseDeadlineUtc = deadline;
+
+        public void ClearPhaseDeadline() => PhaseDeadlineUtc = null;
 
         // ------------------------------------------------------------------
         // Clothing item management
@@ -222,6 +232,14 @@ namespace KnockBox.Services.State.Games.DrawnToDress
         /// by at least <see cref="DrawnToDressSettings.OutfitDistinctnessRule"/> items.
         /// </summary>
         public bool IsDistinctFromAllOutfit1s(Outfit outfit2)
+            => CheckDistinctnessWithDetails(outfit2).IsDistinct;
+
+        /// <summary>
+        /// Checks outfit distinctness and returns the first conflicting Outfit 1 along with
+        /// the number of shared items, to enable precise user-facing error messages.
+        /// </summary>
+        public (bool IsDistinct, Outfit? ConflictingOutfit1, int SharedCount) CheckDistinctnessWithDetails(
+            Outfit outfit2)
         {
             int maxShared = Settings.ClothingTypes.Count - Settings.OutfitDistinctnessRule;
             var outfit2Ids = outfit2.ItemIds.ToHashSet();
@@ -230,9 +248,9 @@ namespace KnockBox.Services.State.Games.DrawnToDress
             {
                 int shared = outfit1.ItemIds.Count(id => outfit2Ids.Contains(id));
                 if (shared > maxShared)
-                    return false;
+                    return (false, outfit1, shared);
             }
-            return true;
+            return (true, null, 0);
         }
     }
 }

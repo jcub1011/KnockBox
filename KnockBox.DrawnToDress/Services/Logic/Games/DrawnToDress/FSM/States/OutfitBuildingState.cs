@@ -6,22 +6,60 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
 {
     /// <summary>
     /// Outfit building phase: players simultaneously claim items from the shared pool
-    /// to assemble a complete outfit. The host ends the phase when time expires.
-    /// Transitions to <see cref="OutfitCustomizationState"/> when the host calls
-    /// <see cref="EndOutfitBuildingCommand"/>.
+    /// to assemble a complete outfit.
+    /// <para>
+    /// Timer: when the deadline passes any incomplete outfits are auto-filled with random
+    /// available items (Case 2), and Outfit-2 distinctness violations are resolved by
+    /// swapping duplicate items (Case 5). The FSM then transitions automatically to
+    /// <see cref="OutfitCustomizationState"/>.
+    /// </para>
     /// </summary>
-    public sealed class OutfitBuildingState : IDrawnToDressGameState
+    public sealed class OutfitBuildingState
+        : IDrawnToDressGameState,
+          ITimedGameState<DrawnToDressGameContext, DrawnToDressCommand>
     {
         public ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?> OnEnter(
             DrawnToDressGameContext context)
         {
             context.State.SetPhase(GamePhase.OutfitBuilding);
+            context.State.SetPhaseDeadline(
+                DateTimeOffset.UtcNow.AddSeconds(context.Settings.OutfitBuildingTimeLimit));
             context.Logger.LogInformation(
-                "FSM → OutfitBuildingState (round {round})", context.State.CurrentOutfitRound);
+                "FSM → OutfitBuildingState (round {round}, deadline: {dl})",
+                context.State.CurrentOutfitRound, context.State.PhaseDeadlineUtc);
             return null;
         }
 
-        public Result OnExit(DrawnToDressGameContext context) => Result.Success;
+        public Result OnExit(DrawnToDressGameContext context)
+        {
+            context.State.ClearPhaseDeadline();
+            return Result.Success;
+        }
+
+        // ── ITimedGameState ───────────────────────────────────────────────────
+
+        public ValueResult<TimeSpan> GetRemainingTime(DrawnToDressGameContext context, DateTimeOffset now)
+        {
+            if (!context.State.PhaseDeadlineUtc.HasValue)
+                return TimeSpan.Zero;
+            var remaining = context.State.PhaseDeadlineUtc.Value - now;
+            return remaining < TimeSpan.Zero ? TimeSpan.Zero : remaining;
+        }
+
+        public ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?> Tick(
+            DrawnToDressGameContext context, DateTimeOffset now)
+        {
+            if (!context.State.PhaseDeadlineUtc.HasValue || now < context.State.PhaseDeadlineUtc.Value)
+                return null;
+
+            context.Logger.LogInformation(
+                "OutfitBuildingState: timer expired (round {round}), auto-filling outfits.",
+                context.State.CurrentOutfitRound);
+
+            return DoEndOutfitBuilding(context);
+        }
+
+        // ── Commands ──────────────────────────────────────────────────────────
 
         public ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?> HandleCommand(
             DrawnToDressGameContext context, DrawnToDressCommand command)
@@ -104,15 +142,31 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
             if (!context.IsHost(cmd.PlayerId))
                 return new ResultError("Only the host can end the outfit building phase.");
 
-            // Auto-lock any complete unlocked outfits
+            return DoEndOutfitBuilding(context);
+        }
+
+        /// <summary>
+        /// Shared end-of-phase logic: auto-lock complete outfits, auto-fill incomplete ones,
+        /// resolve distinctness violations for round 2+, then transition to customization.
+        /// </summary>
+        private static ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?> DoEndOutfitBuilding(
+            DrawnToDressGameContext context)
+        {
+            // Auto-lock complete unlocked outfits
             foreach (var outfit in context.State.Outfits.Values
                 .Where(o => o.OutfitNumber == context.State.CurrentOutfitRound && !o.IsLocked && o.IsComplete))
             {
                 outfit.IsLocked = true;
             }
 
+            // Auto-fill and lock any remaining incomplete outfits (timer expiry / host force-end)
+            context.AutoFillAndLockIncompleteOutfits();
+
+            // Fix distinctness violations for Outfit 2 (Case 5)
+            context.FixDistinctnessViolations();
+
             context.Logger.LogInformation(
-                "OutfitBuildingState: host ended outfit building (round {round}).",
+                "OutfitBuildingState: ended outfit building (round {round}).",
                 context.State.CurrentOutfitRound);
 
             return new OutfitCustomizationState();
