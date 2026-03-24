@@ -1,0 +1,42 @@
+@page "/room/drawn-to-dress/{ObfuscatedRoomCode}"
+
+@inherits DisposableComponent
+
+<PageTitle>Drawn To Dress</PageTitle>
+
+<div class="content">
+    @if (GameState is null)
+    {
+        <div>Loading...</div>
+    }
+    else
+    {
+        <div class="card">
+            <h3>Drawn To Dress</h3>
+            @if (GameState.IsJoinable)
+            {
+                <div class="joinable-state">
+                    <h4>Players</h4>
+                    <div class="player-list">
+                        @foreach (var player in GameState.Players)
+                        {
+                            <button class="btn" title="Click to kick player."
+                                    @onclick="() => GameState.KickPlayer(player)">
+                                @player.Name @(player.Id == GameState.Host.Id ? "(Host)" : "")
+                            </button>
+                        }
+                    </div>
+                    @if (UserService.CurrentUser?.Id == GameState.Host.Id)
+                    {
+                        <button class="btn btn-primary start-btn mt-3" @onclick="StartGame">Start Game</button>
+                    }
+                </div>
+            }
+            else
+            {
+                <p>Phase: @GameState.Phase</p>
+                <p>Game in progress — more content coming soon.</p>
+            }
+        </div>
+    }
+</div>

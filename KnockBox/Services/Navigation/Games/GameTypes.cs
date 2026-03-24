@@ -15,6 +15,9 @@ namespace KnockBox.Services.Navigation.Games
         [Description("Card Counter")]
         [NavigationString("card-counter")]
         CardCounter,
+        [Description("Drawn To Dress")]
+        [NavigationString("drawn-to-dress")]
+        DrawnToDress,
     }
 
     [AttributeUsage(AttributeTargets.Field, Inherited = false)]
