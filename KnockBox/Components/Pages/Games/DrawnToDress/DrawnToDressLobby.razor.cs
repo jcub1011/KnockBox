@@ -109,6 +109,23 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
                 {
                     try
                     {
+                        // Auto-submit the canvas drawing when the drawing deadline is about to expire
+                        if (GameState?.CurrentPhase == GamePhase.Drawing &&
+                            GameState.PhaseDeadlineUtc.HasValue &&
+                            GameState.PhaseDeadlineUtc.Value <= DateTimeOffset.UtcNow.AddSeconds(1) &&
+                            MyDrawingsThisType < GameState.Settings.MaxItemsPerType)
+                        {
+                            await TryAutoSubmitDrawingAsync();
+                        }
+
+                        // Auto-submit fully-selected (but not yet submitted) pending votes when the voting deadline expires
+                        if (GameState?.CurrentPhase == GamePhase.Voting &&
+                            GameState.PhaseDeadlineUtc.HasValue &&
+                            GameState.PhaseDeadlineUtc.Value <= DateTimeOffset.UtcNow.AddSeconds(1))
+                        {
+                            TryAutoSubmitPendingVotes();
+                        }
+
                         // All clients update the countdown display; the FSM deadline check
                         // ensures the auto-advance fires exactly once regardless of which
                         // client reaches it first.
@@ -123,6 +140,40 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
                 }
             }
             catch (OperationCanceledException) { }
+        }
+
+        /// <summary>Silently submits the current canvas content as a drawing when the timer is about to expire.</summary>
+        private async Task TryAutoSubmitDrawingAsync()
+        {
+            if (_canvas is null || GameState is null) return;
+            try
+            {
+                var svgData = await _canvas.GetStorableSvgContentAsync();
+                if (!string.IsNullOrWhiteSpace(svgData))
+                {
+                    var result = GameEngine.SubmitDrawing(UserService.CurrentUser!, GameState, svgData);
+                    if (result.IsSuccess)
+                        await _canvas.ClearAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning(ex, "Auto-submit drawing failed.");
+            }
+        }
+
+        /// <summary>
+        /// Submits any fully-completed pending votes (all criteria selected) when the voting timer expires.
+        /// </summary>
+        private void TryAutoSubmitPendingVotes()
+        {
+            if (GameState is null) return;
+            var matchupIds = _pendingVotes.Keys.ToList();
+            foreach (var matchupId in matchupIds)
+            {
+                if (CanSubmitVote(matchupId))
+                    SubmitVote(matchupId);
+            }
         }
 
         protected override void OnAfterRender(bool firstRender)
@@ -228,6 +279,14 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
             await GameEngine.StartAsync(UserService.CurrentUser!, GameState);
         }
 
+        protected void PlayAgain()
+        {
+            if (GameState is null || !IsHost) return;
+            var result = GameEngine.ResetToLobby(UserService.CurrentUser!, GameState);
+            if (result.TryGetFailure(out var err))
+                Logger.LogWarning("Play again failed: {msg}", err.PublicMessage);
+        }
+
         // ------------------------------------------------------------------
         // Drawing phase
         // ------------------------------------------------------------------
@@ -237,7 +296,7 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
             if (_canvas is null || GameState is null) return;
             DrawingFeedback = string.Empty;
 
-            var svgData = await _canvas.GetSvgContentAsync();
+            var svgData = await _canvas.GetStorableSvgContentAsync();
             if (string.IsNullOrWhiteSpace(svgData))
             {
                 DrawingFeedback = "Canvas is empty. Draw something first!";

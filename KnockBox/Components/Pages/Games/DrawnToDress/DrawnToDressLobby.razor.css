@@ -379,3 +379,34 @@
 .start-btn {
     align-self: flex-start;
 }
+
+/* ── Settings panel ──────────────────────────────────────────────────────── */
+
+.settings-details {
+    background: #f9f9f9;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    padding: 0.5rem 1rem;
+}
+
+.settings-summary {
+    cursor: pointer;
+    font-weight: 600;
+    user-select: none;
+}
+
+.settings-grid {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.5rem 1rem;
+    align-items: center;
+}
+
+.settings-grid label {
+    font-size: 0.9rem;
+    color: #444;
+}
+
+.settings-grid input[type="number"] {
+    max-width: 120px;
+}

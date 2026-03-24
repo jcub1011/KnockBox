@@ -36,6 +36,38 @@
                                        @bind="ThemeInput" @bind:event="oninput" maxlength="50" />
                                 <button class="btn btn-outline-secondary" @onclick="SetTheme">Set</button>
                             </div>
+                            <details class="settings-details mt-2">
+                                <summary class="settings-summary">⚙️ Game Settings</summary>
+                                <div class="settings-grid mt-2">
+                                    <label title="Time (seconds) each player has to draw each clothing type.">Drawing time per type (s):</label>
+                                    <input type="number" class="form-control form-control-sm" min="10" max="600"
+                                           @bind="GameState.Settings.DrawingTimePerRound" />
+
+                                    <label title="Maximum drawings a player can submit per clothing type.">Max drawings per type:</label>
+                                    <input type="number" class="form-control form-control-sm" min="1" max="20"
+                                           @bind="GameState.Settings.MaxItemsPerType" />
+
+                                    <label title="Time (seconds) players have to assemble each outfit.">Outfit building time (s):</label>
+                                    <input type="number" class="form-control form-control-sm" min="10" max="600"
+                                           @bind="GameState.Settings.OutfitBuildingTimeLimit" />
+
+                                    <label title="Time (seconds) players have to name and submit each outfit.">Outfit customization time (s):</label>
+                                    <input type="number" class="form-control form-control-sm" min="10" max="600"
+                                           @bind="GameState.Settings.OutfitCustomizationTimeLimit" />
+
+                                    <label title="Time (seconds) per voting round.">Voting time per round (s):</label>
+                                    <input type="number" class="form-control form-control-sm" min="10" max="600"
+                                           @bind="GameState.Settings.VotingTimePerRound" />
+
+                                    <label title="Number of outfit rounds (1 = one outfit per player; 2 = two outfits per player).">Outfit rounds:</label>
+                                    <input type="number" class="form-control form-control-sm" min="1" max="4"
+                                           @bind="GameState.Settings.NumOutfitRounds" />
+
+                                    <label title="Minimum number of players required to start.">Min players:</label>
+                                    <input type="number" class="form-control form-control-sm" min="2" max="20"
+                                           @bind="GameState.Settings.MinPlayers" />
+                                </div>
+                            </details>
                             <button class="btn btn-primary start-btn mt-3"
                                     disabled="@(GameState.Players.Count < GameState.Settings.MinPlayers - 1)"
                                     @onclick="StartGame">
@@ -204,6 +236,12 @@
                 <div class="card phase-card">
                     <div class="phase-header">
                         <h3>🎨 Outfit Customization — Round @GameState.CurrentOutfitRound</h3>
+                        @if (PhaseTimeRemaining.HasValue)
+                        {
+                            <span class="countdown-badge @(PhaseTimeRemaining.Value.TotalSeconds <= CountdownUrgentThresholdSeconds ? "countdown-urgent" : "")">
+                                ⏱ @FormatCountdown(PhaseTimeRemaining)
+                            </span>
+                        }
                     </div>
                     <div class="outfit-display">
                         @foreach (var type in GameState.Settings.ClothingTypes)
@@ -260,6 +298,12 @@
                 <div class="card phase-card">
                     <div class="phase-header">
                         <h3>🗳️ Voting — Round @GameState.CurrentVotingRound / @GameState.TotalVotingRounds</h3>
+                        @if (PhaseTimeRemaining.HasValue)
+                        {
+                            <span class="countdown-badge @(PhaseTimeRemaining.Value.TotalSeconds <= CountdownUrgentThresholdSeconds ? "countdown-urgent" : "")">
+                                ⏱ @FormatCountdown(PhaseTimeRemaining)
+                            </span>
+                        }
                     </div>
                     @foreach (var matchup in GameState.CurrentRoundMatchups)
                     {
@@ -375,6 +419,18 @@
                             rank++;
                         }
                     </div>
+                    @if (IsHost)
+                    {
+                        <div class="host-controls mt-4">
+                            <button class="btn btn-primary" @onclick="PlayAgain">
+                                🔄 Play Again
+                            </button>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="alert alert-info mt-3">Waiting for the host to start a new game...</div>
+                    }
                 </div>
                 break;
         }

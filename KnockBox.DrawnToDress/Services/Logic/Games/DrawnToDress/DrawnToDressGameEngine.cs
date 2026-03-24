@@ -203,6 +203,31 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress
             return ProcessCommand(ctx, new FinalizeVotingRoundCommand(host.Id));
         }
 
+        /// <summary>
+        /// Resets the game to the Lobby phase so the same group can play again.
+        /// Settings and the player/host roster are preserved; all game data is cleared.
+        /// </summary>
+        public Result ResetToLobby(User host, DrawnToDressGameState state)
+        {
+            if (state is null)
+                return Result.FromError("Game state was null.");
+
+            if (host != state.Host)
+                return Result.FromError("Only the host can restart the game.");
+
+            var executeResult = state.Execute(() =>
+            {
+                state.ResetForNewGame();
+                state.UpdateJoinableStatus(true);
+            });
+
+            if (executeResult.IsFailure) return executeResult;
+
+            logger.LogInformation("DrawnToDress game [{id}] reset to Lobby by host [{hostId}].",
+                state.Host.Id, host.Id);
+            return Result.Success;
+        }
+
         // ── Utility ───────────────────────────────────────────────────────────
 
         private static bool TryGetContext(

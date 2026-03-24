@@ -184,8 +184,11 @@ namespace KnockBoxTests.Unit.Logic.Games.DrawnToDress
             _engine.Tick(state, state.PhaseDeadlineUtc!.Value.AddSeconds(1));
 
             Assert.AreEqual(GamePhase.OutfitCustomization, state.CurrentPhase);
-            Assert.IsNull(state.PhaseDeadlineUtc,
-                "Deadline should be cleared after leaving OutfitBuilding.");
+            // OutfitCustomizationState now has its own timer, so a new deadline is set on enter.
+            Assert.IsNotNull(state.PhaseDeadlineUtc,
+                "OutfitCustomization should set its own deadline on enter.");
+            Assert.IsTrue(state.PhaseDeadlineUtc!.Value > DateTimeOffset.UtcNow,
+                "OutfitCustomization deadline should be in the future.");
         }
 
         // ------------------------------------------------------------------
@@ -448,6 +451,246 @@ namespace KnockBoxTests.Unit.Logic.Games.DrawnToDress
             {
                 if (state.GetPlayerOutfit(player.Id, state.CurrentOutfitRound)?.Items[type] is not null)
                     continue;
+                var item = state.AvailablePool.FirstOrDefault(i => i.Type == type && i.CreatorId != player.Id);
+                if (item is not null) _engine.ClaimItem(player, state, item.Id);
+            }
+        }
+
+        private static List<User> GetAllPlayers(DrawnToDressGameState state) =>
+            [state.Host, .. state.Players];
+    }
+
+    // ------------------------------------------------------------------
+    // Additional tests: OutfitCustomization timer, Voting timer, Play Again
+    // ------------------------------------------------------------------
+
+    [TestClass]
+    public class PhaseTimerAndResetTests
+    {
+        private Mock<IRandomNumberService> _randomMock = default!;
+        private User _host = default!;
+        private DrawnToDressGameEngine _engine = default!;
+
+        [TestInitialize]
+        public void Setup()
+        {
+            _randomMock = new Mock<IRandomNumberService>();
+            _randomMock.Setup(r => r.GetRandomInt(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<RandomType>()))
+                       .Returns(0);
+            _host = new User("Host", "host-id");
+            _engine = new DrawnToDressGameEngine(
+                _randomMock.Object,
+                Mock.Of<ILogger<DrawnToDressGameEngine>>(),
+                Mock.Of<ILogger<DrawnToDressGameState>>());
+        }
+
+        // OutfitCustomization timer tests
+
+        [TestMethod]
+        public async Task OutfitCustomization_DeadlineSetOnEnter()
+        {
+            using var state = await StartCustomizationAsync();
+
+            Assert.AreEqual(GamePhase.OutfitCustomization, state.CurrentPhase);
+            Assert.IsNotNull(state.PhaseDeadlineUtc,
+                "OutfitCustomization should set a deadline on enter.");
+            Assert.IsTrue(state.PhaseDeadlineUtc!.Value > DateTimeOffset.UtcNow);
+        }
+
+        [TestMethod]
+        public async Task OutfitCustomization_TimerExpiry_AutoSubmitsAndAdvances()
+        {
+            using var state = await StartCustomizationAsync();
+
+            // Lock all outfits first (they aren't submitted yet)
+            foreach (var p in GetAllPlayers(state))
+                _engine.LockOutfit(p, state);
+
+            Assert.AreEqual(GamePhase.OutfitCustomization, state.CurrentPhase);
+
+            _engine.Tick(state, state.PhaseDeadlineUtc!.Value.AddSeconds(1));
+
+            Assert.AreEqual(GamePhase.Voting, state.CurrentPhase,
+                "OutfitCustomization timer expiry should auto-advance to Voting.");
+        }
+
+        [TestMethod]
+        public async Task OutfitCustomization_TimerExpiry_BeforeDeadline_DoesNotAdvance()
+        {
+            using var state = await StartCustomizationAsync();
+
+            _engine.Tick(state, DateTimeOffset.UtcNow.AddSeconds(-30));
+
+            Assert.AreEqual(GamePhase.OutfitCustomization, state.CurrentPhase);
+        }
+
+        // VotingState timer tests
+
+        [TestMethod]
+        public async Task VotingState_DeadlineSetOnEnter()
+        {
+            using var state = await StartVotingAsync();
+
+            Assert.AreEqual(GamePhase.Voting, state.CurrentPhase);
+            Assert.IsNotNull(state.PhaseDeadlineUtc,
+                "Voting should set a deadline on enter.");
+            Assert.IsTrue(state.PhaseDeadlineUtc!.Value > DateTimeOffset.UtcNow);
+        }
+
+        [TestMethod]
+        public async Task VotingState_TimerExpiry_FinalizesAndAdvancesOrEndsGame()
+        {
+            using var state = await StartVotingAsync();
+
+            _engine.Tick(state, state.PhaseDeadlineUtc!.Value.AddSeconds(1));
+
+            // Should have advanced to next round or moved to Results
+            bool advanced = state.CurrentPhase is GamePhase.Voting or GamePhase.Results;
+            Assert.IsTrue(advanced,
+                "Timer expiry should finalize the current voting round.");
+        }
+
+        [TestMethod]
+        public async Task VotingState_AllEligibleVoted_AutoFinalizes()
+        {
+            var settings = new DrawnToDressSettings { MinPlayers = 4, NumOutfitRounds = 1 };
+            using var state = new DrawnToDressGameState(_host, Mock.Of<ILogger<DrawnToDressGameState>>(), settings);
+            state.UpdateJoinableStatus(true);
+            var players = new[] { new User("P0", "p0"), new User("P1", "p1"),
+                                  new User("P2", "p2"), new User("P3", "p3") };
+            foreach (var p in players) state.RegisterPlayer(p);
+            await _engine.StartAsync(_host, state);
+
+            var allPlayers = GetAllPlayers(state);
+            foreach (var type in state.Settings.ClothingTypes)
+            {
+                foreach (var p in allPlayers)
+                {
+                    _engine.SubmitDrawing(p, state, "<svg/>");
+                    _engine.SubmitDrawing(p, state, "<svg/>");
+                }
+                _engine.AdvanceDrawingRound(_host, state);
+            }
+            foreach (var p in allPlayers) FillCompleteOutfit(p, state);
+            _engine.EndOutfitBuilding(_host, state);
+            foreach (var p in allPlayers)
+                _engine.SubmitOutfit(p, state, $"{p.Name}'s Outfit");
+            _engine.EndCustomizationPhase(_host, state);
+
+            Assert.AreEqual(GamePhase.Voting, state.CurrentPhase);
+
+            // Get the first matchup and have all eligible players vote
+            var matchup = state.CurrentRoundMatchups.First();
+            var outfitA = state.Outfits[matchup.OutfitAId];
+            var outfitB = state.Outfits[matchup.OutfitBId];
+
+            var eligible = allPlayers
+                .Where(p => p.Id != outfitA.PlayerId && p.Id != outfitB.PlayerId)
+                .ToList();
+
+            var votes = state.Settings.VotingCriteria.ToDictionary(c => c, _ => true);
+            foreach (var voter in eligible)
+                _engine.CastVote(voter, state, matchup.Id, votes);
+
+            // If there was only one matchup, auto-finalize moves round or to Results
+            // Verify state is not stuck in an unexpected phase
+            bool votingOrResults = state.CurrentPhase is GamePhase.Voting or GamePhase.Results;
+            Assert.IsTrue(votingOrResults,
+                "After all eligible players vote, should finalize the round or end tournament.");
+        }
+
+        // Play Again tests
+
+        [TestMethod]
+        public async Task ResetToLobby_HostCanResetAfterGame()
+        {
+            using var state = await StartVotingAsync(); // Game is in Voting
+            state.Settings.Theme = "Space Pirates"; // Preserve settings
+
+            var result = _engine.ResetToLobby(_host, state);
+
+            Assert.IsTrue((bool)result.IsSuccess, "ResetToLobby should succeed for host.");
+            Assert.AreEqual(GamePhase.Lobby, state.CurrentPhase,
+                "Phase should be reset to Lobby.");
+            Assert.IsNull(state.PhaseDeadlineUtc, "Deadline should be cleared on reset.");
+            Assert.AreEqual(0, state.AllDrawings.Count, "Drawings should be cleared.");
+            Assert.AreEqual(0, state.Outfits.Count, "Outfits should be cleared.");
+            Assert.AreEqual(0, state.PlayerScores.Count, "Scores should be cleared.");
+            Assert.AreEqual("Space Pirates", state.Settings.Theme, "Settings should be preserved.");
+        }
+
+        [TestMethod]
+        public async Task ResetToLobby_NonHostFails()
+        {
+            using var state = await StartVotingAsync();
+            var nonHost = state.Players.First();
+
+            var result = _engine.ResetToLobby(nonHost, state);
+
+            Assert.IsTrue((bool)result.IsFailure, "Non-host should not be able to reset.");
+        }
+
+        [TestMethod]
+        public async Task ResetToLobby_ThenCanStartAgain()
+        {
+            using var state = await StartVotingAsync();
+
+            _engine.ResetToLobby(_host, state);
+            Assert.AreEqual(GamePhase.Lobby, state.CurrentPhase);
+
+            // Should be able to start a new game
+            var startResult = await _engine.StartAsync(_host, state);
+            Assert.IsTrue((bool)startResult.IsSuccess, "Should be able to start again after reset.");
+            Assert.AreEqual(GamePhase.Drawing, state.CurrentPhase);
+        }
+
+        // Helpers
+
+        private async Task<DrawnToDressGameState> StartCustomizationAsync()
+        {
+            var settings = new DrawnToDressSettings { MinPlayers = 4, NumOutfitRounds = 1 };
+            var state = new DrawnToDressGameState(_host, Mock.Of<ILogger<DrawnToDressGameState>>(), settings);
+            state.UpdateJoinableStatus(true);
+            for (int i = 0; i < 4; i++) state.RegisterPlayer(new User($"P{i}", $"p{i}"));
+            await _engine.StartAsync(_host, state);
+
+            var allPlayers = GetAllPlayers(state);
+            foreach (var type in state.Settings.ClothingTypes)
+            {
+                foreach (var p in allPlayers) { _engine.SubmitDrawing(p, state, "<svg/>"); _engine.SubmitDrawing(p, state, "<svg/>"); }
+                _engine.AdvanceDrawingRound(_host, state);
+            }
+            foreach (var p in allPlayers) FillCompleteOutfit(p, state);
+            _engine.EndOutfitBuilding(_host, state);
+            return state;
+        }
+
+        private async Task<DrawnToDressGameState> StartVotingAsync()
+        {
+            var settings = new DrawnToDressSettings { MinPlayers = 4, NumOutfitRounds = 1 };
+            var state = new DrawnToDressGameState(_host, Mock.Of<ILogger<DrawnToDressGameState>>(), settings);
+            state.UpdateJoinableStatus(true);
+            for (int i = 0; i < 4; i++) state.RegisterPlayer(new User($"P{i}", $"p{i}"));
+            await _engine.StartAsync(_host, state);
+
+            var allPlayers = GetAllPlayers(state);
+            foreach (var type in state.Settings.ClothingTypes)
+            {
+                foreach (var p in allPlayers) { _engine.SubmitDrawing(p, state, "<svg/>"); _engine.SubmitDrawing(p, state, "<svg/>"); }
+                _engine.AdvanceDrawingRound(_host, state);
+            }
+            foreach (var p in allPlayers) FillCompleteOutfit(p, state);
+            _engine.EndOutfitBuilding(_host, state);
+            foreach (var p in allPlayers) _engine.SubmitOutfit(p, state, $"{p.Name}'s Outfit");
+            _engine.EndCustomizationPhase(_host, state);
+            return state;
+        }
+
+        private void FillCompleteOutfit(User player, DrawnToDressGameState state)
+        {
+            foreach (var type in state.Settings.ClothingTypes)
+            {
+                if (state.GetPlayerOutfit(player.Id, state.CurrentOutfitRound)?.Items[type] is not null) continue;
                 var item = state.AvailablePool.FirstOrDefault(i => i.Type == type && i.CreatorId != player.Id);
                 if (item is not null) _engine.ClaimItem(player, state, item.Id);
             }

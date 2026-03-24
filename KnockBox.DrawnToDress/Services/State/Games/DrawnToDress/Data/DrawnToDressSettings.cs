@@ -20,6 +20,12 @@ namespace KnockBox.Services.State.Games.DrawnToDress.Data
         /// <summary>Outfit building time limit in seconds. Default: 120 (2 minutes).</summary>
         public int OutfitBuildingTimeLimit { get; set; } = 120;
 
+        /// <summary>Outfit customization time limit in seconds. Default: 60 (1 minute).</summary>
+        public int OutfitCustomizationTimeLimit { get; set; } = 60;
+
+        /// <summary>Voting time per round in seconds. Default: 60 (1 minute).</summary>
+        public int VotingTimePerRound { get; set; } = 60;
+
         /// <summary>Number of outfit rounds (1 or 2). Default: 2.</summary>
         public int NumOutfitRounds { get; set; } = 2;
 

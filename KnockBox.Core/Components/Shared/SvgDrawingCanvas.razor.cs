@@ -186,6 +186,29 @@ namespace KnockBox.Core.Components.Shared
             }
         }
 
+        /// <summary>
+        /// Returns a complete, stand-alone SVG document string (with xmlns and viewBox) that
+        /// can be used directly as a data URI for an &lt;img&gt; src.
+        /// Returns an empty string when the canvas contains no strokes.
+        /// </summary>
+        public async Task<string> GetStorableSvgContentAsync()
+        {
+            if (_jsModule is null)
+            {
+                Logger.LogWarning("[SVGCanvas] GetStorableSvgContentAsync: JS module not initialized — svgId={SvgId}", _svgId);
+                return string.Empty;
+            }
+            try
+            {
+                return await _jsModule.InvokeAsync<string>("getStorableSvgContent", _svgId) ?? string.Empty;
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "[SVGCanvas] GetStorableSvgContentAsync failed — svgId={SvgId}", _svgId);
+                return string.Empty;
+            }
+        }
+
         /// <summary>Removes all strokes from the canvas.</summary>
         public async Task ClearAsync()
         {

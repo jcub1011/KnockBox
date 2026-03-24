@@ -252,5 +252,37 @@ namespace KnockBox.Services.State.Games.DrawnToDress
             }
             return (true, null, 0);
         }
+
+        // ------------------------------------------------------------------
+        // Play again: reset all game data for a new round
+        // ------------------------------------------------------------------
+
+        /// <summary>
+        /// Resets all transient game data so the same group of players can play again.
+        /// Settings and the player/host roster are preserved.
+        /// Must be called inside an <see cref="AbstractGameState.Execute"/> lock.
+        /// </summary>
+        public void ResetForNewGame()
+        {
+            lock (_poolLock)
+            {
+                _allDrawings.Clear();
+                _availablePool.Clear();
+            }
+            _outfits.Clear();
+            _playerScores.Clear();
+            lock (_matchupLock)
+            {
+                _votingMatchups.Clear();
+            }
+
+            CurrentPhase = GamePhase.Lobby;
+            CurrentDrawingTypeIndex = 0;
+            CurrentOutfitRound = 1;
+            CurrentVotingRound = 0;
+            TotalVotingRounds = 0;
+            PhaseDeadlineUtc = null;
+            Context = null;
+        }
     }
 }

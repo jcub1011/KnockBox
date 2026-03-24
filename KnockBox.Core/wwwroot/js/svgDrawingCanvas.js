@@ -437,6 +437,35 @@ export function getSvgContent(svgId) {
 }
 
 /**
+ * Returns a complete, stand-alone SVG document string (with xmlns and viewBox) built
+ * from the current drawing.  Unlike {@link getSvgContent}, the returned string can be
+ * used directly as a data URI for an &lt;img&gt; src attribute.
+ * Returns an empty string when the canvas contains no strokes.
+ * @param {string} svgId
+ * @returns {string} A full SVG document string, or '' if the canvas is empty.
+ */
+export function getStorableSvgContent(svgId) {
+    const state = instances.get(svgId);
+    if (!state || state.paths.length === 0) return '';
+
+    const svgEl = state.svg;
+    const rect = svgEl.getBoundingClientRect();
+    const width = Math.round(rect.width) || 800;
+    const height = Math.round(rect.height) || 400;
+
+    const root = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    root.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+    root.setAttribute('viewBox', `0 0 ${width} ${height}`);
+
+    for (const el of state.paths) {
+        const clean = sanitizeStrokeElement(el);
+        if (clean) root.appendChild(clean);
+    }
+
+    return new XMLSerializer().serializeToString(root);
+}
+
+/**
  * Clears the current drawing and loads SVG markup produced by {@link getSvgContent}.
  * Parsed elements are re-sanitized through the allowlist before DOM insertion so that
  * any content tampered with after storage cannot execute in the recipient's browser.

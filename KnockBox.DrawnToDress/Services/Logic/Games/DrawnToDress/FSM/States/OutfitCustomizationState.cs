@@ -6,21 +6,76 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
 {
     /// <summary>
     /// Outfit customization phase: players name their outfit and optionally add a sketch overlay.
-    /// Once all rounds of outfits are complete, the host advances to the voting tournament;
-    /// otherwise the next outfit-building round begins.
+    /// A countdown timer auto-advances any remaining players with generated names when it expires.
+    /// Once all rounds of outfits are complete, transitions to voting; otherwise the next
+    /// outfit-building round begins.
     /// </summary>
-    public sealed class OutfitCustomizationState : IDrawnToDressGameState
+    public sealed class OutfitCustomizationState
+        : IDrawnToDressGameState,
+          ITimedGameState<DrawnToDressGameContext, DrawnToDressCommand>
     {
         public ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?> OnEnter(
             DrawnToDressGameContext context)
         {
             context.State.SetPhase(GamePhase.OutfitCustomization);
+            context.State.SetPhaseDeadline(
+                DateTimeOffset.UtcNow.AddSeconds(context.Settings.OutfitCustomizationTimeLimit));
             context.Logger.LogInformation(
-                "FSM → OutfitCustomizationState (round {round})", context.State.CurrentOutfitRound);
+                "FSM → OutfitCustomizationState (round {round}, deadline: {dl})",
+                context.State.CurrentOutfitRound, context.State.PhaseDeadlineUtc);
             return null;
         }
 
-        public Result OnExit(DrawnToDressGameContext context) => Result.Success;
+        public Result OnExit(DrawnToDressGameContext context)
+        {
+            context.State.ClearPhaseDeadline();
+            return Result.Success;
+        }
+
+        // ── ITimedGameState ───────────────────────────────────────────────────
+
+        public ValueResult<TimeSpan> GetRemainingTime(DrawnToDressGameContext context, DateTimeOffset now)
+        {
+            if (!context.State.PhaseDeadlineUtc.HasValue)
+                return TimeSpan.Zero;
+            var remaining = context.State.PhaseDeadlineUtc.Value - now;
+            return remaining < TimeSpan.Zero ? TimeSpan.Zero : remaining;
+        }
+
+        public ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?> Tick(
+            DrawnToDressGameContext context, DateTimeOffset now)
+        {
+            if (!context.State.PhaseDeadlineUtc.HasValue || now < context.State.PhaseDeadlineUtc.Value)
+                return null;
+
+            context.Logger.LogInformation(
+                "OutfitCustomizationState: timer expired (round {round}), auto-submitting remaining outfits.",
+                context.State.CurrentOutfitRound);
+
+            // Auto-submit outfits for participants who haven't submitted yet
+            foreach (var participant in context.AllParticipants)
+            {
+                var outfit = context.State.GetPlayerOutfit(participant.Id, context.State.CurrentOutfitRound);
+                if (outfit is null || outfit.IsSubmitted) continue;
+
+                // Generate a default name if incomplete or unnamed
+                if (!outfit.IsComplete) continue; // Can't submit incomplete outfits via auto; skip
+
+                outfit.Name = $"{participant.Name}'s Outfit";
+                outfit.IsSubmitted = true;
+
+                var score = context.State.GetOrAddPlayerScore(participant.Id, participant.Name);
+                if (!score.OutfitIds.Contains(outfit.Id))
+                    score.OutfitIds.Add(outfit.Id);
+
+                context.Logger.LogInformation(
+                    "OutfitCustomizationState: auto-submitted outfit for player [{id}].", participant.Id);
+            }
+
+            return DoEndCustomization(context);
+        }
+
+        // ── Commands ──────────────────────────────────────────────────────────
 
         public ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?> HandleCommand(
             DrawnToDressGameContext context, DrawnToDressCommand command)
