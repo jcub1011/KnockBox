@@ -143,8 +143,10 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
         protected void SetTheme()
         {
             if (GameState is null || !IsHost) return;
-            GameState.Settings.Theme = string.IsNullOrWhiteSpace(ThemeInput) ? null : ThemeInput.Trim();
-            GameState.Execute(() => { }); // notify subscribers
+            GameState.Execute(() =>
+            {
+                GameState.Settings.Theme = string.IsNullOrWhiteSpace(ThemeInput) ? null : ThemeInput.Trim();
+            });
         }
 
         protected async Task StartGame()

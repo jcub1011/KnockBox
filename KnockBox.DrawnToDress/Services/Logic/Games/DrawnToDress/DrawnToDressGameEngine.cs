@@ -57,16 +57,15 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress
             var fsm = new FiniteStateMachine<DrawnToDressGameContext, DrawnToDressCommand>(logger);
             context.Fsm = fsm;
 
-            var result = state.Execute(() =>
+            // TransitionTo is included inside Execute so that StateChangedEventManager.Notify()
+            // fires *after* both the joinable-status update and the phase change are committed,
+            // ensuring all connected clients see the Drawing phase in a single re-render.
+            return state.Execute(() =>
             {
                 state.UpdateJoinableStatus(false);
                 state.Context = context;
+                fsm.TransitionTo(context, new DrawingState());
             });
-
-            if (result.IsFailure) return result;
-
-            fsm.TransitionTo(context, new DrawingState());
-            return Result.Success;
         }
 
         // ── FSM core ──────────────────────────────────────────────────────────
