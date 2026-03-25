@@ -67,6 +67,13 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM
     public record ClaimPoolItemCommand(string PlayerId, Guid ItemId) : DrawnToDressCommand(PlayerId);
 
     /// <summary>
+    /// Player releases a previously claimed clothing item back to the communal pool.
+    /// Only items claimed via <see cref="ClaimPoolItemCommand"/> may be unclaimed; a player
+    /// cannot unclaim an item they drew themselves.
+    /// </summary>
+    public record UnclaimPoolItemCommand(string PlayerId, Guid ItemId) : DrawnToDressCommand(PlayerId);
+
+    /// <summary>
     /// Player submits their assembled outfit, selecting one item per clothing type.
     /// </summary>
     public record SubmitOutfitCommand(
