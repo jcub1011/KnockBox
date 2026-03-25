@@ -46,10 +46,24 @@ namespace KnockBox.Services.State.Games.DrawnToDress.Data
         public ThemeSource ThemeSource { get; set; } = ThemeSource.Random;
 
         /// <summary>
+        /// Controls when the selected theme is revealed to players relative to the drawing
+        /// phase.
+        /// GDD default: <see cref="ThemeAnnouncement.BeforeDrawing"/>.
+        /// </summary>
+        public ThemeAnnouncement ThemeAnnouncement { get; set; } = ThemeAnnouncement.BeforeDrawing;
+
+        /// <summary>
         /// Number of seconds the theme is displayed before drawing begins.
         /// GDD default: 10 s.
         /// </summary>
         public int ThemeAnnouncementTimeSec { get; set; } = 10;
+
+        /// <summary>
+        /// Number of candidate themes presented to players for voting when
+        /// <see cref="ThemeSource"/> is <see cref="ThemeSource.RandomVoting"/>.
+        /// GDD default: 3.
+        /// </summary>
+        public int RandomVotingCandidateCount { get; set; } = 3;
 
         // ── Outfit Building phase ─────────────────────────────────────────────
 
@@ -154,6 +168,7 @@ namespace KnockBox.Services.State.Games.DrawnToDress.Data
             // ── Drawing phase ──────────────────────────────────────────────────
             if (DrawingTimeSec < 30)         DrawingTimeSec = 30;
             if (ThemeAnnouncementTimeSec < 5) ThemeAnnouncementTimeSec = 5;
+            if (RandomVotingCandidateCount < 2) RandomVotingCandidateCount = 2;
 
             // ── Outfit building ────────────────────────────────────────────────
             if (OutfitBuildingTimeSec < 30)     OutfitBuildingTimeSec = 30;
