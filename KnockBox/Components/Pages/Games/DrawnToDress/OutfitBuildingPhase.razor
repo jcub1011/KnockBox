@@ -13,7 +13,6 @@
     // Capture SubmittedOutfit once so its value stays consistent throughout this render pass
     // even if the FSM updates player state concurrently from the timer loop.
     var mySubmittedOutfit = myPlayer?.SubmittedOutfit;
-    bool hasSubmitted = mySubmittedOutfit is not null;
 
     int lockedCount = GameState.GamePlayers.Values.Count(p => p.SubmittedOutfit is not null);
     int totalPlayers = GameState.GamePlayers.Count;
@@ -83,7 +82,7 @@
     }
 
     <!-- ── Player view ───────────────────────────────────────────────────── -->
-    else if (hasSubmitted)
+    @if (!isHost && mySubmittedOutfit != null)
     {
         <div class="dtd-outfit-waiting">
             <p>✅ Outfit locked in! Waiting for the others…</p>

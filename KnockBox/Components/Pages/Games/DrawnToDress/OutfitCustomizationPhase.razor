@@ -78,7 +78,7 @@
     }
 
     <!-- ── Player: waiting ───────────────────────────────────────────────── -->
-    else if (hasSubmitted)
+    @if (!isHost && hasSubmitted)
     {
         <div class="dtd-customization-waiting">
             <p>✅ Outfit finalized! Waiting for the others…</p>
