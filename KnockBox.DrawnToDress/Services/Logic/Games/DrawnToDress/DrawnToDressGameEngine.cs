@@ -1,5 +1,7 @@
+using KnockBox.Core.Services.State.Games.Shared;
 using KnockBox.Extensions.Returns;
 using KnockBox.Services.Logic.Games.DrawnToDress.FSM;
+using KnockBox.Services.Logic.Games.DrawnToDress.FSM.States;
 using KnockBox.Services.Logic.Games.Engines.Shared;
 using KnockBox.Services.State.Games.DrawnToDress;
 using KnockBox.Services.State.Games.Shared;
@@ -10,12 +12,15 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress
     /// <summary>
     /// Server-authoritative engine for Drawn To Dress.
     /// The engine is a singleton; all mutable game state lives in
-    /// <see cref="DrawnToDressGameState"/>.
+    /// <see cref="DrawnToDressGameState"/> (and its <see cref="DrawnToDressGameContext"/>),
+    /// which is created per game session.
     /// </summary>
     public class DrawnToDressGameEngine(
         ILogger<DrawnToDressGameEngine> logger,
         ILogger<DrawnToDressGameState> stateLogger) : AbstractGameEngine
     {
+        // ── AbstractGameEngine lifecycle ──────────────────────────────────────
+
         public override Task<ValueResult<AbstractGameState>> CreateStateAsync(
             User host, CancellationToken ct = default)
         {
@@ -26,6 +31,14 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress
             var gameState = new DrawnToDressGameState(host, stateLogger);
             gameState.UpdateJoinableStatus(true);
             gameState.PlayerUnregistered += player => HandlePlayerLeft(player, gameState);
+
+            // Create the context and FSM so the lobby state is active from the start.
+            var context = new DrawnToDressGameContext(gameState, logger);
+            var fsm = new FiniteStateMachine<DrawnToDressGameContext, DrawnToDressCommand>(logger);
+            context.Fsm = fsm;
+            gameState.Context = context;
+            fsm.TransitionTo(context, new LobbyState());
+
             logger.LogInformation("Created DrawnToDress state with host [{id}].", host.Id);
             return Task.FromResult<ValueResult<AbstractGameState>>(gameState);
         }
@@ -40,20 +53,65 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress
             if (host != gameState.Host)
                 return Task.FromResult(Result.FromError("Only the host can start the game."));
 
+            if (gameState.Context is null)
+                return Task.FromResult(Result.FromError("Game context is not initialized."));
+
+            var context = gameState.Context;
+
             var executeResult = state.Execute(() =>
             {
                 state.UpdateJoinableStatus(false);
-                gameState.SetPhase(GamePhase.Drawing);
+                // Transition from LobbyState → ThemeSelectionState.
+                // ThemeSelectionState will chain immediately to DrawingRoundState when
+                // ThemeSource is Random (the default).
+                context.Fsm.TransitionTo(context, new ThemeSelectionState());
             });
 
             if (executeResult.IsFailure) return Task.FromResult(executeResult);
             return Task.FromResult(Result.Success);
         }
 
+        // ── FSM core ──────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Processes a player command by delegating to the current FSM state inside the
+        /// game's execute lock. State transitions are handled automatically.
+        /// </summary>
+        public Result ProcessCommand(DrawnToDressGameContext context, DrawnToDressCommand command)
+        {
+            return context.State.Execute(() =>
+            {
+                var fsmResult = context.Fsm.HandleCommand(context, command);
+                if (fsmResult.TryGetFailure(out var err))
+                    logger.LogError("FSM command error: {msg}", err.PublicMessage);
+            });
+        }
+
+        /// <summary>
+        /// Drives time-based transitions (e.g., drawing timer, outfit building timer).
+        /// Call periodically from a timer or background service.
+        /// </summary>
+        public Result Tick(DrawnToDressGameContext context, DateTimeOffset now)
+        {
+            return context.State.Execute(() =>
+            {
+                var fsmResult = context.Fsm.Tick(context, now);
+                if (fsmResult.TryGetFailure(out var err))
+                    logger.LogError("FSM tick error: {msg}", err.PublicMessage);
+            });
+        }
+
+        // ── Player-leave handling ─────────────────────────────────────────────
+
+        /// <summary>
+        /// Called whenever a player unregisters from the game (disconnect, tab close, or kick).
+        /// </summary>
         internal void HandlePlayerLeft(User player, DrawnToDressGameState state)
         {
             logger.LogInformation("Player [{id}] left DrawnToDress game hosted by [{hostId}].",
                 player.Id, state.Host.Id);
+
+            // TODO: Handle active-player removal during drawing/voting phases in later issues.
         }
     }
 }
