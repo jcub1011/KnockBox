@@ -42,5 +42,13 @@
             </div>
         }
     </div>
-    <svg id="@_svgId" class="svg-canvas-surface" style="background-color: @BackgroundColor;"></svg>
+    <div class="svg-canvas-drawing-area">
+        @if (_sanitizedBackground is not null)
+        {
+            <svg class="svg-canvas-bg" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                @((MarkupString)_sanitizedBackground)
+            </svg>
+        }
+        <svg id="@_svgId" class="svg-canvas-surface" style="background-color: @BackgroundColor;"></svg>
+    </div>
 </div>

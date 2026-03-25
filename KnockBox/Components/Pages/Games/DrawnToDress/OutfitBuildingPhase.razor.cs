@@ -1,3 +1,4 @@
+using KnockBox.Core.Services.Drawing;
 using KnockBox.Services.Logic.Games.DrawnToDress;
 using KnockBox.Services.Logic.Games.DrawnToDress.FSM;
 using KnockBox.Services.State.Games.DrawnToDress;
@@ -124,6 +125,14 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
         // ── Helpers ───────────────────────────────────────────────────────────
 
         private string CurrentPlayerId => UserService.CurrentUser?.Id ?? string.Empty;
+
+        /// <summary>
+        /// Sanitizes raw SVG inner markup for safe rendering via
+        /// <see cref="Microsoft.AspNetCore.Components.MarkupString"/>. Returns
+        /// <see langword="null"/> when there is no content or the content is unparseable.
+        /// </summary>
+        protected static string? SafeSvgContent(string? raw)
+            => SvgContentSanitizer.Sanitize(raw);
 
         /// <summary>
         /// Builds a dictionary mapping each clothing type to the best available item

@@ -97,7 +97,18 @@
                             bool isMyItem = selectedItem.CreatorPlayerId == myId;
                             <div class="dtd-pool-item dtd-pool-item-selected"
                                  title="@(isMyItem ? "Your drawing" : "Selected")">
-                                <span class="dtd-pool-item-icon">🎨</span>
+                                @if (SafeSvgContent(selectedItem.SvgContent) is string safeSvgSelected)
+                                {
+                                    <svg class="dtd-pool-item-preview" viewBox="0 0 800 400"
+                                         preserveAspectRatio="xMidYMid meet"
+                                         xmlns="http://www.w3.org/2000/svg">
+                                        @((MarkupString)safeSvgSelected)
+                                    </svg>
+                                }
+                                else
+                                {
+                                    <span class="dtd-pool-item-icon">🎨</span>
+                                }
                                 @if (isMyItem)
                                 {
                                     <span class="dtd-pool-item-creator">Your drawing</span>
@@ -139,7 +150,18 @@
                                 <div class="dtd-pool-item dtd-pool-item-selected dtd-pool-item-clickable"
                                      title="Click to release"
                                      @onclick="() => UnclaimItem(slotItem.Id)">
-                                    <span class="dtd-pool-item-icon">🎨</span>
+                                    @if (SafeSvgContent(slotItem.SvgContent) is string safeSvgSlot)
+                                    {
+                                        <svg class="dtd-pool-item-preview" viewBox="0 0 800 400"
+                                             preserveAspectRatio="xMidYMid meet"
+                                             xmlns="http://www.w3.org/2000/svg">
+                                            @((MarkupString)safeSvgSlot)
+                                        </svg>
+                                    }
+                                    else
+                                    {
+                                        <span class="dtd-pool-item-icon">🎨</span>
+                                    }
                                     @if (isOwnSlotItem)
                                     {
                                         <span class="dtd-pool-item-creator">Your drawing</span>
@@ -151,7 +173,18 @@
                             {
                                 <div class="dtd-pool-item dtd-pool-item-selected"
                                      title="@(isOwnSlotItem ? "Your drawing — selected for your outfit" : "Selected")">
-                                    <span class="dtd-pool-item-icon">🎨</span>
+                                    @if (SafeSvgContent(slotItem.SvgContent) is string safeSvgSlot)
+                                    {
+                                        <svg class="dtd-pool-item-preview" viewBox="0 0 800 400"
+                                             preserveAspectRatio="xMidYMid meet"
+                                             xmlns="http://www.w3.org/2000/svg">
+                                            @((MarkupString)safeSvgSlot)
+                                        </svg>
+                                    }
+                                    else
+                                    {
+                                        <span class="dtd-pool-item-icon">🎨</span>
+                                    }
                                     @if (isOwnSlotItem)
                                     {
                                         <span class="dtd-pool-item-creator">Your drawing</span>
@@ -230,7 +263,18 @@
                                 <div class="dtd-pool-item @stateClass @(clickable ? "dtd-pool-item-clickable" : "")"
                                      title="@title"
                                      @onclick="() => ToggleClaim(item, claimedByMe, isAvailable)">
-                                    <span class="dtd-pool-item-icon">🎨</span>
+                                    @if (SafeSvgContent(item.SvgContent) is string safeSvgItem)
+                                    {
+                                        <svg class="dtd-pool-item-preview" viewBox="0 0 800 400"
+                                             preserveAspectRatio="xMidYMid meet"
+                                             xmlns="http://www.w3.org/2000/svg">
+                                            @((MarkupString)safeSvgItem)
+                                        </svg>
+                                    }
+                                    else
+                                    {
+                                        <span class="dtd-pool-item-icon">🎨</span>
+                                    }
                                     @if (isMyDrawing)
                                     {
                                         <span class="dtd-pool-item-creator">Your drawing</span>

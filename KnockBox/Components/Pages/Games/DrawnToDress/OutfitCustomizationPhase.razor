@@ -15,6 +15,25 @@
 
     int submittedCount = GameState.GamePlayers.Values.Count(p => p.IsReady);
     int totalPlayers = GameState.GamePlayers.Count;
+
+    // Build a composite background SVG from the player's selected outfit items so they
+    // can see what they assembled while drawing the optional sketch overlay on top.
+    string? outfitBackground = null;
+    if (!isHost && !hasSubmitted && myPlayer?.SubmittedOutfit is not null)
+    {
+        var bgParts = new System.Text.StringBuilder();
+        foreach (var ct in GameState.Config.ClothingTypes)
+        {
+            if (myPlayer.SubmittedOutfit.SelectedItemsByType.TryGetValue(ct.Id, out var itemId)
+                && GameState.ClothingPool.TryGetValue(itemId, out var bgItem)
+                && bgItem.SvgContent is not null)
+            {
+                bgParts.Append(bgItem.SvgContent);
+            }
+        }
+        if (bgParts.Length > 0)
+            outfitBackground = bgParts.ToString();
+    }
 }
 
 <div class="dtd-customization">
@@ -132,7 +151,8 @@
                 <div class="dtd-customization-canvas-wrapper">
                     <SvgDrawingCanvas @ref="_sketchCanvas"
                                       Height="50vh"
-                                      BackgroundColor="transparent" />
+                                      BackgroundColor="transparent"
+                                      BackgroundSvgContent="@outfitBackground" />
                 </div>
             </div>
 
