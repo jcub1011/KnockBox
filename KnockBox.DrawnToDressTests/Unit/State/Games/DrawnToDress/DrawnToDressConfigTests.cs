@@ -111,6 +111,22 @@ namespace KnockBox.DrawnToDressTests.Unit.State.Games.DrawnToDress
             Assert.IsTrue(config.RequireDistinctItemsPerSlot);
         }
 
+        // ── Outfit 2 defaults ─────────────────────────────────────────────────
+
+        [TestMethod]
+        public void Default_CanReuseOutfit1Items_IsFalse()
+        {
+            var config = new DrawnToDressConfig();
+            Assert.IsFalse(config.CanReuseOutfit1Items);
+        }
+
+        [TestMethod]
+        public void Default_Outfit2DistinctnessThreshold_Is3()
+        {
+            var config = new DrawnToDressConfig();
+            Assert.AreEqual(3, config.Outfit2DistinctnessThreshold);
+        }
+
         // ── Voting defaults ───────────────────────────────────────────────────
 
         [TestMethod]

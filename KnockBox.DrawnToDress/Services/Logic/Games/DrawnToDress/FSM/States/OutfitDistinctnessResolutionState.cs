@@ -88,8 +88,8 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
 
             if (context.AllPlayersReady())
             {
-                context.Logger.LogInformation("All conflicts resolved. Moving to voting setup.");
-                return new VotingRoundSetupState();
+                context.Logger.LogInformation("All conflicts resolved. Moving to Outfit 2 building.");
+                return new Outfit2BuildingState();
             }
 
             return null;

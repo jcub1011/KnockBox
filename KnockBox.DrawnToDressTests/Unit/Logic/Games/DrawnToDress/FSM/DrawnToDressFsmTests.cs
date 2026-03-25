@@ -3,6 +3,7 @@ using KnockBox.Services.Logic.Games.DrawnToDress;
 using KnockBox.Services.Logic.Games.DrawnToDress.FSM;
 using KnockBox.Services.Logic.Games.DrawnToDress.FSM.States;
 using KnockBox.Services.State.Games.DrawnToDress;
+using KnockBox.Services.State.Games.DrawnToDress.Data;
 using KnockBox.Services.State.Users;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -765,20 +766,19 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
         }
 
         [TestMethod]
-        public async Task OutfitCustomizationState_OnTimerExpiry_TransitionsToVotingSetup()
+        public async Task OutfitCustomizationState_OnTimerExpiry_TransitionsToOutfit2Building()
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
 
-            // No players → no distinctness conflicts, so goes straight to VotingRoundSetupState
-            // which chains to VotingMatchupState.
+            // No players → no distinctness conflicts, so goes straight to Outfit2BuildingState.
             context.Fsm.TransitionTo(context, new OutfitCustomizationState());
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
 
-            Assert.IsInstanceOfType<VotingMatchupState>(context.Fsm.CurrentState);
-            Assert.AreEqual(GamePhase.Voting, state.Phase);
+            Assert.IsInstanceOfType<Outfit2BuildingState>(context.Fsm.CurrentState);
+            Assert.AreEqual(GamePhase.Outfit2Building, state.Phase);
         }
 
         [TestMethod]
@@ -2146,7 +2146,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
 
             _engine.ProcessCommand(context,
                 new SubmitCustomizationCommand("p2", "Outfit Two"));
-            Assert.IsInstanceOfType<VotingMatchupState>(context.Fsm.CurrentState,
+            Assert.IsInstanceOfType<Outfit2BuildingState>(context.Fsm.CurrentState,
                 "Should advance once all players have submitted customization.");
         }
 
@@ -2190,6 +2190,852 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
             Assert.IsTrue(submission.SelectedItemsByType.ContainsKey("hat"),
                 "Original selected items must be preserved after customization.");
             Assert.AreEqual(itemId, submission.SelectedItemsByType["hat"]);
+        }
+
+        // ── Outfit 2: pool reset on entry ─────────────────────────────────────
+
+        [TestMethod]
+        public async Task Outfit2Building_OnEnter_RemovesOutfit1PicksFromPool()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            state.Config.ClothingTypes =
+            [
+                new() { Id = "hat", DisplayName = "Hat" },
+            ];
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            // Two items in the pool: one selected in Outfit 1, one not.
+            var usedHat = Guid.NewGuid();
+            var unusedHat = Guid.NewGuid();
+            state.ClothingPool[usedHat] = new()
+            {
+                Id = usedHat,
+                ClothingTypeId = "hat",
+                CreatorPlayerId = "p2",
+                SvgContent = "<svg/>",
+                IsInPool = true,
+            };
+            state.ClothingPool[unusedHat] = new()
+            {
+                Id = unusedHat,
+                ClothingTypeId = "hat",
+                CreatorPlayerId = "p3",
+                SvgContent = "<svg/>",
+                IsInPool = true,
+            };
+
+            state.GamePlayers["p1"] = new()
+            {
+                PlayerId = "p1",
+                SubmittedOutfit = new()
+                {
+                    PlayerId = "p1",
+                    SelectedItemsByType = new() { ["hat"] = usedHat },
+                },
+            };
+
+            context.Fsm.TransitionTo(context, new Outfit2BuildingState());
+
+            Assert.IsFalse(state.ClothingPool[usedHat].IsInPool,
+                "Item selected in Outfit 1 must be removed from the Outfit 2 pool.");
+            Assert.IsTrue(state.ClothingPool[unusedHat].IsInPool,
+                "Item not selected in any Outfit 1 must remain in the Outfit 2 pool.");
+        }
+
+        [TestMethod]
+        public async Task Outfit2Building_OnEnter_ClearsAllClaims()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            // A previously claimed item.
+            var itemId = Guid.NewGuid();
+            state.ClothingPool[itemId] = new()
+            {
+                Id = itemId,
+                ClothingTypeId = "hat",
+                CreatorPlayerId = "p2",
+                SvgContent = "<svg/>",
+                IsInPool = true,
+                ClaimedByPlayerId = "p1",  // was claimed in Outfit 1
+            };
+            state.GamePlayers["p1"] = new()
+            {
+                PlayerId = "p1",
+                SubmittedOutfit = new()
+                {
+                    PlayerId = "p1",
+                    SelectedItemsByType = new Dictionary<string, Guid>(), // different item selected
+                },
+                OwnedClothingItemIds = [itemId],
+            };
+
+            context.Fsm.TransitionTo(context, new Outfit2BuildingState());
+
+            Assert.IsNull(state.ClothingPool[itemId].ClaimedByPlayerId,
+                "All claims must be cleared when Outfit 2 building begins.");
+        }
+
+        [TestMethod]
+        public async Task Outfit2Building_OnEnter_SelfDrawnItemsInPool_RemainsOwned()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            state.Config.ClothingTypes =
+            [
+                new() { Id = "hat", DisplayName = "Hat" },
+            ];
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            // p1 drew a hat that is NOT in their Outfit 1, so it remains in the pool.
+            var selfHat = Guid.NewGuid();
+            state.ClothingPool[selfHat] = new()
+            {
+                Id = selfHat,
+                ClothingTypeId = "hat",
+                CreatorPlayerId = "p1",
+                SvgContent = "<svg/>",
+                IsInPool = true,
+            };
+            state.GamePlayers["p1"] = new()
+            {
+                PlayerId = "p1",
+                SubmittedOutfit = new()
+                {
+                    PlayerId = "p1",
+                    SelectedItemsByType = new Dictionary<string, Guid>(), // selfHat not selected
+                },
+                OwnedClothingItemIds = [selfHat],
+            };
+
+            context.Fsm.TransitionTo(context, new Outfit2BuildingState());
+
+            Assert.IsTrue(state.GamePlayers["p1"].OwnedClothingItemIds.Contains(selfHat),
+                "A self-drawn item that is still in the pool must remain in the player's owned set.");
+        }
+
+        [TestMethod]
+        public async Task Outfit2Building_OnEnter_Outfit1SelfDrawnItemUsed_NotInOwned()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            state.Config.ClothingTypes =
+            [
+                new() { Id = "hat", DisplayName = "Hat" },
+            ];
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            // p1 drew a hat AND used it in Outfit 1; it must be excluded from Outfit 2 pool.
+            var selfHat = Guid.NewGuid();
+            state.ClothingPool[selfHat] = new()
+            {
+                Id = selfHat,
+                ClothingTypeId = "hat",
+                CreatorPlayerId = "p1",
+                SvgContent = "<svg/>",
+                IsInPool = true,
+            };
+            state.GamePlayers["p1"] = new()
+            {
+                PlayerId = "p1",
+                SubmittedOutfit = new()
+                {
+                    PlayerId = "p1",
+                    SelectedItemsByType = new() { ["hat"] = selfHat },
+                },
+                OwnedClothingItemIds = [selfHat],
+            };
+
+            context.Fsm.TransitionTo(context, new Outfit2BuildingState());
+
+            Assert.IsFalse(state.GamePlayers["p1"].OwnedClothingItemIds.Contains(selfHat),
+                "A self-drawn item used in Outfit 1 must not be in the player's Outfit 2 owned set " +
+                "when CanReuseOutfit1Items is false.");
+        }
+
+        // ── Outfit 2: CanReuseOutfit1Items ────────────────────────────────────
+
+        [TestMethod]
+        public async Task Outfit2Building_CanReuseOutfit1Items_True_AddsBackOutfit1Picks()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            state.Config.CanReuseOutfit1Items = true;
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            var hatId = Guid.NewGuid();
+            state.ClothingPool[hatId] = new()
+            {
+                Id = hatId,
+                ClothingTypeId = "hat",
+                CreatorPlayerId = "p2",
+                SvgContent = "<svg/>",
+                IsInPool = true,
+            };
+            state.GamePlayers["p1"] = new()
+            {
+                PlayerId = "p1",
+                SubmittedOutfit = new()
+                {
+                    PlayerId = "p1",
+                    SelectedItemsByType = new() { ["hat"] = hatId },
+                },
+                OwnedClothingItemIds = [hatId],
+            };
+
+            context.Fsm.TransitionTo(context, new Outfit2BuildingState());
+
+            // The hat was in Outfit 1 (now IsInPool=false), but CanReuseOutfit1Items allows it back.
+            Assert.IsTrue(state.GamePlayers["p1"].OwnedClothingItemIds.Contains(hatId),
+                "When CanReuseOutfit1Items is true the player's own Outfit 1 picks must remain owned.");
+        }
+
+        [TestMethod]
+        public async Task Outfit2Building_CanReuseOutfit1Items_False_DoesNotAddBackOutfit1Picks()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            state.Config.CanReuseOutfit1Items = false;
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            var hatId = Guid.NewGuid();
+            state.ClothingPool[hatId] = new()
+            {
+                Id = hatId,
+                ClothingTypeId = "hat",
+                CreatorPlayerId = "p2",
+                SvgContent = "<svg/>",
+                IsInPool = true,
+            };
+            state.GamePlayers["p1"] = new()
+            {
+                PlayerId = "p1",
+                SubmittedOutfit = new()
+                {
+                    PlayerId = "p1",
+                    SelectedItemsByType = new() { ["hat"] = hatId },
+                },
+                OwnedClothingItemIds = [hatId],
+            };
+
+            context.Fsm.TransitionTo(context, new Outfit2BuildingState());
+
+            Assert.IsFalse(state.GamePlayers["p1"].OwnedClothingItemIds.Contains(hatId),
+                "When CanReuseOutfit1Items is false the player's Outfit 1 picks must not be owned for Outfit 2.");
+        }
+
+        // ── Outfit 2: claim / unclaim ─────────────────────────────────────────
+
+        [TestMethod]
+        public async Task Outfit2Building_ClaimPoolItem_Success_AddsToOwnedList()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            var hatId = Guid.NewGuid();
+            state.ClothingPool[hatId] = new()
+            {
+                Id = hatId,
+                ClothingTypeId = "hat",
+                CreatorPlayerId = "p2",
+                SvgContent = "<svg/>",
+                IsInPool = true,
+            };
+            state.GamePlayers["p1"] = new() { PlayerId = "p1" };
+            state.GamePlayers["p2"] = new() { PlayerId = "p2" };
+
+            context.Fsm.TransitionTo(context, new Outfit2BuildingState());
+            _engine.ProcessCommand(context, new ClaimPoolItemCommand("p1", hatId));
+
+            Assert.AreEqual("p1", state.ClothingPool[hatId].ClaimedByPlayerId);
+            Assert.IsTrue(state.GamePlayers["p1"].OwnedClothingItemIds.Contains(hatId));
+        }
+
+        [TestMethod]
+        public async Task Outfit2Building_ClaimPoolItem_ItemRemovedByReset_IsRejected()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            var hatId = Guid.NewGuid();
+            state.ClothingPool[hatId] = new()
+            {
+                Id = hatId,
+                ClothingTypeId = "hat",
+                CreatorPlayerId = "p2",
+                SvgContent = "<svg/>",
+                IsInPool = true,
+            };
+            // p2 used hatId in their Outfit 1.
+            state.GamePlayers["p1"] = new() { PlayerId = "p1" };
+            state.GamePlayers["p2"] = new()
+            {
+                PlayerId = "p2",
+                SubmittedOutfit = new()
+                {
+                    PlayerId = "p2",
+                    SelectedItemsByType = new() { ["hat"] = hatId },
+                },
+            };
+
+            context.Fsm.TransitionTo(context, new Outfit2BuildingState());
+
+            // hatId was in Outfit 1 → IsInPool = false → claim must be rejected.
+            _engine.ProcessCommand(context, new ClaimPoolItemCommand("p1", hatId));
+
+            Assert.IsNull(state.ClothingPool[hatId].ClaimedByPlayerId,
+                "An item removed from the Outfit 2 pool must not be claimable.");
+            Assert.IsFalse(state.GamePlayers["p1"].OwnedClothingItemIds.Contains(hatId));
+        }
+
+        // ── Outfit 2: submit validation ───────────────────────────────────────
+
+        [TestMethod]
+        public async Task Outfit2Building_SubmitOutfit_ValidAndDistinct_IsAccepted()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            state.Config.ClothingTypes =
+            [
+                new() { Id = "hat", DisplayName = "Hat" },
+            ];
+            state.Config.Outfit2DistinctnessThreshold = 3;
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            var outfit1Hat = Guid.NewGuid();
+            var outfit2Hat = Guid.NewGuid();
+
+            state.ClothingPool[outfit1Hat] = new()
+            {
+                Id = outfit1Hat, ClothingTypeId = "hat", CreatorPlayerId = "p2", SvgContent = "<svg/>", IsInPool = false,
+            };
+            // outfit2Hat is self-drawn by p1 → after pool reset it will be auto-owned.
+            state.ClothingPool[outfit2Hat] = new()
+            {
+                Id = outfit2Hat, ClothingTypeId = "hat", CreatorPlayerId = "p1", SvgContent = "<svg/>", IsInPool = true,
+            };
+
+            state.GamePlayers["p1"] = new()
+            {
+                PlayerId = "p1",
+                SubmittedOutfit = new()
+                {
+                    PlayerId = "p1",
+                    SelectedItemsByType = new() { ["hat"] = outfit1Hat },
+                },
+            };
+
+            // Pool reset: outfit1Hat excluded (in Outfit 1 picks); outfit2Hat stays (self-drawn by p1).
+            context.Fsm.TransitionTo(context, new Outfit2BuildingState());
+            _engine.ProcessCommand(context, new SubmitOutfitCommand("p1",
+                new Dictionary<string, Guid> { ["hat"] = outfit2Hat }));
+
+            Assert.IsNotNull(state.GamePlayers["p1"].SubmittedOutfit2,
+                "A valid, distinct Outfit 2 submission must be accepted.");
+            Assert.AreEqual(outfit2Hat, state.GamePlayers["p1"].SubmittedOutfit2!.SelectedItemsByType["hat"]);
+        }
+
+        [TestMethod]
+        public async Task Outfit2Building_SubmitOutfit_ViolatesDistinctness_IsRejected()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            state.Config.ClothingTypes =
+            [
+                new() { Id = "hat", DisplayName = "Hat" },
+                new() { Id = "top", DisplayName = "Top" },
+                new() { Id = "shoes", DisplayName = "Shoes" },
+            ];
+            state.Config.Outfit2DistinctnessThreshold = 3;
+            // Allow reuse so the player still owns their Outfit 1 picks in Outfit 2.
+            state.Config.CanReuseOutfit1Items = true;
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            var hatId = Guid.NewGuid();
+            var topId = Guid.NewGuid();
+            var shoesId = Guid.NewGuid();
+
+            foreach (var (id, type) in new[] { (hatId, "hat"), (topId, "top"), (shoesId, "shoes") })
+            {
+                state.ClothingPool[id] = new()
+                {
+                    Id = id, ClothingTypeId = type, CreatorPlayerId = "p2",
+                    SvgContent = "<svg/>", IsInPool = true,
+                };
+            }
+
+            // p1's Outfit 1 uses hatId, topId, shoesId.
+            // With CanReuseOutfit1Items=true the pool reset re-adds them to p1's owned set.
+            state.GamePlayers["p1"] = new()
+            {
+                PlayerId = "p1",
+                SubmittedOutfit = new()
+                {
+                    PlayerId = "p1",
+                    SelectedItemsByType = new() { ["hat"] = hatId, ["top"] = topId, ["shoes"] = shoesId },
+                },
+            };
+
+            context.Fsm.TransitionTo(context, new Outfit2BuildingState());
+            _engine.ProcessCommand(context, new SubmitOutfitCommand("p1",
+                new Dictionary<string, Guid> { ["hat"] = hatId, ["top"] = topId, ["shoes"] = shoesId }));
+
+            Assert.IsNull(state.GamePlayers["p1"].SubmittedOutfit2,
+                "An Outfit 2 that shares 3+ items with any Outfit 1 must be rejected.");
+        }
+
+        [TestMethod]
+        public async Task Outfit2Building_SubmitOutfit_MatchesOtherPlayersOutfit1_IsRejected()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            state.Config.ClothingTypes =
+            [
+                new() { Id = "hat", DisplayName = "Hat" },
+                new() { Id = "top", DisplayName = "Top" },
+                new() { Id = "shoes", DisplayName = "Shoes" },
+            ];
+            state.Config.Outfit2DistinctnessThreshold = 3;
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            var hatId = Guid.NewGuid();
+            var topId = Guid.NewGuid();
+            var shoesId = Guid.NewGuid();
+
+            foreach (var (id, type) in new[] { (hatId, "hat"), (topId, "top"), (shoesId, "shoes") })
+            {
+                state.ClothingPool[id] = new()
+                {
+                    Id = id, ClothingTypeId = type, CreatorPlayerId = "p3",
+                    SvgContent = "<svg/>", IsInPool = true,
+                };
+            }
+
+            // p1's Outfit 1 is empty; p2's Outfit 1 uses hatId, topId, shoesId.
+            state.GamePlayers["p1"] = new()
+            {
+                PlayerId = "p1",
+                SubmittedOutfit = new() { PlayerId = "p1", SelectedItemsByType = new() },
+            };
+            state.GamePlayers["p2"] = new()
+            {
+                PlayerId = "p2",
+                SubmittedOutfit = new()
+                {
+                    PlayerId = "p2",
+                    SelectedItemsByType = new() { ["hat"] = hatId, ["top"] = topId, ["shoes"] = shoesId },
+                },
+            };
+
+            // Pool reset removes hatId/topId/shoesId (in p2's Outfit 1) from pool.
+            context.Fsm.TransitionTo(context, new Outfit2BuildingState());
+
+            // Manually grant p1 access to those items to isolate the distinctness-check logic.
+            // (In game play this could happen if an item appears in multiple Outfit 1s via
+            // CanReuseOutfit1Items, but here we directly test that the cross-player check fires.)
+            state.GamePlayers["p1"].OwnedClothingItemIds.AddRange([hatId, topId, shoesId]);
+
+            _engine.ProcessCommand(context, new SubmitOutfitCommand("p1",
+                new Dictionary<string, Guid> { ["hat"] = hatId, ["top"] = topId, ["shoes"] = shoesId }));
+
+            Assert.IsNull(state.GamePlayers["p1"].SubmittedOutfit2,
+                "An Outfit 2 must be rejected when it is too similar to another player's Outfit 1.");
+        }
+
+        [TestMethod]
+        public async Task Outfit2Building_SubmitOutfit_DistinctnessDisabled_AllowsSimilarOutfit()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            state.Config.ClothingTypes =
+            [
+                new() { Id = "hat", DisplayName = "Hat" },
+                new() { Id = "top", DisplayName = "Top" },
+                new() { Id = "shoes", DisplayName = "Shoes" },
+            ];
+            state.Config.Outfit2DistinctnessThreshold = 0; // disabled
+            // Allow reuse so the player still owns their Outfit 1 picks in Outfit 2.
+            state.Config.CanReuseOutfit1Items = true;
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            var hatId = Guid.NewGuid();
+            var topId = Guid.NewGuid();
+            var shoesId = Guid.NewGuid();
+
+            foreach (var (id, type) in new[] { (hatId, "hat"), (topId, "top"), (shoesId, "shoes") })
+            {
+                state.ClothingPool[id] = new()
+                {
+                    Id = id, ClothingTypeId = type, CreatorPlayerId = "p2",
+                    SvgContent = "<svg/>", IsInPool = true,
+                };
+            }
+
+            // p1's Outfit 1 uses the same items; CanReuseOutfit1Items re-adds them to owned after reset.
+            state.GamePlayers["p1"] = new()
+            {
+                PlayerId = "p1",
+                SubmittedOutfit = new()
+                {
+                    PlayerId = "p1",
+                    SelectedItemsByType = new() { ["hat"] = hatId, ["top"] = topId, ["shoes"] = shoesId },
+                },
+            };
+
+            context.Fsm.TransitionTo(context, new Outfit2BuildingState());
+            _engine.ProcessCommand(context, new SubmitOutfitCommand("p1",
+                new Dictionary<string, Guid> { ["hat"] = hatId, ["top"] = topId, ["shoes"] = shoesId }));
+
+            Assert.IsNotNull(state.GamePlayers["p1"].SubmittedOutfit2,
+                "When distinctness is disabled (threshold=0) identical outfits must be accepted.");
+        }
+
+        [TestMethod]
+        public async Task Outfit2Building_SubmitOutfit_BelowThreshold_IsAccepted()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            state.Config.ClothingTypes =
+            [
+                new() { Id = "hat", DisplayName = "Hat" },
+                new() { Id = "top", DisplayName = "Top" },
+                new() { Id = "shoes", DisplayName = "Shoes" },
+            ];
+            state.Config.Outfit2DistinctnessThreshold = 3;
+            // CanReuseOutfit1Items so hatId/topId/outfit1Shoes are re-owned after pool reset.
+            state.Config.CanReuseOutfit1Items = true;
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            var hatId = Guid.NewGuid();
+            var topId = Guid.NewGuid();
+            var outfit1Shoes = Guid.NewGuid();
+            // outfit2Shoes is self-drawn by p1 so it will be auto-owned after reset.
+            var outfit2Shoes = Guid.NewGuid();
+
+            foreach (var (id, type) in new[]
+            {
+                (hatId, "hat"), (topId, "top"), (outfit1Shoes, "shoes"),
+            })
+            {
+                state.ClothingPool[id] = new()
+                {
+                    Id = id, ClothingTypeId = type, CreatorPlayerId = "p2",
+                    SvgContent = "<svg/>", IsInPool = true,
+                };
+            }
+            state.ClothingPool[outfit2Shoes] = new()
+            {
+                Id = outfit2Shoes, ClothingTypeId = "shoes", CreatorPlayerId = "p1",
+                SvgContent = "<svg/>", IsInPool = true,
+            };
+
+            // Outfit 1 uses hat, top, outfit1Shoes.
+            // After reset with CanReuseOutfit1Items: hat, top, outfit1Shoes re-owned.
+            // outfit2Shoes: self-drawn by p1 and not in Outfit 1 → auto-owned.
+            // Outfit 2 submits hat + top (2 shared) + outfit2Shoes → below threshold of 3 → accepted.
+            state.GamePlayers["p1"] = new()
+            {
+                PlayerId = "p1",
+                SubmittedOutfit = new()
+                {
+                    PlayerId = "p1",
+                    SelectedItemsByType = new() { ["hat"] = hatId, ["top"] = topId, ["shoes"] = outfit1Shoes },
+                },
+            };
+
+            context.Fsm.TransitionTo(context, new Outfit2BuildingState());
+            _engine.ProcessCommand(context, new SubmitOutfitCommand("p1",
+                new Dictionary<string, Guid> { ["hat"] = hatId, ["top"] = topId, ["shoes"] = outfit2Shoes }));
+
+            Assert.IsNotNull(state.GamePlayers["p1"].SubmittedOutfit2,
+                "Outfit 2 sharing fewer than the threshold items with Outfit 1 must be accepted.");
+        }
+
+        // ── Outfit 2: early advance ───────────────────────────────────────────
+
+        [TestMethod]
+        public async Task Outfit2Building_AllPlayersSubmit_AdvancesToVoting()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            state.Config.ClothingTypes =
+            [
+                new() { Id = "hat", DisplayName = "Hat" },
+            ];
+            state.Config.Outfit2DistinctnessThreshold = 0; // disable to simplify
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            var hatA = Guid.NewGuid();
+            var hatB = Guid.NewGuid();
+            state.ClothingPool[hatA] = new()
+            {
+                Id = hatA, ClothingTypeId = "hat", CreatorPlayerId = "p2", SvgContent = "<svg/>", IsInPool = true,
+            };
+            state.ClothingPool[hatB] = new()
+            {
+                Id = hatB, ClothingTypeId = "hat", CreatorPlayerId = "p1", SvgContent = "<svg/>", IsInPool = true,
+            };
+
+            state.GamePlayers["p1"] = new()
+            {
+                PlayerId = "p1",
+                SubmittedOutfit = new() { PlayerId = "p1", SelectedItemsByType = new() },
+                OwnedClothingItemIds = [hatB],
+            };
+            state.GamePlayers["p2"] = new()
+            {
+                PlayerId = "p2",
+                SubmittedOutfit = new() { PlayerId = "p2", SelectedItemsByType = new() },
+                OwnedClothingItemIds = [hatA],
+            };
+
+            context.Fsm.TransitionTo(context, new Outfit2BuildingState());
+
+            _engine.ProcessCommand(context, new SubmitOutfitCommand("p1",
+                new Dictionary<string, Guid> { ["hat"] = hatB }));
+            Assert.IsInstanceOfType<Outfit2BuildingState>(context.Fsm.CurrentState,
+                "Should not advance until all players have submitted Outfit 2.");
+
+            _engine.ProcessCommand(context, new SubmitOutfitCommand("p2",
+                new Dictionary<string, Guid> { ["hat"] = hatA }));
+            Assert.IsInstanceOfType<VotingMatchupState>(context.Fsm.CurrentState,
+                "Should advance to voting once all players submit Outfit 2.");
+        }
+
+        // ── Outfit 2: timer expiry auto-fill ──────────────────────────────────
+
+        [TestMethod]
+        public async Task Outfit2Building_TimerExpiry_AutoFillsIncompleteOutfit2()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            state.Config.ClothingTypes =
+            [
+                new() { Id = "hat", DisplayName = "Hat" },
+            ];
+            state.Config.Outfit2DistinctnessThreshold = 0; // disable to keep auto-fill simple
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            // Hat is self-drawn by p1 and not selected in p1's Outfit 1 →
+            // after pool reset it stays in pool and is auto-owned by p1.
+            var hatId = Guid.NewGuid();
+            state.ClothingPool[hatId] = new()
+            {
+                Id = hatId, ClothingTypeId = "hat", CreatorPlayerId = "p1", SvgContent = "<svg/>", IsInPool = true,
+            };
+            state.GamePlayers["p1"] = new()
+            {
+                PlayerId = "p1",
+                SubmittedOutfit = new() { PlayerId = "p1", SelectedItemsByType = new() }, // empty Outfit 1
+            };
+
+            context.Fsm.TransitionTo(context, new Outfit2BuildingState());
+            Assert.IsNull(state.GamePlayers["p1"].SubmittedOutfit2);
+
+            _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
+
+            Assert.IsInstanceOfType<VotingMatchupState>(context.Fsm.CurrentState);
+            Assert.IsNotNull(state.GamePlayers["p1"].SubmittedOutfit2,
+                "Auto-fill must produce an Outfit 2 when the timer expires.");
+            Assert.IsTrue(state.GamePlayers["p1"].SubmittedOutfit2!.SelectedItemsByType.ContainsKey("hat"));
+        }
+
+        [TestMethod]
+        public async Task Outfit2Building_TimerExpiry_AutoFillPrefersNonConflictingItems()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            state.Config.ClothingTypes =
+            [
+                new() { Id = "hat", DisplayName = "Hat" },
+            ];
+            state.Config.Outfit2DistinctnessThreshold = 1; // any shared item is a violation
+            // Allow reuse so p1 owns both conflictHat and distinctHat after reset.
+            state.Config.CanReuseOutfit1Items = true;
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            var conflictHat = Guid.NewGuid(); // also in p1's Outfit 1
+            var distinctHat = Guid.NewGuid(); // not in any Outfit 1
+
+            // conflictHat was used in p1's Outfit 1 → will be excluded from pool after reset
+            // but CanReuseOutfit1Items will add it back to p1's owned set.
+            // distinctHat is self-drawn by p1 and not in any Outfit 1 → stays in pool.
+            state.ClothingPool[conflictHat] = new()
+            {
+                Id = conflictHat, ClothingTypeId = "hat", CreatorPlayerId = "p2",
+                SvgContent = "<svg conflict/>", IsInPool = true,
+            };
+            state.ClothingPool[distinctHat] = new()
+            {
+                Id = distinctHat, ClothingTypeId = "hat", CreatorPlayerId = "p1",
+                SvgContent = "<svg distinct/>", IsInPool = true,
+            };
+
+            state.GamePlayers["p1"] = new()
+            {
+                PlayerId = "p1",
+                SubmittedOutfit = new()
+                {
+                    PlayerId = "p1",
+                    SelectedItemsByType = new() { ["hat"] = conflictHat },
+                },
+            };
+
+            // After pool reset:
+            //   conflictHat: IsInPool=false (in p1's Outfit 1); re-added to p1's owned via CanReuseOutfit1Items.
+            //   distinctHat: IsInPool=true (not in Outfit 1); auto-owned (self-drawn by p1).
+            // Auto-fill prefers distinctHat because it doesn't appear in any Outfit 1.
+            context.Fsm.TransitionTo(context, new Outfit2BuildingState());
+            _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
+
+            var chosenHat = state.GamePlayers["p1"].SubmittedOutfit2!.SelectedItemsByType["hat"];
+            Assert.AreEqual(distinctHat, chosenHat,
+                "Auto-fill must prefer an item that does not appear in any Outfit 1 over one that does.");
+        }
+
+        // ── OutfitDistinctnessEvaluator unit tests ────────────────────────────
+
+        [TestMethod]
+        public void OutfitDistinctnessEvaluator_CountSharedItems_NoOverlap_ReturnsZero()
+        {
+            var hat1 = Guid.NewGuid();
+            var hat2 = Guid.NewGuid();
+
+            var outfit1 = new OutfitSubmission { SelectedItemsByType = new() { ["hat"] = hat1 } };
+            var outfit2 = new OutfitSubmission { SelectedItemsByType = new() { ["hat"] = hat2 } };
+
+            Assert.AreEqual(0, OutfitDistinctnessEvaluator.CountSharedItems(outfit1, outfit2));
+        }
+
+        [TestMethod]
+        public void OutfitDistinctnessEvaluator_CountSharedItems_FullOverlap_ReturnsCount()
+        {
+            var hatId = Guid.NewGuid();
+            var topId = Guid.NewGuid();
+
+            var outfit1 = new OutfitSubmission
+            {
+                SelectedItemsByType = new() { ["hat"] = hatId, ["top"] = topId },
+            };
+            var outfit2 = new OutfitSubmission
+            {
+                SelectedItemsByType = new() { ["hat"] = hatId, ["top"] = topId },
+            };
+
+            Assert.AreEqual(2, OutfitDistinctnessEvaluator.CountSharedItems(outfit1, outfit2));
+        }
+
+        [TestMethod]
+        public void OutfitDistinctnessEvaluator_CountSharedItems_SameSlotDifferentItem_IsZero()
+        {
+            var hatA = Guid.NewGuid();
+            var hatB = Guid.NewGuid();
+
+            var outfit1 = new OutfitSubmission { SelectedItemsByType = new() { ["hat"] = hatA } };
+            var outfit2 = new OutfitSubmission { SelectedItemsByType = new() { ["hat"] = hatB } };
+
+            Assert.AreEqual(0, OutfitDistinctnessEvaluator.CountSharedItems(outfit1, outfit2),
+                "Items in the same slot but with different IDs must not count as shared.");
+        }
+
+        [TestMethod]
+        public void OutfitDistinctnessEvaluator_ViolatesDistinctnessRule_Disabled_ReturnsFalse()
+        {
+            var hatId = Guid.NewGuid();
+            var outfit1 = new OutfitSubmission { SelectedItemsByType = new() { ["hat"] = hatId } };
+            var outfit2 = new OutfitSubmission { SelectedItemsByType = new() { ["hat"] = hatId } };
+
+            Assert.IsFalse(
+                OutfitDistinctnessEvaluator.ViolatesDistinctnessRule(outfit2, [outfit1], threshold: 0),
+                "ViolatesDistinctnessRule must always return false when threshold is 0 (disabled).");
+        }
+
+        [TestMethod]
+        public void OutfitDistinctnessEvaluator_ViolatesDistinctnessRule_AtThreshold_ReturnsTrue()
+        {
+            var hatId = Guid.NewGuid();
+            var topId = Guid.NewGuid();
+            var shoesId = Guid.NewGuid();
+
+            var outfit1 = new OutfitSubmission
+            {
+                SelectedItemsByType = new() { ["hat"] = hatId, ["top"] = topId, ["shoes"] = shoesId },
+            };
+            var outfit2 = new OutfitSubmission
+            {
+                SelectedItemsByType = new() { ["hat"] = hatId, ["top"] = topId, ["shoes"] = shoesId },
+            };
+
+            Assert.IsTrue(
+                OutfitDistinctnessEvaluator.ViolatesDistinctnessRule(outfit2, [outfit1], threshold: 3),
+                "Sharing exactly the threshold number of items must be treated as a violation.");
+        }
+
+        [TestMethod]
+        public void OutfitDistinctnessEvaluator_ViolatesDistinctnessRule_BelowThreshold_ReturnsFalse()
+        {
+            var hatId = Guid.NewGuid();
+            var topId = Guid.NewGuid();
+            var newShoes = Guid.NewGuid();
+
+            var outfit1 = new OutfitSubmission
+            {
+                SelectedItemsByType = new() { ["hat"] = hatId, ["top"] = topId, ["shoes"] = Guid.NewGuid() },
+            };
+            var outfit2 = new OutfitSubmission
+            {
+                SelectedItemsByType = new() { ["hat"] = hatId, ["top"] = topId, ["shoes"] = newShoes },
+            };
+
+            Assert.IsFalse(
+                OutfitDistinctnessEvaluator.ViolatesDistinctnessRule(outfit2, [outfit1], threshold: 3),
+                "Sharing fewer items than the threshold must not be a violation.");
+        }
+
+        [TestMethod]
+        public void OutfitDistinctnessEvaluator_ViolatesDistinctnessRule_AgainstMultipleOutfit1s_DetectsAny()
+        {
+            var hatId = Guid.NewGuid();
+            var topId = Guid.NewGuid();
+            var shoesId = Guid.NewGuid();
+
+            // Outfit2 only shares 3 items with outfit1B (not outfit1A).
+            var outfit1A = new OutfitSubmission
+            {
+                SelectedItemsByType = new() { ["hat"] = Guid.NewGuid(), ["top"] = Guid.NewGuid() },
+            };
+            var outfit1B = new OutfitSubmission
+            {
+                SelectedItemsByType = new() { ["hat"] = hatId, ["top"] = topId, ["shoes"] = shoesId },
+            };
+            var outfit2 = new OutfitSubmission
+            {
+                SelectedItemsByType = new() { ["hat"] = hatId, ["top"] = topId, ["shoes"] = shoesId },
+            };
+
+            Assert.IsTrue(
+                OutfitDistinctnessEvaluator.ViolatesDistinctnessRule(outfit2, [outfit1A, outfit1B], threshold: 3),
+                "Violating distinctness against any single Outfit 1 must be detected even when other Outfit 1s are fine.");
         }
     }
 }

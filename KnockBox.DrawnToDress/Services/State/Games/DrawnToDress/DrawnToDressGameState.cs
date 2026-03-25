@@ -171,6 +171,13 @@ namespace KnockBox.Services.State.Games.DrawnToDress
         /// </summary>
         OutfitDistinctnessResolution = 6,
 
+        /// <summary>
+        /// Second outfit building phase. Players assemble a second outfit from the
+        /// remaining pool (Outfit 1 picks excluded). Submitted outfits are validated for
+        /// distinctness against every player's Outfit 1.
+        /// </summary>
+        Outfit2Building = 14,
+
         // ── Voting ────────────────────────────────────────────────────────────
         VotingRoundSetup = 7,
 

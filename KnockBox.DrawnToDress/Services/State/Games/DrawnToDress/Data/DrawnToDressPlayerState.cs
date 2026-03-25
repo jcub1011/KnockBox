@@ -24,10 +24,16 @@ namespace KnockBox.Services.State.Games.DrawnToDress.Data
         public List<Guid> OwnedClothingItemIds { get; set; } = [];
 
         /// <summary>
-        /// The outfit this player has submitted, or <see langword="null"/> if they have not
-        /// yet submitted one.
+        /// The outfit this player has submitted during Outfit 1 Building, or
+        /// <see langword="null"/> if they have not yet submitted one.
         /// </summary>
         public OutfitSubmission? SubmittedOutfit { get; set; }
+
+        /// <summary>
+        /// The outfit this player has submitted during Outfit 2 Building, or
+        /// <see langword="null"/> if they have not yet submitted one.
+        /// </summary>
+        public OutfitSubmission? SubmittedOutfit2 { get; set; }
 
         /// <summary>
         /// Bonus points earned by this player through achievements during the game
