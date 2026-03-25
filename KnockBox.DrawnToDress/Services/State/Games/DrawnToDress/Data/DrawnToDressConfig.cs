@@ -65,6 +65,15 @@ namespace KnockBox.Services.State.Games.DrawnToDress.Data
         /// </summary>
         public int RandomVotingCandidateCount { get; set; } = 3;
 
+        // ── Pool reveal phase ─────────────────────────────────────────────────
+
+        /// <summary>
+        /// Number of seconds the pool-reveal screen is displayed before automatically
+        /// advancing to outfit building.  Players may press Ready to skip early.
+        /// GDD default: 30 s.
+        /// </summary>
+        public int PoolRevealTimeSec { get; set; } = 30;
+
         // ── Outfit Building phase ─────────────────────────────────────────────
 
         /// <summary>
@@ -169,6 +178,9 @@ namespace KnockBox.Services.State.Games.DrawnToDress.Data
             if (DrawingTimeSec < 30)         DrawingTimeSec = 30;
             if (ThemeAnnouncementTimeSec < 5) ThemeAnnouncementTimeSec = 5;
             if (RandomVotingCandidateCount < 2) RandomVotingCandidateCount = 2;
+
+            // ── Pool reveal ────────────────────────────────────────────────────
+            if (PoolRevealTimeSec < 5) PoolRevealTimeSec = 5;
 
             // ── Outfit building ────────────────────────────────────────────────
             if (OutfitBuildingTimeSec < 30)     OutfitBuildingTimeSec = 30;
