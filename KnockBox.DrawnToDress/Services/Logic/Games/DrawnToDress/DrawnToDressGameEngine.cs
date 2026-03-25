@@ -113,14 +113,5 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress
 
             // TODO: Handle active-player removal during drawing/voting phases in later issues.
         }
-
-        // ── Utility ───────────────────────────────────────────────────────────
-
-        private static void TransitionTo(
-            DrawnToDressGameContext context,
-            IDrawnToDressGameState next)
-        {
-            context.Fsm.TransitionTo(context, next);
-        }
     }
 }
