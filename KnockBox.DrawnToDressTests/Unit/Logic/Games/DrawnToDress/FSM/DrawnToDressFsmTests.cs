@@ -1805,5 +1805,105 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
             Assert.AreSame(originalOutfit, state.GamePlayers["p1"].SubmittedOutfit,
                 "Auto-fill must not overwrite an outfit already submitted by the player.");
         }
+
+        // ── StartAsync player snapshot (regression: GamePlayers was never populated) ──
+
+        [TestMethod]
+        public async Task StartAsync_PopulatesGamePlayersFromRegisteredPlayers()
+        {
+            // Arrange: create state and register a player.
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+
+            var player = new User("Alice", "alice1");
+            state.RegisterPlayer(player);
+
+            // Act: start the game (default config → ThemeSource.Random → DrawingRoundState).
+            await _engine.StartAsync(_host, state);
+
+            // Assert: registered player is now in GamePlayers with correct identity.
+            Assert.IsTrue(state.GamePlayers.ContainsKey("alice1"),
+                "StartAsync must snapshot registered players into GamePlayers.");
+            Assert.AreEqual("Alice", state.GamePlayers["alice1"].DisplayName);
+            Assert.AreEqual("alice1", state.GamePlayers["alice1"].PlayerId);
+        }
+
+        [TestMethod]
+        public async Task StartAsync_HostIsNotAddedToGamePlayers()
+        {
+            // Arrange
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+
+            // Register one non-host player.
+            var player = new User("Alice", "alice1");
+            state.RegisterPlayer(player);
+
+            // Act
+            await _engine.StartAsync(_host, state);
+
+            // Assert: the host must not appear in GamePlayers.
+            Assert.IsFalse(state.GamePlayers.ContainsKey(_host.Id),
+                "The host must not be added to GamePlayers.");
+            Assert.AreEqual(1, state.GamePlayers.Count,
+                "Only the registered non-host player should be in GamePlayers.");
+        }
+
+        [TestMethod]
+        public async Task SubmitDrawing_WithRegisteredPlayer_AddsItemToPool()
+        {
+            // Arrange: start with a single clothing type and one registered player.
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            state.Config.ClothingTypes =
+            [
+                new() { Id = "hat", DisplayName = "Hat", MaxItemsPerRound = 3 },
+            ];
+
+            var player = new User("Alice", "alice1");
+            state.RegisterPlayer(player);
+
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            // Act: the registered player submits a drawing.
+            var result = _engine.ProcessCommand(context,
+                new SubmitDrawingCommand("alice1", "hat", "<svg/>"));
+
+            // Assert: submission succeeds and the item is added to the pool.
+            Assert.IsTrue((bool)result.IsSuccess);
+            Assert.AreEqual(1, state.ClothingPool.Count,
+                "One drawing should be in the pool after submission.");
+            var item = state.ClothingPool.Values.Single();
+            Assert.AreEqual("alice1", item.CreatorPlayerId);
+            Assert.AreEqual("hat", item.ClothingTypeId);
+            Assert.IsTrue(item.IsInPool);
+        }
+
+        [TestMethod]
+        public async Task SubmitDrawing_MaxItemsEnforced_AfterRegisteredPlayerReachesLimit()
+        {
+            // Arrange: limit is 1 item per round.
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            state.Config.ClothingTypes =
+            [
+                new() { Id = "hat", DisplayName = "Hat", MaxItemsPerRound = 1 },
+            ];
+
+            var player = new User("Alice", "alice1");
+            state.RegisterPlayer(player);
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            // First submission should succeed.
+            _engine.ProcessCommand(context, new SubmitDrawingCommand("alice1", "hat", "<svg/>"));
+            Assert.AreEqual(1, state.ClothingPool.Count);
+
+            // Second submission must be rejected (limit = 1).
+            _engine.ProcessCommand(context, new SubmitDrawingCommand("alice1", "hat", "<svg/>"));
+            Assert.AreEqual(1, state.ClothingPool.Count,
+                "A second submission beyond the per-round limit must not add another item.");
+        }
     }
 }

@@ -4,6 +4,7 @@ using KnockBox.Services.Logic.Games.DrawnToDress.FSM;
 using KnockBox.Services.Logic.Games.DrawnToDress.FSM.States;
 using KnockBox.Services.Logic.Games.Engines.Shared;
 using KnockBox.Services.State.Games.DrawnToDress;
+using KnockBox.Services.State.Games.DrawnToDress.Data;
 using KnockBox.Services.State.Games.Shared;
 using KnockBox.Services.State.Users;
 
@@ -61,6 +62,20 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress
             var executeResult = state.Execute(() =>
             {
                 state.UpdateJoinableStatus(false);
+
+                // Snapshot all registered players into GamePlayers so FSM states can look
+                // them up by ID.  This mirrors the CardCounter pattern and must happen before
+                // the FSM transitions so that commands processed on the very first tick
+                // (e.g. SubmitDrawingCommand) find their player state.
+                foreach (var player in gameState.Players)
+                {
+                    gameState.GamePlayers[player.Id] = new DrawnToDressPlayerState
+                    {
+                        PlayerId = player.Id,
+                        DisplayName = player.Name,
+                    };
+                }
+
                 // Transition from LobbyState → ThemeSelectionState.
                 // ThemeSelectionState will chain immediately to DrawingRoundState when
                 // ThemeSource is Random (the default).
