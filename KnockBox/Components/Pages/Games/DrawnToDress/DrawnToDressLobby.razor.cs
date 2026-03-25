@@ -1,5 +1,4 @@
 using KnockBox.Components.Shared;
-using KnockBox.Services.Logic.Games.DrawnToDress;
 using KnockBox.Services.Navigation;
 using KnockBox.Services.State.Games.DrawnToDress;
 using KnockBox.Services.State.Games.Shared;
@@ -11,8 +10,6 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
 {
     public partial class DrawnToDressLobby : DisposableComponent
     {
-        [Inject] protected DrawnToDressGameEngine GameEngine { get; set; } = default!;
-
         [Inject] protected IGameSessionService GameSessionService { get; set; } = default!;
 
         [Inject] protected INavigationService NavigationService { get; set; } = default!;
@@ -107,10 +104,5 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
         }
 
         protected DrawnToDressGameState GameState { get; set; } = default!;
-
-        protected async Task StartGame()
-        {
-            await GameEngine.StartAsync(UserService.CurrentUser!, GameState);
-        }
     }
 }

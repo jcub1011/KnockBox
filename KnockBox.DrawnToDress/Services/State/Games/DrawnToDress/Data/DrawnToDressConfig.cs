@@ -134,5 +134,65 @@ namespace KnockBox.Services.State.Games.DrawnToDress.Data
         /// GDD default: 120 s.
         /// </summary>
         public int HostDisconnectTimeoutSec { get; set; } = 120;
+
+        // ── Constants ─────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// The recommended minimum number of players for meaningful gameplay.
+        /// Below this count the host sees a warning but can still start.
+        /// </summary>
+        public const int RecommendedMinimumPlayers = 3;
+
+        // ── Validation ────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Normalizes this config in-place, clamping all numeric values to sensible
+        /// minimums and removing invalid combinations.
+        /// </summary>
+        public void Normalize()
+        {
+            // ── Drawing phase ──────────────────────────────────────────────────
+            if (DrawingTimeSec < 30)         DrawingTimeSec = 30;
+            if (ThemeAnnouncementTimeSec < 5) ThemeAnnouncementTimeSec = 5;
+
+            // ── Outfit building ────────────────────────────────────────────────
+            if (OutfitBuildingTimeSec < 30)     OutfitBuildingTimeSec = 30;
+            if (OutfitCustomizationTimeSec < 15) OutfitCustomizationTimeSec = 15;
+
+            // ── Clothing types: require at least one type ─────────────────────
+            if (ClothingTypes.Count == 0)
+            {
+                ClothingTypes =
+                [
+                    new() { Id = "top", DisplayName = "Top", AllowMultiple = false },
+                ];
+            }
+
+            // ── Voting ─────────────────────────────────────────────────────────
+            if (VotingTimeSec < 15) VotingTimeSec = 15;
+            if (VotingRounds < 1)  VotingRounds = 1;
+
+            // Ensure voting criteria have non-negative weights; remove any with empty Id.
+            VotingCriteria.RemoveAll(c => string.IsNullOrWhiteSpace(c.Id));
+            foreach (var criterion in VotingCriteria)
+            {
+                if (criterion.Weight < 0) criterion.Weight = 0;
+            }
+
+            // Require at least one voting criterion.
+            if (VotingCriteria.Count == 0)
+            {
+                VotingCriteria =
+                [
+                    new() { Id = "creativity", DisplayName = "Creativity", Weight = 1.0 },
+                ];
+            }
+
+            // ── Bonus points ───────────────────────────────────────────────────
+            if (BonusPointsForCompleteOutfit < 0) BonusPointsForCompleteOutfit = 0;
+
+            // ── Host / connectivity ────────────────────────────────────────────
+            if (HostDisconnectTimeoutSec < 30) HostDisconnectTimeoutSec = 30;
+        }
     }
 }

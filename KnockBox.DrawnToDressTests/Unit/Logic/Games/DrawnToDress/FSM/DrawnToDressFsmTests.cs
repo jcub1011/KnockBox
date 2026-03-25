@@ -425,5 +425,79 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
             Assert.IsInstanceOfType<OutfitDistinctnessResolutionState>(context.Fsm.CurrentState);
             Assert.AreEqual(GamePhase.OutfitDistinctnessResolution, state.Phase);
         }
+
+        // ── Lobby: host permissions ───────────────────────────────────────────
+
+        [TestMethod]
+        public async Task LobbyState_UpdateConfigCommand_ByHost_UpdatesConfig()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            var context = state.Context!;
+
+            var updatedConfig = new KnockBox.Services.State.Games.DrawnToDress.Data.DrawnToDressConfig
+            {
+                DrawingTimeSec = 240,
+            };
+
+            _engine.ProcessCommand(context, new UpdateConfigCommand(_host.Id, updatedConfig));
+
+            // Should remain in lobby and config should be updated.
+            Assert.IsInstanceOfType<LobbyState>(context.Fsm.CurrentState);
+            Assert.AreEqual(240, state.Config.DrawingTimeSec);
+        }
+
+        [TestMethod]
+        public async Task LobbyState_UpdateConfigCommand_ByNonHost_IsRejected()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            var context = state.Context!;
+            int originalDrawingTime = state.Config.DrawingTimeSec;
+
+            var updatedConfig = new KnockBox.Services.State.Games.DrawnToDress.Data.DrawnToDressConfig
+            {
+                DrawingTimeSec = 999,
+            };
+
+            _engine.ProcessCommand(context, new UpdateConfigCommand("nonhost_id", updatedConfig));
+
+            // Config should not have changed.
+            Assert.AreEqual(originalDrawingTime, state.Config.DrawingTimeSec);
+        }
+
+        [TestMethod]
+        public async Task LobbyState_UpdateConfigCommand_NormalizesInvalidValues()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            var context = state.Context!;
+
+            var invalidConfig = new KnockBox.Services.State.Games.DrawnToDress.Data.DrawnToDressConfig
+            {
+                DrawingTimeSec = 1,     // below minimum of 30
+                VotingRounds = 0,       // below minimum of 1
+                BonusPointsForCompleteOutfit = -10, // negative
+            };
+
+            _engine.ProcessCommand(context, new UpdateConfigCommand(_host.Id, invalidConfig));
+
+            Assert.AreEqual(30, state.Config.DrawingTimeSec);
+            Assert.AreEqual(1, state.Config.VotingRounds);
+            Assert.AreEqual(0, state.Config.BonusPointsForCompleteOutfit);
+        }
+
+        [TestMethod]
+        public async Task LobbyState_StartGameCommand_ByNonHost_DoesNotTransition()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            var context = state.Context!;
+
+            _engine.ProcessCommand(context, new StartGameCommand("notthehost"));
+
+            Assert.IsInstanceOfType<LobbyState>(context.Fsm.CurrentState);
+            Assert.AreEqual(GamePhase.Lobby, state.Phase);
+        }
     }
 }
