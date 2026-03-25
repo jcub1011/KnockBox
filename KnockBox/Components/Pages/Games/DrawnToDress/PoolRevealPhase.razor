@@ -1,0 +1,137 @@
+@using KnockBox.Core.Services.State.Games.Shared
+@using KnockBox.Services.Logic.Games.DrawnToDress.FSM
+@using KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
+@using KnockBox.Services.State.Games.DrawnToDress
+@using KnockBox.Services.State.Games.DrawnToDress.Data
+@using KnockBox.Services.State.Users
+
+@{
+    bool isHost = UserService.CurrentUser?.Id == GameState.Host.Id;
+
+    string? myId = UserService.CurrentUser?.Id;
+    var myPlayer = myId is not null && GameState.GamePlayers.TryGetValue(myId, out var pOut) ? pOut : null;
+    bool isReady = myPlayer?.IsReady ?? false;
+
+    int readyCount = GameState.GamePlayers.Values.Count(p => p.IsReady);
+    int totalPlayers = GameState.GamePlayers.Count;
+
+    var poolByType = GameState.Config.ClothingTypes
+        .ToDictionary(
+            ct => ct,
+            ct => GameState.ClothingPool.Values
+                .Where(item => item.ClothingTypeId == ct.Id && item.IsInPool)
+                .ToList());
+}
+
+<div class="dtd-reveal">
+
+    <!-- ── Header ────────────────────────────────────────────────────────── -->
+    <div class="dtd-reveal-header">
+        <div class="dtd-reveal-phase-badge">
+            <span class="dtd-reveal-phase-icon">👀</span>
+            <span class="dtd-reveal-phase-name">Pool Reveal</span>
+        </div>
+
+        @if (totalPlayers > 0)
+        {
+            <div class="dtd-reveal-progress-pill">
+                @readyCount / @totalPlayers ready
+            </div>
+        }
+
+        @if (GameState.PhaseDeadlineUtc.HasValue &&
+             GameState.Context?.Fsm?.CurrentState is ITimedGameState<DrawnToDressGameContext, DrawnToDressCommand> timedState)
+        {
+            var remaining = timedState.GetRemainingTime(GameState.Context!, DateTimeOffset.UtcNow);
+            if (remaining.IsSuccess)
+            {
+                var secs = (int)Math.Max(0, Math.Ceiling(remaining.Value.TotalSeconds));
+                <div class="dtd-reveal-timer @(secs <= 10 ? "dtd-reveal-timer-urgent" : "")">
+                    ⏱ @secs s
+                </div>
+            }
+        }
+    </div>
+
+    <!-- ── Theme banner (AfterDrawing mode) ──────────────────────────────── -->
+    @if (GameState.ThemeRevealedToPlayers && GameState.CurrentTheme is not null)
+    {
+        <div class="dtd-reveal-theme-banner">
+            <span class="dtd-reveal-theme-label">Theme:</span>
+            <span class="dtd-reveal-theme-name">@GameState.CurrentTheme.DisplayName</span>
+        </div>
+    }
+
+    <!-- ── Pool grid ─────────────────────────────────────────────────────── -->
+    <div class="dtd-reveal-pool-section">
+        <h4 class="dtd-reveal-section-title">All Drawings in the Pool</h4>
+
+        @if (GameState.ClothingPool.Count == 0)
+        {
+            <p class="dtd-reveal-empty-hint">No items were drawn this round.</p>
+        }
+        else
+        {
+            @foreach (var (clothingType, items) in poolByType)
+            {
+                <div class="dtd-pool-type-group">
+                    <h5 class="dtd-pool-type-label">@clothingType.DisplayName</h5>
+                    @if (items.Count == 0)
+                    {
+                        <p class="dtd-pool-empty-hint">No items drawn for this type.</p>
+                    }
+                    else
+                    {
+                        <div class="dtd-pool-grid">
+                            @foreach (var item in items)
+                            {
+                                bool isMyDrawing = item.CreatorPlayerId == myId;
+                                <div class="dtd-pool-item @(isMyDrawing ? "dtd-pool-item-own-drawing" : "dtd-pool-item-available")"
+                                     title="@GetItemTitle(item)">
+                                    <span class="dtd-pool-item-icon">🎨</span>
+                                    <span class="dtd-pool-item-creator">by @GetCreatorName(item.CreatorPlayerId)</span>
+                                    @if (isMyDrawing)
+                                    {
+                                        <span class="dtd-pool-item-badge dtd-badge-own">✏ Yours</span>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+        }
+    </div>
+
+    <!-- ── Ready action (players only) ───────────────────────────────────── -->
+    @if (!isHost)
+    {
+        <div class="dtd-reveal-actions">
+            @if (isReady)
+            {
+                <div class="dtd-reveal-waiting">
+                    ✅ You're ready! Outfit building starts soon…
+                </div>
+            }
+            else
+            {
+                @if (_errorMessage is not null)
+                {
+                    <p class="dtd-reveal-error">@_errorMessage</p>
+                }
+                <button class="dtd-btn dtd-btn-secondary"
+                        @onclick="MarkReady"
+                        disabled="@_submitting">
+                    ⏭ I'm Ready
+                </button>
+            }
+        </div>
+    }
+    else
+    {
+        <p class="dtd-reveal-host-hint">
+            Outfit building begins when the timer expires or all players are ready.
+        </p>
+    }
+
+</div>
