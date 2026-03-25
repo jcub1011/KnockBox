@@ -37,6 +37,17 @@ namespace KnockBox.Core.Components.Shared
         /// </summary>
         [Parameter] public bool EnableSharing { get; set; } = false;
 
+        /// <summary>
+        /// Optional SVG inner markup to display as a read-only background layer behind the
+        /// drawing surface. Rendered as a non-interactive underlay so the player can draw
+        /// on top of an existing image (e.g. a composite of their selected outfit items).
+        /// When <see langword="null"/> (the default) no background is shown.
+        /// </summary>
+        [Parameter] public string? BackgroundSvgContent { get; set; }
+
+        // Sanitized version of BackgroundSvgContent, computed in OnParametersSet.
+        private string? _sanitizedBackground;
+
         private IJSObjectReference? _jsModule;
         private DotNetObjectReference<SvgDrawingCanvas>? _dotNetRef;
 
@@ -60,6 +71,11 @@ namespace KnockBox.Core.Components.Shared
         {
             _currentColor = StrokeColor;
             _currentStrokeWidth = StrokeWidth;
+        }
+
+        protected override void OnParametersSet()
+        {
+            _sanitizedBackground = SvgContentSanitizer.Sanitize(BackgroundSvgContent);
         }
 
         protected override async Task OnAfterRenderAsync(bool firstRender)

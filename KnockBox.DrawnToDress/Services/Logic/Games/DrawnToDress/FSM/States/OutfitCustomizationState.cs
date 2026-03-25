@@ -94,12 +94,29 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
                 return null;
             }
 
-            player.SubmittedOutfit.Customization.OutfitName = cmd.OutfitName;
+            if (string.IsNullOrWhiteSpace(cmd.OutfitName))
+            {
+                context.Logger.LogWarning(
+                    "SubmitCustomization: player [{id}] submitted with no outfit name.", cmd.PlayerId);
+                return null;
+            }
+
+            if (context.Config.SketchingRequired && string.IsNullOrWhiteSpace(cmd.SketchSvgContent))
+            {
+                context.Logger.LogWarning(
+                    "SubmitCustomization: player [{id}] submitted without a required sketch.", cmd.PlayerId);
+                return null;
+            }
+
+            player.SubmittedOutfit.Customization.OutfitName = cmd.OutfitName.Trim();
+            player.SubmittedOutfit.Customization.SketchSvgContent = string.IsNullOrWhiteSpace(cmd.SketchSvgContent)
+                ? null
+                : cmd.SketchSvgContent;
             player.IsReady = true;
 
             context.Logger.LogInformation(
-                "Player [{id}] submitted customization. Outfit name: \"{name}\".",
-                cmd.PlayerId, cmd.OutfitName ?? "<none>");
+                "Player [{id}] submitted customization. Outfit name: \"{name}\". Has sketch: {hasSketch}.",
+                cmd.PlayerId, cmd.OutfitName, cmd.SketchSvgContent is not null);
 
             if (context.AllPlayersReady())
             {

@@ -1,0 +1,41 @@
+@using KnockBox.Core.Services.State.Games.Shared
+@using KnockBox.Services.Logic.Games.DrawnToDress.FSM
+@using KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
+@using KnockBox.Services.State.Games.DrawnToDress
+
+@{
+    int remainingSeconds = 0;
+    if (GameState.PhaseDeadlineUtc.HasValue &&
+        GameState.Context?.Fsm?.CurrentState is ITimedGameState<DrawnToDressGameContext, DrawnToDressCommand> timedState)
+    {
+        var remaining = timedState.GetRemainingTime(GameState.Context!, DateTimeOffset.UtcNow);
+        if (remaining.IsSuccess)
+            remainingSeconds = (int)Math.Max(0, Math.Ceiling(remaining.Value.TotalSeconds));
+    }
+}
+
+<div class="dtd-reveal">
+
+    <!-- ── Theme banner (AfterDrawing mode) ──────────────────────────────── -->
+    @if (GameState.ThemeRevealedToPlayers && GameState.CurrentTheme is not null)
+    {
+        <div class="dtd-reveal-theme-banner">
+            <span class="dtd-reveal-theme-label">Theme:</span>
+            <span class="dtd-reveal-theme-name">@GameState.CurrentTheme.DisplayName</span>
+        </div>
+    }
+
+    <!-- ── Countdown ─────────────────────────────────────────────────────── -->
+    <div class="dtd-reveal-countdown-card">
+        <div class="dtd-reveal-icon">👗</div>
+        <h2 class="dtd-reveal-heading">Get Ready!</h2>
+        <p class="dtd-reveal-subtext">Outfit building starts in…</p>
+        <div class="dtd-reveal-number @(remainingSeconds <= 5 ? "dtd-reveal-number-urgent" : "")">
+            @remainingSeconds
+        </div>
+        <p class="dtd-reveal-hint">
+            You'll be able to pick clothes from the shared pool.
+        </p>
+    </div>
+
+</div>

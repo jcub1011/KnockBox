@@ -10,7 +10,9 @@
 
     string? myId = UserService.CurrentUser?.Id;
     var myPlayer = myId is not null && GameState.GamePlayers.TryGetValue(myId, out var pOut) ? pOut : null;
-    bool hasSubmitted = myPlayer?.SubmittedOutfit is not null;
+    // Capture SubmittedOutfit once so its value stays consistent throughout this render pass
+    // even if the FSM updates player state concurrently from the timer loop.
+    var mySubmittedOutfit = myPlayer?.SubmittedOutfit;
 
     int lockedCount = GameState.GamePlayers.Values.Count(p => p.SubmittedOutfit is not null);
     int totalPlayers = GameState.GamePlayers.Count;
@@ -80,21 +82,37 @@
     }
 
     <!-- ── Player view ───────────────────────────────────────────────────── -->
-    else if (hasSubmitted)
+    @if (!isHost && mySubmittedOutfit != null)
     {
         <div class="dtd-outfit-waiting">
             <p>✅ Outfit locked in! Waiting for the others…</p>
             <div class="dtd-outfit-locked-summary">
                 @foreach (var clothingType in GameState.Config.ClothingTypes)
                 {
-                    bool hasSlot = myPlayer!.SubmittedOutfit!.SelectedItemsByType.TryGetValue(clothingType.Id, out var selectedId);
+                    bool hasSlot = mySubmittedOutfit!.SelectedItemsByType.TryGetValue(clothingType.Id, out var selectedId);
                     <div class="dtd-outfit-slot dtd-outfit-slot-locked">
                         <span class="dtd-outfit-slot-label">@clothingType.DisplayName</span>
                         @if (hasSlot && GameState.ClothingPool.TryGetValue(selectedId, out var selectedItem))
                         {
-                            <div class="dtd-pool-item dtd-pool-item-selected" title="@GetItemTitle(selectedItem)">
-                                <span class="dtd-pool-item-icon">🎨</span>
-                                <span class="dtd-pool-item-creator">by @GetCreatorName(selectedItem.CreatorPlayerId)</span>
+                            bool isMyItem = selectedItem.CreatorPlayerId == myId;
+                            <div class="dtd-pool-item dtd-pool-item-selected"
+                                 title="@(isMyItem ? "Your drawing" : "Selected")">
+                                @if (SafeSvgContent(selectedItem.SvgContent) is string safeSvgSelected)
+                                {
+                                    <svg class="dtd-pool-item-preview" viewBox="0 0 800 400"
+                                         preserveAspectRatio="xMidYMid meet"
+                                         xmlns="http://www.w3.org/2000/svg">
+                                        @((MarkupString)safeSvgSelected)
+                                    </svg>
+                                }
+                                else
+                                {
+                                    <span class="dtd-pool-item-icon">🎨</span>
+                                }
+                                @if (isMyItem)
+                                {
+                                    <span class="dtd-pool-item-creator">Your drawing</span>
+                                }
                             </div>
                         }
                         else
@@ -124,13 +142,55 @@
                         <span class="dtd-outfit-slot-label">@clothingType.DisplayName</span>
                         @if (slotItem is not null)
                         {
-                            <div class="dtd-pool-item dtd-pool-item-selected dtd-pool-item-clickable"
-                                 title="Click to unclaim — @GetItemTitle(slotItem)"
-                                 @onclick="() => UnclaimItem(slotItem.Id)">
-                                <span class="dtd-pool-item-icon">🎨</span>
-                                <span class="dtd-pool-item-creator">by @GetCreatorName(slotItem.CreatorPlayerId)</span>
-                                <span class="dtd-pool-item-action">✕</span>
-                            </div>
+                            bool isOwnSlotItem = slotItem.CreatorPlayerId == myId;
+                            // Own drawings auto-selected as fallback are not claimable/unclaimable.
+                            bool slotItemIsClaimed = slotItem.ClaimedByPlayerId == myId;
+                            if (slotItemIsClaimed)
+                            {
+                                <div class="dtd-pool-item dtd-pool-item-selected dtd-pool-item-clickable"
+                                     title="Click to release"
+                                     @onclick="() => UnclaimItem(slotItem.Id)">
+                                    @if (SafeSvgContent(slotItem.SvgContent) is string safeSvgSlot)
+                                    {
+                                        <svg class="dtd-pool-item-preview" viewBox="0 0 800 400"
+                                             preserveAspectRatio="xMidYMid meet"
+                                             xmlns="http://www.w3.org/2000/svg">
+                                            @((MarkupString)safeSvgSlot)
+                                        </svg>
+                                    }
+                                    else
+                                    {
+                                        <span class="dtd-pool-item-icon">🎨</span>
+                                    }
+                                    @if (isOwnSlotItem)
+                                    {
+                                        <span class="dtd-pool-item-creator">Your drawing</span>
+                                    }
+                                    <span class="dtd-pool-item-action">✕</span>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="dtd-pool-item dtd-pool-item-selected"
+                                     title="@(isOwnSlotItem ? "Your drawing — selected for your outfit" : "Selected")">
+                                    @if (SafeSvgContent(slotItem.SvgContent) is string safeSvgSlot)
+                                    {
+                                        <svg class="dtd-pool-item-preview" viewBox="0 0 800 400"
+                                             preserveAspectRatio="xMidYMid meet"
+                                             xmlns="http://www.w3.org/2000/svg">
+                                            @((MarkupString)safeSvgSlot)
+                                        </svg>
+                                    }
+                                    else
+                                    {
+                                        <span class="dtd-pool-item-icon">🎨</span>
+                                    }
+                                    @if (isOwnSlotItem)
+                                    {
+                                        <span class="dtd-pool-item-creator">Your drawing</span>
+                                    }
+                                </div>
+                            }
                         }
                         else
                         {
@@ -156,6 +216,16 @@
             {
                 <div class="dtd-pool-type-group">
                     <h5 class="dtd-pool-type-label">@clothingType.DisplayName</h5>
+                    @{
+                        // Are there any non-own unclaimed items for this type?
+                        bool hasOtherAvailable = items.Any(i =>
+                            i.CreatorPlayerId != myId && i.ClaimedByPlayerId is null);
+
+                        // Which item is currently auto-selected for this slot?
+                        Guid? autoSelectedId = myPlayer is not null
+                            ? GetSelectedItemForType(myPlayer, clothingType.Id)
+                            : null;
+                    }
                     @if (items.Count == 0)
                     {
                         <p class="dtd-pool-empty-hint">No items drawn for this type.</p>
@@ -170,26 +240,48 @@
                                 bool claimedByOther = item.ClaimedByPlayerId is not null && !claimedByMe;
                                 bool isAvailable = !isMyDrawing && item.ClaimedByPlayerId is null;
 
+                                // Own drawing acts as the selected piece when there are no other options.
+                                bool isOwnAutoSelected = isMyDrawing && !hasOtherAvailable
+                                    && autoSelectedId == item.Id;
+
                                 string stateClass = claimedByMe ? "dtd-pool-item-mine"
+                                    : isOwnAutoSelected ? "dtd-pool-item-mine"
                                     : claimedByOther ? "dtd-pool-item-taken"
                                     : isMyDrawing ? "dtd-pool-item-own-drawing"
                                     : "dtd-pool-item-available";
 
-                                string title = isMyDrawing ? $"Your drawing — cannot claim your own"
-                                    : claimedByOther ? $"Claimed by {GetCreatorName(item.ClaimedByPlayerId!)}"
-                                    : claimedByMe ? $"You claimed this — click to release"
-                                    : $"Available — click to claim";
+                                string title = isMyDrawing
+                                    ? (isOwnAutoSelected
+                                        ? "Your drawing — selected for your outfit"
+                                        : "Your drawing")
+                                    : claimedByOther ? "Already claimed"
+                                    : claimedByMe ? "You claimed this — click to release"
+                                    : "Available — click to claim";
 
                                 bool clickable = isAvailable || claimedByMe;
 
                                 <div class="dtd-pool-item @stateClass @(clickable ? "dtd-pool-item-clickable" : "")"
                                      title="@title"
                                      @onclick="() => ToggleClaim(item, claimedByMe, isAvailable)">
-                                    <span class="dtd-pool-item-icon">🎨</span>
-                                    <span class="dtd-pool-item-creator">by @GetCreatorName(item.CreatorPlayerId)</span>
-                                    @if (claimedByMe)
+                                    @if (SafeSvgContent(item.SvgContent) is string safeSvgItem)
                                     {
-                                        <span class="dtd-pool-item-badge dtd-badge-mine">✔ Yours</span>
+                                        <svg class="dtd-pool-item-preview" viewBox="0 0 800 400"
+                                             preserveAspectRatio="xMidYMid meet"
+                                             xmlns="http://www.w3.org/2000/svg">
+                                            @((MarkupString)safeSvgItem)
+                                        </svg>
+                                    }
+                                    else
+                                    {
+                                        <span class="dtd-pool-item-icon">🎨</span>
+                                    }
+                                    @if (isMyDrawing)
+                                    {
+                                        <span class="dtd-pool-item-creator">Your drawing</span>
+                                    }
+                                    @if (claimedByMe || isOwnAutoSelected)
+                                    {
+                                        <span class="dtd-pool-item-badge dtd-badge-mine">✔ Selected</span>
                                     }
                                     else if (claimedByOther)
                                     {

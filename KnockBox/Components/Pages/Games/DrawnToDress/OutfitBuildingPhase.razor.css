@@ -304,6 +304,15 @@
     font-size: 1.6rem;
 }
 
+.dtd-pool-item-preview {
+    width: 80px;
+    height: 50px;
+    border-radius: 4px;
+    background: #ffffff;
+    display: block;
+    overflow: hidden;
+}
+
 .dtd-pool-item-creator {
     font-size: 0.75rem;
     color: #6b7280;

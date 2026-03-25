@@ -1,0 +1,280 @@
+/* ── Outfit Customization Phase ─────────────────────────────────────────────── */
+
+.dtd-customization {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 16px;
+    gap: 12px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    max-width: 900px;
+    margin: 0 auto;
+    width: 100%;
+}
+
+/* ── Header ──────────────────────────────────────────────────────────────────── */
+
+.dtd-customization-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.dtd-customization-phase-badge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #fdf4ff;
+    border: 1px solid #e9d5ff;
+    border-radius: 24px;
+    padding: 6px 16px;
+}
+
+.dtd-customization-phase-icon {
+    font-size: 1.3rem;
+}
+
+.dtd-customization-phase-name {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #7e22ce;
+}
+
+.dtd-customization-progress-pill {
+    font-size: 0.9rem;
+    color: #6b7280;
+}
+
+.dtd-customization-timer {
+    margin-left: auto;
+    background: #e0f2fe;
+    border: 1px solid #7dd3fc;
+    border-radius: 20px;
+    padding: 4px 14px;
+    font-size: 1rem;
+    font-weight: 700;
+    color: #0369a1;
+    min-width: 70px;
+    text-align: center;
+}
+
+.dtd-customization-timer-urgent {
+    background: #fee2e2;
+    border-color: #fca5a5;
+    color: #b91c1c;
+    animation: dtd-cust-pulse 0.8s ease-in-out infinite;
+}
+
+@keyframes dtd-cust-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+}
+
+/* ── Host panel ──────────────────────────────────────────────────────────────── */
+
+.dtd-customization-host-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 20px;
+}
+
+.dtd-customization-host-title {
+    margin: 0;
+    font-size: 1.1rem;
+    color: #111827;
+}
+
+.dtd-customization-player-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.dtd-customization-player-card {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #ffffff;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    padding: 8px 14px;
+    min-width: 180px;
+    transition: border-color 0.2s;
+}
+
+.dtd-customization-player-card.dtd-customization-player-ready {
+    border-color: #34d399;
+    background: #f0fdf4;
+}
+
+.dtd-customization-player-status {
+    font-size: 1.1rem;
+}
+
+.dtd-customization-player-name {
+    flex: 1;
+    font-weight: 600;
+    color: #111827;
+}
+
+.dtd-customization-player-detail {
+    font-size: 0.8rem;
+    color: #6b7280;
+    font-style: italic;
+}
+
+.dtd-customization-host-hint {
+    margin: 0;
+    font-size: 0.85rem;
+    color: #9ca3af;
+    font-style: italic;
+}
+
+/* ── Waiting panel ───────────────────────────────────────────────────────────── */
+
+.dtd-customization-waiting {
+    background: #f0fdf4;
+    border: 1px solid #6ee7b7;
+    border-radius: 10px;
+    padding: 24px;
+    text-align: center;
+    color: #065f46;
+    font-size: 1rem;
+}
+
+.dtd-customization-submitted-summary {
+    margin-top: 12px;
+}
+
+.dtd-customization-submitted-name {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: #1f2937;
+    margin: 0;
+}
+
+.dtd-customization-submitted-hint {
+    margin: 4px 0 0 0;
+    font-size: 0.9rem;
+    color: #6b7280;
+}
+
+/* ── Form ────────────────────────────────────────────────────────────────────── */
+
+.dtd-customization-form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.dtd-customization-name-section {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.dtd-customization-name-label {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #374151;
+}
+
+.dtd-customization-required {
+    color: #dc2626;
+}
+
+.dtd-customization-optional {
+    font-size: 0.8rem;
+    font-weight: 400;
+    color: #9ca3af;
+}
+
+.dtd-customization-name-input {
+    padding: 10px 14px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    font-size: 1rem;
+    color: #111827;
+    outline: none;
+    transition: border-color 0.15s;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.dtd-customization-name-input:focus {
+    border-color: #7c3aed;
+    box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
+}
+
+/* ── Sketch section ──────────────────────────────────────────────────────────── */
+
+.dtd-customization-sketch-section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.dtd-customization-sketch-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.dtd-customization-sketch-title {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #374151;
+}
+
+.dtd-customization-canvas-wrapper {
+    border: 2px solid #e5e7eb;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+/* ── Actions ─────────────────────────────────────────────────────────────────── */
+
+.dtd-customization-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.dtd-customization-error {
+    color: #b91c1c;
+    font-size: 0.9rem;
+    margin: 0;
+}
+
+/* ── Shared button styles ────────────────────────────────────────────────────── */
+
+.dtd-btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.95rem;
+    font-weight: 600;
+    transition: opacity 0.15s;
+}
+
+.dtd-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.dtd-btn-primary {
+    background: #7c3aed;
+    color: #ffffff;
+}
+
+.dtd-btn-primary:hover:not(:disabled) {
+    background: #6d28d9;
+}

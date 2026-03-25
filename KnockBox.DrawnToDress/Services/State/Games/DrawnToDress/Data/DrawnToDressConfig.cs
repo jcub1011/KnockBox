@@ -70,9 +70,9 @@ namespace KnockBox.Services.State.Games.DrawnToDress.Data
         /// <summary>
         /// Number of seconds the pool-reveal screen is displayed before automatically
         /// advancing to outfit building.  Players may press Ready to skip early.
-        /// GDD default: 30 s.
+        /// GDD default: 5 s.
         /// </summary>
-        public int PoolRevealTimeSec { get; set; } = 30;
+        public int PoolRevealTimeSec { get; set; } = 5;
 
         // ── Outfit Building phase ─────────────────────────────────────────────
 
@@ -103,6 +103,14 @@ namespace KnockBox.Services.State.Games.DrawnToDress.Data
         /// GDD default: <see langword="true"/>.
         /// </summary>
         public bool RequireDistinctItemsPerSlot { get; set; } = true;
+
+        /// <summary>
+        /// When <see langword="true"/>, players must add a sketch overlay during the
+        /// outfit-customization phase before they can submit. The timer and completion
+        /// rules are enforced; a submission without a sketch is rejected.
+        /// GDD default: <see langword="false"/>.
+        /// </summary>
+        public bool SketchingRequired { get; set; } = false;
 
         // ── Voting ────────────────────────────────────────────────────────────
 
