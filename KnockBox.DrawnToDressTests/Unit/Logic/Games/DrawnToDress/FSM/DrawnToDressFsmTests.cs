@@ -100,7 +100,13 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
             // Simulate timer expiry by ticking far into the future.
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
 
-            // PoolRevealState immediately chains to OutfitBuildingState.
+            // Drawing timer ended → now in PoolRevealState.
+            Assert.IsInstanceOfType<PoolRevealState>(context.Fsm.CurrentState);
+            Assert.AreEqual(GamePhase.PoolReveal, state.Phase);
+
+            // Advance through the pool reveal timer.
+            _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
+
             Assert.IsInstanceOfType<OutfitBuildingState>(context.Fsm.CurrentState);
             Assert.AreEqual(GamePhase.OutfitBuilding, state.Phase);
         }
@@ -122,7 +128,13 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
             state.GamePlayers["p1"] = new() { PlayerId = "p1" };
             _engine.ProcessCommand(context, new MarkReadyCommand("p1"));
 
-            // All one player is ready in the last (only) round, so transition should fire.
+            // All one player is ready in the last (only) drawing round → transitions to PoolReveal.
+            Assert.IsInstanceOfType<PoolRevealState>(context.Fsm.CurrentState);
+            Assert.AreEqual(GamePhase.PoolReveal, state.Phase);
+
+            // Advance through the pool reveal timer to reach outfit building.
+            _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
+
             Assert.IsInstanceOfType<OutfitBuildingState>(context.Fsm.CurrentState);
         }
 
@@ -170,7 +182,13 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
             Assert.AreEqual(1, state.CurrentDrawingClothingTypeIndex);
 
-            // Advance through top (last) round → PoolReveal → OutfitBuilding.
+            // Advance through top (last) round → PoolReveal.
+            _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
+
+            Assert.IsInstanceOfType<PoolRevealState>(context.Fsm.CurrentState);
+            Assert.AreEqual(GamePhase.PoolReveal, state.Phase);
+
+            // Advance through the pool reveal timer → OutfitBuilding.
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
 
             Assert.IsInstanceOfType<OutfitBuildingState>(context.Fsm.CurrentState);
@@ -218,8 +236,14 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
             _engine.ProcessCommand(context, new MarkReadyCommand("p1"));
             Assert.AreEqual(1, state.CurrentDrawingClothingTypeIndex);
 
-            // Mark ready on last round → OutfitBuilding.
+            // Mark ready on last round → PoolReveal.
             _engine.ProcessCommand(context, new MarkReadyCommand("p1"));
+
+            Assert.IsInstanceOfType<PoolRevealState>(context.Fsm.CurrentState);
+            Assert.AreEqual(GamePhase.PoolReveal, state.Phase);
+
+            // Advance through the pool reveal timer → OutfitBuilding.
+            _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
 
             Assert.IsInstanceOfType<OutfitBuildingState>(context.Fsm.CurrentState);
             Assert.AreEqual(GamePhase.OutfitBuilding, state.Phase);
@@ -249,7 +273,11 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
             Assert.AreEqual(2, state.CurrentDrawingClothingTypeIndex);
 
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
-            // All types done — transitioned out of Drawing.
+            // All types done — transitioned to PoolReveal.
+            Assert.IsInstanceOfType<PoolRevealState>(context.Fsm.CurrentState);
+
+            // Advance through pool reveal → OutfitBuilding.
+            _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
             Assert.IsInstanceOfType<OutfitBuildingState>(context.Fsm.CurrentState);
         }
 
@@ -312,7 +340,13 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
             // Player draws nothing — pool stays empty.
             Assert.AreEqual(0, state.ClothingPool.Count);
 
-            // Timer still advances the game.
+            // Timer still advances the game → PoolReveal.
+            _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
+
+            Assert.IsInstanceOfType<PoolRevealState>(context.Fsm.CurrentState);
+            Assert.AreEqual(0, state.ClothingPool.Count, "Pool must remain empty when nothing was drawn.");
+
+            // Advance through pool reveal timer → OutfitBuilding.
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
 
             Assert.IsInstanceOfType<OutfitBuildingState>(context.Fsm.CurrentState);
@@ -396,9 +430,325 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
             Assert.IsFalse(state.GamePlayers["p2"].IsReady, "IsReady must be cleared on entering a new round.");
         }
 
+        // ── Pool reveal phase ─────────────────────────────────────────────────
+
         [TestMethod]
-        public async Task OutfitBuildingState_OnTimerExpiry_TransitionsToCustomization()
+        public async Task PoolRevealState_OnTimerExpiry_TransitionsToOutfitBuilding()
         {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            context.Fsm.TransitionTo(context, new PoolRevealState());
+            Assert.AreEqual(GamePhase.PoolReveal, state.Phase);
+            Assert.IsNotNull(state.PhaseDeadlineUtc);
+
+            _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
+
+            Assert.IsInstanceOfType<OutfitBuildingState>(context.Fsm.CurrentState);
+            Assert.AreEqual(GamePhase.OutfitBuilding, state.Phase);
+        }
+
+        [TestMethod]
+        public async Task PoolRevealState_AllPlayersReady_AdvancesEarlyToOutfitBuilding()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            state.GamePlayers["p1"] = new() { PlayerId = "p1" };
+            state.GamePlayers["p2"] = new() { PlayerId = "p2" };
+
+            context.Fsm.TransitionTo(context, new PoolRevealState());
+            Assert.AreEqual(GamePhase.PoolReveal, state.Phase);
+
+            // One player ready — not all ready yet.
+            _engine.ProcessCommand(context, new MarkReadyCommand("p1"));
+            Assert.IsInstanceOfType<PoolRevealState>(context.Fsm.CurrentState);
+            Assert.IsTrue(state.GamePlayers["p1"].IsReady);
+            Assert.IsFalse(state.GamePlayers["p2"].IsReady);
+
+            // Second player ready — all ready → advance immediately.
+            _engine.ProcessCommand(context, new MarkReadyCommand("p2"));
+            Assert.IsInstanceOfType<OutfitBuildingState>(context.Fsm.CurrentState);
+            Assert.AreEqual(GamePhase.OutfitBuilding, state.Phase);
+        }
+
+        [TestMethod]
+        public async Task PoolRevealState_SinglePlayer_MarkReady_AdvancesEarly()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            state.GamePlayers["p1"] = new() { PlayerId = "p1" };
+
+            context.Fsm.TransitionTo(context, new PoolRevealState());
+
+            _engine.ProcessCommand(context, new MarkReadyCommand("p1"));
+
+            Assert.IsInstanceOfType<OutfitBuildingState>(context.Fsm.CurrentState);
+        }
+
+        [TestMethod]
+        public async Task PoolRevealState_ReadyFlagsResetOnEntry()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            state.GamePlayers["p1"] = new() { PlayerId = "p1", IsReady = true };
+            state.GamePlayers["p2"] = new() { PlayerId = "p2", IsReady = true };
+
+            context.Fsm.TransitionTo(context, new PoolRevealState());
+
+            Assert.IsFalse(state.GamePlayers["p1"].IsReady, "IsReady must be cleared on entering PoolRevealState.");
+            Assert.IsFalse(state.GamePlayers["p2"].IsReady, "IsReady must be cleared on entering PoolRevealState.");
+        }
+
+        [TestMethod]
+        public async Task PoolRevealState_ClaimPoolItem_IsRejectedViewOnly()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            state.GamePlayers["p1"] = new() { PlayerId = "p1" };
+            var itemId = Guid.NewGuid();
+            state.ClothingPool[itemId] = new()
+            {
+                ClothingTypeId = "hat",
+                CreatorPlayerId = "p1",
+                SvgContent = "<svg/>",
+                IsInPool = true,
+            };
+
+            context.Fsm.TransitionTo(context, new PoolRevealState());
+            Assert.AreEqual(GamePhase.PoolReveal, state.Phase);
+
+            // Attempt to claim during reveal — must be ignored.
+            _engine.ProcessCommand(context, new ClaimPoolItemCommand("p1", itemId));
+
+            Assert.IsInstanceOfType<PoolRevealState>(context.Fsm.CurrentState,
+                "State must not change when a claim is attempted during pool reveal.");
+            Assert.IsNull(state.ClothingPool[itemId].ClaimedByPlayerId,
+                "Item must not be claimed during the pool reveal phase.");
+        }
+
+        [TestMethod]
+        public async Task PoolRevealState_UnknownPlayer_MarkReady_IsIgnored()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            context.Fsm.TransitionTo(context, new PoolRevealState());
+
+            // No players registered; command from unknown player is a no-op.
+            _engine.ProcessCommand(context, new MarkReadyCommand("unknown"));
+
+            Assert.IsInstanceOfType<PoolRevealState>(context.Fsm.CurrentState);
+        }
+
+        [TestMethod]
+        public async Task PoolRevealState_HasDeadlineSet()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            state.Config.PoolRevealTimeSec = 45;
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            var before = DateTimeOffset.UtcNow;
+            context.Fsm.TransitionTo(context, new PoolRevealState());
+            var after = DateTimeOffset.UtcNow;
+
+            Assert.IsNotNull(state.PhaseDeadlineUtc);
+            Assert.IsTrue(state.PhaseDeadlineUtc >= before.AddSeconds(44),
+                "Deadline should be roughly PoolRevealTimeSec in the future.");
+            Assert.IsTrue(state.PhaseDeadlineUtc <= after.AddSeconds(46),
+                "Deadline should be roughly PoolRevealTimeSec in the future.");
+        }
+
+        [TestMethod]
+        public async Task PoolRevealState_DeadlineClearedOnExit()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            state.Config.PoolRevealTimeSec = 30;
+            state.Config.OutfitBuildingTimeSec = 90;
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            context.Fsm.TransitionTo(context, new PoolRevealState());
+            var revealDeadline = state.PhaseDeadlineUtc;
+            Assert.IsNotNull(revealDeadline);
+
+            _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
+
+            // PoolRevealState cleared its deadline on exit; OutfitBuildingState then set a new one.
+            Assert.IsInstanceOfType<OutfitBuildingState>(context.Fsm.CurrentState);
+            Assert.IsNotNull(state.PhaseDeadlineUtc, "OutfitBuildingState should set a new deadline.");
+            Assert.AreNotEqual(revealDeadline, state.PhaseDeadlineUtc,
+                "Deadline should have changed when transitioning out of PoolRevealState.");
+        }
+
+        // ── Pool aggregation ──────────────────────────────────────────────────
+
+        [TestMethod]
+        public async Task PoolReveal_PoolContainsItemsFromMultipleRounds()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            state.Config.ClothingTypes =
+            [
+                new() { Id = "hat", DisplayName = "Hat", MaxItemsPerRound = 3 },
+                new() { Id = "top", DisplayName = "Top", MaxItemsPerRound = 3 },
+            ];
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            state.GamePlayers["p1"] = new() { PlayerId = "p1" };
+            state.GamePlayers["p2"] = new() { PlayerId = "p2" };
+
+            // Submit hats in round 0.
+            _engine.ProcessCommand(context, new SubmitDrawingCommand("p1", "hat", "<svg>p1 hat</svg>"));
+            _engine.ProcessCommand(context, new SubmitDrawingCommand("p2", "hat", "<svg>p2 hat</svg>"));
+
+            // Advance to top round.
+            _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
+            Assert.AreEqual(1, state.CurrentDrawingClothingTypeIndex);
+
+            // Submit tops in round 1.
+            _engine.ProcessCommand(context, new SubmitDrawingCommand("p1", "top", "<svg>p1 top</svg>"));
+            _engine.ProcessCommand(context, new SubmitDrawingCommand("p2", "top", "<svg>p2 top</svg>"));
+
+            // Advance through top round → PoolReveal.
+            _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
+
+            Assert.IsInstanceOfType<PoolRevealState>(context.Fsm.CurrentState);
+            Assert.AreEqual(4, state.ClothingPool.Count, "Pool should contain items from all drawing rounds.");
+            Assert.AreEqual(2, state.ClothingPool.Values.Count(i => i.ClothingTypeId == "hat"),
+                "Pool should contain 2 hat items.");
+            Assert.AreEqual(2, state.ClothingPool.Values.Count(i => i.ClothingTypeId == "top"),
+                "Pool should contain 2 top items.");
+        }
+
+        [TestMethod]
+        public async Task PoolReveal_AllItemsAreInPool()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            state.Config.ClothingTypes =
+            [
+                new() { Id = "hat", DisplayName = "Hat", MaxItemsPerRound = 3 },
+            ];
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            state.GamePlayers["p1"] = new() { PlayerId = "p1" };
+            state.GamePlayers["p2"] = new() { PlayerId = "p2" };
+
+            _engine.ProcessCommand(context, new SubmitDrawingCommand("p1", "hat", "<svg>p1</svg>"));
+            _engine.ProcessCommand(context, new SubmitDrawingCommand("p2", "hat", "<svg>p2</svg>"));
+
+            _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
+
+            Assert.IsInstanceOfType<PoolRevealState>(context.Fsm.CurrentState);
+            Assert.IsTrue(state.ClothingPool.Values.All(i => i.IsInPool),
+                "All pool items must have IsInPool = true during the reveal phase.");
+        }
+
+        [TestMethod]
+        public async Task PoolReveal_ItemsGroupedByClothingType()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            state.Config.ClothingTypes =
+            [
+                new() { Id = "hat", DisplayName = "Hat", MaxItemsPerRound = 3 },
+                new() { Id = "top", DisplayName = "Top", MaxItemsPerRound = 3 },
+            ];
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            state.GamePlayers["p1"] = new() { PlayerId = "p1" };
+
+            _engine.ProcessCommand(context, new SubmitDrawingCommand("p1", "hat", "<svg>hat</svg>"));
+            _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1)); // hat → top
+            _engine.ProcessCommand(context, new SubmitDrawingCommand("p1", "top", "<svg>top</svg>"));
+            _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1)); // top → PoolReveal
+
+            Assert.IsInstanceOfType<PoolRevealState>(context.Fsm.CurrentState);
+
+            var byType = state.ClothingPool.Values
+                .GroupBy(i => i.ClothingTypeId)
+                .ToDictionary(g => g.Key, g => g.ToList());
+
+            Assert.IsTrue(byType.ContainsKey("hat"), "Pool should have items grouped under 'hat'.");
+            Assert.IsTrue(byType.ContainsKey("top"), "Pool should have items grouped under 'top'.");
+            Assert.AreEqual(1, byType["hat"].Count);
+            Assert.AreEqual(1, byType["top"].Count);
+        }
+
+        [TestMethod]
+        public async Task PoolReveal_ReadyCountUpdatesCorrectly()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            state.GamePlayers["p1"] = new() { PlayerId = "p1" };
+            state.GamePlayers["p2"] = new() { PlayerId = "p2" };
+            state.GamePlayers["p3"] = new() { PlayerId = "p3" };
+
+            context.Fsm.TransitionTo(context, new PoolRevealState());
+
+            // Initially no one is ready.
+            int ReadyCount() => state.GamePlayers.Values.Count(p => p.IsReady);
+            Assert.AreEqual(0, ReadyCount());
+
+            _engine.ProcessCommand(context, new MarkReadyCommand("p1"));
+            Assert.AreEqual(1, ReadyCount());
+
+            _engine.ProcessCommand(context, new MarkReadyCommand("p2"));
+            Assert.AreEqual(2, ReadyCount());
+
+            // Still in PoolRevealState — not all ready yet.
+            Assert.IsInstanceOfType<PoolRevealState>(context.Fsm.CurrentState);
+
+            _engine.ProcessCommand(context, new MarkReadyCommand("p3"));
+            // Now all three are ready → advanced.
+            Assert.IsInstanceOfType<OutfitBuildingState>(context.Fsm.CurrentState);
+        }
+
+        [TestMethod]
+        public async Task PoolRevealConfig_NormalizesInvalidTimeSec()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            var context = state.Context!;
+
+            var invalidConfig = new KnockBox.Services.State.Games.DrawnToDress.Data.DrawnToDressConfig
+            {
+                PoolRevealTimeSec = 1, // below minimum of 5
+            };
+
+            _engine.ProcessCommand(context, new UpdateConfigCommand(_host.Id, invalidConfig));
+
+            Assert.AreEqual(5, state.Config.PoolRevealTimeSec,
+                "PoolRevealTimeSec must be clamped to the minimum of 5 seconds.");
+        }
+
+        [TestMethod]
+        public async Task OutfitBuildingState_OnTimerExpiry_TransitionsToCustomization()        {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
             await _engine.StartAsync(_host, state);
@@ -866,11 +1216,16 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
             context.Fsm.TransitionTo(context, new ThemeSelectionState());
             Assert.IsFalse(state.ThemeRevealedToPlayers);
 
-            // Simulate drawing timer expiry → PoolRevealState → OutfitBuildingState.
+            // Simulate drawing timer expiry → PoolRevealState (theme revealed here).
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
 
             // After drawing completes (in PoolRevealState) the theme should be revealed.
             Assert.IsTrue(state.ThemeRevealedToPlayers);
+            Assert.IsInstanceOfType<PoolRevealState>(context.Fsm.CurrentState);
+
+            // Advance through the pool reveal timer → OutfitBuildingState.
+            _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
+
             Assert.IsInstanceOfType<OutfitBuildingState>(context.Fsm.CurrentState);
         }
 
@@ -888,12 +1243,12 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
             var selectedTheme = state.CurrentTheme;
             Assert.IsNotNull(selectedTheme, "Theme should be selected after game start.");
 
-            // Advance through drawing and outfit building.
-            _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1)); // Drawing → PoolReveal → OutfitBuilding
+            // Advance through drawing and pool reveal.
+            _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1)); // Drawing → PoolReveal
             Assert.AreEqual(selectedTheme, state.CurrentTheme,
                 "Theme must remain the same after drawing phase.");
 
-            _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1)); // OutfitBuilding → OutfitCustomization
+            _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1)); // PoolReveal → OutfitBuilding
             Assert.AreEqual(selectedTheme, state.CurrentTheme,
                 "Theme must remain the same during outfit building.");
         }
