@@ -29,6 +29,22 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM
     /// </summary>
     public record SelectThemeCommand(string PlayerId, string ThemeId) : DrawnToDressCommand(PlayerId);
 
+    /// <summary>
+    /// Player submits a theme text during the theme-selection phase when
+    /// <c>ThemeSource.PlayerWritten</c> is configured.
+    /// </summary>
+    public record SubmitPlayerThemeCommand(
+        string PlayerId,
+        string ThemeText) : DrawnToDressCommand(PlayerId);
+
+    /// <summary>
+    /// Player votes for one of the candidate themes during the theme-selection phase when
+    /// <c>ThemeSource.RandomVoting</c> is configured.
+    /// </summary>
+    public record VoteForThemeCommand(
+        string PlayerId,
+        string ThemeId) : DrawnToDressCommand(PlayerId);
+
     // ── Drawing round ─────────────────────────────────────────────────────────
 
     /// <summary>

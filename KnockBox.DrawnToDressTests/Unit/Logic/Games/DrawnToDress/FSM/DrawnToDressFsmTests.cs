@@ -387,6 +387,231 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
             Assert.AreEqual("retro_futurism", state.CurrentTheme?.Id);
         }
 
+        [TestMethod]
+        public async Task ThemeSelectionState_Random_ImmediatelySelectsThemeAndAdvancesToDrawing()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            state.Config.ThemeSource = KnockBox.Services.State.Games.DrawnToDress.Data.ThemeSource.Random;
+            var context = state.Context!;
+
+            context.Fsm.TransitionTo(context, new ThemeSelectionState());
+
+            // Random source → immediately transitions to DrawingRoundState on entry.
+            Assert.IsInstanceOfType<DrawingRoundState>(context.Fsm.CurrentState);
+            Assert.IsNotNull(state.CurrentTheme);
+            Assert.IsFalse(string.IsNullOrEmpty(state.CurrentTheme.Id));
+        }
+
+        [TestMethod]
+        public async Task ThemeSelectionState_PlayerWritten_WaitsForAllSubmissions()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            var context = state.Context!;
+            state.Config.ThemeSource = KnockBox.Services.State.Games.DrawnToDress.Data.ThemeSource.PlayerWritten;
+
+            state.GamePlayers["p1"] = new() { PlayerId = "p1" };
+            state.GamePlayers["p2"] = new() { PlayerId = "p2" };
+
+            context.Fsm.TransitionTo(context, new ThemeSelectionState());
+            Assert.IsInstanceOfType<ThemeSelectionState>(context.Fsm.CurrentState);
+
+            // Only the first player submits — should stay in ThemeSelectionState.
+            _engine.ProcessCommand(context, new SubmitPlayerThemeCommand("p1", "Sci-Fi Noir"));
+            Assert.IsInstanceOfType<ThemeSelectionState>(context.Fsm.CurrentState);
+            Assert.IsNull(state.CurrentTheme);
+        }
+
+        [TestMethod]
+        public async Task ThemeSelectionState_PlayerWritten_AllPlayersSubmit_SelectsThemeAndAdvances()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            var context = state.Context!;
+            state.Config.ThemeSource = KnockBox.Services.State.Games.DrawnToDress.Data.ThemeSource.PlayerWritten;
+
+            state.GamePlayers["p1"] = new() { PlayerId = "p1" };
+            state.GamePlayers["p2"] = new() { PlayerId = "p2" };
+
+            context.Fsm.TransitionTo(context, new ThemeSelectionState());
+
+            _engine.ProcessCommand(context, new SubmitPlayerThemeCommand("p1", "Sci-Fi Noir"));
+            _engine.ProcessCommand(context, new SubmitPlayerThemeCommand("p2", "Medieval Fantasy"));
+
+            // Both submitted → should advance to DrawingRoundState with one of their themes.
+            Assert.IsInstanceOfType<DrawingRoundState>(context.Fsm.CurrentState);
+            Assert.IsNotNull(state.CurrentTheme);
+            var validThemes = new[] { "Sci-Fi Noir", "Medieval Fantasy" };
+            CollectionAssert.Contains(validThemes, state.CurrentTheme.Id);
+        }
+
+        [TestMethod]
+        public async Task ThemeSelectionState_PlayerWritten_SubmissionsStoredInGameState()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            var context = state.Context!;
+            state.Config.ThemeSource = KnockBox.Services.State.Games.DrawnToDress.Data.ThemeSource.PlayerWritten;
+
+            state.GamePlayers["p1"] = new() { PlayerId = "p1" };
+            state.GamePlayers["p2"] = new() { PlayerId = "p2" };
+
+            context.Fsm.TransitionTo(context, new ThemeSelectionState());
+            _engine.ProcessCommand(context, new SubmitPlayerThemeCommand("p1", "Cosmic Horror"));
+
+            Assert.IsTrue(state.PlayerThemeSubmissions.ContainsKey("p1"));
+            Assert.AreEqual("Cosmic Horror", state.PlayerThemeSubmissions["p1"]);
+            Assert.IsFalse(state.PlayerThemeSubmissions.ContainsKey("p2"));
+        }
+
+        [TestMethod]
+        public async Task ThemeSelectionState_RandomVoting_PopulatesCandidatesOnEntry()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            var context = state.Context!;
+            state.Config.ThemeSource = KnockBox.Services.State.Games.DrawnToDress.Data.ThemeSource.RandomVoting;
+            state.Config.RandomVotingCandidateCount = 3;
+
+            context.Fsm.TransitionTo(context, new ThemeSelectionState());
+
+            Assert.IsInstanceOfType<ThemeSelectionState>(context.Fsm.CurrentState);
+            Assert.AreEqual(3, state.ThemeCandidates.Count);
+            // Candidates should be distinct.
+            var ids = state.ThemeCandidates.Select(t => t.Id).ToList();
+            Assert.AreEqual(ids.Count, ids.Distinct().Count());
+        }
+
+        [TestMethod]
+        public async Task ThemeSelectionState_RandomVoting_AllPlayersVote_SelectsWinnerAndAdvances()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            var context = state.Context!;
+            state.Config.ThemeSource = KnockBox.Services.State.Games.DrawnToDress.Data.ThemeSource.RandomVoting;
+            state.Config.RandomVotingCandidateCount = 3;
+
+            state.GamePlayers["p1"] = new() { PlayerId = "p1" };
+            state.GamePlayers["p2"] = new() { PlayerId = "p2" };
+            state.GamePlayers["p3"] = new() { PlayerId = "p3" };
+
+            context.Fsm.TransitionTo(context, new ThemeSelectionState());
+            Assert.IsInstanceOfType<ThemeSelectionState>(context.Fsm.CurrentState);
+
+            var winningCandidate = state.ThemeCandidates[0];
+
+            // Two players vote for the first candidate; one for another.
+            _engine.ProcessCommand(context, new VoteForThemeCommand("p1", winningCandidate.Id));
+            _engine.ProcessCommand(context, new VoteForThemeCommand("p2", winningCandidate.Id));
+            _engine.ProcessCommand(context, new VoteForThemeCommand("p3", state.ThemeCandidates[1].Id));
+
+            Assert.IsInstanceOfType<DrawingRoundState>(context.Fsm.CurrentState);
+            Assert.AreEqual(winningCandidate.Id, state.CurrentTheme?.Id);
+        }
+
+        [TestMethod]
+        public async Task ThemeSelectionState_RandomVoting_WaitsForAllVotes()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            var context = state.Context!;
+            state.Config.ThemeSource = KnockBox.Services.State.Games.DrawnToDress.Data.ThemeSource.RandomVoting;
+            state.Config.RandomVotingCandidateCount = 3;
+
+            state.GamePlayers["p1"] = new() { PlayerId = "p1" };
+            state.GamePlayers["p2"] = new() { PlayerId = "p2" };
+
+            context.Fsm.TransitionTo(context, new ThemeSelectionState());
+
+            // Only one player votes — should stay in ThemeSelectionState.
+            _engine.ProcessCommand(context, new VoteForThemeCommand("p1", state.ThemeCandidates[0].Id));
+
+            Assert.IsInstanceOfType<ThemeSelectionState>(context.Fsm.CurrentState);
+            Assert.IsNull(state.CurrentTheme);
+        }
+
+        // ── Announcement timing ───────────────────────────────────────────────
+
+        [TestMethod]
+        public async Task ThemeAnnouncement_BeforeDrawing_ThemeRevealedAfterSelection()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            var context = state.Context!;
+            state.Config.ThemeSource = KnockBox.Services.State.Games.DrawnToDress.Data.ThemeSource.Random;
+            state.Config.ThemeAnnouncement = KnockBox.Services.State.Games.DrawnToDress.Data.ThemeAnnouncement.BeforeDrawing;
+
+            context.Fsm.TransitionTo(context, new ThemeSelectionState());
+
+            // Theme should be revealed immediately in BeforeDrawing mode.
+            Assert.IsNotNull(state.CurrentTheme);
+            Assert.IsTrue(state.ThemeRevealedToPlayers);
+            Assert.IsInstanceOfType<DrawingRoundState>(context.Fsm.CurrentState);
+        }
+
+        [TestMethod]
+        public async Task ThemeAnnouncement_AfterDrawing_ThemeNotRevealedDuringDrawing()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            var context = state.Context!;
+            state.Config.ThemeSource = KnockBox.Services.State.Games.DrawnToDress.Data.ThemeSource.Random;
+            state.Config.ThemeAnnouncement = KnockBox.Services.State.Games.DrawnToDress.Data.ThemeAnnouncement.AfterDrawing;
+
+            context.Fsm.TransitionTo(context, new ThemeSelectionState());
+
+            // Theme selected but NOT yet revealed to players.
+            Assert.IsNotNull(state.CurrentTheme);
+            Assert.IsFalse(state.ThemeRevealedToPlayers);
+            Assert.IsInstanceOfType<DrawingRoundState>(context.Fsm.CurrentState);
+        }
+
+        [TestMethod]
+        public async Task ThemeAnnouncement_AfterDrawing_ThemeRevealedAfterDrawingCompletes()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            var context = state.Context!;
+            state.Config.ThemeSource = KnockBox.Services.State.Games.DrawnToDress.Data.ThemeSource.Random;
+            state.Config.ThemeAnnouncement = KnockBox.Services.State.Games.DrawnToDress.Data.ThemeAnnouncement.AfterDrawing;
+
+            // Enter ThemeSelectionState → auto-selects theme but does not reveal.
+            context.Fsm.TransitionTo(context, new ThemeSelectionState());
+            Assert.IsFalse(state.ThemeRevealedToPlayers);
+
+            // Simulate drawing timer expiry → PoolRevealState → OutfitBuildingState.
+            _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
+
+            // After drawing completes (in PoolRevealState) the theme should be revealed.
+            Assert.IsTrue(state.ThemeRevealedToPlayers);
+            Assert.IsInstanceOfType<OutfitBuildingState>(context.Fsm.CurrentState);
+        }
+
+        // ── Same theme for both outfits ────────────────────────────────────────
+
+        [TestMethod]
+        public async Task BothOutfits_SameThemeUsedThroughoutSession()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            // Default: Random source, BeforeDrawing.
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            var selectedTheme = state.CurrentTheme;
+            Assert.IsNotNull(selectedTheme, "Theme should be selected after game start.");
+
+            // Advance through drawing and outfit building.
+            _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1)); // Drawing → PoolReveal → OutfitBuilding
+            Assert.AreEqual(selectedTheme, state.CurrentTheme,
+                "Theme must remain the same after drawing phase.");
+
+            _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1)); // OutfitBuilding → OutfitCustomization
+            Assert.AreEqual(selectedTheme, state.CurrentTheme,
+                "Theme must remain the same during outfit building.");
+        }
+
         // ── Outfit distinctness resolution ────────────────────────────────────
 
         [TestMethod]

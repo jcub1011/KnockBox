@@ -57,6 +57,34 @@ namespace KnockBox.Services.State.Games.DrawnToDress
         /// </summary>
         public ThemeDefinition? CurrentTheme { get; set; }
 
+        /// <summary>
+        /// <see langword="true"/> once the theme has been revealed to players.
+        /// In <see cref="ThemeAnnouncement.BeforeDrawing"/> mode this is set when the
+        /// theme is selected; in <see cref="ThemeAnnouncement.AfterDrawing"/> mode it is
+        /// set after the drawing phase completes.
+        /// </summary>
+        public bool ThemeRevealedToPlayers { get; set; }
+
+        /// <summary>
+        /// Theme texts submitted by players when <see cref="DrawnToDressConfig.ThemeSource"/>
+        /// is <see cref="ThemeSource.PlayerWritten"/>.  Keyed by player ID.
+        /// </summary>
+        public readonly ConcurrentDictionary<string, string> PlayerThemeSubmissions = new();
+
+        /// <summary>
+        /// Candidate themes presented to players for voting when
+        /// <see cref="DrawnToDressConfig.ThemeSource"/> is <see cref="ThemeSource.RandomVoting"/>.
+        /// Populated on entry to <see cref="GamePhase.ThemeSelection"/>.
+        /// </summary>
+        public List<ThemeDefinition> ThemeCandidates { get; set; } = [];
+
+        /// <summary>
+        /// Votes cast by players in <see cref="ThemeSource.RandomVoting"/> mode.
+        /// Keyed by player ID; value is the <see cref="ThemeDefinition.Id"/> of the chosen
+        /// candidate.
+        /// </summary>
+        public readonly ConcurrentDictionary<string, string> ThemeVotes = new();
+
         // ── Clothing pool ─────────────────────────────────────────────────────
 
         /// <summary>
