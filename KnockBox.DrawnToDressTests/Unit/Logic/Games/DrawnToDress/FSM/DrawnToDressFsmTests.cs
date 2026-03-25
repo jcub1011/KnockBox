@@ -86,6 +86,12 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
+            // Use a single clothing type so the first (and only) round's timer goes
+            // directly to PoolReveal → OutfitBuilding.
+            state.Config.ClothingTypes =
+            [
+                new() { Id = "hat", DisplayName = "Hat", MaxItemsPerRound = 3 },
+            ];
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
 
@@ -104,6 +110,11 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
+            // Use a single clothing type so all-ready skips straight to OutfitBuilding.
+            state.Config.ClothingTypes =
+            [
+                new() { Id = "hat", DisplayName = "Hat", MaxItemsPerRound = 3 },
+            ];
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
 
@@ -111,8 +122,278 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
             state.GamePlayers["p1"] = new() { PlayerId = "p1" };
             _engine.ProcessCommand(context, new MarkReadyCommand("p1"));
 
-            // All one player is ready, so transition should fire.
+            // All one player is ready in the last (only) round, so transition should fire.
             Assert.IsInstanceOfType<OutfitBuildingState>(context.Fsm.CurrentState);
+        }
+
+        // ── Sequential drawing rounds ─────────────────────────────────────────
+
+        [TestMethod]
+        public async Task DrawingRoundState_TimerExpiry_AdvancesToNextClothingType()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            state.Config.ClothingTypes =
+            [
+                new() { Id = "hat",  DisplayName = "Hat",  MaxItemsPerRound = 3 },
+                new() { Id = "top",  DisplayName = "Top",  MaxItemsPerRound = 3 },
+                new() { Id = "shoes", DisplayName = "Shoes", MaxItemsPerRound = 3 },
+            ];
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            Assert.IsInstanceOfType<DrawingRoundState>(context.Fsm.CurrentState);
+            Assert.AreEqual(0, state.CurrentDrawingClothingTypeIndex);
+
+            // Tick past first round — should advance to round 1 (Top), still Drawing.
+            _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
+
+            Assert.IsInstanceOfType<DrawingRoundState>(context.Fsm.CurrentState);
+            Assert.AreEqual(GamePhase.Drawing, state.Phase);
+            Assert.AreEqual(1, state.CurrentDrawingClothingTypeIndex);
+        }
+
+        [TestMethod]
+        public async Task DrawingRoundState_LastType_TimerExpiry_TransitionsToPoolReveal_ThenOutfitBuilding()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            state.Config.ClothingTypes =
+            [
+                new() { Id = "hat",  DisplayName = "Hat",  MaxItemsPerRound = 3 },
+                new() { Id = "top",  DisplayName = "Top",  MaxItemsPerRound = 3 },
+            ];
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            // Advance through hat round.
+            _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
+            Assert.AreEqual(1, state.CurrentDrawingClothingTypeIndex);
+
+            // Advance through top (last) round → PoolReveal → OutfitBuilding.
+            _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
+
+            Assert.IsInstanceOfType<OutfitBuildingState>(context.Fsm.CurrentState);
+            Assert.AreEqual(GamePhase.OutfitBuilding, state.Phase);
+        }
+
+        [TestMethod]
+        public async Task DrawingRoundState_AllReady_AdvancesToNextClothingType()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            state.Config.ClothingTypes =
+            [
+                new() { Id = "hat", DisplayName = "Hat", MaxItemsPerRound = 3 },
+                new() { Id = "top", DisplayName = "Top", MaxItemsPerRound = 3 },
+            ];
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+            state.GamePlayers["p1"] = new() { PlayerId = "p1" };
+
+            Assert.AreEqual(0, state.CurrentDrawingClothingTypeIndex);
+
+            // Mark ready on the first round → should advance to round 1 (Top).
+            _engine.ProcessCommand(context, new MarkReadyCommand("p1"));
+
+            Assert.IsInstanceOfType<DrawingRoundState>(context.Fsm.CurrentState);
+            Assert.AreEqual(1, state.CurrentDrawingClothingTypeIndex);
+        }
+
+        [TestMethod]
+        public async Task DrawingRoundState_AllReady_LastType_TransitionsToOutfitBuilding()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            state.Config.ClothingTypes =
+            [
+                new() { Id = "hat", DisplayName = "Hat", MaxItemsPerRound = 3 },
+                new() { Id = "top", DisplayName = "Top", MaxItemsPerRound = 3 },
+            ];
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+            state.GamePlayers["p1"] = new() { PlayerId = "p1" };
+
+            // Advance past hat round.
+            _engine.ProcessCommand(context, new MarkReadyCommand("p1"));
+            Assert.AreEqual(1, state.CurrentDrawingClothingTypeIndex);
+
+            // Mark ready on last round → OutfitBuilding.
+            _engine.ProcessCommand(context, new MarkReadyCommand("p1"));
+
+            Assert.IsInstanceOfType<OutfitBuildingState>(context.Fsm.CurrentState);
+            Assert.AreEqual(GamePhase.OutfitBuilding, state.Phase);
+        }
+
+        [TestMethod]
+        public async Task DrawingRoundState_TracksCurrentClothingTypeIndex()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            state.Config.ClothingTypes =
+            [
+                new() { Id = "hat",    DisplayName = "Hat",    MaxItemsPerRound = 3 },
+                new() { Id = "top",    DisplayName = "Top",    MaxItemsPerRound = 3 },
+                new() { Id = "bottom", DisplayName = "Bottom", MaxItemsPerRound = 3 },
+            ];
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            Assert.AreEqual(0, state.CurrentDrawingClothingTypeIndex);
+            Assert.AreEqual(GamePhase.Drawing, state.Phase);
+
+            _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
+            Assert.AreEqual(1, state.CurrentDrawingClothingTypeIndex);
+
+            _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
+            Assert.AreEqual(2, state.CurrentDrawingClothingTypeIndex);
+
+            _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
+            // All types done — transitioned out of Drawing.
+            Assert.IsInstanceOfType<OutfitBuildingState>(context.Fsm.CurrentState);
+        }
+
+        [TestMethod]
+        public async Task DrawingRoundState_SubmitDrawing_WrongType_IsRejected()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            state.Config.ClothingTypes =
+            [
+                new() { Id = "hat", DisplayName = "Hat", MaxItemsPerRound = 3 },
+                new() { Id = "top", DisplayName = "Top", MaxItemsPerRound = 3 },
+            ];
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+            state.GamePlayers["p1"] = new() { PlayerId = "p1" };
+
+            // Currently in hat round; submitting "top" should be ignored.
+            _engine.ProcessCommand(context,
+                new SubmitDrawingCommand("p1", "top", "<svg/>"));
+
+            Assert.AreEqual(0, state.ClothingPool.Count, "Wrong-type submission must be discarded.");
+        }
+
+        [TestMethod]
+        public async Task DrawingRoundState_MaxItemsPerType_RejectsExcessSubmissions()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            state.Config.ClothingTypes =
+            [
+                new() { Id = "hat", DisplayName = "Hat", MaxItemsPerRound = 2 },
+            ];
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+            state.GamePlayers["p1"] = new() { PlayerId = "p1" };
+
+            // Submit up to the max.
+            _engine.ProcessCommand(context, new SubmitDrawingCommand("p1", "hat", "<svg>1</svg>"));
+            _engine.ProcessCommand(context, new SubmitDrawingCommand("p1", "hat", "<svg>2</svg>"));
+            Assert.AreEqual(2, state.ClothingPool.Count);
+
+            // Third submission should be rejected.
+            _engine.ProcessCommand(context, new SubmitDrawingCommand("p1", "hat", "<svg>3</svg>"));
+            Assert.AreEqual(2, state.ClothingPool.Count, "Submission beyond MaxItemsPerRound must be discarded.");
+        }
+
+        [TestMethod]
+        public async Task DrawingRoundState_PlayerDrawsNothing_TimerAdvancesRound()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            state.Config.ClothingTypes =
+            [
+                new() { Id = "hat", DisplayName = "Hat", MaxItemsPerRound = 3 },
+            ];
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            // Player draws nothing — pool stays empty.
+            Assert.AreEqual(0, state.ClothingPool.Count);
+
+            // Timer still advances the game.
+            _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
+
+            Assert.IsInstanceOfType<OutfitBuildingState>(context.Fsm.CurrentState);
+            Assert.AreEqual(0, state.ClothingPool.Count, "Pool must remain empty when nothing was drawn.");
+        }
+
+        [TestMethod]
+        public async Task DrawingRoundState_SubmitDrawing_StoredWithCreatorAttribution()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            state.Config.ClothingTypes =
+            [
+                new() { Id = "hat", DisplayName = "Hat", MaxItemsPerRound = 3 },
+            ];
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+            state.GamePlayers["p1"] = new() { PlayerId = "p1" };
+
+            _engine.ProcessCommand(context,
+                new SubmitDrawingCommand("p1", "hat", "<svg>my hat</svg>"));
+
+            Assert.AreEqual(1, state.ClothingPool.Count);
+            var item = state.ClothingPool.Values.Single();
+            Assert.AreEqual("p1", item.CreatorPlayerId);
+            Assert.AreEqual("hat", item.ClothingTypeId);
+            Assert.AreEqual("<svg>my hat</svg>", item.SvgContent);
+            Assert.IsTrue(item.IsInPool);
+        }
+
+        [TestMethod]
+        public async Task DrawingRoundState_MultiplePlayersEachType_AllItemsStoredInPool()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            state.Config.ClothingTypes =
+            [
+                new() { Id = "hat", DisplayName = "Hat", MaxItemsPerRound = 3 },
+            ];
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+            state.GamePlayers["p1"] = new() { PlayerId = "p1" };
+            state.GamePlayers["p2"] = new() { PlayerId = "p2" };
+
+            _engine.ProcessCommand(context, new SubmitDrawingCommand("p1", "hat", "<svg>p1 hat</svg>"));
+            _engine.ProcessCommand(context, new SubmitDrawingCommand("p2", "hat", "<svg>p2 hat</svg>"));
+
+            Assert.AreEqual(2, state.ClothingPool.Count);
+            Assert.IsTrue(state.ClothingPool.Values.All(i => i.ClothingTypeId == "hat"));
+            Assert.IsTrue(state.ClothingPool.Values.All(i => i.IsInPool));
+        }
+
+        [TestMethod]
+        public async Task DrawingRoundState_ReadyFlagsResetBetweenRounds()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            state.Config.ClothingTypes =
+            [
+                new() { Id = "hat", DisplayName = "Hat", MaxItemsPerRound = 3 },
+                new() { Id = "top", DisplayName = "Top", MaxItemsPerRound = 3 },
+            ];
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+            state.GamePlayers["p1"] = new() { PlayerId = "p1" };
+            state.GamePlayers["p2"] = new() { PlayerId = "p2" };
+
+            // p1 marks ready in hat round.
+            _engine.ProcessCommand(context, new MarkReadyCommand("p1"));
+            // p2 is not ready yet, so we should still be in the hat round.
+            Assert.IsInstanceOfType<DrawingRoundState>(context.Fsm.CurrentState);
+            Assert.AreEqual(0, state.CurrentDrawingClothingTypeIndex);
+            Assert.IsTrue(state.GamePlayers["p1"].IsReady);
+
+            // p2 marks ready → hat round done, advances to top round.
+            _engine.ProcessCommand(context, new MarkReadyCommand("p2"));
+            Assert.AreEqual(1, state.CurrentDrawingClothingTypeIndex);
+
+            // Ready flags should have been reset for the new round.
+            Assert.IsFalse(state.GamePlayers["p1"].IsReady, "IsReady must be cleared on entering a new round.");
+            Assert.IsFalse(state.GamePlayers["p2"].IsReady, "IsReady must be cleared on entering a new round.");
         }
 
         [TestMethod]
@@ -575,6 +856,11 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
             var context = state.Context!;
             state.Config.ThemeSource = KnockBox.Services.State.Games.DrawnToDress.Data.ThemeSource.Random;
             state.Config.ThemeAnnouncement = KnockBox.Services.State.Games.DrawnToDress.Data.ThemeAnnouncement.AfterDrawing;
+            // Use a single clothing type so one tick exhausts the drawing phase.
+            state.Config.ClothingTypes =
+            [
+                new() { Id = "hat", DisplayName = "Hat", MaxItemsPerRound = 3 },
+            ];
 
             // Enter ThemeSelectionState → auto-selects theme but does not reveal.
             context.Fsm.TransitionTo(context, new ThemeSelectionState());

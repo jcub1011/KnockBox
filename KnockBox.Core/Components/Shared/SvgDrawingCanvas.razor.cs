@@ -186,9 +186,31 @@ namespace KnockBox.Core.Components.Shared
             }
         }
 
-        /// <summary>Downloads the current drawing as an SVG file.</summary>
-        public async Task ExportSvgAsync()
+        /// <summary>
+        /// Returns the current SVG drawing content as a serialised string, or
+        /// <see langword="null"/> when the canvas is empty or has not yet been initialised.
+        /// </summary>
+        public async Task<string?> GetSvgContentAsync()
         {
+            if (_jsModule is null)
+            {
+                Logger.LogWarning("[SVGCanvas] GetSvgContentAsync: JS module not initialized — svgId={SvgId}", _svgId);
+                return null;
+            }
+            try
+            {
+                var content = await _jsModule.InvokeAsync<string>("getSvgContent", _svgId);
+                return string.IsNullOrEmpty(content) ? null : content;
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "[SVGCanvas] GetSvgContentAsync failed — svgId={SvgId}", _svgId);
+                return null;
+            }
+        }
+
+        /// <summary>Downloads the current drawing as an SVG file.</summary>
+        public async Task ExportSvgAsync()        {
             if (_jsModule is null)
             {
                 Logger.LogWarning("[SVGCanvas] ExportSvgAsync: JS module not initialized — svgId={SvgId}", _svgId);

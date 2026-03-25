@@ -13,6 +13,10 @@
     {
         <LobbyPhase GameState="GameState" />
     }
+    else if (GameState.Phase == KnockBox.Services.State.Games.DrawnToDress.GamePhase.Drawing)
+    {
+        <DrawingPhase GameState="GameState" />
+    }
     else
     {
         <div class="card">

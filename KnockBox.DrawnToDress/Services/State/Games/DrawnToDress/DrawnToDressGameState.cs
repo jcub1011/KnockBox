@@ -85,6 +85,15 @@ namespace KnockBox.Services.State.Games.DrawnToDress
         /// </summary>
         public readonly ConcurrentDictionary<string, string> ThemeVotes = new();
 
+        // ── Drawing round tracking ────────────────────────────────────────────
+
+        /// <summary>
+        /// 0-based index into <see cref="DrawnToDressConfig.ClothingTypes"/> identifying the
+        /// clothing type whose drawing round is currently active.
+        /// Updated by <c>DrawingRoundState</c> on entry to each sequential round.
+        /// </summary>
+        public int CurrentDrawingClothingTypeIndex { get; set; }
+
         // ── Clothing pool ─────────────────────────────────────────────────────
 
         /// <summary>
