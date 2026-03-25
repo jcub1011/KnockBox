@@ -1,0 +1,138 @@
+namespace KnockBox.Services.State.Games.DrawnToDress.Data
+{
+    /// <summary>
+    /// All tunable configuration values for a Drawn To Dress session.
+    /// Default property values match the GDD baseline.
+    /// </summary>
+    public class DrawnToDressConfig
+    {
+        // ── Drawing phase ─────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Number of seconds each player has to draw a clothing item.
+        /// GDD default: 180 s (3 minutes).
+        /// </summary>
+        public int DrawingTimeSec { get; set; } = 180;
+
+        /// <summary>
+        /// When <see langword="true"/>, players may continue sketching while the
+        /// Outfit Building phase is active (e.g. to touch-up items before submitting).
+        /// GDD default: <see langword="false"/>.
+        /// </summary>
+        public bool AllowSketchingDuringOutfitBuilding { get; set; } = false;
+
+        // ── Clothing types ────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Ordered list of clothing categories available in this session.
+        /// Determines which drawing slots exist and how outfits are assembled.
+        /// GDD default: Hat, Top, Bottom, Shoes, Accessory (accessory allows multiples).
+        /// </summary>
+        public List<ClothingTypeDefinition> ClothingTypes { get; set; } =
+        [
+            new() { Id = "hat",        DisplayName = "Hat",       AllowMultiple = false },
+            new() { Id = "top",        DisplayName = "Top",       AllowMultiple = false },
+            new() { Id = "bottom",     DisplayName = "Bottom",    AllowMultiple = false },
+            new() { Id = "shoes",      DisplayName = "Shoes",     AllowMultiple = false },
+            new() { Id = "accessory",  DisplayName = "Accessory", AllowMultiple = true  },
+        ];
+
+        // ── Theme ─────────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Determines how the round theme is chosen.
+        /// GDD default: <see cref="ThemeSource.Random"/>.
+        /// </summary>
+        public ThemeSource ThemeSource { get; set; } = ThemeSource.Random;
+
+        /// <summary>
+        /// Number of seconds the theme is displayed before drawing begins.
+        /// GDD default: 10 s.
+        /// </summary>
+        public int ThemeAnnouncementTimeSec { get; set; } = 10;
+
+        // ── Outfit Building phase ─────────────────────────────────────────────
+
+        /// <summary>
+        /// Number of seconds players have to assemble their outfit from available items.
+        /// GDD default: 90 s.
+        /// </summary>
+        public int OutfitBuildingTimeSec { get; set; } = 90;
+
+        /// <summary>
+        /// Number of seconds players have to add a custom name and finalize their outfit.
+        /// GDD default: 60 s.
+        /// </summary>
+        public int OutfitCustomizationTimeSec { get; set; } = 60;
+
+        // ── Pool / reuse / distinctness ───────────────────────────────────────
+
+        /// <summary>
+        /// When <see langword="true"/>, a player may use their own drawn items in their
+        /// outfit in addition to items they have claimed from the pool.
+        /// GDD default: <see langword="true"/>.
+        /// </summary>
+        public bool AllowReuseOwnItems { get; set; } = true;
+
+        /// <summary>
+        /// When <see langword="true"/>, each outfit slot must be filled by a distinct
+        /// clothing item (no item may appear twice in the same outfit).
+        /// GDD default: <see langword="true"/>.
+        /// </summary>
+        public bool RequireDistinctItemsPerSlot { get; set; } = true;
+
+        // ── Voting ────────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// The criteria on which outfits are judged. Each criterion carries a relative
+        /// weight used when aggregating scores.
+        /// GDD defaults: Creativity (1.0), Theme Match (1.0), Overall Look (1.0).
+        /// </summary>
+        public List<VotingCriterionDefinition> VotingCriteria { get; set; } =
+        [
+            new() { Id = "creativity",   DisplayName = "Creativity",   Weight = 1.0 },
+            new() { Id = "theme_match",  DisplayName = "Theme Match",  Weight = 1.0 },
+            new() { Id = "overall_look", DisplayName = "Overall Look", Weight = 1.0 },
+        ];
+
+        /// <summary>
+        /// Number of seconds voters have per voting round to cast all of their votes.
+        /// GDD default: 60 s.
+        /// </summary>
+        public int VotingTimeSec { get; set; } = 60;
+
+        /// <summary>
+        /// When <see langword="true"/>, the creator of each outfit is revealed to voters
+        /// during the voting phase. When <see langword="false"/>, outfits are shown
+        /// anonymously.
+        /// GDD default: <see langword="false"/>.
+        /// </summary>
+        public bool ShowCreatorDuringVoting { get; set; } = false;
+
+        // ── Tournament format ─────────────────────────────────────────────────
+
+        /// <summary>
+        /// Number of Swiss voting rounds to run.
+        /// GDD default: 3.
+        /// </summary>
+        public int VotingRounds { get; set; } = 3;
+
+        // ── Bonus points ──────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Bonus points awarded to a player who submits a complete outfit (all required
+        /// clothing types filled) before the outfit building timer expires.
+        /// GDD default: 1.
+        /// </summary>
+        public int BonusPointsForCompleteOutfit { get; set; } = 1;
+
+        // ── Host / connectivity ───────────────────────────────────────────────
+
+        /// <summary>
+        /// Number of seconds after the host disconnects before the game is automatically
+        /// ended.
+        /// GDD default: 120 s.
+        /// </summary>
+        public int HostDisconnectTimeoutSec { get; set; } = 120;
+    }
+}
