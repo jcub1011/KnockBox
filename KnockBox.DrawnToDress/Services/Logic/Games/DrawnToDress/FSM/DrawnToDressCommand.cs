@@ -1,3 +1,5 @@
+using KnockBox.Services.State.Games.DrawnToDress.Data;
+
 namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM
 {
     /// <summary>
@@ -11,6 +13,14 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM
 
     /// <summary>Host starts the game, triggering the transition out of the lobby.</summary>
     public record StartGameCommand(string PlayerId) : DrawnToDressCommand(PlayerId);
+
+    /// <summary>
+    /// Host updates the game configuration while still in the lobby.
+    /// The supplied <paramref name="Config"/> is normalized and validated before being applied.
+    /// </summary>
+    public record UpdateConfigCommand(
+        string PlayerId,
+        DrawnToDressConfig Config) : DrawnToDressCommand(PlayerId);
 
     // ── Theme selection ───────────────────────────────────────────────────────
 

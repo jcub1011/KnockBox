@@ -182,5 +182,152 @@ namespace KnockBox.DrawnToDressTests.Unit.State.Games.DrawnToDress
             var config = new DrawnToDressConfig();
             Assert.AreEqual(120, config.HostDisconnectTimeoutSec);
         }
+
+        // ── RecommendedMinimumPlayers ────────────────────────────────────────
+
+        [TestMethod]
+        public void RecommendedMinimumPlayers_Is3()
+        {
+            int actual = DrawnToDressConfig.RecommendedMinimumPlayers;
+            Assert.AreEqual(3, actual);
+        }
+
+        // ── Normalize: clamps numeric values to minimums ──────────────────────
+
+        [TestMethod]
+        public void Normalize_DrawingTimeSec_BelowMinimum_ClampsTo30()
+        {
+            var config = new DrawnToDressConfig { DrawingTimeSec = 5 };
+            config.Normalize();
+            Assert.AreEqual(30, config.DrawingTimeSec);
+        }
+
+        [TestMethod]
+        public void Normalize_DrawingTimeSec_AtOrAboveMinimum_Unchanged()
+        {
+            var config = new DrawnToDressConfig { DrawingTimeSec = 180 };
+            config.Normalize();
+            Assert.AreEqual(180, config.DrawingTimeSec);
+        }
+
+        [TestMethod]
+        public void Normalize_ThemeAnnouncementTimeSec_BelowMinimum_ClampsTo5()
+        {
+            var config = new DrawnToDressConfig { ThemeAnnouncementTimeSec = 1 };
+            config.Normalize();
+            Assert.AreEqual(5, config.ThemeAnnouncementTimeSec);
+        }
+
+        [TestMethod]
+        public void Normalize_OutfitBuildingTimeSec_BelowMinimum_ClampsTo30()
+        {
+            var config = new DrawnToDressConfig { OutfitBuildingTimeSec = 10 };
+            config.Normalize();
+            Assert.AreEqual(30, config.OutfitBuildingTimeSec);
+        }
+
+        [TestMethod]
+        public void Normalize_OutfitCustomizationTimeSec_BelowMinimum_ClampsTo15()
+        {
+            var config = new DrawnToDressConfig { OutfitCustomizationTimeSec = 5 };
+            config.Normalize();
+            Assert.AreEqual(15, config.OutfitCustomizationTimeSec);
+        }
+
+        [TestMethod]
+        public void Normalize_VotingTimeSec_BelowMinimum_ClampsTo15()
+        {
+            var config = new DrawnToDressConfig { VotingTimeSec = 5 };
+            config.Normalize();
+            Assert.AreEqual(15, config.VotingTimeSec);
+        }
+
+        [TestMethod]
+        public void Normalize_VotingRounds_BelowMinimum_ClampsTo1()
+        {
+            var config = new DrawnToDressConfig { VotingRounds = 0 };
+            config.Normalize();
+            Assert.AreEqual(1, config.VotingRounds);
+        }
+
+        [TestMethod]
+        public void Normalize_BonusPointsForCompleteOutfit_Negative_ClampsTo0()
+        {
+            var config = new DrawnToDressConfig { BonusPointsForCompleteOutfit = -5 };
+            config.Normalize();
+            Assert.AreEqual(0, config.BonusPointsForCompleteOutfit);
+        }
+
+        [TestMethod]
+        public void Normalize_HostDisconnectTimeoutSec_BelowMinimum_ClampsTo30()
+        {
+            var config = new DrawnToDressConfig { HostDisconnectTimeoutSec = 10 };
+            config.Normalize();
+            Assert.AreEqual(30, config.HostDisconnectTimeoutSec);
+        }
+
+        [TestMethod]
+        public void Normalize_EmptyClothingTypes_RestoresToOneDefaultType()
+        {
+            var config = new DrawnToDressConfig { ClothingTypes = [] };
+            config.Normalize();
+            Assert.AreEqual(1, config.ClothingTypes.Count);
+        }
+
+        [TestMethod]
+        public void Normalize_EmptyVotingCriteria_RestoresToOneDefaultCriterion()
+        {
+            var config = new DrawnToDressConfig { VotingCriteria = [] };
+            config.Normalize();
+            Assert.AreEqual(1, config.VotingCriteria.Count);
+        }
+
+        [TestMethod]
+        public void Normalize_VotingCriterionWithNegativeWeight_ClampsTo0()
+        {
+            var config = new DrawnToDressConfig
+            {
+                VotingCriteria =
+                [
+                    new() { Id = "creativity", DisplayName = "Creativity", Weight = -1.0 }
+                ]
+            };
+            config.Normalize();
+            Assert.AreEqual(0, config.VotingCriteria[0].Weight);
+        }
+
+        [TestMethod]
+        public void Normalize_VotingCriterionWithEmptyId_IsRemoved()
+        {
+            var config = new DrawnToDressConfig
+            {
+                VotingCriteria =
+                [
+                    new() { Id = "", DisplayName = "Bad", Weight = 1.0 },
+                    new() { Id = "creativity", DisplayName = "Creativity", Weight = 1.0 },
+                ]
+            };
+            config.Normalize();
+            Assert.AreEqual(1, config.VotingCriteria.Count);
+            Assert.AreEqual("creativity", config.VotingCriteria[0].Id);
+        }
+
+        [TestMethod]
+        public void Normalize_DefaultConfig_IsIdempotent()
+        {
+            var config = new DrawnToDressConfig();
+            config.Normalize();
+
+            Assert.AreEqual(180, config.DrawingTimeSec);
+            Assert.AreEqual(10, config.ThemeAnnouncementTimeSec);
+            Assert.AreEqual(90, config.OutfitBuildingTimeSec);
+            Assert.AreEqual(60, config.OutfitCustomizationTimeSec);
+            Assert.AreEqual(60, config.VotingTimeSec);
+            Assert.AreEqual(3, config.VotingRounds);
+            Assert.AreEqual(1, config.BonusPointsForCompleteOutfit);
+            Assert.AreEqual(120, config.HostDisconnectTimeoutSec);
+            Assert.AreEqual(5, config.ClothingTypes.Count);
+            Assert.AreEqual(3, config.VotingCriteria.Count);
+        }
     }
 }
