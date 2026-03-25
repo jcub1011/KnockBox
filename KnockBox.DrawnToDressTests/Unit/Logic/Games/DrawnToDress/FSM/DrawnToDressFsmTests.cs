@@ -1365,5 +1365,445 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
             Assert.IsInstanceOfType<LobbyState>(context.Fsm.CurrentState);
             Assert.AreEqual(GamePhase.Lobby, state.Phase);
         }
+
+        // ── Outfit building – claim/unclaim ───────────────────────────────────
+
+        [TestMethod]
+        public async Task OutfitBuilding_ClaimPoolItem_SelfDrawnItem_IsRejected()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            state.GamePlayers["p1"] = new() { PlayerId = "p1" };
+            var itemId = Guid.NewGuid();
+            // Item created BY p1 – p1 must not be able to claim it via ClaimPoolItemCommand.
+            state.ClothingPool[itemId] = new()
+            {
+                ClothingTypeId = "hat",
+                CreatorPlayerId = "p1",
+                SvgContent = "<svg/>",
+                IsInPool = true,
+            };
+
+            context.Fsm.TransitionTo(context, new OutfitBuildingState());
+
+            _engine.ProcessCommand(context, new ClaimPoolItemCommand("p1", itemId));
+
+            Assert.IsNull(state.ClothingPool[itemId].ClaimedByPlayerId,
+                "A player must not be able to claim an item they created.");
+            Assert.IsFalse(state.GamePlayers["p1"].OwnedClothingItemIds.Contains(itemId),
+                "Self-drawn items must not be added to OwnedClothingItemIds via ClaimPoolItemCommand.");
+        }
+
+        [TestMethod]
+        public async Task OutfitBuilding_ClaimPoolItem_AlreadyClaimed_SecondClaimFails()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            state.GamePlayers["p1"] = new() { PlayerId = "p1" };
+            state.GamePlayers["p2"] = new() { PlayerId = "p2" };
+            var itemId = Guid.NewGuid();
+            state.ClothingPool[itemId] = new()
+            {
+                ClothingTypeId = "hat",
+                CreatorPlayerId = "p3",      // drawn by a third player
+                SvgContent = "<svg/>",
+                IsInPool = true,
+            };
+
+            context.Fsm.TransitionTo(context, new OutfitBuildingState());
+
+            // p1 claims first.
+            _engine.ProcessCommand(context, new ClaimPoolItemCommand("p1", itemId));
+            Assert.AreEqual("p1", state.ClothingPool[itemId].ClaimedByPlayerId);
+
+            // p2 attempts to claim the same item – must be rejected.
+            _engine.ProcessCommand(context, new ClaimPoolItemCommand("p2", itemId));
+
+            Assert.AreEqual("p1", state.ClothingPool[itemId].ClaimedByPlayerId,
+                "First claim must win; subsequent claims must fail.");
+            Assert.IsFalse(state.GamePlayers["p2"].OwnedClothingItemIds.Contains(itemId),
+                "Losing claimer must not have the item in their owned list.");
+        }
+
+        [TestMethod]
+        public async Task OutfitBuilding_ClaimPoolItem_Success_AddsToOwnedList()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            state.GamePlayers["p1"] = new() { PlayerId = "p1" };
+            state.GamePlayers["p2"] = new() { PlayerId = "p2" };
+            var itemId = Guid.NewGuid();
+            state.ClothingPool[itemId] = new()
+            {
+                Id = itemId,
+                ClothingTypeId = "hat",
+                CreatorPlayerId = "p1",      // drawn by p1
+                SvgContent = "<svg/>",
+                IsInPool = true,
+            };
+
+            context.Fsm.TransitionTo(context, new OutfitBuildingState());
+
+            // p2 claims p1's hat – this is valid.
+            _engine.ProcessCommand(context, new ClaimPoolItemCommand("p2", itemId));
+
+            Assert.AreEqual("p2", state.ClothingPool[itemId].ClaimedByPlayerId,
+                "Claim by a different player must succeed.");
+            Assert.IsTrue(state.GamePlayers["p2"].OwnedClothingItemIds.Contains(itemId),
+                "Claimed item must appear in the claimer's OwnedClothingItemIds.");
+        }
+
+        [TestMethod]
+        public async Task OutfitBuilding_UnclaimPoolItem_ReturnsToPool()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            state.GamePlayers["p1"] = new() { PlayerId = "p1" };
+            state.GamePlayers["p2"] = new() { PlayerId = "p2" };
+            var itemId = Guid.NewGuid();
+            state.ClothingPool[itemId] = new()
+            {
+                ClothingTypeId = "hat",
+                CreatorPlayerId = "p1",
+                SvgContent = "<svg/>",
+                IsInPool = true,
+            };
+
+            context.Fsm.TransitionTo(context, new OutfitBuildingState());
+
+            // p2 claims, then unclaims.
+            _engine.ProcessCommand(context, new ClaimPoolItemCommand("p2", itemId));
+            Assert.AreEqual("p2", state.ClothingPool[itemId].ClaimedByPlayerId);
+
+            _engine.ProcessCommand(context, new UnclaimPoolItemCommand("p2", itemId));
+
+            Assert.IsNull(state.ClothingPool[itemId].ClaimedByPlayerId,
+                "Unclaimed item must have its ClaimedByPlayerId cleared.");
+            Assert.IsFalse(state.GamePlayers["p2"].OwnedClothingItemIds.Contains(itemId),
+                "Item must be removed from the unclaimer's OwnedClothingItemIds.");
+        }
+
+        [TestMethod]
+        public async Task OutfitBuilding_UnclaimPoolItem_ByWrongPlayer_IsRejected()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            state.GamePlayers["p1"] = new() { PlayerId = "p1" };
+            state.GamePlayers["p2"] = new() { PlayerId = "p2" };
+            var itemId = Guid.NewGuid();
+            state.ClothingPool[itemId] = new()
+            {
+                ClothingTypeId = "hat",
+                CreatorPlayerId = "p3",
+                SvgContent = "<svg/>",
+                IsInPool = true,
+            };
+
+            context.Fsm.TransitionTo(context, new OutfitBuildingState());
+
+            _engine.ProcessCommand(context, new ClaimPoolItemCommand("p1", itemId));
+            Assert.AreEqual("p1", state.ClothingPool[itemId].ClaimedByPlayerId);
+
+            // p2 tries to unclaim p1's item – must be rejected.
+            _engine.ProcessCommand(context, new UnclaimPoolItemCommand("p2", itemId));
+
+            Assert.AreEqual("p1", state.ClothingPool[itemId].ClaimedByPlayerId,
+                "Only the claimant may unclaim an item.");
+        }
+
+        [TestMethod]
+        public async Task OutfitBuilding_UnclaimAndReclaim_AllowsNewClaimer()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            state.GamePlayers["p1"] = new() { PlayerId = "p1" };
+            state.GamePlayers["p2"] = new() { PlayerId = "p2" };
+            var itemId = Guid.NewGuid();
+            state.ClothingPool[itemId] = new()
+            {
+                Id = itemId,
+                ClothingTypeId = "hat",
+                CreatorPlayerId = "p3",
+                SvgContent = "<svg/>",
+                IsInPool = true,
+            };
+
+            context.Fsm.TransitionTo(context, new OutfitBuildingState());
+
+            // p1 claims, then unclaims, then p2 claims.
+            _engine.ProcessCommand(context, new ClaimPoolItemCommand("p1", itemId));
+            _engine.ProcessCommand(context, new UnclaimPoolItemCommand("p1", itemId));
+            _engine.ProcessCommand(context, new ClaimPoolItemCommand("p2", itemId));
+
+            Assert.AreEqual("p2", state.ClothingPool[itemId].ClaimedByPlayerId,
+                "After an unclaim the item must be available for a new claimer.");
+            Assert.IsTrue(state.GamePlayers["p2"].OwnedClothingItemIds.Contains(itemId));
+            Assert.IsFalse(state.GamePlayers["p1"].OwnedClothingItemIds.Contains(itemId),
+                "Previous claimer must not retain ownership after unclaiming.");
+        }
+
+        // ── Outfit building – submit validation ───────────────────────────────
+
+        [TestMethod]
+        public async Task OutfitBuilding_SubmitOutfit_UnownedItem_IsRejected()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            state.GamePlayers["p1"] = new() { PlayerId = "p1" };
+            var hatId = Guid.NewGuid();
+            state.ClothingPool[hatId] = new()
+            {
+                ClothingTypeId = "hat",
+                CreatorPlayerId = "p2",
+                SvgContent = "<svg/>",
+                IsInPool = true,
+            };
+            // p1 does NOT own this item (never claimed it).
+
+            context.Fsm.TransitionTo(context, new OutfitBuildingState());
+
+            _engine.ProcessCommand(context, new SubmitOutfitCommand("p1",
+                new Dictionary<string, Guid> { ["hat"] = hatId }));
+
+            Assert.IsNull(state.GamePlayers["p1"].SubmittedOutfit,
+                "SubmitOutfit must be rejected when the player does not own the item.");
+        }
+
+        [TestMethod]
+        public async Task OutfitBuilding_SubmitOutfit_WrongClothingTypeSlot_IsRejected()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            state.GamePlayers["p1"] = new() { PlayerId = "p1" };
+            var hatId = Guid.NewGuid();
+            state.ClothingPool[hatId] = new()
+            {
+                ClothingTypeId = "hat",
+                CreatorPlayerId = "p1",   // player owns it (self-drawn)
+                SvgContent = "<svg/>",
+                IsInPool = true,
+            };
+            state.GamePlayers["p1"].OwnedClothingItemIds.Add(hatId);
+
+            context.Fsm.TransitionTo(context, new OutfitBuildingState());
+
+            // Submitting the hat item under the "top" slot – type mismatch.
+            _engine.ProcessCommand(context, new SubmitOutfitCommand("p1",
+                new Dictionary<string, Guid> { ["top"] = hatId }));
+
+            Assert.IsNull(state.GamePlayers["p1"].SubmittedOutfit,
+                "SubmitOutfit must be rejected when the item's clothing type does not match the slot.");
+        }
+
+        [TestMethod]
+        public async Task OutfitBuilding_SubmitOutfit_ValidOwnedItems_IsAccepted()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            state.GamePlayers["p1"] = new() { PlayerId = "p1" };
+            var hatId = Guid.NewGuid();
+            state.ClothingPool[hatId] = new()
+            {
+                ClothingTypeId = "hat",
+                CreatorPlayerId = "p2",   // drawn by another player
+                SvgContent = "<svg/>",
+                IsInPool = true,
+                ClaimedByPlayerId = "p1",
+            };
+            state.GamePlayers["p1"].OwnedClothingItemIds.Add(hatId);
+
+            context.Fsm.TransitionTo(context, new OutfitBuildingState());
+
+            _engine.ProcessCommand(context, new SubmitOutfitCommand("p1",
+                new Dictionary<string, Guid> { ["hat"] = hatId }));
+
+            Assert.IsNotNull(state.GamePlayers["p1"].SubmittedOutfit,
+                "A valid outfit with owned items must be accepted.");
+            Assert.AreEqual(hatId, state.GamePlayers["p1"].SubmittedOutfit!.SelectedItemsByType["hat"]);
+        }
+
+        // ── Outfit building – auto-fill ───────────────────────────────────────
+
+        [TestMethod]
+        public async Task OutfitBuilding_TimerExpiry_AutoFillsIncompleteOutfit()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            state.Config.ClothingTypes =
+            [
+                new() { Id = "hat", DisplayName = "Hat" },
+            ];
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            state.GamePlayers["p1"] = new() { PlayerId = "p1" };
+            var hatId = Guid.NewGuid();
+            state.ClothingPool[hatId] = new()
+            {
+                ClothingTypeId = "hat",
+                CreatorPlayerId = "p2",
+                SvgContent = "<svg/>",
+                IsInPool = true,
+                ClaimedByPlayerId = "p1",
+            };
+            state.GamePlayers["p1"].OwnedClothingItemIds.Add(hatId);
+
+            context.Fsm.TransitionTo(context, new OutfitBuildingState());
+            Assert.IsNull(state.GamePlayers["p1"].SubmittedOutfit);
+
+            // Expire the timer.
+            _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
+
+            Assert.IsInstanceOfType<OutfitCustomizationState>(context.Fsm.CurrentState);
+            Assert.IsNotNull(state.GamePlayers["p1"].SubmittedOutfit,
+                "Auto-fill must produce an outfit when the timer expires.");
+            Assert.IsTrue(state.GamePlayers["p1"].SubmittedOutfit!.SelectedItemsByType.ContainsKey("hat"),
+                "Auto-filled outfit must include the available hat slot.");
+        }
+
+        [TestMethod]
+        public async Task OutfitBuilding_TimerExpiry_AutoFillPrefersNonSelfDrawnItems()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            state.Config.ClothingTypes =
+            [
+                new() { Id = "hat", DisplayName = "Hat" },
+            ];
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            state.GamePlayers["p1"] = new() { PlayerId = "p1" };
+
+            var selfDrawnHat = Guid.NewGuid();
+            state.ClothingPool[selfDrawnHat] = new()
+            {
+                Id = selfDrawnHat,
+                ClothingTypeId = "hat",
+                CreatorPlayerId = "p1",   // self-drawn
+                SvgContent = "<svg self/>",
+                IsInPool = true,
+            };
+            state.GamePlayers["p1"].OwnedClothingItemIds.Add(selfDrawnHat);
+
+            var claimedHat = Guid.NewGuid();
+            state.ClothingPool[claimedHat] = new()
+            {
+                Id = claimedHat,
+                ClothingTypeId = "hat",
+                CreatorPlayerId = "p2",   // drawn by p2, claimed by p1
+                SvgContent = "<svg other/>",
+                IsInPool = true,
+                ClaimedByPlayerId = "p1",
+            };
+            state.GamePlayers["p1"].OwnedClothingItemIds.Add(claimedHat);
+
+            context.Fsm.TransitionTo(context, new OutfitBuildingState());
+            _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
+
+            var chosen = state.GamePlayers["p1"].SubmittedOutfit!.SelectedItemsByType["hat"];
+            Assert.AreEqual(claimedHat, chosen,
+                "Auto-fill must prefer a non-self-drawn (claimed) item over a self-drawn one.");
+        }
+
+        [TestMethod]
+        public async Task OutfitBuilding_TimerExpiry_AutoFillFallsBackToSelfDrawnWhenNothingElse()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            state.Config.ClothingTypes =
+            [
+                new() { Id = "hat", DisplayName = "Hat" },
+            ];
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            state.GamePlayers["p1"] = new() { PlayerId = "p1" };
+            var selfDrawnHat = Guid.NewGuid();
+            state.ClothingPool[selfDrawnHat] = new()
+            {
+                Id = selfDrawnHat,
+                ClothingTypeId = "hat",
+                CreatorPlayerId = "p1",
+                SvgContent = "<svg/>",
+                IsInPool = true,
+            };
+            state.GamePlayers["p1"].OwnedClothingItemIds.Add(selfDrawnHat);
+
+            context.Fsm.TransitionTo(context, new OutfitBuildingState());
+            _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
+
+            Assert.IsNotNull(state.GamePlayers["p1"].SubmittedOutfit,
+                "Auto-fill must fall back to the self-drawn item when no other options exist.");
+            Assert.AreEqual(selfDrawnHat,
+                state.GamePlayers["p1"].SubmittedOutfit!.SelectedItemsByType["hat"]);
+        }
+
+        [TestMethod]
+        public async Task OutfitBuilding_TimerExpiry_AlreadySubmittedOutfit_IsNotOverwritten()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            state.Config.ClothingTypes =
+            [
+                new() { Id = "hat", DisplayName = "Hat" },
+            ];
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            state.GamePlayers["p1"] = new() { PlayerId = "p1" };
+            var hatId = Guid.NewGuid();
+            state.ClothingPool[hatId] = new()
+            {
+                ClothingTypeId = "hat",
+                CreatorPlayerId = "p2",
+                SvgContent = "<svg/>",
+                IsInPool = true,
+                ClaimedByPlayerId = "p1",
+            };
+            state.GamePlayers["p1"].OwnedClothingItemIds.Add(hatId);
+
+            context.Fsm.TransitionTo(context, new OutfitBuildingState());
+
+            // Player submits before the timer runs out.
+            _engine.ProcessCommand(context, new SubmitOutfitCommand("p1",
+                new Dictionary<string, Guid> { ["hat"] = hatId }));
+
+            var originalOutfit = state.GamePlayers["p1"].SubmittedOutfit;
+            Assert.IsNotNull(originalOutfit);
+
+            // Simulate a second tick (e.g., a late server tick after the deadline).
+            _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
+
+            Assert.AreSame(originalOutfit, state.GamePlayers["p1"].SubmittedOutfit,
+                "Auto-fill must not overwrite an outfit already submitted by the player.");
+        }
     }
 }
