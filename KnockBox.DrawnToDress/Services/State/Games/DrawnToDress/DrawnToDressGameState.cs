@@ -167,7 +167,7 @@ namespace KnockBox.Services.State.Games.DrawnToDress
 
         /// <summary>
         /// One or more outfits share an item; players must resolve the conflict before
-        /// voting can begin.
+        /// the second outfit building phase begins.
         /// </summary>
         OutfitDistinctnessResolution = 6,
 
@@ -175,6 +175,8 @@ namespace KnockBox.Services.State.Games.DrawnToDress
         /// Second outfit building phase. Players assemble a second outfit from the
         /// remaining pool (Outfit 1 picks excluded). Submitted outfits are validated for
         /// distinctness against every player's Outfit 1.
+        /// Value is 14 (continuation of the sequential run; values 7–13 are taken by
+        /// later phases that were added before this one).
         /// </summary>
         Outfit2Building = 14,
 

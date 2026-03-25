@@ -384,13 +384,8 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
                     SubmittedAt = DateTimeOffset.UtcNow,
                 };
 
-                var submission = new OutfitSubmission
-                {
-                    PlayerId = player.PlayerId,
-                    SelectedItemsByType = selectedItems,
-                };
                 bool violates = threshold > 0 && OutfitDistinctnessEvaluator.ViolatesDistinctnessRule(
-                    submission, allOutfit1s, threshold);
+                    player.SubmittedOutfit2, allOutfit1s, threshold);
 
                 if (violates)
                 {
