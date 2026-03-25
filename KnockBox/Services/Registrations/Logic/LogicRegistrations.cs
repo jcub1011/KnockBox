@@ -3,6 +3,7 @@ using KnockBox.Services.Logic.Games.Shared;
 using KnockBox.Services.Logic.RandomGeneration;
 using KnockBox.Services.Logic.Games.CardCounter;
 using KnockBox.Services.Logic.Games.DiceSimulator;
+using KnockBox.Services.Logic.Games.DrawnToDress;
 
 namespace KnockBox.Services.Registrations.Logic
 {
@@ -17,6 +18,7 @@ namespace KnockBox.Services.Registrations.Logic
             // Register game engines
             services.AddSingleton<DiceSimulatorGameEngine>();
             services.AddSingleton<CardCounterGameEngine>();
+            services.AddSingleton<DrawnToDressGameEngine>();
 
             return services;
         }
