@@ -1905,5 +1905,291 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
             Assert.AreEqual(1, state.ClothingPool.Count,
                 "A second submission beyond the per-round limit must not add another item.");
         }
+
+        // ── Outfit customization: name-required ───────────────────────────────
+
+        [TestMethod]
+        public async Task OutfitCustomizationState_SubmitWithName_SetsNameAndMarksReady()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            // Use two players so one submitting does not advance the state.
+            state.GamePlayers["p1"] = new()
+            {
+                PlayerId = "p1",
+                SubmittedOutfit = new() { PlayerId = "p1" },
+            };
+            state.GamePlayers["p2"] = new()
+            {
+                PlayerId = "p2",
+                SubmittedOutfit = new() { PlayerId = "p2" },
+            };
+
+            context.Fsm.TransitionTo(context, new OutfitCustomizationState());
+
+            _engine.ProcessCommand(context, new SubmitCustomizationCommand("p1", "My Cool Outfit"));
+
+            Assert.IsTrue(state.GamePlayers["p1"].IsReady);
+            Assert.AreEqual("My Cool Outfit", state.GamePlayers["p1"].SubmittedOutfit!.Customization.OutfitName);
+        }
+
+        [TestMethod]
+        public async Task OutfitCustomizationState_SubmitWithNullName_IsIgnored()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            state.GamePlayers["p1"] = new()
+            {
+                PlayerId = "p1",
+                SubmittedOutfit = new() { PlayerId = "p1" },
+            };
+
+            context.Fsm.TransitionTo(context, new OutfitCustomizationState());
+
+            _engine.ProcessCommand(context, new SubmitCustomizationCommand("p1", null));
+
+            Assert.IsFalse(state.GamePlayers["p1"].IsReady,
+                "Player must not be marked ready when OutfitName is null.");
+            Assert.IsNull(state.GamePlayers["p1"].SubmittedOutfit!.Customization.OutfitName,
+                "Outfit name must not be changed when submission is rejected.");
+        }
+
+        [TestMethod]
+        public async Task OutfitCustomizationState_SubmitWithWhitespaceName_IsIgnored()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            state.GamePlayers["p1"] = new()
+            {
+                PlayerId = "p1",
+                SubmittedOutfit = new() { PlayerId = "p1" },
+            };
+
+            context.Fsm.TransitionTo(context, new OutfitCustomizationState());
+
+            _engine.ProcessCommand(context, new SubmitCustomizationCommand("p1", "   "));
+
+            Assert.IsFalse(state.GamePlayers["p1"].IsReady,
+                "Player must not be marked ready when OutfitName is whitespace-only.");
+        }
+
+        // ── Outfit customization: sketch overlay ──────────────────────────────
+
+        [TestMethod]
+        public async Task OutfitCustomizationState_SubmitWithSketch_PersistsSketchContent()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            state.GamePlayers["p1"] = new()
+            {
+                PlayerId = "p1",
+                SubmittedOutfit = new() { PlayerId = "p1" },
+            };
+
+            context.Fsm.TransitionTo(context, new OutfitCustomizationState());
+
+            _engine.ProcessCommand(context,
+                new SubmitCustomizationCommand("p1", "Sketched Outfit", "<svg>sketch</svg>"));
+
+            Assert.AreEqual("<svg>sketch</svg>",
+                state.GamePlayers["p1"].SubmittedOutfit!.Customization.SketchSvgContent);
+        }
+
+        [TestMethod]
+        public async Task OutfitCustomizationState_SubmitWithoutSketch_SketchIsNull()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            state.GamePlayers["p1"] = new()
+            {
+                PlayerId = "p1",
+                SubmittedOutfit = new() { PlayerId = "p1" },
+            };
+
+            context.Fsm.TransitionTo(context, new OutfitCustomizationState());
+
+            _engine.ProcessCommand(context,
+                new SubmitCustomizationCommand("p1", "Plain Outfit"));
+
+            Assert.IsNull(state.GamePlayers["p1"].SubmittedOutfit!.Customization.SketchSvgContent,
+                "Sketch should be null when no SVG is provided.");
+        }
+
+        // ── Outfit customization: SketchingRequired enforcement ───────────────
+
+        [TestMethod]
+        public async Task OutfitCustomizationState_SketchingRequired_WithSketch_Accepted()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            state.Config.SketchingRequired = true;
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            // Use two players so one submitting does not advance the state.
+            state.GamePlayers["p1"] = new()
+            {
+                PlayerId = "p1",
+                SubmittedOutfit = new() { PlayerId = "p1" },
+            };
+            state.GamePlayers["p2"] = new()
+            {
+                PlayerId = "p2",
+                SubmittedOutfit = new() { PlayerId = "p2" },
+            };
+
+            context.Fsm.TransitionTo(context, new OutfitCustomizationState());
+
+            _engine.ProcessCommand(context,
+                new SubmitCustomizationCommand("p1", "My Outfit", "<svg>required sketch</svg>"));
+
+            Assert.IsTrue(state.GamePlayers["p1"].IsReady,
+                "Submission with a sketch must be accepted when SketchingRequired is enabled.");
+        }
+
+        [TestMethod]
+        public async Task OutfitCustomizationState_SketchingRequired_WithoutSketch_IsRejected()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            state.Config.SketchingRequired = true;
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            state.GamePlayers["p1"] = new()
+            {
+                PlayerId = "p1",
+                SubmittedOutfit = new() { PlayerId = "p1" },
+            };
+
+            context.Fsm.TransitionTo(context, new OutfitCustomizationState());
+
+            _engine.ProcessCommand(context,
+                new SubmitCustomizationCommand("p1", "My Outfit"));
+
+            Assert.IsFalse(state.GamePlayers["p1"].IsReady,
+                "Submission without a sketch must be rejected when SketchingRequired is enabled.");
+        }
+
+        [TestMethod]
+        public async Task OutfitCustomizationState_SketchingNotRequired_WithoutSketch_Accepted()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            state.Config.SketchingRequired = false;
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            // Use two players so one submitting does not advance the state.
+            state.GamePlayers["p1"] = new()
+            {
+                PlayerId = "p1",
+                SubmittedOutfit = new() { PlayerId = "p1" },
+            };
+            state.GamePlayers["p2"] = new()
+            {
+                PlayerId = "p2",
+                SubmittedOutfit = new() { PlayerId = "p2" },
+            };
+
+            context.Fsm.TransitionTo(context, new OutfitCustomizationState());
+
+            _engine.ProcessCommand(context,
+                new SubmitCustomizationCommand("p1", "No Sketch Outfit"));
+
+            Assert.IsTrue(state.GamePlayers["p1"].IsReady,
+                "Submission without a sketch must be accepted when SketchingRequired is false.");
+        }
+
+        // ── Outfit customization: all-ready early advance ─────────────────────
+
+        [TestMethod]
+        public async Task OutfitCustomizationState_AllPlayersSubmit_AdvancesEarly()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            state.GamePlayers["p1"] = new()
+            {
+                PlayerId = "p1",
+                SubmittedOutfit = new() { PlayerId = "p1" },
+            };
+            state.GamePlayers["p2"] = new()
+            {
+                PlayerId = "p2",
+                SubmittedOutfit = new() { PlayerId = "p2" },
+            };
+
+            context.Fsm.TransitionTo(context, new OutfitCustomizationState());
+
+            _engine.ProcessCommand(context,
+                new SubmitCustomizationCommand("p1", "Outfit One"));
+            Assert.IsInstanceOfType<OutfitCustomizationState>(context.Fsm.CurrentState,
+                "Should still be in customization after only one player submits.");
+
+            _engine.ProcessCommand(context,
+                new SubmitCustomizationCommand("p2", "Outfit Two"));
+            Assert.IsInstanceOfType<VotingMatchupState>(context.Fsm.CurrentState,
+                "Should advance once all players have submitted customization.");
+        }
+
+        // ── Outfit customization: submission persistence ───────────────────────
+
+        [TestMethod]
+        public async Task OutfitCustomizationState_SubmittedData_PersistedOnOutfitSubmission()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            var itemId = Guid.NewGuid();
+            state.ClothingPool[itemId] = new()
+            {
+                Id = itemId,
+                ClothingTypeId = "hat",
+                CreatorPlayerId = "p1",
+                SvgContent = "<svg/>",
+                IsInPool = true,
+            };
+            state.GamePlayers["p1"] = new()
+            {
+                PlayerId = "p1",
+                SubmittedOutfit = new()
+                {
+                    PlayerId = "p1",
+                    SelectedItemsByType = new() { ["hat"] = itemId },
+                },
+            };
+
+            context.Fsm.TransitionTo(context, new OutfitCustomizationState());
+
+            _engine.ProcessCommand(context,
+                new SubmitCustomizationCommand("p1", "Hat Outfit", "<svg>overlay</svg>"));
+
+            var submission = state.GamePlayers["p1"].SubmittedOutfit!;
+            Assert.AreEqual("Hat Outfit", submission.Customization.OutfitName);
+            Assert.AreEqual("<svg>overlay</svg>", submission.Customization.SketchSvgContent);
+            Assert.IsTrue(submission.SelectedItemsByType.ContainsKey("hat"),
+                "Original selected items must be preserved after customization.");
+            Assert.AreEqual(itemId, submission.SelectedItemsByType["hat"]);
+        }
     }
 }

@@ -104,6 +104,14 @@ namespace KnockBox.Services.State.Games.DrawnToDress.Data
         /// </summary>
         public bool RequireDistinctItemsPerSlot { get; set; } = true;
 
+        /// <summary>
+        /// When <see langword="true"/>, players must add a sketch overlay during the
+        /// outfit-customization phase before they can submit. The timer and completion
+        /// rules are enforced; a submission without a sketch is rejected.
+        /// GDD default: <see langword="false"/>.
+        /// </summary>
+        public bool SketchingRequired { get; set; } = false;
+
         // ── Voting ────────────────────────────────────────────────────────────
 
         /// <summary>

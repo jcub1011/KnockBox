@@ -82,10 +82,15 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM
 
     // ── Outfit customization ──────────────────────────────────────────────────
 
-    /// <summary>Player finalizes the custom name (and any other overlay data) for their outfit.</summary>
+    /// <summary>
+    /// Player finalizes the custom name and optional sketch overlay for their outfit.
+    /// <paramref name="OutfitName"/> is required; <paramref name="SketchSvgContent"/> is
+    /// optional unless <see cref="DrawnToDressConfig.SketchingRequired"/> is enabled.
+    /// </summary>
     public record SubmitCustomizationCommand(
         string PlayerId,
-        string? OutfitName) : DrawnToDressCommand(PlayerId);
+        string? OutfitName,
+        string? SketchSvgContent = null) : DrawnToDressCommand(PlayerId);
 
     // ── Outfit distinctness resolution ────────────────────────────────────────
 

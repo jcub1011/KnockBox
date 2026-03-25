@@ -9,6 +9,14 @@ namespace KnockBox.Services.State.Games.DrawnToDress.Data
     {
         /// <summary>Player-chosen name for the outfit, or <see langword="null"/> if not set.</summary>
         public string? OutfitName { get; set; }
+
+        /// <summary>
+        /// Optional SVG sketch drawn over the assembled outfit during the customization
+        /// phase, or <see langword="null"/> if the player did not add a sketch.
+        /// When <see cref="DrawnToDressConfig.SketchingRequired"/> is enabled this must
+        /// be non-null for the submission to be accepted.
+        /// </summary>
+        public string? SketchSvgContent { get; set; }
     }
 
     /// <summary>
