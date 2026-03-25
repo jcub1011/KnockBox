@@ -19,5 +19,12 @@ namespace KnockBox.Services.State.Games.DrawnToDress.Data
         /// of this type is allowed per outfit.
         /// </summary>
         public bool AllowMultiple { get; set; }
+
+        /// <summary>
+        /// Maximum number of drawings a player may submit for this clothing type during its
+        /// drawing round.  A value of <c>0</c> means no limit.
+        /// GDD default: 3.
+        /// </summary>
+        public int MaxItemsPerRound { get; set; } = 3;
     }
 }
