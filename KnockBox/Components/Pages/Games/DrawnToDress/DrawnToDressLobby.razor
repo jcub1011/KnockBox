@@ -17,6 +17,10 @@
     {
         <DrawingPhase GameState="GameState" />
     }
+    else if (GameState.Phase == KnockBox.Services.State.Games.DrawnToDress.GamePhase.OutfitBuilding)
+    {
+        <OutfitBuildingPhase GameState="GameState" />
+    }
     else
     {
         <div class="card">
