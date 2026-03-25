@@ -70,9 +70,9 @@ namespace KnockBox.Services.State.Games.DrawnToDress.Data
         /// <summary>
         /// Number of seconds the pool-reveal screen is displayed before automatically
         /// advancing to outfit building.  Players may press Ready to skip early.
-        /// GDD default: 30 s.
+        /// GDD default: 5 s.
         /// </summary>
-        public int PoolRevealTimeSec { get; set; } = 30;
+        public int PoolRevealTimeSec { get; set; } = 5;
 
         // ── Outfit Building phase ─────────────────────────────────────────────
 

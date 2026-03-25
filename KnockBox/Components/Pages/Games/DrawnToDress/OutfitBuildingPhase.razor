@@ -10,7 +10,10 @@
 
     string? myId = UserService.CurrentUser?.Id;
     var myPlayer = myId is not null && GameState.GamePlayers.TryGetValue(myId, out var pOut) ? pOut : null;
-    bool hasSubmitted = myPlayer?.SubmittedOutfit is not null;
+    // Capture SubmittedOutfit once so its value stays consistent throughout this render pass
+    // even if the FSM updates player state concurrently from the timer loop.
+    var mySubmittedOutfit = myPlayer?.SubmittedOutfit;
+    bool hasSubmitted = mySubmittedOutfit is not null;
 
     int lockedCount = GameState.GamePlayers.Values.Count(p => p.SubmittedOutfit is not null);
     int totalPlayers = GameState.GamePlayers.Count;
@@ -87,7 +90,7 @@
             <div class="dtd-outfit-locked-summary">
                 @foreach (var clothingType in GameState.Config.ClothingTypes)
                 {
-                    bool hasSlot = myPlayer!.SubmittedOutfit!.SelectedItemsByType.TryGetValue(clothingType.Id, out var selectedId);
+                    bool hasSlot = mySubmittedOutfit!.SelectedItemsByType.TryGetValue(clothingType.Id, out var selectedId);
                     <div class="dtd-outfit-slot dtd-outfit-slot-locked">
                         <span class="dtd-outfit-slot-label">@clothingType.DisplayName</span>
                         @if (hasSlot && GameState.ClothingPool.TryGetValue(selectedId, out var selectedItem))
