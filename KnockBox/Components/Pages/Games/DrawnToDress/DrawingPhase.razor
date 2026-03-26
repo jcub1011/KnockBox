@@ -86,7 +86,8 @@
             {
                 <div class="dtd-drawing-canvas-wrapper">
                     <SvgDrawingCanvas @ref="_canvas"
-                                      Height="50vh"
+                                      Width="@($"{CurrentTypeCanvasWidth}px")"
+                                      Height="@($"{CurrentTypeCanvasHeight}px")"
                                       BackgroundColor="#ffffff" />
                 </div>
 

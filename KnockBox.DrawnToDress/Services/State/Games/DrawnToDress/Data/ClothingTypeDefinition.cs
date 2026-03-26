@@ -26,5 +26,11 @@ namespace KnockBox.Services.State.Games.DrawnToDress.Data
         /// GDD default: 3.
         /// </summary>
         public int MaxItemsPerRound { get; set; } = 3;
+
+        /// <summary>Pixel width of the drawing canvas for this clothing type.</summary>
+        public int CanvasWidth { get; set; } = 300;
+
+        /// <summary>Pixel height of the drawing canvas for this clothing type.</summary>
+        public int CanvasHeight { get; set; } = 300;
     }
 }

@@ -121,7 +121,7 @@
                                      title="@(taken ? "Claimed" : "Available")">
                                     @if (SafeSvgContent(item.SvgContent) is string safeSvg)
                                     {
-                                        <svg class="dtd-pool-item-preview" viewBox="0 0 800 400"
+                                        <svg class="dtd-pool-item-preview" viewBox="0 0 @clothingType.CanvasWidth @clothingType.CanvasHeight"
                                              preserveAspectRatio="xMidYMid meet"
                                              xmlns="http://www.w3.org/2000/svg">
                                             @((MarkupString)safeSvg)
@@ -160,7 +160,7 @@
                                  title="@(isMyItem ? "Your drawing" : "Selected")">
                                 @if (SafeSvgContent(selectedItem.SvgContent) is string safeSvgSelected)
                                 {
-                                    <svg class="dtd-pool-item-preview" viewBox="0 0 800 400"
+                                    <svg class="dtd-pool-item-preview" viewBox="0 0 @clothingType.CanvasWidth @clothingType.CanvasHeight"
                                          preserveAspectRatio="xMidYMid meet"
                                          xmlns="http://www.w3.org/2000/svg">
                                         @((MarkupString)safeSvgSelected)
@@ -213,7 +213,7 @@
                                      @onclick="() => UnclaimItem(slotItem.Id)">
                                     @if (SafeSvgContent(slotItem.SvgContent) is string safeSvgSlot)
                                     {
-                                        <svg class="dtd-pool-item-preview" viewBox="0 0 800 400"
+                                        <svg class="dtd-pool-item-preview" viewBox="0 0 @clothingType.CanvasWidth @clothingType.CanvasHeight"
                                              preserveAspectRatio="xMidYMid meet"
                                              xmlns="http://www.w3.org/2000/svg">
                                             @((MarkupString)safeSvgSlot)
@@ -236,7 +236,7 @@
                                      title="@(isOwnSlotItem ? "Your drawing — selected for your outfit" : "Selected")">
                                     @if (SafeSvgContent(slotItem.SvgContent) is string safeSvgSlot)
                                     {
-                                        <svg class="dtd-pool-item-preview" viewBox="0 0 800 400"
+                                        <svg class="dtd-pool-item-preview" viewBox="0 0 @clothingType.CanvasWidth @clothingType.CanvasHeight"
                                              preserveAspectRatio="xMidYMid meet"
                                              xmlns="http://www.w3.org/2000/svg">
                                             @((MarkupString)safeSvgSlot)
@@ -326,7 +326,7 @@
                                      @onclick="() => ToggleClaim(item, claimedByMe, isAvailable)">
                                     @if (SafeSvgContent(item.SvgContent) is string safeSvgItem)
                                     {
-                                        <svg class="dtd-pool-item-preview" viewBox="0 0 800 400"
+                                        <svg class="dtd-pool-item-preview" viewBox="0 0 @clothingType.CanvasWidth @clothingType.CanvasHeight"
                                              preserveAspectRatio="xMidYMid meet"
                                              xmlns="http://www.w3.org/2000/svg">
                                             @((MarkupString)safeSvgItem)

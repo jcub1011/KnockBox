@@ -106,7 +106,7 @@
                                                     <span class="dtd-voting-item-label">@ct.DisplayName</span>
                                                     @if (SafeSvgContent(item.SvgContent) is string safeSvg)
                                                     {
-                                                        <svg class="dtd-voting-item-preview" viewBox="0 0 800 400"
+                                                        <svg class="dtd-voting-item-preview" viewBox="0 0 @ct.CanvasWidth @ct.CanvasHeight"
                                                              preserveAspectRatio="xMidYMid meet"
                                                              xmlns="http://www.w3.org/2000/svg">
                                                             @((MarkupString)safeSvg)
@@ -139,7 +139,7 @@
                                                     <span class="dtd-voting-item-label">@ct.DisplayName</span>
                                                     @if (SafeSvgContent(item.SvgContent) is string safeSvg)
                                                     {
-                                                        <svg class="dtd-voting-item-preview" viewBox="0 0 800 400"
+                                                        <svg class="dtd-voting-item-preview" viewBox="0 0 @ct.CanvasWidth @ct.CanvasHeight"
                                                              preserveAspectRatio="xMidYMid meet"
                                                              xmlns="http://www.w3.org/2000/svg">
                                                             @((MarkupString)safeSvg)

@@ -48,6 +48,28 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
             }
         }
 
+        /// <summary>Canvas pixel width for the current clothing type.</summary>
+        protected int CurrentTypeCanvasWidth
+        {
+            get
+            {
+                var types = GameState.Config.ClothingTypes;
+                int idx = GameState.CurrentDrawingClothingTypeIndex;
+                return idx >= 0 && idx < types.Count ? types[idx].CanvasWidth : 300;
+            }
+        }
+
+        /// <summary>Canvas pixel height for the current clothing type.</summary>
+        protected int CurrentTypeCanvasHeight
+        {
+            get
+            {
+                var types = GameState.Config.ClothingTypes;
+                int idx = GameState.CurrentDrawingClothingTypeIndex;
+                return idx >= 0 && idx < types.Count ? types[idx].CanvasHeight : 300;
+            }
+        }
+
         /// <summary>
         /// Max items per round for the current clothing type (0 = unlimited).
         /// </summary>
