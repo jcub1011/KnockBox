@@ -45,6 +45,16 @@ namespace KnockBox.Core.Components.Shared
         /// </summary>
         [Parameter] public string? BackgroundSvgContent { get; set; }
 
+        /// <summary>Width of the SVG viewBox coordinate space (device-independent units).</summary>
+        [Parameter] public int? ViewBoxWidth { get; set; }
+
+        /// <summary>Height of the SVG viewBox coordinate space (device-independent units).</summary>
+        [Parameter] public int? ViewBoxHeight { get; set; }
+
+        private string? ViewBoxAttribute => ViewBoxWidth.HasValue && ViewBoxHeight.HasValue
+            ? $"0 0 {ViewBoxWidth} {ViewBoxHeight}"
+            : null;
+
         // Sanitized version of BackgroundSvgContent, computed in OnParametersSet.
         private string? _sanitizedBackground;
 

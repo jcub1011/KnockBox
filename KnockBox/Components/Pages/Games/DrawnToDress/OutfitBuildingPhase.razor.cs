@@ -63,14 +63,36 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
 
         /// <summary>
         /// Claims an available item or unclaims a currently-claimed item (toggle).
+        /// When claiming, automatically unclaims any previously claimed item of the same
+        /// clothing type so only one item per category is selected at a time.
         /// No-ops when the item is another player's drawing or already taken.
         /// </summary>
         protected void ToggleClaim(DrawnClothingItem item, bool claimedByMe, bool isAvailable)
         {
             if (claimedByMe)
+            {
                 UnclaimItem(item.Id);
+            }
             else if (isAvailable)
+            {
+                // Snapshot existing claims for this clothing type before claiming the new item.
+                var previousClaims = GameState.GamePlayers.GetValueOrDefault(CurrentPlayerId)
+                    ?.OwnedClothingItemIds
+                    .Where(id => id != item.Id
+                                 && GameState.ClothingPool.TryGetValue(id, out var existing)
+                                 && existing.ClothingTypeId == item.ClothingTypeId
+                                 && existing.ClaimedByPlayerId == CurrentPlayerId)
+                    .ToList();
+
+                // Claim first — only release the old item after the new one is secured.
                 ClaimItem(item.Id);
+
+                if (previousClaims is not null)
+                {
+                    foreach (var id in previousClaims)
+                        UnclaimItem(id);
+                }
+            }
         }
 
         /// <summary>Sends a <see cref="ClaimPoolItemCommand"/> for the given item.</summary>

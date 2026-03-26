@@ -50,9 +50,10 @@ function buildPath(points) {
  */
 function triggerSvgDownload(state, fileName, backgroundColor) {
     const svgEl = state.svg;
-    const rect = svgEl.getBoundingClientRect();
-    const width = Math.round(rect.width);
-    const height = Math.round(rect.height);
+    const vb = svgEl.viewBox?.baseVal;
+    const hasViewBox = vb && vb.width > 0 && vb.height > 0;
+    const width = hasViewBox ? vb.width : Math.round(svgEl.getBoundingClientRect().width);
+    const height = hasViewBox ? vb.height : Math.round(svgEl.getBoundingClientRect().height);
 
     const clone = svgEl.cloneNode(true);
     clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');

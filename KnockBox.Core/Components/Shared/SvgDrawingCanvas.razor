@@ -45,10 +45,12 @@
     <div class="svg-canvas-drawing-area">
         @if (_sanitizedBackground is not null)
         {
-            <svg class="svg-canvas-bg" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <svg class="svg-canvas-bg" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"
+                 viewBox="@ViewBoxAttribute" preserveAspectRatio="@(ViewBoxAttribute is not null ? "xMidYMid meet" : null)">
                 @((MarkupString)_sanitizedBackground)
             </svg>
         }
-        <svg id="@_svgId" class="svg-canvas-surface" style="background-color: @BackgroundColor;"></svg>
+        <svg id="@_svgId" class="svg-canvas-surface" style="background-color: @BackgroundColor;"
+             viewBox="@ViewBoxAttribute" preserveAspectRatio="@(ViewBoxAttribute is not null ? "xMidYMid meet" : null)"></svg>
     </div>
 </div>
