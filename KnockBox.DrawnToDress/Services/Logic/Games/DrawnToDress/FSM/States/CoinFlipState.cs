@@ -1,18 +1,19 @@
 using KnockBox.Core.Services.State.Games.Shared;
 using KnockBox.Extensions.Returns;
 using KnockBox.Services.State.Games.DrawnToDress;
+using KnockBox.Services.State.Games.DrawnToDress.Data;
 
 namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
 {
     /// <summary>
-    /// Resolves a tied voting matchup via a random coin flip and immediately chains to
+    /// Resolves all tied voting criteria via random coin flips and immediately chains to
     /// <see cref="VotingRoundResultsState"/>.
     ///
-    /// The outcome is recorded on <see cref="DrawnToDressGameState.PendingCoinFlipMatchupId"/>
-    /// (cleared on exit) so the UI can animate the flip.
+    /// Processes all entries in <see cref="DrawnToDressGameState.PendingCoinFlips"/>,
+    /// recording a <see cref="CriterionCoinFlipResult"/> for each.
     ///
     /// Transition ownership:
-    /// - <see cref="OnEnter"/> performs the flip and chains to
+    /// - <see cref="OnEnter"/> performs all flips and chains to
     ///   <see cref="VotingRoundResultsState"/> without waiting for player input.
     /// </summary>
     public sealed class CoinFlipState : IDrawnToDressGameState
@@ -22,14 +23,36 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
         {
             context.State.SetPhase(GamePhase.CoinFlip);
             context.Logger.LogInformation(
-                "FSM → CoinFlipState. Flipping coin for matchup [{matchupId}].",
-                context.State.PendingCoinFlipMatchupId);
+                "FSM → CoinFlipState. Resolving {count} pending coin flips.",
+                context.State.PendingCoinFlips.Count);
 
-            // TODO: Record the CoinFlipResult in state for the UI to display.
-            // Placeholder: just log and proceed.
-            bool isHeads = Random.Shared.Next(2) == 0;
-            context.Logger.LogInformation(
-                "Coin flip result: {result}.", isHeads ? "Heads" : "Tails");
+            int roundIndex = context.State.CurrentVotingRoundIndex;
+            var round = roundIndex < context.State.VotingRounds.Count
+                ? context.State.VotingRounds[roundIndex]
+                : null;
+
+            foreach (var (matchupId, criterionId) in context.State.PendingCoinFlips)
+            {
+                var matchup = round?.Matchups.FirstOrDefault(m => m.Id == matchupId);
+                if (matchup is null)
+                {
+                    context.Logger.LogWarning(
+                        "CoinFlip: matchup [{matchupId}] not found. Skipping.", matchupId);
+                    continue;
+                }
+
+                bool isHeads = Random.Shared.Next(2) == 0;
+                string winner = isHeads ? matchup.EntrantAId : matchup.EntrantBId;
+
+                context.State.CriterionCoinFlipResults.Add(
+                    new CriterionCoinFlipResult(matchupId, criterionId, winner));
+
+                context.Logger.LogInformation(
+                    "Coin flip for matchup [{matchupId}] criterion [{criterionId}]: {result} → winner [{winner}].",
+                    matchupId, criterionId, isHeads ? "Heads" : "Tails", winner);
+            }
+
+            context.State.PendingCoinFlips.Clear();
 
             return new VotingRoundResultsState();
         }

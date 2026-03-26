@@ -26,7 +26,7 @@ namespace KnockBox.Services.State.Games.DrawnToDress.Data
         /// <summary>
         /// Ordered list of clothing categories available in this session.
         /// Determines which drawing slots exist and how outfits are assembled.
-        /// GDD default: Hat, Top, Bottom, Shoes, Accessory (accessory allows multiples).
+        /// GDD default: Hat, Top, Bottom, Shoes.
         /// </summary>
         public List<ClothingTypeDefinition> ClothingTypes { get; set; } =
         [
@@ -188,6 +188,18 @@ namespace KnockBox.Services.State.Games.DrawnToDress.Data
         /// </summary>
         public int BonusPointsForCompleteOutfit { get; set; } = 1;
 
+        /// <summary>
+        /// Bonus points awarded to the player(s) with the highest-scoring outfit in a round.
+        /// GDD default: 3.
+        /// </summary>
+        public int RoundLeaderBonusPoints { get; set; } = 3;
+
+        /// <summary>
+        /// Bonus points awarded to the overall tournament winner(s).
+        /// GDD default: 10.
+        /// </summary>
+        public int TournamentWinnerBonusPoints { get; set; } = 10;
+
         // ── Host / connectivity ───────────────────────────────────────────────
 
         /// <summary>
@@ -260,6 +272,8 @@ namespace KnockBox.Services.State.Games.DrawnToDress.Data
 
             // ── Bonus points ───────────────────────────────────────────────────
             if (BonusPointsForCompleteOutfit < 0) BonusPointsForCompleteOutfit = 0;
+            if (RoundLeaderBonusPoints < 0) RoundLeaderBonusPoints = 0;
+            if (TournamentWinnerBonusPoints < 0) TournamentWinnerBonusPoints = 0;
 
             // ── Host / connectivity ────────────────────────────────────────────
             if (HostDisconnectTimeoutSec < 30) HostDisconnectTimeoutSec = 30;

@@ -126,6 +126,22 @@ namespace KnockBox.Services.State.Games.DrawnToDress
         /// </summary>
         public Guid? PendingCoinFlipMatchupId { get; set; }
 
+        /// <summary>
+        /// All resolved criterion-level coin flip outcomes across the game.
+        /// </summary>
+        public List<CriterionCoinFlipResult> CriterionCoinFlipResults { get; set; } = [];
+
+        /// <summary>
+        /// Criteria ties awaiting coin flip resolution. Populated by
+        /// <see cref="FSM.States.VotingMatchupState"/> and consumed by <see cref="FSM.States.CoinFlipState"/>.
+        /// </summary>
+        public List<(Guid MatchupId, string CriterionId)> PendingCoinFlips { get; set; } = [];
+
+        /// <summary>
+        /// Final ranked standings computed in <see cref="FSM.States.FinalResultsState"/>.
+        /// </summary>
+        public List<LeaderboardEntry> Leaderboard { get; set; } = [];
+
         // ── Methods ───────────────────────────────────────────────────────────
 
         /// <summary>

@@ -1,5 +1,6 @@
 using KnockBox.Core.Services.State.Games.Shared;
 using KnockBox.Extensions.Returns;
+using KnockBox.Services.Logic.Games.DrawnToDress;
 using KnockBox.Services.State.Games.DrawnToDress;
 
 namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
@@ -26,6 +27,33 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
             context.Logger.LogInformation(
                 "FSM → VotingRoundResultsState. Round {n} of {total} complete.",
                 context.State.CurrentVotingRoundIndex + 1, context.Config.VotingRounds);
+
+            // Compute round scores and award round leader bonus.
+            int roundIndex = context.State.CurrentVotingRoundIndex;
+            if (roundIndex < context.State.VotingRounds.Count && context.Config.RoundLeaderBonusPoints > 0)
+            {
+                var round = context.State.VotingRounds[roundIndex];
+                var roundScores = DrawnToDressScoringService.CalculateRoundScores(
+                    round,
+                    context.Config.VotingCriteria,
+                    context.State.Votes.Values,
+                    context.State.CriterionCoinFlipResults);
+
+                var leaders = DrawnToDressScoringService.GetRoundLeaders(roundScores);
+                foreach (var entrantId in leaders)
+                {
+                    var playerId = DrawnToDressGameContext.GetPlayerIdFromEntrantId(entrantId);
+                    var player = context.GetPlayer(playerId);
+                    if (player is not null)
+                    {
+                        player.BonusPoints += context.Config.RoundLeaderBonusPoints;
+                        context.Logger.LogInformation(
+                            "Round leader bonus (+{bonus}) awarded to player [{playerId}] via entrant [{entrantId}].",
+                            context.Config.RoundLeaderBonusPoints, playerId, entrantId);
+                    }
+                }
+            }
+
             return null;
         }
 

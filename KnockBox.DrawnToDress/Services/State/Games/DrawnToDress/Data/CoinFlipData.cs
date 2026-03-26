@@ -26,4 +26,12 @@ namespace KnockBox.Services.State.Games.DrawnToDress.Data
         Guid MatchupId,
         bool IsHeads,
         string WinnerPlayerId);
+
+    /// <summary>
+    /// Records which entrant won a coin flip for a specific tied criterion within a matchup.
+    /// </summary>
+    public record CriterionCoinFlipResult(
+        Guid MatchupId,
+        string CriterionId,
+        string WinnerEntrantId);
 }
