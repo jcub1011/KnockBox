@@ -2933,8 +2933,123 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
 
             _engine.ProcessCommand(context, new SubmitOutfitCommand("p2",
                 new Dictionary<string, Guid> { ["hat"] = hatA }));
+            Assert.IsInstanceOfType<Outfit2CustomizationState>(context.Fsm.CurrentState,
+                "Should advance to Outfit 2 customization once all players submit Outfit 2.");
+        }
+
+        // ── Outfit 2: timer expiry auto-fill ──────────────────────────────────
+
+        // ── Outfit 2 Customization state ──────────────────────────────────────
+
+        [TestMethod]
+        public async Task Outfit2CustomizationState_OnEnter_SetsOutfit2CustomizationPhase()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            context.Fsm.TransitionTo(context, new Outfit2CustomizationState());
+
+            Assert.AreEqual(GamePhase.Outfit2Customization, state.Phase);
+            Assert.IsTrue(state.PhaseDeadlineUtc.HasValue,
+                "Outfit2CustomizationState must set a deadline on entry.");
+        }
+
+        [TestMethod]
+        public async Task Outfit2CustomizationState_TimerExpiry_TransitionsToVotingRoundSetup()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            context.Fsm.TransitionTo(context, new Outfit2CustomizationState());
+            _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
+
+            // VotingRoundSetupState chains immediately to VotingMatchupState.
+            Assert.IsInstanceOfType<VotingMatchupState>(context.Fsm.CurrentState);
+        }
+
+        [TestMethod]
+        public async Task Outfit2CustomizationState_SubmitCustomization_StoresInOutfit2()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            state.GamePlayers["p1"] = new()
+            {
+                PlayerId = "p1",
+                SubmittedOutfit2 = new() { PlayerId = "p1" },
+            };
+
+            context.Fsm.TransitionTo(context, new Outfit2CustomizationState());
+            _engine.ProcessCommand(context,
+                new SubmitCustomizationCommand("p1", "Second Look"));
+
+            Assert.AreEqual("Second Look",
+                state.GamePlayers["p1"].SubmittedOutfit2!.Customization.OutfitName,
+                "Customization must be stored in SubmittedOutfit2, not SubmittedOutfit.");
+        }
+
+        [TestMethod]
+        public async Task Outfit2CustomizationState_AllPlayersSubmit_AdvancesEarlyToVoting()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            state.GamePlayers["p1"] = new()
+            {
+                PlayerId = "p1",
+                SubmittedOutfit2 = new() { PlayerId = "p1" },
+            };
+            state.GamePlayers["p2"] = new()
+            {
+                PlayerId = "p2",
+                SubmittedOutfit2 = new() { PlayerId = "p2" },
+            };
+
+            context.Fsm.TransitionTo(context, new Outfit2CustomizationState());
+
+            _engine.ProcessCommand(context,
+                new SubmitCustomizationCommand("p1", "Look One"));
+            Assert.IsInstanceOfType<Outfit2CustomizationState>(context.Fsm.CurrentState,
+                "Should stay in Outfit2Customization until all players submit.");
+
+            _engine.ProcessCommand(context,
+                new SubmitCustomizationCommand("p2", "Look Two"));
+            // VotingRoundSetupState chains immediately to VotingMatchupState.
             Assert.IsInstanceOfType<VotingMatchupState>(context.Fsm.CurrentState,
-                "Should advance to voting once all players submit Outfit 2.");
+                "Should advance to voting once all Outfit 2 customizations are submitted.");
+        }
+
+        [TestMethod]
+        public async Task Outfit2CustomizationState_NoOutfit2Submitted_RejectsCommand()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            // Player has Outfit 1 but no Outfit 2.
+            state.GamePlayers["p1"] = new()
+            {
+                PlayerId = "p1",
+                SubmittedOutfit = new() { PlayerId = "p1" },
+            };
+
+            context.Fsm.TransitionTo(context, new Outfit2CustomizationState());
+            _engine.ProcessCommand(context,
+                new SubmitCustomizationCommand("p1", "Should Fail"));
+
+            Assert.IsNull(state.GamePlayers["p1"].SubmittedOutfit?.Customization.OutfitName,
+                "SubmitCustomizationCommand must be rejected when SubmittedOutfit2 is null.");
+            Assert.IsInstanceOfType<Outfit2CustomizationState>(context.Fsm.CurrentState,
+                "State must not advance if SubmittedOutfit2 is missing.");
         }
 
         // ── Outfit 2: timer expiry auto-fill ──────────────────────────────────
@@ -2970,7 +3085,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
 
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
 
-            Assert.IsInstanceOfType<VotingMatchupState>(context.Fsm.CurrentState);
+            Assert.IsInstanceOfType<Outfit2CustomizationState>(context.Fsm.CurrentState);
             Assert.IsNotNull(state.GamePlayers["p1"].SubmittedOutfit2,
                 "Auto-fill must produce an Outfit 2 when the timer expires.");
             Assert.IsTrue(state.GamePlayers["p1"].SubmittedOutfit2!.SelectedItemsByType.ContainsKey("hat"));

@@ -80,7 +80,9 @@
     }
 
     <!-- ── Player view ───────────────────────────────────────────────────── -->
-    @if (!isHost && mySubmittedOutfit2 != null)
+    @if (!isHost)
+    {
+    @if (mySubmittedOutfit2 != null)
     {
         <div class="dtd-outfit-waiting">
             <p>✅ Outfit 2 locked in! Waiting for the others…</p>
@@ -312,5 +314,6 @@
             </button>
         </div>
     }
+    } @* end !isHost *@
 
 </div>

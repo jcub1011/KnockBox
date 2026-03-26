@@ -111,9 +111,9 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
             if (now < _deadline) return null;
 
             context.Logger.LogInformation(
-                "Outfit 2 building timer expired. Auto-filling incomplete Outfit 2s and moving to voting.");
+                "Outfit 2 building timer expired. Auto-filling incomplete Outfit 2s and moving to Outfit 2 customization.");
             AutoFillIncompleteOutfit2s(context);
-            return new VotingRoundSetupState();
+            return new Outfit2CustomizationState();
         }
 
         // ── Claim / unclaim ───────────────────────────────────────────────────
@@ -289,8 +289,8 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
             if (AllOutfit2sSubmitted(context))
             {
                 context.Logger.LogInformation(
-                    "All Outfit 2s submitted. Moving to voting early.");
-                return new VotingRoundSetupState();
+                    "All Outfit 2s submitted. Moving to Outfit 2 customization.");
+                return new Outfit2CustomizationState();
             }
 
             return null;

@@ -184,6 +184,11 @@ namespace KnockBox.Services.State.Games.DrawnToDress
         /// </summary>
         Outfit2Building = 14,
 
+        /// <summary>
+        /// Players assign a name and optional sketch overlay to their assembled Outfit 2.
+        /// </summary>
+        Outfit2Customization = 16,
+
         // ── Voting ────────────────────────────────────────────────────────────
         VotingRoundSetup = 7,
 
