@@ -135,6 +135,8 @@ Both outfits in a session always use the same theme. There is no per-outfit them
 | `TournamentRounds` | string/int | "auto" | 1-10 or "auto" | Number of voting rounds. "auto" = ceil(log2(numOutfits)). Example: 6 players × 1 outfit = 6 outfits → ceil(log2(6)) = 3 rounds. 6 players × 2 outfits = 12 outfits → ceil(log2(12)) = 4 rounds |
 | `BonusPoints` | object | {RoundLeader: 3, TournamentWin: 10} | Host-defined (0 to disable) | RoundLeader: awarded to outfit with most points in a round (ties: all tied outfits get it). TournamentWin: awarded to player with highest cumulative points |
 
+**Note:** Swiss-system is the only supported tournament format. SingleElimination and Custom are not implemented.
+
 Default voting criteria:
 1. `{ Id: "creativity", DisplayName: "Creativity", Weight: 1.0 }` — How unique/innovative the outfit is
 2. `{ Id: "theme_match", DisplayName: "Theme Match", Weight: 1.0 }` — How well outfit fits the theme
@@ -150,12 +152,15 @@ Additional available criteria (not in defaults):
 | `HostRole` | enum | Active | Active, Passive | Active=host announces phases, picks themes, moderates. Passive=host just tracks, players self-manage |
 | `HostDisconnectTimeoutSec` | int | 60 | 30, 60, 120, 300 | Seconds to wait for host reconnect before abandoning game |
 
+**Note:** The host is always a non-participant observer (except theme picking in HostPick mode). The Active/Passive distinction is not implemented.
+
 **Advanced Settings:**
 | Property | Type | Default | Allowed Values | Description |
 |----------|------|---------|----------------|-------------|
 | `AllowPlayersToChooseThemes` | bool | false | true, false | If true, players vote on themes before drawing |
-| `AllowVotingRollback` | bool | false | true, false | If true, players can change votes before round closes |
 | `RandomizePairings` | bool | true | true, false | If false, matchups are deterministic (replayable) |
+
+**Note:** Votes are always changeable until voting ends (all votes cast or timer expires). This is not configurable.
 
 #### `DrawnToDressPlayerState`
 | Property | Type | Description |
@@ -287,6 +292,7 @@ Additional available criteria (not in defaults):
 - Default config values match the tables above exactly.
 - Models are suitable for deterministic unit tests.
 - Enum types are defined for: ThemeSource (Random, HostPick, PlayerWritten, RandomVoting), ThemeAnnouncement (BeforeDrawing, AfterDrawing), VoteVisibilityMode (Hidden, PercentagesOnly, IndividualVotes, LiveVoting), VotingScope (CannotVoteOnOwn, CanVoteOnOwn, HostDecides), TournamentFormat (Swiss, SingleElimination, Custom), HostRole (Active, Passive), Outfit2PoolType (ExactCopy, FreshDrawingsOnly, Hybrid).
+- VotingScope is defined but only CannotVoteOnOwn is currently implemented. Other modes are planned for a future release.
 
 ### Test cases
 - Config default-value tests: verify every property matches the default specified above.
@@ -412,6 +418,9 @@ Implement the pre-game lobby and host configuration experience.
 - Host-only settings editing
 - Minimum-player warning and start gating
 - Validation for conflicting or invalid config combinations
+- Quick-select preset buttons (Quick Game, Standard, Full Experience, Creative Focus) that populate config with predefined values
+- Individual settings remain editable after preset selection
+- No save/load preset functionality (future feature)
 
 ### Settings to expose (grouped by category)
 
@@ -445,12 +454,10 @@ Implement the pre-game lobby and host configuration experience.
 
 **Game Flow:**
 - `MinPlayers`: default 3
-- `HostRole`: default Active, options [Active, Passive]
 - `HostDisconnectTimeoutSec`: default 60, options [30, 60, 120, 300]
 
 **Advanced:**
 - `AllowPlayersToChooseThemes`: default false
-- `AllowVotingRollback`: default false
 - `RandomizePairings`: default true
 
 ### Required UX behavior
@@ -476,6 +483,9 @@ Implement the pre-game lobby and host configuration experience.
 - Fewer-than-6 player counts show warning messaging.
 - Starting the game transitions into the first configured gameplay state.
 - All default values match the tables above.
+- Host can select a preset to populate settings with predefined values.
+- Settings remain individually editable after preset selection.
+- Host is always a non-participant observer. No HostRole setting is exposed.
 
 ### Test cases
 - Host permissions tests.
@@ -672,7 +682,7 @@ Generate the shared clothing pool from submitted drawings and implement the reve
 ### In scope
 - Pool generation from submitted drawings
 - Grouping display by clothing type
-- Reveal screen with animated display
+- Reveal screen with pool items displayed grouped by clothing type
 - Ready tracking
 - Auto-advance countdown
 - Claim prevention during reveal
@@ -686,7 +696,7 @@ Generate the shared clothing pool from submitted drawings and implement the reve
 - All players see the same pool contents.
 
 **Reveal screen:**
-- Animated reveal of all drawings, grouped by clothing type.
+- All drawings displayed grouped by clothing type with a countdown timer.
 - Large, clear display of each item in the pool.
 - Players can browse the full pool at their leisure (view-only).
 
@@ -1072,14 +1082,14 @@ Create the tournament engine that turns submitted outfits into voting rounds and
 ### Goals
 - Register outfit submissions as tournament entrants.
 - Generate deterministic, testable round structures.
-- Support Swiss pairing as the primary format.
+- Swiss-system is the only supported tournament format.
 
 ### In scope
 - Register outfits as entrants
 - Calculate round count
 - Generate matchups
 - Enforce creator-voting exclusions in eligibility inputs
-- Support Swiss pairing as primary format
+- Swiss-system is the only supported tournament format (SingleElimination and Custom are not implemented)
 
 ### Required behavior
 
@@ -1200,6 +1210,10 @@ Build the player-facing voting experience for outfit matchups.
 | IndividualVotes | See who voted for what (full transparency) |
 | LiveVoting | See votes come in real-time as they're cast |
 
+**Vote changing:** Players may change their votes at any time before voting ends (all players submit or timer expires). Previously submitted votes are overwritten. There is no AllowVotingRollback config — this behavior is always enabled.
+
+**Creator identity:** When `ShowCreatorDuringVoting = false` (default), outfit creator identity is hidden during voting. Only the outfit name is shown. When `true`, the creator's name is displayed below the outfit name.
+
 ### Edge cases
 - **Voter is one of the two outfit creators:** Voter is disabled for that matchup. "You created one of these outfits and cannot vote."
 - **Voter doesn't submit before round closes:** Vote not counted. Missing votes don't invalidate matchup.
@@ -1213,7 +1227,7 @@ Build the player-facing voting experience for outfit matchups.
 ### Implementation notes
 - Keep vote capture independent from score calculation.
 - Persist votes at the matchup + criterion + voter level.
-- Votes should be write-once (no changes after submission, unless `AllowVotingRollback = true`).
+- Votes are changeable until voting ends (all votes cast or timer expires). Previously submitted votes are overwritten.
 
 ### Acceptance criteria
 - Non-creators can vote on all required criteria.
@@ -1224,6 +1238,8 @@ Build the player-facing voting experience for outfit matchups.
 - All four visibility modes work correctly.
 - Default `VotingVisibility` is **PercentagesOnly**.
 - Timer shows urgency indicator at <= 10 seconds.
+- Players can change their votes after initial submission until voting ends.
+- When ShowCreatorDuringVoting is false, creator identity is not shown during voting.
 
 ### Test cases
 - Voting eligibility tests (creator excluded in default mode).
@@ -1232,6 +1248,8 @@ Build the player-facing voting experience for outfit matchups.
 - Visibility-mode behavior tests (each of the 4 modes).
 - All-abstain edge case (0-0 tie triggers coin flip).
 - VotingScope variation tests.
+- Vote-changing tests (player submits, changes, resubmits).
+- ShowCreatorDuringVoting tests (identity hidden when false, shown when true).
 
 ### Dependencies / sequencing
 - Depends on #60.
@@ -1684,6 +1702,8 @@ Add focused, deterministic tests for FSM states and supporting services.
 - [ ] Edge case handling (disconnects, timeouts, empty pools, etc.)
 - [ ] Accessibility (keyboard nav, screen reader, high contrast)
 - [ ] Mobile responsiveness (drawing on mobile, touch interactions)
+- [ ] ShowCreatorDuringVoting display tests (anonymous vs. named)
+- [ ] Vote-changing tests (overwrite previous vote, final tally uses latest vote)
 
 ### Acceptance criteria
 - Each of the 14 FSM states has at least one OnEnter, HandleCommand, and (if timed) Tick test.
@@ -1771,6 +1791,9 @@ Perform a final polish pass on the Drawn To Dress UX and runtime responsiveness.
 - Drawing performance test (60fps).
 - Claiming latency test (<100ms).
 - Cross-browser basic functionality check.
+
+### Notes
+- Sound effects are planned for a future release.
 
 ### Dependencies / sequencing
 - Final pass issue; should come after all major feature work (#49–#66).

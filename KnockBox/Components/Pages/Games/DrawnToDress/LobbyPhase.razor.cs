@@ -120,5 +120,59 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
             if (result.TryGetFailure(out var err))
                 Logger.LogError("Failed to start game: {msg}", err.PublicMessage);
         }
+
+        // ── Presets ─────────────────────────────────────────────────────────────
+
+        protected static readonly (string Name, string Description, Action<DrawnToDressConfig> Apply)[] Presets =
+        [
+            ("Quick Game", "Short timers, 1 outfit round",
+                cfg =>
+                {
+                    cfg.DrawingTimeSec = 60;
+                    cfg.OutfitBuildingTimeSec = 60;
+                    cfg.OutfitCustomizationTimeSec = 30;
+                    cfg.VotingTimeSec = 30;
+                    cfg.NumOutfitRounds = 1;
+                    cfg.VotingRounds = 2;
+                }),
+            ("Standard", "Default settings",
+                cfg =>
+                {
+                    cfg.DrawingTimeSec = 180;
+                    cfg.OutfitBuildingTimeSec = 90;
+                    cfg.OutfitCustomizationTimeSec = 60;
+                    cfg.VotingTimeSec = 60;
+                    cfg.NumOutfitRounds = 1;
+                    cfg.VotingRounds = 3;
+                }),
+            ("Full Experience", "Longer timers, 2 outfit rounds",
+                cfg =>
+                {
+                    cfg.DrawingTimeSec = 180;
+                    cfg.OutfitBuildingTimeSec = 120;
+                    cfg.OutfitCustomizationTimeSec = 90;
+                    cfg.VotingTimeSec = 90;
+                    cfg.NumOutfitRounds = 2;
+                    cfg.VotingRounds = 4;
+                }),
+            ("Creative Focus", "Extra drawing & customization time, sketching required",
+                cfg =>
+                {
+                    cfg.DrawingTimeSec = 300;
+                    cfg.OutfitBuildingTimeSec = 120;
+                    cfg.OutfitCustomizationTimeSec = 120;
+                    cfg.VotingTimeSec = 60;
+                    cfg.NumOutfitRounds = 1;
+                    cfg.VotingRounds = 3;
+                    cfg.SketchingRequired = true;
+                }),
+        ];
+
+        protected void ApplyPreset(int index)
+        {
+            if (index < 0 || index >= Presets.Length) return;
+            Presets[index].Apply(EditConfig);
+            ApplyConfig();
+        }
     }
 }

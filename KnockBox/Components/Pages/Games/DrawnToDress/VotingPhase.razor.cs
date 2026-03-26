@@ -44,6 +44,25 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
             return $"{name} (Outfit {round})";
         }
 
+        /// <summary>
+        /// Returns the display label for an entrant during voting.
+        /// Always shows the outfit name. Optionally shows creator name below
+        /// when <see cref="DrawnToDressConfig.ShowCreatorDuringVoting"/> is enabled.
+        /// </summary>
+        protected string GetEntrantLabel(string entrantId)
+        {
+            var outfit = GetEntrantOutfit(entrantId);
+            string outfitName = outfit?.Customization.OutfitName ?? "Unnamed Outfit";
+
+            if (GameState.Config.ShowCreatorDuringVoting)
+            {
+                string creatorName = GetEntrantDisplayName(entrantId);
+                return $"{outfitName} — {creatorName}";
+            }
+
+            return outfitName;
+        }
+
         protected OutfitSubmission? GetEntrantOutfit(string entrantId)
         {
             return GameState.Context?.GetOutfitByEntrantId(entrantId);
@@ -53,6 +72,21 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
         {
             _selectedVotes[(matchupId, criterionId)] = entrantId;
             StateHasChanged();
+        }
+
+        /// <summary>
+        /// Loads previously submitted votes for a matchup into the local selection dictionary
+        /// so players can see and change their existing votes.
+        /// </summary>
+        protected void LoadExistingVotes(Guid matchupId)
+        {
+            var existingVotes = GameState.Votes.Values
+                .Where(v => v.VoterPlayerId == CurrentPlayerId && v.MatchupId == matchupId);
+
+            foreach (var vote in existingVotes)
+            {
+                _selectedVotes[(matchupId, vote.CriterionId)] = vote.ChosenEntrantId;
+            }
         }
 
         protected bool AllCriteriaVotedForMatchup(Guid matchupId)

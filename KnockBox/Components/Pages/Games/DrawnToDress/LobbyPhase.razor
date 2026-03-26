@@ -83,6 +83,20 @@
             </div>
             <div class="dtd-settings-body">
 
+                <!-- ── Presets ─────────────────────────────────────────── -->
+                <h4 class="dtd-settings-section">⚡ Quick Presets</h4>
+                <div class="dtd-preset-row">
+                    @for (int i = 0; i < LobbyPhase.Presets.Length; i++)
+                    {
+                        var idx = i;
+                        var preset = LobbyPhase.Presets[idx];
+                        <button class="dtd-btn dtd-btn-preset" @onclick="() => ApplyPreset(idx)"
+                                title="@preset.Description">
+                            @preset.Name
+                        </button>
+                    }
+                </div>
+
                 <!-- ── Drawing ──────────────────────────────────────────── -->
                 <h4 class="dtd-settings-section">🖊️ Drawing</h4>
                 <div class="dtd-settings-grid">

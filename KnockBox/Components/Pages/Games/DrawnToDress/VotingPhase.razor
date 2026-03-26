@@ -55,7 +55,7 @@
                 {
                     int voteCount = GameState.Votes.Values.Count(v => v.MatchupId == matchup.Id);
                     <div class="dtd-voting-matchup-status">
-                        <span>@GetEntrantDisplayName(matchup.EntrantAId) vs @GetEntrantDisplayName(matchup.EntrantBId)</span>
+                        <span>@GetEntrantLabel(matchup.EntrantAId) vs @GetEntrantLabel(matchup.EntrantBId)</span>
                         <span class="dtd-voting-vote-count">@voteCount vote(s)</span>
                     </div>
                 }
@@ -77,14 +77,16 @@
                             <p>You're competing in this matchup!</p>
                         </div>
                     }
-                    else if (alreadySubmitted)
-                    {
-                        <div class="dtd-voting-submitted">
-                            <p>✅ Votes submitted for this matchup.</p>
-                        </div>
-                    }
                     else
                     {
+                        @if (alreadySubmitted)
+                        {
+                            LoadExistingVotes(matchup.Id);
+                            <div class="dtd-voting-submitted">
+                                <p>✅ Votes submitted. You can change your votes below.</p>
+                            </div>
+                        }
+
                         <!-- Side-by-side outfit display -->
                         <div class="dtd-voting-matchup-outfits">
                             @{
@@ -93,7 +95,7 @@
                             }
 
                             <div class="dtd-voting-entrant">
-                                <h4>@GetEntrantDisplayName(matchup.EntrantAId)</h4>
+                                <h4>@GetEntrantLabel(matchup.EntrantAId)</h4>
                                 @if (outfitA is not null)
                                 {
                                     <svg class="dtd-voting-outfit-preview" viewBox="0 0 600 @TotalOutfitHeight"
@@ -133,7 +135,7 @@
                             <div class="dtd-voting-vs">VS</div>
 
                             <div class="dtd-voting-entrant">
-                                <h4>@GetEntrantDisplayName(matchup.EntrantBId)</h4>
+                                <h4>@GetEntrantLabel(matchup.EntrantBId)</h4>
                                 @if (outfitB is not null)
                                 {
                                     <svg class="dtd-voting-outfit-preview" viewBox="0 0 600 @TotalOutfitHeight"
@@ -198,7 +200,7 @@
                             <button class="dtd-btn dtd-btn-primary"
                                     @onclick="() => SubmitVotesForMatchupAsync(matchup.Id)"
                                     disabled="@(!AllCriteriaVotedForMatchup(matchup.Id) || _submitting)">
-                                Submit Vote
+                                @(alreadySubmitted ? "Update Vote" : "Submit Vote")
                             </button>
                         </div>
                     }

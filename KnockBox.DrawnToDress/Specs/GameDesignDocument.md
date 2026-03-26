@@ -238,7 +238,7 @@ Final scores are tallied and displayed.
 **During phase:**
 - Game displays: "Draw HATS — 180 seconds remaining" (or other clothing type)
 - Canvas/drawing area is provided for each player
-- Timer counts down audibly and visually
+- Timer counts down visually
 - Players draw freehand
 - When timer expires, automatically move to next clothing type
 
@@ -259,7 +259,7 @@ Final scores are tallied and displayed.
 ### Phase 2: Pool Reveal (Detailed)
 
 **What players see:**
-- Animated reveal of all drawings in the shared pool, displayed grouped by clothing type
+- All drawings in the shared pool are displayed grouped by clothing type
 - Full grid of every item that will be available to pick
 
 **Player actions:**
@@ -433,6 +433,7 @@ Final scores are tallied and displayed.
 **During Voting:**
 - Player cannot vote on their own outfits
   - *Exception: Host can configure to allow this (at risk of collusion).*
+- Players may change their votes at any time before voting ends (all players submit or timer expires)
 - Voter must vote on all criteria presented
 - Ties are broken by coin flip (see Coin Flip Procedure below)
 
@@ -682,13 +683,8 @@ All settings default to recommended values. Host can customize if desired.
 - **Recommendation:** "cannotVoteOnOwn" (fair, prevents collusion)
 
 #### `tournamentFormat`
-- **Default:** "swiss"
-- **Options:**
-  - `"swiss"` — Swiss system (fair competitive, 4 rounds typical for 6 players)
-  - `"singleElimination"` — Bracket tournament (fast, unbalanced; losers drop out early)
-  - `"custom"` — Host specifies number of voting rounds (Swiss pairing used)
-- **Impact:** Swiss = balanced; Elimination = drama
-- **Recommendation:** "swiss" (best balance for party games)
+- Swiss-system is the only supported tournament format.
+- **Default:** swiss (only supported format)
 
 #### `tournamentRounds`
 - **Default:** auto-calculated (ceil(log2(num_outfits)))
@@ -719,12 +715,10 @@ All settings default to recommended values. Host can customize if desired.
 - **Recommendation:** 3 minimum (6+ recommended for best experience)
 
 #### `hostRole`
-- **Default:** "active"
-- **Options:**
-  - `"active"` — Host announces phases, picks themes, moderates (engaged)
-  - `"passive"` — Host just tracks; players self-manage (autonomous)
-- **Impact:** Active host = guided experience; Passive = self-directed
-- **Recommendation:** "active" (easier for first games)
+- The host is always a non-participant observer
+- The host screen displays game progress and details for spectators
+- The host only participates when selecting a theme in HostPick mode
+- *This setting is not configurable*
 
 #### `hostDisconnectTimeout`
 - **Default:** 60 (seconds)
@@ -742,11 +736,10 @@ All settings default to recommended values. Host can customize if desired.
 - **Impact:** If true, players vote on which themes to use before drawing
 - **Recommendation:** false (simpler; host controls pacing)
 
-#### `allowVotingRollback`
-- **Default:** false
-- **Options:** true, false
-- **Impact:** If true, players can change votes before round closes (reduces finality)
-- **Recommendation:** false (votes are final)
+#### Voting Changes
+- Players may change their votes at any time before voting ends (all players submit or timer expires)
+- Previously submitted votes are overwritten
+- *This behavior is always enabled and not configurable*
 
 #### `randomizePairings`
 - **Default:** true (Swiss system uses smart pairing)
@@ -770,27 +763,27 @@ All settings default to recommended values. Host can customize if desired.
 - Organized by category (Drawing, Theme, Outfit Building, Voting, Game Flow)
 - Default values highlighted / recommended label
 - Each setting has tooltip explaining impact
-- Presets available (quick-select)
-- Save/Load custom preset option
+- Preset quick-select buttons available (Quick Game, Standard, Full Experience, Creative Focus)
+- Save/Load custom preset option (future feature — not in initial release)
 - Back button to lobby
 
 #### Drawing Phase Screen (Different Host and Player Views)
 ##### Host View
 - Clothing type displayed prominently ("DRAW HATS")
-- Timer (visual + audio countdown)
+- Timer (visual countdown)
 - Player submission view (shows which players are finished)
 - Progress indicator (Round 1/4)
 
 ##### Player View
 - Clothing type displayed prominently ("DRAW HATS")
-- Timer (visual + audio countdown)
+- Timer (visual countdown)
 - Canvas for drawing (full screen or primary area)
 - Clear canvas button
 - Visual feedback: "Drawing saved automatically"
 - Submit button
 
 #### Pool Reveal Screen
-- Animated reveal of all drawings, grouped by clothing type
+- All drawings displayed grouped by clothing type
 - Large, clear display of each item in the pool
 - "Ready" button for each player (greyed out until reveal animation completes)
 - Counter showing how many players are ready: "4 / 6 Ready"
@@ -809,7 +802,6 @@ All settings default to recommended values. Host can customize if desired.
 - Drag-and-drop from pool to slots
 - Lock-in button (when all 4 slots filled)
 - Visual feedback: Red outline when item claimed by another player
-- Sound effect: Subtle "woosh" when item is claimed
 
 #### Customization Screen (After Picking - For Players Only)
 - Large display of selected outfit items
@@ -856,9 +848,8 @@ All settings default to recommended values. Host can customize if desired.
 - Auto-save on timer expiration
 
 #### Pool Reveal
-- Smooth staggered animation revealing items one-by-one or group-by-group
-- Subtle sound effect per item reveal or per group reveal
-- Allows scrolling through pool after animation completes
+- Pool items displayed grouped by clothing type with a countdown timer
+- Allows scrolling through pool after display completes
 
 #### Outfit Picking (Simultaneous Real-Time)
 - Click/tap item from pool; it is placed in its corresponding slot, replacing an existing slot item if applicable
@@ -870,6 +861,7 @@ All settings default to recommended values. Host can customize if desired.
 - Visual indication of selected choice
 - Cannot submit until all criteria are voted
 - Confirm button prevents accidental submission
+- Players can change previously submitted votes before the round ends
 
 #### Coin Flip Interaction
 - Selected player sees prominent "HEADS" and "TAILS" buttons
@@ -1085,6 +1077,7 @@ All settings default to recommended values. Host can customize if desired.
 - **State management:** Central game state (phase, players, outfits, votes) on server
 - **Scalability:** Designed for 6–20 players
 - **Coin flip timer:** Server-side 15-second timer to prevent client-side manipulation
+- **Sound effects:** Planned for a future release. All timer and interaction sounds are deferred.
 
 ### Testing Checklist
 
@@ -1124,6 +1117,7 @@ All settings default to recommended values. Host can customize if desired.
 | 1.0 | March 2026 | Initial design complete |
 | 1.1 | March 2026 | Clarified vote-based scoring (1 pt per vote × weight); added Pool Reveal phase; raised minimum players to 6; defined tiebreaker rules; specified coin flip UX with 15s timer; clarified `canReuseOutfit1Items` precedence over `outfitDistinctnessRule`; consolidated theme settings (same theme for both outfits); specified `playerWritten` theme flow; updated Swiss rounds table for 2-outfits-per-player; added host disconnect default timeout (60s); fixed auto-fill self-pick compliance; updated scoring example; fixed typo |
 | 1.2 | March 2026 | Updated defaults based on playtesting: drawing time 60s→180s; clothing types shirt→top, pants→bottom; theme source builtInPool→random; outfit building time 180s→90s; voting criteria changed to creativity/theme_match/overall_look; max items per type 5→3; min players 6→3; default outfit rounds 2→1; updated scoring examples for 3 criteria |
+| 1.3 | March 2026 | Removed SingleElimination/Custom tournament formats (Swiss only); host is always non-participant observer; votes are always changeable; removed reveal animation and sound effects (future release); added quick-select presets; added ShowCreatorDuringVoting behavior |
 
 ---
 
