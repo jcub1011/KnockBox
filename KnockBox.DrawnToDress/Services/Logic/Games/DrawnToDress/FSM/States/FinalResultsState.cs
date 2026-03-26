@@ -2,25 +2,27 @@ using KnockBox.Core.Services.State.Games.Shared;
 using KnockBox.Extensions.Returns;
 using KnockBox.Services.Logic.Games.DrawnToDress;
 using KnockBox.Services.State.Games.DrawnToDress;
+using KnockBox.Services.State.Games.DrawnToDress.Data;
 
 namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
 {
     /// <summary>
-    /// Terminal state that displays the final leaderboard and game-over screen.
+    /// Computation state that calculates the final leaderboard and checks for tied pairs.
     ///
-    /// No further gameplay transitions are possible from this state other than abandoning
-    /// (e.g. to clean up resources on the server).
+    /// If there are ties that cannot be broken by matchup wins, this state populates the
+    /// <see cref="DrawnToDressGameState.PendingCoinFlipQueue"/> with
+    /// <see cref="CoinFlipContext.FinalStandingsTie"/> entries and chains to
+    /// <see cref="CoinFlipState"/> → <see cref="FinalResultsDisplayState"/>.
     ///
-    /// Transition ownership:
-    /// - <see cref="AbandonGameCommand"/> → <see cref="AbandonedState"/>
+    /// If there are no ties (or all ties are broken by matchup wins), it chains directly
+    /// to <see cref="FinalResultsDisplayState"/>.
     /// </summary>
     public sealed class FinalResultsState : IDrawnToDressGameState
     {
         public ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?> OnEnter(
             DrawnToDressGameContext context)
         {
-            context.State.SetPhase(GamePhase.Results);
-            context.Logger.LogInformation("FSM → FinalResultsState. Game complete.");
+            context.Logger.LogInformation("FSM → FinalResultsState. Computing leaderboard.");
 
             var players = context.GamePlayers.ToDictionary(
                 kv => kv.Key, kv => kv.Value) as IReadOnlyDictionary<string, State.Games.DrawnToDress.Data.DrawnToDressPlayerState>;
@@ -66,14 +68,30 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
             // 4. Store in state.
             context.State.Leaderboard = entries;
 
+            // 5. If tied pairs exist, resolve via coin flip.
             if (tiedPairs.Count > 0)
             {
                 context.Logger.LogInformation(
-                    "Leaderboard has {count} tied pair(s) that may need coin flip resolution (deferred to issue #63).",
+                    "Leaderboard has {count} tied pair(s). Setting up coin flip resolution.",
                     tiedPairs.Count);
+
+                var queue = new List<PendingCoinFlipEntry>();
+                foreach (var (playerA, playerB) in tiedPairs)
+                {
+                    queue.Add(new PendingCoinFlipEntry
+                    {
+                        Context = CoinFlipContext.FinalStandingsTie,
+                        PlayerAId = playerA,
+                        PlayerBId = playerB,
+                    });
+                }
+
+                context.State.PendingCoinFlipQueue = queue;
+                return new CoinFlipState(new FinalResultsDisplayState());
             }
 
-            return null;
+            // No ties — go straight to display.
+            return new FinalResultsDisplayState();
         }
 
         public Result OnExit(DrawnToDressGameContext context) => Result.Success;

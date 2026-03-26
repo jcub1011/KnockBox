@@ -138,6 +138,17 @@ namespace KnockBox.Services.State.Games.DrawnToDress
         public List<(Guid MatchupId, string CriterionId)> PendingCoinFlips { get; set; } = [];
 
         /// <summary>
+        /// Interactive coin flip queue for the current coin flip phase.
+        /// Populated by <see cref="FSM.States.VotingMatchupState"/> or <see cref="FSM.States.FinalResultsState"/>.
+        /// </summary>
+        public List<PendingCoinFlipEntry> PendingCoinFlipQueue { get; set; } = [];
+
+        /// <summary>
+        /// Index into <see cref="PendingCoinFlipQueue"/> pointing at the flip currently in progress.
+        /// </summary>
+        public int CurrentCoinFlipIndex { get; set; }
+
+        /// <summary>
         /// Final ranked standings computed in <see cref="FSM.States.FinalResultsState"/>.
         /// </summary>
         public List<LeaderboardEntry> Leaderboard { get; set; } = [];

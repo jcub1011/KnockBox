@@ -44,6 +44,18 @@
     {
         <VotingPhase GameState="GameState" />
     }
+    else if (GameState.Phase == KnockBox.Services.State.Games.DrawnToDress.GamePhase.CoinFlip)
+    {
+        <CoinFlipPhase GameState="GameState" />
+    }
+    else if (GameState.Phase == KnockBox.Services.State.Games.DrawnToDress.GamePhase.VotingRoundResults)
+    {
+        <VotingRoundResultsPhase GameState="GameState" />
+    }
+    else if (GameState.Phase == KnockBox.Services.State.Games.DrawnToDress.GamePhase.Results)
+    {
+        <FinalResultsPhase GameState="GameState" />
+    }
     else
     {
         <div class="card">

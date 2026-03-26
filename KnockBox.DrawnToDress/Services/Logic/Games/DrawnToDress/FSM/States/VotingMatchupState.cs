@@ -179,7 +179,28 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
             context.Logger.LogInformation(
                 "Coin-flip requested for matchup [{matchupId}] by [{id}].",
                 cmd.MatchupId, cmd.PlayerId);
-            return new CoinFlipState();
+
+            // Build a queue entry for the manually requested flip.
+            int roundIndex = context.State.CurrentVotingRoundIndex;
+            var round = roundIndex < context.State.VotingRounds.Count
+                ? context.State.VotingRounds[roundIndex] : null;
+            var matchup = round?.Matchups.FirstOrDefault(m => m.Id == cmd.MatchupId);
+
+            if (matchup is not null)
+            {
+                context.State.PendingCoinFlipQueue =
+                [
+                    new PendingCoinFlipEntry
+                    {
+                        Context = CoinFlipContext.CriterionTie,
+                        MatchupId = cmd.MatchupId,
+                        EntrantAId = matchup.EntrantAId,
+                        EntrantBId = matchup.EntrantBId,
+                    }
+                ];
+            }
+
+            return new CoinFlipState(new VotingRoundResultsState());
         }
 
         private static IGameState<DrawnToDressGameContext, DrawnToDressCommand> ChooseNextState(DrawnToDressGameContext context)
@@ -197,10 +218,30 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
                 if (tiedCriteria.Count > 0)
                 {
                     context.State.PendingCoinFlips = tiedCriteria;
+
+                    // Build interactive coin flip queue entries.
+                    var queue = new List<PendingCoinFlipEntry>();
+                    foreach (var (matchupId, criterionId) in tiedCriteria)
+                    {
+                        var matchup = round.Matchups.FirstOrDefault(m => m.Id == matchupId);
+                        if (matchup is null) continue;
+
+                        queue.Add(new PendingCoinFlipEntry
+                        {
+                            Context = CoinFlipContext.CriterionTie,
+                            MatchupId = matchupId,
+                            CriterionId = criterionId,
+                            EntrantAId = matchup.EntrantAId,
+                            EntrantBId = matchup.EntrantBId,
+                        });
+                    }
+
+                    context.State.PendingCoinFlipQueue = queue;
+
                     context.Logger.LogInformation(
                         "Found {count} tied criteria in round {round}. Moving to coin flip.",
                         tiedCriteria.Count, roundIndex + 1);
-                    return new CoinFlipState();
+                    return new CoinFlipState(new VotingRoundResultsState());
                 }
             }
 

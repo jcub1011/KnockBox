@@ -126,6 +126,25 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM
         string PlayerId,
         Guid MatchupId) : DrawnToDressCommand(PlayerId);
 
+    /// <summary>
+    /// The designated caller chooses heads or tails for the current coin flip.
+    /// </summary>
+    public record CoinFlipCallCommand(
+        string PlayerId,
+        bool ChoseHeads) : DrawnToDressCommand(PlayerId);
+
+    // ── Final results ────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Host requests a new game with the same players (returns to lobby).
+    /// </summary>
+    public record PlayAgainCommand(string PlayerId) : DrawnToDressCommand(PlayerId);
+
+    /// <summary>
+    /// Player exits to the main menu.
+    /// </summary>
+    public record ReturnToMenuCommand(string PlayerId) : DrawnToDressCommand(PlayerId);
+
     // ── Game control ──────────────────────────────────────────────────────────
 
     /// <summary>Host pauses the game, saving the current state for later resumption.</summary>

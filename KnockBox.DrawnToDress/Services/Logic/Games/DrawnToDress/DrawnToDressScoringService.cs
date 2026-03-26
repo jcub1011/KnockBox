@@ -314,5 +314,87 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress
 
             return (entries, tiedPairs);
         }
+
+        /// <summary>
+        /// Re-ranks leaderboard entries that were tied, using resolved coin flip results
+        /// from <see cref="PendingCoinFlipEntry"/> entries with
+        /// <see cref="CoinFlipContext.FinalStandingsTie"/>.
+        /// Winners of the coin flip get the better (lower) rank.
+        /// Sets <see cref="LeaderboardEntry.TiebreakMethod"/> to <c>"coin_flip"</c>.
+        /// </summary>
+        public static void ApplyCoinFlipTiebreaks(
+            List<LeaderboardEntry> entries,
+            List<PendingCoinFlipEntry> resolvedFlips)
+        {
+            var standingsFlips = resolvedFlips
+                .Where(f => f.IsResolved && f.Context == CoinFlipContext.FinalStandingsTie)
+                .ToList();
+
+            if (standingsFlips.Count == 0) return;
+
+            // Build a set of winners and losers from the flips.
+            var flipWinners = new Dictionary<(string, string), string>();
+            foreach (var flip in standingsFlips)
+            {
+                flipWinners[(flip.PlayerAId, flip.PlayerBId)] = flip.WinnerPlayerId;
+                flipWinners[(flip.PlayerBId, flip.PlayerAId)] = flip.WinnerPlayerId;
+            }
+
+            // Group entries by rank (tied groups).
+            var groups = entries.GroupBy(e => e.Rank).Where(g => g.Count() > 1).ToList();
+
+            foreach (var group in groups)
+            {
+                var members = group.ToList();
+                int baseRank = group.Key;
+
+                // Find the start index of this group in the list.
+                int startIdx = entries.IndexOf(members[0]);
+
+                // Sort within the tied group: coin flip winners first.
+                members.Sort((a, b) =>
+                {
+                    if (flipWinners.TryGetValue((a.PlayerId, b.PlayerId), out var winner))
+                    {
+                        return winner == a.PlayerId ? -1 : 1;
+                    }
+                    return string.Compare(a.PlayerId, b.PlayerId, StringComparison.Ordinal);
+                });
+
+                // Replace the group entries in the list with the sorted order.
+                for (int i = 0; i < members.Count; i++)
+                {
+                    entries[startIdx + i] = members[i];
+                    members[i].Rank = baseRank + i;
+                    members[i].TiebreakMethod = "coin_flip";
+                }
+            }
+
+            // Also set matchup_wins for entries that were NOT tied.
+            SetMatchupWinsTiebreakMethod(entries);
+        }
+
+        /// <summary>
+        /// Sets <see cref="LeaderboardEntry.TiebreakMethod"/> to <c>"matchup_wins"</c>
+        /// for entries that share the same <see cref="LeaderboardEntry.TotalScore"/> with
+        /// an adjacent entry but have different <see cref="LeaderboardEntry.MatchupWins"/>
+        /// (i.e. matchup wins already broke the tie).
+        /// </summary>
+        public static void SetMatchupWinsTiebreakMethod(List<LeaderboardEntry> entries)
+        {
+            for (int i = 1; i < entries.Count; i++)
+            {
+                if (entries[i].TiebreakMethod is not null) continue;
+                if (entries[i - 1].TiebreakMethod is not null) continue;
+
+                // Check if these two share the same total score but different matchup wins.
+                if (entries[i].TotalScore == entries[i - 1].TotalScore &&
+                    entries[i].MatchupWins != entries[i - 1].MatchupWins)
+                {
+                    entries[i].TiebreakMethod = "matchup_wins";
+                    entries[i - 1].TiebreakMethod = "matchup_wins";
+                }
+            }
+        }
     }
 }

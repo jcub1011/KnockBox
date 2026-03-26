@@ -30,5 +30,12 @@ namespace KnockBox.Services.State.Games.DrawnToDress.Data
 
         /// <summary>Final rank on the leaderboard (1 = first place).</summary>
         public int Rank { get; set; }
+
+        /// <summary>
+        /// How this player's tie was broken, if applicable.
+        /// <c>null</c> = no tiebreak needed, <c>"matchup_wins"</c> = broken by matchup wins,
+        /// <c>"coin_flip"</c> = broken by coin flip.
+        /// </summary>
+        public string? TiebreakMethod { get; set; }
     }
 }

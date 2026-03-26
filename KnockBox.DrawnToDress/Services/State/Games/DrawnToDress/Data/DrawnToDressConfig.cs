@@ -200,6 +200,14 @@ namespace KnockBox.Services.State.Games.DrawnToDress.Data
         /// </summary>
         public int TournamentWinnerBonusPoints { get; set; } = 10;
 
+        // ── Coin flip ────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Number of seconds the caller has to choose heads or tails during a coin flip.
+        /// GDD default: 15 s.
+        /// </summary>
+        public int CoinFlipTimeSec { get; set; } = 15;
+
         // ── Host / connectivity ───────────────────────────────────────────────
 
         /// <summary>
@@ -274,6 +282,9 @@ namespace KnockBox.Services.State.Games.DrawnToDress.Data
             if (BonusPointsForCompleteOutfit < 0) BonusPointsForCompleteOutfit = 0;
             if (RoundLeaderBonusPoints < 0) RoundLeaderBonusPoints = 0;
             if (TournamentWinnerBonusPoints < 0) TournamentWinnerBonusPoints = 0;
+
+            // ── Coin flip ─────────────────────────────────────────────────────────
+            if (CoinFlipTimeSec < 5) CoinFlipTimeSec = 5;
 
             // ── Host / connectivity ────────────────────────────────────────────
             if (HostDisconnectTimeoutSec < 30) HostDisconnectTimeoutSec = 30;
