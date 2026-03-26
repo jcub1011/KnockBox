@@ -158,6 +158,12 @@ namespace KnockBox.Services.State.Games.DrawnToDress.Data
         /// </summary>
         public bool ShowCreatorDuringVoting { get; set; } = false;
 
+        /// <summary>
+        /// Controls which vote information is visible to players during an active voting round.
+        /// GDD default: <see cref="VoteVisibilityMode.Hidden"/>.
+        /// </summary>
+        public VoteVisibilityMode VoteVisibility { get; set; } = VoteVisibilityMode.Hidden;
+
         // ── Tournament format ─────────────────────────────────────────────────
 
         /// <summary>

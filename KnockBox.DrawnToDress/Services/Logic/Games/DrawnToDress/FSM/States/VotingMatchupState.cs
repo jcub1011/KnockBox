@@ -77,7 +77,7 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
 
         // ── Helpers ───────────────────────────────────────────────────────────
 
-        private static ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?> HandleCastVote(
+        private ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?> HandleCastVote(
             DrawnToDressGameContext context, CastVoteCommand cmd)
         {
             var voter = context.GetPlayer(cmd.PlayerId);
@@ -90,19 +90,57 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
 
             // Enforce creator-voting exclusion: participants in the matchup may not vote on it.
             int roundIndex = context.State.CurrentVotingRoundIndex;
-            if (roundIndex < context.State.VotingRounds.Count)
+            if (roundIndex >= context.State.VotingRounds.Count)
             {
-                var round = context.State.VotingRounds[roundIndex];
-                var matchup = round.Matchups.FirstOrDefault(m => m.Id == cmd.MatchupId);
-                if (matchup is not null && !VotingEligibilityService.IsEligibleToVote(cmd.PlayerId, matchup))
-                {
-                    context.Logger.LogWarning(
-                        "CastVote: player [{id}] is a participant in matchup [{matchupId}] and is not eligible to vote on it.",
-                        cmd.PlayerId, cmd.MatchupId);
-                    return null;
-                }
+                context.Logger.LogWarning("CastVote: no active voting round.");
+                return null;
             }
 
+            var round = context.State.VotingRounds[roundIndex];
+            var matchup = round.Matchups.FirstOrDefault(m => m.Id == cmd.MatchupId);
+            if (matchup is null)
+            {
+                context.Logger.LogWarning(
+                    "CastVote: matchup [{id}] not found in current round.", cmd.MatchupId);
+                return null;
+            }
+
+            if (!VotingEligibilityService.IsEligibleToVote(cmd.PlayerId, matchup))
+            {
+                context.Logger.LogWarning(
+                    "CastVote: player [{id}] is a participant in matchup [{matchupId}] and is not eligible to vote on it.",
+                    cmd.PlayerId, cmd.MatchupId);
+                return null;
+            }
+
+            // Validate that the criterion is known.
+            if (!context.Config.VotingCriteria.Any(c => c.Id == cmd.CriterionId))
+            {
+                context.Logger.LogWarning(
+                    "CastVote: unknown criterion [{id}].", cmd.CriterionId);
+                return null;
+            }
+
+            // Validate that the chosen player is a participant in this matchup.
+            if (cmd.ChosenPlayerId != matchup.PlayerAId && cmd.ChosenPlayerId != matchup.PlayerBId)
+            {
+                context.Logger.LogWarning(
+                    "CastVote: chosen player [{id}] is not a participant in matchup [{matchupId}].",
+                    cmd.ChosenPlayerId, cmd.MatchupId);
+                return null;
+            }
+
+            // Override any previous vote from this voter on the same matchup+criterion.
+            var existingKey = context.State.Votes
+                .FirstOrDefault(kv =>
+                    kv.Value.VoterPlayerId == cmd.PlayerId &&
+                    kv.Value.MatchupId == cmd.MatchupId &&
+                    kv.Value.CriterionId == cmd.CriterionId)
+                .Key;
+            if (existingKey != Guid.Empty)
+                context.State.Votes.TryRemove(existingKey, out _);
+
+            bool isLate = DateTimeOffset.UtcNow > _deadline;
             var submission = new VoteSubmission
             {
                 VoterPlayerId = cmd.PlayerId,
@@ -110,12 +148,18 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
                 CriterionId = cmd.CriterionId,
                 ChosenPlayerId = cmd.ChosenPlayerId,
                 SubmittedAt = DateTimeOffset.UtcNow,
+                IsLate = isLate,
             };
             context.State.Votes[Guid.NewGuid()] = submission;
 
-            context.Logger.LogInformation(
-                "Player [{voter}] voted for [{chosen}] in matchup [{matchup}] on criterion [{criterion}].",
-                cmd.PlayerId, cmd.ChosenPlayerId, cmd.MatchupId, cmd.CriterionId);
+            if (isLate)
+                context.Logger.LogInformation(
+                    "Player [{voter}] voted LATE for [{chosen}] in matchup [{matchup}] on criterion [{criterion}].",
+                    cmd.PlayerId, cmd.ChosenPlayerId, cmd.MatchupId, cmd.CriterionId);
+            else
+                context.Logger.LogInformation(
+                    "Player [{voter}] voted for [{chosen}] in matchup [{matchup}] on criterion [{criterion}].",
+                    cmd.PlayerId, cmd.ChosenPlayerId, cmd.MatchupId, cmd.CriterionId);
 
             // Advance early when all expected votes for this round have been cast.
             if (AllVotesCast(context))
@@ -145,11 +189,12 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
         }
 
         /// <summary>
-        /// Returns <see langword="true"/> when every voter-matchup-criterion combination
-        /// for the current round has been submitted.
+        /// Returns <see langword="true"/> when every eligible voter has cast a vote for
+        /// every configured criterion on every matchup in the current round.
         ///
-        /// TODO: Replace with proper expected-vote-count logic in a later issue.
-        /// Placeholder: mark ready when every player has submitted at least one vote.
+        /// A player is eligible to vote on a matchup when they are not a participant in it
+        /// (see <see cref="VotingEligibilityService.IsEligibleToVote"/>).  If a matchup has
+        /// no eligible voters (e.g. a two-player game) it is treated as already complete.
         /// </summary>
         private static bool AllVotesCast(DrawnToDressGameContext context)
         {
@@ -157,12 +202,33 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
             if (roundIndex >= context.State.VotingRounds.Count) return false;
 
             var round = context.State.VotingRounds[roundIndex];
-            var votersInRound = new HashSet<string>(
-                context.State.Votes.Values
-                    .Where(v => round.Matchups.Any(m => m.Id == v.MatchupId))
-                    .Select(v => v.VoterPlayerId));
+            if (round.Matchups.Count == 0) return true;
 
-            return context.GamePlayers.Keys.All(id => votersInRound.Contains(id));
+            var criteriaIds = context.Config.VotingCriteria.Select(c => c.Id).ToList();
+            if (criteriaIds.Count == 0) return true;
+
+            var allPlayerIds = context.GamePlayers.Keys;
+
+            // Build a lookup set of (voterId, matchupId, criterionId) triples already cast.
+            var castTriples = context.State.Votes.Values
+                .Where(v => round.Matchups.Any(m => m.Id == v.MatchupId))
+                .Select(v => (v.VoterPlayerId, v.MatchupId, v.CriterionId))
+                .ToHashSet();
+
+            foreach (var matchup in round.Matchups)
+            {
+                var eligibleVoterIds = VotingEligibilityService.GetEligibleVoterIds(matchup, allPlayerIds);
+                foreach (var voterId in eligibleVoterIds)
+                {
+                    foreach (var criterionId in criteriaIds)
+                    {
+                        if (!castTriples.Contains((voterId, matchup.Id, criterionId)))
+                            return false;
+                    }
+                }
+            }
+
+            return true;
         }
     }
 }

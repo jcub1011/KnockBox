@@ -1,6 +1,24 @@
 namespace KnockBox.Services.State.Games.DrawnToDress.Data
 {
     /// <summary>
+    /// Controls which vote information is visible to players during an active voting round.
+    /// </summary>
+    public enum VoteVisibilityMode
+    {
+        /// <summary>No vote counts or voter identities are revealed until the round ends.</summary>
+        Hidden = 0,
+
+        /// <summary>
+        /// Running vote percentages per criterion are shown in real time, but individual
+        /// voter identities remain hidden.
+        /// </summary>
+        PercentagesOnly = 1,
+
+        /// <summary>Individual voter choices are revealed as they are cast.</summary>
+        IndividualVotes = 2,
+    }
+
+    /// <summary>
     /// Defines a single axis on which outfits are judged during voting (e.g. Creativity).
     /// Each criterion carries a relative weight used for score aggregation.
     /// </summary>
