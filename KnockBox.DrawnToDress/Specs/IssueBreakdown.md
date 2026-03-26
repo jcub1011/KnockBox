@@ -694,7 +694,7 @@ Create the tournament engine that turns submitted outfits into voting rounds and
 
 ---
 
-## #61 — 1.13 Implement matchup voting flow and vote capture
+## #61 — 1.13 Implement matchup voting flow and vote capture (DONE)
 
 ### Summary
 Build the player-facing voting experience for outfit matchups.
