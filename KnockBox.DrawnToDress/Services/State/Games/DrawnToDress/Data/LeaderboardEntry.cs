@@ -23,6 +23,11 @@ namespace KnockBox.Services.State.Games.DrawnToDress.Data
         /// <summary>Extra points awarded for achievements (e.g. completing an outfit on time).</summary>
         public int BonusPoints { get; set; }
 
+        /// <summary>
+        /// Weighted matchup wins used as a tiebreaker. Win=1.0, tie=0.5, loss=0.0 per matchup.
+        /// </summary>
+        public double MatchupWins { get; set; }
+
         /// <summary>Final rank on the leaderboard (1 = first place).</summary>
         public int Rank { get; set; }
     }

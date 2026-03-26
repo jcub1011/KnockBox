@@ -1,5 +1,6 @@
 using KnockBox.Core.Services.State.Games.Shared;
 using KnockBox.Extensions.Returns;
+using KnockBox.Services.Logic.Games.DrawnToDress;
 using KnockBox.Services.State.Games.DrawnToDress;
 using KnockBox.Services.State.Games.DrawnToDress.Data;
 
@@ -187,36 +188,19 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
             if (roundIndex < context.State.VotingRounds.Count)
             {
                 var round = context.State.VotingRounds[roundIndex];
+                var tiedCriteria = DrawnToDressScoringService.FindTiedCriteria(
+                    round,
+                    context.Config.VotingCriteria,
+                    context.State.Votes.Values,
+                    context.State.CriterionCoinFlipResults);
 
-                foreach (var matchup in round.Matchups)
+                if (tiedCriteria.Count > 0)
                 {
-                    var matchupVotes = context.State.Votes.Values
-                        .Where(v => v.MatchupId == matchup.Id)
-                        .ToList();
-
-                    if (matchupVotes.Count == 0) continue;
-
-                    // Check each criterion for ties.
-                    foreach (var criterion in context.Config.VotingCriteria)
-                    {
-                        var criterionVotes = matchupVotes
-                            .Where(v => v.CriterionId == criterion.Id)
-                            .ToList();
-
-                        if (criterionVotes.Count == 0) continue;
-
-                        int aVotes = criterionVotes.Count(v => v.ChosenEntrantId == matchup.EntrantAId);
-                        int bVotes = criterionVotes.Count(v => v.ChosenEntrantId == matchup.EntrantBId);
-
-                        if (aVotes == bVotes)
-                        {
-                            context.State.PendingCoinFlipMatchupId = matchup.Id;
-                            context.Logger.LogInformation(
-                                "Tie detected in matchup [{matchupId}] on criterion [{criterion}]. Moving to coin flip.",
-                                matchup.Id, criterion.Id);
-                            return new CoinFlipState();
-                        }
-                    }
+                    context.State.PendingCoinFlips = tiedCriteria;
+                    context.Logger.LogInformation(
+                        "Found {count} tied criteria in round {round}. Moving to coin flip.",
+                        tiedCriteria.Count, roundIndex + 1);
+                    return new CoinFlipState();
                 }
             }
 

@@ -774,6 +774,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
             var context = state.Context!;
 
             // No players → no distinctness conflicts, so goes straight to PoolRevealState.
+            context.Config.NumOutfitRounds = 2;
             context.Fsm.TransitionTo(context, new OutfitCustomizationState());
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
 
@@ -1284,6 +1285,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
                 }
             };
 
+            context.Config.NumOutfitRounds = 2;
             context.Fsm.TransitionTo(context, new OutfitCustomizationState());
             // Timer expires with all outfits already submitted and a conflict present.
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
@@ -2137,6 +2139,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
                 SubmittedOutfit = new() { PlayerId = "p2" },
             };
 
+            context.Config.NumOutfitRounds = 2;
             context.Fsm.TransitionTo(context, new OutfitCustomizationState());
 
             _engine.ProcessCommand(context,

@@ -27,7 +27,7 @@ namespace KnockBox.DrawnToDressTests.Unit.State.Games.DrawnToDress
         public void Default_ClothingTypes_HasFiveEntries()
         {
             var config = new DrawnToDressConfig();
-            Assert.AreEqual(5, config.ClothingTypes.Count);
+            Assert.AreEqual(4, config.ClothingTypes.Count);
         }
 
         [TestMethod]
@@ -40,15 +40,6 @@ namespace KnockBox.DrawnToDressTests.Unit.State.Games.DrawnToDress
             CollectionAssert.Contains(ids, "top");
             CollectionAssert.Contains(ids, "bottom");
             CollectionAssert.Contains(ids, "shoes");
-            CollectionAssert.Contains(ids, "accessory");
-        }
-
-        [TestMethod]
-        public void Default_AccessoryClothingType_AllowsMultiple()
-        {
-            var config = new DrawnToDressConfig();
-            var accessory = config.ClothingTypes.Single(t => t.Id == "accessory");
-            Assert.IsTrue(accessory.AllowMultiple);
         }
 
         [TestMethod]
@@ -190,6 +181,20 @@ namespace KnockBox.DrawnToDressTests.Unit.State.Games.DrawnToDress
             Assert.AreEqual(1, config.BonusPointsForCompleteOutfit);
         }
 
+        [TestMethod]
+        public void Default_RoundLeaderBonusPoints_Is3()
+        {
+            var config = new DrawnToDressConfig();
+            Assert.AreEqual(3, config.RoundLeaderBonusPoints);
+        }
+
+        [TestMethod]
+        public void Default_TournamentWinnerBonusPoints_Is10()
+        {
+            var config = new DrawnToDressConfig();
+            Assert.AreEqual(10, config.TournamentWinnerBonusPoints);
+        }
+
         // ── Host / connectivity defaults ──────────────────────────────────────
 
         [TestMethod]
@@ -275,6 +280,22 @@ namespace KnockBox.DrawnToDressTests.Unit.State.Games.DrawnToDress
         }
 
         [TestMethod]
+        public void Normalize_RoundLeaderBonusPoints_Negative_ClampsTo0()
+        {
+            var config = new DrawnToDressConfig { RoundLeaderBonusPoints = -3 };
+            config.Normalize();
+            Assert.AreEqual(0, config.RoundLeaderBonusPoints);
+        }
+
+        [TestMethod]
+        public void Normalize_TournamentWinnerBonusPoints_Negative_ClampsTo0()
+        {
+            var config = new DrawnToDressConfig { TournamentWinnerBonusPoints = -10 };
+            config.Normalize();
+            Assert.AreEqual(0, config.TournamentWinnerBonusPoints);
+        }
+
+        [TestMethod]
         public void Normalize_HostDisconnectTimeoutSec_BelowMinimum_ClampsTo30()
         {
             var config = new DrawnToDressConfig { HostDisconnectTimeoutSec = 10 };
@@ -342,7 +363,7 @@ namespace KnockBox.DrawnToDressTests.Unit.State.Games.DrawnToDress
             Assert.AreEqual(3, config.VotingRounds);
             Assert.AreEqual(1, config.BonusPointsForCompleteOutfit);
             Assert.AreEqual(120, config.HostDisconnectTimeoutSec);
-            Assert.AreEqual(5, config.ClothingTypes.Count);
+            Assert.AreEqual(4, config.ClothingTypes.Count);
             Assert.AreEqual(3, config.VotingCriteria.Count);
         }
     }
