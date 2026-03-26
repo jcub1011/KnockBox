@@ -1,4 +1,5 @@
 using System.Text;
+using System.Xml;
 using System.Xml.Linq;
 
 namespace KnockBox.Core.Services.Drawing
@@ -20,14 +21,30 @@ namespace KnockBox.Core.Services.Drawing
     /// </summary>
     public static class SvgContentSanitizer
     {
+        private static readonly XmlReaderSettings XmlReaderSettings = new()
+        {
+            DtdProcessing = DtdProcessing.Prohibit,
+            MaxCharactersFromEntities = 0,
+            XmlResolver = null,
+        };
+
+        /// <summary>
+        /// 1024 kb
+        /// </summary>
+        private const int MAX_SVG_CONTENT_LENGTH = 1024 * 1024;
+
         // Mirrors ALLOWED_STROKE_TAGS in svgDrawingCanvas.js
-        private static readonly HashSet<string> AllowedTags = ["path", "circle"];
+        private static readonly HashSet<string> AllowedTags = ["path", "circle", "g"];
+
+        // Tags that are containers (have children rather than self-closing)
+        private static readonly HashSet<string> ContainerTags = ["g"];
 
         // Mirrors ALLOWED_STROKE_ATTRS in svgDrawingCanvas.js
         private static readonly HashSet<string> AllowedAttrs =
         [
             "d", "stroke", "stroke-width", "fill",
             "stroke-linecap", "stroke-linejoin", "cx", "cy", "r",
+            "transform",
         ];
 
         /// <summary>
@@ -39,43 +56,60 @@ namespace KnockBox.Core.Services.Drawing
         public static string? Sanitize(string? svgContent)
         {
             if (string.IsNullOrWhiteSpace(svgContent)) return null;
+            if (svgContent.Length > MAX_SVG_CONTENT_LENGTH) return null;
 
             try
             {
+                using var reader = XmlReader.Create(
+                    new StringReader($"<svg xmlns='http://www.w3.org/2000/svg'>{svgContent}</svg>"), 
+                    XmlReaderSettings);
+
                 // Wrap inner markup in a temporary <svg> root for parsing.
-                var doc = XDocument.Parse(
-                    $"<svg xmlns='http://www.w3.org/2000/svg'>{svgContent}</svg>",
-                    LoadOptions.None);
+                var doc = XDocument.Load(reader, LoadOptions.None);
 
                 var sb = new StringBuilder();
-
-                foreach (var el in doc.Root!.Elements())
-                {
-                    var tag = el.Name.LocalName.ToLowerInvariant();
-                    if (!AllowedTags.Contains(tag)) continue;
-
-                    sb.Append('<').Append(tag);
-
-                    foreach (var attr in el.Attributes())
-                    {
-                        var attrName = attr.Name.LocalName.ToLowerInvariant();
-                        if (!AllowedAttrs.Contains(attrName)) continue;
-                        sb.Append(' ')
-                          .Append(attrName)
-                          .Append("=\"")
-                          .Append(EscapeXmlAttrValue(attr.Value))
-                          .Append('"');
-                    }
-
-                    sb.Append("/>");
-                }
-
+                SanitizeElements(doc.Root!.Elements(), sb);
                 return sb.Length > 0 ? sb.ToString() : null;
             }
             catch
             {
                 // Unparseable content is discarded entirely.
                 return null;
+            }
+        }
+
+        private static void SanitizeElements(IEnumerable<XElement> elements, StringBuilder sb, int depth = 0)
+        {
+            if (depth++ > 32) return;
+
+            foreach (var el in elements)
+            {
+                var tag = el.Name.LocalName.ToLowerInvariant();
+                if (!AllowedTags.Contains(tag)) continue;
+
+                sb.Append('<').Append(tag);
+
+                foreach (var attr in el.Attributes())
+                {
+                    var attrName = attr.Name.LocalName.ToLowerInvariant();
+                    if (!AllowedAttrs.Contains(attrName)) continue;
+                    sb.Append(' ')
+                      .Append(attrName)
+                      .Append("=\"")
+                      .Append(EscapeXmlAttrValue(attr.Value))
+                      .Append('"');
+                }
+
+                if (ContainerTags.Contains(tag))
+                {
+                    sb.Append('>');
+                    SanitizeElements(el.Elements(), sb, depth);
+                    sb.Append("</").Append(tag).Append('>');
+                }
+                else
+                {
+                    sb.Append("/>");
+                }
             }
         }
 

@@ -23,8 +23,10 @@
 
     var myOutfit = myPlayer?.GetOutfit(OutfitRound);
 
-    // Build a composite background SVG from the player's selected outfit items so they
-    // can see what they assembled while drawing the optional sketch overlay on top.
+    int totalOutfitHeight = GameState.Config.ClothingTypes.Sum(ct => ct.CanvasHeight);
+
+    // Build a composite background SVG from the player's selected outfit items, applying
+    // any position overrides set via the drag/manual-input layer.
     string? outfitBackground = null;
     if (!isHost && !hasSubmitted && myOutfit is not null)
     {
@@ -36,7 +38,15 @@
                 && GameState.ClothingPool.TryGetValue(itemId, out var bgItem)
                 && bgItem.SvgContent is not null)
             {
-                bgParts.Append($"<g transform=\"translate(0,{yOffset})\">");
+                double itemX = 0;
+                double itemY = yOffset;
+                if (_itemPositions.TryGetValue(ct.Id, out var posOverride))
+                {
+                    itemX = posOverride.X;
+                    itemY = posOverride.Y;
+                }
+
+                bgParts.Append($"<g transform=\"translate({itemX},{itemY})\">");
                 bgParts.Append(bgItem.SvgContent);
                 bgParts.Append("</g>");
             }
@@ -144,32 +154,104 @@
                        @bind:event="oninput" />
             </div>
 
-            <!-- Sketch overlay canvas -->
+            <!-- ── Mode toggle ──────────────────────────────────────────── -->
+            <div class="dtd-customization-mode-toggle">
+                <button class="dtd-btn dtd-btn-mode @(_mode == InteractionMode.Draw ? "dtd-btn-mode-active" : "")"
+                        @onclick="() => SwitchModeAsync(InteractionMode.Draw)">
+                    Draw
+                </button>
+                <button class="dtd-btn dtd-btn-mode @(_mode == InteractionMode.MoveItems ? "dtd-btn-mode-active" : "")"
+                        @onclick="() => SwitchModeAsync(InteractionMode.MoveItems)">
+                    Move Items
+                </button>
+            </div>
+
+            <!-- Sketch overlay canvas + drag layer -->
             <div class="dtd-customization-sketch-section">
                 <div class="dtd-customization-sketch-header">
                     <h4 class="dtd-customization-sketch-title">
-                        Sketch Overlay
-                        @if (GameState.Config.SketchingRequired)
+                        @if (_mode == InteractionMode.Draw)
                         {
-                            <span class="dtd-customization-required"> *</span>
+                            <span>Sketch Overlay</span>
+                            @if (GameState.Config.SketchingRequired)
+                            {
+                                <span class="dtd-customization-required"> *</span>
+                            }
+                            else
+                            {
+                                <span class="dtd-customization-optional">(optional)</span>
+                            }
                         }
                         else
                         {
-                            <span class="dtd-customization-optional">(optional)</span>
+                            <span>Move Items — drag to reposition</span>
                         }
                     </h4>
                 </div>
 
-                <div class="dtd-customization-canvas-wrapper">
-                    <SvgDrawingCanvas @ref="_sketchCanvas"
-                                      Width="600px"
-                                      Height="2400px"
-                                      ViewBoxWidth="600"
-                                      ViewBoxHeight="2400"
-                                      BackgroundColor="transparent"
-                                      BackgroundSvgContent="@outfitBackground" />
+                <div class="dtd-customization-canvas-wrapper @(_mode == InteractionMode.MoveItems ? "dtd-customization-canvas-move-mode" : "")">
+                    @* Drawing canvas — pointer-events disabled during Move mode *@
+                    <div style="@(_mode == InteractionMode.MoveItems ? "pointer-events: none;" : "")">
+                        <SvgDrawingCanvas @ref="_sketchCanvas"
+                                          Width="600px"
+                                          Height="@($"{totalOutfitHeight}px")"
+                                          ViewBoxWidth="600"
+                                          ViewBoxHeight="@totalOutfitHeight"
+                                          BackgroundColor="transparent"
+                                          BackgroundSvgContent="@outfitBackground" />
+                    </div>
+
+                    @* Drag layer — shown only in Move mode, overlays the drawing canvas *@
+                    @if (_mode == InteractionMode.MoveItems)
+                    {
+                        <svg id="@_dragSvgId"
+                             class="dtd-customization-drag-layer"
+                             viewBox="0 0 600 @totalOutfitHeight"
+                             preserveAspectRatio="xMidYMid meet"
+                             xmlns="http://www.w3.org/2000/svg">
+                        </svg>
+                    }
                 </div>
             </div>
+
+            <!-- ── Manual position inputs ────────────────────────────────── -->
+            @if (_mode == InteractionMode.MoveItems)
+            {
+                <details class="dtd-customization-position-panel">
+                    <summary class="dtd-customization-position-summary">Manual Position Controls</summary>
+                    <div class="dtd-customization-position-grid">
+                        @foreach (var ct in GameState.Config.ClothingTypes)
+                        {
+                            var typeId = ct.Id;
+                            _itemPositions.TryGetValue(typeId, out var pos);
+                            double posX = pos?.X ?? 0;
+                            double posY = pos?.Y ?? 0;
+
+                            <div class="dtd-customization-position-row">
+                                <span class="dtd-customization-position-label">@ct.DisplayName</span>
+                                <label class="dtd-customization-position-input-label">
+                                    X:
+                                    <input type="number"
+                                           class="dtd-customization-position-input"
+                                           value="@((int)posX)"
+                                           min="0"
+                                           max="600"
+                                           @onchange="(e) => OnManualPositionChanged(typeId, true, e)" />
+                                </label>
+                                <label class="dtd-customization-position-input-label">
+                                    Y:
+                                    <input type="number"
+                                           class="dtd-customization-position-input"
+                                           value="@((int)posY)"
+                                           min="0"
+                                           max="@totalOutfitHeight"
+                                           @onchange="(e) => OnManualPositionChanged(typeId, false, e)" />
+                                </label>
+                            </div>
+                        }
+                    </div>
+                </details>
+            }
 
             <!-- Actions -->
             <div class="dtd-customization-actions">

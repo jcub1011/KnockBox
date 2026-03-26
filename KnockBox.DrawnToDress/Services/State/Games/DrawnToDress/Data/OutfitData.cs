@@ -1,6 +1,16 @@
 namespace KnockBox.Services.State.Games.DrawnToDress.Data
 {
     /// <summary>
+    /// Stores an absolute viewBox-coordinate position override for a single clothing item.
+    /// Used when the player repositions items via drag or manual X/Y input during customization.
+    /// </summary>
+    public class ItemPositionOverride
+    {
+        public double X { get; set; }
+        public double Y { get; set; }
+    }
+
+    /// <summary>
     /// Overlay data applied on top of an outfit's selected items, such as a custom name
     /// chosen by the player. Kept separate from item selection so that UI overlays do not
     /// contaminate core outfit data.
@@ -17,6 +27,12 @@ namespace KnockBox.Services.State.Games.DrawnToDress.Data
         /// be non-null for the submission to be accepted.
         /// </summary>
         public string? SketchSvgContent { get; set; }
+
+        /// <summary>
+        /// Per-item position overrides keyed by clothing type ID. Stores absolute viewBox
+        /// coordinates. An empty dictionary means the default stacked layout is used.
+        /// </summary>
+        public Dictionary<string, ItemPositionOverride> ItemPositionOverrides { get; set; } = new();
     }
 
     /// <summary>

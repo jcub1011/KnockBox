@@ -2,18 +2,28 @@ using KnockBox.Core.Components.Shared;
 using KnockBox.Services.Logic.Games.DrawnToDress;
 using KnockBox.Services.Logic.Games.DrawnToDress.FSM;
 using KnockBox.Services.State.Games.DrawnToDress;
+using KnockBox.Services.State.Games.DrawnToDress.Data;
 using KnockBox.Services.State.Users;
 using Microsoft.AspNetCore.Components;
+using Microsoft.JSInterop;
 
 namespace KnockBox.Components.Pages.Games.DrawnToDress
 {
-    public partial class OutfitCustomizationPhase : ComponentBase
+    public enum InteractionMode
+    {
+        Draw,
+        MoveItems
+    }
+
+    public partial class OutfitCustomizationPhase : ComponentBase, IAsyncDisposable
     {
         [Inject] protected DrawnToDressGameEngine GameEngine { get; set; } = default!;
 
         [Inject] protected IUserService UserService { get; set; } = default!;
 
         [Inject] protected ILogger<OutfitCustomizationPhase> Logger { get; set; } = default!;
+
+        [Inject] protected IJSRuntime JSRuntime { get; set; } = default!;
 
         [Parameter] public DrawnToDressGameState GameState { get; set; } = default!;
 
@@ -23,6 +33,115 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
         private string? _outfitName;
         private bool _submitting;
         private string? _errorMessage;
+
+        private InteractionMode _mode = InteractionMode.Draw;
+        private Dictionary<string, ItemPositionOverride> _itemPositions = new();
+        private IJSObjectReference? _dragModule;
+        private DotNetObjectReference<OutfitCustomizationPhase>? _dotNetRef;
+        private readonly string _dragSvgId = $"drag-layer-{Guid.NewGuid():N}";
+        private bool _dragInitialized;
+
+        protected override void OnInitialized()
+        {
+            // Initialize default stacked positions
+            int yOffset = 0;
+            foreach (var ct in GameState.Config.ClothingTypes)
+            {
+                _itemPositions[ct.Id] = new ItemPositionOverride { X = 0, Y = yOffset };
+                yOffset += ct.CanvasHeight;
+            }
+        }
+
+        /// <summary>
+        /// Switches between Draw and MoveItems modes.
+        /// </summary>
+        protected async Task SwitchModeAsync(InteractionMode newMode)
+        {
+            if (_mode == newMode) return;
+            _mode = newMode;
+            _dragInitialized = false;
+            StateHasChanged();
+
+            if (newMode == InteractionMode.MoveItems)
+            {
+                // Allow the drag SVG to render, then initialize the JS module
+                await Task.Yield();
+                await InitializeDragLayerAsync();
+            }
+        }
+
+        private async Task InitializeDragLayerAsync()
+        {
+            if (_dragInitialized) return;
+
+            var myId = UserService.CurrentUser?.Id;
+            var myPlayer = myId is not null && GameState.GamePlayers.TryGetValue(myId, out var p) ? p : null;
+            var myOutfit = myPlayer?.GetOutfit(OutfitRound);
+            if (myOutfit is null) return;
+
+            _dragModule ??= await JSRuntime.InvokeAsync<IJSObjectReference>(
+                "import", "./js/outfitItemDrag.js");
+            _dotNetRef ??= DotNetObjectReference.Create(this);
+
+            var items = new List<object>();
+            foreach (var ct in GameState.Config.ClothingTypes)
+            {
+                if (myOutfit.SelectedItemsByType.TryGetValue(ct.Id, out var itemId)
+                    && GameState.ClothingPool.TryGetValue(itemId, out var poolItem)
+                    && poolItem.SvgContent is not null)
+                {
+                    _itemPositions.TryGetValue(ct.Id, out var pos);
+                    items.Add(new
+                    {
+                        typeId = ct.Id,
+                        svgContent = poolItem.SvgContent,
+                        x = pos?.X ?? 0,
+                        y = pos?.Y ?? 0,
+                        width = ct.CanvasWidth,
+                        height = ct.CanvasHeight,
+                    });
+                }
+            }
+
+            int totalHeight = GameState.Config.ClothingTypes.Sum(ct => ct.CanvasHeight);
+            await _dragModule.InvokeVoidAsync("initialize", _dragSvgId, _dotNetRef, items, 600, totalHeight);
+            _dragInitialized = true;
+        }
+
+        /// <summary>
+        /// Called from JS when a drag operation completes.
+        /// </summary>
+        [JSInvokable]
+        public void OnItemMoved(string typeId, double x, double y)
+        {
+            _itemPositions[typeId] = new ItemPositionOverride { X = x, Y = y };
+            InvokeAsync(StateHasChanged);
+        }
+
+        /// <summary>
+        /// Called when a manual X or Y input changes.
+        /// </summary>
+        protected async Task OnManualPositionChanged(string typeId, bool isX, ChangeEventArgs e)
+        {
+            if (!double.TryParse(e.Value?.ToString(), out var val)) return;
+
+            if (!_itemPositions.TryGetValue(typeId, out var pos))
+            {
+                pos = new ItemPositionOverride();
+                _itemPositions[typeId] = pos;
+            }
+
+            if (isX) pos.X = val;
+            else pos.Y = val;
+
+            // Sync to drag layer if it's active
+            if (_dragModule is not null && _dragInitialized)
+            {
+                await _dragModule.InvokeVoidAsync("updateItemPosition", _dragSvgId, typeId, pos.X, pos.Y);
+            }
+
+            StateHasChanged();
+        }
 
         /// <summary>
         /// Retrieves the current sketch SVG (if any) and sends a
@@ -59,10 +178,28 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
                     return;
                 }
 
+                // Build position overrides — only include entries that differ from the
+                // default stacked layout to keep the data lean.
+                Dictionary<string, ItemPositionOverride>? positionOverrides = null;
+                int defaultY = 0;
+                foreach (var ct in GameState.Config.ClothingTypes)
+                {
+                    if (_itemPositions.TryGetValue(ct.Id, out var pos))
+                    {
+                        if (Math.Abs(pos.X) > 0.5 || Math.Abs(pos.Y - defaultY) > 0.5)
+                        {
+                            positionOverrides ??= new();
+                            positionOverrides[ct.Id] = new ItemPositionOverride { X = pos.X, Y = pos.Y };
+                        }
+                    }
+                    defaultY += ct.CanvasHeight;
+                }
+
                 var cmd = new SubmitCustomizationCommand(
                     UserService.CurrentUser.Id,
                     _outfitName.Trim(),
-                    sketchSvg);
+                    sketchSvg,
+                    positionOverrides);
 
                 var result = GameEngine.ProcessCommand(GameState.Context, cmd);
                 if (result.TryGetFailure(out var err))
@@ -81,6 +218,20 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
                 _submitting = false;
                 StateHasChanged();
             }
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            if (_dragModule is not null)
+            {
+                try
+                {
+                    await _dragModule.InvokeVoidAsync("dispose", _dragSvgId);
+                    await _dragModule.DisposeAsync();
+                }
+                catch (JSDisconnectedException) { }
+            }
+            _dotNetRef?.Dispose();
         }
     }
 }

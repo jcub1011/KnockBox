@@ -1,6 +1,7 @@
 using KnockBox.Core.Services.State.Games.Shared;
 using KnockBox.Extensions.Returns;
 using KnockBox.Services.State.Games.DrawnToDress;
+using KnockBox.Services.State.Games.DrawnToDress.Data;
 
 namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
 {
@@ -113,6 +114,21 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
             outfit.Customization.SketchSvgContent = string.IsNullOrWhiteSpace(cmd.SketchSvgContent)
                 ? null
                 : cmd.SketchSvgContent;
+
+            if (cmd.ItemPositionOverrides is { Count: > 0 })
+            {
+                int canvasWidth = context.Config.ClothingTypes.FirstOrDefault()?.CanvasWidth ?? 600;
+                int totalHeight = context.Config.ClothingTypes.Sum(ct => ct.CanvasHeight);
+
+                foreach (var kvp in cmd.ItemPositionOverrides)
+                {
+                    kvp.Value.X = Math.Clamp(kvp.Value.X, 0, canvasWidth);
+                    kvp.Value.Y = Math.Clamp(kvp.Value.Y, 0, totalHeight);
+                }
+
+                outfit.Customization.ItemPositionOverrides = cmd.ItemPositionOverrides;
+            }
+
             player.IsReady = true;
 
             context.Logger.LogInformation(

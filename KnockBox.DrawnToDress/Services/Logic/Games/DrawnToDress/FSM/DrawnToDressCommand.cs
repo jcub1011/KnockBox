@@ -90,7 +90,8 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM
     public record SubmitCustomizationCommand(
         string PlayerId,
         string? OutfitName,
-        string? SketchSvgContent = null) : DrawnToDressCommand(PlayerId);
+        string? SketchSvgContent = null,
+        Dictionary<string, ItemPositionOverride>? ItemPositionOverrides = null) : DrawnToDressCommand(PlayerId);
 
     // ── Outfit distinctness resolution ────────────────────────────────────────
 

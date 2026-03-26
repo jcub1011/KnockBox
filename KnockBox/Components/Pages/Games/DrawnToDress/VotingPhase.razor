@@ -106,7 +106,14 @@
                                             {
                                                 if (SafeSvgContent(item.SvgContent) is string safeSvg)
                                                 {
-                                                    <g transform="translate(0,@yOffA)">@((MarkupString)safeSvg)</g>
+                                                    double itemXA = 0;
+                                                    double itemYA = yOffA;
+                                                    if (outfitA.Customization.ItemPositionOverrides.TryGetValue(ct.Id, out var posA))
+                                                    {
+                                                        itemXA = posA.X;
+                                                        itemYA = posA.Y;
+                                                    }
+                                                    <g transform="translate(@itemXA,@itemYA)">@((MarkupString)safeSvg)</g>
                                                 }
                                             }
                                             yOffA += ct.CanvasHeight;
@@ -139,7 +146,14 @@
                                             {
                                                 if (SafeSvgContent(item.SvgContent) is string safeSvg)
                                                 {
-                                                    <g transform="translate(0,@yOffB)">@((MarkupString)safeSvg)</g>
+                                                    double itemXB = 0;
+                                                    double itemYB = yOffB;
+                                                    if (outfitB.Customization.ItemPositionOverrides.TryGetValue(ct.Id, out var posB))
+                                                    {
+                                                        itemXB = posB.X;
+                                                        itemYB = posB.Y;
+                                                    }
+                                                    <g transform="translate(@itemXB,@itemYB)">@((MarkupString)safeSvg)</g>
                                                 }
                                             }
                                             yOffB += ct.CanvasHeight;

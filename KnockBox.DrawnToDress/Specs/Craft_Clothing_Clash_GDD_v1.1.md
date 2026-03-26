@@ -26,7 +26,7 @@
 
 **Craft Clothing Clash** is a competitive party game blending artistic creation, strategic resource management, and social voting. Players draw clothing items, race to build themed outfits from a shared pool, and compete through peer voting. Success requires balancing drawing ability, decision-making speed, thematic understanding, and taste.
 
-**Target Audience:** Family and friend groups, 6+ players  
+**Target Audience:** Family and friend groups, 3+ players (6+ recommended)  
 **Game Length:** 20–45 minutes (depends on settings)  
 **Platform:** Digital (web - Blazor)
 
@@ -60,13 +60,13 @@ The player with the highest total points after all voting rounds wins. If two or
 Players create clothing items to populate the shared pool.
 
 **What happens:**
-- Game runs sequential drawing rounds (hat → shirt → pants → shoes)
-- Each round lasts a fixed duration (default: 60 seconds)
+- Game runs sequential drawing rounds (hat → top → bottom → shoes)
+- Each round lasts a fixed duration (default: 180 seconds)
 - Players draw as many items as they can, up to the configured limit
 - All drawings are stored and added to a shared pool
 
 **Key constraints:**
-- Maximum items per clothing type per player (default: 5)
+- Maximum items per clothing type per player (default: 3)
 - Players cannot see other players' drawings during this phase
 - Drawings are digital sketches (stylus/mouse input)
 - Each drawing is attributed to its creator (used to block self-picks later)
@@ -105,7 +105,7 @@ Players select items from a shared pool to create outfits. **Picks are simultane
 **What happens:**
 - Host triggers outfit building phase
 - Shared clothing pool is displayed with all available items
-- Players are presented with a clothing grid (hat, shirt, pants, shoes slots)
+- Players are presented with a clothing grid (hat, top, bottom, shoes slots)
 - Each player clicks/drags items into their outfit slots
 - **First player to claim an item owns it** (item removed from pool)
 - If a player tries to pick an item another player just claimed, selection fails (they must pick something else)
@@ -114,8 +114,8 @@ Players select items from a shared pool to create outfits. **Picks are simultane
 
 **Key constraints:**
 - Players cannot pick items they personally drew
-- Each outfit must have exactly 1 hat, 1 shirt, 1 pants, 1 shoes (complete set)
-- Time limit per outfit building phase (default: 3 minutes)
+- Each outfit must have exactly 1 hat, 1 top, 1 bottom, 1 shoes (complete set)
+- Time limit per outfit building phase (default: 90 seconds)
 - All players must either lock in or be auto-submitted when time expires
 
 **Outcome:** Each player has 1 complete outfit + all selected items are removed from the pool
@@ -182,7 +182,7 @@ Players vote on outfit matchups. Each vote cast for an outfit earns that outfit 
 
 **Voting per Matchup:**
 - Voters see both outfits side-by-side (with items, sketches, names)
-- Voters rate each outfit on configured criteria (default: Theme Adherence + Personal Preference)
+- Voters rate each outfit on configured criteria (default: Creativity + Theme Match + Overall Look)
 - Each vote cast for an outfit = 1 point for that outfit on that criterion (multiplied by criterion weight)
 - Both outfits earn points proportionally to the votes they receive
 - Ties in a criterion (equal votes) are broken by a coin flip — the coin flip winner earns 1 bonus point
@@ -215,7 +215,7 @@ Final scores are tallied and displayed.
 ```
 1. Host creates game session
 2. Host configures settings (or uses defaults)
-3. Players join lobby (wait for 6+ players)
+3. Players join lobby (wait for 3+ players, 6+ recommended)
 4. Host starts game → PHASE 1: DRAWING
 5. PHASE 2: POOL REVEAL
 6. PHASE 3: OUTFIT 1 BUILDING
@@ -236,17 +236,17 @@ Final scores are tallied and displayed.
 - Host presses "Start Drawing Phase"
 
 **During phase:**
-- Game displays: "Draw HATS — 60 seconds remaining" (or other clothing type)
+- Game displays: "Draw HATS — 180 seconds remaining" (or other clothing type)
 - Canvas/drawing area is provided for each player
 - Timer counts down audibly and visually
 - Players draw freehand
 - When timer expires, automatically move to next clothing type
 
 **Sequence:**
-1. Draw hats (60s, default)
-2. Draw shirts (60s, default)
-3. Draw pants (60s, default)
-4. Draw shoes (60s, default)
+1. Draw hats (180s, default)
+2. Draw tops (180s, default)
+3. Draw bottoms (180s, default)
+4. Draw shoes (180s, default)
 *(Custom clothing types follow same pattern)*
 
 **Post-phase:**
@@ -279,9 +279,9 @@ Final scores are tallied and displayed.
 - Theme is displayed prominently at top
 
 **During phase:**
-- Timer: 3 minutes (default)
+- Timer: 90 seconds (default)
 - Player sees:
-  - Outfit building area (4 slots: hat, shirt, pants, shoes)
+  - Outfit building area (4 slots: hat, top, bottom, shoes)
   - Clothing pool grid
   - Current selections in their outfit slots
 - Player action: Click/drag items from pool into outfit slots
@@ -325,7 +325,7 @@ Final scores are tallied and displayed.
 - Fresh pool (copy of original, minus Outfit 1 picks)
 - Players cannot pick items they used in Outfit 1 (unless `canReuseOutfit1Items` is enabled)
 - Same theme as Outfit 1
-- Time limit may differ (default: 3 minutes, same as Outfit 1)
+- Time limit may differ (default: 90 seconds, same as Outfit 1)
 
 **Post-phase:**
 - All players' Outfit 2 selections are locked
@@ -411,7 +411,7 @@ Final scores are tallied and displayed.
 
 **During Drawing Phase:**
 - Players draw only the assigned clothing type (enforced by UI limiting shape)
-- Maximum items per type per player: 5 (default, configurable)
+- Maximum items per type per player: 3 (default, configurable)
 - Players cannot see others' drawings live
 
 **During Pool Reveal:**
@@ -455,7 +455,7 @@ When a coin flip is required (tied criterion, tied final standings):
 - Items can be used by different players across outfits
 
 **Outfit Validity:**
-- Outfit 1: Must have 1 hat + 1 shirt + 1 pants + 1 shoes
+- Outfit 1: Must have 1 hat + 1 top + 1 bottom + 1 shoes
 - Outfit 2: Same, plus must differ by 2+ items from **every player's Outfit 1** (cannot match any other player's Outfit 1 in 3+ items)
 - Sketches do not count toward distinctness (only items matter)
 - Both outfits use the same theme
@@ -477,13 +477,15 @@ Both outfits in a matchup earn points — scoring is proportional, not winner-ta
 
 | Criterion | Points Awarded | Tie Resolution |
 |-----------|----------------|----------------|
-| Theme Adherence | 1 pt per vote received (× criterion weight) | Coin flip: winner receives 1 bonus point |
-| Personal Preference | 1 pt per vote received (× criterion weight) | Coin flip: winner receives 1 bonus point |
+| Creativity | 1 pt per vote received (× criterion weight) | Coin flip: winner receives 1 bonus point |
+| Theme Match | 1 pt per vote received (× criterion weight) | Coin flip: winner receives 1 bonus point |
+| Overall Look | 1 pt per vote received (× criterion weight) | Coin flip: winner receives 1 bonus point |
 
 *Example with default weight of 1 and 4 eligible voters:*
-- Theme vote split 3–1 → Outfit A: 3 pts, Outfit B: 1 pt
-- Preference vote split 2–2 → Tie → coin flip → winner gets 2 + 1 bonus = 3 pts, loser gets 2 pts
-- Matchup total: Outfit A: 6 pts, Outfit B: 3 pts
+- Creativity vote split 3–1 → Outfit A: 3 pts, Outfit B: 1 pt
+- Theme Match vote split 2–2 → Tie → coin flip → winner gets 2 + 1 bonus = 3 pts, loser gets 2 pts
+- Overall Look vote split 3–1 → Outfit A: 3 pts, Outfit B: 1 pt
+- Matchup total: Outfit A: 9 pts, Outfit B: 4 pts
 
 *Criterion weights act as multipliers. A weight of 2 means each vote is worth 2 points for that criterion.*
 
@@ -510,27 +512,29 @@ Both outfits in a matchup earn points — scoring is proportional, not winner-ta
 
 | Criterion | Votes for A | Votes for B | A Points | B Points |
 |-----------|-------------|-------------|----------|----------|
-| Theme Adherence | 3 | 1 | 3 | 1 |
-| Personal Preference | 2 | 2 (tie → coin flip → A wins) | 2 + 1 bonus = 3 | 2 |
-| **Matchup Total** | | | **6** | **3** |
+| Creativity | 3 | 1 | 3 | 1 |
+| Theme Match | 2 | 2 (tie → coin flip → A wins) | 2 + 1 bonus = 3 | 2 |
+| Overall Look | 3 | 1 | 3 | 1 |
+| **Matchup Total** | | | **9** | **4** |
 
 **Round 1, Matchup 2 — Outfit C vs. Outfit D:**
 
 | Criterion | Votes for C | Votes for D | C Points | D Points |
 |-----------|-------------|-------------|----------|----------|
-| Theme Adherence | 4 | 0 | 4 | 0 |
-| Personal Preference | 3 | 1 | 3 | 1 |
-| **Matchup Total** | | | **7** | **1** |
+| Creativity | 4 | 0 | 4 | 0 |
+| Theme Match | 3 | 1 | 3 | 1 |
+| Overall Look | 2 | 2 (tie → coin flip → C wins) | 2 + 1 bonus = 3 | 2 |
+| **Matchup Total** | | | **10** | **3** |
 
 **After Round 1 (showing these 4 outfits only):**
-- Outfit C: 7 pts + 3 (round leader bonus) = **10 pts**
-- Outfit A: 6 pts
-- Outfit B: 3 pts
-- Outfit D: 1 pt
+- Outfit C: 10 pts + 3 (round leader bonus) = **13 pts**
+- Outfit A: 9 pts
+- Outfit B: 4 pts
+- Outfit D: 3 pts
 
 **Round 2 Swiss pairing** (similar records face each other):
-- Outfit C (10 pts) vs. Outfit A (6 pts)
-- Outfit B (3 pts) vs. Outfit D (1 pt)
+- Outfit C (13 pts) vs. Outfit A (9 pts)
+- Outfit B (4 pts) vs. Outfit D (3 pts)
 
 *This pattern continues for Rounds 3 and 4. Final player standings sum both of that player's outfits' points. The player with the highest total wins. Ties broken by most matchups won, then coin flip.*
 
@@ -547,19 +551,19 @@ All settings default to recommended values. Host can customize if desired.
 ### DRAWING PHASE Settings
 
 #### `drawingTimePerRound`
-- **Default:** 60 (seconds)
-- **Options:** 45, 60, 90, 120
+- **Default:** 180 (seconds)
+- **Options:** 45, 60, 90, 120, 180
 - **Impact:** Faster = fewer items per type; Slower = larger pool
-- **Recommendation:** 60s is balanced for most groups
+- **Recommendation:** 180s gives players ample time to draw multiple items
 
 #### `maxItemsPerType`
-- **Default:** 5
+- **Default:** 3
 - **Options:** 3, 5, 8, 10, unlimited
 - **Impact:** Limits items per player per clothing type
-- **Recommendation:** 5 ensures variety without overwhelming the pool
+- **Recommendation:** 3 ensures variety without overwhelming the pool
 
 #### `clothingTypes`
-- **Default:** ["hat", "shirt", "pants", "shoes"]
+- **Default:** ["hat", "top", "bottom", "shoes"]
 - **Options:** Custom list (host can redefine types)
 - **Impact:** More types = longer drawing phase; Custom types enable themed games
 - **Recommendation:** Stick with defaults for standard play
@@ -569,14 +573,14 @@ All settings default to recommended values. Host can customize if desired.
 ### THEME SYSTEM Settings
 
 #### `themeSource`
-- **Default:** "builtInPool"
+- **Default:** "random"
 - **Options:**
-  - `"builtInPool"` — Game provides curated themes
+  - `"random"` — Game randomly selects a theme from a curated pool
   - `"playerWritten"` — Each player submits one theme at game start; all submitted themes are shown to all players before outfit building begins
-  - `"hostPicked"` — Host selects from list before game starts
+  - `"hostPick"` — Host selects from list before game starts
   - `"randomVoting"` — Game shows 3–5 random themes; players vote on 2 to use
 - **Impact:** Affects player buy-in and game tone
-- **Recommendation:** "builtInPool" for first-time players; "playerWritten" for repeat groups
+- **Recommendation:** "random" for first-time players; "playerWritten" for repeat groups
 
 *Note on `"playerWritten"`: Since this game is designed for family and friends without matchmaking, theme moderation is not required. All submitted themes are displayed to all players as-is before outfit building begins.*
 
@@ -595,10 +599,10 @@ All settings default to recommended values. Host can customize if desired.
 ### OUTFIT BUILDING Settings
 
 #### `outfitBuildingTimeLimit`
-- **Default:** 180 (seconds, 3 minutes)
-- **Options:** 120, 180, 240, 300, 0 (unlimited)
+- **Default:** 90 (seconds)
+- **Options:** 60, 90, 120, 180, 240, 300, 0 (unlimited)
 - **Impact:** Faster = higher speed pressure; Slower = more thoughtful picks
-- **Recommendation:** 180s balances strategy and tension
+- **Recommendation:** 90s balances strategy and tension
 
 #### `allowSketching`
 - **Default:** true
@@ -641,22 +645,22 @@ All settings default to recommended values. Host can customize if desired.
 ### VOTING & SCORING Settings
 
 #### `votingCriteria`
-- **Default:** ["themeAdherence", "personalPreference"]
+- **Default:** ["creativity", "theme_match", "overall_look"]
 - **Options:** Any combination of:
-  - `"themeAdherence"` — How well outfit fits the theme
-  - `"personalPreference"` — Voter's subjective taste
   - `"creativity"` — How unique/innovative the outfit is
+  - `"theme_match"` — How well outfit fits the theme
+  - `"overall_look"` — Overall aesthetic appeal and cohesion
   - `"skillExecution"` — Quality of drawing/design
 - **Impact:** More criteria = more nuanced voting; Fewer = faster, simpler
-- **Recommendation:** ["themeAdherence", "personalPreference"] (balanced, quick)
+- **Recommendation:** ["creativity", "theme_match", "overall_look"] (balanced, covers key dimensions)
 
 #### `criterionWeights`
-- **Default:** {"themeAdherence": 1, "personalPreference": 1}
+- **Default:** {"creativity": 1, "theme_match": 1, "overall_look": 1}
 - **Options:** Host-defined multiplier values per criterion (whole numbers)
 - **Impact:** Each vote for a criterion is worth `weight` points. Higher weight = that criterion matters more to the final score
-  - Example: {"themeAdherence": 2, "personalPreference": 1} = theme votes worth twice as much
-  - Example: {"personalPreference": 3, "themeAdherence": 1} = taste-focused game
-- **Recommendation:** Equal weights (1/1) for balance
+  - Example: {"theme_match": 2, "creativity": 1, "overall_look": 1} = theme votes worth twice as much
+  - Example: {"creativity": 3, "theme_match": 1, "overall_look": 1} = creativity-focused game
+- **Recommendation:** Equal weights (1/1/1) for balance
 
 #### `votingVisibility`
 - **Default:** "percentagesShown"
@@ -703,16 +707,16 @@ All settings default to recommended values. Host can customize if desired.
 ### GAME FLOW Settings
 
 #### `numOutfitRounds`
-- **Default:** 2
+- **Default:** 1
 - **Options:** 1, 2, 3, 4
 - **Impact:** More rounds = longer game (additive 3+ mins per outfit)
-- **Recommendation:** 2 (standard; tests all mechanics)
+- **Recommendation:** 1 (quick game); 2 for full experience with distinctness mechanics
 
 #### `minPlayers`
-- **Default:** 6
-- **Options:** 6–20+
+- **Default:** 3
+- **Options:** 3–20+
 - **Impact:** Voting viability; Swiss pairing; game balance. Below 6 players, each matchup has fewer than 4 eligible voters, reducing voting meaningfulness
-- **Recommendation:** 6 minimum
+- **Recommendation:** 3 minimum (6+ recommended for best experience)
 
 #### `hostRole`
 - **Default:** "active"
@@ -758,7 +762,7 @@ All settings default to recommended values. Host can customize if desired.
 
 #### Lobby Screen
 - Player list (display all joined players)
-- Start Game button (enabled when 6+ players)
+- Start Game button (enabled when 3+ players)
 - Settings button (host only; opens settings menu)
 - Status: "Waiting for host to start..." / "Ready to play"
 
@@ -800,7 +804,7 @@ All settings default to recommended values. Host can customize if desired.
 
 ##### Player View
 - Left side: Clothing pool (grid of all available items, scrollable)
-- Center: Outfit builder (4 slots: hat, shirt, pants, shoes)
+- Center: Outfit builder (4 slots: hat, top, bottom, shoes)
 - Right side: Timer + status (3/4 items selected)
 - Drag-and-drop from pool to slots
 - Lock-in button (when all 4 slots filled)
@@ -908,7 +912,7 @@ All settings default to recommended values. Host can customize if desired.
 | Term | Definition |
 |------|-----------|
 | **Clothing Pool** | Shared collection of all drawn items available for outfit picking. |
-| **Outfit** | A complete set of 1 hat + 1 shirt + 1 pants + 1 shoes. |
+| **Outfit** | A complete set of 1 hat + 1 top + 1 bottom + 1 shoes. |
 | **Pool Reveal** | Animated phase after drawing where all items are displayed to all players before picking begins. |
 | **Sketch** | Optional embellishment drawn on top of an outfit after picking. |
 | **Criterion / Criteria** | A voting dimension (e.g., "Theme Adherence", "Personal Preference"). |
@@ -1032,8 +1036,8 @@ All settings default to recommended values. Host can customize if desired.
 
 ### Player Count Edge Cases
 
-**Case 1: Fewer than 6 players join**
-- Resolution: Game can start, but with a warning. Host is notified: "At least 6 players is recommended. Currently [N]. Voting may be less meaningful with fewer players."
+**Case 1: Fewer than 6 players join (but at least 3)**
+- Resolution: Game can start, but with a warning. Host is notified: "At least 6 players is recommended for the best experience. Currently [N]. Voting may be less meaningful with fewer players."
 
 **Case 2: Mid-game player leaves/quits**
 - Resolution: Player is marked inactive. Their outfits remain in the pool for voting. They cannot vote but see results. Scoring continues (their outfits can still earn votes).
@@ -1119,6 +1123,7 @@ All settings default to recommended values. Host can customize if desired.
 |---------|------|---------|
 | 1.0 | March 2026 | Initial design complete |
 | 1.1 | March 2026 | Clarified vote-based scoring (1 pt per vote × weight); added Pool Reveal phase; raised minimum players to 6; defined tiebreaker rules; specified coin flip UX with 15s timer; clarified `canReuseOutfit1Items` precedence over `outfitDistinctnessRule`; consolidated theme settings (same theme for both outfits); specified `playerWritten` theme flow; updated Swiss rounds table for 2-outfits-per-player; added host disconnect default timeout (60s); fixed auto-fill self-pick compliance; updated scoring example; fixed typo |
+| 1.2 | March 2026 | Updated defaults based on playtesting: drawing time 60s→180s; clothing types shirt→top, pants→bottom; theme source builtInPool→random; outfit building time 180s→90s; voting criteria changed to creativity/theme_match/overall_look; max items per type 5→3; min players 6→3; default outfit rounds 2→1; updated scoring examples for 3 criteria |
 
 ---
 
