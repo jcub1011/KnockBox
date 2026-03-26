@@ -24,16 +24,37 @@ namespace KnockBox.Services.State.Games.DrawnToDress.Data
         public List<Guid> OwnedClothingItemIds { get; set; } = [];
 
         /// <summary>
+        /// All outfits submitted by this player, keyed by 1-based outfit round number.
+        /// </summary>
+        public Dictionary<int, OutfitSubmission> SubmittedOutfits { get; set; } = new();
+
+        /// <summary>Returns the outfit for the given round, or null.</summary>
+        public OutfitSubmission? GetOutfit(int outfitRound) => SubmittedOutfits.GetValueOrDefault(outfitRound);
+
+        /// <summary>Sets the outfit for the given round.</summary>
+        public void SetOutfit(int outfitRound, OutfitSubmission submission) => SubmittedOutfits[outfitRound] = submission;
+
+        /// <summary>
         /// The outfit this player has submitted during Outfit 1 Building, or
         /// <see langword="null"/> if they have not yet submitted one.
+        /// Convenience property delegating to <see cref="SubmittedOutfits"/>.
         /// </summary>
-        public OutfitSubmission? SubmittedOutfit { get; set; }
+        public OutfitSubmission? SubmittedOutfit
+        {
+            get => GetOutfit(1);
+            set { if (value is not null) SetOutfit(1, value); else SubmittedOutfits.Remove(1); }
+        }
 
         /// <summary>
         /// The outfit this player has submitted during Outfit 2 Building, or
         /// <see langword="null"/> if they have not yet submitted one.
+        /// Convenience property delegating to <see cref="SubmittedOutfits"/>.
         /// </summary>
-        public OutfitSubmission? SubmittedOutfit2 { get; set; }
+        public OutfitSubmission? SubmittedOutfit2
+        {
+            get => GetOutfit(2);
+            set { if (value is not null) SetOutfit(2, value); else SubmittedOutfits.Remove(2); }
+        }
 
         /// <summary>
         /// Bonus points earned by this player through achievements during the game

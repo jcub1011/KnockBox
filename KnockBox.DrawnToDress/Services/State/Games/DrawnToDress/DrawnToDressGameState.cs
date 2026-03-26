@@ -136,6 +136,7 @@ namespace KnockBox.Services.State.Games.DrawnToDress
             Phase = phase;
             StateChangedEventManager.Notify();
         }
+
     }
 
     /// <summary>
@@ -170,24 +171,6 @@ namespace KnockBox.Services.State.Games.DrawnToDress
         /// the second outfit building phase begins.
         /// </summary>
         OutfitDistinctnessResolution = 6,
-
-        /// <summary>
-        /// Timed countdown shown before Outfit 2 building begins. The Outfit 2 pool
-        /// (Outfit 1 picks removed) is revealed here so players can plan their picks.
-        /// </summary>
-        Pool2Reveal = 15,
-
-        /// <summary>
-        /// Second outfit building phase. Players assemble a second outfit from the
-        /// remaining pool (Outfit 1 picks excluded). Submitted outfits are validated for
-        /// distinctness against every player's Outfit 1.
-        /// </summary>
-        Outfit2Building = 14,
-
-        /// <summary>
-        /// Players assign a name and optional sketch overlay to their assembled Outfit 2.
-        /// </summary>
-        Outfit2Customization = 16,
 
         // ── Voting ────────────────────────────────────────────────────────────
         VotingRoundSetup = 7,

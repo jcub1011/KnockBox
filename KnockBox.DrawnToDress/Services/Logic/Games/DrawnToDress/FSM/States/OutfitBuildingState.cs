@@ -7,20 +7,21 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
 {
     /// <summary>
     /// Timed phase in which players assemble their outfit by claiming items from the
-    /// communal pool and selecting one per clothing type.
+    /// communal pool and selecting one per clothing type. Supports multiple outfit rounds
+    /// via the <c>outfitRound</c> parameter.
     ///
-    /// Transition ownership:
-    /// - Timer expiry → <see cref="OutfitCustomizationState"/> (auto-fills incomplete outfits first)
-    /// - All players submit their outfit early → <see cref="OutfitCustomizationState"/>
-    /// - <see cref="ClaimPoolItemCommand"/> → item claimed; no transition
-    /// - <see cref="UnclaimPoolItemCommand"/> → claimed item released back to pool; no transition
-    /// - <see cref="SubmitOutfitCommand"/> → outfit recorded; may trigger early advance
-    /// - <see cref="PauseGameCommand"/> (host only) → <see cref="PausedState"/>
-    /// - <see cref="AbandonGameCommand"/> (host only) → <see cref="AbandonedState"/>
+    /// For round > 1, the pool is reset on entry (previous round picks removed) and
+    /// submitted outfits are validated for distinctness against earlier outfits.
     /// </summary>
     public sealed class OutfitBuildingState : ITimedDrawnToDressGameState
     {
+        private readonly int _outfitRound;
         private DateTimeOffset _deadline;
+
+        public OutfitBuildingState(int outfitRound = 1)
+        {
+            _outfitRound = outfitRound;
+        }
 
         public ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?> OnEnter(
             DrawnToDressGameContext context)
@@ -28,9 +29,22 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
             _deadline = DateTimeOffset.UtcNow.AddSeconds(context.Config.OutfitBuildingTimeSec);
             context.State.PhaseDeadlineUtc = _deadline;
             context.State.SetPhase(GamePhase.OutfitBuilding);
+            context.CurrentOutfitRound = _outfitRound;
             context.ResetReadyFlags();
-            context.Logger.LogInformation(
-                "FSM → OutfitBuildingState. Deadline: {deadline}.", _deadline);
+
+            if (_outfitRound > 1)
+            {
+                context.ResetPoolForRound(_outfitRound);
+                context.Logger.LogInformation(
+                    "FSM → OutfitBuildingState (round {round}). Pool has {count} item(s) after previous picks removed. Deadline: {deadline}.",
+                    _outfitRound, context.ClothingPool.Values.Count(i => i.IsInPool), _deadline);
+            }
+            else
+            {
+                context.Logger.LogInformation(
+                    "FSM → OutfitBuildingState. Deadline: {deadline}.", _deadline);
+            }
+
             return null;
         }
 
@@ -75,14 +89,15 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
             if (now < _deadline) return null;
 
             context.Logger.LogInformation(
-                "Outfit building timer expired. Auto-filling incomplete outfits and moving to customization.");
+                "Outfit building timer expired (round {round}). Auto-filling incomplete outfits and moving to customization.",
+                _outfitRound);
             AutoFillIncompleteOutfits(context);
-            return new OutfitCustomizationState();
+            return new OutfitCustomizationState(_outfitRound);
         }
 
         // ── Helpers ───────────────────────────────────────────────────────────
 
-        private static ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?> HandleClaimPoolItem(
+        private ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?> HandleClaimPoolItem(
             DrawnToDressGameContext context, ClaimPoolItemCommand cmd)
         {
             var player = context.GetPlayer(cmd.PlayerId);
@@ -97,6 +112,13 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
             {
                 context.Logger.LogWarning(
                     "ClaimPoolItem: item [{itemId}] not found in pool.", cmd.ItemId);
+                return null;
+            }
+
+            if (_outfitRound > 1 && !item.IsInPool)
+            {
+                context.Logger.LogWarning(
+                    "ClaimPoolItem: item [{itemId}] is not in the round {round} pool.", cmd.ItemId, _outfitRound);
                 return null;
             }
 
@@ -161,7 +183,7 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
             return null;
         }
 
-        private static ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?> HandleSubmitOutfit(
+        private ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?> HandleSubmitOutfit(
             DrawnToDressGameContext context, SubmitOutfitCommand cmd)
         {
             var player = context.GetPlayer(cmd.PlayerId);
@@ -201,38 +223,80 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
                 }
             }
 
-            player.SubmittedOutfit = new OutfitSubmission
+            // Distinctness check for round > 1.
+            if (_outfitRound > 1)
+            {
+                int threshold = context.Config.Outfit2DistinctnessThreshold;
+                if (threshold > 0)
+                {
+                    var candidate = new OutfitSubmission
+                    {
+                        PlayerId = cmd.PlayerId,
+                        SelectedItemsByType = new Dictionary<string, Guid>(cmd.SelectedItemsByType),
+                    };
+
+                    var allPreviousOutfits = context.GamePlayers.Values
+                        .SelectMany(p => p.SubmittedOutfits
+                            .Where(kv => kv.Key < _outfitRound)
+                            .Select(kv => kv.Value));
+
+                    if (OutfitDistinctnessEvaluator.ViolatesDistinctnessRule(candidate, allPreviousOutfits, threshold))
+                    {
+                        var worstOutfit = allPreviousOutfits
+                            .OrderByDescending(o => OutfitDistinctnessEvaluator.CountSharedItems(o, candidate))
+                            .First();
+                        int shared = OutfitDistinctnessEvaluator.CountSharedItems(worstOutfit, candidate);
+
+                        context.Logger.LogWarning(
+                            "SubmitOutfit round {round}: player [{id}]'s outfit shares {count} item(s) with a previous outfit " +
+                            "(owner: [{owner}]), which meets or exceeds the distinctness threshold of {threshold}. " +
+                            "Submission rejected.",
+                            _outfitRound, cmd.PlayerId, shared, worstOutfit.PlayerId, threshold);
+                        return null;
+                    }
+                }
+            }
+
+            player.SetOutfit(_outfitRound, new OutfitSubmission
             {
                 PlayerId = cmd.PlayerId,
                 SelectedItemsByType = new Dictionary<string, Guid>(cmd.SelectedItemsByType),
                 SubmittedAt = DateTimeOffset.UtcNow,
-            };
+            });
 
             context.Logger.LogInformation(
-                "Player [{id}] submitted their outfit ({count} items).",
-                cmd.PlayerId, cmd.SelectedItemsByType.Count);
+                "Player [{id}] submitted outfit round {round} ({count} items).",
+                cmd.PlayerId, _outfitRound, cmd.SelectedItemsByType.Count);
 
-            if (context.AllOutfitsSubmitted())
+            if (context.AllOutfitsSubmittedForRound(_outfitRound))
             {
                 context.Logger.LogInformation(
-                    "All outfits submitted. Moving to customization early.");
-                return new OutfitCustomizationState();
+                    "All outfits submitted for round {round}. Moving to customization.", _outfitRound);
+                return new OutfitCustomizationState(_outfitRound);
             }
 
             return null;
         }
 
         /// <summary>
-        /// For each player who has not yet submitted an outfit, builds a best-effort outfit
-        /// from the items they own.  For each clothing type, prefers items drawn by other
-        /// players (claimed items) over the player's own drawings so that self-drawn items
-        /// are used only as a fallback.
+        /// For each player who has not yet submitted an outfit for the current round,
+        /// builds a best-effort outfit from the items they own.
         /// </summary>
-        private static void AutoFillIncompleteOutfits(DrawnToDressGameContext context)
+        private void AutoFillIncompleteOutfits(DrawnToDressGameContext context)
         {
+            var allPreviousOutfits = _outfitRound > 1
+                ? context.GamePlayers.Values
+                    .SelectMany(p => p.SubmittedOutfits
+                        .Where(kv => kv.Key < _outfitRound)
+                        .Select(kv => kv.Value))
+                    .ToList()
+                : new List<OutfitSubmission>();
+
+            int threshold = context.Config.Outfit2DistinctnessThreshold;
+
             foreach (var player in context.GamePlayers.Values)
             {
-                if (player.SubmittedOutfit is not null) continue;
+                if (player.GetOutfit(_outfitRound) is not null) continue;
 
                 var selectedItems = new Dictionary<string, Guid>();
 
@@ -247,33 +311,58 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
 
                     if (candidates.Count == 0) continue;
 
-                    // Prefer items drawn by other players to satisfy the self-drawn avoidance rule.
-                    var preferred = candidates
-                        .FirstOrDefault(i => !string.Equals(
-                            i.CreatorPlayerId, player.PlayerId, StringComparison.Ordinal));
-
-                    var chosen = preferred ?? candidates[0];
-                    selectedItems[clothingType.Id] = chosen.Id;
+                    if (_outfitRound > 1 && allPreviousOutfits.Count > 0)
+                    {
+                        // Try to find an item that does not appear in any previous outfit in this slot.
+                        var nonConflicting = candidates.FirstOrDefault(candidate =>
+                            !allPreviousOutfits.Any(o =>
+                                o.SelectedItemsByType.TryGetValue(clothingType.Id, out var oItem)
+                                && oItem == candidate.Id));
+                        var chosen = nonConflicting ?? candidates[0];
+                        selectedItems[clothingType.Id] = chosen.Id;
+                    }
+                    else
+                    {
+                        // Prefer items drawn by other players (claimed) over self-drawn items.
+                        var preferred = candidates
+                            .FirstOrDefault(i => !string.Equals(
+                                i.CreatorPlayerId, player.PlayerId, StringComparison.Ordinal));
+                        var chosen = preferred ?? candidates[0];
+                        selectedItems[clothingType.Id] = chosen.Id;
+                    }
                 }
 
                 if (selectedItems.Count == 0)
                 {
                     context.Logger.LogWarning(
-                        "Auto-fill: player [{id}] has no available items; outfit left empty.",
-                        player.PlayerId);
+                        "Auto-fill: player [{id}] has no available items for round {round}; outfit left empty.",
+                        player.PlayerId, _outfitRound);
                     continue;
                 }
 
-                player.SubmittedOutfit = new OutfitSubmission
+                var submission = new OutfitSubmission
                 {
                     PlayerId = player.PlayerId,
                     SelectedItemsByType = selectedItems,
                     SubmittedAt = DateTimeOffset.UtcNow,
                 };
 
-                context.Logger.LogInformation(
-                    "Auto-filled outfit for player [{id}] ({count} item(s)).",
-                    player.PlayerId, selectedItems.Count);
+                player.SetOutfit(_outfitRound, submission);
+
+                if (_outfitRound > 1 && threshold > 0 &&
+                    OutfitDistinctnessEvaluator.ViolatesDistinctnessRule(submission, allPreviousOutfits, threshold))
+                {
+                    context.Logger.LogWarning(
+                        "Auto-fill: player [{id}]'s outfit round {round} still violates distinctness " +
+                        "(no distinct alternative found). Using best-effort outfit.",
+                        player.PlayerId, _outfitRound);
+                }
+                else
+                {
+                    context.Logger.LogInformation(
+                        "Auto-filled outfit round {round} for player [{id}] ({count} item(s)).",
+                        _outfitRound, player.PlayerId, selectedItems.Count);
+                }
             }
         }
     }

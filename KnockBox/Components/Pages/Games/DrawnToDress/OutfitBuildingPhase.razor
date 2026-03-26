@@ -10,12 +10,18 @@
 
     string? myId = UserService.CurrentUser?.Id;
     var myPlayer = myId is not null && GameState.GamePlayers.TryGetValue(myId, out var pOut) ? pOut : null;
-    // Capture SubmittedOutfit once so its value stays consistent throughout this render pass
+    // Capture submitted outfit once so its value stays consistent throughout this render pass
     // even if the FSM updates player state concurrently from the timer loop.
-    var mySubmittedOutfit = myPlayer?.SubmittedOutfit;
+    var mySubmittedOutfit = myPlayer?.GetOutfit(OutfitRound);
 
-    int lockedCount = GameState.GamePlayers.Values.Count(p => p.SubmittedOutfit is not null);
+    int lockedCount = GameState.GamePlayers.Values.Count(p => p.GetOutfit(OutfitRound) is not null);
     int totalPlayers = GameState.GamePlayers.Count;
+
+    string phaseName = OutfitRound == 1 ? "Outfit Building" : $"Outfit {OutfitRound} Building";
+    string yourOutfitTitle = OutfitRound == 1 ? "Your Outfit" : $"Your Outfit {OutfitRound}";
+    string poolTitle = OutfitRound == 1 ? "Clothing Pool" : $"Clothing Pool (Round {OutfitRound})";
+    string lockInLabel = OutfitRound == 1 ? "Lock In Outfit" : $"Lock In Outfit {OutfitRound}";
+    string lockedMessage = OutfitRound == 1 ? "Outfit locked in! Waiting for the others\u2026" : $"Outfit {OutfitRound} locked in! Waiting for the others\u2026";
 }
 
 <div class="dtd-outfit">
@@ -24,7 +30,7 @@
     <div class="dtd-outfit-header">
         <div class="dtd-outfit-phase-badge">
             <span class="dtd-outfit-phase-icon">👗</span>
-            <span class="dtd-outfit-phase-name">Outfit Building</span>
+            <span class="dtd-outfit-phase-name">@phaseName</span>
         </div>
 
         <div class="dtd-outfit-progress-pill">
@@ -54,7 +60,7 @@
                 @foreach (var kv in GameState.GamePlayers)
                 {
                     var ps = kv.Value;
-                    bool locked = ps.SubmittedOutfit is not null;
+                    bool locked = ps.GetOutfit(OutfitRound) is not null;
                     int claimed = ps.OwnedClothingItemIds
                         .Count(id => GameState.ClothingPool.TryGetValue(id, out var item)
                                      && item.ClaimedByPlayerId == ps.PlayerId);
@@ -82,10 +88,65 @@
     }
 
     <!-- ── Player view ───────────────────────────────────────────────────── -->
-    @if (!isHost && mySubmittedOutfit != null)
+    @if (isHost)
+    {
+        <!-- Host only sees the pool overview below the progress panel -->
+        <div class="dtd-outfit-pool-section">
+            <h4 class="dtd-outfit-section-title">@poolTitle</h4>
+            @{
+                var hostPoolByType = GameState.Config.ClothingTypes
+                    .ToDictionary(
+                        ct => ct,
+                        ct => GameState.ClothingPool.Values
+                            .Where(item => item.ClothingTypeId == ct.Id && item.IsInPool)
+                            .ToList());
+            }
+            @foreach (var (clothingType, items) in hostPoolByType)
+            {
+                <div class="dtd-pool-type-group">
+                    <h5 class="dtd-pool-type-label">@clothingType.DisplayName</h5>
+                    @if (items.Count == 0)
+                    {
+                        <p class="dtd-pool-empty-hint">No items drawn for this type.</p>
+                    }
+                    else
+                    {
+                        <div class="dtd-pool-grid">
+                            @foreach (var item in items)
+                            {
+                                bool taken = item.ClaimedByPlayerId is not null;
+                                string stateClass = taken ? "dtd-pool-item-taken" : "dtd-pool-item-available";
+
+                                <div class="dtd-pool-item @stateClass"
+                                     title="@(taken ? "Claimed" : "Available")">
+                                    @if (SafeSvgContent(item.SvgContent) is string safeSvg)
+                                    {
+                                        <svg class="dtd-pool-item-preview" viewBox="0 0 800 400"
+                                             preserveAspectRatio="xMidYMid meet"
+                                             xmlns="http://www.w3.org/2000/svg">
+                                            @((MarkupString)safeSvg)
+                                        </svg>
+                                    }
+                                    else
+                                    {
+                                        <span class="dtd-pool-item-icon">🎨</span>
+                                    }
+                                    @if (taken)
+                                    {
+                                        <span class="dtd-pool-item-badge dtd-badge-taken">✕ Taken</span>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    }
+    else if (mySubmittedOutfit != null)
     {
         <div class="dtd-outfit-waiting">
-            <p>✅ Outfit locked in! Waiting for the others…</p>
+            <p>✅ @lockedMessage</p>
             <div class="dtd-outfit-locked-summary">
                 @foreach (var clothingType in GameState.Config.ClothingTypes)
                 {
@@ -128,7 +189,7 @@
     {
         <!-- Outfit slots -->
         <div class="dtd-outfit-slots-section">
-            <h4 class="dtd-outfit-section-title">Your Outfit</h4>
+            <h4 class="dtd-outfit-section-title">@yourOutfitTitle</h4>
             <div class="dtd-outfit-slots">
                 @foreach (var clothingType in GameState.Config.ClothingTypes)
                 {
@@ -203,7 +264,7 @@
 
         <!-- Pool grid -->
         <div class="dtd-outfit-pool-section">
-            <h4 class="dtd-outfit-section-title">Clothing Pool</h4>
+            <h4 class="dtd-outfit-section-title">@poolTitle</h4>
             @{
                 var poolByType = GameState.Config.ClothingTypes
                     .ToDictionary(
@@ -313,7 +374,7 @@
                 }
                 else
                 {
-                    <span>🔒 Lock In Outfit</span>
+                    <span>🔒 @lockInLabel</span>
                 }
             </button>
         </div>

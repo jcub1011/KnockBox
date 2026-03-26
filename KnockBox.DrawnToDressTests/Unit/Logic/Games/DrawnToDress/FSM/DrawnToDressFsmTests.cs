@@ -766,19 +766,19 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
         }
 
         [TestMethod]
-        public async Task OutfitCustomizationState_OnTimerExpiry_TransitionsToPool2Reveal()
+        public async Task OutfitCustomizationState_OnTimerExpiry_TransitionsToPoolReveal()
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
 
-            // No players → no distinctness conflicts, so goes straight to Pool2RevealState.
+            // No players → no distinctness conflicts, so goes straight to PoolRevealState.
             context.Fsm.TransitionTo(context, new OutfitCustomizationState());
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
 
-            Assert.IsInstanceOfType<Pool2RevealState>(context.Fsm.CurrentState);
-            Assert.AreEqual(GamePhase.Pool2Reveal, state.Phase);
+            Assert.IsInstanceOfType<PoolRevealState>(context.Fsm.CurrentState);
+            Assert.AreEqual(GamePhase.PoolReveal, state.Phase);
         }
 
         [TestMethod]
@@ -2146,7 +2146,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
 
             _engine.ProcessCommand(context,
                 new SubmitCustomizationCommand("p2", "Outfit Two"));
-            Assert.IsInstanceOfType<Pool2RevealState>(context.Fsm.CurrentState,
+            Assert.IsInstanceOfType<PoolRevealState>(context.Fsm.CurrentState,
                 "Should advance once all players have submitted customization.");
         }
 
@@ -2195,37 +2195,37 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
         // ── Pool 2 Reveal state ───────────────────────────────────────────────
 
         [TestMethod]
-        public async Task Pool2RevealState_OnEnter_SetsPool2RevealPhase()
+        public async Task PoolRevealState_OnEnter_SetsPool2RevealPhase()
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
 
-            context.Fsm.TransitionTo(context, new Pool2RevealState());
+            context.Fsm.TransitionTo(context, new PoolRevealState(outfitRound: 2));
 
-            Assert.AreEqual(GamePhase.Pool2Reveal, state.Phase);
+            Assert.AreEqual(GamePhase.PoolReveal, state.Phase);
             Assert.IsTrue(state.PhaseDeadlineUtc.HasValue,
-                "Pool2RevealState must set a deadline on entry.");
+                "PoolRevealState must set a deadline on entry.");
         }
 
         [TestMethod]
-        public async Task Pool2RevealState_TimerExpiry_AdvancesToOutfit2Building()
+        public async Task PoolRevealState_TimerExpiry_AdvancesToOutfitBuilding()
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
 
-            context.Fsm.TransitionTo(context, new Pool2RevealState());
+            context.Fsm.TransitionTo(context, new PoolRevealState(outfitRound: 2));
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
 
-            Assert.IsInstanceOfType<Outfit2BuildingState>(context.Fsm.CurrentState);
-            Assert.AreEqual(GamePhase.Outfit2Building, state.Phase);
+            Assert.IsInstanceOfType<OutfitBuildingState>(context.Fsm.CurrentState);
+            Assert.AreEqual(GamePhase.OutfitBuilding, state.Phase);
         }
 
         [TestMethod]
-        public async Task Pool2RevealState_AllPlayersReady_AdvancesEarlyToOutfit2Building()
+        public async Task PoolRevealState_Round2_AllPlayersReady_AdvancesEarlyToOutfitBuilding()
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
@@ -2234,15 +2234,15 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
 
             state.GamePlayers["p1"] = new() { PlayerId = "p1" };
 
-            context.Fsm.TransitionTo(context, new Pool2RevealState());
+            context.Fsm.TransitionTo(context, new PoolRevealState(outfitRound: 2));
             _engine.ProcessCommand(context, new MarkReadyCommand("p1"));
 
-            Assert.IsInstanceOfType<Outfit2BuildingState>(context.Fsm.CurrentState,
-                "All-ready should advance early from Pool2Reveal to Outfit2Building.");
+            Assert.IsInstanceOfType<OutfitBuildingState>(context.Fsm.CurrentState,
+                "All-ready should advance early from PoolReveal to OutfitBuilding.");
         }
 
         [TestMethod]
-        public async Task Pool2RevealState_ClaimPoolItem_IsRejected()
+        public async Task PoolRevealState_ClaimPoolItem_IsRejected()
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
@@ -2257,17 +2257,17 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
             };
             state.GamePlayers["p1"] = new() { PlayerId = "p1" };
 
-            context.Fsm.TransitionTo(context, new Pool2RevealState());
+            context.Fsm.TransitionTo(context, new PoolRevealState(outfitRound: 2));
             _engine.ProcessCommand(context, new ClaimPoolItemCommand("p1", hatId));
 
-            Assert.IsInstanceOfType<Pool2RevealState>(context.Fsm.CurrentState,
+            Assert.IsInstanceOfType<PoolRevealState>(context.Fsm.CurrentState,
                 "Pool reveal is view-only — a ClaimPoolItemCommand must not advance the state.");
             Assert.IsNull(state.ClothingPool[hatId].ClaimedByPlayerId,
                 "Items must not be claimable during Pool2Reveal.");
         }
 
         [TestMethod]
-        public async Task Pool2RevealState_OnEnter_ResetsPoolFromOutfit1Picks()
+        public async Task PoolRevealState_OnEnter_ResetsPoolFromOutfit1Picks()
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
@@ -2301,7 +2301,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
                 },
             };
 
-            context.Fsm.TransitionTo(context, new Pool2RevealState());
+            context.Fsm.TransitionTo(context, new PoolRevealState(outfitRound: 2));
 
             Assert.IsFalse(state.ClothingPool[usedHat].IsInPool,
                 "Item selected in Outfit 1 must be removed from the Outfit 2 pool during Pool2Reveal.");
@@ -2312,7 +2312,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
         // ── Outfit 2: pool reset on entry ─────────────────────────────────────
 
         [TestMethod]
-        public async Task Outfit2Building_OnEnter_RemovesOutfit1PicksFromPool()
+        public async Task OutfitBuilding_OnEnter_RemovesOutfit1PicksFromPool()
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
@@ -2353,7 +2353,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
                 },
             };
 
-            context.Fsm.TransitionTo(context, new Outfit2BuildingState());
+            context.Fsm.TransitionTo(context, new OutfitBuildingState(outfitRound: 2));
 
             Assert.IsFalse(state.ClothingPool[usedHat].IsInPool,
                 "Item selected in Outfit 1 must be removed from the Outfit 2 pool.");
@@ -2362,7 +2362,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
         }
 
         [TestMethod]
-        public async Task Outfit2Building_OnEnter_ClearsAllClaims()
+        public async Task OutfitBuilding_OnEnter_ClearsAllClaims()
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
@@ -2391,14 +2391,14 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
                 OwnedClothingItemIds = [itemId],
             };
 
-            context.Fsm.TransitionTo(context, new Outfit2BuildingState());
+            context.Fsm.TransitionTo(context, new OutfitBuildingState(outfitRound: 2));
 
             Assert.IsNull(state.ClothingPool[itemId].ClaimedByPlayerId,
                 "All claims must be cleared when Outfit 2 building begins.");
         }
 
         [TestMethod]
-        public async Task Outfit2Building_OnEnter_SelfDrawnItemsInPool_RemainsOwned()
+        public async Task OutfitBuilding_OnEnter_SelfDrawnItemsInPool_RemainsOwned()
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
@@ -2430,14 +2430,14 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
                 OwnedClothingItemIds = [selfHat],
             };
 
-            context.Fsm.TransitionTo(context, new Outfit2BuildingState());
+            context.Fsm.TransitionTo(context, new OutfitBuildingState(outfitRound: 2));
 
             Assert.IsTrue(state.GamePlayers["p1"].OwnedClothingItemIds.Contains(selfHat),
                 "A self-drawn item that is still in the pool must remain in the player's owned set.");
         }
 
         [TestMethod]
-        public async Task Outfit2Building_OnEnter_Outfit1SelfDrawnItemUsed_NotInOwned()
+        public async Task OutfitBuilding_OnEnter_Outfit1SelfDrawnItemUsed_NotInOwned()
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
@@ -2469,7 +2469,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
                 OwnedClothingItemIds = [selfHat],
             };
 
-            context.Fsm.TransitionTo(context, new Outfit2BuildingState());
+            context.Fsm.TransitionTo(context, new OutfitBuildingState(outfitRound: 2));
 
             Assert.IsFalse(state.GamePlayers["p1"].OwnedClothingItemIds.Contains(selfHat),
                 "A self-drawn item used in Outfit 1 must not be in the player's Outfit 2 owned set " +
@@ -2479,7 +2479,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
         // ── Outfit 2: CanReuseOutfit1Items ────────────────────────────────────
 
         [TestMethod]
-        public async Task Outfit2Building_CanReuseOutfit1Items_True_AddsBackOutfit1Picks()
+        public async Task OutfitBuilding_CanReuseOutfit1Items_True_AddsBackOutfit1Picks()
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
@@ -2507,7 +2507,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
                 OwnedClothingItemIds = [hatId],
             };
 
-            context.Fsm.TransitionTo(context, new Outfit2BuildingState());
+            context.Fsm.TransitionTo(context, new OutfitBuildingState(outfitRound: 2));
 
             // The hat was in Outfit 1 (now IsInPool=false), but CanReuseOutfit1Items allows it back.
             Assert.IsTrue(state.GamePlayers["p1"].OwnedClothingItemIds.Contains(hatId),
@@ -2515,7 +2515,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
         }
 
         [TestMethod]
-        public async Task Outfit2Building_CanReuseOutfit1Items_False_DoesNotAddBackOutfit1Picks()
+        public async Task OutfitBuilding_CanReuseOutfit1Items_False_DoesNotAddBackOutfit1Picks()
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
@@ -2543,7 +2543,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
                 OwnedClothingItemIds = [hatId],
             };
 
-            context.Fsm.TransitionTo(context, new Outfit2BuildingState());
+            context.Fsm.TransitionTo(context, new OutfitBuildingState(outfitRound: 2));
 
             Assert.IsFalse(state.GamePlayers["p1"].OwnedClothingItemIds.Contains(hatId),
                 "When CanReuseOutfit1Items is false the player's Outfit 1 picks must not be owned for Outfit 2.");
@@ -2552,7 +2552,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
         // ── Outfit 2: claim / unclaim ─────────────────────────────────────────
 
         [TestMethod]
-        public async Task Outfit2Building_ClaimPoolItem_Success_AddsToOwnedList()
+        public async Task OutfitBuilding_Round2_ClaimPoolItem_Success_AddsToOwnedList()
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
@@ -2571,7 +2571,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
             state.GamePlayers["p1"] = new() { PlayerId = "p1" };
             state.GamePlayers["p2"] = new() { PlayerId = "p2" };
 
-            context.Fsm.TransitionTo(context, new Outfit2BuildingState());
+            context.Fsm.TransitionTo(context, new OutfitBuildingState(outfitRound: 2));
             _engine.ProcessCommand(context, new ClaimPoolItemCommand("p1", hatId));
 
             Assert.AreEqual("p1", state.ClothingPool[hatId].ClaimedByPlayerId);
@@ -2579,7 +2579,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
         }
 
         [TestMethod]
-        public async Task Outfit2Building_ClaimPoolItem_ItemRemovedByReset_IsRejected()
+        public async Task OutfitBuilding_ClaimPoolItem_ItemRemovedByReset_IsRejected()
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
@@ -2607,7 +2607,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
                 },
             };
 
-            context.Fsm.TransitionTo(context, new Outfit2BuildingState());
+            context.Fsm.TransitionTo(context, new OutfitBuildingState(outfitRound: 2));
 
             // hatId was in Outfit 1 → IsInPool = false → claim must be rejected.
             _engine.ProcessCommand(context, new ClaimPoolItemCommand("p1", hatId));
@@ -2620,7 +2620,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
         // ── Outfit 2: submit validation ───────────────────────────────────────
 
         [TestMethod]
-        public async Task Outfit2Building_SubmitOutfit_ValidAndDistinct_IsAccepted()
+        public async Task OutfitBuilding_SubmitOutfit_ValidAndDistinct_IsAccepted()
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
@@ -2656,7 +2656,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
             };
 
             // Pool reset: outfit1Hat excluded (in Outfit 1 picks); outfit2Hat stays (self-drawn by p1).
-            context.Fsm.TransitionTo(context, new Outfit2BuildingState());
+            context.Fsm.TransitionTo(context, new OutfitBuildingState(outfitRound: 2));
             _engine.ProcessCommand(context, new SubmitOutfitCommand("p1",
                 new Dictionary<string, Guid> { ["hat"] = outfit2Hat }));
 
@@ -2666,7 +2666,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
         }
 
         [TestMethod]
-        public async Task Outfit2Building_SubmitOutfit_ViolatesDistinctness_IsRejected()
+        public async Task OutfitBuilding_SubmitOutfit_ViolatesDistinctness_IsRejected()
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
@@ -2707,7 +2707,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
                 },
             };
 
-            context.Fsm.TransitionTo(context, new Outfit2BuildingState());
+            context.Fsm.TransitionTo(context, new OutfitBuildingState(outfitRound: 2));
             _engine.ProcessCommand(context, new SubmitOutfitCommand("p1",
                 new Dictionary<string, Guid> { ["hat"] = hatId, ["top"] = topId, ["shoes"] = shoesId }));
 
@@ -2716,7 +2716,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
         }
 
         [TestMethod]
-        public async Task Outfit2Building_SubmitOutfit_MatchesOtherPlayersOutfit1_IsRejected()
+        public async Task OutfitBuilding_SubmitOutfit_MatchesOtherPlayersOutfit1_IsRejected()
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
@@ -2760,7 +2760,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
             };
 
             // Pool reset removes hatId/topId/shoesId (in p2's Outfit 1) from pool.
-            context.Fsm.TransitionTo(context, new Outfit2BuildingState());
+            context.Fsm.TransitionTo(context, new OutfitBuildingState(outfitRound: 2));
 
             // Manually grant p1 access to those items to isolate the distinctness-check logic.
             // (In game play this could happen if an item appears in multiple Outfit 1s via
@@ -2775,7 +2775,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
         }
 
         [TestMethod]
-        public async Task Outfit2Building_SubmitOutfit_DistinctnessDisabled_AllowsSimilarOutfit()
+        public async Task OutfitBuilding_SubmitOutfit_DistinctnessDisabled_AllowsSimilarOutfit()
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
@@ -2815,7 +2815,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
                 },
             };
 
-            context.Fsm.TransitionTo(context, new Outfit2BuildingState());
+            context.Fsm.TransitionTo(context, new OutfitBuildingState(outfitRound: 2));
             _engine.ProcessCommand(context, new SubmitOutfitCommand("p1",
                 new Dictionary<string, Guid> { ["hat"] = hatId, ["top"] = topId, ["shoes"] = shoesId }));
 
@@ -2824,7 +2824,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
         }
 
         [TestMethod]
-        public async Task Outfit2Building_SubmitOutfit_BelowThreshold_IsAccepted()
+        public async Task OutfitBuilding_SubmitOutfit_BelowThreshold_IsAccepted()
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
@@ -2877,7 +2877,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
                 },
             };
 
-            context.Fsm.TransitionTo(context, new Outfit2BuildingState());
+            context.Fsm.TransitionTo(context, new OutfitBuildingState(outfitRound: 2));
             _engine.ProcessCommand(context, new SubmitOutfitCommand("p1",
                 new Dictionary<string, Guid> { ["hat"] = hatId, ["top"] = topId, ["shoes"] = outfit2Shoes }));
 
@@ -2888,7 +2888,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
         // ── Outfit 2: early advance ───────────────────────────────────────────
 
         [TestMethod]
-        public async Task Outfit2Building_AllPlayersSubmit_AdvancesToVoting()
+        public async Task OutfitBuilding_AllPlayersSubmit_AdvancesToVoting()
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
@@ -2924,16 +2924,16 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
                 OwnedClothingItemIds = [hatA],
             };
 
-            context.Fsm.TransitionTo(context, new Outfit2BuildingState());
+            context.Fsm.TransitionTo(context, new OutfitBuildingState(outfitRound: 2));
 
             _engine.ProcessCommand(context, new SubmitOutfitCommand("p1",
                 new Dictionary<string, Guid> { ["hat"] = hatB }));
-            Assert.IsInstanceOfType<Outfit2BuildingState>(context.Fsm.CurrentState,
+            Assert.IsInstanceOfType<OutfitBuildingState>(context.Fsm.CurrentState,
                 "Should not advance until all players have submitted Outfit 2.");
 
             _engine.ProcessCommand(context, new SubmitOutfitCommand("p2",
                 new Dictionary<string, Guid> { ["hat"] = hatA }));
-            Assert.IsInstanceOfType<Outfit2CustomizationState>(context.Fsm.CurrentState,
+            Assert.IsInstanceOfType<OutfitCustomizationState>(context.Fsm.CurrentState,
                 "Should advance to Outfit 2 customization once all players submit Outfit 2.");
         }
 
@@ -2942,29 +2942,29 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
         // ── Outfit 2 Customization state ──────────────────────────────────────
 
         [TestMethod]
-        public async Task Outfit2CustomizationState_OnEnter_SetsOutfit2CustomizationPhase()
+        public async Task OutfitCustomizationState_OnEnter_SetsOutfit2CustomizationPhase()
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
 
-            context.Fsm.TransitionTo(context, new Outfit2CustomizationState());
+            context.Fsm.TransitionTo(context, new OutfitCustomizationState(outfitRound: 2));
 
-            Assert.AreEqual(GamePhase.Outfit2Customization, state.Phase);
+            Assert.AreEqual(GamePhase.OutfitCustomization, state.Phase);
             Assert.IsTrue(state.PhaseDeadlineUtc.HasValue,
-                "Outfit2CustomizationState must set a deadline on entry.");
+                "OutfitCustomizationState must set a deadline on entry.");
         }
 
         [TestMethod]
-        public async Task Outfit2CustomizationState_TimerExpiry_TransitionsToVotingRoundSetup()
+        public async Task OutfitCustomizationState_TimerExpiry_TransitionsToVotingRoundSetup()
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
 
-            context.Fsm.TransitionTo(context, new Outfit2CustomizationState());
+            context.Fsm.TransitionTo(context, new OutfitCustomizationState(outfitRound: 2));
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
 
             // VotingRoundSetupState chains immediately to VotingMatchupState.
@@ -2972,7 +2972,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
         }
 
         [TestMethod]
-        public async Task Outfit2CustomizationState_SubmitCustomization_StoresInOutfit2()
+        public async Task OutfitCustomizationState_SubmitCustomization_StoresInOutfit2()
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
@@ -2985,7 +2985,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
                 SubmittedOutfit2 = new() { PlayerId = "p1" },
             };
 
-            context.Fsm.TransitionTo(context, new Outfit2CustomizationState());
+            context.Fsm.TransitionTo(context, new OutfitCustomizationState(outfitRound: 2));
             _engine.ProcessCommand(context,
                 new SubmitCustomizationCommand("p1", "Second Look"));
 
@@ -2995,7 +2995,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
         }
 
         [TestMethod]
-        public async Task Outfit2CustomizationState_AllPlayersSubmit_AdvancesEarlyToVoting()
+        public async Task OutfitCustomizationState_AllPlayersSubmit_AdvancesEarlyToVoting()
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
@@ -3013,11 +3013,11 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
                 SubmittedOutfit2 = new() { PlayerId = "p2" },
             };
 
-            context.Fsm.TransitionTo(context, new Outfit2CustomizationState());
+            context.Fsm.TransitionTo(context, new OutfitCustomizationState(outfitRound: 2));
 
             _engine.ProcessCommand(context,
                 new SubmitCustomizationCommand("p1", "Look One"));
-            Assert.IsInstanceOfType<Outfit2CustomizationState>(context.Fsm.CurrentState,
+            Assert.IsInstanceOfType<OutfitCustomizationState>(context.Fsm.CurrentState,
                 "Should stay in Outfit2Customization until all players submit.");
 
             _engine.ProcessCommand(context,
@@ -3028,7 +3028,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
         }
 
         [TestMethod]
-        public async Task Outfit2CustomizationState_NoOutfit2Submitted_RejectsCommand()
+        public async Task OutfitCustomizationState_NoOutfit2Submitted_RejectsCommand()
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
@@ -3042,20 +3042,20 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
                 SubmittedOutfit = new() { PlayerId = "p1" },
             };
 
-            context.Fsm.TransitionTo(context, new Outfit2CustomizationState());
+            context.Fsm.TransitionTo(context, new OutfitCustomizationState(outfitRound: 2));
             _engine.ProcessCommand(context,
                 new SubmitCustomizationCommand("p1", "Should Fail"));
 
             Assert.IsNull(state.GamePlayers["p1"].SubmittedOutfit?.Customization.OutfitName,
                 "SubmitCustomizationCommand must be rejected when SubmittedOutfit2 is null.");
-            Assert.IsInstanceOfType<Outfit2CustomizationState>(context.Fsm.CurrentState,
+            Assert.IsInstanceOfType<OutfitCustomizationState>(context.Fsm.CurrentState,
                 "State must not advance if SubmittedOutfit2 is missing.");
         }
 
         // ── Outfit 2: timer expiry auto-fill ──────────────────────────────────
 
         [TestMethod]
-        public async Task Outfit2Building_TimerExpiry_AutoFillsIncompleteOutfit2()
+        public async Task OutfitBuilding_TimerExpiry_AutoFillsIncompleteOutfit2()
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
@@ -3080,19 +3080,19 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
                 SubmittedOutfit = new() { PlayerId = "p1", SelectedItemsByType = new() }, // empty Outfit 1
             };
 
-            context.Fsm.TransitionTo(context, new Outfit2BuildingState());
+            context.Fsm.TransitionTo(context, new OutfitBuildingState(outfitRound: 2));
             Assert.IsNull(state.GamePlayers["p1"].SubmittedOutfit2);
 
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
 
-            Assert.IsInstanceOfType<Outfit2CustomizationState>(context.Fsm.CurrentState);
+            Assert.IsInstanceOfType<OutfitCustomizationState>(context.Fsm.CurrentState);
             Assert.IsNotNull(state.GamePlayers["p1"].SubmittedOutfit2,
                 "Auto-fill must produce an Outfit 2 when the timer expires.");
             Assert.IsTrue(state.GamePlayers["p1"].SubmittedOutfit2!.SelectedItemsByType.ContainsKey("hat"));
         }
 
         [TestMethod]
-        public async Task Outfit2Building_TimerExpiry_AutoFillPrefersNonConflictingItems()
+        public async Task OutfitBuilding_TimerExpiry_AutoFillPrefersNonConflictingItems()
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
@@ -3137,7 +3137,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
             //   conflictHat: IsInPool=false (in p1's Outfit 1); re-added to p1's owned via CanReuseOutfit1Items.
             //   distinctHat: IsInPool=true (not in Outfit 1); auto-owned (self-drawn by p1).
             // Auto-fill prefers distinctHat because it doesn't appear in any Outfit 1.
-            context.Fsm.TransitionTo(context, new Outfit2BuildingState());
+            context.Fsm.TransitionTo(context, new OutfitBuildingState(outfitRound: 2));
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
 
             var chosenHat = state.GamePlayers["p1"].SubmittedOutfit2!.SelectedItemsByType["hat"];
@@ -3290,14 +3290,16 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
             context.Fsm.TransitionTo(context, new VotingRoundSetupState());
             Assert.IsInstanceOfType<VotingMatchupState>(context.Fsm.CurrentState);
 
-            // Find a matchup that contains pA.
+            // Find a matchup that contains pA's outfit (entrant IDs are "pA:1" format).
             var currentRound = state.VotingRounds[state.CurrentVotingRoundIndex];
-            var pAMatchup = currentRound.Matchups.First(m => m.PlayerAId == "pA" || m.PlayerBId == "pA");
+            var pAMatchup = currentRound.Matchups.First(m =>
+                DrawnToDressGameContext.GetPlayerIdFromEntrantId(m.EntrantAId) == "pA" ||
+                DrawnToDressGameContext.GetPlayerIdFromEntrantId(m.EntrantBId) == "pA");
 
             // pA tries to vote on their own matchup — must be rejected.
             int votesBefore = state.Votes.Count;
             _engine.ProcessCommand(context,
-                new CastVoteCommand("pA", pAMatchup.Id, "creativity", "pB"));
+                new CastVoteCommand("pA", pAMatchup.Id, "creativity", pAMatchup.EntrantBId));
             Assert.AreEqual(votesBefore, state.Votes.Count,
                 "A participant's vote on their own matchup must be ignored.");
         }
@@ -3320,13 +3322,15 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
             var currentRound = state.VotingRounds[state.CurrentVotingRoundIndex];
             var firstMatchup = currentRound.Matchups[0];
 
-            // Find a player who is NOT in the first matchup.
+            // Find a player who is NOT a creator of either entrant in the first matchup.
+            var entAPlayer = DrawnToDressGameContext.GetPlayerIdFromEntrantId(firstMatchup.EntrantAId);
+            var entBPlayer = DrawnToDressGameContext.GetPlayerIdFromEntrantId(firstMatchup.EntrantBId);
             string outsider = new[] { "pA", "pB", "pC" }
-                .First(id => id != firstMatchup.PlayerAId && id != firstMatchup.PlayerBId);
+                .First(id => id != entAPlayer && id != entBPlayer);
 
             int votesBefore = state.Votes.Count;
             _engine.ProcessCommand(context,
-                new CastVoteCommand(outsider, firstMatchup.Id, "creativity", firstMatchup.PlayerAId));
+                new CastVoteCommand(outsider, firstMatchup.Id, "creativity", firstMatchup.EntrantAId));
             Assert.AreEqual(votesBefore + 1, state.Votes.Count,
                 "A non-participant's vote must be recorded.");
         }
@@ -3348,9 +3352,12 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
             context.Fsm.TransitionTo(context, new VotingRoundSetupState());
 
             var round = state.VotingRounds[0];
-            // pB must not appear in any matchup.
-            var allParticipants = round.Matchups.SelectMany(m => new[] { m.PlayerAId, m.PlayerBId }).ToList();
-            CollectionAssert.DoesNotContain(allParticipants, "pB",
+            // pB must not appear in any matchup (entrant IDs are "playerId:round" format).
+            var allPlayerIds = round.Matchups
+                .SelectMany(m => new[] { m.EntrantAId, m.EntrantBId })
+                .Select(DrawnToDressGameContext.GetPlayerIdFromEntrantId)
+                .ToList();
+            CollectionAssert.DoesNotContain(allPlayerIds, "pB",
                 "Players without submitted outfits must not be included as tournament entrants.");
         }
 
@@ -3369,8 +3376,11 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
             context.Fsm.TransitionTo(context, new VotingRoundSetupState());
 
             var round = state.VotingRounds[0];
-            var participants = round.Matchups.SelectMany(m => new[] { m.PlayerAId, m.PlayerBId }).ToHashSet();
-            Assert.IsTrue(participants.Contains("pA") || participants.Contains("pB"),
+            var participantPlayerIds = round.Matchups
+                .SelectMany(m => new[] { m.EntrantAId, m.EntrantBId })
+                .Select(DrawnToDressGameContext.GetPlayerIdFromEntrantId)
+                .ToHashSet();
+            Assert.IsTrue(participantPlayerIds.Contains("pA") || participantPlayerIds.Contains("pB"),
                 "Players with a submitted Outfit 2 must be included as entrants.");
         }
     }

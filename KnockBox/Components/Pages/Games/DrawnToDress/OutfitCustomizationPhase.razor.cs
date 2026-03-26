@@ -17,6 +17,8 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
 
         [Parameter] public DrawnToDressGameState GameState { get; set; } = default!;
 
+        [Parameter] public int OutfitRound { get; set; } = 1;
+
         private SvgDrawingCanvas? _sketchCanvas;
         private string? _outfitName;
         private bool _submitting;

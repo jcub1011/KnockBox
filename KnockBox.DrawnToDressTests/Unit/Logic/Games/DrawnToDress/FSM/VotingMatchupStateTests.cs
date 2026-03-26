@@ -1,6 +1,7 @@
 using KnockBox.Services.Logic.Games.DrawnToDress;
 using KnockBox.Services.Logic.Games.DrawnToDress.FSM;
 using KnockBox.Services.Logic.Games.DrawnToDress.FSM.States;
+using static KnockBox.Services.Logic.Games.DrawnToDress.FSM.DrawnToDressGameContext;
 using KnockBox.Services.State.Games.DrawnToDress;
 using KnockBox.Services.State.Games.DrawnToDress.Data;
 using KnockBox.Services.State.Users;
@@ -58,8 +59,11 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
 
             var round = state.VotingRounds[state.CurrentVotingRoundIndex];
             var firstMatchup = round.Matchups[0];
+            // Entrant IDs are now "playerId:round" format; extract player IDs for outsider lookup.
+            var entrantAPlayer = DrawnToDressGameContext.GetPlayerIdFromEntrantId(firstMatchup.EntrantAId);
+            var entrantBPlayer = DrawnToDressGameContext.GetPlayerIdFromEntrantId(firstMatchup.EntrantBId);
             string outsider = new[] { "pA", "pB", "pC" }
-                .First(id => id != firstMatchup.PlayerAId && id != firstMatchup.PlayerBId);
+                .First(id => id != entrantAPlayer && id != entrantBPlayer);
 
             return (state, context, firstMatchup, outsider);
         }
@@ -191,8 +195,10 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
 
             var round = state.VotingRounds[state.CurrentVotingRoundIndex];
             var matchup = round.Matchups[0];
+            var playerA = GetPlayerIdFromEntrantId(matchup.EntrantAId);
+            var playerB = GetPlayerIdFromEntrantId(matchup.EntrantBId);
             string outsider = new[] { "pA", "pB", "pC" }
-                .First(id => id != matchup.PlayerAId && id != matchup.PlayerBId);
+                .First(id => id != playerA && id != playerB);
 
             // Cast a vote — the deadline is already in the past so it must be marked late.
             _engine.ProcessCommand(context,
@@ -285,11 +291,13 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
             var firstMatchup = round.Matchups[0];
 
             // Cast a vote from only one of the eligible voters (there must be at least one more).
+            var pA2 = GetPlayerIdFromEntrantId(firstMatchup.EntrantAId);
+            var pB2 = GetPlayerIdFromEntrantId(firstMatchup.EntrantBId);
             string voter1 = new[] { "pA", "pB", "pC", "pD" }
-                .First(id => id != firstMatchup.PlayerAId && id != firstMatchup.PlayerBId);
+                .First(id => id != pA2 && id != pB2);
 
             _engine.ProcessCommand(context,
-                new CastVoteCommand(voter1, firstMatchup.Id, "creativity", firstMatchup.PlayerAId));
+                new CastVoteCommand(voter1, firstMatchup.Id, "creativity", firstMatchup.EntrantAId));
 
             // Not all eligible voters have voted → must remain in voting state.
             Assert.IsInstanceOfType<VotingMatchupState>(context.Fsm.CurrentState,

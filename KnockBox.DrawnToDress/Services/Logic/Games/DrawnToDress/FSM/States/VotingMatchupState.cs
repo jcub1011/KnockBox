@@ -121,12 +121,12 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
                 return null;
             }
 
-            // Validate that the chosen player is a participant in this matchup.
-            if (cmd.ChosenPlayerId != matchup.PlayerAId && cmd.ChosenPlayerId != matchup.PlayerBId)
+            // Validate that the chosen entrant is a participant in this matchup.
+            if (cmd.ChosenEntrantId != matchup.EntrantAId && cmd.ChosenEntrantId != matchup.EntrantBId)
             {
                 context.Logger.LogWarning(
-                    "CastVote: chosen player [{id}] is not a participant in matchup [{matchupId}].",
-                    cmd.ChosenPlayerId, cmd.MatchupId);
+                    "CastVote: chosen entrant [{id}] is not a participant in matchup [{matchupId}].",
+                    cmd.ChosenEntrantId, cmd.MatchupId);
                 return null;
             }
 
@@ -146,7 +146,7 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
                 VoterPlayerId = cmd.PlayerId,
                 MatchupId = cmd.MatchupId,
                 CriterionId = cmd.CriterionId,
-                ChosenPlayerId = cmd.ChosenPlayerId,
+                ChosenEntrantId = cmd.ChosenEntrantId,
                 SubmittedAt = DateTimeOffset.UtcNow,
                 IsLate = isLate,
             };
@@ -183,8 +183,43 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
 
         private static IGameState<DrawnToDressGameContext, DrawnToDressCommand> ChooseNextState(DrawnToDressGameContext context)
         {
-            // TODO: Check vote tallies for ties and return CoinFlipState if needed.
-            // Placeholder: always proceed to results for now.
+            int roundIndex = context.State.CurrentVotingRoundIndex;
+            if (roundIndex < context.State.VotingRounds.Count)
+            {
+                var round = context.State.VotingRounds[roundIndex];
+
+                foreach (var matchup in round.Matchups)
+                {
+                    var matchupVotes = context.State.Votes.Values
+                        .Where(v => v.MatchupId == matchup.Id)
+                        .ToList();
+
+                    if (matchupVotes.Count == 0) continue;
+
+                    // Check each criterion for ties.
+                    foreach (var criterion in context.Config.VotingCriteria)
+                    {
+                        var criterionVotes = matchupVotes
+                            .Where(v => v.CriterionId == criterion.Id)
+                            .ToList();
+
+                        if (criterionVotes.Count == 0) continue;
+
+                        int aVotes = criterionVotes.Count(v => v.ChosenEntrantId == matchup.EntrantAId);
+                        int bVotes = criterionVotes.Count(v => v.ChosenEntrantId == matchup.EntrantBId);
+
+                        if (aVotes == bVotes)
+                        {
+                            context.State.PendingCoinFlipMatchupId = matchup.Id;
+                            context.Logger.LogInformation(
+                                "Tie detected in matchup [{matchupId}] on criterion [{criterion}]. Moving to coin flip.",
+                                matchup.Id, criterion.Id);
+                            return new CoinFlipState();
+                        }
+                    }
+                }
+            }
+
             return new VotingRoundResultsState();
         }
 

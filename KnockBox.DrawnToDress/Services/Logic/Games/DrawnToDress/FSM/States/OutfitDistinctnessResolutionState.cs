@@ -88,8 +88,8 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
 
             if (context.AllPlayersReady())
             {
-                context.Logger.LogInformation("All conflicts resolved. Moving to Outfit 2 pool reveal.");
-                return new Pool2RevealState();
+                context.Logger.LogInformation("All conflicts resolved. Moving to next outfit round pool reveal.");
+                return new PoolRevealState(2);
             }
 
             return null;

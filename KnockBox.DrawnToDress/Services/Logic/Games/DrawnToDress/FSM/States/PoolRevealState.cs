@@ -7,29 +7,21 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
 {
     /// <summary>
     /// Timed display state that reveals the communal clothing pool to all players before
-    /// outfit building begins. The pool is already populated by the end of the drawing round.
+    /// outfit building begins. Supports multiple outfit rounds via the <c>outfitRound</c>
+    /// parameter.
     ///
-    /// Players may browse the pool and press Ready to signal they want to advance early.
-    /// If all players are ready the state transitions immediately; otherwise it auto-advances
-    /// when <see cref="DrawnToDressConfig.PoolRevealTimeSec"/> expires.
-    ///
-    /// Claiming items is explicitly rejected during this phase (view-only).
-    ///
-    /// When <see cref="ThemeAnnouncement.AfterDrawing"/> is configured the theme is also
-    /// revealed here (i.e. <see cref="DrawnToDressGameState.ThemeRevealedToPlayers"/> is set
-    /// to <see langword="true"/>).
-    ///
-    /// Transition ownership:
-    /// - Timer expiry → <see cref="OutfitBuildingState"/>
-    /// - All players mark ready early → <see cref="OutfitBuildingState"/>
-    /// - <see cref="ClaimPoolItemCommand"/> → rejected (view-only phase)
-    /// - <see cref="MarkReadyCommand"/> → tracked; may trigger early advance
-    /// - <see cref="PauseGameCommand"/> (host only) → <see cref="PausedState"/>
-    /// - <see cref="AbandonGameCommand"/> (host only) → <see cref="AbandonedState"/>
+    /// For round 1, optionally reveals the theme (AfterDrawing mode).
+    /// For round > 1, resets the pool (removes previous round picks).
     /// </summary>
     public sealed class PoolRevealState : ITimedDrawnToDressGameState
     {
+        private readonly int _outfitRound;
         private DateTimeOffset _deadline;
+
+        public PoolRevealState(int outfitRound = 1)
+        {
+            _outfitRound = outfitRound;
+        }
 
         public ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?> OnEnter(
             DrawnToDressGameContext context)
@@ -37,19 +29,31 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
             _deadline = DateTimeOffset.UtcNow.AddSeconds(context.Config.PoolRevealTimeSec);
             context.State.PhaseDeadlineUtc = _deadline;
             context.State.SetPhase(GamePhase.PoolReveal);
+            context.CurrentOutfitRound = _outfitRound;
             context.ResetReadyFlags();
-            context.Logger.LogInformation(
-                "FSM → PoolRevealState. Pool contains {count} item(s). Deadline: {deadline}.",
-                context.ClothingPool.Count, _deadline);
 
-            // In AfterDrawing mode the theme is revealed now that drawing is complete.
-            if (context.Config.ThemeAnnouncement == ThemeAnnouncement.AfterDrawing &&
-                !context.State.ThemeRevealedToPlayers)
+            if (_outfitRound == 1)
             {
-                context.State.ThemeRevealedToPlayers = true;
                 context.Logger.LogInformation(
-                    "AfterDrawing: theme revealed: [{id}] \"{name}\".",
-                    context.State.CurrentTheme?.Id, context.State.CurrentTheme?.DisplayName);
+                    "FSM → PoolRevealState. Pool contains {count} item(s). Deadline: {deadline}.",
+                    context.ClothingPool.Count, _deadline);
+
+                // In AfterDrawing mode the theme is revealed now that drawing is complete.
+                if (context.Config.ThemeAnnouncement == ThemeAnnouncement.AfterDrawing &&
+                    !context.State.ThemeRevealedToPlayers)
+                {
+                    context.State.ThemeRevealedToPlayers = true;
+                    context.Logger.LogInformation(
+                        "AfterDrawing: theme revealed: [{id}] \"{name}\".",
+                        context.State.CurrentTheme?.Id, context.State.CurrentTheme?.DisplayName);
+                }
+            }
+            else
+            {
+                context.ResetPoolForRound(_outfitRound);
+                context.Logger.LogInformation(
+                    "FSM → PoolRevealState (round {round}). Pool has {count} item(s). Deadline: {deadline}.",
+                    _outfitRound, context.ClothingPool.Values.Count(i => i.IsInPool), _deadline);
             }
 
             return null;
@@ -70,9 +74,10 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
         {
             if (now < _deadline) return null;
 
-            context.Logger.LogInformation("Pool reveal timer expired. Advancing to outfit building.");
+            context.Logger.LogInformation(
+                "Pool reveal timer expired (round {round}). Advancing to outfit building.", _outfitRound);
             return ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?>.FromValue(
-                new OutfitBuildingState());
+                new OutfitBuildingState(_outfitRound));
         }
 
         public ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?> HandleCommand(
@@ -101,7 +106,7 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
 
         // ── Helpers ───────────────────────────────────────────────────────────
 
-        private static ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?> HandleMarkReady(
+        private ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?> HandleMarkReady(
             DrawnToDressGameContext context, MarkReadyCommand cmd)
         {
             var player = context.GetPlayer(cmd.PlayerId);
@@ -114,14 +119,15 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
 
             player.IsReady = true;
             context.Logger.LogInformation(
-                "Player [{id}] marked ready during pool reveal.", cmd.PlayerId);
+                "Player [{id}] marked ready during pool reveal (round {round}).", cmd.PlayerId, _outfitRound);
 
             if (context.AllPlayersReady())
             {
                 context.Logger.LogInformation(
-                    "All players ready during pool reveal. Advancing early to outfit building.");
+                    "All players ready during pool reveal (round {round}). Advancing early to outfit building.",
+                    _outfitRound);
                 return ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?>.FromValue(
-                    new OutfitBuildingState());
+                    new OutfitBuildingState(_outfitRound));
             }
 
             return null;

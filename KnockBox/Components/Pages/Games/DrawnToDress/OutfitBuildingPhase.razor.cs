@@ -18,6 +18,8 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
 
         [Parameter] public DrawnToDressGameState GameState { get; set; } = default!;
 
+        [Parameter] public int OutfitRound { get; set; } = 1;
+
         private bool _submitting;
         private string? _errorMessage;
 

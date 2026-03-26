@@ -39,13 +39,20 @@ namespace KnockBox.Services.State.Games.DrawnToDress.Data
     }
 
     /// <summary>
-    /// Represents a single head-to-head matchup between two players in a Swiss voting round.
+    /// Represents a single head-to-head matchup between two entrants in a Swiss voting round.
+    /// Entrant IDs encode both the player and outfit round (e.g. "player1:1").
     /// </summary>
     public record SwissMatchup(
         Guid Id,
-        string PlayerAId,
-        string PlayerBId,
-        int RoundNumber);
+        string EntrantAId,
+        string EntrantBId,
+        int RoundNumber)
+    {
+        /// <summary>Backward-compat alias for <see cref="EntrantAId"/>.</summary>
+        public string PlayerAId => EntrantAId;
+        /// <summary>Backward-compat alias for <see cref="EntrantBId"/>.</summary>
+        public string PlayerBId => EntrantBId;
+    }
 
     /// <summary>
     /// Represents one round of Swiss-system voting, containing the set of head-to-head
@@ -62,7 +69,7 @@ namespace KnockBox.Services.State.Games.DrawnToDress.Data
 
     /// <summary>
     /// Records a single vote cast by one player during a voting round.
-    /// Distinguishes the matchup, the voter, the criterion being judged, and the chosen outfit.
+    /// Distinguishes the matchup, the voter, the criterion being judged, and the chosen entrant.
     /// </summary>
     public class VoteSubmission
     {
@@ -77,8 +84,11 @@ namespace KnockBox.Services.State.Games.DrawnToDress.Data
         /// </summary>
         public string CriterionId { get; set; } = string.Empty;
 
-        /// <summary>The player ID of the outfit the voter chose as winner on this criterion.</summary>
-        public string ChosenPlayerId { get; set; } = string.Empty;
+        /// <summary>The entrant ID the voter chose as winner on this criterion.</summary>
+        public string ChosenEntrantId { get; set; } = string.Empty;
+
+        /// <summary>Backward-compat alias for <see cref="ChosenEntrantId"/>.</summary>
+        public string ChosenPlayerId { get => ChosenEntrantId; set => ChosenEntrantId = value; }
 
         /// <summary>UTC timestamp when the vote was submitted.</summary>
         public DateTimeOffset SubmittedAt { get; set; } = DateTimeOffset.UtcNow;

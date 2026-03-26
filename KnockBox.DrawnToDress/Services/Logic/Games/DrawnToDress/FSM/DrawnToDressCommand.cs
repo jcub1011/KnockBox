@@ -104,12 +104,16 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM
 
     // ── Voting ────────────────────────────────────────────────────────────────
 
-    /// <summary>Player casts a vote for one outfit in a head-to-head matchup.</summary>
+    /// <summary>Player casts a vote for one entrant in a head-to-head matchup.</summary>
     public record CastVoteCommand(
         string PlayerId,
         Guid MatchupId,
         string CriterionId,
-        string ChosenPlayerId) : DrawnToDressCommand(PlayerId);
+        string ChosenEntrantId) : DrawnToDressCommand(PlayerId)
+    {
+        /// <summary>Backward-compat: alias for <see cref="ChosenEntrantId"/>.</summary>
+        public string ChosenPlayerId => ChosenEntrantId;
+    }
 
     // ── Coin flip ─────────────────────────────────────────────────────────────
 

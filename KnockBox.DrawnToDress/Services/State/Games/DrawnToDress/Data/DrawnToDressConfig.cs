@@ -104,6 +104,14 @@ namespace KnockBox.Services.State.Games.DrawnToDress.Data
         /// </summary>
         public bool RequireDistinctItemsPerSlot { get; set; } = true;
 
+        // ── Outfit rounds ────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Number of outfit rounds each player builds.
+        /// GDD default: 1.
+        /// </summary>
+        public int NumOutfitRounds { get; set; } = 1;
+
         // ── Outfit 2 ──────────────────────────────────────────────────────────
 
         /// <summary>
@@ -217,6 +225,10 @@ namespace KnockBox.Services.State.Games.DrawnToDress.Data
             // ── Outfit building ────────────────────────────────────────────────
             if (OutfitBuildingTimeSec < 30)     OutfitBuildingTimeSec = 30;
             if (OutfitCustomizationTimeSec < 15) OutfitCustomizationTimeSec = 15;
+
+            // ── Outfit rounds ─────────────────────────────────────────────
+            if (NumOutfitRounds < 1) NumOutfitRounds = 1;
+            if (NumOutfitRounds > 4) NumOutfitRounds = 4;
 
             // ── Clothing types: require at least one type ─────────────────────
             if (ClothingTypes.Count == 0)

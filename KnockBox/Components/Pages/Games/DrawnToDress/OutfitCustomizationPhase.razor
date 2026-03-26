@@ -16,15 +16,22 @@
     int submittedCount = GameState.GamePlayers.Values.Count(p => p.IsReady);
     int totalPlayers = GameState.GamePlayers.Count;
 
+    string phaseName = OutfitRound == 1 ? "Outfit Customization" : $"Outfit {OutfitRound} Customization";
+    string nameLabel = OutfitRound == 1 ? "Outfit Name" : $"Outfit {OutfitRound} Name";
+    string finalizeLabel = OutfitRound == 1 ? "Finalize Outfit" : $"Finalize Outfit {OutfitRound}";
+    string finalizedMessage = OutfitRound == 1 ? "Outfit finalized! Waiting for the others\u2026" : $"Outfit {OutfitRound} finalized! Waiting for the others\u2026";
+
+    var myOutfit = myPlayer?.GetOutfit(OutfitRound);
+
     // Build a composite background SVG from the player's selected outfit items so they
     // can see what they assembled while drawing the optional sketch overlay on top.
     string? outfitBackground = null;
-    if (!isHost && !hasSubmitted && myPlayer?.SubmittedOutfit is not null)
+    if (!isHost && !hasSubmitted && myOutfit is not null)
     {
         var bgParts = new System.Text.StringBuilder();
         foreach (var ct in GameState.Config.ClothingTypes)
         {
-            if (myPlayer.SubmittedOutfit.SelectedItemsByType.TryGetValue(ct.Id, out var itemId)
+            if (myOutfit.SelectedItemsByType.TryGetValue(ct.Id, out var itemId)
                 && GameState.ClothingPool.TryGetValue(itemId, out var bgItem)
                 && bgItem.SvgContent is not null)
             {
@@ -42,7 +49,7 @@
     <div class="dtd-customization-header">
         <div class="dtd-customization-phase-badge">
             <span class="dtd-customization-phase-icon">✏️</span>
-            <span class="dtd-customization-phase-name">Outfit Customization</span>
+            <span class="dtd-customization-phase-name">@phaseName</span>
         </div>
 
         <div class="dtd-customization-progress-pill">
@@ -73,7 +80,7 @@
                 {
                     var ps = kv.Value;
                     string statusIcon = ps.IsReady ? "✅" : "⏳";
-                    string outfitName = ps.SubmittedOutfit?.Customization.OutfitName ?? "(unnamed)";
+                    string outfitName = ps.GetOutfit(OutfitRound)?.Customization.OutfitName ?? "(unnamed)";
                     <div class="dtd-customization-player-card @(ps.IsReady ? "dtd-customization-player-ready" : "")">
                         <span class="dtd-customization-player-status">@statusIcon</span>
                         <span class="dtd-customization-player-name">@ps.DisplayName</span>
@@ -96,24 +103,25 @@
         </div>
     }
 
-    <!-- ── Player: waiting ───────────────────────────────────────────────── -->
-    @if (!isHost && hasSubmitted)
+    @if (isHost)
+    {
+        @* Host sees only the progress panel above *@
+    }
+    else if (hasSubmitted)
     {
         <div class="dtd-customization-waiting">
-            <p>✅ Outfit finalized! Waiting for the others…</p>
+            <p>✅ @finalizedMessage</p>
             <div class="dtd-customization-submitted-summary">
                 <p class="dtd-customization-submitted-name">
-                    @myPlayer!.SubmittedOutfit!.Customization.OutfitName
+                    @myOutfit!.Customization.OutfitName
                 </p>
-                @if (myPlayer.SubmittedOutfit.Customization.SketchSvgContent is not null)
+                @if (myOutfit.Customization.SketchSvgContent is not null)
                 {
                     <p class="dtd-customization-submitted-hint">Sketch overlay included ✏️</p>
                 }
             </div>
         </div>
     }
-
-    <!-- ── Player: form ──────────────────────────────────────────────────── -->
     else
     {
         <div class="dtd-customization-form">
@@ -121,7 +129,7 @@
             <!-- Outfit name input -->
             <div class="dtd-customization-name-section">
                 <label class="dtd-customization-name-label" for="outfit-name-input">
-                    Outfit Name <span class="dtd-customization-required">*</span>
+                    @nameLabel <span class="dtd-customization-required">*</span>
                 </label>
                 <input id="outfit-name-input"
                        class="dtd-customization-name-input"
@@ -172,7 +180,7 @@
                     }
                     else
                     {
-                        <span>🔒 Finalize Outfit</span>
+                        <span>🔒 @finalizeLabel</span>
                     }
                 </button>
             </div>

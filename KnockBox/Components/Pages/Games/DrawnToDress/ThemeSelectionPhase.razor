@@ -1,0 +1,117 @@
+@using KnockBox.Services.State.Games.DrawnToDress
+@using KnockBox.Services.State.Games.DrawnToDress.Data
+@using KnockBox.Services.State.Users
+
+@{
+    bool isHost = UserService.CurrentUser?.Id == GameState.Host.Id;
+    string? myId = UserService.CurrentUser?.Id;
+    bool themeSelected = GameState.CurrentTheme is not null;
+    int submittedCount = GameState.PlayerThemeSubmissions.Count;
+    int totalPlayers = GameState.GamePlayers.Count;
+    bool hasVoted = myId is not null && GameState.ThemeVotes.ContainsKey(myId);
+    bool hasSubmittedTheme = myId is not null && GameState.PlayerThemeSubmissions.ContainsKey(myId);
+}
+
+<div class="dtd-theme-selection">
+
+    @if (themeSelected)
+    {
+        <div class="dtd-theme-selected">
+            <h2>Theme: @GameState.CurrentTheme!.DisplayName</h2>
+            @if (!string.IsNullOrWhiteSpace(GameState.CurrentTheme.Description))
+            {
+                <p>@GameState.CurrentTheme.Description</p>
+            }
+        </div>
+    }
+    else
+    {
+        <h2>Theme Selection</h2>
+
+        @switch (GameState.Config.ThemeSource)
+        {
+            case ThemeSource.Random:
+                <div class="dtd-theme-waiting">
+                    <p>Selecting a random theme...</p>
+                </div>
+                break;
+
+            case ThemeSource.HostPick:
+                @if (isHost)
+                {
+                    <div class="dtd-theme-form">
+                        <label>Choose the theme:</label>
+                        <input type="text" placeholder="Enter a theme..." maxlength="100"
+                               @bind="_themeText" @bind:event="oninput" />
+                        <button class="dtd-btn dtd-btn-primary" @onclick="SubmitHostTheme"
+                                disabled="@(string.IsNullOrWhiteSpace(_themeText))">
+                            Set Theme
+                        </button>
+                    </div>
+                }
+                else
+                {
+                    <div class="dtd-theme-waiting">
+                        <p>Waiting for the host to pick a theme...</p>
+                    </div>
+                }
+                break;
+
+            case ThemeSource.PlayerWritten:
+                @if (hasSubmittedTheme)
+                {
+                    <div class="dtd-theme-waiting">
+                        <p>Theme submitted! Waiting for others... (@submittedCount / @totalPlayers)</p>
+                    </div>
+                }
+                else
+                {
+                    <div class="dtd-theme-form">
+                        <label>Suggest a theme:</label>
+                        <input type="text" placeholder="Enter your theme idea..." maxlength="100"
+                               @bind="_themeText" @bind:event="oninput" />
+                        <button class="dtd-btn dtd-btn-primary" @onclick="SubmitPlayerTheme"
+                                disabled="@(string.IsNullOrWhiteSpace(_themeText))">
+                            Submit Theme
+                        </button>
+                        <p class="dtd-theme-progress">@submittedCount / @totalPlayers submitted</p>
+                    </div>
+                }
+                break;
+
+            case ThemeSource.RandomVoting:
+                @if (hasVoted)
+                {
+                    <div class="dtd-theme-waiting">
+                        <p>Vote cast! Waiting for others... (@GameState.ThemeVotes.Count / @totalPlayers)</p>
+                    </div>
+                }
+                else
+                {
+                    <div class="dtd-theme-candidates">
+                        <p>Vote for a theme:</p>
+                        <div class="dtd-theme-candidate-grid">
+                            @foreach (var candidate in GameState.ThemeCandidates)
+                            {
+                                <button class="dtd-theme-candidate-card" @onclick="() => VoteForTheme(candidate.Id)">
+                                    <span class="dtd-theme-candidate-name">@candidate.DisplayName</span>
+                                    @if (!string.IsNullOrWhiteSpace(candidate.Description))
+                                    {
+                                        <span class="dtd-theme-candidate-desc">@candidate.Description</span>
+                                    }
+                                </button>
+                            }
+                        </div>
+                        <p class="dtd-theme-progress">@GameState.ThemeVotes.Count / @totalPlayers voted</p>
+                    </div>
+                }
+                break;
+        }
+    }
+
+    @if (_errorMessage is not null)
+    {
+        <p class="dtd-theme-error">@_errorMessage</p>
+    }
+
+</div>

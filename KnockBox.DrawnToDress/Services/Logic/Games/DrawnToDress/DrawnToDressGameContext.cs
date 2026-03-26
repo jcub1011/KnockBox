@@ -25,6 +25,13 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM
         /// </summary>
         public IFininteStateMachine<DrawnToDressGameContext, DrawnToDressCommand> Fsm { get; set; } = default!;
 
+        // ── Round tracking ──────────────────────────────────────────────────
+
+        /// <summary>
+        /// The currently active outfit round (1-based). Updated by FSM states on entry.
+        /// </summary>
+        public int CurrentOutfitRound { get; set; }
+
         // ── Convenience accessors ─────────────────────────────────────────────
 
         /// <summary>Shortcut to <see cref="DrawnToDressGameState.Config"/>.</summary>
@@ -70,16 +77,91 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM
             => GamePlayers.Count > 0 && GamePlayers.Values.All(p => p.SubmittedOutfit is not null);
 
         /// <summary>
-        /// Returns the ordered list of player IDs that have submitted at least one outfit
-        /// and are therefore eligible to enter the tournament as entrants.
-        /// The list is sorted by player ID for determinism.
+        /// Returns <see langword="true"/> when every player has submitted an outfit
+        /// for the specified round.
+        /// </summary>
+        public bool AllOutfitsSubmittedForRound(int outfitRound)
+            => GamePlayers.Count > 0 && GamePlayers.Values.All(p => p.GetOutfit(outfitRound) is not null);
+
+        /// <summary>
+        /// Returns the ordered list of entrant IDs for the tournament.
+        /// Each player's submitted outfits become separate entrants encoded as "{playerId}:{round}".
         /// </summary>
         public IReadOnlyList<string> GetTournamentEntrantIds()
-            => GamePlayers.Values
-                .Where(p => p.SubmittedOutfit is not null || p.SubmittedOutfit2 is not null)
-                .Select(p => p.PlayerId)
-                .OrderBy(id => id, StringComparer.Ordinal)
-                .ToList();
+        {
+            var entrants = new List<string>();
+            foreach (var p in GamePlayers.Values.OrderBy(p => p.PlayerId, StringComparer.Ordinal))
+                foreach (var (round, _) in p.SubmittedOutfits.OrderBy(kv => kv.Key))
+                    entrants.Add($"{p.PlayerId}:{round}");
+            return entrants;
+        }
+
+        /// <summary>Extracts the player ID portion from an entrant ID (e.g. "player1:1" → "player1").</summary>
+        public static string GetPlayerIdFromEntrantId(string entrantId) => entrantId.Split(':')[0];
+
+        /// <summary>Extracts the outfit round number from an entrant ID (e.g. "player1:2" → 2).</summary>
+        public static int GetOutfitRoundFromEntrantId(string entrantId) => int.Parse(entrantId.Split(':')[1]);
+
+        /// <summary>
+        /// Looks up the outfit submission for a given entrant ID.
+        /// </summary>
+        public OutfitSubmission? GetOutfitByEntrantId(string entrantId)
+        {
+            var playerId = GetPlayerIdFromEntrantId(entrantId);
+            var round = GetOutfitRoundFromEntrantId(entrantId);
+            return GetPlayer(playerId)?.GetOutfit(round);
+        }
+
+        /// <summary>
+        /// Resets the communal pool for the given outfit round: removes picks from all
+        /// previous rounds, clears all claims, and rebuilds every player's owned-item set.
+        /// </summary>
+        public void ResetPoolForRound(int outfitRound)
+        {
+            // Collect all item IDs that were selected in any previous outfit round.
+            var previousPicks = GamePlayers.Values
+                .SelectMany(p => p.SubmittedOutfits
+                    .Where(kv => kv.Key < outfitRound)
+                    .SelectMany(kv => kv.Value.SelectedItemsByType.Values))
+                .ToHashSet();
+
+            // Update pool membership and clear all claims.
+            foreach (var item in ClothingPool.Values)
+            {
+                if (previousPicks.Contains(item.Id))
+                    item.IsInPool = false;
+                item.ClaimedByPlayerId = null;
+            }
+
+            // Rebuild each player's owned-item set.
+            foreach (var player in GamePlayers.Values)
+            {
+                player.OwnedClothingItemIds.Clear();
+
+                // Self-drawn items that are still in the pool are automatically owned.
+                foreach (var item in ClothingPool.Values)
+                {
+                    if (item.IsInPool &&
+                        string.Equals(item.CreatorPlayerId, player.PlayerId, StringComparison.Ordinal))
+                    {
+                        player.OwnedClothingItemIds.Add(item.Id);
+                    }
+                }
+
+                // When reuse is permitted, add the player's own previous outfit picks back.
+                if (Config.CanReuseOutfit1Items)
+                {
+                    foreach (var (round, outfit) in player.SubmittedOutfits)
+                    {
+                        if (round >= outfitRound) continue;
+                        foreach (var itemId in outfit.SelectedItemsByType.Values)
+                        {
+                            if (!player.OwnedClothingItemIds.Contains(itemId))
+                                player.OwnedClothingItemIds.Add(itemId);
+                        }
+                    }
+                }
+            }
+        }
     }
 }
-

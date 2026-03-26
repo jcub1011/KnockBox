@@ -13,9 +13,20 @@
     {
         <LobbyPhase GameState="GameState" />
     }
+    else if (GameState.Phase == KnockBox.Services.State.Games.DrawnToDress.GamePhase.ThemeSelection)
+    {
+        <ThemeSelectionPhase GameState="GameState" />
+    }
     else if (GameState.Phase == KnockBox.Services.State.Games.DrawnToDress.GamePhase.Drawing)
     {
         <DrawingPhase GameState="GameState" />
+    }
+    else if (GameState.Phase == KnockBox.Services.State.Games.DrawnToDress.GamePhase.PoolReveal
+             && (GameState.Context?.CurrentOutfitRound ?? 1) > 1)
+    {
+        <PoolRevealPhase GameState="GameState"
+                         HeadingText="@($"Get Ready for Round {GameState.Context!.CurrentOutfitRound}!")"
+                         SubText="@($"Outfit {GameState.Context!.CurrentOutfitRound} building starts in\u2026")" />
     }
     else if (GameState.Phase == KnockBox.Services.State.Games.DrawnToDress.GamePhase.PoolReveal)
     {
@@ -23,25 +34,15 @@
     }
     else if (GameState.Phase == KnockBox.Services.State.Games.DrawnToDress.GamePhase.OutfitBuilding)
     {
-        <OutfitBuildingPhase GameState="GameState" />
+        <OutfitBuildingPhase GameState="GameState" OutfitRound="@(GameState.Context?.CurrentOutfitRound ?? 1)" />
     }
     else if (GameState.Phase == KnockBox.Services.State.Games.DrawnToDress.GamePhase.OutfitCustomization)
     {
-        <OutfitCustomizationPhase GameState="GameState" />
+        <OutfitCustomizationPhase GameState="GameState" OutfitRound="@(GameState.Context?.CurrentOutfitRound ?? 1)" />
     }
-    else if (GameState.Phase == KnockBox.Services.State.Games.DrawnToDress.GamePhase.Pool2Reveal)
+    else if (GameState.Phase == KnockBox.Services.State.Games.DrawnToDress.GamePhase.Voting)
     {
-        <PoolRevealPhase GameState="GameState"
-                         HeadingText="Get Ready for Round 2!"
-                         SubText="Outfit 2 building starts in\u2026" />
-    }
-    else if (GameState.Phase == KnockBox.Services.State.Games.DrawnToDress.GamePhase.Outfit2Building)
-    {
-        <Outfit2BuildingPhase GameState="GameState" />
-    }
-    else if (GameState.Phase == KnockBox.Services.State.Games.DrawnToDress.GamePhase.Outfit2Customization)
-    {
-        <Outfit2CustomizationPhase GameState="GameState" />
+        <VotingPhase GameState="GameState" />
     }
     else
     {
