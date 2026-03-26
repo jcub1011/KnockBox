@@ -29,6 +29,16 @@
     {
         <OutfitCustomizationPhase GameState="GameState" />
     }
+    else if (GameState.Phase == KnockBox.Services.State.Games.DrawnToDress.GamePhase.Pool2Reveal)
+    {
+        <PoolRevealPhase GameState="GameState"
+                         HeadingText="Get Ready for Round 2!"
+                         SubText="Outfit 2 building starts in\u2026" />
+    }
+    else if (GameState.Phase == KnockBox.Services.State.Games.DrawnToDress.GamePhase.Outfit2Building)
+    {
+        <Outfit2BuildingPhase GameState="GameState" />
+    }
     else
     {
         <div class="card">

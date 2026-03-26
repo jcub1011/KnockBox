@@ -766,19 +766,19 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
         }
 
         [TestMethod]
-        public async Task OutfitCustomizationState_OnTimerExpiry_TransitionsToOutfit2Building()
+        public async Task OutfitCustomizationState_OnTimerExpiry_TransitionsToPool2Reveal()
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
 
-            // No players → no distinctness conflicts, so goes straight to Outfit2BuildingState.
+            // No players → no distinctness conflicts, so goes straight to Pool2RevealState.
             context.Fsm.TransitionTo(context, new OutfitCustomizationState());
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
 
-            Assert.IsInstanceOfType<Outfit2BuildingState>(context.Fsm.CurrentState);
-            Assert.AreEqual(GamePhase.Outfit2Building, state.Phase);
+            Assert.IsInstanceOfType<Pool2RevealState>(context.Fsm.CurrentState);
+            Assert.AreEqual(GamePhase.Pool2Reveal, state.Phase);
         }
 
         [TestMethod]
@@ -2146,7 +2146,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
 
             _engine.ProcessCommand(context,
                 new SubmitCustomizationCommand("p2", "Outfit Two"));
-            Assert.IsInstanceOfType<Outfit2BuildingState>(context.Fsm.CurrentState,
+            Assert.IsInstanceOfType<Pool2RevealState>(context.Fsm.CurrentState,
                 "Should advance once all players have submitted customization.");
         }
 
@@ -2190,6 +2190,123 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
             Assert.IsTrue(submission.SelectedItemsByType.ContainsKey("hat"),
                 "Original selected items must be preserved after customization.");
             Assert.AreEqual(itemId, submission.SelectedItemsByType["hat"]);
+        }
+
+        // ── Pool 2 Reveal state ───────────────────────────────────────────────
+
+        [TestMethod]
+        public async Task Pool2RevealState_OnEnter_SetsPool2RevealPhase()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            context.Fsm.TransitionTo(context, new Pool2RevealState());
+
+            Assert.AreEqual(GamePhase.Pool2Reveal, state.Phase);
+            Assert.IsTrue(state.PhaseDeadlineUtc.HasValue,
+                "Pool2RevealState must set a deadline on entry.");
+        }
+
+        [TestMethod]
+        public async Task Pool2RevealState_TimerExpiry_AdvancesToOutfit2Building()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            context.Fsm.TransitionTo(context, new Pool2RevealState());
+            _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
+
+            Assert.IsInstanceOfType<Outfit2BuildingState>(context.Fsm.CurrentState);
+            Assert.AreEqual(GamePhase.Outfit2Building, state.Phase);
+        }
+
+        [TestMethod]
+        public async Task Pool2RevealState_AllPlayersReady_AdvancesEarlyToOutfit2Building()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            state.GamePlayers["p1"] = new() { PlayerId = "p1" };
+
+            context.Fsm.TransitionTo(context, new Pool2RevealState());
+            _engine.ProcessCommand(context, new MarkReadyCommand("p1"));
+
+            Assert.IsInstanceOfType<Outfit2BuildingState>(context.Fsm.CurrentState,
+                "All-ready should advance early from Pool2Reveal to Outfit2Building.");
+        }
+
+        [TestMethod]
+        public async Task Pool2RevealState_ClaimPoolItem_IsRejected()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            var hatId = Guid.NewGuid();
+            state.ClothingPool[hatId] = new()
+            {
+                Id = hatId, ClothingTypeId = "hat", CreatorPlayerId = "p2",
+                SvgContent = "<svg/>", IsInPool = true,
+            };
+            state.GamePlayers["p1"] = new() { PlayerId = "p1" };
+
+            context.Fsm.TransitionTo(context, new Pool2RevealState());
+            _engine.ProcessCommand(context, new ClaimPoolItemCommand("p1", hatId));
+
+            Assert.IsInstanceOfType<Pool2RevealState>(context.Fsm.CurrentState,
+                "Pool reveal is view-only — a ClaimPoolItemCommand must not advance the state.");
+            Assert.IsNull(state.ClothingPool[hatId].ClaimedByPlayerId,
+                "Items must not be claimable during Pool2Reveal.");
+        }
+
+        [TestMethod]
+        public async Task Pool2RevealState_OnEnter_ResetsPoolFromOutfit1Picks()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            state.Config.ClothingTypes =
+            [
+                new() { Id = "hat", DisplayName = "Hat" },
+            ];
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            var usedHat = Guid.NewGuid();
+            var freeHat = Guid.NewGuid();
+            state.ClothingPool[usedHat] = new()
+            {
+                Id = usedHat, ClothingTypeId = "hat", CreatorPlayerId = "p2",
+                SvgContent = "<svg/>", IsInPool = true,
+            };
+            state.ClothingPool[freeHat] = new()
+            {
+                Id = freeHat, ClothingTypeId = "hat", CreatorPlayerId = "p3",
+                SvgContent = "<svg/>", IsInPool = true,
+            };
+
+            state.GamePlayers["p1"] = new()
+            {
+                PlayerId = "p1",
+                SubmittedOutfit = new()
+                {
+                    PlayerId = "p1",
+                    SelectedItemsByType = new() { ["hat"] = usedHat },
+                },
+            };
+
+            context.Fsm.TransitionTo(context, new Pool2RevealState());
+
+            Assert.IsFalse(state.ClothingPool[usedHat].IsInPool,
+                "Item selected in Outfit 1 must be removed from the Outfit 2 pool during Pool2Reveal.");
+            Assert.IsTrue(state.ClothingPool[freeHat].IsInPool,
+                "Item not selected in any Outfit 1 must remain in the Outfit 2 pool.");
         }
 
         // ── Outfit 2: pool reset on entry ─────────────────────────────────────

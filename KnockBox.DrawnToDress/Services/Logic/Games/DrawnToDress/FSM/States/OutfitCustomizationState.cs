@@ -137,7 +137,7 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
                 return new OutfitDistinctnessResolutionState();
             }
 
-            return new Outfit2BuildingState();
+            return new Pool2RevealState();
         }
 
         /// <summary>

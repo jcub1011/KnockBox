@@ -59,7 +59,11 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
             context.State.PhaseDeadlineUtc = _deadline;
             context.State.SetPhase(GamePhase.Outfit2Building);
             context.ResetReadyFlags();
-            ResetPoolForOutfit2(context);
+            // Perform the pool reset here as well so that tests and any paths that enter
+            // Outfit2BuildingState directly (e.g. after a resume) start in a consistent state.
+            // In the normal FSM flow Pool2RevealState already ran this on its entry, making
+            // this call a safe no-op.
+            Pool2RevealState.ResetPoolForOutfit2(context);
             context.Logger.LogInformation(
                 "FSM → Outfit2BuildingState. Pool has {count} item(s) after Outfit 1 picks removed. Deadline: {deadline}.",
                 context.ClothingPool.Values.Count(i => i.IsInPool), _deadline);
@@ -110,60 +114,6 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
                 "Outfit 2 building timer expired. Auto-filling incomplete Outfit 2s and moving to voting.");
             AutoFillIncompleteOutfit2s(context);
             return new VotingRoundSetupState();
-        }
-
-        // ── Pool reset ────────────────────────────────────────────────────────
-
-        /// <summary>
-        /// Resets the communal pool for Outfit 2: removes Outfit 1 picks, clears all
-        /// claims, and rebuilds every player's owned-item set.
-        /// </summary>
-        private static void ResetPoolForOutfit2(DrawnToDressGameContext context)
-        {
-            // Collect all item IDs that were selected in any Outfit 1 submission.
-            var outfit1Picks = context.GamePlayers.Values
-                .Where(p => p.SubmittedOutfit is not null)
-                .SelectMany(p => p.SubmittedOutfit!.SelectedItemsByType.Values)
-                .ToHashSet();
-
-            // Update pool membership and clear all claims for Outfit 2.
-            foreach (var item in context.ClothingPool.Values)
-            {
-                if (outfit1Picks.Contains(item.Id))
-                {
-                    // This item was used in an Outfit 1 — exclude from Outfit 2 pool.
-                    item.IsInPool = false;
-                }
-                // Reset claim regardless (Outfit 2 starts with a fresh claim slate).
-                item.ClaimedByPlayerId = null;
-            }
-
-            // Rebuild each player's owned-item set for Outfit 2.
-            foreach (var player in context.GamePlayers.Values)
-            {
-                player.OwnedClothingItemIds.Clear();
-
-                // Self-drawn items that are still in the pool are automatically owned.
-                foreach (var item in context.ClothingPool.Values)
-                {
-                    if (item.IsInPool &&
-                        string.Equals(item.CreatorPlayerId, player.PlayerId, StringComparison.Ordinal))
-                    {
-                        player.OwnedClothingItemIds.Add(item.Id);
-                    }
-                }
-
-                // When reuse is permitted, add the player's own Outfit 1 picks back —
-                // even though they are no longer in the communal pool.
-                if (context.Config.CanReuseOutfit1Items && player.SubmittedOutfit is not null)
-                {
-                    foreach (var itemId in player.SubmittedOutfit.SelectedItemsByType.Values)
-                    {
-                        if (!player.OwnedClothingItemIds.Contains(itemId))
-                            player.OwnedClothingItemIds.Add(itemId);
-                    }
-                }
-            }
         }
 
         // ── Claim / unclaim ───────────────────────────────────────────────────

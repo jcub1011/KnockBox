@@ -172,11 +172,15 @@ namespace KnockBox.Services.State.Games.DrawnToDress
         OutfitDistinctnessResolution = 6,
 
         /// <summary>
+        /// Timed countdown shown before Outfit 2 building begins. The Outfit 2 pool
+        /// (Outfit 1 picks removed) is revealed here so players can plan their picks.
+        /// </summary>
+        Pool2Reveal = 15,
+
+        /// <summary>
         /// Second outfit building phase. Players assemble a second outfit from the
         /// remaining pool (Outfit 1 picks excluded). Submitted outfits are validated for
         /// distinctness against every player's Outfit 1.
-        /// Value is 14 (continuation of the sequential run; values 7–13 are taken by
-        /// later phases that were added before this one).
         /// </summary>
         Outfit2Building = 14,
 
