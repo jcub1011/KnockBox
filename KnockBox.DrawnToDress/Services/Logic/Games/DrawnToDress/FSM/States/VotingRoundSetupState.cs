@@ -41,29 +41,29 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
         // ── Helpers ───────────────────────────────────────────────────────────
 
         /// <summary>
-        /// Generates a simple round-robin pairing for the current round.
-        /// TODO: Replace with proper Swiss-system pairing (by score/standings) in a later issue.
+        /// Generates a Swiss-system pairing for the current round using
+        /// <see cref="SwissTournamentService"/>.
+        ///
+        /// Round 1 pairs entrants by ID order (deterministic seed).
+        /// Subsequent rounds group entrants by cumulative wins and avoid rematches.
+        /// Only players who have submitted at least one outfit are included as entrants.
         /// </summary>
         private static VotingRound BuildRound(DrawnToDressGameContext context)
         {
             int roundNumber = context.State.VotingRounds.Count + 1;
-            var playerIds = context.GamePlayers.Keys.ToList();
-            var matchups = new List<SwissMatchup>();
+            var entrantIds = context.GetTournamentEntrantIds();
 
-            for (int i = 0; i + 1 < playerIds.Count; i += 2)
-            {
-                matchups.Add(new SwissMatchup(
-                    Guid.NewGuid(),
-                    playerIds[i],
-                    playerIds[i + 1],
-                    roundNumber));
-            }
+            var wins = roundNumber > 1
+                ? SwissTournamentService.CalculateWins(
+                    context.State.VotingRounds,
+                    context.State.Votes.Values)
+                : new Dictionary<string, int>();
 
-            return new VotingRound
-            {
-                RoundNumber = roundNumber,
-                Matchups = matchups,
-            };
+            return SwissTournamentService.GenerateRound(
+                roundNumber,
+                entrantIds,
+                context.State.VotingRounds,
+                wins);
         }
     }
 }

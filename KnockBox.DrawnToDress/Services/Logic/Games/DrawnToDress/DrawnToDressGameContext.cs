@@ -68,6 +68,18 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM
         /// </summary>
         public bool AllOutfitsSubmitted()
             => GamePlayers.Count > 0 && GamePlayers.Values.All(p => p.SubmittedOutfit is not null);
+
+        /// <summary>
+        /// Returns the ordered list of player IDs that have submitted at least one outfit
+        /// and are therefore eligible to enter the tournament as entrants.
+        /// The list is sorted by player ID for determinism.
+        /// </summary>
+        public IReadOnlyList<string> GetTournamentEntrantIds()
+            => GamePlayers.Values
+                .Where(p => p.SubmittedOutfit is not null || p.SubmittedOutfit2 is not null)
+                .Select(p => p.PlayerId)
+                .OrderBy(id => id, StringComparer.Ordinal)
+                .ToList();
     }
 }
 
