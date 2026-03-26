@@ -3269,5 +3269,109 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
                 OutfitDistinctnessEvaluator.ViolatesDistinctnessRule(outfit2, [outfit1A, outfit1B], threshold: 3),
                 "Violating distinctness against any single Outfit 1 must be detected even when other Outfit 1s are fine.");
         }
+
+        // ── Voting eligibility enforcement ────────────────────────────────────
+
+        [TestMethod]
+        public async Task VotingMatchupState_Participant_CastVote_IsRejected()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            // Set up players with submitted outfits so they become entrants.
+            var outfit1 = new OutfitSubmission { PlayerId = "pA" };
+            var outfit2 = new OutfitSubmission { PlayerId = "pB" };
+            state.GamePlayers["pA"] = new() { PlayerId = "pA", SubmittedOutfit = outfit1 };
+            state.GamePlayers["pB"] = new() { PlayerId = "pB", SubmittedOutfit = outfit2 };
+            state.GamePlayers["pC"] = new() { PlayerId = "pC", SubmittedOutfit = new() { PlayerId = "pC" } };
+
+            context.Fsm.TransitionTo(context, new VotingRoundSetupState());
+            Assert.IsInstanceOfType<VotingMatchupState>(context.Fsm.CurrentState);
+
+            // Find a matchup that contains pA.
+            var currentRound = state.VotingRounds[state.CurrentVotingRoundIndex];
+            var pAMatchup = currentRound.Matchups.First(m => m.PlayerAId == "pA" || m.PlayerBId == "pA");
+
+            // pA tries to vote on their own matchup — must be rejected.
+            int votesBefore = state.Votes.Count;
+            _engine.ProcessCommand(context,
+                new CastVoteCommand("pA", pAMatchup.Id, "creativity", "pB"));
+            Assert.AreEqual(votesBefore, state.Votes.Count,
+                "A participant's vote on their own matchup must be ignored.");
+        }
+
+        [TestMethod]
+        public async Task VotingMatchupState_NonParticipant_CastVote_IsAccepted()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            state.GamePlayers["pA"] = new() { PlayerId = "pA", SubmittedOutfit = new() { PlayerId = "pA" } };
+            state.GamePlayers["pB"] = new() { PlayerId = "pB", SubmittedOutfit = new() { PlayerId = "pB" } };
+            state.GamePlayers["pC"] = new() { PlayerId = "pC", SubmittedOutfit = new() { PlayerId = "pC" } };
+
+            context.Fsm.TransitionTo(context, new VotingRoundSetupState());
+            Assert.IsInstanceOfType<VotingMatchupState>(context.Fsm.CurrentState);
+
+            var currentRound = state.VotingRounds[state.CurrentVotingRoundIndex];
+            var firstMatchup = currentRound.Matchups[0];
+
+            // Find a player who is NOT in the first matchup.
+            string outsider = new[] { "pA", "pB", "pC" }
+                .First(id => id != firstMatchup.PlayerAId && id != firstMatchup.PlayerBId);
+
+            int votesBefore = state.Votes.Count;
+            _engine.ProcessCommand(context,
+                new CastVoteCommand(outsider, firstMatchup.Id, "creativity", firstMatchup.PlayerAId));
+            Assert.AreEqual(votesBefore + 1, state.Votes.Count,
+                "A non-participant's vote must be recorded.");
+        }
+
+        // ── Swiss pairing: entrant registration ───────────────────────────────
+
+        [TestMethod]
+        public async Task VotingRoundSetupState_OnlyPlayersWithOutfits_AreEntrants()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            // pA has submitted an outfit; pB has not.
+            state.GamePlayers["pA"] = new() { PlayerId = "pA", SubmittedOutfit = new() { PlayerId = "pA" } };
+            state.GamePlayers["pB"] = new() { PlayerId = "pB" }; // no outfit
+
+            context.Fsm.TransitionTo(context, new VotingRoundSetupState());
+
+            var round = state.VotingRounds[0];
+            // pB must not appear in any matchup.
+            var allParticipants = round.Matchups.SelectMany(m => new[] { m.PlayerAId, m.PlayerBId }).ToList();
+            CollectionAssert.DoesNotContain(allParticipants, "pB",
+                "Players without submitted outfits must not be included as tournament entrants.");
+        }
+
+        [TestMethod]
+        public async Task VotingRoundSetupState_PlayerWithOutfit2Only_IsEntrant()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            // pA has only Outfit 2 submitted (e.g. in a multi-outfit scenario).
+            state.GamePlayers["pA"] = new() { PlayerId = "pA", SubmittedOutfit2 = new() { PlayerId = "pA" } };
+            state.GamePlayers["pB"] = new() { PlayerId = "pB", SubmittedOutfit2 = new() { PlayerId = "pB" } };
+
+            context.Fsm.TransitionTo(context, new VotingRoundSetupState());
+
+            var round = state.VotingRounds[0];
+            var participants = round.Matchups.SelectMany(m => new[] { m.PlayerAId, m.PlayerBId }).ToHashSet();
+            Assert.IsTrue(participants.Contains("pA") || participants.Contains("pB"),
+                "Players with a submitted Outfit 2 must be included as entrants.");
+        }
     }
 }

@@ -70,7 +70,11 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
             if (!context.AllPlayersReady()) return null;
 
             // Check whether more voting rounds remain.
-            bool moreRounds = context.State.VotingRounds.Count < context.Config.VotingRounds;
+            // ResolveRoundCount uses the configured value when positive, or auto-calculates
+            // from the entrant count when VotingRounds = 0 (auto mode).
+            int entrantCount = context.GetTournamentEntrantIds().Count;
+            int totalRounds = SwissTournamentService.ResolveRoundCount(entrantCount, context.Config.VotingRounds);
+            bool moreRounds = context.State.VotingRounds.Count < totalRounds;
             if (moreRounds)
             {
                 context.Logger.LogInformation("Advancing to next voting round.");

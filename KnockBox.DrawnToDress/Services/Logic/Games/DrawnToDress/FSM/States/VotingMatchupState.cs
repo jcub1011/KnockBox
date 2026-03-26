@@ -88,6 +88,21 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
                 return null;
             }
 
+            // Enforce creator-voting exclusion: participants in the matchup may not vote on it.
+            int roundIndex = context.State.CurrentVotingRoundIndex;
+            if (roundIndex < context.State.VotingRounds.Count)
+            {
+                var round = context.State.VotingRounds[roundIndex];
+                var matchup = round.Matchups.FirstOrDefault(m => m.Id == cmd.MatchupId);
+                if (matchup is not null && !VotingEligibilityService.IsEligibleToVote(cmd.PlayerId, matchup))
+                {
+                    context.Logger.LogWarning(
+                        "CastVote: player [{id}] is a participant in matchup [{matchupId}] and is not eligible to vote on it.",
+                        cmd.PlayerId, cmd.MatchupId);
+                    return null;
+                }
+            }
+
             var submission = new VoteSubmission
             {
                 VoterPlayerId = cmd.PlayerId,
