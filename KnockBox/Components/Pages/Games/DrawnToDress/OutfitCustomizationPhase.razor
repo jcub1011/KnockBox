@@ -29,14 +29,18 @@
     if (!isHost && !hasSubmitted && myOutfit is not null)
     {
         var bgParts = new System.Text.StringBuilder();
+        int yOffset = 0;
         foreach (var ct in GameState.Config.ClothingTypes)
         {
             if (myOutfit.SelectedItemsByType.TryGetValue(ct.Id, out var itemId)
                 && GameState.ClothingPool.TryGetValue(itemId, out var bgItem)
                 && bgItem.SvgContent is not null)
             {
+                bgParts.Append($"<g transform=\"translate(0,{yOffset})\">");
                 bgParts.Append(bgItem.SvgContent);
+                bgParts.Append("</g>");
             }
+            yOffset += ct.CanvasHeight;
         }
         if (bgParts.Length > 0)
             outfitBackground = bgParts.ToString();

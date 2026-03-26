@@ -132,6 +132,20 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
 
                 // Clear the canvas so the player can draw a new item.
                 await _canvas.ClearAsync();
+
+                // Auto-ready when the player has hit the drawing limit.
+                int myMax = CurrentTypeMaxItems;
+                if (myMax > 0)
+                {
+                    string? myId = UserService.CurrentUser.Id;
+                    var myPlayer = GameState.GamePlayers.TryGetValue(myId, out var p) ? p : null;
+                    int newCount = myPlayer is not null ? CountSubmittedForCurrentType(myPlayer) : 0;
+                    if (newCount >= myMax)
+                    {
+                        var readyCmd = new MarkReadyCommand(UserService.CurrentUser.Id);
+                        GameEngine.ProcessCommand(GameState.Context, readyCmd);
+                    }
+                }
             }
             catch (Exception ex)
             {
