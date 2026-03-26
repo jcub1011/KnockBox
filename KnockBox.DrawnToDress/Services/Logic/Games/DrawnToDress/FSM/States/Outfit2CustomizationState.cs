@@ -5,22 +5,17 @@ using KnockBox.Services.State.Games.DrawnToDress;
 namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
 {
     /// <summary>
-    /// Timed phase in which players add a custom name and finalize their outfit.
-    ///
-    /// After customization the engine checks for outfit distinctness conflicts. If
-    /// <see cref="DrawnToDressConfig.RequireDistinctItemsPerSlot"/> is enabled and two
-    /// outfits share an item, the FSM moves to
-    /// <see cref="OutfitDistinctnessResolutionState"/>; otherwise it proceeds directly to
-    /// <see cref="VotingRoundSetupState"/>.
+    /// Timed phase in which players add a custom name and optional sketch overlay to
+    /// their assembled Outfit 2.
     ///
     /// Transition ownership:
-    /// - Timer expiry → distinctness check → next state
-    /// - All players submit customization early → distinctness check → next state
-    /// - <see cref="SubmitCustomizationCommand"/> → recorded; may trigger early advance
+    /// - Timer expiry → <see cref="VotingRoundSetupState"/>
+    /// - All players submit customization early → <see cref="VotingRoundSetupState"/>
+    /// - <see cref="SubmitCustomizationCommand"/> → recorded in Outfit 2; may trigger early advance
     /// - <see cref="PauseGameCommand"/> (host only) → <see cref="PausedState"/>
     /// - <see cref="AbandonGameCommand"/> (host only) → <see cref="AbandonedState"/>
     /// </summary>
-    public sealed class OutfitCustomizationState : ITimedDrawnToDressGameState
+    public sealed class Outfit2CustomizationState : ITimedDrawnToDressGameState
     {
         private DateTimeOffset _deadline;
 
@@ -29,10 +24,10 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
         {
             _deadline = DateTimeOffset.UtcNow.AddSeconds(context.Config.OutfitCustomizationTimeSec);
             context.State.PhaseDeadlineUtc = _deadline;
-            context.State.SetPhase(GamePhase.OutfitCustomization);
+            context.State.SetPhase(GamePhase.Outfit2Customization);
             context.ResetReadyFlags();
             context.Logger.LogInformation(
-                "FSM → OutfitCustomizationState. Deadline: {deadline}.", _deadline);
+                "FSM → Outfit2CustomizationState. Deadline: {deadline}.", _deadline);
             return null;
         }
 
@@ -70,8 +65,9 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
         {
             if (now < _deadline) return null;
 
-            context.Logger.LogInformation("Customization timer expired.");
-            return ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?>.FromValue(ChooseNextState(context));
+            context.Logger.LogInformation("Outfit 2 customization timer expired.");
+            return ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?>.FromValue(
+                new VotingRoundSetupState());
         }
 
         // ── Helpers ───────────────────────────────────────────────────────────
@@ -83,80 +79,50 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
             if (player is null)
             {
                 context.Logger.LogWarning(
-                    "SubmitCustomization: unknown player [{id}].", cmd.PlayerId);
+                    "Outfit2 SubmitCustomization: unknown player [{id}].", cmd.PlayerId);
                 return null;
             }
 
-            if (player.SubmittedOutfit is null)
+            if (player.SubmittedOutfit2 is null)
             {
                 context.Logger.LogWarning(
-                    "SubmitCustomization: player [{id}] has no submitted outfit.", cmd.PlayerId);
+                    "Outfit2 SubmitCustomization: player [{id}] has no submitted Outfit 2.", cmd.PlayerId);
                 return null;
             }
 
             if (string.IsNullOrWhiteSpace(cmd.OutfitName))
             {
                 context.Logger.LogWarning(
-                    "SubmitCustomization: player [{id}] submitted with no outfit name.", cmd.PlayerId);
+                    "Outfit2 SubmitCustomization: player [{id}] submitted with no outfit name.", cmd.PlayerId);
                 return null;
             }
 
             if (context.Config.SketchingRequired && string.IsNullOrWhiteSpace(cmd.SketchSvgContent))
             {
                 context.Logger.LogWarning(
-                    "SubmitCustomization: player [{id}] submitted without a required sketch.", cmd.PlayerId);
+                    "Outfit2 SubmitCustomization: player [{id}] submitted without a required sketch.", cmd.PlayerId);
                 return null;
             }
 
-            player.SubmittedOutfit.Customization.OutfitName = cmd.OutfitName.Trim();
-            player.SubmittedOutfit.Customization.SketchSvgContent = string.IsNullOrWhiteSpace(cmd.SketchSvgContent)
+            player.SubmittedOutfit2.Customization.OutfitName = cmd.OutfitName.Trim();
+            player.SubmittedOutfit2.Customization.SketchSvgContent = string.IsNullOrWhiteSpace(cmd.SketchSvgContent)
                 ? null
                 : cmd.SketchSvgContent;
             player.IsReady = true;
 
             context.Logger.LogInformation(
-                "Player [{id}] submitted customization. Outfit name: \"{name}\". Has sketch: {hasSketch}.",
+                "Player [{id}] submitted Outfit 2 customization. Outfit name: \"{name}\". Has sketch: {hasSketch}.",
                 cmd.PlayerId, cmd.OutfitName, cmd.SketchSvgContent is not null);
 
             if (context.AllPlayersReady())
             {
                 context.Logger.LogInformation(
-                    "All players submitted customization. Advancing.");
-                return ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?>.FromValue(ChooseNextState(context));
+                    "All players submitted Outfit 2 customization. Moving to voting.");
+                return ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?>.FromValue(
+                    new VotingRoundSetupState());
             }
 
             return null;
-        }
-
-        private static IGameState<DrawnToDressGameContext, DrawnToDressCommand> ChooseNextState(DrawnToDressGameContext context)
-        {
-            if (context.Config.RequireDistinctItemsPerSlot && HasDistinctnessConflict(context))
-            {
-                context.Logger.LogInformation(
-                    "Distinctness conflict detected. Moving to resolution state.");
-                return new OutfitDistinctnessResolutionState();
-            }
-
-            return new Pool2RevealState();
-        }
-
-        /// <summary>
-        /// Returns <see langword="true"/> when any two outfits share the same item ID in
-        /// the same clothing-type slot.
-        /// </summary>
-        private static bool HasDistinctnessConflict(DrawnToDressGameContext context)
-        {
-            var seenItems = new HashSet<(string typeId, Guid itemId)>();
-            foreach (var player in context.GamePlayers.Values)
-            {
-                if (player.SubmittedOutfit is null) continue;
-                foreach (var (typeId, itemId) in player.SubmittedOutfit.SelectedItemsByType)
-                {
-                    if (!seenItems.Add((typeId, itemId)))
-                        return true;
-                }
-            }
-            return false;
         }
     }
 }

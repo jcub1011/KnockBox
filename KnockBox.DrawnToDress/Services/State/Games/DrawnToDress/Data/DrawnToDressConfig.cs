@@ -104,6 +104,24 @@ namespace KnockBox.Services.State.Games.DrawnToDress.Data
         /// </summary>
         public bool RequireDistinctItemsPerSlot { get; set; } = true;
 
+        // ── Outfit 2 ──────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// When <see langword="true"/>, players may include in their Outfit 2 the same
+        /// items they selected for Outfit 1.  When <see langword="false"/> (default) those
+        /// items are excluded from each player's Outfit 2 available set.
+        /// GDD default: <see langword="false"/>.
+        /// </summary>
+        public bool CanReuseOutfit1Items { get; set; } = false;
+
+        /// <summary>
+        /// Minimum number of items that Outfit 2 may share (in the same clothing-type slot)
+        /// with <em>any</em> player's Outfit 1 before the submission is rejected as too
+        /// similar.  Set to <c>0</c> to disable distinctness validation.
+        /// GDD default: <c>3</c> (three or more shared items → rejection).
+        /// </summary>
+        public int Outfit2DistinctnessThreshold { get; set; } = 3;
+
         /// <summary>
         /// When <see langword="true"/>, players must add a sketch overlay during the
         /// outfit-customization phase before they can submit. The timer and completion
