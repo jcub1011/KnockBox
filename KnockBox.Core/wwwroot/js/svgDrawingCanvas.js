@@ -26,52 +26,6 @@ function triangleArea(a, b, c) {
 }
 
 /**
- * Applies bidirectional exponential moving average smoothing to reduce hand tremor.
- * Each point is blended with its neighbors using forward and reverse passes, then
- * averaged to avoid directional bias. Endpoints are preserved exactly.
- *
- * @param {{x: number, y: number}[]} points - Input polyline (not mutated).
- * @param {number} [alpha=0.3] - Smoothing factor (0–1). Lower = more smoothing.
- *     1.0 returns the input unchanged. 0.3 is a moderate level that removes
- *     hand tremor while preserving intentional shape features.
- * @returns {{x: number, y: number}[]} A new array with the same length as input.
- */
-function emaSmooth(points, alpha = 0.3) {
-    const len = points.length;
-    if (len <= 2 || alpha >= 1) return points.slice();
-
-    // Forward pass.
-    const fwd = [{ x: points[0].x, y: points[0].y }];
-    for (let i = 1; i < len; i++) {
-        fwd.push({
-            x: alpha * points[i].x + (1 - alpha) * fwd[i - 1].x,
-            y: alpha * points[i].y + (1 - alpha) * fwd[i - 1].y,
-        });
-    }
-
-    // Reverse pass.
-    const rev = new Array(len);
-    rev[len - 1] = { x: points[len - 1].x, y: points[len - 1].y };
-    for (let i = len - 2; i >= 0; i--) {
-        rev[i] = {
-            x: alpha * points[i].x + (1 - alpha) * rev[i + 1].x,
-            y: alpha * points[i].y + (1 - alpha) * rev[i + 1].y,
-        };
-    }
-
-    // Average forward and reverse, preserving endpoints.
-    const result = [{ x: points[0].x, y: points[0].y }];
-    for (let i = 1; i < len - 1; i++) {
-        result.push({
-            x: Math.round((fwd[i].x + rev[i].x) * 50) / 100,
-            y: Math.round((fwd[i].y + rev[i].y) * 50) / 100,
-        });
-    }
-    result.push({ x: points[len - 1].x, y: points[len - 1].y });
-    return result;
-}
-
-/**
  * Simplifies an array of {x, y} points using the Visvalingam-Whyatt algorithm.
  *
  * The algorithm iteratively removes the point whose removal causes the least
@@ -390,10 +344,9 @@ export function initialize(svgId, dotNetRef, initialColor, initialStrokeWidth, i
             svg.replaceChild(dot, state.currentPath);
             state.paths.push(dot);
         } else {
-            // Smooth hand tremor, then simplify using Visvalingam-Whyatt.
-            const smoothed = emaSmooth(state.currentPoints, 0.7);
+            // Simplify the stroke using Visvalingam-Whyatt before committing.
             const simplified = visvalingamWhyatt(
-                smoothed,
+                state.currentPoints,
                 state.simplifyMinArea ?? 2,
                 3
             );
@@ -892,4 +845,4 @@ export function dispose(svgId) {
     instances.delete(svgId);
 }
 
-export const _testExports = { triangleArea, emaSmooth, visvalingamWhyatt, buildPath };
+export const _testExports = { triangleArea, visvalingamWhyatt, buildPath };
