@@ -1,0 +1,116 @@
+@using KnockBox.Core.Components.Shared
+@using KnockBox.Services.State.Games.DrawnToDress
+@using KnockBox.Services.State.Games.DrawnToDress.Data
+@using KnockBox.Services.State.Users
+
+@{
+    bool isHost = UserService.CurrentUser?.Id == GameState.Host.Id;
+
+    string? myId = UserService.CurrentUser?.Id;
+    var myPlayer = myId is not null && GameState.GamePlayers.TryGetValue(myId, out var pOut) ? pOut : null;
+    int mySubmitted = myPlayer is not null ? CountSubmittedForCurrentType(myPlayer) : 0;
+    int myMax = CurrentTypeMaxItems;
+    bool canSubmit = myMax == 0 || mySubmitted < myMax;
+    bool isDone = myPlayer?.IsReady ?? false;
+}
+
+<div class="dtd-drawing">
+
+    <div class="dtd-drawing-header">
+        <div class="dtd-drawing-type-badge">
+            <span class="dtd-drawing-type-icon">🎨</span>
+            <span class="dtd-drawing-type-name">@CurrentTypeName</span>
+        </div>
+
+        <div class="dtd-drawing-round-info">
+            Round @(GameState.CurrentDrawingClothingTypeIndex + 1) of @GameState.Config.ClothingTypes.Count
+        </div>
+
+        <TimerDisplay GameState="GameState" />
+    </div>
+
+    @if (isHost)
+    {
+        <div class="dtd-drawing-host-panel">
+            <h3 class="dtd-drawing-host-title">Players are drawing: <em>@CurrentTypeName</em></h3>
+
+            <div class="dtd-drawing-player-grid">
+                @foreach (var kv in GameState.GamePlayers)
+                {
+                    var ps = kv.Value;
+                    int submitted = CountSubmittedForCurrentType(ps);
+                    int maxItems = CurrentTypeMaxItems;
+                    string statusIcon = ps.IsReady ? "✅" : submitted > 0 ? "🖊️" : "⏳";
+                    <div class="dtd-drawing-player-card @(ps.IsReady ? "dtd-drawing-player-ready" : "")">
+                        <span class="dtd-drawing-player-status">@statusIcon</span>
+                        <span class="dtd-drawing-player-name">@ps.DisplayName</span>
+                        <span class="dtd-drawing-player-count">
+                            @submitted@(maxItems > 0 ? $"/{maxItems}" : "") drawings
+                        </span>
+                    </div>
+                }
+            </div>
+
+            <p class="dtd-drawing-host-hint">
+                The round advances automatically when the timer expires or all players are done.
+            </p>
+        </div>
+    }
+    else
+    {
+        <div class="dtd-drawing-player-panel">
+            <div class="dtd-drawing-counter" role="status">
+                <span>Your drawings this round:</span>
+                <strong>@mySubmitted@(myMax > 0 ? $" / {myMax}" : "")</strong>
+                @if (!canSubmit)
+                {
+                    <span class="dtd-drawing-counter-full">✅ Limit reached</span>
+                }
+            </div>
+
+            @if (!isDone)
+            {
+                <div class="dtd-drawing-canvas-wrapper" role="img" aria-label="Drawing canvas for @CurrentTypeName">
+                    <SvgDrawingCanvas @ref="_canvas"
+                                      Width="100%"
+                                      Height="@($"{CurrentTypeCanvasHeight + 200}px")"
+                                      ViewBoxWidth="CurrentTypeCanvasWidth"
+                                      ViewBoxHeight="CurrentTypeCanvasHeight"
+                                      BackgroundColor="#ffffff" />
+                </div>
+
+                <div class="dtd-drawing-actions">
+                    @if (canSubmit)
+                    {
+                        <button class="dtd-btn dtd-btn-primary" @onclick="SubmitDrawingAsync" disabled="@_submitting" aria-label="Submit Drawing">
+                            @if (_submitting)
+                            {
+                                <span>Submitting…</span>
+                            }
+                            else
+                            {
+                                <span>✅ Submit Drawing</span>
+                            }
+                        </button>
+                    }
+
+                    <button class="dtd-btn dtd-btn-secondary" @onclick="MarkDoneAsync" disabled="@_submitting" aria-label="Done for this round">
+                        ⏭ Done for this round
+                    </button>
+                </div>
+
+                @if (_errorMessage is not null)
+                {
+                    <p class="dtd-drawing-error">@_errorMessage</p>
+                }
+            }
+            else
+            {
+                <div class="dtd-drawing-waiting">
+                    <p>✅ You're done! Waiting for the others…</p>
+                </div>
+            }
+        </div>
+    }
+
+</div>

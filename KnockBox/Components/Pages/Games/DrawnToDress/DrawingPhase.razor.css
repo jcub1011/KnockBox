@@ -1,0 +1,192 @@
+/* ── Drawing Phase ──────────────────────────────────────────────────────────── */
+
+.dtd-drawing {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 16px;
+    gap: 12px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    max-width: 900px;
+    margin: 0 auto;
+    width: 100%;
+}
+
+/* ── Header ──────────────────────────────────────────────────────────────────── */
+
+.dtd-drawing-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.dtd-drawing-type-badge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #f0f4ff;
+    border: 1px solid #c7d2fe;
+    border-radius: 24px;
+    padding: 6px 16px;
+}
+
+.dtd-drawing-type-icon {
+    font-size: 1.3rem;
+}
+
+.dtd-drawing-type-name {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #3730a3;
+}
+
+.dtd-drawing-round-info {
+    font-size: 0.9rem;
+    color: #6b7280;
+}
+
+.dtd-drawing-timer {
+    margin-left: auto;
+    background: #e0f2fe;
+    border: 1px solid #7dd3fc;
+    border-radius: 20px;
+    padding: 4px 14px;
+    font-size: 1rem;
+    font-weight: 700;
+    color: #0369a1;
+    min-width: 70px;
+    text-align: center;
+}
+
+.dtd-drawing-timer-urgent {
+    background: #fee2e2;
+    border-color: #fca5a5;
+    color: #b91c1c;
+    animation: dtd-pulse 0.8s ease-in-out infinite;
+}
+
+@keyframes dtd-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+}
+
+/* ── Host panel ──────────────────────────────────────────────────────────────── */
+
+.dtd-drawing-host-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 20px;
+}
+
+.dtd-drawing-host-title {
+    margin: 0;
+    font-size: 1.1rem;
+    color: #111827;
+}
+
+.dtd-drawing-player-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.dtd-drawing-player-card {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #ffffff;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    padding: 8px 14px;
+    min-width: 180px;
+    transition: border-color 0.2s;
+}
+
+.dtd-drawing-player-card.dtd-drawing-player-ready {
+    border-color: #34d399;
+    background: #f0fdf4;
+}
+
+.dtd-drawing-player-status {
+    font-size: 1.1rem;
+}
+
+.dtd-drawing-player-name {
+    flex: 1;
+    font-weight: 600;
+    color: #111827;
+}
+
+.dtd-drawing-player-count {
+    font-size: 0.8rem;
+    color: #6b7280;
+}
+
+.dtd-drawing-host-hint {
+    margin: 0;
+    font-size: 0.85rem;
+    color: #9ca3af;
+    font-style: italic;
+}
+
+/* ── Player panel ────────────────────────────────────────────────────────────── */
+
+.dtd-drawing-player-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.dtd-drawing-counter {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.95rem;
+    color: #374151;
+}
+
+.dtd-drawing-counter strong {
+    font-size: 1rem;
+    color: #111827;
+}
+
+.dtd-drawing-counter-full {
+    color: #059669;
+    font-weight: 600;
+}
+
+.dtd-drawing-canvas-wrapper {
+    border: 2px solid #e5e7eb;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.dtd-drawing-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.dtd-drawing-error {
+    color: #b91c1c;
+    font-size: 0.9rem;
+    margin: 0;
+}
+
+.dtd-drawing-waiting {
+    background: #f0fdf4;
+    border: 1px solid #6ee7b7;
+    border-radius: 10px;
+    padding: 24px;
+    text-align: center;
+    color: #065f46;
+    font-size: 1rem;
+}
+
+/* Button styles in dtd-shared.css */

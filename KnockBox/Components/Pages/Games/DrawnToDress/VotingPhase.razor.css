@@ -1,0 +1,198 @@
+.dtd-voting {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    padding: 1rem;
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+.dtd-voting-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.dtd-voting-phase-badge {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
+.dtd-voting-timer {
+    padding: 0.25rem 0.75rem;
+    border-radius: 1rem;
+    background: #f1f5f9;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.dtd-voting-timer-urgent {
+    background: #fef2f2;
+    color: #ef4444;
+}
+
+.dtd-voting-host-panel {
+    background: #f8fafc;
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+}
+
+.dtd-voting-matchup-status {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.dtd-voting-vote-count {
+    color: #64748b;
+    font-size: 0.875rem;
+}
+
+.dtd-voting-matchup-card {
+    border: 2px solid #e2e8f0;
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+    background: white;
+}
+
+.dtd-voting-competing,
+.dtd-voting-submitted {
+    text-align: center;
+    padding: 1rem;
+    color: #64748b;
+}
+
+.dtd-voting-matchup-outfits {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 1rem;
+    align-items: start;
+}
+
+.dtd-voting-entrant {
+    text-align: center;
+}
+
+.dtd-voting-entrant h4 {
+    margin: 0 0 0.75rem;
+    font-size: 1rem;
+}
+
+.dtd-voting-vs {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 1.25rem;
+    color: #94a3b8;
+    padding-top: 2rem;
+}
+
+.dtd-voting-outfit-items {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.dtd-voting-outfit-item {
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+    padding: 0.5rem;
+    background: #f8fafc;
+}
+
+.dtd-voting-item-label {
+    font-size: 0.75rem;
+    color: #64748b;
+    display: block;
+    margin-bottom: 0.25rem;
+}
+
+.dtd-voting-item-preview {
+    width: 100%;
+    max-height: 80px;
+}
+
+.dtd-voting-outfit-name {
+    font-style: italic;
+    color: #475569;
+    margin-top: 0.5rem;
+}
+
+.dtd-voting-criteria {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid #e2e8f0;
+}
+
+.dtd-voting-criterion-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.dtd-voting-criterion-label {
+    font-weight: 500;
+    min-width: 120px;
+}
+
+.dtd-voting-criterion-buttons {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.dtd-btn-vote {
+    padding: 0.5rem 1rem;
+    border: 2px solid #e2e8f0;
+    border-radius: 0.5rem;
+    background: white;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    font-size: 0.875rem;
+}
+
+.dtd-btn-vote:hover {
+    border-color: #6366f1;
+}
+
+.dtd-btn-vote-selected {
+    border-color: #6366f1;
+    background: #eef2ff;
+    font-weight: 600;
+}
+
+.dtd-voting-actions {
+    margin-top: 1rem;
+    text-align: center;
+}
+
+.dtd-voting-error {
+    color: #ef4444;
+    text-align: center;
+    font-size: 0.875rem;
+}
+
+@media (max-width: 640px) {
+    .dtd-voting-matchup-outfits {
+        grid-template-columns: 1fr;
+    }
+
+    .dtd-voting-vs {
+        padding: 0.5rem 0;
+    }
+
+    .dtd-voting-criterion-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+}

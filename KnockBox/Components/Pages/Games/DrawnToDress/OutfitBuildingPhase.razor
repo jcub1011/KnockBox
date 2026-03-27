@@ -1,0 +1,378 @@
+@using KnockBox.Services.State.Games.DrawnToDress
+@using KnockBox.Services.State.Games.DrawnToDress.Data
+@using KnockBox.Services.State.Users
+
+@{
+    bool isHost = UserService.CurrentUser?.Id == GameState.Host.Id;
+
+    string? myId = UserService.CurrentUser?.Id;
+    var myPlayer = myId is not null && GameState.GamePlayers.TryGetValue(myId, out var pOut) ? pOut : null;
+    // Capture submitted outfit once so its value stays consistent throughout this render pass
+    // even if the FSM updates player state concurrently from the timer loop.
+    var mySubmittedOutfit = myPlayer?.GetOutfit(OutfitRound);
+
+    int lockedCount = GameState.GamePlayers.Values.Count(p => p.GetOutfit(OutfitRound) is not null);
+    int totalPlayers = GameState.GamePlayers.Count;
+
+    string phaseName = OutfitRound == 1 ? "Outfit Building" : $"Outfit {OutfitRound} Building";
+    string yourOutfitTitle = OutfitRound == 1 ? "Your Outfit" : $"Your Outfit {OutfitRound}";
+    string poolTitle = OutfitRound == 1 ? "Clothing Pool" : $"Clothing Pool (Round {OutfitRound})";
+    string lockInLabel = OutfitRound == 1 ? "Lock In Outfit" : $"Lock In Outfit {OutfitRound}";
+    string lockedMessage = OutfitRound == 1 ? "Outfit locked in! Waiting for the others\u2026" : $"Outfit {OutfitRound} locked in! Waiting for the others\u2026";
+}
+
+<div class="dtd-outfit">
+
+    <!-- ── Header ────────────────────────────────────────────────────────── -->
+    <div class="dtd-outfit-header">
+        <div class="dtd-outfit-phase-badge">
+            <span class="dtd-outfit-phase-icon">👗</span>
+            <span class="dtd-outfit-phase-name">@phaseName</span>
+        </div>
+
+        <div class="dtd-outfit-progress-pill">
+            @lockedCount / @totalPlayers locked in
+        </div>
+
+        <TimerDisplay GameState="GameState" />
+    </div>
+
+    <!-- ── Host view ─────────────────────────────────────────────────────── -->
+    @if (isHost)
+    {
+        <div class="dtd-outfit-host-panel">
+            <h3 class="dtd-outfit-host-title">Player Progress</h3>
+            <div class="dtd-outfit-player-grid">
+                @foreach (var kv in GameState.GamePlayers)
+                {
+                    var ps = kv.Value;
+                    bool locked = ps.GetOutfit(OutfitRound) is not null;
+                    int claimed = ps.OwnedClothingItemIds
+                        .Count(id => GameState.ClothingPool.TryGetValue(id, out var item)
+                                     && item.ClaimedByPlayerId == ps.PlayerId);
+                    string statusIcon = locked ? "✅" : claimed > 0 ? "🧩" : "⏳";
+                    <div class="dtd-outfit-player-card @(locked ? "dtd-outfit-player-locked" : "")">
+                        <span class="dtd-outfit-player-status">@statusIcon</span>
+                        <span class="dtd-outfit-player-name">@ps.DisplayName</span>
+                        <span class="dtd-outfit-player-detail">
+                            @if (locked)
+                            {
+                                <span>Locked in</span>
+                            }
+                            else
+                            {
+                                <span>@claimed claimed</span>
+                            }
+                        </span>
+                    </div>
+                }
+            </div>
+            <p class="dtd-outfit-host-hint">
+                The round advances when the timer expires or all players lock in.
+            </p>
+        </div>
+    }
+
+    <!-- ── Player view ───────────────────────────────────────────────────── -->
+    @if (isHost)
+    {
+        <!-- Host only sees the pool overview below the progress panel -->
+        <div class="dtd-outfit-pool-section">
+            <h4 class="dtd-outfit-section-title">@poolTitle</h4>
+            @{
+                var hostPoolByType = GameState.Config.ClothingTypes
+                    .ToDictionary(
+                        ct => ct,
+                        ct => GameState.ClothingPool.Values
+                            .Where(item => item.ClothingTypeId == ct.Id && item.IsInPool)
+                            .ToList());
+            }
+            @foreach (var (clothingType, items) in hostPoolByType)
+            {
+                <div class="dtd-pool-type-group">
+                    <h5 class="dtd-pool-type-label">@clothingType.DisplayName</h5>
+                    @if (items.Count == 0)
+                    {
+                        <p class="dtd-pool-empty-hint">No items drawn for this type.</p>
+                    }
+                    else
+                    {
+                        <div class="dtd-pool-grid">
+                            @foreach (var item in items)
+                            {
+                                bool taken = item.ClaimedByPlayerId is not null;
+                                string stateClass = taken ? "dtd-pool-item-taken" : "dtd-pool-item-available";
+
+                                <div class="dtd-pool-item @stateClass"
+                                     title="@(taken ? "Claimed" : "Available")">
+                                    @if (SafeSvgContent(item.SvgContent) is string safeSvg)
+                                    {
+                                        <svg class="dtd-pool-item-preview" viewBox="0 0 @clothingType.CanvasWidth @clothingType.CanvasHeight"
+                                             preserveAspectRatio="xMidYMid meet"
+                                             xmlns="http://www.w3.org/2000/svg">
+                                            @((MarkupString)safeSvg)
+                                        </svg>
+                                    }
+                                    else
+                                    {
+                                        <span class="dtd-pool-item-icon">🎨</span>
+                                    }
+                                    @if (taken)
+                                    {
+                                        <span class="dtd-pool-item-badge dtd-badge-taken">✕ Taken</span>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    }
+    else if (mySubmittedOutfit != null)
+    {
+        <div class="dtd-outfit-waiting">
+            <p>✅ @lockedMessage</p>
+            <div class="dtd-outfit-locked-summary">
+                @foreach (var clothingType in GameState.Config.ClothingTypes)
+                {
+                    bool hasSlot = mySubmittedOutfit!.SelectedItemsByType.TryGetValue(clothingType.Id, out var selectedId);
+                    <div class="dtd-outfit-slot dtd-outfit-slot-locked">
+                        <span class="dtd-outfit-slot-label">@clothingType.DisplayName</span>
+                        @if (hasSlot && GameState.ClothingPool.TryGetValue(selectedId, out var selectedItem))
+                        {
+                            bool isMyItem = selectedItem.CreatorPlayerId == myId;
+                            <div class="dtd-pool-item dtd-pool-item-selected"
+                                 title="@(isMyItem ? "Your drawing" : "Selected")">
+                                @if (SafeSvgContent(selectedItem.SvgContent) is string safeSvgSelected)
+                                {
+                                    <svg class="dtd-pool-item-preview" viewBox="0 0 @clothingType.CanvasWidth @clothingType.CanvasHeight"
+                                         preserveAspectRatio="xMidYMid meet"
+                                         xmlns="http://www.w3.org/2000/svg">
+                                        @((MarkupString)safeSvgSelected)
+                                    </svg>
+                                }
+                                else
+                                {
+                                    <span class="dtd-pool-item-icon">🎨</span>
+                                }
+                                @if (isMyItem)
+                                {
+                                    <span class="dtd-pool-item-creator">Your drawing</span>
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="dtd-outfit-slot-empty">—</div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    }
+    else
+    {
+        <!-- Outfit slots -->
+        <div class="dtd-outfit-slots-section">
+            <h4 class="dtd-outfit-section-title">@yourOutfitTitle</h4>
+            <div class="dtd-outfit-slots">
+                @foreach (var clothingType in GameState.Config.ClothingTypes)
+                {
+                    bool hasSlot = myPlayer is not null
+                                   && GetSelectedItemForType(myPlayer, clothingType.Id) is Guid selId
+                                   && GameState.ClothingPool.TryGetValue(selId, out _);
+                    Guid? slotItemId = myPlayer is not null ? GetSelectedItemForType(myPlayer, clothingType.Id) : null;
+                    DrawnClothingItem? slotItem = slotItemId.HasValue && GameState.ClothingPool.TryGetValue(slotItemId.Value, out var si) ? si : null;
+
+                    <div class="dtd-outfit-slot @(slotItem is not null ? "dtd-outfit-slot-filled" : "dtd-outfit-slot-empty")">
+                        <span class="dtd-outfit-slot-label">@clothingType.DisplayName</span>
+                        @if (slotItem is not null)
+                        {
+                            bool isOwnSlotItem = slotItem.CreatorPlayerId == myId;
+                            // Own drawings auto-selected as fallback are not claimable/unclaimable.
+                            bool slotItemIsClaimed = slotItem.ClaimedByPlayerId == myId;
+                            if (slotItemIsClaimed)
+                            {
+                                <div class="dtd-pool-item dtd-pool-item-selected dtd-pool-item-clickable"
+                                     role="button"
+                                     aria-label="Release @clothingType.DisplayName selection"
+                                     tabindex="0"
+                                     title="Click to release"
+                                     @onclick="() => UnclaimItem(slotItem.Id)"
+                                     @onkeydown="(e) => HandleUnclaimKeydown(e, slotItem.Id)">
+                                    @if (SafeSvgContent(slotItem.SvgContent) is string safeSvgSlot)
+                                    {
+                                        <svg class="dtd-pool-item-preview" viewBox="0 0 @clothingType.CanvasWidth @clothingType.CanvasHeight"
+                                             preserveAspectRatio="xMidYMid meet"
+                                             xmlns="http://www.w3.org/2000/svg">
+                                            @((MarkupString)safeSvgSlot)
+                                        </svg>
+                                    }
+                                    else
+                                    {
+                                        <span class="dtd-pool-item-icon">🎨</span>
+                                    }
+                                    @if (isOwnSlotItem)
+                                    {
+                                        <span class="dtd-pool-item-creator">Your drawing</span>
+                                    }
+                                    <span class="dtd-pool-item-action">✕</span>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="dtd-pool-item dtd-pool-item-selected"
+                                     title="@(isOwnSlotItem ? "Your drawing — selected for your outfit" : "Selected")">
+                                    @if (SafeSvgContent(slotItem.SvgContent) is string safeSvgSlot)
+                                    {
+                                        <svg class="dtd-pool-item-preview" viewBox="0 0 @clothingType.CanvasWidth @clothingType.CanvasHeight"
+                                             preserveAspectRatio="xMidYMid meet"
+                                             xmlns="http://www.w3.org/2000/svg">
+                                            @((MarkupString)safeSvgSlot)
+                                        </svg>
+                                    }
+                                    else
+                                    {
+                                        <span class="dtd-pool-item-icon">🎨</span>
+                                    }
+                                    @if (isOwnSlotItem)
+                                    {
+                                        <span class="dtd-pool-item-creator">Your drawing</span>
+                                    }
+                                </div>
+                            }
+                        }
+                        else
+                        {
+                            <div class="dtd-outfit-slot-placeholder">pick from pool ↓</div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- Pool grid -->
+        <div class="dtd-outfit-pool-section">
+            <h4 class="dtd-outfit-section-title">@poolTitle</h4>
+            @{
+                var poolByType = GameState.Config.ClothingTypes
+                    .ToDictionary(
+                        ct => ct,
+                        ct => GameState.ClothingPool.Values
+                            .Where(item => item.ClothingTypeId == ct.Id && item.IsInPool)
+                            .ToList());
+            }
+            @foreach (var (clothingType, items) in poolByType)
+            {
+                <div class="dtd-pool-type-group">
+                    <h5 class="dtd-pool-type-label">@clothingType.DisplayName</h5>
+                    @{
+                        // Are there any non-own unclaimed items for this type?
+                        bool hasOtherAvailable = items.Any(i =>
+                            i.CreatorPlayerId != myId && i.ClaimedByPlayerId is null);
+
+                        // Which item is currently auto-selected for this slot?
+                        Guid? autoSelectedId = myPlayer is not null
+                            ? GetSelectedItemForType(myPlayer, clothingType.Id)
+                            : null;
+                    }
+                    @if (items.Count == 0)
+                    {
+                        <p class="dtd-pool-empty-hint">No items drawn for this type.</p>
+                    }
+                    else
+                    {
+                        <div class="dtd-pool-grid">
+                            @foreach (var item in items)
+                            {
+                                bool isMyDrawing = item.CreatorPlayerId == myId;
+                                bool claimedByMe = item.ClaimedByPlayerId == myId;
+                                bool claimedByOther = item.ClaimedByPlayerId is not null && !claimedByMe;
+                                bool isAvailable = !isMyDrawing && item.ClaimedByPlayerId is null;
+
+                                // Own drawing acts as the selected piece when there are no other options.
+                                bool isOwnAutoSelected = isMyDrawing && !hasOtherAvailable
+                                    && autoSelectedId == item.Id;
+
+                                string stateClass = claimedByMe ? "dtd-pool-item-mine"
+                                    : isOwnAutoSelected ? "dtd-pool-item-mine"
+                                    : claimedByOther ? "dtd-pool-item-taken"
+                                    : isMyDrawing ? "dtd-pool-item-own-drawing"
+                                    : "dtd-pool-item-available";
+
+                                string title = isMyDrawing
+                                    ? (isOwnAutoSelected
+                                        ? "Your drawing — selected for your outfit"
+                                        : "Your drawing")
+                                    : claimedByOther ? "Already claimed"
+                                    : claimedByMe ? "You claimed this — click to release"
+                                    : "Available — click to claim";
+
+                                bool clickable = isAvailable || claimedByMe;
+
+                                <div class="dtd-pool-item @stateClass @(clickable ? "dtd-pool-item-clickable" : "")"
+                                     title="@title"
+                                     role="button"
+                                     aria-label="@clothingType.DisplayName drawing — @title"
+                                     aria-pressed="@(claimedByMe ? "true" : "false")"
+                                     tabindex="@(clickable ? 0 : -1)"
+                                     @onclick="() => ToggleClaim(item, claimedByMe, isAvailable)"
+                                     @onkeydown="(e) => HandlePoolItemKeydown(e, item, claimedByMe, isAvailable)">
+                                    @if (SafeSvgContent(item.SvgContent) is string safeSvgItem)
+                                    {
+                                        <svg class="dtd-pool-item-preview" viewBox="0 0 @clothingType.CanvasWidth @clothingType.CanvasHeight"
+                                             preserveAspectRatio="xMidYMid meet"
+                                             xmlns="http://www.w3.org/2000/svg">
+                                            @((MarkupString)safeSvgItem)
+                                        </svg>
+                                    }
+                                    else
+                                    {
+                                        <span class="dtd-pool-item-icon">🎨</span>
+                                    }
+                                    @if (isMyDrawing)
+                                    {
+                                        <span class="dtd-pool-item-creator">Your drawing</span>
+                                    }
+                                    @if (claimedByMe || isOwnAutoSelected)
+                                    {
+                                        <span class="dtd-pool-item-badge dtd-badge-mine">✔ Selected</span>
+                                    }
+                                    else if (claimedByOther)
+                                    {
+                                        <span class="dtd-pool-item-badge dtd-badge-taken">✕ Taken</span>
+                                    }
+                                    else if (isMyDrawing)
+                                    {
+                                        <span class="dtd-pool-item-badge dtd-badge-own">✏ Yours</span>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+
+        <!-- Lock-in action -->
+        <div class="dtd-outfit-actions">
+            @if (_errorMessage is not null)
+            {
+                <p class="dtd-outfit-error">@_errorMessage</p>
+            }
+
+            <button class="dtd-btn dtd-btn-primary" @onclick="SubmitOutfitAsync" disabled="@_submitting" aria-label="@lockInLabel">
+                @if (_submitting)
+                {
+                    <span>Locking in…</span>
+                }
+                else
+                {
+                    <span>🔒 @lockInLabel</span>
+                }
+            </button>
+        </div>
+    }
+
+</div>

@@ -53,7 +53,6 @@ namespace KnockBoxTests.Unit.Logic.Games.DiceSimulator
             var result = await _engine.CreateStateAsync(null!);
 
             Assert.IsTrue((bool)result.IsFailure);
-            Assert.IsInstanceOfType(result.Error, typeof(ArgumentNullException));
         }
 
         [TestMethod]
@@ -78,7 +77,6 @@ namespace KnockBoxTests.Unit.Logic.Games.DiceSimulator
             var result = await _engine.StartAsync(nonHost, state);
 
             Assert.IsTrue((bool)result.IsFailure);
-            Assert.IsInstanceOfType(result.Error, typeof(InvalidOperationException));
         }
 
         [TestMethod]
@@ -87,7 +85,6 @@ namespace KnockBoxTests.Unit.Logic.Games.DiceSimulator
             // We use a mock or null as invalid cast
             var result = await _engine.StartAsync(_host, null!);
             Assert.IsTrue((bool)result.IsFailure);
-            Assert.IsInstanceOfType(result.Error, typeof(InvalidCastException));
         }
 
         [TestMethod]

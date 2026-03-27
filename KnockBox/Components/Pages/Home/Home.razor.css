@@ -19,8 +19,9 @@
     z-index: -1; /* Keep it behind all body content */
     /* Apply background-color here beneath the image and tint */
     background-color: var(--bg-color);
-    background-image: linear-gradient(rgba(0, 0, 0, 0.05), rgba(0, 0, 0, 0.05)), url("content/backgrounds/yellow-vertical_loop_crop.png");
+    background-image: linear-gradient(rgba(0, 0, 0, 0.05), rgba(0, 0, 0, 0.05)), url("content/backgrounds/yellow-vertical_loop_crop_lq.webp");
     background-repeat: repeat;
+    filter: blur(4px);
     /* Lock the height to 400px again so it retains its correct, undistorted aspect ratio */
     background-size: auto, auto 400px;
     /* Rotate the entire background canvas 45 degrees */

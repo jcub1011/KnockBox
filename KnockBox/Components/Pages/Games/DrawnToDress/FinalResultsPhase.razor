@@ -1,0 +1,149 @@
+@using KnockBox.Services.Logic.Games.DrawnToDress
+@using KnockBox.Services.Logic.Games.DrawnToDress.FSM
+@using KnockBox.Services.State.Games.DrawnToDress
+@using KnockBox.Services.State.Games.DrawnToDress.Data
+@using KnockBox.Services.State.Users
+
+@{
+    bool isHost = UserService.CurrentUser?.Id == GameState.Host.Id;
+    var leaderboard = GameState.Leaderboard;
+    var winner = leaderboard.FirstOrDefault(e => e.Rank == 1);
+}
+
+<div class="dtd-final-results">
+
+    <!-- ── Winner celebration ──────────────────────────────────────────── -->
+    @if (winner is not null)
+    {
+        <div class="dtd-final-results-winner">
+            <div class="dtd-final-results-trophy">1st</div>
+            <h2 class="dtd-final-results-winner-name">@winner.DisplayName</h2>
+            <p class="dtd-final-results-winner-score">@winner.TotalScore.ToString("0.#") points</p>
+            <p class="dtd-final-results-winner-message">Congratulations!</p>
+        </div>
+    }
+
+    <!-- ── Leaderboard table ───────────────────────────────────────────── -->
+    <div class="dtd-final-results-leaderboard">
+        <h3>Final Standings</h3>
+        <div class="dtd-final-results-table-wrapper">
+        <table class="dtd-final-results-table">
+            <thead>
+                <tr>
+                    <th>Rank</th>
+                    <th>Player</th>
+                    <th>Score</th>
+                    <th>W/L</th>
+                    <th>MW</th>
+                    <th>Bonus</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var entry in leaderboard)
+                {
+                    bool isWinner = entry.Rank == 1;
+                    bool expanded = IsExpanded(entry.PlayerId);
+                    <tr class="@(isWinner ? "dtd-final-results-row-winner" : "") dtd-final-results-row-clickable"
+                        @onclick="() => ToggleBreakdown(entry.PlayerId)">
+                        <td class="dtd-final-results-rank">@entry.Rank</td>
+                        <td class="dtd-final-results-name">
+                            <button class="dtd-final-results-expand-btn"
+                                    aria-expanded="@(expanded ? "true" : "false")"
+                                    aria-label="@(expanded ? "Collapse" : "Expand") breakdown for @entry.DisplayName"
+                                    @onclick="() => ToggleBreakdown(entry.PlayerId)"
+                                    @onclick:stopPropagation="true">
+                                <span class="dtd-final-results-expand-icon">@(expanded ? "▾" : "▸")</span>
+                            </button>
+                            @entry.DisplayName
+                        </td>
+                        <td class="dtd-final-results-pts">@entry.TotalScore.ToString("0.#")</td>
+                        <td class="dtd-final-results-wl">@entry.Wins–@entry.Losses</td>
+                        <td class="dtd-final-results-mw">@entry.MatchupWins.ToString("0.#")</td>
+                        <td class="dtd-final-results-bonus">@entry.BonusPoints</td>
+                        <td class="dtd-final-results-tiebreak">
+                            @if (entry.TiebreakMethod == "matchup_wins")
+                            {
+                                <span class="dtd-final-results-tiebreak-label" title="Tie broken by matchup wins">Won via matchup wins</span>
+                            }
+                            else if (entry.TiebreakMethod == "coin_flip")
+                            {
+                                <span class="dtd-final-results-tiebreak-label dtd-final-results-tiebreak-flip" title="Tie broken by coin flip">Won via coin flip</span>
+                            }
+                        </td>
+                    </tr>
+                    @if (expanded)
+                    {
+                        var breakdown = GetBreakdown(entry.PlayerId);
+                        <tr class="dtd-final-results-detail-row">
+                            <td colspan="7">
+                                <div class="dtd-final-results-detail">
+                                    @if (breakdown.OutfitScores.Count > 0)
+                                    {
+                                        <table class="dtd-final-results-detail-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Outfit</th>
+                                                    <th>Points</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @foreach (var outfit in breakdown.OutfitScores)
+                                                {
+                                                    <tr>
+                                                        <td>Round @outfit.RoundNumber</td>
+                                                        <td>@outfit.Score.ToString("0.#")</td>
+                                                    </tr>
+                                                }
+                                            </tbody>
+                                            <tfoot>
+                                                <tr>
+                                                    <td>Bonus Points</td>
+                                                    <td>@breakdown.BonusPoints</td>
+                                                </tr>
+                                                <tr class="dtd-final-results-detail-total">
+                                                    <td>Total</td>
+                                                    <td>@entry.TotalScore.ToString("0.#")</td>
+                                                </tr>
+                                            </tfoot>
+                                        </table>
+                                    }
+                                    else
+                                    {
+                                        <p class="dtd-final-results-detail-empty">No outfit scores recorded.</p>
+                                    }
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+        </div>
+    </div>
+
+    <!-- ── Actions ─────────────────────────────────────────────────────── -->
+    <div class="dtd-final-results-actions">
+        @if (isHost)
+        {
+            <button class="dtd-btn dtd-btn-primary"
+                    @onclick="PlayAgainAsync"
+                    disabled="@_submitting"
+                    aria-label="Play Again">
+                Play Again
+            </button>
+        }
+        <button class="dtd-btn dtd-btn-secondary"
+                @onclick="ReturnToMenuAsync"
+                disabled="@_submitting"
+                aria-label="Return to Menu">
+            Return to Menu
+        </button>
+    </div>
+
+    @if (_errorMessage is not null)
+    {
+        <p class="dtd-final-results-error">@_errorMessage</p>
+    }
+
+</div>

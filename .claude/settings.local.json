@@ -2,7 +2,12 @@
   "permissions": {
     "allow": [
       "Bash(xargs grep:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(dotnet build:*)",
+      "Bash(dotnet test:*)",
+      "Bash(cd /c/Users/Jacob McCormack/source/repos/KnockBox/KnockBox.DrawnToDress)",
+      "Bash(find 'C:\\\\Users\\\\Jacob McCormack\\\\source\\\\repos\\\\KnockBox' -type f -name package.json -o -name jest.config.* -o -name karma.conf.* -o -name vitest.config.*)",
+      "Bash(find 'C:\\\\Users\\\\Jacob McCormack\\\\source\\\\repos\\\\KnockBox' -type f \\\\\\(-name *.test.js -o -name *.spec.js -o -name *.test.ts -o -name *.spec.ts \\\\\\))"
     ]
   }
 }

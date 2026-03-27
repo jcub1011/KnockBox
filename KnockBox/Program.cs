@@ -1,4 +1,5 @@
 using KnockBox.Components;
+using KnockBox.Core.Services.Drawing;
 using KnockBox.Data.DbContexts;
 using KnockBox.Services.Navigation;
 using KnockBox.Services.Registrations.Logic;
@@ -47,6 +48,9 @@ namespace KnockBox
 
             // Add navigation
             builder.Services.AddScoped<INavigationService, NavigationService>();
+
+            // Add drawing services
+            builder.Services.AddSingleton<ISvgClipboardService, SvgClipboardService>();
 
             var app = builder.Build();
 

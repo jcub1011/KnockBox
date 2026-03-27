@@ -5,6 +5,7 @@ using KnockBox.Services.State.Users;
 using System.Collections.Concurrent;
 using KnockBox.Services.Logic.Games.CardCounter;
 using KnockBox.Services.Logic.Games.DiceSimulator;
+using KnockBox.Services.Logic.Games.DrawnToDress;
 
 namespace KnockBox.Services.Logic.Games.Shared
 {
@@ -46,6 +47,7 @@ namespace KnockBox.Services.Logic.Games.Shared
                 GameType.SplitTheDeck => null,
                 GameType.DiceSimulator => serviceProvider.GetService<DiceSimulatorGameEngine>(),
                 GameType.CardCounter => serviceProvider.GetService<CardCounterGameEngine>(),
+                GameType.DrawnToDress => serviceProvider.GetService<DrawnToDressGameEngine>(),
                 _ => null
             };
 

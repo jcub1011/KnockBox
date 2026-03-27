@@ -1,0 +1,83 @@
+@using KnockBox.Services.Logic.Games.DrawnToDress
+@using KnockBox.Services.State.Games.DrawnToDress
+@using KnockBox.Services.State.Games.DrawnToDress.Data
+@using KnockBox.Services.State.Users
+
+@{
+    int roundIndex = GameState.CurrentVotingRoundIndex;
+    VotingRound? currentRound = roundIndex < GameState.VotingRounds.Count
+        ? GameState.VotingRounds[roundIndex]
+        : null;
+}
+
+<div class="dtd-round-results">
+
+    <!-- ── Header ──────────────────────────────────────────────────────── -->
+    <div class="dtd-round-results-header">
+        <h2>Round @(roundIndex + 1) Results</h2>
+        <TimerDisplay GameState="GameState" />
+    </div>
+
+    @if (currentRound is not null)
+    {
+        @foreach (var matchup in currentRound.Matchups)
+        {
+            var (aTotal, bTotal) = CalculateMatchupTotals(matchup);
+            string winnerClass = aTotal > bTotal ? "winner-a" : bTotal > aTotal ? "winner-b" : "";
+
+            <div class="dtd-round-results-matchup">
+                <div class="dtd-round-results-matchup-header">
+                    <span class="dtd-round-results-entrant @(aTotal >= bTotal && aTotal > 0 ? "dtd-round-results-winner" : "")">
+                        @GetEntrantLabel(matchup.EntrantAId)
+                    </span>
+                    <span class="dtd-round-results-score">
+                        @aTotal.ToString("0.#") — @bTotal.ToString("0.#")
+                    </span>
+                    <span class="dtd-round-results-entrant @(bTotal >= aTotal && bTotal > 0 ? "dtd-round-results-winner" : "")">
+                        @GetEntrantLabel(matchup.EntrantBId)
+                    </span>
+                </div>
+
+                <!-- Per-criterion breakdown -->
+                <div class="dtd-round-results-criteria">
+                    @foreach (var criterion in GameState.Config.VotingCriteria)
+                    {
+                        var (aScore, bScore) = CalculateCriterionScores(matchup, criterion);
+                        bool flipped = IsCriterionFlipped(matchup.Id, criterion.Id);
+
+                        <div class="dtd-round-results-criterion-row">
+                            <span class="dtd-round-results-criterion-score @(aScore > bScore ? "dtd-round-results-leading" : "")">
+                                @aScore.ToString("0.#")
+                            </span>
+                            <span class="dtd-round-results-criterion-label">
+                                @criterion.DisplayName
+                                @if (flipped)
+                                {
+                                    <span class="dtd-round-results-flip-indicator" title="Resolved by coin flip">*</span>
+                                }
+                            </span>
+                            <span class="dtd-round-results-criterion-score @(bScore > aScore ? "dtd-round-results-leading" : "")">
+                                @bScore.ToString("0.#")
+                            </span>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+
+        <!-- ── Round leaders ───────────────────────────────────────────── -->
+        @if (GetRoundLeaders(currentRound).Count > 0)
+        {
+            var leaders = GetRoundLeaders(currentRound);
+            <div class="dtd-round-results-leaders">
+                <h3>Round Leader@(leaders.Count > 1 ? "s" : "")</h3>
+                @foreach (var leaderId in leaders)
+                {
+                    <span class="dtd-round-results-leader-badge">@GetEntrantLabel(leaderId)</span>
+                }
+            </div>
+        }
+    }
+
+
+</div>

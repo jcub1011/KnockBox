@@ -1,0 +1,271 @@
+@using KnockBox.Core.Components.Shared
+@using KnockBox.Services.State.Games.DrawnToDress
+@using KnockBox.Services.State.Games.DrawnToDress.Data
+@using KnockBox.Services.State.Users
+
+@{
+    bool isHost = UserService.CurrentUser?.Id == GameState.Host.Id;
+
+    string? myId = UserService.CurrentUser?.Id;
+    var myPlayer = myId is not null && GameState.GamePlayers.TryGetValue(myId, out var pOut) ? pOut : null;
+    bool hasSubmitted = myPlayer?.IsReady ?? false;
+
+    int submittedCount = GameState.GamePlayers.Values.Count(p => p.IsReady);
+    int totalPlayers = GameState.GamePlayers.Count;
+
+    string phaseName = OutfitRound == 1 ? "Outfit Customization" : $"Outfit {OutfitRound} Customization";
+    string nameLabel = OutfitRound == 1 ? "Outfit Name" : $"Outfit {OutfitRound} Name";
+    string finalizeLabel = OutfitRound == 1 ? "Finalize Outfit" : $"Finalize Outfit {OutfitRound}";
+    string finalizedMessage = OutfitRound == 1 ? "Outfit finalized! Waiting for the others\u2026" : $"Outfit {OutfitRound} finalized! Waiting for the others\u2026";
+
+    var myOutfit = myPlayer?.GetOutfit(OutfitRound);
+
+    int totalOutfitHeight = GameState.Config.ClothingTypes.Sum(ct => ct.CanvasHeight);
+
+    // Build a composite background SVG from the player's selected outfit items, applying
+    // any position overrides set via the drag/manual-input layer.
+    string? outfitBackground = null;
+    if (!isHost && !hasSubmitted && myOutfit is not null)
+    {
+        var bgParts = new System.Text.StringBuilder();
+        int yOffset = 0;
+        foreach (var ct in GameState.Config.ClothingTypes)
+        {
+            if (myOutfit.SelectedItemsByType.TryGetValue(ct.Id, out var itemId)
+                && GameState.ClothingPool.TryGetValue(itemId, out var bgItem)
+                && bgItem.SvgContent is not null)
+            {
+                double itemX = 0;
+                double itemY = yOffset;
+                if (_itemPositions.TryGetValue(ct.Id, out var posOverride))
+                {
+                    itemX = posOverride.X;
+                    itemY = posOverride.Y;
+                }
+
+                bgParts.Append($"<g transform=\"translate({itemX},{itemY})\">");
+                bgParts.Append(bgItem.SvgContent);
+                bgParts.Append("</g>");
+            }
+            yOffset += ct.CanvasHeight;
+        }
+        if (bgParts.Length > 0)
+            outfitBackground = bgParts.ToString();
+    }
+}
+
+<div class="dtd-customization">
+
+    <!-- ── Header ────────────────────────────────────────────────────────── -->
+    <div class="dtd-customization-header">
+        <div class="dtd-customization-phase-badge">
+            <span class="dtd-customization-phase-icon">✏️</span>
+            <span class="dtd-customization-phase-name">@phaseName</span>
+        </div>
+
+        <div class="dtd-customization-progress-pill">
+            @submittedCount / @totalPlayers finalized
+        </div>
+
+        <TimerDisplay GameState="GameState" />
+    </div>
+
+    <!-- ── Host view ─────────────────────────────────────────────────────── -->
+    @if (isHost)
+    {
+        <div class="dtd-customization-host-panel">
+            <h3 class="dtd-customization-host-title">Player Progress</h3>
+            <div class="dtd-customization-player-grid">
+                @foreach (var kv in GameState.GamePlayers)
+                {
+                    var ps = kv.Value;
+                    string statusIcon = ps.IsReady ? "✅" : "⏳";
+                    string outfitName = ps.GetOutfit(OutfitRound)?.Customization.OutfitName ?? "(unnamed)";
+                    <div class="dtd-customization-player-card @(ps.IsReady ? "dtd-customization-player-ready" : "")">
+                        <span class="dtd-customization-player-status">@statusIcon</span>
+                        <span class="dtd-customization-player-name">@ps.DisplayName</span>
+                        <span class="dtd-customization-player-detail">
+                            @if (ps.IsReady)
+                            {
+                                <span>"@outfitName"</span>
+                            }
+                            else
+                            {
+                                <span>Naming outfit…</span>
+                            }
+                        </span>
+                    </div>
+                }
+            </div>
+            <p class="dtd-customization-host-hint">
+                The round advances when the timer expires or all players finalize their outfit.
+            </p>
+        </div>
+    }
+
+    @if (isHost)
+    {
+        @* Host sees only the progress panel above *@
+    }
+    else if (hasSubmitted)
+    {
+        <div class="dtd-customization-waiting">
+            <p>✅ @finalizedMessage</p>
+            <div class="dtd-customization-submitted-summary">
+                <p class="dtd-customization-submitted-name">
+                    @myOutfit!.Customization.OutfitName
+                </p>
+                @if (myOutfit.Customization.SketchSvgContent is not null)
+                {
+                    <p class="dtd-customization-submitted-hint">Sketch overlay included ✏️</p>
+                }
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="dtd-customization-form">
+
+            <!-- Outfit name input -->
+            <div class="dtd-customization-name-section">
+                <label class="dtd-customization-name-label" for="outfit-name-input">
+                    @nameLabel <span class="dtd-customization-required">*</span>
+                </label>
+                <input id="outfit-name-input"
+                       class="dtd-customization-name-input"
+                       type="text"
+                       placeholder="Give your outfit a name…"
+                       maxlength="60"
+                       @bind="_outfitName"
+                       @bind:event="oninput" />
+            </div>
+
+            <!-- ── Mode toggle ──────────────────────────────────────────── -->
+            <div class="dtd-customization-mode-toggle">
+                <button class="dtd-btn dtd-btn-mode @(_mode == InteractionMode.Draw ? "dtd-btn-mode-active" : "")"
+                        aria-pressed="@(_mode == InteractionMode.Draw ? "true" : "false")"
+                        aria-label="Draw mode"
+                        @onclick="() => SwitchModeAsync(InteractionMode.Draw)">
+                    Draw
+                </button>
+                <button class="dtd-btn dtd-btn-mode @(_mode == InteractionMode.MoveItems ? "dtd-btn-mode-active" : "")"
+                        aria-pressed="@(_mode == InteractionMode.MoveItems ? "true" : "false")"
+                        aria-label="Move Items mode"
+                        @onclick="() => SwitchModeAsync(InteractionMode.MoveItems)">
+                    Move Items
+                </button>
+            </div>
+
+            <!-- Sketch overlay canvas + drag layer -->
+            <div class="dtd-customization-sketch-section">
+                <div class="dtd-customization-sketch-header">
+                    <h4 class="dtd-customization-sketch-title">
+                        @if (_mode == InteractionMode.Draw)
+                        {
+                            <span>Sketch Overlay</span>
+                            @if (GameState.Config.SketchingRequired)
+                            {
+                                <span class="dtd-customization-required"> *</span>
+                            }
+                            else
+                            {
+                                <span class="dtd-customization-optional">(optional)</span>
+                            }
+                        }
+                        else
+                        {
+                            <span>Move Items — drag to reposition</span>
+                        }
+                    </h4>
+                </div>
+
+                <div class="dtd-customization-canvas-wrapper @(_mode == InteractionMode.MoveItems ? "dtd-customization-canvas-move-mode" : "")">
+                    @* Drawing canvas — pointer-events disabled during Move mode *@
+                    <div style="@(_mode == InteractionMode.MoveItems ? "pointer-events: none;" : "")">
+                        <SvgDrawingCanvas @ref="_sketchCanvas"
+                                          Width="100%"
+                                          Height="@($"{totalOutfitHeight}px")"
+                                          ViewBoxWidth="600"
+                                          ViewBoxHeight="@totalOutfitHeight"
+                                          BackgroundColor="transparent"
+                                          BackgroundSvgContent="@outfitBackground" />
+                    </div>
+
+                    @* Drag layer — shown only in Move mode, overlays the drawing canvas *@
+                    @if (_mode == InteractionMode.MoveItems)
+                    {
+                        <svg id="@_dragSvgId"
+                             class="dtd-customization-drag-layer"
+                             viewBox="0 0 600 @totalOutfitHeight"
+                             preserveAspectRatio="xMidYMid meet"
+                             xmlns="http://www.w3.org/2000/svg">
+                        </svg>
+                    }
+                </div>
+            </div>
+
+            <!-- ── Manual position inputs ────────────────────────────────── -->
+            @if (_mode == InteractionMode.MoveItems)
+            {
+                <details class="dtd-customization-position-panel">
+                    <summary class="dtd-customization-position-summary">Manual Position Controls</summary>
+                    <div class="dtd-customization-position-grid">
+                        @foreach (var ct in GameState.Config.ClothingTypes)
+                        {
+                            var typeId = ct.Id;
+                            _itemPositions.TryGetValue(typeId, out var pos);
+                            double posX = pos?.X ?? 0;
+                            double posY = pos?.Y ?? 0;
+
+                            <div class="dtd-customization-position-row">
+                                <span class="dtd-customization-position-label">@ct.DisplayName</span>
+                                <label class="dtd-customization-position-input-label">
+                                    X:
+                                    <input type="number"
+                                           class="dtd-customization-position-input"
+                                           value="@((int)posX)"
+                                           min="0"
+                                           max="600"
+                                           @onchange="(e) => OnManualPositionChanged(typeId, true, e)" />
+                                </label>
+                                <label class="dtd-customization-position-input-label">
+                                    Y:
+                                    <input type="number"
+                                           class="dtd-customization-position-input"
+                                           value="@((int)posY)"
+                                           min="0"
+                                           max="@totalOutfitHeight"
+                                           @onchange="(e) => OnManualPositionChanged(typeId, false, e)" />
+                                </label>
+                            </div>
+                        }
+                    </div>
+                </details>
+            }
+
+            <!-- Actions -->
+            <div class="dtd-customization-actions">
+                @if (_errorMessage is not null)
+                {
+                    <p class="dtd-customization-error">@_errorMessage</p>
+                }
+
+                <button class="dtd-btn dtd-btn-primary"
+                        @onclick="SubmitCustomizationAsync"
+                        disabled="@_submitting"
+                        aria-label="@finalizeLabel">
+                    @if (_submitting)
+                    {
+                        <span>Finalizing…</span>
+                    }
+                    else
+                    {
+                        <span>🔒 @finalizeLabel</span>
+                    }
+                </button>
+            </div>
+
+        </div>
+    }
+
+</div>

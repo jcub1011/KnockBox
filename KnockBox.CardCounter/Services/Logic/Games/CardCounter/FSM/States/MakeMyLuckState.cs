@@ -1,3 +1,6 @@
+using KnockBox.Core.Services.State.Games.Shared;
+using KnockBox.Extensions.Returns;
+
 namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
 {
     /// <summary>
@@ -15,14 +18,17 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
             _playerId = playerId;
         }
 
-        public void OnEnter(CardCounterGameContext context)
+        public ValueResult<IGameState<CardCounterGameContext, CardCounterCommand>?> OnEnter(CardCounterGameContext context)
         {
             _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.Config.MakeMyLuckTimeoutMs);
             context.Logger.LogInformation(
                 "FSM → MakeMyLuckState for [{id}]. Expires {exp}.", _playerId, _expiresAt);
+            return null;
         }
 
-        public ICardCounterGameState? HandleCommand(CardCounterGameContext context, CardCounterCommand command)
+        public Result OnExit(CardCounterGameContext context) => Result.Success;
+
+        public ValueResult<IGameState<CardCounterGameContext, CardCounterCommand>?> HandleCommand(CardCounterGameContext context, CardCounterCommand command)
         {
             if (command is not SubmitReorderCommand cmd || cmd.PlayerId != _playerId)
                 return null;
@@ -61,7 +67,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
             return new PlayerTurnState();
         }
 
-        public ICardCounterGameState? Tick(CardCounterGameContext context, DateTimeOffset now)
+        public ValueResult<IGameState<CardCounterGameContext, CardCounterCommand>?> Tick(CardCounterGameContext context, DateTimeOffset now)
         {
             if (now < _expiresAt) return null;
 
@@ -70,7 +76,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
             return ResolveDefault(context, player);
         }
 
-        public TimeSpan GetRemainingTime(CardCounterGameContext context, DateTimeOffset now) => _expiresAt - now;
+        public ValueResult<TimeSpan> GetRemainingTime(CardCounterGameContext context, DateTimeOffset now) => _expiresAt - now;
 
         private static PlayerTurnState ResolveDefault(CardCounterGameContext context, State.Games.CardCounter.Data.PlayerState? player)
         {

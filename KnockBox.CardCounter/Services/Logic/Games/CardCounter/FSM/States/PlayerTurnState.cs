@@ -1,3 +1,5 @@
+using KnockBox.Core.Services.State.Games.Shared;
+using KnockBox.Extensions.Returns;
 using KnockBox.Services.Logic.RandomGeneration;
 using KnockBox.Services.State.Games.CardCounter;
 
@@ -10,7 +12,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
     {
         private DateTimeOffset _expiresAt;
 
-        public void OnEnter(CardCounterGameContext context)
+        public ValueResult<IGameState<CardCounterGameContext, CardCounterCommand>?> OnEnter(CardCounterGameContext context)
         {
             _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.Config.PlayerTurnTimeoutMs);
             context.State.GamePhase = GamePhase.Playing;
@@ -20,9 +22,12 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
             context.State.PendingNotMyMoneyOperator = null;
             context.Logger.LogInformation(
                 "FSM → PlayerTurnState (active: {id})", context.CurrentPlayerId);
+            return null;
         }
 
-        public ICardCounterGameState? HandleCommand(CardCounterGameContext context, CardCounterCommand command)
+        public Result OnExit(CardCounterGameContext context) => Result.Success;
+
+        public ValueResult<IGameState<CardCounterGameContext, CardCounterCommand>?> HandleCommand(CardCounterGameContext context, CardCounterCommand command)
         {
             return command switch
             {
@@ -34,7 +39,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
             };
         }
 
-        public ICardCounterGameState? Tick(CardCounterGameContext context, DateTimeOffset now)
+        public ValueResult<IGameState<CardCounterGameContext, CardCounterCommand>?> Tick(CardCounterGameContext context, DateTimeOffset now)
         {
             if (now < _expiresAt) return null;
             var currentPlayerId = context.CurrentPlayerId;
@@ -43,14 +48,15 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
             // Always return a state so the engine calls TransitionTo, which invokes OnEnter
             // and resets _expiresAt for the next player's turn. If the draw itself triggers a
             // state change (e.g. RoundEndState), pass that through; otherwise start a fresh turn.
-            return HandleDraw(context, new DrawCardCommand(currentPlayerId)) ?? new PlayerTurnState();
+            var drawResult = HandleDraw(context, new DrawCardCommand(currentPlayerId));
+            return drawResult.IsSuccess && drawResult.Value is not null ? drawResult : new PlayerTurnState();
         }
 
-        public TimeSpan GetRemainingTime(CardCounterGameContext context, DateTimeOffset now) => _expiresAt - now;
+        public ValueResult<TimeSpan> GetRemainingTime(CardCounterGameContext context, DateTimeOffset now) => _expiresAt - now;
 
         // ── Draw ──────────────────────────────────────────────────────────────
 
-        private ICardCounterGameState? HandleDraw(CardCounterGameContext context, DrawCardCommand cmd)
+        private ValueResult<IGameState<CardCounterGameContext, CardCounterCommand>?> HandleDraw(CardCounterGameContext context, DrawCardCommand cmd)
         {
             if (!context.IsCurrentPlayer(cmd.PlayerId))
             {
@@ -129,7 +135,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
 
         // ── Pass ─────────────────────────────────────────────────────────────
 
-        private ICardCounterGameState? HandlePass(CardCounterGameContext context, PassTurnCommand cmd)
+        private ValueResult<IGameState<CardCounterGameContext, CardCounterCommand>?> HandlePass(CardCounterGameContext context, PassTurnCommand cmd)
         {
             if (!context.IsCurrentPlayer(cmd.PlayerId))
             {
@@ -157,7 +163,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
 
         // ── Fold ──────────────────────────────────────────────────────────────
 
-        private ICardCounterGameState? HandleFold(CardCounterGameContext context, FoldPotCommand cmd)
+        private ValueResult<IGameState<CardCounterGameContext, CardCounterCommand>?> HandleFold(CardCounterGameContext context, FoldPotCommand cmd)
         {
             if (!context.IsCurrentPlayer(cmd.PlayerId))
             {
@@ -182,7 +188,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
 
         // ── Action cards ──────────────────────────────────────────────────────
 
-        private ICardCounterGameState? HandlePlayActionCard(CardCounterGameContext context, PlayActionCardCommand cmd)
+        private ValueResult<IGameState<CardCounterGameContext, CardCounterCommand>?> HandlePlayActionCard(CardCounterGameContext context, PlayActionCardCommand cmd)
         {
             if (!context.IsCurrentPlayer(cmd.PlayerId))
             {
@@ -243,7 +249,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
 
         // ── Discard ───────────────────────────────────────────────────────────
 
-        private static ICardCounterGameState? HandleFeelingLucky(CardCounterGameContext context, string sourceId)
+        private static ValueResult<IGameState<CardCounterGameContext, CardCounterCommand>?> HandleFeelingLucky(CardCounterGameContext context, string sourceId)
         {
             if (context.TurnOrder.Count <= 1)
             {
@@ -257,7 +263,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
             return new FeelingLuckyChainState(sourceId, targetId);
         }
 
-        private static ICardCounterGameState? HandleMakeMyLuck(CardCounterGameContext context, string sourceId)
+        private static ValueResult<IGameState<CardCounterGameContext, CardCounterCommand>?> HandleMakeMyLuck(CardCounterGameContext context, string sourceId)
         {
             if (context.CurrentShoe.Count == 0) return null;
 
@@ -271,7 +277,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
             return new MakeMyLuckState(sourceId);
         }
 
-        private static ICardCounterGameState? HandleBurn(CardCounterGameContext context)
+        private static ValueResult<IGameState<CardCounterGameContext, CardCounterCommand>?> HandleBurn(CardCounterGameContext context)
         {
             if (context.CurrentShoe.Count == 0) return null;
 
@@ -287,7 +293,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
             return null;
         }
 
-        private static ICardCounterGameState? HandleBlockable(
+        private static ValueResult<IGameState<CardCounterGameContext, CardCounterCommand>?> HandleBlockable(
             CardCounterGameContext context, PlayActionCardCommand cmd, ActionCard card)
         {
             if (string.IsNullOrEmpty(cmd.TargetPlayerId))
@@ -326,7 +332,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
             return new WaitingForReactionState(cmd.PlayerId, cmd.TargetPlayerId, card);
         }
 
-        private static ICardCounterGameState? HandleTilt(CardCounterGameContext context, string sourceId)
+        private static ValueResult<IGameState<CardCounterGameContext, CardCounterCommand>?> HandleTilt(CardCounterGameContext context, string sourceId)
         {
             // Collect all number cards from all players' pots into one pool
             var allDigits = new List<int>();
@@ -371,7 +377,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
             return null; // stay in PlayerTurnState
         }
 
-        private static ICardCounterGameState? HandleSkim(
+        private static ValueResult<IGameState<CardCounterGameContext, CardCounterCommand>?> HandleSkim(
             CardCounterGameContext context, PlayActionCardCommand cmd)
         {
             if (string.IsNullOrEmpty(cmd.TargetPlayerId))
@@ -405,7 +411,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
             return new SkimState(cmd.PlayerId, cmd.TargetPlayerId, new ActionCard(ActionType.Skim));
         }
 
-        private static ICardCounterGameState? HandleHedgeYourBet(CardCounterGameContext context, string sourceId)
+        private static ValueResult<IGameState<CardCounterGameContext, CardCounterCommand>?> HandleHedgeYourBet(CardCounterGameContext context, string sourceId)
         {
             if (context.CurrentShoe.Count == 0)
             {
@@ -419,7 +425,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
             return null; // stay in PlayerTurnState
         }
 
-        private static ICardCounterGameState? HandleLetItRide(CardCounterGameContext context, string sourceId)
+        private static ValueResult<IGameState<CardCounterGameContext, CardCounterCommand>?> HandleLetItRide(CardCounterGameContext context, string sourceId)
         {
             var player = context.GetPlayer(sourceId);
             if (player is null) return null;

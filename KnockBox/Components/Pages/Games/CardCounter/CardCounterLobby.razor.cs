@@ -24,6 +24,7 @@ namespace KnockBox.Components.Pages.Games.CardCounter
 
         private IDisposable? _stateSubscription;
         private PeriodicTimer? _timer;
+        private bool _kickHandled;
 
         private const int ShoeAnimationDurationMs = 2500;
         private int _prevShoeIndex = -1;
@@ -120,6 +121,17 @@ namespace KnockBox.Components.Pages.Games.CardCounter
             {
                 Logger.LogError(ex, "Error handling state tick.");
             }
+        }
+
+        protected override void OnAfterRender(bool firstRender)
+        {
+            if (!_kickHandled && GameState?.KickedPlayers.Contains(UserService.CurrentUser) == true)
+            {
+                _kickHandled = true;
+                GameSessionService.LeaveCurrentSession(navigateHome: true);
+            }
+
+            base.OnAfterRender(firstRender);
         }
 
         public override void Dispose()

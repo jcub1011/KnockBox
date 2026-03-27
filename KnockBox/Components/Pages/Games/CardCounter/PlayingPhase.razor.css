@@ -204,7 +204,7 @@
     justify-content: safe center;
     height: 100%;
     width: 100%;
-    gap: 24px;
+    gap: 32px;
     overflow-y: auto;
     margin: auto;
     padding: 16px;
@@ -217,10 +217,23 @@
     justify-content: center;
     gap: 16px;
     width: 100%;
+    max-width: 450px;
+    margin: 0px auto;
+}
+
+.cc-card-table-group {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.cc-card-group {
+    display: flex;
+    flex-direction: row;
+    gap: 16px;
 }
 
 /* ── Opponents Row ─────────────────────────────────────────────────────────── */
-
 .cc-opponents-row {
     display: flex;
     flex-wrap: wrap;
@@ -234,8 +247,7 @@
     border: 2px solid rgba(255,255,255,0.2);
     border-radius: 12px;
     padding: 10px 14px;
-    min-width: 130px;
-    max-width: 180px;
+    width: 175px;
     display: flex;
     flex-direction: column;
     gap: 6px;
@@ -456,8 +468,8 @@
     flex-direction: row;
     flex-wrap: wrap;
     gap: 12px;
-    flex: 3;
     min-width: 250px;
+    flex-shrink: 1;
 }
 
 .cc-deck-pile {
@@ -534,8 +546,8 @@
 /* ── Shoe Pile Card ──────────────────────────────────────────────────────── */
 
 .cc-shoe-card {
-    width: 72px;
-    height: 100px;
+    width: 94px;
+    height: 130px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -591,8 +603,8 @@
 }
 
 .cc-main-deck-card {
-    width: 72px;
-    height: 100px;
+    width: 94px;
+    height: 130px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1538,135 +1550,6 @@
     color: rgba(255,255,255,0.7);
     font-style: italic;
 }
-
-/* ── Responsive ────────────────────────────────────────────────────────────── */
-
-/*@media (max-width: 600px) {
-    .cc-table-felt {
-        aspect-ratio: auto;
-        min-height: 160px;
-        border-radius: 50% / 30%;
-        gap: 10px;
-        flex-wrap: wrap;
-        padding: 12px;
-    }
-
-    .cc-action-card {
-        width: 68px;
-        height: 96px;
-    }
-
-    .cc-header {
-        padding: 8px 12px;
-        gap: 8px;
-    }
-
-    .cc-game-title {
-        font-size: 1.1rem;
-    }
-
-    .cc-my-panel {
-        padding: 10px 12px;
-    }
-
-    .cc-my-panel-stats {
-        gap: 8px;
-    }
-
-    .cc-my-stat {
-        padding: 6px 10px;
-        flex: 1;
-        min-width: 80px;
-    }
-
-    .cc-opponents-row {
-        gap: 6px;
-    }
-
-    .cc-opponent-card {
-        min-width: 110px;
-        padding: 8px 10px;
-    }
-
-    .cc-hand-area {
-        padding: 10px 10px 12px;
-    }
-
-    .cc-hand-cards {
-        gap: 8px;
-    }
-
-    .cc-action-buttons {
-        gap: 8px;
-    }
-
-    .cc-discard-pile {
-        display: none;
-    }
-
-    .cc-shoe-stats {
-        padding: 8px 12px;
-        min-width: 100px;
-    }
-
-    .cc-pile-stack {
-        width: 48px;
-        height: 68px;
-    }
-
-    .cc-pile-card {
-        font-size: 2.8rem;
-    }
-
-    .cc-table-area {
-        padding: 8px;
-    }
-
-    .cc-discard-history-panel {
-        max-height: 85vh;
-    }
-}
-
-@media (max-width: 400px) {
-    .cc-table-felt {
-        gap: 8px;
-        padding: 8px;
-    }
-
-    .cc-shoe-stats {
-        display: none;
-    }
-
-    .cc-hand-cards {
-        gap: 6px;
-    }
-}*/
-
-/* ── Laptop+ layout: player list to the left of the table ─────────────────── */
-
-/*@media (min-width: 1024px) {
-    .cc-table-area {
-        flex-direction: row;
-        align-items: flex-start;
-        justify-content: center;
-    }
-
-    .cc-opponents-row {
-        flex-direction: column;
-        flex-wrap:nowrap;
-        justify-content: flex-start;
-        align-items: stretch;
-        min-width: 170px;
-        max-width: 210px;
-        padding: 0 0 0 0;
-        order: -1;
-    }
-
-    .cc-opponent-card {
-        max-width: 100%;
-        min-width: 160px;
-    }
-}*/
 
 /* ── Skim Digit Selection Overlay ─────────────────────────────────────────── */
 

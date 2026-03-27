@@ -1,0 +1,133 @@
+@using KnockBox.Services.State.Games.DrawnToDress
+@using KnockBox.Services.State.Games.DrawnToDress.Data
+@using KnockBox.Services.State.Users
+
+@{
+    string? myId = UserService.CurrentUser?.Id;
+    var queue = GameState.PendingCoinFlipQueue;
+    int index = GameState.CurrentCoinFlipIndex;
+    var currentFlip = index >= 0 && index < queue.Count ? queue[index] : null;
+    bool isCaller = currentFlip?.CallerPlayerId == myId;
+}
+
+<div class="dtd-coinflip">
+
+    <!-- ── Header ──────────────────────────────────────────────────────── -->
+    <div class="dtd-coinflip-header">
+        <div class="dtd-coinflip-phase-badge">
+            <span class="dtd-coinflip-phase-name">Coin Flip</span>
+            @if (queue.Count > 1)
+            {
+                <span class="dtd-coinflip-count">Flip @(index + 1) of @queue.Count</span>
+            }
+        </div>
+
+        <TimerDisplay GameState="GameState" />
+    </div>
+
+    @if (currentFlip is not null)
+    {
+        <!-- ── Context label ───────────────────────────────────────────── -->
+        <div class="dtd-coinflip-context">
+            @if (currentFlip.Context == CoinFlipContext.CriterionTie)
+            {
+                string criterionName = GameState.Config.VotingCriteria
+                    .FirstOrDefault(c => c.Id == currentFlip.CriterionId)?.DisplayName ?? currentFlip.CriterionId;
+                <p>Tied on <strong>@criterionName</strong></p>
+            }
+            else
+            {
+                var playerA = GameState.GamePlayers.GetValueOrDefault(currentFlip.PlayerAId);
+                var playerB = GameState.GamePlayers.GetValueOrDefault(currentFlip.PlayerBId);
+                int rank = GameState.Leaderboard.FirstOrDefault(e => e.PlayerId == currentFlip.PlayerAId)?.Rank ?? 0;
+                <p>Tied for <strong>@GetOrdinal(rank) Place</strong></p>
+            }
+        </div>
+
+        <!-- ── Players ─────────────────────────────────────────────────── -->
+        <div class="dtd-coinflip-players">
+            @{
+                string nameA, nameB;
+                if (currentFlip.Context == CoinFlipContext.CriterionTie)
+                {
+                    nameA = GetEntrantDisplayName(currentFlip.EntrantAId);
+                    nameB = GetEntrantDisplayName(currentFlip.EntrantBId);
+                }
+                else
+                {
+                    nameA = GameState.GamePlayers.GetValueOrDefault(currentFlip.PlayerAId)?.DisplayName ?? currentFlip.PlayerAId;
+                    nameB = GameState.GamePlayers.GetValueOrDefault(currentFlip.PlayerBId)?.DisplayName ?? currentFlip.PlayerBId;
+                }
+            }
+            <div class="dtd-coinflip-player">@nameA</div>
+            <div class="dtd-coinflip-vs">vs</div>
+            <div class="dtd-coinflip-player">@nameB</div>
+        </div>
+
+        @if (currentFlip.IsResolved)
+        {
+            <!-- ── Result display ──────────────────────────────────────── -->
+            <div class="dtd-coinflip-result" role="status">
+                @if (currentFlip.IsAutoResolved)
+                {
+                    <p class="dtd-coinflip-timeout">Time's up! @(currentFlip.CallerChoseHeads ? "Heads" : "Tails") was chosen for you.</p>
+                }
+                <div class="dtd-coinflip-coin @(currentFlip.ResultIsHeads ? "dtd-coinflip-heads" : "dtd-coinflip-tails")">
+                    @(currentFlip.ResultIsHeads ? "H" : "T")
+                </div>
+                <p class="dtd-coinflip-result-text">
+                    @(currentFlip.ResultIsHeads ? "Heads" : "Tails")!
+                </p>
+                @{
+                    string winnerName;
+                    if (currentFlip.Context == CoinFlipContext.CriterionTie)
+                    {
+                        winnerName = GetEntrantDisplayName(currentFlip.WinnerPlayerId);
+                    }
+                    else
+                    {
+                        winnerName = GameState.GamePlayers.GetValueOrDefault(currentFlip.WinnerPlayerId)?.DisplayName ?? currentFlip.WinnerPlayerId;
+                    }
+                }
+                <p class="dtd-coinflip-winner">@winnerName wins!</p>
+            </div>
+        }
+        else if (isCaller)
+        {
+            <!-- ── Caller view: buttons ────────────────────────────────── -->
+            <div class="dtd-coinflip-call">
+                <p class="dtd-coinflip-your-call">Your call!</p>
+                <div class="dtd-coinflip-buttons">
+                    <button class="dtd-btn dtd-btn-coinflip dtd-btn-heads"
+                            @onclick="() => CallCoinFlipAsync(true)"
+                            disabled="@_submitting"
+                            aria-label="Call Heads">
+                        Heads
+                    </button>
+                    <button class="dtd-btn dtd-btn-coinflip dtd-btn-tails"
+                            @onclick="() => CallCoinFlipAsync(false)"
+                            disabled="@_submitting"
+                            aria-label="Call Tails">
+                        Tails
+                    </button>
+                </div>
+            </div>
+        }
+        else
+        {
+            <!-- ── Non-caller view: waiting ────────────────────────────── -->
+            <div class="dtd-coinflip-waiting">
+                @{
+                    string callerName = GameState.GamePlayers.GetValueOrDefault(currentFlip.CallerPlayerId)?.DisplayName ?? "Someone";
+                }
+                <p>@callerName is calling it...</p>
+            </div>
+        }
+    }
+
+    @if (_errorMessage is not null)
+    {
+        <p class="dtd-coinflip-error">@_errorMessage</p>
+    }
+
+</div>

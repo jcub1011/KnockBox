@@ -1,0 +1,24 @@
+@using KnockBox.Core.Services.State.Games.Shared
+@using KnockBox.Services.Logic.Games.DrawnToDress.FSM
+@using KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
+@using KnockBox.Services.State.Games.DrawnToDress
+
+@if (GameState.PhaseDeadlineUtc.HasValue &&
+     GameState.Context?.Fsm?.CurrentState is ITimedGameState<DrawnToDressGameContext, DrawnToDressCommand> timedState)
+{
+    var remaining = timedState.GetRemainingTime(GameState.Context!, DateTimeOffset.UtcNow);
+    if (remaining.IsSuccess)
+    {
+        var secs = (int)Math.Max(0, Math.Ceiling(remaining.Value.TotalSeconds));
+        <div class="dtd-timer @(secs <= 10 ? "dtd-timer-urgent" : "")"
+             role="timer"
+             aria-label="@secs seconds remaining">
+            @secs s
+        </div>
+    }
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public DrawnToDressGameState GameState { get; set; } = default!;
+}

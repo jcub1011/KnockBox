@@ -1,0 +1,209 @@
+@using KnockBox.Services.State.Games.DrawnToDress
+@using KnockBox.Services.State.Games.DrawnToDress.Data
+@using KnockBox.Services.State.Users
+
+@{
+    bool isHost = UserService.CurrentUser?.Id == GameState.Host.Id;
+    string? myId = UserService.CurrentUser?.Id;
+
+    int roundIndex = GameState.CurrentVotingRoundIndex;
+    VotingRound? currentRound = roundIndex < GameState.VotingRounds.Count
+        ? GameState.VotingRounds[roundIndex]
+        : null;
+
+    int totalConfiguredRounds = GameState.Config.VotingRounds;
+}
+
+<div class="dtd-voting">
+
+    <!-- ── Header ────────────────────────────────────────────────────────── -->
+    <div class="dtd-voting-header">
+        <div class="dtd-voting-phase-badge">
+            <span class="dtd-voting-phase-icon">🗳</span>
+            <span class="dtd-voting-phase-name">Voting Round @(roundIndex + 1) of @totalConfiguredRounds</span>
+        </div>
+
+        <TimerDisplay GameState="GameState" />
+    </div>
+
+    @if (currentRound is null)
+    {
+        <p>Preparing matchups...</p>
+    }
+    else
+    {
+        <!-- ── Host view ─────────────────────────────────────────────────── -->
+        @if (isHost)
+        {
+            <div class="dtd-voting-host-panel">
+                <h3>Matchup Progress</h3>
+                @foreach (var matchup in currentRound.Matchups)
+                {
+                    int voteCount = GameState.Votes.Values.Count(v => v.MatchupId == matchup.Id);
+                    <div class="dtd-voting-matchup-status">
+                        <span>@GetEntrantLabel(matchup.EntrantAId) vs @GetEntrantLabel(matchup.EntrantBId)</span>
+                        <span class="dtd-voting-vote-count">@voteCount vote(s)</span>
+                    </div>
+                }
+            </div>
+        }
+
+        <!-- ── Player view ───────────────────────────────────────────────── -->
+        @if (!isHost)
+        {
+            @foreach (var matchup in currentRound.Matchups)
+            {
+                bool isCompeting = IsCompetingInMatchup(matchup);
+                bool alreadySubmitted = HasAlreadySubmittedVotesForMatchup(matchup.Id);
+
+                <div class="dtd-voting-matchup-card" role="group" aria-label="Matchup: @GetEntrantLabel(matchup.EntrantAId) vs @GetEntrantLabel(matchup.EntrantBId)">
+                    @if (isCompeting)
+                    {
+                        <div class="dtd-voting-competing">
+                            <p>You're competing in this matchup!</p>
+                        </div>
+                    }
+                    else
+                    {
+                        @if (alreadySubmitted)
+                        {
+                            LoadExistingVotes(matchup.Id);
+                            <div class="dtd-voting-submitted">
+                                <p>✅ Votes submitted. You can change your votes below.</p>
+                            </div>
+                        }
+
+                        <!-- Side-by-side outfit display -->
+                        <div class="dtd-voting-matchup-outfits">
+                            @{
+                                var outfitA = GetEntrantOutfit(matchup.EntrantAId);
+                                var outfitB = GetEntrantOutfit(matchup.EntrantBId);
+                            }
+
+                            <div class="dtd-voting-entrant">
+                                <h4>@GetEntrantLabel(matchup.EntrantAId)</h4>
+                                @if (outfitA is not null)
+                                {
+                                    <svg class="dtd-voting-outfit-preview" viewBox="0 0 600 @TotalOutfitHeight"
+                                         preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg"
+                                         role="img" aria-label="@($"Outfit by {GetEntrantLabel(matchup.EntrantAId)}{(string.IsNullOrWhiteSpace(outfitA.Customization.OutfitName) ? "" : $": {outfitA.Customization.OutfitName}")}")">
+                                        @{ int yOffA = 0; }
+                                        @foreach (var ct in GameState.Config.ClothingTypes)
+                                        {
+                                            if (outfitA.SelectedItemsByType.TryGetValue(ct.Id, out var itemId)
+                                                && GameState.ClothingPool.TryGetValue(itemId, out var item))
+                                            {
+                                                if (SafeSvgContent(item.SvgContent) is string safeSvg)
+                                                {
+                                                    double itemXA = 0;
+                                                    double itemYA = yOffA;
+                                                    if (outfitA.Customization.ItemPositionOverrides.TryGetValue(ct.Id, out var posA))
+                                                    {
+                                                        itemXA = posA.X;
+                                                        itemYA = posA.Y;
+                                                    }
+                                                    <g transform="translate(@itemXA,@itemYA)">@((MarkupString)safeSvg)</g>
+                                                }
+                                            }
+                                            yOffA += ct.CanvasHeight;
+                                        }
+                                        @if (SafeSvgContent(outfitA.Customization.SketchSvgContent) is string sketchSvgA)
+                                        {
+                                            @((MarkupString)sketchSvgA)
+                                        }
+                                    </svg>
+                                    @if (!string.IsNullOrWhiteSpace(outfitA.Customization.OutfitName))
+                                    {
+                                        <p class="dtd-voting-outfit-name">"@outfitA.Customization.OutfitName"</p>
+                                    }
+                                }
+                            </div>
+
+                            <div class="dtd-voting-vs">VS</div>
+
+                            <div class="dtd-voting-entrant">
+                                <h4>@GetEntrantLabel(matchup.EntrantBId)</h4>
+                                @if (outfitB is not null)
+                                {
+                                    <svg class="dtd-voting-outfit-preview" viewBox="0 0 600 @TotalOutfitHeight"
+                                         preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg"
+                                         role="img" aria-label="@($"Outfit by {GetEntrantLabel(matchup.EntrantBId)}{(string.IsNullOrWhiteSpace(outfitB.Customization.OutfitName) ? "" : $": {outfitB.Customization.OutfitName}")}")">
+                                        @{ int yOffB = 0; }
+                                        @foreach (var ct in GameState.Config.ClothingTypes)
+                                        {
+                                            if (outfitB.SelectedItemsByType.TryGetValue(ct.Id, out var itemId)
+                                                && GameState.ClothingPool.TryGetValue(itemId, out var item))
+                                            {
+                                                if (SafeSvgContent(item.SvgContent) is string safeSvg)
+                                                {
+                                                    double itemXB = 0;
+                                                    double itemYB = yOffB;
+                                                    if (outfitB.Customization.ItemPositionOverrides.TryGetValue(ct.Id, out var posB))
+                                                    {
+                                                        itemXB = posB.X;
+                                                        itemYB = posB.Y;
+                                                    }
+                                                    <g transform="translate(@itemXB,@itemYB)">@((MarkupString)safeSvg)</g>
+                                                }
+                                            }
+                                            yOffB += ct.CanvasHeight;
+                                        }
+                                        @if (SafeSvgContent(outfitB.Customization.SketchSvgContent) is string sketchSvgB)
+                                        {
+                                            @((MarkupString)sketchSvgB)
+                                        }
+                                    </svg>
+                                    @if (!string.IsNullOrWhiteSpace(outfitB.Customization.OutfitName))
+                                    {
+                                        <p class="dtd-voting-outfit-name">"@outfitB.Customization.OutfitName"</p>
+                                    }
+                                }
+                            </div>
+                        </div>
+
+                        <!-- Voting criteria buttons -->
+                        <div class="dtd-voting-criteria">
+                            @foreach (var criterion in GameState.Config.VotingCriteria)
+                            {
+                                var key = (matchup.Id, criterion.Id);
+                                _selectedVotes.TryGetValue(key, out var selected);
+
+                                <div class="dtd-voting-criterion-row">
+                                    <span class="dtd-voting-criterion-label">@criterion.DisplayName</span>
+                                    <div class="dtd-voting-criterion-buttons">
+                                        <button class="dtd-btn dtd-btn-vote @(selected == matchup.EntrantAId ? "dtd-btn-vote-selected" : "")"
+                                                aria-pressed="@(selected == matchup.EntrantAId ? "true" : "false")"
+                                                aria-label="Vote for @GetEntrantLabel(matchup.EntrantAId) on @criterion.DisplayName"
+                                                @onclick="() => SelectVote(matchup.Id, criterion.Id, matchup.EntrantAId)">
+                                            Choose A
+                                        </button>
+                                        <button class="dtd-btn dtd-btn-vote @(selected == matchup.EntrantBId ? "dtd-btn-vote-selected" : "")"
+                                                aria-pressed="@(selected == matchup.EntrantBId ? "true" : "false")"
+                                                aria-label="Vote for @GetEntrantLabel(matchup.EntrantBId) on @criterion.DisplayName"
+                                                @onclick="() => SelectVote(matchup.Id, criterion.Id, matchup.EntrantBId)">
+                                            Choose B
+                                        </button>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+
+                        <div class="dtd-voting-actions">
+                            <button class="dtd-btn dtd-btn-primary"
+                                    @onclick="() => SubmitVotesForMatchupAsync(matchup.Id)"
+                                    disabled="@(!AllCriteriaVotedForMatchup(matchup.Id) || _submitting)">
+                                @(alreadySubmitted ? "Update Vote" : "Submit Vote")
+                            </button>
+                        </div>
+                    }
+                </div>
+            }
+        }
+    }
+
+    @if (_errorMessage is not null)
+    {
+        <p class="dtd-voting-error">@_errorMessage</p>
+    }
+
+</div>

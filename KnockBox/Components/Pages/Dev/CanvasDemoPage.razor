@@ -1,0 +1,63 @@
+<PageTitle>Canvas Demo</PageTitle>
+
+<div class="demo-container">
+    <h2>SVG Drawing Canvas — Demo</h2>
+    <p class="demo-hint">
+        Draw freely using mouse or touch. Use the color swatches or the custom color picker to change colors.
+        Strokes already on the canvas keep their original color when you switch colors.
+        Use <strong>↩ Undo</strong> to remove the last stroke, <strong>⬇ Export SVG</strong> to download your
+        drawing, <strong>📋 Copy</strong> to generate a share code, or <strong>📥 Paste</strong> to load a
+        drawing from a code produced on another device.
+    </p>
+
+    <div class="demo-canvases">
+        <section>
+            <h3>White background (default)</h3>
+            <SvgDrawingCanvas Height="420px" EnableSharing="true" />
+        </section>
+
+        <section>
+            <h3>Dark background</h3>
+            <SvgDrawingCanvas Height="420px"
+                              BackgroundColor="#1e1e2e"
+                              StrokeColor="#ffffff"
+                              StrokeWidth="2"
+                              EnableSharing="true" />
+        </section>
+    </div>
+
+    <h2 style="margin-top: 48px;">Resolution-Independent Canvases</h2>
+    <p class="demo-hint">
+        These canvases all share a <strong>600&times;600</strong> viewBox coordinate space but are displayed at
+        different screen sizes. Strokes drawn on any of them produce identical SVG output — the drawing
+        resolution is independent of the on-screen size.
+    </p>
+
+    <div class="demo-canvases">
+        <section>
+            <h3>600&times;600 viewBox at full size (600px)</h3>
+            <SvgDrawingCanvas Width="600px" Height="660px"
+                              ViewBoxWidth="600" ViewBoxHeight="600" />
+        </section>
+
+        <section>
+            <h3>600&times;600 viewBox at half size (300px)</h3>
+            <SvgDrawingCanvas Width="300px" Height="360px"
+                              ViewBoxWidth="600" ViewBoxHeight="600" />
+        </section>
+
+        <section>
+            <h3>600&times;400 viewBox in a wide container</h3>
+            <SvgDrawingCanvas Width="600px" Height="500px"
+                              ViewBoxWidth="600" ViewBoxHeight="400" />
+        </section>
+
+        <section>
+            <h3>400&times;600 viewBox in a narrow container</h3>
+            <SvgDrawingCanvas Width="300px" Height="520px"
+                              ViewBoxWidth="400" ViewBoxHeight="600" />
+        </section>
+    </div>
+
+    <p class="demo-debug-badge">⚠ DEBUG build only — this page is excluded from release builds.</p>
+</div>
