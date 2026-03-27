@@ -31,15 +31,15 @@ function updateSwatchActive(container, color) {
  */
 function buildPath(points) {
     if (points.length === 1) return `M ${points[0].x} ${points[0].y}`;
-    let d = `M ${points[0].x} ${points[0].y}`;
+    const parts = [`M ${points[0].x} ${points[0].y}`];
     for (let i = 1; i < points.length - 1; i++) {
-        const mx = (points[i].x + points[i + 1].x) / 2;
-        const my = (points[i].y + points[i + 1].y) / 2;
-        d += ` Q ${points[i].x} ${points[i].y} ${mx} ${my}`;
+        const mx = Math.round((points[i].x + points[i + 1].x) * 50) / 100;
+        const my = Math.round((points[i].y + points[i + 1].y) * 50) / 100;
+        parts.push(`Q ${points[i].x} ${points[i].y} ${mx} ${my}`);
     }
     const last = points[points.length - 1];
-    d += ` L ${last.x} ${last.y}`;
-    return d;
+    parts.push(`L ${last.x} ${last.y}`);
+    return parts.join(' ');
 }
 
 /**
@@ -123,20 +123,22 @@ export function initialize(svgId, dotNetRef, initialColor, initialStrokeWidth, i
         const ctm = svg.getScreenCTM();
         if (!ctm) return { x: clientX, y: clientY };
         const transformed = svgPoint.matrixTransform(ctm.inverse());
-        return { x: transformed.x, y: transformed.y };
+        return { x: Math.round(transformed.x * 100) / 100, y: Math.round(transformed.y * 100) / 100 };
     }
 
     function startStroke(clientX, clientY) {
         state.isDrawing = true;
         const { x, y } = getSvgCoords(clientX, clientY);
         state.currentPoints = [{ x, y }];
+        state._pathPrefix = `M ${x} ${y}`;
+        state._pathSuffix = '';
         const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
         path.setAttribute('stroke', state.color);
         path.setAttribute('stroke-width', state.strokeWidth);
         path.setAttribute('fill', 'none');
         path.setAttribute('stroke-linecap', 'round');
         path.setAttribute('stroke-linejoin', 'round');
-        path.setAttribute('d', `M ${x} ${y}`);
+        path.setAttribute('d', state._pathPrefix);
         svg.appendChild(path);
         state.currentPath = path;
     }
@@ -144,8 +146,27 @@ export function initialize(svgId, dotNetRef, initialColor, initialStrokeWidth, i
     function continueStroke(clientX, clientY) {
         if (!state.isDrawing || !state.currentPath) return;
         const { x, y } = getSvgCoords(clientX, clientY);
-        state.currentPoints.push({ x, y });
-        state.currentPath.setAttribute('d', buildPath(state.currentPoints));
+
+        const pts = state.currentPoints;
+        const last = pts[pts.length - 1];
+        const dx = x - last.x;
+        const dy = y - last.y;
+        if (dx * dx + dy * dy < 4) return;
+
+        pts.push({ x, y });
+        const n = pts.length;
+
+        if (n === 2) {
+            state._pathSuffix = ` L ${x} ${y}`;
+        } else {
+            const prev = pts[n - 2];
+            const mx = Math.round((prev.x + x) * 50) / 100;
+            const my = Math.round((prev.y + y) * 50) / 100;
+            state._pathPrefix += ` Q ${prev.x} ${prev.y} ${mx} ${my}`;
+            state._pathSuffix = ` L ${x} ${y}`;
+        }
+
+        state.currentPath.setAttribute('d', state._pathPrefix + state._pathSuffix);
     }
 
     function endStroke() {
@@ -418,6 +439,22 @@ function sanitizeStrokeElement(el) {
 }
 
 /**
+ * Rebuilds tracked stroke elements through the sanitization allowlist and returns
+ * the resulting SVG inner markup string.
+ * @param {Element[]} paths
+ * @returns {string}
+ */
+function serializePaths(paths) {
+    if (paths.length === 0) return '';
+    const tmp = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    for (const el of paths) {
+        const clean = sanitizeStrokeElement(el);
+        if (clean) tmp.appendChild(clean);
+    }
+    return tmp.innerHTML;
+}
+
+/**
  * Serializes the current drawing as a string used by the server-side copy/paste flow.
  * Only elements tracked in state.paths are included, and each is rebuilt from an
  * attribute allowlist to prevent injected DOM content from being captured.
@@ -427,14 +464,7 @@ function sanitizeStrokeElement(el) {
 export function getSvgContent(svgId) {
     const state = instances.get(svgId);
     if (!state || state.paths.length === 0) return '';
-
-    // Rebuild from state.paths (our own array, not innerHTML) with an attribute allowlist.
-    const tmp = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    for (const el of state.paths) {
-        const clean = sanitizeStrokeElement(el);
-        if (clean) tmp.appendChild(clean);
-    }
-    return tmp.innerHTML;
+    return serializePaths(state.paths);
 }
 
 /**
@@ -458,13 +488,7 @@ export function prepareSvgContentForChunkedRead(svgId) {
         if (state) state._readCache = '';
         return 0;
     }
-
-    const tmp = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    for (const el of state.paths) {
-        const clean = sanitizeStrokeElement(el);
-        if (clean) tmp.appendChild(clean);
-    }
-    state._readCache = tmp.innerHTML;
+    state._readCache = serializePaths(state.paths);
     return state._readCache.length;
 }
 
