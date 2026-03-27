@@ -23,6 +23,7 @@
     display: flex;
     align-items: center;
     gap: 4px;
+    flex-wrap: wrap;
 }
 
 .toolbar-separator {
@@ -35,6 +36,7 @@
 .toolbar-swatches {
     display: flex;
     gap: 3px;
+    flex-wrap: wrap;
 }
 
 .toolbar-swatch {
@@ -134,6 +136,7 @@
     gap: 4px;
     margin-left: auto;
     position: relative;
+    flex-wrap: wrap;
 }
 
 .toolbar-btn {
