@@ -69,12 +69,17 @@ namespace KnockBox.Core.Components.Shared
         private double _currentStrokeWidth = 3;
         private int _strokeCount;
 
-        // Preset color palette shown as swatches in the toolbar.
+        // Curated color palette — bold, complementary colors.
         private static readonly string[] _colorSwatches =
         [
-            "#000000", "#ffffff", "#ef4444", "#f97316",
-            "#eab308", "#22c55e", "#3b82f6", "#8b5cf6",
-            "#ec4899", "#6b7280", "#92400e", "#164e63",
+            "#000000", "#ffffff", "#ef4444",
+            "#3b82f6", "#22c55e", "#f59e0b",
+        ];
+
+        // Preset brush sizes: small, medium, large.
+        private static readonly (string Label, int Size)[] _sizePresets =
+        [
+            ("S", 3), ("M", 8), ("L", 16),
         ];
 
         protected override void OnInitialized()

@@ -25,6 +25,18 @@ function updateSwatchActive(container, color) {
 }
 
 /**
+ * Updates which size preset button bears the active highlight.
+ * @param {Element|null} container
+ * @param {number} size - stroke width in pixels
+ */
+function updateSizeActive(container, size) {
+    container?.querySelectorAll('.toolbar-size-btn[data-size]').forEach(s => {
+        s.classList.toggle('toolbar-size-btn-active',
+            parseInt(s.dataset.size, 10) === size);
+    });
+}
+
+/**
  * Builds a smooth quadratic Bézier path string from an array of {x, y} points.
  * @param {{x: number, y: number}[]} points
  * @returns {string}
@@ -65,7 +77,7 @@ function triggerSvgDownload(state, fileName, backgroundColor) {
     const bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
     bg.setAttribute('width', '100%');
     bg.setAttribute('height', '100%');
-    bg.setAttribute('fill', backgroundColor || state.backgroundColor);
+    bg.setAttribute('fill', backgroundColor || state.svg.style.backgroundColor || state.backgroundColor);
     clone.insertBefore(bg, clone.firstChild);
 
     const blob = new Blob([new XMLSerializer().serializeToString(clone)],
@@ -226,20 +238,19 @@ export function initialize(svgId, dotNetRef, initialColor, initialStrokeWidth, i
         console.warn('[SVGCanvas] initialize: .toolbar-color not found — color picker will not work.');
     }
 
-    // Size slider
+    // Size input (custom number)
     const sizeInput = container?.querySelector('.toolbar-size');
-    const sizeLabel = sizeInput?.closest('.toolbar-group')?.querySelector('.toolbar-label');
     if (sizeInput) {
-        sizeInput.addEventListener('input', (e) => {
-            const width = parseFloat(e.target.value);
-            if (isNaN(width)) return;
+        sizeInput.addEventListener('change', (e) => {
+            let width = parseInt(e.target.value, 10);
+            if (isNaN(width) || width < 1) width = 1;
+            if (width > 30) width = 30;
+            e.target.value = width;
             state.strokeWidth = width;
-            if (sizeLabel) sizeLabel.textContent = `Size: ${width}`;
+            updateSizeActive(container, width);
             state.dotNetRef.invokeMethodAsync('OnStrokeWidthChanged', width)
                 .catch(err => console.error('[SVGCanvas] OnStrokeWidthChanged failed.', err));
         });
-    } else {
-        console.warn('[SVGCanvas] initialize: .toolbar-size not found — brush size slider will not work.');
     }
 
     // Delegated click handler for swatches, undo, and export.
@@ -254,6 +265,36 @@ export function initialize(svgId, dotNetRef, initialColor, initialStrokeWidth, i
                 updateSwatchActive(container, color);
                 state.dotNetRef.invokeMethodAsync('OnColorChanged', color)
                     .catch(err => console.error('[SVGCanvas] OnColorChanged failed.', err));
+                return;
+            }
+
+            // Size preset
+            const sizeBtn = e.target.closest('.toolbar-size-btn[data-size]');
+            if (sizeBtn) {
+                const width = parseInt(sizeBtn.dataset.size, 10);
+                state.strokeWidth = width;
+                if (sizeInput) sizeInput.value = width;
+                updateSizeActive(container, width);
+                state.dotNetRef.invokeMethodAsync('OnStrokeWidthChanged', width)
+                    .catch(err => console.error('[SVGCanvas] OnStrokeWidthChanged failed.', err));
+                return;
+            }
+
+            // Fill background with current color (undoable)
+            if (e.target.closest('.toolbar-btn-fill')) {
+                const previousBg = svg.style.backgroundColor || state.backgroundColor;
+                svg.style.backgroundColor = state.color;
+                // Push a sentinel object onto the undo stack so this can be undone.
+                state.paths.push({
+                    _isFill: true,
+                    _previousBg: previousBg,
+                    remove() {
+                        svg.style.backgroundColor = this._previousBg;
+                    }
+                });
+                setUndoDisabled(container, false);
+                state.dotNetRef.invokeMethodAsync('OnStrokeCompleted', state.paths.length)
+                    .catch(err => console.error('[SVGCanvas] OnStrokeCompleted failed.', err));
                 return;
             }
 
@@ -277,64 +318,63 @@ export function initialize(svgId, dotNetRef, initialColor, initialStrokeWidth, i
                 return;
             }
 
-            // Copy — serializes the drawing server-side and displays the share code.
+            // Copy — serializes the drawing server-side, copies code to clipboard.
             if (e.target.closest('.toolbar-btn-copy')) {
                 state.dotNetRef.invokeMethodAsync('OnCopyRequestedAsync')
                     .then(code => {
                         if (!code) return;
-                        const display = container.querySelector('.toolbar-share-display');
-                        const codeSpan = container.querySelector('.toolbar-share-code');
-                        if (display && codeSpan) {
-                            codeSpan.textContent = code;
-                            display.style.display = '';
-                        }
+                        navigator.clipboard.writeText(code).then(() => {
+                            const toast = container.querySelector('.toolbar-copy-toast');
+                            if (toast) {
+                                toast.textContent = 'Copied!';
+                                toast.style.display = '';
+                                // Restart animation by removing and re-adding the element.
+                                const parent = toast.parentNode;
+                                const next = toast.nextSibling;
+                                parent.removeChild(toast);
+                                parent.insertBefore(toast, next);
+                                setTimeout(() => { toast.style.display = 'none'; }, 1500);
+                            }
+                        }).catch(() => {
+                            // Fallback: show code in toast if clipboard not available.
+                            const toast = container.querySelector('.toolbar-copy-toast');
+                            if (toast) {
+                                toast.textContent = code;
+                                toast.style.display = '';
+                                setTimeout(() => { toast.style.display = 'none'; }, 3000);
+                            }
+                        });
                     })
                     .catch(err => console.error('[SVGCanvas] Copy failed.', err));
                 return;
             }
 
-            // Dismiss the share code display.
-            if (e.target.closest('.toolbar-btn-share-dismiss')) {
-                const display = container.querySelector('.toolbar-share-display');
-                if (display) display.style.display = 'none';
-                return;
-            }
-
-            // Paste — toggles the share code input group.
+            // Paste — reads code from clipboard and auto-submits.
             if (e.target.closest('.toolbar-btn-paste')) {
-                const group = container.querySelector('.toolbar-paste-group');
-                if (group) group.style.display = group.style.display === 'none' ? '' : 'none';
-                return;
-            }
-
-            // Apply paste — retrieves drawing for the entered code and loads it.
-            if (e.target.closest('.toolbar-btn-paste-apply')) {
-                const input = container.querySelector('.toolbar-paste-input');
-                const code = input?.value?.trim().toUpperCase();
-                if (!code) return;
-                state.dotNetRef.invokeMethodAsync('OnPasteRequestedAsync', code)
-                    .then(success => {
-                        if (success) {
-                            const group = container.querySelector('.toolbar-paste-group');
-                            if (group) group.style.display = 'none';
-                            if (input) input.value = '';
-                        } else {
-                            if (input) {
-                                input.classList.add('toolbar-paste-input-error');
-                                setTimeout(() => input.classList.remove('toolbar-paste-input-error'), 2000);
+                navigator.clipboard.readText().then(text => {
+                    const code = (text || '').trim().toUpperCase();
+                    if (!code) return;
+                    state.dotNetRef.invokeMethodAsync('OnPasteRequestedAsync', code)
+                        .then(success => {
+                            if (!success) {
+                                const toast = container.querySelector('.toolbar-copy-toast');
+                                if (toast) {
+                                    toast.textContent = 'Invalid code';
+                                    toast.style.display = '';
+                                    setTimeout(() => { toast.style.display = 'none'; }, 2000);
+                                }
                             }
-                        }
-                    })
-                    .catch(err => console.error('[SVGCanvas] Paste failed.', err));
+                        })
+                        .catch(err => console.error('[SVGCanvas] Paste failed.', err));
+                }).catch(() => {
+                    const toast = container.querySelector('.toolbar-copy-toast');
+                    if (toast) {
+                        toast.textContent = 'Clipboard unavailable';
+                        toast.style.display = '';
+                        setTimeout(() => { toast.style.display = 'none'; }, 2000);
+                    }
+                });
                 return;
-            }
-
-            // Cancel paste input.
-            if (e.target.closest('.toolbar-btn-paste-cancel')) {
-                const group = container.querySelector('.toolbar-paste-group');
-                if (group) group.style.display = 'none';
-                const input = container.querySelector('.toolbar-paste-input');
-                if (input) input.value = '';
             }
         });
     }
@@ -463,6 +503,7 @@ function serializePaths(paths) {
     if (paths.length === 0) return '';
     const tmp = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     for (const el of paths) {
+        if (el._isFill) continue; // Skip fill sentinels.
         const clean = sanitizeStrokeElement(el);
         if (clean) tmp.appendChild(clean);
     }
