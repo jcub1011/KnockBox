@@ -264,9 +264,15 @@ namespace KnockBox.Core.Components.Shared
         /// </summary>
         private async Task<string?> ReadSvgInChunksAsync()
         {
+            if (_jsModule is null)
+            {
+                Logger.LogWarning("ReadSvgInChunksAsync: JS module not initialized.");
+                return null;
+            }
+
             // First call: JS serializes the SVG into a per-instance cache and returns
             // the total character count. This response is always tiny (just an int).
-            var totalLength = await _jsModule!.InvokeAsync<int>("prepareSvgContentForChunkedRead", _svgId);
+            var totalLength = await _jsModule.InvokeAsync<int>("prepareSvgContentForChunkedRead", _svgId);
             if (totalLength == 0) return null;
 
             // Fetch the cached SVG string in bounded chunks so that no single SignalR
