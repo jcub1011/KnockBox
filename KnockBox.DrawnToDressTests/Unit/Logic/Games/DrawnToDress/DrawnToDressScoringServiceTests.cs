@@ -588,5 +588,69 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress
             Assert.AreEqual(11.0, aTotal, "Spec example 2: A should have 11 points.");
             Assert.AreEqual(6.0, bTotal, "Spec example 2: B should have 6 points.");
         }
+
+        // ── ApplyCoinFlipTiebreaks ──────────────────────────────────────────
+
+        [TestMethod]
+        public void ApplyCoinFlipTiebreaks_ReRanksTiedEntries()
+        {
+            var entries = new List<LeaderboardEntry>
+            {
+                new() { PlayerId = "pA", DisplayName = "A", TotalScore = 10, MatchupWins = 2, Rank = 1 },
+                new() { PlayerId = "pB", DisplayName = "B", TotalScore = 10, MatchupWins = 2, Rank = 1 },
+            };
+
+            var flips = new List<PendingCoinFlipEntry>
+            {
+                new()
+                {
+                    Context = CoinFlipContext.FinalStandingsTie,
+                    PlayerAId = "pA",
+                    PlayerBId = "pB",
+                    WinnerPlayerId = "pB",
+                    IsResolved = true,
+                }
+            };
+
+            DrawnToDressScoringService.ApplyCoinFlipTiebreaks(entries, flips);
+
+            var pB = entries.First(e => e.PlayerId == "pB");
+            var pA = entries.First(e => e.PlayerId == "pA");
+            Assert.IsTrue(pB.Rank < pA.Rank, "Coin flip winner pB should rank higher.");
+            Assert.AreEqual("coin_flip", pB.TiebreakMethod);
+            Assert.AreEqual("coin_flip", pA.TiebreakMethod);
+        }
+
+        [TestMethod]
+        public void SetMatchupWinsTiebreakMethod_SetsMethodForMatchupWinsBreaks()
+        {
+            var entries = new List<LeaderboardEntry>
+            {
+                new() { PlayerId = "pA", DisplayName = "A", TotalScore = 10, MatchupWins = 3, Rank = 1 },
+                new() { PlayerId = "pB", DisplayName = "B", TotalScore = 10, MatchupWins = 2, Rank = 2 },
+                new() { PlayerId = "pC", DisplayName = "C", TotalScore = 5, MatchupWins = 1, Rank = 3 },
+            };
+
+            DrawnToDressScoringService.SetMatchupWinsTiebreakMethod(entries);
+
+            Assert.AreEqual("matchup_wins", entries[0].TiebreakMethod);
+            Assert.AreEqual("matchup_wins", entries[1].TiebreakMethod);
+            Assert.IsNull(entries[2].TiebreakMethod);
+        }
+
+        [TestMethod]
+        public void SetMatchupWinsTiebreakMethod_NoTies_LeavesNull()
+        {
+            var entries = new List<LeaderboardEntry>
+            {
+                new() { PlayerId = "pA", DisplayName = "A", TotalScore = 10, MatchupWins = 3, Rank = 1 },
+                new() { PlayerId = "pB", DisplayName = "B", TotalScore = 5, MatchupWins = 2, Rank = 2 },
+            };
+
+            DrawnToDressScoringService.SetMatchupWinsTiebreakMethod(entries);
+
+            Assert.IsNull(entries[0].TiebreakMethod);
+            Assert.IsNull(entries[1].TiebreakMethod);
+        }
     }
 }

@@ -438,6 +438,52 @@ export function getSvgContent(svgId) {
 }
 
 /**
+ * Serializes the current drawing into a per-instance read cache and returns the total
+ * character count of the resulting SVG markup.
+ *
+ * Complex drawings can produce SVG strings that exceed the default Blazor/SignalR
+ * message size limit (32 KB). Calling this function followed by one or more
+ * {@link getSvgContentChunk} calls allows the server to retrieve arbitrarily large
+ * SVG content without any single SignalR message exceeding the size limit.
+ *
+ * The cached string is overwritten on each call, so callers must finish reading all
+ * chunks before invoking this function again for the same canvas.
+ *
+ * @param {string} svgId
+ * @returns {number} Total character count of the serialized SVG, or 0 if empty.
+ */
+export function prepareSvgContentForChunkedRead(svgId) {
+    const state = instances.get(svgId);
+    if (!state || state.paths.length === 0) {
+        if (state) state._readCache = '';
+        return 0;
+    }
+
+    const tmp = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    for (const el of state.paths) {
+        const clean = sanitizeStrokeElement(el);
+        if (clean) tmp.appendChild(clean);
+    }
+    state._readCache = tmp.innerHTML;
+    return state._readCache.length;
+}
+
+/**
+ * Returns a substring of the SVG content that was cached by the most recent call to
+ * {@link prepareSvgContentForChunkedRead} for the same canvas.
+ *
+ * @param {string} svgId
+ * @param {number} start - Zero-based character index to start reading from.
+ * @param {number} length - Maximum number of characters to return.
+ * @returns {string} The requested substring, or an empty string if no cache is available.
+ */
+export function getSvgContentChunk(svgId, start, length) {
+    const state = instances.get(svgId);
+    if (!state || typeof state._readCache !== 'string') return '';
+    return state._readCache.substring(start, start + length);
+}
+
+/**
  * Clears the current drawing and loads SVG markup produced by {@link getSvgContent}.
  * Parsed elements are re-sanitized through the allowlist before DOM insertion so that
  * any content tampered with after storage cannot execute in the recipient's browser.
@@ -481,6 +527,18 @@ export function loadSvgContent(svgId, svgContent) {
 
     setUndoDisabled(container, state.paths.length === 0);
     return state.paths.length;
+}
+
+/**
+ * Returns whether a canvas instance is currently registered for the given ID.
+ * Used by the .NET host to detect whether the JS-side state was lost (e.g. after
+ * a Blazor circuit reconnect) so it can re-initialize before attempting to read
+ * or modify the canvas.
+ * @param {string} svgId
+ * @returns {boolean}
+ */
+export function isInitialized(svgId) {
+    return instances.has(svgId);
 }
 
 /**

@@ -310,11 +310,14 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
         public async Task TimerExpiry_MissingVotes_DoesNotPreventAdvance()
         {
             // No votes cast at all, but timer expires → must still advance.
+            // With 0-0 ties on all criteria, the state transitions to CoinFlipState
+            // for interactive tie resolution.
             var (_, context, _, _) = await SetupVotingStateAsync();
 
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
 
-            Assert.IsInstanceOfType<VotingRoundResultsState>(context.Fsm.CurrentState,
+            Assert.IsTrue(
+                context.Fsm.CurrentState is VotingRoundResultsState or CoinFlipState,
                 "Timer expiry must advance the round even when some votes are missing.");
         }
 

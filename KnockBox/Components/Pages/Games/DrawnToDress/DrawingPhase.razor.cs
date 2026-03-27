@@ -109,7 +109,18 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
 
             try
             {
-                var svgContent = await _canvas.GetSvgContentAsync();
+                string? svgContent;
+                try
+                {
+                    svgContent = await _canvas.GetSvgContentAsync();
+                }
+                // TaskCanceledException (the specific exception from the bug report) inherits
+                // from OperationCanceledException, so this catch covers both.
+                catch (OperationCanceledException)
+                {
+                    _errorMessage = "Canvas connection timed out — please try again in a moment.";
+                    return;
+                }
 
                 if (string.IsNullOrWhiteSpace(svgContent))
                 {
@@ -174,25 +185,34 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
             try
             {
                 // Auto-submit any in-progress drawing before marking done.
+                // Isolated in its own try/catch so that a canvas retrieval failure
+                // (e.g. a transient circuit interruption) does not block the ready signal.
                 if (_canvas is not null)
                 {
-                    var svgContent = await _canvas.GetSvgContentAsync();
-                    if (!string.IsNullOrWhiteSpace(svgContent))
+                    try
                     {
-                        int myMax = CurrentTypeMaxItems;
-                        string? myId = UserService.CurrentUser.Id;
-                        var myPlayer = GameState.GamePlayers.TryGetValue(myId, out var p) ? p : null;
-                        int mySubmitted = myPlayer is not null ? CountSubmittedForCurrentType(myPlayer) : 0;
-
-                        // Only auto-submit if still under the limit.
-                        if (myMax == 0 || mySubmitted < myMax)
+                        var svgContent = await _canvas.GetSvgContentAsync();
+                        if (!string.IsNullOrWhiteSpace(svgContent))
                         {
-                            var submitCmd = new SubmitDrawingCommand(
-                                myId, CurrentTypeId, svgContent);
-                            var submitResult = GameEngine.ProcessCommand(GameState.Context, submitCmd);
-                            if (submitResult.TryGetFailure(out var submitErr))
-                                Logger.LogWarning("Auto-submit on done failed: {msg}", submitErr.PublicMessage);
+                            int myMax = CurrentTypeMaxItems;
+                            string? myId = UserService.CurrentUser.Id;
+                            var myPlayer = GameState.GamePlayers.TryGetValue(myId, out var p) ? p : null;
+                            int mySubmitted = myPlayer is not null ? CountSubmittedForCurrentType(myPlayer) : 0;
+
+                            // Only auto-submit if still under the limit.
+                            if (myMax == 0 || mySubmitted < myMax)
+                            {
+                                var submitCmd = new SubmitDrawingCommand(
+                                    myId, CurrentTypeId, svgContent);
+                                var submitResult = GameEngine.ProcessCommand(GameState.Context, submitCmd);
+                                if (submitResult.TryGetFailure(out var submitErr))
+                                    Logger.LogWarning("Auto-submit on done failed: {msg}", submitErr.PublicMessage);
+                            }
                         }
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.LogWarning(ex, "Auto-submit before marking done failed — skipping.");
                     }
                 }
 

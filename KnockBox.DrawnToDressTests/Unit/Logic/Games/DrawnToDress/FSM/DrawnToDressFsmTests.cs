@@ -817,7 +817,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
             state.GamePlayers["p1"] = new() { PlayerId = "p1" };
             _engine.ProcessCommand(context, new MarkReadyCommand("p1"));
 
-            Assert.IsInstanceOfType<FinalResultsState>(context.Fsm.CurrentState);
+            Assert.IsInstanceOfType<FinalResultsDisplayState>(context.Fsm.CurrentState);
             Assert.AreEqual(GamePhase.Results, state.Phase);
         }
 
@@ -854,8 +854,9 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
             var context = state.Context!;
 
             state.VotingRounds.Add(new() { RoundNumber = 1 });
-            context.Fsm.TransitionTo(context, new CoinFlipState());
+            context.Fsm.TransitionTo(context, new CoinFlipState(new VotingRoundResultsState()));
 
+            // With an empty queue, CoinFlipState chains immediately to the return state.
             Assert.IsInstanceOfType<VotingRoundResultsState>(context.Fsm.CurrentState);
             Assert.AreEqual(GamePhase.VotingRoundResults, state.Phase);
             // PendingCoinFlipMatchupId is cleared on exit from CoinFlipState.

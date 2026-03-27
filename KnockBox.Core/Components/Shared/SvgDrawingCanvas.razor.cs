@@ -141,7 +141,7 @@ namespace KnockBox.Core.Components.Shared
             if (_jsModule is null) return null;
             try
             {
-                var content = await _jsModule.InvokeAsync<string>("getSvgContent", _svgId);
+                var content = await ReadSvgInChunksAsync();
                 if (string.IsNullOrEmpty(content)) return null;
                 return ClipboardService.Store(content);
             }
@@ -216,6 +216,10 @@ namespace KnockBox.Core.Components.Shared
         /// Returns the current SVG drawing content as a serialised string, or
         /// <see langword="null"/> when the canvas is empty or has not yet been initialised.
         /// </summary>
+        /// <exception cref="JSException">Thrown when the JS interop call fails.</exception>
+        /// <exception cref="OperationCanceledException">Thrown when the Blazor circuit is
+        /// temporarily unavailable. The caller should surface a retry prompt rather than
+        /// treating the canvas as empty.</exception>
         public async Task<string?> GetSvgContentAsync()
         {
             if (_jsModule is null)
@@ -225,15 +229,64 @@ namespace KnockBox.Core.Components.Shared
             }
             try
             {
-                var content = await _jsModule.InvokeAsync<string>("getSvgContent", _svgId);
-                return string.IsNullOrEmpty(content) ? null : content;
+                // If the JS-side canvas state was lost (e.g. after a Blazor circuit
+                // reconnect that reset the JavaScript runtime), re-initialize the canvas
+                // so it is usable again. Any drawing the user made is no longer
+                // recoverable from JS, so return null to indicate an empty canvas.
+                if (!await _jsModule.InvokeAsync<bool>("isInitialized", _svgId))
+                {
+                    Logger.LogWarning(
+                        "[SVGCanvas] GetSvgContentAsync: JS state lost after circuit reconnect, canvas content unrecoverable — re-initializing — svgId={SvgId}", _svgId);
+                    await _jsModule.InvokeVoidAsync(
+                        "initialize", _svgId, _dotNetRef, _currentColor, _currentStrokeWidth, BackgroundColor);
+                    _strokeCount = 0;
+                    return null;
+                }
+
+                return await ReadSvgInChunksAsync();
             }
             catch (Exception ex)
             {
                 Logger.LogError(ex, "[SVGCanvas] GetSvgContentAsync failed — svgId={SvgId}", _svgId);
-                return null;
+                throw;
             }
         }
+
+        /// <summary>
+        /// Retrieves the current SVG content from JS by calling
+        /// <c>prepareSvgContentForChunkedRead</c> once to get the total length, then
+        /// fetching the markup in <see cref="SvgChunkSize"/>-character segments via
+        /// <c>getSvgContentChunk</c>.
+        /// <para>
+        /// This avoids sending the entire SVG as a single SignalR message, which would
+        /// fail for complex drawings that exceed the default 32 KB receive limit.
+        /// </para>
+        /// </summary>
+        private async Task<string?> ReadSvgInChunksAsync()
+        {
+            // First call: JS serializes the SVG into a per-instance cache and returns
+            // the total character count. This response is always tiny (just an int).
+            var totalLength = await _jsModule!.InvokeAsync<int>("prepareSvgContentForChunkedRead", _svgId);
+            if (totalLength == 0) return null;
+
+            // Fetch the cached SVG string in bounded chunks so that no single SignalR
+            // message approaches the server's MaximumReceiveMessageSize limit.
+            var sb = new System.Text.StringBuilder(totalLength);
+            for (int offset = 0; offset < totalLength; offset += SvgChunkSize)
+            {
+                var chunkLength = Math.Min(SvgChunkSize, totalLength - offset);
+                sb.Append(await _jsModule.InvokeAsync<string>("getSvgContentChunk", _svgId, offset, chunkLength));
+            }
+
+            var result = sb.ToString();
+            return result.Length > 0 ? result : null;
+        }
+
+        // Maximum characters transferred per JS interop chunk. Each character in a
+        // JavaScript string is a UTF-16 code unit (2 bytes), so 12 000 chars ≈ 24 KB
+        // of raw data — comfortably below the default 32 KB SignalR message limit even
+        // after JSON framing overhead is added.
+        private const int SvgChunkSize = 12_000;
 
         /// <summary>Downloads the current drawing as an SVG file.</summary>
         public async Task ExportSvgAsync()        {

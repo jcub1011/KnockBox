@@ -1,0 +1,209 @@
+.dtd-coinflip {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.5rem;
+    padding: 2rem 1rem;
+    max-width: 600px;
+    margin: 0 auto;
+    text-align: center;
+}
+
+.dtd-coinflip-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    width: 100%;
+}
+
+.dtd-coinflip-phase-badge {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
+.dtd-coinflip-count {
+    font-size: 0.875rem;
+    font-weight: 400;
+    color: #64748b;
+}
+
+.dtd-coinflip-timer {
+    padding: 0.25rem 0.75rem;
+    border-radius: 1rem;
+    background: #f1f5f9;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    font-size: 1.25rem;
+}
+
+.dtd-coinflip-timer-urgent {
+    background: #fef2f2;
+    color: #ef4444;
+    animation: coinflip-pulse 1s ease-in-out infinite;
+}
+
+@keyframes coinflip-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+}
+
+.dtd-coinflip-context {
+    font-size: 1.125rem;
+    color: #475569;
+}
+
+.dtd-coinflip-context strong {
+    color: #1e293b;
+}
+
+.dtd-coinflip-players {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
+.dtd-coinflip-player {
+    padding: 0.75rem 1.5rem;
+    background: #f8fafc;
+    border: 2px solid #e2e8f0;
+    border-radius: 0.75rem;
+}
+
+.dtd-coinflip-vs {
+    color: #94a3b8;
+    font-weight: 700;
+    font-size: 1rem;
+}
+
+.dtd-coinflip-call {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+}
+
+.dtd-coinflip-your-call {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #6366f1;
+}
+
+.dtd-coinflip-buttons {
+    display: flex;
+    gap: 1.5rem;
+}
+
+.dtd-btn-coinflip {
+    padding: 1.25rem 2.5rem;
+    font-size: 1.5rem;
+    font-weight: 700;
+    border: 3px solid #e2e8f0;
+    border-radius: 1rem;
+    background: white;
+    cursor: pointer;
+    transition: all 0.2s;
+    min-width: 140px;
+}
+
+.dtd-btn-coinflip:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.dtd-btn-coinflip:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.dtd-btn-heads {
+    border-color: #f59e0b;
+    color: #b45309;
+}
+
+.dtd-btn-heads:hover:not(:disabled) {
+    background: #fffbeb;
+    border-color: #d97706;
+}
+
+.dtd-btn-tails {
+    border-color: #6366f1;
+    color: #4338ca;
+}
+
+.dtd-btn-tails:hover:not(:disabled) {
+    background: #eef2ff;
+    border-color: #4f46e5;
+}
+
+.dtd-coinflip-waiting {
+    font-size: 1.25rem;
+    color: #64748b;
+    padding: 2rem;
+}
+
+.dtd-coinflip-result {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.dtd-coinflip-coin {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    font-weight: 700;
+    color: white;
+}
+
+.dtd-coinflip-heads {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+}
+
+.dtd-coinflip-tails {
+    background: linear-gradient(135deg, #6366f1, #4f46e5);
+}
+
+.dtd-coinflip-result-text {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #1e293b;
+}
+
+.dtd-coinflip-winner {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: #059669;
+}
+
+.dtd-coinflip-error {
+    color: #ef4444;
+    font-size: 0.875rem;
+}
+
+@media (max-width: 640px) {
+    .dtd-coinflip-players {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .dtd-coinflip-buttons {
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .dtd-btn-coinflip {
+        padding: 1rem 2rem;
+        font-size: 1.25rem;
+    }
+}
