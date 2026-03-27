@@ -92,6 +92,7 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
 
             // Auto-resolve: random choice on timeout.
             bool autoChoice = Random.Shared.Next(2) == 0;
+            flip.IsAutoResolved = true;
             context.Logger.LogInformation(
                 "Coin flip timer expired. Auto-selecting {choice} for caller [{caller}].",
                 autoChoice ? "Heads" : "Tails", flip.CallerPlayerId);

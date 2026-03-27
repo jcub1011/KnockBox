@@ -189,6 +189,35 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
             // Should auto-resolve and chain to return state.
             Assert.IsInstanceOfType<VotingRoundResultsState>(context.Fsm.CurrentState);
             Assert.IsTrue(state.PendingCoinFlipQueue[0].IsResolved);
+            Assert.IsTrue(state.PendingCoinFlipQueue[0].IsAutoResolved,
+                "Auto-resolved flip should have IsAutoResolved set to true.");
+        }
+
+        // ── Manual call does not set IsAutoResolved ──────────────────────────
+
+        [TestMethod]
+        public async Task ManualCall_DoesNotSetIsAutoResolved()
+        {
+            var (state, context) = await CreateGameAsync();
+            state.PendingCoinFlipQueue =
+            [
+                new PendingCoinFlipEntry
+                {
+                    Context = CoinFlipContext.CriterionTie,
+                    MatchupId = Guid.NewGuid(),
+                    CriterionId = "creativity",
+                    EntrantAId = "pA:1",
+                    EntrantBId = "pB:1",
+                }
+            ];
+
+            context.Fsm.TransitionTo(context, new CoinFlipState(new VotingRoundResultsState()));
+            var caller = state.PendingCoinFlipQueue[0].CallerPlayerId;
+            _engine.ProcessCommand(context, new CoinFlipCallCommand(caller, true));
+
+            Assert.IsTrue(state.PendingCoinFlipQueue[0].IsResolved);
+            Assert.IsFalse(state.PendingCoinFlipQueue[0].IsAutoResolved,
+                "Manually called flip should not have IsAutoResolved set.");
         }
 
         // ── Sequential flips advance correctly ──────────────────────────────

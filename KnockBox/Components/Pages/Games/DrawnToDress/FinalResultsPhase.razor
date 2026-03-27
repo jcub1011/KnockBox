@@ -19,6 +19,7 @@
             <div class="dtd-final-results-trophy">1st</div>
             <h2 class="dtd-final-results-winner-name">@winner.DisplayName</h2>
             <p class="dtd-final-results-winner-score">@winner.TotalScore.ToString("0.#") points</p>
+            <p class="dtd-final-results-winner-message">Congratulations!</p>
         </div>
     }
 
@@ -41,9 +42,14 @@
                 @foreach (var entry in leaderboard)
                 {
                     bool isWinner = entry.Rank == 1;
-                    <tr class="@(isWinner ? "dtd-final-results-row-winner" : "")">
+                    bool expanded = IsExpanded(entry.PlayerId);
+                    <tr class="@(isWinner ? "dtd-final-results-row-winner" : "") dtd-final-results-row-clickable"
+                        @onclick="() => ToggleBreakdown(entry.PlayerId)">
                         <td class="dtd-final-results-rank">@entry.Rank</td>
-                        <td class="dtd-final-results-name">@entry.DisplayName</td>
+                        <td class="dtd-final-results-name">
+                            <span class="dtd-final-results-expand-icon">@(expanded ? "▾" : "▸")</span>
+                            @entry.DisplayName
+                        </td>
                         <td class="dtd-final-results-pts">@entry.TotalScore.ToString("0.#")</td>
                         <td class="dtd-final-results-wl">@entry.Wins–@entry.Losses</td>
                         <td class="dtd-final-results-mw">@entry.MatchupWins.ToString("0.#")</td>
@@ -59,6 +65,50 @@
                             }
                         </td>
                     </tr>
+                    @if (expanded)
+                    {
+                        var breakdown = GetBreakdown(entry.PlayerId);
+                        <tr class="dtd-final-results-detail-row">
+                            <td colspan="7">
+                                <div class="dtd-final-results-detail">
+                                    @if (breakdown.OutfitScores.Count > 0)
+                                    {
+                                        <table class="dtd-final-results-detail-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Outfit</th>
+                                                    <th>Points</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @foreach (var outfit in breakdown.OutfitScores)
+                                                {
+                                                    <tr>
+                                                        <td>Round @outfit.RoundNumber</td>
+                                                        <td>@outfit.Score.ToString("0.#")</td>
+                                                    </tr>
+                                                }
+                                            </tbody>
+                                            <tfoot>
+                                                <tr>
+                                                    <td>Bonus Points</td>
+                                                    <td>@breakdown.BonusPoints</td>
+                                                </tr>
+                                                <tr class="dtd-final-results-detail-total">
+                                                    <td>Total</td>
+                                                    <td>@entry.TotalScore.ToString("0.#")</td>
+                                                </tr>
+                                            </tfoot>
+                                        </table>
+                                    }
+                                    else
+                                    {
+                                        <p class="dtd-final-results-detail-empty">No outfit scores recorded.</p>
+                                    }
+                                </div>
+                            </td>
+                        </tr>
+                    }
                 }
             </tbody>
         </table>

@@ -95,6 +95,9 @@ namespace KnockBox.Services.State.Games.DrawnToDress.Data
         /// <summary>The player/entrant ID of the winner of this flip.</summary>
         public string WinnerPlayerId { get; set; } = string.Empty;
 
+        /// <summary>Whether this flip was auto-resolved due to timer expiry (timeout).</summary>
+        public bool IsAutoResolved { get; set; }
+
         /// <summary>Whether this flip has been resolved.</summary>
         public bool IsResolved { get; set; }
     }

@@ -82,6 +82,10 @@
         {
             <!-- ── Result display ──────────────────────────────────────── -->
             <div class="dtd-coinflip-result">
+                @if (currentFlip.IsAutoResolved)
+                {
+                    <p class="dtd-coinflip-timeout">Time's up! @(currentFlip.CallerChoseHeads ? "Heads" : "Tails") was chosen for you.</p>
+                }
                 <div class="dtd-coinflip-coin @(currentFlip.ResultIsHeads ? "dtd-coinflip-heads" : "dtd-coinflip-tails")">
                     @(currentFlip.ResultIsHeads ? "H" : "T")
                 </div>

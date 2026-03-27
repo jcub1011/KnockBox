@@ -186,6 +186,15 @@
     color: #059669;
 }
 
+.dtd-coinflip-timeout {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: #dc2626;
+    padding: 0.5rem 1rem;
+    background: #fef2f2;
+    border-radius: 0.5rem;
+}
+
 .dtd-coinflip-error {
     color: #ef4444;
     font-size: 0.875rem;
