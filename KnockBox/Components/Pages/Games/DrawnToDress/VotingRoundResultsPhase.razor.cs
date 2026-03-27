@@ -9,18 +9,11 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
 {
     public partial class VotingRoundResultsPhase : ComponentBase
     {
-        [Inject] protected DrawnToDressGameEngine GameEngine { get; set; } = default!;
-
         [Inject] protected IUserService UserService { get; set; } = default!;
 
         [Inject] protected ILogger<VotingRoundResultsPhase> Logger { get; set; } = default!;
 
         [Parameter] public DrawnToDressGameState GameState { get; set; } = default!;
-
-        private bool _submitting;
-        private string? _errorMessage;
-
-        private string CurrentPlayerId => UserService.CurrentUser?.Id ?? string.Empty;
 
         protected string GetEntrantLabel(string entrantId)
         {
@@ -63,36 +56,6 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
         {
             return GameState.CriterionCoinFlipResults.Any(
                 f => f.MatchupId == matchupId && f.CriterionId == criterionId);
-        }
-
-        protected async Task MarkReadyAsync()
-        {
-            if (GameState.Context is null) return;
-
-            _errorMessage = null;
-            _submitting = true;
-            StateHasChanged();
-
-            try
-            {
-                var cmd = new MarkReadyCommand(CurrentPlayerId);
-                var result = GameEngine.ProcessCommand(GameState.Context, cmd);
-                if (result.TryGetFailure(out var err))
-                {
-                    _errorMessage = err.PublicMessage;
-                    Logger.LogWarning("MarkReady failed: {msg}", err.PublicMessage);
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError(ex, "Unexpected error marking ready.");
-                _errorMessage = "An unexpected error occurred.";
-            }
-            finally
-            {
-                _submitting = false;
-                StateHasChanged();
-            }
         }
     }
 }

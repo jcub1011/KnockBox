@@ -1,3 +1,4 @@
+@using KnockBox.Core.Services.State.Games.Shared
 @using KnockBox.Services.Logic.Games.DrawnToDress
 @using KnockBox.Services.Logic.Games.DrawnToDress.FSM
 @using KnockBox.Services.State.Games.DrawnToDress
@@ -5,10 +6,6 @@
 @using KnockBox.Services.State.Users
 
 @{
-    string? myId = UserService.CurrentUser?.Id;
-    var myPlayer = myId is not null && GameState.GamePlayers.TryGetValue(myId, out var pOut) ? pOut : null;
-    bool isDone = myPlayer?.IsReady ?? false;
-
     int roundIndex = GameState.CurrentVotingRoundIndex;
     VotingRound? currentRound = roundIndex < GameState.VotingRounds.Count
         ? GameState.VotingRounds[roundIndex]
@@ -20,6 +17,16 @@
     <!-- ── Header ──────────────────────────────────────────────────────── -->
     <div class="dtd-round-results-header">
         <h2>Round @(roundIndex + 1) Results</h2>
+        @if (GameState.PhaseDeadlineUtc.HasValue &&
+             GameState.Context?.Fsm?.CurrentState is ITimedGameState<DrawnToDressGameContext, DrawnToDressCommand> timedState)
+        {
+            var remaining = timedState.GetRemainingTime(GameState.Context!, DateTimeOffset.UtcNow);
+            if (remaining.IsSuccess)
+            {
+                var secs = (int)Math.Max(0, Math.Ceiling(remaining.Value.TotalSeconds));
+                <span class="dtd-round-results-timer">@secs s</span>
+            }
+        }
     </div>
 
     @if (currentRound is not null)
@@ -83,25 +90,5 @@
         }
     }
 
-    <!-- ── Ready button ────────────────────────────────────────────────── -->
-    <div class="dtd-round-results-actions">
-        @if (isDone)
-        {
-            <p class="dtd-round-results-waiting">Waiting for other players...</p>
-        }
-        else
-        {
-            <button class="dtd-btn dtd-btn-primary"
-                    @onclick="MarkReadyAsync"
-                    disabled="@_submitting">
-                Ready
-            </button>
-        }
-    </div>
-
-    @if (_errorMessage is not null)
-    {
-        <p class="dtd-round-results-error">@_errorMessage</p>
-    }
 
 </div>

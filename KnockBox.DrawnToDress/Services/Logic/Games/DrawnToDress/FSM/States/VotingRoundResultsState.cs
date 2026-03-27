@@ -6,27 +6,33 @@ using KnockBox.Services.State.Games.DrawnToDress;
 namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
 {
     /// <summary>
-    /// Displays the results of a single Swiss voting round. After all players
-    /// acknowledge (or a timer fires in a later issue), the engine advances to the
-    /// next round or ends the game.
+    /// Timed display state that shows the results of a single Swiss voting round.
+    /// Auto-advances after <see cref="Data.DrawnToDressConfig.VotingRoundResultsTimeSec"/>
+    /// seconds to the next round or final results. No player interaction is required.
     ///
     /// Transition ownership:
-    /// - All players mark ready → <see cref="VotingRoundSetupState"/> (next round) or
+    /// - Timer expiry → <see cref="VotingRoundSetupState"/> (next round) or
     ///   <see cref="FinalResultsState"/> (last round)
-    /// - <see cref="MarkReadyCommand"/> → recorded; may trigger advance
     /// - <see cref="PauseGameCommand"/> (host only) → <see cref="PausedState"/>
     /// - <see cref="AbandonGameCommand"/> (host only) → <see cref="AbandonedState"/>
     /// </summary>
-    public sealed class VotingRoundResultsState : IDrawnToDressGameState
+    public sealed class VotingRoundResultsState : ITimedDrawnToDressGameState
     {
+        private DateTimeOffset _deadline;
+
         public ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?> OnEnter(
             DrawnToDressGameContext context)
         {
             context.State.SetPhase(GamePhase.VotingRoundResults);
             context.ResetReadyFlags();
+
+            _deadline = DateTimeOffset.UtcNow.AddSeconds(context.Config.VotingRoundResultsTimeSec);
+            context.State.PhaseDeadlineUtc = _deadline;
+
             context.Logger.LogInformation(
-                "FSM → VotingRoundResultsState. Round {n} of {total} complete.",
-                context.State.CurrentVotingRoundIndex + 1, context.Config.VotingRounds);
+                "FSM → VotingRoundResultsState. Round {n} of {total} complete. Auto-advance in {sec}s.",
+                context.State.CurrentVotingRoundIndex + 1, context.Config.VotingRounds,
+                context.Config.VotingRoundResultsTimeSec);
 
             // Compute round scores and award round leader bonus.
             int roundIndex = context.State.CurrentVotingRoundIndex;
@@ -57,16 +63,17 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
             return null;
         }
 
-        public Result OnExit(DrawnToDressGameContext context) => Result.Success;
+        public Result OnExit(DrawnToDressGameContext context)
+        {
+            context.State.PhaseDeadlineUtc = null;
+            return Result.Success;
+        }
 
         public ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?> HandleCommand(
             DrawnToDressGameContext context, DrawnToDressCommand command)
         {
             switch (command)
             {
-                case MarkReadyCommand cmd:
-                    return HandleMarkReady(context, cmd);
-
                 case PauseGameCommand:
                     return new PausedState(this);
 
@@ -78,28 +85,25 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
             }
         }
 
+        public ValueResult<TimeSpan> GetRemainingTime(
+            DrawnToDressGameContext context, DateTimeOffset now)
+            => _deadline - now;
+
+        public ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?> Tick(
+            DrawnToDressGameContext context, DateTimeOffset now)
+        {
+            if (now < _deadline) return null;
+
+            context.Logger.LogInformation("Voting round results timer expired. Advancing.");
+            return ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?>
+                .FromValue(ChooseNextState(context));
+        }
+
         // ── Helpers ───────────────────────────────────────────────────────────
 
-        private static ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?> HandleMarkReady(
-            DrawnToDressGameContext context, MarkReadyCommand cmd)
+        private static IGameState<DrawnToDressGameContext, DrawnToDressCommand> ChooseNextState(
+            DrawnToDressGameContext context)
         {
-            var player = context.GetPlayer(cmd.PlayerId);
-            if (player is null)
-            {
-                context.Logger.LogWarning(
-                    "MarkReady (VotingRoundResults): unknown player [{id}].", cmd.PlayerId);
-                return null;
-            }
-
-            player.IsReady = true;
-            context.Logger.LogInformation(
-                "Player [{id}] acknowledged round results.", cmd.PlayerId);
-
-            if (!context.AllPlayersReady()) return null;
-
-            // Check whether more voting rounds remain.
-            // ResolveRoundCount uses the configured value when positive, or auto-calculates
-            // from the entrant count when VotingRounds = 0 (auto mode).
             int entrantCount = context.GetTournamentEntrantIds().Count;
             int totalRounds = SwissTournamentService.ResolveRoundCount(entrantCount, context.Config.VotingRounds);
             bool moreRounds = context.State.VotingRounds.Count < totalRounds;

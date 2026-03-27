@@ -200,6 +200,15 @@ namespace KnockBox.Services.State.Games.DrawnToDress.Data
         /// </summary>
         public int TournamentWinnerBonusPoints { get; set; } = 10;
 
+        // ── Voting round results ────────────────────────────────────────────
+
+        /// <summary>
+        /// Number of seconds the voting round results screen is displayed before
+        /// automatically advancing to the next round (or final results).
+        /// GDD default: 5 s.
+        /// </summary>
+        public int VotingRoundResultsTimeSec { get; set; } = 5;
+
         // ── Coin flip ────────────────────────────────────────────────────────
 
         /// <summary>
@@ -282,6 +291,9 @@ namespace KnockBox.Services.State.Games.DrawnToDress.Data
             if (BonusPointsForCompleteOutfit < 0) BonusPointsForCompleteOutfit = 0;
             if (RoundLeaderBonusPoints < 0) RoundLeaderBonusPoints = 0;
             if (TournamentWinnerBonusPoints < 0) TournamentWinnerBonusPoints = 0;
+
+            // ── Voting round results ─────────────────────────────────────────────
+            if (VotingRoundResultsTimeSec < 3) VotingRoundResultsTimeSec = 3;
 
             // ── Coin flip ─────────────────────────────────────────────────────────
             if (CoinFlipTimeSec < 5) CoinFlipTimeSec = 5;

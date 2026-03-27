@@ -807,15 +807,14 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
 
-            // Pre-fill all configured voting rounds so the next MarkReady ends the game.
+            // Pre-fill all configured voting rounds so the timer expiry ends the game.
             for (int i = 0; i < state.Config.VotingRounds; i++)
                 state.VotingRounds.Add(new() { RoundNumber = i + 1 });
 
             context.Fsm.TransitionTo(context, new VotingRoundResultsState());
 
-            // Add a player and have them acknowledge the results.
-            state.GamePlayers["p1"] = new() { PlayerId = "p1" };
-            _engine.ProcessCommand(context, new MarkReadyCommand("p1"));
+            // Fast-forward past the auto-advance timer.
+            _engine.Tick(context, DateTimeOffset.UtcNow.AddMinutes(1));
 
             Assert.IsInstanceOfType<FinalResultsDisplayState>(context.Fsm.CurrentState);
             Assert.AreEqual(GamePhase.Results, state.Phase);
@@ -836,8 +835,8 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
 
             context.Fsm.TransitionTo(context, new VotingRoundResultsState());
 
-            state.GamePlayers["p1"] = new() { PlayerId = "p1" };
-            _engine.ProcessCommand(context, new MarkReadyCommand("p1"));
+            // Fast-forward past the auto-advance timer.
+            _engine.Tick(context, DateTimeOffset.UtcNow.AddMinutes(1));
 
             // VotingRoundSetupState chains immediately to VotingMatchupState.
             Assert.IsInstanceOfType<VotingMatchupState>(context.Fsm.CurrentState);
