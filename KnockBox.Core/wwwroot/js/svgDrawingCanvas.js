@@ -157,15 +157,16 @@ function updateSizeActive(container, size) {
  * @returns {string}
  */
 function buildPath(points) {
-    if (points.length === 1) return `M ${points[0].x} ${points[0].y}`;
-    const parts = [`M ${points[0].x} ${points[0].y}`];
+    const r = n => Math.round(n * 100) / 100;
+    if (points.length === 1) return `M ${r(points[0].x)} ${r(points[0].y)}`;
+    const parts = [`M ${r(points[0].x)} ${r(points[0].y)}`];
     for (let i = 1; i < points.length - 1; i++) {
-        const mx = Math.round((points[i].x + points[i + 1].x) * 50) / 100;
-        const my = Math.round((points[i].y + points[i + 1].y) * 50) / 100;
-        parts.push(`Q ${points[i].x} ${points[i].y} ${mx} ${my}`);
+        const mx = r((points[i].x + points[i + 1].x) / 2);
+        const my = r((points[i].y + points[i + 1].y) / 2);
+        parts.push(`Q ${r(points[i].x)} ${r(points[i].y)} ${mx} ${my}`);
     }
     const last = points[points.length - 1];
-    parts.push(`L ${last.x} ${last.y}`);
+    parts.push(`L ${r(last.x)} ${r(last.y)}`);
     return parts.join(' ');
 }
 
@@ -264,14 +265,15 @@ export function initialize(svgId, dotNetRef, initialColor, initialStrokeWidth, i
         const ctm = svg.getScreenCTM();
         if (!ctm) return { x: clientX, y: clientY };
         const transformed = svgPoint.matrixTransform(ctm.inverse());
-        return { x: Math.round(transformed.x * 100) / 100, y: Math.round(transformed.y * 100) / 100 };
+        return { x: transformed.x, y: transformed.y };
     }
 
     function startStroke(clientX, clientY) {
         state.isDrawing = true;
         const { x, y } = getSvgCoords(clientX, clientY);
         state.currentPoints = [{ x, y }];
-        state._pathPrefix = `M ${x} ${y}`;
+        const r = n => Math.round(n * 100) / 100;
+        state._pathPrefix = `M ${r(x)} ${r(y)}`;
         state._pathSuffix = '';
         const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
         path.setAttribute('stroke', state.color);
@@ -297,14 +299,15 @@ export function initialize(svgId, dotNetRef, initialColor, initialStrokeWidth, i
         pts.push({ x, y });
         const n = pts.length;
 
+        const r = n => Math.round(n * 100) / 100;
         if (n === 2) {
-            state._pathSuffix = ` L ${x} ${y}`;
+            state._pathSuffix = ` L ${r(x)} ${r(y)}`;
         } else {
             const prev = pts[n - 2];
-            const mx = Math.round((prev.x + x) * 50) / 100;
-            const my = Math.round((prev.y + y) * 50) / 100;
-            state._pathPrefix += ` Q ${prev.x} ${prev.y} ${mx} ${my}`;
-            state._pathSuffix = ` L ${x} ${y}`;
+            const mx = r((prev.x + x) / 2);
+            const my = r((prev.y + y) / 2);
+            state._pathPrefix += ` Q ${r(prev.x)} ${r(prev.y)} ${mx} ${my}`;
+            state._pathSuffix = ` L ${r(x)} ${r(y)}`;
         }
 
         // Batch DOM updates via requestAnimationFrame for smooth 60fps rendering.
@@ -334,9 +337,9 @@ export function initialize(svgId, dotNetRef, initialColor, initialStrokeWidth, i
             // Single tap/click — render as a small filled circle.
             const { x, y } = state.currentPoints[0];
             const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-            dot.setAttribute('cx', x);
-            dot.setAttribute('cy', y);
-            dot.setAttribute('r', state.strokeWidth / 2);
+            dot.setAttribute('cx', Math.round(x * 100) / 100);
+            dot.setAttribute('cy', Math.round(y * 100) / 100);
+            dot.setAttribute('r', Math.round(state.strokeWidth / 2 * 100) / 100);
             dot.setAttribute('fill', state.color);
             svg.replaceChild(dot, state.currentPath);
             state.paths.push(dot);
