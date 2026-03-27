@@ -531,29 +531,16 @@ export function initialize(svgId, dotNetRef, initialColor, initialStrokeWidth, i
         });
     }
 
-    // Mouse events
-    svg.addEventListener('mousedown', (e) => {
+    // Pointer events (unified mouse + touch with sub-pixel precision)
+    svg.style.touchAction = 'none'; // prevent browser gestures on touch
+    svg.addEventListener('pointerdown', (e) => {
         if (e.button !== 0) return;
         e.preventDefault();
         startStroke(e.clientX, e.clientY);
     });
-    svg.addEventListener('mousemove', (e) => continueStroke(e.clientX, e.clientY));
-    svg.addEventListener('mouseup', () => endStroke());
-    svg.addEventListener('mouseleave', () => endStroke());
-
-    // Touch events
-    svg.addEventListener('touchstart', (e) => {
-        e.preventDefault();
-        startStroke(e.touches[0].clientX, e.touches[0].clientY);
-    }, { passive: false });
-    svg.addEventListener('touchmove', (e) => {
-        e.preventDefault();
-        continueStroke(e.touches[0].clientX, e.touches[0].clientY);
-    }, { passive: false });
-    svg.addEventListener('touchend', (e) => {
-        e.preventDefault();
-        endStroke();
-    }, { passive: false });
+    svg.addEventListener('pointermove', (e) => continueStroke(e.clientX, e.clientY));
+    svg.addEventListener('pointerup', () => endStroke());
+    svg.addEventListener('pointerleave', () => endStroke());
 }
 
 /**
