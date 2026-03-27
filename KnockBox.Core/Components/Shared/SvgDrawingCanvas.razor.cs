@@ -141,7 +141,7 @@ namespace KnockBox.Core.Components.Shared
             if (_jsModule is null) return null;
             try
             {
-                var content = await _jsModule.InvokeAsync<string>("getSvgContent", _svgId);
+                var content = await ReadSvgInChunksAsync();
                 if (string.IsNullOrEmpty(content)) return null;
                 return ClipboardService.Store(content);
             }
@@ -243,8 +243,7 @@ namespace KnockBox.Core.Components.Shared
                     return null;
                 }
 
-                var content = await _jsModule.InvokeAsync<string>("getSvgContent", _svgId);
-                return string.IsNullOrEmpty(content) ? null : content;
+                return await ReadSvgInChunksAsync();
             }
             catch (Exception ex)
             {
@@ -252,6 +251,42 @@ namespace KnockBox.Core.Components.Shared
                 throw;
             }
         }
+
+        /// <summary>
+        /// Retrieves the current SVG content from JS by calling
+        /// <c>prepareSvgContentForChunkedRead</c> once to get the total length, then
+        /// fetching the markup in <see cref="SvgChunkSize"/>-character segments via
+        /// <c>getSvgContentChunk</c>.
+        /// <para>
+        /// This avoids sending the entire SVG as a single SignalR message, which would
+        /// fail for complex drawings that exceed the default 32 KB receive limit.
+        /// </para>
+        /// </summary>
+        private async Task<string?> ReadSvgInChunksAsync()
+        {
+            // First call: JS serializes the SVG into a per-instance cache and returns
+            // the total character count. This response is always tiny (just an int).
+            var totalLength = await _jsModule!.InvokeAsync<int>("prepareSvgContentForChunkedRead", _svgId);
+            if (totalLength == 0) return null;
+
+            // Fetch the cached SVG string in bounded chunks so that no single SignalR
+            // message approaches the server's MaximumReceiveMessageSize limit.
+            var sb = new System.Text.StringBuilder(totalLength);
+            for (int offset = 0; offset < totalLength; offset += SvgChunkSize)
+            {
+                var chunkLength = Math.Min(SvgChunkSize, totalLength - offset);
+                sb.Append(await _jsModule.InvokeAsync<string>("getSvgContentChunk", _svgId, offset, chunkLength));
+            }
+
+            var result = sb.ToString();
+            return result.Length > 0 ? result : null;
+        }
+
+        // Maximum characters transferred per JS interop chunk. Each character in a
+        // JavaScript string is a UTF-16 code unit (2 bytes), so 12 000 chars ≈ 24 KB
+        // of raw data — comfortably below the default 32 KB SignalR message limit even
+        // after JSON framing overhead is added.
+        private const int SvgChunkSize = 12_000;
 
         /// <summary>Downloads the current drawing as an SVG file.</summary>
         public async Task ExportSvgAsync()        {
