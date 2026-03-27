@@ -484,6 +484,18 @@ export function loadSvgContent(svgId, svgContent) {
 }
 
 /**
+ * Returns whether a canvas instance is currently registered for the given ID.
+ * Used by the .NET host to detect whether the JS-side state was lost (e.g. after
+ * a Blazor circuit reconnect) so it can re-initialize before attempting to read
+ * or modify the canvas.
+ * @param {string} svgId
+ * @returns {boolean}
+ */
+export function isInitialized(svgId) {
+    return instances.has(svgId);
+}
+
+/**
  * Cleans up instance state for the given canvas.
  * @param {string} svgId
  */

@@ -216,6 +216,10 @@ namespace KnockBox.Core.Components.Shared
         /// Returns the current SVG drawing content as a serialised string, or
         /// <see langword="null"/> when the canvas is empty or has not yet been initialised.
         /// </summary>
+        /// <exception cref="JSException">Thrown when the JS interop call fails.</exception>
+        /// <exception cref="OperationCanceledException">Thrown when the Blazor circuit is
+        /// temporarily unavailable. The caller should surface a retry prompt rather than
+        /// treating the canvas as empty.</exception>
         public async Task<string?> GetSvgContentAsync()
         {
             if (_jsModule is null)
@@ -225,13 +229,27 @@ namespace KnockBox.Core.Components.Shared
             }
             try
             {
+                // If the JS-side canvas state was lost (e.g. after a Blazor circuit
+                // reconnect that reset the JavaScript runtime), re-initialize the canvas
+                // so it is usable again. Any drawing the user made is no longer
+                // recoverable from JS, so return null to indicate an empty canvas.
+                if (!await _jsModule.InvokeAsync<bool>("isInitialized", _svgId))
+                {
+                    Logger.LogWarning(
+                        "[SVGCanvas] GetSvgContentAsync: JS state lost after circuit reconnect, canvas content unrecoverable — re-initializing — svgId={SvgId}", _svgId);
+                    await _jsModule.InvokeVoidAsync(
+                        "initialize", _svgId, _dotNetRef, _currentColor, _currentStrokeWidth, BackgroundColor);
+                    _strokeCount = 0;
+                    return null;
+                }
+
                 var content = await _jsModule.InvokeAsync<string>("getSvgContent", _svgId);
                 return string.IsNullOrEmpty(content) ? null : content;
             }
             catch (Exception ex)
             {
                 Logger.LogError(ex, "[SVGCanvas] GetSvgContentAsync failed — svgId={SvgId}", _svgId);
-                return null;
+                throw;
             }
         }
 
