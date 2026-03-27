@@ -3386,5 +3386,512 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
             Assert.IsTrue(participantPlayerIds.Contains("pA") || participantPlayerIds.Contains("pB"),
                 "Players with a submitted Outfit 2 must be included as entrants.");
         }
+
+        // ── OutfitDistinctnessResolutionState: HandleCommand ──────────────────
+
+        [TestMethod]
+        public async Task OutfitDistinctnessResolutionState_OnEnter_SetsPhase()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            context.Fsm.TransitionTo(context, new OutfitDistinctnessResolutionState());
+
+            Assert.IsInstanceOfType<OutfitDistinctnessResolutionState>(context.Fsm.CurrentState);
+            Assert.AreEqual(GamePhase.OutfitDistinctnessResolution, state.Phase);
+        }
+
+        [TestMethod]
+        public async Task OutfitDistinctnessResolutionState_ResolveDistinctnessCommand_MarksPlayerReady()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            state.Config.ClothingTypes = [new() { Id = "hat", DisplayName = "Hat" }];
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            // Give p1 a submitted outfit and a replacement item in the pool.
+            var replacementId = Guid.NewGuid();
+            state.ClothingPool[replacementId] = new()
+            {
+                Id = replacementId,
+                ClothingTypeId = "hat",
+                CreatorPlayerId = "p2",
+                SvgContent = "<svg/>",
+                IsInPool = true,
+            };
+            state.GamePlayers["p1"] = new()
+            {
+                PlayerId = "p1",
+                SubmittedOutfit = new() { PlayerId = "p1", SelectedItemsByType = new() { ["hat"] = Guid.NewGuid() } },
+            };
+            state.GamePlayers["p2"] = new()
+            {
+                PlayerId = "p2",
+                SubmittedOutfit = new() { PlayerId = "p2", SelectedItemsByType = new() { ["hat"] = Guid.NewGuid() } },
+            };
+
+            context.Fsm.TransitionTo(context, new OutfitDistinctnessResolutionState());
+
+            // p1 resolves their conflict by picking the replacement hat.
+            _engine.ProcessCommand(context, new ResolveDistinctnessCommand("p1", replacementId));
+
+            Assert.IsTrue(state.GamePlayers["p1"].IsReady,
+                "Player must be marked ready after successfully resolving a distinctness conflict.");
+            Assert.AreEqual(replacementId, state.GamePlayers["p1"].SubmittedOutfit!.SelectedItemsByType["hat"],
+                "The player's outfit must use the replacement item after resolving.");
+        }
+
+        [TestMethod]
+        public async Task OutfitDistinctnessResolutionState_SinglePlayer_Resolves_AdvancesToPool2Reveal()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            state.Config.ClothingTypes = [new() { Id = "hat", DisplayName = "Hat" }];
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            var replacementId = Guid.NewGuid();
+            state.ClothingPool[replacementId] = new()
+            {
+                Id = replacementId,
+                ClothingTypeId = "hat",
+                CreatorPlayerId = "p2",
+                SvgContent = "<svg/>",
+                IsInPool = true,
+            };
+            state.GamePlayers["p1"] = new()
+            {
+                PlayerId = "p1",
+                SubmittedOutfit = new() { PlayerId = "p1", SelectedItemsByType = new() { ["hat"] = Guid.NewGuid() } },
+            };
+
+            context.Fsm.TransitionTo(context, new OutfitDistinctnessResolutionState());
+
+            // p1 is the only player — resolving should advance to next phase.
+            _engine.ProcessCommand(context, new ResolveDistinctnessCommand("p1", replacementId));
+
+            Assert.IsInstanceOfType<PoolRevealState>(context.Fsm.CurrentState,
+                "Resolving all conflicts must advance to Pool 2 Reveal.");
+        }
+
+        [TestMethod]
+        public async Task OutfitDistinctnessResolutionState_UnknownPlayer_IsIgnored()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            context.Fsm.TransitionTo(context, new OutfitDistinctnessResolutionState());
+
+            // An unknown player sends the command — must remain in the same state.
+            _engine.ProcessCommand(context, new ResolveDistinctnessCommand("ghost", Guid.NewGuid()));
+
+            Assert.IsInstanceOfType<OutfitDistinctnessResolutionState>(context.Fsm.CurrentState,
+                "A command from an unknown player must not change state.");
+        }
+
+        [TestMethod]
+        public async Task OutfitDistinctnessResolutionState_InvalidReplacementItem_IsIgnored()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            state.GamePlayers["p1"] = new()
+            {
+                PlayerId = "p1",
+                SubmittedOutfit = new() { PlayerId = "p1", SelectedItemsByType = new() },
+            };
+
+            context.Fsm.TransitionTo(context, new OutfitDistinctnessResolutionState());
+
+            // A non-existent replacement item must be rejected.
+            _engine.ProcessCommand(context, new ResolveDistinctnessCommand("p1", Guid.NewGuid()));
+
+            Assert.IsFalse(state.GamePlayers["p1"].IsReady,
+                "Using a non-existent replacement item must not mark the player ready.");
+        }
+
+        [TestMethod]
+        public async Task OutfitDistinctnessResolutionState_PauseGameCommand_TransitionsToPaused()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            context.Fsm.TransitionTo(context, new OutfitDistinctnessResolutionState());
+            _engine.ProcessCommand(context, new PauseGameCommand(_host.Id));
+
+            Assert.IsInstanceOfType<PausedState>(context.Fsm.CurrentState,
+                "PauseGameCommand from host must transition to PausedState.");
+        }
+
+        // ── VotingRoundResultsState: round leader bonus ───────────────────────
+
+        [TestMethod]
+        public async Task VotingRoundResultsState_OnEnter_AwardsRoundLeaderBonus()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            // Config: single weight-1 criterion, +3 round leader bonus.
+            state.Config.VotingCriteria = [new() { Id = "c1", Weight = 1.0 }];
+            state.Config.RoundLeaderBonusPoints = 3;
+
+            // Set up players.
+            state.GamePlayers["pA"] = new() { PlayerId = "pA", SubmittedOutfit = new() { PlayerId = "pA" } };
+            state.GamePlayers["pB"] = new() { PlayerId = "pB", SubmittedOutfit = new() { PlayerId = "pB" } };
+
+            // Build a round with one matchup between pA:1 and pB:1.
+            var matchupId = Guid.NewGuid();
+            var round = new VotingRound
+            {
+                RoundNumber = 1,
+                Matchups = [new SwissMatchup(matchupId, "pA:1", "pB:1", 1)],
+            };
+            state.VotingRounds.Add(round);
+            state.CurrentVotingRoundIndex = 0;
+
+            // pA wins by 2-0 votes.
+            state.Votes[Guid.NewGuid()] = new() { MatchupId = matchupId, CriterionId = "c1", ChosenEntrantId = "pA:1" };
+            state.Votes[Guid.NewGuid()] = new() { MatchupId = matchupId, CriterionId = "c1", ChosenEntrantId = "pA:1" };
+
+            // Entering VotingRoundResultsState should award the round leader bonus to pA.
+            context.Fsm.TransitionTo(context, new VotingRoundResultsState());
+
+            Assert.AreEqual(3, state.GamePlayers["pA"].BonusPoints,
+                "The round leader must receive +3 bonus points on VotingRoundResultsState entry.");
+            Assert.AreEqual(0, state.GamePlayers["pB"].BonusPoints,
+                "The non-leader must not receive a round leader bonus.");
+        }
+
+        [TestMethod]
+        public async Task VotingRoundResultsState_OnEnter_AwardsBonusToBothWhenTied()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            state.Config.VotingCriteria = [new() { Id = "c1", Weight = 1.0 }];
+            state.Config.RoundLeaderBonusPoints = 3;
+
+            state.GamePlayers["pA"] = new() { PlayerId = "pA", SubmittedOutfit = new() { PlayerId = "pA" } };
+            state.GamePlayers["pB"] = new() { PlayerId = "pB", SubmittedOutfit = new() { PlayerId = "pB" } };
+
+            var matchupId = Guid.NewGuid();
+            state.VotingRounds.Add(new VotingRound
+            {
+                RoundNumber = 1,
+                Matchups = [new SwissMatchup(matchupId, "pA:1", "pB:1", 1)],
+            });
+            state.CurrentVotingRoundIndex = 0;
+
+            // One vote each — tied round.
+            state.Votes[Guid.NewGuid()] = new() { MatchupId = matchupId, CriterionId = "c1", ChosenEntrantId = "pA:1" };
+            state.Votes[Guid.NewGuid()] = new() { MatchupId = matchupId, CriterionId = "c1", ChosenEntrantId = "pB:1" };
+
+            context.Fsm.TransitionTo(context, new VotingRoundResultsState());
+
+            Assert.AreEqual(3, state.GamePlayers["pA"].BonusPoints,
+                "Both tied leaders must receive the round leader bonus.");
+            Assert.AreEqual(3, state.GamePlayers["pB"].BonusPoints,
+                "Both tied leaders must receive the round leader bonus.");
+        }
+
+        [TestMethod]
+        public async Task VotingRoundResultsState_OnEnter_ZeroBonusConfig_NoBonusAwarded()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            state.Config.VotingCriteria = [new() { Id = "c1", Weight = 1.0 }];
+            state.Config.RoundLeaderBonusPoints = 0;
+
+            state.GamePlayers["pA"] = new() { PlayerId = "pA", SubmittedOutfit = new() { PlayerId = "pA" } };
+            state.GamePlayers["pB"] = new() { PlayerId = "pB", SubmittedOutfit = new() { PlayerId = "pB" } };
+
+            var matchupId = Guid.NewGuid();
+            state.VotingRounds.Add(new VotingRound
+            {
+                RoundNumber = 1,
+                Matchups = [new SwissMatchup(matchupId, "pA:1", "pB:1", 1)],
+            });
+            state.CurrentVotingRoundIndex = 0;
+
+            state.Votes[Guid.NewGuid()] = new() { MatchupId = matchupId, CriterionId = "c1", ChosenEntrantId = "pA:1" };
+            state.Votes[Guid.NewGuid()] = new() { MatchupId = matchupId, CriterionId = "c1", ChosenEntrantId = "pA:1" };
+
+            context.Fsm.TransitionTo(context, new VotingRoundResultsState());
+
+            Assert.AreEqual(0, state.GamePlayers["pA"].BonusPoints,
+                "When RoundLeaderBonusPoints is 0 no bonus must be awarded.");
+        }
+
+        // ── FinalResultsState: tournament winner bonus and leaderboard ─────────
+
+        [TestMethod]
+        public async Task FinalResultsState_OnEnter_AwardsTournamentWinnerBonus()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            state.Config.VotingCriteria = [new() { Id = "c1", Weight = 1.0 }];
+            state.Config.TournamentWinnerBonusPoints = 10;
+            state.Config.VotingRounds = 1;
+
+            state.GamePlayers["pA"] = new() { PlayerId = "pA", SubmittedOutfit = new() { PlayerId = "pA" } };
+            state.GamePlayers["pB"] = new() { PlayerId = "pB", SubmittedOutfit = new() { PlayerId = "pB" } };
+
+            // pA wins the single round.
+            var matchupId = Guid.NewGuid();
+            state.VotingRounds.Add(new VotingRound
+            {
+                RoundNumber = 1,
+                Matchups = [new SwissMatchup(matchupId, "pA:1", "pB:1", 1)],
+            });
+            state.Votes[Guid.NewGuid()] = new() { MatchupId = matchupId, CriterionId = "c1", ChosenEntrantId = "pA:1" };
+            state.Votes[Guid.NewGuid()] = new() { MatchupId = matchupId, CriterionId = "c1", ChosenEntrantId = "pA:1" };
+
+            // FinalResultsState chains immediately to FinalResultsDisplayState.
+            context.Fsm.TransitionTo(context, new FinalResultsState());
+
+            Assert.AreEqual(10, state.GamePlayers["pA"].BonusPoints,
+                "The tournament winner must receive the +10 winner bonus.");
+            Assert.AreEqual(0, state.GamePlayers["pB"].BonusPoints,
+                "The non-winner must not receive the tournament winner bonus.");
+        }
+
+        [TestMethod]
+        public async Task FinalResultsState_OnEnter_BuildsLeaderboard()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            state.Config.VotingCriteria = [new() { Id = "c1", Weight = 1.0 }];
+            state.Config.TournamentWinnerBonusPoints = 0;
+            state.Config.VotingRounds = 1;
+
+            state.GamePlayers["pA"] = new() { PlayerId = "pA", SubmittedOutfit = new() { PlayerId = "pA" } };
+            state.GamePlayers["pB"] = new() { PlayerId = "pB", SubmittedOutfit = new() { PlayerId = "pB" } };
+
+            var matchupId = Guid.NewGuid();
+            state.VotingRounds.Add(new VotingRound
+            {
+                RoundNumber = 1,
+                Matchups = [new SwissMatchup(matchupId, "pA:1", "pB:1", 1)],
+            });
+            state.Votes[Guid.NewGuid()] = new() { MatchupId = matchupId, CriterionId = "c1", ChosenEntrantId = "pA:1" };
+
+            Assert.AreEqual(0, state.Leaderboard.Count, "Leaderboard must be empty before FinalResultsState.");
+
+            context.Fsm.TransitionTo(context, new FinalResultsState());
+
+            Assert.IsTrue(state.Leaderboard.Count > 0,
+                "FinalResultsState must populate the leaderboard on entry.");
+        }
+
+        [TestMethod]
+        public async Task FinalResultsState_OnEnter_ZeroBonusConfig_NoBonusAwarded()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            state.Config.VotingCriteria = [new() { Id = "c1", Weight = 1.0 }];
+            state.Config.TournamentWinnerBonusPoints = 0;
+            state.Config.VotingRounds = 1;
+
+            state.GamePlayers["pA"] = new() { PlayerId = "pA", SubmittedOutfit = new() { PlayerId = "pA" } };
+            state.GamePlayers["pB"] = new() { PlayerId = "pB", SubmittedOutfit = new() { PlayerId = "pB" } };
+
+            var matchupId = Guid.NewGuid();
+            state.VotingRounds.Add(new VotingRound
+            {
+                RoundNumber = 1,
+                Matchups = [new SwissMatchup(matchupId, "pA:1", "pB:1", 1)],
+            });
+            state.Votes[Guid.NewGuid()] = new() { MatchupId = matchupId, CriterionId = "c1", ChosenEntrantId = "pA:1" };
+            state.Votes[Guid.NewGuid()] = new() { MatchupId = matchupId, CriterionId = "c1", ChosenEntrantId = "pA:1" };
+
+            context.Fsm.TransitionTo(context, new FinalResultsState());
+
+            Assert.AreEqual(0, state.GamePlayers["pA"].BonusPoints,
+                "When TournamentWinnerBonusPoints is 0 no bonus must be awarded.");
+        }
+
+        [TestMethod]
+        public async Task FinalResultsState_OnEnter_TiedWinners_BothReceiveBonus()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            state.Config.VotingCriteria = [new() { Id = "c1", Weight = 1.0 }];
+            state.Config.TournamentWinnerBonusPoints = 10;
+            state.Config.VotingRounds = 1;
+
+            state.GamePlayers["pA"] = new() { PlayerId = "pA", SubmittedOutfit = new() { PlayerId = "pA" } };
+            state.GamePlayers["pB"] = new() { PlayerId = "pB", SubmittedOutfit = new() { PlayerId = "pB" } };
+
+            var matchupId = Guid.NewGuid();
+            state.VotingRounds.Add(new VotingRound
+            {
+                RoundNumber = 1,
+                Matchups = [new SwissMatchup(matchupId, "pA:1", "pB:1", 1)],
+            });
+
+            // Tie: one vote each.
+            state.Votes[Guid.NewGuid()] = new() { MatchupId = matchupId, CriterionId = "c1", ChosenEntrantId = "pA:1" };
+            state.Votes[Guid.NewGuid()] = new() { MatchupId = matchupId, CriterionId = "c1", ChosenEntrantId = "pB:1" };
+
+            context.Fsm.TransitionTo(context, new FinalResultsState());
+
+            Assert.AreEqual(10, state.GamePlayers["pA"].BonusPoints,
+                "Tied winners must both receive the tournament winner bonus.");
+            Assert.AreEqual(10, state.GamePlayers["pB"].BonusPoints,
+                "Tied winners must both receive the tournament winner bonus.");
+        }
+
+        // ── OutfitDistinctnessEvaluator: self-comparison ──────────────────────
+
+        [TestMethod]
+        public void OutfitDistinctnessEvaluator_SelfComparison_SameItems_CountsAsShared()
+        {
+            var hatId = Guid.NewGuid();
+            var topId = Guid.NewGuid();
+
+            // A player's own Outfit 1 and Outfit 2 share the same items.
+            var outfit1 = new OutfitSubmission
+            {
+                SelectedItemsByType = new() { ["hat"] = hatId, ["top"] = topId },
+            };
+            var outfit2 = new OutfitSubmission
+            {
+                SelectedItemsByType = new() { ["hat"] = hatId, ["top"] = topId },
+            };
+
+            int shared = OutfitDistinctnessEvaluator.CountSharedItems(outfit1, outfit2);
+
+            Assert.AreEqual(2, shared,
+                "Self-comparison must detect shared items between the player's own Outfit 1 and Outfit 2.");
+        }
+
+        [TestMethod]
+        public void OutfitDistinctnessEvaluator_SelfComparison_ViolatesRule_WhenAtThreshold()
+        {
+            var hatId = Guid.NewGuid();
+            var topId = Guid.NewGuid();
+            var shoesId = Guid.NewGuid();
+
+            var outfit1 = new OutfitSubmission
+            {
+                SelectedItemsByType = new() { ["hat"] = hatId, ["top"] = topId, ["shoes"] = shoesId },
+            };
+            var outfit2 = new OutfitSubmission
+            {
+                SelectedItemsByType = new() { ["hat"] = hatId, ["top"] = topId, ["shoes"] = shoesId },
+            };
+
+            Assert.IsTrue(
+                OutfitDistinctnessEvaluator.ViolatesDistinctnessRule(outfit2, [outfit1], threshold: 3),
+                "A player's own identical Outfit 2 must violate the distinctness rule at threshold=3.");
+        }
+
+        // ── Pool exhaustion / full-pool-claimed edge case ─────────────────────
+
+        [TestMethod]
+        public async Task OutfitBuilding_AllItemsClaimed_NewClaimOnClaimedItem_IsRejected()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            state.GamePlayers["p1"] = new() { PlayerId = "p1" };
+            state.GamePlayers["p2"] = new() { PlayerId = "p2" };
+            state.GamePlayers["p3"] = new() { PlayerId = "p3" };
+
+            // Single item drawn by p3 (so both p1 and p2 can claim but only one wins).
+            var itemId = Guid.NewGuid();
+            state.ClothingPool[itemId] = new()
+            {
+                Id = itemId,
+                ClothingTypeId = "hat",
+                CreatorPlayerId = "p3",
+                SvgContent = "<svg/>",
+                IsInPool = true,
+            };
+
+            context.Fsm.TransitionTo(context, new OutfitBuildingState());
+
+            // p1 claims the only available item.
+            _engine.ProcessCommand(context, new ClaimPoolItemCommand("p1", itemId));
+            Assert.IsTrue(state.GamePlayers["p1"].OwnedClothingItemIds.Contains(itemId));
+
+            // p2 tries to claim the same (now exhausted) item — must be rejected gracefully.
+            _engine.ProcessCommand(context, new ClaimPoolItemCommand("p2", itemId));
+
+            Assert.IsFalse(state.GamePlayers["p2"].OwnedClothingItemIds.Contains(itemId),
+                "Claiming an already-claimed item must be rejected; pool is effectively exhausted for that slot.");
+            Assert.AreEqual("p1", state.ClothingPool[itemId].ClaimedByPlayerId,
+                "First claimer's ownership must remain intact after a rejected second claim.");
+        }
+
+        // ── Simultaneous claims: first-processed wins ─────────────────────────
+
+        [TestMethod]
+        public async Task OutfitBuilding_SimultaneousClaims_FirstProcessedWins()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            state.GamePlayers["p1"] = new() { PlayerId = "p1" };
+            state.GamePlayers["p2"] = new() { PlayerId = "p2" };
+
+            var itemId = Guid.NewGuid();
+            state.ClothingPool[itemId] = new()
+            {
+                Id = itemId,
+                ClothingTypeId = "hat",
+                CreatorPlayerId = "p3",
+                SvgContent = "<svg/>",
+                IsInPool = true,
+            };
+
+            context.Fsm.TransitionTo(context, new OutfitBuildingState());
+
+            // Simulate both players claiming at the same "instant" by sending both commands
+            // in immediate succession. The first command processed wins.
+            _engine.ProcessCommand(context, new ClaimPoolItemCommand("p1", itemId));
+            _engine.ProcessCommand(context, new ClaimPoolItemCommand("p2", itemId));
+
+            // Only one player should own the item; the other's claim must be rejected.
+            bool p1Owns = state.GamePlayers["p1"].OwnedClothingItemIds.Contains(itemId);
+            bool p2Owns = state.GamePlayers["p2"].OwnedClothingItemIds.Contains(itemId);
+
+            Assert.IsTrue(p1Owns ^ p2Owns,
+                "Exactly one player must win a simultaneous claim on the same item.");
+            Assert.AreEqual("p1", state.ClothingPool[itemId].ClaimedByPlayerId,
+                "The first-processed claim (p1) must win when two commands arrive simultaneously.");
+        }
     }
 }
