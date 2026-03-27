@@ -66,6 +66,8 @@ namespace KnockBox.Core.Components.Shared
         private string _sizeInputId => $"size-{_svgId}";
 
         private string _currentColor = "#000000";
+        private string _customSwatchColor = "#808080";
+        private bool _isCustomColorActive;
         private double _currentStrokeWidth = 3;
         private int _strokeCount;
 
@@ -125,6 +127,12 @@ namespace KnockBox.Core.Components.Shared
         public void OnColorChanged(string color)
         {
             _currentColor = color;
+            _isCustomColorActive = !_colorSwatches.Any(s =>
+                string.Equals(s, color, StringComparison.OrdinalIgnoreCase));
+            if (_isCustomColorActive)
+            {
+                _customSwatchColor = color;
+            }
         }
 
         /// <summary>Called from JavaScript when the stroke width changes.</summary>

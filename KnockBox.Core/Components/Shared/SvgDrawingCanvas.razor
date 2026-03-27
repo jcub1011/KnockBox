@@ -15,6 +15,12 @@
                             aria-pressed="@(isActive ? "true" : "false")"></button>
                 }
             </div>
+            <button class="toolbar-swatch toolbar-swatch-custom @(_isCustomColorActive ? "toolbar-swatch-active" : "")"
+                    style="background-color: @_customSwatchColor;"
+                    data-color="custom"
+                    title="Custom color"
+                    aria-label="@($"Custom color{(_isCustomColorActive ? " (selected)" : "")}")"
+                    aria-pressed="@(_isCustomColorActive ? "true" : "false")"></button>
             <input id="@_colorInputId" type="color" class="toolbar-color"
                    value="@_currentColor"
                    title="Custom color"

@@ -1,6 +1,19 @@
 const instances = new Map();
 
 /**
+ * Converts a CSS rgb(r, g, b) string to a hex color string.
+ * @param {string} rgb - e.g. "rgb(255, 0, 128)"
+ * @returns {string|null} hex string e.g. "#ff0080", or null if parsing fails
+ */
+function rgbToHex(rgb) {
+    const match = rgb?.match(/rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)/);
+    if (!match) return null;
+    return '#' + [match[1], match[2], match[3]]
+        .map(n => parseInt(n, 10).toString(16).padStart(2, '0'))
+        .join('');
+}
+
+/**
  * Sets or clears the visual disabled state on the undo button.
  * A CSS class is used instead of the HTML `disabled` attribute so that clicks still
  * bubble to the container's delegated event listener.
@@ -18,10 +31,21 @@ function setUndoDisabled(container, disabled) {
  * @param {string} color - hex or CSS color string
  */
 function updateSwatchActive(container, color) {
-    container?.querySelectorAll('.toolbar-swatch[data-color]').forEach(s => {
-        s.classList.toggle('toolbar-swatch-active',
-            s.dataset.color.toLowerCase() === color.toLowerCase());
+    const customSwatch = container?.querySelector('.toolbar-swatch-custom');
+    let matchedPreset = false;
+    container?.querySelectorAll('.toolbar-swatch[data-color]:not(.toolbar-swatch-custom)').forEach(s => {
+        const isMatch = s.dataset.color.toLowerCase() === color.toLowerCase();
+        if (isMatch) matchedPreset = true;
+        s.classList.toggle('toolbar-swatch-active', isMatch);
     });
+    if (customSwatch) {
+        if (!matchedPreset) {
+            customSwatch.style.backgroundColor = color;
+            customSwatch.classList.add('toolbar-swatch-active');
+        } else {
+            customSwatch.classList.remove('toolbar-swatch-active');
+        }
+    }
 }
 
 /**
@@ -256,6 +280,19 @@ export function initialize(svgId, dotNetRef, initialColor, initialStrokeWidth, i
     // Delegated click handler for swatches, undo, and export.
     if (container) {
         container.addEventListener('click', (e) => {
+            // Custom swatch — select it with its current color
+            const customSwatchEl = e.target.closest('.toolbar-swatch-custom');
+            if (customSwatchEl) {
+                const rgb = getComputedStyle(customSwatchEl).backgroundColor;
+                const hex = rgbToHex(rgb) || state.color;
+                state.color = hex;
+                if (colorInput) colorInput.value = hex;
+                updateSwatchActive(container, hex);
+                state.dotNetRef.invokeMethodAsync('OnColorChanged', hex)
+                    .catch(err => console.error('[SVGCanvas] OnColorChanged failed.', err));
+                return;
+            }
+
             // Swatch
             const swatchEl = e.target.closest('.toolbar-swatch[data-color]');
             if (swatchEl) {

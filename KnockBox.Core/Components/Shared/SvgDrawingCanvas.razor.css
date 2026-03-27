@@ -59,6 +59,14 @@
         transform: scale(1.1);
     }
 
+.toolbar-swatch-custom {
+    border-style: dashed;
+}
+
+    .toolbar-swatch-custom.toolbar-swatch-active {
+        border-style: solid;
+    }
+
 .toolbar-color {
     width: 36px;
     height: 36px;
