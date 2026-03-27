@@ -42,15 +42,17 @@
             </div>
         }
     </div>
-    <div class="svg-canvas-drawing-area">
+    <div class="svg-canvas-drawing-area @(ViewBoxAttribute is not null ? "has-viewbox" : "")">
         @if (_sanitizedBackground is not null)
         {
             <svg class="svg-canvas-bg" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"
+                 width="@ViewBoxWidth" height="@ViewBoxHeight"
                  viewBox="@ViewBoxAttribute" preserveAspectRatio="@(ViewBoxAttribute is not null ? "xMidYMid meet" : null)">
                 @((MarkupString)_sanitizedBackground)
             </svg>
         }
         <svg id="@_svgId" class="svg-canvas-surface" style="background-color: @BackgroundColor;"
+             width="@ViewBoxWidth" height="@ViewBoxHeight"
              viewBox="@ViewBoxAttribute" preserveAspectRatio="@(ViewBoxAttribute is not null ? "xMidYMid meet" : null)"></svg>
     </div>
 </div>
