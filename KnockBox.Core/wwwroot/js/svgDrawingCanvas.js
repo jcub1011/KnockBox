@@ -841,3 +841,5 @@ export function isInitialized(svgId) {
 export function dispose(svgId) {
     instances.delete(svgId);
 }
+
+export const _testExports = { triangleArea, visvalingamWhyatt, buildPath };
