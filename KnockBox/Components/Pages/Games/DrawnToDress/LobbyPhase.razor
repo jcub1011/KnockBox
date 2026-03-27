@@ -16,10 +16,10 @@
         <p class="dtd-lobby-subtitle">Waiting for players...</p>
 
         <h4 class="dtd-section-title">Players (@playerCount)</h4>
-        <div class="dtd-player-list">
+        <div class="dtd-player-list" role="list" aria-label="Players in lobby">
             @* Host is always first *@
-            <div class="dtd-player dtd-player-host @(GameState.Host.Id == UserService.CurrentUser?.Id ? "dtd-player-me" : "")">
-                <span class="dtd-player-avatar">👑</span>
+            <div class="dtd-player dtd-player-host @(GameState.Host.Id == UserService.CurrentUser?.Id ? "dtd-player-me" : "")" role="listitem">
+                <span class="dtd-player-avatar" aria-hidden="true">👑</span>
                 <span class="dtd-player-name">@GameState.Host.Name</span>
                 <span class="dtd-host-badge">HOST</span>
             </div>
@@ -29,18 +29,21 @@
                 bool isMe = player.Id == UserService.CurrentUser?.Id;
                 if (isHost)
                 {
-                    <button class="dtd-player dtd-player-kick @(isMe ? "dtd-player-me" : "")"
-                            @onclick="() => KickPlayer(player.Id)"
-                            title="Click to kick @player.Name">
-                        <span class="dtd-player-avatar">🎨</span>
-                        <span class="dtd-player-name">@player.Name</span>
-                        <span class="dtd-kick-hint">✕ Kick</span>
-                    </button>
+                    <div role="listitem">
+                        <button class="dtd-player dtd-player-kick @(isMe ? "dtd-player-me" : "")"
+                                @onclick="() => KickPlayer(player.Id)"
+                                aria-label="Kick @player.Name"
+                                title="Click to kick @player.Name">
+                            <span class="dtd-player-avatar" aria-hidden="true">🎨</span>
+                            <span class="dtd-player-name">@player.Name</span>
+                            <span class="dtd-kick-hint" aria-hidden="true">✕ Kick</span>
+                        </button>
+                    </div>
                 }
                 else
                 {
-                    <div class="dtd-player @(isMe ? "dtd-player-me" : "")">
-                        <span class="dtd-player-avatar">🎨</span>
+                    <div class="dtd-player @(isMe ? "dtd-player-me" : "")" role="listitem">
+                        <span class="dtd-player-avatar" aria-hidden="true">🎨</span>
                         <span class="dtd-player-name">@player.Name</span>
                     </div>
                 }
@@ -56,7 +59,7 @@
                     You can still start, but gameplay may feel limited.
                 </p>
             }
-            <button class="dtd-btn dtd-btn-primary dtd-btn-lg" @onclick="StartGame">
+            <button class="dtd-btn dtd-btn-primary dtd-btn-lg" @onclick="StartGame" aria-label="Start Game">
                 🎨 Start Game
             </button>
         }
@@ -68,18 +71,19 @@
 
     @if (isHost)
     {
-        <button class="dtd-settings-toggle-btn" @onclick="ToggleSettings" title="Game Settings">
-            ⚙️
+        <button class="dtd-settings-toggle-btn" @onclick="ToggleSettings" aria-label="Game Settings" title="Game Settings">
+            <span aria-hidden="true">⚙️</span>
         </button>
 
         @if (SettingsOpen)
         {
-            <div class="dtd-settings-backdrop" @onclick="ToggleSettings"></div>
+            <div class="dtd-settings-backdrop" @onclick="ToggleSettings" aria-hidden="true"></div>
         }
-        <div class="dtd-settings-drawer @(SettingsOpen ? "dtd-settings-drawer-open" : "")">
+        <div class="dtd-settings-drawer @(SettingsOpen ? "dtd-settings-drawer-open" : "")"
+             role="dialog" aria-label="Game Settings">
             <div class="dtd-settings-header">
                 <h3 class="dtd-settings-title">⚙️ Game Settings</h3>
-                <button class="dtd-settings-close-btn" @onclick="ToggleSettings" title="Close">✕</button>
+                <button class="dtd-settings-close-btn" @onclick="ToggleSettings" aria-label="Close settings" title="Close">✕</button>
             </div>
             <div class="dtd-settings-body">
 

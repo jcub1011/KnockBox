@@ -10,50 +10,40 @@
 .svg-canvas-toolbar {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 8px 12px;
+    gap: 8px;
+    padding: 6px 10px;
     background: #f5f5f5;
     border-bottom: 1px solid #ddd;
     flex-shrink: 0;
     flex-wrap: wrap;
+    min-height: 40px;
 }
 
 .toolbar-group {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 4px;
+    flex-wrap: wrap;
 }
 
-.toolbar-label {
-    font-size: 0.85rem;
-    color: #555;
-    white-space: nowrap;
-    user-select: none;
-}
-
-.toolbar-color {
-    width: 36px;
-    height: 28px;
-    padding: 1px;
-    border: 1px solid #bbb;
-    border-radius: 4px;
-    cursor: pointer;
-    background: none;
+.toolbar-separator {
+    width: 1px;
+    height: 22px;
+    background: #d1d5db;
     flex-shrink: 0;
 }
 
 .toolbar-swatches {
     display: flex;
+    gap: 3px;
     flex-wrap: wrap;
-    gap: 4px;
-    max-width: 200px;
 }
 
 .toolbar-swatch {
-    width: 22px;
-    height: 22px;
+    width: 36px;
+    height: 36px;
     border-radius: 50%;
-    border: 2px solid rgba(0, 0, 0, 0.2);
+    border: 2px solid rgba(0, 0, 0, 0.15);
     cursor: pointer;
     padding: 0;
     flex-shrink: 0;
@@ -61,31 +51,113 @@
 }
 
     .toolbar-swatch:hover {
-        transform: scale(1.2);
-        border-color: rgba(0, 0, 0, 0.5);
+        transform: scale(1.15);
+        border-color: rgba(0, 0, 0, 0.4);
     }
 
     .toolbar-swatch.toolbar-swatch-active {
-        border: 3px solid #333;
-        box-shadow: 0 0 0 2px #fff, 0 0 0 4px #333;
+        border: 2px solid #333;
+        box-shadow: 0 0 0 1px #fff, 0 0 0 3px #333;
         transform: scale(1.1);
     }
 
-.toolbar-size {
-    width: 100px;
+.toolbar-swatch-custom {
+    border-style: dashed;
+}
+
+    .toolbar-swatch-custom.toolbar-swatch-active {
+        border-style: solid;
+    }
+
+.toolbar-color {
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border: 1px solid #bbb;
+    border-radius: 8px;
     cursor: pointer;
-    accent-color: #555;
+    background: none;
+    flex-shrink: 0;
+}
+
+/* ── Size presets ──────────────────────────────────────────────────────────── */
+
+.toolbar-size-group {
+    gap: 3px;
+}
+
+.toolbar-size-btn {
+    width: 36px;
+    height: 36px;
+    border: 1px solid #ccc;
+    border-radius: 10px;
+    background: #fff;
+    cursor: pointer;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #555;
+    padding: 0;
+    transition: background 0.1s, border-color 0.1s;
+}
+
+    .toolbar-size-btn:hover {
+        background: #e8e8e8;
+        border-color: #aaa;
+    }
+
+    .toolbar-size-btn.toolbar-size-btn-active {
+        background: #333;
+        color: #fff;
+        border-color: #333;
+    }
+
+.toolbar-size {
+    width: 36px;
+    height: 36px;
+    padding: 0 4px;
+    border: 1px solid #ccc;
+    border-radius: 10px;
+    font-size: 1rem;
+    text-align: center;
+    -moz-appearance: textfield;
+}
+
+    .toolbar-size::-webkit-inner-spin-button,
+    .toolbar-size::-webkit-outer-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+    }
+
+/* ── Action buttons ───────────────────────────────────────────────────────── */
+
+.toolbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: auto;
+    position: relative;
+    flex-wrap: wrap;
 }
 
 .toolbar-btn {
-    padding: 5px 12px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px;
+    width: 36px;
+    height: 36px;
     background: #fff;
     border: 1px solid #ccc;
-    border-radius: 6px;
-    font-size: 0.85rem;
+    border-radius: 10px;
     cursor: pointer;
     transition: background 0.15s, border-color 0.15s;
-    white-space: nowrap;
+    line-height: 1;
+}
+
+.toolbar-icon {
+    width: 24px;
+    height: 24px;
+    flex-shrink: 0;
 }
 
     .toolbar-btn:hover:not(:disabled) {
@@ -104,56 +176,29 @@
         border-color: #ccc;
     }
 
-.toolbar-btn-export {
-    margin-left: auto;
-}
+/* ── Copy/paste toast ────────────────────────────────────────────────────── */
 
-.toolbar-share-display {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    background: #ecfdf5;
-    border: 1px solid #86efac;
-    border-radius: 6px;
-    padding: 3px 8px;
-    font-size: 0.82rem;
-    color: #166534;
-    white-space: nowrap;
-}
-
-.toolbar-share-label {
-    user-select: none;
-}
-
-.toolbar-share-code {
-    font-family: monospace;
-    font-weight: 700;
-    font-size: 1rem;
-    letter-spacing: 3px;
+.toolbar-copy-toast {
+    position: absolute;
+    right: 100%;
+    top: 50%;
+    transform: translateY(-50%);
+    margin-right: 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
     color: #15803d;
+    white-space: nowrap;
+    pointer-events: none;
+    animation: toolbar-toast-fade 1.5s ease-out forwards;
 }
 
-.toolbar-paste-group {
-    display: flex;
-    align-items: center;
-    gap: 4px;
+@keyframes toolbar-toast-fade {
+    0% { opacity: 1; }
+    70% { opacity: 1; }
+    100% { opacity: 0; }
 }
 
-.toolbar-paste-input {
-    width: 84px;
-    padding: 4px 6px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    font-size: 0.85rem;
-    font-family: monospace;
-    text-transform: uppercase;
-    letter-spacing: 2px;
-}
-
-    .toolbar-paste-input.toolbar-paste-input-error {
-        border-color: #ef4444;
-        background: #fee2e2;
-    }
+/* ── Drawing area ─────────────────────────────────────────────────────────── */
 
 .svg-canvas-drawing-area {
     flex: 1;
@@ -192,4 +237,16 @@
     height: auto;
     max-width: 100%;
     max-height: 100%;
+}
+
+/* ── Responsive ────────────────────────────────────────────────────────────── */
+
+@media (max-width: 480px) {
+    .svg-canvas-toolbar {
+        gap: 6px;
+    }
+
+    .toolbar-actions {
+        margin-left: 0;
+    }
 }

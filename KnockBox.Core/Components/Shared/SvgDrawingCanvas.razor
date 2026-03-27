@@ -3,7 +3,6 @@
 <div class="svg-drawing-canvas" style="width: @Width; height: @Height;">
     <div class="svg-canvas-toolbar">
         <div class="toolbar-group">
-            <label class="toolbar-label">Colors</label>
             <div class="toolbar-swatches">
                 @foreach (var swatch in _colorSwatches)
                 {
@@ -11,36 +10,60 @@
                     <button class="toolbar-swatch @(isActive ? "toolbar-swatch-active" : "")"
                             style="background-color: @swatch;"
                             data-color="@swatch"
-                            title="@swatch"></button>
+                            title="@swatch"
+                            aria-label="@($"Color {swatch}{(isActive ? " (selected)" : "")}")"
+                            aria-pressed="@(isActive ? "true" : "false")"></button>
                 }
             </div>
+            <button class="toolbar-swatch toolbar-swatch-custom @(_isCustomColorActive ? "toolbar-swatch-active" : "")"
+                    style="background-color: @_customSwatchColor;"
+                    data-color="custom"
+                    title="Custom color"
+                    aria-label="@($"Custom color{(_isCustomColorActive ? " (selected)" : "")}")"
+                    aria-pressed="@(_isCustomColorActive ? "true" : "false")"></button>
             <input id="@_colorInputId" type="color" class="toolbar-color"
                    value="@_currentColor"
-                   title="Custom color" />
+                   title="Custom color"
+                   aria-label="Custom color picker" />
         </div>
-        <div class="toolbar-group">
-            <label class="toolbar-label" for="@_sizeInputId">Size: @_currentStrokeWidth</label>
-            <input id="@_sizeInputId" type="range" class="toolbar-size"
+        <div class="toolbar-separator"></div>
+        <div class="toolbar-group toolbar-size-group">
+            @foreach (var preset in _sizePresets)
+            {
+                var isActive = (int)_currentStrokeWidth == preset.Size;
+                <button class="toolbar-size-btn @(isActive ? "toolbar-size-btn-active" : "")"
+                        data-size="@preset.Size"
+                        title="@preset.Label (@(preset.Size)px)"
+                        aria-label="@preset.Label brush size (@(preset.Size) pixels)"
+                        aria-pressed="@(isActive ? "true" : "false")">@preset.Label</button>
+            }
+            <input id="@_sizeInputId" type="number" class="toolbar-size"
                    min="1" max="30" step="1"
-                   value="@_currentStrokeWidth" />
+                   value="@_currentStrokeWidth"
+                   title="Custom brush size"
+                   aria-label="Custom brush size" />
         </div>
-        <button class="toolbar-btn toolbar-btn-undo toolbar-btn-disabled">↩ Undo</button>
-        <button class="toolbar-btn toolbar-btn-export">⬇ Export SVG</button>
-        @if (EnableSharing)
-        {
-            <button class="toolbar-btn toolbar-btn-copy">📋 Copy</button>
-            <div class="toolbar-share-display" style="display:none">
-                <span class="toolbar-share-label">Code:</span>
-                <span class="toolbar-share-code"></span>
-                <button class="toolbar-btn toolbar-btn-share-dismiss">✕</button>
-            </div>
-            <button class="toolbar-btn toolbar-btn-paste">📥 Paste</button>
-            <div class="toolbar-paste-group" style="display:none">
-                <input type="text" class="toolbar-paste-input" placeholder="Enter code" maxlength="6" />
-                <button class="toolbar-btn toolbar-btn-paste-apply">Apply</button>
-                <button class="toolbar-btn toolbar-btn-paste-cancel">✕</button>
-            </div>
-        }
+        <div class="toolbar-actions">
+            <button class="toolbar-btn toolbar-btn-fill" title="Fill background with current color" aria-label="Fill background with current color">
+                <svg class="toolbar-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M16.56 8.94L7.62 0 6.21 1.41l2.38 2.38-5.15 5.15a1.49 1.49 0 0 0 0 2.12l5.5 5.5c.29.29.68.44 1.06.44s.77-.15 1.06-.44l5.5-5.5c.59-.58.59-1.53 0-2.12zM5.21 10L10 5.21 14.79 10H5.21zM19 11.5s-2 2.17-2 3.5a2 2 0 1 0 4 0c0-1.33-2-3.5-2-3.5z"/></svg>
+            </button>
+            <button class="toolbar-btn toolbar-btn-undo toolbar-btn-disabled" title="Undo" aria-label="Undo last stroke">
+                <svg class="toolbar-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12.5 8c-2.65 0-5.05 1.04-6.83 2.73L2.5 7.5v9h9l-3.19-3.19C9.77 12.07 11.07 11.5 12.5 11.5c2.65 0 4.93 1.64 5.85 3.95l2.94-1.05C20.05 11.1 16.58 8 12.5 8z"/></svg>
+            </button>
+            <button class="toolbar-btn toolbar-btn-export" title="Export SVG" aria-label="Export drawing as SVG">
+                <svg class="toolbar-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+            </button>
+            @if (EnableSharing)
+            {
+                <button class="toolbar-btn toolbar-btn-copy" title="Copy drawing code to clipboard" aria-label="Copy drawing code to clipboard">
+                    <svg class="toolbar-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+                </button>
+                <button class="toolbar-btn toolbar-btn-paste" title="Paste drawing from clipboard" aria-label="Paste drawing from clipboard">
+                    <svg class="toolbar-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M19 2h-4.18C14.4.84 13.3 0 12 0S9.6.84 9.18 2H5c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-7 0c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm7 18H5V4h2v3h10V4h2v16z"/></svg>
+                </button>
+                <span class="toolbar-copy-toast" style="display:none">Copied!</span>
+            }
+        </div>
     </div>
     <div class="svg-canvas-drawing-area @(ViewBoxAttribute is not null ? "has-viewbox" : "")">
         @if (_sanitizedBackground is not null)

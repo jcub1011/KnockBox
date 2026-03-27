@@ -6,7 +6,6 @@ using KnockBox.Services.State.Games.DrawnToDress.Data;
 using KnockBox.Services.State.Games.Shared;
 using KnockBox.Services.State.Users;
 using Microsoft.AspNetCore.Components;
-
 namespace KnockBox.Components.Pages.Games.DrawnToDress
 {
     public partial class FinalResultsPhase : ComponentBase

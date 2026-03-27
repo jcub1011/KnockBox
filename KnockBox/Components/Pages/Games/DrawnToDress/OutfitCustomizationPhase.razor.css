@@ -201,7 +201,6 @@
     border-radius: 8px;
     font-size: 1rem;
     color: #111827;
-    outline: none;
     transition: border-color 0.15s;
     width: 100%;
     box-sizing: border-box;
@@ -272,22 +271,7 @@
     margin: 0;
 }
 
-/* ── Shared button styles ────────────────────────────────────────────────────── */
-
-.dtd-btn {
-    padding: 10px 20px;
-    border: none;
-    border-radius: 8px;
-    cursor: pointer;
-    font-size: 0.95rem;
-    font-weight: 600;
-    transition: opacity 0.15s;
-}
-
-.dtd-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
+/* Button overrides — base styles in dtd-shared.css */
 
 .dtd-btn-primary {
     background: #7c3aed;
@@ -384,7 +368,6 @@
     border-radius: 6px;
     font-size: 0.85rem;
     color: #111827;
-    outline: none;
 }
 
 .dtd-customization-position-input:focus {

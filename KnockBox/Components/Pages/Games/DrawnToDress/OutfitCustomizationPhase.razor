@@ -1,7 +1,4 @@
 @using KnockBox.Core.Components.Shared
-@using KnockBox.Core.Services.State.Games.Shared
-@using KnockBox.Services.Logic.Games.DrawnToDress.FSM
-@using KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
 @using KnockBox.Services.State.Games.DrawnToDress
 @using KnockBox.Services.State.Games.DrawnToDress.Data
 @using KnockBox.Services.State.Users
@@ -70,18 +67,7 @@
             @submittedCount / @totalPlayers finalized
         </div>
 
-        @if (GameState.PhaseDeadlineUtc.HasValue &&
-             GameState.Context?.Fsm?.CurrentState is ITimedGameState<DrawnToDressGameContext, DrawnToDressCommand> timedState)
-        {
-            var remaining = timedState.GetRemainingTime(GameState.Context!, DateTimeOffset.UtcNow);
-            if (remaining.IsSuccess)
-            {
-                var secs = (int)Math.Max(0, Math.Ceiling(remaining.Value.TotalSeconds));
-                <div class="dtd-customization-timer @(secs <= 10 ? "dtd-customization-timer-urgent" : "")">
-                    ⏱ @secs s
-                </div>
-            }
-        }
+        <TimerDisplay GameState="GameState" />
     </div>
 
     <!-- ── Host view ─────────────────────────────────────────────────────── -->
@@ -157,10 +143,14 @@
             <!-- ── Mode toggle ──────────────────────────────────────────── -->
             <div class="dtd-customization-mode-toggle">
                 <button class="dtd-btn dtd-btn-mode @(_mode == InteractionMode.Draw ? "dtd-btn-mode-active" : "")"
+                        aria-pressed="@(_mode == InteractionMode.Draw ? "true" : "false")"
+                        aria-label="Draw mode"
                         @onclick="() => SwitchModeAsync(InteractionMode.Draw)">
                     Draw
                 </button>
                 <button class="dtd-btn dtd-btn-mode @(_mode == InteractionMode.MoveItems ? "dtd-btn-mode-active" : "")"
+                        aria-pressed="@(_mode == InteractionMode.MoveItems ? "true" : "false")"
+                        aria-label="Move Items mode"
                         @onclick="() => SwitchModeAsync(InteractionMode.MoveItems)">
                     Move Items
                 </button>
@@ -193,7 +183,7 @@
                     @* Drawing canvas — pointer-events disabled during Move mode *@
                     <div style="@(_mode == InteractionMode.MoveItems ? "pointer-events: none;" : "")">
                         <SvgDrawingCanvas @ref="_sketchCanvas"
-                                          Width="600px"
+                                          Width="100%"
                                           Height="@($"{totalOutfitHeight}px")"
                                           ViewBoxWidth="600"
                                           ViewBoxHeight="@totalOutfitHeight"
@@ -262,7 +252,8 @@
 
                 <button class="dtd-btn dtd-btn-primary"
                         @onclick="SubmitCustomizationAsync"
-                        disabled="@_submitting">
+                        disabled="@_submitting"
+                        aria-label="@finalizeLabel">
                     @if (_submitting)
                     {
                         <span>Finalizing…</span>

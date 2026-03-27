@@ -5,6 +5,7 @@ using KnockBox.Services.State.Games.DrawnToDress;
 using KnockBox.Services.State.Games.DrawnToDress.Data;
 using KnockBox.Services.State.Users;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Web;
 
 namespace KnockBox.Components.Pages.Games.DrawnToDress
 {
@@ -175,6 +176,18 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
             }
 
             return result;
+        }
+
+        protected void HandlePoolItemKeydown(KeyboardEventArgs e, DrawnClothingItem item, bool claimedByMe, bool isAvailable)
+        {
+            if (e.Key is "Enter" or " ")
+                ToggleClaim(item, claimedByMe, isAvailable);
+        }
+
+        protected void HandleUnclaimKeydown(KeyboardEventArgs e, Guid itemId)
+        {
+            if (e.Key is "Enter" or " ")
+                UnclaimItem(itemId);
         }
 
         private void SendCommand(DrawnToDressCommand cmd, string action)

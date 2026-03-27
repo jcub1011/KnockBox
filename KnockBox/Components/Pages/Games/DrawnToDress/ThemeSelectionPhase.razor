@@ -40,8 +40,9 @@
                 @if (isHost)
                 {
                     <div class="dtd-theme-form">
-                        <label>Choose the theme:</label>
-                        <input type="text" placeholder="Enter a theme..." maxlength="100"
+                        <label for="dtd-host-theme-input">Choose the theme:</label>
+                        <input id="dtd-host-theme-input" type="text" placeholder="Enter a theme..." maxlength="100"
+                               aria-label="Theme name"
                                @bind="_themeText" @bind:event="oninput" />
                         <button class="dtd-btn dtd-btn-primary" @onclick="SubmitHostTheme"
                                 disabled="@(string.IsNullOrWhiteSpace(_themeText))">
@@ -67,8 +68,9 @@
                 else
                 {
                     <div class="dtd-theme-form">
-                        <label>Suggest a theme:</label>
-                        <input type="text" placeholder="Enter your theme idea..." maxlength="100"
+                        <label for="dtd-player-theme-input">Suggest a theme:</label>
+                        <input id="dtd-player-theme-input" type="text" placeholder="Enter your theme idea..." maxlength="100"
+                               aria-label="Theme suggestion"
                                @bind="_themeText" @bind:event="oninput" />
                         <button class="dtd-btn dtd-btn-primary" @onclick="SubmitPlayerTheme"
                                 disabled="@(string.IsNullOrWhiteSpace(_themeText))">
@@ -89,11 +91,15 @@
                 else
                 {
                     <div class="dtd-theme-candidates">
-                        <p>Vote for a theme:</p>
-                        <div class="dtd-theme-candidate-grid">
+                        <p id="dtd-theme-vote-label">Vote for a theme:</p>
+                        <div class="dtd-theme-candidate-grid" role="radiogroup" aria-labelledby="dtd-theme-vote-label">
                             @foreach (var candidate in GameState.ThemeCandidates)
                             {
-                                <button class="dtd-theme-candidate-card" @onclick="() => VoteForTheme(candidate.Id)">
+                                <button class="dtd-theme-candidate-card"
+                                        role="radio"
+                                        aria-checked="false"
+                                        aria-label="Vote for @candidate.DisplayName"
+                                        @onclick="() => VoteForTheme(candidate.Id)">
                                     <span class="dtd-theme-candidate-name">@candidate.DisplayName</span>
                                     @if (!string.IsNullOrWhiteSpace(candidate.Description))
                                     {

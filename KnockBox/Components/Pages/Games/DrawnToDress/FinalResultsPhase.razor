@@ -26,6 +26,7 @@
     <!-- ── Leaderboard table ───────────────────────────────────────────── -->
     <div class="dtd-final-results-leaderboard">
         <h3>Final Standings</h3>
+        <div class="dtd-final-results-table-wrapper">
         <table class="dtd-final-results-table">
             <thead>
                 <tr>
@@ -47,7 +48,13 @@
                         @onclick="() => ToggleBreakdown(entry.PlayerId)">
                         <td class="dtd-final-results-rank">@entry.Rank</td>
                         <td class="dtd-final-results-name">
-                            <span class="dtd-final-results-expand-icon">@(expanded ? "▾" : "▸")</span>
+                            <button class="dtd-final-results-expand-btn"
+                                    aria-expanded="@(expanded ? "true" : "false")"
+                                    aria-label="@(expanded ? "Collapse" : "Expand") breakdown for @entry.DisplayName"
+                                    @onclick="() => ToggleBreakdown(entry.PlayerId)"
+                                    @onclick:stopPropagation="true">
+                                <span class="dtd-final-results-expand-icon">@(expanded ? "▾" : "▸")</span>
+                            </button>
                             @entry.DisplayName
                         </td>
                         <td class="dtd-final-results-pts">@entry.TotalScore.ToString("0.#")</td>
@@ -112,6 +119,7 @@
                 }
             </tbody>
         </table>
+        </div>
     </div>
 
     <!-- ── Actions ─────────────────────────────────────────────────────── -->
@@ -120,13 +128,15 @@
         {
             <button class="dtd-btn dtd-btn-primary"
                     @onclick="PlayAgainAsync"
-                    disabled="@_submitting">
+                    disabled="@_submitting"
+                    aria-label="Play Again">
                 Play Again
             </button>
         }
         <button class="dtd-btn dtd-btn-secondary"
                 @onclick="ReturnToMenuAsync"
-                disabled="@_submitting">
+                disabled="@_submitting"
+                aria-label="Return to Menu">
             Return to Menu
         </button>
     </div>

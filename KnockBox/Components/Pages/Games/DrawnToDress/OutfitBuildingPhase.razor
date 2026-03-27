@@ -1,9 +1,6 @@
-@using KnockBox.Services.Logic.Games.DrawnToDress.FSM
-@using KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
 @using KnockBox.Services.State.Games.DrawnToDress
 @using KnockBox.Services.State.Games.DrawnToDress.Data
 @using KnockBox.Services.State.Users
-@using KnockBox.Core.Services.State.Games.Shared
 
 @{
     bool isHost = UserService.CurrentUser?.Id == GameState.Host.Id;
@@ -37,18 +34,7 @@
             @lockedCount / @totalPlayers locked in
         </div>
 
-        @if (GameState.PhaseDeadlineUtc.HasValue &&
-             GameState.Context?.Fsm?.CurrentState is ITimedGameState<DrawnToDressGameContext, DrawnToDressCommand> timedState)
-        {
-            var remaining = timedState.GetRemainingTime(GameState.Context!, DateTimeOffset.UtcNow);
-            if (remaining.IsSuccess)
-            {
-                var secs = (int)Math.Max(0, Math.Ceiling(remaining.Value.TotalSeconds));
-                <div class="dtd-outfit-timer @(secs <= 10 ? "dtd-outfit-timer-urgent" : "")">
-                    ⏱ @secs s
-                </div>
-            }
-        }
+        <TimerDisplay GameState="GameState" />
     </div>
 
     <!-- ── Host view ─────────────────────────────────────────────────────── -->
@@ -209,8 +195,12 @@
                             if (slotItemIsClaimed)
                             {
                                 <div class="dtd-pool-item dtd-pool-item-selected dtd-pool-item-clickable"
+                                     role="button"
+                                     aria-label="Release @clothingType.DisplayName selection"
+                                     tabindex="0"
                                      title="Click to release"
-                                     @onclick="() => UnclaimItem(slotItem.Id)">
+                                     @onclick="() => UnclaimItem(slotItem.Id)"
+                                     @onkeydown="(e) => HandleUnclaimKeydown(e, slotItem.Id)">
                                     @if (SafeSvgContent(slotItem.SvgContent) is string safeSvgSlot)
                                     {
                                         <svg class="dtd-pool-item-preview" viewBox="0 0 @clothingType.CanvasWidth @clothingType.CanvasHeight"
@@ -323,7 +313,12 @@
 
                                 <div class="dtd-pool-item @stateClass @(clickable ? "dtd-pool-item-clickable" : "")"
                                      title="@title"
-                                     @onclick="() => ToggleClaim(item, claimedByMe, isAvailable)">
+                                     role="button"
+                                     aria-label="@clothingType.DisplayName drawing — @title"
+                                     aria-pressed="@(claimedByMe ? "true" : "false")"
+                                     tabindex="@(clickable ? 0 : -1)"
+                                     @onclick="() => ToggleClaim(item, claimedByMe, isAvailable)"
+                                     @onkeydown="(e) => HandlePoolItemKeydown(e, item, claimedByMe, isAvailable)">
                                     @if (SafeSvgContent(item.SvgContent) is string safeSvgItem)
                                     {
                                         <svg class="dtd-pool-item-preview" viewBox="0 0 @clothingType.CanvasWidth @clothingType.CanvasHeight"
@@ -367,7 +362,7 @@
                 <p class="dtd-outfit-error">@_errorMessage</p>
             }
 
-            <button class="dtd-btn dtd-btn-primary" @onclick="SubmitOutfitAsync" disabled="@_submitting">
+            <button class="dtd-btn dtd-btn-primary" @onclick="SubmitOutfitAsync" disabled="@_submitting" aria-label="@lockInLabel">
                 @if (_submitting)
                 {
                     <span>Locking in…</span>

@@ -1,0 +1,146 @@
+/* ══════════════════════════════════════════════════════════════════════════════
+   Drawn To Dress — Shared Styles
+   Accessibility, touch targets, focus indicators, and common button styles.
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+/* ── CSS Custom Properties ──────────────────────────────────────────────────── */
+
+:root {
+    --dtd-timer-normal-bg: #e0f2fe;
+    --dtd-timer-normal-border: #7dd3fc;
+    --dtd-timer-normal-color: #0369a1;
+    --dtd-timer-urgent-bg: #fee2e2;
+    --dtd-timer-urgent-border: #fca5a5;
+    --dtd-timer-urgent-color: #b91c1c;
+    --dtd-focus-color: #4f46e5;
+}
+
+/* ── Focus Indicators ───────────────────────────────────────────────────────── */
+
+.dtd-game *:focus-visible {
+    outline: 2px solid var(--dtd-focus-color);
+    outline-offset: 2px;
+}
+
+/* ── Touch Target Minimums (44x44px per WCAG 2.5.8) ────────────────────────── */
+
+.dtd-btn,
+.dtd-btn-vote,
+.dtd-btn-preset,
+.dtd-btn-coinflip,
+.dtd-btn-mode,
+.dtd-theme-candidate-card,
+.dtd-pool-item-clickable,
+.dtd-settings-toggle-btn,
+.dtd-settings-close-btn {
+    min-height: 44px;
+}
+
+.dtd-btn-preset,
+.dtd-settings-close-btn {
+    min-width: 44px;
+}
+
+/* ── Shared Button Base ─────────────────────────────────────────────────────── */
+
+.dtd-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.95rem;
+    font-weight: 600;
+    transition: opacity 0.15s, filter 0.15s;
+}
+
+.dtd-btn:hover:not(:disabled) {
+    filter: brightness(0.92);
+}
+
+.dtd-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.dtd-btn-primary {
+    background: #4f46e5;
+    color: #ffffff;
+}
+
+.dtd-btn-primary:hover:not(:disabled) {
+    background: #4338ca;
+}
+
+.dtd-btn-secondary {
+    background: #f3f4f6;
+    color: #374151;
+    border: 1px solid #d1d5db;
+}
+
+.dtd-btn-secondary:hover:not(:disabled) {
+    background: #e5e7eb;
+}
+
+.dtd-btn-lg {
+    font-size: 1.1rem;
+    padding: 14px 32px;
+}
+
+/* ── Visually Hidden (screen reader only) ───────────────────────────────────── */
+
+.dtd-sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* ── Timer Display ──────────────────────────────────────────────────────────── */
+
+.dtd-timer {
+    background: var(--dtd-timer-normal-bg);
+    border: 1px solid var(--dtd-timer-normal-border);
+    border-radius: 20px;
+    padding: 4px 14px;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--dtd-timer-normal-color);
+    min-width: 70px;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+}
+
+.dtd-timer-urgent {
+    background: var(--dtd-timer-urgent-bg);
+    border-color: var(--dtd-timer-urgent-border);
+    color: var(--dtd-timer-urgent-color);
+    animation: dtd-timer-pulse 0.8s ease-in-out infinite;
+}
+
+@keyframes dtd-timer-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+}
+
+/* ── Reduced Motion ─────────────────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+    .dtd-timer-urgent,
+    .dtd-drawing-timer-urgent,
+    .dtd-outfit-timer-urgent,
+    .dtd-customization-timer-urgent,
+    .dtd-voting-timer-urgent,
+    .dtd-coinflip-timer-urgent,
+    .dtd-reveal-number-urgent {
+        animation: none;
+    }
+}

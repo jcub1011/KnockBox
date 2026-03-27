@@ -66,15 +66,22 @@ namespace KnockBox.Core.Components.Shared
         private string _sizeInputId => $"size-{_svgId}";
 
         private string _currentColor = "#000000";
+        private string _customSwatchColor = "#808080";
+        private bool _isCustomColorActive;
         private double _currentStrokeWidth = 3;
         private int _strokeCount;
 
-        // Preset color palette shown as swatches in the toolbar.
+        // Curated color palette — bold, complementary colors.
         private static readonly string[] _colorSwatches =
         [
-            "#000000", "#ffffff", "#ef4444", "#f97316",
-            "#eab308", "#22c55e", "#3b82f6", "#8b5cf6",
-            "#ec4899", "#6b7280", "#92400e", "#164e63",
+            "#000000", "#ffffff", "#ef4444",
+            "#3b82f6", "#22c55e", "#f59e0b",
+        ];
+
+        // Preset brush sizes: small, medium, large.
+        private static readonly (string Label, int Size)[] _sizePresets =
+        [
+            ("S", 3), ("M", 8), ("L", 16),
         ];
 
         protected override void OnInitialized()
@@ -120,6 +127,12 @@ namespace KnockBox.Core.Components.Shared
         public void OnColorChanged(string color)
         {
             _currentColor = color;
+            _isCustomColorActive = !_colorSwatches.Any(s =>
+                string.Equals(s, color, StringComparison.OrdinalIgnoreCase));
+            if (_isCustomColorActive)
+            {
+                _customSwatchColor = color;
+            }
         }
 
         /// <summary>Called from JavaScript when the stroke width changes.</summary>
@@ -141,7 +154,7 @@ namespace KnockBox.Core.Components.Shared
             if (_jsModule is null) return null;
             try
             {
-                var content = await ReadSvgInChunksAsync();
+                var content = await ReadSvgInChunksWithBgAsync();
                 if (string.IsNullOrEmpty(content)) return null;
                 return ClipboardService.Store(content);
             }
@@ -262,7 +275,13 @@ namespace KnockBox.Core.Components.Shared
         /// fail for complex drawings that exceed the default 32 KB receive limit.
         /// </para>
         /// </summary>
-        private async Task<string?> ReadSvgInChunksAsync()
+        private Task<string?> ReadSvgInChunksAsync()
+            => ReadSvgInChunksAsync("prepareSvgContentForChunkedRead");
+
+        private Task<string?> ReadSvgInChunksWithBgAsync()
+            => ReadSvgInChunksAsync("prepareSvgContentWithBgForChunkedRead");
+
+        private async Task<string?> ReadSvgInChunksAsync(string prepareFunction)
         {
             if (_jsModule is null)
             {
@@ -272,7 +291,7 @@ namespace KnockBox.Core.Components.Shared
 
             // First call: JS serializes the SVG into a per-instance cache and returns
             // the total character count. This response is always tiny (just an int).
-            var totalLength = await _jsModule.InvokeAsync<int>("prepareSvgContentForChunkedRead", _svgId);
+            var totalLength = await _jsModule.InvokeAsync<int>(prepareFunction, _svgId);
             if (totalLength == 0) return null;
 
             // Fetch the cached SVG string in bounded chunks so that no single SignalR
