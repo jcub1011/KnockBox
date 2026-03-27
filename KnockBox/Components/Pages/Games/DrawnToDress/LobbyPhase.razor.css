@@ -136,32 +136,11 @@
     font-style: italic;
 }
 
-/* ── Buttons ────────────────────────────────────────────────────────────────── */
-
-.dtd-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    border: none;
-    border-radius: 8px;
-    cursor: pointer;
-    font-weight: 600;
-    padding: 10px 20px;
-    transition: filter 0.15s;
-}
-
-.dtd-btn:hover {
-    filter: brightness(0.92);
-}
+/* Button overrides — base styles in dtd-shared.css */
 
 .dtd-btn-primary {
     background: #0d6efd;
     color: #fff;
-}
-
-.dtd-btn-lg {
-    font-size: 1.1rem;
-    padding: 14px 32px;
 }
 
 /* ── Settings toggle button ─────────────────────────────────────────────────── */
@@ -325,4 +304,16 @@
 .dtd-btn-preset:hover {
     background: #e2e6ea;
     border-color: #0d6efd;
+}
+
+/* ── Responsive ────────────────────────────────────────────────────────────── */
+
+@media (max-width: 480px) {
+    .dtd-lobby {
+        padding: 16px 12px;
+    }
+
+    .dtd-settings-drawer {
+        width: 100vw;
+    }
 }

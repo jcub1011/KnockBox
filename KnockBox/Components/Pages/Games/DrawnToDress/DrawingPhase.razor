@@ -1,7 +1,4 @@
 @using KnockBox.Core.Components.Shared
-@using KnockBox.Core.Services.State.Games.Shared
-@using KnockBox.Services.Logic.Games.DrawnToDress.FSM
-@using KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
 @using KnockBox.Services.State.Games.DrawnToDress
 @using KnockBox.Services.State.Games.DrawnToDress.Data
 @using KnockBox.Services.State.Users
@@ -29,18 +26,7 @@
             Round @(GameState.CurrentDrawingClothingTypeIndex + 1) of @GameState.Config.ClothingTypes.Count
         </div>
 
-        @if (GameState.PhaseDeadlineUtc.HasValue &&
-             GameState.Context?.Fsm?.CurrentState is ITimedGameState<DrawnToDressGameContext, DrawnToDressCommand> timedState)
-        {
-            var remaining = timedState.GetRemainingTime(GameState.Context!, DateTimeOffset.UtcNow);
-            if (remaining.IsSuccess)
-            {
-                var secs = (int)Math.Max(0, Math.Ceiling(remaining.Value.TotalSeconds));
-                <div class="dtd-drawing-timer @(secs <= 10 ? "dtd-drawing-timer-urgent" : "")">
-                    ⏱ @secs s
-                </div>
-            }
-        }
+        <TimerDisplay GameState="GameState" />
     </div>
 
     @if (isHost)
@@ -73,7 +59,7 @@
     else
     {
         <div class="dtd-drawing-player-panel">
-            <div class="dtd-drawing-counter">
+            <div class="dtd-drawing-counter" role="status">
                 <span>Your drawings this round:</span>
                 <strong>@mySubmitted@(myMax > 0 ? $" / {myMax}" : "")</strong>
                 @if (!canSubmit)
@@ -84,9 +70,9 @@
 
             @if (!isDone)
             {
-                <div class="dtd-drawing-canvas-wrapper">
+                <div class="dtd-drawing-canvas-wrapper" role="img" aria-label="Drawing canvas for @CurrentTypeName">
                     <SvgDrawingCanvas @ref="_canvas"
-                                      Width="@($"{CurrentTypeCanvasWidth}px")"
+                                      Width="100%"
                                       Height="@($"{CurrentTypeCanvasHeight + 200}px")"
                                       ViewBoxWidth="CurrentTypeCanvasWidth"
                                       ViewBoxHeight="CurrentTypeCanvasHeight"
@@ -96,7 +82,7 @@
                 <div class="dtd-drawing-actions">
                     @if (canSubmit)
                     {
-                        <button class="dtd-btn dtd-btn-primary" @onclick="SubmitDrawingAsync" disabled="@_submitting">
+                        <button class="dtd-btn dtd-btn-primary" @onclick="SubmitDrawingAsync" disabled="@_submitting" aria-label="Submit Drawing">
                             @if (_submitting)
                             {
                                 <span>Submitting…</span>
@@ -108,7 +94,7 @@
                         </button>
                     }
 
-                    <button class="dtd-btn dtd-btn-secondary" @onclick="MarkDoneAsync" disabled="@_submitting">
+                    <button class="dtd-btn dtd-btn-secondary" @onclick="MarkDoneAsync" disabled="@_submitting" aria-label="Done for this round">
                         ⏭ Done for this round
                     </button>
                 </div>

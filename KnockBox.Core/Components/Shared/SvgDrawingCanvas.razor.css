@@ -32,8 +32,8 @@
 }
 
 .toolbar-color {
-    width: 36px;
-    height: 28px;
+    width: 44px;
+    height: 44px;
     padding: 1px;
     border: 1px solid #bbb;
     border-radius: 4px;
@@ -50,14 +50,16 @@
 }
 
 .toolbar-swatch {
-    width: 22px;
-    height: 22px;
+    width: 28px;
+    height: 28px;
     border-radius: 50%;
     border: 2px solid rgba(0, 0, 0, 0.2);
     cursor: pointer;
-    padding: 0;
+    padding: 8px;
+    box-sizing: content-box;
     flex-shrink: 0;
     transition: transform 0.1s, border-color 0.1s;
+    /* 28px visual + 8px padding each side = 44px touch target */
 }
 
     .toolbar-swatch:hover {
@@ -78,7 +80,8 @@
 }
 
 .toolbar-btn {
-    padding: 5px 12px;
+    padding: 10px 12px;
+    min-height: 44px;
     background: #fff;
     border: 1px solid #ccc;
     border-radius: 6px;
@@ -192,4 +195,22 @@
     height: auto;
     max-width: 100%;
     max-height: 100%;
+}
+
+/* ── Responsive ────────────────────────────────────────────────────────────── */
+
+@media (max-width: 480px) {
+    .svg-canvas-toolbar {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+
+    .toolbar-swatches {
+        max-width: none;
+    }
+
+    .toolbar-btn-export {
+        margin-left: 0;
+    }
 }

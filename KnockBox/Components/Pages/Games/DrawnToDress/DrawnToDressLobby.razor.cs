@@ -4,6 +4,9 @@ using KnockBox.Services.Navigation;
 using KnockBox.Services.State.Games.DrawnToDress;
 using KnockBox.Services.State.Games.Shared;
 using KnockBox.Services.State.Users;
+using KnockBox.Core.Services.State.Games.Shared;
+using KnockBox.Services.Logic.Games.DrawnToDress.FSM;
+using KnockBox.Services.Logic.Games.DrawnToDress.FSM.States;
 using Microsoft.AspNetCore.Components;
 using System.Diagnostics.CodeAnalysis;
 
@@ -22,6 +25,11 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
         [Inject] protected ILogger<DrawnToDressLobby> Logger { get; set; } = default!;
 
         [Parameter] public string ObfuscatedRoomCode { get; set; } = default!;
+
+        private DtdAriaAnnouncer? _announcer;
+        private GamePhase? _lastAnnouncedPhase;
+        private bool _announced10s;
+        private bool _announced5s;
 
         private IDisposable? _stateSubscription;
         private PeriodicTimer? _timer;
@@ -64,7 +72,14 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
             }
 
             GameState.OnStateDisposed += HandleStateDisposed;
-            _stateSubscription = GameState.StateChangedEventManager.Subscribe(async () => await InvokeAsync(StateHasChanged));
+            _stateSubscription = GameState.StateChangedEventManager.Subscribe(async () =>
+            {
+                await InvokeAsync(() =>
+                {
+                    AnnouncePhaseChangeIfNeeded();
+                    StateHasChanged();
+                });
+            });
 
             _timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
             _ = StartTimerAsync();
@@ -85,6 +100,7 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
                             // Only the host drives FSM ticks to avoid concurrent transitions.
                             if (GameState?.Context is not null && IsHost())
                                 GameEngine.Tick(GameState.Context, DateTimeOffset.UtcNow);
+                            AnnounceTimerWarningsIfNeeded();
                             StateHasChanged();
                         });
                     }
@@ -121,6 +137,55 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
                 GameSessionService.LeaveCurrentSession(navigateHome: false);
                 NavigationService.ToHome();
             });
+        }
+
+        private void AnnouncePhaseChangeIfNeeded()
+        {
+            if (GameState is null || _announcer is null) return;
+            var currentPhase = GameState.Phase;
+            if (_lastAnnouncedPhase != currentPhase)
+            {
+                _lastAnnouncedPhase = currentPhase;
+                _announced10s = false;
+                _announced5s = false;
+
+                var phaseName = currentPhase switch
+                {
+                    GamePhase.ThemeSelection => "Theme Selection",
+                    GamePhase.Drawing => "Drawing Round",
+                    GamePhase.PoolReveal => "Pool Reveal",
+                    GamePhase.OutfitBuilding => "Outfit Building",
+                    GamePhase.OutfitCustomization => "Outfit Customization",
+                    GamePhase.Voting => "Voting",
+                    GamePhase.CoinFlip => "Coin Flip",
+                    GamePhase.VotingRoundResults => "Voting Round Results",
+                    GamePhase.Results => "Final Results",
+                    _ => currentPhase.ToString()
+                };
+                _announcer.Announce($"Phase changed to {phaseName}");
+            }
+        }
+
+        private void AnnounceTimerWarningsIfNeeded()
+        {
+            if (GameState?.Context?.Fsm?.CurrentState is not ITimedGameState<DrawnToDressGameContext, DrawnToDressCommand> timedState)
+                return;
+            if (_announcer is null) return;
+
+            var remaining = timedState.GetRemainingTime(GameState.Context!, DateTimeOffset.UtcNow);
+            if (!remaining.IsSuccess) return;
+
+            var secs = (int)Math.Ceiling(remaining.Value.TotalSeconds);
+            if (secs <= 10 && secs > 5 && !_announced10s)
+            {
+                _announced10s = true;
+                _announcer.Announce("10 seconds remaining");
+            }
+            else if (secs <= 5 && secs > 0 && !_announced5s)
+            {
+                _announced5s = true;
+                _announcer.Announce("5 seconds remaining");
+            }
         }
 
         public override void Dispose()

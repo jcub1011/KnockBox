@@ -11,21 +11,25 @@
                     <button class="toolbar-swatch @(isActive ? "toolbar-swatch-active" : "")"
                             style="background-color: @swatch;"
                             data-color="@swatch"
-                            title="@swatch"></button>
+                            title="@swatch"
+                            aria-label="@($"Color {swatch}{(isActive ? " (selected)" : "")}")"
+                            aria-pressed="@(isActive ? "true" : "false")"></button>
                 }
             </div>
             <input id="@_colorInputId" type="color" class="toolbar-color"
                    value="@_currentColor"
-                   title="Custom color" />
+                   title="Custom color"
+                   aria-label="Custom color picker" />
         </div>
         <div class="toolbar-group">
             <label class="toolbar-label" for="@_sizeInputId">Size: @_currentStrokeWidth</label>
             <input id="@_sizeInputId" type="range" class="toolbar-size"
                    min="1" max="30" step="1"
-                   value="@_currentStrokeWidth" />
+                   value="@_currentStrokeWidth"
+                   aria-label="Brush size: @_currentStrokeWidth pixels" />
         </div>
-        <button class="toolbar-btn toolbar-btn-undo toolbar-btn-disabled">↩ Undo</button>
-        <button class="toolbar-btn toolbar-btn-export">⬇ Export SVG</button>
+        <button class="toolbar-btn toolbar-btn-undo toolbar-btn-disabled" aria-label="Undo last stroke">↩ Undo</button>
+        <button class="toolbar-btn toolbar-btn-export" aria-label="Export drawing as SVG">⬇ Export SVG</button>
         @if (EnableSharing)
         {
             <button class="toolbar-btn toolbar-btn-copy">📋 Copy</button>

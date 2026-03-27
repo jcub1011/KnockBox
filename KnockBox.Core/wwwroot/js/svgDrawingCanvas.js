@@ -166,13 +166,28 @@ export function initialize(svgId, dotNetRef, initialColor, initialStrokeWidth, i
             state._pathSuffix = ` L ${x} ${y}`;
         }
 
-        state.currentPath.setAttribute('d', state._pathPrefix + state._pathSuffix);
+        // Batch DOM updates via requestAnimationFrame for smooth 60fps rendering.
+        if (!state._rafPending) {
+            state._rafPending = true;
+            requestAnimationFrame(() => {
+                if (state.currentPath) {
+                    state.currentPath.setAttribute('d', state._pathPrefix + state._pathSuffix);
+                }
+                state._rafPending = false;
+            });
+        }
     }
 
     function endStroke() {
         if (!state.isDrawing) return;
         state.isDrawing = false;
         if (!state.currentPath) return;
+
+        // Flush any pending rAF so the final stroke segment is not lost.
+        if (state._rafPending && state.currentPath) {
+            state.currentPath.setAttribute('d', state._pathPrefix + state._pathSuffix);
+            state._rafPending = false;
+        }
 
         if (state.currentPoints.length === 1) {
             // Single tap/click — render as a small filled circle.

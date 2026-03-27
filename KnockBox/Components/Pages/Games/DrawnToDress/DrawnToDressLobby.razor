@@ -4,7 +4,15 @@
 
 <PageTitle>Drawn To Dress</PageTitle>
 
-<div class="content">
+<HeadContent>
+    <link rel="stylesheet" href="css/dtd-shared.css" />
+</HeadContent>
+
+<DtdAriaAnnouncer @ref="_announcer" />
+
+<div class="content dtd-game" role="main">
+    <h1 class="dtd-sr-only">Drawn To Dress Game</h1>
+
     @if (GameState is null)
     {
         <div>Loading...</div>

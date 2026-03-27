@@ -1,6 +1,3 @@
-@using KnockBox.Core.Services.State.Games.Shared
-@using KnockBox.Services.Logic.Games.DrawnToDress.FSM
-@using KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
 @using KnockBox.Services.State.Games.DrawnToDress
 @using KnockBox.Services.State.Games.DrawnToDress.Data
 @using KnockBox.Services.State.Users
@@ -26,18 +23,7 @@
             <span class="dtd-voting-phase-name">Voting Round @(roundIndex + 1) of @totalConfiguredRounds</span>
         </div>
 
-        @if (GameState.PhaseDeadlineUtc.HasValue &&
-             GameState.Context?.Fsm?.CurrentState is ITimedGameState<DrawnToDressGameContext, DrawnToDressCommand> timedState)
-        {
-            var remaining = timedState.GetRemainingTime(GameState.Context!, DateTimeOffset.UtcNow);
-            if (remaining.IsSuccess)
-            {
-                var secs = (int)Math.Max(0, Math.Ceiling(remaining.Value.TotalSeconds));
-                <div class="dtd-voting-timer @(secs <= 10 ? "dtd-voting-timer-urgent" : "")">
-                    ⏱ @secs s
-                </div>
-            }
-        }
+        <TimerDisplay GameState="GameState" />
     </div>
 
     @if (currentRound is null)
@@ -70,7 +56,7 @@
                 bool isCompeting = IsCompetingInMatchup(matchup);
                 bool alreadySubmitted = HasAlreadySubmittedVotesForMatchup(matchup.Id);
 
-                <div class="dtd-voting-matchup-card">
+                <div class="dtd-voting-matchup-card" role="group" aria-label="Matchup: @GetEntrantLabel(matchup.EntrantAId) vs @GetEntrantLabel(matchup.EntrantBId)">
                     @if (isCompeting)
                     {
                         <div class="dtd-voting-competing">
@@ -99,7 +85,8 @@
                                 @if (outfitA is not null)
                                 {
                                     <svg class="dtd-voting-outfit-preview" viewBox="0 0 600 @TotalOutfitHeight"
-                                         preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
+                                         preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg"
+                                         role="img" aria-label="@($"Outfit by {GetEntrantLabel(matchup.EntrantAId)}{(string.IsNullOrWhiteSpace(outfitA.Customization.OutfitName) ? "" : $": {outfitA.Customization.OutfitName}")}")">
                                         @{ int yOffA = 0; }
                                         @foreach (var ct in GameState.Config.ClothingTypes)
                                         {
@@ -139,7 +126,8 @@
                                 @if (outfitB is not null)
                                 {
                                     <svg class="dtd-voting-outfit-preview" viewBox="0 0 600 @TotalOutfitHeight"
-                                         preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
+                                         preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg"
+                                         role="img" aria-label="@($"Outfit by {GetEntrantLabel(matchup.EntrantBId)}{(string.IsNullOrWhiteSpace(outfitB.Customization.OutfitName) ? "" : $": {outfitB.Customization.OutfitName}")}")">
                                         @{ int yOffB = 0; }
                                         @foreach (var ct in GameState.Config.ClothingTypes)
                                         {
@@ -184,10 +172,14 @@
                                     <span class="dtd-voting-criterion-label">@criterion.DisplayName</span>
                                     <div class="dtd-voting-criterion-buttons">
                                         <button class="dtd-btn dtd-btn-vote @(selected == matchup.EntrantAId ? "dtd-btn-vote-selected" : "")"
+                                                aria-pressed="@(selected == matchup.EntrantAId ? "true" : "false")"
+                                                aria-label="Vote for @GetEntrantLabel(matchup.EntrantAId) on @criterion.DisplayName"
                                                 @onclick="() => SelectVote(matchup.Id, criterion.Id, matchup.EntrantAId)">
                                             Choose A
                                         </button>
                                         <button class="dtd-btn dtd-btn-vote @(selected == matchup.EntrantBId ? "dtd-btn-vote-selected" : "")"
+                                                aria-pressed="@(selected == matchup.EntrantBId ? "true" : "false")"
+                                                aria-label="Vote for @GetEntrantLabel(matchup.EntrantBId) on @criterion.DisplayName"
                                                 @onclick="() => SelectVote(matchup.Id, criterion.Id, matchup.EntrantBId)">
                                             Choose B
                                         </button>

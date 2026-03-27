@@ -94,3 +94,19 @@
     color: #9ca3af;
     font-style: italic;
 }
+
+/* ── Responsive ────────────────────────────────────────────────────────────── */
+
+@media (max-width: 480px) {
+    .dtd-reveal-countdown-card {
+        padding: 24px 20px;
+    }
+
+    .dtd-reveal-heading {
+        font-size: 1.3rem;
+    }
+
+    .dtd-reveal-number {
+        font-size: 3.5rem;
+    }
+}

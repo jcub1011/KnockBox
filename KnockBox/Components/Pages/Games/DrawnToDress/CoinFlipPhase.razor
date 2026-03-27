@@ -1,6 +1,3 @@
-@using KnockBox.Core.Services.State.Games.Shared
-@using KnockBox.Services.Logic.Games.DrawnToDress.FSM
-@using KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
 @using KnockBox.Services.State.Games.DrawnToDress
 @using KnockBox.Services.State.Games.DrawnToDress.Data
 @using KnockBox.Services.State.Users
@@ -25,18 +22,7 @@
             }
         </div>
 
-        @if (GameState.PhaseDeadlineUtc.HasValue &&
-             GameState.Context?.Fsm?.CurrentState is ITimedGameState<DrawnToDressGameContext, DrawnToDressCommand> timedState)
-        {
-            var remaining = timedState.GetRemainingTime(GameState.Context!, DateTimeOffset.UtcNow);
-            if (remaining.IsSuccess)
-            {
-                var secs = (int)Math.Max(0, Math.Ceiling(remaining.Value.TotalSeconds));
-                <div class="dtd-coinflip-timer @(secs <= 5 ? "dtd-coinflip-timer-urgent" : "")">
-                    @secs s
-                </div>
-            }
-        }
+        <TimerDisplay GameState="GameState" />
     </div>
 
     @if (currentFlip is not null)
@@ -81,7 +67,7 @@
         @if (currentFlip.IsResolved)
         {
             <!-- ── Result display ──────────────────────────────────────── -->
-            <div class="dtd-coinflip-result">
+            <div class="dtd-coinflip-result" role="status">
                 @if (currentFlip.IsAutoResolved)
                 {
                     <p class="dtd-coinflip-timeout">Time's up! @(currentFlip.CallerChoseHeads ? "Heads" : "Tails") was chosen for you.</p>
@@ -114,12 +100,14 @@
                 <div class="dtd-coinflip-buttons">
                     <button class="dtd-btn dtd-btn-coinflip dtd-btn-heads"
                             @onclick="() => CallCoinFlipAsync(true)"
-                            disabled="@_submitting">
+                            disabled="@_submitting"
+                            aria-label="Call Heads">
                         Heads
                     </button>
                     <button class="dtd-btn dtd-btn-coinflip dtd-btn-tails"
                             @onclick="() => CallCoinFlipAsync(false)"
-                            disabled="@_submitting">
+                            disabled="@_submitting"
+                            aria-label="Call Tails">
                         Tails
                     </button>
                 </div>

@@ -83,3 +83,15 @@
     color: #ef4444;
     font-size: 0.875rem;
 }
+
+/* ── Responsive ────────────────────────────────────────────────────────────── */
+
+@media (max-width: 480px) {
+    .dtd-theme-selection {
+        padding: 1rem 0.75rem;
+    }
+
+    .dtd-theme-candidate-grid {
+        grid-template-columns: 1fr;
+    }
+}

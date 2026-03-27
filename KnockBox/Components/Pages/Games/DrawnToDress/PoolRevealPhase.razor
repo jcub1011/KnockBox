@@ -30,7 +30,8 @@
         <div class="dtd-reveal-icon">👗</div>
         <h2 class="dtd-reveal-heading">@HeadingText</h2>
         <p class="dtd-reveal-subtext">@SubText</p>
-        <div class="dtd-reveal-number @(remainingSeconds <= 5 ? "dtd-reveal-number-urgent" : "")">
+        <div class="dtd-reveal-number @(remainingSeconds <= 5 ? "dtd-reveal-number-urgent" : "")"
+             role="timer" aria-label="@remainingSeconds seconds remaining">
             @remainingSeconds
         </div>
         <p class="dtd-reveal-hint">

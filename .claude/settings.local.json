@@ -4,7 +4,8 @@
       "Bash(xargs grep:*)",
       "Bash(ls:*)",
       "Bash(dotnet build:*)",
-      "Bash(dotnet test:*)"
+      "Bash(dotnet test:*)",
+      "Bash(cd /c/Users/Jacob McCormack/source/repos/KnockBox/KnockBox.DrawnToDress)"
     ]
   }
 }

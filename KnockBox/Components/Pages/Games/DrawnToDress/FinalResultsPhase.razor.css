@@ -61,6 +61,11 @@
     font-size: 1.25rem;
 }
 
+.dtd-final-results-table-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
 .dtd-final-results-table {
     width: 100%;
     border-collapse: collapse;
@@ -135,6 +140,14 @@
 
 .dtd-final-results-row-winner.dtd-final-results-row-clickable:hover {
     background: #fef9c3;
+}
+
+.dtd-final-results-expand-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    vertical-align: middle;
 }
 
 .dtd-final-results-expand-icon {
