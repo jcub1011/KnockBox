@@ -26,5 +26,38 @@
         </section>
     </div>
 
+    <h2 style="margin-top: 48px;">Resolution-Independent Canvases</h2>
+    <p class="demo-hint">
+        These canvases all share a <strong>600&times;600</strong> viewBox coordinate space but are displayed at
+        different screen sizes. Strokes drawn on any of them produce identical SVG output — the drawing
+        resolution is independent of the on-screen size.
+    </p>
+
+    <div class="demo-canvases">
+        <section>
+            <h3>600&times;600 viewBox at full size (600px)</h3>
+            <SvgDrawingCanvas Width="600px" Height="660px"
+                              ViewBoxWidth="600" ViewBoxHeight="600" />
+        </section>
+
+        <section>
+            <h3>600&times;600 viewBox at half size (300px)</h3>
+            <SvgDrawingCanvas Width="300px" Height="360px"
+                              ViewBoxWidth="600" ViewBoxHeight="600" />
+        </section>
+
+        <section>
+            <h3>600&times;400 viewBox in a wide container</h3>
+            <SvgDrawingCanvas Width="600px" Height="500px"
+                              ViewBoxWidth="600" ViewBoxHeight="400" />
+        </section>
+
+        <section>
+            <h3>400&times;600 viewBox in a narrow container</h3>
+            <SvgDrawingCanvas Width="300px" Height="520px"
+                              ViewBoxWidth="400" ViewBoxHeight="600" />
+        </section>
+    </div>
+
     <p class="demo-debug-badge">⚠ DEBUG build only — this page is excluded from release builds.</p>
 </div>
