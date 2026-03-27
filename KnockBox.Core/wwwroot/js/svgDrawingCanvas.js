@@ -92,6 +92,17 @@ function triggerSvgDownload(state, fileName, backgroundColor) {
     const height = hasViewBox ? vb.height : Math.round(svgEl.getBoundingClientRect().height);
 
     const clone = svgEl.cloneNode(true);
+
+    // Strip DOM-only attributes (Blazor CSS isolation, class, id, inline style) that
+    // are meaningless in a standalone SVG file and can confuse basic renderers (e.g.
+    // Windows thumbnail generators).
+    clone.removeAttribute('id');
+    clone.removeAttribute('class');
+    clone.removeAttribute('style');
+    for (const attr of [...clone.attributes]) {
+        if (attr.name.startsWith('b-')) clone.removeAttribute(attr.name);
+    }
+
     clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
     clone.setAttribute('width', width);
     clone.setAttribute('height', height);
@@ -99,8 +110,8 @@ function triggerSvgDownload(state, fileName, backgroundColor) {
 
     // Insert background rect as the first child so it renders behind all strokes.
     const bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-    bg.setAttribute('width', '100%');
-    bg.setAttribute('height', '100%');
+    bg.setAttribute('width', width);
+    bg.setAttribute('height', height);
     bg.setAttribute('fill', backgroundColor || state.svg.style.backgroundColor || state.backgroundColor);
     clone.insertBefore(bg, clone.firstChild);
 
