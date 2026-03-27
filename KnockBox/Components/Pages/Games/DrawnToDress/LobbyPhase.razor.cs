@@ -134,6 +134,7 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
                     cfg.VotingTimeSec = 30;
                     cfg.NumOutfitRounds = 1;
                     cfg.VotingRounds = 2;
+                    cfg.AllowReuseOwnItems = true;
                 }),
             ("Standard", "Default settings",
                 cfg =>
@@ -144,6 +145,7 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
                     cfg.VotingTimeSec = 60;
                     cfg.NumOutfitRounds = 1;
                     cfg.VotingRounds = 3;
+                    cfg.AllowReuseOwnItems = true;
                 }),
             ("Full Experience", "Longer timers, 2 outfit rounds",
                 cfg =>
@@ -154,6 +156,7 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
                     cfg.VotingTimeSec = 90;
                     cfg.NumOutfitRounds = 2;
                     cfg.VotingRounds = 4;
+                    cfg.AllowReuseOwnItems = true;
                 }),
             ("Creative Focus", "Extra drawing & customization time, sketching required",
                 cfg =>
@@ -165,6 +168,7 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
                     cfg.NumOutfitRounds = 1;
                     cfg.VotingRounds = 3;
                     cfg.SketchingRequired = true;
+                    cfg.AllowReuseOwnItems = true;
                 }),
         ];
 
