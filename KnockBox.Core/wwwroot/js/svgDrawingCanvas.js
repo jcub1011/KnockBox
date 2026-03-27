@@ -14,6 +14,97 @@ function rgbToHex(rgb) {
 }
 
 /**
+ * Computes the triangle area formed by three {x, y} points using the cross-product formula.
+ * Returns the absolute area (not halved) for efficiency — only relative ordering matters.
+ * @param {{x: number, y: number}} a
+ * @param {{x: number, y: number}} b
+ * @param {{x: number, y: number}} c
+ * @returns {number}
+ */
+function triangleArea(a, b, c) {
+    return Math.abs((b.x - a.x) * (c.y - a.y) - (c.x - a.x) * (b.y - a.y));
+}
+
+/**
+ * Simplifies an array of {x, y} points using the Visvalingam-Whyatt algorithm.
+ *
+ * The algorithm iteratively removes the point whose removal causes the least
+ * change in shape (measured by the area of the triangle it forms with its
+ * neighbors). This preserves high-curvature features while aggressively
+ * pruning near-collinear runs, making it well-suited for freehand drawings.
+ *
+ * @param {{x: number, y: number}[]} points - Input polyline (not mutated).
+ * @param {number} [minArea=2] - Minimum effective area threshold. Points whose
+ *     triangle area is below this value are candidates for removal. Higher
+ *     values yield more aggressive simplification. Reasonable range for
+ *     screen-space SVG coordinates: 0.5 (subtle) to 8 (aggressive).
+ * @param {number} [minPoints=3] - Never reduce below this many points.
+ *     Defaults to 3 so that a stroke always retains start, middle, and end.
+ * @returns {{x: number, y: number}[]} A new array with a subset of the original points.
+ */
+function visvalingamWhyatt(points, minArea = 2, minPoints = 3) {
+    const len = points.length;
+    if (len <= minPoints) return points.slice();
+
+    // Build a doubly-linked list so removals are O(1).
+    const nodes = points.map((p, i) => ({ x: p.x, y: p.y, index: i, prev: null, next: null, area: Infinity }));
+    for (let i = 0; i < len; i++) {
+        nodes[i].prev = nodes[i - 1] || null;
+        nodes[i].next = nodes[i + 1] || null;
+    }
+
+    // Compute initial effective areas (endpoints keep Infinity so they're never removed).
+    for (let i = 1; i < len - 1; i++) {
+        nodes[i].area = triangleArea(nodes[i].prev, nodes[i], nodes[i].next);
+    }
+
+    // Use a simple min-scan approach. For typical freehand stroke sizes (hundreds of
+    // points at most) this is fast enough and avoids the complexity of a binary heap
+    // that must support key-decrease operations.
+    let remaining = len;
+
+    while (remaining > minPoints) {
+        // Find the interior node with the smallest area.
+        let minNode = null;
+        let minVal = Infinity;
+        let cur = nodes[0].next; // skip first endpoint
+        while (cur && cur.next) { // skip last endpoint
+            if (cur.area < minVal) {
+                minVal = cur.area;
+                minNode = cur;
+            }
+            cur = cur.next;
+        }
+
+        if (!minNode || minVal >= minArea) break; // All remaining points are significant.
+
+        // Remove the node from the linked list.
+        minNode.prev.next = minNode.next;
+        minNode.next.prev = minNode.prev;
+        remaining--;
+
+        // Recalculate areas for the two neighbors that are now adjacent to each other.
+        const prev = minNode.prev;
+        const next = minNode.next;
+        if (prev.prev) {
+            prev.area = Math.max(triangleArea(prev.prev, prev, next), minVal);
+        }
+        if (next.next) {
+            next.area = Math.max(triangleArea(prev, next, next.next), minVal);
+        }
+    }
+
+    // Walk the surviving linked list to build the result.
+    const result = [];
+    let node = nodes[0];
+    while (node) {
+        result.push({ x: node.x, y: node.y });
+        node = node.next;
+    }
+    return result;
+}
+
+/**
  * Sets or clears the visual disabled state on the undo button.
  * A CSS class is used instead of the HTML `disabled` attribute so that clicks still
  * bubble to the container's delegated event listener.
@@ -157,6 +248,9 @@ export function initialize(svgId, dotNetRef, initialColor, initialStrokeWidth, i
         currentPath: null,
         currentPoints: [],
         paths: [],
+        /** Visvalingam-Whyatt minimum area threshold for stroke simplification.
+         *  0 = no simplification; 0.5 = subtle; 2 = balanced (default); 8 = aggressive. */
+        simplifyMinArea: 2,
     };
 
     instances.set(svgId, state);
@@ -247,6 +341,13 @@ export function initialize(svgId, dotNetRef, initialColor, initialStrokeWidth, i
             svg.replaceChild(dot, state.currentPath);
             state.paths.push(dot);
         } else {
+            // Simplify the stroke using Visvalingam-Whyatt before committing.
+            const simplified = visvalingamWhyatt(
+                state.currentPoints,
+                state.simplifyMinArea ?? 2,
+                3
+            );
+            state.currentPath.setAttribute('d', buildPath(simplified));
             state.paths.push(state.currentPath);
         }
 
@@ -476,6 +577,19 @@ export function setStrokeWidth(svgId, width) {
     const state = instances.get(svgId);
     if (!state) return;
     state.strokeWidth = width;
+}
+
+/**
+ * Sets the Visvalingam-Whyatt minimum area threshold used to simplify strokes
+ * when they are completed. A value of 0 disables simplification entirely.
+ * Recommended range: 0.5 (subtle) – 8 (aggressive). Default is 2.
+ * @param {string} svgId
+ * @param {number} minArea
+ */
+export function setSimplifyMinArea(svgId, minArea) {
+    const state = instances.get(svgId);
+    if (!state) return;
+    state.simplifyMinArea = Math.max(0, minArea);
 }
 
 /**
