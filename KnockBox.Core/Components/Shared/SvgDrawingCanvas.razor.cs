@@ -146,7 +146,7 @@ namespace KnockBox.Core.Components.Shared
             if (_jsModule is null) return null;
             try
             {
-                var content = await ReadSvgInChunksAsync();
+                var content = await ReadSvgInChunksWithBgAsync();
                 if (string.IsNullOrEmpty(content)) return null;
                 return ClipboardService.Store(content);
             }
@@ -267,7 +267,13 @@ namespace KnockBox.Core.Components.Shared
         /// fail for complex drawings that exceed the default 32 KB receive limit.
         /// </para>
         /// </summary>
-        private async Task<string?> ReadSvgInChunksAsync()
+        private Task<string?> ReadSvgInChunksAsync()
+            => ReadSvgInChunksAsync("prepareSvgContentForChunkedRead");
+
+        private Task<string?> ReadSvgInChunksWithBgAsync()
+            => ReadSvgInChunksAsync("prepareSvgContentWithBgForChunkedRead");
+
+        private async Task<string?> ReadSvgInChunksAsync(string prepareFunction)
         {
             if (_jsModule is null)
             {
@@ -277,7 +283,7 @@ namespace KnockBox.Core.Components.Shared
 
             // First call: JS serializes the SVG into a per-instance cache and returns
             // the total character count. This response is always tiny (just an int).
-            var totalLength = await _jsModule.InvokeAsync<int>("prepareSvgContentForChunkedRead", _svgId);
+            var totalLength = await _jsModule.InvokeAsync<int>(prepareFunction, _svgId);
             if (totalLength == 0) return null;
 
             // Fetch the cached SVG string in bounded chunks so that no single SignalR

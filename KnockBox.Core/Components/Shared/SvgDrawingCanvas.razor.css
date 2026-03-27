@@ -38,8 +38,8 @@
 }
 
 .toolbar-swatch {
-    width: 22px;
-    height: 22px;
+    width: 36px;
+    height: 36px;
     border-radius: 50%;
     border: 2px solid rgba(0, 0, 0, 0.15);
     cursor: pointer;
@@ -60,11 +60,11 @@
     }
 
 .toolbar-color {
-    width: 26px;
-    height: 26px;
+    width: 36px;
+    height: 36px;
     padding: 0;
     border: 1px solid #bbb;
-    border-radius: 4px;
+    border-radius: 8px;
     cursor: pointer;
     background: none;
     flex-shrink: 0;
@@ -77,13 +77,13 @@
 }
 
 .toolbar-size-btn {
-    width: 28px;
-    height: 28px;
+    width: 36px;
+    height: 36px;
     border: 1px solid #ccc;
-    border-radius: 4px;
+    border-radius: 10px;
     background: #fff;
     cursor: pointer;
-    font-size: 0.75rem;
+    font-size: 1rem;
     font-weight: 600;
     color: #555;
     padding: 0;
@@ -102,12 +102,12 @@
     }
 
 .toolbar-size {
-    width: 42px;
-    height: 28px;
+    width: 36px;
+    height: 36px;
     padding: 0 4px;
     border: 1px solid #ccc;
-    border-radius: 4px;
-    font-size: 0.8rem;
+    border-radius: 10px;
+    font-size: 1rem;
     text-align: center;
     -moz-appearance: textfield;
 }
@@ -125,6 +125,7 @@
     align-items: center;
     gap: 4px;
     margin-left: auto;
+    position: relative;
 }
 
 .toolbar-btn {
@@ -132,19 +133,19 @@
     align-items: center;
     justify-content: center;
     padding: 4px;
-    width: 28px;
-    height: 28px;
+    width: 36px;
+    height: 36px;
     background: #fff;
     border: 1px solid #ccc;
-    border-radius: 4px;
+    border-radius: 10px;
     cursor: pointer;
     transition: background 0.15s, border-color 0.15s;
     line-height: 1;
 }
 
 .toolbar-icon {
-    width: 16px;
-    height: 16px;
+    width: 24px;
+    height: 24px;
     flex-shrink: 0;
 }
 
@@ -167,10 +168,16 @@
 /* ── Copy/paste toast ────────────────────────────────────────────────────── */
 
 .toolbar-copy-toast {
+    position: absolute;
+    right: 100%;
+    top: 50%;
+    transform: translateY(-50%);
+    margin-right: 6px;
     font-size: 0.75rem;
     font-weight: 600;
     color: #15803d;
     white-space: nowrap;
+    pointer-events: none;
     animation: toolbar-toast-fade 1.5s ease-out forwards;
 }
 

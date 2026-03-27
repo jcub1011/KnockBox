@@ -511,6 +511,37 @@ function serializePaths(paths) {
 }
 
 /**
+ * Serializes paths and the current background color into a storable string.
+ * Format: `bg:<color>\n<svg markup>` — the bg line is stripped on load.
+ * @param {object} state - Canvas instance state.
+ * @returns {string}
+ */
+function serializeWithBackground(state) {
+    const markup = serializePaths(state.paths);
+    if (!markup) return '';
+    const bg = state.svg.style.backgroundColor || state.backgroundColor || 'white';
+    return `bg:${bg}\n${markup}`;
+}
+
+/**
+ * Parses a serialized string that may contain a `bg:` prefix line.
+ * @param {string} data
+ * @returns {{ background: string|null, markup: string }}
+ */
+function parseSerializedContent(data) {
+    if (data.startsWith('bg:')) {
+        const newline = data.indexOf('\n');
+        if (newline !== -1) {
+            return {
+                background: data.substring(3, newline),
+                markup: data.substring(newline + 1),
+            };
+        }
+    }
+    return { background: null, markup: data };
+}
+
+/**
  * Serializes the current drawing as a string used by the server-side copy/paste flow.
  * Only elements tracked in state.paths are included, and each is rebuilt from an
  * attribute allowlist to prevent injected DOM content from being captured.
@@ -545,6 +576,20 @@ export function prepareSvgContentForChunkedRead(svgId) {
         return 0;
     }
     state._readCache = serializePaths(state.paths);
+    return state._readCache.length;
+}
+
+/**
+ * Like prepareSvgContentForChunkedRead but includes background color in the
+ * serialized output for copy/paste sharing.
+ */
+export function prepareSvgContentWithBgForChunkedRead(svgId) {
+    const state = instances.get(svgId);
+    if (!state || state.paths.length === 0) {
+        if (state) state._readCache = '';
+        return 0;
+    }
+    state._readCache = serializeWithBackground(state);
     return state._readCache.length;
 }
 
@@ -589,10 +634,16 @@ export function loadSvgContent(svgId, svgContent) {
         return 0;
     }
 
+    // Parse background color if present.
+    const { background, markup } = parseSerializedContent(svgContent);
+    if (background) {
+        state.svg.style.backgroundColor = background;
+    }
+
     // DOMParser requires a root element; wrap the markup in a temporary <svg>.
     const parser = new DOMParser();
     const doc = parser.parseFromString(
-        `<svg xmlns="http://www.w3.org/2000/svg">${svgContent}</svg>`,
+        `<svg xmlns="http://www.w3.org/2000/svg">${markup}</svg>`,
         'image/svg+xml'
     );
 
