@@ -57,6 +57,12 @@ namespace KnockBox.Services.State.Games.DrawnToDress.Data
         }
 
         /// <summary>
+        /// The name the player has typed for their outfit, but not yet finalized.
+        /// Used to recover the name if the timer expires before manual submission.
+        /// </summary>
+        public string? DraftOutfitName { get; set; }
+
+        /// <summary>
         /// Bonus points earned by this player through achievements during the game
         /// (e.g. submitting an outfit before the deadline).
         /// </summary>

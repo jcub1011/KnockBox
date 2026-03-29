@@ -101,13 +101,17 @@
                     }
                 </div>
 
-                <!-- ── Drawing ──────────────────────────────────────────── -->
-                <h4 class="dtd-settings-section">🖊️ Drawing</h4>
+                <!-- ── Drawing ────────────────────────────────────────────── -->
+                <h4 class="dtd-settings-section">🎨 Drawing</h4>
                 <div class="dtd-settings-grid">
                     <label class="dtd-setting-label">
-                        Drawing Time (seconds):
-                        <input type="number" min="30" class="dtd-setting-input"
+                        Drawing Time (sec):
+                        <input type="number" min="30" max="600" step="10" class="dtd-setting-input"
                                @bind="EditConfig.DrawingTimeSec" @bind:after="ApplyConfig" />
+                    </label>
+                    <label class="dtd-setting-label">
+                        <input type="checkbox" @bind="EditConfig.ShowMannequin" @bind:after="ApplyConfig" />
+                        Show Mannequin Reference
                     </label>
                     <label class="dtd-setting-label">
                         Theme Announcement Time (seconds):
@@ -121,6 +125,30 @@
                     </label>
                 </div>
 
+                <!-- ── Clothing Types ─────────────────────────────────────── -->
+                <h4 class="dtd-settings-section">👕 Clothing Categories</h4>
+                <div class="dtd-clothing-types-editor">
+                    @foreach (var ct in EditConfig.ClothingTypes)
+                    {
+                        <div class="dtd-clothing-type-row">
+                            <input type="text" class="dtd-setting-input dtd-ct-name" @bind="ct.DisplayName" @bind:after="ApplyConfig" placeholder="Name" />
+                            <div class="dtd-ct-dims">
+                                <input type="number" class="dtd-setting-input dtd-ct-dim" @bind="ct.CanvasWidth" @bind:after="ApplyConfig" title="Width" />
+                                <span>×</span>
+                                <input type="number" class="dtd-setting-input dtd-ct-dim" @bind="ct.CanvasHeight" @bind:after="ApplyConfig" title="Height" />
+                            </div>
+                            <div class="dtd-ct-actions">
+                                <button class="dtd-btn-icon" @onclick="() => MoveClothingType(ct.Id, -1)" title="Move Up">↑</button>
+                                <button class="dtd-btn-icon" @onclick="() => MoveClothingType(ct.Id, 1)" title="Move Down">↓</button>
+                                <button class="dtd-btn-icon dtd-btn-delete" @onclick="() => RemoveClothingType(ct.Id)" title="Remove">✕</button>
+                            </div>
+                        </div>
+                    }
+                    <button class="dtd-btn dtd-btn-secondary dtd-btn-sm" @onclick="AddClothingType">
+                        ＋ Add Category
+                    </button>
+                </div>
+
                 <!-- ── Theme ────────────────────────────────────────────── -->
                 <h4 class="dtd-settings-section">🎭 Theme</h4>
                 <div class="dtd-settings-grid">
@@ -130,6 +158,15 @@
                             @foreach (var source in Enum.GetValues<ThemeSource>())
                             {
                                 <option value="@source">@source</option>
+                            }
+                        </select>
+                    </label>
+                    <label class="dtd-setting-label">
+                        Theme Reveal:
+                        <select class="dtd-setting-select" @bind="EditConfig.ThemeAnnouncement" @bind:after="ApplyConfig">
+                            @foreach (var announcement in Enum.GetValues<ThemeAnnouncement>())
+                            {
+                                <option value="@announcement">@announcement</option>
                             }
                         </select>
                     </label>
@@ -161,7 +198,7 @@
                 </div>
 
                 <!-- ── Voting ────────────────────────────────────────────── -->
-                <h4 class="dtd-settings-section">🗳️ Voting</h4>
+                <h4 class="dtd-settings-section">🗳 Voting</h4>
                 <div class="dtd-settings-grid">
                     <label class="dtd-setting-label">
                         Voting Time (seconds):

@@ -50,6 +50,9 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
                 case SubmitCustomizationCommand cmd:
                     return HandleSubmitCustomization(context, cmd);
 
+                case UpdateDraftOutfitNameCommand cmd:
+                    return HandleUpdateDraftOutfitName(context, cmd);
+
                 case PauseGameCommand:
                     return new PausedState(this);
 
@@ -117,7 +120,7 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
 
             if (cmd.ItemPositionOverrides is { Count: > 0 })
             {
-                int canvasWidth = context.Config.ClothingTypes.FirstOrDefault()?.CanvasWidth ?? 600;
+                int canvasWidth = context.Config.ClothingTypes.FirstOrDefault()?.CanvasWidth ?? 400;
                 int totalHeight = context.Config.ClothingTypes.Sum(ct => ct.CanvasHeight);
 
                 foreach (var kvp in cmd.ItemPositionOverrides)
@@ -145,8 +148,34 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
             return null;
         }
 
+        private ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?> HandleUpdateDraftOutfitName(
+            DrawnToDressGameContext context, UpdateDraftOutfitNameCommand cmd)
+        {
+            var player = context.GetPlayer(cmd.PlayerId);
+            if (player is not null)
+            {
+                player.DraftOutfitName = cmd.DraftName;
+                context.State.StateChangedEventManager.Notify();
+            }
+            return null;
+        }
+
         private IGameState<DrawnToDressGameContext, DrawnToDressCommand> ChooseNextState(DrawnToDressGameContext context)
         {
+            // Apply draft names for any player who hasn't manually submitted yet.
+            foreach (var player in context.GamePlayers.Values)
+            {
+                if (player.IsReady) continue;
+                var outfit = player.GetOutfit(_outfitRound);
+                if (outfit is not null && !string.IsNullOrWhiteSpace(player.DraftOutfitName))
+                {
+                    outfit.Customization.OutfitName = player.DraftOutfitName.Trim();
+                    context.Logger.LogInformation(
+                        "Applying draft name \"{name}\" for player [{id}] (timer expired).",
+                        outfit.Customization.OutfitName, player.PlayerId);
+                }
+            }
+
             if (_outfitRound < context.Config.NumOutfitRounds)
             {
                 // More outfit rounds to go — check distinctness, then proceed to next round.

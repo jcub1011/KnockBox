@@ -20,6 +20,7 @@
 
     var myOutfit = myPlayer?.GetOutfit(OutfitRound);
 
+    int canvasWidth = GameState.Config.ClothingTypes.FirstOrDefault()?.CanvasWidth ?? 600;
     int totalOutfitHeight = GameState.Config.ClothingTypes.Sum(ct => ct.CanvasHeight);
 
     // Build a composite background SVG from the player's selected outfit items, applying
@@ -28,27 +29,47 @@
     if (!isHost && !hasSubmitted && myOutfit is not null)
     {
         var bgParts = new System.Text.StringBuilder();
-        int yOffset = 0;
-        foreach (var ct in GameState.Config.ClothingTypes)
-        {
-            if (myOutfit.SelectedItemsByType.TryGetValue(ct.Id, out var itemId)
-                && GameState.ClothingPool.TryGetValue(itemId, out var bgItem)
-                && bgItem.SvgContent is not null)
-            {
-                double itemX = 0;
-                double itemY = yOffset;
-                if (_itemPositions.TryGetValue(ct.Id, out var posOverride))
-                {
-                    itemX = posOverride.X;
-                    itemY = posOverride.Y;
-                }
 
-                bgParts.Append($"<g transform=\"translate({itemX},{itemY})\">");
-                bgParts.Append(bgItem.SvgContent);
-                bgParts.Append("</g>");
+        if (_mode == InteractionMode.Draw)
+        {
+            foreach (var ct in GameState.Config.ClothingTypes)
+            {
+                if (myOutfit.SelectedItemsByType.TryGetValue(ct.Id, out var itemId)
+                    && GameState.ClothingPool.TryGetValue(itemId, out var bgItem)
+                    && bgItem.SvgContent is not null)
+                {
+                    double itemX = 0;
+                    double itemY = 0;
+                    if (_itemPositions.TryGetValue(ct.Id, out var posOverride))
+                    {
+                        itemX = posOverride.X;
+                        itemY = posOverride.Y;
+                    }
+
+                    bgParts.Append($"<g transform=\"translate({itemX},{itemY})\">");
+                    bgParts.Append(bgItem.SvgContent);
+                    bgParts.Append("</g>");
+                }
             }
-            yOffset += ct.CanvasHeight;
         }
+
+        if (_showMannequin && GameState.Config.ShowMannequin)
+        {
+            int mannequinXOffset = (canvasWidth / 2) - 600;
+            string mannequinSvg = $@"
+                <g transform=""translate({mannequinXOffset}, 200) scale(2, 2)"" fill-opacity=""0.3"" stroke=""#94a3b8"" stroke-width=""2"">
+                    <circle cx=""300"" cy=""80"" r=""50"" fill=""#e2e8f0"" />
+                    <path d=""M240,140 L360,140 L340,300 L260,300 Z"" fill=""#e2e8f0"" />
+                    <path d=""M240,140 L200,280"" stroke-linecap=""round"" />
+                    <path d=""M360,140 L400,280"" stroke-linecap=""round"" />
+                    <path d=""M260,300 L240,520"" fill=""none"" stroke=""#e2e8f0"" stroke-width=""40"" stroke-linecap=""round"" />
+                    <path d=""M340,300 L360,520"" fill=""none"" stroke=""#e2e8f0"" stroke-width=""40"" stroke-linecap=""round"" />
+                    <path d=""M220,520 L200,550 L250,550 Z"" fill=""#e2e8f0"" />
+                    <path d=""M380,520 L400,550 L350,550 Z"" fill=""#e2e8f0"" />
+                </g>";
+            bgParts.Insert(0, mannequinSvg);
+        }
+
         if (bgParts.Length > 0)
             outfitBackground = bgParts.ToString();
     }
@@ -136,8 +157,8 @@
                        type="text"
                        placeholder="Give your outfit a name…"
                        maxlength="60"
-                       @bind="_outfitName"
-                       @bind:event="oninput" />
+                       value="@_outfitName"
+                       @oninput="(e) => OnOutfitNameChangedAsync(e.Value?.ToString() ?? string.Empty)" />
             </div>
 
             <!-- ── Mode toggle ──────────────────────────────────────────── -->
@@ -177,30 +198,38 @@
                             <span>Move Items — drag to reposition</span>
                         }
                     </h4>
+                    @if (GameState.Config.ShowMannequin)
+                    {
+                        <div class="dtd-customization-sketch-options">
+                            <label style="display: flex; gap: 6px; align-items: center; font-size: 0.9rem; font-weight: 500; cursor: pointer; color: #4b5563;">
+                                <input type="checkbox" @bind="_showMannequin" style="width: 16px; height: 16px; cursor: pointer;" /> Show Mannequin Reference
+                            </label>
+                        </div>
+                    }
                 </div>
 
                 <div class="dtd-customization-canvas-wrapper @(_mode == InteractionMode.MoveItems ? "dtd-customization-canvas-move-mode" : "")">
-                    @* Drawing canvas — pointer-events disabled during Move mode *@
-                    <div style="@(_mode == InteractionMode.MoveItems ? "pointer-events: none;" : "")">
-                        <SvgDrawingCanvas @ref="_sketchCanvas"
-                                          Width="100%"
-                                          Height="@($"{totalOutfitHeight}px")"
-                                          ViewBoxWidth="600"
-                                          ViewBoxHeight="@totalOutfitHeight"
-                                          BackgroundColor="transparent"
-                                          BackgroundSvgContent="@outfitBackground" />
-                    </div>
-
-                    @* Drag layer — shown only in Move mode, overlays the drawing canvas *@
-                    @if (_mode == InteractionMode.MoveItems)
-                    {
-                        <svg id="@_dragSvgId"
-                             class="dtd-customization-drag-layer"
-                             viewBox="0 0 600 @totalOutfitHeight"
-                             preserveAspectRatio="xMidYMid meet"
-                             xmlns="http://www.w3.org/2000/svg">
-                        </svg>
-                    }
+                    <SvgDrawingCanvas @ref="_sketchCanvas"
+                                      Width="100%"
+                                      Height="100%"
+                                      ViewBoxWidth="@canvasWidth"
+                                      ViewBoxHeight="@totalOutfitHeight"
+                                      BackgroundColor="#ffffff"
+                                      BackgroundSvgContent="@outfitBackground"
+                                      ShowToolbar="@(_mode == InteractionMode.Draw)">
+                        <OverlayContent>
+                            @if (_mode == InteractionMode.MoveItems)
+                            {
+                                <svg id="@_dragSvgId"
+                                     class="dtd-customization-drag-layer"
+                                     width="@canvasWidth" height="@totalOutfitHeight"
+                                     viewBox="0 0 @canvasWidth @totalOutfitHeight"
+                                     preserveAspectRatio="xMidYMid meet"
+                                     xmlns="http://www.w3.org/2000/svg">
+                                </svg>
+                            }
+                        </OverlayContent>
+                    </SvgDrawingCanvas>
                 </div>
             </div>
 
@@ -225,7 +254,7 @@
                                            class="dtd-customization-position-input"
                                            value="@((int)posX)"
                                            min="0"
-                                           max="600"
+                                           max="@canvasWidth"
                                            @onchange="(e) => OnManualPositionChanged(typeId, true, e)" />
                                 </label>
                                 <label class="dtd-customization-position-input-label">

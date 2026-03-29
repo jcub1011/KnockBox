@@ -135,10 +135,13 @@ export function initialize(svgId, dotNetRef, items, viewBoxWidth, viewBoxHeight)
         let newX = pt.x - state.dragging.offsetX;
         let newY = pt.y - state.dragging.offsetY;
 
-        // Clamp within viewBox bounds
-        newX = Math.max(0, Math.min(newX, state.viewBoxWidth - info.width));
-        newY = Math.max(0, Math.min(newY, state.viewBoxHeight - info.height));
+        // Loosen clamping to allow horizontal shifting (e.g. up to 50% off-screen).
+        // This ensures players can still position items even if the canvas is narrow.
+        const hMargin = info.width * 0.5;
+        newX = Math.max(-hMargin, Math.min(newX, state.viewBoxWidth - info.width + hMargin));
 
+        // Keep vertical clamping strict to prevent items from being lost entirely.
+        newY = Math.max(0, Math.min(newY, state.viewBoxHeight - info.height));
         info.x = newX;
         info.y = newY;
         info.group.setAttribute('transform', `translate(${newX},${newY})`);

@@ -138,8 +138,9 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
             }
         }
 
-        protected int TotalOutfitHeight
-            => GameState.Config.ClothingTypes.Sum(ct => ct.CanvasHeight);
+        protected int TotalOutfitWidth => GameState.Config.ClothingTypes.FirstOrDefault()?.CanvasWidth ?? 600;
+
+        protected int TotalOutfitHeight => GameState.Config.ClothingTypes.Sum(ct => ct.CanvasHeight);
 
         protected static string? SafeSvgContent(string? raw)
             => SvgContentSanitizer.Sanitize(raw);

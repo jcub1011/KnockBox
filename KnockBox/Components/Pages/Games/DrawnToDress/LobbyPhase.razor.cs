@@ -38,19 +38,27 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
             EditConfig = new DrawnToDressConfig
             {
                 DrawingTimeSec = src.DrawingTimeSec,
+                ShowMannequin = src.ShowMannequin,
                 AllowSketchingDuringOutfitBuilding = src.AllowSketchingDuringOutfitBuilding,
                 ClothingTypes = src.ClothingTypes.Select(t => new ClothingTypeDefinition
                 {
                     Id = t.Id,
                     DisplayName = t.DisplayName,
                     AllowMultiple = t.AllowMultiple,
+                    CanvasWidth = t.CanvasWidth,
+                    CanvasHeight = t.CanvasHeight,
                 }).ToList(),
                 ThemeSource = src.ThemeSource,
+                ThemeAnnouncement = src.ThemeAnnouncement,
                 ThemeAnnouncementTimeSec = src.ThemeAnnouncementTimeSec,
                 OutfitBuildingTimeSec = src.OutfitBuildingTimeSec,
                 OutfitCustomizationTimeSec = src.OutfitCustomizationTimeSec,
                 AllowReuseOwnItems = src.AllowReuseOwnItems,
                 RequireDistinctItemsPerSlot = src.RequireDistinctItemsPerSlot,
+                NumOutfitRounds = src.NumOutfitRounds,
+                CanReuseOutfit1Items = src.CanReuseOutfit1Items,
+                Outfit2DistinctnessThreshold = src.Outfit2DistinctnessThreshold,
+                SketchingRequired = src.SketchingRequired,
                 VotingCriteria = src.VotingCriteria.Select(c => new VotingCriterionDefinition
                 {
                     Id = c.Id,
@@ -59,10 +67,48 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
                 }).ToList(),
                 VotingTimeSec = src.VotingTimeSec,
                 ShowCreatorDuringVoting = src.ShowCreatorDuringVoting,
+                VoteVisibility = src.VoteVisibility,
                 VotingRounds = src.VotingRounds,
                 BonusPointsForCompleteOutfit = src.BonusPointsForCompleteOutfit,
+                RoundLeaderBonusPoints = src.RoundLeaderBonusPoints,
+                TournamentWinnerBonusPoints = src.TournamentWinnerBonusPoints,
+                VotingRoundResultsTimeSec = src.VotingRoundResultsTimeSec,
+                CoinFlipTimeSec = src.CoinFlipTimeSec,
                 HostDisconnectTimeoutSec = src.HostDisconnectTimeoutSec,
             };
+        }
+
+        protected void AddClothingType()
+        {
+            var id = $"custom_{Guid.NewGuid():N}";
+            EditConfig.ClothingTypes.Add(new ClothingTypeDefinition
+            {
+                Id = id,
+                DisplayName = "New Category",
+                CanvasWidth = 600,
+                CanvasHeight = 600,
+            });
+            ApplyConfig();
+        }
+
+        protected void RemoveClothingType(string id)
+        {
+            EditConfig.ClothingTypes.RemoveAll(t => t.Id == id);
+            ApplyConfig();
+        }
+
+        protected void MoveClothingType(string id, int delta)
+        {
+            var idx = EditConfig.ClothingTypes.FindIndex(t => t.Id == id);
+            if (idx == -1) return;
+
+            int newIdx = idx + delta;
+            if (newIdx < 0 || newIdx >= EditConfig.ClothingTypes.Count) return;
+
+            var item = EditConfig.ClothingTypes[idx];
+            EditConfig.ClothingTypes.RemoveAt(idx);
+            EditConfig.ClothingTypes.Insert(newIdx, item);
+            ApplyConfig();
         }
 
         protected void ToggleSettings() => SettingsOpen = !SettingsOpen;
