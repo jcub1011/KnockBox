@@ -13,6 +13,11 @@ namespace KnockBox.Core.Services.State.Shared
         ValueResult<IDisposable> RegisterTickCallback(Action tickCallback, int tickInterval = 1);
 
         /// <summary>
+        /// The ticks that elapse per second.
+        /// </summary>
+        int TicksPerSecond { get; }
+
+        /// <summary>
         /// The time between ticks.
         /// </summary>
         TimeSpan TickInterval { get; }

@@ -106,6 +106,9 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
                     return new AbandonedState();
 
                 default:
+                    context.Logger.LogWarning(
+                        "ThemeSelectionState: unrecognized command [{type}] from player [{id}].",
+                        command.GetType().Name, command.PlayerId);
                     return null;
             }
         }
@@ -234,7 +237,7 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
         {
             // TODO: Replace with a proper injected theme repository in a later issue.
             var themes = FallbackThemes;
-            var theme = themes[Random.Shared.Next(themes.Length)];
+            var theme = themes[context.Random.GetRandomInt(themes.Length)];
             context.State.CurrentTheme = theme;
         }
 
@@ -255,7 +258,7 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
             var indices = Enumerable.Range(0, allThemes.Length).ToArray();
             for (int i = 0; i < count; i++)
             {
-                int j = Random.Shared.Next(i, indices.Length);
+                int j = context.Random.GetRandomInt(i, indices.Length);
                 (indices[i], indices[j]) = (indices[j], indices[i]);
             }
 
@@ -265,7 +268,7 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
         private static void SelectThemeFromPlayerSubmissions(DrawnToDressGameContext context)
         {
             var submissions = context.State.PlayerThemeSubmissions.Values.ToList();
-            var chosen = submissions[Random.Shared.Next(submissions.Count)];
+            var chosen = submissions[context.Random.GetRandomInt(submissions.Count)];
             // Trim the submitted text; use the trimmed text as both ID and display name.
             var trimmed = chosen.Trim();
             context.State.CurrentTheme = new ThemeDefinition(trimmed, trimmed);
@@ -281,7 +284,7 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
 
             int maxVotes = tally.Max(t => t.Votes);
             var winners = tally.Where(t => t.Votes == maxVotes).ToList();
-            var winnerId = winners[Random.Shared.Next(winners.Count)].ThemeId;
+            var winnerId = winners[context.Random.GetRandomInt(winners.Count)].ThemeId;
 
             context.State.CurrentTheme = context.State.ThemeCandidates
                 .First(t => t.Id == winnerId);

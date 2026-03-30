@@ -47,15 +47,9 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
             // To center it in the new canvasWidth, offset = (canvasWidth / 2) - 600;
             int xOffset = (canvasWidth / 2) - 600;
 
-            int partCenterY = 0;
-            switch (currentTypeId)
-            {
-                case "hat": partCenterY = 80 * 2; break; // 160
-                case "top": partCenterY = (140 + 300); break; // 440 (average of 140*2, 300*2 = 440)
-                case "bottom": partCenterY = (300 + 520); break; // 820
-                case "shoes": partCenterY = (520 + 550); break; // 1070
-                default: partCenterY = 440; break;
-            }
+            // Use the configurable anchor Y from ClothingTypeDefinition, falling back to
+            // a sensible default if not set.
+            int partCenterY = ct?.MannequinAnchorY ?? 440;
 
             int viewCenterY = canvasHeight / 2;
             int yOffset = viewCenterY - partCenterY;

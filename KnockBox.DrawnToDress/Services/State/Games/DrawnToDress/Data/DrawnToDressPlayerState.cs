@@ -63,6 +63,12 @@ namespace KnockBox.Services.State.Games.DrawnToDress.Data
         public string? DraftOutfitName { get; set; }
 
         /// <summary>
+        /// <see langword="true"/> when the player has disconnected from the game.
+        /// Used to skip actions for departed players (e.g. auto-fill outfits, skip voting).
+        /// </summary>
+        public bool IsDisconnected { get; set; }
+
+        /// <summary>
         /// Bonus points earned by this player through achievements during the game
         /// (e.g. submitting an outfit before the deadline).
         /// </summary>

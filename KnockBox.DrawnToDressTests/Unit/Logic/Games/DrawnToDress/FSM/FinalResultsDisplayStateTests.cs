@@ -1,6 +1,7 @@
 using KnockBox.Services.Logic.Games.DrawnToDress;
 using KnockBox.Services.Logic.Games.DrawnToDress.FSM;
 using KnockBox.Services.Logic.Games.DrawnToDress.FSM.States;
+using KnockBox.Services.Logic.RandomGeneration;
 using KnockBox.Services.State.Games.DrawnToDress;
 using KnockBox.Services.State.Games.DrawnToDress.Data;
 using KnockBox.Services.State.Users;
@@ -14,6 +15,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
     {
         private Mock<ILogger<DrawnToDressGameEngine>> _engineLoggerMock = default!;
         private Mock<ILogger<DrawnToDressGameState>> _stateLoggerMock = default!;
+        private Mock<IRandomNumberService> _randomMock = default!;
         private User _host = default!;
         private DrawnToDressGameEngine _engine = default!;
 
@@ -22,10 +24,14 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
         {
             _engineLoggerMock = new Mock<ILogger<DrawnToDressGameEngine>>();
             _stateLoggerMock = new Mock<ILogger<DrawnToDressGameState>>();
+            _randomMock = new Mock<IRandomNumberService>();
+            _randomMock.Setup(r => r.GetRandomInt(It.IsAny<int>(), It.IsAny<RandomType>())).Returns(0);
+            _randomMock.Setup(r => r.GetRandomInt(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<RandomType>())).Returns(0);
             _host = new User("Host", "host1");
             _engine = new DrawnToDressGameEngine(
                 _engineLoggerMock.Object,
-                _stateLoggerMock.Object);
+                _stateLoggerMock.Object,
+                _randomMock.Object);
         }
 
         private async Task<(DrawnToDressGameState state, DrawnToDressGameContext context)> CreateGameAsync()

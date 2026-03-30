@@ -3,6 +3,7 @@ using KnockBox.Extensions.Returns;
 using KnockBox.Services.Logic.Games.DrawnToDress.FSM;
 using KnockBox.Services.Logic.Games.DrawnToDress.FSM.States;
 using KnockBox.Services.Logic.Games.Engines.Shared;
+using KnockBox.Services.Logic.RandomGeneration;
 using KnockBox.Services.State.Games.DrawnToDress;
 using KnockBox.Services.State.Games.DrawnToDress.Data;
 using KnockBox.Services.State.Games.Shared;
@@ -18,7 +19,8 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress
     /// </summary>
     public class DrawnToDressGameEngine(
         ILogger<DrawnToDressGameEngine> logger,
-        ILogger<DrawnToDressGameState> stateLogger) : AbstractGameEngine
+        ILogger<DrawnToDressGameState> stateLogger,
+        IRandomNumberService randomNumberService) : AbstractGameEngine
     {
         // ── AbstractGameEngine lifecycle ──────────────────────────────────────
 
@@ -34,7 +36,7 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress
             gameState.PlayerUnregistered += player => HandlePlayerLeft(player, gameState);
 
             // Create the context and FSM so the lobby state is active from the start.
-            var context = new DrawnToDressGameContext(gameState, logger);
+            var context = new DrawnToDressGameContext(gameState, logger, randomNumberService);
             var fsm = new FiniteStateMachine<DrawnToDressGameContext, DrawnToDressCommand>(logger);
             context.Fsm = fsm;
             gameState.Context = context;
@@ -94,12 +96,19 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress
         /// </summary>
         public Result ProcessCommand(DrawnToDressGameContext context, DrawnToDressCommand command)
         {
-            return context.State.Execute(() =>
+            var executeResult = context.State.Execute(() =>
             {
                 var fsmResult = context.Fsm.HandleCommand(context, command);
                 if (fsmResult.TryGetFailure(out var err))
+                {
                     logger.LogError("FSM command error: {msg}", err.PublicMessage);
+                    return Result.FromError(err.PublicMessage, err.InternalMessage);
+                }
+                return Result.Success;
             });
+
+            if (!executeResult.IsSuccess) return executeResult.Error.Error;
+            return executeResult.Value;
         }
 
         /// <summary>
@@ -133,7 +142,17 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress
             logger.LogInformation("Player [{id}] left DrawnToDress game hosted by [{hostId}].",
                 player.Id, state.Host.Id);
 
-            // TODO: Handle active-player removal during drawing/voting phases in later issues.
+            if (state.Context is null) return;
+            if (!state.GamePlayers.TryGetValue(player.Id, out var playerState)) return;
+
+            // Mark the departed player as ready so that AllPlayersReady() checks pass
+            // and the game doesn't hang waiting for them.
+            playerState.IsReady = true;
+            playerState.IsDisconnected = true;
+
+            logger.LogInformation(
+                "Player [{id}] auto-readied due to disconnect. Phase: {phase}.",
+                player.Id, state.Phase);
         }
     }
 }
