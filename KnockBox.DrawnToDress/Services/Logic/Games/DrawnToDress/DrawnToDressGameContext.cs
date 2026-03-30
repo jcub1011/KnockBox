@@ -27,7 +27,7 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM
         /// The finite state machine that owns the current game flow.
         /// Assigned immediately after construction in <c>StartAsync</c>.
         /// </summary>
-        public IFininteStateMachine<DrawnToDressGameContext, DrawnToDressCommand> Fsm { get; set; } = default!;
+        public IFiniteStateMachine<DrawnToDressGameContext, DrawnToDressCommand> Fsm { get; set; } = default!;
 
         // ── Round tracking ──────────────────────────────────────────────────
 
