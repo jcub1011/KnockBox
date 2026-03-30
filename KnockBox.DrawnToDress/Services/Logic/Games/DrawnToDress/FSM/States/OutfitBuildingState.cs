@@ -15,6 +15,8 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
     /// </summary>
     public sealed class OutfitBuildingState : ITimedDrawnToDressGameState
     {
+        public bool IsTimerOptional => true;
+
         private readonly int _outfitRound;
         private DateTimeOffset _deadline;
 
@@ -75,6 +77,9 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
                     return new AbandonedState();
 
                 default:
+                    context.Logger.LogWarning(
+                        "OutfitBuildingState: unrecognized command [{type}] from player [{id}].",
+                        command.GetType().Name, command.PlayerId);
                     return null;
             }
         }
@@ -128,7 +133,8 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
                 context.Logger.LogWarning(
                     "ClaimPoolItem: player [{id}] attempted to claim their own item [{itemId}].",
                     cmd.PlayerId, cmd.ItemId);
-                return null;
+                return ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?>.FromError(
+                    "You can't claim your own drawing.");
             }
 
             // First valid claim wins — reject if already taken by another player.
@@ -137,7 +143,8 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
                 context.Logger.LogWarning(
                     "ClaimPoolItem: item [{itemId}] is already claimed by [{claimer}].",
                     cmd.ItemId, item.ClaimedByPlayerId);
-                return null;
+                return ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?>.FromError(
+                    "This item has already been claimed by another player.");
             }
 
             item.ClaimedByPlayerId = cmd.PlayerId;
@@ -252,7 +259,8 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
                             "(owner: [{owner}]), which meets or exceeds the distinctness threshold of {threshold}. " +
                             "Submission rejected.",
                             _outfitRound, cmd.PlayerId, shared, worstOutfit.PlayerId, threshold);
-                        return null;
+                        return ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?>.FromError(
+                            $"Your outfit shares too many items ({shared}) with a previous outfit. Please swap some items.");
                     }
                 }
             }
@@ -284,6 +292,21 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
         /// </summary>
         private void AutoFillIncompleteOutfits(DrawnToDressGameContext context)
         {
+            // Pre-index previously used items by (typeId, itemId) for O(1) conflict lookups.
+            var previouslyUsedItems = new HashSet<(string typeId, Guid itemId)>();
+            if (_outfitRound > 1)
+            {
+                foreach (var p in context.GamePlayers.Values)
+                {
+                    foreach (var (round, outfit) in p.SubmittedOutfits)
+                    {
+                        if (round >= _outfitRound) continue;
+                        foreach (var (typeId, itemId) in outfit.SelectedItemsByType)
+                            previouslyUsedItems.Add((typeId, itemId));
+                    }
+                }
+            }
+
             var allPreviousOutfits = _outfitRound > 1
                 ? context.GamePlayers.Values
                     .SelectMany(p => p.SubmittedOutfits
@@ -294,30 +317,42 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
 
             int threshold = context.Config.Outfit2DistinctnessThreshold;
 
+            // Pre-index pool items by clothing type for efficient lookup.
+            // Use dictionary key (not item.Id) since callers may store items with mismatched keys.
+            var poolByType = new Dictionary<string, List<(Guid Key, DrawnClothingItem Item)>>();
+            foreach (var (key, item) in context.ClothingPool)
+            {
+                if (!poolByType.TryGetValue(item.ClothingTypeId, out var list))
+                {
+                    list = [];
+                    poolByType[item.ClothingTypeId] = list;
+                }
+                list.Add((key, item));
+            }
+
             foreach (var player in context.GamePlayers.Values)
             {
                 if (player.GetOutfit(_outfitRound) is not null) continue;
 
+                var ownedSet = player.OwnedClothingItemIds.ToHashSet();
                 var selectedItems = new Dictionary<string, Guid>();
 
                 foreach (var clothingType in context.Config.ClothingTypes)
                 {
-                    // Gather all items of this type owned by the player.
-                    var candidates = player.OwnedClothingItemIds
-                        .Where(id => context.ClothingPool.TryGetValue(id, out var poolItem)
-                                     && poolItem.ClothingTypeId == clothingType.Id)
-                        .Select(id => context.ClothingPool[id])
+                    // Gather all items of this type owned by the player using the pre-indexed pool.
+                    if (!poolByType.TryGetValue(clothingType.Id, out var typeItems)) continue;
+                    var candidates = typeItems
+                        .Where(entry => ownedSet.Contains(entry.Key))
+                        .Select(entry => entry.Item)
                         .ToList();
 
                     if (candidates.Count == 0) continue;
 
-                    if (_outfitRound > 1 && allPreviousOutfits.Count > 0)
+                    if (_outfitRound > 1 && previouslyUsedItems.Count > 0)
                     {
                         // Try to find an item that does not appear in any previous outfit in this slot.
                         var nonConflicting = candidates.FirstOrDefault(candidate =>
-                            !allPreviousOutfits.Any(o =>
-                                o.SelectedItemsByType.TryGetValue(clothingType.Id, out var oItem)
-                                && oItem == candidate.Id));
+                            !previouslyUsedItems.Contains((clothingType.Id, candidate.Id)));
                         var chosen = nonConflicting ?? candidates[0];
                         selectedItems[clothingType.Id] = chosen.Id;
                     }

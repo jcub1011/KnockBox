@@ -28,9 +28,15 @@ namespace KnockBox.Services.State.Games.DrawnToDress.Data
         public int MaxItemsPerRound { get; set; } = 3;
 
         /// <summary>Pixel width of the drawing canvas for this clothing type.</summary>
-        public int CanvasWidth { get; set; } = 300;
+        public int CanvasWidth { get; set; } = 600;
 
         /// <summary>Pixel height of the drawing canvas for this clothing type.</summary>
-        public int CanvasHeight { get; set; } = 300;
+        public int CanvasHeight { get; set; } = 450;
+
+        /// <summary>
+        /// The Y-coordinate center of this body part on the mannequin overlay (in scaled 2x coordinates).
+        /// Used by the drawing phase to position the mannequin reference for each clothing type.
+        /// </summary>
+        public int MannequinAnchorY { get; set; }
     }
 }

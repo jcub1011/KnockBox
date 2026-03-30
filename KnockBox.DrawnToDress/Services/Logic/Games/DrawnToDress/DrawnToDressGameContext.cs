@@ -1,4 +1,5 @@
 using KnockBox.Core.Services.State.Games.Shared;
+using KnockBox.Services.Logic.RandomGeneration;
 using KnockBox.Services.State.Games.DrawnToDress;
 using KnockBox.Services.State.Games.DrawnToDress.Data;
 using System.Collections.Concurrent;
@@ -9,7 +10,7 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM
     /// Per-game context that holds shared data and helpers used by FSM states.
     /// Created once during <c>StartAsync</c> and stored on <see cref="DrawnToDressGameState"/>.
     /// </summary>
-    public class DrawnToDressGameContext(DrawnToDressGameState state, ILogger logger)
+    public class DrawnToDressGameContext(DrawnToDressGameState state, ILogger logger, IRandomNumberService random)
     {
         // ── Core references ───────────────────────────────────────────────────
 
@@ -18,6 +19,9 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM
 
         /// <summary>Logger shared by all FSM states.</summary>
         public ILogger Logger { get; } = logger;
+
+        /// <summary>Random number service shared by all FSM states.</summary>
+        public IRandomNumberService Random { get; } = random;
 
         /// <summary>
         /// The finite state machine that owns the current game flow.
@@ -85,31 +89,23 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM
 
         /// <summary>
         /// Returns the ordered list of entrant IDs for the tournament.
-        /// Each player's submitted outfits become separate entrants encoded as "{playerId}:{round}".
+        /// Each player's submitted outfits become separate entrants.
         /// </summary>
-        public IReadOnlyList<string> GetTournamentEntrantIds()
+        public IReadOnlyList<EntrantId> GetTournamentEntrantIds()
         {
-            var entrants = new List<string>();
+            var entrants = new List<EntrantId>();
             foreach (var p in GamePlayers.Values.OrderBy(p => p.PlayerId, StringComparer.Ordinal))
                 foreach (var (round, _) in p.SubmittedOutfits.OrderBy(kv => kv.Key))
-                    entrants.Add($"{p.PlayerId}:{round}");
+                    entrants.Add(new EntrantId(p.PlayerId, round));
             return entrants;
         }
-
-        /// <summary>Extracts the player ID portion from an entrant ID (e.g. "player1:1" → "player1").</summary>
-        public static string GetPlayerIdFromEntrantId(string entrantId) => entrantId.Split(':')[0];
-
-        /// <summary>Extracts the outfit round number from an entrant ID (e.g. "player1:2" → 2).</summary>
-        public static int GetOutfitRoundFromEntrantId(string entrantId) => int.Parse(entrantId.Split(':')[1]);
 
         /// <summary>
         /// Looks up the outfit submission for a given entrant ID.
         /// </summary>
-        public OutfitSubmission? GetOutfitByEntrantId(string entrantId)
+        public OutfitSubmission? GetOutfitByEntrantId(EntrantId entrantId)
         {
-            var playerId = GetPlayerIdFromEntrantId(entrantId);
-            var round = GetOutfitRoundFromEntrantId(entrantId);
-            return GetPlayer(playerId)?.GetOutfit(round);
+            return GetPlayer(entrantId.PlayerId)?.GetOutfit(entrantId.Round);
         }
 
         /// <summary>

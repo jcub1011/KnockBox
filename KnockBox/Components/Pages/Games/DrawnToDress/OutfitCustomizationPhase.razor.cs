@@ -30,26 +30,67 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
         [Parameter] public int OutfitRound { get; set; } = 1;
 
         private SvgDrawingCanvas? _sketchCanvas;
-        private string? _outfitName;
+        private string _outfitName = string.Empty;
         private bool _submitting;
         private string? _errorMessage;
 
         private InteractionMode _mode = InteractionMode.Draw;
+        private bool _showMannequin;
         private Dictionary<string, ItemPositionOverride> _itemPositions = new();
         private IJSObjectReference? _dragModule;
         private DotNetObjectReference<OutfitCustomizationPhase>? _dotNetRef;
         private readonly string _dragSvgId = $"drag-layer-{Guid.NewGuid():N}";
         private bool _dragInitialized;
+        private CancellationTokenSource? _nameSyncCts;
+
+        private string CurrentPlayerId => UserService.CurrentUser?.Id ?? string.Empty;
 
         protected override void OnInitialized()
         {
-            // Initialize default stacked positions
-            int yOffset = 0;
+            _showMannequin = GameState.Config.ShowMannequin;
+            var myPlayer = GameState.GamePlayers.GetValueOrDefault(CurrentPlayerId);
+            _outfitName = myPlayer?.DraftOutfitName ?? string.Empty;
+
+            // Initialize default scaled positions to natively match the mannequin
             foreach (var ct in GameState.Config.ClothingTypes)
             {
-                _itemPositions[ct.Id] = new ItemPositionOverride { X = 0, Y = yOffset };
-                yOffset += ct.CanvasHeight;
+                int viewCenterY = ct.CanvasHeight / 2;
+                int partCenterY = 440;
+                switch (ct.Id)
+                {
+                    case "hat": partCenterY = 160; break;
+                    case "top": partCenterY = 440; break;
+                    case "bottom": partCenterY = 820; break;
+                    case "shoes": partCenterY = 1070; break;
+                }
+                
+                // Since the item was drawn centered in its respective canvas height,
+                // translating it natively here maps it perfectly.
+                _itemPositions[ct.Id] = new ItemPositionOverride { X = 50, Y = (partCenterY - viewCenterY) + 200 };
             }
+        }
+
+        private async Task OnOutfitNameChangedAsync(string newName)
+        {
+            _outfitName = newName;
+
+            // Debounce the sync to the server.
+            _nameSyncCts?.Cancel();
+            _nameSyncCts?.Dispose();
+            _nameSyncCts = new CancellationTokenSource();
+            try
+            {
+                await Task.Delay(500, _nameSyncCts.Token);
+                UpdateDraftNameOnServer(newName);
+            }
+            catch (TaskCanceledException) { }
+        }
+
+        private void UpdateDraftNameOnServer(string name)
+        {
+            if (GameState.Context is null) return;
+            var cmd = new UpdateDraftOutfitNameCommand(CurrentPlayerId, name);
+            GameEngine.ProcessCommand(GameState.Context, cmd);
         }
 
         /// <summary>
@@ -103,8 +144,9 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
                 }
             }
 
-            int totalHeight = GameState.Config.ClothingTypes.Sum(ct => ct.CanvasHeight);
-            await _dragModule.InvokeVoidAsync("initialize", _dragSvgId, _dotNetRef, items, 600, totalHeight);
+            int canvasWidth = (GameState.Config.ClothingTypes.FirstOrDefault()?.CanvasWidth ?? 600) + 100;
+            int totalHeight = GameState.Config.ClothingTypes.Sum(ct => (int)(ct.CanvasHeight * 0.8));
+            await _dragModule.InvokeVoidAsync("initialize", _dragSvgId, _dotNetRef, items, canvasWidth, totalHeight);
             _dragInitialized = true;
         }
 
@@ -178,21 +220,14 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
                     return;
                 }
 
-                // Build position overrides — only include entries that differ from the
-                // default stacked layout to keep the data lean.
-                Dictionary<string, ItemPositionOverride>? positionOverrides = null;
-                int defaultY = 0;
+                // Always submit position overrides so VotingPhase properly reconstructs the mapped outfit.
+                Dictionary<string, ItemPositionOverride>? positionOverrides = new();
                 foreach (var ct in GameState.Config.ClothingTypes)
                 {
                     if (_itemPositions.TryGetValue(ct.Id, out var pos))
                     {
-                        if (Math.Abs(pos.X) > 0.5 || Math.Abs(pos.Y - defaultY) > 0.5)
-                        {
-                            positionOverrides ??= new();
-                            positionOverrides[ct.Id] = new ItemPositionOverride { X = pos.X, Y = pos.Y };
-                        }
+                        positionOverrides[ct.Id] = new ItemPositionOverride { X = pos.X, Y = pos.Y };
                     }
-                    defaultY += ct.CanvasHeight;
                 }
 
                 var cmd = new SubmitCustomizationCommand(
@@ -222,6 +257,15 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
 
         public async ValueTask DisposeAsync()
         {
+            // Flush any pending debounced outfit name to the server before tearing down.
+            _nameSyncCts?.Cancel();
+            _nameSyncCts?.Dispose();
+            _nameSyncCts = null;
+            if (!string.IsNullOrWhiteSpace(_outfitName))
+            {
+                UpdateDraftNameOnServer(_outfitName);
+            }
+
             if (_dragModule is not null)
             {
                 try

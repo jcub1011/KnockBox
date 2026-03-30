@@ -1,0 +1,64 @@
+<div class="dtd-phase dtd-distinctness-phase">
+    <h2>Outfit Conflict Resolution</h2>
+    <p class="dtd-distinctness-description">
+        Some outfits share the same items. Players with conflicts must pick a replacement item.
+    </p>
+
+    @if (IsPlayerResolved())
+    {
+        <div class="dtd-distinctness-resolved">
+            <p>Your conflict has been resolved. Waiting for other players...</p>
+        </div>
+    }
+    else
+    {
+        var conflicts = GetConflictsForCurrentPlayer();
+        @if (conflicts.Count == 0)
+        {
+            <div class="dtd-distinctness-no-conflict">
+                <p>Your outfit has no conflicts. Waiting for other players to resolve theirs...</p>
+            </div>
+        }
+        else
+        {
+            <div class="dtd-distinctness-conflicts">
+                @foreach (var (typeId, conflictingItemId) in conflicts)
+                {
+                    var typeName = GameState.Config.ClothingTypes.FirstOrDefault(c => c.Id == typeId)?.DisplayName ?? typeId;
+                    var candidates = GetReplacementCandidates(typeId, conflictingItemId);
+
+                    <div class="dtd-distinctness-conflict-slot">
+                        <h3>@typeName — Conflict</h3>
+                        <p>Pick a different item for this slot:</p>
+
+                        @if (candidates.Count == 0)
+                        {
+                            <p class="dtd-distinctness-no-candidates">No alternative items available for this slot.</p>
+                        }
+                        else
+                        {
+                            <div class="dtd-distinctness-candidates">
+                                @foreach (var item in candidates)
+                                {
+                                    <button class="dtd-btn dtd-btn-replacement"
+                                            @onclick="() => SubmitReplacementAsync(item.Id)"
+                                            disabled="@_submitting"
+                                            aria-label="@($"Select replacement {typeName} item")">
+                                        <div class="dtd-pool-item-preview">
+                                            @((MarkupString)(item.SvgContent ?? ""))
+                                        </div>
+                                    </button>
+                                }
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        }
+    }
+
+    @if (_errorMessage is not null)
+    {
+        <p class="dtd-error">@_errorMessage</p>
+    }
+</div>

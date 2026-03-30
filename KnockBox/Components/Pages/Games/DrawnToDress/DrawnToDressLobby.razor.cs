@@ -1,4 +1,5 @@
 using KnockBox.Components.Shared;
+using KnockBox.Core.Services.State.Shared;
 using KnockBox.Services.Logic.Games.DrawnToDress;
 using KnockBox.Services.Navigation;
 using KnockBox.Services.State.Games.DrawnToDress;
@@ -6,7 +7,6 @@ using KnockBox.Services.State.Games.Shared;
 using KnockBox.Services.State.Users;
 using KnockBox.Core.Services.State.Games.Shared;
 using KnockBox.Services.Logic.Games.DrawnToDress.FSM;
-using KnockBox.Services.Logic.Games.DrawnToDress.FSM.States;
 using Microsoft.AspNetCore.Components;
 using System.Diagnostics.CodeAnalysis;
 
@@ -22,17 +22,17 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
 
         [Inject] protected IUserService UserService { get; set; } = default!;
 
+        [Inject] protected ITickService TickService { get; set; } = default!;
+
         [Inject] protected ILogger<DrawnToDressLobby> Logger { get; set; } = default!;
 
         [Parameter] public string ObfuscatedRoomCode { get; set; } = default!;
 
         private DtdAriaAnnouncer? _announcer;
         private GamePhase? _lastAnnouncedPhase;
-        private bool _announced10s;
-        private bool _announced5s;
 
         private IDisposable? _stateSubscription;
-        private PeriodicTimer? _timer;
+        private IDisposable? _tickSubscription;
 
         protected override async Task OnInitializedAsync()
         {
@@ -81,41 +81,25 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
                 });
             });
 
-            _timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
-            _ = StartTimerAsync();
+            // Register with the server-side tick service. Only the host drives FSM ticks to
+            // avoid redundant lock contention from every client. The tick service runs
+            // independently of any Blazor circuit, so the game continues even if the host
+            // disconnects and a new host is promoted.
+            if (IsHost())
+            {
+                var tickResult = TickService.RegisterTickCallback(() =>
+                {
+                    if (GameState?.Context is not null)
+                        GameEngine.Tick(GameState.Context, DateTimeOffset.UtcNow);
+                }, tickInterval: TickService.TicksPerSecond); // once per second
+
+                if (tickResult.TryGetSuccess(out var sub))
+                    _tickSubscription = sub;
+                else
+                    Logger.LogError("Failed to register tick callback: {Error}", tickResult.Error);
+            }
 
             await base.OnInitializedAsync();
-        }
-
-        private async Task StartTimerAsync()
-        {
-            try
-            {
-                while (await _timer!.WaitForNextTickAsync(ComponentDetached))
-                {
-                    try
-                    {
-                        await InvokeAsync(() =>
-                        {
-                            // Only the host drives FSM ticks to avoid concurrent transitions.
-                            if (GameState?.Context is not null && IsHost())
-                                GameEngine.Tick(GameState.Context, DateTimeOffset.UtcNow);
-                            AnnounceTimerWarningsIfNeeded();
-                            StateHasChanged();
-                        });
-                    }
-                    catch (ObjectDisposedException) { break; }
-                    catch (Exception ex)
-                    {
-                        Logger.LogError(ex, "Error during timer tick.");
-                    }
-                }
-            }
-            catch (OperationCanceledException) { }
-            catch (Exception ex)
-            {
-                Logger.LogError(ex, "Timer loop terminated unexpectedly.");
-            }
         }
 
         private bool IsHost() => UserService.CurrentUser?.Id == GameState?.Host?.Id;
@@ -146,8 +130,6 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
             if (_lastAnnouncedPhase != currentPhase)
             {
                 _lastAnnouncedPhase = currentPhase;
-                _announced10s = false;
-                _announced5s = false;
 
                 var phaseName = currentPhase switch
                 {
@@ -166,37 +148,15 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
             }
         }
 
-        private void AnnounceTimerWarningsIfNeeded()
-        {
-            if (GameState?.Context?.Fsm?.CurrentState is not ITimedGameState<DrawnToDressGameContext, DrawnToDressCommand> timedState)
-                return;
-            if (_announcer is null) return;
-
-            var remaining = timedState.GetRemainingTime(GameState.Context!, DateTimeOffset.UtcNow);
-            if (!remaining.IsSuccess) return;
-
-            var secs = (int)Math.Ceiling(remaining.Value.TotalSeconds);
-            if (secs <= 10 && secs > 5 && !_announced10s)
-            {
-                _announced10s = true;
-                _announcer.Announce("10 seconds remaining");
-            }
-            else if (secs <= 5 && secs > 0 && !_announced5s)
-            {
-                _announced5s = true;
-                _announcer.Announce("5 seconds remaining");
-            }
-        }
-
         public override void Dispose()
         {
-            base.Dispose();
-            _timer?.Dispose();
+            _tickSubscription?.Dispose();
             if (GameState is not null)
             {
                 GameState.OnStateDisposed -= HandleStateDisposed;
             }
             _stateSubscription?.Dispose();
+            base.Dispose();
         }
 
         private static bool TryExtractObfuscatedRoomCode(string uri, [NotNullWhen(true)] out string? obfuscatedRoomCode)

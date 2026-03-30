@@ -1,6 +1,7 @@
 using KnockBox.Services.Logic.Games.DrawnToDress;
 using KnockBox.Services.Logic.Games.DrawnToDress.FSM;
 using KnockBox.Services.State.Games.DrawnToDress;
+using KnockBox.Services.State.Games.DrawnToDress.Data;
 using KnockBox.Services.State.Users;
 using Microsoft.AspNetCore.Components;
 
@@ -21,13 +22,11 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
 
         private string CurrentPlayerId => UserService.CurrentUser?.Id ?? string.Empty;
 
-        protected string GetEntrantDisplayName(string entrantId)
+        protected string GetEntrantDisplayName(EntrantId entrantId)
         {
-            var playerId = DrawnToDressGameContext.GetPlayerIdFromEntrantId(entrantId);
-            var round = DrawnToDressGameContext.GetOutfitRoundFromEntrantId(entrantId);
-            var player = GameState.GamePlayers.GetValueOrDefault(playerId);
-            string name = player?.DisplayName ?? playerId;
-            return $"{name} (Outfit {round})";
+            var player = GameState.GamePlayers.GetValueOrDefault(entrantId.PlayerId);
+            string name = player?.DisplayName ?? entrantId.PlayerId;
+            return $"{name} (Outfit {entrantId.Round})";
         }
 
         protected async Task CallCoinFlipAsync(bool choseHeads)

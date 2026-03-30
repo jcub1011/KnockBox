@@ -119,6 +119,7 @@
     border-radius: 10px;
     font-size: 1rem;
     text-align: center;
+    appearance: textfield;
     -moz-appearance: textfield;
 }
 
@@ -165,6 +166,13 @@
         border-color: #aaa;
     }
 
+    .toolbar-btn.toolbar-btn-active {
+        background: #333;
+        color: #fff;
+        border-color: #333;
+        transform: scale(1.05);
+    }
+
     .toolbar-btn:disabled,
     .toolbar-btn.toolbar-btn-disabled {
         opacity: 0.4;
@@ -203,7 +211,11 @@
 .svg-canvas-drawing-area {
     flex: 1;
     display: grid;
+    position: relative;
     overflow: hidden;
+    min-height: 0;
+    min-width: 0;
+    background-color: #f1f5f9;
 }
 
 .svg-canvas-drawing-area > svg {
@@ -216,14 +228,21 @@
     display: block;
     cursor: crosshair;
     touch-action: none;
-    z-index: 1;
+    z-index: 2;
 }
 
 .svg-canvas-bg {
     width: 100%;
     height: 100%;
     pointer-events: none;
+    z-index: 1;
+}
+
+.svg-canvas-base {
+    width: 100%;
+    height: 100%;
     z-index: 0;
+    pointer-events: none;
 }
 
 /* When viewBox is set, maintain aspect ratio and center within container */
@@ -232,7 +251,8 @@
 }
 
 .has-viewbox > .svg-canvas-surface,
-.has-viewbox > .svg-canvas-bg {
+.has-viewbox > .svg-canvas-bg,
+.has-viewbox > .svg-canvas-base {
     width: auto;
     height: auto;
     max-width: 100%;

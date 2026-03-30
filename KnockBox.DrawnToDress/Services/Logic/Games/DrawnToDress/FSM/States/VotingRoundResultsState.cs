@@ -48,7 +48,7 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
                 var leaders = DrawnToDressScoringService.GetRoundLeaders(roundScores);
                 foreach (var entrantId in leaders)
                 {
-                    var playerId = DrawnToDressGameContext.GetPlayerIdFromEntrantId(entrantId);
+                    var playerId = entrantId.PlayerId;
                     var player = context.GetPlayer(playerId);
                     if (player is not null)
                     {
@@ -81,6 +81,9 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
                     return new AbandonedState();
 
                 default:
+                    context.Logger.LogWarning(
+                        "VotingRoundResultsState: unrecognized command [{type}] from player [{id}].",
+                        command.GetType().Name, command.PlayerId);
                     return null;
             }
         }

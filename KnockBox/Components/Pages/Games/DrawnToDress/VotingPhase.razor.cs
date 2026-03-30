@@ -18,16 +18,15 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
 
         [Parameter] public DrawnToDressGameState GameState { get; set; } = default!;
 
-        private readonly Dictionary<(Guid matchupId, string criterionId), string> _selectedVotes = new();
+        private readonly Dictionary<(Guid matchupId, string criterionId), EntrantId> _selectedVotes = new();
         private bool _submitting;
         private string? _errorMessage;
 
         private string CurrentPlayerId => UserService.CurrentUser?.Id ?? string.Empty;
 
-        protected bool IsCreatorOfEntrant(string entrantId)
+        protected bool IsCreatorOfEntrant(EntrantId entrantId)
         {
-            var playerId = DrawnToDressGameContext.GetPlayerIdFromEntrantId(entrantId);
-            return playerId == CurrentPlayerId;
+            return entrantId.PlayerId == CurrentPlayerId;
         }
 
         protected bool IsCompetingInMatchup(SwissMatchup matchup)
@@ -35,13 +34,11 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
             return IsCreatorOfEntrant(matchup.EntrantAId) || IsCreatorOfEntrant(matchup.EntrantBId);
         }
 
-        protected string GetEntrantDisplayName(string entrantId)
+        protected string GetEntrantDisplayName(EntrantId entrantId)
         {
-            var playerId = DrawnToDressGameContext.GetPlayerIdFromEntrantId(entrantId);
-            var round = DrawnToDressGameContext.GetOutfitRoundFromEntrantId(entrantId);
-            var player = GameState.GamePlayers.GetValueOrDefault(playerId);
-            string name = player?.DisplayName ?? playerId;
-            return $"{name} (Outfit {round})";
+            var player = GameState.GamePlayers.GetValueOrDefault(entrantId.PlayerId);
+            string name = player?.DisplayName ?? entrantId.PlayerId;
+            return $"{name} (Outfit {entrantId.Round})";
         }
 
         /// <summary>
@@ -49,7 +46,7 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
         /// Always shows the outfit name. Optionally shows creator name below
         /// when <see cref="DrawnToDressConfig.ShowCreatorDuringVoting"/> is enabled.
         /// </summary>
-        protected string GetEntrantLabel(string entrantId)
+        protected string GetEntrantLabel(EntrantId entrantId)
         {
             var outfit = GetEntrantOutfit(entrantId);
             string outfitName = outfit?.Customization.OutfitName ?? "Unnamed Outfit";
@@ -63,12 +60,12 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
             return outfitName;
         }
 
-        protected OutfitSubmission? GetEntrantOutfit(string entrantId)
+        protected OutfitSubmission? GetEntrantOutfit(EntrantId entrantId)
         {
             return GameState.Context?.GetOutfitByEntrantId(entrantId);
         }
 
-        protected void SelectVote(Guid matchupId, string criterionId, string entrantId)
+        protected void SelectVote(Guid matchupId, string criterionId, EntrantId entrantId)
         {
             _selectedVotes[(matchupId, criterionId)] = entrantId;
             StateHasChanged();
@@ -138,8 +135,12 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
             }
         }
 
-        protected int TotalOutfitHeight
-            => GameState.Config.ClothingTypes.Sum(ct => ct.CanvasHeight);
+        protected int TotalOutfitWidth =>
+            ((GameState.Config.ClothingTypes.Any()
+                ? GameState.Config.ClothingTypes.Max(ct => ct.CanvasWidth)
+                : 600) + 100);
+
+        protected int TotalOutfitHeight => GameState.Config.ClothingTypes.Sum(ct => (int)(ct.CanvasHeight * 0.8));
 
         protected static string? SafeSvgContent(string? raw)
             => SvgContentSanitizer.Sanitize(raw);

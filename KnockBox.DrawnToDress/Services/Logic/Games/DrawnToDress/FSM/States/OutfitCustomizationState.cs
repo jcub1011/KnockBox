@@ -15,6 +15,26 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
     /// </summary>
     public sealed class OutfitCustomizationState : ITimedDrawnToDressGameState
     {
+        /// <summary>
+        /// Default canvas width when no clothing types are configured.
+        /// Must match the client-side default in OutfitCustomizationPhase.razor.
+        /// </summary>
+        private const int DefaultCanvasWidth = 600;
+
+        /// <summary>
+        /// Horizontal padding added to the max clothing-type canvas width to produce
+        /// the composite canvas width. Must match the client-side value in OutfitCustomizationPhase.razor.
+        /// </summary>
+        private const int CanvasWidthPadding = 100;
+
+        /// <summary>
+        /// Scale factor applied to each clothing type's canvas height when computing the
+        /// composite total height. Must match the client-side value in OutfitCustomizationPhase.razor.
+        /// </summary>
+        private const double HeightScaleFactor = 0.8;
+
+        public bool IsTimerOptional => true;
+
         private readonly int _outfitRound;
         private DateTimeOffset _deadline;
 
@@ -50,6 +70,9 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
                 case SubmitCustomizationCommand cmd:
                     return HandleSubmitCustomization(context, cmd);
 
+                case UpdateDraftOutfitNameCommand cmd:
+                    return HandleUpdateDraftOutfitName(context, cmd);
+
                 case PauseGameCommand:
                     return new PausedState(this);
 
@@ -57,6 +80,9 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
                     return new AbandonedState();
 
                 default:
+                    context.Logger.LogWarning(
+                        "OutfitCustomizationState: unrecognized command [{type}] from player [{id}].",
+                        command.GetType().Name, command.PlayerId);
                     return null;
             }
         }
@@ -117,13 +143,29 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
 
             if (cmd.ItemPositionOverrides is { Count: > 0 })
             {
-                int canvasWidth = context.Config.ClothingTypes.FirstOrDefault()?.CanvasWidth ?? 600;
-                int totalHeight = context.Config.ClothingTypes.Sum(ct => ct.CanvasHeight);
+                // Match the client composite-canvas dimensions exactly:
+                // width = max clothing type canvas width + 100 padding
+                // height = sum of each type's canvas height scaled to 80%
+                int canvasWidth = (context.Config.ClothingTypes.Any()
+                    ? context.Config.ClothingTypes.Max(ct => ct.CanvasWidth)
+                    : DefaultCanvasWidth) + CanvasWidthPadding;
+                int totalHeight = context.Config.ClothingTypes.Sum(ct => (int)(ct.CanvasHeight * HeightScaleFactor));
+
+                var clothingTypeById = context.Config.ClothingTypes.ToDictionary(ct => ct.Id);
 
                 foreach (var kvp in cmd.ItemPositionOverrides)
                 {
-                    kvp.Value.X = Math.Clamp(kvp.Value.X, 0, canvasWidth);
-                    kvp.Value.Y = Math.Clamp(kvp.Value.Y, 0, totalHeight);
+                    if (!clothingTypeById.TryGetValue(kvp.Key, out var ct))
+                    {
+                        context.Logger.LogWarning(
+                            "SubmitCustomization: player [{id}] submitted position override for unknown clothing type \"{typeId}\". Skipping.",
+                            cmd.PlayerId, kvp.Key);
+                        continue;
+                    }
+
+                    // Allow up to 50% of the item off each edge, matching the client drag/input bounds.
+                    kvp.Value.X = Math.Clamp(kvp.Value.X, -ct.CanvasWidth / 2.0, canvasWidth - ct.CanvasWidth / 2.0);
+                    kvp.Value.Y = Math.Clamp(kvp.Value.Y, -ct.CanvasHeight / 2.0, totalHeight - ct.CanvasHeight / 2.0);
                 }
 
                 outfit.Customization.ItemPositionOverrides = cmd.ItemPositionOverrides;
@@ -145,8 +187,40 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
             return null;
         }
 
+        private ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?> HandleUpdateDraftOutfitName(
+            DrawnToDressGameContext context, UpdateDraftOutfitNameCommand cmd)
+        {
+            var player = context.GetPlayer(cmd.PlayerId);
+            if (player is not null)
+            {
+                player.DraftOutfitName = cmd.DraftName;
+                context.State.StateChangedEventManager.Notify();
+            }
+            return null;
+        }
+
         private IGameState<DrawnToDressGameContext, DrawnToDressCommand> ChooseNextState(DrawnToDressGameContext context)
         {
+            // Apply draft names for any player who hasn't manually submitted yet,
+            // then clear the draft so it cannot leak into subsequent outfit rounds.
+            foreach (var player in context.GamePlayers.Values)
+            {
+                if (!player.IsReady)
+                {
+                    var outfit = player.GetOutfit(_outfitRound);
+                    if (outfit is not null && !string.IsNullOrWhiteSpace(player.DraftOutfitName))
+                    {
+                        outfit.Customization.OutfitName = player.DraftOutfitName.Trim();
+                        context.Logger.LogInformation(
+                            "Applying draft name \"{name}\" for player [{id}] (timer expired).",
+                            outfit.Customization.OutfitName, player.PlayerId);
+                    }
+                }
+
+                // Clear any draft name at the end of this round to avoid reusing it in later rounds.
+                player.DraftOutfitName = string.Empty;
+            }
+
             if (_outfitRound < context.Config.NumOutfitRounds)
             {
                 // More outfit rounds to go — check distinctness, then proceed to next round.

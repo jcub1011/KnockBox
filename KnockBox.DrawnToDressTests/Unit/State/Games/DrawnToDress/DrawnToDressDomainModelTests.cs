@@ -98,7 +98,7 @@ namespace KnockBox.DrawnToDressTests.Unit.State.Games.DrawnToDress
         public void SwissMatchup_Construction_PreservesAllFields()
         {
             var id = Guid.NewGuid();
-            var matchup = new SwissMatchup(id, "playerA", "playerB", 1);
+            var matchup = new SwissMatchup(id, new EntrantId("playerA", 1), new EntrantId("playerB", 1), 1);
 
             Assert.AreEqual(id, matchup.Id);
             Assert.AreEqual("playerA", matchup.PlayerAId);
@@ -136,7 +136,7 @@ namespace KnockBox.DrawnToDressTests.Unit.State.Games.DrawnToDress
                 VoterPlayerId = "voter1",
                 MatchupId = matchupId,
                 CriterionId = "creativity",
-                ChosenPlayerId = "playerA",
+                ChosenEntrantId = new EntrantId("playerA", 1),
                 IsLate = false,
             };
 

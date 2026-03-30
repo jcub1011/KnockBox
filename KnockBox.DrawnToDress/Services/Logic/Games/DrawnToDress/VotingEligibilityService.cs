@@ -1,4 +1,3 @@
-using KnockBox.Services.Logic.Games.DrawnToDress.FSM;
 using KnockBox.Services.State.Games.DrawnToDress.Data;
 
 namespace KnockBox.Services.Logic.Games.DrawnToDress
@@ -23,8 +22,8 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress
         {
             var excluded = new HashSet<string>
             {
-                DrawnToDressGameContext.GetPlayerIdFromEntrantId(matchup.EntrantAId),
-                DrawnToDressGameContext.GetPlayerIdFromEntrantId(matchup.EntrantBId),
+                matchup.EntrantAId.PlayerId,
+                matchup.EntrantBId.PlayerId,
             };
             return allPlayerIds
                 .Where(id => !excluded.Contains(id))
@@ -38,9 +37,7 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress
         /// </summary>
         public static bool IsEligibleToVote(string voterId, SwissMatchup matchup)
         {
-            var playerA = DrawnToDressGameContext.GetPlayerIdFromEntrantId(matchup.EntrantAId);
-            var playerB = DrawnToDressGameContext.GetPlayerIdFromEntrantId(matchup.EntrantBId);
-            return voterId != playerA && voterId != playerB;
+            return voterId != matchup.EntrantAId.PlayerId && voterId != matchup.EntrantBId.PlayerId;
         }
     }
 }

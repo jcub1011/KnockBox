@@ -70,7 +70,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress
         {
             var rounds = new List<VotingRound>
             {
-                new() { RoundNumber = 1, Matchups = [new(Guid.NewGuid(), "pA", "pB", 1)] },
+                new() { RoundNumber = 1, Matchups = [new(Guid.NewGuid(), new EntrantId("pA", 1), new EntrantId("pB", 1), 1)] },
             };
 
             var wins = SwissTournamentService.CalculateWins(rounds, []);
@@ -87,20 +87,20 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress
                 new()
                 {
                     RoundNumber = 1,
-                    Matchups = [new(matchupId, "pA", "pB", 1)],
+                    Matchups = [new(matchupId, new EntrantId("pA", 1), new EntrantId("pB", 1), 1)],
                 },
             };
             var votes = new List<VoteSubmission>
             {
-                new() { MatchupId = matchupId, ChosenPlayerId = "pA", CriterionId = "creativity" },
-                new() { MatchupId = matchupId, ChosenPlayerId = "pA", CriterionId = "theme_match" },
-                new() { MatchupId = matchupId, ChosenPlayerId = "pB", CriterionId = "overall_look" },
+                new() { MatchupId = matchupId, ChosenEntrantId = new EntrantId("pA", 1), CriterionId = "creativity" },
+                new() { MatchupId = matchupId, ChosenEntrantId = new EntrantId("pA", 1), CriterionId = "theme_match" },
+                new() { MatchupId = matchupId, ChosenEntrantId = new EntrantId("pB", 1), CriterionId = "overall_look" },
             };
 
             var wins = SwissTournamentService.CalculateWins(rounds, votes);
 
-            Assert.AreEqual(1, wins.GetValueOrDefault("pA", 0), "pA should have 1 win.");
-            Assert.AreEqual(0, wins.GetValueOrDefault("pB", 0), "pB should have 0 wins.");
+            Assert.AreEqual(1, wins.GetValueOrDefault(new EntrantId("pA", 1), 0), "pA should have 1 win.");
+            Assert.AreEqual(0, wins.GetValueOrDefault(new EntrantId("pB", 1), 0), "pB should have 0 wins.");
         }
 
         [TestMethod]
@@ -112,19 +112,19 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress
                 new()
                 {
                     RoundNumber = 1,
-                    Matchups = [new(matchupId, "pA", "pB", 1)],
+                    Matchups = [new(matchupId, new EntrantId("pA", 1), new EntrantId("pB", 1), 1)],
                 },
             };
             var votes = new List<VoteSubmission>
             {
-                new() { MatchupId = matchupId, ChosenPlayerId = "pA", CriterionId = "creativity" },
-                new() { MatchupId = matchupId, ChosenPlayerId = "pB", CriterionId = "theme_match" },
+                new() { MatchupId = matchupId, ChosenEntrantId = new EntrantId("pA", 1), CriterionId = "creativity" },
+                new() { MatchupId = matchupId, ChosenEntrantId = new EntrantId("pB", 1), CriterionId = "theme_match" },
             };
 
             var wins = SwissTournamentService.CalculateWins(rounds, votes);
 
-            Assert.AreEqual(0, wins.GetValueOrDefault("pA", 0));
-            Assert.AreEqual(0, wins.GetValueOrDefault("pB", 0));
+            Assert.AreEqual(0, wins.GetValueOrDefault(new EntrantId("pA", 1), 0));
+            Assert.AreEqual(0, wins.GetValueOrDefault(new EntrantId("pB", 1), 0));
         }
 
         [TestMethod]
@@ -138,29 +138,29 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress
                 new()
                 {
                     RoundNumber = 1,
-                    Matchups = [new(id1, "pA", "pB", 1)],
+                    Matchups = [new(id1, new EntrantId("pA", 1), new EntrantId("pB", 1), 1)],
                 },
                 new()
                 {
                     RoundNumber = 2,
-                    Matchups = [new(id2, "pA", "pC", 2)],
+                    Matchups = [new(id2, new EntrantId("pA", 1), new EntrantId("pC", 1), 2)],
                 },
             };
 
             // pA wins round 1, pC wins round 2.
             var votes = new List<VoteSubmission>
             {
-                new() { MatchupId = id1, ChosenPlayerId = "pA", CriterionId = "creativity" },
-                new() { MatchupId = id1, ChosenPlayerId = "pA", CriterionId = "theme_match" },
-                new() { MatchupId = id2, ChosenPlayerId = "pC", CriterionId = "creativity" },
-                new() { MatchupId = id2, ChosenPlayerId = "pC", CriterionId = "theme_match" },
+                new() { MatchupId = id1, ChosenEntrantId = new EntrantId("pA", 1), CriterionId = "creativity" },
+                new() { MatchupId = id1, ChosenEntrantId = new EntrantId("pA", 1), CriterionId = "theme_match" },
+                new() { MatchupId = id2, ChosenEntrantId = new EntrantId("pC", 1), CriterionId = "creativity" },
+                new() { MatchupId = id2, ChosenEntrantId = new EntrantId("pC", 1), CriterionId = "theme_match" },
             };
 
             var wins = SwissTournamentService.CalculateWins(rounds, votes);
 
-            Assert.AreEqual(1, wins.GetValueOrDefault("pA", 0));
-            Assert.AreEqual(0, wins.GetValueOrDefault("pB", 0));
-            Assert.AreEqual(1, wins.GetValueOrDefault("pC", 0));
+            Assert.AreEqual(1, wins.GetValueOrDefault(new EntrantId("pA", 1), 0));
+            Assert.AreEqual(0, wins.GetValueOrDefault(new EntrantId("pB", 1), 0));
+            Assert.AreEqual(1, wins.GetValueOrDefault(new EntrantId("pC", 1), 0));
         }
 
         // ── GenerateRound – round 1 (no previous rounds) ─────────────────────
@@ -168,7 +168,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress
         [TestMethod]
         public void GenerateRound_Round1_TwoPlayers_ProducesOneMatchup()
         {
-            var entrants = new List<string> { "pA", "pB" };
+            var entrants = new List<EntrantId> { new("pA", 1), new("pB", 1) };
 
             var round = SwissTournamentService.GenerateRound(1, entrants, [], null);
 
@@ -184,7 +184,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress
         [TestMethod]
         public void GenerateRound_Round1_FourPlayers_ProducesTwoMatchups()
         {
-            var entrants = new List<string> { "pA", "pB", "pC", "pD" };
+            var entrants = new List<EntrantId> { new("pA", 1), new("pB", 1), new("pC", 1), new("pD", 1) };
 
             var round = SwissTournamentService.GenerateRound(1, entrants, [], null);
 
@@ -194,7 +194,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress
         [TestMethod]
         public void GenerateRound_Round1_OddPlayerCount_LeavesOneUnpaired()
         {
-            var entrants = new List<string> { "pA", "pB", "pC" };
+            var entrants = new List<EntrantId> { new("pA", 1), new("pB", 1), new("pC", 1) };
 
             var round = SwissTournamentService.GenerateRound(1, entrants, [], null);
 
@@ -205,7 +205,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress
         [TestMethod]
         public void GenerateRound_Round1_NoSelfMatchups()
         {
-            var entrants = new List<string> { "pA", "pB", "pC", "pD" };
+            var entrants = new List<EntrantId> { new("pA", 1), new("pB", 1), new("pC", 1), new("pD", 1) };
 
             var round = SwissTournamentService.GenerateRound(1, entrants, [], null);
 
@@ -217,7 +217,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress
         [TestMethod]
         public void GenerateRound_Round1_EachPlayerAppearsAtMostOnce()
         {
-            var entrants = new List<string> { "pA", "pB", "pC", "pD" };
+            var entrants = new List<EntrantId> { new("pA", 1), new("pB", 1), new("pC", 1), new("pD", 1) };
 
             var round = SwissTournamentService.GenerateRound(1, entrants, [], null);
 
@@ -232,7 +232,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress
         [TestMethod]
         public void GenerateRound_Round1_IsDeterministic()
         {
-            var entrants = new List<string> { "pC", "pA", "pD", "pB" };
+            var entrants = new List<EntrantId> { new("pC", 1), new("pA", 1), new("pD", 1), new("pB", 1) };
 
             var round1 = SwissTournamentService.GenerateRound(1, entrants, [], null);
             var round2 = SwissTournamentService.GenerateRound(1, entrants, [], null);
@@ -261,14 +261,14 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress
                     RoundNumber = 1,
                     Matchups =
                     [
-                        new(round1MatchupAB, "pA", "pB", 1),
-                        new(round1MatchupCD, "pC", "pD", 1),
+                        new(round1MatchupAB, new EntrantId("pA", 1), new EntrantId("pB", 1), 1),
+                        new(round1MatchupCD, new EntrantId("pC", 1), new EntrantId("pD", 1), 1),
                     ],
                 },
             };
 
             // All even wins; no preference from scores.
-            var round2 = SwissTournamentService.GenerateRound(2, ["pA", "pB", "pC", "pD"], previousRounds, new Dictionary<string, int>());
+            var round2 = SwissTournamentService.GenerateRound(2, [new EntrantId("pA", 1), new EntrantId("pB", 1), new EntrantId("pC", 1), new EntrantId("pD", 1)], previousRounds, new Dictionary<EntrantId, int>());
 
             // pA must not face pB again; pC must not face pD again.
             foreach (var matchup in round2.Matchups)
@@ -296,15 +296,15 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress
                     RoundNumber = 1,
                     Matchups =
                     [
-                        new(matchupId1, "pA", "pB", 1), // pA wins
-                        new(matchupId2, "pC", "pD", 1), // pC wins
+                        new(matchupId1, new EntrantId("pA", 1), new EntrantId("pB", 1), 1), // pA wins
+                        new(matchupId2, new EntrantId("pC", 1), new EntrantId("pD", 1), 1), // pC wins
                     ],
                 },
             };
 
-            var wins = new Dictionary<string, int> { ["pA"] = 1, ["pC"] = 1 };
+            var wins = new Dictionary<EntrantId, int> { [new EntrantId("pA", 1)] = 1, [new EntrantId("pC", 1)] = 1 };
 
-            var round2 = SwissTournamentService.GenerateRound(2, ["pA", "pB", "pC", "pD"], previousRounds, wins);
+            var round2 = SwissTournamentService.GenerateRound(2, [new EntrantId("pA", 1), new EntrantId("pB", 1), new EntrantId("pC", 1), new EntrantId("pD", 1)], previousRounds, wins);
 
             // The high-wins group (pA and pC) should be paired together.
             bool highWinnersPaired = round2.Matchups.Any(m =>
@@ -317,7 +317,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress
         [TestMethod]
         public void GenerateRound_MatchupIds_AreUnique()
         {
-            var entrants = new List<string> { "pA", "pB", "pC", "pD" };
+            var entrants = new List<EntrantId> { new("pA", 1), new("pB", 1), new("pC", 1), new("pD", 1) };
             var round = SwissTournamentService.GenerateRound(1, entrants, [], null);
 
             var ids = round.Matchups.Select(m => m.Id).ToList();
@@ -327,14 +327,14 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress
         [TestMethod]
         public void GenerateRound_EmptyEntrantList_ProducesEmptyRound()
         {
-            var round = SwissTournamentService.GenerateRound(1, [], [], null);
+            var round = SwissTournamentService.GenerateRound(1, new List<EntrantId>(), [], null);
             Assert.AreEqual(0, round.Matchups.Count);
         }
 
         [TestMethod]
         public void GenerateRound_SingleEntrant_ProducesEmptyRound()
         {
-            var round = SwissTournamentService.GenerateRound(1, ["pA"], [], null);
+            var round = SwissTournamentService.GenerateRound(1, [new EntrantId("pA", 1)], [], null);
             Assert.AreEqual(0, round.Matchups.Count);
         }
     }

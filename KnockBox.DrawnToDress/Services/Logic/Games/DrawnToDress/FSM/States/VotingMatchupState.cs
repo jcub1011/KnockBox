@@ -20,6 +20,8 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
     /// </summary>
     public sealed class VotingMatchupState : ITimedDrawnToDressGameState
     {
+        public bool IsTimerOptional => true;
+
         private DateTimeOffset _deadline;
 
         public ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?> OnEnter(
@@ -59,6 +61,9 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
                     return new AbandonedState();
 
                 default:
+                    context.Logger.LogWarning(
+                        "VotingMatchupState: unrecognized command [{type}] from player [{id}].",
+                        command.GetType().Name, command.PlayerId);
                     return null;
             }
         }

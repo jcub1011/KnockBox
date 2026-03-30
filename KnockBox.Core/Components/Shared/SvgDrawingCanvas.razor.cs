@@ -21,6 +21,16 @@ namespace KnockBox.Core.Components.Shared
         /// <summary>CSS height of the canvas container (e.g. "400px", "60vh").</summary>
         [Parameter] public string Height { get; set; } = "400px";
 
+        /// <summary>
+        /// Optional overlay content to render perfectly inside the drawing area bounds.
+        /// </summary>
+        [Parameter] public RenderFragment? OverlayContent { get; set; }
+
+        /// <summary>
+        /// Whether to show the drawing toolbar.
+        /// </summary>
+        [Parameter] public bool ShowToolbar { get; set; } = true;
+
         /// <summary>CSS background color of the drawing surface.</summary>
         [Parameter] public string BackgroundColor { get; set; } = "#ffffff";
 
@@ -68,6 +78,8 @@ namespace KnockBox.Core.Components.Shared
         private string _currentColor = "#000000";
         private string _customSwatchColor = "#808080";
         private bool _isCustomColorActive;
+        private bool _isEraserActive;
+        private bool _isFillActive;
         private double _currentStrokeWidth = 3;
         private int _strokeCount;
 
@@ -120,6 +132,15 @@ namespace KnockBox.Core.Components.Shared
         public void OnStrokeCompleted(int strokeCount)
         {
             _strokeCount = strokeCount;
+        }
+
+        /// <summary>Called from JavaScript when the active tool changes.</summary>
+        [JSInvokable]
+        public void OnToolChanged(string toolName)
+        {
+            _isEraserActive = toolName == "eraser";
+            _isFillActive = toolName == "fill";
+            StateHasChanged();
         }
 
         /// <summary>Called from JavaScript when the stroke color changes.</summary>

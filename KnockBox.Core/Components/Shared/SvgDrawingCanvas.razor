@@ -1,7 +1,9 @@
 @namespace KnockBox.Core.Components.Shared
 
 <div class="svg-drawing-canvas" style="width: @Width; height: @Height;">
-    <div class="svg-canvas-toolbar">
+    @if (ShowToolbar)
+    {
+        <div class="svg-canvas-toolbar">
         <div class="toolbar-group">
             <div class="toolbar-swatches">
                 @foreach (var swatch in _colorSwatches)
@@ -44,7 +46,20 @@
                    aria-label="Custom brush size" />
         </div>
         <div class="toolbar-actions">
-            <button class="toolbar-btn toolbar-btn-fill" title="Fill background with current color" aria-label="Fill background with current color">
+            <button class="toolbar-btn toolbar-btn-eraser @(_isEraserActive ? "toolbar-btn-active" : "")"
+                    title="Eraser tool"
+                    aria-label="Eraser tool"
+                    aria-pressed="@(_isEraserActive ? "true" : "false")">
+                <svg class="toolbar-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M16.24,3.56L21.19,8.5C21.97,9.29 21.97,10.55 21.19,11.34L12,20.53C10.44,22.09 7.91,22.09 6.34,20.53L2.81,17C2.03,16.21 2.03,14.95 2.81,14.16L11.66,5.31L16.24,3.56M15.13,4.96L12.04,6.12L14.88,8.96L17.97,7.8L15.13,4.96Z"/></svg>
+            </button>
+            <button class="toolbar-btn toolbar-btn-clear" title="Clear all" aria-label="Clear all strokes">
+                <svg class="toolbar-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M16 9v10H8V9h8m-1.5-6h-5l-1 1H5v2h14V4h-3.5l-1-1zM18 7H6v12c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7z"/></svg>
+            </button>
+            <div class="toolbar-separator"></div>
+            <button class="toolbar-btn toolbar-btn-fill @(_isFillActive ? "toolbar-btn-active" : "")" 
+                    title="Paint bucket (flood fill area)" 
+                    aria-label="Paint bucket tool"
+                    aria-pressed="@(_isFillActive ? "true" : "false")">
                 <svg class="toolbar-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M16.56 8.94L7.62 0 6.21 1.41l2.38 2.38-5.15 5.15a1.49 1.49 0 0 0 0 2.12l5.5 5.5c.29.29.68.44 1.06.44s.77-.15 1.06-.44l5.5-5.5c.59-.58.59-1.53 0-2.12zM5.21 10L10 5.21 14.79 10H5.21zM19 11.5s-2 2.17-2 3.5a2 2 0 1 0 4 0c0-1.33-2-3.5-2-3.5z"/></svg>
             </button>
             <button class="toolbar-btn toolbar-btn-undo toolbar-btn-disabled" title="Undo" aria-label="Undo last stroke">
@@ -64,8 +79,18 @@
                 <span class="toolbar-copy-toast" style="display:none">Copied!</span>
             }
         </div>
-    </div>
+        </div>
+    }
     <div class="svg-canvas-drawing-area @(ViewBoxAttribute is not null ? "has-viewbox" : "")">
+        <!-- Base layer to establish the precise boundary of the drawable viewbox -->
+        <svg class="svg-canvas-base"
+             style="background-color: @BackgroundColor;"
+             width="@ViewBoxWidth" height="@ViewBoxHeight"
+             viewBox="@ViewBoxAttribute" preserveAspectRatio="@(ViewBoxAttribute is not null ? "xMidYMid meet" : null)">
+             <!-- The outline rect guarantees a highly visible border inside the drawable area bounds -->
+             <rect width="100%" height="100%" fill="none" stroke="#64748b" stroke-width="2" stroke-dasharray="8 8" vector-effect="non-scaling-stroke" />
+        </svg>
+
         @if (_sanitizedBackground is not null)
         {
             <svg class="svg-canvas-bg" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"
@@ -74,8 +99,14 @@
                 @((MarkupString)_sanitizedBackground)
             </svg>
         }
-        <svg id="@_svgId" class="svg-canvas-surface" style="background-color: @BackgroundColor;"
+        <svg id="@_svgId" class="svg-canvas-surface"
+             style="@(!ShowToolbar ? "pointer-events: none;" : "")"
              width="@ViewBoxWidth" height="@ViewBoxHeight"
              viewBox="@ViewBoxAttribute" preserveAspectRatio="@(ViewBoxAttribute is not null ? "xMidYMid meet" : null)"></svg>
+        
+        @if (OverlayContent is not null)
+        {
+            @OverlayContent
+        }
     </div>
 </div>

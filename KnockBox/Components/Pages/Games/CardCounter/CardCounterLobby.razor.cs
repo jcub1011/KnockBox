@@ -1,4 +1,5 @@
 using KnockBox.Components.Shared;
+using KnockBox.Core.Services.State.Shared;
 using KnockBox.Services.Logic.Games.CardCounter;
 using KnockBox.Services.Navigation;
 using KnockBox.Services.State.Games.CardCounter;
@@ -18,12 +19,14 @@ namespace KnockBox.Components.Pages.Games.CardCounter
 
         [Inject] protected IUserService UserService { get; set; } = default!;
 
+        [Inject] protected ITickService TickService { get; set; } = default!;
+
         [Inject] protected ILogger<CardCounterLobby> Logger { get; set; } = default!;
 
         [Parameter] public string ObfuscatedRoomCode { get; set; } = default!;
 
         private IDisposable? _stateSubscription;
-        private PeriodicTimer? _timer;
+        private IDisposable? _tickSubscription;
         private bool _kickHandled;
 
         private const int ShoeAnimationDurationMs = 2500;
@@ -84,43 +87,21 @@ namespace KnockBox.Components.Pages.Games.CardCounter
                 }
             });
 
-            _timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
-            _ = StartTimerAsync();
+            if (IsHost())
+            {
+                var tickResult = TickService.RegisterTickCallback(() =>
+                {
+                    if (GameState?.Context is not null)
+                        GameEngine.Tick(GameState.Context, DateTimeOffset.UtcNow);
+                }, tickInterval: TickService.TicksPerSecond); // once per second
+
+                if (tickResult.TryGetSuccess(out var sub))
+                    _tickSubscription = sub;
+                else
+                    Logger.LogError("Failed to register tick callback: {Error}", tickResult.Error);
+            }
 
             await base.OnInitializedAsync();
-        }
-
-        private async Task StartTimerAsync()
-        {
-            try
-            {
-                while (await _timer!.WaitForNextTickAsync(ComponentDetached))
-                {
-                    try
-                    {
-                        // Run Tick and StateHasChanged together on the Blazor dispatcher thread so
-                        // that state mutations (ActionHand.Add/Remove etc.) are never concurrent
-                        // with the render, preventing InvalidOperationException from List<T>'s
-                        // version-check during LINQ enumeration.
-                        await InvokeAsync(() =>
-                        {
-                            if (GameState?.Context != null && IsHost())
-                                GameEngine.Tick(GameState.Context, DateTimeOffset.UtcNow);
-                            StateHasChanged();
-                        });
-                    }
-                    catch (ObjectDisposedException) { break; }
-                    catch (Exception ex)
-                    {
-                        Logger.LogError(ex, "Error handling state tick.");
-                    }
-                }
-            }
-            catch (OperationCanceledException) { }
-            catch (Exception ex)
-            {
-                Logger.LogError(ex, "Error handling state tick.");
-            }
         }
 
         protected override void OnAfterRender(bool firstRender)
@@ -136,7 +117,7 @@ namespace KnockBox.Components.Pages.Games.CardCounter
 
         public override void Dispose()
         {
-            _timer?.Dispose();
+            _tickSubscription?.Dispose();
             if (GameState != null)
                 GameState.OnStateDisposed -= HandleGameStateDisposed;
             _stateSubscription?.Dispose();

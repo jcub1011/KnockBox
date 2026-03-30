@@ -1,4 +1,3 @@
-using KnockBox.Services.Logic.Games.DrawnToDress.FSM;
 using KnockBox.Services.State.Games.DrawnToDress.Data;
 
 namespace KnockBox.Services.Logic.Games.DrawnToDress
@@ -107,14 +106,14 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress
         /// <summary>
         /// Calculates total points per entrant for a given round (across all matchups).
         /// </summary>
-        public static Dictionary<string, double> CalculateRoundScores(
+        public static Dictionary<EntrantId, double> CalculateRoundScores(
             VotingRound round,
             IReadOnlyList<VotingCriterionDefinition> criteria,
             IEnumerable<VoteSubmission> votes,
             IReadOnlyList<CriterionCoinFlipResult> coinFlipResults)
         {
             var voteList = votes.ToList();
-            var scores = new Dictionary<string, double>();
+            var scores = new Dictionary<EntrantId, double>();
 
             foreach (var matchup in round.Matchups)
             {
@@ -130,7 +129,7 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress
         /// Returns the set of entrant IDs with the highest score in the round.
         /// Handles ties (all tied leaders are returned).
         /// </summary>
-        public static HashSet<string> GetRoundLeaders(Dictionary<string, double> roundScores)
+        public static HashSet<EntrantId> GetRoundLeaders(Dictionary<EntrantId, double> roundScores)
         {
             if (roundScores.Count == 0) return [];
 
@@ -145,14 +144,14 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress
         /// Calculates matchup win/tie/loss values per entrant across all rounds.
         /// Win=1.0, tie=0.5, loss=0.0 per matchup.
         /// </summary>
-        public static Dictionary<string, double> CalculateMatchupWins(
+        public static Dictionary<EntrantId, double> CalculateMatchupWins(
             IReadOnlyList<VotingRound> rounds,
             IReadOnlyList<VotingCriterionDefinition> criteria,
             IEnumerable<VoteSubmission> votes,
             IReadOnlyList<CriterionCoinFlipResult> coinFlipResults)
         {
             var voteList = votes.ToList();
-            var wins = new Dictionary<string, double>();
+            var wins = new Dictionary<EntrantId, double>();
 
             foreach (var round in rounds)
             {
@@ -201,8 +200,7 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress
                 var roundScores = CalculateRoundScores(round, criteria, voteList, coinFlipResults);
                 foreach (var (entrantId, score) in roundScores)
                 {
-                    var playerId = DrawnToDressGameContext.GetPlayerIdFromEntrantId(entrantId);
-                    playerTotals[playerId] = playerTotals.GetValueOrDefault(playerId) + score;
+                    playerTotals[entrantId.PlayerId] = playerTotals.GetValueOrDefault(entrantId.PlayerId) + score;
                 }
             }
 
@@ -236,8 +234,7 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress
             var playerMatchupWins = new Dictionary<string, double>();
             foreach (var (entrantId, mw) in entrantMatchupWins)
             {
-                var playerId = DrawnToDressGameContext.GetPlayerIdFromEntrantId(entrantId);
-                playerMatchupWins[playerId] = playerMatchupWins.GetValueOrDefault(playerId) + mw;
+                playerMatchupWins[entrantId.PlayerId] = playerMatchupWins.GetValueOrDefault(entrantId.PlayerId) + mw;
             }
 
             // Calculate Swiss W/L from SwissTournamentService for display.
@@ -245,7 +242,7 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress
             var playerSwissWins = new Dictionary<string, int>();
             var playerSwissLosses = new Dictionary<string, int>();
             // Count total matchups per entrant to derive losses.
-            var totalMatchupsPerEntrant = new Dictionary<string, int>();
+            var totalMatchupsPerEntrant = new Dictionary<EntrantId, int>();
             foreach (var round in rounds)
             {
                 foreach (var matchup in round.Matchups)
@@ -257,13 +254,13 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress
 
             foreach (var (entrantId, w) in swissWins)
             {
-                var pid = DrawnToDressGameContext.GetPlayerIdFromEntrantId(entrantId);
+                var pid = entrantId.PlayerId;
                 playerSwissWins[pid] = playerSwissWins.GetValueOrDefault(pid) + w;
             }
 
             foreach (var (entrantId, total) in totalMatchupsPerEntrant)
             {
-                var pid = DrawnToDressGameContext.GetPlayerIdFromEntrantId(entrantId);
+                var pid = entrantId.PlayerId;
                 int entrantWins = swissWins.GetValueOrDefault(entrantId);
                 int entrantLosses = total - entrantWins;
                 playerSwissLosses[pid] = playerSwissLosses.GetValueOrDefault(pid) + entrantLosses;

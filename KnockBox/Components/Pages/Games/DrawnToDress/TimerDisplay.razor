@@ -4,9 +4,10 @@
 @using KnockBox.Services.State.Games.DrawnToDress
 
 @if (GameState.PhaseDeadlineUtc.HasValue &&
-     GameState.Context?.Fsm?.CurrentState is ITimedGameState<DrawnToDressGameContext, DrawnToDressCommand> timedState)
+     GameState.Context?.Fsm?.CurrentState is ITimedDrawnToDressGameState timed &&
+     (GameState.Config.EnableTimer || !timed.IsTimerOptional))
 {
-    var remaining = timedState.GetRemainingTime(GameState.Context!, DateTimeOffset.UtcNow);
+    var remaining = timed.GetRemainingTime(GameState.Context!, DateTimeOffset.UtcNow);
     if (remaining.IsSuccess)
     {
         var secs = (int)Math.Max(0, Math.Ceiling(remaining.Value.TotalSeconds));

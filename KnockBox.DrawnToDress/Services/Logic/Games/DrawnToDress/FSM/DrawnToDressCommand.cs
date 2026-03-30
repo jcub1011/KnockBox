@@ -93,6 +93,11 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM
         string? SketchSvgContent = null,
         Dictionary<string, ItemPositionOverride>? ItemPositionOverrides = null) : DrawnToDressCommand(PlayerId);
 
+    /// <summary>Updates the draft outfit name for the player while they are typing.</summary>
+    public record UpdateDraftOutfitNameCommand(
+        string PlayerId,
+        string DraftName) : DrawnToDressCommand(PlayerId);
+
     // ── Outfit distinctness resolution ────────────────────────────────────────
 
     /// <summary>
@@ -110,10 +115,10 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM
         string PlayerId,
         Guid MatchupId,
         string CriterionId,
-        string ChosenEntrantId) : DrawnToDressCommand(PlayerId)
+        EntrantId ChosenEntrantId) : DrawnToDressCommand(PlayerId)
     {
-        /// <summary>Backward-compat: alias for <see cref="ChosenEntrantId"/>.</summary>
-        public string ChosenPlayerId => ChosenEntrantId;
+        /// <summary>Player ID of the chosen entrant.</summary>
+        public string ChosenPlayerId => ChosenEntrantId.PlayerId;
     }
 
     // ── Coin flip ─────────────────────────────────────────────────────────────

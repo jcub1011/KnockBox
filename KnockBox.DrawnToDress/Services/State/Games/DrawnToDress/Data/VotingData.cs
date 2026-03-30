@@ -40,18 +40,17 @@ namespace KnockBox.Services.State.Games.DrawnToDress.Data
 
     /// <summary>
     /// Represents a single head-to-head matchup between two entrants in a Swiss voting round.
-    /// Entrant IDs encode both the player and outfit round (e.g. "player1:1").
     /// </summary>
     public record SwissMatchup(
         Guid Id,
-        string EntrantAId,
-        string EntrantBId,
+        EntrantId EntrantAId,
+        EntrantId EntrantBId,
         int RoundNumber)
     {
-        /// <summary>Backward-compat alias for <see cref="EntrantAId"/>.</summary>
-        public string PlayerAId => EntrantAId;
-        /// <summary>Backward-compat alias for <see cref="EntrantBId"/>.</summary>
-        public string PlayerBId => EntrantBId;
+        /// <summary>Player ID of entrant A.</summary>
+        public string PlayerAId => EntrantAId.PlayerId;
+        /// <summary>Player ID of entrant B.</summary>
+        public string PlayerBId => EntrantBId.PlayerId;
     }
 
     /// <summary>
@@ -85,10 +84,10 @@ namespace KnockBox.Services.State.Games.DrawnToDress.Data
         public string CriterionId { get; set; } = string.Empty;
 
         /// <summary>The entrant ID the voter chose as winner on this criterion.</summary>
-        public string ChosenEntrantId { get; set; } = string.Empty;
+        public EntrantId ChosenEntrantId { get; set; }
 
-        /// <summary>Backward-compat alias for <see cref="ChosenEntrantId"/>.</summary>
-        public string ChosenPlayerId { get => ChosenEntrantId; set => ChosenEntrantId = value; }
+        /// <summary>Player ID of the chosen entrant.</summary>
+        public string ChosenPlayerId => ChosenEntrantId.PlayerId;
 
         /// <summary>UTC timestamp when the vote was submitted.</summary>
         public DateTimeOffset SubmittedAt { get; set; } = DateTimeOffset.UtcNow;

@@ -2,6 +2,7 @@ using KnockBox.Core.Services.State.Games.Shared;
 using KnockBox.Services.Logic.Games.DrawnToDress;
 using KnockBox.Services.Logic.Games.DrawnToDress.FSM;
 using KnockBox.Services.Logic.Games.DrawnToDress.FSM.States;
+using KnockBox.Services.Logic.RandomGeneration;
 using KnockBox.Services.State.Games.DrawnToDress;
 using KnockBox.Services.State.Games.DrawnToDress.Data;
 using KnockBox.Services.State.Users;
@@ -15,6 +16,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
     {
         private Mock<ILogger<DrawnToDressGameEngine>> _engineLoggerMock = default!;
         private Mock<ILogger<DrawnToDressGameState>> _stateLoggerMock = default!;
+        private Mock<IRandomNumberService> _randomMock = default!;
         private User _host = default!;
         private DrawnToDressGameEngine _engine = default!;
 
@@ -23,10 +25,14 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
         {
             _engineLoggerMock = new Mock<ILogger<DrawnToDressGameEngine>>();
             _stateLoggerMock = new Mock<ILogger<DrawnToDressGameState>>();
+            _randomMock = new Mock<IRandomNumberService>();
+            _randomMock.Setup(r => r.GetRandomInt(It.IsAny<int>(), It.IsAny<RandomType>())).Returns(0);
+            _randomMock.Setup(r => r.GetRandomInt(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<RandomType>())).Returns(0);
             _host = new User("Host", "host1");
             _engine = new DrawnToDressGameEngine(
                 _engineLoggerMock.Object,
-                _stateLoggerMock.Object);
+                _stateLoggerMock.Object,
+                _randomMock.Object);
         }
 
         private async Task<(DrawnToDressGameState state, DrawnToDressGameContext context)> CreateGameAsync()
@@ -68,8 +74,8 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
                     Context = CoinFlipContext.CriterionTie,
                     MatchupId = matchupId,
                     CriterionId = "creativity",
-                    EntrantAId = "pA:1",
-                    EntrantBId = "pB:1",
+                    EntrantAId = new EntrantId("pA", 1),
+                    EntrantBId = new EntrantId("pB", 1),
                 }
             ];
 
@@ -117,8 +123,8 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
                     Context = CoinFlipContext.CriterionTie,
                     MatchupId = matchupId,
                     CriterionId = "creativity",
-                    EntrantAId = "pA:1",
-                    EntrantBId = "pB:1",
+                    EntrantAId = new EntrantId("pA", 1),
+                    EntrantBId = new EntrantId("pB", 1),
                 }
             ];
 
@@ -146,8 +152,8 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
                     Context = CoinFlipContext.CriterionTie,
                     MatchupId = Guid.NewGuid(),
                     CriterionId = "creativity",
-                    EntrantAId = "pA:1",
-                    EntrantBId = "pB:1",
+                    EntrantAId = new EntrantId("pA", 1),
+                    EntrantBId = new EntrantId("pB", 1),
                 }
             ];
 
@@ -175,8 +181,8 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
                     Context = CoinFlipContext.CriterionTie,
                     MatchupId = Guid.NewGuid(),
                     CriterionId = "creativity",
-                    EntrantAId = "pA:1",
-                    EntrantBId = "pB:1",
+                    EntrantAId = new EntrantId("pA", 1),
+                    EntrantBId = new EntrantId("pB", 1),
                 }
             ];
 
@@ -206,8 +212,8 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
                     Context = CoinFlipContext.CriterionTie,
                     MatchupId = Guid.NewGuid(),
                     CriterionId = "creativity",
-                    EntrantAId = "pA:1",
-                    EntrantBId = "pB:1",
+                    EntrantAId = new EntrantId("pA", 1),
+                    EntrantBId = new EntrantId("pB", 1),
                 }
             ];
 
@@ -233,24 +239,24 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
                     Context = CoinFlipContext.CriterionTie,
                     MatchupId = Guid.NewGuid(),
                     CriterionId = "creativity",
-                    EntrantAId = "pA:1",
-                    EntrantBId = "pB:1",
+                    EntrantAId = new EntrantId("pA", 1),
+                    EntrantBId = new EntrantId("pB", 1),
                 },
                 new PendingCoinFlipEntry
                 {
                     Context = CoinFlipContext.CriterionTie,
                     MatchupId = Guid.NewGuid(),
                     CriterionId = "theme_match",
-                    EntrantAId = "pA:1",
-                    EntrantBId = "pB:1",
+                    EntrantAId = new EntrantId("pA", 1),
+                    EntrantBId = new EntrantId("pB", 1),
                 },
                 new PendingCoinFlipEntry
                 {
                     Context = CoinFlipContext.CriterionTie,
                     MatchupId = Guid.NewGuid(),
                     CriterionId = "overall_look",
-                    EntrantAId = "pA:1",
-                    EntrantBId = "pB:1",
+                    EntrantAId = new EntrantId("pA", 1),
+                    EntrantBId = new EntrantId("pB", 1),
                 },
             ];
 
@@ -291,8 +297,8 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
                     Context = CoinFlipContext.CriterionTie,
                     MatchupId = matchupId,
                     CriterionId = "creativity",
-                    EntrantAId = "pA:1",
-                    EntrantBId = "pB:1",
+                    EntrantAId = new EntrantId("pA", 1),
+                    EntrantBId = new EntrantId("pB", 1),
                 }
             ];
 
@@ -304,7 +310,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
             var result = state.CriterionCoinFlipResults[0];
             Assert.AreEqual(matchupId, result.MatchupId);
             Assert.AreEqual("creativity", result.CriterionId);
-            Assert.IsTrue(result.WinnerEntrantId == "pA:1" || result.WinnerEntrantId == "pB:1");
+            Assert.IsTrue(result.WinnerEntrantId == new EntrantId("pA", 1) || result.WinnerEntrantId == new EntrantId("pB", 1));
         }
 
         // ── Final standings flip results ────────────────────────────────────
@@ -346,8 +352,8 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
                     Context = CoinFlipContext.CriterionTie,
                     MatchupId = Guid.NewGuid(),
                     CriterionId = "creativity",
-                    EntrantAId = "pA:1",
-                    EntrantBId = "pB:1",
+                    EntrantAId = new EntrantId("pA", 1),
+                    EntrantBId = new EntrantId("pB", 1),
                 }
             ];
 
@@ -368,8 +374,8 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
                     Context = CoinFlipContext.CriterionTie,
                     MatchupId = Guid.NewGuid(),
                     CriterionId = "creativity",
-                    EntrantAId = "pA:1",
-                    EntrantBId = "pB:1",
+                    EntrantAId = new EntrantId("pA", 1),
+                    EntrantBId = new EntrantId("pB", 1),
                 }
             ];
 

@@ -99,12 +99,12 @@ namespace KnockBox.Components.Pages.Games.DiceSimulator
 
         public override void Dispose()
         {
-            base.Dispose();
             if (GameState is not null)
             {
                 GameState.OnStateDisposed -= HandleStateDisposed;
             }
             _stateSubscription?.Dispose();
+            base.Dispose();
         }
 
         private static bool TryExtractObfuscatedRoomCode(string uri, [NotNullWhen(true)] out string? obfuscatedRoomCode)
