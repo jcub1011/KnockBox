@@ -122,13 +122,29 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
 
             if (cmd.ItemPositionOverrides is { Count: > 0 })
             {
-                int canvasWidth = context.Config.ClothingTypes.FirstOrDefault()?.CanvasWidth ?? 400;
-                int totalHeight = context.Config.ClothingTypes.Sum(ct => ct.CanvasHeight);
+                // Match the client composite-canvas dimensions exactly:
+                // width = max clothing type canvas width + 100 padding
+                // height = sum of each type's canvas height scaled to 80%
+                int canvasWidth = (context.Config.ClothingTypes.Any()
+                    ? context.Config.ClothingTypes.Max(ct => ct.CanvasWidth)
+                    : 600) + 100;
+                int totalHeight = context.Config.ClothingTypes.Sum(ct => (int)(ct.CanvasHeight * 0.8));
+
+                var clothingTypeById = context.Config.ClothingTypes.ToDictionary(ct => ct.Id);
 
                 foreach (var kvp in cmd.ItemPositionOverrides)
                 {
-                    kvp.Value.X = Math.Clamp(kvp.Value.X, 0, canvasWidth);
-                    kvp.Value.Y = Math.Clamp(kvp.Value.Y, 0, totalHeight);
+                    if (!clothingTypeById.TryGetValue(kvp.Key, out var ct))
+                    {
+                        context.Logger.LogWarning(
+                            "SubmitCustomization: player [{id}] submitted position override for unknown clothing type \"{typeId}\". Skipping.",
+                            cmd.PlayerId, kvp.Key);
+                        continue;
+                    }
+
+                    // Allow up to 50% of the item off each edge, matching the client drag/input bounds.
+                    kvp.Value.X = Math.Clamp(kvp.Value.X, -ct.CanvasWidth / 2.0, canvasWidth - ct.CanvasWidth / 2.0);
+                    kvp.Value.Y = Math.Clamp(kvp.Value.Y, -ct.CanvasHeight / 2.0, totalHeight - ct.CanvasHeight / 2.0);
                 }
 
                 outfit.Customization.ItemPositionOverrides = cmd.ItemPositionOverrides;
