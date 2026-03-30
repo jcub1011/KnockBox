@@ -20,7 +20,9 @@
 
     var myOutfit = myPlayer?.GetOutfit(OutfitRound);
 
-    int canvasWidth = (GameState.Config.ClothingTypes.FirstOrDefault()?.CanvasWidth ?? 600) + 100;
+    int canvasWidth = (GameState.Config.ClothingTypes.Any()
+        ? GameState.Config.ClothingTypes.Max(ct => ct.CanvasWidth)
+        : 600) + 100;
     int totalOutfitHeight = GameState.Config.ClothingTypes.Sum(ct => (int)(ct.CanvasHeight * 0.8));
 
     // Build a composite background SVG from the player's selected outfit items, applying
