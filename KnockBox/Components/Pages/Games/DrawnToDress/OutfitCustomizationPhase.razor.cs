@@ -76,6 +76,7 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
 
             // Debounce the sync to the server.
             _nameSyncCts?.Cancel();
+            _nameSyncCts?.Dispose();
             _nameSyncCts = new CancellationTokenSource();
             try
             {
