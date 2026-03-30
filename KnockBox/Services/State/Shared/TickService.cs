@@ -1,6 +1,7 @@
 using KnockBox.Core.Services.State.Shared;
 using KnockBox.Extensions.Disposable;
 using KnockBox.Extensions.Returns;
+using Microsoft.Extensions.ObjectPool;
 
 namespace KnockBox.Services.State.Shared
 {
@@ -12,6 +13,9 @@ namespace KnockBox.Services.State.Shared
     public sealed class TickService(ILogger<TickService> logger) : BackgroundService, ITickService
     {
         private static readonly TimeSpan Interval = TimeSpan.FromMilliseconds(50); // 20 ticks/sec
+
+        private static readonly ObjectPool<List<Action>> CallbackPool =
+            ObjectPool.Create<List<Action>>();
 
         private readonly Lock _lock = new();
         private readonly Dictionary<int, HashSet<Action>> _tickMap = [];
@@ -69,26 +73,34 @@ namespace KnockBox.Services.State.Shared
                 {
                     tickCount++;
 
-                    List<Action> callbacks = [];
-                    lock (_lock)
+                    var callbacks = CallbackPool.Get();
+                    try
                     {
-                        foreach (var kvp in _tickMap)
+                        lock (_lock)
                         {
-                            if (tickCount % kvp.Key == 0)
-                                callbacks.AddRange(kvp.Value);
+                            foreach (var kvp in _tickMap)
+                            {
+                                if (tickCount % kvp.Key == 0)
+                                    callbacks.AddRange(kvp.Value);
+                            }
+                        }
+
+                        foreach (var callback in callbacks)
+                        {
+                            try
+                            {
+                                callback();
+                            }
+                            catch (Exception ex)
+                            {
+                                logger.LogError(ex, "Error in tick callback.");
+                            }
                         }
                     }
-
-                    foreach (var callback in callbacks)
+                    finally
                     {
-                        try
-                        {
-                            callback.Invoke();
-                        }
-                        catch (Exception ex)
-                        {
-                            logger.LogError(ex, "Error in tick callback.");
-                        }
+                        callbacks.Clear();
+                        CallbackPool.Return(callbacks);
                     }
                 }
             }
