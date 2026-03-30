@@ -13,7 +13,7 @@ namespace KnockBox.Services.State.Shared
     public sealed class TickService(ILogger<TickService> logger) : BackgroundService, ITickService
     {
         private const int TPS = 20;
-        private static readonly TimeSpan _tickInterval = TimeSpan.FromMilliseconds(1.0 / TPS);
+        private static readonly TimeSpan _tickInterval = TimeSpan.FromMilliseconds(1000 / TPS);
         private static readonly ObjectPool<List<Action>> CallbackPool =
             ObjectPool.Create<List<Action>>();
 
