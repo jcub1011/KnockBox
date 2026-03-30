@@ -77,7 +77,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM
         public ILogger Logger { get; }
 
         /// <summary>The FSM that manages state transitions for this game.</summary>
-        public IFininteStateMachine<CardCounterGameContext, CardCounterCommand> Fsm { get; set; } = null!;
+        public IFiniteStateMachine<CardCounterGameContext, CardCounterCommand> Fsm { get; set; } = null!;
 
         /// <summary>
         /// Resolution stack used for multi-step interactions such as the Feeling Lucky chain
