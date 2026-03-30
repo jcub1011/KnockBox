@@ -45,7 +45,7 @@ Agents all share the **same secret word**. Their goal is to identify and elimina
 Insiders have a **different secret word** — one that is thematically related but distinct. They must blend in with the Agents by giving convincing clues, even though their word is different. They win if they survive to the end of the game without being eliminated.
 
 ### 4.3 The Informant (Solo Role — 5+ Players)
-The Informant has **no word at all**. They must fake their way through every clue round using only context from other players' clues. The Informant wins by either surviving undetected or correctly guessing the Agents' secret word before the game ends.
+The Informant has **no word at all**. They must fake their way through every clue round using only context from other players' clues. The Informant wins by either surviving undetected until the game ends, or correctly guessing the Agents' secret word when voted out. The Informant only gets one guess attempt, and it can only be made at the moment they are voted out — not at any other time during the game.
 
 **Key Twist:** Players do not know their own role at the start. You know your word (or lack of one), but you don't know whether your word belongs to the majority or the minority. You discover your allegiance through gameplay.
 
@@ -89,11 +89,15 @@ The remaining players begin a new Clue Phase with a **new clue** (you cannot reu
 
 ## 6. Win Conditions
 
-| Role | Win Condition |
-|------|---------------|
-| **Agents** | Eliminate all Insiders and the Informant. |
-| **Insiders** | Survive until only two players remain, or survive until the Agents vote to end the game. |
-| **Informant** | Survive undetected **or** correctly guess the Agents' secret word at any point during the game (doing so immediately ends the round). |
+| Role | Win Condition | Priority |
+|------|---------------|----------|
+| **Informant** | Survive until the game ends **or** correctly guess the Agents' secret word when voted out. | Highest |
+| **Insiders** | Have at least one Insider alive when the game ends (by vote to end or 2 players remaining). | Middle |
+| **Agents** | Be the only role remaining when the game ends. | Lowest |
+
+**Win Priority:** When the game ends, wins are evaluated in order: Informant → Insider → Agent. If the Informant is alive, the Informant wins. Otherwise, if any Insider is alive, Insiders win. Otherwise, Agents win.
+
+**Game End Triggers:** The game ends when (1) only two players remain, (2) a majority of alive players vote to end the game, or (3) a voted-out Informant correctly guesses the Agents' word. The game does **not** auto-end when all Insiders or the Informant are eliminated — doing so would reveal information about which roles are still in play.
 
 ---
 

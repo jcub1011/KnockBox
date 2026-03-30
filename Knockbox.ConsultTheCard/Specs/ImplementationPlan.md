@@ -62,6 +62,7 @@ KnockBox.ConsultTheCardTests/
     VotePhaseStateTests.cs
     RevealPhaseStateTests.cs
     GameOverStateTests.cs
+    WordBankTests.cs
 ```
 
 ---
@@ -110,18 +111,18 @@ KnockBox.ConsultTheCardTests/
 ### ConsultTheCardPlayerState (separate file)
 - `PlayerId`, `DisplayName`, `Role`, `SecretWord` (null for Informant)
 - `IsEliminated`, `HasSubmittedClue`, `CurrentClue`, `VoteTargetId`, `HasVoted`
-- `HasVotedToEndGame` — tracks whether this player has voted to end the game
+- `HasVotedToEndGame` — tracks whether this player has voted to end the game this elimination cycle (reset each cycle, one vote per cycle per player to prevent spam)
 - `Score`, `PreviousClues` (list, prevents reuse across rounds)
 
 ### ConsultTheCardGameConfig
-- `SetupPhaseTimeoutMs` (5000), `CluePhaseTimeoutMs` (30000), `DiscussionPhaseTimeoutMs` (120000), `VotePhaseTimeoutMs` (15000), `RevealPhaseTimeoutMs` (10000)
+- `SetupPhaseTimeoutMs` (5000), `CluePhaseTimeoutMs` (30000), `DiscussionPhaseTimeoutMs` (120000), `VotePhaseTimeoutMs` (15000), `RevealPhaseTimeoutMs` (10000), `InformantGuessTimeoutMs` (15000)
 - `EnableTimers`, `TotalGames` (for multi-game scoring, default 5)
 
 ### ConsultTheCardGameState (extends AbstractGameState)
 - `Context`, `GamePhase`, `GamePlayers` (ConcurrentDictionary), `TurnOrder`
-- `CurrentCluePlayerIndex`, `CurrentEliminationCycle`, `CurrentGameNumber`, `CurrentWordPair`
+- `CurrentCluePlayerIndex`, `CurrentEliminationCycle` (int, initialized to 0), `CurrentGameNumber` (int, initialized to 1), `CurrentWordPair`
 - `CurrentRoundClues`, `CurrentRoundVotes`
-- `LastElimination`, `LastInformantGuess`, `WinResult`, `Config`
+- `LastElimination`, `LastInformantGuess`, `AwaitingInformantGuess`, `WinResult`, `Config`
 - `EndGameVoteStatus` — tracking for the "Agents vote to end" mechanic
 - `GameScores` (Dictionary<string, int>) — cumulative scores across all games in a multi-game session
 
@@ -133,10 +134,10 @@ KnockBox.ConsultTheCardTests/
 ```
 ConsultTheCardCommand(string PlayerId)               # abstract base
 ├── SubmitClueCommand(PlayerId, string Clue)          # CluePhase
-├── InformantGuessCommand(PlayerId, string GuessedWord) # Discussion
 ├── AdvanceToVoteCommand(PlayerId)                    # Discussion (host only)
-├── VoteToEndGameCommand(PlayerId)                    # Discussion (any player — Insider win if majority of alive players vote)
+├── VoteToEndGameCommand(PlayerId)                    # Discussion (any player, once per turn — Insider win if majority of alive players vote)
 ├── CastVoteCommand(PlayerId, string TargetPlayerId)  # Voting
+├── InformantGuessCommand(PlayerId, string GuessedWord) # Reveal (only if eliminated player is Informant, one attempt)
 ├── StartNextGameCommand(PlayerId)                    # GameOver (host only, advances to next game in series)
 └── ReturnToLobbyCommand(PlayerId)                    # GameOver (host only)
 ```
@@ -153,28 +154,29 @@ Key helpers:
 - **`SelectWordPair()`** — Picks a random unused `WordGroup` from `WordBank`, selects 2 words at random from the group, then randomly assigns which becomes the Agent word and which becomes the Insider word. A group with N words produces N*(N-1) possible configurations, dramatically increasing variety and discouraging memorization.
 - **`GetAlivePlayers()`** / **`GetAlivePlayerCount()`**
 - **`TallyVotes()`** — Returns player ID with most votes, or null on tie
-- **`CheckWinConditions()`** — Agents win if no Insiders/Informant alive; Insiders win if <=2 alive OR if majority of alive players voted to end the game; otherwise continue
+- **`CheckWinConditions()`** — The game auto-ends **only** when <=2 players remain or when a majority of alive players voted to end the game. The game does **not** auto-end when all Insiders/Informant are eliminated (this would leak role information). When the game ends, evaluate winners in priority order: (1) If the Informant is alive → Informant wins. (2) Else if any Insider is alive → Insiders win. (3) Else → Agents win. Returns `WinConditionResult(GameOver, WinningTeam, Reason)` or `continue` if neither end trigger is met.
 - **`ResetEliminationCycleState()`** — Clears per-cycle clue/vote/end-game-vote data for all alive players
-- **`ApplyScoring()`** — Per design doc: +2 survived, +1 winning team, +3 Informant correct guess, -1 voted for Agent. Must be called **before** `ResetEliminationCycleState()` so vote data is still available.
+- **`ApplyCycleScoring()`** — Per-cycle penalties only: -1 for each player who voted for an Agent. Must be called **before** `ResetEliminationCycleState()` so vote data is still available.
+- **`ApplyEndOfGameScoring()`** — End-of-game bonuses: +2 for each player who survived, +1 for each player on the winning team, +3 if the Informant correctly guessed the Agents' word. Called once in `GameOverState.OnEnter` when the game ends.
 
 ---
 
 ## Phase 4: FSM States
 
 ### SetupState (timed, 5s timeout)
-- `OnEnter`: Increment `CurrentEliminationCycle`, call `AssignRoles()` + `SelectWordPair()`, randomize clue order, set phase to `Setup`
+- `OnEnter`: Increment `CurrentEliminationCycle` (initial value is 0, so first cycle becomes 1; reset to 0 by `StartNextGameCommand` between games), call `AssignRoles()` + `SelectWordPair()`, randomize clue order, set phase to `Setup`
 - `Tick`: Auto-advance to `CluePhaseState` after `SetupPhaseTimeoutMs` (5s)
 - `GetRemainingTime`: Returns countdown based on expiration set in `OnEnter`
 
 ### CluePhaseState (timed)
-- Tracks whose turn it is to give a clue (skips eliminated players)
+- `OnEnter`: Advance `CurrentCluePlayerIndex` past any eliminated players to find the first alive player. If no alive players remain, transition to `GameOverState`.
+- Tracks whose turn it is to give a clue (skips eliminated players on advancement)
 - `HandleCommand(SubmitClueCommand)`: Validate single word (no spaces), not the player's secret word, not previously used by this player in any prior cycle. Store clue, advance to next player. When all alive players have submitted, transition to `DiscussionPhaseState`.
 - `Tick`: If `EnableTimers`, auto-submit "..." for timed-out player and advance. If timers disabled, no auto-action (players submit manually with no time pressure).
 - **Known limitation:** The GDD prohibits "direct synonyms of the secret word." Synonym detection is not feasible to implement programmatically, so this rule is enforced socially (players call out violations). This is consistent with the in-person party game design.
 
 ### DiscussionPhaseState (timed)
-- `HandleCommand(InformantGuessCommand)`: Any player can attempt. If guesser is Informant and correct: Informant wins, → `GameOverState`. If Informant and wrong: eliminate them, apply scoring, check win conditions, → `RevealPhaseState` or `GameOverState`. If not Informant: reject silently (no-op, preserves secrecy).
-- `HandleCommand(VoteToEndGameCommand)`: Any alive player can vote to end the game. Track in `EndGameVoteStatus`. If majority of alive players have voted to end, Insiders win → `GameOverState`.
+- `HandleCommand(VoteToEndGameCommand)`: Any alive player can vote to end the game, **once per elimination cycle** (to prevent spam). Track in `EndGameVoteStatus`. If majority of alive players have voted to end, game ends → evaluate win conditions → `GameOverState`.
 - `HandleCommand(AdvanceToVoteCommand)`: Host only. Transitions to `VotePhaseState`.
 - `Tick`: If `EnableTimers`, auto-advance to `VotePhaseState` on timeout. If timers disabled, no auto-advance (host must explicitly advance).
 
@@ -183,12 +185,13 @@ Key helpers:
 - `Tick`: If `EnableTimers`, abstain for non-voters on timeout, tally, transition. If timers disabled, waits indefinitely for all votes.
 
 ### RevealPhaseState (timed)
-- `OnEnter`: If elimination occurred, reveal role. Call `ApplyScoring()` (while vote data is still intact). Check win conditions. If game over → chain to `GameOverState`. Otherwise, call `ResetEliminationCycleState()` to clear per-cycle data.
-- `Tick`: If `EnableTimers`, transition to `CluePhaseState` (next cycle) or `GameOverState` on timeout. If timers disabled, auto-advance still occurs (reveal is always timed to keep the game moving).
+- `OnEnter`: If elimination occurred, reveal eliminated player's role. Call `ApplyCycleScoring()` (per-cycle penalties while vote data is still intact). If eliminated player is the **Informant**, set `AwaitingInformantGuess = true` and pause auto-advance — the Informant gets one chance to guess the Agents' word. Otherwise, call `ResetEliminationCycleState()` to clear per-cycle data.
+- `HandleCommand(InformantGuessCommand)`: Only accepted if `AwaitingInformantGuess == true` and command sender is the eliminated Informant. If correct: Informant wins → `GameOverState`. If wrong: set `AwaitingInformantGuess = false`, record result in `LastInformantGuess`, continue to next cycle or game end. Only one guess attempt is permitted.
+- `Tick`: If `AwaitingInformantGuess`, use a separate `InformantGuessTimeoutMs` (default 15000ms) — if the Informant doesn't guess in time, treat as forfeited. Otherwise, if `EnableTimers`, transition to `CluePhaseState` (next cycle) on timeout. If timers disabled, auto-advance still occurs (reveal is always timed to keep the game moving). On transition out, call `ResetEliminationCycleState()`.
 
 ### GameOverState
-- `OnEnter`: Calculate final scores for this game, accumulate into `GameScores`. Set phase to `GameOver`.
-- `HandleCommand(StartNextGameCommand)`: Host only. If `CurrentGameNumber < TotalGames`, increment `CurrentGameNumber`, reset game state (roles, words, elimination cycles), transition to `SetupState` for the next game. Otherwise, this is the final game — show cumulative scores.
+- `OnEnter`: Call `ApplyEndOfGameScoring()` (+2 survived, +1 winning team, +3 Informant correct guess). Accumulate game scores into `GameScores`. Set phase to `GameOver`.
+- `HandleCommand(StartNextGameCommand)`: Host only. If `CurrentGameNumber < TotalGames`, increment `CurrentGameNumber` and reset per-game state: clear roles/words on all players, reset `CurrentEliminationCycle` to 0, clear `PreviousClues` for all players, re-randomize `TurnOrder`, reset `EndGameVoteStatus`, clear `LastElimination`/`LastInformantGuess`/`AwaitingInformantGuess`/`WinResult`. **Preserve** `UsedWordPairIndices` (to avoid repeat word groups across games) and `GameScores` (cumulative). Transition to `SetupState` for the next game. Otherwise, this is the final game — show cumulative scores.
 - `HandleCommand(ReturnToLobbyCommand)`: Host only. Returns to lobby.
 
 ---
@@ -196,6 +199,12 @@ Key helpers:
 ## Phase 5: Engine
 
 `ConsultTheCardGameEngine` — singleton, extends `AbstractGameEngine`:
+
+**Properties**:
+- `MinPlayerCount` → 4
+- `MaxPlayerCount` → 8
+
+**Host Role**: The host is a **spectator only**. They manage the lobby (start game, kick players, advance phases) but do not receive a role, give clues, or vote. The host observes the game state and sees all public information. `Players` (from `AbstractGameState`) contains only the participating players — the host is excluded.
 
 **Constructor** (primary constructor pattern):
 ```csharp
@@ -205,18 +214,17 @@ public class ConsultTheCardGameEngine(
     ILogger<ConsultTheCardGameState> stateLogger) : AbstractGameEngine
 ```
 
-**`CreateStateAsync(User host, CancellationToken ct)`**:
+**`CreateStateAsync(User host, CancellationToken ct)`** → `Task<ValueResult<AbstractGameState>>`:
 - Validate host is not null
 - Create `ConsultTheCardGameState(host, stateLogger)`
 - Set `UpdateJoinableStatus(true)`
 - Wire event: `gameState.PlayerUnregistered += player => HandlePlayerLeft(player, gameState)`
 - Return state
 
-**`StartAsync(User host, AbstractGameState state, CancellationToken ct)`**:
+**`StartAsync(User host, AbstractGameState state, CancellationToken ct)`** → `Task<Result>`:
 - Validate `state is ConsultTheCardGameState` (type check)
 - Validate `host == gameState.Host` (only host can start)
-- Validate `gameState.Players.Count >= 4` (host is NOT included in Players count — host is separate)
-- Validate `gameState.Players.Count <= 8`
+- Player count validated by `CanStartAsync()` via inherited `MinPlayerCount` (4) and `MaxPlayerCount` (8) — the host is a **spectator only** and does not participate in the game (no role, no clues, no votes)
 - Create `ConsultTheCardGameContext(gameState, randomNumberService, logger)`
 - Create `FiniteStateMachine<ConsultTheCardGameContext, ConsultTheCardCommand>(logger)` and assign to `context.Fsm`
 - Inside `gameState.Execute()`: set not joinable, assign context, initialize game, transition to `SetupState`
@@ -230,12 +238,14 @@ public class ConsultTheCardGameEngine(
 **Public UI methods** (all follow `TryGetContext` → create command → `ProcessCommand` pattern):
 - `SubmitClue(User player, ConsultTheCardGameState state, string clue)`
 - `CastVote(User player, ConsultTheCardGameState state, string targetPlayerId)`
-- `InformantGuess(User player, ConsultTheCardGameState state, string guessedWord)`
+- `InformantGuess(User player, ConsultTheCardGameState state, string guessedWord)` — only valid during RevealPhase when eliminated player is the Informant
 - `AdvanceToVote(User player, ConsultTheCardGameState state)`
 - `VoteToEndGame(User player, ConsultTheCardGameState state)`
 - `StartNextGame(User player, ConsultTheCardGameState state)`
 - `ReturnToLobby(User host, ConsultTheCardGameState state)` — host only, sets joinable, clears context
 - `ResetGame(User host, ConsultTheCardGameState state)` — host only, full reset for new session
+
+**Important**: All state mutations — including `ReturnToLobby` (set joinable, clear context) and `ResetGame` (reinitialize state) — must be wrapped inside `context.State.Execute()` to acquire the semaphore and notify state change listeners. This applies to every public method, not just command-based ones.
 
 **`HandlePlayerLeft(User player, ConsultTheCardGameState state)`**: Remove from turn order, adjust `CurrentCluePlayerIndex` if needed, mark as eliminated, check win conditions, auto-advance if the leaving player was the current clue giver or if all votes are now in.
 
@@ -265,9 +275,12 @@ Mountain,Hill,Peak,Ridge,Summit
 No header row. Each row is a thematic group. At runtime, `SelectWordPair()` picks a random group, selects 2 words at random from it, then randomly assigns Agent/Insider roles. A row with N words produces N*(N-1) possible configurations (e.g., a 5-word row yields 20 configurations). This dramatically increases variety and makes memorizing the word list useless — even knowing the group doesn't tell you which two words are in play or which role you have.
 
 ### `WordBank.cs`
-- Static class that loads and parses `WordPairs.csv` at startup (embedded resource or file read)
+- Static class that loads and parses `WordPairs.csv` via file read at startup
+- `WordPairs.csv` must be configured in the `.csproj` as: `<Content Include="Services\Logic\Games\ConsultTheCard\Data\WordPairs.csv" CopyToOutputDirectory="PreserveNewest" />`
+- Loads from disk using `File.ReadAllLines(Path.Combine(AppContext.BaseDirectory, "Services/Logic/Games/ConsultTheCard/Data/WordPairs.csv"))`
 - Returns `IReadOnlyList<WordGroup>` where `WordGroup(string[] Words)` contains 2+ words
-- Validates each row has at least 2 words on load
+- Validates each row has at least 2 words on load; rows with fewer than 2 words are skipped with a warning log
+- Empty lines and whitespace-only lines are skipped
 - Target: ~1000 word groups eventually. Initial implementation ships with 50-100 groups; the CSV format makes it trivial to add more over time. Groups with more words are especially high-value since they multiply configurations.
 - Word groups follow the design philosophy: "thematically adjacent but distinct" — all words in a group should share some associations but diverge on others. Too similar (car/automobile) makes the game impossible for Agents; too different (banana/algebra) makes it trivial.
 
@@ -276,6 +289,14 @@ No header row. Each row is a thematic group. At runtime, `SelectWordPair()` pick
 ## Phase 8: Blazor UI
 
 Following the CardCounter UI pattern exactly: one main lobby page (`DisposableComponent`) with phase-specific child components (`ComponentBase`).
+
+### Error Display Pattern
+Use **toast notifications** (following the CardCounter pattern with `@key`-based re-render and `@onanimationend` auto-dismiss) for all user-facing errors:
+- **Clue rejections**: Show an **ambiguous** error message (e.g., "Clue not accepted. Try a different word.") to avoid revealing the secret word to other players. Do not specify *why* the clue was rejected (spaces, matches secret word, previously used) — all rejections use the same generic message.
+- **Vote errors**: "You cannot vote for that player." (covers voting for self and voting for eliminated players)
+- **VoteToEndGame spam**: "You have already voted to end the game this round."
+- **Informant guess timeout**: "Time's up — guess forfeited."
+- **General command rejections**: "Action not available right now." (for commands sent in wrong phase)
 
 ### ConsultTheCardLobby (main page)
 - **Route**: `@page "/room/consult-the-card/{ObfuscatedRoomCode}"`
@@ -320,12 +341,10 @@ Following the CardCounter UI pattern exactly: one main lobby page (`DisposableCo
 ### DiscussionPhase
 - All submitted clues displayed prominently in a grid/list
 - Player list with role-unknown indicators
-- "Guess the Agents' Word" button — opens a text input for any player to attempt
-- "Vote to End Game" button — any player can vote; shows progress (X of Y needed)
+- "Vote to End Game" button — any alive player can vote, once per elimination cycle; shows progress (X of Y needed). Button disabled after player has voted this cycle.
 - Host "Advance to Vote" button to end discussion early
 - Timer countdown shown
-- Calls `GameEngine.InformantGuess()`, `GameEngine.VoteToEndGame()`, or `GameEngine.AdvanceToVote()`
-- If an Informant guess result occurs, show overlay with result (correct = game over, wrong = player eliminated)
+- Calls `GameEngine.VoteToEndGame()` or `GameEngine.AdvanceToVote()`
 
 ### VotePhase
 - Grid of alive players (excluding self) as vote targets
@@ -338,9 +357,10 @@ Following the CardCounter UI pattern exactly: one main lobby page (`DisposableCo
 ### RevealPhase
 - If elimination: dramatic reveal of eliminated player's name and role (Agent/Insider/Informant)
 - If tie: "No elimination — tied vote" message
+- **If eliminated player is the Informant**: Show a text input and "Guess the Agents' Word" button **only to the eliminated Informant**. Other players see "The Informant is making their guess..." with a countdown timer. One attempt only. If correct → game over overlay. If wrong or timed out → result shown, game continues.
 - Round summary: vote tally breakdown (who voted for whom)
-- Score changes for this cycle
-- Auto-advances via timer to next CluePhase or GameOver
+- Per-cycle score changes (vote penalties)
+- Auto-advances via timer to next CluePhase (paused while awaiting Informant guess)
 
 ### GameOverPhase
 - Winner announcement (team or Informant) with reason
@@ -378,14 +398,18 @@ create ConsultTheCardGameState, create ConsultTheCardGameContext
 - `SelectWordPair` picks unused group, selects 2 words from group, randomly assigns Agent/Insider roles, handles exhaustion
 - `SelectWordPair` works correctly with groups of varying sizes (2, 3, 5+ words)
 - `TallyVotes` returns correct winner, handles ties
-- `CheckWinConditions` — all Insiders+Informant eliminated → Agents win
-- `CheckWinConditions` — 2 players remain → Insiders win
-- `CheckWinConditions` — majority voted to end game → Insiders win
-- `CheckWinConditions` — game continues when neither met
+- `CheckWinConditions` — 2 players remain, Informant alive → Informant wins
+- `CheckWinConditions` — 2 players remain, Insider alive (no Informant) → Insiders win
+- `CheckWinConditions` — 2 players remain, only Agents alive → Agents win
+- `CheckWinConditions` — majority voted to end, Informant alive → Informant wins
+- `CheckWinConditions` — majority voted to end, Insider alive (no Informant) → Insiders win
+- `CheckWinConditions` — majority voted to end, only Agents alive → Agents win
+- `CheckWinConditions` — all Insiders+Informant eliminated but >2 players remain → game continues (no auto-resolve)
+- `CheckWinConditions` — game continues when neither end trigger met
 - `ResetEliminationCycleState` clears per-cycle data
 - `GetAlivePlayers` excludes eliminated players
-- `ApplyScoring` — correct scores for each outcome (+2 survived, +1 winning team, +3 Informant guess, -1 voted for Agent)
-- `ApplyScoring` is called before reset so vote data is available
+- `ApplyCycleScoring` — applies -1 penalty to players who voted for an Agent, called before ResetEliminationCycleState so vote data is available
+- `ApplyEndOfGameScoring` — applies +2 survived, +1 winning team, +3 Informant correct guess, called once at game end
 
 **ConsultTheCardGameEngineTests.cs**
 - `CreateStateAsync` returns valid state with `PlayerUnregistered` wired
@@ -423,11 +447,9 @@ create ConsultTheCardGameState, create ConsultTheCardGameContext
 - Timeout auto-submits "..." and advances
 
 **DiscussionPhaseStateTests.cs**
-- Informant guesses correctly → GameOverState (Informant wins)
-- Informant guesses incorrectly → eliminated, scoring applied, check win conditions
-- Non-Informant guess → rejected (no-op)
 - VoteToEndGame — single vote recorded, game continues
-- VoteToEndGame — majority reached → Insiders win → GameOverState
+- VoteToEndGame — duplicate vote from same player in same cycle rejected
+- VoteToEndGame — majority reached → game ends, win conditions evaluated → GameOverState
 - Host advances to vote → VotePhaseState
 - Non-host cannot advance to vote
 - Timeout → VotePhaseState
@@ -442,29 +464,43 @@ create ConsultTheCardGameState, create ConsultTheCardGameContext
 - Timeout → abstaining players skipped, tally proceeds
 
 **RevealPhaseStateTests.cs**
-- Elimination of last Insider → Agents win → GameOverState
-- Elimination reduces to 2 players → Insiders win → GameOverState
+- Elimination of non-Informant → no guess prompt, auto-advances
+- Elimination of Informant → AwaitingInformantGuess set, auto-advance paused
+- Informant guesses correctly → Informant wins → GameOverState
+- Informant guesses incorrectly → game continues, result recorded
+- Informant guess timeout → treated as forfeited, game continues
+- Non-Informant player sends InformantGuessCommand → rejected
+- Elimination reduces to 2 players → game ends, win conditions evaluated
+- Elimination of last Insider/Informant with >2 remaining → game continues (no auto-resolve)
 - Tie (no elimination) → next CluePhaseState
-- Scoring applied correctly before cycle reset
-- -1 penalty applied to players who voted for an Agent
-- Tick auto-advances
+- Per-cycle scoring (-1 penalty) applied correctly before cycle reset
+- Tick auto-advances after reveal (or after Informant guess resolves)
 
 **GameOverStateTests.cs**
-- `OnEnter` calculates final scores and accumulates into `GameScores`
+- `OnEnter` calls `ApplyEndOfGameScoring` and accumulates into `GameScores`
 - `StartNextGameCommand` advances to next game when games remain
 - `StartNextGameCommand` rejected when all games complete
 - `ReturnToLobbyCommand` returns to lobby
 - Multi-game: cumulative scores tracked correctly across games
+
+**WordBankTests.cs**
+- Parses valid CSV with 2-word rows correctly
+- Parses valid CSV with variable-length rows (2, 3, 5+ words)
+- Skips empty lines and whitespace-only lines
+- Skips rows with fewer than 2 words (logs warning)
+- Trims whitespace from words
+- Returns empty list for empty file (does not throw)
+- All returned `WordGroup` entries have at least 2 words
 
 ---
 
 ## Key Design Decisions
 
 1. **Players don't know their role** — they see their word (or blank) but not whether it's the Agent or Insider word. Role is only revealed on elimination.
-2. **Informant guess** — any player can attempt it during Discussion. Only the actual Informant gets the win; non-Informants are silently rejected (the command is a no-op). This preserves the secret that you don't know who the Informant is.
+2. **Informant guess** — the Informant can only attempt a guess when they are voted out during RevealPhase. They get one attempt with a 15-second timeout. The guess UI is only shown to the eliminated Informant; other players see a waiting message. This preserves secrecy during gameplay — no one can reveal themselves as the Informant by attempting a guess.
 3. **Tie votes** — no elimination, new clue cycle begins.
 4. **Player disconnect** — counts as elimination for win-condition purposes.
-5. **End game vote** — any player can vote to end the game during Discussion. If a majority of alive players vote to end, Insiders win. This implements the GDD's "Agents vote to end the game" win condition as a democratic mechanism.
+5. **End game vote** — any alive player can vote to end the game during Discussion, once per elimination cycle (to prevent spam). If a majority of alive players vote to end, the game ends and win conditions are evaluated in priority order (Informant → Insider → Agent). This is a democratic mechanism that ties into the Insider goal of gaining the Agents' trust.
 6. **Synonym checking** — the GDD prohibits direct synonyms as clues, but programmatic synonym detection is infeasible. This rule is enforced socially by players, consistent with the in-person party game design.
 7. **Multi-game sessions** — `TotalGames` controls how many full games are played. Each game has its own role assignments, word pair, and elimination cycles. Scores accumulate across games. `CurrentEliminationCycle` tracks cycles within a single game; `CurrentGameNumber` tracks games within a session.
 
