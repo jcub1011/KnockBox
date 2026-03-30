@@ -7,7 +7,6 @@ using KnockBox.Services.State.Games.Shared;
 using KnockBox.Services.State.Users;
 using KnockBox.Core.Services.State.Games.Shared;
 using KnockBox.Services.Logic.Games.DrawnToDress.FSM;
-using KnockBox.Services.Logic.Games.DrawnToDress.FSM.States;
 using Microsoft.AspNetCore.Components;
 using System.Diagnostics.CodeAnalysis;
 
@@ -31,8 +30,6 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
 
         private DtdAriaAnnouncer? _announcer;
         private GamePhase? _lastAnnouncedPhase;
-        private bool _announced10s;
-        private bool _announced5s;
 
         private IDisposable? _stateSubscription;
         private IDisposable? _tickSubscription;
@@ -94,10 +91,12 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
                 {
                     if (GameState?.Context is not null)
                         GameEngine.Tick(GameState.Context, DateTimeOffset.UtcNow);
-                }, tickInterval: 20); // 20 ticks @ 50ms = once per second
+                }, tickInterval: TickService.TicksPerSecond); // once per second
 
                 if (tickResult.TryGetSuccess(out var sub))
                     _tickSubscription = sub;
+                else
+                    Logger.LogError("Failed to register tick callback: {Error}", tickResult.Error);
             }
 
             await base.OnInitializedAsync();
@@ -131,8 +130,6 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
             if (_lastAnnouncedPhase != currentPhase)
             {
                 _lastAnnouncedPhase = currentPhase;
-                _announced10s = false;
-                _announced5s = false;
 
                 var phaseName = currentPhase switch
                 {
@@ -148,34 +145,6 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
                     _ => currentPhase.ToString()
                 };
                 _announcer.Announce($"Phase changed to {phaseName}");
-            }
-        }
-
-        private void AnnounceTimerWarningsIfNeeded()
-        {
-            var state = GameState;
-            var context = state?.Context;
-            if (context?.Fsm?.CurrentState is not ITimedDrawnToDressGameState timedState)
-                return;
-
-            if (timedState.IsTimerOptional && state?.Config?.EnableTimer == false)
-                return;
-
-            if (_announcer is null) return;
-
-            var remaining = timedState.GetRemainingTime(context, DateTimeOffset.UtcNow);
-            if (!remaining.IsSuccess) return;
-
-            var secs = (int)Math.Ceiling(remaining.Value.TotalSeconds);
-            if (secs <= 10 && secs > 5 && !_announced10s)
-            {
-                _announced10s = true;
-                _announcer.Announce("10 seconds remaining");
-            }
-            else if (secs <= 5 && secs > 0 && !_announced5s)
-            {
-                _announced5s = true;
-                _announcer.Announce("5 seconds remaining");
             }
         }
 

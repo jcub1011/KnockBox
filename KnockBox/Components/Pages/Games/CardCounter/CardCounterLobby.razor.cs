@@ -97,6 +97,8 @@ namespace KnockBox.Components.Pages.Games.CardCounter
 
                 if (tickResult.TryGetSuccess(out var sub))
                     _tickSubscription = sub;
+                else
+                    Logger.LogError("Failed to register tick callback: {Error}", tickResult.Error);
             }
 
             await base.OnInitializedAsync();
@@ -115,11 +117,11 @@ namespace KnockBox.Components.Pages.Games.CardCounter
 
         public override void Dispose()
         {
+            base.Dispose();
             _tickSubscription?.Dispose();
             if (GameState != null)
                 GameState.OnStateDisposed -= HandleGameStateDisposed;
             _stateSubscription?.Dispose();
-            base.Dispose();
         }
 
         private void HandleGameStateDisposed()
