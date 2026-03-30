@@ -13,7 +13,6 @@ namespace KnockBox.Services.State.Shared
     public sealed class TickService(ILogger<TickService> logger) : BackgroundService, ITickService
     {
         private static readonly TimeSpan Interval = TimeSpan.FromMilliseconds(50); // 20 ticks/sec
-
         private static readonly ObjectPool<List<Action>> CallbackPool =
             ObjectPool.Create<List<Action>>();
 
@@ -64,15 +63,12 @@ namespace KnockBox.Services.State.Shared
         {
             logger.LogInformation("TickService started. Interval: {interval}ms.", Interval.TotalMilliseconds);
 
-            using var timer = new PeriodicTimer(Interval);
-            long tickCount = 0;
+            var fixedLoop = new FixedTickLoop(Interval);
 
             try
             {
-                while (await timer.WaitForNextTickAsync(stoppingToken))
+                await fixedLoop.RunAsync((tick) =>
                 {
-                    tickCount++;
-
                     var callbacks = CallbackPool.Get();
                     try
                     {
@@ -80,7 +76,7 @@ namespace KnockBox.Services.State.Shared
                         {
                             foreach (var kvp in _tickMap)
                             {
-                                if (tickCount % kvp.Key == 0)
+                                if (tick % kvp.Key == 0)
                                     callbacks.AddRange(kvp.Value);
                             }
                         }
@@ -102,9 +98,13 @@ namespace KnockBox.Services.State.Shared
                         callbacks.Clear();
                         CallbackPool.Return(callbacks);
                     }
-                }
+                }, stoppingToken);
             }
-            catch (OperationCanceledException) { }
+            catch (OperationCanceledException) { } // Ignore cancellation errors
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Error handling tick.");
+            }
 
             logger.LogInformation("TickService stopped.");
         }
