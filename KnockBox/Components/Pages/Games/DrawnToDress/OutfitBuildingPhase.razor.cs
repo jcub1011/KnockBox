@@ -39,12 +39,15 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
                 if (item.ClaimedByPlayerId == player.PlayerId) return id;
             }
 
-            // Fall back to own drawing for this type.
-            foreach (var id in player.OwnedClothingItemIds)
+            // Fall back to own drawing for this type if enabled.
+            if (GameState.Config.AllowReuseOwnItems)
             {
-                if (!GameState.ClothingPool.TryGetValue(id, out var item)) continue;
-                if (item.ClothingTypeId != clothingTypeId) continue;
-                if (item.CreatorPlayerId == player.PlayerId) return id;
+                foreach (var id in player.OwnedClothingItemIds)
+                {
+                    if (!GameState.ClothingPool.TryGetValue(id, out var item)) continue;
+                    if (item.ClothingTypeId != clothingTypeId) continue;
+                    if (item.CreatorPlayerId == player.PlayerId) return id;
+                }
             }
 
             return null;

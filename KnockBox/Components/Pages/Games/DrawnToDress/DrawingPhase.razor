@@ -19,12 +19,25 @@
     <div class="dtd-drawing-header">
         <div class="dtd-drawing-type-badge">
             <span class="dtd-drawing-type-icon">🎨</span>
-            <span class="dtd-drawing-type-name">@CurrentTypeName</span>
+            <span class="dtd-drawing-type-name">
+                @CurrentTypeName
+                @if (GameState.ThemeRevealedToPlayers && GameState.CurrentTheme is not null)
+                {
+                    <span class="dtd-drawing-theme-reveal"> — @GameState.CurrentTheme.DisplayName</span>
+                }
+            </span>
         </div>
 
         <div class="dtd-drawing-round-info">
             Round @(GameState.CurrentDrawingClothingTypeIndex + 1) of @GameState.Config.ClothingTypes.Count
         </div>
+
+        <button class="dtd-btn dtd-btn-secondary dtd-btn-mannequin @(_showMannequin ? "dtd-btn-mannequin-active" : "")"
+                @onclick="ToggleMannequin"
+                aria-label="Toggle mannequin reference"
+                title="Toggle mannequin reference">
+            👤
+        </button>
 
         <TimerDisplay GameState="GameState" />
     </div>
@@ -73,10 +86,11 @@
                 <div class="dtd-drawing-canvas-wrapper" role="img" aria-label="Drawing canvas for @CurrentTypeName">
                     <SvgDrawingCanvas @ref="_canvas"
                                       Width="100%"
-                                      Height="@($"{CurrentTypeCanvasHeight + 200}px")"
-                                      ViewBoxWidth="CurrentTypeCanvasWidth"
-                                      ViewBoxHeight="CurrentTypeCanvasHeight"
-                                      BackgroundColor="#ffffff" />
+                                      Height="@($"{CurrentTypeCanvasHeight}px")"
+                                      ViewBoxWidth="@CurrentTypeCanvasWidth"
+                                      ViewBoxHeight="@CurrentTypeCanvasHeight"
+                                      BackgroundColor="#ffffff"
+                                      BackgroundSvgContent="@MannequinSvg" />
                 </div>
 
                 <div class="dtd-drawing-actions">

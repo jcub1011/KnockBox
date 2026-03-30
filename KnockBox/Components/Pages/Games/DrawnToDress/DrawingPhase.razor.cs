@@ -21,6 +21,69 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
         private SvgDrawingCanvas? _canvas;
         private bool _submitting;
         private string? _errorMessage;
+        private bool _showMannequin;
+
+        protected string? MannequinSvg => _showMannequin ? GetMannequinSvg(CurrentTypeId) : null;
+
+        protected void ToggleMannequin()
+        {
+            _showMannequin = !_showMannequin;
+            StateHasChanged();
+        }
+
+        protected override void OnInitialized()
+        {
+            _showMannequin = GameState.Config.ShowMannequin;
+        }
+
+        private string GetMannequinSvg(string currentTypeId)
+        {
+            var ct = GameState.Config.ClothingTypes.FirstOrDefault(c => c.Id == currentTypeId);
+            int canvasWidth = ct?.CanvasWidth ?? 400;
+            int canvasHeight = ct?.CanvasHeight ?? 400;
+
+            // Native original mannequin width is 600, center is 300.
+            // When scaled by 2.0, width is 1200, center is 600.
+            // To center it in the new canvasWidth, offset = (canvasWidth / 2) - 600;
+            int xOffset = (canvasWidth / 2) - 600;
+
+            int partCenterY = 0;
+            switch (currentTypeId)
+            {
+                case "hat": partCenterY = 80 * 2; break; // 160
+                case "top": partCenterY = (140 + 300); break; // 440 (average of 140*2, 300*2 = 440)
+                case "bottom": partCenterY = (300 + 520); break; // 820
+                case "shoes": partCenterY = (520 + 550); break; // 1070
+                default: partCenterY = 440; break;
+            }
+
+            int viewCenterY = canvasHeight / 2;
+            int yOffset = viewCenterY - partCenterY;
+
+            string headColor = currentTypeId == "hat" ? "#7c3aed" : "#e2e8f0";
+            string torsoColor = currentTypeId == "top" ? "#7c3aed" : "#e2e8f0";
+            string legsColor = currentTypeId == "bottom" ? "#7c3aed" : "#e2e8f0";
+            string feetColor = currentTypeId == "shoes" ? "#7c3aed" : "#e2e8f0";
+
+            return $@"
+                <g transform=""translate(0, {yOffset})"">
+                    <g transform=""translate({xOffset}, 0) scale(2, 2)"" fill-opacity=""0.3"" stroke=""#94a3b8"" stroke-width=""2"">
+                        <!-- Head -->
+                        <circle cx=""300"" cy=""80"" r=""50"" fill=""{headColor}"" />
+                        <!-- Torso -->
+                        <path d=""M240,140 L360,140 L340,300 L260,300 Z"" fill=""{torsoColor}"" />
+                        <!-- Arms -->
+                        <path d=""M240,140 L200,280"" stroke-linecap=""round"" />
+                        <path d=""M360,140 L400,280"" stroke-linecap=""round"" />
+                        <!-- Legs -->
+                        <path d=""M260,300 L240,520"" fill=""none"" stroke=""{legsColor}"" stroke-width=""40"" stroke-linecap=""round"" />
+                        <path d=""M340,300 L360,520"" fill=""none"" stroke=""{legsColor}"" stroke-width=""40"" stroke-linecap=""round"" />
+                        <!-- Feet -->
+                        <path d=""M220,520 L200,550 L250,550 Z"" fill=""{feetColor}"" />
+                        <path d=""M380,520 L400,550 L350,550 Z"" fill=""{feetColor}"" />
+                    </g>
+                </g>";
+        }
 
         /// <summary>Display name for the clothing type of the current round.</summary>
         protected string CurrentTypeName

@@ -44,7 +44,7 @@ namespace KnockBox.Core.Services.Drawing
         [
             "d", "stroke", "stroke-width", "fill",
             "stroke-linecap", "stroke-linejoin", "cx", "cy", "r",
-            "transform",
+            "transform", "data-type", "fill-rule",
         ];
 
         /// <summary>

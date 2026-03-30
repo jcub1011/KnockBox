@@ -1,11 +1,19 @@
 namespace KnockBox.Services.State.Games.DrawnToDress.Data
 {
-    /// <summary>
-    /// All tunable configuration values for a Drawn To Dress session.
-    /// Default property values match the GDD baseline.
-    /// </summary>
     public class DrawnToDressConfig
     {
+        /// <summary>
+        /// When <see langword="true"/>, the game provides a mannequin drawing reference
+        /// that highlights parts based on what is being drawn.
+        /// </summary>
+        public bool ShowMannequin { get; set; } = true;
+
+        /// <summary>
+        /// When <see langword="true"/>, the game advances phases automatically based on
+        /// timers. When <see langword="false"/>, players must manually ready/submit to advance.
+        /// </summary>
+        public bool EnableTimer { get; set; } = true;
+
         // ── Drawing phase ─────────────────────────────────────────────────────
 
         /// <summary>
@@ -30,10 +38,10 @@ namespace KnockBox.Services.State.Games.DrawnToDress.Data
         /// </summary>
         public List<ClothingTypeDefinition> ClothingTypes { get; set; } =
         [
-            new() { Id = "hat",        DisplayName = "Hat",       AllowMultiple = false, CanvasWidth = 600, CanvasHeight = 600 },
-            new() { Id = "top",        DisplayName = "Top",       AllowMultiple = false, CanvasWidth = 600, CanvasHeight = 600 },
-            new() { Id = "bottom",     DisplayName = "Bottom",    AllowMultiple = false, CanvasWidth = 600, CanvasHeight = 600 },
-            new() { Id = "shoes",      DisplayName = "Shoes",     AllowMultiple = false, CanvasWidth = 600, CanvasHeight = 600 },
+            new() { Id = "hat",        DisplayName = "Hat",       AllowMultiple = false, CanvasWidth = 600, CanvasHeight = 450 },
+            new() { Id = "top",        DisplayName = "Top",       AllowMultiple = false, CanvasWidth = 600, CanvasHeight = 450 },
+            new() { Id = "bottom",     DisplayName = "Bottom",    AllowMultiple = false, CanvasWidth = 600, CanvasHeight = 850 },
+            new() { Id = "shoes",      DisplayName = "Shoes",     AllowMultiple = false, CanvasWidth = 600, CanvasHeight = 450 },
         ];
 
         // ── Theme ─────────────────────────────────────────────────────────────
@@ -263,7 +271,7 @@ namespace KnockBox.Services.State.Games.DrawnToDress.Data
             {
                 ClothingTypes =
                 [
-                    new() { Id = "top", DisplayName = "Top", AllowMultiple = false, CanvasWidth = 600, CanvasHeight = 600 },
+                    new() { Id = "top", DisplayName = "Top", AllowMultiple = false, CanvasWidth = 600, CanvasHeight = 450 },
                 ];
             }
 

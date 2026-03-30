@@ -93,6 +93,11 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM
         string? SketchSvgContent = null,
         Dictionary<string, ItemPositionOverride>? ItemPositionOverrides = null) : DrawnToDressCommand(PlayerId);
 
+    /// <summary>Updates the draft outfit name for the player while they are typing.</summary>
+    public record UpdateDraftOutfitNameCommand(
+        string PlayerId,
+        string DraftName) : DrawnToDressCommand(PlayerId);
+
     // ── Outfit distinctness resolution ────────────────────────────────────────
 
     /// <summary>

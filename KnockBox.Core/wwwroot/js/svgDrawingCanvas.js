@@ -6,11 +6,24 @@ const instances = new Map();
  * @returns {string|null} hex string e.g. "#ff0080", or null if parsing fails
  */
 function rgbToHex(rgb) {
-    const match = rgb?.match(/rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)/);
+    const match = rgb?.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
     if (!match) return null;
     return '#' + [match[1], match[2], match[3]]
         .map(n => parseInt(n, 10).toString(16).padStart(2, '0'))
         .join('');
+}
+
+/**
+ * Checks if two 32-bit integer colors match within a given tolerance per channel.
+ */
+function colorsMatch(c1, c2, tolerance = 0) {
+    if (c1 === c2) return true;
+    if (tolerance === 0) return false;
+    const r1 = (c1 >> 24) & 0xFF, g1 = (c1 >> 16) & 0xFF, b1 = (c1 >> 8) & 0xFF;
+    const r2 = (c2 >> 24) & 0xFF, g2 = (c2 >> 16) & 0xFF, b2 = (c2 >> 8) & 0xFF;
+    return Math.abs(r1 - r2) <= tolerance && 
+           Math.abs(g1 - g2) <= tolerance && 
+           Math.abs(b1 - b2) <= tolerance;
 }
 
 /**
@@ -102,6 +115,94 @@ function visvalingamWhyatt(points, minArea = 2, minPoints = 3) {
         node = node.next;
     }
     return result;
+}
+
+/**
+ * Computes a 32-bit integer representation of a pixel's RGBA color.
+ */
+function getPixelColor(data, x, y, width) {
+    const idx = (y * width + x) * 4;
+    return (data[idx] << 24) | (data[idx + 1] << 16) | (data[idx + 2] << 8) | data[idx + 3];
+}
+
+/**
+ * Performs a span-based flood fill on ImageData, returning a bitmask of the filled area.
+ */
+function floodFillSpan(imageData, x, y, fillColor) {
+    const data = imageData.data;
+    const width = imageData.width;
+    const height = imageData.height;
+    
+    const targetColor = getPixelColor(data, x, y, width);
+    
+    // Parse hex fill color to 32-bit int
+    const fillR = parseInt(fillColor.slice(1, 3), 16);
+    const fillG = parseInt(fillColor.slice(3, 5), 16);
+    const fillB = parseInt(fillColor.slice(5, 7), 16);
+    const fillIntValue = (fillR << 24) | (fillG << 16) | (fillB << 8) | 255;
+
+    if (targetColor === fillIntValue) return null;
+
+    const mask = new Uint8Array(width * height);
+    const stack = [[x, y]];
+
+    while (stack.length > 0) {
+        let [lx, ly] = stack.pop();
+        let rx = lx;
+        
+        while (lx > 0 && getPixelColor(data, lx - 1, ly, width) === targetColor && !mask[ly * width + (lx - 1)]) {
+            lx--;
+        }
+        while (rx < width - 1 && getPixelColor(data, rx + 1, ly, width) === targetColor && !mask[ly * width + (rx + 1)]) {
+            rx++;
+        }
+
+        for (let i = lx; i <= rx; i++) {
+            mask[ly * width + i] = 1;
+            if (ly > 0 && getPixelColor(data, i, ly - 1, width) === targetColor && !mask[(ly - 1) * width + i]) {
+                if (i === lx || getPixelColor(data, i - 1, ly - 1, width) !== targetColor || mask[(ly - 1) * width + (i - 1)]) {
+                    stack.push([i, ly - 1]);
+                }
+            }
+            if (ly < height - 1 && getPixelColor(data, i, ly + 1, width) === targetColor && !mask[(ly + 1) * width + i]) {
+                if (i === lx || getPixelColor(data, i - 1, ly + 1, width) !== targetColor || mask[(ly + 1) * width + (i - 1)]) {
+                    stack.push([i, ly + 1]);
+                }
+            }
+        }
+    }
+    return mask;
+}
+
+/**
+ * Converts a bitmask to an SVG path string consisting of horizontal spans.
+ * @param {Uint8Array} mask
+ * @param {number} width - mask width in pixels
+ * @param {number} height - mask height in pixels
+ * @param {number} scale - scale factor used during rasterization
+ */
+function maskToPath(mask, width, height, scale = 1) {
+    const paths = [];
+    const s = 1 / scale;
+    const r = n => Math.round(n * 100) / 100;
+
+    for (let y = 0; y < height; y++) {
+        let startX = -1;
+        for (let x = 0; x <= width; x++) {
+            const isFilled = x < width && mask[y * width + x];
+            if (isFilled && startX === -1) {
+                startX = x;
+            } else if (!isFilled && startX !== -1) {
+                const rx = startX * s;
+                const ry = y * s;
+                const rw = (x - startX) * s;
+                const rh = s;
+                paths.push(`M${r(rx)} ${r(ry)}h${r(rw)}v${r(rh)}h${r(-rw)}z`);
+                startX = -1;
+            }
+        }
+    }
+    return paths.join('');
 }
 
 /**
@@ -252,6 +353,8 @@ export function initialize(svgId, dotNetRef, initialColor, initialStrokeWidth, i
         /** Visvalingam-Whyatt minimum area threshold for stroke simplification.
          *  0 = no simplification; 0.5 = subtle; 2 = balanced (default); 8 = aggressive. */
         simplifyMinArea: 2,
+        currentTool: 'brush', // 'brush', 'eraser', or 'fill'
+        undoStack: [], // Stores actions: { type: 'draw'|'erase'|'fill', element, index, previousBg }
     };
 
     instances.set(svgId, state);
@@ -268,7 +371,133 @@ export function initialize(svgId, dotNetRef, initialColor, initialStrokeWidth, i
         return { x: transformed.x, y: transformed.y };
     }
 
+    function eraseAt(clientX, clientY) {
+        const el = document.elementFromPoint(clientX, clientY);
+        // Only erase paths/circles that belong to THIS SVG.
+        if (el && (el.tagName === 'path' || el.tagName === 'circle') && el.parentNode === svg) {
+            const idx = state.paths.indexOf(el);
+            if (idx !== -1) {
+                state.paths.splice(idx, 1);
+                el.remove();
+                state.undoStack.push({ type: 'erase', element: el, index: idx });
+                state.dotNetRef.invokeMethodAsync('OnStrokeCompleted', state.paths.length)
+                    .catch(err => console.error('[SVGCanvas] OnStrokeCompleted failed.', err));
+                setUndoDisabled(container, false);
+            }
+        }
+    }
+
+    function performFloodFillAt(clientX, clientY) {
+        const { x, y } = getSvgCoords(clientX, clientY);
+        const SCALE = 2; // 2x resolution for better precision and smoother edges
+        
+        // Get coordinate space dimensions from viewBox or client bounds.
+        const vb = svg.viewBox?.baseVal;
+        const viewWidth = (vb && vb.width > 0) ? vb.width : svg.clientWidth;
+        const viewHeight = (vb && vb.height > 0) ? vb.height : svg.clientHeight;
+        
+        const width = Math.round(viewWidth * SCALE);
+        const height = Math.round(viewHeight * SCALE);
+        
+        // Rasterize current state to a temporary canvas for flood fill calculation.
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        
+        ctx.scale(SCALE, SCALE);
+
+        // Background
+        ctx.fillStyle = svg.style.backgroundColor || state.backgroundColor;
+        ctx.fillRect(0, 0, viewWidth, viewHeight);
+        
+        // Draw existing strokes (only those tracked in state.paths)
+        for (const el of state.paths) {
+            ctx.strokeStyle = el.getAttribute('stroke') || 'none';
+            ctx.lineWidth = el.getAttribute('stroke-width') || 0;
+            ctx.lineCap = el.getAttribute('stroke-linecap') || 'round';
+            ctx.lineJoin = el.getAttribute('stroke-linejoin') || 'round';
+            ctx.fillStyle = el.getAttribute('fill') || 'none';
+            
+            if (el.tagName === 'path') {
+                const fillRule = el.getAttribute('fill-rule') || 'nonzero';
+                const p = new Path2D(el.getAttribute('d'));
+                if (ctx.fillStyle !== 'none') ctx.fill(p, fillRule);
+                
+                // Fills should NOT be stroked during rasterization to prevent bleed-over
+                // into adjacent empty areas (which would block subsequent fills).
+                if (el.getAttribute('data-type') !== 'fill') {
+                    if (ctx.strokeStyle !== 'none') ctx.stroke(p);
+                }
+            } else if (el.tagName === 'circle') {
+                ctx.beginPath();
+                ctx.arc(parseFloat(el.getAttribute('cx')), parseFloat(el.getAttribute('cy')), parseFloat(el.getAttribute('r')), 0, Math.PI * 2);
+                if (ctx.fillStyle !== 'none') ctx.fill();
+                if (ctx.strokeStyle !== 'none') ctx.stroke();
+            }
+        }
+        
+        const imageData = ctx.getImageData(0, 0, width, height);
+        const ix = Math.round(x * SCALE);
+        const iy = Math.round(y * SCALE);
+        
+        if (ix < 0 || ix >= width || iy < 0 || iy >= height) return;
+        
+        const targetColor = getPixelColor(imageData.data, ix, iy, width);
+        const fillR = parseInt(state.color.slice(1, 3), 16);
+        const fillG = parseInt(state.color.slice(3, 5), 16);
+        const fillB = parseInt(state.color.slice(5, 7), 16);
+        const fillIntValue = (fillR << 24) | (fillG << 16) | (fillB << 8) | 255;
+
+        // Tolerance check for the seed point to avoid "refusing" to fill due to sub-pixel bleed
+        if (colorsMatch(targetColor, fillIntValue, 2)) return;
+
+        const mask = floodFillSpan(imageData, ix, iy, state.color);
+        if (!mask) return; 
+        
+        const d = maskToPath(mask, width, height, SCALE);
+        if (!d) return;
+        
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('data-type', 'fill');
+        path.setAttribute('fill', state.color);
+        path.setAttribute('stroke', state.color);
+        path.setAttribute('stroke-width', '1'); // Reduced bleed
+        path.setAttribute('stroke-linejoin', 'round');
+        path.setAttribute('d', d);
+        
+        // Insertion logic: Keep fills behind all strokes, but newer fills on top of older fills.
+        let lastFillIdx = -1;
+        for (let i = 0; i < state.paths.length; i++) {
+            if (state.paths[i].getAttribute('data-type') === 'fill') {
+                lastFillIdx = i;
+            } else {
+                break; // Fills always come first in the path list
+            }
+        }
+        
+        const insertionIdx = lastFillIdx + 1;
+        const nextElInDom = state.paths[insertionIdx];
+        svg.insertBefore(path, nextElInDom || null);
+        state.paths.splice(insertionIdx, 0, path);
+        
+        state.undoStack.push({ type: 'draw', element: path });
+        setUndoDisabled(container, false);
+        state.dotNetRef.invokeMethodAsync('OnStrokeCompleted', state.paths.length)
+            .catch(err => console.error('[SVGCanvas] OnStrokeCompleted failed.', err));
+    }
+
     function startStroke(clientX, clientY) {
+        if (state.currentTool === 'eraser') {
+            state.isDrawing = true;
+            state.isErasing = true;
+            eraseAt(clientX, clientY);
+            return;
+        }
+        if (state.currentTool === 'fill') {
+            performFloodFillAt(clientX, clientY);
+            return;
+        }
         state.isDrawing = true;
         const { x, y } = getSvgCoords(clientX, clientY);
         state.currentPoints = [{ x, y }];
@@ -287,7 +516,12 @@ export function initialize(svgId, dotNetRef, initialColor, initialStrokeWidth, i
     }
 
     function continueStroke(clientX, clientY) {
-        if (!state.isDrawing || !state.currentPath) return;
+        if (!state.isDrawing) return;
+        if (state.isErasing) {
+            eraseAt(clientX, clientY);
+            return;
+        }
+        if (!state.currentPath) return;
         const { x, y } = getSvgCoords(clientX, clientY);
 
         const pts = state.currentPoints;
@@ -325,6 +559,7 @@ export function initialize(svgId, dotNetRef, initialColor, initialStrokeWidth, i
     function endStroke() {
         if (!state.isDrawing) return;
         state.isDrawing = false;
+        state.isErasing = false;
         if (!state.currentPath) return;
 
         // Flush any pending rAF so the final stroke segment is not lost.
@@ -333,6 +568,7 @@ export function initialize(svgId, dotNetRef, initialColor, initialStrokeWidth, i
             state._rafPending = false;
         }
 
+        let element;
         if (state.currentPoints.length === 1) {
             // Single tap/click — render as a small filled circle.
             const { x, y } = state.currentPoints[0];
@@ -342,7 +578,7 @@ export function initialize(svgId, dotNetRef, initialColor, initialStrokeWidth, i
             dot.setAttribute('r', Math.round(state.strokeWidth / 2 * 100) / 100);
             dot.setAttribute('fill', state.color);
             svg.replaceChild(dot, state.currentPath);
-            state.paths.push(dot);
+            element = dot;
         } else {
             // Simplify the stroke using Visvalingam-Whyatt before committing.
             const simplified = visvalingamWhyatt(
@@ -351,9 +587,11 @@ export function initialize(svgId, dotNetRef, initialColor, initialStrokeWidth, i
                 3
             );
             state.currentPath.setAttribute('d', buildPath(simplified));
-            state.paths.push(state.currentPath);
+            element = state.currentPath;
         }
 
+        state.paths.push(element);
+        state.undoStack.push({ type: 'draw', element });
         state.currentPath = null;
         state.currentPoints = [];
         setUndoDisabled(container, false);
@@ -364,10 +602,20 @@ export function initialize(svgId, dotNetRef, initialColor, initialStrokeWidth, i
     // Undo starts disabled; first completed stroke enables it.
     setUndoDisabled(container, true);
 
+    function deselectEraserIfActive() {
+        if (state.currentTool === 'eraser') {
+            state.currentTool = 'brush';
+            container.querySelector('.toolbar-btn-eraser')?.classList.remove('toolbar-btn-active');
+            state.dotNetRef.invokeMethodAsync('OnToolChanged', 'brush')
+                .catch(err => console.error('[SVGCanvas] OnToolChanged failed.', err));
+        }
+    }
+
     // Color picker
     const colorInput = container?.querySelector('.toolbar-color');
     if (colorInput) {
         colorInput.addEventListener('input', (e) => {
+            deselectEraserIfActive();
             state.color = e.target.value;
             updateSwatchActive(container, e.target.value);
             state.dotNetRef.invokeMethodAsync('OnColorChanged', e.target.value)
@@ -398,6 +646,7 @@ export function initialize(svgId, dotNetRef, initialColor, initialStrokeWidth, i
             // Custom swatch — select it with its current color
             const customSwatchEl = e.target.closest('.toolbar-swatch-custom');
             if (customSwatchEl) {
+                deselectEraserIfActive();
                 const rgb = getComputedStyle(customSwatchEl).backgroundColor;
                 const hex = rgbToHex(rgb) || state.color;
                 state.color = hex;
@@ -411,6 +660,7 @@ export function initialize(svgId, dotNetRef, initialColor, initialStrokeWidth, i
             // Swatch
             const swatchEl = e.target.closest('.toolbar-swatch[data-color]');
             if (swatchEl) {
+                deselectEraserIfActive();
                 const color = swatchEl.dataset.color;
                 state.color = color;
                 if (colorInput) colorInput.value = color;
@@ -433,19 +683,31 @@ export function initialize(svgId, dotNetRef, initialColor, initialStrokeWidth, i
             }
 
             // Fill background with current color (undoable)
-            if (e.target.closest('.toolbar-btn-fill')) {
-                const previousBg = svg.style.backgroundColor || state.backgroundColor;
-                svg.style.backgroundColor = state.color;
-                // Push a sentinel object onto the undo stack so this can be undone.
-                state.paths.push({
-                    _isFill: true,
-                    _previousBg: previousBg,
-                    remove() {
-                        svg.style.backgroundColor = this._previousBg;
-                    }
-                });
-                setUndoDisabled(container, false);
-                state.dotNetRef.invokeMethodAsync('OnStrokeCompleted', state.paths.length)
+            const fillBtn = e.target.closest('.toolbar-btn-fill');
+            if (fillBtn) {
+                state.currentTool = state.currentTool === 'fill' ? 'brush' : 'fill';
+                fillBtn.classList.toggle('toolbar-btn-active', state.currentTool === 'fill');
+                container.querySelector('.toolbar-btn-eraser')?.classList.remove('toolbar-btn-active');
+                state.dotNetRef.invokeMethodAsync('OnToolChanged', state.currentTool)
+                    .catch(err => console.error('[SVGCanvas] OnToolChanged failed.', err));
+                return;
+            }
+
+            // Eraser toggle
+            const eraserBtn = e.target.closest('.toolbar-btn-eraser');
+            if (eraserBtn) {
+                state.currentTool = state.currentTool === 'eraser' ? 'brush' : 'eraser';
+                eraserBtn.classList.toggle('toolbar-btn-active', state.currentTool === 'eraser');
+                container.querySelector('.toolbar-btn-fill')?.classList.remove('toolbar-btn-active');
+                state.dotNetRef.invokeMethodAsync('OnToolChanged', state.currentTool)
+                    .catch(err => console.error('[SVGCanvas] OnToolChanged failed.', err));
+                return;
+            }
+
+            // Clear all
+            if (e.target.closest('.toolbar-btn-clear')) {
+                clear(svgId);
+                state.dotNetRef.invokeMethodAsync('OnStrokeCompleted', 0)
                     .catch(err => console.error('[SVGCanvas] OnStrokeCompleted failed.', err));
                 return;
             }
@@ -453,9 +715,7 @@ export function initialize(svgId, dotNetRef, initialColor, initialStrokeWidth, i
             // Undo
             const undoBtn = e.target.closest('.toolbar-btn-undo');
             if (undoBtn) {
-                if (undoBtn.classList.contains('toolbar-btn-disabled') || state.paths.length === 0) return;
-                state.paths.pop().remove();
-                setUndoDisabled(container, state.paths.length === 0);
+                undo(svgId);
                 state.dotNetRef.invokeMethodAsync('OnStrokeCompleted', state.paths.length)
                     .catch(err => console.error('[SVGCanvas] OnStrokeCompleted failed.', err));
                 return;
@@ -589,9 +849,27 @@ export function setSimplifyMinArea(svgId, minArea) {
  */
 export function undo(svgId) {
     const state = instances.get(svgId);
-    if (!state || state.paths.length === 0) return 0;
-    state.paths.pop().remove();
-    setUndoDisabled(state.svg.closest('.svg-drawing-canvas'), state.paths.length === 0);
+    if (!state || state.undoStack.length === 0) return 0;
+
+    const action = state.undoStack.pop();
+    if (action.type === 'draw') {
+        const idx = state.paths.indexOf(action.element);
+        if (idx !== -1) state.paths.splice(idx, 1);
+        action.element.remove();
+    } else if (action.type === 'erase') {
+        state.paths.splice(action.index, 0, action.element);
+        // Find correct visual neighbor to maintain Z-order
+        let nextEl = null;
+        for (let i = action.index + 1; i < state.paths.length; i++) {
+            if (state.paths[i].parentNode === state.svg) {
+                nextEl = state.paths[i];
+                break;
+            }
+        }
+        state.svg.insertBefore(action.element, nextEl);
+    }
+
+    setUndoDisabled(state.svg.closest('.svg-drawing-canvas'), state.undoStack.length === 0);
     return state.paths.length;
 }
 
@@ -604,6 +882,7 @@ export function clear(svgId) {
     if (!state) return;
     for (const path of state.paths) path.remove();
     state.paths = [];
+    state.undoStack = [];
     setUndoDisabled(state.svg.closest('.svg-drawing-canvas'), true);
 }
 
@@ -625,7 +904,7 @@ export function downloadSvg(svgId, fileName, backgroundColor) {
 const ALLOWED_STROKE_TAGS = new Set(['path', 'circle']);
 const ALLOWED_STROKE_ATTRS = new Set([
     'd', 'stroke', 'stroke-width', 'fill', 'stroke-linecap', 'stroke-linejoin',
-    'cx', 'cy', 'r',
+    'cx', 'cy', 'r', 'data-type', 'fill-rule',
 ]);
 
 /**
@@ -655,7 +934,6 @@ function serializePaths(paths) {
     if (paths.length === 0) return '';
     const tmp = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     for (const el of paths) {
-        if (el._isFill) continue; // Skip fill sentinels.
         const clean = sanitizeStrokeElement(el);
         if (clean) tmp.appendChild(clean);
     }
@@ -776,6 +1054,7 @@ export function loadSvgContent(svgId, svgContent) {
     // Clear existing strokes.
     for (const p of state.paths) p.remove();
     state.paths = [];
+    state.undoStack = [];
     state.currentPath = null;
     state.currentPoints = [];
 
@@ -806,6 +1085,7 @@ export function loadSvgContent(svgId, svgContent) {
         if (!clean) continue;
         state.svg.appendChild(clean);
         state.paths.push(clean);
+        state.undoStack.push({ type: 'draw', element: clean });
     }
 
     setUndoDisabled(container, state.paths.length === 0);
