@@ -92,8 +92,14 @@ namespace KnockBox.Services.State.Games.DrawnToDress.Data
         /// <summary>The server-generated coin flip result (heads = <see langword="true"/>).</summary>
         public bool ResultIsHeads { get; set; }
 
-        /// <summary>The player/entrant ID of the winner of this flip.</summary>
+        /// <summary>The player ID of the winner of this flip (always an actual player ID).</summary>
         public string WinnerPlayerId { get; set; } = string.Empty;
+
+        /// <summary>
+        /// The entrant ID of the winner (for <see cref="CoinFlipContext.CriterionTie"/>).
+        /// Empty for <see cref="CoinFlipContext.FinalStandingsTie"/>.
+        /// </summary>
+        public string WinnerEntrantId { get; set; } = string.Empty;
 
         /// <summary>Whether this flip was auto-resolved due to timer expiry (timeout).</summary>
         public bool IsAutoResolved { get; set; }

@@ -1,6 +1,8 @@
-﻿using KnockBox.Services.Logic.Games.Shared;
+﻿using KnockBox.Core.Services.State.Shared;
+using KnockBox.Services.Logic.Games.Shared;
 using KnockBox.Services.State;
 using KnockBox.Services.State.Games.Shared;
+using KnockBox.Services.State.Shared;
 using KnockBox.Services.State.Users;
 using Microsoft.AspNetCore.Components.Server.Circuits;
 
@@ -11,6 +13,9 @@ namespace KnockBox.Services.Registrations.States
         public static IServiceCollection RegisterStateServices(this IServiceCollection services)
         {
             // Add states
+            services.AddSingleton<TickService>();
+            services.AddSingleton<ITickService>(sp => sp.GetRequiredService<TickService>());
+            services.AddHostedService(sp => sp.GetRequiredService<TickService>());
             services.AddSingleton<ILobbyService, LobbyService>();
             services.AddSingleton<IIDBackedServiceProvider, IDBackedServiceProvider>();
             services.AddScoped<IUserService, UserService>();

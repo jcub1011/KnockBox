@@ -1,4 +1,5 @@
 using KnockBox.Components.Shared;
+using KnockBox.Core.Services.State.Shared;
 using KnockBox.Services.Logic.Games.DrawnToDress;
 using KnockBox.Services.Navigation;
 using KnockBox.Services.State.Games.DrawnToDress;
@@ -22,6 +23,8 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
 
         [Inject] protected IUserService UserService { get; set; } = default!;
 
+        [Inject] protected ITickService TickService { get; set; } = default!;
+
         [Inject] protected ILogger<DrawnToDressLobby> Logger { get; set; } = default!;
 
         [Parameter] public string ObfuscatedRoomCode { get; set; } = default!;
@@ -32,7 +35,7 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
         private bool _announced5s;
 
         private IDisposable? _stateSubscription;
-        private PeriodicTimer? _timer;
+        private IDisposable? _tickSubscription;
 
         protected override async Task OnInitializedAsync()
         {
@@ -81,41 +84,23 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
                 });
             });
 
-            _timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
-            _ = StartTimerAsync();
+            // Register with the server-side tick service. Only the host drives FSM ticks to
+            // avoid redundant lock contention from every client. The tick service runs
+            // independently of any Blazor circuit, so the game continues even if the host
+            // disconnects and a new host is promoted.
+            if (IsHost())
+            {
+                var tickResult = TickService.RegisterTickCallback(() =>
+                {
+                    if (GameState?.Context is not null)
+                        GameEngine.Tick(GameState.Context, DateTimeOffset.UtcNow);
+                }, tickInterval: 20); // 20 ticks @ 50ms = once per second
+
+                if (tickResult.TryGetSuccess(out var sub))
+                    _tickSubscription = sub;
+            }
 
             await base.OnInitializedAsync();
-        }
-
-        private async Task StartTimerAsync()
-        {
-            try
-            {
-                while (await _timer!.WaitForNextTickAsync(ComponentDetached))
-                {
-                    try
-                    {
-                        await InvokeAsync(() =>
-                        {
-                            // Only the host drives FSM ticks to avoid concurrent transitions.
-                            if (GameState?.Context is not null && IsHost())
-                                GameEngine.Tick(GameState.Context, DateTimeOffset.UtcNow);
-                            AnnounceTimerWarningsIfNeeded();
-                            StateHasChanged();
-                        });
-                    }
-                    catch (ObjectDisposedException) { break; }
-                    catch (Exception ex)
-                    {
-                        Logger.LogError(ex, "Error during timer tick.");
-                    }
-                }
-            }
-            catch (OperationCanceledException) { }
-            catch (Exception ex)
-            {
-                Logger.LogError(ex, "Timer loop terminated unexpectedly.");
-            }
         }
 
         private bool IsHost() => UserService.CurrentUser?.Id == GameState?.Host?.Id;
@@ -197,7 +182,7 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
         public override void Dispose()
         {
             base.Dispose();
-            _timer?.Dispose();
+            _tickSubscription?.Dispose();
             if (GameState is not null)
             {
                 GameState.OnStateDisposed -= HandleStateDisposed;

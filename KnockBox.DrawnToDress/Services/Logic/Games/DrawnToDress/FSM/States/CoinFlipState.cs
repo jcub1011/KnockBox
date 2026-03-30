@@ -74,6 +74,9 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
                     return new AbandonedState();
 
                 default:
+                    context.Logger.LogWarning(
+                        "CoinFlipState: unrecognized command [{type}] from player [{id}].",
+                        command.GetType().Name, command.PlayerId);
                     return null;
             }
         }
@@ -91,7 +94,7 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
             if (flip is null || flip.IsResolved) return null;
 
             // Auto-resolve: random choice on timeout.
-            bool autoChoice = Random.Shared.Next(2) == 0;
+            bool autoChoice = context.Random.GetRandomInt(2) == 0;
             flip.IsAutoResolved = true;
             context.Logger.LogInformation(
                 "Coin flip timer expired. Auto-selecting {choice} for caller [{caller}].",
@@ -128,7 +131,7 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
         private static void ResolveFlip(DrawnToDressGameContext context, PendingCoinFlipEntry flip, bool callerChoseHeads)
         {
             flip.CallerChoseHeads = callerChoseHeads;
-            flip.ResultIsHeads = Random.Shared.Next(2) == 0;
+            flip.ResultIsHeads = context.Random.GetRandomInt(2) == 0;
 
             bool callerWins = flip.CallerChoseHeads == flip.ResultIsHeads;
 
@@ -149,7 +152,8 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
                 }
 
                 string winnerEntrantId = callerWins ? callerEntrantId : opponentEntrantId;
-                flip.WinnerPlayerId = winnerEntrantId;
+                flip.WinnerEntrantId = winnerEntrantId;
+                flip.WinnerPlayerId = DrawnToDressGameContext.GetPlayerIdFromEntrantId(winnerEntrantId);
 
                 // Persist to CriterionCoinFlipResults for scoring.
                 context.State.CriterionCoinFlipResults.Add(
@@ -207,7 +211,7 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
                 playerB = flip.PlayerBId;
             }
 
-            flip.CallerPlayerId = Random.Shared.Next(2) == 0 ? playerA : playerB;
+            flip.CallerPlayerId = context.Random.GetRandomInt(2) == 0 ? playerA : playerB;
 
             _deadline = DateTimeOffset.UtcNow.AddSeconds(context.Config.CoinFlipTimeSec);
             context.State.PhaseDeadlineUtc = _deadline;

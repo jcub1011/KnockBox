@@ -26,6 +26,7 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
 
         private readonly int _clothingTypeIndex;
         private DateTimeOffset _deadline;
+        private readonly HashSet<string> _recentSubmissions = new();
 
         /// <summary>
         /// Initialises the drawing round for the specified clothing-type slot.
@@ -79,6 +80,9 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
                     return new AbandonedState();
 
                 default:
+                    context.Logger.LogWarning(
+                        "DrawingRoundState: unrecognized command [{type}] from player [{id}].",
+                        command.GetType().Name, command.PlayerId);
                     return null;
             }
         }
@@ -137,6 +141,17 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
                 context.Logger.LogWarning(
                     "SubmitDrawing: unknown player [{id}].", cmd.PlayerId);
                 return null;
+            }
+
+            // Reject duplicate submissions with identical SVG content from the same player.
+            string contentKey = $"{cmd.PlayerId}:{cmd.SvgContent?.GetHashCode()}";
+            if (!_recentSubmissions.Add(contentKey))
+            {
+                context.Logger.LogWarning(
+                    "SubmitDrawing: player [{id}] submitted duplicate content. Ignoring.",
+                    cmd.PlayerId);
+                return ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?>.FromError(
+                    "This drawing has already been submitted.");
             }
 
             // Validate the clothing type matches the CURRENT round.

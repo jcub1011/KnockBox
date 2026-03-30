@@ -12,14 +12,16 @@ namespace KnockBox.Services.State.Shared
     /// </summary>
     public sealed class TickService(ILogger<TickService> logger) : BackgroundService, ITickService
     {
-        private static readonly TimeSpan Interval = TimeSpan.FromMilliseconds(50); // 20 ticks/sec
+        private const int TPS = 20;
+        private static readonly TimeSpan _tickInterval = TimeSpan.FromMilliseconds(1.0 / TPS);
         private static readonly ObjectPool<List<Action>> CallbackPool =
             ObjectPool.Create<List<Action>>();
 
         private readonly Lock _lock = new();
         private readonly Dictionary<int, HashSet<Action>> _tickMap = [];
 
-        public TimeSpan TickInterval => Interval;
+        public int TicksPerSecond => TPS;
+        public TimeSpan TickInterval => _tickInterval;
 
         public ValueResult<IDisposable> RegisterTickCallback(Action tickCallback, int tickInterval = 1)
         {
@@ -61,9 +63,9 @@ namespace KnockBox.Services.State.Shared
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            logger.LogInformation("TickService started. Interval: {interval}ms.", Interval.TotalMilliseconds);
+            logger.LogInformation("TickService started. Interval: {interval}ms.", TickInterval.TotalMilliseconds);
 
-            var fixedLoop = new FixedTickLoop(Interval);
+            var fixedLoop = new FixedTickLoop(TickInterval);
 
             try
             {

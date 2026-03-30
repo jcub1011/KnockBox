@@ -7,7 +7,11 @@
       "Bash(dotnet test:*)",
       "Bash(cd /c/Users/Jacob McCormack/source/repos/KnockBox/KnockBox.DrawnToDress)",
       "Bash(find 'C:\\\\Users\\\\Jacob McCormack\\\\source\\\\repos\\\\KnockBox' -type f -name package.json -o -name jest.config.* -o -name karma.conf.* -o -name vitest.config.*)",
-      "Bash(find 'C:\\\\Users\\\\Jacob McCormack\\\\source\\\\repos\\\\KnockBox' -type f \\\\\\(-name *.test.js -o -name *.spec.js -o -name *.test.ts -o -name *.spec.ts \\\\\\))"
+      "Bash(find 'C:\\\\Users\\\\Jacob McCormack\\\\source\\\\repos\\\\KnockBox' -type f \\\\\\(-name *.test.js -o -name *.spec.js -o -name *.test.ts -o -name *.spec.ts \\\\\\))",
+      "Bash(find /c/Users/Jacob McCormack/source/repos/KnockBox -name *PendingCoinFlip* -o -name *CoinFlip*)",
+      "Bash(grep -r OutfitSubmission /c/Users/Jacob McCormack/source/repos/KnockBox/KnockBox.DrawnToDress --include=*.cs)",
+      "Bash(grep -E \"\\\\.cs$\")",
+      "Bash(find 'C:/Users/Jacob McCormack/source/repos/KnockBox/KnockBox.DrawnToDressTests/' -name *.cs -type f)"
     ]
   }
 }
