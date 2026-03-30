@@ -15,6 +15,7 @@ Implement `ConsultTheCardGameEngine` as the singleton entry point that wires up 
 ### 5.2 Host Role
 - Host is a **spectator only** -- manages lobby (start, kick, advance phases) but does not receive a role, give clues, or vote
 - `Players` (from `AbstractGameState`) contains only participating players; host is excluded
+- Host-only commands (`AdvanceToVoteCommand`, `StartNextGameCommand`, `ReturnToLobbyCommand`) use the host's user ID as `PlayerId`; FSM state handlers validate via `command.PlayerId == context.State.Host.Id`
 
 ### 5.3 `CreateStateAsync(User host, CancellationToken ct)`
 - Validate host is not null
@@ -50,6 +51,7 @@ All follow `TryGetContext` -> create command -> `ProcessCommand` pattern:
 - Remove from turn order
 - Adjust `CurrentCluePlayerIndex` if needed
 - Mark as eliminated
+- If during VotePhase: void any votes cast for the disconnected player (reset `VoteTargetId`/`HasVoted` for voters who targeted this player)
 - Check win conditions
 - Auto-advance if leaving player was current clue giver or if all votes are now in
 

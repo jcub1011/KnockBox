@@ -39,6 +39,11 @@ Key helper methods:
 
 ---
 
+## Dependencies
+- **Milestone 7 (Word Bank)**: `SelectWordPair()` loads word groups from `WordBank`. If implementing before Milestone 7, stub `WordBank` with hardcoded test data or use an interface that can be swapped later.
+
+---
+
 ## Acceptance Criteria
 - [ ] All 7 command types compile and inherit from `ConsultTheCardCommand`
 - [ ] Type aliases correctly reference the generic state machine interfaces

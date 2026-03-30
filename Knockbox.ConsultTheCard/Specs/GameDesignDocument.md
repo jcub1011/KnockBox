@@ -79,7 +79,7 @@ All players simultaneously point at the player they want to eliminate (or use a 
 
 ### 5.5 Reveal
 
-The eliminated player reveals their role to the group by consulting their Role Card against the Mission Card.
+The eliminated player's role is **not** revealed to the group. The only exception is the Informant: if the eliminated player is the Informant, their identity is revealed through the guess mechanic (they are prompted to guess the Agents' word — see Section 6). For all other roles, the eliminated player's allegiance remains hidden until the game ends.
 
 ### 5.6 Repeat
 

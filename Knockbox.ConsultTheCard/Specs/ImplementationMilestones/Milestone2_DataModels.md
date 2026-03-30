@@ -18,14 +18,14 @@ Define all enums, records, configuration, player state, and game state classes n
 - `EliminationResult(string PlayerId, string PlayerName, Role Role, bool WasTie)`
 - `InformantGuessResult(string PlayerId, string PlayerName, string GuessedWord, bool WasCorrect)`
 - `WinConditionResult(bool GameOver, Role? WinningTeam, string Reason)`
-- `EndGameVoteStatus(HashSet<string> VotedToEnd, int RequiredVotes)` -- tracks Agent end-game votes
+- `EndGameVoteStatus(HashSet<string> VotedToEnd, int RequiredVotes)` -- tracks player votes to end the game
 
 ### 2.3 ConsultTheCardPlayerState (separate file: `Data/ConsultTheCardPlayerState.cs`)
 Properties:
 - `PlayerId`, `DisplayName`, `Role`, `SecretWord` (null for Informant)
 - `IsEliminated`, `HasSubmittedClue`, `CurrentClue`, `VoteTargetId`, `HasVoted`
 - `HasVotedToEndGame` -- one vote per elimination cycle per player
-- `Score`, `PreviousClues` (list, prevents reuse across rounds)
+- `Score`
 
 ### 2.4 ConsultTheCardGameConfig
 - `SetupPhaseTimeoutMs` (5000), `CluePhaseTimeoutMs` (30000), `DiscussionPhaseTimeoutMs` (120000)
@@ -38,7 +38,8 @@ Properties:
 - `CurrentCluePlayerIndex`, `CurrentEliminationCycle` (int, init 0), `CurrentGameNumber` (int, init 1), `CurrentWordPair`
 - `CurrentRoundClues`, `CurrentRoundVotes`
 - `LastElimination`, `LastInformantGuess`, `AwaitingInformantGuess`, `WinResult`, `Config`
-- `EndGameVoteStatus` -- tracking for "Agents vote to end" mechanic
+- `EndGameVoteStatus` -- tracking for "vote to end game" mechanic
+- `UsedClues` (HashSet<string>) -- all clue words used by any player in the current game (prevents reuse across players and cycles)
 - `GameScores` (Dictionary<string, int>) -- cumulative scores across games
 
 ---

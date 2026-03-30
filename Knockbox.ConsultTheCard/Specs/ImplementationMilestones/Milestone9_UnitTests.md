@@ -47,7 +47,7 @@ Write comprehensive unit tests covering all game logic: context helpers, engine,
 
 ### 9.4 ConsultTheCardGameEnginePlayerLeftTests.cs
 - Player leaves during CluePhase (was current clue giver) -> advances to next
-- Player leaves during VotePhase -> rechecks if all voted
+- Player leaves during VotePhase -> votes targeting them are voided, rechecks if all voted
 - Insider leaves -> check if Agents now win
 - All players leave -> GameOver
 - Player leaves during Discussion -> adjusts alive count
@@ -62,7 +62,7 @@ Write comprehensive unit tests covering all game logic: context helpers, engine,
 - Valid clue submission stores clue and advances turn
 - Clue with spaces rejected
 - Clue matching secret word rejected
-- Previously used clue rejected
+- Clue previously used by any player in the current game rejected
 - Non-active player's submission rejected
 - All clues submitted -> transitions to DiscussionPhaseState
 - Timeout auto-submits "..." and advances
@@ -80,21 +80,22 @@ Write comprehensive unit tests covering all game logic: context helpers, engine,
 - Cannot vote for self
 - Cannot vote for eliminated player
 - All votes in -> transitions to RevealPhaseState
-- Tie -> `EliminationResult.WasTie = true`
-- Majority -> correct player eliminated
+- Tie -> `EliminationResult.WasTie = true`, no player marked `IsEliminated`
+- Majority -> correct player marked `IsEliminated`, `LastElimination` set
 - Timeout -> abstaining players skipped, tally proceeds
 
 ### 9.9 RevealPhaseStateTests.cs
-- Elimination of non-Informant -> no guess prompt, auto-advances
-- Elimination of Informant -> `AwaitingInformantGuess` set, auto-advance paused
+- Elimination of non-Informant -> role NOT revealed, no guess prompt, auto-advances
+- Elimination of Informant -> role revealed via guess mechanic, `AwaitingInformantGuess` set, auto-advance paused
 - Informant guesses correctly -> Informant wins -> GameOverState
-- Informant guesses incorrectly -> game continues, result recorded
+- Informant guesses incorrectly -> `CheckWinConditions()` called, game continues if >2 players, result recorded
+- Informant guesses incorrectly with ≤2 players remaining -> game ends, win conditions evaluated
 - Informant guess timeout -> forfeited, game continues
 - Non-Informant sends InformantGuessCommand -> rejected
 - Elimination reduces to 2 players -> game ends, win conditions evaluated
 - Elimination of last Insider/Informant with >2 remaining -> game continues
-- Tie (no elimination) -> next CluePhaseState
-- Per-cycle scoring (-1 penalty) applied correctly before cycle reset
+- Tie (no elimination) -> scoring still applied, cycle reset, next CluePhaseState
+- Per-cycle scoring (-1 penalty) applied on both elimination and tie (always called)
 - Tick auto-advances after reveal (or after Informant guess resolves)
 
 ### 9.10 GameOverStateTests.cs

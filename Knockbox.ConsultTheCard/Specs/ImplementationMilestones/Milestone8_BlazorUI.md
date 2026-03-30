@@ -43,7 +43,7 @@ Use toast notifications (CardCounter pattern with `@key`-based re-render and `@o
 - Active player sees text input + submit button
 - Non-active players see waiting indicator
 - Clue history: submitted clues for this cycle (player name + clue word)
-- Previously used clues shown as disabled hints
+- All previously used clues (from any player, any cycle) shown as disabled hints via game-level `UsedClues`
 - Calls `GameEngine.SubmitClue()`
 
 ### 8.6 DiscussionPhase
@@ -63,11 +63,11 @@ Use toast notifications (CardCounter pattern with `@key`-based re-render and `@o
 - Calls `GameEngine.CastVote()`
 
 ### 8.8 RevealPhase
-- If elimination: reveal eliminated player's name and role
+- If elimination: show the eliminated player's name. **Do not reveal their role** -- roles are hidden during gameplay.
 - If tie: "No elimination -- tied vote" message
-- If Informant eliminated: text input + "Guess the Agents' Word" button **only for eliminated Informant**; others see "The Informant is making their guess..." with countdown. One attempt. Correct = game over. Wrong/timeout = result shown, game continues.
-- Round summary: vote tally breakdown
-- Per-cycle score changes
+- If Informant eliminated: this is the only case where a role is revealed mid-game. Text input + "Guess the Agents' Word" button **only for eliminated Informant**; others see "The Informant is making their guess..." with countdown. One attempt. Correct = game over. Wrong/timeout = result shown, game continues.
+- Round summary: vote tally breakdown (who voted for whom)
+- Per-cycle score changes are **not** displayed (would reveal roles). Scores tracked internally and shown at game end.
 - Auto-advances via timer (paused during Informant guess)
 
 ### 8.9 GameOverPhase
@@ -92,7 +92,7 @@ Use toast notifications (CardCounter pattern with `@key`-based re-render and `@o
 - [ ] CluePhase shows turn indicator, input for active player, and clue history
 - [ ] DiscussionPhase shows clues, end-game vote button with progress, and host advance
 - [ ] VotePhase shows vote targets, confirmation, progress, and waiting state
-- [ ] RevealPhase shows elimination result, Informant guess UI (when applicable), and vote tally
+- [ ] RevealPhase shows elimination without revealing role (except Informant via guess mechanic), vote tally, and no per-cycle score breakdown
 - [ ] GameOverPhase shows winner, scores, multi-game controls, and lobby return
 - [ ] All error toasts use the correct ambiguous/generic messages
 - [ ] Kicked players are detected and handled
