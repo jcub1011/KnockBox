@@ -11,7 +11,8 @@
       "Bash(find /c/Users/Jacob McCormack/source/repos/KnockBox -name *PendingCoinFlip* -o -name *CoinFlip*)",
       "Bash(grep -r OutfitSubmission /c/Users/Jacob McCormack/source/repos/KnockBox/KnockBox.DrawnToDress --include=*.cs)",
       "Bash(grep -E \"\\\\.cs$\")",
-      "Bash(find 'C:/Users/Jacob McCormack/source/repos/KnockBox/KnockBox.DrawnToDressTests/' -name *.cs -type f)"
+      "Bash(find 'C:/Users/Jacob McCormack/source/repos/KnockBox/KnockBox.DrawnToDressTests/' -name *.cs -type f)",
+      "WebFetch(domain:api.github.com)"
     ]
   }
 }

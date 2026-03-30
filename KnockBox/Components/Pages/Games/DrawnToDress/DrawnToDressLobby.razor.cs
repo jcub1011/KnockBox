@@ -150,13 +150,13 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
 
         public override void Dispose()
         {
-            base.Dispose();
             _tickSubscription?.Dispose();
             if (GameState is not null)
             {
                 GameState.OnStateDisposed -= HandleStateDisposed;
             }
             _stateSubscription?.Dispose();
+            base.Dispose();
         }
 
         private static bool TryExtractObfuscatedRoomCode(string uri, [NotNullWhen(true)] out string? obfuscatedRoomCode)

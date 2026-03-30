@@ -12,116 +12,154 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress
     [TestClass]
     public class EntrantIdParsingTests
     {
-        // ── TryParseEntrantId ────────────────────────────────────────────────
+        // ── TryParse ────────────────────────────────────────────────────────
 
         [TestMethod]
-        public void TryParseEntrantId_ValidFormat_ReturnsTrueWithParsedValues()
+        public void TryParse_ValidFormat_ReturnsTrueWithParsedValues()
         {
-            var result = DrawnToDressGameContext.TryParseEntrantId("player1:1", out var playerId, out var round);
+            var result = EntrantId.TryParse("player1:1", out var entrantId);
 
             Assert.IsTrue(result);
-            Assert.AreEqual("player1", playerId);
-            Assert.AreEqual(1, round);
+            Assert.AreEqual("player1", entrantId.PlayerId);
+            Assert.AreEqual(1, entrantId.Round);
         }
 
         [TestMethod]
-        public void TryParseEntrantId_ComplexPlayerId_ReturnsTrueWithParsedValues()
+        public void TryParse_ComplexPlayerId_ReturnsTrueWithParsedValues()
         {
-            var result = DrawnToDressGameContext.TryParseEntrantId("abc-def:3", out var playerId, out var round);
+            var result = EntrantId.TryParse("abc-def:3", out var entrantId);
 
             Assert.IsTrue(result);
-            Assert.AreEqual("abc-def", playerId);
-            Assert.AreEqual(3, round);
+            Assert.AreEqual("abc-def", entrantId.PlayerId);
+            Assert.AreEqual(3, entrantId.Round);
         }
 
         [TestMethod]
-        public void TryParseEntrantId_MissingColon_ReturnsFalse()
+        public void TryParse_MissingColon_ReturnsFalse()
         {
-            var result = DrawnToDressGameContext.TryParseEntrantId("player1", out _, out _);
+            var result = EntrantId.TryParse("player1", out _);
 
             Assert.IsFalse(result);
         }
 
         [TestMethod]
-        public void TryParseEntrantId_EmptyString_ReturnsFalse()
+        public void TryParse_EmptyString_ReturnsFalse()
         {
-            var result = DrawnToDressGameContext.TryParseEntrantId("", out _, out _);
+            var result = EntrantId.TryParse("", out _);
 
             Assert.IsFalse(result);
         }
 
         [TestMethod]
-        public void TryParseEntrantId_Null_ReturnsFalse()
+        public void TryParse_Null_ReturnsFalse()
         {
-            var result = DrawnToDressGameContext.TryParseEntrantId(null!, out _, out _);
+            var result = EntrantId.TryParse(null, out _);
 
             Assert.IsFalse(result);
         }
 
         [TestMethod]
-        public void TryParseEntrantId_NoRoundPart_ReturnsFalse()
+        public void TryParse_NoRoundPart_ReturnsFalse()
         {
-            var result = DrawnToDressGameContext.TryParseEntrantId("player1:", out _, out _);
+            var result = EntrantId.TryParse("player1:", out _);
 
             Assert.IsFalse(result);
         }
 
         [TestMethod]
-        public void TryParseEntrantId_NonNumericRound_ReturnsFalse()
+        public void TryParse_NonNumericRound_ReturnsFalse()
         {
-            var result = DrawnToDressGameContext.TryParseEntrantId("player1:abc", out _, out _);
+            var result = EntrantId.TryParse("player1:abc", out _);
 
             Assert.IsFalse(result);
         }
 
         [TestMethod]
-        public void TryParseEntrantId_ColonAtStart_ReturnsFalse()
+        public void TryParse_ColonAtStart_ReturnsFalse()
         {
-            var result = DrawnToDressGameContext.TryParseEntrantId(":1", out _, out _);
+            var result = EntrantId.TryParse(":1", out _);
 
             Assert.IsFalse(result);
         }
 
-        // ── GetPlayerIdFromEntrantId ─────────────────────────────────────────
+        // ── Properties ──────────────────────────────────────────────────────
 
         [TestMethod]
-        public void GetPlayerIdFromEntrantId_ValidInput_ReturnsPlayerId()
+        public void PlayerId_AfterValidParse_ReturnsPlayerId()
         {
-            var playerId = DrawnToDressGameContext.GetPlayerIdFromEntrantId("player1:2");
+            EntrantId.TryParse("player1:2", out var entrantId);
 
-            Assert.AreEqual("player1", playerId);
+            Assert.AreEqual("player1", entrantId.PlayerId);
         }
 
         [TestMethod]
-        public void GetPlayerIdFromEntrantId_MalformedInput_ReturnsWholeString()
+        public void Round_AfterValidParse_ReturnsRound()
         {
-            var result = DrawnToDressGameContext.GetPlayerIdFromEntrantId("malformed");
+            EntrantId.TryParse("player1:2", out var entrantId);
 
-            Assert.AreEqual("malformed", result);
+            Assert.AreEqual(2, entrantId.Round);
         }
 
-        // ── GetOutfitRoundFromEntrantId ──────────────────────────────────────
+        // ── ToString ────────────────────────────────────────────────────────
 
         [TestMethod]
-        public void GetOutfitRoundFromEntrantId_ValidInput_ReturnsRound()
+        public void ToString_ReturnsCanonicalFormat()
         {
-            var round = DrawnToDressGameContext.GetOutfitRoundFromEntrantId("player1:2");
+            var entrantId = new EntrantId("player1", 2);
 
-            Assert.AreEqual(2, round);
+            Assert.AreEqual("player1:2", entrantId.ToString());
         }
 
         [TestMethod]
-        public void GetOutfitRoundFromEntrantId_MalformedInput_ReturnsZero()
+        public void ToString_AfterParse_RoundTrips()
         {
-            var round = DrawnToDressGameContext.GetOutfitRoundFromEntrantId("malformed");
+            EntrantId.TryParse("abc-def:3", out var entrantId);
 
-            Assert.AreEqual(0, round);
+            Assert.AreEqual("abc-def:3", entrantId.ToString());
+        }
+
+        // ── Value Equality ──────────────────────────────────────────────────
+
+        [TestMethod]
+        public void Equals_SamePlayerIdAndRound_AreEqual()
+        {
+            var a = new EntrantId("player1", 1);
+            var b = new EntrantId("player1", 1);
+
+            Assert.AreEqual(a, b);
+        }
+
+        [TestMethod]
+        public void Equals_DifferentPlayerId_AreNotEqual()
+        {
+            var a = new EntrantId("player1", 1);
+            var b = new EntrantId("player2", 1);
+
+            Assert.AreNotEqual(a, b);
+        }
+
+        [TestMethod]
+        public void Equals_DifferentRound_AreNotEqual()
+        {
+            var a = new EntrantId("player1", 1);
+            var b = new EntrantId("player1", 2);
+
+            Assert.AreNotEqual(a, b);
+        }
+
+        [TestMethod]
+        public void Equals_ParsedAndConstructed_AreEqual()
+        {
+            EntrantId.TryParse("player1:1", out var parsed);
+            var constructed = new EntrantId("player1", 1);
+
+            Assert.AreEqual(parsed, constructed);
         }
 
         // ── GetOutfitByEntrantId ─────────────────────────────────────────────
 
         [TestMethod]
-        public async Task GetOutfitByEntrantId_MalformedEntrantId_ReturnsNull()
+        public async Task GetOutfitByEntrantId_NonExistentEntrant_ReturnsNull()
         {
             // Arrange: create a real game context via the engine.
             var engineLoggerMock = new Mock<ILogger<DrawnToDressGameEngine>>();
@@ -141,7 +179,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress
             var context = state.Context!;
 
             // Act
-            var outfit = context.GetOutfitByEntrantId("malformed");
+            var outfit = context.GetOutfitByEntrantId(new EntrantId("nonexistent", 1));
 
             // Assert
             Assert.IsNull(outfit);

@@ -1,4 +1,3 @@
-using KnockBox.Services.Logic.Games.DrawnToDress.FSM;
 using KnockBox.Services.State.Games.DrawnToDress.Data;
 
 namespace KnockBox.Services.Logic.Games.DrawnToDress
@@ -7,8 +6,7 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress
     /// Provides deterministic Swiss-system tournament pairing and round-count calculation
     /// for Drawn To Dress voting rounds.
     ///
-    /// Entrant IDs encode player+round (e.g. "player1:1"). Pairing avoids matching a
-    /// player's own outfits against each other when possible.
+    /// Pairing avoids matching a player's own outfits against each other when possible.
     /// </summary>
     public static class SwissTournamentService
     {
@@ -37,11 +35,11 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress
         /// The entrant who received strictly more criterion votes in a matchup is credited
         /// with one win. Ties award no win to either entrant.
         /// </summary>
-        public static Dictionary<string, int> CalculateWins(
+        public static Dictionary<EntrantId, int> CalculateWins(
             IReadOnlyList<VotingRound> previousRounds,
             IEnumerable<VoteSubmission> votes)
         {
-            var wins = new Dictionary<string, int>();
+            var wins = new Dictionary<EntrantId, int>();
             var voteList = votes.ToList();
 
             foreach (var round in previousRounds)
@@ -74,17 +72,17 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress
         /// </summary>
         public static VotingRound GenerateRound(
             int roundNumber,
-            IReadOnlyList<string> entrantIds,
+            IReadOnlyList<EntrantId> entrantIds,
             IReadOnlyList<VotingRound> previousRounds,
-            IReadOnlyDictionary<string, int>? winsByPlayerId = null)
+            IReadOnlyDictionary<EntrantId, int>? winsByEntrantId = null)
         {
-            var wins = winsByPlayerId ?? new Dictionary<string, int>();
+            var wins = winsByEntrantId ?? new Dictionary<EntrantId, int>();
             var previousPairs = CollectPreviousPairs(previousRounds);
 
-            // Sort: highest wins first; break ties by entrant ID for determinism.
+            // Sort: highest wins first; break ties by entrant ID string for determinism.
             var sorted = entrantIds
                 .OrderByDescending(id => wins.TryGetValue(id, out var w) ? w : 0)
-                .ThenBy(id => id, StringComparer.Ordinal)
+                .ThenBy(id => id.ToString(), StringComparer.Ordinal)
                 .ToList();
 
             var matchups = PairGreedy(sorted, previousPairs, roundNumber);
@@ -98,10 +96,10 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress
 
         // ── Private helpers ───────────────────────────────────────────────────
 
-        private static HashSet<(string, string)> CollectPreviousPairs(
+        private static HashSet<(EntrantId, EntrantId)> CollectPreviousPairs(
             IReadOnlyList<VotingRound> previousRounds)
         {
-            var pairs = new HashSet<(string, string)>();
+            var pairs = new HashSet<(EntrantId, EntrantId)>();
             foreach (var round in previousRounds)
                 foreach (var matchup in round.Matchups)
                     pairs.Add(NormalizedPair(matchup.EntrantAId, matchup.EntrantBId));
@@ -113,19 +111,19 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress
         /// Avoids pairing two entrants from the same player when possible.
         /// </summary>
         private static List<SwissMatchup> PairGreedy(
-            List<string> sorted,
-            HashSet<(string, string)> previousPairs,
+            List<EntrantId> sorted,
+            HashSet<(EntrantId, EntrantId)> previousPairs,
             int roundNumber)
         {
             var matchups = new List<SwissMatchup>();
-            var unpaired = new List<string>(sorted);
+            var unpaired = new List<EntrantId>(sorted);
 
             while (unpaired.Count >= 2)
             {
-                string a = unpaired[0];
+                var a = unpaired[0];
                 unpaired.RemoveAt(0);
 
-                string aPlayer = DrawnToDressGameContext.GetPlayerIdFromEntrantId(a);
+                string aPlayer = a.PlayerId;
 
                 // Find the best opponent:
                 // 1. Not a rematch AND not the same player
@@ -137,8 +135,7 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress
                 // Pass 1: non-rematch, different player
                 for (int i = 0; i < unpaired.Count; i++)
                 {
-                    string bPlayer = DrawnToDressGameContext.GetPlayerIdFromEntrantId(unpaired[i]);
-                    if (bPlayer != aPlayer && !previousPairs.Contains(NormalizedPair(a, unpaired[i])))
+                    if (unpaired[i].PlayerId != aPlayer && !previousPairs.Contains(NormalizedPair(a, unpaired[i])))
                     {
                         bIndex = i;
                         break;
@@ -163,8 +160,7 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress
                 {
                     for (int i = 0; i < unpaired.Count; i++)
                     {
-                        string bPlayer = DrawnToDressGameContext.GetPlayerIdFromEntrantId(unpaired[i]);
-                        if (bPlayer != aPlayer)
+                        if (unpaired[i].PlayerId != aPlayer)
                         {
                             bIndex = i;
                             break;
@@ -176,7 +172,7 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress
                 if (bIndex == -1)
                     bIndex = 0;
 
-                string b = unpaired[bIndex];
+                var b = unpaired[bIndex];
                 unpaired.RemoveAt(bIndex);
 
                 matchups.Add(new SwissMatchup(Guid.NewGuid(), a, b, roundNumber));
@@ -185,7 +181,7 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress
             return matchups;
         }
 
-        private static (string, string) NormalizedPair(string a, string b)
-            => string.Compare(a, b, StringComparison.Ordinal) < 0 ? (a, b) : (b, a);
+        private static (EntrantId, EntrantId) NormalizedPair(EntrantId a, EntrantId b)
+            => string.Compare(a.ToString(), b.ToString(), StringComparison.Ordinal) < 0 ? (a, b) : (b, a);
     }
 }

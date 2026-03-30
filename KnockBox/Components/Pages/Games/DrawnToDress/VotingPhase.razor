@@ -139,7 +139,7 @@
 </div>
 
 @code {
-    RenderFragment RenderEntrant(string entrantId, string label) => __builder =>
+    RenderFragment RenderEntrant(EntrantId entrantId, string label) => __builder =>
     {
         var outfit = GetEntrantOutfit(entrantId);
         <div class="dtd-voting-entrant">

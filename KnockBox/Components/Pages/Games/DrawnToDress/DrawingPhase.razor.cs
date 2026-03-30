@@ -41,42 +41,10 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
             var ct = GameState.Config.ClothingTypes.FirstOrDefault(c => c.Id == currentTypeId);
             int canvasWidth = ct?.CanvasWidth ?? 400;
             int canvasHeight = ct?.CanvasHeight ?? 400;
-
-            // Native original mannequin width is 600, center is 300.
-            // When scaled by 2.0, width is 1200, center is 600.
-            // To center it in the new canvasWidth, offset = (canvasWidth / 2) - 600;
-            int xOffset = (canvasWidth / 2) - 600;
-
-            // Use the configurable anchor Y from ClothingTypeDefinition, falling back to
-            // a sensible default if not set.
             int partCenterY = ct?.MannequinAnchorY ?? 440;
+            int yOffset = (canvasHeight / 2) - partCenterY;
 
-            int viewCenterY = canvasHeight / 2;
-            int yOffset = viewCenterY - partCenterY;
-
-            string headColor = currentTypeId == "hat" ? "#7c3aed" : "#e2e8f0";
-            string torsoColor = currentTypeId == "top" ? "#7c3aed" : "#e2e8f0";
-            string legsColor = currentTypeId == "bottom" ? "#7c3aed" : "#e2e8f0";
-            string feetColor = currentTypeId == "shoes" ? "#7c3aed" : "#e2e8f0";
-
-            return $@"
-                <g transform=""translate(0, {yOffset})"">
-                    <g transform=""translate({xOffset}, 0) scale(2, 2)"" fill-opacity=""0.3"" stroke=""#94a3b8"" stroke-width=""2"">
-                        <!-- Head -->
-                        <circle cx=""300"" cy=""80"" r=""50"" fill=""{headColor}"" />
-                        <!-- Torso -->
-                        <path d=""M240,140 L360,140 L340,300 L260,300 Z"" fill=""{torsoColor}"" />
-                        <!-- Arms -->
-                        <path d=""M240,140 L200,280"" stroke-linecap=""round"" />
-                        <path d=""M360,140 L400,280"" stroke-linecap=""round"" />
-                        <!-- Legs -->
-                        <path d=""M260,300 L240,520"" fill=""none"" stroke=""{legsColor}"" stroke-width=""40"" stroke-linecap=""round"" />
-                        <path d=""M340,300 L360,520"" fill=""none"" stroke=""{legsColor}"" stroke-width=""40"" stroke-linecap=""round"" />
-                        <!-- Feet -->
-                        <path d=""M220,520 L200,550 L250,550 Z"" fill=""{feetColor}"" />
-                        <path d=""M380,520 L400,550 L350,550 Z"" fill=""{feetColor}"" />
-                    </g>
-                </g>";
+            return MannequinSvgHelper.Build(canvasWidth, yOffset, currentTypeId);
         }
 
         /// <summary>Display name for the clothing type of the current round.</summary>

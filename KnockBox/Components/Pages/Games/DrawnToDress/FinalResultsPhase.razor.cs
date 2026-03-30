@@ -29,7 +29,7 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
         private string CurrentPlayerId => UserService.CurrentUser?.Id ?? string.Empty;
 
         /// <summary>Per-outfit score for a single voting round.</summary>
-        protected record OutfitRoundScore(int RoundNumber, string EntrantId, double Score);
+        protected record OutfitRoundScore(int RoundNumber, EntrantId EntrantId, double Score);
 
         /// <summary>Full breakdown for a player: per-round outfit scores and bonus points.</summary>
         protected record PlayerBreakdown(List<OutfitRoundScore> OutfitScores, int BonusPoints);
@@ -56,7 +56,7 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
 
                 foreach (var (entrantId, score) in roundScores)
                 {
-                    if (DrawnToDressGameContext.GetPlayerIdFromEntrantId(entrantId) == playerId)
+                    if (entrantId.PlayerId == playerId)
                     {
                         outfitScores.Add(new OutfitRoundScore(round.RoundNumber, entrantId, score));
                     }

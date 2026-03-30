@@ -57,7 +57,7 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
                 ? SwissTournamentService.CalculateWins(
                     context.State.VotingRounds,
                     context.State.Votes.Values)
-                : new Dictionary<string, int>();
+                : new Dictionary<EntrantId, int>();
 
             return SwissTournamentService.GenerateRound(
                 roundNumber,

@@ -139,21 +139,18 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
             {
                 // Determine which entrant the caller represents.
                 string callerPlayerId = flip.CallerPlayerId;
-                string callerEntrantId = flip.EntrantAId;
-                string opponentEntrantId = flip.EntrantBId;
+                var callerEntrantId = flip.EntrantAId;
+                var opponentEntrantId = flip.EntrantBId;
 
-                var playerAId = DrawnToDressGameContext.GetPlayerIdFromEntrantId(flip.EntrantAId);
-                var playerBId = DrawnToDressGameContext.GetPlayerIdFromEntrantId(flip.EntrantBId);
-
-                if (callerPlayerId == playerBId)
+                if (callerPlayerId == flip.EntrantBId.PlayerId)
                 {
                     callerEntrantId = flip.EntrantBId;
                     opponentEntrantId = flip.EntrantAId;
                 }
 
-                string winnerEntrantId = callerWins ? callerEntrantId : opponentEntrantId;
+                var winnerEntrantId = callerWins ? callerEntrantId : opponentEntrantId;
                 flip.WinnerEntrantId = winnerEntrantId;
-                flip.WinnerPlayerId = DrawnToDressGameContext.GetPlayerIdFromEntrantId(winnerEntrantId);
+                flip.WinnerPlayerId = winnerEntrantId.PlayerId;
 
                 // Persist to CriterionCoinFlipResults for scoring.
                 context.State.CriterionCoinFlipResults.Add(
@@ -202,8 +199,8 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
             string playerA, playerB;
             if (flip.Context == CoinFlipContext.CriterionTie)
             {
-                playerA = DrawnToDressGameContext.GetPlayerIdFromEntrantId(flip.EntrantAId);
-                playerB = DrawnToDressGameContext.GetPlayerIdFromEntrantId(flip.EntrantBId);
+                playerA = flip.EntrantAId.PlayerId;
+                playerB = flip.EntrantBId.PlayerId;
             }
             else
             {

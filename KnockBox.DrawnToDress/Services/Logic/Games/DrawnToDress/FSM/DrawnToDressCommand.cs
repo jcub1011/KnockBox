@@ -115,10 +115,10 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM
         string PlayerId,
         Guid MatchupId,
         string CriterionId,
-        string ChosenEntrantId) : DrawnToDressCommand(PlayerId)
+        EntrantId ChosenEntrantId) : DrawnToDressCommand(PlayerId)
     {
-        /// <summary>Backward-compat: alias for <see cref="ChosenEntrantId"/>.</summary>
-        public string ChosenPlayerId => ChosenEntrantId;
+        /// <summary>Player ID of the chosen entrant.</summary>
+        public string ChosenPlayerId => ChosenEntrantId.PlayerId;
     }
 
     // ── Coin flip ─────────────────────────────────────────────────────────────

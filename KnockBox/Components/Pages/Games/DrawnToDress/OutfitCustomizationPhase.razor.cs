@@ -257,6 +257,15 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
 
         public async ValueTask DisposeAsync()
         {
+            // Flush any pending debounced outfit name to the server before tearing down.
+            _nameSyncCts?.Cancel();
+            _nameSyncCts?.Dispose();
+            _nameSyncCts = null;
+            if (!string.IsNullOrWhiteSpace(_outfitName))
+            {
+                UpdateDraftNameOnServer(_outfitName);
+            }
+
             if (_dragModule is not null)
             {
                 try

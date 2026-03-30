@@ -89,5 +89,67 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress
             // Assert: both players are now ready.
             Assert.IsTrue(context.AllPlayersReady());
         }
+
+        [TestMethod]
+        public async Task HandlePlayerLeft_UnknownPlayer_DoesNotThrow()
+        {
+            // Arrange
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            await _engine.StartAsync(_host, state);
+
+            var unknownPlayer = new User("Ghost", "unknown-id");
+
+            // Act: should not throw — the guard clause returns early.
+            _engine.HandlePlayerLeft(unknownPlayer, state);
+
+            // Assert: no player was added.
+            Assert.IsFalse(state.GamePlayers.ContainsKey("unknown-id"));
+        }
+
+        [TestMethod]
+        public async Task HandlePlayerLeft_CalledTwice_DoesNotThrow()
+        {
+            // Arrange
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            await _engine.StartAsync(_host, state);
+
+            var player = new User("Player1", "p1");
+            state.GamePlayers["p1"] = new DrawnToDressPlayerState { PlayerId = "p1" };
+
+            // Act: disconnect twice.
+            _engine.HandlePlayerLeft(player, state);
+            _engine.HandlePlayerLeft(player, state);
+
+            // Assert: still disconnected and ready, no exception.
+            Assert.IsTrue(state.GamePlayers["p1"].IsDisconnected);
+            Assert.IsTrue(state.GamePlayers["p1"].IsReady);
+        }
+
+        [TestMethod]
+        public async Task DisconnectedPlayer_RemainingPlayerReadies_AllPlayersReadyTransitions()
+        {
+            // Arrange
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            state.GamePlayers["p1"] = new DrawnToDressPlayerState { PlayerId = "p1", IsReady = false };
+            state.GamePlayers["p2"] = new DrawnToDressPlayerState { PlayerId = "p2", IsReady = false };
+
+            // Act: disconnect p1, then p2 readies up.
+            _engine.HandlePlayerLeft(new User("Player1", "p1"), state);
+
+            Assert.IsTrue(state.GamePlayers["p1"].IsReady);
+            Assert.IsFalse(state.GamePlayers["p2"].IsReady);
+            Assert.IsFalse(context.AllPlayersReady());
+
+            state.GamePlayers["p2"].IsReady = true;
+
+            // Assert: now all players are ready.
+            Assert.IsTrue(context.AllPlayersReady());
+        }
     }
 }

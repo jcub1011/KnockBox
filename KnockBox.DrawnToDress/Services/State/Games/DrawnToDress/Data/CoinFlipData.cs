@@ -33,7 +33,7 @@ namespace KnockBox.Services.State.Games.DrawnToDress.Data
     public record CriterionCoinFlipResult(
         Guid MatchupId,
         string CriterionId,
-        string WinnerEntrantId);
+        EntrantId WinnerEntrantId);
 
     /// <summary>
     /// Distinguishes whether a coin flip resolves a criterion tie or a final standings tie.
@@ -68,10 +68,10 @@ namespace KnockBox.Services.State.Games.DrawnToDress.Data
         public string CriterionId { get; set; } = string.Empty;
 
         /// <summary>Entrant A in the matchup (for <see cref="CoinFlipContext.CriterionTie"/>).</summary>
-        public string EntrantAId { get; set; } = string.Empty;
+        public EntrantId EntrantAId { get; set; }
 
         /// <summary>Entrant B in the matchup (for <see cref="CoinFlipContext.CriterionTie"/>).</summary>
-        public string EntrantBId { get; set; } = string.Empty;
+        public EntrantId EntrantBId { get; set; }
 
         // ── Final standings tie fields ───────────────────────────────────────
 
@@ -97,9 +97,9 @@ namespace KnockBox.Services.State.Games.DrawnToDress.Data
 
         /// <summary>
         /// The entrant ID of the winner (for <see cref="CoinFlipContext.CriterionTie"/>).
-        /// Empty for <see cref="CoinFlipContext.FinalStandingsTie"/>.
+        /// Default for <see cref="CoinFlipContext.FinalStandingsTie"/>.
         /// </summary>
-        public string WinnerEntrantId { get; set; } = string.Empty;
+        public EntrantId WinnerEntrantId { get; set; }
 
         /// <summary>Whether this flip was auto-resolved due to timer expiry (timeout).</summary>
         public bool IsAutoResolved { get; set; }

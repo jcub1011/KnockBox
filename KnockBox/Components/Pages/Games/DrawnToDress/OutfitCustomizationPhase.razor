@@ -57,19 +57,7 @@
 
         if (_showMannequin && GameState.Config.ShowMannequin)
         {
-            int mannequinXOffset = (canvasWidth / 2) - 600;
-            string mannequinSvg = $@"
-                <g transform=""translate({mannequinXOffset}, 200) scale(2, 2)"" fill-opacity=""0.3"" stroke=""#94a3b8"" stroke-width=""2"">
-                    <circle cx=""300"" cy=""80"" r=""50"" fill=""#e2e8f0"" />
-                    <path d=""M240,140 L360,140 L340,300 L260,300 Z"" fill=""#e2e8f0"" />
-                    <path d=""M240,140 L200,280"" stroke-linecap=""round"" />
-                    <path d=""M360,140 L400,280"" stroke-linecap=""round"" />
-                    <path d=""M260,300 L240,520"" fill=""none"" stroke=""#e2e8f0"" stroke-width=""40"" stroke-linecap=""round"" />
-                    <path d=""M340,300 L360,520"" fill=""none"" stroke=""#e2e8f0"" stroke-width=""40"" stroke-linecap=""round"" />
-                    <path d=""M220,520 L200,550 L250,550 Z"" fill=""#e2e8f0"" />
-                    <path d=""M380,520 L400,550 L350,550 Z"" fill=""#e2e8f0"" />
-                </g>";
-            bgParts.Insert(0, mannequinSvg);
+            bgParts.Insert(0, MannequinSvgHelper.Build(canvasWidth, 200));
         }
 
         if (bgParts.Length > 0)

@@ -3299,11 +3299,11 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
             context.Fsm.TransitionTo(context, new VotingRoundSetupState());
             Assert.IsInstanceOfType<VotingMatchupState>(context.Fsm.CurrentState);
 
-            // Find a matchup that contains pA's outfit (entrant IDs are "pA:1" format).
+            // Find a matchup that contains pA's outfit.
             var currentRound = state.VotingRounds[state.CurrentVotingRoundIndex];
             var pAMatchup = currentRound.Matchups.First(m =>
-                DrawnToDressGameContext.GetPlayerIdFromEntrantId(m.EntrantAId) == "pA" ||
-                DrawnToDressGameContext.GetPlayerIdFromEntrantId(m.EntrantBId) == "pA");
+                m.EntrantAId.PlayerId == "pA" ||
+                m.EntrantBId.PlayerId == "pA");
 
             // pA tries to vote on their own matchup — must be rejected.
             int votesBefore = state.Votes.Count;
@@ -3332,8 +3332,8 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
             var firstMatchup = currentRound.Matchups[0];
 
             // Find a player who is NOT a creator of either entrant in the first matchup.
-            var entAPlayer = DrawnToDressGameContext.GetPlayerIdFromEntrantId(firstMatchup.EntrantAId);
-            var entBPlayer = DrawnToDressGameContext.GetPlayerIdFromEntrantId(firstMatchup.EntrantBId);
+            var entAPlayer = firstMatchup.EntrantAId.PlayerId;
+            var entBPlayer = firstMatchup.EntrantBId.PlayerId;
             string outsider = new[] { "pA", "pB", "pC" }
                 .First(id => id != entAPlayer && id != entBPlayer);
 
@@ -3361,10 +3361,10 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
             context.Fsm.TransitionTo(context, new VotingRoundSetupState());
 
             var round = state.VotingRounds[0];
-            // pB must not appear in any matchup (entrant IDs are "playerId:round" format).
+            // pB must not appear in any matchup.
             var allPlayerIds = round.Matchups
                 .SelectMany(m => new[] { m.EntrantAId, m.EntrantBId })
-                .Select(DrawnToDressGameContext.GetPlayerIdFromEntrantId)
+                .Select(e => e.PlayerId)
                 .ToList();
             CollectionAssert.DoesNotContain(allPlayerIds, "pB",
                 "Players without submitted outfits must not be included as tournament entrants.");
@@ -3387,7 +3387,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
             var round = state.VotingRounds[0];
             var participantPlayerIds = round.Matchups
                 .SelectMany(m => new[] { m.EntrantAId, m.EntrantBId })
-                .Select(DrawnToDressGameContext.GetPlayerIdFromEntrantId)
+                .Select(e => e.PlayerId)
                 .ToHashSet();
             Assert.IsTrue(participantPlayerIds.Contains("pA") || participantPlayerIds.Contains("pB"),
                 "Players with a submitted Outfit 2 must be included as entrants.");
@@ -3561,14 +3561,14 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
             var round = new VotingRound
             {
                 RoundNumber = 1,
-                Matchups = [new SwissMatchup(matchupId, "pA:1", "pB:1", 1)],
+                Matchups = [new SwissMatchup(matchupId, new EntrantId("pA", 1), new EntrantId("pB", 1), 1)],
             };
             state.VotingRounds.Add(round);
             state.CurrentVotingRoundIndex = 0;
 
             // pA wins by 2-0 votes.
-            state.Votes[Guid.NewGuid()] = new() { MatchupId = matchupId, CriterionId = "c1", ChosenEntrantId = "pA:1" };
-            state.Votes[Guid.NewGuid()] = new() { MatchupId = matchupId, CriterionId = "c1", ChosenEntrantId = "pA:1" };
+            state.Votes[Guid.NewGuid()] = new() { MatchupId = matchupId, CriterionId = "c1", ChosenEntrantId = new EntrantId("pA", 1) };
+            state.Votes[Guid.NewGuid()] = new() { MatchupId = matchupId, CriterionId = "c1", ChosenEntrantId = new EntrantId("pA", 1) };
 
             // Entering VotingRoundResultsState should award the round leader bonus to pA.
             context.Fsm.TransitionTo(context, new VotingRoundResultsState());
@@ -3597,13 +3597,13 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
             state.VotingRounds.Add(new VotingRound
             {
                 RoundNumber = 1,
-                Matchups = [new SwissMatchup(matchupId, "pA:1", "pB:1", 1)],
+                Matchups = [new SwissMatchup(matchupId, new EntrantId("pA", 1), new EntrantId("pB", 1), 1)],
             });
             state.CurrentVotingRoundIndex = 0;
 
             // One vote each — tied round.
-            state.Votes[Guid.NewGuid()] = new() { MatchupId = matchupId, CriterionId = "c1", ChosenEntrantId = "pA:1" };
-            state.Votes[Guid.NewGuid()] = new() { MatchupId = matchupId, CriterionId = "c1", ChosenEntrantId = "pB:1" };
+            state.Votes[Guid.NewGuid()] = new() { MatchupId = matchupId, CriterionId = "c1", ChosenEntrantId = new EntrantId("pA", 1) };
+            state.Votes[Guid.NewGuid()] = new() { MatchupId = matchupId, CriterionId = "c1", ChosenEntrantId = new EntrantId("pB", 1) };
 
             context.Fsm.TransitionTo(context, new VotingRoundResultsState());
 
@@ -3631,12 +3631,12 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
             state.VotingRounds.Add(new VotingRound
             {
                 RoundNumber = 1,
-                Matchups = [new SwissMatchup(matchupId, "pA:1", "pB:1", 1)],
+                Matchups = [new SwissMatchup(matchupId, new EntrantId("pA", 1), new EntrantId("pB", 1), 1)],
             });
             state.CurrentVotingRoundIndex = 0;
 
-            state.Votes[Guid.NewGuid()] = new() { MatchupId = matchupId, CriterionId = "c1", ChosenEntrantId = "pA:1" };
-            state.Votes[Guid.NewGuid()] = new() { MatchupId = matchupId, CriterionId = "c1", ChosenEntrantId = "pA:1" };
+            state.Votes[Guid.NewGuid()] = new() { MatchupId = matchupId, CriterionId = "c1", ChosenEntrantId = new EntrantId("pA", 1) };
+            state.Votes[Guid.NewGuid()] = new() { MatchupId = matchupId, CriterionId = "c1", ChosenEntrantId = new EntrantId("pA", 1) };
 
             context.Fsm.TransitionTo(context, new VotingRoundResultsState());
 
@@ -3666,10 +3666,10 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
             state.VotingRounds.Add(new VotingRound
             {
                 RoundNumber = 1,
-                Matchups = [new SwissMatchup(matchupId, "pA:1", "pB:1", 1)],
+                Matchups = [new SwissMatchup(matchupId, new EntrantId("pA", 1), new EntrantId("pB", 1), 1)],
             });
-            state.Votes[Guid.NewGuid()] = new() { MatchupId = matchupId, CriterionId = "c1", ChosenEntrantId = "pA:1" };
-            state.Votes[Guid.NewGuid()] = new() { MatchupId = matchupId, CriterionId = "c1", ChosenEntrantId = "pA:1" };
+            state.Votes[Guid.NewGuid()] = new() { MatchupId = matchupId, CriterionId = "c1", ChosenEntrantId = new EntrantId("pA", 1) };
+            state.Votes[Guid.NewGuid()] = new() { MatchupId = matchupId, CriterionId = "c1", ChosenEntrantId = new EntrantId("pA", 1) };
 
             // FinalResultsState chains immediately to FinalResultsDisplayState.
             context.Fsm.TransitionTo(context, new FinalResultsState());
@@ -3699,9 +3699,9 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
             state.VotingRounds.Add(new VotingRound
             {
                 RoundNumber = 1,
-                Matchups = [new SwissMatchup(matchupId, "pA:1", "pB:1", 1)],
+                Matchups = [new SwissMatchup(matchupId, new EntrantId("pA", 1), new EntrantId("pB", 1), 1)],
             });
-            state.Votes[Guid.NewGuid()] = new() { MatchupId = matchupId, CriterionId = "c1", ChosenEntrantId = "pA:1" };
+            state.Votes[Guid.NewGuid()] = new() { MatchupId = matchupId, CriterionId = "c1", ChosenEntrantId = new EntrantId("pA", 1) };
 
             Assert.AreEqual(0, state.Leaderboard.Count, "Leaderboard must be empty before FinalResultsState.");
 
@@ -3730,10 +3730,10 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
             state.VotingRounds.Add(new VotingRound
             {
                 RoundNumber = 1,
-                Matchups = [new SwissMatchup(matchupId, "pA:1", "pB:1", 1)],
+                Matchups = [new SwissMatchup(matchupId, new EntrantId("pA", 1), new EntrantId("pB", 1), 1)],
             });
-            state.Votes[Guid.NewGuid()] = new() { MatchupId = matchupId, CriterionId = "c1", ChosenEntrantId = "pA:1" };
-            state.Votes[Guid.NewGuid()] = new() { MatchupId = matchupId, CriterionId = "c1", ChosenEntrantId = "pA:1" };
+            state.Votes[Guid.NewGuid()] = new() { MatchupId = matchupId, CriterionId = "c1", ChosenEntrantId = new EntrantId("pA", 1) };
+            state.Votes[Guid.NewGuid()] = new() { MatchupId = matchupId, CriterionId = "c1", ChosenEntrantId = new EntrantId("pA", 1) };
 
             context.Fsm.TransitionTo(context, new FinalResultsState());
 
@@ -3760,12 +3760,12 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
             state.VotingRounds.Add(new VotingRound
             {
                 RoundNumber = 1,
-                Matchups = [new SwissMatchup(matchupId, "pA:1", "pB:1", 1)],
+                Matchups = [new SwissMatchup(matchupId, new EntrantId("pA", 1), new EntrantId("pB", 1), 1)],
             });
 
             // Tie: one vote each.
-            state.Votes[Guid.NewGuid()] = new() { MatchupId = matchupId, CriterionId = "c1", ChosenEntrantId = "pA:1" };
-            state.Votes[Guid.NewGuid()] = new() { MatchupId = matchupId, CriterionId = "c1", ChosenEntrantId = "pB:1" };
+            state.Votes[Guid.NewGuid()] = new() { MatchupId = matchupId, CriterionId = "c1", ChosenEntrantId = new EntrantId("pA", 1) };
+            state.Votes[Guid.NewGuid()] = new() { MatchupId = matchupId, CriterionId = "c1", ChosenEntrantId = new EntrantId("pB", 1) };
 
             context.Fsm.TransitionTo(context, new FinalResultsState());
 

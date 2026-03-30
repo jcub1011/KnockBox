@@ -1,5 +1,4 @@
 using KnockBox.Services.Logic.Games.DrawnToDress;
-using KnockBox.Services.Logic.Games.DrawnToDress.FSM;
 using KnockBox.Services.State.Games.DrawnToDress;
 using KnockBox.Services.State.Games.DrawnToDress.Data;
 using KnockBox.Services.State.Users;
@@ -15,11 +14,10 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
 
         [Parameter] public DrawnToDressGameState GameState { get; set; } = default!;
 
-        protected string GetEntrantLabel(string entrantId)
+        protected string GetEntrantLabel(EntrantId entrantId)
         {
-            var playerId = DrawnToDressGameContext.GetPlayerIdFromEntrantId(entrantId);
-            var player = GameState.GamePlayers.GetValueOrDefault(playerId);
-            return player?.DisplayName ?? playerId;
+            var player = GameState.GamePlayers.GetValueOrDefault(entrantId.PlayerId);
+            return player?.DisplayName ?? entrantId.PlayerId;
         }
 
         protected (double AScore, double BScore) CalculateCriterionScores(SwissMatchup matchup, VotingCriterionDefinition criterion)
@@ -37,7 +35,7 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
                 GameState.CriterionCoinFlipResults);
         }
 
-        protected Dictionary<string, double> CalculateRoundScores(VotingRound round)
+        protected Dictionary<EntrantId, double> CalculateRoundScores(VotingRound round)
         {
             return DrawnToDressScoringService.CalculateRoundScores(
                 round,
@@ -46,7 +44,7 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
                 GameState.CriterionCoinFlipResults);
         }
 
-        protected HashSet<string> GetRoundLeaders(VotingRound round)
+        protected HashSet<EntrantId> GetRoundLeaders(VotingRound round)
         {
             var roundScores = CalculateRoundScores(round);
             return DrawnToDressScoringService.GetRoundLeaders(roundScores);

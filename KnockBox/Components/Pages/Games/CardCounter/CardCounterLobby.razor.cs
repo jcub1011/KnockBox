@@ -117,11 +117,11 @@ namespace KnockBox.Components.Pages.Games.CardCounter
 
         public override void Dispose()
         {
-            base.Dispose();
             _tickSubscription?.Dispose();
             if (GameState != null)
                 GameState.OnStateDisposed -= HandleGameStateDisposed;
             _stateSubscription?.Dispose();
+            base.Dispose();
         }
 
         private void HandleGameStateDisposed()

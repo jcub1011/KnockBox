@@ -8,10 +8,10 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress
     {
         // ── Helpers ─────────────────────────────────────────────────────────────
 
-        private static SwissMatchup MakeMatchup(string entrantA, string entrantB, int round = 1)
+        private static SwissMatchup MakeMatchup(EntrantId entrantA, EntrantId entrantB, int round = 1)
             => new(Guid.NewGuid(), entrantA, entrantB, round);
 
-        private static VoteSubmission Vote(Guid matchupId, string criterionId, string chosenEntrantId, string voterId = "voter1")
+        private static VoteSubmission Vote(Guid matchupId, string criterionId, EntrantId chosenEntrantId, string voterId = "voter1")
             => new()
             {
                 VoterPlayerId = voterId,
@@ -41,12 +41,12 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress
         public void CriterionScores_BasicVoting_ReturnsVoteCountTimesWeight()
         {
             // 3 voters, weight=1. A gets 2 votes, B gets 1.
-            var matchup = MakeMatchup("pA:1", "pB:1");
+            var matchup = MakeMatchup(new EntrantId("pA", 1), new EntrantId("pB", 1));
             var votes = new List<VoteSubmission>
             {
-                Vote(matchup.Id, "creativity", "pA:1", "v1"),
-                Vote(matchup.Id, "creativity", "pA:1", "v2"),
-                Vote(matchup.Id, "creativity", "pB:1", "v3"),
+                Vote(matchup.Id, "creativity", new EntrantId("pA", 1), "v1"),
+                Vote(matchup.Id, "creativity", new EntrantId("pA", 1), "v2"),
+                Vote(matchup.Id, "creativity", new EntrantId("pB", 1), "v3"),
             };
 
             var (aScore, bScore) = DrawnToDressScoringService.CalculateCriterionScores(
@@ -60,13 +60,13 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress
         public void CriterionScores_WeightedScoring_MultipliesVotesByWeight()
         {
             // weight=2 on creativity: A gets 3 votes, B gets 1.
-            var matchup = MakeMatchup("pA:1", "pB:1");
+            var matchup = MakeMatchup(new EntrantId("pA", 1), new EntrantId("pB", 1));
             var votes = new List<VoteSubmission>
             {
-                Vote(matchup.Id, "creativity", "pA:1", "v1"),
-                Vote(matchup.Id, "creativity", "pA:1", "v2"),
-                Vote(matchup.Id, "creativity", "pA:1", "v3"),
-                Vote(matchup.Id, "creativity", "pB:1", "v4"),
+                Vote(matchup.Id, "creativity", new EntrantId("pA", 1), "v1"),
+                Vote(matchup.Id, "creativity", new EntrantId("pA", 1), "v2"),
+                Vote(matchup.Id, "creativity", new EntrantId("pA", 1), "v3"),
+                Vote(matchup.Id, "creativity", new EntrantId("pB", 1), "v4"),
             };
 
             var (aScore, bScore) = DrawnToDressScoringService.CalculateCriterionScores(
@@ -80,12 +80,12 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress
         public void CriterionScores_ProportionalScoring_BothOutfitsEarnPoints()
         {
             // Both entrants should earn points in the same matchup.
-            var matchup = MakeMatchup("pA:1", "pB:1");
+            var matchup = MakeMatchup(new EntrantId("pA", 1), new EntrantId("pB", 1));
             var votes = new List<VoteSubmission>
             {
-                Vote(matchup.Id, "creativity", "pA:1", "v1"),
-                Vote(matchup.Id, "creativity", "pB:1", "v2"),
-                Vote(matchup.Id, "creativity", "pB:1", "v3"),
+                Vote(matchup.Id, "creativity", new EntrantId("pA", 1), "v1"),
+                Vote(matchup.Id, "creativity", new EntrantId("pB", 1), "v2"),
+                Vote(matchup.Id, "creativity", new EntrantId("pB", 1), "v3"),
             };
 
             var (aScore, bScore) = DrawnToDressScoringService.CalculateCriterionScores(
@@ -100,7 +100,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress
         [TestMethod]
         public void FindTiedCriteria_NoTies_ReturnsEmpty()
         {
-            var matchup = MakeMatchup("pA:1", "pB:1");
+            var matchup = MakeMatchup(new EntrantId("pA", 1), new EntrantId("pB", 1));
             var round = new VotingRound { RoundNumber = 1, Matchups = [matchup] };
             var criteria = new List<VotingCriterionDefinition>
             {
@@ -108,9 +108,9 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress
             };
             var votes = new List<VoteSubmission>
             {
-                Vote(matchup.Id, "creativity", "pA:1", "v1"),
-                Vote(matchup.Id, "creativity", "pA:1", "v2"),
-                Vote(matchup.Id, "creativity", "pB:1", "v3"),
+                Vote(matchup.Id, "creativity", new EntrantId("pA", 1), "v1"),
+                Vote(matchup.Id, "creativity", new EntrantId("pA", 1), "v2"),
+                Vote(matchup.Id, "creativity", new EntrantId("pB", 1), "v3"),
             };
 
             var ties = DrawnToDressScoringService.FindTiedCriteria(round, criteria, votes);
@@ -121,7 +121,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress
         [TestMethod]
         public void FindTiedCriteria_OneTie_ReturnsSingleEntry()
         {
-            var matchup = MakeMatchup("pA:1", "pB:1");
+            var matchup = MakeMatchup(new EntrantId("pA", 1), new EntrantId("pB", 1));
             var round = new VotingRound { RoundNumber = 1, Matchups = [matchup] };
             var criteria = new List<VotingCriterionDefinition>
             {
@@ -129,8 +129,8 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress
             };
             var votes = new List<VoteSubmission>
             {
-                Vote(matchup.Id, "creativity", "pA:1", "v1"),
-                Vote(matchup.Id, "creativity", "pB:1", "v2"),
+                Vote(matchup.Id, "creativity", new EntrantId("pA", 1), "v1"),
+                Vote(matchup.Id, "creativity", new EntrantId("pB", 1), "v2"),
             };
 
             var ties = DrawnToDressScoringService.FindTiedCriteria(round, criteria, votes);
@@ -143,7 +143,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress
         [TestMethod]
         public void FindTiedCriteria_MultipleTies_ReturnsAll()
         {
-            var matchup = MakeMatchup("pA:1", "pB:1");
+            var matchup = MakeMatchup(new EntrantId("pA", 1), new EntrantId("pB", 1));
             var round = new VotingRound { RoundNumber = 1, Matchups = [matchup] };
             var criteria = new List<VotingCriterionDefinition>
             {
@@ -152,10 +152,10 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress
             };
             var votes = new List<VoteSubmission>
             {
-                Vote(matchup.Id, "creativity", "pA:1", "v1"),
-                Vote(matchup.Id, "creativity", "pB:1", "v2"),
-                Vote(matchup.Id, "theme_match", "pA:1", "v1"),
-                Vote(matchup.Id, "theme_match", "pB:1", "v2"),
+                Vote(matchup.Id, "creativity", new EntrantId("pA", 1), "v1"),
+                Vote(matchup.Id, "creativity", new EntrantId("pB", 1), "v2"),
+                Vote(matchup.Id, "theme_match", new EntrantId("pA", 1), "v1"),
+                Vote(matchup.Id, "theme_match", new EntrantId("pB", 1), "v2"),
             };
 
             var ties = DrawnToDressScoringService.FindTiedCriteria(round, criteria, votes);
@@ -166,7 +166,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress
         [TestMethod]
         public void FindTiedCriteria_ZeroZeroAllAbstain_IsTreatedAsTie()
         {
-            var matchup = MakeMatchup("pA:1", "pB:1");
+            var matchup = MakeMatchup(new EntrantId("pA", 1), new EntrantId("pB", 1));
             var round = new VotingRound { RoundNumber = 1, Matchups = [matchup] };
             var criteria = new List<VotingCriterionDefinition>
             {
@@ -182,7 +182,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress
         [TestMethod]
         public void FindTiedCriteria_AlreadyResolved_ExcludesExistingFlipResults()
         {
-            var matchup = MakeMatchup("pA:1", "pB:1");
+            var matchup = MakeMatchup(new EntrantId("pA", 1), new EntrantId("pB", 1));
             var round = new VotingRound { RoundNumber = 1, Matchups = [matchup] };
             var criteria = new List<VotingCriterionDefinition>
             {
@@ -190,12 +190,12 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress
             };
             var votes = new List<VoteSubmission>
             {
-                Vote(matchup.Id, "creativity", "pA:1", "v1"),
-                Vote(matchup.Id, "creativity", "pB:1", "v2"),
+                Vote(matchup.Id, "creativity", new EntrantId("pA", 1), "v1"),
+                Vote(matchup.Id, "creativity", new EntrantId("pB", 1), "v2"),
             };
             var existingFlips = new List<CriterionCoinFlipResult>
             {
-                new(matchup.Id, "creativity", "pA:1"),
+                new(matchup.Id, "creativity", new EntrantId("pA", 1)),
             };
 
             var ties = DrawnToDressScoringService.FindTiedCriteria(round, criteria, votes, existingFlips);
@@ -208,7 +208,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress
         [TestMethod]
         public void MatchupTotals_CoinFlipBonus_AddsFlatOneToWinner()
         {
-            var matchup = MakeMatchup("pA:1", "pB:1");
+            var matchup = MakeMatchup(new EntrantId("pA", 1), new EntrantId("pB", 1));
             var criteria = new List<VotingCriterionDefinition>
             {
                 new() { Id = "creativity", DisplayName = "Creativity", Weight = 1.0 },
@@ -216,13 +216,13 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress
             // Tied votes: 1-1.
             var votes = new List<VoteSubmission>
             {
-                Vote(matchup.Id, "creativity", "pA:1", "v1"),
-                Vote(matchup.Id, "creativity", "pB:1", "v2"),
+                Vote(matchup.Id, "creativity", new EntrantId("pA", 1), "v1"),
+                Vote(matchup.Id, "creativity", new EntrantId("pB", 1), "v2"),
             };
             // Coin flip: A wins.
             var flips = new List<CriterionCoinFlipResult>
             {
-                new(matchup.Id, "creativity", "pA:1"),
+                new(matchup.Id, "creativity", new EntrantId("pA", 1)),
             };
 
             var (aTotal, bTotal) = DrawnToDressScoringService.CalculateMatchupTotals(
@@ -236,7 +236,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress
         public void MatchupTotals_WeightedCriteriaWithCoinFlip_CorrectTotal()
         {
             // Spec Example 2: 3 criteria (weights 2,1,1), 4 voters.
-            var matchup = MakeMatchup("pA:1", "pB:1");
+            var matchup = MakeMatchup(new EntrantId("pA", 1), new EntrantId("pB", 1));
             var criteria = new List<VotingCriterionDefinition>
             {
                 new() { Id = "creativity",   DisplayName = "Creativity",   Weight = 2.0 },
@@ -250,26 +250,26 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress
             var votes = new List<VoteSubmission>
             {
                 // Creativity
-                Vote(matchup.Id, "creativity", "pA:1", "v1"),
-                Vote(matchup.Id, "creativity", "pA:1", "v2"),
-                Vote(matchup.Id, "creativity", "pA:1", "v3"),
-                Vote(matchup.Id, "creativity", "pB:1", "v4"),
+                Vote(matchup.Id, "creativity", new EntrantId("pA", 1), "v1"),
+                Vote(matchup.Id, "creativity", new EntrantId("pA", 1), "v2"),
+                Vote(matchup.Id, "creativity", new EntrantId("pA", 1), "v3"),
+                Vote(matchup.Id, "creativity", new EntrantId("pB", 1), "v4"),
                 // Theme Match (tied)
-                Vote(matchup.Id, "theme_match", "pA:1", "v1"),
-                Vote(matchup.Id, "theme_match", "pA:1", "v2"),
-                Vote(matchup.Id, "theme_match", "pB:1", "v3"),
-                Vote(matchup.Id, "theme_match", "pB:1", "v4"),
+                Vote(matchup.Id, "theme_match", new EntrantId("pA", 1), "v1"),
+                Vote(matchup.Id, "theme_match", new EntrantId("pA", 1), "v2"),
+                Vote(matchup.Id, "theme_match", new EntrantId("pB", 1), "v3"),
+                Vote(matchup.Id, "theme_match", new EntrantId("pB", 1), "v4"),
                 // Overall Look
-                Vote(matchup.Id, "overall_look", "pA:1", "v1"),
-                Vote(matchup.Id, "overall_look", "pA:1", "v2"),
-                Vote(matchup.Id, "overall_look", "pA:1", "v3"),
-                Vote(matchup.Id, "overall_look", "pB:1", "v4"),
+                Vote(matchup.Id, "overall_look", new EntrantId("pA", 1), "v1"),
+                Vote(matchup.Id, "overall_look", new EntrantId("pA", 1), "v2"),
+                Vote(matchup.Id, "overall_look", new EntrantId("pA", 1), "v3"),
+                Vote(matchup.Id, "overall_look", new EntrantId("pB", 1), "v4"),
             };
 
             // Coin flip: B wins theme_match tie.
             var flips = new List<CriterionCoinFlipResult>
             {
-                new(matchup.Id, "theme_match", "pB:1"),
+                new(matchup.Id, "theme_match", new EntrantId("pB", 1)),
             };
 
             var (aTotal, bTotal) = DrawnToDressScoringService.CalculateMatchupTotals(
@@ -286,8 +286,8 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress
         [TestMethod]
         public void RoundScores_MultipleMatchups_SumsCorrectly()
         {
-            var m1 = MakeMatchup("pA:1", "pB:1");
-            var m2 = MakeMatchup("pC:1", "pD:1");
+            var m1 = MakeMatchup(new EntrantId("pA", 1), new EntrantId("pB", 1));
+            var m2 = MakeMatchup(new EntrantId("pC", 1), new EntrantId("pD", 1));
             var round = new VotingRound { RoundNumber = 1, Matchups = [m1, m2] };
             var criteria = new List<VotingCriterionDefinition>
             {
@@ -295,21 +295,21 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress
             };
             var votes = new List<VoteSubmission>
             {
-                Vote(m1.Id, "creativity", "pA:1", "v1"),
-                Vote(m1.Id, "creativity", "pA:1", "v2"),
-                Vote(m1.Id, "creativity", "pB:1", "v3"),
-                Vote(m2.Id, "creativity", "pC:1", "v1"),
-                Vote(m2.Id, "creativity", "pD:1", "v2"),
-                Vote(m2.Id, "creativity", "pD:1", "v3"),
+                Vote(m1.Id, "creativity", new EntrantId("pA", 1), "v1"),
+                Vote(m1.Id, "creativity", new EntrantId("pA", 1), "v2"),
+                Vote(m1.Id, "creativity", new EntrantId("pB", 1), "v3"),
+                Vote(m2.Id, "creativity", new EntrantId("pC", 1), "v1"),
+                Vote(m2.Id, "creativity", new EntrantId("pD", 1), "v2"),
+                Vote(m2.Id, "creativity", new EntrantId("pD", 1), "v3"),
             };
 
             var scores = DrawnToDressScoringService.CalculateRoundScores(
                 round, criteria, votes, []);
 
-            Assert.AreEqual(2.0, scores["pA:1"]);
-            Assert.AreEqual(1.0, scores["pB:1"]);
-            Assert.AreEqual(1.0, scores["pC:1"]);
-            Assert.AreEqual(2.0, scores["pD:1"]);
+            Assert.AreEqual(2.0, scores[new EntrantId("pA", 1)]);
+            Assert.AreEqual(1.0, scores[new EntrantId("pB", 1)]);
+            Assert.AreEqual(1.0, scores[new EntrantId("pC", 1)]);
+            Assert.AreEqual(2.0, scores[new EntrantId("pD", 1)]);
         }
 
         // ── GetRoundLeaders ─────────────────────────────────────────────────────
@@ -317,30 +317,30 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress
         [TestMethod]
         public void GetRoundLeaders_SingleLeader_ReturnsOne()
         {
-            var scores = new Dictionary<string, double>
+            var scores = new Dictionary<EntrantId, double>
             {
-                ["pA:1"] = 5.0, ["pB:1"] = 3.0, ["pC:1"] = 2.0,
+                [new EntrantId("pA", 1)] = 5.0, [new EntrantId("pB", 1)] = 3.0, [new EntrantId("pC", 1)] = 2.0,
             };
 
             var leaders = DrawnToDressScoringService.GetRoundLeaders(scores);
 
             Assert.AreEqual(1, leaders.Count);
-            Assert.IsTrue(leaders.Contains("pA:1"));
+            Assert.IsTrue(leaders.Contains(new EntrantId("pA", 1)));
         }
 
         [TestMethod]
         public void GetRoundLeaders_TiedLeaders_ReturnsBoth()
         {
-            var scores = new Dictionary<string, double>
+            var scores = new Dictionary<EntrantId, double>
             {
-                ["pA:1"] = 5.0, ["pB:1"] = 5.0, ["pC:1"] = 2.0,
+                [new EntrantId("pA", 1)] = 5.0, [new EntrantId("pB", 1)] = 5.0, [new EntrantId("pC", 1)] = 2.0,
             };
 
             var leaders = DrawnToDressScoringService.GetRoundLeaders(scores);
 
             Assert.AreEqual(2, leaders.Count);
-            Assert.IsTrue(leaders.Contains("pA:1"));
-            Assert.IsTrue(leaders.Contains("pB:1"));
+            Assert.IsTrue(leaders.Contains(new EntrantId("pA", 1)));
+            Assert.IsTrue(leaders.Contains(new EntrantId("pB", 1)));
         }
 
         // ── CalculateMatchupWins ────────────────────────────────────────────────
@@ -348,8 +348,8 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress
         [TestMethod]
         public void MatchupWins_WinTieLoss_CorrectValues()
         {
-            var m1 = MakeMatchup("pA:1", "pB:1");
-            var m2 = MakeMatchup("pA:1", "pC:1");
+            var m1 = MakeMatchup(new EntrantId("pA", 1), new EntrantId("pB", 1));
+            var m2 = MakeMatchup(new EntrantId("pA", 1), new EntrantId("pC", 1));
             var rounds = new List<VotingRound>
             {
                 new() { RoundNumber = 1, Matchups = [m1] },
@@ -362,19 +362,19 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress
             // m1: A wins (2-1), m2: tied (1-1)
             var votes = new List<VoteSubmission>
             {
-                Vote(m1.Id, "creativity", "pA:1", "v1"),
-                Vote(m1.Id, "creativity", "pA:1", "v2"),
-                Vote(m1.Id, "creativity", "pB:1", "v3"),
-                Vote(m2.Id, "creativity", "pA:1", "v1"),
-                Vote(m2.Id, "creativity", "pC:1", "v2"),
+                Vote(m1.Id, "creativity", new EntrantId("pA", 1), "v1"),
+                Vote(m1.Id, "creativity", new EntrantId("pA", 1), "v2"),
+                Vote(m1.Id, "creativity", new EntrantId("pB", 1), "v3"),
+                Vote(m2.Id, "creativity", new EntrantId("pA", 1), "v1"),
+                Vote(m2.Id, "creativity", new EntrantId("pC", 1), "v2"),
             };
 
             var wins = DrawnToDressScoringService.CalculateMatchupWins(
                 rounds, criteria, votes, []);
 
-            Assert.AreEqual(1.5, wins["pA:1"], "A: win(1.0) + tie(0.5) = 1.5");
-            Assert.AreEqual(0.0, wins["pB:1"], "B: loss(0.0)");
-            Assert.AreEqual(0.5, wins["pC:1"], "C: tie(0.5)");
+            Assert.AreEqual(1.5, wins[new EntrantId("pA", 1)], "A: win(1.0) + tie(0.5) = 1.5");
+            Assert.AreEqual(0.0, wins[new EntrantId("pB", 1)], "B: loss(0.0)");
+            Assert.AreEqual(0.5, wins[new EntrantId("pC", 1)], "C: tie(0.5)");
         }
 
         // ── CalculatePlayerTotals ───────────────────────────────────────────────
@@ -383,8 +383,8 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress
         public void PlayerTotals_TwoOutfitsPerPlayer_SumsCorrectly()
         {
             // Player "pA" has two entrants: pA:1 and pA:2.
-            var m1 = MakeMatchup("pA:1", "pB:1");
-            var m2 = MakeMatchup("pA:2", "pC:1");
+            var m1 = MakeMatchup(new EntrantId("pA", 1), new EntrantId("pB", 1));
+            var m2 = MakeMatchup(new EntrantId("pA", 2), new EntrantId("pC", 1));
             var rounds = new List<VotingRound>
             {
                 new() { RoundNumber = 1, Matchups = [m1, m2] },
@@ -397,12 +397,12 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress
             // m2: pA:2 gets 3 votes, pC:1 gets 0.
             var votes = new List<VoteSubmission>
             {
-                Vote(m1.Id, "creativity", "pA:1", "v1"),
-                Vote(m1.Id, "creativity", "pA:1", "v2"),
-                Vote(m1.Id, "creativity", "pB:1", "v3"),
-                Vote(m2.Id, "creativity", "pA:2", "v1"),
-                Vote(m2.Id, "creativity", "pA:2", "v2"),
-                Vote(m2.Id, "creativity", "pA:2", "v3"),
+                Vote(m1.Id, "creativity", new EntrantId("pA", 1), "v1"),
+                Vote(m1.Id, "creativity", new EntrantId("pA", 1), "v2"),
+                Vote(m1.Id, "creativity", new EntrantId("pB", 1), "v3"),
+                Vote(m2.Id, "creativity", new EntrantId("pA", 2), "v1"),
+                Vote(m2.Id, "creativity", new EntrantId("pA", 2), "v2"),
+                Vote(m2.Id, "creativity", new EntrantId("pA", 2), "v3"),
             };
 
             var players = new Dictionary<string, DrawnToDressPlayerState>
@@ -428,8 +428,8 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress
         [TestMethod]
         public void BuildLeaderboard_RankedByTotalPoints_ThenMatchupWins()
         {
-            var m1 = MakeMatchup("pA:1", "pB:1");
-            var m2 = MakeMatchup("pC:1", "pA:1");
+            var m1 = MakeMatchup(new EntrantId("pA", 1), new EntrantId("pB", 1));
+            var m2 = MakeMatchup(new EntrantId("pC", 1), new EntrantId("pA", 1));
             var rounds = new List<VotingRound>
             {
                 new() { RoundNumber = 1, Matchups = [m1] },
@@ -442,14 +442,14 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress
             // m1: A=3, B=1. m2: C=2, A=2 (tie).
             var votes = new List<VoteSubmission>
             {
-                Vote(m1.Id, "creativity", "pA:1", "v1"),
-                Vote(m1.Id, "creativity", "pA:1", "v2"),
-                Vote(m1.Id, "creativity", "pA:1", "v3"),
-                Vote(m1.Id, "creativity", "pB:1", "v4"),
-                Vote(m2.Id, "creativity", "pC:1", "v1"),
-                Vote(m2.Id, "creativity", "pC:1", "v2"),
-                Vote(m2.Id, "creativity", "pA:1", "v3"),
-                Vote(m2.Id, "creativity", "pA:1", "v4"),
+                Vote(m1.Id, "creativity", new EntrantId("pA", 1), "v1"),
+                Vote(m1.Id, "creativity", new EntrantId("pA", 1), "v2"),
+                Vote(m1.Id, "creativity", new EntrantId("pA", 1), "v3"),
+                Vote(m1.Id, "creativity", new EntrantId("pB", 1), "v4"),
+                Vote(m2.Id, "creativity", new EntrantId("pC", 1), "v1"),
+                Vote(m2.Id, "creativity", new EntrantId("pC", 1), "v2"),
+                Vote(m2.Id, "creativity", new EntrantId("pA", 1), "v3"),
+                Vote(m2.Id, "creativity", new EntrantId("pA", 1), "v4"),
             };
 
             var players = MakePlayers("pA", "pB", "pC");
@@ -471,7 +471,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress
         [TestMethod]
         public void BuildLeaderboard_TiedPlayers_ShareRank()
         {
-            var m1 = MakeMatchup("pA:1", "pB:1");
+            var m1 = MakeMatchup(new EntrantId("pA", 1), new EntrantId("pB", 1));
             var rounds = new List<VotingRound>
             {
                 new() { RoundNumber = 1, Matchups = [m1] },
@@ -483,8 +483,8 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress
             // Tied: A=1, B=1.
             var votes = new List<VoteSubmission>
             {
-                Vote(m1.Id, "creativity", "pA:1", "v1"),
-                Vote(m1.Id, "creativity", "pB:1", "v2"),
+                Vote(m1.Id, "creativity", new EntrantId("pA", 1), "v1"),
+                Vote(m1.Id, "creativity", new EntrantId("pB", 1), "v2"),
             };
 
             var players = MakePlayers("pA", "pB");
@@ -506,32 +506,32 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress
             // Theme Match:  A=2, B=2 (tie → coin flip → A wins)
             // Overall Look: A=3, B=1
             // A total: 3+2+1(flip)+3 = 9, B total: 1+2+1 = 4
-            var matchup = MakeMatchup("pA:1", "pB:1");
+            var matchup = MakeMatchup(new EntrantId("pA", 1), new EntrantId("pB", 1));
             var criteria = DefaultCriteria();
 
             var votes = new List<VoteSubmission>
             {
                 // Creativity: A=3, B=1
-                Vote(matchup.Id, "creativity", "pA:1", "v1"),
-                Vote(matchup.Id, "creativity", "pA:1", "v2"),
-                Vote(matchup.Id, "creativity", "pA:1", "v3"),
-                Vote(matchup.Id, "creativity", "pB:1", "v4"),
+                Vote(matchup.Id, "creativity", new EntrantId("pA", 1), "v1"),
+                Vote(matchup.Id, "creativity", new EntrantId("pA", 1), "v2"),
+                Vote(matchup.Id, "creativity", new EntrantId("pA", 1), "v3"),
+                Vote(matchup.Id, "creativity", new EntrantId("pB", 1), "v4"),
                 // Theme Match: A=2, B=2
-                Vote(matchup.Id, "theme_match", "pA:1", "v1"),
-                Vote(matchup.Id, "theme_match", "pA:1", "v2"),
-                Vote(matchup.Id, "theme_match", "pB:1", "v3"),
-                Vote(matchup.Id, "theme_match", "pB:1", "v4"),
+                Vote(matchup.Id, "theme_match", new EntrantId("pA", 1), "v1"),
+                Vote(matchup.Id, "theme_match", new EntrantId("pA", 1), "v2"),
+                Vote(matchup.Id, "theme_match", new EntrantId("pB", 1), "v3"),
+                Vote(matchup.Id, "theme_match", new EntrantId("pB", 1), "v4"),
                 // Overall Look: A=3, B=1
-                Vote(matchup.Id, "overall_look", "pA:1", "v1"),
-                Vote(matchup.Id, "overall_look", "pA:1", "v2"),
-                Vote(matchup.Id, "overall_look", "pA:1", "v3"),
-                Vote(matchup.Id, "overall_look", "pB:1", "v4"),
+                Vote(matchup.Id, "overall_look", new EntrantId("pA", 1), "v1"),
+                Vote(matchup.Id, "overall_look", new EntrantId("pA", 1), "v2"),
+                Vote(matchup.Id, "overall_look", new EntrantId("pA", 1), "v3"),
+                Vote(matchup.Id, "overall_look", new EntrantId("pB", 1), "v4"),
             };
 
             // Coin flip: A wins theme_match tie.
             var flips = new List<CriterionCoinFlipResult>
             {
-                new(matchup.Id, "theme_match", "pA:1"),
+                new(matchup.Id, "theme_match", new EntrantId("pA", 1)),
             };
 
             var (aTotal, bTotal) = DrawnToDressScoringService.CalculateMatchupTotals(
@@ -549,7 +549,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress
             // Theme Match (×1): A=2, B=2 (tie → coin flip → B wins) → A=2, B=2+1=3
             // Overall Look (×1): A=3, B=1 → A=3, B=1
             // A total: 6+2+3 = 11, B total: 2+3+1 = 6
-            var matchup = MakeMatchup("pA:1", "pB:1");
+            var matchup = MakeMatchup(new EntrantId("pA", 1), new EntrantId("pB", 1));
             var criteria = new List<VotingCriterionDefinition>
             {
                 new() { Id = "creativity",   DisplayName = "Creativity",   Weight = 2.0 },
@@ -560,26 +560,26 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress
             var votes = new List<VoteSubmission>
             {
                 // Creativity: A=3, B=1
-                Vote(matchup.Id, "creativity", "pA:1", "v1"),
-                Vote(matchup.Id, "creativity", "pA:1", "v2"),
-                Vote(matchup.Id, "creativity", "pA:1", "v3"),
-                Vote(matchup.Id, "creativity", "pB:1", "v4"),
+                Vote(matchup.Id, "creativity", new EntrantId("pA", 1), "v1"),
+                Vote(matchup.Id, "creativity", new EntrantId("pA", 1), "v2"),
+                Vote(matchup.Id, "creativity", new EntrantId("pA", 1), "v3"),
+                Vote(matchup.Id, "creativity", new EntrantId("pB", 1), "v4"),
                 // Theme Match: A=2, B=2
-                Vote(matchup.Id, "theme_match", "pA:1", "v1"),
-                Vote(matchup.Id, "theme_match", "pA:1", "v2"),
-                Vote(matchup.Id, "theme_match", "pB:1", "v3"),
-                Vote(matchup.Id, "theme_match", "pB:1", "v4"),
+                Vote(matchup.Id, "theme_match", new EntrantId("pA", 1), "v1"),
+                Vote(matchup.Id, "theme_match", new EntrantId("pA", 1), "v2"),
+                Vote(matchup.Id, "theme_match", new EntrantId("pB", 1), "v3"),
+                Vote(matchup.Id, "theme_match", new EntrantId("pB", 1), "v4"),
                 // Overall Look: A=3, B=1
-                Vote(matchup.Id, "overall_look", "pA:1", "v1"),
-                Vote(matchup.Id, "overall_look", "pA:1", "v2"),
-                Vote(matchup.Id, "overall_look", "pA:1", "v3"),
-                Vote(matchup.Id, "overall_look", "pB:1", "v4"),
+                Vote(matchup.Id, "overall_look", new EntrantId("pA", 1), "v1"),
+                Vote(matchup.Id, "overall_look", new EntrantId("pA", 1), "v2"),
+                Vote(matchup.Id, "overall_look", new EntrantId("pA", 1), "v3"),
+                Vote(matchup.Id, "overall_look", new EntrantId("pB", 1), "v4"),
             };
 
             // Coin flip: B wins theme_match tie.
             var flips = new List<CriterionCoinFlipResult>
             {
-                new(matchup.Id, "theme_match", "pB:1"),
+                new(matchup.Id, "theme_match", new EntrantId("pB", 1)),
             };
 
             var (aTotal, bTotal) = DrawnToDressScoringService.CalculateMatchupTotals(

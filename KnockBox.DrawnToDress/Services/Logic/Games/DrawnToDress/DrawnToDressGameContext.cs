@@ -89,65 +89,23 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM
 
         /// <summary>
         /// Returns the ordered list of entrant IDs for the tournament.
-        /// Each player's submitted outfits become separate entrants encoded as "{playerId}:{round}".
+        /// Each player's submitted outfits become separate entrants.
         /// </summary>
-        public IReadOnlyList<string> GetTournamentEntrantIds()
+        public IReadOnlyList<EntrantId> GetTournamentEntrantIds()
         {
-            var entrants = new List<string>();
+            var entrants = new List<EntrantId>();
             foreach (var p in GamePlayers.Values.OrderBy(p => p.PlayerId, StringComparer.Ordinal))
                 foreach (var (round, _) in p.SubmittedOutfits.OrderBy(kv => kv.Key))
-                    entrants.Add($"{p.PlayerId}:{round}");
+                    entrants.Add(new EntrantId(p.PlayerId, round));
             return entrants;
-        }
-
-        /// <summary>
-        /// Attempts to parse an entrant ID in the format "playerId:round".
-        /// Returns <see langword="false"/> if the format is invalid.
-        /// </summary>
-        public static bool TryParseEntrantId(string entrantId, out string playerId, out int round)
-        {
-            playerId = string.Empty;
-            round = 0;
-
-            if (string.IsNullOrEmpty(entrantId))
-                return false;
-
-            int colonIndex = entrantId.IndexOf(':');
-            if (colonIndex <= 0 || colonIndex >= entrantId.Length - 1)
-                return false;
-
-            playerId = entrantId[..colonIndex];
-            return int.TryParse(entrantId.AsSpan(colonIndex + 1), out round);
-        }
-
-        /// <summary>Extracts the player ID portion from an entrant ID (e.g. "player1:1" → "player1").</summary>
-        public static string GetPlayerIdFromEntrantId(string entrantId)
-        {
-            if (TryParseEntrantId(entrantId, out var playerId, out _))
-                return playerId;
-
-            // Fallback: return the whole string and log defensively.
-            return entrantId;
-        }
-
-        /// <summary>Extracts the outfit round number from an entrant ID (e.g. "player1:2" → 2).</summary>
-        public static int GetOutfitRoundFromEntrantId(string entrantId)
-        {
-            if (TryParseEntrantId(entrantId, out _, out var round))
-                return round;
-
-            return 0;
         }
 
         /// <summary>
         /// Looks up the outfit submission for a given entrant ID.
         /// </summary>
-        public OutfitSubmission? GetOutfitByEntrantId(string entrantId)
+        public OutfitSubmission? GetOutfitByEntrantId(EntrantId entrantId)
         {
-            if (!TryParseEntrantId(entrantId, out var playerId, out var round))
-                return null;
-
-            return GetPlayer(playerId)?.GetOutfit(round);
+            return GetPlayer(entrantId.PlayerId)?.GetOutfit(entrantId.Round);
         }
 
         /// <summary>

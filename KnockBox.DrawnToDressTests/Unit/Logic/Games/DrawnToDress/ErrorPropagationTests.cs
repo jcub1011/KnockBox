@@ -109,5 +109,76 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress
             // Assert
             Assert.IsTrue(result.IsSuccess);
         }
+
+        [TestMethod]
+        public async Task ProcessCommand_UnknownPlayer_ClaimPoolItem_DoesNotClaimItem()
+        {
+            // Arrange
+            var (state, context) = await CreateGameInOutfitBuildingPhaseAsync();
+
+            var item = new DrawnClothingItem
+            {
+                ClothingTypeId = "hat",
+                CreatorPlayerId = "p1",
+                SvgContent = "<svg>hat</svg>",
+                IsInPool = true,
+            };
+            context.ClothingPool[item.Id] = item;
+
+            // Act: unknown player tries to claim an item.
+            _engine.ProcessCommand(context,
+                new ClaimPoolItemCommand("unknown-player", item.Id));
+
+            // Assert: the item was not claimed.
+            Assert.IsNull(item.ClaimedByPlayerId);
+        }
+
+        [TestMethod]
+        public async Task ProcessCommand_SubmitDrawing_InvalidClothingType_DoesNotAddToPool()
+        {
+            // Arrange: create a game in the drawing phase.
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            state.Config.ClothingTypes =
+            [
+                new() { Id = "hat", DisplayName = "Hat", MaxItemsPerRound = 10 },
+            ];
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            state.GamePlayers["p1"] = new DrawnToDressPlayerState { PlayerId = "p1" };
+            Assert.IsInstanceOfType<DrawingRoundState>(context.Fsm.CurrentState);
+
+            // Act: submit a drawing for a clothing type that doesn't exist.
+            _engine.ProcessCommand(context,
+                new SubmitDrawingCommand("p1", "nonexistent-type", "<svg>drawing</svg>"));
+
+            // Assert: no item was added to the pool for the invalid type.
+            Assert.IsFalse(context.ClothingPool.Values.Any(i => i.ClothingTypeId == "nonexistent-type"));
+        }
+
+        [TestMethod]
+        public async Task ProcessCommand_SubmitCustomization_DuringDrawingPhase_IsIgnored()
+        {
+            // Arrange: create a game in the drawing phase.
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            state.Config.ClothingTypes =
+            [
+                new() { Id = "hat", DisplayName = "Hat", MaxItemsPerRound = 10 },
+            ];
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+
+            state.GamePlayers["p1"] = new DrawnToDressPlayerState { PlayerId = "p1" };
+            Assert.IsInstanceOfType<DrawingRoundState>(context.Fsm.CurrentState);
+
+            // Act: attempt to submit a customization while still in the drawing phase.
+            _engine.ProcessCommand(context,
+                new SubmitCustomizationCommand("p1", "My Outfit"));
+
+            // Assert: the command was ignored (wrong state), player not marked ready.
+            Assert.IsFalse(state.GamePlayers["p1"].IsReady);
+        }
     }
 }
