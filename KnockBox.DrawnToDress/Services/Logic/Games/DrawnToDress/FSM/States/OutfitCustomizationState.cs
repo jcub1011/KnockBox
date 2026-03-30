@@ -164,18 +164,24 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
 
         private IGameState<DrawnToDressGameContext, DrawnToDressCommand> ChooseNextState(DrawnToDressGameContext context)
         {
-            // Apply draft names for any player who hasn't manually submitted yet.
+            // Apply draft names for any player who hasn't manually submitted yet,
+            // then clear the draft so it cannot leak into subsequent outfit rounds.
             foreach (var player in context.GamePlayers.Values)
             {
-                if (player.IsReady) continue;
-                var outfit = player.GetOutfit(_outfitRound);
-                if (outfit is not null && !string.IsNullOrWhiteSpace(player.DraftOutfitName))
+                if (!player.IsReady)
                 {
-                    outfit.Customization.OutfitName = player.DraftOutfitName.Trim();
-                    context.Logger.LogInformation(
-                        "Applying draft name \"{name}\" for player [{id}] (timer expired).",
-                        outfit.Customization.OutfitName, player.PlayerId);
+                    var outfit = player.GetOutfit(_outfitRound);
+                    if (outfit is not null && !string.IsNullOrWhiteSpace(player.DraftOutfitName))
+                    {
+                        outfit.Customization.OutfitName = player.DraftOutfitName.Trim();
+                        context.Logger.LogInformation(
+                            "Applying draft name \"{name}\" for player [{id}] (timer expired).",
+                            outfit.Customization.OutfitName, player.PlayerId);
+                    }
                 }
+
+                // Clear any draft name at the end of this round to avoid reusing it in later rounds.
+                player.DraftOutfitName = string.Empty;
             }
 
             if (_outfitRound < context.Config.NumOutfitRounds)
