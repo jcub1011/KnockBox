@@ -20,8 +20,8 @@
 
     var myOutfit = myPlayer?.GetOutfit(OutfitRound);
 
-    int canvasWidth = GameState.Config.ClothingTypes.FirstOrDefault()?.CanvasWidth ?? 600;
-    int totalOutfitHeight = GameState.Config.ClothingTypes.Sum(ct => ct.CanvasHeight);
+    int canvasWidth = (GameState.Config.ClothingTypes.FirstOrDefault()?.CanvasWidth ?? 600) + 100;
+    int totalOutfitHeight = GameState.Config.ClothingTypes.Sum(ct => (int)(ct.CanvasHeight * 0.8));
 
     // Build a composite background SVG from the player's selected outfit items, applying
     // any position overrides set via the drag/manual-input layer.
@@ -253,8 +253,8 @@
                                     <input type="number"
                                            class="dtd-customization-position-input"
                                            value="@((int)posX)"
-                                           min="0"
-                                           max="@canvasWidth"
+                                           min="@(-ct.CanvasWidth / 2)"
+                                           max="@(canvasWidth - ct.CanvasWidth / 2)"
                                            @onchange="(e) => OnManualPositionChanged(typeId, true, e)" />
                                 </label>
                                 <label class="dtd-customization-position-input-label">
@@ -262,8 +262,8 @@
                                     <input type="number"
                                            class="dtd-customization-position-input"
                                            value="@((int)posY)"
-                                           min="0"
-                                           max="@totalOutfitHeight"
+                                           min="@(-ct.CanvasHeight / 2)"
+                                           max="@(totalOutfitHeight - ct.CanvasHeight / 2)"
                                            @onchange="(e) => OnManualPositionChanged(typeId, false, e)" />
                                 </label>
                             </div>

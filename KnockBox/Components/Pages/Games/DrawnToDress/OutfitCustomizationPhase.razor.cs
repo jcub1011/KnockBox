@@ -66,7 +66,7 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
                 
                 // Since the item was drawn centered in its respective canvas height,
                 // translating it natively here maps it perfectly.
-                _itemPositions[ct.Id] = new ItemPositionOverride { X = 0, Y = (partCenterY - viewCenterY) + 200 };
+                _itemPositions[ct.Id] = new ItemPositionOverride { X = 50, Y = (partCenterY - viewCenterY) + 200 };
             }
         }
 
@@ -143,8 +143,8 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
                 }
             }
 
-            int canvasWidth = GameState.Config.ClothingTypes.FirstOrDefault()?.CanvasWidth ?? 600;
-            int totalHeight = GameState.Config.ClothingTypes.Sum(ct => ct.CanvasHeight);
+            int canvasWidth = (GameState.Config.ClothingTypes.FirstOrDefault()?.CanvasWidth ?? 600) + 100;
+            int totalHeight = GameState.Config.ClothingTypes.Sum(ct => (int)(ct.CanvasHeight * 0.8));
             await _dragModule.InvokeVoidAsync("initialize", _dragSvgId, _dotNetRef, items, canvasWidth, totalHeight);
             _dragInitialized = true;
         }

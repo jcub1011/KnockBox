@@ -140,8 +140,9 @@ export function initialize(svgId, dotNetRef, items, viewBoxWidth, viewBoxHeight)
         const hMargin = info.width * 0.5;
         newX = Math.max(-hMargin, Math.min(newX, state.viewBoxWidth - info.width + hMargin));
 
-        // Keep vertical clamping strict to prevent items from being lost entirely.
-        newY = Math.max(0, Math.min(newY, state.viewBoxHeight - info.height));
+        // Loosen vertical clamping to allow items to be moved partially (50%) outside.
+        const vMargin = info.height * 0.5;
+        newY = Math.max(-vMargin, Math.min(newY, state.viewBoxHeight - info.height + vMargin));
         info.x = newX;
         info.y = newY;
         info.group.setAttribute('transform', `translate(${newX},${newY})`);
@@ -228,8 +229,8 @@ export function updateItemPosition(svgId, typeId, x, y) {
     const info = state.items.get(typeId);
     if (!info) return;
 
-    x = Math.max(0, Math.min(x, state.viewBoxWidth - info.width));
-    y = Math.max(0, Math.min(y, state.viewBoxHeight - info.height));
+    x = Math.max(-info.width * 0.5, Math.min(x, state.viewBoxWidth - info.width * 0.5));
+    y = Math.max(-info.height * 0.5, Math.min(y, state.viewBoxHeight - info.height * 0.5));
 
     info.x = x;
     info.y = y;

@@ -39,6 +39,7 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
             {
                 DrawingTimeSec = src.DrawingTimeSec,
                 ShowMannequin = src.ShowMannequin,
+                EnableTimer = src.EnableTimer,
                 AllowSketchingDuringOutfitBuilding = src.AllowSketchingDuringOutfitBuilding,
                 ClothingTypes = src.ClothingTypes.Select(t => new ClothingTypeDefinition
                 {

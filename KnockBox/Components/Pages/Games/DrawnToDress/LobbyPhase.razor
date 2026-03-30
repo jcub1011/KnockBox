@@ -114,6 +114,10 @@
                         Show Mannequin Reference
                     </label>
                     <label class="dtd-setting-label">
+                        <input type="checkbox" @bind="EditConfig.EnableTimer" @bind:after="ApplyConfig" />
+                        Enable Game Timers
+                    </label>
+                    <label class="dtd-setting-label">
                         Theme Announcement Time (seconds):
                         <input type="number" min="5" class="dtd-setting-input"
                                @bind="EditConfig.ThemeAnnouncementTimeSec" @bind:after="ApplyConfig" />

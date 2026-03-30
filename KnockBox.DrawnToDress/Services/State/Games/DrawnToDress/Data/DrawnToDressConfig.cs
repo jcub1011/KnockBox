@@ -8,6 +8,12 @@ namespace KnockBox.Services.State.Games.DrawnToDress.Data
         /// </summary>
         public bool ShowMannequin { get; set; } = true;
 
+        /// <summary>
+        /// When <see langword="true"/>, the game advances phases automatically based on
+        /// timers. When <see langword="false"/>, players must manually ready/submit to advance.
+        /// </summary>
+        public bool EnableTimer { get; set; } = true;
+
         // ── Drawing phase ─────────────────────────────────────────────────────
 
         /// <summary>

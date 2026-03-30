@@ -158,7 +158,7 @@
                             {
                                 int viewCenterY = ct.CanvasHeight / 2;
                                 int partCenterY = ct.Id switch { "hat" => 160, "bottom" => 820, "shoes" => 1070, _ => 440 };
-                                double itemX = 0;
+                                double itemX = 50;
                                 double itemY = (partCenterY - viewCenterY) + 200;
                                 if (outfit.Customization.ItemPositionOverrides.TryGetValue(ct.Id, out var pos))
                                 {

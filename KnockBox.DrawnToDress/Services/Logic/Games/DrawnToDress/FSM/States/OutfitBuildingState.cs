@@ -15,6 +15,8 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
     /// </summary>
     public sealed class OutfitBuildingState : ITimedDrawnToDressGameState
     {
+        public bool IsTimerOptional => true;
+
         private readonly int _outfitRound;
         private DateTimeOffset _deadline;
 

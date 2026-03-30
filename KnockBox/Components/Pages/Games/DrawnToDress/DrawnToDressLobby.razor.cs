@@ -168,11 +168,17 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
 
         private void AnnounceTimerWarningsIfNeeded()
         {
-            if (GameState?.Context?.Fsm?.CurrentState is not ITimedGameState<DrawnToDressGameContext, DrawnToDressCommand> timedState)
+            var state = GameState;
+            var context = state?.Context;
+            if (context?.Fsm?.CurrentState is not ITimedDrawnToDressGameState timedState)
                 return;
+
+            if (timedState.IsTimerOptional && state?.Config?.EnableTimer == false)
+                return;
+
             if (_announcer is null) return;
 
-            var remaining = timedState.GetRemainingTime(GameState.Context!, DateTimeOffset.UtcNow);
+            var remaining = timedState.GetRemainingTime(context, DateTimeOffset.UtcNow);
             if (!remaining.IsSuccess) return;
 
             var secs = (int)Math.Ceiling(remaining.Value.TotalSeconds);

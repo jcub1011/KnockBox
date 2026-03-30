@@ -20,6 +20,8 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
     /// </summary>
     public sealed class VotingMatchupState : ITimedDrawnToDressGameState
     {
+        public bool IsTimerOptional => true;
+
         private DateTimeOffset _deadline;
 
         public ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?> OnEnter(

@@ -110,6 +110,13 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress
         {
             return context.State.Execute(() =>
             {
+                if (context.Fsm.CurrentState is ITimedDrawnToDressGameState timed &&
+                    timed.IsTimerOptional &&
+                    !context.State.Config.EnableTimer)
+                {
+                    return;
+                }
+
                 var fsmResult = context.Fsm.Tick(context, now);
                 if (fsmResult.TryGetFailure(out var err))
                     logger.LogError("FSM tick error: {msg}", err.PublicMessage);

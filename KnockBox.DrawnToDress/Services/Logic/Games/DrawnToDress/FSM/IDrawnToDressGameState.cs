@@ -17,5 +17,13 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM
     /// making timer-driven behaviour easy to add in later issues.
     /// </summary>
     public interface ITimedDrawnToDressGameState
-        : ITimedGameState<DrawnToDressGameContext, DrawnToDressCommand>, IDrawnToDressGameState;
+        : ITimedGameState<DrawnToDressGameContext, DrawnToDressCommand>, IDrawnToDressGameState
+    {
+        /// <summary>
+        /// When <see langword="true"/>, this state respects the <see cref="DrawnToDressConfig.EnableTimer"/>
+        /// configuration and will not auto-advance if it is disabled.
+        /// Default is <see langword="false"/> (always auto-advance).
+        /// </summary>
+        bool IsTimerOptional => false;
+    }
 }
