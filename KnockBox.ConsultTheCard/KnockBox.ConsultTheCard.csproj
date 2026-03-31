@@ -7,6 +7,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Content Include="Services\Logic\Games\ConsultTheCard\Data\WordPairs.csv" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\KnockBox.Core\KnockBox.Core.csproj" />
   </ItemGroup>
 
