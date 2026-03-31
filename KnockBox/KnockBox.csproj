@@ -53,6 +53,7 @@
     <ProjectReference Include="..\KnockBox.Core\KnockBox.Core.csproj" />
     <ProjectReference Include="..\KnockBox.DiceSimulator\KnockBox.DiceSimulator.csproj" />
     <ProjectReference Include="..\KnockBox.DrawnToDress\KnockBox.DrawnToDress.csproj" />
+    <ProjectReference Include="..\KnockBox.ConsultTheCard\KnockBox.ConsultTheCard.csproj" />
   </ItemGroup>
 
 </Project>
