@@ -1,0 +1,79 @@
+@using KnockBox.Services.State.Users
+@using KnockBox.Services.State.Games.ConsultTheCard
+
+<div class="ctc-discussion-area">
+    @{
+        var myId = UserService.CurrentUser?.Id ?? "";
+        var isHost = GameState.Host.Id == myId;
+        var myPlayer = GetMyPlayer();
+        var endVote = GameState.EndGameVoteStatus;
+        bool hasVotedToEnd = myPlayer is not null && myPlayer.HasVotedToEndGame;
+    }
+
+    <div class="ctc-discussion-panel">
+        <h2 class="ctc-phase-title">💬 DISCUSSION PHASE</h2>
+
+        @* ── Submitted clues ── *@
+        @if (GameState.CurrentRoundClues.Count > 0)
+        {
+            <div class="ctc-discussion-clues">
+                <h3 class="ctc-section-title">Submitted Clues</h3>
+                <div class="ctc-clue-list ctc-clue-list-prominent">
+                    @foreach (var clue in GameState.CurrentRoundClues)
+                    {
+                        <div class="ctc-clue-entry ctc-clue-entry-lg">
+                            <span class="ctc-clue-player">@clue.PlayerName</span>
+                            <span class="ctc-clue-word">@clue.Clue</span>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+
+        @* ── Player list ── *@
+        <div class="ctc-discussion-players">
+            <h3 class="ctc-section-title">Players</h3>
+            <div class="ctc-player-list">
+                @foreach (var ps in GameState.GamePlayers.Values)
+                {
+                    bool isEliminated = ps.IsEliminated;
+                    bool isMe = ps.PlayerId == myId;
+                    <div class="ctc-player-row @(isEliminated ? "ctc-player-eliminated" : "") @(isMe ? "ctc-player-me" : "")">
+                        <span class="ctc-player-name">@ps.DisplayName</span>
+                        @if (isEliminated)
+                        {
+                            <span class="ctc-status-badge ctc-status-eliminated">Eliminated</span>
+                        }
+                        else
+                        {
+                            <span class="ctc-status-badge ctc-status-unknown">❓</span>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+
+        @* ── Vote to End Game ── *@
+        @if (myPlayer is not null && !myPlayer.IsEliminated)
+        {
+            <div class="ctc-end-game-vote">
+                <div class="ctc-vote-progress">
+                    Vote to End: @endVote.VotedToEnd.Count / @endVote.RequiredVotes needed
+                </div>
+                <button class="ctc-btn ctc-btn-warning" @onclick="VoteToEndGame"
+                        disabled="@hasVotedToEnd"
+                        title="@(hasVotedToEnd ? "You have already voted to end the game this round" : "Vote to end the game early")">
+                    @(hasVotedToEnd ? "✅ Voted to End" : "🗳️ Vote to End Game")
+                </button>
+            </div>
+        }
+
+        @* ── Host advance button ── *@
+        @if (isHost)
+        {
+            <button class="ctc-btn ctc-btn-primary" @onclick="AdvanceToVote">
+                ⏩ Advance to Vote
+            </button>
+        }
+    </div>
+</div>
