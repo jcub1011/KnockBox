@@ -28,6 +28,9 @@ namespace KnockBox.Services.State.Games.ConsultTheCard.Data
         /// <summary>The clue submitted by this player for the current round.</summary>
         public string? CurrentClue { get; set; }
 
+        /// <summary>A complete history of all clues submitted by this player in the current game.</summary>
+        public List<string> ClueHistory { get; set; } = [];
+
         /// <summary>The player ID this player has voted to eliminate.</summary>
         public string? VoteTargetId { get; set; }
 
@@ -35,10 +38,16 @@ namespace KnockBox.Services.State.Games.ConsultTheCard.Data
         public bool HasVoted { get; set; }
 
         /// <summary>
-        /// Whether this player has voted to end the current game.
+        /// Whether the player has voted to end the game early.
         /// One vote per elimination cycle per player.
         /// </summary>
         public bool HasVotedToEndGame { get; set; }
+
+        /// <summary>
+        /// Whether the player has voted to skip the remaining discussion time.
+        /// One vote per elimination cycle per player.
+        /// </summary>
+        public bool HasVotedToSkipTime { get; set; }
 
         /// <summary>The player's score for the current game.</summary>
         public int Score { get; set; }

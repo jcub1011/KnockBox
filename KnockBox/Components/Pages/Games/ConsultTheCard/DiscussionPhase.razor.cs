@@ -28,18 +28,50 @@ namespace KnockBox.Components.Pages.Games.ConsultTheCard
         {
             if (UserService.CurrentUser == null) return;
 
-            var myPlayer = GetMyPlayer();
-            if (myPlayer is not null && myPlayer.HasVotedToEndGame)
-            {
-                _ = OnError.InvokeAsync("You have already voted to end the game this round.");
-                return;
-            }
-
             var result = GameEngine.VoteToEndGame(UserService.CurrentUser, GameState);
             if (result.TryGetFailure(out var error))
             {
                 Logger.LogError("Failed to vote to end game: {Error}", error);
                 _ = OnError.InvokeAsync("Action not available right now.");
+            }
+        }
+
+        protected void SkipRemainingTime()
+        {
+            if (UserService.CurrentUser == null) return;
+
+            var result = GameEngine.SkipRemainingTime(UserService.CurrentUser, GameState);
+            if (result.TryGetFailure(out var error))
+            {
+                Logger.LogError("Failed to skip remaining time: {Error}", error);
+                _ = OnError.InvokeAsync("Only the host can skip time.");
+            }
+        }
+
+        protected void SelectTarget(string targetId)
+        {
+            if (UserService.CurrentUser == null) return;
+
+            var myPlayer = GetMyPlayer();
+            if (myPlayer is not null && myPlayer.HasVoted) return;
+
+            var result = GameEngine.CastVote(UserService.CurrentUser, GameState, targetId);
+            if (result.TryGetFailure(out var error))
+            {
+                Logger.LogError("Failed to select vote target: {Error}", error);
+                _ = OnError.InvokeAsync("You cannot vote for that player.");
+            }
+        }
+
+        protected void ConfirmVote()
+        {
+            if (UserService.CurrentUser == null) return;
+
+            var result = GameEngine.LockInVote(UserService.CurrentUser, GameState);
+            if (result.TryGetFailure(out var error))
+            {
+                Logger.LogError("Failed to lock in vote: {Error}", error);
+                _ = OnError.InvokeAsync("Please select a player before locking in.");
             }
         }
 

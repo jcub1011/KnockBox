@@ -9,9 +9,21 @@
             : "";
         var isMyTurn = myId == activeId;
         var activePlayerName = GameState.GamePlayers.TryGetValue(activeId, out var activePs) ? activePs.DisplayName : "...";
+        bool isEliminated = GameState.GamePlayers.TryGetValue(myId, out var playerState) ? playerState.IsEliminated : true;
     }
 
     <div class="ctc-clue-panel">
+        @if (isEliminated == true)
+        {
+            <div class="ctc-eliminated-banner">
+                <span class="ctc-eliminated-icon">👻</span>
+                <div class="ctc-eliminated-text">
+                    <h3>YOU ARE ELIMINATED</h3>
+                    <p>You can no longer give clues.</p>
+                </div>
+            </div>
+        }
+
         <h2 class="ctc-phase-title">📝 CLUE PHASE</h2>
 
         @* ── Turn indicator ── *@
@@ -30,7 +42,7 @@
         @if (isMyTurn)
         {
             <div class="ctc-clue-input-area">
-                <input type="text" class="ctc-clue-input" placeholder="Enter a one-word clue..."
+                <input type="text" class="ctc-clue-input" placeholder="Enter a clue (max 50 chars)..."
                        @bind="_clueText" @bind:event="oninput" maxlength="50" />
                 <button class="ctc-btn ctc-btn-primary" @onclick="SubmitClue"
                         disabled="@(string.IsNullOrWhiteSpace(_clueText))">

@@ -132,11 +132,18 @@ namespace KnockBox.Services.Logic.Games.ConsultTheCard
             return ProcessCommand(ctx, new SubmitClueCommand(player.Id, clue));
         }
 
-        /// <summary>Player casts a vote to eliminate the targeted player.</summary>
+        /// <summary>Player casts a vote to eliminate the targeted player (not yet locked in).</summary>
         public Result CastVote(User player, ConsultTheCardGameState state, string targetPlayerId)
         {
             if (!TryGetContext(state, out var ctx, out var err)) return err;
             return ProcessCommand(ctx, new CastVoteCommand(player.Id, targetPlayerId));
+        }
+
+        /// <summary>Player locks in their selected vote.</summary>
+        public Result LockInVote(User player, ConsultTheCardGameState state)
+        {
+            if (!TryGetContext(state, out var ctx, out var err)) return err;
+            return ProcessCommand(ctx, new LockInVoteCommand(player.Id));
         }
 
         /// <summary>Informant guesses the Agent word during the reveal phase.</summary>
@@ -151,6 +158,13 @@ namespace KnockBox.Services.Logic.Games.ConsultTheCard
         {
             if (!TryGetContext(state, out var ctx, out var err)) return err;
             return ProcessCommand(ctx, new AdvanceToVoteCommand(player.Id));
+        }
+
+        /// <summary>Host or player skips the remaining discussion time.</summary>
+        public Result SkipRemainingTime(User player, ConsultTheCardGameState state)
+        {
+            if (!TryGetContext(state, out var ctx, out var err)) return err;
+            return ProcessCommand(ctx, new SkipRemainingTimeCommand(player.Id));
         }
 
         /// <summary>Any player votes to end the current game (once per elimination cycle).</summary>
@@ -295,9 +309,9 @@ namespace KnockBox.Services.Logic.Games.ConsultTheCard
                     "Player [{id}] left the game. TurnOrder now has {n} player(s).",
                     player.Id, state.TurnOrder.Count);
 
-                // If during VotePhase: void any votes cast for the disconnected player
+                // If during VotePhase or Discussion: void any votes cast for the disconnected player
                 // and remove the disconnected player's own outbound vote.
-                if (state.GamePhase == ConsultTheCardGamePhase.Voting)
+                if (state.GamePhase == ConsultTheCardGamePhase.Voting || state.GamePhase == ConsultTheCardGamePhase.Discussion)
                 {
                     foreach (var ps in context.GetAlivePlayers())
                     {
@@ -339,14 +353,15 @@ namespace KnockBox.Services.Logic.Games.ConsultTheCard
                     return;
                 }
 
-                // Auto-advance if during VotePhase and all remaining alive players have voted.
-                if (state.GamePhase == ConsultTheCardGamePhase.Voting
+                // Auto-advance if during Vote/Discussion Phase and all remaining alive players have voted.
+                if ((state.GamePhase == ConsultTheCardGamePhase.Voting || state.GamePhase == ConsultTheCardGamePhase.Discussion)
                     && context.GetAlivePlayers().All(p => p.HasVoted))
                 {
                     // All votes are in — process the vote result by re-entering the FSM.
-                    // The VotePhaseState checks for all voted on command handling,
-                    // but since we voided votes, we re-trigger via a no-op transition.
-                    context.Fsm.TransitionTo(context, new VotePhaseState());
+                    if (state.GamePhase == ConsultTheCardGamePhase.Voting)
+                        context.Fsm.TransitionTo(context, new VotePhaseState());
+                    else
+                        context.Fsm.TransitionTo(context, new DiscussionPhaseState());
                     return;
                 }
             });

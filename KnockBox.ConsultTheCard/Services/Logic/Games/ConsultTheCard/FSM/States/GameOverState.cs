@@ -63,10 +63,10 @@ namespace KnockBox.Services.Logic.Games.ConsultTheCard.FSM.States
                 ps.IsEliminated = false;
                 ps.HasSubmittedClue = false;
                 ps.CurrentClue = null;
+                ps.ClueHistory.Clear();
                 ps.VoteTargetId = null;
                 ps.HasVoted = false;
                 ps.HasVotedToEndGame = false;
-                ps.Score = 0;
             }
 
             // Reset game-level state.

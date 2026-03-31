@@ -8,7 +8,168 @@
     color: #fff;
     font-family: var(--font-primary);
     position: relative;
-    overflow: hidden;
+    overflow-y: auto;
+}
+
+/* ── Secret Word Banner ── */
+
+::deep .ctc-secret-word-banner {
+    background: linear-gradient(90deg, #7c3aed, #a78bfa);
+    padding: 10px 20px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin-bottom: 20px;
+    border: 2px solid rgba(255,255,255,0.2);
+    box-shadow: 0 4px 15px rgba(124,58,237,0.3);
+}
+
+::deep .ctc-secret-word-label {
+    font-size: 0.9rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.8);
+}
+
+::deep .ctc-secret-word-value {
+    font-size: 1.4rem;
+    font-weight: 900;
+    color: #fff;
+    letter-spacing: 1px;
+}
+
+/* ── Clue History Bubbles ── */
+
+::deep .ctc-clue-history-bubbles {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    flex: 1;
+}
+
+::deep .ctc-clue-bubble {
+    background: rgba(167,139,250,0.15);
+    border: 1px solid rgba(167,139,250,0.3);
+    border-radius: 16px;
+    padding: 4px 12px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #fff;
+}
+
+/* ── Voting Section ── */
+
+::deep .ctc-voting-section {
+    margin-top: 10px;
+    padding-top: 20px;
+    border-top: 2px solid rgba(255,255,255,0.1);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+::deep .ctc-selection-check {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    font-size: 1.2rem;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
+}
+
+::deep .ctc-vote-target {
+    position: relative;
+}
+
+::deep .ctc-vote-locked {
+    text-align: center;
+    padding: 15px;
+    background: rgba(0,0,0,0.2);
+    border-radius: 10px;
+}
+
+/* ── Actions ── */
+
+::deep .ctc-discussion-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    margin-top: 10px;
+}
+
+::deep .ctc-action-group {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+::deep .ctc-action-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+}
+
+::deep .ctc-vote-small-progress {
+    font-size: 0.75rem;
+    color: rgba(255,255,255,0.4);
+    font-weight: 600;
+}
+
+::deep .ctc-host-actions {
+    display: flex;
+    justify-content: center;
+    border-top: 1px solid rgba(255,255,255,0.05);
+    padding-top: 15px;
+}
+
+::deep .ctc-vote-to-end-progress {
+    font-size: 0.8rem;
+    color: rgba(255,255,255,0.4);
+    text-align: center;
+}
+
+/* ── Eliminated Banner ── */
+
+::deep .ctc-eliminated-banner {
+    background: rgba(45, 45, 45, 0.9);
+    border: 2px solid #e74c3c;
+    border-radius: 12px;
+    padding: 16px 24px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    margin-bottom: 24px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+}
+
+::deep .ctc-eliminated-icon {
+    font-size: 2.5rem;
+    filter: drop-shadow(0 0 8px rgba(231, 76, 60, 0.5));
+}
+
+::deep .ctc-eliminated-text h3 {
+    margin: 0;
+    color: #e74c3c;
+    font-size: 1.1rem;
+    font-weight: 900;
+    letter-spacing: 1px;
+}
+
+::deep .ctc-eliminated-text p {
+    margin: 4px 0 0 0;
+    color: rgba(255,255,255,0.7);
+    font-size: 0.9rem;
+}
+
+/* ── Public Votes Tally ── */
+
+::deep .ctc-public-votes {
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid rgba(255,255,255,0.1);
 }
 
 .ctc-loading {
@@ -651,7 +812,15 @@
 }
 
 ::deep .ctc-player-eliminated {
-    opacity: 0.5;
+    opacity: 0.4;
+    filter: grayscale(100%);
+    border-color: rgba(255,255,255,0.05);
+    background: rgba(0,0,0,0.1);
+}
+
+::deep .ctc-player-eliminated .ctc-player-name {
+    color: #888;
+    text-decoration: line-through;
 }
 
 ::deep .ctc-player-name {

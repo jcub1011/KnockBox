@@ -58,10 +58,12 @@ namespace KnockBox.Services.Logic.Games.ConsultTheCard.FSM.States
             if (player.HasSubmittedClue)
                 return new ResultError("You have already submitted a clue.");
 
-            // Validate: single word (no spaces).
+            // Validate: character limit.
             string clue = cmd.Clue.Trim();
-            if (string.IsNullOrWhiteSpace(clue) || clue.Contains(' '))
-                return new ResultError("Clue must be a single word with no spaces.");
+            if (string.IsNullOrWhiteSpace(clue))
+                return new ResultError("Clue cannot be empty.");
+            if (clue.Length > 50)
+                return new ResultError("Clue must be 50 characters or less.");
 
             // Validate: not the player's secret word.
             if (player.SecretWord is not null &&
@@ -75,6 +77,7 @@ namespace KnockBox.Services.Logic.Games.ConsultTheCard.FSM.States
             // Store the clue.
             player.HasSubmittedClue = true;
             player.CurrentClue = clue;
+            player.ClueHistory.Add(clue);
             context.State.UsedClues.Add(clue);
             context.State.CurrentRoundClues.Add(
                 new ClueEntry(player.PlayerId, player.DisplayName, clue));
@@ -110,6 +113,7 @@ namespace KnockBox.Services.Logic.Games.ConsultTheCard.FSM.States
                 string defaultClue = "...";
                 player.HasSubmittedClue = true;
                 player.CurrentClue = defaultClue;
+                player.ClueHistory.Add(defaultClue);
                 context.State.UsedClues.Add(defaultClue);
                 context.State.CurrentRoundClues.Add(
                     new ClueEntry(player.PlayerId, player.DisplayName, defaultClue));

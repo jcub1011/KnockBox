@@ -20,6 +20,42 @@ namespace KnockBox.Components.Pages.Games.ConsultTheCard
 
         protected void ToggleSettings() => SettingsOpen = !SettingsOpen;
 
+        protected int SetupPhaseTimeoutSeconds
+        {
+            get => GameState.Config.SetupPhaseTimeoutMs / 1000;
+            set { GameState.Config.SetupPhaseTimeoutMs = value * 1000; NotifyConfigChanged(); }
+        }
+
+        protected int CluePhaseTimeoutSeconds
+        {
+            get => GameState.Config.CluePhaseTimeoutMs / 1000;
+            set { GameState.Config.CluePhaseTimeoutMs = value * 1000; NotifyConfigChanged(); }
+        }
+
+        protected int DiscussionPhaseTimeoutSeconds
+        {
+            get => GameState.Config.DiscussionPhaseTimeoutMs / 1000;
+            set { GameState.Config.DiscussionPhaseTimeoutMs = value * 1000; NotifyConfigChanged(); }
+        }
+
+        protected int VotePhaseTimeoutSeconds
+        {
+            get => GameState.Config.VotePhaseTimeoutMs / 1000;
+            set { GameState.Config.VotePhaseTimeoutMs = value * 1000; NotifyConfigChanged(); }
+        }
+
+        protected int RevealPhaseTimeoutSeconds
+        {
+            get => GameState.Config.RevealPhaseTimeoutMs / 1000;
+            set { GameState.Config.RevealPhaseTimeoutMs = value * 1000; NotifyConfigChanged(); }
+        }
+
+        protected int InformantGuessTimeoutSeconds
+        {
+            get => GameState.Config.InformantGuessTimeoutMs / 1000;
+            set { GameState.Config.InformantGuessTimeoutMs = value * 1000; NotifyConfigChanged(); }
+        }
+
         protected void KickPlayer(string userId)
         {
             if (string.IsNullOrWhiteSpace(userId))

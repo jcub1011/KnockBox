@@ -261,6 +261,7 @@ namespace KnockBox.Services.Logic.Games.ConsultTheCard.FSM
                 ps.VoteTargetId = null;
                 ps.HasVoted = false;
                 ps.HasVotedToEndGame = false;
+                ps.HasVotedToSkipTime = false;
             }
 
             State.CurrentRoundClues.Clear();
@@ -268,6 +269,11 @@ namespace KnockBox.Services.Logic.Games.ConsultTheCard.FSM
             State.LastElimination = null;
             State.LastInformantGuess = null;
             State.AwaitingInformantGuess = false;
+
+            // Reset skip time status for the next cycle.
+            int aliveCount = GetAlivePlayerCount();
+            int required = (aliveCount / 2) + 1;
+            State.SkipTimeVoteStatus = new EndGameVoteStatus([], required);
         }
 
         // ── Scoring ───────────────────────────────────────────────────────────

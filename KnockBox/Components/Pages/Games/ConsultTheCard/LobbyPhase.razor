@@ -89,28 +89,28 @@
                         <input type="checkbox" class="ctc-config-checkbox" @bind="GameState.Config.EnableTimers" @bind:after="NotifyConfigChanged" />
                     </label>
                     <label class="ctc-config-label">
-                        Setup Timeout (ms):
-                        <input type="number" class="ctc-config-input" @bind="GameState.Config.SetupPhaseTimeoutMs" @bind:after="NotifyConfigChanged" />
+                        Setup Timeout (s):
+                        <input type="number" step="1" class="ctc-config-input" @bind="SetupPhaseTimeoutSeconds" />
                     </label>
                     <label class="ctc-config-label">
-                        Clue Phase Timeout (ms):
-                        <input type="number" class="ctc-config-input" @bind="GameState.Config.CluePhaseTimeoutMs" @bind:after="NotifyConfigChanged" />
+                        Clue Phase Timeout (s):
+                        <input type="number" step="1" class="ctc-config-input" @bind="CluePhaseTimeoutSeconds" />
                     </label>
                     <label class="ctc-config-label">
-                        Discussion Timeout (ms):
-                        <input type="number" class="ctc-config-input" @bind="GameState.Config.DiscussionPhaseTimeoutMs" @bind:after="NotifyConfigChanged" />
+                        Discussion Timeout (s):
+                        <input type="number" step="1" class="ctc-config-input" @bind="DiscussionPhaseTimeoutSeconds" />
                     </label>
                     <label class="ctc-config-label">
-                        Vote Timeout (ms):
-                        <input type="number" class="ctc-config-input" @bind="GameState.Config.VotePhaseTimeoutMs" @bind:after="NotifyConfigChanged" />
+                        Vote Timeout (s):
+                        <input type="number" step="1" class="ctc-config-input" @bind="VotePhaseTimeoutSeconds" />
                     </label>
                     <label class="ctc-config-label">
-                        Reveal Timeout (ms):
-                        <input type="number" class="ctc-config-input" @bind="GameState.Config.RevealPhaseTimeoutMs" @bind:after="NotifyConfigChanged" />
+                        Reveal Timeout (s):
+                        <input type="number" step="1" class="ctc-config-input" @bind="RevealPhaseTimeoutSeconds" />
                     </label>
                     <label class="ctc-config-label">
-                        Informant Guess Timeout (ms):
-                        <input type="number" class="ctc-config-input" @bind="GameState.Config.InformantGuessTimeoutMs" @bind:after="NotifyConfigChanged" />
+                        Informant Guess Timeout (s):
+                        <input type="number" step="1" class="ctc-config-input" @bind="InformantGuessTimeoutSeconds" />
                     </label>
                 </div>
 

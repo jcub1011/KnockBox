@@ -20,10 +20,16 @@ namespace KnockBox.Services.Logic.Games.ConsultTheCard.FSM
     /// <summary>Any player votes to end the current game (once per elimination cycle).</summary>
     public record VoteToEndGameCommand(string PlayerId) : ConsultTheCardCommand(PlayerId);
 
+    /// <summary>Player skips the remaining discussion time.</summary>
+    public record SkipRemainingTimeCommand(string PlayerId) : ConsultTheCardCommand(PlayerId);
+
     // ── Voting ────────────────────────────────────────────────────────────────
 
-    /// <summary>Player casts a vote to eliminate the targeted player.</summary>
+    /// <summary>Player selects a target to eliminate (not yet locked in).</summary>
     public record CastVoteCommand(string PlayerId, string TargetPlayerId) : ConsultTheCardCommand(PlayerId);
+
+    /// <summary>Player locks in their selected vote.</summary>
+    public record LockInVoteCommand(string PlayerId) : ConsultTheCardCommand(PlayerId);
 
     // ── Reveal ────────────────────────────────────────────────────────────────
 
