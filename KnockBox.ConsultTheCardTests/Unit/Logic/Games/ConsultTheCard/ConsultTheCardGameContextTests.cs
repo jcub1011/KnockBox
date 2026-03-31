@@ -513,6 +513,24 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard
             Assert.AreEqual(8, _state.GameScores["p1"]);
         }
 
+        [TestMethod]
+        public void ApplyEndOfGameScoring_AccumulatesAcrossMultipleGames()
+        {
+            var p1 = AddPlayer("p1", "P1");
+            p1.Role = Role.Agent;
+
+            // Simulate Game 1 result persisted to GameScores.
+            _state.GameScores["p1"] = 5;
+
+            // Game 2: player scores +2 survived + +1 winning team.
+            var winResult = new WinConditionResult(true, Role.Agent, "Test");
+            _context.ApplyEndOfGameScoring(winResult);
+
+            // Score this game = 3, cumulative GameScores = 5 + 3 = 8.
+            Assert.AreEqual(3, p1.Score);
+            Assert.AreEqual(8, _state.GameScores["p1"]);
+        }
+
         // ── Command types ─────────────────────────────────────────────────────
 
         [TestMethod]
