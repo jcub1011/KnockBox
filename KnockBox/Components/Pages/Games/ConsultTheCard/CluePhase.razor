@@ -1,0 +1,77 @@
+@using KnockBox.Services.State.Users
+@using KnockBox.Services.State.Games.ConsultTheCard
+
+<div class="ctc-clue-area">
+    @{
+        var myId = UserService.CurrentUser?.Id ?? "";
+        var activeId = GameState.TurnOrder.Count > 0 && GameState.CurrentCluePlayerIndex < GameState.TurnOrder.Count
+            ? GameState.TurnOrder[GameState.CurrentCluePlayerIndex]
+            : "";
+        var isMyTurn = myId == activeId;
+        var activePlayerName = GameState.GamePlayers.TryGetValue(activeId, out var activePs) ? activePs.DisplayName : "...";
+    }
+
+    <div class="ctc-clue-panel">
+        <h2 class="ctc-phase-title">📝 CLUE PHASE</h2>
+
+        @* ── Turn indicator ── *@
+        <div class="ctc-turn-indicator">
+            @if (isMyTurn)
+            {
+                <span class="ctc-turn-badge ctc-turn-you">YOUR TURN</span>
+            }
+            else
+            {
+                <span class="ctc-turn-badge">@activePlayerName is giving a clue...</span>
+            }
+        </div>
+
+        @* ── Clue input (active player only) ── *@
+        @if (isMyTurn)
+        {
+            <div class="ctc-clue-input-area">
+                <input type="text" class="ctc-clue-input" placeholder="Enter a one-word clue..."
+                       @bind="_clueText" @bind:event="oninput" maxlength="50" />
+                <button class="ctc-btn ctc-btn-primary" @onclick="SubmitClue"
+                        disabled="@(string.IsNullOrWhiteSpace(_clueText))">
+                    ✏️ Submit Clue
+                </button>
+            </div>
+        }
+        else
+        {
+            <p class="ctc-waiting-text">⏳ Waiting for @activePlayerName to submit their clue...</p>
+        }
+
+        @* ── Current round clues ── *@
+        @if (GameState.CurrentRoundClues.Count > 0)
+        {
+            <div class="ctc-clue-history">
+                <h3 class="ctc-section-title">This Round's Clues</h3>
+                <div class="ctc-clue-list">
+                    @foreach (var clue in GameState.CurrentRoundClues)
+                    {
+                        <div class="ctc-clue-entry">
+                            <span class="ctc-clue-player">@clue.PlayerName</span>
+                            <span class="ctc-clue-word">@clue.Clue</span>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+
+        @* ── Previously used clues ── *@
+        @if (GameState.UsedClues.Count > 0)
+        {
+            <div class="ctc-used-clues">
+                <h3 class="ctc-section-title">Used Clues</h3>
+                <div class="ctc-used-clue-list">
+                    @foreach (var usedClue in GameState.UsedClues)
+                    {
+                        <span class="ctc-used-clue-tag">@usedClue</span>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+</div>

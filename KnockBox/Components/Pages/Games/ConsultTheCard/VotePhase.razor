@@ -1,0 +1,62 @@
+@using KnockBox.Services.State.Users
+@using KnockBox.Services.State.Games.ConsultTheCard
+
+<div class="ctc-vote-area">
+    @{
+        var myId = UserService.CurrentUser?.Id ?? "";
+        var myPlayer = GetMyPlayer();
+        bool hasVoted = myPlayer is not null && myPlayer.HasVoted;
+        var alivePlayers = GameState.GamePlayers.Values
+            .Where(p => !p.IsEliminated && p.PlayerId != myId)
+            .ToList();
+        int aliveCount = GameState.GamePlayers.Values.Count(p => !p.IsEliminated);
+        int votedCount = GameState.GamePlayers.Values.Count(p => !p.IsEliminated && p.HasVoted);
+    }
+
+    <div class="ctc-vote-panel">
+        <h2 class="ctc-phase-title">🗳️ VOTING PHASE</h2>
+
+        <div class="ctc-vote-progress-bar">
+            @votedCount / @aliveCount votes cast
+        </div>
+
+        @if (hasVoted)
+        {
+            <div class="ctc-vote-waiting">
+                <span class="ctc-lock-icon">🔒</span>
+                <p class="ctc-waiting-text">Your vote has been cast. Waiting for others...</p>
+            </div>
+        }
+        else if (myPlayer is not null && !myPlayer.IsEliminated)
+        {
+            <div class="ctc-vote-grid">
+                @foreach (var target in alivePlayers)
+                {
+                    bool isSelected = _selectedTargetId == target.PlayerId;
+                    <button class="ctc-vote-target @(isSelected ? "ctc-vote-target-selected" : "")"
+                            @onclick="() => SelectTarget(target.PlayerId)">
+                        <span class="ctc-vote-target-name">@target.DisplayName</span>
+                    </button>
+                }
+            </div>
+
+            @if (_selectedTargetId is not null)
+            {
+                var targetName = GameState.GamePlayers.TryGetValue(_selectedTargetId, out var tp) ? tp.DisplayName : "...";
+                <div class="ctc-vote-confirm">
+                    <p>Eliminate <strong>@targetName</strong>?</p>
+                    <button class="ctc-btn ctc-btn-danger" @onclick="ConfirmVote">
+                        ✅ Confirm Vote
+                    </button>
+                    <button class="ctc-btn ctc-btn-secondary" @onclick="CancelSelection">
+                        ✕ Cancel
+                    </button>
+                </div>
+            }
+        }
+        else
+        {
+            <p class="ctc-waiting-text">You have been eliminated and cannot vote.</p>
+        }
+    </div>
+</div>

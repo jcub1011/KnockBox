@@ -1,0 +1,77 @@
+@page "/room/consult-the-card/{ObfuscatedRoomCode}"
+
+@inherits DisposableComponent
+@using KnockBox.Services.State.Games.ConsultTheCard
+@using KnockBox.Services.Logic.Games.ConsultTheCard.FSM
+@using KnockBox.Core.Services.State.Games.Shared
+
+<PageTitle>Consult The Card</PageTitle>
+
+@if (GameState == null)
+{
+    <div class="ctc-loading">
+        <span class="ctc-loading-icon">🔍</span>
+        <span>Loading room...</span>
+    </div>
+}
+else
+{
+    <div class="ctc-page">
+
+        @if (GameState.Config.EnableTimers && GameState.Context?.Fsm?.CurrentState is ITimedGameState<ConsultTheCardGameContext, ConsultTheCardCommand> timedState)
+        {
+            var remaining = timedState.GetRemainingTime(GameState.Context!, DateTimeOffset.UtcNow);
+            if (remaining.IsSuccess)
+            {
+                var seconds = (int)Math.Ceiling(remaining.Value.TotalSeconds);
+                if (seconds >= 0)
+                {
+                    <div class="ctc-timer-container">
+                        <div class="ctc-timer-card @(seconds < 5 ? "ctc-timer-urgent" : "")">
+                            ⏳ @seconds
+                        </div>
+                    </div>
+                }
+            }
+        }
+
+        @* ── Error toast ── *@
+        @if (_errorMessage is not null)
+        {
+            <div @key="_errorKey" class="ctc-error-toast" @onanimationend="DismissError">
+                <span class="ctc-error-icon">⚠️</span>
+                <span>@_errorMessage</span>
+            </div>
+        }
+
+        @if (GameState.IsJoinable)
+        {
+            <LobbyPhase GameState="GameState" />
+        }
+        else
+        {
+            @switch (GameState.GamePhase)
+            {
+                case ConsultTheCardGamePhase.Setup:
+                    <SetupPhase GameState="GameState" />
+                    break;
+                case ConsultTheCardGamePhase.CluePhase:
+                    <CluePhase GameState="GameState" OnError="ShowError" />
+                    break;
+                case ConsultTheCardGamePhase.Discussion:
+                    <DiscussionPhase GameState="GameState" OnError="ShowError" />
+                    break;
+                case ConsultTheCardGamePhase.Voting:
+                    <VotePhase GameState="GameState" OnError="ShowError" />
+                    break;
+                case ConsultTheCardGamePhase.Reveal:
+                    <RevealPhase GameState="GameState" OnError="ShowError" />
+                    break;
+                case ConsultTheCardGamePhase.GameOver:
+                    <GameOverPhase GameState="GameState" />
+                    break;
+            }
+        }
+
+    </div>
+}
