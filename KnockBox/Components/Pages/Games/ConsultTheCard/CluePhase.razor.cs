@@ -19,6 +19,18 @@ namespace KnockBox.Components.Pages.Games.ConsultTheCard
 
         private string _clueText = string.Empty;
 
+        protected void OnClueInput(ChangeEventArgs e)
+        {
+            _clueText = e.Value?.ToString() ?? string.Empty;
+
+            // Store pending clue on player state so the server can auto-submit on timeout.
+            var myId = UserService.CurrentUser?.Id;
+            if (myId is not null && GameState.GamePlayers.TryGetValue(myId, out var player) && !player.HasSubmittedClue)
+            {
+                player.PendingClue = _clueText;
+            }
+        }
+
         protected void SubmitClue()
         {
             if (UserService.CurrentUser == null || string.IsNullOrWhiteSpace(_clueText)) return;

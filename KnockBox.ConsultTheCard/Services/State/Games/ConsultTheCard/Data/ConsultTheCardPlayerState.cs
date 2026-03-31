@@ -22,6 +22,12 @@ namespace KnockBox.Services.State.Games.ConsultTheCard.Data
         /// <summary>Whether this player has been eliminated in the current game.</summary>
         public bool IsEliminated { get; set; }
 
+        /// <summary>
+        /// The text currently typed in the clue input, used for auto-submit on timeout.
+        /// Updated by the UI on every keystroke so the server can submit it if the timer expires.
+        /// </summary>
+        public string? PendingClue { get; set; }
+
         /// <summary>Whether this player has submitted a clue for the current round.</summary>
         public bool HasSubmittedClue { get; set; }
 
