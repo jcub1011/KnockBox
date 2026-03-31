@@ -102,6 +102,45 @@ namespace KnockBox.Services.State.Games.Shared
                 return ValueResult<IDisposable>.FromError("You have been kicked from this lobby and cannot rejoin.", $"Player [{player.Name}] was kicked and cannot rejoin.");
             }
 
+            // Check for re-join to avoid renaming if the player is already in the lobby (by ID).
+            bool isRejoin = _players.Keys.Any(u => u.Id == player.Id);
+
+            if (!isRejoin)
+            {
+                var takenNames = _players.Keys
+                    .Concat([Host])
+                    .Select(u => u.Name)
+                    .ToHashSet();
+
+                if (takenNames.Contains(player.Name))
+                {
+                    string originalName = player.Name;
+                    int counter = 1;
+                    while (true)
+                    {
+                        // Generate suffix: (#) where # is an incrementing counter.
+                        string suffix = $" ({counter})";
+
+                        // Truncate original name to fit suffix within 12 chars.
+                        int maxBaseLength = 12 - suffix.Length;
+                        string baseName = originalName;
+                        if (baseName.Length > maxBaseLength)
+                        {
+                            baseName = baseName[..maxBaseLength];
+                        }
+
+                        string candidate = baseName + suffix;
+
+                        if (!takenNames.Contains(candidate))
+                        {
+                            player.Name = candidate;
+                            break;
+                        }
+                        counter++;
+                    }
+                }
+            }
+
             bool isNew = !_players.ContainsKey(player);
 
             // Self-reference allows the dispose closure to verify that this is still the

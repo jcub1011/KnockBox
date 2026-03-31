@@ -38,6 +38,28 @@
 
         <h2 class="ctc-phase-title">💬 DISCUSSION & VOTING</h2>
 
+        @* ── Player List ── *@
+        <div class="ctc-discussion-players">
+            <h3 class="ctc-section-title">Players</h3>
+            <div class="ctc-player-list">
+                @foreach (var ps in GameState.GamePlayers.Values.OrderBy(p => p.DisplayName))
+                {
+                    bool isMe = ps.PlayerId == myId;
+                    <div class="ctc-player-row @(isMe ? "ctc-player-me" : "") @(ps.IsEliminated ? "ctc-player-eliminated" : "")">
+                        <span class="ctc-player-name">@ps.DisplayName</span>
+                        @if (ps.IsEliminated)
+                        {
+                            <span class="ctc-status-badge ctc-status-eliminated">ELIMINATED</span>
+                        }
+                        else if (ps.HasVoted)
+                        {
+                            <span class="ctc-status-badge ctc-status-voted">READY</span>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+
         @* ── Clue History ── *@
         <div class="ctc-discussion-clues">
             <h3 class="ctc-section-title">Clue History</h3>
