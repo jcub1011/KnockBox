@@ -127,5 +127,68 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard.States
             Assert.IsTrue(result.IsSuccess);
             Assert.IsNull(result.Value);
         }
+
+        [TestMethod]
+        public void OnEnter_SetsWordPairOnAllPlayers()
+        {
+            var setupState = new SetupState();
+            setupState.OnEnter(_context);
+
+            foreach (var ps in _state.GamePlayers.Values)
+            {
+                if (ps.Role == Role.Informant)
+                    continue; // Informant has null SecretWord.
+                Assert.IsNotNull(ps.SecretWord, $"Player {ps.PlayerId} (role={ps.Role}) should have a SecretWord.");
+            }
+        }
+
+        [TestMethod]
+        public void OnEnter_InformantGetsNullSecretWord()
+        {
+            // 5 players gives distribution 3 Agents/1 Insider/1 Informant.
+            var setupState = new SetupState();
+            setupState.OnEnter(_context);
+
+            var informants = _state.GamePlayers.Values.Where(p => p.Role == Role.Informant).ToList();
+            Assert.IsTrue(informants.Count > 0, "5 players should have at least 1 Informant.");
+
+            foreach (var informant in informants)
+            {
+                Assert.IsNull(informant.SecretWord, $"Informant {informant.PlayerId} should have null SecretWord.");
+            }
+        }
+
+        [TestMethod]
+        [DataRow(4)]
+        [DataRow(5)]
+        [DataRow(6)]
+        [DataRow(7)]
+        [DataRow(8)]
+        public void OnEnter_AssignsRolesMatchingScalingTable(int playerCount)
+        {
+            // Reconstruct state with the given player count.
+            _state.GamePlayers.Clear();
+            _state.TurnOrder.Clear();
+            for (int i = 0; i < playerCount; i++)
+            {
+                _state.GamePlayers[$"p{i}"] = new ConsultTheCardPlayerState
+                {
+                    PlayerId = $"p{i}",
+                    DisplayName = $"Player {i}"
+                };
+                _state.TurnOrder.Add($"p{i}");
+            }
+
+            var setupState = new SetupState();
+            setupState.OnEnter(_context);
+
+            var (expectedAgents, expectedInsiders, expectedInformants) =
+                ConsultTheCardGameContext.GetRoleDistribution(playerCount);
+
+            var players = _state.GamePlayers.Values.ToList();
+            Assert.AreEqual(expectedAgents, players.Count(p => p.Role == Role.Agent));
+            Assert.AreEqual(expectedInsiders, players.Count(p => p.Role == Role.Insider));
+            Assert.AreEqual(expectedInformants, players.Count(p => p.Role == Role.Informant));
+        }
     }
 }

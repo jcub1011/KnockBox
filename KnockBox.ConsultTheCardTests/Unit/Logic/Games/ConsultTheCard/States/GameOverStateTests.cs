@@ -262,5 +262,35 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard.States
             Assert.IsNotNull(_state.WinResult);
             Assert.IsTrue(_state.WinResult.GameOver);
         }
+
+        [TestMethod]
+        public void MultiGame_CumulativeScoresTrackedCorrectly()
+        {
+            _state.Config.TotalGames = 3;
+            _state.WinResult = new WinConditionResult(true, Role.Agent, "Test");
+
+            // Game 1: Apply scoring.
+            var gameOver1 = new GameOverState();
+            gameOver1.OnEnter(_context);
+
+            // p0: Agent, alive → +2 + +1 = 3. GameScores["p0"] = 3.
+            int game1Score = _state.GameScores.GetValueOrDefault("p0", 0);
+            Assert.IsTrue(game1Score > 0, "Game 1 score should be > 0.");
+
+            // Start next game → resets player Score but preserves GameScores.
+            gameOver1.HandleCommand(_context, new StartNextGameCommand("host-id"));
+            Assert.AreEqual(0, _state.GamePlayers["p0"].Score, "Player score should reset after StartNextGame.");
+            Assert.AreEqual(game1Score, _state.GameScores["p0"], "GameScores should be preserved after StartNextGame.");
+
+            // Simulate Game 2: reassign roles (setup happens via SetupState transition).
+            // Manually set WinResult for next GameOver.
+            _state.WinResult = new WinConditionResult(true, Role.Agent, "Test2");
+
+            var gameOver2 = new GameOverState();
+            gameOver2.OnEnter(_context);
+
+            int game2Cumulative = _state.GameScores.GetValueOrDefault("p0", 0);
+            Assert.IsTrue(game2Cumulative > game1Score, "Cumulative scores should increase across games.");
+        }
     }
 }
