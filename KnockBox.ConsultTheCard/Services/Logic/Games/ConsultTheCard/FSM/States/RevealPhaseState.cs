@@ -19,9 +19,6 @@ namespace KnockBox.Services.Logic.Games.ConsultTheCard.FSM.States
         {
             context.State.GamePhase = ConsultTheCardGamePhase.Reveal;
 
-            // Apply per-cycle scoring before anything else.
-            context.ApplyCycleScoring();
-
             var elimination = context.State.LastElimination;
 
             if (elimination is not null && !elimination.WasTie)

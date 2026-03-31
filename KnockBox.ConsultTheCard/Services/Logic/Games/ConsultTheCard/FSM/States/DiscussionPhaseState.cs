@@ -209,10 +209,10 @@ namespace KnockBox.Services.Logic.Games.ConsultTheCard.FSM.States
                     "DiscussionPhase: [{pid}] did not lock in vote; abstaining.", player.PlayerId);
             }
 
-            // Apply per-cycle scoring.
-            context.ApplyCycleScoring();
-
             string? eliminatedId = context.TallyVotes();
+
+            // Apply per-cycle scoring.
+            context.ApplyCycleScoring(eliminatedId);
 
             if (eliminatedId is not null)
             {

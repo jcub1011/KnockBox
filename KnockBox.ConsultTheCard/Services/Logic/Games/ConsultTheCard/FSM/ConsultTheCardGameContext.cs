@@ -279,20 +279,56 @@ namespace KnockBox.Services.Logic.Games.ConsultTheCard.FSM
         // ── Scoring ───────────────────────────────────────────────────────────
 
         /// <summary>
-        /// Per-cycle scoring: −1 for each player who voted for an Agent.
+        /// Per-cycle scoring:
+        /// Agents: −1 for voting for an Agent.
+        /// Insiders/Informants: +1 for surviving the round.
         /// Must be called <b>before</b> <see cref="ResetEliminationCycleState"/>.
         /// </summary>
-        public void ApplyCycleScoring()
+        public void ApplyCycleScoring(string? eliminatedId)
         {
             foreach (var voter in GetAlivePlayers().Where(p => p.HasVoted && p.VoteTargetId is not null))
             {
-                var target = GetPlayer(voter.VoteTargetId!);
-                if (target is not null && target.Role == Role.Agent)
+                if (voter.Role == Role.Agent)
                 {
-                    voter.Score -= 1;
-                    Logger.LogInformation(
-                        "ApplyCycleScoring: [{voter}] voted for Agent [{target}]; −1 point.",
-                        voter.PlayerId, target.PlayerId);
+                    var target = GetPlayer(voter.VoteTargetId!);
+                    if (target is not null)
+                    {
+                        if (target.Role == Role.Agent)
+                        {
+                            voter.Score -= 1;
+                            Logger.LogInformation(
+                                "ApplyCycleScoring: Agent [{voter}] voted for Agent [{target}]; −1 point.",
+                                voter.PlayerId, target.PlayerId);
+                        }
+                        else if (target.Role == Role.Insider || target.Role == Role.Informant)
+                        {
+                            voter.Score += 1;
+                            Logger.LogInformation(
+                                "ApplyCycleScoring: Agent [{voter}] correctly voted for [{role}] [{target}]; +1 point.",
+                                voter.PlayerId, target.Role, target.PlayerId);
+                        }
+                    }
+                }
+            }
+
+            foreach (var player in GetAlivePlayers())
+            {
+                if (player.Role == Role.Insider || player.Role == Role.Informant)
+                {
+                    if (player.PlayerId == eliminatedId)
+                    {
+                        player.Score -= 1;
+                        Logger.LogInformation(
+                            "ApplyCycleScoring: [{role}] [{id}] was voted out; −1 point.",
+                            player.Role, player.PlayerId);
+                    }
+                    else
+                    {
+                        player.Score += 1;
+                        Logger.LogInformation(
+                            "ApplyCycleScoring: [{role}] [{id}] survived the round; +1 point.",
+                            player.Role, player.PlayerId);
+                    }
                 }
             }
         }
