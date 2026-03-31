@@ -28,11 +28,18 @@ namespace KnockBox.Components.Pages.Games.ConsultTheCard
         {
             if (UserService.CurrentUser == null) return;
 
+            var myPlayer = GetMyPlayer();
+            if (myPlayer is not null && myPlayer.HasVotedToEndGame)
+            {
+                _ = OnError.InvokeAsync("You have already voted to end the game this round.");
+                return;
+            }
+
             var result = GameEngine.VoteToEndGame(UserService.CurrentUser, GameState);
             if (result.TryGetFailure(out var error))
             {
                 Logger.LogError("Failed to vote to end game: {Error}", error);
-                _ = OnError.InvokeAsync("You have already voted to end the game this round.");
+                _ = OnError.InvokeAsync("Action not available right now.");
             }
         }
 

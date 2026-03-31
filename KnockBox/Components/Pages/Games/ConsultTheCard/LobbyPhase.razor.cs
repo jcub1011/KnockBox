@@ -24,7 +24,7 @@ namespace KnockBox.Components.Pages.Games.ConsultTheCard
         {
             if (string.IsNullOrWhiteSpace(userId))
             {
-                Logger.LogWarning("Unable to kick provided user as it is null/whitespace.");
+                Logger.LogWarning("Cannot kick player: user ID is null or empty.");
                 return;
             }
 
