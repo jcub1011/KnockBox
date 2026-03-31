@@ -163,6 +163,28 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard
             Assert.AreEqual(4, state.TurnOrder.Count);
         }
 
+        [TestMethod]
+        public async Task StartAsync_WithTooFewPlayers_CanStartReturnsFalse()
+        {
+            // Create state with only 3 players (min is 4).
+            var state = await CreateStateWithPlayersAsync(3);
+
+            var canStart = await _engine.CanStartAsync(state);
+
+            Assert.IsFalse(canStart, "CanStartAsync should return false with fewer than 4 players.");
+        }
+
+        [TestMethod]
+        public async Task StartAsync_WithTooManyPlayers_CanStartReturnsFalse()
+        {
+            // Create state with 9 players (max is 8).
+            var state = await CreateStateWithPlayersAsync(9);
+
+            var canStart = await _engine.CanStartAsync(state);
+
+            Assert.IsFalse(canStart, "CanStartAsync should return false with more than 8 players.");
+        }
+
         // ── UI methods before game start return errors ────────────────────────
 
         [TestMethod]

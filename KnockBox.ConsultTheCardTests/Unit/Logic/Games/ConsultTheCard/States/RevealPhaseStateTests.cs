@@ -262,5 +262,86 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard.States
             Assert.IsTrue(result.IsSuccess);
             Assert.IsInstanceOfType<GameOverState>(result.Value);
         }
+
+        [TestMethod]
+        public void HandleCommand_InformantWrongGuess_TwoRemaining_TransitionsToGameOver()
+        {
+            // Remove p2 and p3 from game state, add p4 as Informant.
+            // Remaining: p0 (Agent), p1 (Agent), p4 (Informant).
+            _state.GamePlayers.TryRemove("p2", out _);
+            _state.TurnOrder.Remove("p2");
+            _state.GamePlayers.TryRemove("p3", out _);
+            _state.TurnOrder.Remove("p3");
+            AddPlayer("p4", "Player 4", Role.Informant, null);
+
+            // p4 (Informant) is eliminated; p0 and p1 remain alive.
+            _state.GamePlayers["p4"].IsEliminated = true;
+            _state.LastElimination = new EliminationResult("p4", "Player 4", Role.Informant, WasTie: false);
+
+            var reveal = new RevealPhaseState();
+            reveal.OnEnter(_context);
+
+            Assert.IsTrue(_state.AwaitingInformantGuess);
+
+            // Wrong guess — only 2 alive players (p0, p1) remain → game should end.
+            var result = reveal.HandleCommand(_context, new InformantGuessCommand("p4", "WrongWord"));
+            Assert.IsTrue(result.IsSuccess);
+            Assert.IsInstanceOfType<GameOverState>(result.Value);
+        }
+
+        [TestMethod]
+        public void OnEnter_LastInsiderEliminated_MoreThanTwoRemaining_GameContinues()
+        {
+            // 4 players: p0 (Agent), p1 (Agent), p2 (Insider, eliminated), p3 (Agent).
+            // 3 alive after elimination — game should continue.
+            _state.GamePlayers["p2"].IsEliminated = true;
+            _state.LastElimination = new EliminationResult("p2", "Player 2", Role.Insider, WasTie: false);
+
+            var reveal = new RevealPhaseState();
+            var result = reveal.OnEnter(_context);
+
+            Assert.IsTrue(result.IsSuccess);
+            Assert.IsNull(result.Value, "Game should continue when >2 players alive after Insider eliminated.");
+        }
+
+        [TestMethod]
+        public void Tick_AwaitingInformantGuess_Timeout_TwoRemaining_TransitionsToGameOver()
+        {
+            // Set up: 3 players total, Informant eliminated, 2 alive remain.
+            _state.GamePlayers.TryRemove("p2", out _);
+            _state.TurnOrder.Remove("p2");
+            _state.GamePlayers.TryRemove("p3", out _);
+            _state.TurnOrder.Remove("p3");
+            AddPlayer("p4", "Player 4", Role.Informant, null);
+
+            _state.GamePlayers["p4"].IsEliminated = true;
+            _state.LastElimination = new EliminationResult("p4", "Player 4", Role.Informant, WasTie: false);
+
+            var reveal = new RevealPhaseState();
+            reveal.OnEnter(_context);
+
+            Assert.IsTrue(_state.AwaitingInformantGuess);
+
+            // Timeout → forfeit → only 2 alive → game over.
+            var result = reveal.Tick(_context, DateTimeOffset.UtcNow.AddMinutes(5));
+            Assert.IsTrue(result.IsSuccess);
+            Assert.IsInstanceOfType<GameOverState>(result.Value);
+        }
+
+        [TestMethod]
+        public void OnEnter_PerCycleScoringApplied_OnBothEliminationAndTie()
+        {
+            // Test that scoring is applied for a real elimination too.
+            _state.GamePlayers["p2"].HasVoted = true;
+            _state.GamePlayers["p2"].VoteTargetId = "p0"; // Agent
+            _state.GamePlayers["p3"].IsEliminated = true;
+            _state.LastElimination = new EliminationResult("p3", "Player 3", Role.Agent, WasTie: false);
+
+            var reveal = new RevealPhaseState();
+            reveal.OnEnter(_context);
+
+            // p2 (Insider) voted for Agent p0 → −1 score, applied for elimination case too.
+            Assert.AreEqual(-1, _state.GamePlayers["p2"].Score);
+        }
     }
 }

@@ -553,5 +553,36 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard
                 Assert.AreEqual("p1", cmd.PlayerId);
             }
         }
+
+        [TestMethod]
+        public void SelectWordPair_WorksWithVariableSizeGroups()
+        {
+            // Provide groups with 2, 3, and 5 words.
+            _context.WordBank = [
+                new WordGroup(["A", "B"]),
+                new WordGroup(["C", "D", "E"]),
+                new WordGroup(["F", "G", "H", "I", "J"]),
+            ];
+
+            int callCount = 0;
+            _randomMock
+                .Setup(r => r.GetRandomInt(It.IsAny<int>(), It.IsAny<RandomType>()))
+                .Returns((int max, RandomType _) =>
+                {
+                    callCount++;
+                    return callCount % 2 == 0 ? 1 % max : 0;
+                });
+
+            // All three groups should be selectable.
+            for (int i = 0; i < 3; i++)
+            {
+                var (agentWord, insiderWord) = _context.SelectWordPair();
+                Assert.IsFalse(string.IsNullOrWhiteSpace(agentWord));
+                Assert.IsFalse(string.IsNullOrWhiteSpace(insiderWord));
+                Assert.AreNotEqual(agentWord, insiderWord);
+            }
+
+            Assert.AreEqual(3, _context.UsedWordPairIndices.Count);
+        }
     }
 }
