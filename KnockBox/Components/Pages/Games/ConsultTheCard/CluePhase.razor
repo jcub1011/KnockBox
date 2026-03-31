@@ -3,13 +3,15 @@
 
 <div class="ctc-clue-area">
     @{
-        var myId = UserService.CurrentUser?.Id ?? "";
+        var myId = UserService.CurrentUser?.Id ?? string.Empty;
+        GameState.GamePlayers.TryGetValue(myId, out var playerState);
         var activeId = GameState.TurnOrder.Count > 0 && GameState.CurrentCluePlayerIndex < GameState.TurnOrder.Count
             ? GameState.TurnOrder[GameState.CurrentCluePlayerIndex]
             : "";
         var isMyTurn = myId == activeId;
         var activePlayerName = GameState.GamePlayers.TryGetValue(activeId, out var activePs) ? activePs.DisplayName : "...";
-        bool isEliminated = GameState.GamePlayers.TryGetValue(myId, out var playerState) ? playerState.IsEliminated : true;
+
+        bool isEliminated = !(myId == GameState.Host.Id || (playerState is not null && !playerState.IsEliminated));
     }
 
     <div class="ctc-clue-panel">

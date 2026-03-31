@@ -17,6 +17,16 @@ namespace KnockBox.Components.Pages.Home
         [Inject] IGameSessionService GameSessionService { get; set; } = default!;
         [Inject] ILogger<Home> Logger { get; set; } = default!;
 
+        [Parameter]
+        [SupplyParameterFromQuery(Name = "join")]
+        public string? JoinCode { get; set; }
+
+        [Parameter]
+        [SupplyParameterFromQuery(Name = "fresh")]
+        public int? Fresh { get; set; }
+
+        private static readonly Random _random = new();
+
         private string? LobbyCode { get; set; }
 
         private string? _playerName;
@@ -48,7 +58,24 @@ namespace KnockBox.Components.Pages.Home
             {
                 if (UserService.CurrentUser is null)
                     await UserService.InitializeCurrentUserAsync(ComponentDetached);
+
+                if (Fresh == 1)
+                {
+                    await UserService.ResetIdentityAsync(ComponentDetached);
+                }
+                
                 await base.OnInitializedAsync();
+
+                if (!string.IsNullOrWhiteSpace(JoinCode))
+                {
+                    // If the user has no name, give them a random one for testing convenience.
+                    if (UserService.CurrentUser is not null && (string.IsNullOrWhiteSpace(UserService.CurrentUser.Name) || UserService.CurrentUser.Name == "Not Set"))
+                    {
+                        PlayerName = $"Tester {_random.Next(1000, 9999)}";
+                    }
+
+                    await JoinLobby(JoinCode);
+                }
             }
             catch (Exception ex)
             {
