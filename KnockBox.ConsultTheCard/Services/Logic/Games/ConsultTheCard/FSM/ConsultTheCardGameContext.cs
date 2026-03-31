@@ -1,4 +1,5 @@
 using KnockBox.Core.Services.State.Games.Shared;
+using KnockBox.Services.Logic.Games.ConsultTheCard.Data;
 using KnockBox.Services.Logic.RandomGeneration;
 using KnockBox.Services.State.Games.ConsultTheCard;
 using KnockBox.Services.State.Games.ConsultTheCard.Data;
@@ -12,24 +13,6 @@ namespace KnockBox.Services.Logic.Games.ConsultTheCard.FSM
     /// </summary>
     public class ConsultTheCardGameContext
     {
-        /// <summary>
-        /// Stub word bank used until Milestone 7 provides a CSV-backed implementation.
-        /// Each entry is a <see cref="WordGroup"/> containing 2+ thematically related words.
-        /// </summary>
-        private static readonly IReadOnlyList<WordGroup> DefaultWordBank =
-        [
-            new(["Ocean", "Lake"]),
-            new(["Guitar", "Violin"]),
-            new(["Castle", "Fortress"]),
-            new(["Sunrise", "Sunset"]),
-            new(["Astronaut", "Pilot"]),
-            new(["Mountain", "Hill"]),
-            new(["Sword", "Shield"]),
-            new(["Piano", "Organ"]),
-            new(["Forest", "Jungle"]),
-            new(["Candle", "Torch"]),
-        ];
-
         public ConsultTheCardGameContext(
             ConsultTheCardGameState state,
             IRandomNumberService rng,
@@ -38,6 +21,7 @@ namespace KnockBox.Services.Logic.Games.ConsultTheCard.FSM
             State = state;
             Rng = rng;
             Logger = logger;
+            WordBank = Data.WordBank.Load(logger);
         }
 
         // ── Core references ───────────────────────────────────────────────────
@@ -61,10 +45,9 @@ namespace KnockBox.Services.Logic.Games.ConsultTheCard.FSM
         public HashSet<int> UsedWordPairIndices { get; } = [];
 
         /// <summary>
-        /// The word bank providing word groups. Defaults to a hardcoded stub;
-        /// replace with a CSV-backed implementation in Milestone 7.
+        /// The word bank providing word groups, loaded from <c>WordPairs.csv</c>.
         /// </summary>
-        public IReadOnlyList<WordGroup> WordBank { get; set; } = DefaultWordBank;
+        public IReadOnlyList<WordGroup> WordBank { get; set; } = [];
 
         // ── Convenience accessors (delegate to State) ─────────────────────────
 
