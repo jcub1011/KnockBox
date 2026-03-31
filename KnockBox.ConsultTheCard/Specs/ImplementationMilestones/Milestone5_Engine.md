@@ -37,15 +37,17 @@ Implement `ConsultTheCardGameEngine` as the singleton entry point that wires up 
 - `Tick(context, now)` -- wraps FSM tick inside `state.Execute()`, always called regardless of `EnableTimers`
 
 ### 5.6 Public UI Methods
-All follow `TryGetContext` -> create command -> `ProcessCommand` pattern:
+Most follow `TryGetContext` -> create command -> `ProcessCommand` pattern:
 - `SubmitClue(User player, ConsultTheCardGameState state, string clue)`
 - `CastVote(User player, ConsultTheCardGameState state, string targetPlayerId)`
 - `InformantGuess(User player, ConsultTheCardGameState state, string guessedWord)`
 - `AdvanceToVote(User player, ConsultTheCardGameState state)`
 - `VoteToEndGame(User player, ConsultTheCardGameState state)`
 - `StartNextGame(User player, ConsultTheCardGameState state)`
+
+**Exceptions** (handle logic inline because they null out or recreate the context, making the FSM command pattern inapplicable):
 - `ReturnToLobby(User host, ConsultTheCardGameState state)` -- host only, sets joinable, clears context
-- `ResetGame(User host, ConsultTheCardGameState state)` -- host only, full reset
+- `ResetGame(User host, ConsultTheCardGameState state)` -- host only, full reset with fresh context/FSM
 
 ### 5.7 `HandlePlayerLeft(User player, ConsultTheCardGameState state)`
 - Remove from turn order

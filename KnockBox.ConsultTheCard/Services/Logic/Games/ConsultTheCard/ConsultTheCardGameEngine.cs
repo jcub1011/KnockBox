@@ -191,6 +191,7 @@ namespace KnockBox.Services.Logic.Games.ConsultTheCard
                 state.LastInformantGuess = null;
                 state.AwaitingInformantGuess = false;
                 state.WinResult = null;
+                state.CurrentGameNumber = 1;
                 state.EndGameVoteStatus = new EndGameVoteStatus([], 0);
                 state.GameScores.Clear();
                 state.UpdateJoinableStatus(true);
@@ -294,7 +295,8 @@ namespace KnockBox.Services.Logic.Games.ConsultTheCard
                     "Player [{id}] left the game. TurnOrder now has {n} player(s).",
                     player.Id, state.TurnOrder.Count);
 
-                // If during VotePhase: void any votes cast for the disconnected player.
+                // If during VotePhase: void any votes cast for the disconnected player
+                // and remove the disconnected player's own outbound vote.
                 if (state.GamePhase == ConsultTheCardGamePhase.Voting)
                 {
                     foreach (var ps in context.GetAlivePlayers())
@@ -307,6 +309,14 @@ namespace KnockBox.Services.Logic.Games.ConsultTheCard
                                 "HandlePlayerLeft: voided vote from [{voter}] targeting disconnected [{target}].",
                                 ps.PlayerId, player.Id);
                         }
+                    }
+
+                    // Remove the disconnected player's own vote entry and state.
+                    state.CurrentRoundVotes.RemoveAll(v => v.VoterId == player.Id);
+                    if (playerState is not null)
+                    {
+                        playerState.HasVoted = false;
+                        playerState.VoteTargetId = null;
                     }
                 }
 
