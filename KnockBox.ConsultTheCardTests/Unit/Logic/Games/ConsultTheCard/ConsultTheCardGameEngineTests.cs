@@ -359,11 +359,9 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard
             // Set the current clue player to index 3
             state.CurrentCluePlayerIndex = 3;
             // Remove player at index 1 (before current)
-            var leavingPlayer = new User(state.TurnOrder[1], state.TurnOrder[1]);
+            string leavingPlayerId = state.TurnOrder[1];
 
-            _engine.HandlePlayerLeft(
-                new User("dummy", state.TurnOrder[1]),
-                state);
+            _engine.HandlePlayerLeft(new User(leavingPlayerId, leavingPlayerId), state);
 
             Assert.AreEqual(2, state.CurrentCluePlayerIndex);
         }
