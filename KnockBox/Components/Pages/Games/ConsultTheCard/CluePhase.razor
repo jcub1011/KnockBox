@@ -5,9 +5,7 @@
     @{
         var myId = UserService.CurrentUser?.Id ?? string.Empty;
         GameState.GamePlayers.TryGetValue(myId, out var playerState);
-        var activeId = GameState.TurnOrder.Count > 0 && GameState.CurrentCluePlayerIndex < GameState.TurnOrder.Count
-            ? GameState.TurnOrder[GameState.CurrentCluePlayerIndex]
-            : "";
+        var activeId = GameState.TurnManager.CurrentPlayer ?? "";
         var isMyTurn = myId == activeId;
         var activePlayerName = GameState.GamePlayers.TryGetValue(activeId, out var activePs) ? activePs.DisplayName : "...";
 

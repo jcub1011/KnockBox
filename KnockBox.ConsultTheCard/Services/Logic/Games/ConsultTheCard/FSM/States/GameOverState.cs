@@ -18,7 +18,7 @@ namespace KnockBox.Services.Logic.Games.ConsultTheCard.FSM.States
             context.State.WinResult ??= context.CheckWinConditions();
 
             context.ApplyEndOfGameScoring(context.State.WinResult);
-            context.State.GamePhase = ConsultTheCardGamePhase.GameOver;
+            context.State.SetPhase(ConsultTheCardGamePhase.GameOver);
 
             context.Logger.LogInformation(
                 "FSM → GameOverState (game {num}, winner: {team})",
@@ -67,11 +67,12 @@ namespace KnockBox.Services.Logic.Games.ConsultTheCard.FSM.States
                 ps.VoteTargetId = null;
                 ps.HasVoted = false;
                 ps.HasVotedToEndGame = false;
+                ps.Score = 0;
             }
 
             // Reset game-level state.
             context.State.CurrentEliminationCycle = 0;
-            context.State.CurrentCluePlayerIndex = 0;
+            context.State.TurnManager.SetCurrentPlayerIndex(0);
             context.State.CurrentWordPair = null;
             context.State.CurrentRoundClues.Clear();
             context.State.CurrentRoundVotes.Clear();
@@ -83,7 +84,7 @@ namespace KnockBox.Services.Logic.Games.ConsultTheCard.FSM.States
             context.State.EndGameVoteStatus = new EndGameVoteStatus([], 0);
 
             // Re-randomize TurnOrder.
-            var turnOrder = context.State.TurnOrder;
+            var turnOrder = context.State.TurnManager.TurnOrder;
             for (int i = turnOrder.Count - 1; i > 0; i--)
             {
                 int j = context.Rng.GetRandomInt(0, i + 1);

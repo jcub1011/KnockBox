@@ -36,7 +36,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
         {
             var player = new PlayerState { PlayerId = id, DisplayName = name };
             _state.GamePlayers[id] = player;
-            _state.TurnOrder.Add(id);
+            _state.TurnManager.TurnOrder.Add(id);
             return player;
         }
 
@@ -45,7 +45,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
         {
             var source = AddPlayer("src", "Source");
             var target = AddPlayer("tgt", "Target");
-            _state.CurrentPlayerIndex = 0;
+            _state.TurnManager.SetCurrentPlayerIndex(0);
 
             // source.Pot = [1, 2, 3], target.Pot = [4, 5, 6]
             source.Pot.AddRange([1, 2, 3]);
@@ -72,7 +72,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
         {
             var source = AddPlayer("src", "Source");
             var target = AddPlayer("tgt", "Target");
-            _state.CurrentPlayerIndex = 0;
+            _state.TurnManager.SetCurrentPlayerIndex(0);
 
             source.Pot.AddRange([7, 8]);
             target.Pot.AddRange([9, 10]);
@@ -98,7 +98,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
         {
             var source = AddPlayer("src", "Source");
             var target = AddPlayer("tgt", "Target");
-            _state.CurrentPlayerIndex = 0;
+            _state.TurnManager.SetCurrentPlayerIndex(0);
             source.Pot.AddRange([1, 2]);
             target.Pot.AddRange([3, 4]);
             target.ActionHand.Add(new ActionCard(ActionType.Compd));
@@ -120,7 +120,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
         {
             var source = AddPlayer("src", "Source");
             var target = AddPlayer("tgt", "Target");
-            _state.CurrentPlayerIndex = 0;
+            _state.TurnManager.SetCurrentPlayerIndex(0);
             source.Pot.Add(1);
             target.Pot.Add(2);
             target.ActionHand.Add(new ActionCard(ActionType.Compd));
@@ -139,7 +139,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
         {
             AddPlayer("src", "Source");
             AddPlayer("tgt", "Target");
-            _state.CurrentPlayerIndex = 0;
+            _state.TurnManager.SetCurrentPlayerIndex(0);
 
             var actionCard = new ActionCard(ActionType.Skim);
             var fsmState = new SkimState("src", "tgt", actionCard);
@@ -155,7 +155,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
         {
             var source = AddPlayer("src", "Source");
             var target = AddPlayer("tgt", "Target");
-            _state.CurrentPlayerIndex = 0;
+            _state.TurnManager.SetCurrentPlayerIndex(0);
             source.Pot.AddRange([1, 2, 3]);
             target.Pot.AddRange([4, 5, 6]);
 
@@ -177,7 +177,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
         {
             var source = AddPlayer("src", "Source");
             var target = AddPlayer("tgt", "Target");
-            _state.CurrentPlayerIndex = 0;
+            _state.TurnManager.SetCurrentPlayerIndex(0);
             source.Pot.AddRange([1, 2]);
             target.Pot.AddRange([3, 4]);
 

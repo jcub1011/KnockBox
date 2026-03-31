@@ -48,7 +48,7 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard.States
                 Role = role,
                 SecretWord = role == Role.Agent ? "Ocean" : "Lake"
             };
-            _state.TurnOrder.Add(id);
+            _state.TurnManager.TurnOrder.Add(id);
         }
 
         [TestMethod]
@@ -56,7 +56,7 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard.States
         {
             var voteState = new VotePhaseState();
             voteState.OnEnter(_context);
-            Assert.AreEqual(ConsultTheCardGamePhase.Voting, _state.GamePhase);
+            Assert.AreEqual(ConsultTheCardGamePhase.Voting, _state.Phase);
         }
 
         [TestMethod]

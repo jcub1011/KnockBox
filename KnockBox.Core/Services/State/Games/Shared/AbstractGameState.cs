@@ -19,6 +19,14 @@ namespace KnockBox.Services.State.Games.Shared
         private int _disposed;
 
         /// <summary>
+        /// Notifies all subscribers that the state has changed.
+        /// </summary>
+        protected void NotifyStateChanged()
+        {
+            StateChangedEventManager.Notify();
+        }
+
+        /// <summary>
         /// The UTC time when this state was created.
         /// </summary>
         public DateTime CreatedAt { get; } = DateTime.UtcNow;

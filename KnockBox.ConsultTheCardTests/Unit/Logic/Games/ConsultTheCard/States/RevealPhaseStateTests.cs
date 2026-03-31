@@ -50,7 +50,7 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard.States
                 Role = role,
                 SecretWord = secretWord
             };
-            _state.TurnOrder.Add(id);
+            _state.TurnManager.TurnOrder.Add(id);
         }
 
         [TestMethod]
@@ -61,7 +61,7 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard.States
 
             var reveal = new RevealPhaseState();
             reveal.OnEnter(_context);
-            Assert.AreEqual(ConsultTheCardGamePhase.Reveal, _state.GamePhase);
+            Assert.AreEqual(ConsultTheCardGamePhase.Reveal, _state.Phase);
         }
 
         [TestMethod]
@@ -75,8 +75,8 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard.States
             var reveal = new RevealPhaseState();
             reveal.OnEnter(_context);
 
-            // p2 (Insider) voted for Agent → −1 score.
-            Assert.AreEqual(-1, _state.GamePlayers["p2"].Score);
+            // p2 (Insider) survives round → +1 score. Note: only Agents lose points for voting for an Agent.
+            Assert.AreEqual(1, _state.GamePlayers["p2"].Score);
         }
 
         [TestMethod]
@@ -113,7 +113,7 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard.States
         {
             // Start with 3 players, eliminate one to get to 2.
             _state.GamePlayers.TryRemove("p3", out _);
-            _state.TurnOrder.Remove("p3");
+            _state.TurnManager.TurnOrder.Remove("p3");
             _state.GamePlayers["p2"].IsEliminated = true;
             _state.LastElimination = new EliminationResult("p2", "Player 2", Role.Insider, WasTie: false);
 
@@ -269,9 +269,9 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard.States
             // Remove p2 and p3 from game state, add p4 as Informant.
             // Remaining: p0 (Agent), p1 (Agent), p4 (Informant).
             _state.GamePlayers.TryRemove("p2", out _);
-            _state.TurnOrder.Remove("p2");
+            _state.TurnManager.TurnOrder.Remove("p2");
             _state.GamePlayers.TryRemove("p3", out _);
-            _state.TurnOrder.Remove("p3");
+            _state.TurnManager.TurnOrder.Remove("p3");
             AddPlayer("p4", "Player 4", Role.Informant, null);
 
             // p4 (Informant) is eliminated; p0 and p1 remain alive.
@@ -309,9 +309,9 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard.States
         {
             // Set up: 3 players total, Informant eliminated, 2 alive remain.
             _state.GamePlayers.TryRemove("p2", out _);
-            _state.TurnOrder.Remove("p2");
+            _state.TurnManager.TurnOrder.Remove("p2");
             _state.GamePlayers.TryRemove("p3", out _);
-            _state.TurnOrder.Remove("p3");
+            _state.TurnManager.TurnOrder.Remove("p3");
             AddPlayer("p4", "Player 4", Role.Informant, null);
 
             _state.GamePlayers["p4"].IsEliminated = true;
@@ -340,8 +340,8 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard.States
             var reveal = new RevealPhaseState();
             reveal.OnEnter(_context);
 
-            // p2 (Insider) voted for Agent p0 → −1 score, applied for elimination case too.
-            Assert.AreEqual(-1, _state.GamePlayers["p2"].Score);
+            // p2 (Insider) survives the round since they weren't eliminated → +1 score.
+            Assert.AreEqual(1, _state.GamePlayers["p2"].Score);
         }
     }
 }

@@ -64,17 +64,17 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard
 
             // Advance to CluePhase by ticking past setup timeout.
             _engine.Tick(context, DateTimeOffset.UtcNow.AddSeconds(10));
-            Assert.AreEqual(ConsultTheCardGamePhase.CluePhase, state.GamePhase);
+            Assert.AreEqual(ConsultTheCardGamePhase.CluePhase, state.Phase);
 
             // Identify the current clue giver.
-            string currentClueGiverId = state.TurnOrder[state.CurrentCluePlayerIndex];
+            string currentClueGiverId = state.TurnManager.TurnOrder[state.TurnManager.CurrentPlayerIndex];
 
             // Remove the current clue giver.
             _engine.HandlePlayerLeft(new User("dummy", currentClueGiverId), state);
 
             // Game should still be in CluePhase (re-entered) and the index should point to an alive player.
-            Assert.AreEqual(ConsultTheCardGamePhase.CluePhase, state.GamePhase);
-            string newClueGiverId = state.TurnOrder[state.CurrentCluePlayerIndex];
+            Assert.AreEqual(ConsultTheCardGamePhase.CluePhase, state.Phase);
+            string newClueGiverId = state.TurnManager.TurnOrder[state.TurnManager.CurrentPlayerIndex];
             var newPlayer = context.GetPlayer(newClueGiverId);
             Assert.IsNotNull(newPlayer);
             Assert.IsFalse(newPlayer.IsEliminated);
@@ -88,7 +88,7 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard
 
             // Advance to CluePhase.
             _engine.Tick(context, DateTimeOffset.UtcNow.AddSeconds(10));
-            Assert.AreEqual(ConsultTheCardGamePhase.CluePhase, state.GamePhase);
+            Assert.AreEqual(ConsultTheCardGamePhase.CluePhase, state.Phase);
 
             // Submit clues for all alive players to advance to Discussion.
             var alivePlayers = context.GetAlivePlayers();
@@ -96,17 +96,17 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard
             string[] clues = ["wave", "splash", "tide", "fish", "coral"];
             for (int i = 0; i < alivePlayers.Count; i++)
             {
-                string currentPlayerId = state.TurnOrder[state.CurrentCluePlayerIndex];
+                string currentPlayerId = state.TurnManager.TurnOrder[state.TurnManager.CurrentPlayerIndex];
                 _engine.SubmitClue(new User("dummy", currentPlayerId), state, clues[i]);
             }
 
             // Should now be in Discussion.
-            Assert.AreEqual(ConsultTheCardGamePhase.Discussion, state.GamePhase);
+            Assert.AreEqual(ConsultTheCardGamePhase.Discussion, state.Phase);
 
             // Advance to VotePhase.
             _engine.AdvanceToVote(_host, state);
 
-            Assert.AreEqual(ConsultTheCardGamePhase.Voting, state.GamePhase);
+            Assert.AreEqual(ConsultTheCardGamePhase.Voting, state.Phase);
 
             // Have some players vote for a specific target.
             alivePlayers = context.GetAlivePlayers();
@@ -126,6 +126,10 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard
             // Vote targeting the leaving player should be voided.
             Assert.IsFalse(voterState.HasVoted, "Vote should be voided when target leaves.");
             Assert.IsNull(voterState.VoteTargetId, "VoteTargetId should be cleared.");
+            
+            // Phase should remain Voting
+            Assert.AreEqual(ConsultTheCardGamePhase.Voting, state.Phase);
+
         }
 
         [TestMethod]
@@ -145,7 +149,7 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard
             _engine.HandlePlayerLeft(new User("dummy", agents[1].PlayerId), state);
 
             // Should transition to GameOver with ≤2 remaining.
-            Assert.AreEqual(ConsultTheCardGamePhase.GameOver, state.GamePhase);
+            Assert.AreEqual(ConsultTheCardGamePhase.GameOver, state.Phase);
             Assert.IsNotNull(state.WinResult);
             Assert.IsTrue(state.WinResult.GameOver);
             // Insider should win (Insider alive, no Informant).
@@ -163,7 +167,7 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard
                 _engine.HandlePlayerLeft(MakePlayer(i), state);
             }
 
-            Assert.AreEqual(ConsultTheCardGamePhase.GameOver, state.GamePhase);
+            Assert.AreEqual(ConsultTheCardGamePhase.GameOver, state.Phase);
         }
 
         [TestMethod]
@@ -173,10 +177,10 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard
             var context = state.Context!;
 
             // Manually set phase to Discussion to simulate being in that phase.
-            state.GamePhase = ConsultTheCardGamePhase.Discussion;
+            state.SetPhase(ConsultTheCardGamePhase.Discussion);
 
             int aliveCountBefore = context.GetAlivePlayerCount();
-            string leavingPlayerId = state.TurnOrder[0];
+            string leavingPlayerId = state.TurnManager.TurnOrder[0];
 
             _engine.HandlePlayerLeft(new User("dummy", leavingPlayerId), state);
 

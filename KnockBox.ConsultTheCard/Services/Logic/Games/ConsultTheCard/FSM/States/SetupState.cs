@@ -23,7 +23,7 @@ namespace KnockBox.Services.Logic.Games.ConsultTheCard.FSM.States
             // carries over (rotating start player).
             if (context.State.CurrentEliminationCycle == 1)
             {
-                var turnOrder = context.State.TurnOrder;
+                var turnOrder = context.State.TurnManager.TurnOrder;
                 for (int i = turnOrder.Count - 1; i > 0; i--)
                 {
                     int j = context.Rng.GetRandomInt(0, i + 1);
@@ -31,7 +31,7 @@ namespace KnockBox.Services.Logic.Games.ConsultTheCard.FSM.States
                 }
             }
 
-            context.State.GamePhase = ConsultTheCardGamePhase.Setup;
+            context.State.SetPhase(ConsultTheCardGamePhase.Setup);
             _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.State.Config.SetupPhaseTimeoutMs);
 
             context.Logger.LogInformation(

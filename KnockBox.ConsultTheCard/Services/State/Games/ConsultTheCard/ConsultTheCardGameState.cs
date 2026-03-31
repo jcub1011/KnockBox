@@ -1,6 +1,8 @@
 using KnockBox.Services.Logic.Games.ConsultTheCard.FSM;
 using KnockBox.Services.State.Games.ConsultTheCard.Data;
 using KnockBox.Services.State.Games.Shared;
+using KnockBox.Services.State.Games.Shared.Components;
+using KnockBox.Services.State.Games.Shared.Interfaces;
 using KnockBox.Services.State.Users;
 using System.Collections.Concurrent;
 
@@ -9,32 +11,40 @@ namespace KnockBox.Services.State.Games.ConsultTheCard
     public class ConsultTheCardGameState(
         User host,
         ILogger<ConsultTheCardGameState> logger)
-        : AbstractGameState(host, logger)
+        : AbstractGameState(host, logger),
+          IPhasedGameState<ConsultTheCardGamePhase>,
+          IConfigurableGameState<ConsultTheCardGameConfig>,
+          IPlayerTrackedGameState<ConsultTheCardPlayerState>,
+          IFsmContextGameState<ConsultTheCardGameContext>
     {
         /// <summary>
         /// The FSM context for this game instance. Set when the game starts.
         /// </summary>
-        public ConsultTheCardGameContext? Context { get; internal set; }
+        public ConsultTheCardGameContext? Context { get; set; }
 
         /// <summary>
         /// The current phase of the game.
         /// </summary>
-        public ConsultTheCardGamePhase GamePhase { get; set; }
+        public ConsultTheCardGamePhase Phase { get; private set; }
+
+        /// <summary>
+        /// Updates the current phase and notifies state-change listeners.
+        /// </summary>
+        public void SetPhase(ConsultTheCardGamePhase phase)
+        {
+            Phase = phase;
+            NotifyStateChanged();
+        }
 
         /// <summary>
         /// All player states, keyed by player ID.
         /// </summary>
-        public readonly ConcurrentDictionary<string, ConsultTheCardPlayerState> GamePlayers = new();
+        public ConcurrentDictionary<string, ConsultTheCardPlayerState> GamePlayers { get; } = new();
 
         /// <summary>
-        /// Players in turn order (by player ID).
+        /// Manages turn order and active player tracking.
         /// </summary>
-        public readonly List<string> TurnOrder = [];
-
-        /// <summary>
-        /// Index into <see cref="TurnOrder"/> identifying the current clue-giving player.
-        /// </summary>
-        public int CurrentCluePlayerIndex { get; set; }
+        public TurnManager TurnManager { get; } = new();
 
         /// <summary>
         /// The current elimination cycle number within a game. Starts at 0.

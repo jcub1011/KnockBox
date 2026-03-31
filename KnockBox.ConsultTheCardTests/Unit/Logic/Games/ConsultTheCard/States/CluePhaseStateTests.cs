@@ -52,7 +52,7 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard.States
                 SecretWord = secretWord
             };
             _state.GamePlayers[id] = ps;
-            _state.TurnOrder.Add(id);
+            _state.TurnManager.TurnOrder.Add(id);
         }
 
         [TestMethod]
@@ -60,7 +60,7 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard.States
         {
             var clueState = new CluePhaseState();
             clueState.OnEnter(_context);
-            Assert.AreEqual(ConsultTheCardGamePhase.CluePhase, _state.GamePhase);
+            Assert.AreEqual(ConsultTheCardGamePhase.CluePhase, _state.Phase);
         }
 
         [TestMethod]
@@ -68,12 +68,12 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard.States
         {
             // Eliminate p0 so the first alive player is p1.
             _state.GamePlayers["p0"].IsEliminated = true;
-            _state.CurrentCluePlayerIndex = 0;
+            _state.TurnManager.SetCurrentPlayerIndex(0);
 
             var clueState = new CluePhaseState();
             clueState.OnEnter(_context);
 
-            string currentPlayer = _state.TurnOrder[_state.CurrentCluePlayerIndex];
+            string currentPlayer = _state.TurnManager.TurnOrder[_state.TurnManager.CurrentPlayerIndex];
             Assert.AreNotEqual("p0", currentPlayer, "Should skip eliminated player.");
         }
 
@@ -81,13 +81,13 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard.States
         public void OnEnter_RotatingStartPlayer()
         {
             // Set index to 2 (simulating previous cycle ended at index 2).
-            _state.CurrentCluePlayerIndex = 2;
+            _state.TurnManager.SetCurrentPlayerIndex(2);
 
             var clueState = new CluePhaseState();
             clueState.OnEnter(_context);
 
             // Should start at index 2 (p2) since p2 is alive.
-            Assert.AreEqual(2, _state.CurrentCluePlayerIndex);
+            Assert.AreEqual(2, _state.TurnManager.CurrentPlayerIndex);
         }
 
         [TestMethod]
@@ -96,7 +96,7 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard.States
             var clueState = new CluePhaseState();
             clueState.OnEnter(_context);
 
-            string currentPlayer = _state.TurnOrder[_state.CurrentCluePlayerIndex];
+            string currentPlayer = _state.TurnManager.TurnOrder[_state.TurnManager.CurrentPlayerIndex];
             var result = clueState.HandleCommand(_context, new SubmitClueCommand(currentPlayer, "wave"));
 
             Assert.IsTrue(result.IsSuccess);
@@ -112,7 +112,7 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard.States
             var clueState = new CluePhaseState();
             clueState.OnEnter(_context);
 
-            string currentPlayer = _state.TurnOrder[_state.CurrentCluePlayerIndex];
+            string currentPlayer = _state.TurnManager.TurnOrder[_state.TurnManager.CurrentPlayerIndex];
             var result = clueState.HandleCommand(_context, new SubmitClueCommand(currentPlayer, "two words"));
 
             Assert.IsFalse(result.IsSuccess);
@@ -124,7 +124,7 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard.States
             var clueState = new CluePhaseState();
             clueState.OnEnter(_context);
 
-            string currentPlayer = _state.TurnOrder[_state.CurrentCluePlayerIndex];
+            string currentPlayer = _state.TurnManager.TurnOrder[_state.TurnManager.CurrentPlayerIndex];
             var player = _context.GetPlayer(currentPlayer)!;
             var result = clueState.HandleCommand(_context, new SubmitClueCommand(currentPlayer, player.SecretWord!));
 
@@ -139,7 +139,7 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard.States
             var clueState = new CluePhaseState();
             clueState.OnEnter(_context);
 
-            string currentPlayer = _state.TurnOrder[_state.CurrentCluePlayerIndex];
+            string currentPlayer = _state.TurnManager.TurnOrder[_state.TurnManager.CurrentPlayerIndex];
             var result = clueState.HandleCommand(_context, new SubmitClueCommand(currentPlayer, "wave"));
 
             Assert.IsFalse(result.IsSuccess);
@@ -151,8 +151,8 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard.States
             var clueState = new CluePhaseState();
             clueState.OnEnter(_context);
 
-            string currentPlayer = _state.TurnOrder[_state.CurrentCluePlayerIndex];
-            string wrongPlayer = _state.TurnOrder[(_state.CurrentCluePlayerIndex + 1) % _state.TurnOrder.Count];
+            string currentPlayer = _state.TurnManager.TurnOrder[_state.TurnManager.CurrentPlayerIndex];
+            string wrongPlayer = _state.TurnManager.TurnOrder[(_state.TurnManager.CurrentPlayerIndex + 1) % _state.TurnManager.TurnOrder.Count];
 
             var result = clueState.HandleCommand(_context, new SubmitClueCommand(wrongPlayer, "wave"));
             Assert.IsFalse(result.IsSuccess);
@@ -168,7 +168,7 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard.States
             string[] clues = ["wave", "splash", "tide", "fish"];
             for (int i = 0; i < 4; i++)
             {
-                string currentPlayer = _state.TurnOrder[_state.CurrentCluePlayerIndex];
+                string currentPlayer = _state.TurnManager.TurnOrder[_state.TurnManager.CurrentPlayerIndex];
                 var result = clueState.HandleCommand(_context, new SubmitClueCommand(currentPlayer, clues[i]));
                 Assert.IsTrue(result.IsSuccess);
 
@@ -184,7 +184,7 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard.States
         {
             // Eliminate p1 (index 1 in turn order).
             _state.GamePlayers["p1"].IsEliminated = true;
-            _state.CurrentCluePlayerIndex = 0;
+            _state.TurnManager.SetCurrentPlayerIndex(0);
 
             var clueState = new CluePhaseState();
             clueState.OnEnter(_context);
@@ -194,7 +194,7 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard.States
             Assert.IsTrue(result.IsSuccess);
 
             // Next player should be p2, not p1 (eliminated).
-            string next = _state.TurnOrder[_state.CurrentCluePlayerIndex];
+            string next = _state.TurnManager.TurnOrder[_state.TurnManager.CurrentPlayerIndex];
             Assert.AreEqual("p2", next, "Should skip eliminated p1.");
         }
 
@@ -205,7 +205,7 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard.States
             var clueState = new CluePhaseState();
             clueState.OnEnter(_context);
 
-            string currentPlayer = _state.TurnOrder[_state.CurrentCluePlayerIndex];
+            string currentPlayer = _state.TurnManager.TurnOrder[_state.TurnManager.CurrentPlayerIndex];
 
             // Tick after timeout.
             var result = clueState.Tick(_context, DateTimeOffset.UtcNow.AddMinutes(5));
@@ -227,7 +227,7 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard.States
             Assert.IsTrue(result.IsSuccess);
             Assert.IsNull(result.Value);
 
-            string currentPlayer = _state.TurnOrder[_state.CurrentCluePlayerIndex];
+            string currentPlayer = _state.TurnManager.TurnOrder[_state.TurnManager.CurrentPlayerIndex];
             var player = _context.GetPlayer(currentPlayer)!;
             Assert.IsFalse(player.HasSubmittedClue);
         }
@@ -238,7 +238,7 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard.States
             var clueState = new CluePhaseState();
             clueState.OnEnter(_context);
 
-            string currentPlayer = _state.TurnOrder[_state.CurrentCluePlayerIndex];
+            string currentPlayer = _state.TurnManager.TurnOrder[_state.TurnManager.CurrentPlayerIndex];
             // Secret word is "Ocean"; try lowercase.
             var result = clueState.HandleCommand(_context, new SubmitClueCommand(currentPlayer, "ocean"));
             Assert.IsFalse(result.IsSuccess);
@@ -252,7 +252,7 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard.States
             var clueState = new CluePhaseState();
             clueState.OnEnter(_context);
 
-            string currentPlayer = _state.TurnOrder[_state.CurrentCluePlayerIndex];
+            string currentPlayer = _state.TurnManager.TurnOrder[_state.TurnManager.CurrentPlayerIndex];
             var result = clueState.HandleCommand(_context, new SubmitClueCommand(currentPlayer, "wave"));
             Assert.IsFalse(result.IsSuccess);
         }

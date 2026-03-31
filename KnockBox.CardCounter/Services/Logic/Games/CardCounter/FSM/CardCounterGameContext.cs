@@ -92,26 +92,23 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM
         public Stack<BaseCard> CurrentShoe => State.CurrentShoe;
         public Stack<BaseCard> DiscardPile => State.DiscardPile;
         public Stack<string> ForceDrawStack => State.ForceDrawStack;
-        public List<string> TurnOrder => State.TurnOrder;
+        public List<string> TurnOrder => State.TurnManager.TurnOrder;
         public GameConfig Config => State.Config;
 
         // ── Turn helpers ──────────────────────────────────────────────────────
 
         /// <summary>Player ID of the currently active player, or null if there are no players.</summary>
-        public string? CurrentPlayerId =>
-            TurnOrder.Count > 0 ? TurnOrder[State.CurrentPlayerIndex] : null;
+        public string? CurrentPlayerId => State.TurnManager.CurrentPlayer;
 
         public bool IsCurrentPlayer(string playerId) => CurrentPlayerId == playerId;
 
-        public PlayerState? GetCurrentPlayer() =>
-            CurrentPlayerId is { } id && GamePlayers.TryGetValue(id, out var ps) ? ps : null;
+        public PlayerState? GetCurrentPlayer() => State.CurrentPlayerState;
 
         public PlayerState? GetPlayer(string playerId) =>
             GamePlayers.TryGetValue(playerId, out var ps) ? ps : null;
 
         /// <summary>Advances the turn pointer to the next player in TurnOrder (wraps around).</summary>
-        public void AdvanceTurn() =>
-            State.CurrentPlayerIndex = (State.CurrentPlayerIndex + 1) % TurnOrder.Count;
+        public void AdvanceTurn() => State.TurnManager.NextTurn();
 
         // ── Card / deck helpers ───────────────────────────────────────────────
 

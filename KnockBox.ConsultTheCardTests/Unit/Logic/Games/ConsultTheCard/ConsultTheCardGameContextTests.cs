@@ -416,14 +416,14 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard
         public void ApplyCycleScoring_MinusOneForVotingForAgent()
         {
             var p1 = AddPlayer("p1", "P1");
-            p1.Role = Role.Insider;
+            p1.Role = Role.Agent;
             p1.HasVoted = true;
             p1.VoteTargetId = "p2";
 
             var p2 = AddPlayer("p2", "P2");
             p2.Role = Role.Agent;
 
-            _context.ApplyCycleScoring();
+            _context.ApplyCycleScoring(null);
 
             Assert.AreEqual(-1, p1.Score);
         }
@@ -439,9 +439,9 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard
             var p2 = AddPlayer("p2", "P2");
             p2.Role = Role.Insider;
 
-            _context.ApplyCycleScoring();
+            _context.ApplyCycleScoring(null);
 
-            Assert.AreEqual(0, p1.Score);
+            Assert.AreEqual(1, p1.Score);
         }
 
         // ── ApplyEndOfGameScoring ─────────────────────────────────────────────

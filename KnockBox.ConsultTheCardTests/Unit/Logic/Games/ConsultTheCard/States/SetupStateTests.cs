@@ -43,7 +43,7 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard.States
                     PlayerId = $"p{i}",
                     DisplayName = $"Player {i}"
                 };
-                _state.TurnOrder.Add($"p{i}");
+                _state.TurnManager.TurnOrder.Add($"p{i}");
             }
         }
 
@@ -72,7 +72,7 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard.States
         {
             var setupState = new SetupState();
             setupState.OnEnter(_context);
-            Assert.AreEqual(ConsultTheCardGamePhase.Setup, _state.GamePhase);
+            Assert.AreEqual(ConsultTheCardGamePhase.Setup, _state.Phase);
         }
 
         [TestMethod]
@@ -168,7 +168,7 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard.States
         {
             // Reconstruct state with the given player count.
             _state.GamePlayers.Clear();
-            _state.TurnOrder.Clear();
+            _state.TurnManager.TurnOrder.Clear();
             for (int i = 0; i < playerCount; i++)
             {
                 _state.GamePlayers[$"p{i}"] = new ConsultTheCardPlayerState
@@ -176,7 +176,7 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard.States
                     PlayerId = $"p{i}",
                     DisplayName = $"Player {i}"
                 };
-                _state.TurnOrder.Add($"p{i}");
+                _state.TurnManager.TurnOrder.Add($"p{i}");
             }
 
             var setupState = new SetupState();

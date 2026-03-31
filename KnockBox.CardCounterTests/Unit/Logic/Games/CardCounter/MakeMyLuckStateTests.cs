@@ -36,7 +36,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
         {
             var player = new PlayerState { PlayerId = id, DisplayName = name };
             _state.GamePlayers[id] = player;
-            _state.TurnOrder.Add(id);
+            _state.TurnManager.TurnOrder.Add(id);
             return player;
         }
 
@@ -44,7 +44,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
         public void SubmitReorder_ValidReorder_RearrangesTopCardsInShoe()
         {
             var player = AddPlayer("p1", "Player 1");
-            _state.CurrentPlayerIndex = 0;
+            _state.TurnManager.SetCurrentPlayerIndex(0);
 
             // Shoe (top to bottom): card3, card2, card1
             var card1 = new NumberCard(1);
@@ -75,7 +75,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
         {
             var player = AddPlayer("p1", "Player 1");
             var other = AddPlayer("p2", "Player 2");
-            _state.CurrentPlayerIndex = 0;
+            _state.TurnManager.SetCurrentPlayerIndex(0);
 
             var card = new NumberCard(5);
             _state.CurrentShoe.Push(card);
@@ -94,7 +94,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
         public void SubmitReorder_DuplicateIndices_IsNoOp()
         {
             var player = AddPlayer("p1", "Player 1");
-            _state.CurrentPlayerIndex = 0;
+            _state.TurnManager.SetCurrentPlayerIndex(0);
 
             var card1 = new NumberCard(1);
             var card2 = new NumberCard(2);
@@ -115,7 +115,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
         public void SubmitReorder_OutOfRangeIndex_IsNoOp()
         {
             var player = AddPlayer("p1", "Player 1");
-            _state.CurrentPlayerIndex = 0;
+            _state.TurnManager.SetCurrentPlayerIndex(0);
 
             var card = new NumberCard(3);
             _state.CurrentShoe.Push(card);
@@ -133,7 +133,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
         public void SubmitReorder_WrongNumberOfIndices_IsNoOp()
         {
             var player = AddPlayer("p1", "Player 1");
-            _state.CurrentPlayerIndex = 0;
+            _state.TurnManager.SetCurrentPlayerIndex(0);
 
             var card1 = new NumberCard(1);
             var card2 = new NumberCard(2);
@@ -154,7 +154,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
         public void SubmitReorder_ClearsPrivateReveal()
         {
             var player = AddPlayer("p1", "Player 1");
-            _state.CurrentPlayerIndex = 0;
+            _state.TurnManager.SetCurrentPlayerIndex(0);
 
             var card = new NumberCard(5);
             _state.CurrentShoe.Push(card);
@@ -172,7 +172,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
         public void SubmitReorder_TransitionsToPlayerTurnState()
         {
             var player = AddPlayer("p1", "Player 1");
-            _state.CurrentPlayerIndex = 0;
+            _state.TurnManager.SetCurrentPlayerIndex(0);
 
             var card = new NumberCard(7);
             _state.CurrentShoe.Push(card);
@@ -191,7 +191,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
         public void NonSubmitReorderCommand_IsIgnored()
         {
             var player = AddPlayer("p1", "Player 1");
-            _state.CurrentPlayerIndex = 0;
+            _state.TurnManager.SetCurrentPlayerIndex(0);
 
             var card = new NumberCard(7);
             _state.CurrentShoe.Push(card);

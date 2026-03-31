@@ -134,7 +134,7 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard
         {
             using var state = await CreateStartedGameAsync(4);
 
-            Assert.AreEqual(ConsultTheCardGamePhase.Setup, state.GamePhase);
+            Assert.AreEqual(ConsultTheCardGamePhase.Setup, state.Phase);
         }
 
         [TestMethod]
@@ -160,7 +160,7 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard
             using var state = await CreateStartedGameAsync(4);
 
             Assert.AreEqual(4, state.GamePlayers.Count);
-            Assert.AreEqual(4, state.TurnOrder.Count);
+            Assert.AreEqual(4, state.TurnManager.TurnOrder.Count);
         }
 
         [TestMethod]
@@ -280,8 +280,8 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard
             _engine.ReturnToLobby(_host, state);
 
             Assert.AreEqual(0, state.GamePlayers.Count);
-            Assert.AreEqual(0, state.TurnOrder.Count);
-            Assert.AreEqual(0, state.CurrentCluePlayerIndex);
+            Assert.AreEqual(0, state.TurnManager.TurnOrder.Count);
+            Assert.AreEqual(0, state.TurnManager.CurrentPlayerIndex);
         }
 
         // ── ResetGame ─────────────────────────────────────────────────────────
@@ -306,7 +306,7 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard
 
             Assert.IsTrue((bool)result.IsSuccess);
             Assert.IsNotNull(state.Context);
-            Assert.AreEqual(ConsultTheCardGamePhase.Setup, state.GamePhase);
+            Assert.AreEqual(ConsultTheCardGamePhase.Setup, state.Phase);
         }
 
         // ── Tick ──────────────────────────────────────────────────────────────
@@ -343,12 +343,12 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard
         {
             using var state = await CreateStartedGameAsync(4);
             var leavingPlayer = MakePlayer(0);
-            int initialCount = state.TurnOrder.Count;
+            int initialCount = state.TurnManager.TurnOrder.Count;
 
             _engine.HandlePlayerLeft(leavingPlayer, state);
 
-            Assert.AreEqual(initialCount - 1, state.TurnOrder.Count);
-            Assert.IsFalse(state.TurnOrder.Contains(leavingPlayer.Id));
+            Assert.AreEqual(initialCount - 1, state.TurnManager.TurnOrder.Count);
+            Assert.IsFalse(state.TurnManager.TurnOrder.Contains(leavingPlayer.Id));
         }
 
         [TestMethod]
@@ -379,13 +379,13 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard
         {
             using var state = await CreateStartedGameAsync(5);
             // Set the current clue player to index 3
-            state.CurrentCluePlayerIndex = 3;
+            state.TurnManager.SetCurrentPlayerIndex(3);
             // Remove player at index 1 (before current)
-            string leavingPlayerId = state.TurnOrder[1];
+            string leavingPlayerId = state.TurnManager.TurnOrder[1];
 
             _engine.HandlePlayerLeft(new User(leavingPlayerId, leavingPlayerId), state);
 
-            Assert.AreEqual(2, state.CurrentCluePlayerIndex);
+            Assert.AreEqual(2, state.TurnManager.CurrentPlayerIndex);
         }
 
         [TestMethod]
@@ -395,11 +395,11 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard
             var context = state.Context!;
 
             // Advance to vote phase
-            state.GamePhase = ConsultTheCardGamePhase.Voting;
+            state.SetPhase(ConsultTheCardGamePhase.Voting);
 
             // Have a player vote for the player who will leave
-            var leavingPlayerId = state.TurnOrder[0];
-            var votingPlayerId = state.TurnOrder[1];
+            var leavingPlayerId = state.TurnManager.TurnOrder[0];
+            var votingPlayerId = state.TurnManager.TurnOrder[1];
             var voterState = context.GetPlayer(votingPlayerId)!;
             voterState.HasVoted = true;
             voterState.VoteTargetId = leavingPlayerId;
@@ -417,13 +417,13 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard
             using var state = await CreateStartedGameAsync(4);
 
             // Remove players until <= 2 remain (4 players, remove 2)
-            var player0 = new User("dummy", state.TurnOrder[0]);
-            var player1 = new User("dummy", state.TurnOrder[1]);
+            var player0 = new User("dummy", state.TurnManager.TurnOrder[0]);
+            var player1 = new User("dummy", state.TurnManager.TurnOrder[1]);
 
             _engine.HandlePlayerLeft(player0, state);
             _engine.HandlePlayerLeft(player1, state);
 
-            Assert.AreEqual(ConsultTheCardGamePhase.GameOver, state.GamePhase);
+            Assert.AreEqual(ConsultTheCardGamePhase.GameOver, state.Phase);
         }
     }
 }

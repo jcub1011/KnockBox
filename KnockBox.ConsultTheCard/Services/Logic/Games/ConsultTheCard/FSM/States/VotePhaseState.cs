@@ -15,7 +15,7 @@ namespace KnockBox.Services.Logic.Games.ConsultTheCard.FSM.States
 
         public ValueResult<IGameState<ConsultTheCardGameContext, ConsultTheCardCommand>?> OnEnter(ConsultTheCardGameContext context)
         {
-            context.State.GamePhase = ConsultTheCardGamePhase.Voting;
+            context.State.SetPhase(ConsultTheCardGamePhase.Voting);
             _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.State.Config.VotePhaseTimeoutMs);
 
             context.Logger.LogInformation("FSM → VotePhaseState");

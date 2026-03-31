@@ -16,7 +16,7 @@ namespace KnockBox.Services.Logic.Games.ConsultTheCard.FSM.States
 
         public ValueResult<IGameState<ConsultTheCardGameContext, ConsultTheCardCommand>?> OnEnter(ConsultTheCardGameContext context)
         {
-            context.State.GamePhase = ConsultTheCardGamePhase.CluePhase;
+            context.State.SetPhase(ConsultTheCardGamePhase.CluePhase);
 
             // Advance past eliminated players to the next alive player.
             if (!AdvanceToNextAlivePlayer(context))
@@ -30,8 +30,8 @@ namespace KnockBox.Services.Logic.Games.ConsultTheCard.FSM.States
 
             context.Logger.LogInformation(
                 "FSM → CluePhaseState (current player index: {idx}, player: {pid})",
-                context.State.CurrentCluePlayerIndex,
-                context.State.TurnOrder[context.State.CurrentCluePlayerIndex]);
+                context.State.TurnManager.CurrentPlayerIndex,
+                context.State.TurnManager.CurrentPlayer);
 
             return null;
         }
@@ -44,8 +44,7 @@ namespace KnockBox.Services.Logic.Games.ConsultTheCard.FSM.States
             if (command is not SubmitClueCommand cmd)
                 return null;
 
-            var turnOrder = context.State.TurnOrder;
-            string currentPlayerId = turnOrder[context.State.CurrentCluePlayerIndex];
+            string? currentPlayerId = context.State.TurnManager.CurrentPlayer;
 
             // Only the current player may submit.
             if (cmd.PlayerId != currentPlayerId)
@@ -58,10 +57,12 @@ namespace KnockBox.Services.Logic.Games.ConsultTheCard.FSM.States
             if (player.HasSubmittedClue)
                 return new ResultError("You have already submitted a clue.");
 
-            // Validate: character limit.
+            // Validate: character limit and format.
             string clue = cmd.Clue.Trim();
             if (string.IsNullOrWhiteSpace(clue))
                 return new ResultError("Clue cannot be empty.");
+            if (clue.Contains(" "))
+                return new ResultError("Clue cannot contain spaces.");
             if (clue.Length > 50)
                 return new ResultError("Clue must be 50 characters or less.");
 
@@ -90,7 +91,7 @@ namespace KnockBox.Services.Logic.Games.ConsultTheCard.FSM.States
                 return new DiscussionPhaseState();
 
             // Advance to next alive player and reset timer.
-            AdvanceCluePlayerIndex(context);
+            context.State.TurnManager.NextTurn();
             AdvanceToNextAlivePlayer(context);
             _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.State.Config.CluePhaseTimeoutMs);
 
@@ -106,8 +107,8 @@ namespace KnockBox.Services.Logic.Games.ConsultTheCard.FSM.States
                 return null;
 
             // Auto-submit "..." for the timed-out player.
-            string currentPlayerId = context.State.TurnOrder[context.State.CurrentCluePlayerIndex];
-            var player = context.GetPlayer(currentPlayerId);
+            string? currentPlayerId = context.State.TurnManager.CurrentPlayer;
+            var player = currentPlayerId is not null ? context.GetPlayer(currentPlayerId) : null;
             if (player is not null && !player.HasSubmittedClue)
             {
                 string defaultClue = "...";
@@ -127,7 +128,7 @@ namespace KnockBox.Services.Logic.Games.ConsultTheCard.FSM.States
                 return new DiscussionPhaseState();
 
             // Advance to next alive player and reset timer.
-            AdvanceCluePlayerIndex(context);
+            context.State.TurnManager.NextTurn();
             AdvanceToNextAlivePlayer(context);
             _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.State.Config.CluePhaseTimeoutMs);
 
@@ -140,38 +141,27 @@ namespace KnockBox.Services.Logic.Games.ConsultTheCard.FSM.States
         // ── Private helpers ───────────────────────────────────────────────────
 
         /// <summary>
-        /// Advances <see cref="ConsultTheCardGameState.CurrentCluePlayerIndex"/> by one (wrapping).
-        /// </summary>
-        private static void AdvanceCluePlayerIndex(ConsultTheCardGameContext context)
-        {
-            var turnOrder = context.State.TurnOrder;
-            context.State.CurrentCluePlayerIndex =
-                (context.State.CurrentCluePlayerIndex + 1) % turnOrder.Count;
-        }
-
-        /// <summary>
-        /// Advances <see cref="ConsultTheCardGameState.CurrentCluePlayerIndex"/> past eliminated players
+        /// Advances <see cref="ConsultTheCardGameState.TurnManager.CurrentPlayerIndex"/> past eliminated players
         /// to the next alive player. Returns <see langword="false"/> if no alive player is found
         /// (full wrap without hitting an alive player).
         /// </summary>
         private static bool AdvanceToNextAlivePlayer(ConsultTheCardGameContext context)
         {
-            var turnOrder = context.State.TurnOrder;
-            int startIndex = context.State.CurrentCluePlayerIndex;
+            var turnOrder = context.State.TurnManager.TurnOrder;
+            int startIndex = context.State.TurnManager.CurrentPlayerIndex;
 
             for (int i = 0; i < turnOrder.Count; i++)
             {
-                string playerId = turnOrder[context.State.CurrentCluePlayerIndex];
+                string playerId = turnOrder[context.State.TurnManager.CurrentPlayerIndex];
                 var player = context.GetPlayer(playerId);
                 if (player is not null && !player.IsEliminated && !player.HasSubmittedClue)
                     return true;
 
-                context.State.CurrentCluePlayerIndex =
-                    (context.State.CurrentCluePlayerIndex + 1) % turnOrder.Count;
+                context.State.TurnManager.NextTurn();
             }
 
             // Wrapped fully — no alive un-submitted player found.
-            context.State.CurrentCluePlayerIndex = startIndex;
+            context.State.TurnManager.SetCurrentPlayerIndex(startIndex);
             return context.GetAlivePlayerCount() > 0;
         }
     }

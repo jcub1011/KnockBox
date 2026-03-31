@@ -66,7 +66,7 @@ namespace KnockBox.Services.Logic.Games.ConsultTheCard
                         PlayerId = user.Id,
                         DisplayName = user.Name
                     };
-                    gameState.TurnOrder.Add(user.Id);
+                    gameState.TurnManager.TurnOrder.Add(user.Id);
                 }
 
                 fsm.TransitionTo(context, new SetupState());
@@ -194,8 +194,8 @@ namespace KnockBox.Services.Logic.Games.ConsultTheCard
             {
                 state.Context = null;
                 state.GamePlayers.Clear();
-                state.TurnOrder.Clear();
-                state.CurrentCluePlayerIndex = 0;
+                state.TurnManager.TurnOrder.Clear();
+                state.TurnManager.SetCurrentPlayerIndex(0);
                 state.CurrentEliminationCycle = 0;
                 state.CurrentWordPair = null;
                 state.CurrentRoundClues.Clear();
@@ -231,8 +231,8 @@ namespace KnockBox.Services.Logic.Games.ConsultTheCard
 
                 // Clear per-game state.
                 state.GamePlayers.Clear();
-                state.TurnOrder.Clear();
-                state.CurrentCluePlayerIndex = 0;
+                state.TurnManager.TurnOrder.Clear();
+                state.TurnManager.SetCurrentPlayerIndex(0);
                 state.CurrentEliminationCycle = 0;
                 state.CurrentWordPair = null;
                 state.CurrentRoundClues.Clear();
@@ -252,7 +252,7 @@ namespace KnockBox.Services.Logic.Games.ConsultTheCard
                         PlayerId = user.Id,
                         DisplayName = user.Name
                     };
-                    state.TurnOrder.Add(user.Id);
+                    state.TurnManager.TurnOrder.Add(user.Id);
                 }
 
                 fsm.TransitionTo(context, new SetupState());
@@ -276,42 +276,42 @@ namespace KnockBox.Services.Logic.Games.ConsultTheCard
 
             state.Execute(() =>
             {
-                int leftIndex = state.TurnOrder.IndexOf(player.Id);
+                int leftIndex = state.TurnManager.TurnOrder.IndexOf(player.Id);
 
                 // Remove from turn order.
                 if (leftIndex >= 0)
-                    state.TurnOrder.RemoveAt(leftIndex);
+                    state.TurnManager.TurnOrder.RemoveAt(leftIndex);
 
                 // Mark as eliminated.
                 var playerState = context.GetPlayer(player.Id);
                 if (playerState is not null)
                     playerState.IsEliminated = true;
 
-                // Adjust CurrentCluePlayerIndex if needed.
-                if (leftIndex >= 0 && state.TurnOrder.Count > 0)
+                // Adjust CurrentPlayerIndex if needed.
+                if (leftIndex >= 0 && state.TurnManager.TurnOrder.Count > 0)
                 {
-                    if (leftIndex < state.CurrentCluePlayerIndex)
+                    if (leftIndex < state.TurnManager.CurrentPlayerIndex)
                     {
-                        state.CurrentCluePlayerIndex--;
+                        state.TurnManager.SetCurrentPlayerIndex(state.TurnManager.CurrentPlayerIndex - 1);
                     }
-                    else if (leftIndex == state.CurrentCluePlayerIndex
-                             && state.CurrentCluePlayerIndex >= state.TurnOrder.Count)
+                    else if (leftIndex == state.TurnManager.CurrentPlayerIndex
+                             && state.TurnManager.CurrentPlayerIndex >= state.TurnManager.TurnOrder.Count)
                     {
-                        state.CurrentCluePlayerIndex = 0;
+                        state.TurnManager.SetCurrentPlayerIndex(0);
                     }
                 }
-                else if (state.TurnOrder.Count == 0)
+                else if (state.TurnManager.TurnOrder.Count == 0)
                 {
-                    state.CurrentCluePlayerIndex = 0;
+                    state.TurnManager.SetCurrentPlayerIndex(0);
                 }
 
                 logger.LogInformation(
                     "Player [{id}] left the game. TurnOrder now has {n} player(s).",
-                    player.Id, state.TurnOrder.Count);
+                    player.Id, state.TurnManager.TurnOrder.Count);
 
                 // If during VotePhase or Discussion: void any votes cast for the disconnected player
                 // and remove the disconnected player's own outbound vote.
-                if (state.GamePhase == ConsultTheCardGamePhase.Voting || state.GamePhase == ConsultTheCardGamePhase.Discussion)
+                if (state.Phase == ConsultTheCardGamePhase.Voting || state.Phase == ConsultTheCardGamePhase.Discussion)
                 {
                     foreach (var ps in context.GetAlivePlayers())
                     {
@@ -344,7 +344,7 @@ namespace KnockBox.Services.Logic.Games.ConsultTheCard
                 }
 
                 // Auto-advance if the leaving player was the current clue giver during CluePhase.
-                if (state.GamePhase == ConsultTheCardGamePhase.CluePhase
+                if (state.Phase == ConsultTheCardGamePhase.CluePhase
                     && leftIndex >= 0)
                 {
                     // The current clue giver index may now point to the next player;
@@ -354,11 +354,11 @@ namespace KnockBox.Services.Logic.Games.ConsultTheCard
                 }
 
                 // Auto-advance if during Vote/Discussion Phase and all remaining alive players have voted.
-                if ((state.GamePhase == ConsultTheCardGamePhase.Voting || state.GamePhase == ConsultTheCardGamePhase.Discussion)
+                if ((state.Phase == ConsultTheCardGamePhase.Voting || state.Phase == ConsultTheCardGamePhase.Discussion)
                     && context.GetAlivePlayers().All(p => p.HasVoted))
                 {
                     // All votes are in — process the vote result by re-entering the FSM.
-                    if (state.GamePhase == ConsultTheCardGamePhase.Voting)
+                    if (state.Phase == ConsultTheCardGamePhase.Voting)
                         context.Fsm.TransitionTo(context, new VotePhaseState());
                     else
                         context.Fsm.TransitionTo(context, new DiscussionPhaseState());

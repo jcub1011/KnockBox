@@ -49,7 +49,7 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard.States
                 Role = role,
                 SecretWord = secretWord
             };
-            _state.TurnOrder.Add(id);
+            _state.TurnManager.TurnOrder.Add(id);
         }
 
         [TestMethod]
@@ -60,7 +60,7 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard.States
             var gameOver = new GameOverState();
             gameOver.OnEnter(_context);
 
-            Assert.AreEqual(ConsultTheCardGamePhase.GameOver, _state.GamePhase);
+            Assert.AreEqual(ConsultTheCardGamePhase.GameOver, _state.Phase);
         }
 
         [TestMethod]
@@ -166,7 +166,7 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard.States
             gameOver.HandleCommand(_context, new StartNextGameCommand("host-id"));
 
             Assert.AreEqual(0, _state.CurrentEliminationCycle);
-            Assert.AreEqual(0, _state.CurrentCluePlayerIndex);
+            Assert.AreEqual(0, _state.TurnManager.CurrentPlayerIndex);
             Assert.IsNull(_state.CurrentWordPair);
             Assert.AreEqual(0, _state.CurrentRoundClues.Count);
             Assert.AreEqual(0, _state.CurrentRoundVotes.Count);
