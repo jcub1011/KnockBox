@@ -24,6 +24,14 @@
             </div>
         }
 
+        @if (playerState is not null && playerState.Role != Role.Informant && !string.IsNullOrEmpty(playerState.SecretWord))
+        {
+            <div class="ctc-secret-word-banner">
+                <span class="ctc-secret-word-label">Your Word:</span>
+                <span class="ctc-secret-word-value">@playerState.SecretWord</span>
+            </div>
+        }
+
         <h2 class="ctc-phase-title">📝 CLUE PHASE</h2>
 
         @* ── Turn indicator ── *@
@@ -43,7 +51,7 @@
         {
             <div class="ctc-clue-input-area">
                 <input type="text" class="ctc-clue-input" placeholder="Enter a clue (max 50 chars)..."
-                       @bind="_clueText" @bind:event="oninput" maxlength="50" />
+                       value="@_clueText" @oninput="OnClueInput" maxlength="50" />
                 <button class="ctc-btn ctc-btn-primary" @onclick="SubmitClue"
                         disabled="@(string.IsNullOrWhiteSpace(_clueText))">
                     ✏️ Submit Clue

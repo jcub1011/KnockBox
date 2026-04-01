@@ -107,7 +107,7 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard.States
         }
 
         [TestMethod]
-        public void HandleCommand_RejectsClueWithSpaces()
+        public void HandleCommand_AcceptsClueWithSpaces()
         {
             var clueState = new CluePhaseState();
             clueState.OnEnter(_context);
@@ -115,7 +115,10 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard.States
             string currentPlayer = _state.TurnManager.TurnOrder[_state.TurnManager.CurrentPlayerIndex];
             var result = clueState.HandleCommand(_context, new SubmitClueCommand(currentPlayer, "two words"));
 
-            Assert.IsFalse(result.IsSuccess);
+            Assert.IsTrue(result.IsSuccess);
+            var player = _context.GetPlayer(currentPlayer)!;
+            Assert.IsTrue(player.HasSubmittedClue);
+            Assert.AreEqual("two words", player.CurrentClue);
         }
 
         [TestMethod]
@@ -255,6 +258,95 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard.States
             string currentPlayer = _state.TurnManager.TurnOrder[_state.TurnManager.CurrentPlayerIndex];
             var result = clueState.HandleCommand(_context, new SubmitClueCommand(currentPlayer, "wave"));
             Assert.IsFalse(result.IsSuccess);
+        }
+
+        // ── PendingClue auto-submit tests ─────────────────────────────────────
+
+        [TestMethod]
+        public void Tick_WithPendingClue_AutoSubmitsPendingText()
+        {
+            _state.Config.EnableTimers = true;
+            var clueState = new CluePhaseState();
+            clueState.OnEnter(_context);
+
+            string currentPlayer = _state.TurnManager.TurnOrder[_state.TurnManager.CurrentPlayerIndex];
+            var player = _context.GetPlayer(currentPlayer)!;
+            player.PendingClue = "my pending clue";
+
+            clueState.Tick(_context, DateTimeOffset.UtcNow.AddMinutes(5));
+
+            Assert.IsTrue(player.HasSubmittedClue);
+            Assert.AreEqual("my pending clue", player.CurrentClue);
+        }
+
+        [TestMethod]
+        public void Tick_WithEmptyPendingClue_FallsBackToEllipsis()
+        {
+            _state.Config.EnableTimers = true;
+            var clueState = new CluePhaseState();
+            clueState.OnEnter(_context);
+
+            string currentPlayer = _state.TurnManager.TurnOrder[_state.TurnManager.CurrentPlayerIndex];
+            var player = _context.GetPlayer(currentPlayer)!;
+            player.PendingClue = "   "; // whitespace-only
+
+            clueState.Tick(_context, DateTimeOffset.UtcNow.AddMinutes(5));
+
+            Assert.IsTrue(player.HasSubmittedClue);
+            Assert.AreEqual("...", player.CurrentClue);
+        }
+
+        [TestMethod]
+        public void Tick_WithPendingClueMatchingSecretWord_FallsBackToEllipsis()
+        {
+            _state.Config.EnableTimers = true;
+            var clueState = new CluePhaseState();
+            clueState.OnEnter(_context);
+
+            string currentPlayer = _state.TurnManager.TurnOrder[_state.TurnManager.CurrentPlayerIndex];
+            var player = _context.GetPlayer(currentPlayer)!;
+            player.PendingClue = player.SecretWord; // "Ocean"
+
+            clueState.Tick(_context, DateTimeOffset.UtcNow.AddMinutes(5));
+
+            Assert.IsTrue(player.HasSubmittedClue);
+            Assert.AreEqual("...", player.CurrentClue);
+        }
+
+        [TestMethod]
+        public void Tick_WithPendingClueAlreadyUsed_FallsBackToEllipsis()
+        {
+            _state.Config.EnableTimers = true;
+            _state.UsedClues.Add("wave");
+
+            var clueState = new CluePhaseState();
+            clueState.OnEnter(_context);
+
+            string currentPlayer = _state.TurnManager.TurnOrder[_state.TurnManager.CurrentPlayerIndex];
+            var player = _context.GetPlayer(currentPlayer)!;
+            player.PendingClue = "wave";
+
+            clueState.Tick(_context, DateTimeOffset.UtcNow.AddMinutes(5));
+
+            Assert.IsTrue(player.HasSubmittedClue);
+            Assert.AreEqual("...", player.CurrentClue);
+        }
+
+        [TestMethod]
+        public void Tick_WithNoPendingClue_FallsBackToEllipsis()
+        {
+            _state.Config.EnableTimers = true;
+            var clueState = new CluePhaseState();
+            clueState.OnEnter(_context);
+
+            string currentPlayer = _state.TurnManager.TurnOrder[_state.TurnManager.CurrentPlayerIndex];
+            var player = _context.GetPlayer(currentPlayer)!;
+            player.PendingClue = null;
+
+            clueState.Tick(_context, DateTimeOffset.UtcNow.AddMinutes(5));
+
+            Assert.IsTrue(player.HasSubmittedClue);
+            Assert.AreEqual("...", player.CurrentClue);
         }
     }
 }

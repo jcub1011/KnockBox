@@ -81,7 +81,7 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard
         }
 
         [TestMethod]
-        public async Task PlayerLeft_DuringVotePhase_VoidsVotesAndRechecks()
+        public async Task PlayerLeft_DuringDiscussionPhase_VoidsVotesAndRechecks()
         {
             using var state = await CreateStartedGameAsync(5);
             var context = state.Context!;
@@ -100,24 +100,18 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard
                 _engine.SubmitClue(new User("dummy", currentPlayerId), state, clues[i]);
             }
 
-            // Should now be in Discussion.
+            // Should now be in Discussion (which includes inline voting).
             Assert.AreEqual(ConsultTheCardGamePhase.Discussion, state.Phase);
 
-            // Advance to VotePhase.
-            _engine.AdvanceToVote(_host, state);
-
-            Assert.AreEqual(ConsultTheCardGamePhase.Voting, state.Phase);
-
-            // Have some players vote for a specific target.
+            // Have a player select a vote target (inline voting in discussion phase).
             alivePlayers = context.GetAlivePlayers();
             string leavingPlayerId = alivePlayers[0].PlayerId;
             string voterId = alivePlayers[1].PlayerId;
 
-            // Cast a vote for the player who will leave.
+            // Cast a vote for the player who will leave (select target, don't lock in).
             _engine.CastVote(new User("dummy", voterId), state, leavingPlayerId);
 
             var voterState = context.GetPlayer(voterId)!;
-            Assert.IsTrue(voterState.HasVoted);
             Assert.AreEqual(leavingPlayerId, voterState.VoteTargetId);
 
             // Player leaves.
@@ -126,10 +120,9 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard
             // Vote targeting the leaving player should be voided.
             Assert.IsFalse(voterState.HasVoted, "Vote should be voided when target leaves.");
             Assert.IsNull(voterState.VoteTargetId, "VoteTargetId should be cleared.");
-            
-            // Phase should remain Voting
-            Assert.AreEqual(ConsultTheCardGamePhase.Voting, state.Phase);
 
+            // Phase should remain Discussion (not enough players gone to end game).
+            Assert.AreEqual(ConsultTheCardGamePhase.Discussion, state.Phase);
         }
 
         [TestMethod]

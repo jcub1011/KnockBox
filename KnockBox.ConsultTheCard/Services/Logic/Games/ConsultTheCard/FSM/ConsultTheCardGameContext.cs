@@ -258,6 +258,7 @@ namespace KnockBox.Services.Logic.Games.ConsultTheCard.FSM
             {
                 ps.HasSubmittedClue = false;
                 ps.CurrentClue = null;
+                ps.PendingClue = null;
                 ps.VoteTargetId = null;
                 ps.HasVoted = false;
                 ps.HasVotedToEndGame = false;

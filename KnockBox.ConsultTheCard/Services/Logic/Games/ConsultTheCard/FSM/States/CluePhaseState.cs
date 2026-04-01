@@ -1,6 +1,7 @@
 using KnockBox.Core.Services.State.Games.Shared;
 using KnockBox.Extensions.Returns;
 using KnockBox.Services.State.Games.ConsultTheCard;
+using KnockBox.Services.State.Games.ConsultTheCard.Data;
 
 namespace KnockBox.Services.Logic.Games.ConsultTheCard.FSM.States
 {
@@ -61,8 +62,6 @@ namespace KnockBox.Services.Logic.Games.ConsultTheCard.FSM.States
             string clue = cmd.Clue.Trim();
             if (string.IsNullOrWhiteSpace(clue))
                 return new ResultError("Clue cannot be empty.");
-            if (clue.Contains(" "))
-                return new ResultError("Clue cannot contain spaces.");
             if (clue.Length > 50)
                 return new ResultError("Clue must be 50 characters or less.");
 
@@ -106,21 +105,21 @@ namespace KnockBox.Services.Logic.Games.ConsultTheCard.FSM.States
             if (!context.State.Config.EnableTimers)
                 return null;
 
-            // Auto-submit "..." for the timed-out player.
+            // Auto-submit for the timed-out player. Use pending clue text if valid, otherwise "...".
             string? currentPlayerId = context.State.TurnManager.CurrentPlayer;
             var player = currentPlayerId is not null ? context.GetPlayer(currentPlayerId) : null;
             if (player is not null && !player.HasSubmittedClue)
             {
-                string defaultClue = "...";
+                string clue = ResolvePendingClue(context, player);
                 player.HasSubmittedClue = true;
-                player.CurrentClue = defaultClue;
-                player.ClueHistory.Add(defaultClue);
-                context.State.UsedClues.Add(defaultClue);
+                player.CurrentClue = clue;
+                player.ClueHistory.Add(clue);
+                context.State.UsedClues.Add(clue);
                 context.State.CurrentRoundClues.Add(
-                    new ClueEntry(player.PlayerId, player.DisplayName, defaultClue));
+                    new ClueEntry(player.PlayerId, player.DisplayName, clue));
 
                 context.Logger.LogInformation(
-                    "CluePhase: [{pid}] timed out; auto-submitted '...'.", currentPlayerId);
+                    "CluePhase: [{pid}] timed out; auto-submitted '{clue}'.", currentPlayerId, clue);
             }
 
             // Check if all alive players have submitted.
@@ -139,6 +138,25 @@ namespace KnockBox.Services.Logic.Games.ConsultTheCard.FSM.States
             => _expiresAt - now;
 
         // ── Private helpers ───────────────────────────────────────────────────
+
+        /// <summary>
+        /// Returns the player's pending clue text if valid, otherwise "...".
+        /// Validates: non-empty, ≤50 chars, not the secret word, not previously used.
+        /// </summary>
+        private static string ResolvePendingClue(ConsultTheCardGameContext context, ConsultTheCardPlayerState player)
+        {
+            string? pending = player.PendingClue?.Trim();
+            if (string.IsNullOrWhiteSpace(pending))
+                return "...";
+            if (pending.Length > 50)
+                return "...";
+            if (player.SecretWord is not null &&
+                string.Equals(pending, player.SecretWord, StringComparison.OrdinalIgnoreCase))
+                return "...";
+            if (context.State.UsedClues.Contains(pending))
+                return "...";
+            return pending;
+        }
 
         /// <summary>
         /// Advances <see cref="ConsultTheCardGameState.TurnManager.CurrentPlayerIndex"/> past eliminated players
