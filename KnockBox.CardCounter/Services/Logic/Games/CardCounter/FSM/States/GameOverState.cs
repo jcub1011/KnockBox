@@ -12,7 +12,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
     {
         public ValueResult<IGameState<CardCounterGameContext, CardCounterCommand>?> OnEnter(CardCounterGameContext context)
         {
-            context.State.GamePhase = GamePhase.GameOver;
+            context.State.SetPhase(GamePhase.GameOver);
 
             foreach (var player in context.GamePlayers.Values)
             {

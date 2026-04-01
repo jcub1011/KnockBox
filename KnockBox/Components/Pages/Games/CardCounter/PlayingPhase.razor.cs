@@ -79,8 +79,8 @@ namespace KnockBox.Components.Pages.Games.CardCounter
 
             // Only clear transient UI state (pending card, selected target, etc.) when the
             // game phase or active player actually changes — not on every tick notification.
-            var currentPhase = GameState?.GamePhase;
-            var currentPlayerIndex = GameState?.CurrentPlayerIndex ?? -1;
+            var currentPhase = GameState?.Phase;
+            var currentPlayerIndex = GameState?.TurnManager.CurrentPlayerIndex ?? -1;
             if (currentPhase != _lastKnownPhase || currentPlayerIndex != _lastKnownPlayerIndex)
             {
                 _lastKnownPhase = currentPhase;
@@ -145,8 +145,8 @@ namespace KnockBox.Components.Pages.Games.CardCounter
             if (GameState == null || UserService.CurrentUser == null) return false;
             var me = GetMyPlayer();
             if (me == null) return false;
-            if (GameState.TurnOrder.Count == 0 || GameState.CurrentPlayerIndex >= GameState.TurnOrder.Count) return false;
-            var activeId = GameState.TurnOrder[GameState.CurrentPlayerIndex];
+            if (GameState.TurnManager.TurnOrder.Count == 0 || GameState.TurnManager.CurrentPlayerIndex >= GameState.TurnManager.TurnOrder.Count) return false;
+            var activeId = GameState.TurnManager.TurnOrder[GameState.TurnManager.CurrentPlayerIndex];
             return activeId == UserService.CurrentUser.Id
                 && me.PrivateReveal == null
                 && !IsOverHandLimit()
@@ -283,7 +283,7 @@ namespace KnockBox.Components.Pages.Games.CardCounter
             if (GameState == null || UserService.CurrentUser == null) return false;
             // Show Not My Money target selection to the active player when the state is waiting for their choice
             if (!GameState.IsNotMyMoneySelecting) return false;
-            var activeId = GameState.TurnOrder.Count > 0 ? GameState.TurnOrder[GameState.CurrentPlayerIndex] : "";
+            var activeId = GameState.TurnManager.CurrentPlayer ?? "";
             return activeId == UserService.CurrentUser.Id;
         }
 

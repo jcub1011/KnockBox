@@ -11,7 +11,7 @@ namespace KnockBox.Core.Services.State.Games.Shared
     /// </summary>
     /// <typeparam name="TContext"></typeparam>
     /// <typeparam name="TCommand"></typeparam>
-    public interface IFininteStateMachine<TContext, TCommand>
+    public interface IFiniteStateMachine<TContext, TCommand>
     {
         /// <summary>
         /// The event manager responsible for handling state change events.

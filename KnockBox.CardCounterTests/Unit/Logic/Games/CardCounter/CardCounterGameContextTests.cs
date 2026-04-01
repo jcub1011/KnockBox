@@ -36,7 +36,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             var player = new PlayerState { PlayerId = id, DisplayName = name, Balance = balance };
             if (pot != null) player.Pot.AddRange(pot);
             _state.GamePlayers[id] = player;
-            _state.TurnOrder.Add(id);
+            _state.TurnManager.TurnOrder.Add(id);
             return player;
         }
 
@@ -295,11 +295,11 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
         {
             MakePlayer("p1", "P1");
             MakePlayer("p2", "P2");
-            _state.CurrentPlayerIndex = 1; // last player
+            _state.TurnManager.SetCurrentPlayerIndex(1); // last player
 
             _context.AdvanceTurn();
 
-            Assert.AreEqual(0, _state.CurrentPlayerIndex, "Advancing from last player should wrap to index 0.");
+            Assert.AreEqual(0, _state.TurnManager.CurrentPlayerIndex, "Advancing from last player should wrap to index 0.");
         }
 
         [TestMethod]
@@ -308,11 +308,11 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             MakePlayer("p1", "P1");
             MakePlayer("p2", "P2");
             MakePlayer("p3", "P3");
-            _state.CurrentPlayerIndex = 0;
+            _state.TurnManager.SetCurrentPlayerIndex(0);
 
             _context.AdvanceTurn();
 
-            Assert.AreEqual(1, _state.CurrentPlayerIndex);
+            Assert.AreEqual(1, _state.TurnManager.CurrentPlayerIndex);
         }
 
         // ── RecordDraw / RecordBurn / RecordActionCardPlay ────────────────────

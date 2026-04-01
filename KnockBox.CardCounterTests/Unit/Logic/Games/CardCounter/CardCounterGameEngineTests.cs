@@ -114,7 +114,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             using var state = await CreateStartedGameAsync(_player1);
 
             // After start, game enters BuyIn phase
-            Assert.AreEqual(GamePhase.BuyIn, state.GamePhase);
+            Assert.AreEqual(GamePhase.BuyIn, state.Phase);
         }
 
         [TestMethod]
@@ -144,7 +144,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             using var state = await CreateStartedActiveOperatorGameAsync(_player1);
 
             // Active Operator Mode skips the buy-in phase; game should be in Playing state
-            Assert.AreEqual(GamePhase.Playing, state.GamePhase,
+            Assert.AreEqual(GamePhase.Playing, state.Phase,
                 "Active Operator Mode should skip BuyIn and go straight to Playing.");
         }
 
@@ -242,6 +242,78 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             Assert.IsTrue(result.IsFailure);
         }
 
+        [TestMethod]
+        public async Task AcceptPending_BeforeGameStarted_ReturnsError()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            using var state = (CardCounterGameState)stateResult.Value!;
+            state.RegisterPlayer(_player1);
+
+            var result = _engine.AcceptPending(_player1, state);
+
+            Assert.IsTrue(result.IsFailure);
+        }
+
+        [TestMethod]
+        public async Task SubmitReorder_BeforeGameStarted_ReturnsError()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            using var state = (CardCounterGameState)stateResult.Value!;
+            state.RegisterPlayer(_player1);
+
+            var result = _engine.SubmitReorder(_player1, state, [0, 1, 2]);
+
+            Assert.IsTrue(result.IsFailure);
+        }
+
+        [TestMethod]
+        public async Task DiscardActionCards_BeforeGameStarted_ReturnsError()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            using var state = (CardCounterGameState)stateResult.Value!;
+            state.RegisterPlayer(_player1);
+
+            var result = _engine.DiscardActionCards(_player1, state, [0]);
+
+            Assert.IsTrue(result.IsFailure);
+        }
+
+        [TestMethod]
+        public async Task SkimSelect_BeforeGameStarted_ReturnsError()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            using var state = (CardCounterGameState)stateResult.Value!;
+            state.RegisterPlayer(_player1);
+
+            var result = _engine.SkimSelect(_player1, state, 0, 0);
+
+            Assert.IsTrue(result.IsFailure);
+        }
+
+        [TestMethod]
+        public async Task NotMyMoneySelectTarget_BeforeGameStarted_ReturnsError()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            using var state = (CardCounterGameState)stateResult.Value!;
+            state.RegisterPlayer(_player1);
+
+            var result = _engine.NotMyMoneySelectTarget(_player1, state, "target-id");
+
+            Assert.IsTrue(result.IsFailure);
+        }
+
+        [TestMethod]
+        public async Task NotMyMoneyCancel_BeforeGameStarted_ReturnsError()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            using var state = (CardCounterGameState)stateResult.Value!;
+            state.RegisterPlayer(_player1);
+
+            var result = _engine.NotMyMoneyCancel(_player1, state);
+
+            Assert.IsTrue(result.IsFailure);
+        }
+
         // ── EnableActionTimer ─────────────────────────────────────────────────
 
         [TestMethod]
@@ -271,7 +343,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
         public async Task ResetGame_ByNonHost_ReturnsError()
         {
             using var state = await CreateStartedGameAsync(_player1);
-            state.GamePhase = GamePhase.GameOver;
+            state.SetPhase(GamePhase.GameOver);
 
             var nonHost = new User("NotHost", "nothost-id");
             var result = _engine.ResetGame(nonHost, state);
@@ -283,7 +355,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
         public async Task ResetGame_DuringActiveGame_ReturnsError()
         {
             using var state = await CreateStartedGameAsync(_player1);
-            state.GamePhase = GamePhase.Playing;
+            state.SetPhase(GamePhase.Playing);
 
             var result = _engine.ResetGame(_host, state);
 
@@ -294,7 +366,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
         public async Task ResetGame_DuringBuyIn_ReturnsError()
         {
             using var state = await CreateStartedGameAsync(_player1);
-            // GamePhase is already BuyIn after start
+            // Phase is already BuyIn after start
 
             var result = _engine.ResetGame(_host, state);
 
@@ -305,12 +377,12 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
         public async Task ResetGame_AfterGameOver_TransitionsToBuyIn()
         {
             using var state = await CreateStartedGameAsync(_player1);
-            state.GamePhase = GamePhase.GameOver;
+            state.SetPhase(GamePhase.GameOver);
 
             var result = _engine.ResetGame(_host, state);
 
             Assert.IsTrue((bool)result.IsSuccess);
-            Assert.AreEqual(GamePhase.BuyIn, state.GamePhase, "Reset should transition back to BuyIn.");
+            Assert.AreEqual(GamePhase.BuyIn, state.Phase, "Reset should transition back to BuyIn.");
         }
 
         [TestMethod]
@@ -318,7 +390,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
         {
             using var state = await CreateStartedGameAsync(_player1);
             state.DiscardHistory.Add(new DiscardHistoryEntry("# 5", "🔢", "Player", false));
-            state.GamePhase = GamePhase.GameOver;
+            state.SetPhase(GamePhase.GameOver);
 
             _engine.ResetGame(_host, state);
 
@@ -330,7 +402,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
         {
             using var state = await CreateStartedGameAsync(_player1);
             state.LastPlayedAction = new LastPlayedActionInfo("p1", "P1", ActionType.Burn, null, null);
-            state.GamePhase = GamePhase.GameOver;
+            state.SetPhase(GamePhase.GameOver);
 
             _engine.ResetGame(_host, state);
 
@@ -341,7 +413,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
         public async Task ResetGame_AfterGameOver_RebuildsDeck()
         {
             using var state = await CreateStartedGameAsync(_player1);
-            state.GamePhase = GamePhase.GameOver;
+            state.SetPhase(GamePhase.GameOver);
 
             // Main deck should be empty (exhausted to trigger game over)
             state.MainDeck.Clear();
@@ -350,19 +422,19 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             _engine.ResetGame(_host, state);
 
             // After reset, deck should be rebuilt and BuyIn state sets up shoe via RoundEnd
-            Assert.AreEqual(GamePhase.BuyIn, state.GamePhase);
+            Assert.AreEqual(GamePhase.BuyIn, state.Phase);
         }
 
         [TestMethod]
         public async Task ResetGame_ActiveOperatorMode_SkipsBuyInPhase()
         {
             using var state = await CreateStartedActiveOperatorGameAsync(_player1);
-            state.GamePhase = GamePhase.GameOver;
+            state.SetPhase(GamePhase.GameOver);
 
             var result = _engine.ResetGame(_host, state);
 
             Assert.IsTrue((bool)result.IsSuccess);
-            Assert.AreEqual(GamePhase.Playing, state.GamePhase,
+            Assert.AreEqual(GamePhase.Playing, state.Phase,
                 "Active Operator Mode reset should skip BuyIn and go straight to Playing.");
         }
 
@@ -373,7 +445,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             // Simulate players having earned/lost balance during the game
             foreach (var ps in state.GamePlayers.Values)
                 ps.Balance = 999;
-            state.GamePhase = GamePhase.GameOver;
+            state.SetPhase(GamePhase.GameOver);
 
             _engine.ResetGame(_host, state);
 
@@ -388,7 +460,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
         public async Task ReturnToLobby_ByNonHost_ReturnsError()
         {
             using var state = await CreateStartedGameAsync(_player1);
-            state.GamePhase = GamePhase.GameOver;
+            state.SetPhase(GamePhase.GameOver);
 
             var nonHost = new User("NotHost", "nothost-id");
             var result = _engine.ReturnToLobby(nonHost, state);
@@ -400,7 +472,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
         public async Task ReturnToLobby_DuringActiveGame_ReturnsError()
         {
             using var state = await CreateStartedGameAsync(_player1);
-            state.GamePhase = GamePhase.Playing;
+            state.SetPhase(GamePhase.Playing);
 
             var result = _engine.ReturnToLobby(_host, state);
 
@@ -411,7 +483,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
         public async Task ReturnToLobby_DuringBuyIn_ReturnsError()
         {
             using var state = await CreateStartedGameAsync(_player1);
-            // GamePhase is already BuyIn after start
+            // Phase is already BuyIn after start
 
             var result = _engine.ReturnToLobby(_host, state);
 
@@ -422,7 +494,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
         public async Task ReturnToLobby_AfterGameOver_MakesStateJoinable()
         {
             using var state = await CreateStartedGameAsync(_player1);
-            state.GamePhase = GamePhase.GameOver;
+            state.SetPhase(GamePhase.GameOver);
 
             var result = _engine.ReturnToLobby(_host, state);
 
@@ -434,7 +506,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
         public async Task ReturnToLobby_AfterGameOver_ClearsContext()
         {
             using var state = await CreateStartedGameAsync(_player1);
-            state.GamePhase = GamePhase.GameOver;
+            state.SetPhase(GamePhase.GameOver);
 
             _engine.ReturnToLobby(_host, state);
 
@@ -445,7 +517,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
         public async Task ReturnToLobby_AfterGameOver_ClearsGamePlayers()
         {
             using var state = await CreateStartedGameAsync(_player1);
-            state.GamePhase = GamePhase.GameOver;
+            state.SetPhase(GamePhase.GameOver);
 
             _engine.ReturnToLobby(_host, state);
 
@@ -457,7 +529,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
         {
             using var state = await CreateStartedGameAsync(_player1);
             state.DiscardHistory.Add(new DiscardHistoryEntry("# 5", "🔢", "Player", false));
-            state.GamePhase = GamePhase.GameOver;
+            state.SetPhase(GamePhase.GameOver);
 
             _engine.ReturnToLobby(_host, state);
 
@@ -469,7 +541,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
         {
             using var state = await CreateStartedGameAsync(_player1);
             state.LastPlayedAction = new LastPlayedActionInfo("p1", "P1", ActionType.Burn, null, null);
-            state.GamePhase = GamePhase.GameOver;
+            state.SetPhase(GamePhase.GameOver);
 
             _engine.ReturnToLobby(_host, state);
 
@@ -480,7 +552,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
         public async Task ReturnToLobby_AfterReturnToLobby_CanStartAgain()
         {
             using var state = await CreateStartedGameAsync(_player1);
-            state.GamePhase = GamePhase.GameOver;
+            state.SetPhase(GamePhase.GameOver);
             _engine.ReturnToLobby(_host, state);
 
             // After returning to lobby, the game should be startable again

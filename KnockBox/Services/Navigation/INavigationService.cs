@@ -29,6 +29,14 @@ namespace KnockBox.Services.Navigation
         string GetGameUri(LobbyRegistration lobbyRegistration);
 
         /// <summary>
+        /// Returns the absolute uri for the join page with the provided room code.
+        /// </summary>
+        /// <param name="code"></param>
+        /// <param name="fresh">Whether to force a fresh session (new user id).</param>
+        /// <returns></returns>
+        string GetJoinUri(string code, bool fresh = false);
+
+        /// <summary>
         /// Navigates to the lobby of the provided game.
         /// </summary>
         /// <param name="lobbyRegistration"></param>

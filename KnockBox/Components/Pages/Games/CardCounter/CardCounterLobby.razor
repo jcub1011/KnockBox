@@ -39,15 +39,15 @@ else
         {
             <LobbyPhase GameState="GameState" />
         }
-        else if (GameState.GamePhase == GamePhase.BuyIn)
+        else if (GameState.Phase == GamePhase.BuyIn)
         {
             <BuyInPhase GameState="GameState" />
         }
-        else if (GameState.GamePhase == GamePhase.Playing)
+        else if (GameState.Phase == GamePhase.Playing)
         {
             <PlayingPhase GameState="GameState" IsAnimatingShoe="IsAnimatingShoe" />
         }
-        else if (GameState.GamePhase == GamePhase.GameOver)
+        else if (GameState.Phase == GamePhase.GameOver)
         {
             <GameOverPhase GameState="GameState" />
         }

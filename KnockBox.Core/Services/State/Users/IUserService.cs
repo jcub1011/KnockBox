@@ -64,5 +64,12 @@
         /// <param name="ct"></param>
         /// <returns></returns>
         Task InitializeCurrentUserAsync(CancellationToken ct = default);
+
+        /// <summary>
+        /// Resets the user's identity, generating a new unique id.
+        /// </summary>
+        /// <param name="ct"></param>
+        /// <returns></returns>
+        Task ResetIdentityAsync(CancellationToken ct = default);
     }
 }

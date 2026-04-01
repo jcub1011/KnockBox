@@ -36,7 +36,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
         {
             var player = new PlayerState { PlayerId = id, DisplayName = name };
             _state.GamePlayers[id] = player;
-            _state.TurnOrder.Add(id);
+            _state.TurnManager.TurnOrder.Add(id);
             return player;
         }
 
@@ -49,7 +49,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
 
             gameOver.OnEnter(_context);
 
-            Assert.AreEqual(GamePhase.GameOver, _state.GamePhase);
+            Assert.AreEqual(GamePhase.GameOver, _state.Phase);
         }
 
         [TestMethod]

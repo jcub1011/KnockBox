@@ -6,7 +6,7 @@
 @{
     var myPlayer = GetMyPlayer();
     var myId = UserService.CurrentUser?.Id ?? "";
-    var activeId = GameState.TurnOrder.Count > 0 ? GameState.TurnOrder[GameState.CurrentPlayerIndex] : "";
+    var activeId = GameState.TurnManager.CurrentPlayer ?? "";
     var isHost = IsHost();
     // Show all game players in the player list (including self; host has no player state)
     var allPlayers = GameState.GamePlayers.Values.ToList();
@@ -993,10 +993,10 @@ else if (GameState.GamePlayers.Values.Any(p => p.ActionHand.Count > GameState.Co
     <div class="cc-header-right">
         @if (!GameState.IsJoinable)
         {
-            <span class="cc-phase-badge cc-phase-@GameState.GamePhase.ToString().ToLower()">
+            <span class="cc-phase-badge cc-phase-@GameState.Phase.ToString().ToLower()">
                 @GetPhaseLabel()
             </span>
-            @if (GameState.GamePhase == GamePhase.Playing && GameState.TurnOrder.Count > 0)
+            @if (GameState.Phase == GamePhase.Playing && GameState.TurnManager.TurnOrder.Count > 0)
             {
                 if (GameState.GamePlayers.TryGetValue(activeId, out var activePl))
                 {
@@ -1021,7 +1021,7 @@ else if (GameState.GamePlayers.Values.Any(p => p.ActionHand.Count > GameState.Co
 </div>
 
 @code {
-    private string GetPhaseLabel() => GameState?.GamePhase switch
+    private string GetPhaseLabel() => GameState?.Phase switch
     {
         GamePhase.BuyIn => "🎲 Buy In",
         GamePhase.Playing => "🃏 Playing",

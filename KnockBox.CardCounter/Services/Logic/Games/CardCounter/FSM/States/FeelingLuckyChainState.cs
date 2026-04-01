@@ -145,7 +145,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
         {
             // Restore turn pointer to the originator
             int idx = context.TurnOrder.IndexOf(_originatorId);
-            if (idx >= 0) context.State.CurrentPlayerIndex = idx;
+            if (idx >= 0) context.State.TurnManager.SetCurrentPlayerIndex(idx);
 
             if (context.CurrentShoe.Count == 0)
                 return new RoundEndState();

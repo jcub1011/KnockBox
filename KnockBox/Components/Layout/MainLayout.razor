@@ -18,9 +18,10 @@
                     Join Code: 
                     <button class="room-code-btn"
                             @onclick="ToggleRoomCode" 
+                            @onmouseup="OnMouseUp"
                             @oncontextmenu="@(() => CopyRoomCodeAsync(currentSession.LobbyRegistration.Code))" 
                             @oncontextmenu:preventDefault="true"
-                            title="Click to reveal. Right-click/Long-press to copy.">
+                            title="Click to reveal. Right-click/Long-press to copy. Middle-click to join in a new tab.">
                         @(_isRoomCodeRevealed ? currentSession.LobbyRegistration.Code : "••••••")
                     </button>
                 </span>
@@ -88,6 +89,16 @@
     }
 
     private void ToggleRoomCode() => _isRoomCodeRevealed = !_isRoomCodeRevealed;
+
+    private async Task OnMouseUp(MouseEventArgs e)
+    {
+        // Button 1 is the middle mouse button.
+        if (e.Button == 1 && GameSessionService.TryGetCurrentSession(out var session))
+        {
+            var url = NavigationService.GetJoinUri(session.LobbyRegistration.Code, fresh: true);
+            await JSRuntime.InvokeVoidAsync("window.open", url, "_blank");
+        }
+    }
 
     private async Task CopyRoomCodeAsync(string code)
     {

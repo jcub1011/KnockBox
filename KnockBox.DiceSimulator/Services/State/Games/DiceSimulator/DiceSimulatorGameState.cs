@@ -1,5 +1,6 @@
 ﻿using KnockBox.Services.State.Games.DiceSimulator.Data;
 using KnockBox.Services.State.Games.Shared;
+using KnockBox.Services.State.Games.Shared.Interfaces;
 using KnockBox.Services.State.Users;
 using System.Collections.Concurrent;
 
@@ -8,10 +9,11 @@ namespace KnockBox.Services.State.Games.DiceSimulator
     public class DiceSimulatorGameState(
         User host,
         ILogger<DiceSimulatorGameState> logger)
-        : AbstractGameState(host, logger)
+        : AbstractGameState(host, logger),
+          IPlayerTrackedGameState<PlayerStats>
     {
         private readonly List<DiceRollEntry> _rollHistory = new();
-        private readonly ConcurrentDictionary<string, PlayerStats> _playerStats = new();
+        public ConcurrentDictionary<string, PlayerStats> GamePlayers { get; } = new();
 
         public IReadOnlyList<DiceRollEntry> RollHistory 
         { 
@@ -24,7 +26,7 @@ namespace KnockBox.Services.State.Games.DiceSimulator
             } 
         }
         
-        public IReadOnlyDictionary<string, PlayerStats> PlayerStats => _playerStats;
+        public IReadOnlyDictionary<string, PlayerStats> PlayerStats => GamePlayers;
 
         public void AddRoll(DiceRollEntry entry)
         {
@@ -36,7 +38,7 @@ namespace KnockBox.Services.State.Games.DiceSimulator
         
         public PlayerStats GetOrAddPlayerStats(string playerId, string playerName)
         {
-            return _playerStats.GetOrAdd(playerId, _ => new PlayerStats { PlayerName = playerName });
+            return GamePlayers.GetOrAdd(playerId, _ => new PlayerStats { PlayerName = playerName });
         }
         
         public void ClearHistory()
@@ -45,7 +47,7 @@ namespace KnockBox.Services.State.Games.DiceSimulator
             {
                 _rollHistory.Clear();
             }
-            _playerStats.Clear();
+            GamePlayers.Clear();
         }
     }
 }

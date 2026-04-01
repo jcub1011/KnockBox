@@ -36,7 +36,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
         {
             var player = new PlayerState { PlayerId = id, DisplayName = name };
             _state.GamePlayers[id] = player;
-            _state.TurnOrder.Add(id);
+            _state.TurnManager.TurnOrder.Add(id);
             return player;
         }
 
@@ -47,7 +47,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
         {
             var source = AddPlayer("src", "Source");
             var target = AddPlayer("tgt", "Target");
-            _state.CurrentPlayerIndex = 0;
+            _state.TurnManager.SetCurrentPlayerIndex(0);
             target.Pot.AddRange([1, 2, 3]);
             _state.CurrentShoe.Push(new NumberCard(1)); // keep shoe non-empty
 
@@ -66,7 +66,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
         {
             var source = AddPlayer("src", "Source");
             var target = AddPlayer("tgt", "Target");
-            _state.CurrentPlayerIndex = 0;
+            _state.TurnManager.SetCurrentPlayerIndex(0);
             target.Pot.AddRange([1, 2, 3]);
             target.ActionHand.Add(new ActionCard(ActionType.Compd));
 
@@ -86,7 +86,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
         {
             var source = AddPlayer("src", "Source");
             var target = AddPlayer("tgt", "Target");
-            _state.CurrentPlayerIndex = 0;
+            _state.TurnManager.SetCurrentPlayerIndex(0);
             target.ActionHand.Add(new ActionCard(ActionType.Compd));
 
             var fsmState = new WaitingForReactionState("src", "tgt", new ActionCard(ActionType.TurnTheTable));
@@ -106,7 +106,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
         {
             var source = AddPlayer("src", "Source");
             var target = AddPlayer("tgt", "Target");
-            _state.CurrentPlayerIndex = 0;
+            _state.TurnManager.SetCurrentPlayerIndex(0);
             source.Pot.AddRange([1, 2]);
             target.Pot.AddRange([3, 4, 5]);
             _state.CurrentShoe.Push(new NumberCard(1));
@@ -125,7 +125,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
         {
             var source = AddPlayer("src", "Source");
             var target = AddPlayer("tgt", "Target");
-            _state.CurrentPlayerIndex = 0;
+            _state.TurnManager.SetCurrentPlayerIndex(0);
             source.Pot.AddRange([1, 2]);
             target.Pot.AddRange([3, 4, 5]);
             target.ActionHand.Add(new ActionCard(ActionType.Compd));
@@ -147,7 +147,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             var source = AddPlayer("src", "Source");
             var target = AddPlayer("tgt", "Target");
             var other = AddPlayer("other", "Other");
-            _state.CurrentPlayerIndex = 0;
+            _state.TurnManager.SetCurrentPlayerIndex(0);
             target.Pot.AddRange([1, 2, 3]);
 
             var fsmState = new WaitingForReactionState("src", "tgt", new ActionCard(ActionType.TurnTheTable));
@@ -165,7 +165,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
         {
             var source = AddPlayer("src", "Source");
             var target = AddPlayer("tgt", "Target");
-            _state.CurrentPlayerIndex = 0;
+            _state.TurnManager.SetCurrentPlayerIndex(0);
 
             var actionCard = new ActionCard(ActionType.TurnTheTable);
             var fsmState = new WaitingForReactionState("src", "tgt", actionCard);
@@ -184,7 +184,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
         {
             var source = AddPlayer("src", "Source");
             var target = AddPlayer("tgt", "Target");
-            _state.CurrentPlayerIndex = 0;
+            _state.TurnManager.SetCurrentPlayerIndex(0);
             target.Pot.AddRange([1, 2]);
             // No cards in shoe → after advancing turn the shoe is empty → RoundEnd
 
@@ -207,7 +207,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
         {
             var source = AddPlayer("src", "Source");
             var target = AddPlayer("tgt", "Target");
-            _state.CurrentPlayerIndex = 0;
+            _state.TurnManager.SetCurrentPlayerIndex(0);
             target.ActionHand.Add(new ActionCard(ActionType.Burn)); // not a Comp'd
             target.Pot.AddRange([1, 2, 3]);
 

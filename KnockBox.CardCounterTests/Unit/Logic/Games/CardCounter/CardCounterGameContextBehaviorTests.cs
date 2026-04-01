@@ -106,8 +106,8 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             var player = new PlayerState { PlayerId = "p1", DisplayName = "Player 1" };
             player.ActionHand.Add(new ActionCard(ActionType.Burn));
             state.GamePlayers[player.PlayerId] = player;
-            state.TurnOrder.Add(player.PlayerId);
-            state.CurrentPlayerIndex = 0;
+            state.TurnManager.TurnOrder.Add(player.PlayerId);
+            state.TurnManager.SetCurrentPlayerIndex(0);
 
             // Place exactly one card in the shoe; main deck stays empty
             state.CurrentShoe.Push(new NumberCard(5));
@@ -151,10 +151,10 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             state.GamePlayers[p1.PlayerId] = p1;
             state.GamePlayers[p2.PlayerId] = p2;
             state.GamePlayers[p3.PlayerId] = p3;
-            state.TurnOrder.Add(p1.PlayerId);
-            state.TurnOrder.Add(p2.PlayerId);
-            state.TurnOrder.Add(p3.PlayerId);
-            state.CurrentPlayerIndex = 0;
+            state.TurnManager.TurnOrder.Add(p1.PlayerId);
+            state.TurnManager.TurnOrder.Add(p2.PlayerId);
+            state.TurnManager.TurnOrder.Add(p3.PlayerId);
+            state.TurnManager.SetCurrentPlayerIndex(0);
 
             var fsmState = new PlayerTurnState();
             fsmState.OnEnter(context);
@@ -199,10 +199,10 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             state.GamePlayers[p1.PlayerId] = p1;
             state.GamePlayers[p2.PlayerId] = p2;
             state.GamePlayers[p3.PlayerId] = p3;
-            state.TurnOrder.Add(p1.PlayerId);
-            state.TurnOrder.Add(p2.PlayerId);
-            state.TurnOrder.Add(p3.PlayerId);
-            state.CurrentPlayerIndex = 0;
+            state.TurnManager.TurnOrder.Add(p1.PlayerId);
+            state.TurnManager.TurnOrder.Add(p2.PlayerId);
+            state.TurnManager.TurnOrder.Add(p3.PlayerId);
+            state.TurnManager.SetCurrentPlayerIndex(0);
 
             var fsmState = new PlayerTurnState();
             fsmState.OnEnter(context);
@@ -245,10 +245,10 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             state.GamePlayers[p1.PlayerId] = p1;
             state.GamePlayers[p2.PlayerId] = p2;
             state.GamePlayers[p3.PlayerId] = p3;
-            state.TurnOrder.Add(p1.PlayerId);
-            state.TurnOrder.Add(p2.PlayerId);
-            state.TurnOrder.Add(p3.PlayerId);
-            state.CurrentPlayerIndex = 1; // p2 is the active player
+            state.TurnManager.TurnOrder.Add(p1.PlayerId);
+            state.TurnManager.TurnOrder.Add(p2.PlayerId);
+            state.TurnManager.TurnOrder.Add(p3.PlayerId);
+            state.TurnManager.SetCurrentPlayerIndex(1); // p2 is the active player
 
             var fsmState = new PlayerTurnState();
             fsmState.OnEnter(context);
@@ -281,9 +281,9 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
 
             state.GamePlayers[p1.PlayerId] = p1;
             state.GamePlayers[p2.PlayerId] = p2;
-            state.TurnOrder.Add(p1.PlayerId);
-            state.TurnOrder.Add(p2.PlayerId);
-            state.CurrentPlayerIndex = 0;
+            state.TurnManager.TurnOrder.Add(p1.PlayerId);
+            state.TurnManager.TurnOrder.Add(p2.PlayerId);
+            state.TurnManager.SetCurrentPlayerIndex(0);
 
             var fsmState = new PlayerTurnState();
             fsmState.OnEnter(context);
@@ -311,8 +311,8 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             p1.ActionHand.Add(new ActionCard(ActionType.Tilt));
 
             state.GamePlayers[p1.PlayerId] = p1;
-            state.TurnOrder.Add(p1.PlayerId);
-            state.CurrentPlayerIndex = 0;
+            state.TurnManager.TurnOrder.Add(p1.PlayerId);
+            state.TurnManager.SetCurrentPlayerIndex(0);
 
             var fsmState = new PlayerTurnState();
             fsmState.OnEnter(context);

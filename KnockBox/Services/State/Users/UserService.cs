@@ -44,6 +44,20 @@
             UserInitialized?.Invoke();
         }
 
+        public async Task ResetIdentityAsync(CancellationToken ct = default)
+        {
+            try
+            {
+                await sessionStorageService.RemoveAsync("user", "id");
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Error resetting user identity.");
+            }
+
+            await InitializeCurrentUserAsync(ct);
+        }
+
         private async void OnNameChanged(UserNameChangedArgs args)
         {
             try

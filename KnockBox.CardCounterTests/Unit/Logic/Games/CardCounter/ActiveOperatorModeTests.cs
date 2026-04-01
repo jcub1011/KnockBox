@@ -48,7 +48,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
                 ActiveOperator = activeOperator
             };
             _state.GamePlayers[id] = player;
-            _state.TurnOrder.Add(id);
+            _state.TurnManager.TurnOrder.Add(id);
             return player;
         }
 
@@ -384,7 +384,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             var source = MakePlayer("src", "Source");
             var target = MakePlayer("tgt", "Target");
             target.Balance = 321;
-            _state.CurrentPlayerIndex = 0;
+            _state.TurnManager.SetCurrentPlayerIndex(0);
             _state.CurrentShoe.Push(new NumberCard(1));
 
             var fsmState = new WaitingForReactionState("src", "tgt", new ActionCard(ActionType.TurnTheTable));
@@ -403,7 +403,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             var source = MakePlayer("src", "Source");
             var target = MakePlayer("tgt", "Target");
             target.Balance = 321;
-            _state.CurrentPlayerIndex = 0;
+            _state.TurnManager.SetCurrentPlayerIndex(0);
             target.ActionHand.Add(new ActionCard(ActionType.Compd));
 
             var fsmState = new WaitingForReactionState("src", "tgt", new ActionCard(ActionType.TurnTheTable));
@@ -420,7 +420,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             var source = MakePlayer("src", "Source");
             var target = MakePlayer("tgt", "Target");
             target.Balance = -42;
-            _state.CurrentPlayerIndex = 0;
+            _state.TurnManager.SetCurrentPlayerIndex(0);
             _state.CurrentShoe.Push(new NumberCard(1));
 
             var fsmState = new WaitingForReactionState("src", "tgt", new ActionCard(ActionType.TurnTheTable));
@@ -439,7 +439,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             var target = MakePlayer("tgt", "Target");
             source.Balance = 100;
             target.Balance = -50;
-            _state.CurrentPlayerIndex = 0;
+            _state.TurnManager.SetCurrentPlayerIndex(0);
             _state.CurrentShoe.Push(new NumberCard(1));
 
             var fsmState = new WaitingForReactionState("src", "tgt", new ActionCard(ActionType.Launder));
@@ -457,7 +457,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             var target = MakePlayer("tgt", "Target");
             source.Balance = 100;
             target.Balance = -50;
-            _state.CurrentPlayerIndex = 0;
+            _state.TurnManager.SetCurrentPlayerIndex(0);
             target.ActionHand.Add(new ActionCard(ActionType.Compd));
 
             var fsmState = new WaitingForReactionState("src", "tgt", new ActionCard(ActionType.Launder));
@@ -478,7 +478,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             p1.Balance = 321;
             p1.ActiveOperator = Operator.Add;
             p1.ActionHand.Add(new ActionCard(ActionType.TurnTheTable));
-            _state.CurrentPlayerIndex = 0;
+            _state.TurnManager.SetCurrentPlayerIndex(0);
             _state.CurrentShoe.Push(new NumberCard(1));
 
             var fsmState = new PlayerTurnState();

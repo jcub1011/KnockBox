@@ -1,6 +1,8 @@
 using KnockBox.Services.Logic.Games.CardCounter.FSM;
 using KnockBox.Services.State.Games.CardCounter.Data;
 using KnockBox.Services.State.Games.Shared;
+using KnockBox.Services.State.Games.Shared.Components;
+using KnockBox.Services.State.Games.Shared.Interfaces;
 using KnockBox.Services.State.Users;
 using System.Collections.Concurrent;
 
@@ -9,42 +11,50 @@ namespace KnockBox.Services.State.Games.CardCounter
     public class CardCounterGameState(
         User host,
         ILogger<CardCounterGameState> logger)
-        : AbstractGameState(host, logger)
+        : AbstractGameState(host, logger),
+          IPhasedGameState<GamePhase>,
+          IConfigurableGameState<GameConfig>,
+          IPlayerTrackedGameState<PlayerState>,
+          IFsmContextGameState<CardCounterGameContext>
     {
         /// <summary>
         /// The FSM context for this game instance. Set when the game starts.
         /// </summary>
-        public CardCounterGameContext? Context { get; internal set; }
+        public CardCounterGameContext? Context { get; set; }
 
         /// <summary>
         /// The current phase of the game.
         /// </summary>
-        public GamePhase GamePhase { get; set; }
+        public GamePhase Phase { get; private set; }
 
         /// <summary>
-        /// Players in turn order (by player ID).
+        /// Updates the current phase and notifies state-change listeners.
         /// </summary>
-        public readonly List<string> TurnOrder = [];
+        public void SetPhase(GamePhase phase)
+        {
+            Phase = phase;
+            NotifyStateChanged();
+        }
 
         /// <summary>
-        /// Index into <see cref="TurnOrder"/> identifying the active player.
+        /// Manages turn order and active player tracking.
         /// </summary>
-        public int CurrentPlayerIndex { get; set; }
+        public TurnManager TurnManager { get; } = new();
 
         /// <summary>
         /// Gets the id of the current player in the turn order.
         /// </summary>
-        public string CurrentPlayer => TurnOrder[CurrentPlayerIndex];
+        public string? CurrentPlayer => TurnManager.CurrentPlayer;
 
         /// <summary>
         /// Gets the player state of the current player in the turn order. Null when the current player does not have a state defined.
         /// </summary>
-        public PlayerState? CurrentPlayerState => GamePlayers.TryGetValue(CurrentPlayer, out var state) ? state : null;
+        public PlayerState? CurrentPlayerState => CurrentPlayer != null && GamePlayers.TryGetValue(CurrentPlayer, out var state) ? state : null;
 
         /// <summary>
         /// All player states, keyed by player ID.
         /// </summary>
-        public readonly ConcurrentDictionary<string, PlayerState> GamePlayers = new();
+        public ConcurrentDictionary<string, PlayerState> GamePlayers { get; } = new();
 
         /// <summary>
         /// Current shoe index (incremented each time a new shoe is dealt).

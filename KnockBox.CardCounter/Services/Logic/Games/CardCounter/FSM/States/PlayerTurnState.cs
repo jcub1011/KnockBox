@@ -15,7 +15,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
         public ValueResult<IGameState<CardCounterGameContext, CardCounterCommand>?> OnEnter(CardCounterGameContext context)
         {
             _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.Config.PlayerTurnTimeoutMs);
-            context.State.GamePhase = GamePhase.Playing;
+            context.State.SetPhase(GamePhase.Playing);
             context.State.PendingReaction = null;
             context.State.FeelingLuckyTargetId = null;
             context.State.IsNotMyMoneySelecting = false;
@@ -258,7 +258,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter.FSM.States
             }
 
             // Determine the next player in turn order (wrapping) to be the first target
-            int nextIndex = (context.State.CurrentPlayerIndex + 1) % context.TurnOrder.Count;
+            int nextIndex = (context.State.TurnManager.CurrentPlayerIndex + 1) % context.TurnOrder.Count;
             string targetId = context.TurnOrder[nextIndex];
             return new FeelingLuckyChainState(sourceId, targetId);
         }
