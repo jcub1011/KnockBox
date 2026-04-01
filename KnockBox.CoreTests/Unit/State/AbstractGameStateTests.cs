@@ -302,7 +302,7 @@ public sealed class AbstractGameStateTests
 
         Assert.IsTrue(result.IsSuccess);
         Assert.IsFalse(state.Players.Contains(player));
-        Assert.IsTrue(state.KickedPlayers.Contains(player));
+        Assert.IsTrue(state.IsKicked(player));
     }
 
     [TestMethod]

@@ -36,7 +36,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
         {
             var player = new PlayerState { PlayerId = id, DisplayName = name };
             _state.GamePlayers[id] = player;
-            _state.TurnOrder.Add(id);
+            _state.TurnManager.TurnOrder.Add(id);
             return player;
         }
 
@@ -44,7 +44,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
         public void OnEnter_SetsIsNotMyMoneySelectingAndPendingOperator()
         {
             AddPlayer("p1", "Player 1");
-            _state.CurrentPlayerIndex = 0;
+            _state.TurnManager.SetCurrentPlayerIndex(0);
 
             var operatorCard = new OperatorCard(Operator.Add);
             var fsmState = new NotMyMoneyState("p1", operatorCard);
@@ -59,7 +59,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
         {
             var player = AddPlayer("p1", "Player 1");
             var target = AddPlayer("p2", "Player 2");
-            _state.CurrentPlayerIndex = 0;
+            _state.TurnManager.SetCurrentPlayerIndex(0);
             player.ActionHand.Add(new ActionCard(ActionType.NotMyMoney));
             _state.CurrentShoe.Push(new NumberCard(1)); // keep shoe non-empty
 
@@ -78,7 +78,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
         {
             var player = AddPlayer("p1", "Player 1");
             AddPlayer("p2", "Player 2");
-            _state.CurrentPlayerIndex = 0;
+            _state.TurnManager.SetCurrentPlayerIndex(0);
             player.ActionHand.Add(new ActionCard(ActionType.NotMyMoney));
 
             var fsmState = new NotMyMoneyState("p1", new OperatorCard(Operator.Add));
@@ -94,7 +94,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
         {
             var player = AddPlayer("p1", "Player 1");
             AddPlayer("p2", "Player 2");
-            _state.CurrentPlayerIndex = 0;
+            _state.TurnManager.SetCurrentPlayerIndex(0);
             player.ActionHand.Add(new ActionCard(ActionType.NotMyMoney));
 
             var fsmState = new NotMyMoneyState("p1", new OperatorCard(Operator.Add));
@@ -109,7 +109,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
         public void SelectTarget_UnknownTarget_IsNoOp()
         {
             AddPlayer("p1", "Player 1");
-            _state.CurrentPlayerIndex = 0;
+            _state.TurnManager.SetCurrentPlayerIndex(0);
 
             var fsmState = new NotMyMoneyState("p1", new OperatorCard(Operator.Add));
             fsmState.OnEnter(_context);
@@ -124,7 +124,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
         {
             var player = AddPlayer("p1", "Player 1");
             AddPlayer("p2", "Player 2"); // need at least 2 players for turn advance
-            _state.CurrentPlayerIndex = 0;
+            _state.TurnManager.SetCurrentPlayerIndex(0);
             player.Balance = 100;
             player.Pot.Add(5); // pot = 5
             _state.CurrentShoe.Push(new NumberCard(1)); // keep shoe non-empty
@@ -143,7 +143,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
         {
             var player = AddPlayer("p1", "Player 1");
             AddPlayer("p2", "Player 2");
-            _state.CurrentPlayerIndex = 0;
+            _state.TurnManager.SetCurrentPlayerIndex(0);
             _state.CurrentShoe.Push(new NumberCard(1));
 
             var fsmState = new NotMyMoneyState("p1", new OperatorCard(Operator.Add));
@@ -160,7 +160,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
         {
             var player = AddPlayer("p1", "Player 1");
             var p2 = AddPlayer("p2", "Player 2");
-            _state.CurrentPlayerIndex = 0;
+            _state.TurnManager.SetCurrentPlayerIndex(0);
             _state.CurrentShoe.Push(new NumberCard(1)); // keep shoe non-empty
 
             var fsmState = new NotMyMoneyState("p1", new OperatorCard(Operator.Add));
@@ -168,7 +168,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
 
             fsmState.HandleCommand(_context, new NotMyMoneyCancelCommand("p1"));
 
-            Assert.AreEqual(1, _state.CurrentPlayerIndex, "Turn should advance to p2 after cancel.");
+            Assert.AreEqual(1, _state.TurnManager.CurrentPlayerIndex, "Turn should advance to p2 after cancel.");
         }
 
         [TestMethod]
@@ -176,7 +176,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
         {
             var player = AddPlayer("p1", "Player 1");
             AddPlayer("p2", "Player 2");
-            _state.CurrentPlayerIndex = 0;
+            _state.TurnManager.SetCurrentPlayerIndex(0);
             _state.CurrentShoe.Push(new NumberCard(1));
 
             var fsmState = new NotMyMoneyState("p1", new OperatorCard(Operator.Subtract));
@@ -193,7 +193,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
         {
             var player = AddPlayer("p1", "Player 1");
             AddPlayer("p2", "Player 2");
-            _state.CurrentPlayerIndex = 0;
+            _state.TurnManager.SetCurrentPlayerIndex(0);
             // Shoe is empty
 
             var fsmState = new NotMyMoneyState("p1", new OperatorCard(Operator.Add));
@@ -210,7 +210,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
         {
             AddPlayer("p1", "Player 1");
             var other = AddPlayer("other", "Other");
-            _state.CurrentPlayerIndex = 0;
+            _state.TurnManager.SetCurrentPlayerIndex(0);
 
             var fsmState = new NotMyMoneyState("p1", new OperatorCard(Operator.Add));
             fsmState.OnEnter(_context);
@@ -225,7 +225,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
         {
             var player = AddPlayer("p1", "Player 1");
             var target = AddPlayer("p2", "Player 2");
-            _state.CurrentPlayerIndex = 0;
+            _state.TurnManager.SetCurrentPlayerIndex(0);
             player.ActionHand.Add(new ActionCard(ActionType.NotMyMoney));
 
             var fsmState = new NotMyMoneyState("p1", new OperatorCard(Operator.Add));

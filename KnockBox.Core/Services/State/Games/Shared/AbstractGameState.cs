@@ -13,10 +13,18 @@ namespace KnockBox.Services.State.Games.Shared
         private readonly Lock _scheduledLock = new();
         private readonly List<CancellationTokenSource> _scheduledCallbacks = [];
         private readonly Lock _playerLock = new();
-        private readonly Dictionary<User, IDisposable> _players = [];
-        private readonly HashSet<User> _kickedPlayers = [];
+        private readonly Dictionary<string, (User User, IDisposable Token)> _players = [];
+        private readonly HashSet<string> _kickedPlayers = [];
         private readonly CancellationTokenSource _disposeCts = new();
         private int _disposed;
+
+        /// <summary>
+        /// Notifies all subscribers that the state has changed.
+        /// </summary>
+        protected void NotifyStateChanged()
+        {
+            StateChangedEventManager.Notify();
+        }
 
         /// <summary>
         /// The UTC time when this state was created.
@@ -64,7 +72,7 @@ namespace KnockBox.Services.State.Games.Shared
             get
             {
                 using var scope = _playerLock.EnterScope();
-                return [.. _players.Keys];
+                return [.. _players.Values.Select(p => p.User)];
             }
         }
 
@@ -76,8 +84,20 @@ namespace KnockBox.Services.State.Games.Shared
             get
             {
                 using var scope = _playerLock.EnterScope();
-                return [.. _kickedPlayers];
+                return [.. _players.Values.Where(p => _kickedPlayers.Contains(p.User.Id)).Select(p => p.User)];
             }
+        }
+
+        /// <summary>
+        /// Checks if a player has been kicked from this game.
+        /// </summary>
+        /// <param name="user"></param>
+        /// <returns></returns>
+        public bool IsKicked(User user)
+        {
+            if (user is null) return false;
+            using var scope = _playerLock.EnterScope();
+            return _kickedPlayers.Contains(user.Id);
         }
 
         /// <summary>
@@ -93,16 +113,53 @@ namespace KnockBox.Services.State.Games.Shared
             if (!IsJoinable)
                 return ValueResult<IDisposable>.FromError("The game is not currently joinable.");
 
-            if (Host == player)
+            if (Host.Id == player.Id)
                 return ValueResult<IDisposable>.FromError("Host cannot be a player in the game.");
 
             using var scope = _playerLock.EnterScope();
-            if (_kickedPlayers.Contains(player))
+            if (_kickedPlayers.Contains(player.Id))
             {
                 return ValueResult<IDisposable>.FromError("You have been kicked from this lobby and cannot rejoin.", $"Player [{player.Name}] was kicked and cannot rejoin.");
             }
 
-            bool isNew = !_players.ContainsKey(player);
+            // Check for re-join to avoid renaming if the player is already in the lobby (by ID).
+            bool isRejoin = _players.ContainsKey(player.Id);
+
+            if (!isRejoin)
+            {
+                var takenNames = _players.Values.Select(p => p.User)
+                    .Concat([Host])
+                    .Select(u => u.Name)
+                    .ToHashSet();
+
+                if (takenNames.Contains(player.Name))
+                {
+                    string originalName = player.Name;
+                    int counter = 1;
+                    while (true)
+                    {
+                        // Generate suffix: (#) where # is an incrementing counter.
+                        string suffix = $" ({counter})";
+
+                        // Truncate original name to fit suffix within 12 chars.
+                        int maxBaseLength = 12 - suffix.Length;
+                        string baseName = originalName;
+                        if (baseName.Length > maxBaseLength)
+                        {
+                            baseName = baseName[..maxBaseLength];
+                        }
+
+                        string candidate = baseName + suffix;
+
+                        if (!takenNames.Contains(candidate))
+                        {
+                            player.Name = candidate;
+                            break;
+                        }
+                        counter++;
+                    }
+                }
+            }
 
             // Self-reference allows the dispose closure to verify that this is still the
             // authoritative token for this player.  If the player re-registers before
@@ -121,18 +178,18 @@ namespace KnockBox.Services.State.Games.Shared
                 Execute(() =>
                 {
                     using var innerScope = _playerLock.EnterScope();
-                    if (_players.TryGetValue(player, out var current) && ReferenceEquals(current, unsubscriber))
+                    if (_players.TryGetValue(player.Id, out var current) && ReferenceEquals(current.Token, unsubscriber))
                     {
-                        _players.Remove(player);
+                        _players.Remove(player.Id);
                         shouldFire = true;
                     }
                 });
                 if (shouldFire) PlayerUnregistered?.Invoke(player);
             });
 
-            _players[player] = unsubscriber;
+            _players[player.Id] = (player, unsubscriber);
 
-            if (isNew)
+            if (!isRejoin)
                 logger.LogInformation("User [{userId}] entered game [{type}] hosted by user [{hostId}].", player.Id, GetType().Name, Host.Id);
             else
                 logger.LogInformation("User [{userId}] rejoined game [{type}] hosted by user [{hostId}].", player.Id, GetType().Name, Host.Id);
@@ -148,10 +205,10 @@ namespace KnockBox.Services.State.Games.Shared
         public Result KickPlayer(User player)
         {
             using var scope = _playerLock.EnterScope();
-            if (_players.TryGetValue(player, out var leaveToken))
+            if (_players.TryGetValue(player.Id, out var registration))
             {
-                _kickedPlayers.Add(player);
-                leaveToken.Dispose();
+                _kickedPlayers.Add(player.Id);
+                registration.Token.Dispose();
                 return Result.Success;
             }
 

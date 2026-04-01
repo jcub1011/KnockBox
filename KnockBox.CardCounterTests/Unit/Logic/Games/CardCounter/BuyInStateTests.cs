@@ -35,7 +35,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
         {
             var player = new PlayerState { PlayerId = id, DisplayName = name, BuyInRoll = buyInRoll };
             _state.GamePlayers[id] = player;
-            _state.TurnOrder.Add(id);
+            _state.TurnManager.TurnOrder.Add(id);
             return player;
         }
 
@@ -45,7 +45,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             var fsmState = new BuyInState();
             fsmState.OnEnter(_context);
 
-            Assert.AreEqual(GamePhase.BuyIn, _state.GamePhase);
+            Assert.AreEqual(GamePhase.BuyIn, _state.Phase);
         }
 
         [TestMethod]

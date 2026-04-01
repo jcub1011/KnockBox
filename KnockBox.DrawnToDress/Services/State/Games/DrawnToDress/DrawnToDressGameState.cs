@@ -1,6 +1,7 @@
 using KnockBox.Services.Logic.Games.DrawnToDress.FSM;
 using KnockBox.Services.State.Games.DrawnToDress.Data;
 using KnockBox.Services.State.Games.Shared;
+using KnockBox.Services.State.Games.Shared.Interfaces;
 using KnockBox.Services.State.Users;
 using System.Collections.Concurrent;
 
@@ -9,7 +10,11 @@ namespace KnockBox.Services.State.Games.DrawnToDress
     public class DrawnToDressGameState(
         User host,
         ILogger<DrawnToDressGameState> logger)
-        : AbstractGameState(host, logger)
+        : AbstractGameState(host, logger),
+          IPhasedGameState<GamePhase>,
+          IConfigurableGameState<DrawnToDressConfig>,
+          IPlayerTrackedGameState<DrawnToDressPlayerState>,
+          IFsmContextGameState<DrawnToDressGameContext>
     {
         // ── Phase ─────────────────────────────────────────────────────────────
 
@@ -30,7 +35,7 @@ namespace KnockBox.Services.State.Games.DrawnToDress
         /// <summary>
         /// All player states, keyed by player ID.
         /// </summary>
-        public readonly ConcurrentDictionary<string, DrawnToDressPlayerState> GamePlayers = new();
+        public ConcurrentDictionary<string, DrawnToDressPlayerState> GamePlayers { get; } = new();
 
         // ── FSM ───────────────────────────────────────────────────────────────
 
@@ -161,7 +166,7 @@ namespace KnockBox.Services.State.Games.DrawnToDress
         public void SetPhase(GamePhase phase)
         {
             Phase = phase;
-            StateChangedEventManager.Notify();
+            NotifyStateChanged();
         }
 
     }

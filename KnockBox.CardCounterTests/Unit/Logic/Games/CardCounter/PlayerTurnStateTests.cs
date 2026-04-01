@@ -36,13 +36,13 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
         {
             var player = new PlayerState { PlayerId = id, DisplayName = name };
             _state.GamePlayers[id] = player;
-            _state.TurnOrder.Add(id);
+            _state.TurnManager.TurnOrder.Add(id);
             return player;
         }
 
         private void SetCurrentPlayer(int index)
         {
-            _state.CurrentPlayerIndex = index;
+            _state.TurnManager.SetCurrentPlayerIndex(index);
         }
 
         // ── EnableActionTimer = false ─────────────────────────────────────────
@@ -168,7 +168,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             fsmState.OnEnter(_context);
             fsmState.HandleCommand(_context, new DrawCardCommand("p1"));
 
-            Assert.AreEqual(1, _state.CurrentPlayerIndex, "Turn should advance to p2 (index 1).");
+            Assert.AreEqual(1, _state.TurnManager.CurrentPlayerIndex, "Turn should advance to p2 (index 1).");
         }
 
         [TestMethod]
@@ -558,11 +558,11 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
         [TestMethod]
         public void OnEnter_SetsPlayingPhase()
         {
-            _state.GamePhase = GamePhase.BuyIn;
+            _state.SetPhase(GamePhase.BuyIn);
             var fsmState = new PlayerTurnState();
             fsmState.OnEnter(_context);
 
-            Assert.AreEqual(GamePhase.Playing, _state.GamePhase);
+            Assert.AreEqual(GamePhase.Playing, _state.Phase);
         }
 
         // ── PlayActionCard – HedgeYourBet ─────────────────────────────────────
@@ -798,7 +798,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             fsmState.HandleCommand(_context, new DrawCardCommand("p1"));
 
             // p1 should still be the active player (extra turn consumed, not advancing)
-            Assert.AreEqual(0, _state.CurrentPlayerIndex, "Player should not advance when ExtraTurns > 0.");
+            Assert.AreEqual(0, _state.TurnManager.CurrentPlayerIndex, "Player should not advance when ExtraTurns > 0.");
             Assert.AreEqual(0, p1.ExtraTurns, "ExtraTurns should be decremented by 1 after draw.");
         }
 
@@ -817,7 +817,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             fsmState.OnEnter(_context);
             fsmState.HandleCommand(_context, new DrawCardCommand("p1"));
 
-            Assert.AreEqual(1, _state.CurrentPlayerIndex, "Turn should advance to next player when ExtraTurns is 0.");
+            Assert.AreEqual(1, _state.TurnManager.CurrentPlayerIndex, "Turn should advance to next player when ExtraTurns is 0.");
         }
 
         [TestMethod]
@@ -838,21 +838,21 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
 
             // First draw: 2 extra turns → consume 1, stay at p1
             fsmState.HandleCommand(_context, new DrawCardCommand("p1"));
-            Assert.AreEqual(0, _state.CurrentPlayerIndex, "After first extra-turn draw, still p1's turn.");
+            Assert.AreEqual(0, _state.TurnManager.CurrentPlayerIndex, "After first extra-turn draw, still p1's turn.");
             Assert.AreEqual(1, p1.ExtraTurns);
 
             // Second draw: 1 extra turn → consume 1, stay at p1
             var fsmState2 = new PlayerTurnState();
             fsmState2.OnEnter(_context);
             fsmState2.HandleCommand(_context, new DrawCardCommand("p1"));
-            Assert.AreEqual(0, _state.CurrentPlayerIndex, "After second extra-turn draw, still p1's turn.");
+            Assert.AreEqual(0, _state.TurnManager.CurrentPlayerIndex, "After second extra-turn draw, still p1's turn.");
             Assert.AreEqual(0, p1.ExtraTurns);
 
             // Third draw: 0 extra turns → advance to p2
             var fsmState3 = new PlayerTurnState();
             fsmState3.OnEnter(_context);
             fsmState3.HandleCommand(_context, new DrawCardCommand("p1"));
-            Assert.AreEqual(1, _state.CurrentPlayerIndex, "After third draw (no extra turns), turn advances to p2.");
+            Assert.AreEqual(1, _state.TurnManager.CurrentPlayerIndex, "After third draw (no extra turns), turn advances to p2.");
         }
 
         [TestMethod]

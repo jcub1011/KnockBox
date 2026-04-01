@@ -36,7 +36,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
         {
             var player = new PlayerState { PlayerId = id, DisplayName = name };
             _state.GamePlayers[id] = player;
-            _state.TurnOrder.Add(id);
+            _state.TurnManager.TurnOrder.Add(id);
             return player;
         }
 
@@ -45,7 +45,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
         {
             AddPlayer("orig", "Originator");
             AddPlayer("tgt", "Target");
-            _state.CurrentPlayerIndex = 0;
+            _state.TurnManager.SetCurrentPlayerIndex(0);
 
             var fsmState = new FeelingLuckyChainState("orig", "tgt");
             fsmState.OnEnter(_context);
@@ -58,7 +58,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
         {
             var originator = AddPlayer("orig", "Originator");
             var target = AddPlayer("tgt", "Target");
-            _state.CurrentPlayerIndex = 0;
+            _state.TurnManager.SetCurrentPlayerIndex(0);
 
             // Push an extra card so the shoe isn't empty after the draw
             _state.CurrentShoe.Push(new NumberCard(1));
@@ -80,7 +80,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
         {
             var originator = AddPlayer("orig", "Originator");
             var target = AddPlayer("tgt", "Target");
-            _state.CurrentPlayerIndex = 0;
+            _state.TurnManager.SetCurrentPlayerIndex(0);
             target.Balance = 100;
             target.Pot.Add(5); // pot value = 5
 
@@ -101,7 +101,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
         {
             var originator = AddPlayer("orig", "Originator");
             var target = AddPlayer("tgt", "Target");
-            _state.CurrentPlayerIndex = 0;
+            _state.TurnManager.SetCurrentPlayerIndex(0);
             _state.CurrentShoe.Push(new NumberCard(1));
             target.ActionHand.Add(new ActionCard(ActionType.Compd));
 
@@ -121,7 +121,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
         {
             AddPlayer("orig", "Originator");
             var target = AddPlayer("tgt", "Target");
-            _state.CurrentPlayerIndex = 0;
+            _state.TurnManager.SetCurrentPlayerIndex(0);
             target.ActionHand.Add(new ActionCard(ActionType.Compd));
 
             var fsmState = new FeelingLuckyChainState("orig", "tgt");
@@ -139,7 +139,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             var originator = AddPlayer("orig", "Originator");
             var target1 = AddPlayer("tgt1", "Target1");
             var target2 = AddPlayer("tgt2", "Target2");
-            _state.CurrentPlayerIndex = 0;
+            _state.TurnManager.SetCurrentPlayerIndex(0);
             _state.CurrentShoe.Push(new NumberCard(1));
             target1.ActionHand.Add(new ActionCard(ActionType.FeelingLucky));
 
@@ -159,7 +159,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             // Setup: orig → tgt1 → orig (wraps) → tgt1 must draw
             var originator = AddPlayer("orig", "Originator");
             var target1 = AddPlayer("tgt1", "Target1");
-            _state.CurrentPlayerIndex = 0;
+            _state.TurnManager.SetCurrentPlayerIndex(0);
             _state.CurrentShoe.Push(new NumberCard(1)); // extra
             _state.CurrentShoe.Push(new NumberCard(5)); // the force draw
             target1.ActionHand.Add(new ActionCard(ActionType.FeelingLucky));
@@ -180,7 +180,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             AddPlayer("orig", "Originator");
             var target = AddPlayer("tgt", "Target");
             var other = AddPlayer("other", "Other");
-            _state.CurrentPlayerIndex = 0;
+            _state.TurnManager.SetCurrentPlayerIndex(0);
             _state.CurrentShoe.Push(new NumberCard(1));
 
             var fsmState = new FeelingLuckyChainState("orig", "tgt");
@@ -197,7 +197,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
         {
             var originator = AddPlayer("orig", "Originator");
             AddPlayer("tgt", "Target");
-            _state.CurrentPlayerIndex = 0;
+            _state.TurnManager.SetCurrentPlayerIndex(0);
             // Shoe is empty
 
             var fsmState = new FeelingLuckyChainState("orig", "tgt");
@@ -215,7 +215,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             var originator = AddPlayer("orig", "Originator");
             var target = AddPlayer("tgt", "Target");
             // originator is index 0, target is index 1
-            _state.CurrentPlayerIndex = 0;
+            _state.TurnManager.SetCurrentPlayerIndex(0);
             _state.CurrentShoe.Push(new NumberCard(1)); // extra
             _state.CurrentShoe.Push(new NumberCard(5));
 
@@ -224,7 +224,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
 
             fsmState.HandleCommand(_context, new DrawCardCommand("tgt"));
 
-            Assert.AreEqual(0, _state.CurrentPlayerIndex, "Turn should be restored to the originator (index 0).");
+            Assert.AreEqual(0, _state.TurnManager.CurrentPlayerIndex, "Turn should be restored to the originator (index 0).");
         }
     }
 }

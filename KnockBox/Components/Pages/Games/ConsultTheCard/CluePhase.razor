@@ -1,0 +1,97 @@
+@using KnockBox.Services.State.Users
+@using KnockBox.Services.State.Games.ConsultTheCard
+
+<div class="ctc-clue-area">
+    @{
+        var myId = UserService.CurrentUser?.Id ?? string.Empty;
+        GameState.GamePlayers.TryGetValue(myId, out var playerState);
+        var activeId = GameState.TurnManager.CurrentPlayer ?? "";
+        var isMyTurn = myId == activeId;
+        var activePlayerName = GameState.GamePlayers.TryGetValue(activeId, out var activePs) ? activePs.DisplayName : "...";
+
+        bool isEliminated = !(myId == GameState.Host.Id || (playerState is not null && !playerState.IsEliminated));
+    }
+
+    <div class="ctc-clue-panel">
+        <h2 class="ctc-phase-title">📝 CLUE PHASE</h2>
+
+        @if (playerState is not null && playerState.Role != Role.Informant && !string.IsNullOrEmpty(playerState.SecretWord))
+        {
+            <div class="ctc-secret-word-banner">
+                <span class="ctc-secret-word-label">Your Word:</span>
+                <span class="ctc-secret-word-value">@playerState.SecretWord</span>
+            </div>
+        }
+        
+        @if (isEliminated == true)
+        {
+            <div class="ctc-eliminated-banner">
+                <span class="ctc-eliminated-icon"></span>
+                <div class="ctc-eliminated-text">
+                    <h3>YOU ARE ELIMINATED</h3>
+                    <p>You can no longer give clues.</p>
+                </div>
+            </div>
+        }
+
+        @* ── Turn indicator ── *@
+        <div class="ctc-turn-indicator">
+            @if (isMyTurn)
+            {
+                <span class="ctc-turn-badge ctc-turn-you">YOUR TURN</span>
+            }
+            else
+            {
+                <span class="ctc-turn-badge">@activePlayerName is giving a clue...</span>
+            }
+        </div>
+
+        @* ── Clue input (active player only) ── *@
+        @if (isMyTurn)
+        {
+            <form class="ctc-clue-input-area" @onsubmit="SubmitClue" @onsubmit:preventDefault="true">
+                <input type="text" class="ctc-clue-input" placeholder="Enter a clue (max 50 chars)..."
+                       value="@_clueText" @oninput="OnClueInput" maxlength="50" />
+                <button type="submit" class="ctc-btn ctc-btn-primary"
+                        disabled="@(string.IsNullOrWhiteSpace(_clueText))">
+                    ✏️ Submit Clue
+                </button>
+            </form>
+        }
+        else
+        {
+            <p class="ctc-waiting-text">⏳ Waiting for @activePlayerName to submit their clue...</p>
+        }
+
+        @* ── Current round clues ── *@
+        @if (GameState.CurrentRoundClues.Count > 0)
+        {
+            <div class="ctc-clue-history">
+                <h3 class="ctc-section-title">This Round's Clues</h3>
+                <div class="ctc-clue-list">
+                    @foreach (var clue in GameState.CurrentRoundClues)
+                    {
+                        <div class="ctc-clue-entry">
+                            <span class="ctc-clue-player">@clue.PlayerName</span>
+                            <span class="ctc-clue-word">@clue.Clue</span>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+
+        @* ── Previously used clues ── *@
+        @if (GameState.UsedClues.Count > 0)
+        {
+            <div class="ctc-used-clues">
+                <h3 class="ctc-section-title">Used Clues</h3>
+                <div class="ctc-used-clue-list">
+                    @foreach (var usedClue in GameState.UsedClues)
+                    {
+                        <span class="ctc-used-clue-tag">@usedClue</span>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+</div>

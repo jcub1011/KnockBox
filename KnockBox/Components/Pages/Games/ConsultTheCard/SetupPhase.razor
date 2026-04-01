@@ -1,0 +1,33 @@
+@using KnockBox.Services.State.Users
+@using KnockBox.Services.State.Games.ConsultTheCard
+
+<div class="ctc-setup-area">
+    <div class="ctc-setup-panel">
+        <h2 class="ctc-setup-title">🔒 YOUR SECRET WORD</h2>
+        @{
+            var myPlayer = GetMyPlayer();
+        }
+        @if (myPlayer is not null)
+        {
+            @if (myPlayer.Role == Role.Informant)
+            {
+                <div class="ctc-word-card ctc-word-card-informant">
+                    <span class="ctc-word-value">???</span>
+                    <span class="ctc-word-hint">You are the Informant — you don't know the word!</span>
+                </div>
+            }
+            else
+            {
+                <div class="ctc-word-card">
+                    <span class="ctc-word-value">@myPlayer.SecretWord</span>
+                    <span class="ctc-word-hint">Keep this secret! Give clues to find your allies.</span>
+                </div>
+            }
+        }
+        else
+        {
+            <p class="ctc-waiting-text">Loading...</p>
+        }
+        <p class="ctc-setup-auto-advance">Game will begin shortly...</p>
+    </div>
+</div>

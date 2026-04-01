@@ -1,0 +1,104 @@
+@using KnockBox.Services.State.Users
+@using KnockBox.Services.State.Games.ConsultTheCard
+
+<div class="ctc-reveal-area">
+    @{
+        var myId = UserService.CurrentUser?.Id ?? "";
+        var elimination = GameState.LastElimination;
+        var informantGuess = GameState.LastInformantGuess;
+        bool awaitingGuess = GameState.AwaitingInformantGuess;
+        bool isEliminatedInformant = elimination is not null
+            && !elimination.WasTie
+            && elimination.Role == Role.Informant
+            && elimination.PlayerId == myId;
+    }
+
+    <div class="ctc-reveal-panel">
+        <h2 class="ctc-phase-title">REVEAL</h2>
+
+        @* ── Elimination result ── *@
+        @if (elimination is not null)
+        {
+            @if (elimination.WasTie)
+            {
+                <div class="ctc-reveal-result ctc-reveal-tie">
+                    <span class="ctc-reveal-icon">⚖️</span>
+                    <p class="ctc-reveal-text">No elimination — tied vote</p>
+                </div>
+            }
+            else
+            {
+                <div class="ctc-reveal-result ctc-reveal-eliminated">
+                    <span class="ctc-reveal-icon">❌</span>
+                    <p class="ctc-reveal-text"><strong>@elimination.PlayerName</strong> has been eliminated.</p>
+                </div>
+            }
+        }
+
+        @* ── Informant guess mechanic ── *@
+        @if (awaitingGuess)
+        {
+            @if (isEliminatedInformant)
+            {
+                <div class="ctc-informant-guess">
+                    <h3 class="ctc-section-title">🎯 Guess the Agents' Word</h3>
+                    <p class="ctc-hint-text">You've been eliminated! As the Informant, you get one chance to guess the Agents' secret word.</p>
+                    <div class="ctc-clue-input-area">
+                        <input type="text" class="ctc-clue-input" placeholder="Enter your guess..."
+                               @bind="_guessText" @bind:event="oninput" maxlength="50" />
+                        <button class="ctc-btn ctc-btn-primary" @onclick="SubmitGuess"
+                                disabled="@(string.IsNullOrWhiteSpace(_guessText))">
+                            🎯 Guess
+                        </button>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="ctc-informant-waiting">
+                    <span class="ctc-reveal-icon">🕐</span>
+                    <p class="ctc-waiting-text">The Informant is making their guess...</p>
+                </div>
+            }
+        }
+
+        @* ── Informant guess result ── *@
+        @if (informantGuess is not null)
+        {
+            <div class="ctc-informant-result @(informantGuess.WasCorrect ? "ctc-guess-correct" : "ctc-guess-wrong")">
+                @if (informantGuess.WasCorrect)
+                {
+                    <p>🎉 <strong>@informantGuess.PlayerName</strong> (Informant) correctly guessed the word: <strong>@informantGuess.GuessedWord</strong></p>
+                }
+                else if (string.IsNullOrEmpty(informantGuess.GuessedWord))
+                {
+                    <p>⏱️ Time's up — guess forfeited.</p>
+                }
+                else
+                {
+                    <p>❌ <strong>@informantGuess.PlayerName</strong> (Informant) guessed "<strong>@informantGuess.GuessedWord</strong>" — incorrect!</p>
+                }
+            </div>
+        }
+
+        @* ── Vote tally breakdown ── *@
+        @if (GameState.CurrentRoundVotes.Count > 0)
+        {
+            <div class="ctc-vote-tally">
+                <h3 class="ctc-section-title">Vote Tally</h3>
+                <div class="ctc-tally-list">
+                    @foreach (var vote in GameState.CurrentRoundVotes)
+                    {
+                        <div class="ctc-tally-entry">
+                            <span class="ctc-tally-voter">@vote.VoterName</span>
+                            <span class="ctc-tally-arrow">→</span>
+                            <span class="ctc-tally-target">@vote.TargetName</span>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+
+        <p class="ctc-setup-auto-advance">Next phase begins shortly...</p>
+    </div>
+</div>

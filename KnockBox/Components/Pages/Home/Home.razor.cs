@@ -1,7 +1,8 @@
-﻿using KnockBox.Components.Shared;
+using KnockBox.Components.Shared;
 using KnockBox.Extensions.Disposable;
 using KnockBox.Extensions.Exceptions;
 using KnockBox.Services.Logic.Games.Shared;
+using KnockBox.Services.Logic.RandomGeneration;
 using KnockBox.Services.Navigation.Games;
 using KnockBox.Services.State.Games.Shared;
 using KnockBox.Services.State.Users;
@@ -15,7 +16,16 @@ namespace KnockBox.Components.Pages.Home
         [Inject] ILobbyCodeService LobbyCodeService { get; set; } = default!;
         [Inject] IUserService UserService { get; set; } = default!;
         [Inject] IGameSessionService GameSessionService { get; set; } = default!;
+        [Inject] IRandomNumberService RandomNumberService { get; set; } = default!;
         [Inject] ILogger<Home> Logger { get; set; } = default!;
+
+        [Parameter]
+        [SupplyParameterFromQuery(Name = "join")]
+        public string? JoinCode { get; set; }
+
+        [Parameter]
+        [SupplyParameterFromQuery(Name = "fresh")]
+        public int? Fresh { get; set; }
 
         private string? LobbyCode { get; set; }
 
@@ -46,9 +56,27 @@ namespace KnockBox.Components.Pages.Home
         {
             try
             {
-                if (UserService.CurrentUser is null)
+                if (Fresh == 1)
+                {
+                    await UserService.ResetIdentityAsync(ComponentDetached);
+                }
+                else if (UserService.CurrentUser is null)
+                {
                     await UserService.InitializeCurrentUserAsync(ComponentDetached);
+                }
+                
                 await base.OnInitializedAsync();
+
+                if (!string.IsNullOrWhiteSpace(JoinCode))
+                {
+                    // If the user has no name, give them a random one for testing convenience.
+                    if (UserService.CurrentUser is not null && (string.IsNullOrWhiteSpace(UserService.CurrentUser.Name) || UserService.CurrentUser.Name == "Not Set"))
+                    {
+                        PlayerName = $"Tester {RandomNumberService.GetRandomInt(1000, 9999)}";
+                    }
+
+                    await JoinLobby(JoinCode);
+                }
             }
             catch (Exception ex)
             {

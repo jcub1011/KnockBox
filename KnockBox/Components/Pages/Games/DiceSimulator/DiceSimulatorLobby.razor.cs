@@ -78,7 +78,7 @@ namespace KnockBox.Components.Pages.Games.DiceSimulator
 
         protected override void OnAfterRender(bool firstRender)
         {
-            if (GameState.KickedPlayers.Contains(UserService.CurrentUser))
+            if (GameState.IsKicked(UserService.CurrentUser!))
             {
                 GameSessionService.LeaveCurrentSession(navigateHome: true);
             }

@@ -10,7 +10,7 @@ namespace KnockBox.Core.Services.State.Games.Shared
     /// <typeparam name="TCommand"></typeparam>
     /// <param name="logger"></param>
     public class FiniteStateMachine<TContext, TCommand>(ILogger? logger = null) 
-        : IFininteStateMachine<TContext, TCommand>
+        : IFiniteStateMachine<TContext, TCommand>
     {
         public IThreadSafeEventManager<StateChangeArgs<TContext, TCommand>> StateChangedManager { get; } 
             = new ThreadSafeEventManager<StateChangeArgs<TContext, TCommand>>(logger);

@@ -106,7 +106,7 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
 
         protected override void OnAfterRender(bool firstRender)
         {
-            if (GameState is not null && GameState.KickedPlayers.Contains(UserService.CurrentUser))
+            if (GameState is not null && GameState.IsKicked(UserService.CurrentUser!))
             {
                 GameSessionService.LeaveCurrentSession(navigateHome: true);
             }

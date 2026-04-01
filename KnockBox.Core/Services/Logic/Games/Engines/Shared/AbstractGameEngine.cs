@@ -7,6 +7,20 @@ namespace KnockBox.Services.Logic.Games.Engines.Shared
     public abstract class AbstractGameEngine
     {
         /// <summary>
+        /// Initializes a new instance with default (zero) player count limits.
+        /// </summary>
+        protected AbstractGameEngine() { }
+
+        /// <summary>
+        /// Initializes a new instance with explicit player count limits.
+        /// </summary>
+        protected AbstractGameEngine(int minPlayerCount, int maxPlayerCount)
+        {
+            MinPlayerCount = minPlayerCount;
+            MaxPlayerCount = maxPlayerCount;
+        }
+
+        /// <summary>
         /// The max player count for this type of game.
         /// </summary>
         public int MaxPlayerCount { get; }

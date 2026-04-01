@@ -1,0 +1,94 @@
+@using KnockBox.Services.State.Users
+@using KnockBox.Services.State.Games.ConsultTheCard
+
+<div class="ctc-gameover-area">
+    @{
+        var myId = UserService.CurrentUser?.Id ?? "";
+        var isHost = GameState.Host.Id == myId;
+        var winResult = GameState.WinResult;
+        bool isFinalGame = GameState.CurrentGameNumber >= GameState.Config.TotalGames;
+    }
+
+    <div class="ctc-gameover-panel">
+        <h2 class="ctc-gameover-title">🏆 GAME OVER</h2>
+
+        @* ── Winner announcement ── *@
+        @if (winResult is not null)
+        {
+            <div class="ctc-winner-announcement">
+                <span class="ctc-winner-role">@GetTeamName(winResult.WinningTeam) Wins!</span>
+                <p class="ctc-winner-reason">@winResult.Reason</p>
+            </div>
+        }
+
+        @* ── Multi-game progress ── *@
+        <p class="ctc-game-progress">Game @GameState.CurrentGameNumber of @GameState.Config.TotalGames</p>
+
+        @* ── Scoreboard with roles revealed ── *@
+        <div class="ctc-scoreboard">
+            <h3 class="ctc-section-title">Scoreboard</h3>
+            <div class="ctc-leaderboard">
+                @{
+                    var rankedPlayers = GameState.GamePlayers.Values
+                        .OrderByDescending(p => GameState.GameScores.TryGetValue(p.PlayerId, out var s) ? s : 0)
+                        .ToList();
+                    int rank = 1;
+                }
+                @foreach (var ps in rankedPlayers)
+                {
+                    bool isMe = ps.PlayerId == myId;
+                    int cumulativeScore = GameState.GameScores.TryGetValue(ps.PlayerId, out var cs) ? cs : 0;
+                    bool isWinner = rank == 1;
+                    <div class="ctc-leaderboard-row @(isWinner ? "ctc-leaderboard-winner" : "") @(isMe ? "ctc-leaderboard-me" : "")">
+                        <span class="ctc-rank">@(rank == 1 ? "🥇" : rank == 2 ? "🥈" : rank == 3 ? "🥉" : $"#{rank}")</span>
+                        <span class="ctc-player-result-name">@ps.DisplayName</span>
+                        <span class="ctc-player-role ctc-role-@ps.Role.ToString().ToLowerInvariant()">@ps.Role</span>
+                        <span class="ctc-player-result-score">@cumulativeScore pts</span>
+                        @if (ps.IsEliminated)
+                        {
+                            <span class="ctc-status-badge ctc-status-eliminated">Eliminated</span>
+                        }
+                    </div>
+                    rank++;
+                }
+            </div>
+        </div>
+
+        @* ── Scoring breakdown ── *@
+        <div class="ctc-scoring-breakdown">
+            <h3 class="ctc-section-title">This Game's Scores</h3>
+            <div class="ctc-score-list">
+                @foreach (var ps in rankedPlayers)
+                {
+                    <div class="ctc-score-entry">
+                        <span class="ctc-score-player">@ps.DisplayName</span>
+                        <span class="ctc-score-value">@ps.Score pts</span>
+                    </div>
+                }
+            </div>
+        </div>
+
+        @* ── Host controls ── *@
+        @if (isHost)
+        {
+            <div class="ctc-gameover-actions">
+                @if (!isFinalGame)
+                {
+                    <button class="ctc-btn ctc-btn-primary" @onclick="StartNextGame">
+                        ▶️ Next Game
+                    </button>
+                }
+                <button class="ctc-btn ctc-btn-secondary" @onclick="ReturnToLobby">
+                    🏠 Return to Lobby
+                </button>
+                <button class="ctc-btn ctc-btn-secondary" @onclick="ResetGame">
+                    🔄 Play Again
+                </button>
+            </div>
+        }
+        else
+        {
+            <p class="ctc-waiting-text">Waiting for host...</p>
+        }
+    </div>
+</div>

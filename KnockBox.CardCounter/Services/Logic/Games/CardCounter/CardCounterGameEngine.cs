@@ -216,15 +216,14 @@ namespace KnockBox.Services.Logic.Games.CardCounter
             if (state.Host.Id != host.Id)
                 return Result.FromError("Only the host can return the game to the lobby.");
 
-            if (state.GamePhase != GamePhase.GameOver)
+            if (state.Phase != GamePhase.GameOver)
                 return Result.FromError("Can only return to the lobby after the game is over.");
 
             return state.Execute(() =>
             {
                 state.Context = null;
                 state.GamePlayers.Clear();
-                state.TurnOrder.Clear();
-                state.CurrentPlayerIndex = 0;
+                state.TurnManager.SetTurnOrder([]);
                 state.ShoeIndex = 0;
                 state.DiscardHistory.Clear();
                 state.MainDeck.Clear();
@@ -254,7 +253,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter
             if (state.Host.Id != host.Id)
                 return Result.FromError("Only the host can reset the game.");
 
-            if (state.GamePhase != GamePhase.GameOver)
+            if (state.Phase != GamePhase.GameOver)
                 return Result.FromError("Can only reset after the game is over.");
 
             return state.Execute(() =>
@@ -311,38 +310,38 @@ namespace KnockBox.Services.Logic.Games.CardCounter
 
             state.Execute(() =>
             {
-                int leftIndex = state.TurnOrder.IndexOf(player.Id);
+                int leftIndex = state.TurnManager.TurnOrder.IndexOf(player.Id);
                 if (leftIndex < 0) return; // Not in turn order; nothing to adjust.
 
                 // Remember whether the leaving player was the one currently taking their turn.
-                bool wasActiveTurn = leftIndex == state.CurrentPlayerIndex
-                                     && state.GamePhase == GamePhase.Playing;
+                bool wasActiveTurn = leftIndex == state.TurnManager.CurrentPlayerIndex
+                                     && state.Phase == GamePhase.Playing;
 
-                state.TurnOrder.RemoveAt(leftIndex);
+                state.TurnManager.TurnOrder.RemoveAt(leftIndex);
                 state.GamePlayers.TryRemove(player.Id, out _);
 
                 logger.LogInformation(
                     "Player [{id}] left the game. TurnOrder now has {n} player(s).",
-                    player.Id, state.TurnOrder.Count);
+                    player.Id, state.TurnManager.TurnOrder.Count);
 
                 // If no players remain, end the game immediately.
-                if (state.TurnOrder.Count == 0)
+                if (state.TurnManager.TurnOrder.Count == 0)
                 {
                     TransitionTo(context, new GameOverState());
                     return;
                 }
 
                 // Adjust CurrentPlayerIndex to stay pointed at the correct next player.
-                if (leftIndex < state.CurrentPlayerIndex)
+                if (leftIndex < state.TurnManager.CurrentPlayerIndex)
                 {
                     // A player before the current one was removed; shift the index left.
-                    state.CurrentPlayerIndex--;
+                    state.TurnManager.SetCurrentPlayerIndex(state.TurnManager.CurrentPlayerIndex - 1);
                 }
-                else if (leftIndex == state.CurrentPlayerIndex
-                         && state.CurrentPlayerIndex >= state.TurnOrder.Count)
+                else if (leftIndex == state.TurnManager.CurrentPlayerIndex
+                         && state.TurnManager.CurrentPlayerIndex >= state.TurnManager.TurnOrder.Count)
                 {
                     // The removed player was last in the list; wrap to the first player.
-                    state.CurrentPlayerIndex = 0;
+                    state.TurnManager.SetCurrentPlayerIndex(0);
                 }
                 // else: removed player was after the current one — index is unaffected.
 
@@ -357,7 +356,7 @@ namespace KnockBox.Services.Logic.Games.CardCounter
 
                 // During BuyIn, check whether all remaining players have now committed
                 // their buy-in (the leaving player may have been the only one outstanding).
-                if (state.GamePhase == GamePhase.BuyIn
+                if (state.Phase == GamePhase.BuyIn
                     && state.GamePlayers.Values.All(p => p.HasSetBuyIn))
                 {
                     TransitionTo(context, new RoundEndState());
@@ -371,11 +370,11 @@ namespace KnockBox.Services.Logic.Games.CardCounter
         {
             var state = context.State;
             state.GamePlayers.Clear();
-            state.TurnOrder.Clear();
-            state.CurrentPlayerIndex = 0;
+            state.TurnManager.SetTurnOrder([]);
             state.ShoeIndex = 0;
 
             // Register every non-host player
+            var playerIds = new List<string>();
             foreach (var user in state.Players)
             {
                 var ps = new PlayerState
@@ -388,8 +387,9 @@ namespace KnockBox.Services.Logic.Games.CardCounter
                 };
 
                 state.GamePlayers[user.Id] = ps;
-                state.TurnOrder.Add(user.Id);
+                playerIds.Add(user.Id);
             }
+            state.TurnManager.SetTurnOrder(playerIds);
 
             BuildAndShuffleDeck(context);
         }

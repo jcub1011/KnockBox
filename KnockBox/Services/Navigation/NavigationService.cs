@@ -23,6 +23,16 @@ namespace KnockBox.Services.Navigation
             return $"{navigationManager.BaseUri}{lobbyRegistration.Uri}";
         }
 
+        public string GetJoinUri(string code, bool fresh = false)
+        {
+            var uri = $"{GetHomeUri()}?join={code}";
+            if (fresh)
+            {
+                uri += "&fresh=1";
+            }
+            return uri;
+        }
+
         public void ToGame(LobbyRegistration lobbyRegistration)
         {
             navigationManager.NavigateTo(GetGameUri(lobbyRegistration));

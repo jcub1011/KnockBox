@@ -71,12 +71,12 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             using var state = await CreateStartedGameAsync(_player1, _player2, _player3);
 
             // Make p1 the active player
-            state.CurrentPlayerIndex = state.TurnOrder.IndexOf(_player1.Id);
+            state.TurnManager.SetCurrentPlayerIndex(state.TurnManager.TurnOrder.IndexOf(_player1.Id));
 
             // p3 (not active) leaves
             _engine.HandlePlayerLeft(_player3, state);
 
-            Assert.IsFalse(state.TurnOrder.Contains(_player3.Id));
+            Assert.IsFalse(state.TurnManager.TurnOrder.Contains(_player3.Id));
             Assert.IsFalse(state.GamePlayers.ContainsKey(_player3.Id));
         }
 
@@ -86,14 +86,14 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             using var state = await CreateStartedGameAsync(_player1, _player2, _player3);
 
             // Make p1 the active player (index 0)
-            state.CurrentPlayerIndex = 0;
+            state.TurnManager.SetCurrentPlayerIndex(0);
 
             // p3 (last, index 2) leaves
             _engine.HandlePlayerLeft(_player3, state);
 
             // Index should still point to p1 (now at index 0 in the shorter list)
-            Assert.AreEqual(0, state.CurrentPlayerIndex);
-            Assert.AreEqual(_player1.Id, state.TurnOrder[state.CurrentPlayerIndex]);
+            Assert.AreEqual(0, state.TurnManager.CurrentPlayerIndex);
+            Assert.AreEqual(_player1.Id, state.TurnManager.TurnOrder[state.TurnManager.CurrentPlayerIndex]);
         }
 
         [TestMethod]
@@ -102,14 +102,14 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             using var state = await CreateStartedGameAsync(_player1, _player2, _player3);
 
             // TurnOrder: [p1, p2, p3]; current = p3 (index 2)
-            state.CurrentPlayerIndex = 2;
+            state.TurnManager.SetCurrentPlayerIndex(2);
 
             // p1 (index 0, before current) leaves
             _engine.HandlePlayerLeft(_player1, state);
 
             // TurnOrder: [p2, p3]; p3 is now index 1
-            Assert.AreEqual(1, state.CurrentPlayerIndex);
-            Assert.AreEqual(_player3.Id, state.TurnOrder[state.CurrentPlayerIndex]);
+            Assert.AreEqual(1, state.TurnManager.CurrentPlayerIndex);
+            Assert.AreEqual(_player3.Id, state.TurnManager.TurnOrder[state.TurnManager.CurrentPlayerIndex]);
         }
 
         // ── HandlePlayerLeft – Active player leaves ───────────────────────────
@@ -120,15 +120,15 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             using var state = await CreateStartedGameAsync(_player1, _player2);
 
             // Force the FSM into Playing phase and make p1 active
-            state.GamePhase = GamePhase.Playing;
-            state.CurrentPlayerIndex = 0; // p1
+            state.SetPhase(GamePhase.Playing);
+            state.TurnManager.SetCurrentPlayerIndex(0); // p1
 
             _engine.HandlePlayerLeft(_player1, state);
 
             // p1 removed; p2 is now the only player and must be active
-            Assert.IsFalse(state.TurnOrder.Contains(_player1.Id));
-            Assert.AreEqual(GamePhase.Playing, state.GamePhase);
-            Assert.AreEqual(_player2.Id, state.TurnOrder[state.CurrentPlayerIndex]);
+            Assert.IsFalse(state.TurnManager.TurnOrder.Contains(_player1.Id));
+            Assert.AreEqual(GamePhase.Playing, state.Phase);
+            Assert.AreEqual(_player2.Id, state.TurnManager.TurnOrder[state.TurnManager.CurrentPlayerIndex]);
         }
 
         [TestMethod]
@@ -137,14 +137,14 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             using var state = await CreateStartedGameAsync(_player1, _player2, _player3);
 
             // Make p3 (last index) the active player
-            state.GamePhase = GamePhase.Playing;
-            state.CurrentPlayerIndex = 2; // p3
+            state.SetPhase(GamePhase.Playing);
+            state.TurnManager.SetCurrentPlayerIndex(2); // p3
 
             _engine.HandlePlayerLeft(_player3, state);
 
             // TurnOrder: [p1, p2]; index should wrap to 0
-            Assert.AreEqual(0, state.CurrentPlayerIndex);
-            Assert.AreEqual(_player1.Id, state.TurnOrder[state.CurrentPlayerIndex]);
+            Assert.AreEqual(0, state.TurnManager.CurrentPlayerIndex);
+            Assert.AreEqual(_player1.Id, state.TurnManager.TurnOrder[state.TurnManager.CurrentPlayerIndex]);
         }
 
         // ── HandlePlayerLeft – Last player leaves → GameOver ──────────────────
@@ -154,12 +154,12 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
         {
             using var state = await CreateStartedGameAsync(_player1);
 
-            state.GamePhase = GamePhase.Playing;
+            state.SetPhase(GamePhase.Playing);
 
             _engine.HandlePlayerLeft(_player1, state);
 
-            Assert.AreEqual(GamePhase.GameOver, state.GamePhase);
-            Assert.AreEqual(0, state.TurnOrder.Count);
+            Assert.AreEqual(GamePhase.GameOver, state.Phase);
+            Assert.AreEqual(0, state.TurnManager.TurnOrder.Count);
         }
 
         // ── HandlePlayerLeft – Game not started ───────────────────────────────
@@ -175,7 +175,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             // Should not throw; TurnOrder is empty because the game hasn't initialized it
             _engine.HandlePlayerLeft(_player1, state);
 
-            Assert.AreEqual(0, state.TurnOrder.Count);
+            Assert.AreEqual(0, state.TurnManager.TurnOrder.Count);
         }
 
         // ── PlayerUnregistered event wiring ───────────────────────────────────
@@ -195,8 +195,8 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
 
             await _engine.StartAsync(_host, state);
 
-            state.GamePhase = GamePhase.Playing;
-            Assert.IsTrue(state.TurnOrder.Contains(_player2.Id));
+            state.SetPhase(GamePhase.Playing);
+            Assert.IsTrue(state.TurnManager.TurnOrder.Contains(_player2.Id));
 
             // Act: dispose p2's token to simulate disconnect — this triggers PlayerUnregistered
             p2Token.Dispose();
@@ -205,7 +205,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             await Task.Delay(100);
 
             // Assert: p2 removed from TurnOrder via the event wiring
-            Assert.IsFalse(state.TurnOrder.Contains(_player2.Id));
+            Assert.IsFalse(state.TurnManager.TurnOrder.Contains(_player2.Id));
             Assert.IsFalse(state.GamePlayers.ContainsKey(_player2.Id));
         }
 
@@ -213,11 +213,11 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
         public async Task HandlePlayerLeft_DirectCall_RemovesFromTurnOrder()
         {
             using var state = await CreateStartedGameAsync(_player1, _player2);
-            state.GamePhase = GamePhase.Playing;
+            state.SetPhase(GamePhase.Playing);
 
             _engine.HandlePlayerLeft(_player2, state);
 
-            Assert.IsFalse(state.TurnOrder.Contains(_player2.Id));
+            Assert.IsFalse(state.TurnManager.TurnOrder.Contains(_player2.Id));
             Assert.IsFalse(state.GamePlayers.ContainsKey(_player2.Id));
         }
     }
