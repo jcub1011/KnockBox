@@ -64,6 +64,21 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard.States
         }
 
         [TestMethod]
+        public void OnEnter_ResetsCycleState()
+        {
+            _state.GamePlayers["p0"].HasSubmittedClue = true;
+            _state.GamePlayers["p0"].CurrentClue = "wave";
+            _state.LastElimination = new EliminationResult("", "", default, WasTie: true);
+
+            var clueState = new CluePhaseState();
+            clueState.OnEnter(_context);
+
+            Assert.IsFalse(_state.GamePlayers["p0"].HasSubmittedClue);
+            Assert.IsNull(_state.GamePlayers["p0"].CurrentClue);
+            Assert.IsNull(_state.LastElimination);
+        }
+
+        [TestMethod]
         public void OnEnter_AdvancesToAlivePlayer()
         {
             // Eliminate p0 so the first alive player is p1.

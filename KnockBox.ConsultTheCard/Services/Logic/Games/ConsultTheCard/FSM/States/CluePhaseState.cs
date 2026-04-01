@@ -17,6 +17,7 @@ namespace KnockBox.Services.Logic.Games.ConsultTheCard.FSM.States
 
         public ValueResult<IGameState<ConsultTheCardGameContext, ConsultTheCardCommand>?> OnEnter(ConsultTheCardGameContext context)
         {
+            context.ResetEliminationCycleState();
             context.State.SetPhase(ConsultTheCardGamePhase.CluePhase);
 
             // Advance past eliminated players to the next alive player.

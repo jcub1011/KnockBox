@@ -80,20 +80,6 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard.States
         }
 
         [TestMethod]
-        public void OnEnter_Tie_ResetsCycleState()
-        {
-            _state.GamePlayers["p0"].HasSubmittedClue = true;
-            _state.GamePlayers["p0"].CurrentClue = "wave";
-            _state.LastElimination = new EliminationResult("", "", default, WasTie: true);
-
-            var reveal = new RevealPhaseState();
-            reveal.OnEnter(_context);
-
-            Assert.IsFalse(_state.GamePlayers["p0"].HasSubmittedClue);
-            Assert.IsNull(_state.GamePlayers["p0"].CurrentClue);
-        }
-
-        [TestMethod]
         public void OnEnter_NonInformantEliminated_ChecksWinConditions()
         {
             // Eliminate p2 (Insider) — leaving only 3 players alive, game continues.

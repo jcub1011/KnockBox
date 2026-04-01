@@ -51,12 +51,12 @@ namespace KnockBox.Services.Logic.Games.ConsultTheCard.FSM.States
                 }
 
                 // Game continues — reset for next cycle.
-                context.ResetEliminationCycleState();
+
             }
             else
             {
                 // Tie — no elimination. Reset for next cycle.
-                context.ResetEliminationCycleState();
+
             }
 
             _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.State.Config.RevealPhaseTimeoutMs);
@@ -145,7 +145,7 @@ namespace KnockBox.Services.Logic.Games.ConsultTheCard.FSM.States
                     return new GameOverState();
                 }
 
-                context.ResetEliminationCycleState();
+
                 _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.State.Config.RevealPhaseTimeoutMs);
                 return null;
             }
