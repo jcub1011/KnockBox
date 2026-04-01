@@ -106,7 +106,7 @@ namespace KnockBox.Components.Pages.Games.CardCounter
 
         protected override void OnAfterRender(bool firstRender)
         {
-            if (!_kickHandled && GameState?.KickedPlayers.Contains(UserService.CurrentUser) == true)
+            if (!_kickHandled && GameState?.IsKicked(UserService.CurrentUser!) == true)
             {
                 _kickHandled = true;
                 GameSessionService.LeaveCurrentSession(navigateHome: true);

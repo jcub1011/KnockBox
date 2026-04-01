@@ -44,7 +44,7 @@ namespace KnockBox.Components.Pages.Games.ConsultTheCard
             if (result.TryGetFailure(out var error))
             {
                 Logger.LogError("Failed to skip remaining time: {Error}", error);
-                _ = OnError.InvokeAsync("Only the host can skip time.");
+                _ = OnError.InvokeAsync("Action not available right now.");
             }
         }
 
