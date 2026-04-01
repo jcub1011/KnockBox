@@ -89,7 +89,7 @@ namespace KnockBox.Services.Logic.Games.ConsultTheCard.FSM.States
             foreach (var player in context.GetAlivePlayers().Where(p => !p.HasVoted))
             {
                 player.HasVoted = true;
-                // VoteTargetId remains null — counts as abstain.
+                player.VoteTargetId = null; // discard unconfirmed vote
                 context.Logger.LogInformation(
                     "VotePhase: [{pid}] timed out; abstaining.", player.PlayerId);
             }

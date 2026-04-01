@@ -17,9 +17,9 @@ namespace KnockBox.Services.Logic.Games.ConsultTheCard.FSM.States
 
         public ValueResult<IGameState<ConsultTheCardGameContext, ConsultTheCardCommand>?> OnEnter(ConsultTheCardGameContext context)
         {
-            context.State.SetPhase(ConsultTheCardGamePhase.Reveal);
-
             var elimination = context.State.LastElimination;
+
+            context.State.SetPhase(ConsultTheCardGamePhase.Reveal);
 
             // Apply per-cycle scoring while vote data is still intact.
             string? eliminatedId = (elimination is not null && !elimination.WasTie) ? elimination.PlayerId : null;

@@ -1,3 +1,4 @@
+@using KnockBox.Services.State.Games.ConsultTheCard.Data
 @using KnockBox.Services.State.Users
 @using KnockBox.Services.State.Games.ConsultTheCard
 
@@ -17,7 +18,7 @@
     }
 
     <div class="ctc-discussion-panel">
-        <h2 class="ctc-phase-title">💬 DISCUSSION & VOTING</h2>
+        <h2 class="ctc-phase-title">DISCUSSION & VOTING</h2>
 
         @if (myPlayer is not null && myPlayer.Role != Role.Informant && !string.IsNullOrEmpty(myPlayer.SecretWord))
         {
@@ -30,7 +31,7 @@
         @if (myPlayer is not null && myPlayer.IsEliminated)
         {
             <div class="ctc-eliminated-banner">
-                <span class="ctc-eliminated-icon">👻</span>
+                <span class="ctc-eliminated-icon"></span>
                 <div class="ctc-eliminated-text">
                     <h3>YOU ARE ELIMINATED</h3>
                     <p>You can no longer vote or give clues.</p>
@@ -50,19 +51,31 @@
                     string playerRowCss = "ctc-player-row " 
                         + (isMe ? "ctc-player-me" : string.Empty) 
                         + (ps.IsEliminated ? "ctc-player-eliminated" : string.Empty);
+                    string? voteTargetName = GameState.GamePlayers.TryGetValue(ps.VoteTargetId ?? string.Empty, out var targetPlayer) ? targetPlayer.DisplayName : "N/A";
+                    var alivePlayers = GameState.GamePlayers.Values.Where(state => !state.IsEliminated);
 
-                    if (isMe || ps.IsEliminated || myPlayer.IsEliminated)
+                    int lockedVotes = alivePlayers.Count(state => state.VoteTargetId == ps.PlayerId && state.HasVoted);
+
+                    if (isMe || ps.IsEliminated || myPlayer.IsEliminated || myPlayer.HasVoted)
                     {
                         <div class="@playerRowCss">
                             <div class="ctc-player-row-row">
-                                <span class="ctc-clue-player">@ps.DisplayName</span>
+                                @if (lockedVotes > 0)
+                                {
+                                    <span class="ctc-clue-player">@ps.DisplayName - Vote(s) @lockedVotes</span>
+                                }
+                                else
+                                {
+                                    <span class="ctc-clue-player">@ps.DisplayName</span>
+                                }
+
                                 @if (ps.IsEliminated)
                                 {
                                     <span class="ctc-status-badge ctc-status-eliminated">ELIMINATED</span>
                                 }
                                 else if (ps.HasVoted)
                                 {
-                                    <span class="ctc-status-badge ctc-status-voted">READY</span>
+                                    <span class="ctc-status-badge ctc-status-voted">VOTED → @voteTargetName</span>
                                 }
                             </div>
                             <div class="ctc-player-row-row">
@@ -82,14 +95,22 @@
 
                         <button class="@playerRowCss @voteCss" @onclick="() => SelectTarget(ps.PlayerId)">
                             <div class="ctc-player-row-row">
-                                <span class="ctc-clue-player">@ps.DisplayName</span>
+                                @if (lockedVotes > 0)
+                                {
+                                    <span class="ctc-clue-player">@ps.DisplayName - Vote(s) @lockedVotes</span>
+                                }
+                                else
+                                {
+                                    <span class="ctc-clue-player">@ps.DisplayName</span>
+                                }
+
                                 @if (ps.IsEliminated)
                                 {
                                     <span class="ctc-status-badge ctc-status-eliminated">ELIMINATED</span>
                                 }
                                 else if (ps.HasVoted)
                                 {
-                                    <span class="ctc-status-badge ctc-status-voted">READY</span>
+                                    <span class="ctc-status-badge ctc-status-voted">VOTED → @voteTargetName</span>
                                 }
                             </div>
                             <div class="ctc-player-row-row">
@@ -118,15 +139,23 @@
             }
             else if (myPlayer is not null && !myPlayer.IsEliminated)
             {
-                @if (myPlayer.VoteTargetId is not null)
-                {
-                    var targetName = GameState.GamePlayers.TryGetValue(myPlayer.VoteTargetId, out var tp) ? tp.DisplayName : "...";
-                    <div class="ctc-vote-confirm">
+                ConsultTheCardPlayerState? tp = null;
+                bool targetSelected = myPlayer.VoteTargetId is not null && GameState.GamePlayers.TryGetValue(myPlayer.VoteTargetId, out tp);
+
+                <div class="ctc-vote-confirm">
+                    @if (targetSelected)
+                    {
                         <button class="ctc-btn ctc-btn-danger ctc-btn-lg" @onclick="ConfirmVote">
-                            🔒 Lock-In Vote for @targetName
+                            Lock-In Vote
                         </button>
-                    </div>
-                }
+                    }
+                    else
+                    {
+                        <button class="ctc-btn ctc-btn-danger ctc-btn-lg ctc-lock-vote-disabled" disabled @onclick="ConfirmVote">
+                            Lock-In Vote
+                        </button>
+                    }
+                </div>
             }
             else if (myPlayer is not null && myPlayer.IsEliminated)
             {
@@ -172,24 +201,6 @@
                     </div>
                 }
             </div>
-
-            @* ── Public Votes ── *@
-            @if (GameState.CurrentRoundVotes.Count > 0)
-            {
-                <div class="ctc-public-votes">
-                    <h3 class="ctc-section-title">Locked-In Votes</h3>
-                    <div class="ctc-tally-list">
-                        @foreach (var vote in GameState.CurrentRoundVotes)
-                        {
-                            <div class="ctc-tally-entry">
-                                <span class="ctc-tally-voter">@vote.VoterName</span>
-                                <span class="ctc-tally-arrow">→</span>
-                                <span class="ctc-tally-target">@vote.TargetName</span>
-                            </div>
-                        }
-                    </div>
-                </div>
-            }
         </div>
     </div>
 </div>

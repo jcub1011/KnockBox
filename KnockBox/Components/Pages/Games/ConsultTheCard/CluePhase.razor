@@ -49,14 +49,14 @@
         @* ── Clue input (active player only) ── *@
         @if (isMyTurn)
         {
-            <div class="ctc-clue-input-area">
+            <form class="ctc-clue-input-area" @onsubmit="SubmitClue" @onsubmit:preventDefault="true">
                 <input type="text" class="ctc-clue-input" placeholder="Enter a clue (max 50 chars)..."
                        value="@_clueText" @oninput="OnClueInput" maxlength="50" />
-                <button class="ctc-btn ctc-btn-primary" @onclick="SubmitClue"
+                <button type="submit" class="ctc-btn ctc-btn-primary"
                         disabled="@(string.IsNullOrWhiteSpace(_clueText))">
                     ✏️ Submit Clue
                 </button>
-            </div>
+            </form>
         }
         else
         {
