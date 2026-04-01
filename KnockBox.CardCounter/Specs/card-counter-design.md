@@ -10,7 +10,6 @@ End the game with a balance as close to 0 as possible. Negative balances are all
 - **Buy-In (Starting Balance):** Roll a 6-sided die and multiply the result by 8. The player chooses whether their starting balance is positive or negative.
 - **Main Deck:** 52 cards containing only number cards and operator cards (number-to-operator ratio is 4:1, and add/subtract-to-multiply/divide ratio is 4:1). The deck is shuffled once and divided into subsets called shoes for each round.
 - **Action Deck:** A separate deck of action cards, not part of the main deck. Players are dealt 3 action cards per round and have a hand limit of 6.
-- **Passes:** 3 passes per player.
 - **Turn Order:** Clockwise.
 
 ---
@@ -34,10 +33,8 @@ When a player draws an operator card:
 
 **Rounding:** Operations that result in decimals are rounded using away-from-zero rounding.
 
-**Division by Zero:** If a player's pot value is 0 when a division operator is drawn, one of the following events occurs at random (25% chance each):
+**Division by Zero:** If a player's pot value is 0 when a division operator is drawn, one of the following events occurs at random (50% chance each):
 
-- Player gains an extra pass.
-- Player loses a pass (if they have > 0 passes).
 - Player gains a random action card (if under hand limit).
 - Player loses a random action card (if they have > 0 action cards).
 
@@ -55,7 +52,7 @@ Action cards come from a separate deck and are **not** part of the main deck. Pl
 
 | Card | Effect |
 |---|---|
-| **Feeling Lucky?** (Force Draw) | Forces the next player to draw a card. That player may respond by playing their own "Feeling Lucky?" to pass the force to the next player in turn order, forming a chain. If any player in the chain plays "Comp'd," the player before them in the chain must still draw or pass. The round resumes from the player who initially played "Feeling Lucky?" This card **does not** end your turn. Forced players do not have their normal turn skipped. |
+| **Feeling Lucky?** (Force Draw) | Forces the next player to draw a card. That player may respond by playing their own "Feeling Lucky?" to pass the force to the next player in turn order, forming a chain. If any player in the chain plays "Comp'd," the player before them in the chain must still draw. The round resumes from the player who initially played "Feeling Lucky?" This card **does not** end your turn. Forced players do not have their normal turn skipped. |
 | **Make My Luck** (Alter the Future) | View the top 3 cards of the current shoe and reorder them in any order. |
 | **Skim** (Swap a Digit) | Swap a single digit from your pot with a single digit from a different player's pot. Digits remain in their respective positions. *(Example: Player A swaps their digit in position 1 with Player B's digit in position 2. Player A's position 1 now holds Player B's old digit, and Player B's position 2 now holds Player A's old digit.)* Blockable. |
 | **Burn** (Discard) | Discard the top card of the current shoe. The discarded card is revealed to all players. |
@@ -88,16 +85,7 @@ At the start of each shoe, players are shown the **quantity** of each card type 
 On each turn, a player may:
 
 1. **Play action cards** (optional, before drawing).
-2. **Fold** (optional, consumes a pass, does not end the turn).
-3. **Draw** the top card of the current shoe **or pass**.
-
-### Passing
-
-Players have a limited number of passes for the **entire game** (3 passes per player). Passing skips the player's draw for that turn and consumes one pass.
-
-### Folding
-
-From the same pass pool, the player can opt to fold their pot. This consumes a pass but discards their pot. Their turn does not end with this action.
+2. **Draw** the top card of the current shoe.
 
 ### Transparency
 
@@ -132,5 +120,4 @@ The game ends when all cards in the main deck have been drawn across all shoes.
 
 **Tiebreaker:**
 
-1. The tied player with the most remaining passes wins.
-2. If still tied, the winner is determined by coin flip.
+1. The winner is determined by coin flip.
