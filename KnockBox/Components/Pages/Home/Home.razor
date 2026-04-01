@@ -10,26 +10,28 @@
 <div class="home-container">
     <h1>Knockbox</h1>
 
-    <div class="join-form" style="margin-bottom: 24px;">
-        <div class="join-form-room-code text-start">
-            <h2>Player Name:</h2>
-            <input placeholder="Enter name" 
-                   type="text" maxlength="12" name="player-name" 
-                   @bind="PlayerName" @bind:event="oninput" style="text-transform: none;"/>
+    <form @onsubmit="() => JoinLobby(LobbyCode ?? string.Empty)" @onsubmit:preventDefault="true">
+        <div class="join-form" style="margin-bottom: 24px;">
+            <div class="join-form-room-code text-start">
+                <h2>Player Name:</h2>
+                <input placeholder="Enter name" 
+                       type="text" maxlength="12" name="player-name" 
+                       @bind="PlayerName" @bind:event="oninput" style="text-transform: none;"/>
+            </div>
         </div>
-    </div>
 
-    <div class="join-form">
-        <div class="join-form-room-code">
-            <h2>
-                Room Code:
-            </h2>
-            <input placeholder="KN0CK3OX" 
-                   type="text" maxlength="@LobbyCodeService.LobbyCodeLength" name="room-code" 
-                   @bind="LobbyCode"/>
+        <div class="join-form">
+            <div class="join-form-room-code">
+                <h2>
+                    Room Code:
+                </h2>
+                <input placeholder="KN0CK3OX" 
+                       type="text" maxlength="@LobbyCodeService.LobbyCodeLength" name="room-code" 
+                       @bind="LobbyCode"/>
+            </div>
+            <button type="submit" disabled="@(!CanJoinOrCreate)">Join</button>
         </div>
-        <button disabled="@(!CanJoinOrCreate)" @onclick="() => JoinLobby(LobbyCode ?? string.Empty)">Join</button>
-    </div>
+    </form>
 
     <div class="game-grid">
         <button class="game" aria-label="Dice Simulator" disabled="@(!CanJoinOrCreate)" @onclick="() => CreateLobby(GameType.DiceSimulator)">
