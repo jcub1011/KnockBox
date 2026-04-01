@@ -13,16 +13,7 @@
     }
 
     <div class="ctc-clue-panel">
-        @if (isEliminated == true)
-        {
-            <div class="ctc-eliminated-banner">
-                <span class="ctc-eliminated-icon">👻</span>
-                <div class="ctc-eliminated-text">
-                    <h3>YOU ARE ELIMINATED</h3>
-                    <p>You can no longer give clues.</p>
-                </div>
-            </div>
-        }
+        <h2 class="ctc-phase-title">📝 CLUE PHASE</h2>
 
         @if (playerState is not null && playerState.Role != Role.Informant && !string.IsNullOrEmpty(playerState.SecretWord))
         {
@@ -31,8 +22,17 @@
                 <span class="ctc-secret-word-value">@playerState.SecretWord</span>
             </div>
         }
-
-        <h2 class="ctc-phase-title">📝 CLUE PHASE</h2>
+        
+        @if (isEliminated == true)
+        {
+            <div class="ctc-eliminated-banner">
+                <span class="ctc-eliminated-icon"></span>
+                <div class="ctc-eliminated-text">
+                    <h3>YOU ARE ELIMINATED</h3>
+                    <p>You can no longer give clues.</p>
+                </div>
+            </div>
+        }
 
         @* ── Turn indicator ── *@
         <div class="ctc-turn-indicator">

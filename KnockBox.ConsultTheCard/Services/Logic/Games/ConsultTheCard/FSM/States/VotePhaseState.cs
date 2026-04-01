@@ -46,13 +46,29 @@ namespace KnockBox.Services.Logic.Games.ConsultTheCard.FSM.States
             if (target is null || target.IsEliminated)
                 return new ResultError("You cannot vote for an eliminated player.");
 
-            voter.HasVoted = true;
-            voter.VoteTargetId = cmd.TargetPlayerId;
-            context.State.CurrentRoundVotes.Add(
-                new VoteEntry(voter.PlayerId, voter.DisplayName, target.PlayerId, target.DisplayName));
+            // Remove existing vote
+            if (voter.VoteTargetId == cmd.TargetPlayerId)
+            {
+                voter.HasVoted = false;
+                voter.VoteTargetId = null;
+                context.State.CurrentRoundVotes.RemoveAll((entry) =>
+                {
+                    return entry.VoterId == cmd.PlayerId && entry.TargetId == cmd.TargetPlayerId;
+                });
 
-            context.Logger.LogInformation(
-                "VotePhase: [{voter}] voted for [{target}].", cmd.PlayerId, cmd.TargetPlayerId);
+                context.Logger.LogInformation(
+                    "VotePhase: [{voter}] rescinded vote for [{target}].", cmd.PlayerId, cmd.TargetPlayerId);
+            }
+            else
+            {
+                voter.HasVoted = true;
+                voter.VoteTargetId = cmd.TargetPlayerId;
+                context.State.CurrentRoundVotes.Add(
+                    new VoteEntry(voter.PlayerId, voter.DisplayName, target.PlayerId, target.DisplayName));
+
+                context.Logger.LogInformation(
+                    "VotePhase: [{voter}] voted for [{target}].", cmd.PlayerId, cmd.TargetPlayerId);
+            }
 
             // Check if all alive players have voted.
             if (context.GetAlivePlayers().All(p => p.HasVoted))

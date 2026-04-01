@@ -17,6 +17,16 @@
     }
 
     <div class="ctc-discussion-panel">
+        <h2 class="ctc-phase-title">💬 DISCUSSION & VOTING</h2>
+
+        @if (myPlayer is not null && myPlayer.Role != Role.Informant && !string.IsNullOrEmpty(myPlayer.SecretWord))
+        {
+            <div class="ctc-secret-word-banner">
+                <span class="ctc-secret-word-label">Your Word:</span>
+                <span class="ctc-secret-word-value">@myPlayer.SecretWord</span>
+            </div>
+        }
+
         @if (myPlayer is not null && myPlayer.IsEliminated)
         {
             <div class="ctc-eliminated-banner">
@@ -28,63 +38,73 @@
             </div>
         }
 
-        @if (myPlayer is not null && myPlayer.Role != Role.Informant && !string.IsNullOrEmpty(myPlayer.SecretWord))
-        {
-            <div class="ctc-secret-word-banner">
-                <span class="ctc-secret-word-label">Your Word:</span>
-                <span class="ctc-secret-word-value">@myPlayer.SecretWord</span>
-            </div>
-        }
-
-        <h2 class="ctc-phase-title">💬 DISCUSSION & VOTING</h2>
-
         @* ── Player List ── *@
         <div class="ctc-discussion-players">
-            <h3 class="ctc-section-title">Players</h3>
+            <h3 class="ctc-section-title">Cast Your Vote</h3>
             <div class="ctc-player-list">
                 @foreach (var ps in GameState.GamePlayers.Values.OrderBy(p => p.DisplayName))
                 {
+                    if (ps is null || myPlayer is null) continue;
                     bool isMe = ps.PlayerId == myId;
-                    <div class="ctc-player-row @(isMe ? "ctc-player-me" : "") @(ps.IsEliminated ? "ctc-player-eliminated" : "")">
-                        <span class="ctc-player-name">@ps.DisplayName</span>
-                        @if (ps.IsEliminated)
-                        {
-                            <span class="ctc-status-badge ctc-status-eliminated">ELIMINATED</span>
-                        }
-                        else if (ps.HasVoted)
-                        {
-                            <span class="ctc-status-badge ctc-status-voted">READY</span>
-                        }
-                    </div>
-                }
-            </div>
-        </div>
 
-        @* ── Clue History ── *@
-        <div class="ctc-discussion-clues">
-            <h3 class="ctc-section-title">Clue History</h3>
-            <div class="ctc-clue-list">
-                @foreach (var ps in GameState.GamePlayers.Values.OrderBy(p => p.DisplayName))
-                {
-                    @if (ps.ClueHistory.Count > 0)
+                    string playerRowCss = "ctc-player-row " 
+                        + (isMe ? "ctc-player-me" : string.Empty) 
+                        + (ps.IsEliminated ? "ctc-player-eliminated" : string.Empty);
+
+                    if (isMe || ps.IsEliminated || myPlayer.IsEliminated)
                     {
-                        <div class="ctc-clue-entry">
-                            <span class="ctc-clue-player">@ps.DisplayName</span>
-                            <div class="ctc-clue-history-bubbles">
-                                @foreach (var clue in ps.ClueHistory)
+                        <div class="@playerRowCss">
+                            <div class="ctc-player-row-row">
+                                <span class="ctc-clue-player">@ps.DisplayName</span>
+                                @if (ps.IsEliminated)
                                 {
-                                    <span class="ctc-clue-bubble">@clue</span>
+                                    <span class="ctc-status-badge ctc-status-eliminated">ELIMINATED</span>
                                 }
+                                else if (ps.HasVoted)
+                                {
+                                    <span class="ctc-status-badge ctc-status-voted">READY</span>
+                                }
+                            </div>
+                            <div class="ctc-player-row-row">
+                                <div class="ctc-clue-history-bubbles">
+                                    @foreach (var clue in ps.ClueHistory)
+                                    {
+                                        <span class="ctc-clue-bubble">@clue</span>
+                                    }
+                                </div>
                             </div>
                         </div>
                     }
+                    else
+                    {
+                        bool isSelected = myPlayer.VoteTargetId == ps.PlayerId;
+                        string voteCss = isSelected ? "ctc-vote-target-selected" : string.Empty;
+
+                        <button class="@playerRowCss @voteCss" @onclick="() => SelectTarget(ps.PlayerId)">
+                            <div class="ctc-player-row-row">
+                                <span class="ctc-clue-player">@ps.DisplayName</span>
+                                @if (ps.IsEliminated)
+                                {
+                                    <span class="ctc-status-badge ctc-status-eliminated">ELIMINATED</span>
+                                }
+                                else if (ps.HasVoted)
+                                {
+                                    <span class="ctc-status-badge ctc-status-voted">READY</span>
+                                }
+                            </div>
+                            <div class="ctc-player-row-row">
+                                <div class="ctc-clue-history-bubbles">
+                                    @foreach (var clue in ps.ClueHistory)
+                                    {
+                                        <span class="ctc-clue-bubble">@clue</span>
+                                    }
+                                </div>
+                            </div>
+                        </button>
+                    }
                 }
             </div>
-        </div>
-
-        @* ── Voting Section ── *@
-        <div class="ctc-voting-section">
-            <h3 class="ctc-section-title">Cast Your Vote</h3>
+            
             <div class="ctc-vote-progress-bar">
                 @lockedInCount / @aliveCount votes locked in
             </div>
@@ -98,21 +118,6 @@
             }
             else if (myPlayer is not null && !myPlayer.IsEliminated)
             {
-                <div class="ctc-vote-grid">
-                    @foreach (var target in alivePlayersForVoting)
-                    {
-                        bool isSelected = myPlayer.VoteTargetId == target.PlayerId;
-                        <button class="ctc-vote-target @(isSelected ? "ctc-vote-target-selected" : "")"
-                                @onclick="() => SelectTarget(target.PlayerId)">
-                            <span class="ctc-vote-target-name">@target.DisplayName</span>
-                            @if (isSelected)
-                            {
-                                <span class="ctc-selection-check">🎯</span>
-                            }
-                        </button>
-                    }
-                </div>
-
                 @if (myPlayer.VoteTargetId is not null)
                 {
                     var targetName = GameState.GamePlayers.TryGetValue(myPlayer.VoteTargetId, out var tp) ? tp.DisplayName : "...";
@@ -125,73 +130,66 @@
             }
             else if (myPlayer is not null && myPlayer.IsEliminated)
             {
-                <p class="ctc-waiting-text">You are eliminated and cannot vote.</p>
+                <p class="ctc-waiting-text">You cannot vote.</p>
             }
-        </div>
 
-        @* ── Actions ── *@
-        <div class="ctc-discussion-actions">
-            @if (myPlayer is not null && !myPlayer.IsEliminated)
-            {
-                var skipVote = GameState.SkipTimeVoteStatus;
-                bool hasVotedToSkip = myPlayer.HasVotedToSkipTime;
+            @* ── Actions ── *@
+            <div class="ctc-discussion-actions">
+                @if (myPlayer is not null && !myPlayer.IsEliminated)
+                {
+                    var skipVote = GameState.SkipTimeVoteStatus;
+                    bool hasVotedToSkip = myPlayer.HasVotedToSkipTime;
 
-                <div class="ctc-action-group">
-                    <div class="ctc-action-item">
-                        <button class="ctc-btn ctc-btn-warning" @onclick="VoteToEndGame"
-                                title="@(hasVotedToEnd ? "Click to rescind your vote to end the game" : "Vote to end the game early")">
-                            @(hasVotedToEnd ? "❌ Rescind End Vote" : "🗳️ Vote to End Game")
-                        </button>
-                        <div class="ctc-vote-small-progress">
-                            @endVote.VotedToEnd.Count / @endVote.RequiredVotes needed
+                    <div class="ctc-action-group">
+                        <div class="ctc-action-item">
+                            <button class="ctc-btn ctc-btn-warning" @onclick="VoteToEndGame"
+                                    title="@(hasVotedToEnd ? "Click to rescind your vote to end the game" : "Vote to end the game early")">
+                                @(hasVotedToEnd ? "❌ Rescind End Vote" : "🗳️ Vote to End Game")
+                            </button>
+                            <div class="ctc-vote-small-progress">
+                                @endVote.VotedToEnd.Count / @endVote.RequiredVotes needed
+                            </div>
+                        </div>
+
+                        <div class="ctc-action-item">
+                            <button class="ctc-btn ctc-btn-secondary" @onclick="SkipRemainingTime"
+                                    title="@(hasVotedToSkip ? "Click to rescind your vote to skip time" : "Vote to skip the remaining discussion time")">
+                                @(hasVotedToSkip ? "❌ Rescind Skip Discussion" : "⏩ Vote to Skip Discussion")
+                            </button>
+                            <div class="ctc-vote-small-progress">
+                                @skipVote.VotedToEnd.Count / @skipVote.RequiredVotes needed
+                            </div>
                         </div>
                     </div>
+                }
 
-                    <div class="ctc-action-item">
-                        <button class="ctc-btn ctc-btn-secondary" @onclick="SkipRemainingTime"
-                                title="@(hasVotedToSkip ? "Click to rescind your vote to skip time" : "Vote to skip the remaining discussion time")">
-                            @(hasVotedToSkip ? "❌ Rescind Skip Vote" : "⏩ Vote to Skip Time")
+                @if (isHost)
+                {
+                    <div class="ctc-host-actions">
+                        <button class="ctc-btn ctc-btn-primary" @onclick="AdvanceToVote">
+                            ⚡ Force Advance
                         </button>
-                        <div class="ctc-vote-small-progress">
-                            @skipVote.VotedToEnd.Count / @skipVote.RequiredVotes needed
-                        </div>
+                    </div>
+                }
+            </div>
+
+            @* ── Public Votes ── *@
+            @if (GameState.CurrentRoundVotes.Count > 0)
+            {
+                <div class="ctc-public-votes">
+                    <h3 class="ctc-section-title">Locked-In Votes</h3>
+                    <div class="ctc-tally-list">
+                        @foreach (var vote in GameState.CurrentRoundVotes)
+                        {
+                            <div class="ctc-tally-entry">
+                                <span class="ctc-tally-voter">@vote.VoterName</span>
+                                <span class="ctc-tally-arrow">→</span>
+                                <span class="ctc-tally-target">@vote.TargetName</span>
+                            </div>
+                        }
                     </div>
                 </div>
             }
-
-            @if (isHost)
-            {
-                <div class="ctc-host-actions">
-                    <button class="ctc-btn ctc-btn-primary" @onclick="AdvanceToVote">
-                        ⚡ Force Advance
-                    </button>
-                </div>
-            }
         </div>
-
-        @if (endVote.VotedToEnd.Count > 0)
-        {
-            <div class="ctc-vote-to-end-progress">
-                End Game Votes: @endVote.VotedToEnd.Count / @endVote.RequiredVotes
-            </div>
-        }
-
-        @* ── Public Votes ── *@
-        @if (GameState.CurrentRoundVotes.Count > 0)
-        {
-            <div class="ctc-public-votes">
-                <h3 class="ctc-section-title">Locked-In Votes</h3>
-                <div class="ctc-tally-list">
-                    @foreach (var vote in GameState.CurrentRoundVotes)
-                    {
-                        <div class="ctc-tally-entry">
-                            <span class="ctc-tally-voter">@vote.VoterName</span>
-                            <span class="ctc-tally-arrow">→</span>
-                            <span class="ctc-tally-target">@vote.TargetName</span>
-                        </div>
-                    }
-                </div>
-            </div>
-        }
     </div>
 </div>

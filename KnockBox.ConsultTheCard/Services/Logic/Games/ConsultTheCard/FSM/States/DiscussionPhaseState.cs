@@ -184,10 +184,21 @@ namespace KnockBox.Services.Logic.Games.ConsultTheCard.FSM.States
             if (target is null || target.IsEliminated)
                 return new ResultError("You cannot vote for an eliminated player.");
 
-            voter.VoteTargetId = cmd.TargetPlayerId;
+            // Rescind vote
+            if (voter.VoteTargetId == cmd.TargetPlayerId)
+            {
+                voter.VoteTargetId = null;
 
-            context.Logger.LogInformation(
-                "DiscussionPhase: [{voter}] selected vote target [{target}].", cmd.PlayerId, cmd.TargetPlayerId);
+                context.Logger.LogInformation(
+                    "DiscussionPhase: [{voter}] removed vote target [{target}].", cmd.PlayerId, cmd.TargetPlayerId);
+            }
+            else
+            {
+                voter.VoteTargetId = cmd.TargetPlayerId;
+
+                context.Logger.LogInformation(
+                    "DiscussionPhase: [{voter}] selected vote target [{target}].", cmd.PlayerId, cmd.TargetPlayerId);
+            }
 
             return null;
         }

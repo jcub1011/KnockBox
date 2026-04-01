@@ -739,6 +739,7 @@
     font-weight: 700;
     color: #a78bfa;
     min-width: 80px;
+    font-size: 16px;
 }
 
 ::deep .ctc-clue-word {
@@ -798,12 +799,23 @@
 
 ::deep .ctc-player-row {
     display: flex;
-    align-items: center;
+    flex-direction: column;
     gap: 12px;
     background: rgba(255,255,255,0.05);
     border: 1px solid rgba(255,255,255,0.1);
     border-radius: 8px;
     padding: 8px 14px;
+    transition: all ease 0.2s;
+}
+
+::deep button.ctc-player-row:hover {
+    cursor: pointer;
+    border-color: white;
+}
+
+::deep .ctc-player-row-row {
+    display: flex;
+    gap: 12px;
 }
 
 ::deep .ctc-player-me {
@@ -817,7 +829,7 @@
     background: rgba(231, 76, 60, 0.05);
 }
 
-::deep .ctc-player-eliminated .ctc-player-name {
+::deep .ctc-player-eliminated .ctc-clue-player {
     color: #e74c3c;
     text-decoration: line-through;
     text-decoration-thickness: 2px;
