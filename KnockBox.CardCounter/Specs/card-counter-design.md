@@ -6,13 +6,12 @@ End the game with a balance as close to 0 as possible. Negative balances are all
 
 ## Setup
 
-- **Players:** 2–? (to be determined via playtesting)
+- **Players:** 2–?
 - **Buy-In (Starting Balance):** Roll a 6-sided die and multiply the result by 8. The player chooses whether their starting balance is positive or negative.
-- **Main Deck:** 52 cards containing only number cards and operator cards (deck size, card counts, and ratios are placeholder values to be adjusted via playtesting). The deck is shuffled once and divided into subsets called shoes for each round.
-- **Action Deck:** A separate deck of action cards, not part of the main deck.
+- **Main Deck:** 52 cards containing only number cards and operator cards (number-to-operator ratio is 4:1, and add/subtract-to-multiply/divide ratio is 4:1). The deck is shuffled once and divided into subsets called shoes for each round.
+- **Action Deck:** A separate deck of action cards, not part of the main deck. Players are dealt 3 action cards per round and have a hand limit of 6.
+- **Passes:** 3 passes per player.
 - **Turn Order:** Clockwise.
-
-> **Playtesting Note:** The following values are placeholders and subject to change: deck size (52), number-to-operator ratio (4:1), add/subtract-to-multiply/divide ratio (4:1), action cards dealt per round (3), action card hand limit (6), and total passes per game.
 
 ---
 
@@ -33,14 +32,14 @@ When a player draws an operator card:
 1. If the player's pot is empty, the operator is a **no-op** (nothing happens).
 2. Otherwise, the player's new balance is calculated as: **New Balance = Current Balance [Operator] Pot Value**. The pot is then cleared.
 
-**Rounding:** Operations that result in decimals are rounded to the nearest integer.
+**Rounding:** Operations that result in decimals are rounded using away-from-zero rounding.
 
-**Division by Zero:** If a player's pot value is 0 when a division operator is drawn, one of the following events occurs at random:
+**Division by Zero:** If a player's pot value is 0 when a division operator is drawn, one of the following events occurs at random (25% chance each):
 
 - Player gains an extra pass.
-- Player loses a pass.
-- Player gains a random action card (subject to hand limit overflow rules).
-- Player loses a random action card (no-op if the player has no action cards).
+- Player loses a pass (if they have > 0 passes).
+- Player gains a random action card (if under hand limit).
+- Player loses a random action card (if they have > 0 action cards).
 
 ### Action Cards
 
@@ -94,7 +93,7 @@ On each turn, a player may:
 
 ### Passing
 
-Players have a limited number of passes for the **entire game** (quantity to be determined via playtesting). Passing skips the player's draw for that turn and consumes one pass.
+Players have a limited number of passes for the **entire game** (3 passes per player). Passing skips the player's draw for that turn and consumes one pass.
 
 ### Folding
 
@@ -105,6 +104,23 @@ From the same pass pool, the player can opt to fold their pot. This consumes a p
 - All player **balances** and **pots** are visible at all times.
 - Action cards in hand are **hidden**.
 - The only unknown information is the **order** of the remaining cards in the current shoe.
+
+---
+
+## Game Modes
+
+### Normal Mode
+
+The standard way to play Card Counter as detailed above.
+
+### Active Operator Mode
+
+An alternative game mode that modifies how numbers and operators interact:
+- **No Pots:** Players have no pot.
+- **No Buy-in:** The initial buy-in step is skipped; every player starts with a balance of 10.
+- **Active Operators:** Drawing a number card applies it directly to the player's balance using their "Active Operator" (which begins as Add `+`).
+- Drawing an operator card replaces the player's Active Operator.
+- **Action Card Modifications:** *Skim* and *Turn The Table* are not distributed in this mode; however, *Turn The Table* is repurposed to reverse balance digits when played (e.g., a balance of 123 becomes 321, preserving sign).
 
 ---
 
