@@ -5,6 +5,7 @@ using KnockBox.Services.Logic.Games.CardCounter;
 using KnockBox.Services.Logic.Games.DiceSimulator;
 using KnockBox.Services.Logic.Games.DrawnToDress;
 using KnockBox.Services.Logic.Games.ConsultTheCard;
+using KnockBox.Services.Logic.Games.Operator;
 
 namespace KnockBox.Services.Registrations.Logic
 {
@@ -21,6 +22,7 @@ namespace KnockBox.Services.Registrations.Logic
             services.AddSingleton<CardCounterGameEngine>();
             services.AddSingleton<DrawnToDressGameEngine>();
             services.AddSingleton<ConsultTheCardGameEngine>();
+            services.AddSingleton<OperatorGameEngine>();
 
             return services;
         }
