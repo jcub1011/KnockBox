@@ -25,6 +25,9 @@ public class OperatorGameState(
     
     public OperatorGamePhase Phase { get; set; } = OperatorGamePhase.Setup;
     
+    public OperatorGameConfig Config { get; set; } = new();
+    public DateTimeOffset StateStartTime { get; set; } = DateTimeOffset.UtcNow;
+    
     public TurnManager TurnManager { get; } = new();
 
     public OperatorCommand? PendingActionCommand { get; set; }
