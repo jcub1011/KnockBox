@@ -22,7 +22,15 @@ public enum CardAction
 {
     None,
     Shield,
-    LiabilityTransfer
+    LiabilityTransfer,
+    CookTheBooks,
+    Comp,
+    Steal,
+    HotPotato,
+    FlashFlood,
+    HostileTakeover,
+    Audit,
+    MarketCrash
 }
 
 public readonly record struct Card(
