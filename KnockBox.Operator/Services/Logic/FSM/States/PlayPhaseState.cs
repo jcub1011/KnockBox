@@ -60,7 +60,8 @@ public class PlayPhaseState : IOperatorGameState, ITimedGameState<OperatorGameCo
 
             bool hasTargetedAction = playedCards.Any(c => c.Type == CardType.Action && 
                 (c.ActionValue == CardAction.Steal || c.ActionValue == CardAction.LiabilityTransfer || 
-                 c.ActionValue == CardAction.HostileTakeover || c.ActionValue == CardAction.Audit));
+                 c.ActionValue == CardAction.HostileTakeover || c.ActionValue == CardAction.Audit ||
+                 c.ActionValue == CardAction.HotPotato || c.ActionValue == CardAction.FlashFlood));
 
             if (hasTargetedAction && !string.IsNullOrEmpty(play.TargetPlayerId))
             {
@@ -70,31 +71,103 @@ public class PlayPhaseState : IOperatorGameState, ITimedGameState<OperatorGameCo
                 return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromValue(new ReactionState());
             }
 
-            var numbers = playedCards.Where(c => c.Type == CardType.Number).ToList();
-            if (numbers.Any())
-            {
-                decimal val = 0;
-                foreach (var num in numbers)
-                {
-                    val = val * 10 + num.NumberValue;
-                }
-                
-                var (newScore, newOp) = OperatorGameContext.CalculateNewScore(pState.CurrentPoints, pState.ActiveOperator, val);
-                pState.CurrentPoints = newScore;
-                pState.ScoreTimestamp = DateTimeOffset.UtcNow;
-            }
-
-            var opCard = playedCards.LastOrDefault(c => c.Type == CardType.Operator);
-            if (opCard.Type == CardType.Operator)
-            {
-                pState.ActiveOperator = opCard.OperatorValue;
-            }
+            // Resolve immediate logic if no reaction needed
+            ResolvePlayedCards(context, play, playedCards, false);
 
             context.State.Phase = OperatorGamePhase.Draw;
             return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromValue(new DrawPhaseState());
         }
 
         return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromError("Invalid command for PlayPhase.");
+    }
+
+    public static void ResolvePlayedCards(OperatorGameContext context, PlayCardsCommand play, List<Card> playedCards, bool actionBlocked)
+    {
+        var pState = context.GamePlayers[play.PlayerId];
+        var actionCards = playedCards.Where(c => c.Type == CardType.Action).ToList();
+        var numbers = playedCards.Where(c => c.Type == CardType.Number).ToList();
+
+        // Calculate combined number value
+        decimal val = 0;
+        if (numbers.Any())
+        {
+            foreach (var num in numbers)
+            {
+                val = val * 10 + num.NumberValue;
+            }
+        }
+
+        string effectiveScoreTarget = play.PlayerId;
+
+        // Non-targeted or resolved targeted actions
+        foreach (var action in actionCards)
+        {
+            if (action.ActionValue == CardAction.Comp)
+            {
+                context.ResolveComp(play.PlayerId);
+            }
+            else if (action.ActionValue == CardAction.MarketCrash)
+            {
+                context.ResolveMarketCrash();
+            }
+            else if (!actionBlocked)
+            {
+                if (action.ActionValue == CardAction.CookTheBooks && numbers.Any())
+                {
+                    context.ResolveCookTheBooks(play.PlayerId, val);
+                    numbers.Clear(); // prevent standard score calculation below
+                }
+                else if (action.ActionValue == CardAction.LiabilityTransfer && play.TargetPlayerId != null)
+                {
+                    effectiveScoreTarget = play.TargetPlayerId;
+                }
+                else if (action.ActionValue == CardAction.Steal && play.TargetPlayerId != null)
+                {
+                    context.ResolveSteal(play.PlayerId, play.TargetPlayerId);
+                }
+                else if (action.ActionValue == CardAction.HotPotato && play.TargetPlayerId != null && numbers.Any())
+                {
+                    // For Hot Potato, give the last number card to target
+                    var hotPotatoNum = numbers.Last();
+                    context.ResolveHotPotato(play.TargetPlayerId, hotPotatoNum);
+                    numbers.Remove(hotPotatoNum);
+                    
+                    // The given card should be removed from discard pile because it's now in the target's hand
+                    var inDiscard = context.State.DiscardPile.FindLastIndex(c => c.Id == hotPotatoNum.Id);
+                    if (inDiscard != -1) context.State.DiscardPile.RemoveAt(inDiscard);
+                }
+                else if (action.ActionValue == CardAction.FlashFlood && play.TargetPlayerId != null)
+                {
+                    context.ResolveFlashFlood(play.TargetPlayerId);
+                }
+                else if (action.ActionValue == CardAction.HostileTakeover && play.TargetPlayerId != null)
+                {
+                    context.ResolveHostileTakeover(play.PlayerId, play.TargetPlayerId);
+                }
+                else if (action.ActionValue == CardAction.Audit && play.TargetPlayerId != null)
+                {
+                    context.ResolveAudit(play.TargetPlayerId);
+                }
+            }
+        }
+
+        // Apply standard number score logic if not consumed by CookTheBooks
+        if (numbers.Any())
+        {
+            if (context.GamePlayers.TryGetValue(effectiveScoreTarget, out var targetPlayerState))
+            {
+                var (newScore, newOp) = OperatorGameContext.CalculateNewScore(targetPlayerState.CurrentPoints, targetPlayerState.ActiveOperator, val);
+                targetPlayerState.CurrentPoints = newScore;
+                targetPlayerState.ScoreTimestamp = DateTimeOffset.UtcNow;
+            }
+        }
+
+        // Apply operator changes
+        var opCard = playedCards.LastOrDefault(c => c.Type == CardType.Operator);
+        if (opCard.Type == CardType.Operator && !pState.IsAudited)
+        {
+            pState.ActiveOperator = opCard.OperatorValue;
+        }
     }
 
     public ValueResult<TimeSpan> GetRemainingTime(OperatorGameContext context, DateTimeOffset now)

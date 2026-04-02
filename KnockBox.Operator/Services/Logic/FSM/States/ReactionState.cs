@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Collections.Generic;
 using KnockBox.Core.Services.State.Games.Shared;
 using KnockBox.Extensions.Returns;
 using KnockBox.Operator.Models;
@@ -36,6 +37,8 @@ public class ReactionState : IOperatorGameState, ITimedGameState<OperatorGameCon
             pState.Hand.RemoveAt(shieldIdx);
             context.State.DiscardPile.Add(shield);
             
+            ResolvePendingAction(context, true);
+            
             context.State.PendingActionCommand = null;
             context.State.ReactionTargetPlayerId = null;
 
@@ -44,6 +47,8 @@ public class ReactionState : IOperatorGameState, ITimedGameState<OperatorGameCon
         }
         else if (command is PassReactionCommand)
         {
+            ResolvePendingAction(context, false);
+            
             context.State.PendingActionCommand = null;
             context.State.ReactionTargetPlayerId = null;
             context.State.Phase = OperatorGamePhase.Draw;
@@ -51,6 +56,27 @@ public class ReactionState : IOperatorGameState, ITimedGameState<OperatorGameCon
         }
 
         return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromError("Invalid command for ReactionPhase.");
+    }
+
+    private void ResolvePendingAction(OperatorGameContext context, bool actionBlocked)
+    {
+        if (context.State.PendingActionCommand is PlayCardsCommand playCommand)
+        {
+            var playedCards = new List<Card>();
+            foreach (var id in playCommand.CardIds)
+            {
+                var card = context.State.DiscardPile.FirstOrDefault(c => c.Id == id);
+                if (card.Type != 0 || card.ActionValue != 0 || card.NumberValue != 0) // Basic check if card exists
+                {
+                    playedCards.Add(card);
+                }
+            }
+
+            if (playedCards.Count > 0)
+            {
+                PlayPhaseState.ResolvePlayedCards(context, playCommand, playedCards, actionBlocked);
+            }
+        }
     }
 
     public ValueResult<TimeSpan> GetRemainingTime(OperatorGameContext context, DateTimeOffset now)
@@ -68,6 +94,8 @@ public class ReactionState : IOperatorGameState, ITimedGameState<OperatorGameCon
         var elapsed = now - context.State.StateStartTime;
         if (elapsed >= context.State.Config.ReactionPhaseTimeout)
         {
+            ResolvePendingAction(context, false);
+            
             context.State.PendingActionCommand = null;
             context.State.ReactionTargetPlayerId = null;
             context.State.Phase = OperatorGamePhase.Draw;
