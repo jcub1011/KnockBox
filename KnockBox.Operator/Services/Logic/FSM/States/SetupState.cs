@@ -12,6 +12,10 @@ public class SetupState : IOperatorGameState, ITimedGameState<OperatorGameContex
     public ValueResult<IGameState<OperatorGameContext, OperatorCommand>?> OnEnter(OperatorGameContext context)
     {
         context.State.StateStartTime = DateTimeOffset.UtcNow;
+        foreach (var state in context.State.GamePlayers.Values)
+        {
+            state.CurrentPoints = 0m; // reset points
+        }
         return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromValue(null);
     }
 

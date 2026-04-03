@@ -8,103 +8,103 @@
             ⚙️
         </button>
     }
-
-    <div class="op-lobby-content">
-        <h2 class="op-lobby-title">Operator Lobby</h2>
-        
-        <div class="op-player-list">
-            <h3 class="op-section-title">Players (@GameState.Players.Count)</h3>
-            <div class="op-player-grid">
+    
+    <div class="op-lobby-table-container">
+        <div class="op-lobby-table">
+            <h2 class="op-lobby-title">Operator Lobby</h2>
+                
+            <div class="op-lobby-players">
                 @foreach (var player in GameState.Players)
                 {
-                    <div class="op-player-card">
-                        <span class="op-player-name">
-                            @player.Name
-                            @if (player.Id == GameState.Host.Id)
-                            {
-                                <span class="op-host-badge" title="Host">👑</span>
-                            }
-                        </span>
-                        
-                        @if (UserService.CurrentUser?.Id == GameState.Host.Id && player.Id != GameState.Host.Id)
+                    var isMe = player.Id == UserService.CurrentUser?.Id;
+                    var isHost = player.Id == GameState.Host.Id;
+                    
+                    <div class="op-lobby-player @(isMe ? "op-lobby-player-me" : "")">
+                        <span class="op-player-lobbyname">@player.Name</span>
+                        @if (isHost)
                         {
-                            <button class="op-kick-btn" @onclick="() => KickPlayer(player.Id)" title="Kick Player">
-                                ❌
+                            <span class="op-host-badge">HOST</span>
+                        }
+                        
+                        @if (UserService.CurrentUser?.Id == GameState.Host.Id && !isHost)
+                        {
+                            <button class="op-btn op-btn-danger op-btn-sm" @onclick="() => KickPlayer(player.Id)" title="Kick Player">
+                                ✕
                             </button>
                         }
                     </div>
                 }
             </div>
-        </div>
 
-        @if (UserService.CurrentUser?.Id == GameState.Host.Id)
-        {
-            <div class="op-lobby-actions">
-                <button class="op-start-btn" 
-                        disabled="@(GameState.Players.Count < 2)" 
+            <p class="op-lobby-player-count">@GameState.Players.Count players</p>
+
+            @if (UserService.CurrentUser?.Id == GameState.Host.Id)
+            {
+                <button class="op-btn op-btn-primary op-btn-lg"
+                        disabled="@(GameState.Players.Count < 2)"
                         @onclick="StartGame">
-                    Start Game
+                    START GAME
                 </button>
                 @if (GameState.Players.Count < 2)
                 {
-                    <p class="op-lobby-hint">Waiting for at least 2 players...</p>
+                    <p class="op-waiting-text">⚠️ Need at least 2 players</p>
                 }
-            </div>
-        }
-        else
-        {
-            <div class="op-lobby-waiting">
-                <div class="op-loading-spinner"></div>
-                <p>Waiting for host to start the game...</p>
-            </div>
-        }
+            }
+            else
+            {
+                <div class="op-lobby-waiting">
+                    <p class="op-waiting-text">Waiting for host to start...</p>
+                </div>
+            }
+        </div>
     </div>
 </div>
 
 @if (SettingsOpen)
 {
-    <div class="op-settings-modal-overlay" @onclick="ToggleSettings">
-        <div class="op-settings-modal" @onclick:stopPropagation="true">
-            <div class="op-settings-header">
-                <h3>Game Settings</h3>
-                <button class="op-settings-close" @onclick="ToggleSettings">✕</button>
-            </div>
-            
-            <div class="op-settings-body">
-                <div class="op-setting-item">
-                    <label>Enable Timers</label>
+    <div class="op-settings-backdrop" @onclick="ToggleSettings"></div>
+    <div class="op-settings-drawer @(SettingsOpen ? "op-settings-drawer-open" : "")">
+        <div class="op-settings-drawer-header">
+            <h3 class="op-config-section-title">⚙️ Game Settings</h3>
+            <button class="op-btn op-btn-sm" @onclick="ToggleSettings">✕</button>
+        </div>
+        
+        <div class="op-settings-drawer-body">
+            <div class="op-config-grid">
+                <label class="op-config-label op-config-label-row">
+                    <span>Enable Timers</span>
                     <input type="checkbox" @bind="TimersEnabled" />
-                </div>
+                </label>
 
                 @if (TimersEnabled)
                 {
-                    <div class="op-setting-item">
-                        <label>Setup Timeout (s)</label>
-                        <input type="number" @bind="SetupPhaseTimeoutSeconds" min="5" max="300" />
-                    </div>
-                    <div class="op-setting-item">
-                        <label>Play Timeout (s)</label>
-                        <input type="number" @bind="PlayPhaseTimeoutSeconds" min="5" max="300" />
-                    </div>
-                    <div class="op-setting-item">
-                        <label>Reaction Timeout (s)</label>
-                        <input type="number" @bind="ReactionPhaseTimeoutSeconds" min="5" max="300" />
-                    </div>
-                    <div class="op-setting-item">
-                        <label>Draw Timeout (s)</label>
-                        <input type="number" @bind="DrawPhaseTimeoutSeconds" min="5" max="300" />
-                    </div>
+                    <label class="op-config-label">
+                        Setup Timeout (s)
+                        <input type="number" class="op-config-input" @bind="SetupPhaseTimeoutSeconds" min="5" max="300" />
+                    </label>
+                    <label class="op-config-label">
+                        Play Timeout (s)
+                        <input type="number" class="op-config-input" @bind="PlayPhaseTimeoutSeconds" min="5" max="300" />
+                    </label>
+                    <label class="op-config-label">
+                        Reaction Timeout (s)
+                        <input type="number" class="op-config-input" @bind="ReactionPhaseTimeoutSeconds" min="5" max="300" />
+                    </label>
+                    <label class="op-config-label">
+                        Draw Timeout (s)
+                        <input type="number" class="op-config-input" @bind="DrawPhaseTimeoutSeconds" min="5" max="300" />
+                    </label>
                 }
 
-                <div class="op-setting-item">
-                    <label>Enable Card Stacking</label>
+                <label class="op-config-label op-config-label-row">
+                    <span>Enable Card Stacking</span>
                     <input type="checkbox" @bind="EnableStacking" />
-                </div>
+                </label>
 
-                <div class="op-setting-item">
-                    <label>Flip Win Condition (Furthest from 0)</label>
+                <label class="op-config-label op-config-label-row">
+                    <span>Flip Win Condition</span>
                     <input type="checkbox" @bind="FlipWinCondition" />
-                </div>
+                </label>
             </div>
         </div>
     </div>

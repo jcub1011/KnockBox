@@ -1,42 +1,42 @@
 @using KnockBox.Operator.Models
 
-<div class="op-reaction">
+<div class="op-setup">
     <div class="op-reaction-content">
         @if (IsTargeted)
         {
-            <h2 class="op-reaction-title">YOU ARE BEING TARGETED!</h2>
-            <p class="op-reaction-subtitle">Someone played an action against you. Do you want to use a Shield?</p>
+            <h2 class="op-phase-title">⚠️ YOU ARE BEING TARGETED!</h2>
+            <p class="op-waiting-text">Someone played an action against you. Use a shield or take the hit.</p>
 
             var shields = GetShields();
 
             @if (shields.Count > 0)
             {
-                <div class="op-reaction-choices">
-                    <div class="op-shield-list">
-                        @foreach (var shield in shields)
-                        {
-                            <div class="op-shield-option" @onclick="() => PlayShield(shield.Id)">
-                                <OperatorCard Card="shield" />
-                                <button class="op-use-shield-btn">USE SHIELD</button>
-                            </div>
-                        }
-                    </div>
-                    <button class="op-pass-btn" @onclick="Pass">TAKE IT (PASS)</button>
+                <div class="op-setup-choices">
+                    @foreach (var shield in shields)
+                    {
+                        <div class="op-choice-btn" @onclick="() => PlayShield(shield.Id)">
+                            <div class="op-card-icon">🛡️</div>
+                            <div class="op-choice-label">USE SHIELD</div>
+                        </div>
+                    }
+                </div>
+                <div style="margin-top: 20px; text-align: center;">
+                    <button class="op-btn op-btn-danger" @onclick="Pass">TAKE THE HIT (PASS)</button>
                 </div>
             }
             else
             {
-                <div class="op-no-shields">
-                    <p>You have no shields in your hand.</p>
-                    <button class="op-pass-btn op-pass-forced" @onclick="Pass">CONTINUE</button>
+                <div class="op-no-shields" style="text-align: center;">
+                    <p class="op-waiting-text">You have no shields available.</p>
+                    <button class="op-btn op-btn-primary" @onclick="Pass">CONTINUE</button>
                 </div>
             }
         }
         else
         {
             <div class="op-reaction-waiting">
-                <div class="op-loading-spinner"></div>
-                <p>Waiting for @(GameState.Players.FirstOrDefault(p => p.Id == GameState.ReactionTargetPlayerId)?.Name ?? "the target") to react...</p>
+                <h2 class="op-phase-title">Waiting for reaction...</h2>
+                <p class="op-waiting-text">Waiting for @(GameState.Players.FirstOrDefault(p => p.Id == GameState.ReactionTargetPlayerId)?.Name ?? "the target") to respond.</p>
             </div>
         }
     </div>

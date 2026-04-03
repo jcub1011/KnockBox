@@ -2,7 +2,7 @@
 @using KnockBox.Operator.Services.State
 
 <div class="op-game-board">
-    @* Opponents (All participants except current user) *@
+    @* Opponents *@
     <div class="op-opponents-grid">
         @foreach (var player in GameState.Players.Where(p => p.Id != UserService.CurrentUser?.Id))
         {
@@ -41,43 +41,42 @@
                 OnClick="@(() => SelectTarget(UserService.CurrentUser!.Id))" />
         }
     </div>
+</div>
 
-    @* Controls & Hand *@
-    <div class="op-bottom-tray @(IsMyTurn ? "active" : "")">
+@* Controls & Hand *@
+<div class="op-bottom-tray">
+    <div class="op-controls">
         @if (IsMyTurn)
         {
-            <div class="op-controls">
-                @if (SelectedCardIds.Count > 0)
-                {
-                    <button class="op-play-btn" @onclick="PlayCards">
-                        COMMIT PLAY (@SelectedCardIds.Count)
-                    </button>
-                }
-                else if (CanSkip())
-                {
-                    <button class="op-skip-btn" @onclick="SkipTurn">
-                        SKIP TURN
-                    </button>
-                }
-                else
-                {
-                    <div class="op-turn-hint">Select cards to play...</div>
-                }
-            </div>
+            @if (SelectedCardIds.Count > 0)
+            {
+                <button class="op-btn op-btn-primary op-btn-lg" @onclick="PlayCards">
+                    COMMIT PLAY (@SelectedCardIds.Count)
+                </button>
+            }
+            else if (CanSkip())
+            {
+                <button class="op-btn op-btn-secondary" @onclick="SkipTurn">
+                    SKIP TURN
+                </button>
+            }
+            else
+            {
+                <div class="op-section-title">Select cards to play</div>
+            }
         }
         else
         {
-            <div class="op-waiting-hint">
+            <div class="op-waiting-text">
                 Waiting for @(GameState.Players.FirstOrDefault(p => p.Id == GameState.TurnManager.CurrentPlayer)?.Name ?? "another player")...
             </div>
         }
-
-        @if (CurrentPlayerState != null)
-        {
-            <OperatorHand 
-                Hand="@CurrentPlayerState.Hand" 
-                SelectedCards="@SelectedCardIds" 
-                OnCardToggled="ToggleCard" />
-        }
     </div>
+
+    @if (CurrentPlayerState != null)
+    {
+        <OperatorHand Hand="@CurrentPlayerState.Hand"
+                      SelectedCards="@SelectedCardIds"
+                      OnCardToggled="ToggleCard" />
+    }
 </div>

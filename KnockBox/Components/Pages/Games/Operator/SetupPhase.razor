@@ -1,47 +1,34 @@
-@using KnockBox.Services.State.Users
+@using KnockBox.Operator.Models
 @using KnockBox.Operator.Services.State
 
 <div class="op-setup">
-    <div class="op-setup-content">
-        <h2 class="op-setup-title">Choose Your Starting Score</h2>
-        @if (IsHost())
-        {
-            <p class="op-setup-subtitle">The game is initializing. Waiting for players to select their starting values.</p>
-        }
-        else
-        {
-            <p class="op-setup-subtitle">Select your entry point. This will also set your initial operator.</p>
-        }
+    @if (IsHost())
+    {
+        int scoresSubmitted = GameState.GamePlayers.Values.Count(state => state.CurrentPoints != 0m);
+        int totalPlayers = GameState.GamePlayers.Values.Count;
 
+        <h2 class="op-phase-title">PLAYERS SELECTING STARTING SCORE</h2>
+        <div class="op-waiting-section">Waiting on players: @scoresSubmitted / @totalPlayers</div>
+    }
+    else
+    {
+        <h2 class="op-phase-title">CHOOSE YOUR STARTING SCORE</h2>
+    
+        <div class="op-setup-choices">
+            <div class="op-choice-btn op-choice-positive" @onclick="() => SubmitChoice(10m)">
+                <span class="op-choice-value">+10.0</span>
+            </div>
+        
+            <div class="op-choice-btn op-choice-negative" @onclick="() => SubmitChoice(-10m)">
+                <span class="op-choice-value">-10.0</span>
+            </div>
+        </div>
+    
         @if (ShouldShowWaiting())
         {
-            <div class="op-setup-waiting">
-                <div class="op-loading-spinner"></div>
-                <p>@(IsHost() ? "Waiting for players to choose..." : "Waiting for other players to choose...")</p>
-                <div class="op-setup-player-status">
-                    @foreach (var player in GameState.Players)
-                    {
-                        var playerState = GameState.Context?.GamePlayers.GetValueOrDefault(player.Id);
-                        var selected = playerState != null && (playerState.CurrentPoints == 10m || playerState.CurrentPoints == -10m);
-                        <div class="op-status-item @(selected ? "selected" : "")">
-                            @(selected ? "✅" : "⏳") @player.Name
-                        </div>
-                    }
-                </div>
+            <div class="op-waiting-section">
+                <p class="op-waiting-text">Choice locked! Waiting for others...</p>
             </div>
         }
-        else
-        {
-            <div class="op-setup-choices">
-                <button class="op-choice-btn op-choice-positive" @onclick="() => SubmitChoice(10m)">
-                    <span class="op-choice-value">+10.0</span>
-                    <span class="op-choice-desc">Start high, use subtraction</span>
-                </button>
-                <button class="op-choice-btn op-choice-negative" @onclick="() => SubmitChoice(-10m)">
-                    <span class="op-choice-value">-10.0</span>
-                    <span class="op-choice-desc">Start low, use addition</span>
-                </button>
-            </div>
-        }
-    </div>
+    }
 </div>
