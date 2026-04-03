@@ -1,0 +1,135 @@
+/* ── Card Base ────────────────────────────────────────────────────────────── */
+
+.op-card {
+    width: 100px;
+    height: 140px;
+    border: 3px solid #000;
+    border-radius: 12px;
+    background: #fff;
+    color: #000;
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    box-shadow: 4px 4px 0 rgba(0,0,0,0.5);
+    cursor: pointer;
+    transition: transform 0.15s ease-out, box-shadow 0.15s ease-out;
+    user-select: none;
+    overflow: hidden;
+}
+
+.op-card:hover {
+    transform: translateY(-10px) rotate(-1deg);
+    box-shadow: 6px 14px 0 rgba(0,0,0,0.3), 0 0 20px rgba(230,57,70,0.15);
+}
+
+.op-card.selected {
+    border-color: #e63946;
+    box-shadow: 0 0 0 4px #e63946, 8px 16px 0 rgba(0,0,0,0.4);
+    transform: translateY(-20px) scale(1.08);
+    z-index: 10;
+}
+
+/* ── Selected shimmer ── */
+
+.op-card.selected::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+        105deg,
+        transparent 40%,
+        rgba(230,57,70,0.08) 45%,
+        rgba(230,57,70,0.15) 50%,
+        rgba(230,57,70,0.08) 55%,
+        transparent 60%
+    );
+    animation: op-card-shimmer 2s infinite linear;
+    border-radius: 12px;
+    pointer-events: none;
+    z-index: 1;
+}
+
+@keyframes op-card-shimmer {
+    0% { transform: translateX(-150%); }
+    100% { transform: translateX(150%); }
+}
+
+/* ── Card Type Variants ── */
+
+.op-card-num {
+    background: #fff5f5;
+    border-left: 5px solid #e63946;
+}
+
+.op-card-op {
+    background: #fffbeb;
+    border-left: 5px solid #ffd166;
+}
+
+.op-card-act {
+    background: #f5f0ff;
+    border-left: 5px solid #a855f7;
+}
+
+/* ── Card Inner Layout ── */
+
+.op-card-inner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    gap: 4px;
+    position: relative;
+    z-index: 2;
+}
+
+.op-card-value {
+    font-size: 2.2rem;
+    font-weight: 900;
+    line-height: 1;
+}
+
+.op-card-icon {
+    font-size: 2rem;
+}
+
+.op-card-name {
+    font-size: 0.75rem;
+    font-weight: 900;
+    text-align: center;
+    text-transform: uppercase;
+}
+
+.op-card-label {
+    font-size: 0.55rem;
+    font-weight: 700;
+    color: rgba(0,0,0,0.4);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+/* ── Card Draw Animation ── */
+
+@keyframes op-card-deal {
+    0% {
+        transform: translateY(-80px) scale(0.6) rotate(-10deg);
+        opacity: 0;
+    }
+    50% {
+        transform: translateY(5px) scale(1.03) rotate(1deg);
+        opacity: 1;
+    }
+    75% {
+        transform: translateY(-2px) scale(0.99);
+    }
+    100% {
+        transform: translateY(0) scale(1) rotate(0);
+        opacity: 1;
+    }
+}
+
+.op-card.op-card-new {
+    animation: op-card-deal 0.5s ease-out both;
+}

@@ -1,32 +1,36 @@
 @using KnockBox.Operator.Models
 
-<div class="op-setup">
-    <div class="op-reaction-content">
+<div class="op-reaction-overlay">
+    <div class="op-reaction-backdrop"></div>
+    <div class="op-reaction-panel">
         @if (IsTargeted)
         {
-            <h2 class="op-phase-title">&#x26A0;&#xFE0F; YOU ARE BEING TARGETED!</h2>
-            <p class="op-waiting-text">Someone played an action against you. Use a shield or take the hit.</p>
+            <div class="op-reaction-alert-icon">&#x26A0;&#xFE0F;</div>
+            <h2 class="op-reaction-title">YOU ARE BEING TARGETED!</h2>
+            <p class="op-reaction-subtitle">
+                <strong>@GetAttackerName()</strong> played <strong>@GetActionDescription()</strong> against you!
+            </p>
 
             var shields = GetShields();
             var hotPotatoes = GetHotPotatoes();
 
             @if (shields.Count > 0 || (hotPotatoes.Count > 0 && CanRedirectHotPotato))
             {
-                <div class="op-setup-choices">
+                <div class="op-reaction-actions">
                     @foreach (var shield in shields)
                     {
-                        <div class="op-choice-btn" @onclick="() => PlayShield(shield.Id)">
-                            <div class="op-card-icon">&#x1F6E1;&#xFE0F;</div>
-                            <div class="op-choice-label">USE SHIELD</div>
+                        <div class="op-reaction-action-btn shield-btn" @onclick="() => PlayShield(shield.Id)">
+                            <div class="op-reaction-action-icon">&#x1F6E1;&#xFE0F;</div>
+                            <div class="op-reaction-action-label">USE SHIELD</div>
                         </div>
                     }
                     @if (hotPotatoes.Count > 0 && CanRedirectHotPotato)
                     {
                         @foreach (var hp in hotPotatoes)
                         {
-                            <div class="op-choice-btn" @onclick="() => StartRedirect(hp.Id)">
-                                <div class="op-card-icon">&#x1F954;</div>
-                                <div class="op-choice-label">REDIRECT</div>
+                            <div class="op-reaction-action-btn redirect-btn" @onclick="() => StartRedirect(hp.Id)">
+                                <div class="op-reaction-action-icon">&#x1F954;</div>
+                                <div class="op-reaction-action-label">REDIRECT</div>
                             </div>
                         }
                     }
@@ -34,27 +38,27 @@
 
                 @if (_redirectingWithCardId != null)
                 {
-                    <div style="margin-top: 20px; text-align: center;">
+                    <div class="op-redirect-section">
                         <p class="op-waiting-text">Select a player to redirect Hot Potato to:</p>
-                        <div class="op-setup-choices">
+                        <div class="op-redirect-players">
                             @foreach (var player in GameState.Players.Where(p => p.Id != UserService.CurrentUser?.Id))
                             {
-                                <div class="op-choice-btn" @onclick="() => RedirectHotPotato(player.Id)">
-                                    <div class="op-choice-label">@player.Name</div>
-                                </div>
+                                <button class="op-redirect-player-btn" @onclick="() => RedirectHotPotato(player.Id)">
+                                    @player.Name
+                                </button>
                             }
                         </div>
-                        <button class="op-btn op-btn-secondary" style="margin-top: 10px;" @onclick="CancelRedirect">CANCEL</button>
+                        <button class="op-btn op-btn-secondary" @onclick="CancelRedirect">CANCEL</button>
                     </div>
                 }
 
-                <div style="margin-top: 20px; text-align: center;">
+                <div class="op-reaction-pass">
                     <button class="op-btn op-btn-danger" @onclick="Pass">TAKE THE HIT (PASS)</button>
                 </div>
             }
             else
             {
-                <div class="op-no-shields" style="text-align: center;">
+                <div class="op-no-shields">
                     <p class="op-waiting-text">You have no shields available.</p>
                     <button class="op-btn op-btn-primary" @onclick="Pass">CONTINUE</button>
                 </div>
@@ -62,9 +66,11 @@
         }
         else
         {
-            <div class="op-reaction-waiting">
-                <h2 class="op-phase-title">Waiting for reaction...</h2>
-                <p class="op-waiting-text">Waiting for @(GameState.Players.FirstOrDefault(p => p.Id == GameState.ReactionTargetPlayerId)?.Name ?? "the target") to respond.</p>
+            <div class="op-reaction-waiting-content">
+                <h2 class="op-reaction-title" style="font-size: 1.2rem;">Waiting for reaction...</h2>
+                <p class="op-reaction-subtitle">
+                    Waiting for <strong>@(GameState.Players.FirstOrDefault(p => p.Id == GameState.ReactionTargetPlayerId)?.Name ?? "the target")</strong> to respond.
+                </p>
             </div>
         }
     </div>

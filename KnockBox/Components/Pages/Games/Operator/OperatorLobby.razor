@@ -49,8 +49,25 @@ else
         {
             <LobbyPhase GameState="GameState" />
         }
+        else if (IsHost())
+        {
+            @* Host spectator routing *@
+            @switch (GameState.Phase)
+            {
+                case OperatorGamePhase.Setup:
+                    <SetupPhase GameState="GameState" />
+                    break;
+                case OperatorGamePhase.GameOver:
+                    <GameOverPhase GameState="GameState" />
+                    break;
+                default:
+                    <SpectatorView GameState="GameState" />
+                    break;
+            }
+        }
         else
         {
+            @* Player routing *@
             @switch (GameState.Phase)
             {
                 case OperatorGamePhase.Setup:
@@ -60,6 +77,7 @@ else
                     <PlayPhase GameState="GameState" OnError="ShowError" />
                     break;
                 case OperatorGamePhase.Reaction:
+                    <PlayPhase GameState="GameState" OnError="ShowError" IsReadOnly="true" />
                     <ReactionPhase GameState="GameState" OnError="ShowError" />
                     break;
                 case OperatorGamePhase.Draw:

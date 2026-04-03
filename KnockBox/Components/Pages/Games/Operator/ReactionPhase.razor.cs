@@ -91,5 +91,43 @@ namespace KnockBox.Components.Pages.Games.Operator
         {
             return CurrentPlayerState?.Hand.Where(c => c.Type == CardType.Action && c.ActionValue == CardAction.HotPotato).ToList() ?? new();
         }
+
+        protected string GetAttackerName()
+        {
+            if (GameState.PendingActionCommand is PlayCardsCommand play)
+            {
+                return GameState.Players.FirstOrDefault(p => p.Id == play.PlayerId)?.Name ?? "Unknown";
+            }
+            return "Unknown";
+        }
+
+        protected string GetActionDescription()
+        {
+            if (GameState.PendingActionCommand is PlayCardsCommand play)
+            {
+                foreach (var cardId in play.CardIds)
+                {
+                    var card = GameState.DiscardPile.FirstOrDefault(c => c.Id == cardId);
+                    if (card.Type == CardType.Action)
+                    {
+                        return card.ActionValue switch
+                        {
+                            CardAction.Shield => "Shield",
+                            CardAction.LiabilityTransfer => "Liability Transfer",
+                            CardAction.CookTheBooks => "Cook the Books",
+                            CardAction.Comp => "Comp",
+                            CardAction.Steal => "Steal",
+                            CardAction.HotPotato => "Hot Potato",
+                            CardAction.FlashFlood => "Flash Flood",
+                            CardAction.HostileTakeover => "Hostile Takeover",
+                            CardAction.Audit => "Audit",
+                            CardAction.MarketCrash => "Market Crash",
+                            _ => "an action"
+                        };
+                    }
+                }
+            }
+            return "an action";
+        }
     }
 }

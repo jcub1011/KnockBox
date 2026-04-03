@@ -1,0 +1,204 @@
+/* ── Lobby Layout ─────────────────────────────────────────────────────────── */
+
+.op-lobby {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    padding: 24px;
+}
+
+.op-settings-gear-btn {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    font-size: 1.5rem;
+    background: none;
+    border: none;
+    cursor: pointer;
+    z-index: 100;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
+    transition: transform 0.2s;
+}
+
+.op-settings-gear-btn:hover {
+    transform: rotate(45deg) scale(1.1);
+}
+
+/* ── Lobby Table ── */
+
+.op-lobby-table-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.op-lobby-table {
+    background: rgba(15,5,5,0.7);
+    backdrop-filter: blur(8px);
+    border: 3px solid #e63946;
+    border-radius: 24px;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.5), 0 0 30px rgba(230,57,70,0.15);
+    padding: 40px 48px;
+    max-width: 520px;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    align-items: center;
+    animation: op-lobby-idle-pulse 4s ease-in-out infinite;
+}
+
+@keyframes op-lobby-idle-pulse {
+    0%, 100% { border-color: #e63946; box-shadow: 0 8px 40px rgba(0,0,0,0.5), 0 0 30px rgba(230,57,70,0.15); }
+    50% { border-color: #ff2d55; box-shadow: 0 8px 40px rgba(0,0,0,0.5), 0 0 40px rgba(230,57,70,0.25); }
+}
+
+.op-lobby-title {
+    font-size: 1.4rem;
+    font-weight: 900;
+    color: #e63946;
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    margin: 0;
+    text-shadow: 0 0 20px rgba(230,57,70,0.3);
+}
+
+/* ── Player List ── */
+
+.op-lobby-players {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 16px 0;
+}
+
+.op-lobby-player {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 16px;
+    background: rgba(255,255,255,0.03);
+    border: 2px solid rgba(255,255,255,0.08);
+    border-radius: 12px;
+    width: 100%;
+    text-align: left;
+    transition: background 0.2s, border-color 0.2s;
+}
+
+.op-lobby-player:hover {
+    background: rgba(255,255,255,0.06);
+}
+
+.op-lobby-player-me {
+    border-color: #e63946;
+    background: rgba(230,57,70,0.1);
+}
+
+.op-player-lobbyname {
+    font-weight: 700;
+    flex: 1;
+}
+
+.op-lobby-player-count {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: rgba(255,255,255,0.4);
+    margin: 0;
+}
+
+.op-lobby-waiting {
+    text-align: center;
+}
+
+/* ── Settings Drawer ── */
+
+.op-settings-drawer {
+    position: fixed;
+    top: 0;
+    right: -320px;
+    width: 320px;
+    height: 100%;
+    background: #0f0505;
+    border-left: 3px solid #e63946;
+    box-shadow: -10px 0 30px rgba(0,0,0,0.5);
+    z-index: 10000;
+    transition: right 0.3s ease;
+    display: flex;
+    flex-direction: column;
+}
+
+.op-settings-drawer-open {
+    right: 0;
+}
+
+.op-settings-drawer-header {
+    padding: 20px;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.op-settings-drawer-body {
+    padding: 20px;
+    overflow-y: auto;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.op-settings-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.6);
+    z-index: 9999;
+}
+
+.op-config-section-title {
+    font-size: 0.8rem;
+    font-weight: 900;
+    text-transform: uppercase;
+    color: #e63946;
+    margin: 0;
+}
+
+.op-config-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.op-config-label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 0.85rem;
+    font-weight: 700;
+}
+
+.op-config-label-row {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.op-config-input {
+    background: rgba(0,0,0,0.3);
+    border: 2px solid rgba(255,255,255,0.1);
+    border-radius: 6px;
+    padding: 6px 10px;
+    color: #fff;
+    font-family: var(--font-mono);
+}
+
+.op-config-input:focus {
+    border-color: #e63946;
+    outline: none;
+}

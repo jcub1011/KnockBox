@@ -25,22 +25,31 @@
 
     @* Deck *@
     <div class="op-deck-area">
-        <div class="op-deck-stack">
-            @if (GameState.Deck.Count > 2)
-            {
-                <div class="op-deck-card op-deck-card-3"></div>
-            }
-            @if (GameState.Deck.Count > 1)
-            {
-                <div class="op-deck-card op-deck-card-2"></div>
-            }
-            @if (GameState.Deck.Count > 0)
-            {
+        @if (GameState.Deck.Count > 0)
+        {
+            <div class="op-deck-stack">
+                @if (GameState.Deck.Count > 2)
+                {
+                    <div class="op-deck-card op-deck-card-3"></div>
+                }
+                @if (GameState.Deck.Count > 1)
+                {
+                    <div class="op-deck-card op-deck-card-2"></div>
+                }
                 <div class="op-deck-card op-deck-card-1"></div>
-            }
+            </div>
+        }
+        else
+        {
+            <div class="op-deck-empty">EMPTY</div>
+        }
+        <div class="op-deck-info">
+            <div class="op-deck-count">@GameState.Deck.Count</div>
+            <div class="op-deck-label">CARDS LEFT</div>
+            <div class="op-deck-bar">
+                <div class="op-deck-bar-fill" style="width: @(GetDeckPercentage())%"></div>
+            </div>
         </div>
-        <div class="op-deck-count">@GameState.Deck.Count</div>
-        <div class="op-deck-label">CARDS LEFT</div>
     </div>
 
     @* Active Player Status (Self) *@

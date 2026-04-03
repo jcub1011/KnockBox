@@ -19,6 +19,8 @@ namespace KnockBox.Components.Pages.Games.Operator
 
         [Parameter] public EventCallback<string> OnError { get; set; }
 
+        [Parameter] public bool IsReadOnly { get; set; }
+
         private Card? _pendingAction;
         private readonly List<Guid> _selectedNumberIds = new();
         private string? _targetPlayerId;
@@ -27,7 +29,7 @@ namespace KnockBox.Components.Pages.Games.Operator
         protected OperatorPlayerState? CurrentPlayerState =>
             UserService.CurrentUser != null ? GameState.Context?.GamePlayers.GetValueOrDefault(UserService.CurrentUser.Id) : null;
 
-        protected bool IsMyTurn => GameState.TurnManager.CurrentPlayer == UserService.CurrentUser?.Id;
+        protected bool IsMyTurn => !IsReadOnly && GameState.TurnManager.CurrentPlayer == UserService.CurrentUser?.Id;
 
         protected HashSet<Guid> NewCardIds
         {
@@ -204,6 +206,12 @@ namespace KnockBox.Components.Pages.Games.Operator
         {
             if (!IsMyTurn || CurrentPlayerState == null) return false;
             return CurrentPlayerState.Hand.All(c => c.Type == CardType.Action && c.ActionValue == CardAction.Shield);
+        }
+
+        protected int GetDeckPercentage()
+        {
+            var total = GameState.Deck.Count + GameState.DiscardPile.Count;
+            return total > 0 ? (int)(100.0 * GameState.Deck.Count / total) : 0;
         }
     }
 }
