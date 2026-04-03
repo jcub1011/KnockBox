@@ -57,7 +57,7 @@ namespace KnockBox.Components.Pages.Games.Operator
         }
 
         protected bool ShowSubmit =>
-            _selectedNumberIds.Count > 0
+            (_selectedNumberIds.Count > 0 && (_pendingAction == null || !ActionNeedsTarget(_pendingAction.Value.ActionValue) || _targetPlayerId != null))
             || (_selectedOperatorId != null && _targetPlayerId != null)
             || (_pendingAction != null && !ActionNeedsNumbers(_pendingAction.Value.ActionValue)
                 && (!ActionNeedsTarget(_pendingAction.Value.ActionValue) || _targetPlayerId != null));
@@ -135,17 +135,28 @@ namespace KnockBox.Components.Pages.Games.Operator
                         CardAction.Audit => "Audit",
                         CardAction.LiabilityTransfer => "Liability Transfer",
                         CardAction.HotPotato => "Hot Potato",
-                        _ => "this action"
+                        _ => "action"
                     };
-                    return $"Select a target for {actionName}";
+                    return $"Select target for {actionName}";
                 }
                 if (_selectedOperatorId != null && _targetPlayerId == null)
-                    return "Select a target player";
-                if (_pendingAction != null && _selectedNumberIds.Count == 0)
+                    return "Select target";
+
+                if (_pendingAction != null)
                 {
-                    if (ActionNeedsTarget(_pendingAction.Value.ActionValue))
-                        return "Select a target and number cards, then submit";
-                    return "Select number cards, then submit";
+                    var action = _pendingAction.Value.ActionValue;
+                    bool needsNumbers = ActionNeedsNumbers(action);
+                    bool needsTarget = ActionNeedsTarget(action);
+
+                    bool hasNumbers = _selectedNumberIds.Count > 0;
+                    bool hasTarget = _targetPlayerId != null;
+
+                    if (needsNumbers && needsTarget && (!hasNumbers || !hasTarget))
+                        return "Select target & numbers";
+                    if (needsNumbers && !hasNumbers)
+                        return "Select numbers";
+                    if (needsTarget && !hasTarget)
+                        return "Select target";
                 }
                 return null;
             }
