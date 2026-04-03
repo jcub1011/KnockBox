@@ -9,7 +9,7 @@
             var pState = GameState.Context?.GamePlayers.GetValueOrDefault(player.Id);
             if (pState != null)
             {
-                <OperatorPlayerInfo 
+                <OperatorPlayerInfo
                     Name="@player.Name"
                     Score="@pState.CurrentPoints"
                     ActiveOperator="@pState.ActiveOperator"
@@ -17,7 +17,7 @@
                     IsActive="@(GameState.TurnManager.CurrentPlayer == player.Id)"
                     IsAudited="@pState.IsAudited"
                     IsTargetable="@IsMyTurn"
-                    IsTargeted="@(TargetPlayerId == player.Id)"
+                    IsTargeted="@(_targetPlayerId == player.Id)"
                     OnClick="@(() => SelectTarget(player.Id))" />
             }
         }
@@ -27,7 +27,7 @@
     <div class="op-self-status">
         @if (CurrentPlayerState != null)
         {
-            <OperatorPlayerInfo 
+            <OperatorPlayerInfo
                 Name="@UserService.CurrentUser!.Name"
                 Score="@CurrentPlayerState.CurrentPoints"
                 ActiveOperator="@CurrentPlayerState.ActiveOperator"
@@ -35,7 +35,7 @@
                 IsActive="@IsMyTurn"
                 IsAudited="@CurrentPlayerState.IsAudited"
                 IsTargetable="@IsMyTurn"
-                IsTargeted="@(TargetPlayerId == UserService.CurrentUser!.Id)"
+                IsTargeted="@(_targetPlayerId == UserService.CurrentUser!.Id)"
                 OnClick="@(() => SelectTarget(UserService.CurrentUser!.Id))" />
         }
     </div>
@@ -46,21 +46,36 @@
     <div class="op-controls">
         @if (IsMyTurn)
         {
-            @if (SelectedCardIds.Count > 0)
+            @if (ShowSubmit)
             {
-                <button class="op-btn op-btn-primary op-btn-lg" @onclick="PlayCards">
-                    COMMIT PLAY (@SelectedCardIds.Count)
+                <button class="op-btn op-btn-primary op-btn-lg" @onclick="Submit">
+                    SUBMIT (@_selectedNumberIds.Count)
                 </button>
             }
-            else if (CanSkip())
+
+            @if (_pendingAction != null || _selectedNumberIds.Count > 0 || _waitingForTarget)
             {
-                <button class="op-btn op-btn-secondary" @onclick="SkipTurn">
-                    SKIP TURN
+                <button class="op-btn op-btn-secondary" @onclick="CancelSelection">
+                    CANCEL
                 </button>
             }
-            else
+
+            @if (SelectionHint != null)
             {
-                <div class="op-section-title">Select cards to play</div>
+                <div class="op-section-title">@SelectionHint</div>
+            }
+            else if (!ShowSubmit && _pendingAction == null && !_waitingForTarget)
+            {
+                @if (CanSkip())
+                {
+                    <button class="op-btn op-btn-secondary" @onclick="SkipTurn">
+                        SKIP TURN
+                    </button>
+                }
+                else
+                {
+                    <div class="op-section-title">Select a card to play</div>
+                }
             }
         }
         else

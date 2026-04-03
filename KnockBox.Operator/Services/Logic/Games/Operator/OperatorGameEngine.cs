@@ -46,24 +46,12 @@ public class OperatorGameEngine(ILogger<OperatorGameState> stateLogger)
 
         return await state.ExecuteAsync(() =>
         {
-            // 1. Generate Deck
-            // We EXCLUDE the host from the game players.
             var allParticipants = operatorState.Players.ToList();
-            operatorState.Deck = OperatorGameContext.GenerateDeck(allParticipants.Count);
-            
-            // 2. Initialize GamePlayers and Deal 5 cards
+
+            // Initialize GamePlayers (deck generation and dealing happen in SetupState after choices)
             foreach (var user in allParticipants)
             {
                 var playerState = new OperatorPlayerState { UserId = user.Id };
-                for (int i = 0; i < 5; i++)
-                {
-                    if (operatorState.Deck.Count > 0)
-                    {
-                        var card = operatorState.Deck[0];
-                        operatorState.Deck.RemoveAt(0);
-                        playerState.Hand.Add(card);
-                    }
-                }
                 operatorState.GamePlayers[user.Id] = playerState;
             }
 

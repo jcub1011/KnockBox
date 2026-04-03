@@ -19,49 +19,133 @@ namespace KnockBox.Components.Pages.Games.Operator
 
         [Parameter] public EventCallback<string> OnError { get; set; }
 
-        protected HashSet<Guid> SelectedCardIds { get; } = new();
-        protected string? TargetPlayerId { get; set; }
+        private Card? _pendingAction;
+        private readonly List<Guid> _selectedNumberIds = new();
+        private string? _targetPlayerId;
+        private bool _waitingForTarget;
 
-        protected OperatorPlayerState? CurrentPlayerState => 
+        protected OperatorPlayerState? CurrentPlayerState =>
             UserService.CurrentUser != null ? GameState.Context?.GamePlayers.GetValueOrDefault(UserService.CurrentUser.Id) : null;
 
         protected bool IsMyTurn => GameState.TurnManager.CurrentPlayer == UserService.CurrentUser?.Id;
 
-        protected void ToggleCard(Guid cardId)
+        protected HashSet<Guid> SelectedCardIds
         {
-            if (!IsMyTurn) return;
-
-            if (SelectedCardIds.Contains(cardId))
-                SelectedCardIds.Remove(cardId);
-            else
-                SelectedCardIds.Add(cardId);
-            
-            StateHasChanged();
-        }
-
-        protected void SelectTarget(string playerId)
-        {
-            if (!IsMyTurn) return;
-            
-            if (TargetPlayerId == playerId)
-                TargetPlayerId = null;
-            else
-                TargetPlayerId = playerId;
-
-            StateHasChanged();
-        }
-
-        protected async Task PlayCards()
-        {
-            if (!IsMyTurn || UserService.CurrentUser == null) return;
-
-            if (SelectedCardIds.Count == 0)
+            get
             {
-                await OnError.InvokeAsync("You must select at least one card to play.");
+                var ids = new HashSet<Guid>(_selectedNumberIds);
+                if (_pendingAction != null) ids.Add(_pendingAction.Value.Id);
+                return ids;
+            }
+        }
+
+        protected bool ShowSubmit => _selectedNumberIds.Count > 0;
+
+        protected string? SelectionHint
+        {
+            get
+            {
+                if (_waitingForTarget) return "Select a target player";
+                if (_pendingAction != null && _selectedNumberIds.Count == 0) return "Select number cards, then submit";
+                return null;
+            }
+        }
+
+        private static bool ActionNeedsNumbers(CardAction action) =>
+            action is CardAction.CookTheBooks or CardAction.HotPotato or CardAction.LiabilityTransfer;
+
+        private static bool ActionNeedsTarget(CardAction action) =>
+            action is CardAction.LiabilityTransfer or CardAction.Steal or CardAction.HotPotato
+                or CardAction.FlashFlood or CardAction.HostileTakeover or CardAction.Audit;
+
+        protected async Task ToggleCard(Guid cardId)
+        {
+            if (!IsMyTurn || CurrentPlayerState == null) return;
+
+            var card = CurrentPlayerState.Hand.FirstOrDefault(c => c.Id == cardId);
+            if (card.Id == Guid.Empty) return;
+
+            switch (card.Type)
+            {
+                case CardType.Number:
+                    if (_waitingForTarget) return;
+                    if (_selectedNumberIds.Contains(card.Id))
+                        _selectedNumberIds.Remove(card.Id);
+                    else
+                        _selectedNumberIds.Add(card.Id);
+                    break;
+
+                case CardType.Operator:
+                    await PlayCardSet(new List<Guid> { card.Id });
+                    break;
+
+                case CardType.Action:
+                    await HandleActionClick(card);
+                    break;
+            }
+        }
+
+        private async Task HandleActionClick(Card card)
+        {
+            if (card.ActionValue == CardAction.Shield) return;
+
+            if (ActionNeedsNumbers(card.ActionValue))
+            {
+                if (_pendingAction?.Id == card.Id)
+                {
+                    _pendingAction = null;
+                }
+                else
+                {
+                    _pendingAction = card;
+                    _waitingForTarget = false;
+                }
+            }
+            else if (ActionNeedsTarget(card.ActionValue) && _targetPlayerId == null)
+            {
+                _pendingAction = card;
+                _waitingForTarget = true;
+            }
+            else
+            {
+                await PlayCardSet(new List<Guid> { card.Id });
+            }
+        }
+
+        protected async Task SelectTarget(string playerId)
+        {
+            if (!IsMyTurn) return;
+
+            _targetPlayerId = _targetPlayerId == playerId ? null : playerId;
+
+            if (_waitingForTarget && _targetPlayerId != null && _pendingAction != null
+                && !ActionNeedsNumbers(_pendingAction.Value.ActionValue))
+            {
+                await PlayCardSet(new List<Guid> { _pendingAction.Value.Id });
                 return;
             }
 
-            var command = new PlayCardsCommand(UserService.CurrentUser.Id, SelectedCardIds.ToList(), TargetPlayerId);
+            StateHasChanged();
+        }
+
+        protected async Task Submit()
+        {
+            if (!IsMyTurn || UserService.CurrentUser == null) return;
+
+            var cardIds = new List<Guid>(_selectedNumberIds);
+            if (_pendingAction != null)
+                cardIds.Add(_pendingAction.Value.Id);
+
+            if (cardIds.Count == 0) return;
+
+            await PlayCardSet(cardIds);
+        }
+
+        private async Task PlayCardSet(List<Guid> cardIds)
+        {
+            if (UserService.CurrentUser == null) return;
+
+            var command = new PlayCardsCommand(UserService.CurrentUser.Id, cardIds, _targetPlayerId);
             var result = await GameEngine.ExecuteCommandAsync(GameState, command);
 
             if (result.TryGetFailure(out var error))
@@ -71,9 +155,22 @@ namespace KnockBox.Components.Pages.Games.Operator
             }
             else
             {
-                SelectedCardIds.Clear();
-                TargetPlayerId = null;
+                ClearSelection();
             }
+        }
+
+        private void ClearSelection()
+        {
+            _pendingAction = null;
+            _selectedNumberIds.Clear();
+            _targetPlayerId = null;
+            _waitingForTarget = false;
+        }
+
+        protected void CancelSelection()
+        {
+            ClearSelection();
+            StateHasChanged();
         }
 
         protected async Task SkipTurn()
@@ -93,7 +190,6 @@ namespace KnockBox.Components.Pages.Games.Operator
         protected bool CanSkip()
         {
             if (!IsMyTurn || CurrentPlayerState == null) return false;
-            // According to GDD, can skip if hand consists ONLY of Shield cards.
             return CurrentPlayerState.Hand.All(c => c.Type == CardType.Action && c.ActionValue == CardAction.Shield);
         }
     }
