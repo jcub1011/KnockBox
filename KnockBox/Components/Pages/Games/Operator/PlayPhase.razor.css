@@ -157,6 +157,7 @@
     gap: 16px;
     margin-top: auto;
     box-shadow: 0 -4px 30px rgba(0,0,0,0.4);
+    overflow: visible;
 }
 
 .op-controls {

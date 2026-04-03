@@ -15,7 +15,7 @@
     cursor: pointer;
     transition: transform 0.15s ease-out, box-shadow 0.15s ease-out;
     user-select: none;
-    overflow: hidden;
+    overflow: visible;
 }
 
 .op-card:hover {
@@ -32,10 +32,10 @@
 
 /* ── Selected shimmer ── */
 
-.op-card.selected::before {
+.op-card.selected .op-card-inner::before {
     content: '';
     position: absolute;
-    inset: 0;
+    inset: -8px;
     background: linear-gradient(
         105deg,
         transparent 40%,
@@ -45,9 +45,8 @@
         transparent 60%
     );
     animation: op-card-shimmer 2s infinite linear;
-    border-radius: 12px;
     pointer-events: none;
-    z-index: 1;
+    z-index: -1;
 }
 
 @keyframes op-card-shimmer {
@@ -83,6 +82,8 @@
     gap: 4px;
     position: relative;
     z-index: 2;
+    overflow: hidden;
+    border-radius: 8px;
 }
 
 .op-card-value {
@@ -108,6 +109,62 @@
     color: rgba(0,0,0,0.4);
     text-transform: uppercase;
     letter-spacing: 1px;
+}
+
+/* ── Tooltip ── */
+
+.op-card-tooltip {
+    position: absolute;
+    bottom: calc(100% + 12px);
+    left: 50%;
+    transform: translateX(-50%);
+    width: 220px;
+    background: rgba(15,5,5,0.95);
+    backdrop-filter: blur(12px);
+    border: 2px solid rgba(230,57,70,0.4);
+    border-radius: 12px;
+    padding: 12px;
+    z-index: 100;
+    pointer-events: none;
+    animation: op-tooltip-enter 0.2s ease-out;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.6), 0 0 15px rgba(230,57,70,0.15);
+}
+
+/* Tooltip arrow */
+.op-card-tooltip::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 8px solid transparent;
+    border-top-color: rgba(230,57,70,0.4);
+}
+
+@keyframes op-tooltip-enter {
+    from { opacity: 0; transform: translateX(-50%) translateY(4px); }
+    to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+.op-card-tooltip-title {
+    font-size: 0.8rem;
+    font-weight: 900;
+    color: #ffd166;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+}
+
+.op-card-tooltip-desc {
+    font-size: 0.7rem;
+    font-weight: 500;
+    color: rgba(255,255,255,0.8);
+    line-height: 1.4;
+}
+
+/* Ensure tooltip is visible above other cards */
+.op-card.tooltip-visible {
+    z-index: 50;
 }
 
 /* ── Card Draw Animation ── */

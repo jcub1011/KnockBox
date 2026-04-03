@@ -1,8 +1,13 @@
 @using KnockBox.Operator.Models
 
-<div class="op-card @GetCardTypeClass() @(IsSelected ? "selected" : "") @(IsNew ? "op-card-new" : "")"
+<div class="op-card @GetCardTypeClass() @(IsSelected ? "selected" : "") @(IsNew ? "op-card-new" : "") @(_showTooltip ? "tooltip-visible" : "")"
      style="@(IsNew ? $"animation-delay: {AnimationDelay * 150}ms" : "")"
-     @onclick="OnClick">
+     @onclick="HandleClick"
+     @onpointerdown="OnPointerDown"
+     @onpointerup="OnPointerUp"
+     @onpointerleave="OnPointerLeave"
+     @onmouseenter="OnMouseEnter"
+     @onmouseleave="OnMouseLeave">
     <div class="op-card-inner">
         @if (Card.Type == CardType.Number)
         {
@@ -21,6 +26,14 @@
             <div class="op-card-label">ACTION</div>
         }
     </div>
+
+    @if (_showTooltip)
+    {
+        <div class="op-card-tooltip">
+            <div class="op-card-tooltip-title">@GetTooltipTitle()</div>
+            <div class="op-card-tooltip-desc">@GetTooltipDescription()</div>
+        </div>
+    }
 </div>
 
 @code {
@@ -29,6 +42,10 @@
     [Parameter] public bool IsNew { get; set; }
     [Parameter] public int AnimationDelay { get; set; }
     [Parameter] public EventCallback OnClick { get; set; }
+
+    private bool _showTooltip;
+    private bool _longPressTriggered;
+    private System.Threading.Timer? _longPressTimer;
 
     private string GetCardTypeClass() => Card.Type switch
     {
@@ -76,4 +93,117 @@
         CardAction.MarketCrash => "CRASH",
         _ => "UNKNOWN"
     };
+
+    // ── Tooltip content ──
+
+    private string GetTooltipTitle() => Card.Type switch
+    {
+        CardType.Number => $"Number {(int)Card.NumberValue}",
+        CardType.Operator => Card.OperatorValue switch
+        {
+            CardOperator.Add => "Add (+)",
+            CardOperator.Subtract => "Subtract (-)",
+            CardOperator.Multiply => "Multiply (\u00d7)",
+            CardOperator.Divide => "Divide (\u00f7)",
+            _ => "Operator"
+        },
+        CardType.Action => Card.ActionValue switch
+        {
+            CardAction.Shield => "Shield",
+            CardAction.LiabilityTransfer => "Liability Transfer",
+            CardAction.CookTheBooks => "Cook the Books",
+            CardAction.Comp => "Comp",
+            CardAction.Steal => "Steal",
+            CardAction.HotPotato => "Hot Potato",
+            CardAction.FlashFlood => "Flash Flood",
+            CardAction.HostileTakeover => "Hostile Takeover",
+            CardAction.Audit => "Audit",
+            CardAction.MarketCrash => "Market Crash",
+            _ => "Action"
+        },
+        _ => "Card"
+    };
+
+    private string GetTooltipDescription() => Card.Type switch
+    {
+        CardType.Number => "Play number cards to modify scores. Stack multiple numbers to form larger values (e.g. 3 + 7 = 37).",
+        CardType.Operator => Card.OperatorValue switch
+        {
+            CardOperator.Add => "Sets a player's active operator to Add. Future number cards will be added to their score.",
+            CardOperator.Subtract => "Sets a player's active operator to Subtract. Future number cards will be subtracted from their score.",
+            CardOperator.Multiply => "Sets a player's active operator to Multiply. Future number cards will multiply their score.",
+            CardOperator.Divide => "Sets a player's active operator to Divide. Future number cards will divide their score.",
+            _ => "Changes a player's active operator."
+        },
+        CardType.Action => Card.ActionValue switch
+        {
+            CardAction.Shield => "Hold in your hand to block an incoming targeted action. Used automatically during reaction.",
+            CardAction.LiabilityTransfer => "Play with number cards to apply them to a target player's score instead of your own.",
+            CardAction.CookTheBooks => "Play with a number card to divide a target player's score by that number.",
+            CardAction.Comp => "Flips a target player's operator. Positive scores get Subtract, negative scores get Add. Blocked by Audit.",
+            CardAction.Steal => "Take a random card from a target player's hand and add it to yours.",
+            CardAction.HotPotato => "Play with a number card to force it into a target player's hand. They can redirect it with their own Hot Potato.",
+            CardAction.FlashFlood => "Forces a target player to draw 2 extra cards from the deck.",
+            CardAction.HostileTakeover => "Swap your active operator with a target player's. Blocked by Audit.",
+            CardAction.Audit => "Locks a target player's operator for a full round. They cannot change it until the audit expires.",
+            CardAction.MarketCrash => "Forces ALL players to switch to the Divide operator. Audited players are unaffected.",
+            _ => "Performs a special action."
+        },
+        _ => ""
+    };
+
+    // ── Hover (desktop) ──
+
+    private void OnMouseEnter()
+    {
+        _showTooltip = true;
+    }
+
+    private void OnMouseLeave()
+    {
+        _showTooltip = false;
+    }
+
+    // ── Long press (mobile) ──
+
+    private void OnPointerDown()
+    {
+        _longPressTriggered = false;
+        _longPressTimer?.Dispose();
+        _longPressTimer = new System.Threading.Timer(_ =>
+        {
+            _longPressTriggered = true;
+            InvokeAsync(() =>
+            {
+                _showTooltip = true;
+                StateHasChanged();
+            });
+        }, null, 500, System.Threading.Timeout.Infinite);
+    }
+
+    private void OnPointerUp()
+    {
+        _longPressTimer?.Dispose();
+        _longPressTimer = null;
+
+        if (_longPressTriggered)
+        {
+            _showTooltip = false;
+            _longPressTriggered = false;
+        }
+    }
+
+    private void OnPointerLeave()
+    {
+        _longPressTimer?.Dispose();
+        _longPressTimer = null;
+        _showTooltip = false;
+        _longPressTriggered = false;
+    }
+
+    private async Task HandleClick()
+    {
+        if (_longPressTriggered) return;
+        await OnClick.InvokeAsync();
+    }
 }

@@ -4,7 +4,7 @@
     display: flex;
     gap: 12px;
     padding: 10px 0;
-    overflow-x: auto;
     width: 100%;
     justify-content: center;
+    flex-wrap: wrap;
 }
