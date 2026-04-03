@@ -4,13 +4,20 @@
 <div class="op-setup">
     <div class="op-setup-content">
         <h2 class="op-setup-title">Choose Your Starting Score</h2>
-        <p class="op-setup-subtitle">Select your entry point. This will also set your initial operator.</p>
+        @if (IsHost())
+        {
+            <p class="op-setup-subtitle">The game is initializing. Waiting for players to select their starting values.</p>
+        }
+        else
+        {
+            <p class="op-setup-subtitle">Select your entry point. This will also set your initial operator.</p>
+        }
 
-        @if (HasSelected())
+        @if (ShouldShowWaiting())
         {
             <div class="op-setup-waiting">
                 <div class="op-loading-spinner"></div>
-                <p>Waiting for other players to choose...</p>
+                <p>@(IsHost() ? "Waiting for players to choose..." : "Waiting for other players to choose...")</p>
                 <div class="op-setup-player-status">
                     @foreach (var player in GameState.Players)
                     {

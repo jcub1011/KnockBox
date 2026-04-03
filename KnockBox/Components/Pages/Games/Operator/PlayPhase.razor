@@ -2,7 +2,7 @@
 @using KnockBox.Operator.Services.State
 
 <div class="op-game-board">
-    @* Opponents *@
+    @* Opponents (All participants except current user) *@
     <div class="op-opponents-grid">
         @foreach (var player in GameState.Players.Where(p => p.Id != UserService.CurrentUser?.Id))
         {

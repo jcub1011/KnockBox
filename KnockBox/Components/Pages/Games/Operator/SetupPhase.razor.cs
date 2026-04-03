@@ -27,9 +27,15 @@ namespace KnockBox.Components.Pages.Games.Operator
                 Logger.LogError("Failed to submit setup choice: {Error}", error);
         }
 
-        protected bool HasSelected()
+        protected bool IsHost()
+        {
+            return UserService.CurrentUser?.Id == GameState.Host.Id;
+        }
+
+        protected bool ShouldShowWaiting()
         {
             if (UserService.CurrentUser == null) return false;
+            if (IsHost()) return true;
             if (GameState.Context == null) return false;
             
             return GameState.Context.GamePlayers.TryGetValue(UserService.CurrentUser.Id, out var playerState) 

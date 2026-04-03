@@ -47,12 +47,12 @@ public class OperatorGameEngine(ILogger<OperatorGameState> stateLogger)
         return await state.ExecuteAsync(() =>
         {
             // 1. Generate Deck
-            // We include the host in the player count.
-            var allPlayers = operatorState.Players.Concat([operatorState.Host]).ToList();
-            operatorState.Deck = OperatorGameContext.GenerateDeck(allPlayers.Count);
+            // We EXCLUDE the host from the game players.
+            var allParticipants = operatorState.Players.ToList();
+            operatorState.Deck = OperatorGameContext.GenerateDeck(allParticipants.Count);
             
             // 2. Initialize GamePlayers and Deal 5 cards
-            foreach (var user in allPlayers)
+            foreach (var user in allParticipants)
             {
                 var playerState = new OperatorPlayerState { UserId = user.Id };
                 for (int i = 0; i < 5; i++)
@@ -73,7 +73,7 @@ public class OperatorGameEngine(ILogger<OperatorGameState> stateLogger)
             fsm.TransitionTo(context, new KnockBox.Operator.Services.Logic.FSM.States.SetupState());
             
             // 4. Initialize Turn Manager
-            operatorState.TurnManager.SetTurnOrder(allPlayers.Select(p => p.Id));
+            operatorState.TurnManager.SetTurnOrder(allParticipants.Select(p => p.Id));
             
             // 5. Update Joinable Status
             operatorState.UpdateJoinableStatus(false);
