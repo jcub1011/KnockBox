@@ -1,11 +1,23 @@
 @using KnockBox.Operator.Models
 
 <div class="op-hand">
-    @foreach (var card in Hand)
+    @{ var sorted = Hand
+        .OrderBy(c => c.Type)
+        .ThenBy(c => c.NumberValue)
+        .ThenBy(c => (int)c.OperatorValue)
+        .ThenBy(c => (int)c.ActionValue)
+        .ToList();
+       int newIndex = 0;
+    }
+    @foreach (var card in sorted)
     {
-        <OperatorCard 
-            Card="card" 
-            IsSelected="@SelectedCards.Contains(card.Id)" 
+        bool isNew = NewCardIds.Contains(card.Id);
+        int delay = isNew ? newIndex++ : 0;
+        <OperatorCard @key="card.Id"
+            Card="card"
+            IsSelected="@SelectedCards.Contains(card.Id)"
+            IsNew="isNew"
+            AnimationDelay="delay"
             OnClick="@(() => ToggleCard(card.Id))" />
     }
 </div>
@@ -13,6 +25,7 @@
 @code {
     [Parameter] public List<Card> Hand { get; set; } = new();
     [Parameter] public HashSet<Guid> SelectedCards { get; set; } = new();
+    [Parameter] public HashSet<Guid> NewCardIds { get; set; } = new();
     [Parameter] public EventCallback<Guid> OnCardToggled { get; set; }
 
     private async Task ToggleCard(Guid cardId)

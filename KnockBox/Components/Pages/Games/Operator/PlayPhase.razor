@@ -23,6 +23,26 @@
         }
     </div>
 
+    @* Deck *@
+    <div class="op-deck-area">
+        <div class="op-deck-stack">
+            @if (GameState.Deck.Count > 2)
+            {
+                <div class="op-deck-card op-deck-card-3"></div>
+            }
+            @if (GameState.Deck.Count > 1)
+            {
+                <div class="op-deck-card op-deck-card-2"></div>
+            }
+            @if (GameState.Deck.Count > 0)
+            {
+                <div class="op-deck-card op-deck-card-1"></div>
+            }
+        </div>
+        <div class="op-deck-count">@GameState.Deck.Count</div>
+        <div class="op-deck-label">CARDS LEFT</div>
+    </div>
+
     @* Active Player Status (Self) *@
     <div class="op-self-status">
         @if (CurrentPlayerState != null)
@@ -90,6 +110,7 @@
     {
         <OperatorHand Hand="@CurrentPlayerState.Hand"
                       SelectedCards="@SelectedCardIds"
+                      NewCardIds="@NewCardIds"
                       OnCardToggled="ToggleCard" />
     }
 </div>

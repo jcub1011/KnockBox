@@ -29,6 +29,19 @@ namespace KnockBox.Components.Pages.Games.Operator
 
         protected bool IsMyTurn => GameState.TurnManager.CurrentPlayer == UserService.CurrentUser?.Id;
 
+        protected HashSet<Guid> NewCardIds
+        {
+            get
+            {
+                var ps = CurrentPlayerState;
+                if (ps?.PreDrawCardIds == null || ps.PreDrawCardIds.Count == 0) return new();
+                return ps.Hand
+                    .Where(c => !ps.PreDrawCardIds.Contains(c.Id))
+                    .Select(c => c.Id)
+                    .ToHashSet();
+            }
+        }
+
         protected HashSet<Guid> SelectedCardIds
         {
             get

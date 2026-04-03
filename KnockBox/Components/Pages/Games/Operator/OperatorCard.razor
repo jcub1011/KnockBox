@@ -1,6 +1,8 @@
 @using KnockBox.Operator.Models
 
-<div class="op-card @GetCardTypeClass() @(IsSelected ? "selected" : "")" @onclick="OnClick">
+<div class="op-card @GetCardTypeClass() @(IsSelected ? "selected" : "") @(IsNew ? "op-card-new" : "")"
+     style="@(IsNew ? $"animation-delay: {AnimationDelay * 150}ms" : "")"
+     @onclick="OnClick">
     <div class="op-card-inner">
         @if (Card.Type == CardType.Number)
         {
@@ -24,6 +26,8 @@
 @code {
     [Parameter] public Card Card { get; set; }
     [Parameter] public bool IsSelected { get; set; }
+    [Parameter] public bool IsNew { get; set; }
+    [Parameter] public int AnimationDelay { get; set; }
     [Parameter] public EventCallback OnClick { get; set; }
 
     private string GetCardTypeClass() => Card.Type switch
@@ -38,24 +42,24 @@
     {
         CardOperator.Add => "+",
         CardOperator.Subtract => "-",
-        CardOperator.Multiply => "×",
-        CardOperator.Divide => "÷",
+        CardOperator.Multiply => "\u00d7",
+        CardOperator.Divide => "\u00f7",
         _ => "?"
     };
 
     private string GetActionIcon() => Card.ActionValue switch
     {
-        CardAction.Shield => "🛡️",
-        CardAction.LiabilityTransfer => "📤",
-        CardAction.CookTheBooks => "🧑‍🍳",
-        CardAction.Comp => "⚖️",
-        CardAction.Steal => "🕵️",
-        CardAction.HotPotato => "🥔",
-        CardAction.FlashFlood => "🌊",
-        CardAction.HostileTakeover => "🤝",
-        CardAction.Audit => "📝",
-        CardAction.MarketCrash => "📉",
-        _ => "❓"
+        CardAction.Shield => "\ud83d\udee1\ufe0f",
+        CardAction.LiabilityTransfer => "\ud83d\udce4",
+        CardAction.CookTheBooks => "\ud83e\uddd1\u200d\ud83c\udf73",
+        CardAction.Comp => "\u2696\ufe0f",
+        CardAction.Steal => "\ud83d\udd75\ufe0f",
+        CardAction.HotPotato => "\ud83e\udd54",
+        CardAction.FlashFlood => "\ud83c\udf0a",
+        CardAction.HostileTakeover => "\ud83e\udd1d",
+        CardAction.Audit => "\ud83d\udcdd",
+        CardAction.MarketCrash => "\ud83d\udcc9",
+        _ => "\u2753"
     };
 
     private string GetActionName() => Card.ActionValue switch
