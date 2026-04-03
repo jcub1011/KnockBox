@@ -7,6 +7,7 @@ using KnockBox.Services.Logic.Games.CardCounter;
 using KnockBox.Services.Logic.Games.DiceSimulator;
 using KnockBox.Services.Logic.Games.DrawnToDress;
 using KnockBox.Services.Logic.Games.ConsultTheCard;
+using KnockBox.Services.Logic.Games.Operator;
 
 namespace KnockBox.Services.Logic.Games.Shared
 {
@@ -50,6 +51,7 @@ namespace KnockBox.Services.Logic.Games.Shared
                 GameType.CardCounter => serviceProvider.GetService<CardCounterGameEngine>(),
                 GameType.DrawnToDress => serviceProvider.GetService<DrawnToDressGameEngine>(),
                 GameType.ConsultTheCard => serviceProvider.GetService<ConsultTheCardGameEngine>(),
+                GameType.Operator => serviceProvider.GetService<OperatorGameEngine>(),
                 _ => null
             };
 

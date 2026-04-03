@@ -1,0 +1,22 @@
+@using KnockBox.Operator.Models
+
+<div class="op-hand">
+    @foreach (var card in Hand)
+    {
+        <OperatorCard 
+            Card="card" 
+            IsSelected="@SelectedCards.Contains(card.Id)" 
+            OnClick="@(() => ToggleCard(card.Id))" />
+    }
+</div>
+
+@code {
+    [Parameter] public List<Card> Hand { get; set; } = new();
+    [Parameter] public HashSet<Guid> SelectedCards { get; set; } = new();
+    [Parameter] public EventCallback<Guid> OnCardToggled { get; set; }
+
+    private async Task ToggleCard(Guid cardId)
+    {
+        await OnCardToggled.InvokeAsync(cardId);
+    }
+}

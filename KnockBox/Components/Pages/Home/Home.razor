@@ -46,5 +46,8 @@
         <button class="game" aria-label="Consult The Card" disabled="@(!CanJoinOrCreate)" @onclick="() => CreateLobby(GameType.ConsultTheCard)">
             Consult The Card
         </button>
+        <button class="game" aria-label="Operator" disabled="@(!CanJoinOrCreate)" @onclick="() => CreateLobby(GameType.Operator)">
+            Operator
+        </button>
     </div>
 </div>

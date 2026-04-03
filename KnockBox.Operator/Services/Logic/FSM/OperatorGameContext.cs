@@ -1,5 +1,6 @@
 using KnockBox.Operator.Models;
 using KnockBox.Operator.Services.State;
+using KnockBox.Core.Services.State.Games.Shared;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
@@ -11,6 +12,8 @@ public class OperatorGameContext(OperatorGameState state)
     public OperatorGameState State { get; } = state;
 
     public ConcurrentDictionary<string, OperatorPlayerState> GamePlayers => State.GamePlayers;
+
+    public IFiniteStateMachine<OperatorGameContext, OperatorCommand> Fsm { get; set; } = null!;
 
     public static List<Card> GenerateDeck(int playerCount)
     {

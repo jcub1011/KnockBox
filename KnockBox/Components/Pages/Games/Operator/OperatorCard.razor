@@ -1,0 +1,75 @@
+@using KnockBox.Operator.Models
+
+<div class="op-card @GetCardTypeClass() @(IsSelected ? "selected" : "")" @onclick="OnClick">
+    <div class="op-card-inner">
+        @if (Card.Type == CardType.Number)
+        {
+            <div class="op-card-value">@((int)Card.NumberValue)</div>
+            <div class="op-card-label">NUMBER</div>
+        }
+        else if (Card.Type == CardType.Operator)
+        {
+            <div class="op-card-value">@GetOperatorSymbol()</div>
+            <div class="op-card-label">OPERATOR</div>
+        }
+        else if (Card.Type == CardType.Action)
+        {
+            <div class="op-card-icon">@GetActionIcon()</div>
+            <div class="op-card-name">@GetActionName()</div>
+            <div class="op-card-label">ACTION</div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public Card Card { get; set; }
+    [Parameter] public bool IsSelected { get; set; }
+    [Parameter] public EventCallback OnClick { get; set; }
+
+    private string GetCardTypeClass() => Card.Type switch
+    {
+        CardType.Number => "op-card-num",
+        CardType.Operator => "op-card-op",
+        CardType.Action => "op-card-act",
+        _ => ""
+    };
+
+    private string GetOperatorSymbol() => Card.OperatorValue switch
+    {
+        CardOperator.Add => "+",
+        CardOperator.Subtract => "-",
+        CardOperator.Multiply => "×",
+        CardOperator.Divide => "÷",
+        _ => "?"
+    };
+
+    private string GetActionIcon() => Card.ActionValue switch
+    {
+        CardAction.Shield => "🛡️",
+        CardAction.LiabilityTransfer => "📤",
+        CardAction.CookTheBooks => "🧑‍🍳",
+        CardAction.Comp => "⚖️",
+        CardAction.Steal => "🕵️",
+        CardAction.HotPotato => "🥔",
+        CardAction.FlashFlood => "🌊",
+        CardAction.HostileTakeover => "🤝",
+        CardAction.Audit => "📝",
+        CardAction.MarketCrash => "📉",
+        _ => "❓"
+    };
+
+    private string GetActionName() => Card.ActionValue switch
+    {
+        CardAction.Shield => "SHIELD",
+        CardAction.LiabilityTransfer => "LIABILITY",
+        CardAction.CookTheBooks => "COOK",
+        CardAction.Comp => "COMP",
+        CardAction.Steal => "STEAL",
+        CardAction.HotPotato => "POTATO",
+        CardAction.FlashFlood => "FLOOD",
+        CardAction.HostileTakeover => "TAKEOVER",
+        CardAction.Audit => "AUDIT",
+        CardAction.MarketCrash => "CRASH",
+        _ => "UNKNOWN"
+    };
+}

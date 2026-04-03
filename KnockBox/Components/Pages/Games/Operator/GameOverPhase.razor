@@ -1,0 +1,53 @@
+@using KnockBox.Operator.Models
+@using KnockBox.Operator.Services.State
+@using KnockBox.Services.Navigation
+@using KnockBox.Services.State.Users
+
+<div class="op-game-over">
+    <div class="op-game-over-content">
+        <h1 class="op-game-over-title">GAME OVER</h1>
+        
+        <div class="op-leaderboard">
+            @{
+                var sortedPlayers = GameState.Players
+                    .Select(p => new { Player = p, State = GameState.Context?.GamePlayers.GetValueOrDefault(p.Id) })
+                    .Where(x => x.State != null)
+                    .OrderBy(x => Math.Abs(x.State!.CurrentPoints))
+                    .ThenBy(x => x.State!.ScoreTimestamp)
+                    .ToList();
+            }
+
+            @for (int i = 0; i < sortedPlayers.Count; i++)
+            {
+                var entry = sortedPlayers[i];
+                var isWinner = i == 0;
+                <div class="op-leaderboard-entry @(isWinner ? "winner" : "")">
+                    <span class="op-rank">#@(i + 1)</span>
+                    <span class="op-player-name">@entry.Player.Name</span>
+                    <div class="op-player-result">
+                        <span class="op-final-score">@entry.State!.CurrentPoints.ToString("F1")</span>
+                        <span class="op-distance">(@Math.Abs(entry.State!.CurrentPoints).ToString("F1") from 0)</span>
+                    </div>
+                    @if (isWinner)
+                    {
+                        <span class="op-winner-badge">🏆 WINNER</span>
+                    }
+                </div>
+            }
+        </div>
+
+        <div class="op-game-over-actions">
+            <button class="op-home-btn" @onclick="GoHome">RETURN TO LOBBY</button>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Inject] protected INavigationService NavigationService { get; set; } = default!;
+    [Parameter] public OperatorGameState GameState { get; set; } = default!;
+
+    private void GoHome()
+    {
+        NavigationService.ToHome();
+    }
+}

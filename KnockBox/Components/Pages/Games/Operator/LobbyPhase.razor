@@ -1,0 +1,111 @@
+@using KnockBox.Services.State.Users
+@using KnockBox.Operator.Services.State
+
+<div class="op-lobby">
+    @if (UserService.CurrentUser?.Id == GameState.Host.Id)
+    {
+        <button class="op-settings-gear-btn" @onclick="ToggleSettings" title="Game Settings">
+            ⚙️
+        </button>
+    }
+
+    <div class="op-lobby-content">
+        <h2 class="op-lobby-title">Operator Lobby</h2>
+        
+        <div class="op-player-list">
+            <h3 class="op-section-title">Players (@GameState.Players.Count)</h3>
+            <div class="op-player-grid">
+                @foreach (var player in GameState.Players)
+                {
+                    <div class="op-player-card">
+                        <span class="op-player-name">
+                            @player.Name
+                            @if (player.Id == GameState.Host.Id)
+                            {
+                                <span class="op-host-badge" title="Host">👑</span>
+                            }
+                        </span>
+                        
+                        @if (UserService.CurrentUser?.Id == GameState.Host.Id && player.Id != GameState.Host.Id)
+                        {
+                            <button class="op-kick-btn" @onclick="() => KickPlayer(player.Id)" title="Kick Player">
+                                ❌
+                            </button>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+
+        @if (UserService.CurrentUser?.Id == GameState.Host.Id)
+        {
+            <div class="op-lobby-actions">
+                <button class="op-start-btn" 
+                        disabled="@(GameState.Players.Count < 2)" 
+                        @onclick="StartGame">
+                    Start Game
+                </button>
+                @if (GameState.Players.Count < 2)
+                {
+                    <p class="op-lobby-hint">Waiting for at least 2 players...</p>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="op-lobby-waiting">
+                <div class="op-loading-spinner"></div>
+                <p>Waiting for host to start the game...</p>
+            </div>
+        }
+    </div>
+</div>
+
+@if (SettingsOpen)
+{
+    <div class="op-settings-modal-overlay" @onclick="ToggleSettings">
+        <div class="op-settings-modal" @onclick:stopPropagation="true">
+            <div class="op-settings-header">
+                <h3>Game Settings</h3>
+                <button class="op-settings-close" @onclick="ToggleSettings">✕</button>
+            </div>
+            
+            <div class="op-settings-body">
+                <div class="op-setting-item">
+                    <label>Enable Timers</label>
+                    <input type="checkbox" @bind="TimersEnabled" />
+                </div>
+
+                @if (TimersEnabled)
+                {
+                    <div class="op-setting-item">
+                        <label>Setup Timeout (s)</label>
+                        <input type="number" @bind="SetupPhaseTimeoutSeconds" min="5" max="300" />
+                    </div>
+                    <div class="op-setting-item">
+                        <label>Play Timeout (s)</label>
+                        <input type="number" @bind="PlayPhaseTimeoutSeconds" min="5" max="300" />
+                    </div>
+                    <div class="op-setting-item">
+                        <label>Reaction Timeout (s)</label>
+                        <input type="number" @bind="ReactionPhaseTimeoutSeconds" min="5" max="300" />
+                    </div>
+                    <div class="op-setting-item">
+                        <label>Draw Timeout (s)</label>
+                        <input type="number" @bind="DrawPhaseTimeoutSeconds" min="5" max="300" />
+                    </div>
+                }
+
+                <div class="op-setting-item">
+                    <label>Enable Card Stacking</label>
+                    <input type="checkbox" @bind="EnableStacking" />
+                </div>
+
+                <div class="op-setting-item">
+                    <label>Flip Win Condition (Furthest from 0)</label>
+                    <input type="checkbox" @bind="FlipWinCondition" />
+                </div>
+            </div>
+        </div>
+    </div>
+}

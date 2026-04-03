@@ -1,0 +1,83 @@
+@using KnockBox.Operator.Models
+@using KnockBox.Operator.Services.State
+
+<div class="op-game-board">
+    @* Opponents *@
+    <div class="op-opponents-grid">
+        @foreach (var player in GameState.Players.Where(p => p.Id != UserService.CurrentUser?.Id))
+        {
+            var pState = GameState.Context?.GamePlayers.GetValueOrDefault(player.Id);
+            if (pState != null)
+            {
+                <OperatorPlayerInfo 
+                    Name="@player.Name"
+                    Score="@pState.CurrentPoints"
+                    ActiveOperator="@pState.ActiveOperator"
+                    HandSize="@pState.Hand.Count"
+                    IsActive="@(GameState.TurnManager.CurrentPlayer == player.Id)"
+                    IsAudited="@pState.IsAudited"
+                    HasLiabilityTransfer="@pState.HasLiabilityTransfer"
+                    IsTargetable="@IsMyTurn"
+                    IsTargeted="@(TargetPlayerId == player.Id)"
+                    OnClick="@(() => SelectTarget(player.Id))" />
+            }
+        }
+    </div>
+
+    @* Active Player Status (Self) *@
+    <div class="op-self-status">
+        @if (CurrentPlayerState != null)
+        {
+            <OperatorPlayerInfo 
+                Name="@UserService.CurrentUser!.Name"
+                Score="@CurrentPlayerState.CurrentPoints"
+                ActiveOperator="@CurrentPlayerState.ActiveOperator"
+                HandSize="@CurrentPlayerState.Hand.Count"
+                IsActive="@IsMyTurn"
+                IsAudited="@CurrentPlayerState.IsAudited"
+                HasLiabilityTransfer="@CurrentPlayerState.HasLiabilityTransfer"
+                IsTargetable="@IsMyTurn"
+                IsTargeted="@(TargetPlayerId == UserService.CurrentUser!.Id)"
+                OnClick="@(() => SelectTarget(UserService.CurrentUser!.Id))" />
+        }
+    </div>
+
+    @* Controls & Hand *@
+    <div class="op-bottom-tray @(IsMyTurn ? "active" : "")">
+        @if (IsMyTurn)
+        {
+            <div class="op-controls">
+                @if (SelectedCardIds.Count > 0)
+                {
+                    <button class="op-play-btn" @onclick="PlayCards">
+                        COMMIT PLAY (@SelectedCardIds.Count)
+                    </button>
+                }
+                else if (CanSkip())
+                {
+                    <button class="op-skip-btn" @onclick="SkipTurn">
+                        SKIP TURN
+                    </button>
+                }
+                else
+                {
+                    <div class="op-turn-hint">Select cards to play...</div>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="op-waiting-hint">
+                Waiting for @(GameState.Players.FirstOrDefault(p => p.Id == GameState.TurnManager.CurrentPlayer)?.Name ?? "another player")...
+            </div>
+        }
+
+        @if (CurrentPlayerState != null)
+        {
+            <OperatorHand 
+                Hand="@CurrentPlayerState.Hand" 
+                SelectedCards="@SelectedCardIds" 
+                OnCardToggled="ToggleCard" />
+        }
+    </div>
+</div>

@@ -1,0 +1,44 @@
+@using KnockBox.Operator.Models
+
+<div class="op-player-info @(IsActive ? "active" : "") @(IsTargetable ? "targetable" : "") @(IsTargeted ? "targeted" : "")" @onclick="OnClick">
+    <div class="op-player-info-main">
+        <span class="op-player-name">@Name</span>
+        <div class="op-player-score-container">
+            <span class="op-player-operator">@GetOperatorSymbol()</span>
+            <span class="op-player-score">@Score.ToString("F1")</span>
+        </div>
+    </div>
+    
+    <div class="op-player-status-row">
+        <div class="op-hand-size" title="Hand Size">🎴 @HandSize</div>
+        @if (IsAudited) { <span class="op-status-badge" title="Audited">📝</span> }
+        @if (HasLiabilityTransfer) { <span class="op-status-badge" title="Liability Transfer">📤</span> }
+    </div>
+
+    @if (IsActive)
+    {
+        <div class="op-active-indicator">TURN</div>
+    }
+</div>
+
+@code {
+    [Parameter] public string Name { get; set; } = "";
+    [Parameter] public decimal Score { get; set; }
+    [Parameter] public CardOperator ActiveOperator { get; set; }
+    [Parameter] public int HandSize { get; set; }
+    [Parameter] public bool IsActive { get; set; }
+    [Parameter] public bool IsAudited { get; set; }
+    [Parameter] public bool HasLiabilityTransfer { get; set; }
+    [Parameter] public bool IsTargetable { get; set; }
+    [Parameter] public bool IsTargeted { get; set; }
+    [Parameter] public EventCallback OnClick { get; set; }
+
+    private string GetOperatorSymbol() => ActiveOperator switch
+    {
+        CardOperator.Add => "+",
+        CardOperator.Subtract => "-",
+        CardOperator.Multiply => "×",
+        CardOperator.Divide => "÷",
+        _ => "?"
+    };
+}

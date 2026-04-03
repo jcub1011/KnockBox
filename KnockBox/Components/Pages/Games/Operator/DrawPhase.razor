@@ -1,0 +1,13 @@
+@using KnockBox.Operator.Services.State
+
+<div class="op-draw">
+    <div class="op-draw-content">
+        <div class="op-loading-spinner large"></div>
+        <h2 class="op-draw-title">Drawing Cards...</h2>
+        <p class="op-draw-subtitle">The next turn is about to begin.</p>
+    </div>
+</div>
+
+@code {
+    [Parameter] public OperatorGameState GameState { get; set; } = default!;
+}

@@ -4,6 +4,7 @@ using KnockBox.Operator.Services.Logic.FSM;
 using KnockBox.Operator.Services.State;
 using KnockBox.Services.Logic.Games.Engines.Shared;
 using KnockBox.Services.State.Games.Shared;
+using KnockBox.Core.Services.State.Games.Shared;
 using KnockBox.Services.State.Users;
 using Microsoft.Extensions.Logging;
 using System.Collections.Generic;
@@ -39,6 +40,10 @@ public class OperatorGameEngine(ILogger<OperatorGameState> stateLogger)
             return Result.FromError("Only the host can start the game.");
         }
 
+        var context = new OperatorGameContext(operatorState);
+        var fsm = new FiniteStateMachine<OperatorGameContext, OperatorCommand>(stateLogger);
+        context.Fsm = fsm;
+
         return await state.ExecuteAsync(() =>
         {
             // 1. Generate Deck
@@ -64,6 +69,8 @@ public class OperatorGameEngine(ILogger<OperatorGameState> stateLogger)
 
             // 3. Set Phase to Setup
             operatorState.Phase = OperatorGamePhase.Setup;
+            operatorState.Context = context;
+            fsm.TransitionTo(context, new KnockBox.Operator.Services.Logic.FSM.States.SetupState());
             
             // 4. Initialize Turn Manager
             operatorState.TurnManager.SetTurnOrder(allPlayers.Select(p => p.Id));
@@ -78,9 +85,43 @@ public class OperatorGameEngine(ILogger<OperatorGameState> stateLogger)
     /// <summary>
     /// Processes a game command by delegating to the current FSM state.
     /// </summary>
-    public Task<Result> ProcessCommand(OperatorGameState state, OperatorCommand command)
+    public Task<Result> ExecuteCommandAsync(OperatorGameState state, OperatorCommand command)
     {
-        // Stub for now. Transitions to actual FSM logic will happen in Phase 3.
-        return Task.FromResult(Result.Success);
+        if (state.Context?.Fsm == null)
+            return Task.FromResult(Result.FromError("FSM not initialized."));
+
+        var result = state.Execute(() =>
+        {
+            var fsmResult = state.Context.Fsm.HandleCommand(state.Context, command);
+            if (fsmResult.TryGetFailure(out var err))
+            {
+                return Result.FromError(err.PublicMessage, err.InternalMessage);
+            }
+            return Result.Success;
+        });
+
+        if (!result.IsSuccess) return Task.FromResult<Result>(result.Error.Error);
+        return Task.FromResult(result.Value);
+    }
+
+    /// <summary>
+    /// Drives time-based transitions.
+    /// </summary>
+    public Result Tick(OperatorGameContext context, DateTimeOffset now)
+    {
+        if (context.Fsm == null) return Result.Success;
+
+        var executeResult = context.State.Execute(() =>
+        {
+            var fsmResult = context.Fsm.Tick(context, now);
+            if (fsmResult.TryGetFailure(out var err))
+            {
+                return Result.FromError(err.PublicMessage, err.InternalMessage);
+            }
+            return Result.Success;
+        });
+
+        if (!executeResult.IsSuccess) return executeResult.Error.Error;
+        return executeResult.Value;
     }
 }

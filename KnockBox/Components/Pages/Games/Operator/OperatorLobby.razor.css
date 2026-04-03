@@ -1,0 +1,519 @@
+/* Operator Game Styles */
+
+.op-page {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    width: 100vw;
+    background-color: #1a1a2e;
+    color: #e9e9e9;
+    font-family: var(--font-primary);
+    overflow: hidden;
+    position: relative;
+}
+
+/* Loading */
+.op-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    gap: 20px;
+    font-size: 1.5rem;
+}
+
+.op-loading-icon {
+    font-size: 4rem;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1); }
+}
+
+/* Timer */
+.op-timer-container {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    z-index: 100;
+}
+
+.op-timer-card {
+    background: rgba(0, 0, 0, 0.6);
+    padding: 10px 20px;
+    border-radius: 12px;
+    font-size: 1.5rem;
+    font-weight: bold;
+    border: 2px solid #fff;
+    transition: all 0.3s;
+}
+
+.op-timer-urgent {
+    color: #ff4d4d;
+    border-color: #ff4d4d;
+    animation: shake 0.5s infinite;
+}
+
+@keyframes shake {
+    0% { transform: translate(1px, 1px) rotate(0deg); }
+    10% { transform: translate(-1px, -2px) rotate(-1deg); }
+    20% { transform: translate(-3px, 0px) rotate(1deg); }
+    30% { transform: translate(3px, 2px) rotate(0deg); }
+    40% { transform: translate(1px, -1px) rotate(1deg); }
+    50% { transform: translate(-1px, 2px) rotate(-1deg); }
+    60% { transform: translate(-3px, 1px) rotate(0deg); }
+    70% { transform: translate(3px, 1px) rotate(-1deg); }
+    80% { transform: translate(-1px, -1px) rotate(1deg); }
+    90% { transform: translate(1px, 2px) rotate(0deg); }
+    100% { transform: translate(1px, -2px) rotate(-1deg); }
+}
+
+/* Error Toast */
+.op-error-toast {
+    position: absolute;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #ff4d4d;
+    color: white;
+    padding: 12px 24px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    z-index: 1000;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    animation: slideDown 0.3s ease-out, fadeOut 0.5s ease-in 4.5s forwards;
+}
+
+@keyframes slideDown {
+    from { top: -60px; }
+    to { top: 20px; }
+}
+
+@keyframes fadeOut {
+    from { opacity: 1; }
+    to { opacity: 0; }
+}
+
+/* Lobby Phase */
+::deep .op-lobby {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    padding: 20px;
+}
+
+::deep .op-lobby-content {
+    background: rgba(255, 255, 255, 0.05);
+    padding: 40px;
+    border-radius: 24px;
+    backdrop-filter: blur(10px);
+    width: 100%;
+    max-width: 600px;
+    text-align: center;
+}
+
+::deep .op-settings-gear-btn {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    background: none;
+    border: none;
+    font-size: 2rem;
+    cursor: pointer;
+    transition: transform 0.3s;
+}
+
+::deep .op-settings-gear-btn:hover {
+    transform: rotate(90deg);
+}
+
+::deep .op-lobby-code-section {
+    margin: 20px 0;
+    padding: 15px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+}
+
+::deep .op-lobby-code-value {
+    font-size: 2rem;
+    font-weight: bold;
+    color: #ffd700;
+    letter-spacing: 2px;
+    margin-left: 10px;
+}
+
+::deep .op-player-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 15px;
+    margin: 20px 0;
+}
+
+::deep .op-player-card {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 12px;
+    border-radius: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+::deep .op-start-btn {
+    background: #4caf50;
+    color: white;
+    border: none;
+    padding: 15px 40px;
+    font-size: 1.5rem;
+    border-radius: 12px;
+    cursor: pointer;
+    margin-top: 20px;
+    transition: background 0.3s;
+}
+
+::deep .op-start-btn:disabled {
+    background: #333;
+    cursor: not-allowed;
+}
+
+/* Setup Phase */
+::deep .op-setup {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+}
+
+::deep .op-setup-content {
+    text-align: center;
+}
+
+::deep .op-setup-choices {
+    display: flex;
+    gap: 30px;
+    margin-top: 40px;
+}
+
+::deep .op-choice-btn {
+    flex: 1;
+    padding: 40px;
+    border-radius: 20px;
+    border: 4px solid transparent;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    transition: all 0.3s;
+    background: #252545;
+    color: white;
+}
+
+::deep .op-choice-positive:hover {
+    border-color: #4caf50;
+    box-shadow: 0 0 20px rgba(76, 175, 80, 0.4);
+}
+
+::deep .op-choice-negative:hover {
+    border-color: #f44336;
+    box-shadow: 0 0 20px rgba(244, 67, 54, 0.4);
+}
+
+::deep .op-choice-value {
+    font-size: 2.5rem;
+    font-weight: bold;
+}
+
+/* Play Phase Grid */
+::deep .op-game-board {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    padding: 20px;
+    gap: 20px;
+}
+
+::deep .op-opponents-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 20px;
+}
+
+::deep .op-self-status {
+    display: flex;
+    justify-content: center;
+}
+
+/* Player Info Component */
+::deep .op-player-info {
+    background: #2a2a4a;
+    padding: 15px;
+    border-radius: 12px;
+    border: 2px solid transparent;
+    transition: all 0.3s;
+    cursor: default;
+    position: relative;
+    min-width: 200px;
+}
+
+::deep .op-player-info.active {
+    border-color: #ffd700;
+    box-shadow: 0 0 10px rgba(255, 215, 0, 0.3);
+}
+
+::deep .op-player-info.targetable {
+    cursor: pointer;
+}
+
+::deep .op-player-info.targetable:hover {
+    background: #3a3a5a;
+}
+
+::deep .op-player-info.targeted {
+    border-color: #ff4d4d;
+    background: #4a2a2a;
+    animation: target-pulse 1.5s infinite;
+}
+
+@keyframes target-pulse {
+    0% { box-shadow: 0 0 0px #ff4d4d; }
+    50% { box-shadow: 0 0 15px #ff4d4d; }
+    100% { box-shadow: 0 0 0px #ff4d4d; }
+}
+
+::deep .op-player-score-container {
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    gap: 5px;
+    margin: 10px 0;
+}
+
+::deep .op-player-operator {
+    font-size: 1.5rem;
+    color: #aaa;
+}
+
+::deep .op-player-score {
+    font-size: 2.5rem;
+    font-weight: bold;
+}
+
+::deep .op-player-status-row {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+}
+
+/* Card Component */
+::deep .op-card {
+    width: 100px;
+    height: 140px;
+    border-radius: 10px;
+    background: #fff;
+    color: #000;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+    user-select: none;
+    position: relative;
+    border: 3px solid transparent;
+}
+
+::deep .op-card:hover {
+    transform: translateY(-10px);
+}
+
+::deep .op-card.selected {
+    border-color: #ffd700;
+    box-shadow: 0 0 15px #ffd700;
+    transform: translateY(-20px);
+}
+
+::deep .op-card-num { background: #e3f2fd; }
+::deep .op-card-op { background: #fff3e0; }
+::deep .op-card-act { background: #f3e5f5; }
+
+::deep .op-card-value {
+    font-size: 2.5rem;
+    font-weight: bold;
+}
+
+::deep .op-card-icon {
+    font-size: 2.5rem;
+}
+
+::deep .op-card-name {
+    font-size: 0.8rem;
+    font-weight: bold;
+    text-align: center;
+}
+
+::deep .op-card-label {
+    font-size: 0.6rem;
+    color: #666;
+    margin-top: auto;
+}
+
+/* Hand & Tray */
+::deep .op-bottom-tray {
+    margin-top: auto;
+    background: rgba(0, 0, 0, 0.4);
+    padding: 20px;
+    border-radius: 20px 20px 0 0;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    align-items: center;
+}
+
+::deep .op-hand {
+    display: flex;
+    gap: 10px;
+    padding: 10px;
+    overflow-x: auto;
+    max-width: 90vw;
+}
+
+::deep .op-controls {
+    display: flex;
+    gap: 20px;
+}
+
+::deep .op-play-btn {
+    background: #ffd700;
+    color: #000;
+    border: none;
+    padding: 10px 30px;
+    font-weight: bold;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+/* Game Over */
+::deep .op-game-over {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+}
+
+::deep .op-leaderboard {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+    padding: 30px;
+    width: 100%;
+    max-width: 500px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+::deep .op-leaderboard-entry {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 15px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+}
+
+::deep .op-leaderboard-entry.winner {
+    background: rgba(255, 215, 0, 0.2);
+    border: 2px solid #ffd700;
+}
+
+::deep .op-final-score {
+    font-weight: bold;
+    font-size: 1.2rem;
+}
+
+::deep .op-distance {
+    font-size: 0.9rem;
+    color: #aaa;
+}
+
+/* Settings Modal */
+::deep .op-settings-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+::deep .op-settings-modal {
+    background: #2a2a4a;
+    width: 90%;
+    max-width: 400px;
+    border-radius: 16px;
+    padding: 24px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+}
+
+::deep .op-settings-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+::deep .op-settings-close {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 1.5rem;
+    cursor: pointer;
+}
+
+::deep .op-setting-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+::deep .op-setting-item input[type="number"] {
+    width: 60px;
+    background: #1a1a2e;
+    border: 1px solid #444;
+    color: white;
+    padding: 5px;
+    border-radius: 4px;
+}
+
+/* Loading Spinner */
+::deep .op-loading-spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid rgba(255, 255, 255, 0.1);
+    border-left-color: #ffd700;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 20px auto;
+}
+
+::deep .op-loading-spinner.large {
+    width: 80px;
+    height: 80px;
+    border-width: 8px;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}

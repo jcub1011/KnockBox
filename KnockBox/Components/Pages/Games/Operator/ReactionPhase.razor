@@ -1,0 +1,43 @@
+@using KnockBox.Operator.Models
+
+<div class="op-reaction">
+    <div class="op-reaction-content">
+        @if (IsTargeted)
+        {
+            <h2 class="op-reaction-title">YOU ARE BEING TARGETED!</h2>
+            <p class="op-reaction-subtitle">Someone played an action against you. Do you want to use a Shield?</p>
+
+            var shields = GetShields();
+
+            @if (shields.Count > 0)
+            {
+                <div class="op-reaction-choices">
+                    <div class="op-shield-list">
+                        @foreach (var shield in shields)
+                        {
+                            <div class="op-shield-option" @onclick="() => PlayShield(shield.Id)">
+                                <OperatorCard Card="shield" />
+                                <button class="op-use-shield-btn">USE SHIELD</button>
+                            </div>
+                        }
+                    </div>
+                    <button class="op-pass-btn" @onclick="Pass">TAKE IT (PASS)</button>
+                </div>
+            }
+            else
+            {
+                <div class="op-no-shields">
+                    <p>You have no shields in your hand.</p>
+                    <button class="op-pass-btn op-pass-forced" @onclick="Pass">CONTINUE</button>
+                </div>
+            }
+        }
+        else
+        {
+            <div class="op-reaction-waiting">
+                <div class="op-loading-spinner"></div>
+                <p>Waiting for @(GameState.Players.FirstOrDefault(p => p.Id == GameState.ReactionTargetPlayerId)?.Name ?? "the target") to react...</p>
+            </div>
+        }
+    </div>
+</div>
