@@ -67,7 +67,11 @@ public class GameFlowTests
 
         var playCmd = new PlayCardsCommand("p1", new List<Guid> { card.Id });
         _fsm.HandleCommand(_context, playCmd);
-        // After play -> auto-draw -> next player's play phase
+        
+        var endCmd = new EndTurnCommand("p1");
+        _fsm.HandleCommand(_context, endCmd);
+        
+        // After play + end turn -> auto-draw -> next player's play phase
         Assert.IsInstanceOfType(_fsm.CurrentState, typeof(PlayPhaseState));
         Assert.AreEqual(OperatorGamePhase.Play, _state.Phase);
         Assert.AreEqual(15m, p1.CurrentPoints);

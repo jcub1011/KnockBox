@@ -51,6 +51,13 @@ public class DrawPhaseState : IOperatorGameState
         // Advance to next player's turn
         context.State.TurnManager.NextTurn();
         context.State.TurnCount++;
+
+        var newPlayerId = context.State.TurnManager.CurrentPlayer;
+        if (newPlayerId != null && context.GamePlayers.TryGetValue(newPlayerId, out var newPState))
+        {
+            newPState.HasPlayedCardThisTurn = false;
+        }
+
         context.State.Phase = OperatorGamePhase.Play;
         return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromValue(new PlayPhaseState());
     }

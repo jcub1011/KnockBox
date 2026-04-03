@@ -13,4 +13,5 @@ public class OperatorPlayerState
     public int AuditExpiresTurnCount { get; set; }
     public DateTimeOffset ScoreTimestamp { get; set; } = DateTimeOffset.UtcNow;
     public HashSet<Guid> PreDrawCardIds { get; set; } = new();
+    public bool HasPlayedCardThisTurn { get; set; } = false;
 }

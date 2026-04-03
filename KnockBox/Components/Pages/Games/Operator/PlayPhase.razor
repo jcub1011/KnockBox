@@ -111,10 +111,12 @@
                         SKIP TURN
                     </button>
                 }
-                else
-                {
-                    <div class="op-section-title">Select a card to play</div>
-                }
+                
+                <button class="op-btn op-btn-secondary" @onclick="EndTurn" disabled="@(!CanEndTurn())">
+                    END TURN
+                </button>
+
+                <div class="op-section-title">Select a card to play</div>
             }
         }
         else

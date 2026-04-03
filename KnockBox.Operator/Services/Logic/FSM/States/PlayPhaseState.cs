@@ -54,6 +54,18 @@ public class PlayPhaseState : IOperatorGameState, ITimedGameState<OperatorGameCo
             return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromError("Cannot skip unless hand is only Shields.");
         }
 
+        if (command is EndTurnCommand end)
+        {
+            var pState = context.GamePlayers[end.PlayerId];
+            if (!pState.HasPlayedCardThisTurn)
+                return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromError("Cannot end turn before playing a card.");
+            if (pState.Hand.Count > 5)
+                return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromError("Cannot end turn with more than 5 cards.");
+
+            context.State.Phase = OperatorGamePhase.Draw;
+            return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromValue(new DrawPhaseState());
+        }
+
         if (command is PlayCardsCommand play)
         {
             if (play.CardIds.Count == 0)
@@ -74,6 +86,9 @@ public class PlayPhaseState : IOperatorGameState, ITimedGameState<OperatorGameCo
                 pState.Hand.Remove(c);
                 context.State.DiscardPile.Add(c);
             }
+
+            pState.HasPlayedCardThisTurn = true;
+            context.State.StateStartTime = DateTimeOffset.UtcNow;
 
             bool hasTargetedAction = playedCards.Any(c => c.Type == CardType.Action &&
                 (c.ActionValue == CardAction.Steal || c.ActionValue == CardAction.LiabilityTransfer ||
@@ -111,8 +126,13 @@ public class PlayPhaseState : IOperatorGameState, ITimedGameState<OperatorGameCo
             // Resolve immediate logic if no reaction needed
             ResolvePlayedCards(context, play, playedCards, false);
 
-            context.State.Phase = OperatorGamePhase.Draw;
-            return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromValue(new DrawPhaseState());
+            if (pState.Hand.Count == 0)
+            {
+                context.State.Phase = OperatorGamePhase.Draw;
+                return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromValue(new DrawPhaseState());
+            }
+
+            return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromValue(null);
         }
 
         return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromError("Invalid command for PlayPhase.");

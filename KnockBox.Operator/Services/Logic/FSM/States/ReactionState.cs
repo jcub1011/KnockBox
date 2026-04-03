@@ -21,6 +21,19 @@ public class ReactionState : IOperatorGameState, ITimedGameState<OperatorGameCon
         return Result.Success;
     }
 
+    private ValueResult<IGameState<OperatorGameContext, OperatorCommand>?> TransitionAfterReaction(OperatorGameContext context)
+    {
+        var currentPlayerId = context.State.TurnManager.CurrentPlayer;
+        if (currentPlayerId != null && context.GamePlayers.TryGetValue(currentPlayerId, out var pState) && pState.Hand.Count == 0)
+        {
+            context.State.Phase = OperatorGamePhase.Draw;
+            return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromValue(new DrawPhaseState());
+        }
+
+        context.State.Phase = OperatorGamePhase.Play;
+        return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromValue(new PlayPhaseState());
+    }
+
     public ValueResult<IGameState<OperatorGameContext, OperatorCommand>?> HandleCommand(OperatorGameContext context, OperatorCommand command)
     {
         if (command.PlayerId != context.State.ReactionTargetPlayerId)
@@ -40,8 +53,7 @@ public class ReactionState : IOperatorGameState, ITimedGameState<OperatorGameCon
             ResolvePendingAction(context, true);
             ClearPendingState(context);
 
-            context.State.Phase = OperatorGamePhase.Draw;
-            return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromValue(new DrawPhaseState());
+            return TransitionAfterReaction(context);
         }
         else if (command is RedirectHotPotatoCommand redirect)
         {
@@ -52,8 +64,7 @@ public class ReactionState : IOperatorGameState, ITimedGameState<OperatorGameCon
             ResolvePendingAction(context, false);
             ClearPendingState(context);
 
-            context.State.Phase = OperatorGamePhase.Draw;
-            return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromValue(new DrawPhaseState());
+            return TransitionAfterReaction(context);
         }
 
         return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromError("Invalid command for ReactionPhase.");
@@ -157,8 +168,7 @@ public class ReactionState : IOperatorGameState, ITimedGameState<OperatorGameCon
             ResolvePendingAction(context, false);
             ClearPendingState(context);
 
-            context.State.Phase = OperatorGamePhase.Draw;
-            return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromValue(new DrawPhaseState());
+            return TransitionAfterReaction(context);
         }
 
         return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromValue(null);

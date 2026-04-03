@@ -330,6 +330,26 @@ namespace KnockBox.Components.Pages.Games.Operator
             return CurrentPlayerState.Hand.All(c => c.Type == CardType.Action && c.ActionValue == CardAction.Shield);
         }
 
+        protected bool CanEndTurn()
+        {
+            if (!IsMyTurn || CurrentPlayerState == null) return false;
+            return CurrentPlayerState.HasPlayedCardThisTurn && CurrentPlayerState.Hand.Count <= 5;
+        }
+
+        protected async Task EndTurn()
+        {
+            if (!IsMyTurn || UserService.CurrentUser == null || !CanEndTurn()) return;
+
+            var command = new EndTurnCommand(UserService.CurrentUser.Id);
+            var result = await GameEngine.ExecuteCommandAsync(GameState, command);
+
+            if (result.TryGetFailure(out var error))
+            {
+                await OnError.InvokeAsync(error.PublicMessage);
+                Logger.LogError("Failed to end turn: {Error}", error);
+            }
+        }
+
         protected int GetDeckPercentage()
         {
             var total = GameState.Deck.Count + GameState.DiscardPile.Count;
