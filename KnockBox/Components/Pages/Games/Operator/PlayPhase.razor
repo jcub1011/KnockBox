@@ -52,22 +52,20 @@
         </div>
     </div>
 
-    @* Active Player Status (Self) *@
-    <div class="op-self-status">
-        @if (CurrentPlayerState != null)
-        {
-            <OperatorPlayerInfo
-                Name="@UserService.CurrentUser!.Name"
-                Score="@CurrentPlayerState.CurrentPoints"
-                ActiveOperator="@CurrentPlayerState.ActiveOperator"
-                HandSize="@CurrentPlayerState.Hand.Count"
-                IsActive="@IsMyTurn"
-                IsAudited="@CurrentPlayerState.IsAudited"
-                IsTargetable="@IsMyTurn"
-                IsTargeted="@(_targetPlayerId == UserService.CurrentUser!.Id)"
-                OnClick="@(() => SelectTarget(UserService.CurrentUser!.Id))" />
-        }
-    </div>
+    @if (CurrentPlayerState != null)
+    {
+        @* Your Score (bottom-left) *@
+        <div class="op-self-score-display">
+            <div class="op-self-score-value">@CurrentPlayerState.CurrentPoints.ToString("F1")</div>
+            <div class="op-self-score-label">YOUR SCORE</div>
+        </div>
+
+        @* Your Active Operator (bottom-right) *@
+        <div class="op-active-operator-display">
+            <div class="op-active-operator-symbol">@GetActiveOperatorSymbol()</div>
+            <div class="op-active-operator-label">YOUR OPERATOR</div>
+        </div>
+    }
 </div>
 
 @* Controls & Hand *@

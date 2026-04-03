@@ -17,9 +17,6 @@ public class DrawPhaseState : IOperatorGameState
         var playerId = context.State.TurnManager.CurrentPlayer;
         if (playerId != null && context.GamePlayers.TryGetValue(playerId, out var pState))
         {
-            // Snapshot hand before drawing so the UI can animate new cards
-            pState.PreDrawCardIds = new System.Collections.Generic.HashSet<Guid>(pState.Hand.Select(c => c.Id));
-
             int cardsNeeded = Math.Min(3, 5 - pState.Hand.Count);
 
             for (int i = 0; i < cardsNeeded; i++)

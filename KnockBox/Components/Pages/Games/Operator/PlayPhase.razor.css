@@ -6,6 +6,7 @@
     height: 100%;
     padding: 20px;
     gap: 20px;
+    position: relative;
 }
 
 .op-opponents-grid {
@@ -14,11 +15,34 @@
     gap: 16px;
 }
 
-.op-self-status {
+/* ── Your Score Display (bottom-left) ── */
+
+.op-self-score-display {
+    position: absolute;
+    bottom: 16px;
+    left: 16px;
     display: flex;
-    justify-content: center;
-    margin-top: auto;
-    margin-bottom: 10px;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    pointer-events: none;
+    z-index: 5;
+}
+
+.op-self-score-value {
+    font-family: var(--font-mono);
+    font-size: 2.4rem;
+    font-weight: 900;
+    color: #fff;
+    text-shadow: 0 0 20px rgba(230,57,70,0.4);
+}
+
+.op-self-score-label {
+    font-size: 0.65rem;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: rgba(255,255,255,0.5);
 }
 
 /* ── Deck Display ── */
@@ -164,6 +188,44 @@
     display: flex;
     gap: 16px;
     align-items: center;
+}
+
+/* ── Your Active Operator Display (bottom-right) ── */
+
+.op-active-operator-display {
+    position: absolute;
+    bottom: 16px;
+    right: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    pointer-events: none;
+    z-index: 5;
+}
+
+.op-active-operator-symbol {
+    width: 80px;
+    height: 112px;
+    background: #fffbeb;
+    border: 3px solid #000;
+    border-left: 5px solid #ffd166;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 3rem;
+    font-weight: 900;
+    color: #000;
+    box-shadow: 3px 3px 0 rgba(0,0,0,0.4);
+}
+
+.op-active-operator-label {
+    font-size: 0.65rem;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: rgba(255,255,255,0.5);
 }
 
 /* ── Concatenation Preview ── */

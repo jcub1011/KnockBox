@@ -67,16 +67,33 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 4px;
+    gap: 10px;
     background: rgba(0,0,0,0.3);
     border-radius: 8px;
     padding: 4px;
 }
 
-.op-player-operator {
-    font-size: 1.2rem;
+/* ── Mini Operator Card ── */
+
+.op-player-operator-card {
+    width: 32px;
+    height: 40px;
+    background: #fffbeb;
+    border: 2px solid #000;
+    border-left: 3px solid #ffd166;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    box-shadow: 1px 1px 0 rgba(0,0,0,0.4);
+}
+
+.op-player-operator-card-symbol {
+    font-size: 1.1rem;
     font-weight: 900;
-    color: #ffd166;
+    color: #000;
+    line-height: 1;
 }
 
 .op-player-score {

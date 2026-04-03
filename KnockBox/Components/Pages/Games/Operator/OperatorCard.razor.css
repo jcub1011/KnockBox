@@ -204,6 +204,26 @@
     animation: op-card-deal 0.5s ease-out both;
 }
 
+@keyframes op-card-deal-disabled {
+    0% {
+        transform: translateY(-80px) scale(0.6) rotate(-10deg);
+        opacity: 0;
+    }
+    50% {
+        transform: translateY(5px) scale(1.03) rotate(1deg);
+        opacity: 0.4;
+    }
+    75% {
+        transform: translateY(-2px) scale(0.99);
+        opacity: 0.4;
+    }
+    100% {
+        transform: translateY(0) scale(1) rotate(0);
+        opacity: 0.4;
+    }
+}
+
 .op-card.disabled.op-card-new {
-    animation: none;
+    animation: op-card-deal-disabled 0.5s ease-out both;
+    filter: grayscale(0.6);
 }

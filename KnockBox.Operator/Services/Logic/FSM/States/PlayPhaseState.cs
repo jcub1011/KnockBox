@@ -14,6 +14,13 @@ public class PlayPhaseState : IOperatorGameState, ITimedGameState<OperatorGameCo
     {
         context.State.StateStartTime = DateTimeOffset.UtcNow;
 
+        // Snapshot hand at turn start so the Draw phase can diff against it for new-card animation
+        var playerId = context.State.TurnManager.CurrentPlayer;
+        if (playerId != null && context.GamePlayers.TryGetValue(playerId, out var currentPlayer))
+        {
+            currentPlayer.PreDrawCardIds = new System.Collections.Generic.HashSet<Guid>(currentPlayer.Hand.Select(c => c.Id));
+        }
+
         // Clear expired audits
         foreach (var player in context.GamePlayers.Values)
         {

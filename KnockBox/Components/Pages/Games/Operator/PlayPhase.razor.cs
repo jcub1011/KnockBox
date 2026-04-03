@@ -219,6 +219,9 @@ namespace KnockBox.Components.Pages.Games.Operator
             if (ActionNeedsNumbers(card.ActionValue))
             {
                 _waitingForTarget = false;
+                // Clear target for self-only actions (e.g. CookTheBooks)
+                if (!ActionNeedsTarget(card.ActionValue))
+                    _targetPlayerId = null;
             }
             else if (ActionNeedsTarget(card.ActionValue))
             {
@@ -228,12 +231,17 @@ namespace KnockBox.Components.Pages.Games.Operator
             {
                 // Comp, MarketCrash — no target or numbers needed, just select it
                 _waitingForTarget = false;
+                _targetPlayerId = null;
             }
         }
 
         protected void SelectTarget(string playerId)
         {
             if (!IsMyTurn) return;
+
+            // Block target selection for self-only actions (e.g. CookTheBooks, Comp, MarketCrash)
+            if (_pendingAction != null && !ActionNeedsTarget(_pendingAction.Value.ActionValue))
+                return;
 
             _targetPlayerId = _targetPlayerId == playerId ? null : playerId;
 
@@ -316,5 +324,14 @@ namespace KnockBox.Components.Pages.Games.Operator
             var total = GameState.Deck.Count + GameState.DiscardPile.Count;
             return total > 0 ? (int)(100.0 * GameState.Deck.Count / total) : 0;
         }
+
+        protected string GetActiveOperatorSymbol() => CurrentPlayerState?.ActiveOperator switch
+        {
+            CardOperator.Add => "+",
+            CardOperator.Subtract => "-",
+            CardOperator.Multiply => "\u00d7",
+            CardOperator.Divide => "\u00f7",
+            _ => "?"
+        };
     }
 }

@@ -4,7 +4,9 @@
     <div class="op-player-info-main">
         <span class="op-player-name">@Name</span>
         <div class="op-player-score-container">
-            <span class="op-player-operator">@GetOperatorSymbol()</span>
+            <div class="op-player-operator-card">
+                <span class="op-player-operator-card-symbol">@GetOperatorSymbol()</span>
+            </div>
             <span class="op-player-score">@Score.ToString("F1")</span>
         </div>
     </div>
