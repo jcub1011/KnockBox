@@ -3,10 +3,12 @@ using KnockBox.Operator.Services.Logic.FSM;
 using KnockBox.Operator.Services.Logic.FSM.Commands;
 using KnockBox.Operator.Services.Logic.FSM.States;
 using KnockBox.Operator.Services.State;
+using KnockBox.Services.Logic.RandomGeneration;
 using KnockBox.Services.State.Users;
 using KnockBox.Core.Services.State.Games.Shared;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Moq;
 using System.Collections.Generic;
 using System;
 using System.Linq;
@@ -19,13 +21,15 @@ public class GameFlowTests
     private OperatorGameState _state = default!;
     private OperatorGameContext _context = default!;
     private FiniteStateMachine<OperatorGameContext, OperatorCommand> _fsm = default!;
+    private Mock<IRandomNumberService> _rngMock = default!;
 
     [TestInitialize]
     public void Setup()
     {
+        _rngMock = new Mock<IRandomNumberService>();
         var host = new User("Host", "host1");
         _state = new OperatorGameState(host, NullLogger<OperatorGameState>.Instance);
-        _context = new OperatorGameContext(_state);
+        _context = new OperatorGameContext(_state, _rngMock.Object);
         _fsm = new FiniteStateMachine<OperatorGameContext, OperatorCommand>(NullLogger.Instance);
         _context.Fsm = _fsm;
 

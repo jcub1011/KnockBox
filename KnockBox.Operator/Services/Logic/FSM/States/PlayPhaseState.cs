@@ -225,10 +225,69 @@ public class PlayPhaseState : IOperatorGameState, ITimedGameState<OperatorGameCo
         var elapsed = now - context.State.StateStartTime;
         if (elapsed >= context.State.Config.PlayPhaseTimeout)
         {
+            AutoPlayOnTimeout(context);
             context.State.Phase = OperatorGamePhase.Draw;
             return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromValue(new DrawPhaseState());
         }
 
         return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromValue(null);
+    }
+
+    private static void AutoPlayOnTimeout(OperatorGameContext context)
+    {
+        var playerId = context.State.TurnManager.CurrentPlayer;
+        if (playerId == null || !context.GamePlayers.TryGetValue(playerId, out var pState))
+            return;
+
+        // Skip if hand is all Shields (valid skip per spec)
+        if (pState.Hand.All(c => c.Type == CardType.Action && c.ActionValue == CardAction.Shield))
+            return;
+
+        // Try to auto-play one card: first number, then operator, then discard random
+        var numberCard = pState.Hand.FirstOrDefault(c => c.Type == CardType.Number);
+        var operatorCard = pState.Hand.FirstOrDefault(c => c.Type == CardType.Operator);
+
+        if (numberCard.Id != Guid.Empty)
+        {
+            pState.Hand.Remove(numberCard);
+            context.State.DiscardPile.Add(numberCard);
+
+            var playCommand = new PlayCardsCommand(playerId, new List<Guid> { numberCard.Id }, null);
+            ResolvePlayedCards(context, playCommand, new List<Card> { numberCard }, false);
+        }
+        else if (operatorCard.Id != Guid.Empty)
+        {
+            pState.Hand.Remove(operatorCard);
+            context.State.DiscardPile.Add(operatorCard);
+
+            var playCommand = new PlayCardsCommand(playerId, new List<Guid> { operatorCard.Id }, null);
+            ResolvePlayedCards(context, playCommand, new List<Card> { operatorCard }, false);
+        }
+        else
+        {
+            // Discard a random card
+            var idx = context.Rng.GetRandomInt(pState.Hand.Count);
+            var discarded = pState.Hand[idx];
+            pState.Hand.RemoveAt(idx);
+            context.State.DiscardPile.Add(discarded);
+        }
+
+        // Discard extra cards to bring hand size down to 5
+        while (pState.Hand.Count > 5)
+        {
+            // Prefer discarding non-Shield cards
+            var nonShieldIdx = pState.Hand.FindIndex(c => c.Type != CardType.Action || c.ActionValue != CardAction.Shield);
+            if (nonShieldIdx != -1)
+            {
+                context.State.DiscardPile.Add(pState.Hand[nonShieldIdx]);
+                pState.Hand.RemoveAt(nonShieldIdx);
+            }
+            else
+            {
+                // All remaining are Shields — discard one
+                context.State.DiscardPile.Add(pState.Hand[0]);
+                pState.Hand.RemoveAt(0);
+            }
+        }
     }
 }

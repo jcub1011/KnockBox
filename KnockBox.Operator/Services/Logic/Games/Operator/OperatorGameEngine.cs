@@ -3,6 +3,7 @@ using KnockBox.Operator.Models;
 using KnockBox.Operator.Services.Logic.FSM;
 using KnockBox.Operator.Services.State;
 using KnockBox.Services.Logic.Games.Engines.Shared;
+using KnockBox.Services.Logic.RandomGeneration;
 using KnockBox.Services.State.Games.Shared;
 using KnockBox.Core.Services.State.Games.Shared;
 using KnockBox.Services.State.Users;
@@ -14,7 +15,7 @@ using System.Threading.Tasks;
 
 namespace KnockBox.Services.Logic.Games.Operator;
 
-public class OperatorGameEngine(ILogger<OperatorGameState> stateLogger) 
+public class OperatorGameEngine(ILogger<OperatorGameState> stateLogger, IRandomNumberService randomNumberService)
     : AbstractGameEngine(minPlayerCount: 2, maxPlayerCount: int.MaxValue)
 {
     public override Task<ValueResult<AbstractGameState>> CreateStateAsync(User host, CancellationToken ct = default)
@@ -23,7 +24,7 @@ public class OperatorGameEngine(ILogger<OperatorGameState> stateLogger)
             return Task.FromResult(ValueResult<AbstractGameState>.FromError("Failed to create game state.", "Host was null."));
 
         var state = new OperatorGameState(host, stateLogger);
-        state.Context = new OperatorGameContext(state);
+        state.Context = new OperatorGameContext(state, randomNumberService);
         state.UpdateJoinableStatus(true);
         return Task.FromResult(ValueResult<AbstractGameState>.FromValue(state));
     }
@@ -40,7 +41,7 @@ public class OperatorGameEngine(ILogger<OperatorGameState> stateLogger)
             return Result.FromError("Only the host can start the game.");
         }
 
-        var context = new OperatorGameContext(operatorState);
+        var context = new OperatorGameContext(operatorState, randomNumberService);
         var fsm = new FiniteStateMachine<OperatorGameContext, OperatorCommand>(stateLogger);
         context.Fsm = fsm;
 

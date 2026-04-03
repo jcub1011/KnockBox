@@ -3,9 +3,11 @@ using KnockBox.Operator.Services.Logic.FSM;
 using KnockBox.Operator.Services.Logic.FSM.Commands;
 using KnockBox.Operator.Services.Logic.FSM.States;
 using KnockBox.Operator.Services.State;
+using KnockBox.Services.Logic.RandomGeneration;
 using KnockBox.Services.State.Users;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Moq;
 using System.Collections.Generic;
 using System;
 
@@ -18,13 +20,15 @@ public class ActionReactionTests
     private OperatorGameContext _context = default!;
     private PlayPhaseState _playPhase = default!;
     private ReactionState _reactionPhase = default!;
+    private Mock<IRandomNumberService> _rngMock = default!;
 
     [TestInitialize]
     public void Setup()
     {
+        _rngMock = new Mock<IRandomNumberService>();
         var host = new User("Host", "host1");
         _state = new OperatorGameState(host, NullLogger<OperatorGameState>.Instance);
-        _context = new OperatorGameContext(_state);
+        _context = new OperatorGameContext(_state, _rngMock.Object);
         
         _state.GamePlayers.TryAdd("p1", new OperatorPlayerState { UserId = "p1", CurrentPoints = 10m, ActiveOperator = CardOperator.Add });
         _state.GamePlayers.TryAdd("p2", new OperatorPlayerState { UserId = "p2", CurrentPoints = 10m, ActiveOperator = CardOperator.Add });

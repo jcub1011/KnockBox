@@ -1,6 +1,8 @@
 using KnockBox.Operator.Models;
 using KnockBox.Operator.Services.Logic.FSM;
+using KnockBox.Services.Logic.RandomGeneration;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Moq;
 using System.Linq;
 
 namespace KnockBox.OperatorTests.Unit.Context;
@@ -8,6 +10,14 @@ namespace KnockBox.OperatorTests.Unit.Context;
 [TestClass]
 public class DeckGenerationTests
 {
+    private Mock<IRandomNumberService> _rngMock = default!;
+
+    [TestInitialize]
+    public void Setup()
+    {
+        _rngMock = new Mock<IRandomNumberService>();
+    }
+
     [TestMethod]
     [DataRow(2, 80)]
     [DataRow(4, 80)]
@@ -15,14 +25,14 @@ public class DeckGenerationTests
     [DataRow(8, 160)]
     public void GenerateDeck_CreatesCorrectNumberOfCards_BasedOnPlayerCount(int playerCount, int expectedDeckSize)
     {
-        var deck = OperatorGameContext.GenerateDeck(playerCount);
+        var deck = OperatorGameContext.GenerateDeck(playerCount, _rngMock.Object);
         Assert.AreEqual(expectedDeckSize, deck.Count);
     }
 
     [TestMethod]
     public void GenerateDeck_DistributesCardTypesCorrectly()
     {
-        var deck = OperatorGameContext.GenerateDeck(4); // 1 base deck (80 cards)
+        var deck = OperatorGameContext.GenerateDeck(4, _rngMock.Object); // 1 base deck (80 cards)
         
         // Numbers: 40
         Assert.AreEqual(40, deck.Count(c => c.Type == CardType.Number));
@@ -35,8 +45,8 @@ public class DeckGenerationTests
     [TestMethod]
     public void GenerateDeck_SpecificCardCounts_AreCorrect()
     {
-        var deck = OperatorGameContext.GenerateDeck(4);
-        
+        var deck = OperatorGameContext.GenerateDeck(4, _rngMock.Object);
+
         // 0s and 1s have 2 each
         Assert.AreEqual(2, deck.Count(c => c.Type == CardType.Number && c.NumberValue == 0m));
         Assert.AreEqual(2, deck.Count(c => c.Type == CardType.Number && c.NumberValue == 1m));

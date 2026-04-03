@@ -46,7 +46,7 @@ public class SetupState : IOperatorGameState, ITimedGameState<OperatorGameContex
             if (context.GamePlayers.Values.All(p => p.CurrentPoints == 10m || p.CurrentPoints == -10m))
             {
                 // Deal cards
-                context.State.Deck = OperatorGameContext.GenerateDeck(context.GamePlayers.Count);
+                context.State.Deck = OperatorGameContext.GenerateDeck(context.GamePlayers.Count, context.Rng);
                 foreach (var player in context.GamePlayers.Values)
                 {
                     for (int i = 0; i < 5; i++)
@@ -90,13 +90,14 @@ public class SetupState : IOperatorGameState, ITimedGameState<OperatorGameContex
                 if (p.CurrentPoints == 0m)
                 {
                     p.CurrentPoints = 10m;
+                    p.ActiveOperator = CardOperator.Add;
                     p.ScoreTimestamp = DateTimeOffset.UtcNow;
                 }
             }
 
             if (context.GamePlayers.Values.All(p => p.CurrentPoints == 10m || p.CurrentPoints == -10m))
             {
-                context.State.Deck = OperatorGameContext.GenerateDeck(context.GamePlayers.Count);
+                context.State.Deck = OperatorGameContext.GenerateDeck(context.GamePlayers.Count, context.Rng);
                 foreach (var player in context.GamePlayers.Values)
                 {
                     for (int i = 0; i < 5; i++)

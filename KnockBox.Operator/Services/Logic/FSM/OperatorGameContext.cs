@@ -1,21 +1,24 @@
+using KnockBox.Core.Extensions.Collections;
 using KnockBox.Operator.Models;
 using KnockBox.Operator.Services.State;
 using KnockBox.Core.Services.State.Games.Shared;
+using KnockBox.Services.Logic.RandomGeneration;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 
 namespace KnockBox.Operator.Services.Logic.FSM;
 
-public class OperatorGameContext(OperatorGameState state)
+public class OperatorGameContext(OperatorGameState state, IRandomNumberService rng)
 {
     public OperatorGameState State { get; } = state;
+    public IRandomNumberService Rng { get; } = rng;
 
     public ConcurrentDictionary<string, OperatorPlayerState> GamePlayers => State.GamePlayers;
 
     public IFiniteStateMachine<OperatorGameContext, OperatorCommand> Fsm { get; set; } = null!;
 
-    public static List<Card> GenerateDeck(int playerCount)
+    public static List<Card> GenerateDeck(int playerCount, IRandomNumberService rng)
     {
         var deck = new List<Card>();
         int deckCount = (playerCount + 3) / 4;
@@ -25,7 +28,8 @@ public class OperatorGameContext(OperatorGameState state)
             AddBaseDeck(deck);
         }
 
-        return deck.OrderBy(_ => Guid.NewGuid()).ToList();
+        deck.Shuffle(rng);
+        return deck;
     }
 
     private static void AddBaseDeck(List<Card> deck)
@@ -116,10 +120,9 @@ public class OperatorGameContext(OperatorGameState state)
     {
         if (GamePlayers.TryGetValue(playerId, out var player))
         {
-            var (newScore, _) = CalculateNewScore(player.CurrentPoints, CardOperator.Divide, incomingValue);
+            var (newScore, newOp) = CalculateNewScore(player.CurrentPoints, CardOperator.Divide, incomingValue);
             player.CurrentPoints = newScore;
-            // CookTheBooks divides score but does not change the player's active operator
-            // (divide-by-zero via CookTheBooks still zeroes the score per CalculateNewScore)
+            if (incomingValue == 0m) player.ActiveOperator = newOp;
             player.ScoreTimestamp = DateTimeOffset.UtcNow;
         }
     }
@@ -130,8 +133,7 @@ public class OperatorGameContext(OperatorGameState state)
         {
             if (target.Hand.Count > 0)
             {
-                var rand = new Random();
-                var cardIdx = rand.Next(target.Hand.Count);
+                var cardIdx = Rng.GetRandomInt(target.Hand.Count);
                 var stolen = target.Hand[cardIdx];
                 target.Hand.RemoveAt(cardIdx);
                 source.Hand.Add(stolen);
@@ -153,11 +155,6 @@ public class OperatorGameContext(OperatorGameState state)
         {
             for (int i = 0; i < 2; i++)
             {
-                if (State.Deck.Count == 0 && State.DiscardPile.Count > 0)
-                {
-                    State.Deck.AddRange(State.DiscardPile.OrderBy(_ => Guid.NewGuid()));
-                    State.DiscardPile.Clear();
-                }
                 if (State.Deck.Count > 0)
                 {
                     target.Hand.Add(State.Deck[0]);

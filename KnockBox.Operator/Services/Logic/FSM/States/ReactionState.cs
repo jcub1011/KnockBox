@@ -96,15 +96,18 @@ public class ReactionState : IOperatorGameState, ITimedGameState<OperatorGameCon
 
     private void ResolvePendingAction(OperatorGameContext context, bool actionBlocked)
     {
+        // Track Hot Potato number card ID so we can exclude it from ResolvePlayedCards
+        Guid resolvedHotPotatoCardId = Guid.Empty;
+
         // If there's a pending Hot Potato, resolve it directly
         if (context.State.PendingHotPotatoCard is Card hotPotatoCard)
         {
+            resolvedHotPotatoCardId = hotPotatoCard.Id;
             if (!actionBlocked && context.State.ReactionTargetPlayerId != null)
             {
                 context.ResolveHotPotato(context.State.ReactionTargetPlayerId, hotPotatoCard);
             }
-            // Don't fall through to ResolvePlayedCards for the Hot Potato portion —
-            // still need to resolve other cards (numbers for score, operators, etc.)
+            context.State.PendingHotPotatoCard = null;
         }
 
         if (context.State.PendingActionCommand is PlayCardsCommand playCommand)
@@ -112,8 +115,11 @@ public class ReactionState : IOperatorGameState, ITimedGameState<OperatorGameCon
             var playedCards = new List<Card>();
             foreach (var id in playCommand.CardIds)
             {
+                // Skip the Hot Potato number card — it was already resolved above
+                if (id == resolvedHotPotatoCardId) continue;
+
                 var card = context.State.DiscardPile.FirstOrDefault(c => c.Id == id);
-                if (card.Type != 0 || card.ActionValue != 0 || card.NumberValue != 0)
+                if (card.Id != Guid.Empty)
                 {
                     playedCards.Add(card);
                 }
