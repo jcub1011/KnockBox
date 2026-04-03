@@ -22,6 +22,7 @@ namespace KnockBox.Components.Pages.Games.Operator
         [Parameter] public bool IsReadOnly { get; set; }
 
         private Card? _pendingAction;
+        private Guid? _selectedOperatorId;
         private readonly List<Guid> _selectedNumberIds = new();
         private string? _targetPlayerId;
         private bool _waitingForTarget;
@@ -50,19 +51,119 @@ namespace KnockBox.Components.Pages.Games.Operator
             {
                 var ids = new HashSet<Guid>(_selectedNumberIds);
                 if (_pendingAction != null) ids.Add(_pendingAction.Value.Id);
+                if (_selectedOperatorId != null) ids.Add(_selectedOperatorId.Value);
                 return ids;
             }
         }
 
-        protected bool ShowSubmit => _selectedNumberIds.Count > 0;
+        protected bool ShowSubmit =>
+            _selectedNumberIds.Count > 0
+            || (_selectedOperatorId != null && _targetPlayerId != null)
+            || (_pendingAction != null && !ActionNeedsNumbers(_pendingAction.Value.ActionValue)
+                && (!ActionNeedsTarget(_pendingAction.Value.ActionValue) || _targetPlayerId != null));
+
+        protected bool NeedsTargetSelection =>
+            _waitingForTarget
+            || (_pendingAction != null && ActionNeedsTarget(_pendingAction.Value.ActionValue) && _targetPlayerId == null)
+            || (_selectedOperatorId != null && _targetPlayerId == null);
+
+        protected HashSet<Guid> DisabledCardIds
+        {
+            get
+            {
+                if (CurrentPlayerState == null || !IsMyTurn)
+                    return CurrentPlayerState?.Hand.Select(c => c.Id).ToHashSet() ?? new();
+
+                var hand = CurrentPlayerState.Hand;
+                var disabled = new HashSet<Guid>();
+
+                // Waiting for target — disable all hand cards
+                if (_waitingForTarget)
+                {
+                    foreach (var c in hand)
+                        disabled.Add(c.Id);
+                    return disabled;
+                }
+
+                // Operator selected — disable everything except the selected operator
+                if (_selectedOperatorId != null)
+                {
+                    foreach (var c in hand.Where(c => c.Id != _selectedOperatorId.Value))
+                        disabled.Add(c.Id);
+                    return disabled;
+                }
+
+                // Action pending that needs numbers — only numbers + the action itself enabled
+                if (_pendingAction != null)
+                {
+                    foreach (var c in hand.Where(c => c.Type != CardType.Number && c.Id != _pendingAction.Value.Id))
+                        disabled.Add(c.Id);
+                    return disabled;
+                }
+
+                // Numbers selected, no action — numbers + actions needing numbers enabled
+                if (_selectedNumberIds.Count > 0)
+                {
+                    foreach (var c in hand)
+                    {
+                        if (c.Type == CardType.Number) continue;
+                        if (c.Type == CardType.Action && ActionNeedsNumbers(c.ActionValue)) continue;
+                        disabled.Add(c.Id);
+                    }
+                    return disabled;
+                }
+
+                // No selection — all enabled except Shield
+                foreach (var c in hand.Where(c => c.Type == CardType.Action && c.ActionValue == CardAction.Shield))
+                    disabled.Add(c.Id);
+
+                return disabled;
+            }
+        }
 
         protected string? SelectionHint
         {
             get
             {
-                if (_waitingForTarget) return "Select a target player";
-                if (_pendingAction != null && _selectedNumberIds.Count == 0) return "Select number cards, then submit";
+                if (_waitingForTarget)
+                {
+                    var actionName = _pendingAction?.ActionValue switch
+                    {
+                        CardAction.Steal => "Steal",
+                        CardAction.FlashFlood => "Flash Flood",
+                        CardAction.HostileTakeover => "Hostile Takeover",
+                        CardAction.Audit => "Audit",
+                        CardAction.LiabilityTransfer => "Liability Transfer",
+                        CardAction.HotPotato => "Hot Potato",
+                        _ => "this action"
+                    };
+                    return $"Select a target for {actionName}";
+                }
+                if (_selectedOperatorId != null && _targetPlayerId == null)
+                    return "Select a target player";
+                if (_pendingAction != null && _selectedNumberIds.Count == 0)
+                {
+                    if (ActionNeedsTarget(_pendingAction.Value.ActionValue))
+                        return "Select a target and number cards, then submit";
+                    return "Select number cards, then submit";
+                }
                 return null;
+            }
+        }
+
+        protected string? ConcatenatedValue
+        {
+            get
+            {
+                if (_selectedNumberIds.Count < 2 || CurrentPlayerState == null) return null;
+                decimal val = 0;
+                foreach (var id in _selectedNumberIds)
+                {
+                    var card = CurrentPlayerState.Hand.FirstOrDefault(c => c.Id == id);
+                    if (card.Id == Guid.Empty) continue;
+                    val = val * 10 + card.NumberValue;
+                }
+                return $"= {val:G}";
             }
         }
 
@@ -73,17 +174,17 @@ namespace KnockBox.Components.Pages.Games.Operator
             action is CardAction.LiabilityTransfer or CardAction.Steal or CardAction.HotPotato
                 or CardAction.FlashFlood or CardAction.HostileTakeover or CardAction.Audit;
 
-        protected async Task ToggleCard(Guid cardId)
+        protected Task ToggleCard(Guid cardId)
         {
-            if (!IsMyTurn || CurrentPlayerState == null) return;
+            if (!IsMyTurn || CurrentPlayerState == null) return Task.CompletedTask;
 
             var card = CurrentPlayerState.Hand.FirstOrDefault(c => c.Id == cardId);
-            if (card.Id == Guid.Empty) return;
+            if (card.Id == Guid.Empty) return Task.CompletedTask;
 
             switch (card.Type)
             {
                 case CardType.Number:
-                    if (_waitingForTarget) return;
+                    if (_waitingForTarget) return Task.CompletedTask;
                     if (_selectedNumberIds.Contains(card.Id))
                         _selectedNumberIds.Remove(card.Id);
                     else
@@ -91,54 +192,53 @@ namespace KnockBox.Components.Pages.Games.Operator
                     break;
 
                 case CardType.Operator:
-                    await PlayCardSet(new List<Guid> { card.Id });
+                    _selectedOperatorId = _selectedOperatorId == card.Id ? null : card.Id;
                     break;
 
                 case CardType.Action:
-                    await HandleActionClick(card);
+                    HandleActionClick(card);
                     break;
             }
+
+            return Task.CompletedTask;
         }
 
-        private async Task HandleActionClick(Card card)
+        private void HandleActionClick(Card card)
         {
             if (card.ActionValue == CardAction.Shield) return;
 
+            if (_pendingAction?.Id == card.Id)
+            {
+                _pendingAction = null;
+                _waitingForTarget = false;
+                return;
+            }
+
+            _pendingAction = card;
+
             if (ActionNeedsNumbers(card.ActionValue))
             {
-                if (_pendingAction?.Id == card.Id)
-                {
-                    _pendingAction = null;
-                }
-                else
-                {
-                    _pendingAction = card;
-                    _waitingForTarget = false;
-                }
+                _waitingForTarget = false;
             }
-            else if (ActionNeedsTarget(card.ActionValue) && _targetPlayerId == null)
+            else if (ActionNeedsTarget(card.ActionValue))
             {
-                _pendingAction = card;
-                _waitingForTarget = true;
+                _waitingForTarget = _targetPlayerId == null;
             }
             else
             {
-                await PlayCardSet(new List<Guid> { card.Id });
+                // Comp, MarketCrash — no target or numbers needed, just select it
+                _waitingForTarget = false;
             }
         }
 
-        protected async Task SelectTarget(string playerId)
+        protected void SelectTarget(string playerId)
         {
             if (!IsMyTurn) return;
 
             _targetPlayerId = _targetPlayerId == playerId ? null : playerId;
 
-            if (_waitingForTarget && _targetPlayerId != null && _pendingAction != null
-                && !ActionNeedsNumbers(_pendingAction.Value.ActionValue))
-            {
-                await PlayCardSet(new List<Guid> { _pendingAction.Value.Id });
-                return;
-            }
+            if (_waitingForTarget && _targetPlayerId != null)
+                _waitingForTarget = false;
 
             StateHasChanged();
         }
@@ -150,6 +250,8 @@ namespace KnockBox.Components.Pages.Games.Operator
             var cardIds = new List<Guid>(_selectedNumberIds);
             if (_pendingAction != null)
                 cardIds.Add(_pendingAction.Value.Id);
+            if (_selectedOperatorId != null)
+                cardIds.Add(_selectedOperatorId.Value);
 
             if (cardIds.Count == 0) return;
 
@@ -177,6 +279,7 @@ namespace KnockBox.Components.Pages.Games.Operator
         private void ClearSelection()
         {
             _pendingAction = null;
+            _selectedOperatorId = null;
             _selectedNumberIds.Clear();
             _targetPlayerId = null;
             _waitingForTarget = false;

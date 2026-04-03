@@ -165,3 +165,17 @@
     gap: 16px;
     align-items: center;
 }
+
+/* ── Concatenation Preview ── */
+
+.op-concat-preview {
+    font-family: var(--font-mono);
+    font-size: 1.4rem;
+    font-weight: 900;
+    color: #ffd166;
+    background: rgba(255,209,102,0.1);
+    border: 2px solid rgba(255,209,102,0.3);
+    border-radius: 8px;
+    padding: 4px 12px;
+    letter-spacing: 1px;
+}
