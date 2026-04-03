@@ -15,7 +15,7 @@ using System.Threading.Tasks;
 namespace KnockBox.Services.Logic.Games.Operator;
 
 public class OperatorGameEngine(ILogger<OperatorGameState> stateLogger) 
-    : AbstractGameEngine(minPlayerCount: 2, maxPlayerCount: 8)
+    : AbstractGameEngine(minPlayerCount: 2, maxPlayerCount: int.MaxValue)
 {
     public override Task<ValueResult<AbstractGameState>> CreateStateAsync(User host, CancellationToken ct = default)
     {

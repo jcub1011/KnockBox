@@ -116,8 +116,10 @@ public class OperatorGameContext(OperatorGameState state)
     {
         if (GamePlayers.TryGetValue(playerId, out var player))
         {
-            var (newScore, newOp) = CalculateNewScore(player.CurrentPoints, CardOperator.Divide, incomingValue);
+            var (newScore, _) = CalculateNewScore(player.CurrentPoints, CardOperator.Divide, incomingValue);
             player.CurrentPoints = newScore;
+            // CookTheBooks divides score but does not change the player's active operator
+            // (divide-by-zero via CookTheBooks still zeroes the score per CalculateNewScore)
             player.ScoreTimestamp = DateTimeOffset.UtcNow;
         }
     }
@@ -181,6 +183,8 @@ public class OperatorGameContext(OperatorGameState state)
         if (GamePlayers.TryGetValue(targetPlayerId, out var target))
         {
             target.IsAudited = true;
+            // Audit expires after 1 full round (number of players' turns)
+            target.AuditExpiresTurnCount = State.TurnCount + GamePlayers.Count;
         }
     }
 }

@@ -39,6 +39,7 @@ public class SetupState : IOperatorGameState, ITimedGameState<OperatorGameContex
             }
 
             playerState.CurrentPoints = setupCommand.Choice;
+            playerState.ActiveOperator = setupCommand.Choice > 0 ? CardOperator.Add : CardOperator.Subtract;
             playerState.ScoreTimestamp = DateTimeOffset.UtcNow;
 
             // Check if everyone chose

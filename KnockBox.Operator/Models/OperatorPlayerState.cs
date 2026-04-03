@@ -10,6 +10,6 @@ public class OperatorPlayerState
     public CardOperator ActiveOperator { get; set; } = CardOperator.Add;
     public List<Card> Hand { get; set; } = new();
     public bool IsAudited { get; set; }
-    public bool HasLiabilityTransfer { get; set; }
+    public int AuditExpiresTurnCount { get; set; }
     public DateTimeOffset ScoreTimestamp { get; set; } = DateTimeOffset.UtcNow;
 }

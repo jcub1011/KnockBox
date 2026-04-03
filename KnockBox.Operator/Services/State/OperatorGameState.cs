@@ -32,4 +32,9 @@ public class OperatorGameState(
 
     public OperatorCommand? PendingActionCommand { get; set; }
     public string? ReactionTargetPlayerId { get; set; }
+    public Card? PendingHotPotatoCard { get; set; }
+
+    public int TurnCount { get; set; }
+
+    public string? WinnerPlayerId { get; set; }
 }

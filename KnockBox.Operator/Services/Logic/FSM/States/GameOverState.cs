@@ -14,8 +14,9 @@ public class GameOverState : IOperatorGameState
             .OrderBy(p => Math.Abs(p.CurrentPoints))
             .ThenBy(p => p.ScoreTimestamp)
             .FirstOrDefault();
-            
-        // Final score logic is implemented, transitions are over.
+
+        context.State.WinnerPlayerId = winner?.UserId;
+
         return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromValue(null);
     }
 

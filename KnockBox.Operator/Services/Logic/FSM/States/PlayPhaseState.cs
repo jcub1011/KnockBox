@@ -13,6 +13,16 @@ public class PlayPhaseState : IOperatorGameState, ITimedGameState<OperatorGameCo
     public ValueResult<IGameState<OperatorGameContext, OperatorCommand>?> OnEnter(OperatorGameContext context)
     {
         context.State.StateStartTime = DateTimeOffset.UtcNow;
+
+        // Clear expired audits
+        foreach (var player in context.GamePlayers.Values)
+        {
+            if (player.IsAudited && context.State.TurnCount >= player.AuditExpiresTurnCount)
+            {
+                player.IsAudited = false;
+            }
+        }
+
         return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromValue(null);
     }
 
@@ -58,15 +68,35 @@ public class PlayPhaseState : IOperatorGameState, ITimedGameState<OperatorGameCo
                 context.State.DiscardPile.Add(c);
             }
 
-            bool hasTargetedAction = playedCards.Any(c => c.Type == CardType.Action && 
-                (c.ActionValue == CardAction.Steal || c.ActionValue == CardAction.LiabilityTransfer || 
+            bool hasTargetedAction = playedCards.Any(c => c.Type == CardType.Action &&
+                (c.ActionValue == CardAction.Steal || c.ActionValue == CardAction.LiabilityTransfer ||
                  c.ActionValue == CardAction.HostileTakeover || c.ActionValue == CardAction.Audit ||
                  c.ActionValue == CardAction.HotPotato || c.ActionValue == CardAction.FlashFlood));
 
-            if (hasTargetedAction && !string.IsNullOrEmpty(play.TargetPlayerId))
+            bool hasTargetedOperator = playedCards.Any(c => c.Type == CardType.Operator)
+                && !string.IsNullOrEmpty(play.TargetPlayerId)
+                && play.TargetPlayerId != play.PlayerId;
+
+            if ((hasTargetedAction || hasTargetedOperator) && !string.IsNullOrEmpty(play.TargetPlayerId))
             {
                 context.State.PendingActionCommand = play;
                 context.State.ReactionTargetPlayerId = play.TargetPlayerId;
+
+                // If Hot Potato is in play, extract the number card for redirect tracking
+                bool hasHotPotato = playedCards.Any(c => c.Type == CardType.Action && c.ActionValue == CardAction.HotPotato);
+                if (hasHotPotato)
+                {
+                    var numbers = playedCards.Where(c => c.Type == CardType.Number).ToList();
+                    if (numbers.Count > 0)
+                    {
+                        var hotPotatoNum = numbers.Last();
+                        context.State.PendingHotPotatoCard = hotPotatoNum;
+                        // Remove from discard — it will be resolved by ReactionState
+                        var inDiscard = context.State.DiscardPile.FindLastIndex(c => c.Id == hotPotatoNum.Id);
+                        if (inDiscard != -1) context.State.DiscardPile.RemoveAt(inDiscard);
+                    }
+                }
+
                 context.State.Phase = OperatorGamePhase.Reaction;
                 return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromValue(new ReactionState());
             }
@@ -158,15 +188,25 @@ public class PlayPhaseState : IOperatorGameState, ITimedGameState<OperatorGameCo
             {
                 var (newScore, newOp) = OperatorGameContext.CalculateNewScore(targetPlayerState.CurrentPoints, targetPlayerState.ActiveOperator, val);
                 targetPlayerState.CurrentPoints = newScore;
+                targetPlayerState.ActiveOperator = newOp;
                 targetPlayerState.ScoreTimestamp = DateTimeOffset.UtcNow;
             }
         }
 
-        // Apply operator changes
+        // Apply operator changes — target another player if specified, otherwise self
         var opCard = playedCards.LastOrDefault(c => c.Type == CardType.Operator);
-        if (opCard.Type == CardType.Operator && !pState.IsAudited)
+        if (opCard.Type == CardType.Operator)
         {
-            pState.ActiveOperator = opCard.OperatorValue;
+            bool operatorTargetsOther = !string.IsNullOrEmpty(play.TargetPlayerId) && play.TargetPlayerId != play.PlayerId;
+            string opTargetId = operatorTargetsOther ? play.TargetPlayerId! : play.PlayerId;
+
+            if (!actionBlocked || !operatorTargetsOther)
+            {
+                if (context.GamePlayers.TryGetValue(opTargetId, out var opTarget) && !opTarget.IsAudited)
+                {
+                    opTarget.ActiveOperator = opCard.OperatorValue;
+                }
+            }
         }
     }
 

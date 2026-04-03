@@ -30,27 +30,28 @@ public class ReactionState : IOperatorGameState, ITimedGameState<OperatorGameCon
         {
             var pState = context.GamePlayers[react.PlayerId];
             var shieldIdx = pState.Hand.FindIndex(c => c.Id == react.ShieldCardId && c.Type == CardType.Action && c.ActionValue == CardAction.Shield);
-            
+
             if (shieldIdx == -1) return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromError("Shield not found.");
-            
+
             var shield = pState.Hand[shieldIdx];
             pState.Hand.RemoveAt(shieldIdx);
             context.State.DiscardPile.Add(shield);
-            
+
             ResolvePendingAction(context, true);
-            
-            context.State.PendingActionCommand = null;
-            context.State.ReactionTargetPlayerId = null;
+            ClearPendingState(context);
 
             context.State.Phase = OperatorGamePhase.Draw;
             return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromValue(new DrawPhaseState());
         }
+        else if (command is RedirectHotPotatoCommand redirect)
+        {
+            return HandleHotPotatoRedirect(context, redirect);
+        }
         else if (command is PassReactionCommand)
         {
             ResolvePendingAction(context, false);
-            
-            context.State.PendingActionCommand = null;
-            context.State.ReactionTargetPlayerId = null;
+            ClearPendingState(context);
+
             context.State.Phase = OperatorGamePhase.Draw;
             return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromValue(new DrawPhaseState());
         }
@@ -58,15 +59,61 @@ public class ReactionState : IOperatorGameState, ITimedGameState<OperatorGameCon
         return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromError("Invalid command for ReactionPhase.");
     }
 
+    private ValueResult<IGameState<OperatorGameContext, OperatorCommand>?> HandleHotPotatoRedirect(
+        OperatorGameContext context, RedirectHotPotatoCommand redirect)
+    {
+        // Verify pending action is a Hot Potato
+        if (context.State.PendingHotPotatoCard is null)
+            return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromError("No Hot Potato to redirect.");
+
+        // Verify the reactor has a Hot Potato card
+        var pState = context.GamePlayers[redirect.PlayerId];
+        var hpIdx = pState.Hand.FindIndex(c => c.Id == redirect.HotPotatoCardId
+            && c.Type == CardType.Action && c.ActionValue == CardAction.HotPotato);
+
+        if (hpIdx == -1)
+            return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromError("Hot Potato card not found in hand.");
+
+        // Verify new target exists and isn't the redirector
+        if (redirect.NewTargetPlayerId == redirect.PlayerId)
+            return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromError("Cannot redirect Hot Potato to yourself.");
+
+        if (!context.GamePlayers.ContainsKey(redirect.NewTargetPlayerId))
+            return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromError("Target player not found.");
+
+        // Consume the reactor's Hot Potato card
+        var hpCard = pState.Hand[hpIdx];
+        pState.Hand.RemoveAt(hpIdx);
+        context.State.DiscardPile.Add(hpCard);
+
+        // Redirect to new target — re-enter reaction state
+        context.State.ReactionTargetPlayerId = redirect.NewTargetPlayerId;
+        context.State.StateStartTime = DateTimeOffset.UtcNow;
+
+        // Stay in ReactionState with new target (return null to stay, but we need a fresh state)
+        return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromValue(new ReactionState());
+    }
+
     private void ResolvePendingAction(OperatorGameContext context, bool actionBlocked)
     {
+        // If there's a pending Hot Potato, resolve it directly
+        if (context.State.PendingHotPotatoCard is Card hotPotatoCard)
+        {
+            if (!actionBlocked && context.State.ReactionTargetPlayerId != null)
+            {
+                context.ResolveHotPotato(context.State.ReactionTargetPlayerId, hotPotatoCard);
+            }
+            // Don't fall through to ResolvePlayedCards for the Hot Potato portion —
+            // still need to resolve other cards (numbers for score, operators, etc.)
+        }
+
         if (context.State.PendingActionCommand is PlayCardsCommand playCommand)
         {
             var playedCards = new List<Card>();
             foreach (var id in playCommand.CardIds)
             {
                 var card = context.State.DiscardPile.FirstOrDefault(c => c.Id == id);
-                if (card.Type != 0 || card.ActionValue != 0 || card.NumberValue != 0) // Basic check if card exists
+                if (card.Type != 0 || card.ActionValue != 0 || card.NumberValue != 0)
                 {
                     playedCards.Add(card);
                 }
@@ -77,6 +124,13 @@ public class ReactionState : IOperatorGameState, ITimedGameState<OperatorGameCon
                 PlayPhaseState.ResolvePlayedCards(context, playCommand, playedCards, actionBlocked);
             }
         }
+    }
+
+    private static void ClearPendingState(OperatorGameContext context)
+    {
+        context.State.PendingActionCommand = null;
+        context.State.ReactionTargetPlayerId = null;
+        context.State.PendingHotPotatoCard = null;
     }
 
     public ValueResult<TimeSpan> GetRemainingTime(OperatorGameContext context, DateTimeOffset now)
@@ -95,9 +149,8 @@ public class ReactionState : IOperatorGameState, ITimedGameState<OperatorGameCon
         if (elapsed >= context.State.Config.ReactionPhaseTimeout)
         {
             ResolvePendingAction(context, false);
-            
-            context.State.PendingActionCommand = null;
-            context.State.ReactionTargetPlayerId = null;
+            ClearPendingState(context);
+
             context.State.Phase = OperatorGamePhase.Draw;
             return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromValue(new DrawPhaseState());
         }

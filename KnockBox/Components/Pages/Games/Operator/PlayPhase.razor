@@ -16,7 +16,6 @@
                     HandSize="@pState.Hand.Count"
                     IsActive="@(GameState.TurnManager.CurrentPlayer == player.Id)"
                     IsAudited="@pState.IsAudited"
-                    HasLiabilityTransfer="@pState.HasLiabilityTransfer"
                     IsTargetable="@IsMyTurn"
                     IsTargeted="@(TargetPlayerId == player.Id)"
                     OnClick="@(() => SelectTarget(player.Id))" />
@@ -35,7 +34,6 @@
                 HandSize="@CurrentPlayerState.Hand.Count"
                 IsActive="@IsMyTurn"
                 IsAudited="@CurrentPlayerState.IsAudited"
-                HasLiabilityTransfer="@CurrentPlayerState.HasLiabilityTransfer"
                 IsTargetable="@IsMyTurn"
                 IsTargeted="@(TargetPlayerId == UserService.CurrentUser!.Id)"
                 OnClick="@(() => SelectTarget(UserService.CurrentUser!.Id))" />
