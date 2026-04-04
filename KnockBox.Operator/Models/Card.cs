@@ -1,6 +1,4 @@
 using KnockBox.Operator.Services.Logic.FSM;
-using System;
-using System.Collections.Generic;
 
 namespace KnockBox.Operator.Models;
 
@@ -41,8 +39,9 @@ public interface ITargetableCard
     /// Gets the players that can be targeted by this card.
     /// </summary>
     /// <param name="context"></param>
+    /// <param name="thisPlayer"></param>
     /// <returns></returns>
-    IEnumerable<OperatorPlayerState> GetPotentialTargets(OperatorGameContext context);
+    IEnumerable<OperatorPlayerState> GetPotentialTargets(OperatorGameContext context, OperatorPlayerState thisPlayer);
 }
 
 public interface IBlockableCard
@@ -50,9 +49,10 @@ public interface IBlockableCard
     /// <summary>
     /// Gets the cards that can be used as a reaction to this card.
     /// </summary>
-    /// <param name="playerState"></param>
+    /// <param name="context"></param>
+    /// <param name="thisPlayer"></param>
     /// <returns></returns>
-    IEnumerable<Card> GetPotentialReactionCards(OperatorPlayerState playerState);
+    IEnumerable<Card> GetPotentialReactionCards(OperatorGameContext context, OperatorPlayerState thisPlayer);
 }
 
 public abstract class Card

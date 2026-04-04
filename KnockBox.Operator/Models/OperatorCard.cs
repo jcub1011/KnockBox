@@ -1,6 +1,4 @@
 using KnockBox.Operator.Services.Logic.FSM;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace KnockBox.Operator.Models;
 
@@ -47,17 +45,17 @@ public sealed class OperatorCard(CardOperator operatorValue = CardOperator.None)
         };
     }
 
-    public IEnumerable<Card> GetPotentialReactionCards(OperatorPlayerState playerState)
+    public IEnumerable<Card> GetPotentialReactionCards(OperatorGameContext context, OperatorPlayerState thisPlayer)
     {
         // Only shield cards can block operators
-        return playerState.Hand.Where((card) 
+        return thisPlayer.Hand.Where((card) 
             => card is ActionCard { ActionValue: CardAction.Shield });
     }
 
-    public IEnumerable<OperatorPlayerState> GetPotentialTargets(OperatorGameContext context)
+    public IEnumerable<OperatorPlayerState> GetPotentialTargets(OperatorGameContext context, OperatorPlayerState thisPlayer)
     {
-        // Can't replace active operator if operator are the same type
+        // Can't replace active operator if operators are the same type
         return context.GamePlayers.Values.Where((player)
-            => player.ActiveOperator != OperatorValue);
+            => player.ActiveOperator != OperatorValue && !player.IsAudited);
     }
 }
