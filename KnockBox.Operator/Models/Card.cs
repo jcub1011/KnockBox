@@ -70,7 +70,7 @@ public abstract class Card
     public abstract string TooltipDescription();
 }
 
-public class NumberCard(decimal numberValue = 0m) : Card
+public sealed class NumberCard(decimal numberValue = 0m) : Card
 {
     public decimal NumberValue { get; init; } = numberValue;
 
@@ -84,7 +84,7 @@ public class NumberCard(decimal numberValue = 0m) : Card
         => "Play number cards to modify scores. Stack multiple numbers to form larger values (e.g. 3 + 7 = 37).";
 }
 
-public class OperatorCard(CardOperator operatorValue = CardOperator.None) 
+public sealed class OperatorCard(CardOperator operatorValue = CardOperator.None) 
     : Card, ITargetableCard, IBlockableCard
 {
     public CardOperator OperatorValue { get; init; } = operatorValue;
