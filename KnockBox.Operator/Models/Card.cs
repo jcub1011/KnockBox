@@ -66,7 +66,18 @@ public interface IPairableCard
     IEnumerable<Card> GetPotentialPairingCards(OperatorGameContext context, OperatorPlayerState thisPlayer);
 }
 
-public abstract class Card
+public interface IPlayableCard
+{
+    /// <summary>
+    /// Checks if this card is able to be played.
+    /// </summary>
+    /// <param name="context"></param>
+    /// <param name="thisPlayer"></param>
+    /// <returns></returns>
+    bool IsPlayable(OperatorGameContext context, OperatorPlayerState thisPlayer);
+}
+
+public abstract class Card : IPlayableCard
 {
     public Guid Id { get; init; } = Guid.NewGuid();
 
