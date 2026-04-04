@@ -46,13 +46,12 @@ public class PlayPhaseState : IOperatorGameState, ITimedGameState<OperatorGameCo
         if (command is SkipTurnCommand skip)
         {
             var pState = context.GamePlayers[skip.PlayerId];
-            if (pState.Hand.All(c => c is ShieldCard
-                || pState.Hand.All(c => c is ITargetableCard t && !t.GetPotentialTargets(context, pState).Any())))
+            if (!pState.Hand.Any(c => c.IsPlayable(context, pState)))
             {
                 context.State.Phase = OperatorGamePhase.Draw;
                 return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromValue(new DrawPhaseState());
             }
-            return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromError("Cannot skip unless hand is only Shields.");
+            return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromError("Cannot skip if you have playable cards.");
         }
 
         if (command is EndTurnCommand end)
@@ -80,6 +79,29 @@ public class PlayPhaseState : IOperatorGameState, ITimedGameState<OperatorGameCo
                 var cardIdx = pState.Hand.FindIndex(c => c.Id == id);
                 if (cardIdx == -1) return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromError("Card not found in hand.");
                 playedCards.Add(pState.Hand[cardIdx]);
+            }
+
+            if (playedCards.Count == 1)
+            {
+                if (!playedCards[0].IsPlayable(context, pState))
+                    return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromError("Card is not playable.");
+            }
+            else if (playedCards.Count > 1)
+            {
+                bool allNumbers = playedCards.All(c => c is NumberCard);
+                if (!allNumbers)
+                {
+                    var pairableCards = playedCards.OfType<IPairableCard>().ToList();
+                    if (pairableCards.Count != 1)
+                        return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromError("Multi-card plays with actions require exactly one pairable card.");
+                    
+                    var pairableCard = pairableCards[0];
+                    var pairings = pairableCard.GetPotentialPairingCards(context, pState).ToList();
+                    
+                    var otherCards = playedCards.Where(c => c != (Card)pairableCard).ToList();
+                    if (!otherCards.All(c => pairings.Contains(c)))
+                        return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromError("Invalid card pairing.");
+                }
             }
 
             foreach (var c in playedCards)

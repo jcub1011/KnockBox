@@ -28,14 +28,13 @@ public class DrawPhaseState : IOperatorGameState
             }
         }
 
-        // Check game-over condition: deck empty and no player has non-Shield cards
+        // Check game-over condition: deck empty and no player has playable cards
         if (context.State.Deck.Count == 0)
         {
             bool hasMoves = false;
             foreach (var p in context.GamePlayers.Values)
             {
-                if (p.Hand.Any(c => c is not ShieldCard 
-                && (c is ITargetableCard targetable && targetable.GetPotentialTargets(context, p).Any())))
+                if (p.Hand.Any(c => c.IsPlayable(context, p)))
                 {
                     hasMoves = true;
                     break;

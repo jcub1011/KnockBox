@@ -44,6 +44,7 @@ public class ActionReactionTests
     {
         var stealCard = new StealCard();
         _state.GamePlayers["p1"].Hand.Add(stealCard);
+        _state.GamePlayers["p2"].Hand.Add(new NumberCard(5m)); // P2 needs a card for Steal to be playable
 
         var playCmd = new PlayCardsCommand("p1", new List<Guid> { stealCard.Id }, "p2");
         var result = _playPhase.HandleCommand(_context, playCmd);

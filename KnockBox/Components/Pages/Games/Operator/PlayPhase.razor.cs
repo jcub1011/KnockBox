@@ -71,11 +71,12 @@ namespace KnockBox.Components.Pages.Games.Operator
         {
             get
             {
-                if (CurrentPlayerState == null || !IsMyTurn)
+                if (CurrentPlayerState == null || !IsMyTurn || GameState.Context == null)
                     return CurrentPlayerState?.Hand.Select(c => c.Id).ToHashSet() ?? new();
 
                 var hand = CurrentPlayerState.Hand;
                 var disabled = new HashSet<Guid>();
+                var context = GameState.Context;
 
                 // Waiting for target — disable all hand cards
                 if (_waitingForTarget)
@@ -96,8 +97,17 @@ namespace KnockBox.Components.Pages.Games.Operator
                 // Action pending that needs numbers — only numbers + the action itself enabled
                 if (_pendingAction != null)
                 {
-                    foreach (var c in hand.Where(c => c is not NumberCard && c.Id != _pendingAction.Id))
-                        disabled.Add(c.Id);
+                    if (_pendingAction is IPairableCard pairable)
+                    {
+                        var pairings = pairable.GetPotentialPairingCards(context, CurrentPlayerState).ToList();
+                        foreach (var c in hand.Where(c => !pairings.Contains(c) && c.Id != _pendingAction.Id))
+                            disabled.Add(c.Id);
+                    }
+                    else
+                    {
+                        foreach (var c in hand.Where(c => c.Id != _pendingAction.Id))
+                            disabled.Add(c.Id);
+                    }
                     return disabled;
                 }
 
@@ -107,15 +117,18 @@ namespace KnockBox.Components.Pages.Games.Operator
                     foreach (var c in hand)
                     {
                         if (c is NumberCard) continue;
-                        if (ActionNeedsNumbers(c)) continue;
+                        if (c is IPairableCard pairable && pairable.GetPotentialPairingCards(context, CurrentPlayerState).Any(num => _selectedNumberIds.Contains(num.Id))) continue;
                         disabled.Add(c.Id);
                     }
                     return disabled;
                 }
 
-                // No selection — all enabled except Shield
-                foreach (var c in hand.Where(c => c is ShieldCard))
-                    disabled.Add(c.Id);
+                // No selection — use IsPlayable
+                foreach (var c in hand)
+                {
+                    if (!c.IsPlayable(context, CurrentPlayerState))
+                        disabled.Add(c.Id);
+                }
 
                 return disabled;
             }
@@ -172,10 +185,10 @@ namespace KnockBox.Components.Pages.Games.Operator
         }
 
         private static bool ActionNeedsNumbers(Card card) =>
-            card is CookTheBooksCard or HotPotatoCard or LiabilityTransferCard;
+            card is IPairableCard;
 
         private static bool ActionNeedsTarget(Card card) =>
-            card is LiabilityTransferCard or StealCard or HotPotatoCard or FlashFloodCard or HostileTakeoverCard or AuditCard;
+            card is ITargetableCard;
 
         protected Task ToggleCard(Guid cardId)
         {
@@ -318,8 +331,8 @@ namespace KnockBox.Components.Pages.Games.Operator
 
         protected bool CanSkip()
         {
-            if (!IsMyTurn || CurrentPlayerState == null) return false;
-            return CurrentPlayerState.Hand.All(c => c is ShieldCard);
+            if (!IsMyTurn || CurrentPlayerState == null || GameState.Context == null) return false;
+            return !CurrentPlayerState.Hand.Any(c => c.IsPlayable(GameState.Context, CurrentPlayerState));
         }
 
         protected bool CanEndTurn()
