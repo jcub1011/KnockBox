@@ -3,13 +3,6 @@ using System;
 
 namespace KnockBox.Operator.Models;
 
-public enum CardType
-{
-    Number,
-    Operator,
-    Action
-}
-
 public enum CardOperator
 {
     None,
@@ -54,19 +47,18 @@ public interface IBlockableCard
     IEnumerable<Card> GetPotentialReactionCards(OperatorPlayerState playerState);
 }
 
-public class Card(CardType type)
+public class Card
 {
-    public CardType Type { get; init; } = type;
     public Guid Id { get; init; } = Guid.NewGuid();
 }
 
-public class NumberCard(CardType type, decimal numberValue = 0m) : Card(type)
+public class NumberCard(decimal numberValue = 0m)
 {
     public decimal NumberValue { get; init; } = numberValue;
 }
 
-public abstract class OperatorCard(CardType type, CardOperator operatorValue = CardOperator.None) 
-    : Card(type), ITargetableCard, IBlockableCard
+public abstract class OperatorCard(CardOperator operatorValue = CardOperator.None) 
+    : Card, ITargetableCard, IBlockableCard
 {
     public CardOperator OperatorValue { get; init; } = operatorValue;
 
@@ -74,8 +66,8 @@ public abstract class OperatorCard(CardType type, CardOperator operatorValue = C
     public abstract IEnumerable<OperatorPlayerState> GetPotentialTargets(OperatorGameContext context);
 }
 
-public abstract class ActionCard(CardType type, CardAction actionValue = CardAction.None) 
-    : Card(type), ITargetableCard, IBlockableCard
+public abstract class ActionCard(CardAction actionValue = CardAction.None) 
+    : Card, ITargetableCard, IBlockableCard
 {
     public CardAction ActionValue { get; init; } = actionValue;
 
