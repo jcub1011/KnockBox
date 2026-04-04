@@ -25,9 +25,11 @@ public sealed class ShieldCard() : ActionCard(CardAction.Shield)
 
     public override IEnumerable<Card> GetPotentialReactionCards(OperatorGameContext context, OperatorPlayerState thisPlayer) => [];
     public override IEnumerable<OperatorPlayerState> GetPotentialTargets(OperatorGameContext context, OperatorPlayerState thisPlayer) => [thisPlayer];
+    public override bool IsPlayable(OperatorGameContext context, OperatorPlayerState thisPlayer) => false; // Can only be used as a reaction
 }
 
-public sealed class LiabilityTransferCard() : ActionCard(CardAction.LiabilityTransfer)
+public sealed class LiabilityTransferCard() 
+    : ActionCard(CardAction.LiabilityTransfer), IPairableCard
 {
     public override string CardIcon() => "\ud83d\udce4";
     public override string TooltipName() => "Liability Transfer";
@@ -42,9 +44,18 @@ public sealed class LiabilityTransferCard() : ActionCard(CardAction.LiabilityTra
     {
         return context.GamePlayers.Values.Where(player => player != thisPlayer);
     }
+
+    public IEnumerable<Card> GetPotentialPairingCards(OperatorGameContext contex, OperatorPlayerState thisPlayer)
+    {
+        return thisPlayer.Hand.Where(c => c is NumberCard);
+    }
+
+    public override bool IsPlayable(OperatorGameContext context, OperatorPlayerState thisPlayer) 
+        => GetPotentialPairingCards(context, thisPlayer).Any();
 }
 
-public sealed class CookTheBooksCard() : ActionCard(CardAction.CookTheBooks)
+public sealed class CookTheBooksCard() 
+    : ActionCard(CardAction.CookTheBooks), IPairableCard
 {
     public override string CardIcon() => "\ud83e\uddd1\u200d\ud83c\udf73";
     public override string TooltipName() => "Cook the Books";
@@ -54,6 +65,14 @@ public sealed class CookTheBooksCard() : ActionCard(CardAction.CookTheBooks)
 
     public override IEnumerable<OperatorPlayerState> GetPotentialTargets(OperatorGameContext context, OperatorPlayerState thisPlayer)
         => [thisPlayer];
+
+    public IEnumerable<Card> GetPotentialPairingCards(OperatorGameContext contex, OperatorPlayerState thisPlayer)
+    {
+        return thisPlayer.Hand.Where(c => c is NumberCard);
+    }
+
+    public override bool IsPlayable(OperatorGameContext context, OperatorPlayerState thisPlayer)
+        => GetPotentialPairingCards(context, thisPlayer).Any();
 }
 
 public sealed class CompCard() : ActionCard(CardAction.Comp)
@@ -63,11 +82,15 @@ public sealed class CompCard() : ActionCard(CardAction.Comp)
     public override string TooltipDescription() => "Changes your operator. Positive scores get Subtract, negative scores get Add. Blocked by Audit.";
 
     public override IEnumerable<Card> GetPotentialReactionCards(OperatorGameContext context, OperatorPlayerState thisPlayer) => [];
+
     public override IEnumerable<OperatorPlayerState> GetPotentialTargets(OperatorGameContext context, OperatorPlayerState thisPlayer)
     {
         if (thisPlayer.IsAudited) return [];
         else return [thisPlayer];
     }
+
+    public override bool IsPlayable(OperatorGameContext context, OperatorPlayerState thisPlayer) 
+        => !thisPlayer.IsAudited;
 }
 
 public sealed class StealCard() : ActionCard(CardAction.Steal)
@@ -85,9 +108,13 @@ public sealed class StealCard() : ActionCard(CardAction.Steal)
     {
         return context.GamePlayers.Values.Where(p => p.Hand.Count > 0 && p != thisPlayer);
     }
+
+    public override bool IsPlayable(OperatorGameContext context, OperatorPlayerState thisPlayer)
+        => GetPotentialTargets(context, thisPlayer).Any();
 }
 
-public sealed class HotPotatoCard() : ActionCard(CardAction.HotPotato)
+public sealed class HotPotatoCard() 
+    : ActionCard(CardAction.HotPotato), IPairableCard
 {
     public override string CardIcon() => "\ud83e\udd54";
     public override string TooltipName() => "Hot Potato";
@@ -102,6 +129,14 @@ public sealed class HotPotatoCard() : ActionCard(CardAction.HotPotato)
     {
         return context.GamePlayers.Values.Where(player => player != thisPlayer);
     }
+
+    public IEnumerable<Card> GetPotentialPairingCards(OperatorGameContext contex, OperatorPlayerState thisPlayer)
+    {
+        return thisPlayer.Hand.Where(c => c is NumberCard);
+    }
+
+    public override bool IsPlayable(OperatorGameContext context, OperatorPlayerState thisPlayer)
+        => GetPotentialPairingCards(context, thisPlayer).Any();
 }
 
 public sealed class FlashFloodCard() : ActionCard(CardAction.FlashFlood)
@@ -117,8 +152,12 @@ public sealed class FlashFloodCard() : ActionCard(CardAction.FlashFlood)
 
     public override IEnumerable<OperatorPlayerState> GetPotentialTargets(OperatorGameContext context, OperatorPlayerState thisPlayer)
     {
+        if (context.State.Deck.Count <= 0) return [];
         return context.GamePlayers.Values;
     }
+
+    public override bool IsPlayable(OperatorGameContext context, OperatorPlayerState thisPlayer)
+        => context.State.Deck.Count > 0;
 }
 
 public sealed class HostileTakeoverCard() : ActionCard(CardAction.HostileTakeover)
@@ -136,6 +175,9 @@ public sealed class HostileTakeoverCard() : ActionCard(CardAction.HostileTakeove
     {
         return context.GamePlayers.Values.Where(p => !p.IsAudited && p != thisPlayer);
     }
+
+    public override bool IsPlayable(OperatorGameContext context, OperatorPlayerState thisPlayer)
+        => GetPotentialTargets(context, thisPlayer).Any();
 }
 
 public sealed class AuditCard() : ActionCard(CardAction.Audit)
@@ -153,6 +195,9 @@ public sealed class AuditCard() : ActionCard(CardAction.Audit)
     {
         return context.GamePlayers.Values.Where(p => !p.IsAudited);
     }
+
+    public override bool IsPlayable(OperatorGameContext context, OperatorPlayerState thisPlayer)
+        => GetPotentialTargets(context, thisPlayer).Any();
 }
 
 public sealed class MarketCrashCard() : ActionCard(CardAction.MarketCrash)
@@ -167,4 +212,7 @@ public sealed class MarketCrashCard() : ActionCard(CardAction.MarketCrash)
     {
         return context.GamePlayers.Values.Where(p => !p.IsAudited);
     }
+
+    public override bool IsPlayable(OperatorGameContext context, OperatorPlayerState thisPlayer)
+        => true;
 }

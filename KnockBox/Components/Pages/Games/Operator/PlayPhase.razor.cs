@@ -50,21 +50,21 @@ namespace KnockBox.Components.Pages.Games.Operator
             get
             {
                 var ids = new HashSet<Guid>(_selectedNumberIds);
-                if (_pendingAction != null) ids.Add(_pendingAction.Value.Id);
+                if (_pendingAction != null) ids.Add(_pendingAction.Id);
                 if (_selectedOperatorId != null) ids.Add(_selectedOperatorId.Value);
                 return ids;
             }
         }
 
         protected bool ShowSubmit =>
-            (_selectedNumberIds.Count > 0 && (_pendingAction == null || !ActionNeedsTarget(_pendingAction.Value.ActionValue) || _targetPlayerId != null))
+            (_selectedNumberIds.Count > 0 && (_pendingAction == null || !ActionNeedsTarget(_pendingAction) || _targetPlayerId != null))
             || (_selectedOperatorId != null && _targetPlayerId != null)
-            || (_pendingAction != null && !ActionNeedsNumbers(_pendingAction.Value.ActionValue)
-                && (!ActionNeedsTarget(_pendingAction.Value.ActionValue) || _targetPlayerId != null));
+            || (_pendingAction != null && !ActionNeedsNumbers(_pendingAction)
+                && (!ActionNeedsTarget(_pendingAction) || _targetPlayerId != null));
 
         protected bool NeedsTargetSelection =>
             _waitingForTarget
-            || (_pendingAction != null && ActionNeedsTarget(_pendingAction.Value.ActionValue) && _targetPlayerId == null)
+            || (_pendingAction != null && ActionNeedsTarget(_pendingAction) && _targetPlayerId == null)
             || (_selectedOperatorId != null && _targetPlayerId == null);
 
         protected HashSet<Guid> DisabledCardIds
@@ -96,7 +96,7 @@ namespace KnockBox.Components.Pages.Games.Operator
                 // Action pending that needs numbers — only numbers + the action itself enabled
                 if (_pendingAction != null)
                 {
-                    foreach (var c in hand.Where(c => c.Type != CardType.Number && c.Id != _pendingAction.Value.Id))
+                    foreach (var c in hand.Where(c => c is not NumberCard && c.Id != _pendingAction.Id))
                         disabled.Add(c.Id);
                     return disabled;
                 }
@@ -106,15 +106,15 @@ namespace KnockBox.Components.Pages.Games.Operator
                 {
                     foreach (var c in hand)
                     {
-                        if (c.Type == CardType.Number) continue;
-                        if (c.Type == CardType.Action && ActionNeedsNumbers(c.ActionValue)) continue;
+                        if (c is NumberCard) continue;
+                        if (ActionNeedsNumbers(c)) continue;
                         disabled.Add(c.Id);
                     }
                     return disabled;
                 }
 
                 // No selection — all enabled except Shield
-                foreach (var c in hand.Where(c => c.Type == CardType.Action && c.ActionValue == CardAction.Shield))
+                foreach (var c in hand.Where(c => c is ShieldCard))
                     disabled.Add(c.Id);
 
                 return disabled;
@@ -127,16 +127,7 @@ namespace KnockBox.Components.Pages.Games.Operator
             {
                 if (_waitingForTarget)
                 {
-                    var actionName = _pendingAction?.ActionValue switch
-                    {
-                        CardAction.Steal => "Steal",
-                        CardAction.FlashFlood => "Flash Flood",
-                        CardAction.HostileTakeover => "Hostile Takeover",
-                        CardAction.Audit => "Audit",
-                        CardAction.LiabilityTransfer => "Liability Transfer",
-                        CardAction.HotPotato => "Hot Potato",
-                        _ => "action"
-                    };
+                    var actionName = _pendingAction?.TooltipName() ?? "action";
                     return $"Select target for {actionName}";
                 }
                 if (_selectedOperatorId != null && _targetPlayerId == null)
@@ -144,9 +135,8 @@ namespace KnockBox.Components.Pages.Games.Operator
 
                 if (_pendingAction != null)
                 {
-                    var action = _pendingAction.Value.ActionValue;
-                    bool needsNumbers = ActionNeedsNumbers(action);
-                    bool needsTarget = ActionNeedsTarget(action);
+                    bool needsNumbers = ActionNeedsNumbers(_pendingAction);
+                    bool needsTarget = ActionNeedsTarget(_pendingAction);
 
                     bool hasNumbers = _selectedNumberIds.Count > 0;
                     bool hasTarget = _targetPlayerId != null;
@@ -171,30 +161,32 @@ namespace KnockBox.Components.Pages.Games.Operator
                 foreach (var id in _selectedNumberIds)
                 {
                     var card = CurrentPlayerState.Hand.FirstOrDefault(c => c.Id == id);
-                    if (card.Id == Guid.Empty) continue;
-                    val = val * 10 + card.NumberValue;
+                    if (card == null) continue;
+                    if (card is NumberCard numCard)
+                    {
+                        val = val * 10 + numCard.NumberValue;
+                    }
                 }
                 return $"= {val:G}";
             }
         }
 
-        private static bool ActionNeedsNumbers(CardAction action) =>
-            action is CardAction.CookTheBooks or CardAction.HotPotato or CardAction.LiabilityTransfer;
+        private static bool ActionNeedsNumbers(Card card) =>
+            card is CookTheBooksCard or HotPotatoCard or LiabilityTransferCard;
 
-        private static bool ActionNeedsTarget(CardAction action) =>
-            action is CardAction.LiabilityTransfer or CardAction.Steal or CardAction.HotPotato
-                or CardAction.FlashFlood or CardAction.HostileTakeover or CardAction.Audit;
+        private static bool ActionNeedsTarget(Card card) =>
+            card is LiabilityTransferCard or StealCard or HotPotatoCard or FlashFloodCard or HostileTakeoverCard or AuditCard;
 
         protected Task ToggleCard(Guid cardId)
         {
             if (!IsMyTurn || CurrentPlayerState == null) return Task.CompletedTask;
 
             var card = CurrentPlayerState.Hand.FirstOrDefault(c => c.Id == cardId);
-            if (card.Id == Guid.Empty) return Task.CompletedTask;
+            if (card == null) return Task.CompletedTask;
 
-            switch (card.Type)
+            switch (card)
             {
-                case CardType.Number:
+                case NumberCard:
                     if (_waitingForTarget) return Task.CompletedTask;
                     if (_selectedNumberIds.Contains(card.Id))
                         _selectedNumberIds.Remove(card.Id);
@@ -202,11 +194,11 @@ namespace KnockBox.Components.Pages.Games.Operator
                         _selectedNumberIds.Add(card.Id);
                     break;
 
-                case CardType.Operator:
+                case KnockBox.Operator.Models.OperatorCard:
                     _selectedOperatorId = _selectedOperatorId == card.Id ? null : card.Id;
                     break;
 
-                case CardType.Action:
+                case ActionCard:
                     HandleActionClick(card);
                     break;
             }
@@ -216,7 +208,7 @@ namespace KnockBox.Components.Pages.Games.Operator
 
         private void HandleActionClick(Card card)
         {
-            if (card.ActionValue == CardAction.Shield) return;
+            if (card is ShieldCard) return;
 
             if (_pendingAction?.Id == card.Id)
             {
@@ -227,14 +219,14 @@ namespace KnockBox.Components.Pages.Games.Operator
 
             _pendingAction = card;
 
-            if (ActionNeedsNumbers(card.ActionValue))
+            if (ActionNeedsNumbers(card))
             {
                 _waitingForTarget = false;
                 // Clear target for self-only actions (e.g. CookTheBooks)
-                if (!ActionNeedsTarget(card.ActionValue))
+                if (!ActionNeedsTarget(card))
                     _targetPlayerId = null;
             }
-            else if (ActionNeedsTarget(card.ActionValue))
+            else if (ActionNeedsTarget(card))
             {
                 _waitingForTarget = _targetPlayerId == null;
             }
@@ -251,7 +243,7 @@ namespace KnockBox.Components.Pages.Games.Operator
             if (!IsMyTurn) return;
 
             // Block target selection for self-only actions (e.g. CookTheBooks, Comp, MarketCrash)
-            if (_pendingAction != null && !ActionNeedsTarget(_pendingAction.Value.ActionValue))
+            if (_pendingAction != null && !ActionNeedsTarget(_pendingAction))
                 return;
 
             _targetPlayerId = _targetPlayerId == playerId ? null : playerId;
@@ -268,7 +260,7 @@ namespace KnockBox.Components.Pages.Games.Operator
 
             var cardIds = new List<Guid>(_selectedNumberIds);
             if (_pendingAction != null)
-                cardIds.Add(_pendingAction.Value.Id);
+                cardIds.Add(_pendingAction.Id);
             if (_selectedOperatorId != null)
                 cardIds.Add(_selectedOperatorId.Value);
 
@@ -327,7 +319,7 @@ namespace KnockBox.Components.Pages.Games.Operator
         protected bool CanSkip()
         {
             if (!IsMyTurn || CurrentPlayerState == null) return false;
-            return CurrentPlayerState.Hand.All(c => c.Type == CardType.Action && c.ActionValue == CardAction.Shield);
+            return CurrentPlayerState.Hand.All(c => c is ShieldCard);
         }
 
         protected bool CanEndTurn()

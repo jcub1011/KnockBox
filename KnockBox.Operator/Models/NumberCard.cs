@@ -1,3 +1,5 @@
+using KnockBox.Operator.Services.Logic.FSM;
+
 namespace KnockBox.Operator.Models;
 
 public sealed class NumberCard(decimal numberValue = 0m) : Card
@@ -14,4 +16,6 @@ public sealed class NumberCard(decimal numberValue = 0m) : Card
 
     public override string TooltipDescription()
         => "Play number cards to modify scores. Stack multiple numbers to form larger values (e.g. 3 + 7 = 37).";
+
+    public override bool IsPlayable(OperatorGameContext context, OperatorPlayerState thisPlayer) => true;
 }

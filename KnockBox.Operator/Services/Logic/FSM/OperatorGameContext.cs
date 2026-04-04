@@ -67,17 +67,34 @@ public class OperatorGameContext(OperatorGameState state, IRandomNumberService r
 
     private static void AddCards(List<Card> deck, CardType type, decimal value, int count)
     {
-        for (int i = 0; i < count; i++) deck.Add(new Card(type, NumberValue: value));
+        for (int i = 0; i < count; i++) deck.Add(new NumberCard(value));
     }
 
     private static void AddCards(List<Card> deck, CardType type, CardOperator op, int count)
     {
-        for (int i = 0; i < count; i++) deck.Add(new Card(type, OperatorValue: op));
+        for (int i = 0; i < count; i++) deck.Add(new OperatorCard(op));
     }
 
     private static void AddCards(List<Card> deck, CardType type, CardAction action, int count)
     {
-        for (int i = 0; i < count; i++) deck.Add(new Card(type, ActionValue: action));
+        for (int i = 0; i < count; i++)
+        {
+            Card card = action switch
+            {
+                CardAction.Shield => new ShieldCard(),
+                CardAction.LiabilityTransfer => new LiabilityTransferCard(),
+                CardAction.CookTheBooks => new CookTheBooksCard(),
+                CardAction.Comp => new CompCard(),
+                CardAction.Steal => new StealCard(),
+                CardAction.HotPotato => new HotPotatoCard(),
+                CardAction.FlashFlood => new FlashFloodCard(),
+                CardAction.HostileTakeover => new HostileTakeoverCard(),
+                CardAction.Audit => new AuditCard(),
+                CardAction.MarketCrash => new MarketCrashCard(),
+                _ => throw new NotImplementedException()
+            };
+            deck.Add(card);
+        }
     }
 
     public static (decimal NewScore, CardOperator NewOperator) CalculateNewScore(decimal currentScore, CardOperator op, decimal value)

@@ -3,9 +3,9 @@
 <div class="op-hand">
     @{ var sorted = Hand
         .OrderBy(c => c.Type)
-        .ThenBy(c => c.NumberValue)
-        .ThenBy(c => (int)c.OperatorValue)
-        .ThenBy(c => (int)c.ActionValue)
+        .ThenBy(c => c is NumberCard n ? n.NumberValue : decimal.MaxValue)
+        .ThenBy(c => c is KnockBox.Operator.Models.OperatorCard o ? (int)o.OperatorValue : int.MaxValue)
+        .ThenBy(c => c is ActionCard a ? (int)a.ActionValue : int.MaxValue)
         .ToList();
        int newIndex = 0;
     }

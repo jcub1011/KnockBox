@@ -60,10 +60,10 @@ public class GameFlowTests
 
         // 2. Play Phase -> (auto Draw) -> Play Phase (p1 plays a number card)
         var p1 = _state.GamePlayers["p1"];
-        var card = new Card(CardType.Number, 5m);
+        var card = new NumberCard(5m);
         p1.Hand.Add(card);
         // Add a card to deck so draw can give p1 a card
-        _state.Deck.Add(new Card(CardType.Number, 1m));
+        _state.Deck.Add(new NumberCard(1m));
 
         var playCmd = new PlayCardsCommand("p1", new List<Guid> { card.Id });
         _fsm.HandleCommand(_context, playCmd);
@@ -79,12 +79,12 @@ public class GameFlowTests
 
         // 3. Play Phase (p2 plays) -> check GameOver or next turn
         var p2 = _state.GamePlayers["p2"];
-        var winCard = new Card(CardType.Number, 5m);
+        var winCard = new NumberCard(5m);
         p2.Hand.Add(winCard);
         // Ensure deck is empty and hands are only shields to trigger game over
         _state.Deck.Clear();
         p1.Hand.Clear();
-        p1.Hand.Add(new Card(CardType.Action, ActionValue: CardAction.Shield));
+        p1.Hand.Add(new ShieldCard());
         p2.Hand.Clear();
         p2.Hand.Add(winCard);
 

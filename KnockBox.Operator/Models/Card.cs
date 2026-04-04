@@ -55,6 +55,17 @@ public interface IBlockableCard
     IEnumerable<Card> GetPotentialReactionCards(OperatorGameContext context, OperatorPlayerState thisPlayer);
 }
 
+public interface IPairableCard
+{
+    /// <summary>
+    /// Gets the cards that can be played with this card.
+    /// </summary>
+    /// <param name="context"></param>
+    /// <param name="thisPlayer"></param>
+    /// <returns></returns>
+    IEnumerable<Card> GetPotentialPairingCards(OperatorGameContext context, OperatorPlayerState thisPlayer);
+}
+
 public abstract class Card
 {
     public Guid Id { get; init; } = Guid.NewGuid();
@@ -78,4 +89,12 @@ public abstract class Card
     /// </summary>
     /// <returns></returns>
     public abstract string TooltipDescription();
+
+    /// <summary>
+    /// Checks if this card can be played.
+    /// </summary>
+    /// <param name="context"></param>
+    /// <param name="thisPlayer"></param>
+    /// <returns></returns>
+    public abstract bool IsPlayable(OperatorGameContext context, OperatorPlayerState thisPlayer);
 }

@@ -58,4 +58,7 @@ public sealed class OperatorCard(CardOperator operatorValue = CardOperator.None)
         return context.GamePlayers.Values.Where((player)
             => player.ActiveOperator != OperatorValue && !player.IsAudited);
     }
+
+    public override bool IsPlayable(OperatorGameContext context, OperatorPlayerState thisPlayer)
+        => GetPotentialTargets(context, thisPlayer).Any();
 }

@@ -46,7 +46,8 @@ public class PlayPhaseState : IOperatorGameState, ITimedGameState<OperatorGameCo
         if (command is SkipTurnCommand skip)
         {
             var pState = context.GamePlayers[skip.PlayerId];
-            if (pState.Hand.All(c => c.Type == CardType.Action && c.ActionValue == CardAction.Shield))
+            if (pState.Hand.All(c => c is ShieldCard
+                || pState.Hand.All(c => c is ITargetableCard t && !t.GetPotentialTargets(context, pState).Any())))
             {
                 context.State.Phase = OperatorGamePhase.Draw;
                 return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromValue(new DrawPhaseState());
@@ -90,7 +91,7 @@ public class PlayPhaseState : IOperatorGameState, ITimedGameState<OperatorGameCo
             pState.HasPlayedCardThisTurn = true;
             context.State.StateStartTime = DateTimeOffset.UtcNow;
 
-            bool hasTargetedAction = playedCards.Any(c => c.Type == CardType.Action &&
+            bool hasTargetedAction = playedCards.OfType<ActionCard>().Any(c =>
                 (c.ActionValue == CardAction.Steal || c.ActionValue == CardAction.LiabilityTransfer ||
                  c.ActionValue == CardAction.HostileTakeover || c.ActionValue == CardAction.Audit ||
                  c.ActionValue == CardAction.HotPotato || c.ActionValue == CardAction.FlashFlood));
@@ -105,7 +106,7 @@ public class PlayPhaseState : IOperatorGameState, ITimedGameState<OperatorGameCo
                 context.State.ReactionTargetPlayerId = play.TargetPlayerId;
 
                 // If Hot Potato is in play, extract the number card for redirect tracking
-                bool hasHotPotato = playedCards.Any(c => c.Type == CardType.Action && c.ActionValue == CardAction.HotPotato);
+                bool hasHotPotato = playedCards.Any(c => c is HotPotatoCard);
                 if (hasHotPotato)
                 {
                     var numbers = playedCards.Where(c => c.Type == CardType.Number).ToList();
@@ -141,8 +142,8 @@ public class PlayPhaseState : IOperatorGameState, ITimedGameState<OperatorGameCo
     public static void ResolvePlayedCards(OperatorGameContext context, PlayCardsCommand play, List<Card> playedCards, bool actionBlocked)
     {
         var pState = context.GamePlayers[play.PlayerId];
-        var actionCards = playedCards.Where(c => c.Type == CardType.Action).ToList();
-        var numbers = playedCards.Where(c => c.Type == CardType.Number).ToList();
+        var actionCards = playedCards.OfType<ActionCard>().ToList();
+        var numbers = playedCards.OfType<NumberCard>().ToList();
 
         // Calculate combined number value
         decimal val = 0;
@@ -221,8 +222,8 @@ public class PlayPhaseState : IOperatorGameState, ITimedGameState<OperatorGameCo
         }
 
         // Apply operator changes — target another player if specified, otherwise self
-        var opCard = playedCards.LastOrDefault(c => c.Type == CardType.Operator);
-        if (opCard.Type == CardType.Operator)
+        var opCard = playedCards.OfType<OperatorCard>().LastOrDefault();
+        if (opCard != null)
         {
             bool operatorTargetsOther = !string.IsNullOrEmpty(play.TargetPlayerId) && play.TargetPlayerId != play.PlayerId;
             string opTargetId = operatorTargetsOther ? play.TargetPlayerId! : play.PlayerId;
@@ -267,14 +268,14 @@ public class PlayPhaseState : IOperatorGameState, ITimedGameState<OperatorGameCo
             return;
 
         // Skip if hand is all Shields (valid skip per spec)
-        if (pState.Hand.All(c => c.Type == CardType.Action && c.ActionValue == CardAction.Shield))
+        if (pState.Hand.All(c => c is ShieldCard))
             return;
 
         // Try to auto-play one card: first number, then operator, then discard random
-        var numberCard = pState.Hand.FirstOrDefault(c => c.Type == CardType.Number);
-        var operatorCard = pState.Hand.FirstOrDefault(c => c.Type == CardType.Operator);
+        var numberCard = pState.Hand.OfType<NumberCard>().FirstOrDefault();
+        var operatorCard = pState.Hand.OfType<OperatorCard>().FirstOrDefault();
 
-        if (numberCard.Id != Guid.Empty)
+        if (numberCard != null)
         {
             pState.Hand.Remove(numberCard);
             context.State.DiscardPile.Add(numberCard);
@@ -282,7 +283,7 @@ public class PlayPhaseState : IOperatorGameState, ITimedGameState<OperatorGameCo
             var playCommand = new PlayCardsCommand(playerId, new List<Guid> { numberCard.Id }, null);
             ResolvePlayedCards(context, playCommand, new List<Card> { numberCard }, false);
         }
-        else if (operatorCard.Id != Guid.Empty)
+        else if (operatorCard != null)
         {
             pState.Hand.Remove(operatorCard);
             context.State.DiscardPile.Add(operatorCard);
@@ -303,7 +304,7 @@ public class PlayPhaseState : IOperatorGameState, ITimedGameState<OperatorGameCo
         while (pState.Hand.Count > 5)
         {
             // Prefer discarding non-Shield cards
-            var nonShieldIdx = pState.Hand.FindIndex(c => c.Type != CardType.Action || c.ActionValue != CardAction.Shield);
+            var nonShieldIdx = pState.Hand.FindIndex(c => c is not ShieldCard);
             if (nonShieldIdx != -1)
             {
                 context.State.DiscardPile.Add(pState.Hand[nonShieldIdx]);

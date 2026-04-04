@@ -11,22 +11,21 @@
                 <strong>@GetAttackerName()</strong> played <strong>@GetActionDescription()</strong> against you!
             </p>
 
-            var shields = GetShields();
-            var hotPotatoes = GetHotPotatoes();
+            var reactionCards = GetPotentialReactionCards();
 
-            @if (shields.Count > 0 || (hotPotatoes.Count > 0 && CanRedirectHotPotato))
+            @if (reactionCards.Count > 0)
             {
                 <div class="op-reaction-actions">
-                    @foreach (var shield in shields)
+                    @foreach (var card in reactionCards)
                     {
-                        <div class="op-reaction-action-btn shield-btn" @onclick="() => PlayShield(shield.Id)">
-                            <div class="op-reaction-action-icon">&#x1F6E1;&#xFE0F;</div>
-                            <div class="op-reaction-action-label">USE SHIELD</div>
-                        </div>
-                    }
-                    @if (hotPotatoes.Count > 0 && CanRedirectHotPotato)
-                    {
-                        @foreach (var hp in hotPotatoes)
+                        @if (card is ShieldCard shield)
+                        {
+                            <div class="op-reaction-action-btn shield-btn" @onclick="() => PlayShield(shield.Id)">
+                                <div class="op-reaction-action-icon">&#x1F6E1;&#xFE0F;</div>
+                                <div class="op-reaction-action-label">USE SHIELD</div>
+                            </div>
+                        }
+                        else if (card is HotPotatoCard hp && CanRedirectHotPotato)
                         {
                             <div class="op-reaction-action-btn redirect-btn" @onclick="() => StartRedirect(hp.Id)">
                                 <div class="op-reaction-action-icon">&#x1F954;</div>
@@ -59,7 +58,7 @@
             else
             {
                 <div class="op-no-shields">
-                    <p class="op-waiting-text">You have no shields available.</p>
+                    <p class="op-waiting-text">You have no reaction cards available.</p>
                     <button class="op-btn op-btn-primary" @onclick="Pass">CONTINUE</button>
                 </div>
             }

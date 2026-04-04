@@ -42,7 +42,7 @@ public class ReactionState : IOperatorGameState, ITimedGameState<OperatorGameCon
         if (command is PlayReactionCommand react)
         {
             var pState = context.GamePlayers[react.PlayerId];
-            var shieldIdx = pState.Hand.FindIndex(c => c.Id == react.ShieldCardId && c.Type == CardType.Action && c.ActionValue == CardAction.Shield);
+            var shieldIdx = pState.Hand.FindIndex(c => c.Id == react.ShieldCardId && c is ShieldCard);
 
             if (shieldIdx == -1) return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromError("Shield not found.");
 
@@ -79,8 +79,7 @@ public class ReactionState : IOperatorGameState, ITimedGameState<OperatorGameCon
 
         // Verify the reactor has a Hot Potato card
         var pState = context.GamePlayers[redirect.PlayerId];
-        var hpIdx = pState.Hand.FindIndex(c => c.Id == redirect.HotPotatoCardId
-            && c.Type == CardType.Action && c.ActionValue == CardAction.HotPotato);
+        var hpIdx = pState.Hand.FindIndex(c => c.Id == redirect.HotPotatoCardId && c is HotPotatoCard);
 
         if (hpIdx == -1)
             return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromError("Hot Potato card not found in hand.");
@@ -130,7 +129,7 @@ public class ReactionState : IOperatorGameState, ITimedGameState<OperatorGameCon
                 if (id == resolvedHotPotatoCardId) continue;
 
                 var card = context.State.DiscardPile.FirstOrDefault(c => c.Id == id);
-                if (card.Id != Guid.Empty)
+                if (card != null)
                 {
                     playedCards.Add(card);
                 }

@@ -34,7 +34,8 @@ public class DrawPhaseState : IOperatorGameState
             bool hasMoves = false;
             foreach (var p in context.GamePlayers.Values)
             {
-                if (p.Hand.Any(c => c.Type != CardType.Action || c.ActionValue != CardAction.Shield))
+                if (p.Hand.Any(c => c is not ShieldCard 
+                && (c is ITargetableCard targetable && targetable.GetPotentialTargets(context, p).Any())))
                 {
                     hasMoves = true;
                     break;

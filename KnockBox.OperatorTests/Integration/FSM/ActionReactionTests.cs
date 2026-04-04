@@ -42,7 +42,7 @@ public class ActionReactionTests
     [TestMethod]
     public void TargetedAction_TransitionsToReactionState()
     {
-        var stealCard = new Card(CardType.Action, ActionValue: CardAction.Steal);
+        var stealCard = new StealCard();
         _state.GamePlayers["p1"].Hand.Add(stealCard);
 
         var playCmd = new PlayCardsCommand("p1", new List<Guid> { stealCard.Id }, "p2");
@@ -56,8 +56,8 @@ public class ActionReactionTests
     [TestMethod]
     public void LiabilityTransfer_Passed_RedirectsScoreMutation()
     {
-        var liabilityCard = new Card(CardType.Action, ActionValue: CardAction.LiabilityTransfer);
-        var numberCard = new Card(CardType.Number, NumberValue: 5m);
+        var liabilityCard = new LiabilityTransferCard();
+        var numberCard = new NumberCard(5m);
         
         _state.GamePlayers["p1"].Hand.Add(liabilityCard);
         _state.GamePlayers["p1"].Hand.Add(numberCard);
@@ -76,14 +76,14 @@ public class ActionReactionTests
     [TestMethod]
     public void TargetedAction_BlockedByShield_NullifiesEffect()
     {
-        var stealCard = new Card(CardType.Action, ActionValue: CardAction.Steal);
-        var shieldCard = new Card(CardType.Action, ActionValue: CardAction.Shield);
+        var stealCard = new StealCard();
+        var shieldCard = new ShieldCard();
         
         _state.GamePlayers["p1"].Hand.Add(stealCard);
         _state.GamePlayers["p2"].Hand.Add(shieldCard);
         
         // P2 has a card to steal
-        var cardToSteal = new Card(CardType.Number, 9m);
+        var cardToSteal = new NumberCard(9m);
         _state.GamePlayers["p2"].Hand.Add(cardToSteal);
 
         var playCmd = new PlayCardsCommand("p1", new List<Guid> { stealCard.Id }, "p2");

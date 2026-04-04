@@ -48,22 +48,22 @@ public class DeckGenerationTests
         var deck = OperatorGameContext.GenerateDeck(4, _rngMock.Object);
 
         // 0s and 1s have 2 each
-        Assert.AreEqual(2, deck.Count(c => c.Type == CardType.Number && c.NumberValue == 0m));
-        Assert.AreEqual(2, deck.Count(c => c.Type == CardType.Number && c.NumberValue == 1m));
+        Assert.AreEqual(2, deck.Count(c => c is NumberCard n && n.NumberValue == 0m));
+        Assert.AreEqual(2, deck.Count(c => c is NumberCard n && n.NumberValue == 1m));
         
         // 9s have 6 each
-        Assert.AreEqual(6, deck.Count(c => c.Type == CardType.Number && c.NumberValue == 9m));
+        Assert.AreEqual(6, deck.Count(c => c is NumberCard n && n.NumberValue == 9m));
         
         // Add/Subtract have 8 each
-        Assert.AreEqual(8, deck.Count(c => c.Type == CardType.Operator && c.OperatorValue == CardOperator.Add));
-        Assert.AreEqual(8, deck.Count(c => c.Type == CardType.Operator && c.OperatorValue == CardOperator.Subtract));
+        Assert.AreEqual(8, deck.Count(c => c is OperatorCard o && o.OperatorValue == CardOperator.Add));
+        Assert.AreEqual(8, deck.Count(c => c is OperatorCard o && o.OperatorValue == CardOperator.Subtract));
         
         // Multiply/Divide have 2 each
-        Assert.AreEqual(2, deck.Count(c => c.Type == CardType.Operator && c.OperatorValue == CardOperator.Multiply));
-        Assert.AreEqual(2, deck.Count(c => c.Type == CardType.Operator && c.OperatorValue == CardOperator.Divide));
+        Assert.AreEqual(2, deck.Count(c => c is OperatorCard o && o.OperatorValue == CardOperator.Multiply));
+        Assert.AreEqual(2, deck.Count(c => c is OperatorCard o && o.OperatorValue == CardOperator.Divide));
 
         // Audit and HostileTakeover have 1 each
-        Assert.AreEqual(1, deck.Count(c => c.Type == CardType.Action && c.ActionValue == CardAction.Audit));
-        Assert.AreEqual(1, deck.Count(c => c.Type == CardType.Action && c.ActionValue == CardAction.HostileTakeover));
+        Assert.AreEqual(1, deck.Count(c => c is ActionCard a && a.ActionValue == CardAction.Audit));
+        Assert.AreEqual(1, deck.Count(c => c is ActionCard a && a.ActionValue == CardAction.HostileTakeover));
     }
 }

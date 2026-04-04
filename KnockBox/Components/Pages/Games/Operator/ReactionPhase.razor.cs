@@ -82,14 +82,32 @@ namespace KnockBox.Components.Pages.Games.Operator
             }
         }
 
-        protected List<Card> GetShields()
+        protected Card? GetPendingActionCard()
         {
-            return CurrentPlayerState?.Hand.Where(c => c.Type == CardType.Action && c.ActionValue == CardAction.Shield).ToList() ?? new();
+            if (GameState.PendingActionCommand is PlayCardsCommand play)
+            {
+                foreach (var cardId in play.CardIds)
+                {
+                    var card = GameState.DiscardPile.FirstOrDefault(c => c.Id == cardId);
+                    if (card is ActionCard || card is KnockBox.Operator.Models.OperatorCard)
+                    {
+                        return card;
+                    }
+                }
+            }
+            return null;
         }
 
-        protected List<Card> GetHotPotatoes()
+        protected List<Card> GetPotentialReactionCards()
         {
-            return CurrentPlayerState?.Hand.Where(c => c.Type == CardType.Action && c.ActionValue == CardAction.HotPotato).ToList() ?? new();
+            if (GameState.Context == null || CurrentPlayerState == null) return new();
+
+            var pendingCard = GetPendingActionCard();
+            if (pendingCard is IBlockableCard blockable)
+            {
+                return blockable.GetPotentialReactionCards(GameState.Context, CurrentPlayerState).ToList();
+            }
+            return new();
         }
 
         protected string GetAttackerName()
@@ -103,29 +121,10 @@ namespace KnockBox.Components.Pages.Games.Operator
 
         protected string GetActionDescription()
         {
-            if (GameState.PendingActionCommand is PlayCardsCommand play)
+            var pendingCard = GetPendingActionCard();
+            if (pendingCard != null)
             {
-                foreach (var cardId in play.CardIds)
-                {
-                    var card = GameState.DiscardPile.FirstOrDefault(c => c.Id == cardId);
-                    if (card.Type == CardType.Action)
-                    {
-                        return card.ActionValue switch
-                        {
-                            CardAction.Shield => "Shield",
-                            CardAction.LiabilityTransfer => "Liability Transfer",
-                            CardAction.CookTheBooks => "Cook the Books",
-                            CardAction.Comp => "Comp",
-                            CardAction.Steal => "Steal",
-                            CardAction.HotPotato => "Hot Potato",
-                            CardAction.FlashFlood => "Flash Flood",
-                            CardAction.HostileTakeover => "Hostile Takeover",
-                            CardAction.Audit => "Audit",
-                            CardAction.MarketCrash => "Market Crash",
-                            _ => "an action"
-                        };
-                    }
-                }
+                return pendingCard.TooltipName();
             }
             return "an action";
         }
