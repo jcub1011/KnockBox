@@ -124,6 +124,13 @@ public class ReactionState : IOperatorGameState, ITimedGameState<OperatorGameCon
                 }
             }
 
+            // Re-add the Hot Potato number card so ResolvePlayedCards can find it
+            if (context.State.PendingHotPotatoCard is { } hpCard && !playedCards.Any(c => c.Id == hpCard.Id))
+            {
+                playedCards.Add(hpCard);
+                context.State.DiscardPile.Add(hpCard);
+            }
+
             if (playedCards.Count > 0)
             {
                 PlayPhaseState.ResolvePlayedCards(context, playCommand, playedCards, actionBlocked);
