@@ -11,9 +11,18 @@
         var seconds = (int)Math.Ceiling(remaining.Value.TotalSeconds);
         if (seconds >= 0)
         {
+            var total = GetTotalDuration().TotalSeconds;
+            var fraction = total > 0 ? Math.Clamp(remaining.Value.TotalSeconds / total, 0, 1) : 0;
+            var dashOffset = Circumference * (1 - fraction);
+
             <div class="op-timer-container">
                 <div class="op-timer-card @(seconds < 5 ? "op-timer-urgent" : "")">
-                    ⏳ @seconds
+                    <svg class="op-timer-ring" viewBox="0 0 60 60">
+                        <circle class="op-timer-ring-bg" cx="30" cy="30" r="26" />
+                        <circle class="op-timer-ring-fill" cx="30" cy="30" r="26"
+                                style="stroke-dashoffset: @dashOffset.ToString("F2")" />
+                    </svg>
+                    <span class="op-timer-text">@seconds</span>
                 </div>
             </div>
         }
@@ -22,4 +31,15 @@
 
 @code {
     [Parameter] public OperatorGameState GameState { get; set; } = default!;
+
+    private const double Circumference = 2 * Math.PI * 26; // ~163.36
+
+    private TimeSpan GetTotalDuration() => GameState.Phase switch
+    {
+        OperatorGamePhase.Setup => GameState.Config.SetupPhaseTimeout,
+        OperatorGamePhase.Play => GameState.Config.PlayPhaseTimeout,
+        OperatorGamePhase.Reaction => GameState.Config.ReactionPhaseTimeout,
+        OperatorGamePhase.Draw => GameState.Config.DrawPhaseTimeout,
+        _ => TimeSpan.FromSeconds(30)
+    };
 }

@@ -62,47 +62,6 @@
     to { transform: rotate(360deg); }
 }
 
-/* ── Timer Display ── */
-
-.op-timer-container {
-    position: absolute;
-    bottom: 0px;
-    left: 50%;
-    transform: translateX(-50%);
-    padding: 10px;
-    z-index: 10000;
-    pointer-events: none;
-}
-
-.op-timer-card {
-    background-color: rgba(0, 0, 0, 0.35);
-    backdrop-filter: blur(6px);
-    border: 2px solid rgba(230,57,70,0.3);
-    border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
-    padding: 8px 16px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-family: var(--font-mono);
-    font-size: 1.5rem;
-    font-weight: 700;
-    color: #ffd166;
-    transition: all 0.3s ease;
-}
-
-.op-timer-urgent {
-    border-color: #ff4757;
-    color: #ff4757;
-    animation: op-pulse-urgent 1s infinite alternate;
-    box-shadow: 0 0 15px rgba(255, 71, 87, 0.4);
-}
-
-@keyframes op-pulse-urgent {
-    0% { transform: scale(1); }
-    100% { transform: scale(1.1); text-shadow: 0 0 8px rgba(255, 71, 87, 0.6); }
-}
-
 /* ── Error Toast ── */
 
 .op-error-toast {
