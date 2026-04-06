@@ -216,10 +216,8 @@ public class PlayPhaseState : IOperatorGameState, ITimedGameState<OperatorGameCo
                 }
                 else if (action.ActionValue == CardAction.HotPotato && play.TargetPlayerId != null && numbers.Any())
                 {
-                    // For Hot Potato, give the last number card to target
-                    var hotPotatoNum = numbers.Last();
-                    context.ResolveHotPotato(play.TargetPlayerId, hotPotatoNum);
-                    numbers.Remove(hotPotatoNum);
+                    context.ResolveHotPotato(play.TargetPlayerId, val);
+                    numbers.Clear();
                 }
                 else if (action.ActionValue == CardAction.FlashFlood && play.TargetPlayerId != null)
                 {

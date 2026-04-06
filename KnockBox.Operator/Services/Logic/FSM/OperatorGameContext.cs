@@ -158,11 +158,11 @@ public class OperatorGameContext(OperatorGameState state, IRandomNumberService r
         }
     }
 
-    public void ResolveHotPotato(string targetPlayerId, Card numberCard)
+    public void ResolveHotPotato(string targetPlayerId, decimal value)
     {
-        if (GamePlayers.TryGetValue(targetPlayerId, out var target) && numberCard is NumberCard num)
+        if (GamePlayers.TryGetValue(targetPlayerId, out var target))
         {
-            var (newScore, newOp) = CalculateNewScore(target.CurrentPoints, target.ActiveOperator, num.NumberValue);
+            var (newScore, newOp) = CalculateNewScore(target.CurrentPoints, target.ActiveOperator, value);
             target.CurrentPoints = newScore;
             target.ActiveOperator = newOp;
             target.ScoreTimestamp = DateTimeOffset.UtcNow;

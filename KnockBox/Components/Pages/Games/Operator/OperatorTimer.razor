@@ -1,0 +1,25 @@
+@using KnockBox.Operator.Services.State
+@using KnockBox.Operator.Models
+@using KnockBox.Operator.Services.Logic.FSM
+@using KnockBox.Core.Services.State.Games.Shared
+
+@if (GameState.Config.TimersEnabled && GameState.Context?.Fsm?.CurrentState is ITimedGameState<OperatorGameContext, OperatorCommand> timedState)
+{
+    var remaining = timedState.GetRemainingTime(GameState.Context!, DateTimeOffset.UtcNow);
+    if (remaining.IsSuccess)
+    {
+        var seconds = (int)Math.Ceiling(remaining.Value.TotalSeconds);
+        if (seconds >= 0)
+        {
+            <div class="op-timer-container">
+                <div class="op-timer-card @(seconds < 5 ? "op-timer-urgent" : "")">
+                    ⏳ @seconds
+                </div>
+            </div>
+        }
+    }
+}
+
+@code {
+    [Parameter] public OperatorGameState GameState { get; set; } = default!;
+}

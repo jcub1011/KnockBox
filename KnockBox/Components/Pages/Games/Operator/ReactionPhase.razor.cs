@@ -124,9 +124,22 @@ namespace KnockBox.Components.Pages.Games.Operator
             var pendingCard = GetPendingActionCard();
             if (pendingCard != null)
             {
-                if (pendingCard is HotPotatoCard && GameState.PendingHotPotatoCard is NumberCard num)
+                if (pendingCard is HotPotatoCard)
                 {
-                    return $"Hot Potato with the number {num.NumberValue}";
+                    if (GameState.PendingActionCommand is PlayCardsCommand playCmd)
+                    {
+                        decimal val = 0;
+                        var numCards = playCmd.CardIds
+                            .Select(id => GameState.DiscardPile.FirstOrDefault(c => c.Id == id))
+                            .OfType<NumberCard>()
+                            .ToList();
+
+                        if (numCards.Count > 0)
+                        {
+                            foreach (var num in numCards) val = val * 10 + num.NumberValue;
+                            return $"Hot Potato with the value {val}";
+                        }
+                    }
                 }
                 if (pendingCard is KnockBox.Operator.Models.OperatorCard opCard)
                 {

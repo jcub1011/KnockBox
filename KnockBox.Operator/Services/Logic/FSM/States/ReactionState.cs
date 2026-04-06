@@ -99,6 +99,10 @@ public class ReactionState : IOperatorGameState, ITimedGameState<OperatorGameCon
         // Redirect to new target — re-enter reaction state
         context.State.ReactionTargetPlayerId = redirect.NewTargetPlayerId;
         context.State.StateStartTime = DateTimeOffset.UtcNow;
+        if (context.State.PendingActionCommand is PlayCardsCommand playCmd)
+        {
+            context.State.PendingActionCommand = playCmd with { TargetPlayerId = redirect.NewTargetPlayerId };
+        }
 
         // Stay in ReactionState with new target (return null to stay, but we need a fresh state)
         return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromValue(new ReactionState());
@@ -106,28 +110,11 @@ public class ReactionState : IOperatorGameState, ITimedGameState<OperatorGameCon
 
     private void ResolvePendingAction(OperatorGameContext context, bool actionBlocked)
     {
-        // Track Hot Potato number card ID so we can exclude it from ResolvePlayedCards
-        Guid resolvedHotPotatoCardId = Guid.Empty;
-
-        // If there's a pending Hot Potato, resolve it directly
-        if (context.State.PendingHotPotatoCard is Card hotPotatoCard)
-        {
-            resolvedHotPotatoCardId = hotPotatoCard.Id;
-            if (!actionBlocked && context.State.ReactionTargetPlayerId != null)
-            {
-                context.ResolveHotPotato(context.State.ReactionTargetPlayerId, hotPotatoCard);
-            }
-            context.State.PendingHotPotatoCard = null;
-        }
-
         if (context.State.PendingActionCommand is PlayCardsCommand playCommand)
         {
             var playedCards = new List<Card>();
             foreach (var id in playCommand.CardIds)
             {
-                // Skip the Hot Potato number card — it was already resolved above
-                if (id == resolvedHotPotatoCardId) continue;
-
                 var card = context.State.DiscardPile.FirstOrDefault(c => c.Id == id);
                 if (card != null)
                 {
@@ -140,6 +127,7 @@ public class ReactionState : IOperatorGameState, ITimedGameState<OperatorGameCon
                 PlayPhaseState.ResolvePlayedCards(context, playCommand, playedCards, actionBlocked);
             }
         }
+        context.State.PendingHotPotatoCard = null;
     }
 
     private static void ClearPendingState(OperatorGameContext context)
