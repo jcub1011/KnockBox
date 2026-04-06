@@ -6,13 +6,11 @@ End the game with a balance as close to 0 as possible. Negative balances are all
 
 ## Setup
 
-- **Players:** 2–? (to be determined via playtesting)
+- **Players:** 2–?
 - **Buy-In (Starting Balance):** Roll a 6-sided die and multiply the result by 8. The player chooses whether their starting balance is positive or negative.
-- **Main Deck:** 52 cards containing only number cards and operator cards (deck size, card counts, and ratios are placeholder values to be adjusted via playtesting). The deck is shuffled once and divided into subsets called shoes for each round.
-- **Action Deck:** A separate deck of action cards, not part of the main deck.
+- **Main Deck:** 52 cards containing only number cards and operator cards (number-to-operator ratio is 4:1, and add/subtract-to-multiply/divide ratio is 4:1). The deck is shuffled once and divided into subsets called shoes for each round.
+- **Action Deck:** A separate deck of action cards, not part of the main deck. Players are dealt 3 action cards per round and have a hand limit of 6.
 - **Turn Order:** Clockwise.
-
-> **Playtesting Note:** The following values are placeholders and subject to change: deck size (52), number-to-operator ratio (4:1), add/subtract-to-multiply/divide ratio (4:1), action cards dealt per round (3), action card hand limit (6), and total passes per game.
 
 ---
 
@@ -33,14 +31,12 @@ When a player draws an operator card:
 1. If the player's pot is empty, the operator is a **no-op** (nothing happens).
 2. Otherwise, the player's new balance is calculated as: **New Balance = Current Balance [Operator] Pot Value**. The pot is then cleared.
 
-**Rounding:** Operations that result in decimals are rounded to the nearest integer.
+**Rounding:** Operations that result in decimals are rounded using away-from-zero rounding.
 
-**Division by Zero:** If a player's pot value is 0 when a division operator is drawn, one of the following events occurs at random:
+**Division by Zero:** If a player's pot value is 0 when a division operator is drawn, one of the following events occurs at random (50% chance each):
 
-- Player gains an extra pass.
-- Player loses a pass.
-- Player gains a random action card (subject to hand limit overflow rules).
-- Player loses a random action card (no-op if the player has no action cards).
+- Player gains a random action card (if under hand limit).
+- Player loses a random action card (if they have > 0 action cards).
 
 ### Action Cards
 
@@ -56,7 +52,7 @@ Action cards come from a separate deck and are **not** part of the main deck. Pl
 
 | Card | Effect |
 |---|---|
-| **Feeling Lucky?** (Force Draw) | Forces the next player to draw a card. That player may respond by playing their own "Feeling Lucky?" to pass the force to the next player in turn order, forming a chain. If any player in the chain plays "Comp'd," the player before them in the chain must still draw or pass. The round resumes from the player who initially played "Feeling Lucky?" This card **does not** end your turn. Forced players do not have their normal turn skipped. |
+| **Feeling Lucky?** (Force Draw) | Forces the next player to draw a card. That player may respond by playing their own "Feeling Lucky?" to pass the force to the next player in turn order, forming a chain. If any player in the chain plays "Comp'd," the player before them in the chain must still draw. The round resumes from the player who initially played "Feeling Lucky?" This card **does not** end your turn. Forced players do not have their normal turn skipped. |
 | **Make My Luck** (Alter the Future) | View the top 3 cards of the current shoe and reorder them in any order. |
 | **Skim** (Swap a Digit) | Swap a single digit from your pot with a single digit from a different player's pot. Digits remain in their respective positions. *(Example: Player A swaps their digit in position 1 with Player B's digit in position 2. Player A's position 1 now holds Player B's old digit, and Player B's position 2 now holds Player A's old digit.)* Blockable. |
 | **Burn** (Discard) | Discard the top card of the current shoe. The discarded card is revealed to all players. |
@@ -89,22 +85,30 @@ At the start of each shoe, players are shown the **quantity** of each card type 
 On each turn, a player may:
 
 1. **Play action cards** (optional, before drawing).
-2. **Fold** (optional, consumes a pass, does not end the turn).
-3. **Draw** the top card of the current shoe **or pass**.
-
-### Passing
-
-Players have a limited number of passes for the **entire game** (quantity to be determined via playtesting). Passing skips the player's draw for that turn and consumes one pass.
-
-### Folding
-
-From the same pass pool, the player can opt to fold their pot. This consumes a pass but discards their pot. Their turn does not end with this action.
+2. **Draw** the top card of the current shoe.
 
 ### Transparency
 
 - All player **balances** and **pots** are visible at all times.
 - Action cards in hand are **hidden**.
 - The only unknown information is the **order** of the remaining cards in the current shoe.
+
+---
+
+## Game Modes
+
+### Normal Mode
+
+The standard way to play Card Counter as detailed above.
+
+### Active Operator Mode
+
+An alternative game mode that modifies how numbers and operators interact:
+- **No Pots:** Players have no pot.
+- **No Buy-in:** The initial buy-in step is skipped; every player starts with a balance of 10.
+- **Active Operators:** Drawing a number card applies it directly to the player's balance using their "Active Operator" (which begins as Add `+`).
+- Drawing an operator card replaces the player's Active Operator.
+- **Action Card Modifications:** *Skim* and *Turn The Table* are not distributed in this mode; however, *Turn The Table* is repurposed to reverse balance digits when played (e.g., a balance of 123 becomes 321, preserving sign).
 
 ---
 
@@ -116,5 +120,4 @@ The game ends when all cards in the main deck have been drawn across all shoes.
 
 **Tiebreaker:**
 
-1. The tied player with the most remaining passes wins.
-2. If still tied, the winner is determined by coin flip.
+1. The winner is determined by coin flip.

@@ -1,0 +1,79 @@
+/* ── Setup Phase ──────────────────────────────────────────────────────────── */
+
+.op-setup {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    gap: 40px;
+}
+
+.op-setup-choices {
+    display: flex;
+    gap: 20px;
+    width: 100%;
+    max-width: 600px;
+}
+
+.op-choice-btn {
+    flex: 1;
+    height: 200px;
+    border-radius: 16px;
+    border: 3px solid rgba(255,255,255,0.15);
+    box-shadow: 6px 6px 0 #000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    cursor: pointer;
+    transition: transform 0.15s ease-out, box-shadow 0.15s ease-out, border-color 0.2s, background 0.2s;
+    background: rgba(15,5,5,0.5);
+    backdrop-filter: blur(4px);
+}
+
+.op-choice-btn:hover {
+    transform: translate(-4px, -4px);
+    box-shadow: 10px 10px 0 #000;
+}
+
+.op-choice-btn:active {
+    transform: translate(2px, 2px);
+    box-shadow: 4px 4px 0 #000;
+}
+
+.op-choice-positive {
+    border-color: #2ecc71;
+    color: #2ecc71;
+}
+
+.op-choice-positive:hover {
+    background: rgba(46,204,113,0.1);
+    box-shadow: 10px 10px 0 #000, 0 0 25px rgba(46,204,113,0.2);
+}
+
+.op-choice-negative {
+    border-color: #ff2d55;
+    color: #ff2d55;
+}
+
+.op-choice-negative:hover {
+    background: rgba(255,45,85,0.1);
+    box-shadow: 10px 10px 0 #000, 0 0 25px rgba(255,45,85,0.2);
+}
+
+.op-choice-value {
+    font-size: 3rem;
+    font-weight: 900;
+}
+
+.op-choice-label {
+    font-size: 0.8rem;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+.op-waiting-section {
+    text-align: center;
+}

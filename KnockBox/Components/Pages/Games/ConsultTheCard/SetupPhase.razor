@@ -3,7 +3,7 @@
 
 <div class="ctc-setup-area">
     <div class="ctc-setup-panel">
-        <h2 class="ctc-setup-title">🔒 YOUR SECRET WORD</h2>
+        <h2 class="ctc-setup-title glitch" data-text="[ CLASSIFIED INTEL ]">[ CLASSIFIED INTEL ]</h2>
         @{
             var myPlayer = GetMyPlayer();
         }
@@ -12,22 +12,22 @@
             @if (myPlayer.Role == Role.Informant)
             {
                 <div class="ctc-word-card ctc-word-card-informant">
-                    <span class="ctc-word-value">???</span>
-                    <span class="ctc-word-hint">You are the Informant — you don't know the word!</span>
+                    <span class="ctc-word-value glitch" data-text="NO INTEL">NO INTEL</span>
+                    <span class="ctc-word-hint">CRITICAL: NO INTEL DETECTED. BLEND IN. DO NOT BREAK COVER.</span>
                 </div>
             }
             else
             {
                 <div class="ctc-word-card">
                     <span class="ctc-word-value">@myPlayer.SecretWord</span>
-                    <span class="ctc-word-hint">Keep this secret! Give clues to find your allies.</span>
+                    <span class="ctc-word-hint">Keep this secret. Issue clues to identify your allies.</span>
                 </div>
             }
         }
         else
         {
-            <p class="ctc-waiting-text">Loading...</p>
+            <p class="ctc-waiting-text">Establishing secure connection...</p>
         }
-        <p class="ctc-setup-auto-advance">Game will begin shortly...</p>
+        <p class="ctc-setup-auto-advance">Terminal access granted shortly...</p>
     </div>
 </div>

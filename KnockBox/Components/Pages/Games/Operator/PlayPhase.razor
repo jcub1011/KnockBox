@@ -1,0 +1,139 @@
+@using KnockBox.Operator.Models
+@using KnockBox.Operator.Services.State
+
+<div class="op-game-board">
+    @* Opponents *@
+    <div class="op-opponents-grid">
+        @foreach (var player in GameState.Players.Where(p => p.Id != UserService.CurrentUser?.Id))
+        {
+            var pState = GameState.Context?.GamePlayers.GetValueOrDefault(player.Id);
+            if (pState != null)
+            {
+                <OperatorPlayerInfo
+                    Name="@player.Name"
+                    Score="@pState.CurrentPoints"
+                    ActiveOperator="@pState.ActiveOperator"
+                    HandSize="@pState.Hand.Count"
+                    IsActive="@(GameState.TurnManager.CurrentPlayer == player.Id)"
+                    IsAudited="@pState.IsAudited"
+                    IsTargetable="@IsPlayerTargetable(player.Id, pState)"
+                    IsTargeted="@(_targetPlayerId == player.Id)"
+                    OnClick="@(() => SelectTarget(player.Id))" />
+            }
+        }
+    </div>
+
+    @* Deck *@
+    <div class="op-deck-area">
+        @if (GameState.Deck.Count > 0)
+        {
+            <div class="op-deck-stack">
+                @if (GameState.Deck.Count > 2)
+                {
+                    <div class="op-deck-card op-deck-card-3"></div>
+                }
+                @if (GameState.Deck.Count > 1)
+                {
+                    <div class="op-deck-card op-deck-card-2"></div>
+                }
+                <div class="op-deck-card op-deck-card-1"></div>
+            </div>
+        }
+        else
+        {
+            <div class="op-deck-empty">EMPTY</div>
+        }
+        <div class="op-deck-info">
+            <div class="op-deck-count">@GameState.Deck.Count</div>
+            <div class="op-deck-label">CARDS LEFT</div>
+            <div class="op-deck-bar">
+                <div class="op-deck-bar-fill" style="width: @(GetDeckPercentage())%"></div>
+            </div>
+        </div>
+    </div>
+
+    @if (CurrentPlayerState != null)
+    {
+        @* Your Score (bottom-left) *@
+        <div class="op-self-score-display">
+            <div class="op-self-score-value">@CurrentPlayerState.CurrentPoints.ToString("F1")</div>
+            <div class="op-self-score-label">YOUR SCORE</div>
+        </div>
+
+        @* Your Active Operator (bottom-right) *@
+        <div class="op-active-operator-display">
+            <div class="op-active-operator-symbol">@GetActiveOperatorSymbol()</div>
+            <div class="op-active-operator-label">YOUR OPERATOR</div>
+        </div>
+    }
+
+</div>
+
+@* Controls & Hand *@
+<div class="op-bottom-tray">
+    <div class="op-controls">
+        @if (IsMyTurn)
+        {
+            @if (ConcatenatedValue != null)
+            {
+                <div class="op-concat-preview">@ConcatenatedValue</div>
+            }
+
+            @if (ShowSubmit)
+            {
+                <button class="op-btn op-btn-primary op-btn-lg" @onclick="Submit">
+                    SUBMIT
+                </button>
+            }
+
+            @if (_pendingAction != null || _selectedNumberIds.Count > 0 || _selectedOperatorId != null || _waitingForTarget)
+            {
+                <button class="op-btn op-btn-secondary" @onclick="CancelSelection">
+                    CANCEL
+                </button>
+            }
+
+            @if (NeedsTargetSelection && CanTargetSelf)
+            {
+                <button class="op-btn op-btn-secondary" @onclick="() => SelectTarget(UserService.CurrentUser!.Id)">
+                    TARGET SELF
+                </button>
+            }
+
+            @if (SelectionHint != null)
+            {
+                <div class="op-section-title">@SelectionHint</div>
+            }
+            else if (!ShowSubmit && _pendingAction == null && _selectedOperatorId == null && !_waitingForTarget)
+            {
+                @if (CanSkip())
+                {
+                    <button class="op-btn op-btn-secondary" @onclick="SkipTurn">
+                        SKIP TURN
+                    </button>
+                }
+                
+                <button class="op-btn op-btn-secondary" @onclick="EndTurn" disabled="@(!CanEndTurn())">
+                    END TURN
+                </button>
+
+                <div class="op-section-title">Select a card to play</div>
+            }
+        }
+        else
+        {
+            <div class="op-waiting-text">
+                Waiting for @(GameState.Players.FirstOrDefault(p => p.Id == GameState.TurnManager.CurrentPlayer)?.Name ?? "another player")...
+            </div>
+        }
+    </div>
+
+    @if (CurrentPlayerState != null)
+    {
+        <OperatorHand Hand="@CurrentPlayerState.Hand"
+                      SelectedCards="@SelectedCardIds"
+                      DisabledCards="@DisabledCardIds"
+                      NewCardIds="@NewCardIds"
+                      OnCardToggled="ToggleCard" />
+    }
+</div>

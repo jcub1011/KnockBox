@@ -3,17 +3,6 @@
 @using KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
 @using KnockBox.Services.State.Games.DrawnToDress
 
-@{
-    int remainingSeconds = 0;
-    if (GameState.PhaseDeadlineUtc.HasValue &&
-        GameState.Context?.Fsm?.CurrentState is ITimedGameState<DrawnToDressGameContext, DrawnToDressCommand> timedState)
-    {
-        var remaining = timedState.GetRemainingTime(GameState.Context!, DateTimeOffset.UtcNow);
-        if (remaining.IsSuccess)
-            remainingSeconds = (int)Math.Max(0, Math.Ceiling(remaining.Value.TotalSeconds));
-    }
-}
-
 <div class="dtd-reveal">
 
     <!-- ── Theme banner (AfterDrawing mode) ──────────────────────────────── -->
@@ -30,10 +19,32 @@
         <div class="dtd-reveal-icon">👗</div>
         <h2 class="dtd-reveal-heading">@HeadingText</h2>
         <p class="dtd-reveal-subtext">@SubText</p>
-        <div class="dtd-reveal-number @(remainingSeconds <= 5 ? "dtd-reveal-number-urgent" : "")"
-             role="timer" aria-label="@remainingSeconds seconds remaining">
-            @remainingSeconds
-        </div>
+        
+        @if (GameState.PhaseDeadlineUtc.HasValue &&
+             GameState.Context?.Fsm?.CurrentState is ITimedGameState<DrawnToDressGameContext, DrawnToDressCommand> timedState)
+        {
+            var remaining = timedState.GetRemainingTime(GameState.Context!, DateTimeOffset.UtcNow);
+            if (remaining.IsSuccess && remaining.Value.TotalSeconds >= 0)
+            {
+                var endTime = DateTimeOffset.UtcNow.Add(remaining.Value);
+                var duration = TimeSpan.FromSeconds(GameState.Config.PoolRevealTimeSec);
+
+                <CountdownClock EndTimeUtc="endTime" Duration="duration" Context="countdown">
+                    @{
+                        var remainingSeconds = (int)Math.Max(0, Math.Ceiling(countdown.RemainingSeconds));
+                    }
+                    <div class="dtd-reveal-number @(remainingSeconds <= 5 ? "dtd-reveal-number-urgent" : "")"
+                         role="timer" aria-label="@remainingSeconds seconds remaining">
+                        @remainingSeconds
+                    </div>
+                </CountdownClock>
+            }
+        }
+        else
+        {
+            <div class="dtd-reveal-number" role="timer">0</div>
+        }
+
         <p class="dtd-reveal-hint">
             You'll be able to pick clothes from the shared pool.
         </p>

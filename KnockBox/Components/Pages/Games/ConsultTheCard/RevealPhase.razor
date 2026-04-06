@@ -14,7 +14,7 @@
     }
 
     <div class="ctc-reveal-panel">
-        <h2 class="ctc-phase-title">REVEAL</h2>
+        <h2 class="ctc-phase-title glitch" data-text="[ AFTER-ACTION REPORT ]">[ AFTER-ACTION REPORT ]</h2>
 
         @* ── Elimination result ── *@
         @if (elimination is not null)
@@ -22,14 +22,14 @@
             @if (elimination.WasTie)
             {
                 <div class="ctc-reveal-result ctc-reveal-tie">
-                    <span class="ctc-reveal-icon">⚖️</span>
-                    <p class="ctc-reveal-text">No elimination — tied vote</p>
+                    <span class="ctc-reveal-icon">[ INCONCLUSIVE ]</span>
+                    <p class="ctc-reveal-text">No target eliminated — tied vote</p>
                 </div>
             }
             else
             {
                 <div class="ctc-reveal-result ctc-reveal-eliminated">
-                    <span class="ctc-reveal-icon">❌</span>
+                    <span class="ctc-reveal-icon">[ TERMINATED ]</span>
                     <p class="ctc-reveal-text"><strong>@elimination.PlayerName</strong> has been eliminated.</p>
                 </div>
             }
@@ -41,14 +41,14 @@
             @if (isEliminatedInformant)
             {
                 <div class="ctc-informant-guess">
-                    <h3 class="ctc-section-title">🎯 Guess the Agents' Word</h3>
-                    <p class="ctc-hint-text">You've been eliminated! As the Informant, you get one chance to guess the Agents' secret word.</p>
+                    <h3 class="ctc-section-title">[ INTERROGATE: IDENTIFY INTEL ]</h3>
+                    <p class="ctc-hint-text">You have been compromised. As a final act, attempt to identify the target intel.</p>
                     <div class="ctc-clue-input-area">
-                        <input type="text" class="ctc-clue-input" placeholder="Enter your guess..."
+                        <input type="text" class="ctc-clue-input" placeholder="Input target intel..."
                                @bind="_guessText" @bind:event="oninput" maxlength="50" />
                         <button class="ctc-btn ctc-btn-primary" @onclick="SubmitGuess"
                                 disabled="@(string.IsNullOrWhiteSpace(_guessText))">
-                            🎯 Guess
+                            [ SUBMIT INTEL ]
                         </button>
                     </div>
                 </div>
@@ -56,8 +56,8 @@
             else
             {
                 <div class="ctc-informant-waiting">
-                    <span class="ctc-reveal-icon">🕐</span>
-                    <p class="ctc-waiting-text">The Informant is making their guess...</p>
+                    <span class="ctc-reveal-icon">[ AWAITING ]</span>
+                    <p class="ctc-waiting-text">Awaiting Informant's final transmission...</p>
                 </div>
             }
         }
@@ -68,15 +68,15 @@
             <div class="ctc-informant-result @(informantGuess.WasCorrect ? "ctc-guess-correct" : "ctc-guess-wrong")">
                 @if (informantGuess.WasCorrect)
                 {
-                    <p>🎉 <strong>@informantGuess.PlayerName</strong> (Informant) correctly guessed the word: <strong>@informantGuess.GuessedWord</strong></p>
+                    <p>[ INTEL COMPROMISED ] <strong>@informantGuess.PlayerName</strong> (Informant) correctly identified the intel: <strong>@informantGuess.GuessedWord</strong></p>
                 }
                 else if (string.IsNullOrEmpty(informantGuess.GuessedWord))
                 {
-                    <p>⏱️ Time's up — guess forfeited.</p>
+                    <p>[ TIMEOUT ] Connection lost — no intel provided.</p>
                 }
                 else
                 {
-                    <p>❌ <strong>@informantGuess.PlayerName</strong> (Informant) guessed "<strong>@informantGuess.GuessedWord</strong>" — incorrect!</p>
+                    <p>[ INTEL SECURE ] <strong>@informantGuess.PlayerName</strong> (Informant) failed to identify the intel ("<strong>@informantGuess.GuessedWord</strong>").</p>
                 }
             </div>
         }
@@ -85,7 +85,7 @@
         @if (GameState.CurrentRoundVotes.Count > 0)
         {
             <div class="ctc-vote-tally">
-                <h3 class="ctc-section-title">Vote Tally</h3>
+                <h3 class="ctc-section-title">[ VOTE LOG ]</h3>
                 <div class="ctc-tally-list">
                     @foreach (var vote in GameState.CurrentRoundVotes)
                     {
@@ -99,6 +99,6 @@
             </div>
         }
 
-        <p class="ctc-setup-auto-advance">Next phase begins shortly...</p>
+        <p class="ctc-setup-auto-advance">Proceeding to next phase...</p>
     </div>
 </div>

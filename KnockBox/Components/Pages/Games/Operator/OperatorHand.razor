@@ -1,0 +1,38 @@
+@using KnockBox.Operator.Models
+
+<div class="op-hand">
+    @{ var sorted = Hand
+        .OrderBy(c => c.Type)
+        .ThenBy(c => c is NumberCard n ? n.NumberValue : decimal.MaxValue)
+        .ThenBy(c => c is KnockBox.Operator.Models.OperatorCard o ? (int)o.OperatorValue : int.MaxValue)
+        .ThenBy(c => c is ActionCard a ? (int)a.ActionValue : int.MaxValue)
+        .ToList();
+       int newIndex = 0;
+    }
+    @foreach (var card in sorted)
+    {
+        bool isNew = NewCardIds.Contains(card.Id);
+        bool isDisabled = DisabledCards.Contains(card.Id);
+        int delay = isNew ? newIndex++ : 0;
+        <OperatorCard @key="card.Id"
+            Card="card"
+            IsSelected="@SelectedCards.Contains(card.Id)"
+            IsDisabled="isDisabled"
+            IsNew="isNew"
+            AnimationDelay="delay"
+            OnClick="@(() => ToggleCard(card.Id))" />
+    }
+</div>
+
+@code {
+    [Parameter] public List<Card> Hand { get; set; } = new();
+    [Parameter] public HashSet<Guid> SelectedCards { get; set; } = new();
+    [Parameter] public HashSet<Guid> DisabledCards { get; set; } = new();
+    [Parameter] public HashSet<Guid> NewCardIds { get; set; } = new();
+    [Parameter] public EventCallback<Guid> OnCardToggled { get; set; }
+
+    private async Task ToggleCard(Guid cardId)
+    {
+        await OnCardToggled.InvokeAsync(cardId);
+    }
+}

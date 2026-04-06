@@ -1,0 +1,50 @@
+@using KnockBox.Operator.Models
+@using KnockBox.Operator.Services.State
+@using KnockBox.Services.Navigation
+@using KnockBox.Services.State.Users
+
+@{
+    var sortedPlayers = GameState.Players
+        .Select(p => new { Player = p, State = GameState.Context?.GamePlayers.GetValueOrDefault(p.Id) })
+        .Where(x => x.State != null)
+        .OrderBy(x => Math.Abs(x.State!.CurrentPoints))
+        .ThenBy(x => x.State!.ScoreTimestamp)
+        .ToList();
+}
+
+<div class="op-game-over">
+    <h1 class="op-phase-title">🏆 GAME OVER 🏆</h1>
+    
+    <div class="op-leaderboard">
+        @for (int i = 0; i < sortedPlayers.Count; i++)
+        {
+            var entry = sortedPlayers[i];
+            var isWinner = i == 0;
+            
+            <div class="op-leaderboard-entry @(isWinner ? "winner" : "")">
+                <span class="op-entry-rank">#@(i + 1)</span>
+                <span class="op-entry-name">@entry.Player.Name</span>
+                <div class="op-entry-score-col">
+                    <span class="op-entry-score">@entry.State!.CurrentPoints.ToString("F1")</span>
+                    @if (isWinner) { <span class="op-host-badge">WINNER</span> }
+                </div>
+            </div>
+        }
+    </div>
+
+    <div class="op-game-over-actions">
+        <button class="op-btn op-btn-primary op-btn-lg" @onclick="GoHome">
+            RETURN TO LOBBY
+        </button>
+    </div>
+</div>
+
+@code {
+    [Inject] protected INavigationService NavigationService { get; set; } = default!;
+    [Parameter] public OperatorGameState GameState { get; set; } = default!;
+
+    private void GoHome()
+    {
+        NavigationService.ToHome();
+    }
+}

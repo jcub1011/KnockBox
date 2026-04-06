@@ -1,0 +1,222 @@
+/* ── Spectator View ───────────────────────────────────────────────────────── */
+
+.op-spectator {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    gap: 30px;
+}
+
+/* ── Header ── */
+
+.op-spectator-header {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+}
+
+.op-spectator-phase-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(230,57,70,0.15);
+    border: 2px solid rgba(230,57,70,0.3);
+    border-radius: 20px;
+    padding: 6px 16px;
+    font-size: 0.8rem;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: #e63946;
+}
+
+.op-spectator-turn {
+    font-size: 1.1rem;
+    color: rgba(255,255,255,0.7);
+}
+
+.op-spectator-turn strong {
+    color: #ffd166;
+}
+
+/* ── Leaderboard ── */
+
+.op-spectator-leaderboard {
+    background: rgba(15,5,5,0.6);
+    backdrop-filter: blur(8px);
+    border: 3px solid rgba(230,57,70,0.3);
+    border-radius: 24px;
+    padding: 30px;
+    width: 100%;
+    max-width: 600px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.op-spectator-title {
+    font-size: 1rem;
+    font-weight: 900;
+    color: #e63946;
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    text-align: center;
+    margin: 0;
+}
+
+.op-spectator-entries {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.op-spectator-entry {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 12px 16px;
+    background: rgba(255,255,255,0.03);
+    border: 2px solid transparent;
+    border-radius: 12px;
+    transition: all 0.3s;
+}
+
+.op-spectator-entry.active-turn {
+    border-color: rgba(230,57,70,0.4);
+    background: rgba(230,57,70,0.08);
+    box-shadow: 0 0 15px rgba(230,57,70,0.15);
+}
+
+.op-spectator-entry.targeted {
+    border-color: rgba(255,71,87,0.5);
+    background: rgba(255,71,87,0.1);
+    animation: op-spectator-target-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes op-spectator-target-pulse {
+    0%, 100% { box-shadow: 0 0 10px rgba(255,71,87,0.2); }
+    50% { box-shadow: 0 0 20px rgba(255,71,87,0.4); }
+}
+
+/* ── Entry Details ── */
+
+.op-spectator-rank {
+    font-size: 1.2rem;
+    font-weight: 900;
+    min-width: 36px;
+    color: rgba(255,255,255,0.5);
+}
+
+.op-spectator-entry:first-child .op-spectator-rank {
+    color: #ffd166;
+}
+
+.op-spectator-player-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.op-spectator-player-name {
+    font-weight: 800;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+}
+
+.op-spectator-player-details {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.85rem;
+}
+
+.op-spectator-operator {
+    font-weight: 900;
+    font-size: 1rem;
+    color: #ffd166;
+}
+
+.op-spectator-score {
+    font-family: var(--font-mono);
+    font-weight: 900;
+    font-size: 1.1rem;
+}
+
+.op-spectator-hand-count {
+    color: rgba(255,255,255,0.5);
+    font-size: 0.8rem;
+}
+
+.op-spectator-badge {
+    font-size: 0.7rem;
+    color: rgba(255,255,255,0.5);
+}
+
+.op-spectator-turn-badge {
+    background: #e63946;
+    color: #fff;
+    font-size: 0.6rem;
+    font-weight: 900;
+    padding: 2px 8px;
+    border-radius: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.op-spectator-target-badge {
+    background: #ff4757;
+    color: #fff;
+    font-size: 0.6rem;
+    font-weight: 900;
+    padding: 2px 8px;
+    border-radius: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+/* ── Deck Status ── */
+
+.op-spectator-deck {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: rgba(15,5,5,0.4);
+    border: 2px solid rgba(255,255,255,0.08);
+    border-radius: 12px;
+    padding: 12px 20px;
+}
+
+.op-spectator-deck-label {
+    font-size: 0.7rem;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: rgba(255,255,255,0.4);
+}
+
+.op-spectator-deck-count {
+    font-family: var(--font-mono);
+    font-size: 1.4rem;
+    font-weight: 900;
+    color: #ffd166;
+}
+
+.op-spectator-deck-bar {
+    width: 120px;
+    height: 6px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.op-spectator-deck-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #e63946, #ff2d55);
+    border-radius: 3px;
+    transition: width 0.5s ease-out;
+}

@@ -1,0 +1,100 @@
+@using KnockBox.Operator.Models
+@using KnockBox.Operator.Services.State
+
+@{
+    var sortedPlayers = GameState.Players
+        .Select(p => new { Player = p, State = GameState.Context?.GamePlayers.GetValueOrDefault(p.Id) })
+        .Where(x => x.State != null)
+        .OrderBy(x => Math.Abs(x.State!.CurrentPoints))
+        .ThenBy(x => x.State!.ScoreTimestamp)
+        .ToList();
+
+    var currentPlayerName = GameState.Players.FirstOrDefault(p => p.Id == GameState.TurnManager.CurrentPlayer)?.Name ?? "...";
+}
+
+<div class="op-spectator">
+    @* Phase & Turn Indicator *@
+    <div class="op-spectator-header">
+        <div class="op-spectator-phase-badge">
+            @GetPhaseIcon() @GetPhaseName()
+        </div>
+        <div class="op-spectator-turn">
+            It's <strong>@currentPlayerName</strong>'s turn
+        </div>
+    </div>
+
+    @* Live Leaderboard *@
+    <div class="op-spectator-leaderboard">
+        <h2 class="op-spectator-title">LIVE STANDINGS</h2>
+        <div class="op-spectator-entries">
+            @for (int i = 0; i < sortedPlayers.Count; i++)
+            {
+                var entry = sortedPlayers[i];
+                var isCurrentTurn = entry.Player.Id == GameState.TurnManager.CurrentPlayer;
+                var isReactionTarget = GameState.Phase == OperatorGamePhase.Reaction
+                    && entry.Player.Id == GameState.ReactionTargetPlayerId;
+
+                <div class="op-spectator-entry @(isCurrentTurn ? "active-turn" : "") @(isReactionTarget ? "targeted" : "")">
+                    <span class="op-spectator-rank">#@(i + 1)</span>
+                    <div class="op-spectator-player-info">
+                        <span class="op-spectator-player-name">@entry.Player.Name</span>
+                        <div class="op-spectator-player-details">
+                            <span class="op-spectator-operator">@GetOperatorSymbol(entry.State!.ActiveOperator)</span>
+                            <span class="op-spectator-score">@entry.State!.CurrentPoints.ToString("F1")</span>
+                            <span class="op-spectator-hand-count">🎴 @entry.State!.Hand.Count</span>
+                            @if (entry.State!.IsAudited)
+                            {
+                                <span class="op-spectator-badge">📝 AUDITED</span>
+                            }
+                        </div>
+                    </div>
+                    @if (isCurrentTurn)
+                    {
+                        <span class="op-spectator-turn-badge">TURN</span>
+                    }
+                    @if (isReactionTarget)
+                    {
+                        <span class="op-spectator-target-badge">TARGETED</span>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+
+    @* Deck Status *@
+    <div class="op-spectator-deck">
+        <div class="op-spectator-deck-label">DECK</div>
+        <div class="op-spectator-deck-count">@GameState.Deck.Count</div>
+        <div class="op-spectator-deck-bar">
+            <div class="op-spectator-deck-bar-fill" style="width: @(GetDeckPercentage())%"></div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public OperatorGameState GameState { get; set; } = default!;
+
+    private string GetPhaseIcon() => GameState.Phase switch
+    {
+        OperatorGamePhase.Play => "🎯",
+        OperatorGamePhase.Reaction => "⚡",
+        OperatorGamePhase.Draw => "🎴",
+        _ => "🧮"
+    };
+
+    private string GetPhaseName() => GameState.Phase switch
+    {
+        OperatorGamePhase.Play => "PLAY PHASE",
+        OperatorGamePhase.Reaction => "REACTION PHASE",
+        OperatorGamePhase.Draw => "DRAW PHASE",
+        _ => GameState.Phase.ToString().ToUpper()
+    };
+
+    private string GetOperatorSymbol(CardOperator op) => op.ToSymbol();
+
+    private int GetDeckPercentage()
+    {
+        var total = GameState.Deck.Count + GameState.DiscardPile.Count;
+        return total > 0 ? (int)(100.0 * GameState.Deck.Count / total) : 0;
+    }
+}

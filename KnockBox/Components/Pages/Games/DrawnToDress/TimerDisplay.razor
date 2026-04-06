@@ -8,18 +8,38 @@
      (GameState.Config.EnableTimer || !timed.IsTimerOptional))
 {
     var remaining = timed.GetRemainingTime(GameState.Context!, DateTimeOffset.UtcNow);
-    if (remaining.IsSuccess)
+    if (remaining.IsSuccess && remaining.Value.TotalSeconds >= 0)
     {
-        var secs = (int)Math.Max(0, Math.Ceiling(remaining.Value.TotalSeconds));
-        <div class="dtd-timer @(secs <= 10 ? "dtd-timer-urgent" : "")"
-             role="timer"
-             aria-label="@secs seconds remaining">
-            @secs s
-        </div>
+        var endTime = DateTimeOffset.UtcNow.Add(remaining.Value);
+        var duration = GetTotalDuration();
+
+        <CountdownClock EndTimeUtc="endTime" Duration="duration" Context="countdown">
+            @{
+                var secs = (int)Math.Max(0, Math.Ceiling(countdown.RemainingSeconds));
+            }
+            <div class="dtd-timer @(secs <= 10 ? "dtd-timer-urgent" : "")"
+                 role="timer"
+                 aria-label="@secs seconds remaining">
+                @secs s
+            </div>
+        </CountdownClock>
     }
 }
 
 @code {
     [Parameter, EditorRequired]
     public DrawnToDressGameState GameState { get; set; } = default!;
+
+    private TimeSpan GetTotalDuration() => GameState.Phase switch
+    {
+        GamePhase.ThemeSelection => TimeSpan.FromSeconds(GameState.Config.ThemeAnnouncementTimeSec),
+        GamePhase.Drawing => TimeSpan.FromSeconds(GameState.Config.DrawingTimeSec),
+        GamePhase.PoolReveal => TimeSpan.FromSeconds(GameState.Config.PoolRevealTimeSec),
+        GamePhase.OutfitBuilding => TimeSpan.FromSeconds(GameState.Config.OutfitBuildingTimeSec),
+        GamePhase.OutfitCustomization => TimeSpan.FromSeconds(GameState.Config.OutfitCustomizationTimeSec),
+        GamePhase.Voting => TimeSpan.FromSeconds(GameState.Config.VotingTimeSec),
+        GamePhase.VotingRoundResults => TimeSpan.FromSeconds(GameState.Config.VotingRoundResultsTimeSec),
+        GamePhase.CoinFlip => TimeSpan.FromSeconds(GameState.Config.CoinFlipTimeSec),
+        _ => TimeSpan.FromSeconds(30)
+    };
 }

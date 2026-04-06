@@ -23,6 +23,7 @@ namespace KnockBox.Components.Pages.Games.ConsultTheCard
 
         [Inject] protected ILogger<ConsultTheCardLobby> Logger { get; set; } = default!;
 
+
         [Parameter] public string ObfuscatedRoomCode { get; set; } = default!;
 
         private IDisposable? _stateSubscription;
@@ -79,7 +80,7 @@ namespace KnockBox.Components.Pages.Games.ConsultTheCard
             await base.OnInitializedAsync();
         }
 
-        protected override void OnAfterRender(bool firstRender)
+        protected override async Task OnAfterRenderAsync(bool firstRender)
         {
             if (!_kickHandled && GameState?.IsKicked(UserService.CurrentUser!) == true)
             {
@@ -87,7 +88,8 @@ namespace KnockBox.Components.Pages.Games.ConsultTheCard
                 GameSessionService.LeaveCurrentSession(navigateHome: true);
             }
 
-            base.OnAfterRender(firstRender);
+
+            await base.OnAfterRenderAsync(firstRender);
         }
 
         public override void Dispose()
@@ -123,6 +125,22 @@ namespace KnockBox.Components.Pages.Games.ConsultTheCard
         {
             if (GameState == null || UserService.CurrentUser == null) return false;
             return GameState.Host.Id == UserService.CurrentUser.Id;
+        }
+
+        // ── Timer helpers ─────────────────────────────────────────────────────
+
+        protected int GetPhaseTotalMs()
+        {
+            if (GameState?.Config is not { } config) return 1;
+            return GameState.Phase switch
+            {
+                ConsultTheCardGamePhase.Setup => config.SetupPhaseTimeoutMs,
+                ConsultTheCardGamePhase.CluePhase => config.CluePhaseTimeoutMs,
+                ConsultTheCardGamePhase.Discussion => config.DiscussionPhaseTimeoutMs,
+                ConsultTheCardGamePhase.Voting => config.VotePhaseTimeoutMs,
+                ConsultTheCardGamePhase.Reveal => config.RevealPhaseTimeoutMs,
+                _ => 1
+            };
         }
 
         // ── Error toast ───────────────────────────────────────────────────────

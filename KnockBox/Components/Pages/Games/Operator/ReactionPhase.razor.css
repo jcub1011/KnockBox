@@ -1,0 +1,220 @@
+/* ── Reaction Overlay ─────────────────────────────────────────────────────── */
+
+.op-reaction-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 5000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: op-overlay-enter 0.4s ease-out;
+}
+
+@keyframes op-overlay-enter {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.op-reaction-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(10,2,2,0.75);
+    backdrop-filter: blur(6px);
+}
+
+/* ── Reaction Panel ── */
+
+.op-reaction-panel {
+    position: relative;
+    z-index: 1;
+    background: rgba(30,10,10,0.95);
+    backdrop-filter: blur(12px);
+    border: 3px solid #e63946;
+    border-radius: 24px;
+    padding: 40px;
+    max-width: 520px;
+    width: 90%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+    box-shadow: 0 0 60px rgba(230,57,70,0.4), 0 20px 60px rgba(0,0,0,0.6);
+    animation: op-panel-slam 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes op-panel-slam {
+    0% { transform: scale(0.5) translateY(-40px); opacity: 0; }
+    100% { transform: scale(1) translateY(0); opacity: 1; }
+}
+
+/* ── Alert Icon ── */
+
+.op-reaction-alert-icon {
+    font-size: 4rem;
+    animation: op-alert-shake 0.6s ease-out;
+}
+
+@keyframes op-alert-shake {
+    0%, 100% { transform: rotate(0deg); }
+    15% { transform: rotate(-15deg); }
+    30% { transform: rotate(15deg); }
+    45% { transform: rotate(-10deg); }
+    60% { transform: rotate(10deg); }
+    75% { transform: rotate(-5deg); }
+}
+
+/* ── Text ── */
+
+.op-reaction-title {
+    font-size: 1.6rem;
+    font-weight: 900;
+    color: #ff2d55;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    text-align: center;
+    text-shadow: 0 0 20px rgba(255,45,85,0.5);
+    margin: 0;
+}
+
+.op-reaction-subtitle {
+    color: rgba(240,230,230,0.8);
+    text-align: center;
+    font-size: 1rem;
+    margin: 0;
+    line-height: 1.5;
+}
+
+.op-reaction-subtitle strong {
+    color: #ffd166;
+}
+
+/* ── Action Buttons ── */
+
+.op-reaction-actions {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-top: 10px;
+    width: 100%;
+}
+
+.op-reaction-action-btn {
+    flex: 1;
+    min-width: 120px;
+    max-width: 200px;
+    height: 100px;
+    border-radius: 16px;
+    border: 3px solid rgba(255,255,255,0.15);
+    box-shadow: 4px 4px 0 #000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    cursor: pointer;
+    transition: transform 0.15s ease-out, box-shadow 0.15s ease-out, border-color 0.2s;
+    background: rgba(15,5,5,0.5);
+    backdrop-filter: blur(4px);
+    color: #fff;
+    font-family: var(--font-primary);
+}
+
+.op-reaction-action-btn:hover {
+    transform: translate(-2px, -2px);
+    box-shadow: 6px 6px 0 #000;
+}
+
+.op-reaction-action-btn:active {
+    transform: translate(2px, 2px);
+    box-shadow: 2px 2px 0 #000;
+}
+
+.op-reaction-action-btn.shield-btn {
+    border-color: #2ecc71;
+}
+
+.op-reaction-action-btn.shield-btn:hover {
+    background: rgba(46,204,113,0.15);
+    box-shadow: 6px 6px 0 #000, 0 0 20px rgba(46,204,113,0.2);
+}
+
+.op-reaction-action-btn.redirect-btn {
+    border-color: #ff9f1c;
+}
+
+.op-reaction-action-btn.redirect-btn:hover {
+    background: rgba(255,159,28,0.15);
+    box-shadow: 6px 6px 0 #000, 0 0 20px rgba(255,159,28,0.2);
+}
+
+.op-reaction-action-icon {
+    font-size: 1.8rem;
+}
+
+.op-reaction-action-label {
+    font-size: 0.75rem;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+/* ── Redirect Player Selection ── */
+
+.op-redirect-section {
+    margin-top: 10px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+}
+
+.op-redirect-players {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.op-redirect-player-btn {
+    padding: 10px 20px;
+    border-radius: 12px;
+    border: 2px solid rgba(255,255,255,0.15);
+    background: rgba(15,5,5,0.5);
+    color: #fff;
+    font-family: var(--font-primary);
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s ease-out;
+}
+
+.op-redirect-player-btn:hover {
+    border-color: #ff9f1c;
+    background: rgba(255,159,28,0.15);
+}
+
+/* ── Pass Button Area ── */
+
+.op-reaction-pass {
+    margin-top: 10px;
+    text-align: center;
+}
+
+/* ── No Shields State ── */
+
+.op-no-shields {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+}
+
+/* ── Waiting State ── */
+
+.op-reaction-waiting-content {
+    text-align: center;
+    padding: 20px 0;
+}
