@@ -129,16 +129,16 @@ namespace KnockBox.Components.Pages.Games.ConsultTheCard
 
         // ── Timer helpers ─────────────────────────────────────────────────────
 
-        protected int GetPhaseTotalSeconds()
+        protected int GetPhaseTotalMs()
         {
             if (GameState?.Config is not { } config) return 1;
             return GameState.Phase switch
             {
-                ConsultTheCardGamePhase.Setup => config.SetupPhaseTimeoutMs / 1000,
-                ConsultTheCardGamePhase.CluePhase => config.CluePhaseTimeoutMs / 1000,
-                ConsultTheCardGamePhase.Discussion => config.DiscussionPhaseTimeoutMs / 1000,
-                ConsultTheCardGamePhase.Voting => config.VotePhaseTimeoutMs / 1000,
-                ConsultTheCardGamePhase.Reveal => config.RevealPhaseTimeoutMs / 1000,
+                ConsultTheCardGamePhase.Setup => config.SetupPhaseTimeoutMs,
+                ConsultTheCardGamePhase.CluePhase => config.CluePhaseTimeoutMs,
+                ConsultTheCardGamePhase.Discussion => config.DiscussionPhaseTimeoutMs,
+                ConsultTheCardGamePhase.Voting => config.VotePhaseTimeoutMs,
+                ConsultTheCardGamePhase.Reveal => config.RevealPhaseTimeoutMs,
                 _ => 1
             };
         }

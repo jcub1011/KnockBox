@@ -4,6 +4,7 @@
 @using KnockBox.Services.State.Games.ConsultTheCard
 @using KnockBox.Services.Logic.Games.ConsultTheCard.FSM
 @using KnockBox.Core.Services.State.Games.Shared
+@using KnockBox.Components.Shared
 
 <PageTitle>Consult The Card</PageTitle>
 
@@ -29,24 +30,25 @@ else
             @if (GameState.Config.EnableTimers && GameState.Context?.Fsm?.CurrentState is ITimedGameState<ConsultTheCardGameContext, ConsultTheCardCommand> timedState)
             {
                 var remaining = timedState.GetRemainingTime(GameState.Context!, DateTimeOffset.UtcNow);
-                if (remaining.IsSuccess)
+                if (remaining.IsSuccess && remaining.Value.TotalSeconds >= 0)
                 {
-                    var seconds = (int)Math.Ceiling(remaining.Value.TotalSeconds);
-                    if (seconds >= 0)
-                    {
-                        var totalSeconds = GetPhaseTotalSeconds();
-                        var fraction = totalSeconds > 0 ? Math.Clamp((double)seconds / totalSeconds, 0, 1) : 0;
-                        var barWidth = 20;
-                        var filled = (int)(fraction * barWidth);
-                        var empty = barWidth - filled;
-                        var bar = new string('█', filled) + new string('░', empty);
+                    var endTime = DateTimeOffset.UtcNow.Add(remaining.Value);
+                    var duration = TimeSpan.FromMilliseconds(GetPhaseTotalMs());
 
+                    <CountdownClock EndTimeUtc="endTime" Duration="duration" Context="countdown">
+                        @{
+                            var barWidth = 20;
+                            var filled = (int)Math.Ceiling(countdown.Fraction * barWidth);
+                            var empty = barWidth - filled;
+                            var bar = new string('\u2588', filled) + new string('\u2591', empty);
+                            var seconds = (int)Math.Ceiling(countdown.RemainingSeconds);
+                        }
                         <div class="ctc-timer-container">
                             <div class="ctc-timer-bar @(seconds < 5 ? "ctc-timer-urgent" : "")">
                                 <span class="ctc-timer-text">[@bar] @(seconds)s</span>
                             </div>
                         </div>
-                    }
+                    </CountdownClock>
                 }
             }
 

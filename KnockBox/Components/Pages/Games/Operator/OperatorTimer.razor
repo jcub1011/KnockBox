@@ -6,15 +6,16 @@
 @if (GameState.Config.TimersEnabled && GameState.Context?.Fsm?.CurrentState is ITimedGameState<OperatorGameContext, OperatorCommand> timedState)
 {
     var remaining = timedState.GetRemainingTime(GameState.Context!, DateTimeOffset.UtcNow);
-    if (remaining.IsSuccess)
+    if (remaining.IsSuccess && remaining.Value.TotalSeconds >= 0)
     {
-        var seconds = (int)Math.Ceiling(remaining.Value.TotalSeconds);
-        if (seconds >= 0)
-        {
-            var total = GetTotalDuration().TotalSeconds;
-            var fraction = total > 0 ? Math.Clamp(remaining.Value.TotalSeconds / total, 0, 1) : 0;
-            var dashOffset = Circumference * (1 - fraction);
+        var endTime = DateTimeOffset.UtcNow.Add(remaining.Value);
+        var duration = GetTotalDuration();
 
+        <CountdownClock EndTimeUtc="endTime" Duration="duration" Context="countdown">
+            @{
+                var seconds = (int)Math.Ceiling(countdown.RemainingSeconds);
+                var dashOffset = Circumference * (1 - countdown.Fraction);
+            }
             <div class="op-timer-container">
                 <div class="op-timer-card @(seconds < 5 ? "op-timer-urgent" : "")">
                     <svg class="op-timer-ring" viewBox="0 0 60 60">
@@ -25,7 +26,7 @@
                     <span class="op-timer-text">@seconds</span>
                 </div>
             </div>
-        }
+        </CountdownClock>
     }
 }
 
