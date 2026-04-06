@@ -192,18 +192,42 @@ namespace KnockBox.Components.Pages.Games.Operator
 
         protected bool IsPlayerTargetable(string targetPlayerId, OperatorPlayerState targetState)
         {
-            if (!IsMyTurn) return false;
+            if (!IsMyTurn || CurrentPlayerState == null || GameState.Context == null) return false;
+
+            var card = GetSelectedTargetableCard();
+            if (card == null) return false;
+
+            return card.GetPotentialTargets(GameState.Context, CurrentPlayerState)
+                .Any(p => p == targetState);
+        }
+
+        private ITargetableCard? GetSelectedTargetableCard()
+        {
+            if (_pendingAction is ITargetableCard actionTarget)
+                return actionTarget;
 
             if (_selectedOperatorId != null && CurrentPlayerState != null)
             {
-                var opCard = CurrentPlayerState.Hand.FirstOrDefault(c => c.Id == _selectedOperatorId) as KnockBox.Operator.Models.OperatorCard;
-                if (opCard != null && opCard.OperatorValue == targetState.ActiveOperator)
-                {
-                    return false;
-                }
+                var opCard = CurrentPlayerState.Hand.FirstOrDefault(c => c.Id == _selectedOperatorId.Value);
+                if (opCard is ITargetableCard opTarget)
+                    return opTarget;
             }
 
-            return true;
+            return null;
+        }
+
+        protected bool CanTargetSelf
+        {
+            get
+            {
+                if (CurrentPlayerState == null || GameState.Context == null) return false;
+
+                var card = GetSelectedTargetableCard();
+                if (card == null) return false;
+
+                return card.GetPotentialTargets(GameState.Context, CurrentPlayerState)
+                    .Any(p => p == CurrentPlayerState);
+            }
         }
 
         protected Task ToggleCard(Guid cardId)
@@ -269,10 +293,15 @@ namespace KnockBox.Components.Pages.Games.Operator
 
         protected void SelectTarget(string playerId)
         {
-            if (!IsMyTurn) return;
+            if (!IsMyTurn || GameState.Context == null) return;
 
             // Block target selection for self-only actions (e.g. CookTheBooks, Comp, MarketCrash)
             if (_pendingAction != null && !ActionNeedsTarget(_pendingAction))
+                return;
+
+            // Validate against potential targets
+            var targetState = GameState.Context.GamePlayers.GetValueOrDefault(playerId);
+            if (targetState != null && !IsPlayerTargetable(playerId, targetState))
                 return;
 
             _targetPlayerId = _targetPlayerId == playerId ? null : playerId;

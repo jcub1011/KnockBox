@@ -94,7 +94,7 @@
                 </button>
             }
 
-            @if (NeedsTargetSelection)
+            @if (NeedsTargetSelection && CanTargetSelf)
             {
                 <button class="op-btn op-btn-secondary" @onclick="() => SelectTarget(UserService.CurrentUser!.Id)">
                     TARGET SELF
