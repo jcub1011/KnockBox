@@ -4,10 +4,10 @@
     <div class="op-player-info-main">
         <span class="op-player-name">@Name</span>
         <div class="op-player-score-container">
-            <div class="op-player-operator-card">
+            <div class="op-player-operator-card @(_opChanged ? "op-op-changed" : "")">
                 <span class="op-player-operator-card-symbol">@GetOperatorSymbol()</span>
             </div>
-            <span class="op-player-score">@Score.ToString("F1")</span>
+            <span class="op-player-score @(_scoreChanged ? "op-score-changed" : "")">@Score.ToString("F1")</span>
         </div>
     </div>
     
@@ -32,6 +32,29 @@
     [Parameter] public bool IsTargetable { get; set; }
     [Parameter] public bool IsTargeted { get; set; }
     [Parameter] public EventCallback OnClick { get; set; }
+
+    private decimal? _prevScore;
+    private bool _scoreChanged;
+
+    private CardOperator? _prevOp;
+    private bool _opChanged;
+
+    protected override void OnParametersSet()
+    {
+        if (_prevScore.HasValue && _prevScore.Value != Score)
+        {
+            _scoreChanged = true;
+            _ = Task.Delay(1000).ContinueWith(_ => { _scoreChanged = false; InvokeAsync(StateHasChanged); });
+        }
+        _prevScore = Score;
+
+        if (_prevOp.HasValue && _prevOp.Value != ActiveOperator)
+        {
+            _opChanged = true;
+            _ = Task.Delay(1000).ContinueWith(_ => { _opChanged = false; InvokeAsync(StateHasChanged); });
+        }
+        _prevOp = ActiveOperator;
+    }
 
     private string GetOperatorSymbol() => ActiveOperator switch
     {

@@ -66,6 +66,9 @@
 
 .op-timer-container {
     position: absolute;
+    bottom: 160px;
+    left: 50%;
+    transform: translateX(-50%);
     padding: 10px;
     z-index: 10000;
     pointer-events: none;

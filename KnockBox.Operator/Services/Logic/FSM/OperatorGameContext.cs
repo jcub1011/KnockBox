@@ -34,21 +34,21 @@ public class OperatorGameContext(OperatorGameState state, IRandomNumberService r
 
     private static void AddBaseDeck(List<Card> deck)
     {
-        // Numbers (40)
+        // Numbers (48)
         AddCards(deck, CardType.Number, 0m, 2);
         AddCards(deck, CardType.Number, 1m, 2);
-        AddCards(deck, CardType.Number, 2m, 3);
-        AddCards(deck, CardType.Number, 3m, 3);
-        AddCards(deck, CardType.Number, 4m, 4);
-        AddCards(deck, CardType.Number, 5m, 4);
-        AddCards(deck, CardType.Number, 6m, 5);
-        AddCards(deck, CardType.Number, 7m, 5);
-        AddCards(deck, CardType.Number, 8m, 6);
-        AddCards(deck, CardType.Number, 9m, 6);
+        AddCards(deck, CardType.Number, 2m, 4);
+        AddCards(deck, CardType.Number, 3m, 4);
+        AddCards(deck, CardType.Number, 4m, 5);
+        AddCards(deck, CardType.Number, 5m, 5);
+        AddCards(deck, CardType.Number, 6m, 6);
+        AddCards(deck, CardType.Number, 7m, 6);
+        AddCards(deck, CardType.Number, 8m, 7);
+        AddCards(deck, CardType.Number, 9m, 7);
 
-        // Operators (20)
-        AddCards(deck, CardType.Operator, CardOperator.Add, 8);
-        AddCards(deck, CardType.Operator, CardOperator.Subtract, 8);
+        // Operators (12)
+        AddCards(deck, CardType.Operator, CardOperator.Add, 4);
+        AddCards(deck, CardType.Operator, CardOperator.Subtract, 4);
         AddCards(deck, CardType.Operator, CardOperator.Multiply, 2);
         AddCards(deck, CardType.Operator, CardOperator.Divide, 2);
 
@@ -160,9 +160,12 @@ public class OperatorGameContext(OperatorGameState state, IRandomNumberService r
 
     public void ResolveHotPotato(string targetPlayerId, Card numberCard)
     {
-        if (GamePlayers.TryGetValue(targetPlayerId, out var target))
+        if (GamePlayers.TryGetValue(targetPlayerId, out var target) && numberCard is NumberCard num)
         {
-            target.Hand.Add(numberCard);
+            var (newScore, newOp) = CalculateNewScore(target.CurrentPoints, target.ActiveOperator, num.NumberValue);
+            target.CurrentPoints = newScore;
+            target.ActiveOperator = newOp;
+            target.ScoreTimestamp = DateTimeOffset.UtcNow;
         }
     }
 

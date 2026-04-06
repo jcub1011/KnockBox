@@ -16,7 +16,7 @@
                     HandSize="@pState.Hand.Count"
                     IsActive="@(GameState.TurnManager.CurrentPlayer == player.Id)"
                     IsAudited="@pState.IsAudited"
-                    IsTargetable="@IsMyTurn"
+                    IsTargetable="@IsPlayerTargetable(player.Id, pState)"
                     IsTargeted="@(_targetPlayerId == player.Id)"
                     OnClick="@(() => SelectTarget(player.Id))" />
             }

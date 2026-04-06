@@ -122,7 +122,16 @@ public class PlayPhaseState : IOperatorGameState, ITimedGameState<OperatorGameCo
                 && !string.IsNullOrEmpty(play.TargetPlayerId)
                 && play.TargetPlayerId != play.PlayerId;
 
-            if ((hasTargetedAction || hasTargetedOperator) && !string.IsNullOrEmpty(play.TargetPlayerId))
+            if (hasTargetedOperator)
+            {
+                var opCard = playedCards.OfType<OperatorCard>().Last();
+                if (context.GamePlayers.TryGetValue(play.TargetPlayerId!, out var targetPlayer) && targetPlayer.ActiveOperator == opCard.OperatorValue)
+                {
+                    return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromError("Target already has this operator.");
+                }
+            }
+
+            if ((hasTargetedAction || hasTargetedOperator) && !string.IsNullOrEmpty(play.TargetPlayerId) && play.TargetPlayerId != play.PlayerId)
             {
                 context.State.PendingActionCommand = play;
                 context.State.ReactionTargetPlayerId = play.TargetPlayerId;
@@ -211,10 +220,6 @@ public class PlayPhaseState : IOperatorGameState, ITimedGameState<OperatorGameCo
                     var hotPotatoNum = numbers.Last();
                     context.ResolveHotPotato(play.TargetPlayerId, hotPotatoNum);
                     numbers.Remove(hotPotatoNum);
-                    
-                    // The given card should be removed from discard pile because it's now in the target's hand
-                    var inDiscard = context.State.DiscardPile.FindLastIndex(c => c.Id == hotPotatoNum.Id);
-                    if (inDiscard != -1) context.State.DiscardPile.RemoveAt(inDiscard);
                 }
                 else if (action.ActionValue == CardAction.FlashFlood && play.TargetPlayerId != null)
                 {

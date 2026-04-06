@@ -124,6 +124,14 @@ namespace KnockBox.Components.Pages.Games.Operator
             var pendingCard = GetPendingActionCard();
             if (pendingCard != null)
             {
+                if (pendingCard is HotPotatoCard && GameState.PendingHotPotatoCard is NumberCard num)
+                {
+                    return $"Hot Potato with the number {num.NumberValue}";
+                }
+                if (pendingCard is KnockBox.Operator.Models.OperatorCard opCard)
+                {
+                    return $"an Operator card to change your operator to {opCard.OperatorValue}";
+                }
                 return pendingCard.TooltipName();
             }
             return "an action";

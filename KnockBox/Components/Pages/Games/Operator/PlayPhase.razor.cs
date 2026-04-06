@@ -190,6 +190,22 @@ namespace KnockBox.Components.Pages.Games.Operator
         private static bool ActionNeedsTarget(Card card) =>
             card is ITargetableCard;
 
+        protected bool IsPlayerTargetable(string targetPlayerId, OperatorPlayerState targetState)
+        {
+            if (!IsMyTurn) return false;
+
+            if (_selectedOperatorId != null && CurrentPlayerState != null)
+            {
+                var opCard = CurrentPlayerState.Hand.FirstOrDefault(c => c.Id == _selectedOperatorId) as KnockBox.Operator.Models.OperatorCard;
+                if (opCard != null && opCard.OperatorValue == targetState.ActiveOperator)
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
         protected Task ToggleCard(Guid cardId)
         {
             if (!IsMyTurn || CurrentPlayerState == null) return Task.CompletedTask;

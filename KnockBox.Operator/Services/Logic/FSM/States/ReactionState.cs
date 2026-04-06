@@ -149,20 +149,56 @@ public class ReactionState : IOperatorGameState, ITimedGameState<OperatorGameCon
         context.State.PendingHotPotatoCard = null;
     }
 
+    private bool TargetCanReact(OperatorGameContext context)
+    {
+        if (context.State.ReactionTargetPlayerId != null && context.GamePlayers.TryGetValue(context.State.ReactionTargetPlayerId, out var targetPlayer))
+        {
+            Card? pendingAction = null;
+            if (context.State.PendingActionCommand is PlayCardsCommand playCmd)
+            {
+                pendingAction = context.State.DiscardPile.FirstOrDefault(c => playCmd.CardIds.Contains(c.Id) && (c is ActionCard || c is OperatorCard));
+            }
+            if (pendingAction is IBlockableCard blockable)
+            {
+                return blockable.GetPotentialReactionCards(context, targetPlayer).Any();
+            }
+        }
+        return false;
+    }
+
     public ValueResult<TimeSpan> GetRemainingTime(OperatorGameContext context, DateTimeOffset now)
     {
-        if (!context.State.Config.TimersEnabled) return ValueResult<TimeSpan>.FromValue(TimeSpan.MaxValue);
+        bool canReact = TargetCanReact(context);
         var elapsed = now - context.State.StateStartTime;
-        var remaining = context.State.Config.ReactionPhaseTimeout - elapsed;
-        return ValueResult<TimeSpan>.FromValue(remaining > TimeSpan.Zero ? remaining : TimeSpan.Zero);
+
+        if (!canReact)
+        {
+            var remaining = TimeSpan.FromSeconds(5) - elapsed;
+            return ValueResult<TimeSpan>.FromValue(remaining > TimeSpan.Zero ? remaining : TimeSpan.Zero);
+        }
+
+        if (!context.State.Config.TimersEnabled) return ValueResult<TimeSpan>.FromValue(TimeSpan.MaxValue);
+
+        var normalRemaining = context.State.Config.ReactionPhaseTimeout - elapsed;
+        return ValueResult<TimeSpan>.FromValue(normalRemaining > TimeSpan.Zero ? normalRemaining : TimeSpan.Zero);
     }
 
     public ValueResult<IGameState<OperatorGameContext, OperatorCommand>?> Tick(OperatorGameContext context, DateTimeOffset now)
     {
-        if (!context.State.Config.TimersEnabled) return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromValue(null);
-
         var elapsed = now - context.State.StateStartTime;
-        if (elapsed >= context.State.Config.ReactionPhaseTimeout)
+        bool canReact = TargetCanReact(context);
+
+        bool isTimeout = false;
+        if (!canReact && elapsed >= TimeSpan.FromSeconds(5))
+        {
+            isTimeout = true;
+        }
+        else if (context.State.Config.TimersEnabled && elapsed >= context.State.Config.ReactionPhaseTimeout)
+        {
+            isTimeout = true;
+        }
+
+        if (isTimeout)
         {
             ResolvePendingAction(context, false);
             ClearPendingState(context);

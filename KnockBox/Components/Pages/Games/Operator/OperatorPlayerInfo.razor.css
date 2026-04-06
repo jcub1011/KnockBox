@@ -132,3 +132,23 @@
     text-transform: uppercase;
     letter-spacing: 1px;
 }
+
+.op-score-changed {
+    animation: op-score-flash 1s;
+}
+
+@keyframes op-score-flash {
+    0% { color: inherit; text-shadow: none; transform: scale(1); }
+    20% { color: #fff; text-shadow: 0 0 15px #ffd166, 0 0 30px #e63946; transform: scale(1.3); }
+    100% { color: inherit; text-shadow: none; transform: scale(1); }
+}
+
+.op-op-changed {
+    animation: op-op-flash 1s;
+}
+
+@keyframes op-op-flash {
+    0% { transform: scale(1); background: #fffbeb; }
+    20% { transform: scale(1.3) rotate(10deg); background: #ffd166; box-shadow: 0 0 15px #ffd166; }
+    100% { transform: scale(1) rotate(0deg); background: #fffbeb; box-shadow: 1px 1px 0 rgba(0,0,0,0.4); }
+}
