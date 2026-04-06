@@ -127,6 +127,22 @@ namespace KnockBox.Components.Pages.Games.ConsultTheCard
             return GameState.Host.Id == UserService.CurrentUser.Id;
         }
 
+        // ── Timer helpers ─────────────────────────────────────────────────────
+
+        protected int GetPhaseTotalSeconds()
+        {
+            if (GameState?.Config is not { } config) return 1;
+            return GameState.Phase switch
+            {
+                ConsultTheCardGamePhase.Setup => config.SetupPhaseTimeoutMs / 1000,
+                ConsultTheCardGamePhase.CluePhase => config.CluePhaseTimeoutMs / 1000,
+                ConsultTheCardGamePhase.Discussion => config.DiscussionPhaseTimeoutMs / 1000,
+                ConsultTheCardGamePhase.Voting => config.VotePhaseTimeoutMs / 1000,
+                ConsultTheCardGamePhase.Reveal => config.RevealPhaseTimeoutMs / 1000,
+                _ => 1
+            };
+        }
+
         // ── Error toast ───────────────────────────────────────────────────────
 
         private void ShowError(string message)

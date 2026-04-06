@@ -34,9 +34,16 @@ else
                     var seconds = (int)Math.Ceiling(remaining.Value.TotalSeconds);
                     if (seconds >= 0)
                     {
+                        var totalSeconds = GetPhaseTotalSeconds();
+                        var fraction = totalSeconds > 0 ? Math.Clamp((double)seconds / totalSeconds, 0, 1) : 0;
+                        var barWidth = 20;
+                        var filled = (int)(fraction * barWidth);
+                        var empty = barWidth - filled;
+                        var bar = new string('█', filled) + new string('░', empty);
+
                         <div class="ctc-timer-container">
-                            <div class="ctc-timer-card @(seconds < 5 ? "ctc-timer-urgent" : "")">
-                                ⏳ @seconds
+                            <div class="ctc-timer-bar @(seconds < 5 ? "ctc-timer-urgent" : "")">
+                                <span class="ctc-timer-text">[@bar] @(seconds)s</span>
                             </div>
                         </div>
                     }
