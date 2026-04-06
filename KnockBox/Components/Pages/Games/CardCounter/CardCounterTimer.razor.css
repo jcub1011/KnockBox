@@ -1,0 +1,36 @@
+/* ── Timer Display ── */
+
+.cc-timer-container {
+    position: absolute;
+    padding: 10px;
+    z-index: 10000;
+    pointer-events: none;
+}
+
+.cc-timer-card {
+    background-color: rgba(0, 0, 0, 0.25);
+    border: 2px solid rgba(255,255,255,0.15);
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    padding: 8px 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font-mono);
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    transition: all 0.3s ease;
+}
+
+.cc-timer-urgent {
+    border-color: #ff4757;
+    color: #ff4757;
+    animation: cc-pulse-urgent 1s infinite alternate;
+    box-shadow: 0 0 15px rgba(255, 71, 87, 0.4);
+}
+
+@keyframes cc-pulse-urgent {
+    0% { transform: scale(1); }
+    100% { transform: scale(1.1); text-shadow: 0 0 8px rgba(255, 71, 87, 0.6); }
+}

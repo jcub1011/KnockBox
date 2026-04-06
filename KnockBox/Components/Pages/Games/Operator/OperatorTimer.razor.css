@@ -1,0 +1,97 @@
+/* ── Timer Container ── */
+
+.op-timer-container {
+    position: fixed;
+    top: 64px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10;
+    pointer-events: none;
+}
+
+/* ── Circular Timer Card ── */
+
+.op-timer-card {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 72px;
+    height: 72px;
+    background: rgba(10, 5, 5, 0.85);
+    backdrop-filter: blur(8px);
+    border: 2px solid rgba(230, 57, 70, 0.4);
+    border-radius: 50%;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
+    transition: all 0.3s ease;
+}
+
+/* ── SVG Progress Ring ── */
+
+.op-timer-ring {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    transform: rotate(-90deg);
+}
+
+.op-timer-ring-bg {
+    fill: none;
+    stroke: rgba(255, 255, 255, 0.1);
+    stroke-width: 3;
+}
+
+.op-timer-ring-fill {
+    fill: none;
+    stroke: #ffd166;
+    stroke-width: 3;
+    stroke-dasharray: 163.36;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 1s linear, stroke 0.3s ease;
+}
+
+/* ── Timer Number ── */
+
+.op-timer-text {
+    position: relative;
+    font-family: var(--font-mono);
+    font-size: 1.8rem;
+    font-weight: 900;
+    color: #ffd166;
+    z-index: 1;
+}
+
+/* ── Urgent State (< 5 seconds) ── */
+
+.op-timer-urgent .op-timer-ring-fill {
+    stroke: #ff4757;
+}
+
+.op-timer-urgent .op-timer-text {
+    color: #ff4757;
+}
+
+.op-timer-urgent {
+    border-color: #ff4757;
+    animation: op-pulse-urgent 0.8s infinite alternate;
+    box-shadow: 0 0 20px rgba(255, 71, 87, 0.5);
+}
+
+@keyframes op-pulse-urgent {
+    0% { transform: scale(1); }
+    100% { transform: scale(1.12); }
+}
+
+/* ── Responsive ── */
+
+@media (max-width: 400px) {
+    .op-timer-card {
+        width: 56px;
+        height: 56px;
+    }
+
+    .op-timer-text {
+        font-size: 1.4rem;
+    }
+}

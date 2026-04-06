@@ -73,7 +73,7 @@ else
                 <button class="btn btn-success flex-1" @onclick="RollDice">ROLL!</button>
                 @if (UserService.CurrentUser?.Id == GameState.Host.Id)
                 {
-                    <button class="btn btn-danger flex-1" @onclick="ClearHistory">Clear History</button>
+                    <button class="btn btn-danger" @onclick="ClearHistory">Clear History</button>
                 }
             </div>
             <div class="">
@@ -95,9 +95,8 @@ else
                             <tr>
                                 <th>Player</th>
                                 <th>Rolls</th>
-                                <th>Dice Rolled</th>
-                                <th>Nat 20s</th>
-                                <th>Nat 1s</th>
+                                <th class="ds-hide-sm">Dice Rolled</th>
+                                <th>Crits</th>
                                 <th>Highest</th>
                                 <th>Cumulative</th>
                             </tr>
@@ -108,9 +107,8 @@ else
                                 <tr>
                                     <td>@stats.PlayerName</td>
                                     <td>@stats.TotalRolls</td>
-                                    <td>@stats.TotalDiceRolled</td>
-                                    <td>@stats.NatTwentyCount</td>
-                                    <td>@stats.NatOneCount</td>
+                                    <td class="ds-hide-sm">@stats.TotalDiceRolled</td>
+                                    <td><span class="nat-twenty">@stats.NatTwentyCount</span> / <span class="nat-one">@stats.NatOneCount</span></td>
                                     <td>@stats.HighestResult (@stats.HighestResultExpression)</td>
                                     <td>@stats.CumulativeTotal</td>
                                 </tr>
@@ -129,7 +127,10 @@ else
                     {
                         var playerLastRoll = GameState.RollHistory.LastOrDefault(r => r.PlayerId == player.Id);
                         var playerRollCount = GameState.RollHistory.Count(r => r.PlayerId == player.Id);
+                        var playerRolls = GameState.RollHistory.Where(r => r.PlayerId == player.Id).ToList();
+                        var displayRolls = playerRolls.AsEnumerable().Reverse().Take(200).ToList();
                         var isExpanded = IsPlayerExpanded(player.Id);
+
                         <div class="player-roll-row" @onclick="() => TogglePlayerHistory(player.Id)">
                             <div class="player-roll-summary">
                                 <span class="player-roll-name">@player.Name</span>
@@ -149,10 +150,8 @@ else
                                 <span class="player-roll-toggle">@(isExpanded ? "▲" : "▼")</span>
                             </div>
                         </div>
-                        @if (isExpanded)
-                        {
-                            var playerRolls = GameState.RollHistory.Where(r => r.PlayerId == player.Id).ToList();
-                            var displayRolls = playerRolls.AsEnumerable().Reverse().Take(200).ToList();
+
+                        <div class="player-roll-history-wrapper @(isExpanded ? "expanded" : "")">
                             <div class="player-roll-history list">
                                 @for (int i = 0; i < displayRolls.Count; i++)
                                 {
@@ -176,7 +175,7 @@ else
                                     </div>
                                 }
                             </div>
-                        }
+                        </div>
                     }
                 </div>
             </div>

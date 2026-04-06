@@ -126,14 +126,14 @@
     <div class="dtd-final-results-actions">
         @if (isHost)
         {
-            <button class="dtd-btn dtd-btn-primary"
+            <button class="dtd-btn dtd-btn-lg dtd-btn-primary"
                     @onclick="PlayAgainAsync"
                     disabled="@_submitting"
                     aria-label="Play Again">
                 Play Again
             </button>
         }
-        <button class="dtd-btn dtd-btn-secondary"
+        <button class="dtd-btn dtd-btn-lg dtd-btn-secondary"
                 @onclick="ReturnToMenuAsync"
                 disabled="@_submitting"
                 aria-label="Return to Menu">

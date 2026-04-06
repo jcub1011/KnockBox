@@ -1,392 +1,356 @@
-/* ── Outfit Customization Phase ─────────────────────────────────────────────── */
+/* ── Outfit Customization Phase — Playful / Toy-like Redesign ────────────── */
 
 .dtd-customization {
     flex: 1;
     display: flex;
     flex-direction: column;
-    padding: 16px;
-    gap: 12px;
-    overflow-x: hidden;
-    overflow-y: hidden;
-    max-width: 900px;
-    margin: 0 auto;
-    width: 100%;
+    padding: 24px;
+    gap: 20px;
     height: 100%;
-    min-height: 0;
-    max-height: 100dvh;
+    width: 100%;
+    max-width: 1400px;
+    margin: 0 auto;
+    overflow-y: auto; /* Allow scrolling if content overflows */
 }
 
-/* ── Header ──────────────────────────────────────────────────────────────────── */
+/* ── Header ────────────────────────────────────────────────────────────────── */
 
 .dtd-customization-header {
     display: flex;
     align-items: center;
+    justify-content: space-between;
     gap: 16px;
-    flex-wrap: wrap;
+    flex-shrink: 0;
 }
 
 .dtd-customization-phase-badge {
     display: flex;
     align-items: center;
-    gap: 8px;
-    background: #fdf4ff;
-    border: 1px solid #e9d5ff;
-    border-radius: 24px;
-    padding: 6px 16px;
+    gap: 12px;
+    background: #fff;
+    border: 3px solid var(--dtd-color-lavender);
+    border-radius: 20px;
+    padding: 8px 20px;
+    box-shadow: 0 4px 0 var(--dtd-color-lavender-deep);
 }
 
 .dtd-customization-phase-icon {
-    font-size: 1.3rem;
+    font-size: 1.5rem;
 }
 
 .dtd-customization-phase-name {
-    font-size: 1.1rem;
-    font-weight: 700;
-    color: #7e22ce;
+    font-family: var(--font-primary);
+    font-size: 1.3rem;
+    font-weight: 900;
+    color: var(--dtd-color-dark);
+    margin: 0;
 }
 
 .dtd-customization-progress-pill {
-    font-size: 0.9rem;
-    color: #6b7280;
-}
-
-.dtd-customization-timer {
-    margin-left: auto;
-    background: #e0f2fe;
-    border: 1px solid #7dd3fc;
-    border-radius: 20px;
-    padding: 4px 14px;
+    font-family: var(--font-mono);
+    font-weight: 800;
+    background: var(--dtd-color-bg-soft);
+    color: var(--dtd-color-lavender-deep);
+    padding: 6px 16px;
+    border-radius: 12px;
     font-size: 1rem;
-    font-weight: 700;
-    color: #0369a1;
-    min-width: 70px;
-    text-align: center;
 }
 
-.dtd-customization-timer-urgent {
-    background: #fee2e2;
-    border-color: #fca5a5;
-    color: #b91c1c;
-    animation: dtd-cust-pulse 0.8s ease-in-out infinite;
-}
+/* ── Main Layout ───────────────────────────────────────────────────────────── */
 
-@keyframes dtd-cust-pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.6; }
-}
-
-/* ── Host panel ──────────────────────────────────────────────────────────────── */
-
-.dtd-customization-host-panel {
+.dtd-customization-main {
+    flex: 1;
+    min-height: 0;
     display: flex;
     flex-direction: column;
-    gap: 16px;
-    background: #f9fafb;
-    border: 1px solid #e5e7eb;
-    border-radius: 12px;
-    padding: 20px;
 }
 
-.dtd-customization-host-title {
+/* ── Host View ─────────────────────────────────────────────────────────────── */
+
+.dtd-customization-host-panel {
+    flex: 1;
+    background: #fff;
+    border-radius: 32px;
+    border: 4px solid var(--dtd-color-lavender);
+    box-shadow: 0 12px 0 var(--dtd-color-lavender-deep);
+    padding: 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    overflow-y: auto;
+}
+
+.dtd-customization-section-title {
+    font-family: var(--font-primary);
+    font-size: 1.2rem;
+    font-weight: 900;
+    text-transform: uppercase;
+    color: var(--dtd-color-dark);
     margin: 0;
-    font-size: 1.1rem;
-    color: #111827;
 }
 
 .dtd-customization-player-grid {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 16px;
 }
 
 .dtd-customization-player-card {
     display: flex;
     align-items: center;
-    gap: 8px;
-    background: #ffffff;
-    border: 1px solid #d1d5db;
-    border-radius: 8px;
-    padding: 8px 14px;
-    min-width: 180px;
-    transition: border-color 0.2s;
+    gap: 12px;
+    background: var(--dtd-color-bg-soft);
+    border: 3px solid transparent;
+    border-radius: 20px;
+    padding: 16px;
+    transition: all 0.2s var(--dtd-bounce);
 }
 
-.dtd-customization-player-card.dtd-customization-player-ready {
-    border-color: #34d399;
-    background: #f0fdf4;
-}
-
-.dtd-customization-player-status {
-    font-size: 1.1rem;
+.dtd-customization-player-ready {
+    background: #fff;
+    border-color: var(--dtd-color-mint);
+    box-shadow: 0 6px 0 var(--dtd-color-mint-deep);
+    transform: translateY(-2px);
 }
 
 .dtd-customization-player-name {
+    font-weight: 800;
     flex: 1;
-    font-weight: 600;
-    color: #111827;
 }
 
 .dtd-customization-player-detail {
     font-size: 0.8rem;
-    color: #6b7280;
     font-style: italic;
+    opacity: 0.7;
 }
 
-.dtd-customization-host-hint {
-    margin: 0;
-    font-size: 0.85rem;
-    color: #9ca3af;
-    font-style: italic;
+/* ── Editor Layout ─────────────────────────────────────────────────────────── */
+
+.dtd-customization-editor-layout {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    gap: 24px;
+    min-height: 0;
 }
 
-/* ── Waiting panel ───────────────────────────────────────────────────────────── */
-
-.dtd-customization-waiting {
-    background: #f0fdf4;
-    border: 1px solid #6ee7b7;
-    border-radius: 10px;
+.dtd-customization-controls-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    background: #fff;
+    border-radius: 32px;
+    border: 4px solid var(--dtd-color-bg-soft);
     padding: 24px;
-    text-align: center;
-    color: #065f46;
-    font-size: 1rem;
 }
 
-.dtd-customization-submitted-summary {
-    margin-top: 12px;
-}
-
-.dtd-customization-submitted-name {
-    font-size: 1.2rem;
-    font-weight: 700;
-    color: #1f2937;
-    margin: 0;
-}
-
-.dtd-customization-submitted-hint {
-    margin: 4px 0 0 0;
-    font-size: 0.9rem;
-    color: #6b7280;
-}
-
-/* ── Form ────────────────────────────────────────────────────────────────────── */
-
-.dtd-customization-form {
+.dtd-customization-canvas-panel {
     display: flex;
     flex-direction: column;
     gap: 16px;
-    flex: 1;
-    min-height: 0;
-    overflow-y: auto;
-}
-
-.dtd-customization-name-section {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-}
-
-.dtd-customization-name-label {
-    font-size: 0.95rem;
-    font-weight: 600;
-    color: #374151;
-}
-
-.dtd-customization-required {
-    color: #dc2626;
-}
-
-.dtd-customization-optional {
-    font-size: 0.8rem;
-    font-weight: 400;
-    color: #9ca3af;
-}
-
-.dtd-customization-name-input {
-    padding: 10px 14px;
-    border: 1px solid #d1d5db;
-    border-radius: 8px;
-    font-size: 1rem;
-    color: #111827;
-    transition: border-color 0.15s;
-    width: 100%;
-    box-sizing: border-box;
-}
-
-.dtd-customization-name-input:focus {
-    border-color: #7c3aed;
-    box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
-}
-
-/* ── Sketch section ──────────────────────────────────────────────────────────── */
-
-.dtd-customization-sketch-section {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    flex: 1;
     min-height: 0;
 }
 
-.dtd-customization-sketch-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-}
-
-.dtd-customization-sketch-title {
-    margin: 0;
-    font-size: 1rem;
-    font-weight: 600;
-    color: #374151;
-}
-
-.dtd-customization-canvas-wrapper {
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    border: 2px solid #e5e7eb;
-    border-radius: 8px;
+.dtd-customization-canvas-container {
+    flex: 1;
+    background: #fff;
+    border-radius: 24px;
+    border: 4px solid var(--dtd-color-bg-soft);
     overflow: hidden;
-    transition: border-color 0.2s;
-    flex: 1;
-    min-height: 0;
+    position: relative;
+    box-shadow: inset 0 0 20px rgba(0,0,0,0.02);
 }
 
-.dtd-customization-canvas-wrapper.dtd-customization-canvas-move-mode {
-    border-color: #7c3aed;
-    box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.15);
+.dtd-canvas-move-mode {
+    border-color: var(--dtd-color-lavender);
+    box-shadow: 0 0 0 4px rgba(177, 156, 217, 0.1);
 }
 
-.dtd-customization-canvas-wrapper.dtd-customization-canvas-move-mode .svg-canvas-toolbar {
-    display: none;
-}
+/* ── Form Elements ─────────────────────────────────────────────────────────── */
 
-/* ── Drag layer overlay ─────────────────────────────────────────────────────── */
-
-.dtd-customization-drag-layer {
-    grid-area: 1 / 1;
-    width: auto;
-    height: auto;
-    max-width: 100%;
-    max-height: 100%;
-    pointer-events: all;
-    z-index: 10;
-}
-
-/* ── Actions ─────────────────────────────────────────────────────────────────── */
-
-.dtd-customization-actions {
+.dtd-customization-field {
     display: flex;
     flex-direction: column;
     gap: 8px;
 }
 
-.dtd-customization-error {
-    color: #b91c1c;
+.dtd-customization-label {
+    font-family: var(--font-primary);
     font-size: 0.9rem;
-    margin: 0;
+    font-weight: 900;
+    text-transform: uppercase;
+    color: var(--dtd-color-lavender-deep);
 }
 
-/* Button overrides — base styles in dtd-shared.css */
-
-.dtd-btn-primary {
-    background: #7c3aed;
-    color: #ffffff;
+.dtd-customization-input {
+    padding: 12px 16px;
+    border: 3px solid var(--dtd-color-bg-soft);
+    border-radius: 16px;
+    font-family: var(--font-primary);
+    font-size: 1rem;
+    font-weight: 700;
+    transition: all 0.2s;
 }
 
-.dtd-btn-primary:hover:not(:disabled) {
-    background: #6d28d9;
+.dtd-customization-input:focus {
+    outline: none;
+    border-color: var(--dtd-color-lavender);
+    background: #fff;
 }
-
-/* ── Mode toggle ────────────────────────────────────────────────────────────── */
 
 .dtd-customization-mode-toggle {
-    display: flex;
-    gap: 4px;
-    background: #f3f4f6;
-    border-radius: 8px;
-    padding: 3px;
-    width: fit-content;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    background: var(--dtd-color-bg-soft);
+    padding: 6px;
+    border-radius: 16px;
 }
 
 .dtd-btn-mode {
-    padding: 6px 16px;
+    padding: 10px;
     border: none;
-    border-radius: 6px;
+    border-radius: 12px;
+    font-family: var(--font-primary);
+    font-size: 0.9rem;
+    font-weight: 800;
     cursor: pointer;
-    font-size: 0.85rem;
-    font-weight: 600;
     background: transparent;
-    color: #6b7280;
-    transition: background 0.15s, color 0.15s;
-}
-
-.dtd-btn-mode:hover:not(.dtd-btn-mode-active) {
-    background: #e5e7eb;
-    color: #374151;
+    color: var(--dtd-color-dark);
+    transition: all 0.2s;
 }
 
 .dtd-btn-mode-active {
-    background: #ffffff;
-    color: #7c3aed;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    background: #fff;
+    color: var(--dtd-color-lavender-deep);
+    box-shadow: 0 4px 0 rgba(0,0,0,0.05);
 }
 
-/* ── Manual position controls ───────────────────────────────────────────────── */
-
-.dtd-customization-position-panel {
-    border: 1px solid #e5e7eb;
-    border-radius: 8px;
-    padding: 0;
-}
-
-.dtd-customization-position-summary {
-    padding: 10px 14px;
+.dtd-customization-checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
     font-size: 0.9rem;
-    font-weight: 600;
-    color: #374151;
+    font-weight: 700;
     cursor: pointer;
-    user-select: none;
 }
 
-.dtd-customization-position-grid {
+.dtd-customization-checkbox-label input {
+    width: 20px;
+    height: 20px;
+    accent-color: var(--dtd-color-lavender);
+}
+
+.dtd-customization-spacer {
+    flex: 1;
+}
+
+/* ── Manual Position ───────────────────────────────────────────────────────── */
+
+.dtd-customization-manual-pos {
+    flex-shrink: 0;
+}
+
+.dtd-manual-pos-grid {
     display: flex;
     flex-direction: column;
     gap: 8px;
-    padding: 0 14px 14px;
+    padding-top: 12px;
 }
 
-.dtd-customization-position-row {
+.dtd-manual-pos-row {
     display: flex;
     align-items: center;
     gap: 12px;
 }
 
-.dtd-customization-position-label {
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: #374151;
-    min-width: 60px;
+.dtd-manual-pos-label {
+    flex: 1;
+    font-size: 0.8rem;
+    font-weight: 800;
 }
 
-.dtd-customization-position-input-label {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 0.85rem;
-    color: #6b7280;
-}
-
-.dtd-customization-position-input {
-    width: 70px;
+.dtd-customization-input-sm {
+    width: 60px;
     padding: 4px 8px;
-    border: 1px solid #d1d5db;
-    border-radius: 6px;
-    font-size: 0.85rem;
-    color: #111827;
+    border: 2px solid var(--dtd-color-bg-soft);
+    border-radius: 8px;
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
 }
 
-.dtd-customization-position-input:focus {
-    border-color: #7c3aed;
-    box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.1);
+/* ── Waiting View ─────────────────────────────────────────────────────────── */
+
+.dtd-customization-waiting-card {
+    flex: 1;
+    background: #fff;
+    border-radius: 40px;
+    border: 4px solid var(--dtd-color-mint);
+    box-shadow: 0 12px 0 var(--dtd-color-mint-deep);
+    padding: 40px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 32px;
+}
+
+.dtd-customization-waiting-icon {
+    font-size: 4rem;
+}
+
+.dtd-customization-waiting-text {
+    font-size: 1.5rem;
+    font-weight: 900;
+    color: var(--dtd-color-mint-deep);
+    margin-top: 16px;
+    text-align: center;
+}
+
+.dtd-customization-submitted-preview {
+    text-align: center;
+}
+
+.dtd-customization-submitted-name {
+    font-size: 2rem;
+    font-weight: 900;
+    color: var(--dtd-color-dark);
+    margin-bottom: 12px;
+}
+
+.dtd-customization-submitted-badge {
+    background: var(--dtd-color-lavender);
+    color: #fff;
+    padding: 6px 16px;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    font-weight: 800;
+}
+
+/* ── Responsive ────────────────────────────────────────────────────────────── */
+
+@media (max-width: 900px) {
+    .dtd-customization-editor-layout {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto 1fr;
+    }
+    
+    .dtd-customization-controls-panel {
+        flex-direction: row;
+        flex-wrap: wrap;
+        padding: 16px;
+    }
+    
+    .dtd-customization-field {
+        flex: 1;
+        min-width: 200px;
+    }
+    
+    .dtd-customization-spacer {
+        display: none;
+    }
+
+    .dtd-customization-actions {
+        width: 100%;
+    }
 }

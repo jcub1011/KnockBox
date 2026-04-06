@@ -19,8 +19,7 @@ public sealed class BaseRepositoryIntegrationTests
     [TestInitialize]
     public async Task Initialize()
     {
-        _connectionString = ResolveConnectionString() 
-            ?? throw new AssertInconclusiveException("Connection string not defined. Unable to complete test.");
+        _connectionString = ResolveConnectionString() ?? string.Empty;
 
         if (string.IsNullOrWhiteSpace(_connectionString))
         {
@@ -37,6 +36,7 @@ public sealed class BaseRepositoryIntegrationTests
     [TestCleanup]
     public async Task Cleanup()
     {
+        if (_factory is null) return;
         await using var ctx = await _factory.CreateDbContextAsync();
         await TruncateTestEntityAsync(ctx);
     }

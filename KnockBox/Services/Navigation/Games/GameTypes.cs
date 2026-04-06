@@ -21,6 +21,9 @@ namespace KnockBox.Services.Navigation.Games
         [Description("Consult The Card")]
         [NavigationString("consult-the-card")]
         ConsultTheCard,
+        [Description("Operator")]
+        [NavigationString("operator")]
+        Operator,
     }
 
     [AttributeUsage(AttributeTargets.Field, Inherited = false)]

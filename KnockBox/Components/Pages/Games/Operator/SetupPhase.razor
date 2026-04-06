@@ -1,0 +1,34 @@
+@using KnockBox.Operator.Models
+@using KnockBox.Operator.Services.State
+
+<div class="op-setup">
+    @if (IsHost())
+    {
+        int scoresSubmitted = GameState.GamePlayers.Values.Count(state => state.CurrentPoints != 0m);
+        int totalPlayers = GameState.GamePlayers.Values.Count;
+
+        <h2 class="op-phase-title">PLAYERS SELECTING STARTING SCORE</h2>
+        <div class="op-waiting-section">Waiting on players: @scoresSubmitted / @totalPlayers</div>
+    }
+    else
+    {
+        <h2 class="op-phase-title">CHOOSE YOUR STARTING SCORE</h2>
+    
+        <div class="op-setup-choices">
+            <div class="op-choice-btn op-choice-positive" @onclick="() => SubmitChoice(GameState.Config.InitialPointsPositive)">
+                <span class="op-choice-value">+@GameState.Config.InitialPointsPositive.ToString("F1")</span>
+            </div>
+
+            <div class="op-choice-btn op-choice-negative" @onclick="() => SubmitChoice(GameState.Config.InitialPointsNegative)">
+                <span class="op-choice-value">@GameState.Config.InitialPointsNegative.ToString("F1")</span>
+            </div>
+        </div>
+    
+        @if (ShouldShowWaiting())
+        {
+            <div class="op-waiting-section">
+                <p class="op-waiting-text">Choice locked! Waiting for others...</p>
+            </div>
+        }
+    }
+</div>

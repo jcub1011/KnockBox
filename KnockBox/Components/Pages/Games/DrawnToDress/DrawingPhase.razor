@@ -72,45 +72,48 @@
     else
     {
         <div class="dtd-drawing-player-panel">
-            <div class="dtd-drawing-counter" role="status">
-                <span>Your drawings this round:</span>
-                <strong>@mySubmitted@(myMax > 0 ? $" / {myMax}" : "")</strong>
-                @if (!canSubmit)
-                {
-                    <span class="dtd-drawing-counter-full">✅ Limit reached</span>
-                }
-            </div>
-
             @if (!isDone)
             {
-                <div class="dtd-drawing-canvas-wrapper" role="img" aria-label="Drawing canvas for @CurrentTypeName">
-                    <SvgDrawingCanvas @ref="_canvas"
-                                      Width="100%"
-                                      Height="@($"{CurrentTypeCanvasHeight}px")"
-                                      ViewBoxWidth="@CurrentTypeCanvasWidth"
-                                      ViewBoxHeight="@CurrentTypeCanvasHeight"
-                                      BackgroundColor="#ffffff"
-                                      BackgroundSvgContent="@MannequinSvg" />
+                <div class="dtd-drawing-canvas-container">
+                    <div class="dtd-drawing-canvas-wrapper" role="img" aria-label="Drawing canvas for @CurrentTypeName">
+                        <SvgDrawingCanvas @ref="_canvas"
+                                          Width="100%"
+                                          Height="100%"
+                                          ViewBoxWidth="@CurrentTypeCanvasWidth"
+                                          ViewBoxHeight="@CurrentTypeCanvasHeight"
+                                          BackgroundColor="#ffffff"
+                                          BackgroundSvgContent="@MannequinSvg" />
+                    </div>
                 </div>
 
-                <div class="dtd-drawing-actions">
-                    @if (canSubmit)
-                    {
-                        <button class="dtd-btn dtd-btn-primary" @onclick="SubmitDrawingAsync" disabled="@_submitting" aria-label="Submit Drawing">
-                            @if (_submitting)
-                            {
-                                <span>Submitting…</span>
-                            }
-                            else
-                            {
-                                <span>✅ Submit Drawing</span>
-                            }
-                        </button>
-                    }
+                <div class="dtd-drawing-footer">
+                    <div class="dtd-drawing-counter" role="status">
+                        <span>Drawing: @mySubmitted@(myMax > 0 ? $" / {myMax}" : "")</span>
+                        @if (!canSubmit)
+                        {
+                            <span class="dtd-drawing-counter-full">✅</span>
+                        }
+                    </div>
 
-                    <button class="dtd-btn dtd-btn-secondary" @onclick="MarkDoneAsync" disabled="@_submitting" aria-label="Done for this round">
-                        ⏭ Done for this round
-                    </button>
+                    <div class="dtd-drawing-actions">
+                        @if (canSubmit)
+                        {
+                            <button class="dtd-btn dtd-btn-primary" @onclick="SubmitDrawingAsync" disabled="@_submitting" aria-label="Submit Drawing">
+                                @if (_submitting)
+                                {
+                                    <span>Submitting…</span>
+                                }
+                                else
+                                {
+                                    <span>✅ Submit</span>
+                                }
+                            </button>
+                        }
+
+                        <button class="dtd-btn dtd-btn-secondary" @onclick="MarkDoneAsync" disabled="@_submitting" aria-label="Done for this round">
+                            ⏭ Done
+                        </button>
+                    </div>
                 </div>
 
                 @if (_errorMessage is not null)

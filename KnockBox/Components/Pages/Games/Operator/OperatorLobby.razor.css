@@ -1,0 +1,220 @@
+/* ══════════════════════════════════════════════════════════════════════════
+   OperatorLobby.razor.css
+   Parent-level styles + shared utility classes used across child components.
+   Component-specific styles live in each component's own .razor.css file.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Page Layout ─────────────────────────────────────────────────────────── */
+
+.op-page {
+    display: flex;
+    flex-direction: column;
+    min-height: 100%;
+    background: radial-gradient(ellipse at center, #1a0a0a 0%, #0f0505 100%);
+    color: #fff;
+    font-family: var(--font-primary);
+    position: relative;
+    overflow-y: auto;
+}
+
+/* Subtle diamond pattern overlay */
+.op-page::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+        45deg,
+        transparent,
+        transparent 20px,
+        rgba(230,57,70,0.015) 20px,
+        rgba(230,57,70,0.015) 21px
+    );
+    pointer-events: none;
+    z-index: 0;
+}
+
+.op-page > * {
+    position: relative;
+    z-index: 1;
+}
+
+/* ── Loading ── */
+
+.op-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    gap: 12px;
+    font-size: 1.2rem;
+    color: #e63946;
+    background: #0f0505;
+}
+
+.op-loading-icon {
+    font-size: 3rem;
+    animation: op-spin 2s linear infinite;
+}
+
+@keyframes op-spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* ── Error Toast ── */
+
+.op-error-toast {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #ff4757;
+    color: #fff;
+    padding: 12px 24px;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(255, 71, 87, 0.4);
+    z-index: 20000;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+    animation: op-toast-slide 3s ease-in-out forwards;
+    pointer-events: none;
+}
+
+.op-error-icon {
+    font-size: 1.2rem;
+}
+
+@keyframes op-toast-slide {
+    0% { opacity: 0; transform: translateX(-50%) translateY(-20px); }
+    10% { opacity: 1; transform: translateX(-50%) translateY(0); }
+    80% { opacity: 1; transform: translateX(-50%) translateY(0); }
+    100% { opacity: 0; transform: translateX(-50%) translateY(-20px); }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Shared Utility Styles (::deep)
+   These classes are used across multiple child components.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+::deep .op-waiting-text {
+    color: rgba(255,255,255,0.6);
+    font-style: italic;
+    font-size: 0.95rem;
+    margin: 0;
+}
+
+::deep .op-phase-title {
+    font-size: 1.6rem;
+    font-weight: 900;
+    color: #e63946;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    margin: 0 0 16px 0;
+    text-align: center;
+    text-shadow: 0 0 20px rgba(230,57,70,0.3);
+}
+
+::deep .op-section-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: rgba(255,255,255,0.7);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin: 0 0 8px 0;
+}
+
+/* ── Shared Buttons ── */
+
+::deep .op-btn {
+    font-family: var(--font-primary);
+    font-size: 0.9rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border: 3px solid #000;
+    border-radius: 8px;
+    box-shadow: 4px 4px 0 #000;
+    transition: transform 0.15s ease-out, box-shadow 0.15s ease-out;
+    cursor: pointer;
+    padding: 8px 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    white-space: nowrap;
+    background: none;
+    color: #fff;
+}
+
+::deep .op-btn:hover:not(:disabled) {
+    transform: translate(-2px, -2px);
+    box-shadow: 6px 6px 0 #000;
+}
+
+::deep .op-btn:active:not(:disabled) {
+    transform: translate(2px, 2px);
+    box-shadow: 2px 2px 0 #000;
+}
+
+::deep .op-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    box-shadow: none;
+    transform: none;
+    filter: grayscale(30%);
+}
+
+::deep .op-btn-primary {
+    background: #e63946;
+    color: #fff;
+}
+
+::deep .op-btn-primary:hover:not(:disabled) {
+    box-shadow: 6px 6px 0 #000, 0 0 20px rgba(230,57,70,0.3);
+}
+
+::deep .op-btn-secondary {
+    background: rgba(255,255,255,0.1);
+    border-color: rgba(255,255,255,0.2);
+    color: #fff;
+    backdrop-filter: blur(4px);
+}
+
+::deep .op-btn-danger {
+    background: #ff4757;
+    color: #fff;
+}
+
+::deep .op-btn-warning {
+    background: #ff9f1c;
+    color: #fff;
+}
+
+::deep .op-btn-success {
+    background: #2ecc71;
+    color: #fff;
+}
+
+::deep .op-btn-lg {
+    font-size: 1.1rem;
+    padding: 12px 28px;
+}
+
+::deep .op-btn-sm {
+    font-size: 0.75rem;
+    padding: 4px 10px;
+}
+
+/* ── Shared Badge ── */
+
+::deep .op-host-badge {
+    background: #ffd166;
+    color: #000;
+    font-size: 0.65rem;
+    font-weight: 900;
+    padding: 2px 6px;
+    border-radius: 4px;
+}

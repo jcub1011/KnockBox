@@ -3,6 +3,7 @@ using KnockBox.Services.State.Games.CardCounter;
 using KnockBox.Services.State.Games.CardCounter.Data;
 using KnockBox.Services.State.Users;
 using Microsoft.AspNetCore.Components;
+using CardCounterOperator = KnockBox.Services.State.Games.CardCounter.Operator;
 
 namespace KnockBox.Components.Pages.Games.CardCounter
 {
@@ -443,12 +444,12 @@ namespace KnockBox.Components.Pages.Games.CardCounter
             _ => ""
         };
 
-        protected static string GetOperatorSymbol(Operator op) => op switch
+        protected static string GetOperatorSymbol(CardCounterOperator op) => op switch
         {
-            Operator.Add => "+",
-            Operator.Subtract => "−",
-            Operator.Multiply => "×",
-            Operator.Divide => "÷",
+            CardCounterOperator.Add => "+",
+            CardCounterOperator.Subtract => "−",
+            CardCounterOperator.Multiply => "×",
+            CardCounterOperator.Divide => "÷",
             _ => "?"
         };
 
@@ -457,10 +458,10 @@ namespace KnockBox.Components.Pages.Games.CardCounter
             NumberCard nc => $"{nc.Value}",
             OperatorCard oc => oc.Op switch
             {
-                Operator.Add => "+",
-                Operator.Subtract => "−",
-                Operator.Multiply => "×",
-                Operator.Divide => "÷",
+                CardCounterOperator.Add => "+",
+                CardCounterOperator.Subtract => "−",
+                CardCounterOperator.Multiply => "×",
+                CardCounterOperator.Divide => "÷",
                 _ => "?"
             },
             _ => "?"

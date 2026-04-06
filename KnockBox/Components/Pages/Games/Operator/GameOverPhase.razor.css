@@ -1,0 +1,131 @@
+/* ── Game Over ────────────────────────────────────────────────────────────── */
+
+.op-game-over {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    padding: 40px;
+    gap: 30px;
+    position: relative;
+    overflow: hidden;
+}
+
+/* ── Confetti effect ── */
+
+.op-game-over::before,
+.op-game-over::after {
+    content: '';
+    position: absolute;
+    top: -10%;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    pointer-events: none;
+}
+
+.op-game-over::before {
+    left: 20%;
+    background: #e63946;
+    box-shadow:
+        60px 15px 0 #ffd166,
+        120px 30px 0 #2ecc71,
+        200px 10px 0 #ff2d55,
+        280px 40px 0 #a855f7,
+        350px 20px 0 #e63946,
+        430px 35px 0 #ffd166;
+    animation: op-confetti-fall 4s linear infinite;
+}
+
+.op-game-over::after {
+    left: 35%;
+    background: #ffd166;
+    box-shadow:
+        40px 20px 0 #e63946,
+        100px 5px 0 #a855f7,
+        170px 35px 0 #2ecc71,
+        240px 15px 0 #ff2d55,
+        310px 45px 0 #ffd166,
+        380px 25px 0 #e63946;
+    animation: op-confetti-fall 4s linear infinite 1s;
+}
+
+@keyframes op-confetti-fall {
+    0% { transform: translateY(-20px); opacity: 1; }
+    100% { transform: translateY(110vh); opacity: 0.3; }
+}
+
+/* ── Trophy Title ── */
+
+.op-game-over .op-phase-title {
+    animation: op-trophy-bounce 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+}
+
+@keyframes op-trophy-bounce {
+    0% { transform: scale(0.3); opacity: 0; }
+    50% { transform: scale(1.1); }
+    70% { transform: scale(0.95); }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+/* ── Leaderboard ── */
+
+.op-leaderboard {
+    background: rgba(15,5,5,0.6);
+    backdrop-filter: blur(8px);
+    border: 3px solid #e63946;
+    border-radius: 24px;
+    padding: 30px;
+    width: 100%;
+    max-width: 500px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    box-shadow: 0 0 30px rgba(230,57,70,0.15);
+}
+
+.op-leaderboard-entry {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 12px 20px;
+    background: rgba(255,255,255,0.03);
+    border-radius: 12px;
+    border: 2px solid transparent;
+    transition: all 0.3s;
+}
+
+.op-leaderboard-entry.winner {
+    background: rgba(230,57,70,0.12);
+    border-color: #e63946;
+    box-shadow: 0 0 20px rgba(230,57,70,0.2);
+}
+
+.op-entry-rank {
+    font-size: 1.5rem;
+    font-weight: 900;
+    min-width: 30px;
+}
+
+.op-entry-name {
+    flex: 1;
+    font-weight: 700;
+}
+
+.op-entry-score {
+    font-family: var(--font-mono);
+    font-weight: 900;
+    font-size: 1.2rem;
+}
+
+.op-entry-score-col {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+}
+
+.op-game-over-actions {
+    margin-top: 10px;
+}

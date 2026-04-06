@@ -1,0 +1,46 @@
+@using KnockBox.Operator.Services.State
+@using KnockBox.Operator.Models
+@using KnockBox.Operator.Services.Logic.FSM
+@using KnockBox.Core.Services.State.Games.Shared
+
+@if (GameState.Config.TimersEnabled && GameState.Context?.Fsm?.CurrentState is ITimedGameState<OperatorGameContext, OperatorCommand> timedState)
+{
+    var remaining = timedState.GetRemainingTime(GameState.Context!, DateTimeOffset.UtcNow);
+    if (remaining.IsSuccess && remaining.Value.TotalSeconds >= 0)
+    {
+        var endTime = DateTimeOffset.UtcNow.Add(remaining.Value);
+        var duration = GetTotalDuration();
+
+        <CountdownClock EndTimeUtc="endTime" Duration="duration" Context="countdown">
+            @{
+                var seconds = (int)Math.Ceiling(countdown.RemainingSeconds);
+                var dashOffset = Circumference * (1 - countdown.Fraction);
+            }
+            <div class="op-timer-container">
+                <div class="op-timer-card @(seconds < 5 ? "op-timer-urgent" : "")">
+                    <svg class="op-timer-ring" viewBox="0 0 60 60">
+                        <circle class="op-timer-ring-bg" cx="30" cy="30" r="26" />
+                        <circle class="op-timer-ring-fill" cx="30" cy="30" r="26"
+                                style="stroke-dashoffset: @dashOffset.ToString("F2")" />
+                    </svg>
+                    <span class="op-timer-text">@seconds</span>
+                </div>
+            </div>
+        </CountdownClock>
+    }
+}
+
+@code {
+    [Parameter] public OperatorGameState GameState { get; set; } = default!;
+
+    private const double Circumference = 2 * Math.PI * 26; // ~163.36
+
+    private TimeSpan GetTotalDuration() => GameState.Phase switch
+    {
+        OperatorGamePhase.Setup => GameState.Config.SetupPhaseTimeout,
+        OperatorGamePhase.Play => GameState.Config.PlayPhaseTimeout,
+        OperatorGamePhase.Reaction => GameState.Config.ReactionPhaseTimeout,
+        OperatorGamePhase.Draw => GameState.Config.DrawPhaseTimeout,
+        _ => TimeSpan.FromSeconds(30)
+    };
+}
