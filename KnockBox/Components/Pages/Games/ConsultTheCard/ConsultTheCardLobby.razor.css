@@ -8,11 +8,19 @@
     --font-mono: 'Share Tech Mono', monospace;
 }
 
+/* ── CRT Bezel (black background behind the distorted screen) ── */
+.ctc-crt-bezel {
+    width: 100%;
+    height: 100%;
+    background: #000;
+}
+
 /* ── CRT Screen Wrapper (fills article, barrel distortion filter applied) ── */
 .ctc-crt-screen {
     position: relative;
     width: 100%;
     height: 100%;
+    background: #000;
     filter: url(#barrel-distortion);
     overflow: hidden;
     font-family: var(--font-mono) !important;
@@ -34,7 +42,7 @@
     display: block;
     position: absolute;
     inset: 0;
-    background: radial-gradient(circle, rgba(50,205,50,0.03) 0%, rgba(0,0,0,0.4) 100%);
+    background: radial-gradient(ellipse, rgba(50,205,50,0.03) 0%, rgba(0,0,0,0) 40%, rgba(0,0,0,0.5) 70%, rgba(0,0,0,1) 100%);
     z-index: 3;
     pointer-events: none;
 }
@@ -44,7 +52,7 @@
     background: radial-gradient(ellipse at center, #0a0000 0%, #000000 100%) !important;
 }
 .ctc-state-informant::after {
-    background: radial-gradient(circle, rgba(231,76,60,0.05) 0%, rgba(20,0,0,0.8) 100%);
+    background: radial-gradient(ellipse, rgba(231,76,60,0.05) 0%, rgba(20,0,0,0) 40%, rgba(20,0,0,0.7) 70%, rgba(0,0,0,1) 100%);
     animation: ctc-heartbeat 2s infinite ease-in-out;
 }
 
