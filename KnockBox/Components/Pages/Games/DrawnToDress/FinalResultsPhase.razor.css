@@ -21,6 +21,7 @@
     box-shadow: 0 10px 0 var(--dtd-color-yellow-deep);
     position: relative;
     overflow: hidden;
+    flex-shrink: 0;
 }
 
 .dtd-final-results-winner::before {

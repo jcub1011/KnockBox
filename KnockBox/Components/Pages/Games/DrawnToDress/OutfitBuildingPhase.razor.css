@@ -10,7 +10,7 @@
     width: 100%;
     max-width: 1400px;
     margin: 0 auto;
-    overflow: hidden; /* Strict no-scroll on root */
+    overflow-y: auto; /* Allow scrolling if content overflows */
 }
 
 /* ── Header ────────────────────────────────────────────────────────────────── */

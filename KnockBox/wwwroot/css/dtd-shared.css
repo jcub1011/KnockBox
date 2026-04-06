@@ -176,7 +176,36 @@
     50% { transform: scale(1.05); }
 }
 
+/* ── Custom Playful Scrollbar ────────────────────────────────────────────────── */
+
+.dtd-game ::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+}
+
+.dtd-game ::-webkit-scrollbar-track {
+    background: var(--dtd-color-bg-soft);
+    border-radius: 10px;
+}
+
+.dtd-game ::-webkit-scrollbar-thumb {
+    background: var(--dtd-color-lavender);
+    border: 3px solid var(--dtd-color-bg-soft);
+    border-radius: 10px;
+    box-shadow: inset 0 -2px 0 var(--dtd-color-lavender-deep);
+}
+
+.dtd-game ::-webkit-scrollbar-thumb:hover {
+    background: var(--dtd-color-lavender-deep);
+}
+
 /* ── Utility Classes ────────────────────────────────────────────────────────── */
+
+.dtd-scrollable {
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+}
 
 .dtd-text-primary { font-family: var(--font-primary); }
 .dtd-text-mono { font-family: var(--font-mono); }
