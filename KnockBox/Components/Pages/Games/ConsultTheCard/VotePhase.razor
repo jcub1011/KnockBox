@@ -14,17 +14,17 @@
     }
 
     <div class="ctc-vote-panel">
-        <h2 class="ctc-phase-title">🗳️ VOTING PHASE</h2>
+        <h2 class="ctc-phase-title glitch" data-text="[ FINAL DESIGNATION ]">[ FINAL DESIGNATION ]</h2>
 
         <div class="ctc-vote-progress-bar">
-            @votedCount / @aliveCount votes cast
+            @votedCount / @aliveCount votes logged
         </div>
 
         @if (hasVoted)
         {
             <div class="ctc-vote-waiting">
-                <span class="ctc-lock-icon">🔒</span>
-                <p class="ctc-waiting-text">Your vote has been cast. Waiting for others...</p>
+                <span class="ctc-lock-icon">[ LOCKED ]</span>
+                <p class="ctc-waiting-text">Designation confirmed. Awaiting squad...</p>
             </div>
         }
         else if (myPlayer is not null && !myPlayer.IsEliminated)
@@ -44,19 +44,19 @@
             {
                 var targetName = GameState.GamePlayers.TryGetValue(_selectedTargetId, out var tp) ? tp.DisplayName : "...";
                 <div class="ctc-vote-confirm">
-                    <p>Eliminate <strong>@targetName</strong>?</p>
+                    <p>Designate <strong>@targetName</strong> for termination?</p>
                     <button class="ctc-btn ctc-btn-danger" @onclick="ConfirmVote">
-                        ✅ Confirm Vote
+                        [ CONFIRM TERMINATION ]
                     </button>
                     <button class="ctc-btn ctc-btn-secondary" @onclick="CancelSelection">
-                        ✕ Cancel
+                        [ ABORT ]
                     </button>
                 </div>
             }
         }
         else
         {
-            <p class="ctc-waiting-text">You have been eliminated and cannot vote.</p>
+            <p class="ctc-waiting-text">You have been terminated and cannot log a designation.</p>
         }
     </div>
 </div>

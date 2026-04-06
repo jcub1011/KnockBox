@@ -1,5 +1,129 @@
 /* ── Page layout ──────────────────────────────────────────────────────────── */
 
+/* ── SPY THEME OVERRIDES ── */
+
+:root {
+    --spy-crt-color: #32cd32;
+    --spy-dread-color: #e74c3c;
+    --font-mono: 'Share Tech Mono', monospace;
+}
+
+.ctc-page {
+    font-family: var(--font-mono) !important;
+}
+
+.ctc-page::before {
+    content: " ";
+    display: block;
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    right: 0;
+    background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+    z-index: 2;
+    background-size: 100% 2px, 3px 100%;
+    pointer-events: none;
+}
+
+.ctc-page::after {
+    content: " ";
+    display: block;
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    right: 0;
+    background: radial-gradient(circle, rgba(50,205,50,0.03) 0%, rgba(0,0,0,0.4) 100%);
+    z-index: 3;
+    pointer-events: none;
+}
+
+/* Informant Dread State */
+.ctc-state-informant {
+    background: radial-gradient(ellipse at center, #0a0000 0%, #000000 100%) !important;
+}
+.ctc-state-informant::after {
+    background: radial-gradient(circle, rgba(231,76,60,0.05) 0%, rgba(20,0,0,0.8) 100%);
+    animation: ctc-heartbeat 2s infinite ease-in-out;
+}
+
+@keyframes ctc-heartbeat {
+    0% { opacity: 0.8; }
+    20% { opacity: 1; }
+    40% { opacity: 0.8; }
+    100% { opacity: 0.8; }
+}
+
+/* Glitch Text Effect */
+::deep .glitch {
+    position: relative;
+    color: white;
+}
+::deep .glitch::before, ::deep .glitch::after {
+    content: attr(data-text);
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: inherit;
+}
+::deep .glitch::before {
+    left: 2px;
+    text-shadow: -1px 0 red;
+    animation: glitch-anim-1 2s infinite linear alternate-reverse;
+}
+::deep .glitch::after {
+    left: -2px;
+    text-shadow: -1px 0 blue;
+    animation: glitch-anim-2 3s infinite linear alternate-reverse;
+}
+@keyframes glitch-anim-1 {
+    0% { clip-path: inset(20% 0 80% 0); }
+    20% { clip-path: inset(60% 0 10% 0); }
+    40% { clip-path: inset(40% 0 50% 0); }
+    60% { clip-path: inset(80% 0 5% 0); }
+    80% { clip-path: inset(10% 0 70% 0); }
+    100% { clip-path: inset(30% 0 20% 0); }
+}
+@keyframes glitch-anim-2 {
+    0% { clip-path: inset(10% 0 60% 0); }
+    20% { clip-path: inset(30% 0 20% 0); }
+    40% { clip-path: inset(70% 0 10% 0); }
+    60% { clip-path: inset(20% 0 50% 0); }
+    80% { clip-path: inset(50% 0 30% 0); }
+    100% { clip-path: inset(5% 0 80% 0); }
+}
+
+/* Redacted Text */
+::deep .redacted-text {
+    background-color: #000;
+    color: #000;
+    transition: color 0.2s, background-color 0.2s;
+    user-select: none;
+}
+::deep .redacted-text:hover {
+    color: #32cd32;
+    background-color: transparent;
+}
+
+/* Typewriter Entry */
+::deep .typewriter-entry .ctc-clue-word {
+    overflow: hidden;
+    white-space: nowrap;
+    border-right: 2px solid #32cd32;
+    animation: typing 1s steps(40, end), blink-caret .75s step-end infinite;
+}
+@keyframes typing {
+  from { width: 0 }
+  to { width: 100% }
+}
+@keyframes blink-caret {
+  from, to { border-color: transparent }
+  50% { border-color: #32cd32; }
+}
+
 .ctc-page {
     display: flex;
     flex-direction: column;
@@ -23,7 +147,7 @@
     gap: 12px;
     margin-bottom: 20px;
     border: 2px solid rgba(255,255,255,0.2);
-    box-shadow: 0 4px 15px rgba(124,58,237,0.3);
+    box-shadow: 0 4px 15px rgba(15,56,15,0.3);
 }
 
 ::deep .ctc-secret-word-label {
@@ -606,7 +730,7 @@
     border: 3px solid #fff;
     border-radius: 16px;
     padding: 32px 48px;
-    box-shadow: 0 8px 32px rgba(124,58,237,0.4);
+    box-shadow: 0 8px 32px rgba(15,56,15,0.4);
     display: flex;
     flex-direction: column;
     gap: 8px;
@@ -674,15 +798,15 @@
 }
 
 ::deep .ctc-turn-you {
-    background: rgba(124,58,237,0.2);
+    background: rgba(15,56,15,0.2);
     border-color: #7c3aed;
     color: #a78bfa;
     animation: ctc-pulse-turn 1.5s infinite alternate;
 }
 
 @keyframes ctc-pulse-turn {
-    0% { box-shadow: 0 0 0 rgba(124,58,237,0); }
-    100% { box-shadow: 0 0 20px rgba(124,58,237,0.3); }
+    0% { box-shadow: 0 0 0 rgba(15,56,15,0); }
+    100% { box-shadow: 0 0 20px rgba(15,56,15,0.3); }
 }
 
 ::deep .ctc-clue-input-area {
@@ -1033,8 +1157,8 @@
     width: 100%;
     align-items: center;
     padding: 16px;
-    background: rgba(124,58,237,0.1);
-    border: 2px solid rgba(124,58,237,0.3);
+    background: rgba(15,56,15,0.1);
+    border: 2px solid rgba(15,56,15,0.3);
     border-radius: 12px;
 }
 
@@ -1290,4 +1414,7 @@
     gap: 12px;
     flex-wrap: wrap;
     justify-content: center;
+}
+
+center;
 }

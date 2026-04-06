@@ -16,7 +16,13 @@
 }
 else
 {
-    <div class="ctc-page">
+    var isInformant = false;
+    if (UserService.CurrentUser != null && GameState.GamePlayers.TryGetValue(UserService.CurrentUser.Id, out var p))
+    {
+        isInformant = p.Role == KnockBox.Services.State.Games.ConsultTheCard.Role.Informant;
+    }
+    
+    <div class="ctc-page @(isInformant ? "ctc-state-informant" : "")">
 
         @if (GameState.Config.EnableTimers && GameState.Context?.Fsm?.CurrentState is ITimedGameState<ConsultTheCardGameContext, ConsultTheCardCommand> timedState)
         {

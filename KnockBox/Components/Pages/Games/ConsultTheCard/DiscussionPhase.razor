@@ -18,12 +18,12 @@
     }
 
     <div class="ctc-discussion-panel">
-        <h2 class="ctc-phase-title">DISCUSSION & VOTING</h2>
+        <h2 class="ctc-phase-title glitch" data-text="[ INTEL ANALYSIS ]">[ INTEL ANALYSIS ]</h2>
 
         @if (myPlayer is not null && myPlayer.Role != Role.Informant && !string.IsNullOrEmpty(myPlayer.SecretWord))
         {
             <div class="ctc-secret-word-banner">
-                <span class="ctc-secret-word-label">Your Word:</span>
+                <span class="ctc-secret-word-label">Target Intel:</span>
                 <span class="ctc-secret-word-value">@myPlayer.SecretWord</span>
             </div>
         }
@@ -33,15 +33,15 @@
             <div class="ctc-eliminated-banner">
                 <span class="ctc-eliminated-icon"></span>
                 <div class="ctc-eliminated-text">
-                    <h3>YOU ARE ELIMINATED</h3>
-                    <p>You can no longer vote or give clues.</p>
+                    <h3>CONNECTION TERMINATED</h3>
+                    <p>Transmission capabilities disabled.</p>
                 </div>
             </div>
         }
 
         @* ── Player List ── *@
         <div class="ctc-discussion-players">
-            <h3 class="ctc-section-title">Cast Your Vote</h3>
+            <h3 class="ctc-section-title">[ TARGET DESIGNATION ]</h3>
             <div class="ctc-player-list">
                 @foreach (var ps in GameState.GamePlayers.Values.OrderBy(p => p.DisplayName))
                 {
@@ -133,8 +133,8 @@
             @if (hasLockedIn)
             {
                 <div class="ctc-vote-locked">
-                    <span class="ctc-lock-icon">🔒</span>
-                    <p class="ctc-waiting-text">Your vote is locked. Waiting for others...</p>
+                    <span class="ctc-lock-icon">[ LOCKED ]</span>
+                    <p class="ctc-waiting-text">Designation confirmed. Awaiting squad...</p>
                 </div>
             }
             else if (myPlayer is not null && !myPlayer.IsEliminated)
@@ -146,20 +146,20 @@
                     @if (targetSelected)
                     {
                         <button class="ctc-btn ctc-btn-danger ctc-btn-lg" @onclick="ConfirmVote">
-                            Lock-In Vote
+                            [ LOCK-IN DESIGNATION ]
                         </button>
                     }
                     else
                     {
                         <button class="ctc-btn ctc-btn-danger ctc-btn-lg ctc-lock-vote-disabled" disabled @onclick="ConfirmVote">
-                            Lock-In Vote
+                            [ LOCK-IN DESIGNATION ]
                         </button>
                     }
                 </div>
             }
             else if (myPlayer is not null && myPlayer.IsEliminated)
             {
-                <p class="ctc-waiting-text">You cannot vote.</p>
+                <p class="ctc-waiting-text">You are compromised and cannot vote.</p>
             }
 
             @* ── Actions ── *@
@@ -173,20 +173,20 @@
                         <div class="ctc-action-item">
                             <button class="ctc-btn ctc-btn-warning" @onclick="VoteToEndGame"
                                     title="@(hasVotedToEnd ? "Click to rescind your vote to end the game" : "Vote to end the game early")">
-                                @(hasVotedToEnd ? "❌ Rescind End Vote" : "🗳️ Vote to End Game")
+                                @(hasVotedToEnd ? "[ ABORT TERMINATION ]" : "[ INITIATE TERMINATION ]")
                             </button>
                             <div class="ctc-vote-small-progress">
-                                @endVote.VotedToEnd.Count / @endVote.RequiredVotes needed
+                                @endVote.VotedToEnd.Count / @endVote.RequiredVotes required
                             </div>
                         </div>
 
                         <div class="ctc-action-item">
                             <button class="ctc-btn ctc-btn-secondary" @onclick="SkipRemainingTime"
                                     title="@(hasVotedToSkip ? "Click to rescind your vote to skip time" : "Vote to skip the remaining discussion time")">
-                                @(hasVotedToSkip ? "❌ Rescind Skip Discussion" : "⏩ Vote to Skip Discussion")
+                                @(hasVotedToSkip ? "[ ABORT SKIP ]" : "[ FAST-FORWARD ]")
                             </button>
                             <div class="ctc-vote-small-progress">
-                                @skipVote.VotedToEnd.Count / @skipVote.RequiredVotes needed
+                                @skipVote.VotedToEnd.Count / @skipVote.RequiredVotes required
                             </div>
                         </div>
                     </div>
@@ -196,7 +196,7 @@
                 {
                     <div class="ctc-host-actions">
                         <button class="ctc-btn ctc-btn-primary" @onclick="AdvanceToVote">
-                            ⚡ Force Advance
+                            [ OVERRIDE PROTOCOL ]
                         </button>
                     </div>
                 }
