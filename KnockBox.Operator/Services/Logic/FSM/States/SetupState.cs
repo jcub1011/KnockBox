@@ -28,9 +28,9 @@ public class SetupState : IOperatorGameState, ITimedGameState<OperatorGameContex
     {
         if (command is SubmitSetupChoiceCommand setupCommand)
         {
-            if (setupCommand.Choice != 10m && setupCommand.Choice != -10m)
+            if (setupCommand.Choice != context.State.Config.InitialPointsPositive && setupCommand.Choice != context.State.Config.InitialPointsNegative)
             {
-                return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromError("Invalid choice. Must be 10.0 or -10.0.");
+                return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromError($"Invalid choice. Must be {context.State.Config.InitialPointsPositive} or {context.State.Config.InitialPointsNegative}.");
             }
 
             if (!context.GamePlayers.TryGetValue(setupCommand.PlayerId, out var playerState))
@@ -43,18 +43,15 @@ public class SetupState : IOperatorGameState, ITimedGameState<OperatorGameContex
             playerState.ScoreTimestamp = DateTimeOffset.UtcNow;
 
             // Check if everyone chose
-            if (context.GamePlayers.Values.All(p => p.CurrentPoints == 10m || p.CurrentPoints == -10m))
+            var posPoints = context.State.Config.InitialPointsPositive;
+            var negPoints = context.State.Config.InitialPointsNegative;
+            if (context.GamePlayers.Values.All(p => p.CurrentPoints == posPoints || p.CurrentPoints == negPoints))
             {
                 // Deal cards
                 context.State.Deck = OperatorGameContext.GenerateDeck(context.GamePlayers.Count, context.Rng);
                 foreach (var player in context.GamePlayers.Values)
                 {
-                    for (int i = 0; i < 5; i++)
-                    {
-                        var card = context.State.Deck[0];
-                        context.State.Deck.RemoveAt(0);
-                        player.Hand.Add(card);
-                    }
+                    context.DealCards(player, context.State.Config.MaxHandSize);
                 }
 
                 // Initialize TurnManager
@@ -89,23 +86,20 @@ public class SetupState : IOperatorGameState, ITimedGameState<OperatorGameContex
             {
                 if (p.CurrentPoints == 0m)
                 {
-                    p.CurrentPoints = 10m;
+                    p.CurrentPoints = context.State.Config.InitialPointsPositive;
                     p.ActiveOperator = CardOperator.Add;
                     p.ScoreTimestamp = DateTimeOffset.UtcNow;
                 }
             }
 
-            if (context.GamePlayers.Values.All(p => p.CurrentPoints == 10m || p.CurrentPoints == -10m))
+            var posPoints2 = context.State.Config.InitialPointsPositive;
+            var negPoints2 = context.State.Config.InitialPointsNegative;
+            if (context.GamePlayers.Values.All(p => p.CurrentPoints == posPoints2 || p.CurrentPoints == negPoints2))
             {
                 context.State.Deck = OperatorGameContext.GenerateDeck(context.GamePlayers.Count, context.Rng);
                 foreach (var player in context.GamePlayers.Values)
                 {
-                    for (int i = 0; i < 5; i++)
-                    {
-                        var card = context.State.Deck[0];
-                        context.State.Deck.RemoveAt(0);
-                        player.Hand.Add(card);
-                    }
+                    context.DealCards(player, context.State.Config.MaxHandSize);
                 }
 
                 context.State.TurnManager.SetTurnOrder(context.GamePlayers.Keys);

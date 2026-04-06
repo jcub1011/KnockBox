@@ -90,14 +90,7 @@
         _ => GameState.Phase.ToString().ToUpper()
     };
 
-    private string GetOperatorSymbol(CardOperator op) => op switch
-    {
-        CardOperator.Add => "+",
-        CardOperator.Subtract => "-",
-        CardOperator.Multiply => "\u00d7",
-        CardOperator.Divide => "\u00f7",
-        _ => "?"
-    };
+    private string GetOperatorSymbol(CardOperator op) => op.ToSymbol();
 
     private int GetDeckPercentage()
     {

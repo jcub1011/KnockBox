@@ -45,7 +45,7 @@ public sealed class LiabilityTransferCard()
         return context.GamePlayers.Values.Where(player => player != thisPlayer);
     }
 
-    public IEnumerable<Card> GetPotentialPairingCards(OperatorGameContext contex, OperatorPlayerState thisPlayer)
+    public IEnumerable<Card> GetPotentialPairingCards(OperatorGameContext context, OperatorPlayerState thisPlayer)
     {
         return thisPlayer.Hand.Where(c => c is NumberCard);
     }
@@ -66,7 +66,7 @@ public sealed class CookTheBooksCard()
     public override IEnumerable<OperatorPlayerState> GetPotentialTargets(OperatorGameContext context, OperatorPlayerState thisPlayer)
         => [thisPlayer];
 
-    public IEnumerable<Card> GetPotentialPairingCards(OperatorGameContext contex, OperatorPlayerState thisPlayer)
+    public IEnumerable<Card> GetPotentialPairingCards(OperatorGameContext context, OperatorPlayerState thisPlayer)
     {
         return thisPlayer.Hand.Where(c => c is NumberCard);
     }
@@ -130,7 +130,7 @@ public sealed class HotPotatoCard()
         return context.GamePlayers.Values.Where(player => player != thisPlayer);
     }
 
-    public IEnumerable<Card> GetPotentialPairingCards(OperatorGameContext contex, OperatorPlayerState thisPlayer)
+    public IEnumerable<Card> GetPotentialPairingCards(OperatorGameContext context, OperatorPlayerState thisPlayer)
     {
         return thisPlayer.Hand.Where(c => c is NumberCard);
     }
@@ -143,18 +143,11 @@ public sealed class FlashFloodCard() : ActionCard(CardAction.FlashFlood)
 {
     public override string CardIcon() => "\ud83c\udf0a";
     public override string TooltipName() => "Flash Flood";
-    public override string TooltipDescription() => "Forces a target player to draw 2 extra cards from the deck.";
+    public override string TooltipDescription() => "All players draw 2 extra cards from the deck.";
 
-    public override IEnumerable<Card> GetPotentialReactionCards(OperatorGameContext context, OperatorPlayerState thisPlayer)
-    {
-        return thisPlayer.Hand.Where(c => c is ActionCard { ActionValue: CardAction.Shield });
-    }
+    public override IEnumerable<Card> GetPotentialReactionCards(OperatorGameContext context, OperatorPlayerState thisPlayer) => [];
 
-    public override IEnumerable<OperatorPlayerState> GetPotentialTargets(OperatorGameContext context, OperatorPlayerState thisPlayer)
-    {
-        if (context.State.Deck.Count <= 0) return [];
-        return context.GamePlayers.Values;
-    }
+    public override IEnumerable<OperatorPlayerState> GetPotentialTargets(OperatorGameContext context, OperatorPlayerState thisPlayer) => [];
 
     public override bool IsPlayable(OperatorGameContext context, OperatorPlayerState thisPlayer)
         => context.State.Deck.Count > 0;

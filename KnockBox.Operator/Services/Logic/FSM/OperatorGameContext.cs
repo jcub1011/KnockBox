@@ -97,6 +97,17 @@ public class OperatorGameContext(OperatorGameState state, IRandomNumberService r
         }
     }
 
+    public void DealCards(OperatorPlayerState player, int count)
+    {
+        for (int i = 0; i < count; i++)
+        {
+            if (State.Deck.Count == 0) break;
+            var card = State.Deck[0];
+            State.Deck.RemoveAt(0);
+            player.Hand.Add(card);
+        }
+    }
+
     public static (decimal NewScore, CardOperator NewOperator) CalculateNewScore(decimal currentScore, CardOperator op, decimal value)
     {
         if (op == CardOperator.Divide && value == 0m)
@@ -169,18 +180,11 @@ public class OperatorGameContext(OperatorGameState state, IRandomNumberService r
         }
     }
 
-    public void ResolveFlashFlood(string targetPlayerId)
+    public void ResolveFlashFlood()
     {
-        if (GamePlayers.TryGetValue(targetPlayerId, out var target))
+        foreach (var player in GamePlayers.Values)
         {
-            for (int i = 0; i < 2; i++)
-            {
-                if (State.Deck.Count > 0)
-                {
-                    target.Hand.Add(State.Deck[0]);
-                    State.Deck.RemoveAt(0);
-                }
-            }
+            DealCards(player, 2);
         }
     }
 

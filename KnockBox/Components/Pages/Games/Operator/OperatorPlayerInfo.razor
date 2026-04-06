@@ -1,3 +1,4 @@
+@implements IDisposable
 @using KnockBox.Operator.Models
 
 <div class="op-player-info @(IsActive ? "active" : "") @(IsTargetable ? "targetable" : "") @(IsTargeted ? "targeted" : "")" @onclick="OnClick">
@@ -39,29 +40,46 @@
     private CardOperator? _prevOp;
     private bool _opChanged;
 
+    private CancellationTokenSource _cts = new();
+
     protected override void OnParametersSet()
     {
         if (_prevScore.HasValue && _prevScore.Value != Score)
         {
             _scoreChanged = true;
-            _ = Task.Delay(1000).ContinueWith(_ => { _scoreChanged = false; InvokeAsync(StateHasChanged); });
+            var token = _cts.Token;
+            _ = Task.Delay(1000, token).ContinueWith(_ =>
+            {
+                if (!token.IsCancellationRequested)
+                {
+                    _scoreChanged = false;
+                    InvokeAsync(StateHasChanged);
+                }
+            }, token, TaskContinuationOptions.OnlyOnRanToCompletion, TaskScheduler.Default);
         }
         _prevScore = Score;
 
         if (_prevOp.HasValue && _prevOp.Value != ActiveOperator)
         {
             _opChanged = true;
-            _ = Task.Delay(1000).ContinueWith(_ => { _opChanged = false; InvokeAsync(StateHasChanged); });
+            var token = _cts.Token;
+            _ = Task.Delay(1000, token).ContinueWith(_ =>
+            {
+                if (!token.IsCancellationRequested)
+                {
+                    _opChanged = false;
+                    InvokeAsync(StateHasChanged);
+                }
+            }, token, TaskContinuationOptions.OnlyOnRanToCompletion, TaskScheduler.Default);
         }
         _prevOp = ActiveOperator;
     }
 
-    private string GetOperatorSymbol() => ActiveOperator switch
+    private string GetOperatorSymbol() => ActiveOperator.ToSymbol();
+
+    public void Dispose()
     {
-        CardOperator.Add => "+",
-        CardOperator.Subtract => "-",
-        CardOperator.Multiply => "×",
-        CardOperator.Divide => "÷",
-        _ => "?"
-    };
+        _cts.Cancel();
+        _cts.Dispose();
+    }
 }

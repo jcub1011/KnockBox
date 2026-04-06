@@ -45,7 +45,8 @@ public class PlayPhaseState : IOperatorGameState, ITimedGameState<OperatorGameCo
 
         if (command is SkipTurnCommand skip)
         {
-            var pState = context.GamePlayers[skip.PlayerId];
+            if (!context.GamePlayers.TryGetValue(skip.PlayerId, out var pState))
+                return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromError("Player not found.");
             if (!pState.Hand.Any(c => c.IsPlayable(context, pState)))
             {
                 context.State.Phase = OperatorGamePhase.Draw;
@@ -56,11 +57,12 @@ public class PlayPhaseState : IOperatorGameState, ITimedGameState<OperatorGameCo
 
         if (command is EndTurnCommand end)
         {
-            var pState = context.GamePlayers[end.PlayerId];
+            if (!context.GamePlayers.TryGetValue(end.PlayerId, out var pState))
+                return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromError("Player not found.");
             if (!pState.HasPlayedCardThisTurn)
                 return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromError("Cannot end turn before playing a card.");
-            if (pState.Hand.Count > 5)
-                return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromError("Cannot end turn with more than 5 cards.");
+            if (pState.Hand.Count > context.State.Config.MaxHandSize)
+                return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromError($"Cannot end turn with more than {context.State.Config.MaxHandSize} cards.");
 
             context.State.Phase = OperatorGamePhase.Draw;
             return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromValue(new DrawPhaseState());
@@ -71,7 +73,8 @@ public class PlayPhaseState : IOperatorGameState, ITimedGameState<OperatorGameCo
             if (play.CardIds.Count == 0)
                 return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromError("Must play at least 1 card.");
 
-            var pState = context.GamePlayers[play.PlayerId];
+            if (!context.GamePlayers.TryGetValue(play.PlayerId, out var pState))
+                return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromError("Player not found.");
             var playedCards = new List<Card>();
 
             foreach (var id in play.CardIds)
@@ -116,7 +119,7 @@ public class PlayPhaseState : IOperatorGameState, ITimedGameState<OperatorGameCo
             bool hasTargetedAction = playedCards.OfType<ActionCard>().Any(c =>
                 (c.ActionValue == CardAction.Steal || c.ActionValue == CardAction.LiabilityTransfer ||
                  c.ActionValue == CardAction.HostileTakeover || c.ActionValue == CardAction.Audit ||
-                 c.ActionValue == CardAction.HotPotato || c.ActionValue == CardAction.FlashFlood));
+                 c.ActionValue == CardAction.HotPotato));
 
             bool hasTargetedOperator = playedCards.Any(c => c.Type == CardType.Operator)
                 && !string.IsNullOrEmpty(play.TargetPlayerId)
@@ -133,6 +136,9 @@ public class PlayPhaseState : IOperatorGameState, ITimedGameState<OperatorGameCo
 
             if ((hasTargetedAction || hasTargetedOperator) && !string.IsNullOrEmpty(play.TargetPlayerId) && play.TargetPlayerId != play.PlayerId)
             {
+                if (!context.GamePlayers.ContainsKey(play.TargetPlayerId))
+                    return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromError("Target player not found.");
+
                 context.State.PendingActionCommand = play;
                 context.State.ReactionTargetPlayerId = play.TargetPlayerId;
 
@@ -172,7 +178,8 @@ public class PlayPhaseState : IOperatorGameState, ITimedGameState<OperatorGameCo
 
     public static void ResolvePlayedCards(OperatorGameContext context, PlayCardsCommand play, List<Card> playedCards, bool actionBlocked)
     {
-        var pState = context.GamePlayers[play.PlayerId];
+        if (!context.GamePlayers.TryGetValue(play.PlayerId, out var pState))
+            return;
         var actionCards = playedCards.OfType<ActionCard>().ToList();
         var numbers = playedCards.OfType<NumberCard>().ToList();
 
@@ -219,9 +226,9 @@ public class PlayPhaseState : IOperatorGameState, ITimedGameState<OperatorGameCo
                     context.ResolveHotPotato(play.TargetPlayerId, val);
                     numbers.Clear();
                 }
-                else if (action.ActionValue == CardAction.FlashFlood && play.TargetPlayerId != null)
+                else if (action.ActionValue == CardAction.FlashFlood)
                 {
-                    context.ResolveFlashFlood(play.TargetPlayerId);
+                    context.ResolveFlashFlood();
                 }
                 else if (action.ActionValue == CardAction.HostileTakeover && play.TargetPlayerId != null)
                 {
@@ -292,6 +299,9 @@ public class PlayPhaseState : IOperatorGameState, ITimedGameState<OperatorGameCo
         if (playerId == null || !context.GamePlayers.TryGetValue(playerId, out var pState))
             return;
 
+        if (pState.Hand.Count == 0)
+            return;
+
         // Skip if hand is all Shields (valid skip per spec)
         if (pState.Hand.All(c => c is ShieldCard))
             return;
@@ -325,8 +335,8 @@ public class PlayPhaseState : IOperatorGameState, ITimedGameState<OperatorGameCo
             context.State.DiscardPile.Add(discarded);
         }
 
-        // Discard extra cards to bring hand size down to 5
-        while (pState.Hand.Count > 5)
+        // Discard extra cards to bring hand size down to max
+        while (pState.Hand.Count > context.State.Config.MaxHandSize)
         {
             // Prefer discarding non-Shield cards
             var nonShieldIdx = pState.Hand.FindIndex(c => c is not ShieldCard);

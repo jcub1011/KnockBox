@@ -15,12 +15,12 @@
         <h2 class="op-phase-title">CHOOSE YOUR STARTING SCORE</h2>
     
         <div class="op-setup-choices">
-            <div class="op-choice-btn op-choice-positive" @onclick="() => SubmitChoice(10m)">
-                <span class="op-choice-value">+10.0</span>
+            <div class="op-choice-btn op-choice-positive" @onclick="() => SubmitChoice(GameState.Config.InitialPointsPositive)">
+                <span class="op-choice-value">+@GameState.Config.InitialPointsPositive.ToString("F1")</span>
             </div>
-        
-            <div class="op-choice-btn op-choice-negative" @onclick="() => SubmitChoice(-10m)">
-                <span class="op-choice-value">-10.0</span>
+
+            <div class="op-choice-btn op-choice-negative" @onclick="() => SubmitChoice(GameState.Config.InitialPointsNegative)">
+                <span class="op-choice-value">@GameState.Config.InitialPointsNegative.ToString("F1")</span>
             </div>
         </div>
     

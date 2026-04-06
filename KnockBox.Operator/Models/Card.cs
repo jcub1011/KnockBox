@@ -33,6 +33,18 @@ public enum CardAction
     MarketCrash
 }
 
+public static class CardOperatorExtensions
+{
+    public static string ToSymbol(this CardOperator op) => op switch
+    {
+        CardOperator.Add => "+",
+        CardOperator.Subtract => "-",
+        CardOperator.Multiply => "\u00d7",
+        CardOperator.Divide => "\u00f7",
+        _ => "?"
+    };
+}
+
 public interface ITargetableCard
 {
     /// <summary>

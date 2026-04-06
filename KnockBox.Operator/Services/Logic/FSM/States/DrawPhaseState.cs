@@ -17,15 +17,8 @@ public class DrawPhaseState : IOperatorGameState
         var playerId = context.State.TurnManager.CurrentPlayer;
         if (playerId != null && context.GamePlayers.TryGetValue(playerId, out var pState))
         {
-            int cardsNeeded = Math.Min(3, 5 - pState.Hand.Count);
-
-            for (int i = 0; i < cardsNeeded; i++)
-            {
-                if (context.State.Deck.Count == 0) break;
-                var card = context.State.Deck[0];
-                context.State.Deck.RemoveAt(0);
-                pState.Hand.Add(card);
-            }
+            int cardsNeeded = Math.Min(context.State.Config.MaxDrawPerTurn, context.State.Config.MaxHandSize - pState.Hand.Count);
+            context.DealCards(pState, cardsNeeded);
         }
 
         // Check game-over condition: deck empty and no player has playable cards

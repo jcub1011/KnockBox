@@ -93,7 +93,7 @@
                 await _jsModule.InvokeVoidAsync("stop", _clockId);
                 await _jsModule.DisposeAsync();
             }
-            catch (JSDisconnectedException) { }
+            catch (Exception) { }
         }
         _dotNetRef?.Dispose();
     }

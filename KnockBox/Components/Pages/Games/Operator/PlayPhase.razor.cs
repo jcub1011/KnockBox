@@ -329,17 +329,20 @@ namespace KnockBox.Components.Pages.Games.Operator
 
         private async Task PlayCardSet(List<Guid> cardIds)
         {
-            if (UserService.CurrentUser == null) return;
+            if (UserService.CurrentUser == null || !IsMyTurn) return;
 
             var command = new PlayCardsCommand(UserService.CurrentUser.Id, cardIds, _targetPlayerId);
-            var result = await GameEngine.ExecuteCommandAsync(GameState, command);
-
-            if (result.TryGetFailure(out var error))
+            try
             {
-                await OnError.InvokeAsync(error.PublicMessage);
-                Logger.LogError("Failed to play cards: {Error}", error);
+                var result = await GameEngine.ExecuteCommandAsync(GameState, command);
+
+                if (result.TryGetFailure(out var error))
+                {
+                    await OnError.InvokeAsync(error.PublicMessage);
+                    Logger.LogError("Failed to play cards: {Error}", error);
+                }
             }
-            else
+            finally
             {
                 ClearSelection();
             }
@@ -406,13 +409,7 @@ namespace KnockBox.Components.Pages.Games.Operator
             return total > 0 ? (int)(100.0 * GameState.Deck.Count / total) : 0;
         }
 
-        protected string GetActiveOperatorSymbol() => CurrentPlayerState?.ActiveOperator switch
-        {
-            CardOperator.Add => "+",
-            CardOperator.Subtract => "-",
-            CardOperator.Multiply => "\u00d7",
-            CardOperator.Divide => "\u00f7",
-            _ => "?"
-        };
+        protected string GetActiveOperatorSymbol() =>
+            CurrentPlayerState?.ActiveOperator.ToSymbol() ?? "?";
     }
 }

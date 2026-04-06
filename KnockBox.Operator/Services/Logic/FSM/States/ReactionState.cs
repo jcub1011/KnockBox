@@ -41,7 +41,8 @@ public class ReactionState : IOperatorGameState, ITimedGameState<OperatorGameCon
 
         if (command is PlayReactionCommand react)
         {
-            var pState = context.GamePlayers[react.PlayerId];
+            if (!context.GamePlayers.TryGetValue(react.PlayerId, out var pState))
+                return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromError("Player not found.");
             var shieldIdx = pState.Hand.FindIndex(c => c.Id == react.ShieldCardId && c is ShieldCard);
 
             if (shieldIdx == -1) return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromError("Shield not found.");
@@ -78,7 +79,8 @@ public class ReactionState : IOperatorGameState, ITimedGameState<OperatorGameCon
             return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromError("No Hot Potato to redirect.");
 
         // Verify the reactor has a Hot Potato card
-        var pState = context.GamePlayers[redirect.PlayerId];
+        if (!context.GamePlayers.TryGetValue(redirect.PlayerId, out var pState))
+            return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromError("Player not found.");
         var hpIdx = pState.Hand.FindIndex(c => c.Id == redirect.HotPotatoCardId && c is HotPotatoCard);
 
         if (hpIdx == -1)
@@ -161,7 +163,7 @@ public class ReactionState : IOperatorGameState, ITimedGameState<OperatorGameCon
 
         if (!canReact)
         {
-            var remaining = TimeSpan.FromSeconds(5) - elapsed;
+            var remaining = context.State.Config.NoReactionTimeout - elapsed;
             return ValueResult<TimeSpan>.FromValue(remaining > TimeSpan.Zero ? remaining : TimeSpan.Zero);
         }
 
@@ -177,7 +179,7 @@ public class ReactionState : IOperatorGameState, ITimedGameState<OperatorGameCon
         bool canReact = TargetCanReact(context);
 
         bool isTimeout = false;
-        if (!canReact && elapsed >= TimeSpan.FromSeconds(5))
+        if (!canReact && elapsed >= context.State.Config.NoReactionTimeout)
         {
             isTimeout = true;
         }

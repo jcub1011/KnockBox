@@ -38,8 +38,9 @@ namespace KnockBox.Components.Pages.Games.Operator
             if (IsHost()) return true;
             if (GameState.Context == null) return false;
             
-            return GameState.Context.GamePlayers.TryGetValue(UserService.CurrentUser.Id, out var playerState) 
-                   && (playerState.CurrentPoints == 10m || playerState.CurrentPoints == -10m);
+            return GameState.Context.GamePlayers.TryGetValue(UserService.CurrentUser.Id, out var playerState)
+                   && (playerState.CurrentPoints == GameState.Config.InitialPointsPositive
+                       || playerState.CurrentPoints == GameState.Config.InitialPointsNegative);
         }
     }
 }
