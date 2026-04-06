@@ -6,7 +6,6 @@ using KnockBox.Services.State.Games.ConsultTheCard;
 using KnockBox.Services.State.Games.Shared;
 using KnockBox.Services.State.Users;
 using Microsoft.AspNetCore.Components;
-using Microsoft.JSInterop;
 
 namespace KnockBox.Components.Pages.Games.ConsultTheCard
 {
@@ -24,14 +23,12 @@ namespace KnockBox.Components.Pages.Games.ConsultTheCard
 
         [Inject] protected ILogger<ConsultTheCardLobby> Logger { get; set; } = default!;
 
-        [Inject] protected IJSRuntime JSRuntime { get; set; } = default!;
 
         [Parameter] public string ObfuscatedRoomCode { get; set; } = default!;
 
         private IDisposable? _stateSubscription;
         private IDisposable? _tickSubscription;
         private bool _kickHandled;
-        private bool _barrelDistortionInitialized;
 
         // ── Error toast state ─────────────────────────────────────────────────
         private string? _errorMessage;
@@ -91,11 +88,6 @@ namespace KnockBox.Components.Pages.Games.ConsultTheCard
                 GameSessionService.LeaveCurrentSession(navigateHome: true);
             }
 
-            if (!_barrelDistortionInitialized && GameState != null)
-            {
-                _barrelDistortionInitialized = true;
-                await JSRuntime.InvokeVoidAsync("initBarrelDistortion", "barrel-distortion-map", 1920);
-            }
 
             await base.OnAfterRenderAsync(firstRender);
         }
