@@ -22,62 +22,73 @@ else
         isInformant = p.Role == KnockBox.Services.State.Games.ConsultTheCard.Role.Informant;
     }
     
-    <div class="ctc-page @(isInformant ? "ctc-state-informant" : "")">
+    <div class="ctc-crt-screen @(isInformant ? "ctc-state-informant" : "")">
+        <div class="ctc-page">
 
-        @if (GameState.Config.EnableTimers && GameState.Context?.Fsm?.CurrentState is ITimedGameState<ConsultTheCardGameContext, ConsultTheCardCommand> timedState)
-        {
-            var remaining = timedState.GetRemainingTime(GameState.Context!, DateTimeOffset.UtcNow);
-            if (remaining.IsSuccess)
+            @if (GameState.Config.EnableTimers && GameState.Context?.Fsm?.CurrentState is ITimedGameState<ConsultTheCardGameContext, ConsultTheCardCommand> timedState)
             {
-                var seconds = (int)Math.Ceiling(remaining.Value.TotalSeconds);
-                if (seconds >= 0)
+                var remaining = timedState.GetRemainingTime(GameState.Context!, DateTimeOffset.UtcNow);
+                if (remaining.IsSuccess)
                 {
-                    <div class="ctc-timer-container">
-                        <div class="ctc-timer-card @(seconds < 5 ? "ctc-timer-urgent" : "")">
-                            ⏳ @seconds
+                    var seconds = (int)Math.Ceiling(remaining.Value.TotalSeconds);
+                    if (seconds >= 0)
+                    {
+                        <div class="ctc-timer-container">
+                            <div class="ctc-timer-card @(seconds < 5 ? "ctc-timer-urgent" : "")">
+                                ⏳ @seconds
+                            </div>
                         </div>
-                    </div>
+                    }
                 }
             }
-        }
 
-        @* ── Error toast ── *@
-        @if (_errorMessage is not null)
-        {
-            <div @key="_errorKey" class="ctc-error-toast" @onanimationend="DismissError">
-                <span class="ctc-error-icon">⚠️</span>
-                <span>@_errorMessage</span>
-            </div>
-        }
-
-        @if (GameState.IsJoinable)
-        {
-            <LobbyPhase GameState="GameState" />
-        }
-        else
-        {
-            @switch (GameState.Phase)
+            @* ── Error toast ── *@
+            @if (_errorMessage is not null)
             {
-                case ConsultTheCardGamePhase.Setup:
-                    <SetupPhase GameState="GameState" />
-                    break;
-                case ConsultTheCardGamePhase.CluePhase:
-                    <CluePhase GameState="GameState" OnError="ShowError" />
-                    break;
-                case ConsultTheCardGamePhase.Discussion:
-                    <DiscussionPhase GameState="GameState" OnError="ShowError" />
-                    break;
-                case ConsultTheCardGamePhase.Voting:
-                    <VotePhase GameState="GameState" OnError="ShowError" />
-                    break;
-                case ConsultTheCardGamePhase.Reveal:
-                    <RevealPhase GameState="GameState" OnError="ShowError" />
-                    break;
-                case ConsultTheCardGamePhase.GameOver:
-                    <GameOverPhase GameState="GameState" />
-                    break;
+                <div @key="_errorKey" class="ctc-error-toast" @onanimationend="DismissError">
+                    <span class="ctc-error-icon">⚠️</span>
+                    <span>@_errorMessage</span>
+                </div>
             }
-        }
 
+            @if (GameState.IsJoinable)
+            {
+                <LobbyPhase GameState="GameState" />
+            }
+            else
+            {
+                @switch (GameState.Phase)
+                {
+                    case ConsultTheCardGamePhase.Setup:
+                        <SetupPhase GameState="GameState" />
+                        break;
+                    case ConsultTheCardGamePhase.CluePhase:
+                        <CluePhase GameState="GameState" OnError="ShowError" />
+                        break;
+                    case ConsultTheCardGamePhase.Discussion:
+                        <DiscussionPhase GameState="GameState" OnError="ShowError" />
+                        break;
+                    case ConsultTheCardGamePhase.Voting:
+                        <VotePhase GameState="GameState" OnError="ShowError" />
+                        break;
+                    case ConsultTheCardGamePhase.Reveal:
+                        <RevealPhase GameState="GameState" OnError="ShowError" />
+                        break;
+                    case ConsultTheCardGamePhase.GameOver:
+                        <GameOverPhase GameState="GameState" />
+                        break;
+                }
+            }
+
+        </div>
     </div>
+
+    <svg style="position:absolute;width:0;height:0;overflow:hidden">
+        <defs>
+            <filter id="barrel-distortion" x="0%" y="0%" width="100%" height="100%" color-interpolation-filters="sRGB">
+                <feImage id="barrel-distortion-map" result="distMap" preserveAspectRatio="none" />
+                <feDisplacementMap in="SourceGraphic" in2="distMap" scale="50" xChannelSelector="R" yChannelSelector="G" />
+            </filter>
+        </defs>
+    </svg>
 }

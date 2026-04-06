@@ -8,39 +8,39 @@
     --font-mono: 'Share Tech Mono', monospace;
 }
 
-.ctc-page {
+/* ── CRT Screen Wrapper (fills article, barrel distortion filter applied) ── */
+.ctc-crt-screen {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    filter: url(#barrel-distortion);
+    overflow: hidden;
     font-family: var(--font-mono) !important;
 }
 
-.ctc-page::before {
+.ctc-crt-screen::before {
     content: " ";
     display: block;
     position: absolute;
-    top: 0;
-    left: 0;
-    bottom: 0;
-    right: 0;
+    inset: 0;
     background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
     z-index: 2;
     background-size: 100% 2px, 3px 100%;
     pointer-events: none;
 }
 
-.ctc-page::after {
+.ctc-crt-screen::after {
     content: " ";
     display: block;
     position: absolute;
-    top: 0;
-    left: 0;
-    bottom: 0;
-    right: 0;
+    inset: 0;
     background: radial-gradient(circle, rgba(50,205,50,0.03) 0%, rgba(0,0,0,0.4) 100%);
     z-index: 3;
     pointer-events: none;
 }
 
 /* Informant Dread State */
-.ctc-state-informant {
+.ctc-state-informant .ctc-page {
     background: radial-gradient(ellipse at center, #0a0000 0%, #000000 100%) !important;
 }
 .ctc-state-informant::after {
@@ -55,45 +55,25 @@
     100% { opacity: 0.8; }
 }
 
-/* Glitch Text Effect */
+/* Glitch Text Effect - REFINED & SUBTLE */
 ::deep .glitch {
     position: relative;
     color: white;
+    display: inline-block;
+    animation: ctc-glitch-simple 10s infinite; /* Much slower */
 }
+
+/* Remove text doubling pseudo-elements */
 ::deep .glitch::before, ::deep .glitch::after {
-    content: attr(data-text);
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: inherit;
+    display: none !important;
 }
-::deep .glitch::before {
-    left: 2px;
-    text-shadow: -1px 0 red;
-    animation: glitch-anim-1 2s infinite linear alternate-reverse;
-}
-::deep .glitch::after {
-    left: -2px;
-    text-shadow: -1px 0 blue;
-    animation: glitch-anim-2 3s infinite linear alternate-reverse;
-}
-@keyframes glitch-anim-1 {
-    0% { clip-path: inset(20% 0 80% 0); }
-    20% { clip-path: inset(60% 0 10% 0); }
-    40% { clip-path: inset(40% 0 50% 0); }
-    60% { clip-path: inset(80% 0 5% 0); }
-    80% { clip-path: inset(10% 0 70% 0); }
-    100% { clip-path: inset(30% 0 20% 0); }
-}
-@keyframes glitch-anim-2 {
-    0% { clip-path: inset(10% 0 60% 0); }
-    20% { clip-path: inset(30% 0 20% 0); }
-    40% { clip-path: inset(70% 0 10% 0); }
-    60% { clip-path: inset(20% 0 50% 0); }
-    80% { clip-path: inset(50% 0 30% 0); }
-    100% { clip-path: inset(5% 0 80% 0); }
+
+@keyframes ctc-glitch-simple {
+    0%, 95%, 100% { transform: translate(0) scale(1); opacity: 1; filter: blur(0); }
+    96% { transform: translate(-1px, 0.5px) scale(1.01); opacity: 0.9; filter: blur(0.5px); }
+    97% { transform: translate(1px, -0.5px) scale(0.99); opacity: 0.8; }
+    98% { transform: translate(-0.5px, 1px); opacity: 0.9; filter: blur(0); }
+    99% { transform: translate(0.5px, -1px); opacity: 1; }
 }
 
 /* Redacted Text */
@@ -108,16 +88,20 @@
     background-color: transparent;
 }
 
-/* Typewriter Entry */
+/* Typewriter Entry - FIXED TRAILING SPACES */
 ::deep .typewriter-entry .ctc-clue-word {
+    display: inline-block;
+    width: fit-content;
+    max-width: 0;
     overflow: hidden;
     white-space: nowrap;
     border-right: 2px solid #32cd32;
-    animation: typing 1s steps(40, end), blink-caret .75s step-end infinite;
+    animation: typing-fit 2s steps(40, end) forwards, blink-caret .75s step-end infinite;
+    vertical-align: bottom;
 }
-@keyframes typing {
-  from { width: 0 }
-  to { width: 100% }
+@keyframes typing-fit {
+  from { max-width: 0; }
+  to { max-width: 50ch; } /* Ceiling based on max input length */
 }
 @keyframes blink-caret {
   from, to { border-color: transparent }
@@ -127,7 +111,8 @@
 .ctc-page {
     display: flex;
     flex-direction: column;
-    min-height: 100%;
+    width: 100%;
+    height: 100%;
     background: radial-gradient(ellipse at center, #1a1a2e 0%, #0f0f1a 100%);
     color: #fff;
     font-family: var(--font-primary);
@@ -138,16 +123,22 @@
 /* ── Secret Word Banner ── */
 
 ::deep .ctc-secret-word-banner {
-    background: linear-gradient(90deg, #7c3aed, #a78bfa);
+    background: linear-gradient(90deg, #0f380f, #1a4d1a);
     padding: 10px 20px;
-    border-radius: 12px;
+    border-radius: 4px; /* More brutalist/terminal look */
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 12px;
     margin-bottom: 20px;
-    border: 2px solid rgba(255,255,255,0.2);
-    box-shadow: 0 4px 15px rgba(15,56,15,0.3);
+    border: 2px solid #32cd32;
+    box-shadow: 0 0 10px rgba(50, 205, 50, 0.3);
+}
+
+::deep .ctc-secret-word-banner-informant {
+    background: #9e0000 !important;
+    border-color: #ff4757 !important;
+    box-shadow: 0 0 20px rgba(158, 0, 0, 0.6) !important;
 }
 
 ::deep .ctc-secret-word-label {
