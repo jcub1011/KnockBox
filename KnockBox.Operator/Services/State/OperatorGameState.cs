@@ -36,6 +36,7 @@ public class OperatorGameState(
     public OperatorCommand? PendingActionCommand { get; set; }
     public string? ReactionTargetPlayerId { get; set; }
     public List<Card> PendingHotPotatoCards { get; set; } = new();
+    public HashSet<string> BlueShellBlockedPlayerIds { get; set; } = new();
 
     public int TurnCount { get; set; }
 

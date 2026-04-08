@@ -132,6 +132,21 @@ public class PlayPhaseState : IOperatorGameState, ITimedGameState<OperatorGameCo
                 && !string.IsNullOrEmpty(play.TargetPlayerId)
                 && play.TargetPlayerId != play.PlayerId;
 
+            bool isBlueShell = playedCards.Any(c => c is BlueShellCard);
+
+            if (isBlueShell)
+            {
+                var zeroPlayers = context.GamePlayers.Values.Where(p => p.CurrentPoints == 0m).Select(p => p.UserId).ToList();
+                if (zeroPlayers.Any())
+                {
+                    context.State.PendingActionCommand = play;
+                    context.State.BlueShellBlockedPlayerIds.Clear();
+                    context.State.ReactionTargetPlayerId = zeroPlayers[0]; // Start with first zero player
+                    context.State.Phase = OperatorGamePhase.Reaction;
+                    return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromValue(new ReactionState());
+                }
+            }
+
             if ((hasTargetedAction || hasTargetedOperator) && !string.IsNullOrEmpty(play.TargetPlayerId) && play.TargetPlayerId != play.PlayerId)
             {
                 if (!context.GamePlayers.ContainsKey(play.TargetPlayerId))
@@ -265,6 +280,15 @@ public class PlayPhaseState : IOperatorGameState, ITimedGameState<OperatorGameCo
                 else if (action.ActionValue == CardAction.Audit && play.TargetPlayerId != null)
                 {
                     context.ResolveAudit(play.TargetPlayerId);
+                }
+                else if (action.ActionValue == CardAction.Surcharge && play.TargetPlayerId != null && numbers.Any())
+                {
+                    context.ResolveSurcharge(play.TargetPlayerId, val);
+                    numbers.Clear();
+                }
+                else if (action.ActionValue == CardAction.BlueShell)
+                {
+                    context.ResolveBlueShell(context.State.BlueShellBlockedPlayerIds);
                 }
             }
         }

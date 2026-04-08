@@ -19,10 +19,10 @@ public class DeckGenerationTests
     }
 
     [TestMethod]
-    [DataRow(2, 78)]
-    [DataRow(4, 78)]
-    [DataRow(5, 156)]
-    [DataRow(8, 156)]
+    [DataRow(2, 82)]
+    [DataRow(4, 82)]
+    [DataRow(5, 164)]
+    [DataRow(8, 164)]
     public void GenerateDeck_CreatesCorrectNumberOfCards_BasedOnPlayerCount(int playerCount, int expectedDeckSize)
     {
         var deck = OperatorGameContext.GenerateDeck(playerCount, _rngMock.Object);
@@ -32,14 +32,14 @@ public class DeckGenerationTests
     [TestMethod]
     public void GenerateDeck_DistributesCardTypesCorrectly()
     {
-        var deck = OperatorGameContext.GenerateDeck(4, _rngMock.Object); // 1 base deck (78 cards)
+        var deck = OperatorGameContext.GenerateDeck(4, _rngMock.Object); // 1 base deck (82 cards)
         
         // Numbers: 48
         Assert.AreEqual(48, deck.Count(c => c.Type == CardType.Number));
         // Operators: 10
         Assert.AreEqual(10, deck.Count(c => c.Type == CardType.Operator));
-        // Actions: 20
-        Assert.AreEqual(20, deck.Count(c => c.Type == CardType.Action));
+        // Actions: 24
+        Assert.AreEqual(24, deck.Count(c => c.Type == CardType.Action));
     }
 
     [TestMethod]
@@ -65,5 +65,9 @@ public class DeckGenerationTests
         // Audit and HostileTakeover have 1 each
         Assert.AreEqual(1, deck.Count(c => c is ActionCard a && a.ActionValue == CardAction.Audit));
         Assert.AreEqual(1, deck.Count(c => c is ActionCard a && a.ActionValue == CardAction.HostileTakeover));
+
+        // Surcharge and BlueShell have 2 each
+        Assert.AreEqual(2, deck.Count(c => c is ActionCard a && a.ActionValue == CardAction.Surcharge));
+        Assert.AreEqual(2, deck.Count(c => c is ActionCard a && a.ActionValue == CardAction.BlueShell));
     }
 }

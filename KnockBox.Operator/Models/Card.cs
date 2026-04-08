@@ -30,7 +30,9 @@ public enum CardAction
     FlashFlood,
     HostileTakeover,
     Audit,
-    MarketCrash
+    MarketCrash,
+    Surcharge,
+    BlueShell
 }
 
 public static class CardOperatorExtensions

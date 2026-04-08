@@ -70,6 +70,8 @@ Actions provide utility, defense, and the ability to redirect massive concatenat
 | **Hostile Takeover**| Any | Swap your `activeOperator` with another player. | 1 |
 | **Audit** | Any | Protects target's `activeOperator` from changes for 1 round. | 1 |
 | **Market Crash** | All | Replaces every player's operator with `/`. | 1 |
+| **Surcharge** | Opponent | Play with a Number card. Adds that value directly to target score (bypasses operator). | 2 |
+| **Blue Shell** | All (0.0) | Resets ALL players at 0.0 to 10.0 and sets operator to `+`. Only playable if someone is at 0.0. | 2 |
 
 ---
 

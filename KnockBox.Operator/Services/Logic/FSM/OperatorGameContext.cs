@@ -63,6 +63,8 @@ public class OperatorGameContext(OperatorGameState state, IRandomNumberService r
         AddCards(deck, CardType.Action, CardAction.HostileTakeover, 1);
         AddCards(deck, CardType.Action, CardAction.Audit, 1);
         AddCards(deck, CardType.Action, CardAction.MarketCrash, 1);
+        AddCards(deck, CardType.Action, CardAction.Surcharge, 2);
+        AddCards(deck, CardType.Action, CardAction.BlueShell, 2);
     }
 
     private static void AddCards(List<Card> deck, CardType type, decimal value, int count)
@@ -91,6 +93,8 @@ public class OperatorGameContext(OperatorGameState state, IRandomNumberService r
                 CardAction.HostileTakeover => new HostileTakeoverCard(),
                 CardAction.Audit => new AuditCard(),
                 CardAction.MarketCrash => new MarketCrashCard(),
+                CardAction.Surcharge => new SurchargeCard(),
+                CardAction.BlueShell => new BlueShellCard(),
                 _ => throw new NotImplementedException()
             };
             deck.Add(card);
@@ -217,6 +221,28 @@ public class OperatorGameContext(OperatorGameState state, IRandomNumberService r
             foreach (var card in numberCards)
             {
                 State.DiscardPile.Remove(card);
+            }
+        }
+    }
+
+    public void ResolveSurcharge(string targetPlayerId, decimal value)
+    {
+        if (GamePlayers.TryGetValue(targetPlayerId, out var target))
+        {
+            target.CurrentPoints += value;
+            target.ScoreTimestamp = DateTimeOffset.UtcNow;
+        }
+    }
+
+    public void ResolveBlueShell(HashSet<string>? blockedPlayerIds = null)
+    {
+        foreach (var player in GamePlayers.Values)
+        {
+            if (player.CurrentPoints == 0m && (blockedPlayerIds == null || !blockedPlayerIds.Contains(player.UserId)))
+            {
+                player.CurrentPoints = 10.0m;
+                player.ActiveOperator = CardOperator.Add;
+                player.ScoreTimestamp = DateTimeOffset.UtcNow;
             }
         }
     }
