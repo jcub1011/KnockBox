@@ -1,8 +1,9 @@
+using KnockBox.Extensions.Returns;
 using KnockBox.Operator.Services.Logic.FSM;
 
 namespace KnockBox.Operator.Models;
 
-public sealed class OperatorCard(CardOperator operatorValue = CardOperator.None) 
+public sealed class OperatorCard(CardOperator operatorValue = CardOperator.None)
     : Card, ITargetableCard, IBlockableCard
 {
     public override CardType Type => CardType.Operator;
@@ -48,7 +49,7 @@ public sealed class OperatorCard(CardOperator operatorValue = CardOperator.None)
     public IEnumerable<Card> GetPotentialReactionCards(OperatorGameContext context, OperatorPlayerState thisPlayer)
     {
         // Only shield cards can block operators
-        return thisPlayer.Hand.Where((card) 
+        return thisPlayer.Hand.Where((card)
             => card is ActionCard { ActionValue: CardAction.Shield });
     }
 
@@ -60,4 +61,44 @@ public sealed class OperatorCard(CardOperator operatorValue = CardOperator.None)
 
     public override bool IsPlayable(OperatorGameContext context, OperatorPlayerState thisPlayer)
         => GetPotentialTargets(context, thisPlayer).Any();
+
+    public override ValueResult<CardPlayResult> Play(CardPlayContext ctx)
+    {
+        bool targetsOther = !string.IsNullOrEmpty(ctx.TargetPlayerId) && ctx.TargetPlayerId != ctx.ThisPlayer.UserId;
+        string opTargetId = targetsOther ? ctx.TargetPlayerId! : ctx.ThisPlayer.UserId;
+
+        if (ctx.ActionBlocked && targetsOther)
+            return ValueResult<CardPlayResult>.FromValue(CardPlayResult.Ok());
+
+        if (ctx.GameContext.GamePlayers.TryGetValue(opTargetId, out var opTarget) && !opTarget.IsAudited)
+        {
+            bool toggled = opTarget.ActiveOperator == OperatorValue;
+
+            if (toggled)
+            {
+                opTarget.ActiveOperator = OperatorValue switch
+                {
+                    CardOperator.Add => CardOperator.Subtract,
+                    CardOperator.Subtract => CardOperator.Add,
+                    CardOperator.Multiply => CardOperator.Divide,
+                    CardOperator.Divide => CardOperator.Multiply,
+                    _ => OperatorValue
+                };
+            }
+            else
+            {
+                opTarget.ActiveOperator = OperatorValue;
+            }
+
+            // Reset divide uses if operator changed
+            if (opTarget.ActiveOperator != CardOperator.Divide)
+            {
+                opTarget.DivideUses = 0;
+            }
+
+            return ValueResult<CardPlayResult>.FromValue(new CardPlayResult(Toggled: toggled, OperatorTargetId: opTarget.UserId));
+        }
+
+        return ValueResult<CardPlayResult>.FromValue(CardPlayResult.Ok());
+    }
 }

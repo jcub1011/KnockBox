@@ -195,7 +195,7 @@ public class PlayPhaseState : IOperatorGameState, ITimedGameState<OperatorGameCo
     {
         if (!context.GamePlayers.TryGetValue(play.PlayerId, out var pState))
             return;
-        
+
         var actionCards = playedCards.OfType<ActionCard>().ToList();
         var numbers = playedCards.OfType<NumberCard>().ToList();
         var opCard = playedCards.OfType<OperatorCard>().LastOrDefault();
@@ -204,7 +204,7 @@ public class PlayPhaseState : IOperatorGameState, ITimedGameState<OperatorGameCo
         string sourceName = context.State.Players.FirstOrDefault(p => p.Id == play.PlayerId)?.Name ?? "Unknown";
         string targetName = play.TargetPlayerId != null ? context.State.Players.FirstOrDefault(p => p.Id == play.TargetPlayerId)?.Name ?? "Unknown" : "themselves";
         string cardNames = string.Join(", ", playedCards.Select(c => c.TooltipName()));
-        
+
         context.State.ActionLog.Add(new ActionLogEntry(
             $"{sourceName} played {cardNames} targeting {targetName}",
             DateTimeOffset.UtcNow,
@@ -218,88 +218,38 @@ public class PlayPhaseState : IOperatorGameState, ITimedGameState<OperatorGameCo
                 DateTimeOffset.UtcNow,
                 play.TargetPlayerId,
                 play.PlayerId));
-            // Note: We don't return here because some effects (like self-operators or non-targeted parts) might still resolve
         }
 
         // Calculate combined number value
         decimal val = 0;
-        if (numbers.Any())
+        foreach (var num in numbers)
         {
-            foreach (var num in numbers)
-            {
-                val = val * 10 + num.NumberValue;
-            }
+            val = val * 10 + num.NumberValue;
         }
 
-        string effectiveScoreTarget = play.PlayerId;
+        // Build shared play context
+        var playContext = new CardPlayContext(
+            GameContext: context,
+            ThisPlayer: pState,
+            TargetPlayerId: play.TargetPlayerId,
+            CombinedNumberValue: val,
+            PairedNumbers: numbers,
+            ActionBlocked: actionBlocked
+        );
 
-        // Non-targeted or resolved targeted actions
+        // Dispatch to action cards — each handles its own blocking
+        bool numbersConsumed = false;
         foreach (var action in actionCards)
         {
-            if (action.ActionValue == CardAction.Comp)
-            {
-                context.ResolveComp(play.PlayerId);
-            }
-            else if (action.ActionValue == CardAction.MarketCrash)
-            {
-                context.ResolveMarketCrash();
-            }
-            else if (!actionBlocked)
-            {
-                if (action.ActionValue == CardAction.CookTheBooks && numbers.Any())
-                {
-                    context.ResolveCookTheBooks(play.PlayerId, val);
-                    numbers.Clear(); // prevent standard score calculation below
-                }
-                else if (action.ActionValue == CardAction.LiabilityTransfer && play.TargetPlayerId != null)
-                {
-                    context.ResolveLiabilityTransfer(play.TargetPlayerId, numbers.Cast<Card>().ToList());
-                    numbers.Clear(); // prevent standard score calculation below
-                }
-                else if (action.ActionValue == CardAction.Steal && play.TargetPlayerId != null)
-                {
-                    if (context.GamePlayers.TryGetValue(play.TargetPlayerId, out var target))
-                    {
-                        target.IsBeingStolenFrom = true;
-                    }
-                    context.ResolveSteal(play.PlayerId, play.TargetPlayerId);
-                }
-                else if (action.ActionValue == CardAction.HotPotato && play.TargetPlayerId != null && numbers.Any())
-                {
-                    context.ResolveHotPotato(play.TargetPlayerId, val);
-                    numbers.Clear();
-                }
-                else if (action.ActionValue == CardAction.FlashFlood)
-                {
-                    context.ResolveFlashFlood();
-                }
-                else if (action.ActionValue == CardAction.HostileTakeover && play.TargetPlayerId != null)
-                {
-                    context.ResolveHostileTakeover(play.PlayerId, play.TargetPlayerId);
-                }
-                else if (action.ActionValue == CardAction.Audit && play.TargetPlayerId != null)
-                {
-                    context.ResolveAudit(play.TargetPlayerId);
-                }
-                else if (action.ActionValue == CardAction.Surcharge && play.TargetPlayerId != null && numbers.Any())
-                {
-                    context.ResolveSurcharge(play.TargetPlayerId, val);
-                    numbers.Clear();
-                }
-                else if (action.ActionValue == CardAction.BlueShell)
-                {
-                    context.ResolveBlueShell(context.State.PlayerReactions
-                        .Where(r => r.ReactionCard != null)
-                        .Select(r => r.PlayerId)
-                        .ToHashSet());
-                }
-            }
+            var result = action.Play(playContext);
+            if (result.TryGetSuccess(out var playResult) && playResult.ConsumedNumbers)
+                numbersConsumed = true;
         }
 
-        // Apply standard number score logic if not consumed by CookTheBooks
-        if (numbers.Any())
+        // Apply standard number score logic if not consumed by an action card
+        if (!numbersConsumed && numbers.Count > 0)
         {
-            if (context.GamePlayers.TryGetValue(effectiveScoreTarget, out var targetPlayerState))
+            if (context.GamePlayers.TryGetValue(play.PlayerId, out var targetPlayerState))
             {
                 // Divide breaking mechanic
                 if (targetPlayerState.ActiveOperator == CardOperator.Divide)
@@ -310,7 +260,7 @@ public class PlayPhaseState : IOperatorGameState, ITimedGameState<OperatorGameCo
                         targetPlayerState.IsDivideBroken = true;
                         targetPlayerState.ActiveOperator = CardOperator.Add;
                         targetPlayerState.DivideUses = 0;
-                        
+
                         string targetPlayerName = context.State.Players.FirstOrDefault(p => p.Id == targetPlayerState.UserId)?.Name ?? "Unknown";
                         context.State.ActionLog.Add(new ActionLogEntry(
                             $"The Divide operator shattered! {targetPlayerName}'s operator reverted to Plus.",
@@ -324,10 +274,6 @@ public class PlayPhaseState : IOperatorGameState, ITimedGameState<OperatorGameCo
                         }
                         else
                         {
-                            // Resolve the last divide before it breaks? 
-                            // Usually "breaking" implies it failed to work or worked one last time.
-                            // The prompt says "animation showing divide operator breaking when dividing by zero or when it is used 4 times (broken divide reverts to a Plus)".
-                            // I'll assume it resolves the current action THEN breaks, unless it's divide by zero.
                             var (newScore, newOp) = OperatorGameContext.CalculateNewScore(targetPlayerState.CurrentPoints, CardOperator.Divide, val);
                             targetPlayerState.CurrentPoints = newScore;
                         }
@@ -349,45 +295,20 @@ public class PlayPhaseState : IOperatorGameState, ITimedGameState<OperatorGameCo
             }
         }
 
-        // Apply operator changes — target another player if specified, otherwise self
+        // Dispatch to operator card
         if (opCard != null)
         {
-            bool operatorTargetsOther = !string.IsNullOrEmpty(play.TargetPlayerId) && play.TargetPlayerId != play.PlayerId;
-            string opTargetId = operatorTargetsOther ? play.TargetPlayerId! : play.PlayerId;
-
-            if (!actionBlocked || !operatorTargetsOther)
+            var opResult = opCard.Play(playContext);
+            if (opResult.TryGetSuccess(out var opPlayResult) && opPlayResult.Toggled && opPlayResult.OperatorTargetId != null)
             {
-                if (context.GamePlayers.TryGetValue(opTargetId, out var opTarget) && !opTarget.IsAudited)
+                if (context.GamePlayers.TryGetValue(opPlayResult.OperatorTargetId, out var opTarget))
                 {
-                    // Toggling logic
-                    if (opTarget.ActiveOperator == opCard.OperatorValue)
-                    {
-                        opTarget.ActiveOperator = opCard.OperatorValue switch
-                        {
-                            CardOperator.Add => CardOperator.Subtract,
-                            CardOperator.Subtract => CardOperator.Add,
-                            CardOperator.Multiply => CardOperator.Divide,
-                            CardOperator.Divide => CardOperator.Multiply,
-                            _ => opCard.OperatorValue
-                        };
-                        
-                        string targetNameLog = context.State.Players.FirstOrDefault(p => p.Id == opTarget.UserId)?.Name ?? "Unknown";
-                        context.State.ActionLog.Add(new ActionLogEntry(
-                            $"Operator toggled to opposite! {targetNameLog} is now {opTarget.ActiveOperator}.",
-                            DateTimeOffset.UtcNow,
-                            null,
-                            opTarget.UserId));
-                    }
-                    else
-                    {
-                        opTarget.ActiveOperator = opCard.OperatorValue;
-                    }
-                    
-                    // Reset divide uses if operator changed
-                    if (opTarget.ActiveOperator != CardOperator.Divide)
-                    {
-                        opTarget.DivideUses = 0;
-                    }
+                    string targetNameLog = context.State.Players.FirstOrDefault(p => p.Id == opTarget.UserId)?.Name ?? "Unknown";
+                    context.State.ActionLog.Add(new ActionLogEntry(
+                        $"Operator toggled to opposite! {targetNameLog} is now {opTarget.ActiveOperator}.",
+                        DateTimeOffset.UtcNow,
+                        null,
+                        opTarget.UserId));
                 }
             }
         }
