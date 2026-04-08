@@ -18,6 +18,10 @@ namespace KnockBox.Services.Registrations.States
             services.AddHostedService(sp => sp.GetRequiredService<TickService>());
             services.AddSingleton<ILobbyService, LobbyService>();
             services.AddSingleton<IIDBackedServiceProvider, IDBackedServiceProvider>();
+
+            // Session service registrations
+            services.AddSingleton<ISessionServiceProvider, SessionServiceProvider>();
+            services.AddScoped<ISessionTokenProvider, SessionTokenProvider>();
             services.AddScoped<IUserService, UserService>();
 
             // GameSessionState is the long-lived session holder cached per user id by
