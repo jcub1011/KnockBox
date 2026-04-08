@@ -26,10 +26,11 @@
     </div>
 
     @* Blocked Animation for Attacker *@
-    @if (GameState.BlockedAttackerId == UserService.CurrentUser?.Id)
+    @if (GameState.LastBlockedActionMessage != null && GameState.BlockedAttackerId == UserService.CurrentUser?.Id)
     {
-        <div class="op-attacker-blocked-overlay">
-            <div class="op-blocked-stamp">BLOCKED</div>
+        <div @key="GameState.LastBlockedActionMessage" class="op-blocked-banner">
+            <div class="op-blocked-icon">&#x1F6E1;&#xFE0F;</div>
+            <div class="op-blocked-text">@GameState.LastBlockedActionMessage</div>
         </div>
     }
 
@@ -77,14 +78,6 @@
             <div class="op-deck-count">@GameState.DiscardPile.Count</div>
         </div>
     </div>
-
-    @if (GameState.LastBlockedActionMessage != null)
-    {
-        <div class="op-blocked-banner">
-            <div class="op-blocked-icon">&#x1F6E1;&#xFE0F;</div>
-            <div class="op-blocked-text">@GameState.LastBlockedActionMessage</div>
-        </div>
-    }
 
     @if (_showDiscardHistory)
     {

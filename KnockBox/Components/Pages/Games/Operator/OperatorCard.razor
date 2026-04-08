@@ -1,7 +1,7 @@
 @implements IDisposable
 @using KnockBox.Operator.Models
 
-<div class="op-card @GetCardTypeClass() @(IsSelected ? "selected" : "") @(IsDisabled ? "disabled" : "") @(IsNew ? "op-card-new" : "") @(_showTooltip ? "tooltip-visible" : "")"
+<div class="op-card @GetCardTypeClass() @(IsSelected ? "selected" : "") @(IsDisabled ? "disabled" : "") @(IsNew ? "op-card-new" : "") @(IsExiting ? "op-card-exit" : "") @(_showTooltip ? "tooltip-visible" : "")"
      style="@(IsNew ? $"animation-delay: {AnimationDelay * 150}ms" : "")"
      @onclick="HandleClick"
      @onpointerdown="OnPointerDown"
@@ -42,6 +42,7 @@
     [Parameter] public bool IsSelected { get; set; }
     [Parameter] public bool IsDisabled { get; set; }
     [Parameter] public bool IsNew { get; set; }
+    [Parameter] public bool IsExiting { get; set; }
     [Parameter] public int AnimationDelay { get; set; }
     [Parameter] public EventCallback OnClick { get; set; }
 

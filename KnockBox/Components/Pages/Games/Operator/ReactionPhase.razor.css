@@ -18,9 +18,44 @@
 .op-reaction-backdrop {
     position: absolute;
     inset: 0;
-    background: rgba(10,2,2,0.75);
-    backdrop-filter: blur(6px);
+    background: rgba(10,2,2,0.85);
 }
+
+/* ── Liability Transfer Preview ── */
+.op-lt-preview {
+    margin: 10px 0;
+    padding: 20px;
+    background: rgba(46, 204, 113, 0.08);
+    border: 2px solid #2ecc71;
+    border-radius: 16px;
+    text-align: center;
+    width: 100%;
+}
+
+.op-lt-preview-label { font-size: 0.7rem; font-weight: 900; color: #2ecc71; letter-spacing: 2px; }
+
+.op-lt-preview-cards {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    margin: 15px 0;
+}
+
+.op-lt-preview-card {
+    width: 40px;
+    height: 56px;
+    background: #2ecc71;
+    color: #fff;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 900;
+    font-size: 1.4rem;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+}
+
+.op-lt-preview-hint { font-size: 0.8rem; color: rgba(255,255,255,0.6); font-style: italic; }
 
 /* ── Reaction Panel ── */
 

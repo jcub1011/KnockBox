@@ -5,6 +5,8 @@
     <div class="op-reaction-panel">
         @if (IsTargeted)
         {
+            var ltCards = GetPendingLiabilityTransferCards();
+
             <div class="op-reaction-alert-icon">&#x26A0;&#xFE0F;</div>
             <h2 class="op-reaction-title">YOU ARE BEING TARGETED!</h2>
             <p class="op-reaction-subtitle">
@@ -34,6 +36,20 @@
                     <div class="op-hp-preview-label">POTENTIAL IMPACT:</div>
                     <div class="op-hp-preview-value">@totalVal</div>
                     <div class="op-hp-preview-hint">Cards in this set will be applied to your score using your current operator.</div>
+                </div>
+            }
+
+            @if (ltCards.Count > 0)
+            {
+                <div class="op-lt-preview">
+                    <div class="op-lt-preview-label">INCOMING CARDS:</div>
+                    <div class="op-lt-preview-cards">
+                        @foreach (var card in ltCards)
+                        {
+                            <div class="op-lt-preview-card">@card.NumberValue</div>
+                        }
+                    </div>
+                    <div class="op-lt-preview-hint">These cards will be added to your hand if you don't block.</div>
                 </div>
             }
 

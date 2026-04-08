@@ -28,6 +28,25 @@ namespace KnockBox.Components.Pages.Games.Operator
 
         protected bool CanRedirectHotPotato => GameState.PendingHotPotatoCards.Count > 0;
 
+        protected List<NumberCard> GetPendingLiabilityTransferCards()
+        {
+            if (GameState.PendingActionCommand is PlayCardsCommand play)
+            {
+                var playedCards = new List<Card>();
+                foreach (var id in play.CardIds)
+                {
+                    var card = GameState.DiscardPile.FirstOrDefault(c => c.Id == id);
+                    if (card != null) playedCards.Add(card);
+                }
+
+                if (playedCards.Any(c => c is LiabilityTransferCard))
+                {
+                    return playedCards.OfType<NumberCard>().ToList();
+                }
+            }
+            return new();
+        }
+
         protected async Task PlayShield(Guid cardId)
         {
             if (!IsTargeted || UserService.CurrentUser == null) return;

@@ -208,4 +208,16 @@ public class OperatorGameContext(OperatorGameState state, IRandomNumberService r
             target.AuditExpiresTurnCount = State.TurnCount + GamePlayers.Count;
         }
     }
+
+    public void ResolveLiabilityTransfer(string targetPlayerId, List<Card> numberCards)
+    {
+        if (GamePlayers.TryGetValue(targetPlayerId, out var target))
+        {
+            target.Hand.AddRange(numberCards);
+            foreach (var card in numberCards)
+            {
+                State.DiscardPile.Remove(card);
+            }
+        }
+    }
 }

@@ -27,8 +27,6 @@ public class PlayPhaseState : IOperatorGameState, ITimedGameState<OperatorGameCo
             player.IsDivideBroken = false;
             player.IsBeingStolenFrom = false;
         }
-        context.State.LastBlockedActionMessage = null;
-        context.State.BlockedAttackerId = null;
 
         // Clear expired audits
         foreach (var player in context.GamePlayers.Values)
@@ -81,6 +79,9 @@ public class PlayPhaseState : IOperatorGameState, ITimedGameState<OperatorGameCo
         {
             if (play.CardIds.Count == 0)
                 return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromError("Must play at least 1 card.");
+
+            context.State.LastBlockedActionMessage = null;
+            context.State.BlockedAttackerId = null;
 
             if (!context.GamePlayers.TryGetValue(play.PlayerId, out var pState))
                 return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromError("Player not found.");
@@ -237,7 +238,8 @@ public class PlayPhaseState : IOperatorGameState, ITimedGameState<OperatorGameCo
                 }
                 else if (action.ActionValue == CardAction.LiabilityTransfer && play.TargetPlayerId != null)
                 {
-                    effectiveScoreTarget = play.TargetPlayerId;
+                    context.ResolveLiabilityTransfer(play.TargetPlayerId, numbers.Cast<Card>().ToList());
+                    numbers.Clear(); // prevent standard score calculation below
                 }
                 else if (action.ActionValue == CardAction.Steal && play.TargetPlayerId != null)
                 {

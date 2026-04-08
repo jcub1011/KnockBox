@@ -54,7 +54,7 @@ public class ReactionState : IOperatorGameState, ITimedGameState<OperatorGameCon
             string reactorName = context.State.Players.FirstOrDefault(p => p.Id == react.PlayerId)?.Name ?? "Unknown";
             string attackerName = context.State.Players.FirstOrDefault(p => p.Id == context.State.TurnManager.CurrentPlayer)?.Name ?? "Unknown";
 
-            context.State.LastBlockedActionMessage = $"{reactorName} blocked the action!";
+            context.State.LastBlockedActionMessage = "Your action was blocked!";
             context.State.BlockedAttackerId = context.State.TurnManager.CurrentPlayer;
             context.State.ActionLog.Add(new ActionLogEntry(
                 $"{reactorName} used a Shield to block {attackerName}'s action.",

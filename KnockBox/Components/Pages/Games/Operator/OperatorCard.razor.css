@@ -227,3 +227,22 @@
     animation: op-card-deal-disabled 0.5s ease-out both;
     filter: grayscale(0.6);
 }
+
+/* ── Card Exit Animation ── */
+
+@keyframes op-card-exit {
+    0% {
+        transform: translateY(0) scale(1);
+        opacity: 1;
+    }
+    100% {
+        transform: translateY(-100px) scale(0.5) rotate(-10deg);
+        opacity: 0;
+    }
+}
+
+.op-card.op-card-exit {
+    animation: op-card-exit 0.2s ease-in forwards;
+    pointer-events: none;
+    z-index: -1;
+}
