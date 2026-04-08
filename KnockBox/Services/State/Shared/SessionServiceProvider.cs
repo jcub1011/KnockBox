@@ -1,6 +1,7 @@
-﻿using KnockBox.Extensions.Disposable;
+using KnockBox.Extensions.Disposable;
 using KnockBox.Extensions.Returns;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Primitives;
 
 namespace KnockBox.Services.State.Shared;
 
@@ -67,12 +68,16 @@ public class SessionServiceProvider(
                 {
                     registration.ReferenceCount--;
 
-                    // If no one is using it anymore, start the 1-minute countdown
+                    // If no one is using it anymore, start the 1-minute countdown.
+                    // We use an ExpirationToken (ChangeToken) to make the eviction proactive,
+                    // otherwise IMemoryCache only evicts during the next cache operation.
                     if (registration.ReferenceCount <= 0)
                     {
+                        var cts = new CancellationTokenSource(TimeSpan.FromMinutes(1));
                         var options = new MemoryCacheEntryOptions()
                             .SetAbsoluteExpiration(TimeSpan.FromMinutes(1))
-                            .RegisterPostEvictionCallback(EvictionCallback);
+                            .AddExpirationToken(new CancellationChangeToken(cts.Token))
+                            .RegisterPostEvictionCallback(EvictionCallback, state: cts);
 
                         cache.Set(key, lazyRegistration, options);
                     }
@@ -108,15 +113,31 @@ public class SessionServiceProvider(
 
     private void EvictionCallback(object key, object? value, EvictionReason reason, object? state)
     {
-        // We ONLY dispose if it naturally expired or memory pressure forced it out.
-        if (reason == EvictionReason.Expired || reason == EvictionReason.Removed || reason == EvictionReason.Capacity)
+        // Always dispose the CTS if it was passed in the state to avoid leaking timer resources.
+        if (state is CancellationTokenSource cts)
         {
-            // Add a null check here to satisfy the compiler
+            cts.Dispose();
+        }
+
+        var regKey = (RegistrationKey)key;
+        logger.LogDebug("Session cache eviction: {Type} for {Token}. Reason: {Reason}", regKey.ServiceType.Name, regKey.SessionToken.Token, reason);
+
+        // We dispose the service if it expired (absolute time), token expired (CTS timer), 
+        // was manually removed, or evicted due to capacity.
+        // We do NOT dispose if it was Replaced (e.g., a player reconnected and "locked" the entry).
+        if (reason == EvictionReason.Expired || 
+            reason == EvictionReason.TokenExpired || 
+            reason == EvictionReason.Removed || 
+            reason == EvictionReason.Capacity)
+        {
             if (value is Lazy<CacheRegistration> lazyReg && lazyReg.IsValueCreated)
             {
                 lazyReg.Value.Dispose();
-                var regKey = (RegistrationKey)key;
-                logger.LogInformation("Session service {Type} expired and was disposed.", regKey.ServiceType.Name);
+                logger.LogInformation(
+                    "Session service {Type} for {Token} expired and was disposed. (Reason: {Reason})", 
+                    regKey.ServiceType.Name, 
+                    regKey.SessionToken.Token,
+                    reason);
             }
         }
     }
