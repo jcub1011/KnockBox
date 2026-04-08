@@ -6,9 +6,9 @@ namespace KnockBox.Services.State.Games.Shared
     /// <summary>
     /// Transient, user-ID-backed state holder for a single user's active game session.
     /// <para>
-    /// Registered as Transient in the DI container so that <see cref="IIDBackedServiceProvider"/>
+    /// Registered as Transient in the DI container so that <see cref="ISessionServiceProvider"/>
     /// can cache exactly one instance per user identifier, surviving Blazor circuit breaks.
-    /// When <see cref="IIDBackedServiceProvider"/> disposes this instance (after the
+    /// When <see cref="ISessionServiceProvider"/> disposes this instance (after the
     /// post-disconnect grace period), <see cref="Dispose"/> automatically removes the user
     /// from the game state so the lobby slot is freed without requiring an active circuit.
     /// </para>
@@ -45,7 +45,7 @@ namespace KnockBox.Services.State.Games.Shared
         }
 
         /// <summary>
-        /// Removes the user from the game state when <see cref="IIDBackedServiceProvider"/>
+        /// Removes the user from the game state when <see cref="ISessionServiceProvider"/>
         /// disposes this instance after the post-disconnect grace period expires.
         /// </summary>
         public void Dispose()
