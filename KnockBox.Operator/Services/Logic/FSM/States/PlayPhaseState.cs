@@ -21,6 +21,15 @@ public class PlayPhaseState : IOperatorGameState, ITimedGameState<OperatorGameCo
             currentPlayer.PreDrawCardIds = new System.Collections.Generic.HashSet<Guid>(currentPlayer.Hand.Select(c => c.Id));
         }
 
+        // Clear transient UI states
+        foreach (var player in context.GamePlayers.Values)
+        {
+            player.IsDivideBroken = false;
+            player.IsBeingStolenFrom = false;
+        }
+        context.State.LastBlockedActionMessage = null;
+        context.State.BlockedAttackerId = null;
+
         // Clear expired audits
         foreach (var player in context.GamePlayers.Values)
         {
@@ -116,23 +125,11 @@ public class PlayPhaseState : IOperatorGameState, ITimedGameState<OperatorGameCo
             pState.HasPlayedCardThisTurn = true;
             context.State.StateStartTime = DateTimeOffset.UtcNow;
 
-            bool hasTargetedAction = playedCards.OfType<ActionCard>().Any(c =>
-                (c.ActionValue == CardAction.Steal || c.ActionValue == CardAction.LiabilityTransfer ||
-                 c.ActionValue == CardAction.HostileTakeover || c.ActionValue == CardAction.Audit ||
-                 c.ActionValue == CardAction.HotPotato));
+            bool hasTargetedAction = playedCards.Any(c => c is ActionCard && c is ITargetableCard);
 
             bool hasTargetedOperator = playedCards.Any(c => c.Type == CardType.Operator)
                 && !string.IsNullOrEmpty(play.TargetPlayerId)
                 && play.TargetPlayerId != play.PlayerId;
-
-            if (hasTargetedOperator)
-            {
-                var opCard = playedCards.OfType<OperatorCard>().Last();
-                if (context.GamePlayers.TryGetValue(play.TargetPlayerId!, out var targetPlayer) && targetPlayer.ActiveOperator == opCard.OperatorValue)
-                {
-                    return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromError("Target already has this operator.");
-                }
-            }
 
             if ((hasTargetedAction || hasTargetedOperator) && !string.IsNullOrEmpty(play.TargetPlayerId) && play.TargetPlayerId != play.PlayerId)
             {
@@ -142,18 +139,20 @@ public class PlayPhaseState : IOperatorGameState, ITimedGameState<OperatorGameCo
                 context.State.PendingActionCommand = play;
                 context.State.ReactionTargetPlayerId = play.TargetPlayerId;
 
-                // If Hot Potato is in play, extract the number card for redirect tracking
+                // If Hot Potato is in play, extract the number cards for redirect tracking
                 bool hasHotPotato = playedCards.Any(c => c is HotPotatoCard);
                 if (hasHotPotato)
                 {
                     var numbers = playedCards.Where(c => c.Type == CardType.Number).ToList();
                     if (numbers.Count > 0)
                     {
-                        var hotPotatoNum = numbers.Last();
-                        context.State.PendingHotPotatoCard = hotPotatoNum;
+                        context.State.PendingHotPotatoCards = new List<Card>(numbers);
                         // Remove from discard — it will be resolved by ReactionState
-                        var inDiscard = context.State.DiscardPile.FindLastIndex(c => c.Id == hotPotatoNum.Id);
-                        if (inDiscard != -1) context.State.DiscardPile.RemoveAt(inDiscard);
+                        foreach (var num in numbers)
+                        {
+                            var inDiscard = context.State.DiscardPile.FindLastIndex(c => c.Id == num.Id);
+                            if (inDiscard != -1) context.State.DiscardPile.RemoveAt(inDiscard);
+                        }
                     }
                 }
 
@@ -180,8 +179,31 @@ public class PlayPhaseState : IOperatorGameState, ITimedGameState<OperatorGameCo
     {
         if (!context.GamePlayers.TryGetValue(play.PlayerId, out var pState))
             return;
+        
         var actionCards = playedCards.OfType<ActionCard>().ToList();
         var numbers = playedCards.OfType<NumberCard>().ToList();
+        var opCard = playedCards.OfType<OperatorCard>().LastOrDefault();
+
+        // Log the base play
+        string sourceName = context.State.Players.FirstOrDefault(p => p.Id == play.PlayerId)?.Name ?? "Unknown";
+        string targetName = play.TargetPlayerId != null ? context.State.Players.FirstOrDefault(p => p.Id == play.TargetPlayerId)?.Name ?? "Unknown" : "themselves";
+        string cardNames = string.Join(", ", playedCards.Select(c => c.TooltipName()));
+        
+        context.State.ActionLog.Add(new ActionLogEntry(
+            $"{sourceName} played {cardNames} targeting {targetName}",
+            DateTimeOffset.UtcNow,
+            play.PlayerId,
+            play.TargetPlayerId));
+
+        if (actionBlocked)
+        {
+            context.State.ActionLog.Add(new ActionLogEntry(
+                $"{targetName} blocked the action!",
+                DateTimeOffset.UtcNow,
+                play.TargetPlayerId,
+                play.PlayerId));
+            // Note: We don't return here because some effects (like self-operators or non-targeted parts) might still resolve
+        }
 
         // Calculate combined number value
         decimal val = 0;
@@ -219,6 +241,10 @@ public class PlayPhaseState : IOperatorGameState, ITimedGameState<OperatorGameCo
                 }
                 else if (action.ActionValue == CardAction.Steal && play.TargetPlayerId != null)
                 {
+                    if (context.GamePlayers.TryGetValue(play.TargetPlayerId, out var target))
+                    {
+                        target.IsBeingStolenFrom = true;
+                    }
                     context.ResolveSteal(play.PlayerId, play.TargetPlayerId);
                 }
                 else if (action.ActionValue == CardAction.HotPotato && play.TargetPlayerId != null && numbers.Any())
@@ -246,15 +272,55 @@ public class PlayPhaseState : IOperatorGameState, ITimedGameState<OperatorGameCo
         {
             if (context.GamePlayers.TryGetValue(effectiveScoreTarget, out var targetPlayerState))
             {
-                var (newScore, newOp) = OperatorGameContext.CalculateNewScore(targetPlayerState.CurrentPoints, targetPlayerState.ActiveOperator, val);
-                targetPlayerState.CurrentPoints = newScore;
-                targetPlayerState.ActiveOperator = newOp;
+                // Divide breaking mechanic
+                if (targetPlayerState.ActiveOperator == CardOperator.Divide)
+                {
+                    targetPlayerState.DivideUses++;
+                    if (targetPlayerState.DivideUses >= 4 || val == 0m)
+                    {
+                        targetPlayerState.IsDivideBroken = true;
+                        targetPlayerState.ActiveOperator = CardOperator.Add;
+                        targetPlayerState.DivideUses = 0;
+                        
+                        string targetPlayerName = context.State.Players.FirstOrDefault(p => p.Id == targetPlayerState.UserId)?.Name ?? "Unknown";
+                        context.State.ActionLog.Add(new ActionLogEntry(
+                            $"The Divide operator shattered! {targetPlayerName}'s operator reverted to Plus.",
+                            DateTimeOffset.UtcNow,
+                            null,
+                            targetPlayerState.UserId));
+
+                        if (val == 0m)
+                        {
+                            targetPlayerState.CurrentPoints = 0m;
+                        }
+                        else
+                        {
+                            // Resolve the last divide before it breaks? 
+                            // Usually "breaking" implies it failed to work or worked one last time.
+                            // The prompt says "animation showing divide operator breaking when dividing by zero or when it is used 4 times (broken divide reverts to a Plus)".
+                            // I'll assume it resolves the current action THEN breaks, unless it's divide by zero.
+                            var (newScore, newOp) = OperatorGameContext.CalculateNewScore(targetPlayerState.CurrentPoints, CardOperator.Divide, val);
+                            targetPlayerState.CurrentPoints = newScore;
+                        }
+                    }
+                    else
+                    {
+                        var (newScore, newOp) = OperatorGameContext.CalculateNewScore(targetPlayerState.CurrentPoints, targetPlayerState.ActiveOperator, val);
+                        targetPlayerState.CurrentPoints = newScore;
+                        targetPlayerState.ActiveOperator = newOp;
+                    }
+                }
+                else
+                {
+                    var (newScore, newOp) = OperatorGameContext.CalculateNewScore(targetPlayerState.CurrentPoints, targetPlayerState.ActiveOperator, val);
+                    targetPlayerState.CurrentPoints = newScore;
+                    targetPlayerState.ActiveOperator = newOp;
+                }
                 targetPlayerState.ScoreTimestamp = DateTimeOffset.UtcNow;
             }
         }
 
         // Apply operator changes — target another player if specified, otherwise self
-        var opCard = playedCards.OfType<OperatorCard>().LastOrDefault();
         if (opCard != null)
         {
             bool operatorTargetsOther = !string.IsNullOrEmpty(play.TargetPlayerId) && play.TargetPlayerId != play.PlayerId;
@@ -264,7 +330,35 @@ public class PlayPhaseState : IOperatorGameState, ITimedGameState<OperatorGameCo
             {
                 if (context.GamePlayers.TryGetValue(opTargetId, out var opTarget) && !opTarget.IsAudited)
                 {
-                    opTarget.ActiveOperator = opCard.OperatorValue;
+                    // Toggling logic
+                    if (opTarget.ActiveOperator == opCard.OperatorValue)
+                    {
+                        opTarget.ActiveOperator = opCard.OperatorValue switch
+                        {
+                            CardOperator.Add => CardOperator.Subtract,
+                            CardOperator.Subtract => CardOperator.Add,
+                            CardOperator.Multiply => CardOperator.Divide,
+                            CardOperator.Divide => CardOperator.Multiply,
+                            _ => opCard.OperatorValue
+                        };
+                        
+                        string targetNameLog = context.State.Players.FirstOrDefault(p => p.Id == opTarget.UserId)?.Name ?? "Unknown";
+                        context.State.ActionLog.Add(new ActionLogEntry(
+                            $"Operator toggled to opposite! {targetNameLog} is now {opTarget.ActiveOperator}.",
+                            DateTimeOffset.UtcNow,
+                            null,
+                            opTarget.UserId));
+                    }
+                    else
+                    {
+                        opTarget.ActiveOperator = opCard.OperatorValue;
+                    }
+                    
+                    // Reset divide uses if operator changed
+                    if (opTarget.ActiveOperator != CardOperator.Divide)
+                    {
+                        opTarget.DivideUses = 0;
+                    }
                 }
             }
         }

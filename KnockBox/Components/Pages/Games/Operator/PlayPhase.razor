@@ -16,6 +16,8 @@
                     HandSize="@pState.Hand.Count"
                     IsActive="@(GameState.TurnManager.CurrentPlayer == player.Id)"
                     IsAudited="@pState.IsAudited"
+                    IsDivideBroken="@pState.IsDivideBroken"
+                    IsBeingStolenFrom="@pState.IsBeingStolenFrom"
                     IsTargetable="@IsPlayerTargetable(player.Id, pState)"
                     IsTargeted="@(_targetPlayerId == player.Id)"
                     OnClick="@(() => SelectTarget(player.Id))" />
@@ -23,34 +25,105 @@
         }
     </div>
 
-    @* Deck *@
+    @* Blocked Animation for Attacker *@
+    @if (GameState.BlockedAttackerId == UserService.CurrentUser?.Id)
+    {
+        <div class="op-attacker-blocked-overlay">
+            <div class="op-blocked-stamp">BLOCKED</div>
+        </div>
+    }
+
+    @* Deck & Discard *@
     <div class="op-deck-area">
-        @if (GameState.Deck.Count > 0)
-        {
-            <div class="op-deck-stack">
-                @if (GameState.Deck.Count > 2)
-                {
-                    <div class="op-deck-card op-deck-card-3"></div>
-                }
-                @if (GameState.Deck.Count > 1)
-                {
-                    <div class="op-deck-card op-deck-card-2"></div>
-                }
-                <div class="op-deck-card op-deck-card-1"></div>
-            </div>
-        }
-        else
-        {
-            <div class="op-deck-empty">EMPTY</div>
-        }
-        <div class="op-deck-info">
+        <div class="op-deck-stack-container">
+            <div class="op-deck-label">DECK</div>
+            @if (GameState.Deck.Count > 0)
+            {
+                <div class="op-deck-stack">
+                    @if (GameState.Deck.Count > 2)
+                    {
+                        <div class="op-deck-card op-deck-card-3"></div>
+                    }
+                    @if (GameState.Deck.Count > 1)
+                    {
+                        <div class="op-deck-card op-deck-card-2"></div>
+                    }
+                    <div class="op-deck-card op-deck-card-1"></div>
+                </div>
+            }
+            else
+            {
+                <div class="op-deck-empty">EMPTY</div>
+            }
             <div class="op-deck-count">@GameState.Deck.Count</div>
-            <div class="op-deck-label">CARDS LEFT</div>
-            <div class="op-deck-bar">
-                <div class="op-deck-bar-fill" style="width: @(GetDeckPercentage())%"></div>
-            </div>
+        </div>
+
+        <div class="op-discard-stack-container" @onclick="() => _showDiscardHistory = true">
+            <div class="op-deck-label">DISCARD</div>
+            @if (GameState.DiscardPile.Count > 0)
+            {
+                var topCard = GameState.DiscardPile.Last();
+                <div class="op-discard-card">
+                    <div class="op-card-mini">
+                        <div class="op-card-mini-icon">@topCard.CardIcon()</div>
+                        <div class="op-card-mini-name">@topCard.TooltipName()</div>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="op-deck-empty">EMPTY</div>
+            }
+            <div class="op-deck-count">@GameState.DiscardPile.Count</div>
         </div>
     </div>
+
+    @if (GameState.LastBlockedActionMessage != null)
+    {
+        <div class="op-blocked-banner">
+            <div class="op-blocked-icon">&#x1F6E1;&#xFE0F;</div>
+            <div class="op-blocked-text">@GameState.LastBlockedActionMessage</div>
+        </div>
+    }
+
+    @if (_showDiscardHistory)
+    {
+        <div class="op-history-modal-overlay" @onclick="() => _showDiscardHistory = false">
+            <div class="op-history-modal" @onclick:stopPropagation>
+                <div class="op-history-header">
+                    <h3>GAME HISTORY</h3>
+                    <button class="op-history-close" @onclick="() => _showDiscardHistory = false">&times;</button>
+                </div>
+                <div class="op-history-content">
+                    @if (GameState.ActionLog.Count == 0 && GameState.DiscardPile.Count == 0)
+                    {
+                        <p class="op-history-empty">No history yet.</p>
+                    }
+                    else
+                    {
+                        var historyItems = GameState.ActionLog.OrderByDescending(l => l.Timestamp).ToList();
+                        @foreach (var entry in historyItems)
+                        {
+                            <div class="op-history-entry">
+                                <span class="op-history-time">@entry.Timestamp.ToString("HH:mm:ss")</span>
+                                <span class="op-history-msg">@entry.Message</span>
+                            </div>
+                        }
+                        
+                        <div class="op-history-divider">Discarded Cards (Most Recent First)</div>
+                        @foreach (var card in GameState.DiscardPile.AsEnumerable().Reverse())
+                        {
+                            <div class="op-history-card-item">
+                                <span class="op-history-card-icon">@card.CardIcon()</span>
+                                <span class="op-history-card-name">@card.TooltipName()</span>
+                                <span class="op-history-card-desc">@card.TooltipDescription()</span>
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+        </div>
+    }
 
     @if (CurrentPlayerState != null)
     {
@@ -62,7 +135,7 @@
 
         @* Your Active Operator (bottom-right) *@
         <div class="op-active-operator-display">
-            <div class="op-active-operator-symbol">@GetActiveOperatorSymbol()</div>
+            <div class="op-active-operator-symbol @(CurrentPlayerState.IsAudited ? "holo-effect" : "")">@GetActiveOperatorSymbol()</div>
             <div class="op-active-operator-label">YOUR OPERATOR</div>
         </div>
     }

@@ -22,6 +22,9 @@ public class OperatorGameState(
     
     public List<Card> Deck { get; set; } = new();
     public List<Card> DiscardPile { get; set; } = new();
+    public List<ActionLogEntry> ActionLog { get; set; } = new();
+    public string? LastBlockedActionMessage { get; set; }
+    public string? BlockedAttackerId { get; set; }
     
     public OperatorGamePhase Phase { get; set; } = OperatorGamePhase.Setup;
     
@@ -32,7 +35,7 @@ public class OperatorGameState(
 
     public OperatorCommand? PendingActionCommand { get; set; }
     public string? ReactionTargetPlayerId { get; set; }
-    public Card? PendingHotPotatoCard { get; set; }
+    public List<Card> PendingHotPotatoCards { get; set; } = new();
 
     public int TurnCount { get; set; }
 

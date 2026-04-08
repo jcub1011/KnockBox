@@ -50,7 +50,7 @@ public class OperatorGameContext(OperatorGameState state, IRandomNumberService r
         AddCards(deck, CardType.Operator, CardOperator.Add, 4);
         AddCards(deck, CardType.Operator, CardOperator.Subtract, 4);
         AddCards(deck, CardType.Operator, CardOperator.Multiply, 2);
-        AddCards(deck, CardType.Operator, CardOperator.Divide, 2);
+        AddCards(deck, CardType.Operator, CardOperator.Divide, 0);
 
         // Actions (20)
         AddCards(deck, CardType.Action, CardAction.Shield, 4);

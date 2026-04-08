@@ -19,10 +19,10 @@ public class DeckGenerationTests
     }
 
     [TestMethod]
-    [DataRow(2, 80)]
-    [DataRow(4, 80)]
-    [DataRow(5, 160)]
-    [DataRow(8, 160)]
+    [DataRow(2, 78)]
+    [DataRow(4, 78)]
+    [DataRow(5, 156)]
+    [DataRow(8, 156)]
     public void GenerateDeck_CreatesCorrectNumberOfCards_BasedOnPlayerCount(int playerCount, int expectedDeckSize)
     {
         var deck = OperatorGameContext.GenerateDeck(playerCount, _rngMock.Object);
@@ -32,12 +32,12 @@ public class DeckGenerationTests
     [TestMethod]
     public void GenerateDeck_DistributesCardTypesCorrectly()
     {
-        var deck = OperatorGameContext.GenerateDeck(4, _rngMock.Object); // 1 base deck (80 cards)
+        var deck = OperatorGameContext.GenerateDeck(4, _rngMock.Object); // 1 base deck (78 cards)
         
         // Numbers: 48
         Assert.AreEqual(48, deck.Count(c => c.Type == CardType.Number));
-        // Operators: 12
-        Assert.AreEqual(12, deck.Count(c => c.Type == CardType.Operator));
+        // Operators: 10
+        Assert.AreEqual(10, deck.Count(c => c.Type == CardType.Operator));
         // Actions: 20
         Assert.AreEqual(20, deck.Count(c => c.Type == CardType.Action));
     }
@@ -58,9 +58,9 @@ public class DeckGenerationTests
         Assert.AreEqual(4, deck.Count(c => c is OperatorCard o && o.OperatorValue == CardOperator.Add));
         Assert.AreEqual(4, deck.Count(c => c is OperatorCard o && o.OperatorValue == CardOperator.Subtract));
         
-        // Multiply/Divide have 2 each
+        // Multiply has 2, Divide has 0
         Assert.AreEqual(2, deck.Count(c => c is OperatorCard o && o.OperatorValue == CardOperator.Multiply));
-        Assert.AreEqual(2, deck.Count(c => c is OperatorCard o && o.OperatorValue == CardOperator.Divide));
+        Assert.AreEqual(0, deck.Count(c => c is OperatorCard o && o.OperatorValue == CardOperator.Divide));
 
         // Audit and HostileTakeover have 1 each
         Assert.AreEqual(1, deck.Count(c => c is ActionCard a && a.ActionValue == CardAction.Audit));

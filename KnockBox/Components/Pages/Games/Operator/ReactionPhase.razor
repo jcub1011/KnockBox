@@ -11,6 +11,32 @@
                 <strong>@GetAttackerName()</strong> played <strong>@GetActionDescription()</strong> against you!
             </p>
 
+            <div class="op-reaction-player-status">
+                <div class="op-status-item">
+                    <span class="op-status-label">YOUR SCORE:</span>
+                    <span class="op-status-value">@(CurrentPlayerState?.CurrentPoints.ToString("F1") ?? "0.0")</span>
+                </div>
+                <div class="op-status-item">
+                    <span class="op-status-label">YOUR OPERATOR:</span>
+                    <span class="op-status-value">@(CurrentPlayerState?.ActiveOperator.ToSymbol() ?? "+")</span>
+                </div>
+            </div>
+
+            @if (GameState.PendingHotPotatoCards.Count > 0)
+            {
+                decimal totalVal = 0;
+                foreach (var card in GameState.PendingHotPotatoCards.OfType<NumberCard>())
+                {
+                    totalVal = totalVal * 10 + card.NumberValue;
+                }
+
+                <div class="op-hp-preview">
+                    <div class="op-hp-preview-label">POTENTIAL IMPACT:</div>
+                    <div class="op-hp-preview-value">@totalVal</div>
+                    <div class="op-hp-preview-hint">Cards in this set will be applied to your score using your current operator.</div>
+                </div>
+            }
+
             var reactionCards = GetPotentialReactionCards();
 
             @if (reactionCards.Count > 0)

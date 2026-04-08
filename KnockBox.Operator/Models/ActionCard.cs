@@ -3,7 +3,7 @@ using KnockBox.Operator.Services.Logic.FSM;
 namespace KnockBox.Operator.Models;
 
 public abstract class ActionCard(CardAction actionValue = CardAction.None) 
-    : Card, ITargetableCard, IBlockableCard
+    : Card, IBlockableCard
 {
     public override CardType Type => CardType.Action;
 
@@ -14,7 +14,6 @@ public abstract class ActionCard(CardAction actionValue = CardAction.None)
     public abstract override string TooltipDescription();
 
     public abstract IEnumerable<Card> GetPotentialReactionCards(OperatorGameContext context, OperatorPlayerState thisPlayer);
-    public abstract IEnumerable<OperatorPlayerState> GetPotentialTargets(OperatorGameContext context, OperatorPlayerState thisPlayer);
 }
 
 public sealed class ShieldCard() : ActionCard(CardAction.Shield)
@@ -24,23 +23,22 @@ public sealed class ShieldCard() : ActionCard(CardAction.Shield)
     public override string TooltipDescription() => "Hold in your hand to block an incoming targeted action. Used as a reaction to other action cards.";
 
     public override IEnumerable<Card> GetPotentialReactionCards(OperatorGameContext context, OperatorPlayerState thisPlayer) => [];
-    public override IEnumerable<OperatorPlayerState> GetPotentialTargets(OperatorGameContext context, OperatorPlayerState thisPlayer) => [thisPlayer];
     public override bool IsPlayable(OperatorGameContext context, OperatorPlayerState thisPlayer) => false; // Can only be used as a reaction
 }
 
 public sealed class LiabilityTransferCard() 
-    : ActionCard(CardAction.LiabilityTransfer), IPairableCard
+    : ActionCard(CardAction.LiabilityTransfer), ITargetableCard, IPairableCard
 {
     public override string CardIcon() => "\ud83d\udce4";
     public override string TooltipName() => "Liability Transfer";
-    public override string TooltipDescription() => "Play with number cards to apply them to a target player's score instead of your own.";
+    public override string TooltipDescription() => "Play with number cards to pass them to the target player.";
 
     public override IEnumerable<Card> GetPotentialReactionCards(OperatorGameContext context, OperatorPlayerState thisPlayer)
     {
         return thisPlayer.Hand.Where(c => c is ActionCard { ActionValue: CardAction.Shield });
     }
 
-    public override IEnumerable<OperatorPlayerState> GetPotentialTargets(OperatorGameContext context, OperatorPlayerState thisPlayer)
+    public IEnumerable<OperatorPlayerState> GetPotentialTargets(OperatorGameContext context, OperatorPlayerState thisPlayer)
     {
         return context.GamePlayers.Values.Where(player => player != thisPlayer);
     }
@@ -63,9 +61,6 @@ public sealed class CookTheBooksCard()
 
     public override IEnumerable<Card> GetPotentialReactionCards(OperatorGameContext context, OperatorPlayerState thisPlayer) => [];
 
-    public override IEnumerable<OperatorPlayerState> GetPotentialTargets(OperatorGameContext context, OperatorPlayerState thisPlayer)
-        => [thisPlayer];
-
     public IEnumerable<Card> GetPotentialPairingCards(OperatorGameContext context, OperatorPlayerState thisPlayer)
     {
         return thisPlayer.Hand.Where(c => c is NumberCard);
@@ -83,17 +78,11 @@ public sealed class CompCard() : ActionCard(CardAction.Comp)
 
     public override IEnumerable<Card> GetPotentialReactionCards(OperatorGameContext context, OperatorPlayerState thisPlayer) => [];
 
-    public override IEnumerable<OperatorPlayerState> GetPotentialTargets(OperatorGameContext context, OperatorPlayerState thisPlayer)
-    {
-        if (thisPlayer.IsAudited) return [];
-        else return [thisPlayer];
-    }
-
     public override bool IsPlayable(OperatorGameContext context, OperatorPlayerState thisPlayer) 
         => !thisPlayer.IsAudited;
 }
 
-public sealed class StealCard() : ActionCard(CardAction.Steal)
+public sealed class StealCard() : ActionCard(CardAction.Steal), ITargetableCard
 {
     public override string CardIcon() => "\ud83d\udd75\ufe0f";
     public override string TooltipName() => "Steal";
@@ -104,7 +93,7 @@ public sealed class StealCard() : ActionCard(CardAction.Steal)
         return thisPlayer.Hand.Where(c => c is ActionCard { ActionValue: CardAction.Shield });
     }
 
-    public override IEnumerable<OperatorPlayerState> GetPotentialTargets(OperatorGameContext context, OperatorPlayerState thisPlayer)
+    public IEnumerable<OperatorPlayerState> GetPotentialTargets(OperatorGameContext context, OperatorPlayerState thisPlayer)
     {
         return context.GamePlayers.Values.Where(p => p.Hand.Count > 0 && p != thisPlayer);
     }
@@ -114,18 +103,18 @@ public sealed class StealCard() : ActionCard(CardAction.Steal)
 }
 
 public sealed class HotPotatoCard() 
-    : ActionCard(CardAction.HotPotato), IPairableCard
+    : ActionCard(CardAction.HotPotato), ITargetableCard, IPairableCard
 {
     public override string CardIcon() => "\ud83e\udd54";
     public override string TooltipName() => "Hot Potato";
-    public override string TooltipDescription() => "Play with a number card to force it into a target player's hand. They can redirect it with their own Hot Potato.";
+    public override string TooltipDescription() => "Play with number cards to apply it to the target player's score using their operator. They can redirect it with their own Hot Potato.";
 
     public override IEnumerable<Card> GetPotentialReactionCards(OperatorGameContext context, OperatorPlayerState thisPlayer)
     {
         return thisPlayer.Hand.Where(c => c is ActionCard { ActionValue: CardAction.Shield or CardAction.HotPotato });
     }
 
-    public override IEnumerable<OperatorPlayerState> GetPotentialTargets(OperatorGameContext context, OperatorPlayerState thisPlayer)
+    public IEnumerable<OperatorPlayerState> GetPotentialTargets(OperatorGameContext context, OperatorPlayerState thisPlayer)
     {
         return context.GamePlayers.Values.Where(player => player != thisPlayer);
     }
@@ -147,13 +136,11 @@ public sealed class FlashFloodCard() : ActionCard(CardAction.FlashFlood)
 
     public override IEnumerable<Card> GetPotentialReactionCards(OperatorGameContext context, OperatorPlayerState thisPlayer) => [];
 
-    public override IEnumerable<OperatorPlayerState> GetPotentialTargets(OperatorGameContext context, OperatorPlayerState thisPlayer) => [];
-
     public override bool IsPlayable(OperatorGameContext context, OperatorPlayerState thisPlayer)
         => context.State.Deck.Count > 0;
 }
 
-public sealed class HostileTakeoverCard() : ActionCard(CardAction.HostileTakeover)
+public sealed class HostileTakeoverCard() : ActionCard(CardAction.HostileTakeover), ITargetableCard
 {
     public override string CardIcon() => "\ud83e\udd1d";
     public override string TooltipName() => "Hostile Takeover";
@@ -164,7 +151,7 @@ public sealed class HostileTakeoverCard() : ActionCard(CardAction.HostileTakeove
         return thisPlayer.Hand.Where(c => c is ActionCard { ActionValue: CardAction.Shield });
     }
 
-    public override IEnumerable<OperatorPlayerState> GetPotentialTargets(OperatorGameContext context, OperatorPlayerState thisPlayer)
+    public IEnumerable<OperatorPlayerState> GetPotentialTargets(OperatorGameContext context, OperatorPlayerState thisPlayer)
     {
         return context.GamePlayers.Values.Where(p => !p.IsAudited && p != thisPlayer);
     }
@@ -173,7 +160,7 @@ public sealed class HostileTakeoverCard() : ActionCard(CardAction.HostileTakeove
         => GetPotentialTargets(context, thisPlayer).Any();
 }
 
-public sealed class AuditCard() : ActionCard(CardAction.Audit)
+public sealed class AuditCard() : ActionCard(CardAction.Audit), ITargetableCard
 {
     public override string CardIcon() => "\ud83d\udcdd";
     public override string TooltipName() => "Audit";
@@ -184,7 +171,7 @@ public sealed class AuditCard() : ActionCard(CardAction.Audit)
         return thisPlayer.Hand.Where(c => c is ActionCard { ActionValue: CardAction.Shield });
     }
 
-    public override IEnumerable<OperatorPlayerState> GetPotentialTargets(OperatorGameContext context, OperatorPlayerState thisPlayer)
+    public IEnumerable<OperatorPlayerState> GetPotentialTargets(OperatorGameContext context, OperatorPlayerState thisPlayer)
     {
         return context.GamePlayers.Values.Where(p => !p.IsAudited);
     }
@@ -200,11 +187,6 @@ public sealed class MarketCrashCard() : ActionCard(CardAction.MarketCrash)
     public override string TooltipDescription() => "Forces ALL players to switch to the Divide operator. Audited players are unaffected.";
 
     public override IEnumerable<Card> GetPotentialReactionCards(OperatorGameContext context, OperatorPlayerState thisPlayer) => [];
-
-    public override IEnumerable<OperatorPlayerState> GetPotentialTargets(OperatorGameContext context, OperatorPlayerState thisPlayer)
-    {
-        return context.GamePlayers.Values.Where(p => !p.IsAudited);
-    }
 
     public override bool IsPlayable(OperatorGameContext context, OperatorPlayerState thisPlayer)
         => true;

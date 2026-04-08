@@ -88,6 +88,63 @@
     color: #ffd166;
 }
 
+.op-reaction-player-status {
+    margin: 10px 0;
+    padding: 15px 25px;
+    background: rgba(255,255,255,0.05);
+    border-radius: 16px;
+    border: 1px solid rgba(255,255,255,0.1);
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    gap: 30px;
+    width: 100%;
+}
+
+.op-status-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+}
+
+.op-status-label {
+    font-size: 0.65rem;
+    font-weight: 900;
+    color: rgba(255,255,255,0.5);
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+}
+
+.op-status-value {
+    font-size: 1.8rem;
+    font-weight: 900;
+    color: #fff;
+    font-family: var(--font-mono);
+    line-height: 1;
+}
+
+/* ── Hot Potato Preview ── */
+.op-hp-preview {
+    margin: 20px 0;
+    padding: 20px;
+    background: rgba(255, 193, 7, 0.08);
+    border: 2px solid #ffc107;
+    border-radius: 16px;
+    text-align: center;
+    width: 100%;
+    animation: op-hp-pulse 2s infinite alternate;
+}
+
+@keyframes op-hp-pulse {
+    from { box-shadow: 0 0 10px rgba(255,193,7,0.2); }
+    to { box-shadow: 0 0 30px rgba(255,193,7,0.4); transform: scale(1.02); }
+}
+
+.op-hp-preview-label { font-size: 0.7rem; font-weight: 900; color: #ffc107; letter-spacing: 2px; }
+.op-hp-preview-value { font-size: 4rem; font-weight: 900; color: #fff; line-height: 1; margin: 10px 0; text-shadow: 0 0 20px rgba(0,0,0,0.5); }
+.op-hp-preview-hint { font-size: 0.8rem; color: rgba(255,255,255,0.6); font-style: italic; }
+
 /* ── Action Buttons ── */
 
 .op-reaction-actions {

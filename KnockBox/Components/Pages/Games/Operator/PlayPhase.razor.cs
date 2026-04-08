@@ -26,6 +26,7 @@ namespace KnockBox.Components.Pages.Games.Operator
         private readonly List<Guid> _selectedNumberIds = new();
         private string? _targetPlayerId;
         private bool _waitingForTarget;
+        private bool _showDiscardHistory;
 
         protected OperatorPlayerState? CurrentPlayerState =>
             UserService.CurrentUser != null ? GameState.Context?.GamePlayers.GetValueOrDefault(UserService.CurrentUser.Id) : null;

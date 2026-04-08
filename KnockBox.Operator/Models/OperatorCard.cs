@@ -37,11 +37,11 @@ public sealed class OperatorCard(CardOperator operatorValue = CardOperator.None)
     {
         return OperatorValue switch
         {
-            CardOperator.Add => "Sets a player's active operator to Add. Future number cards will be added to their score.",
-            CardOperator.Subtract => "Sets a player's active operator to Subtract. Future number cards will be subtracted from their score.",
-            CardOperator.Multiply => "Sets a player's active operator to Multiply. Future number cards will multiply their score.",
-            CardOperator.Divide => "Sets a player's active operator to Divide. Future number cards will divide their score.",
-            _ => "Changes a player's active operator."
+            CardOperator.Add => "Sets a player's active operator to Add. Future number cards will be added to their score. Playing this on a player with an Add active operator flips it to a Subtract.",
+            CardOperator.Subtract => "Sets a player's active operator to Subtract. Future number cards will be subtracted from their score. Playing this on a player with a Subtract active operator flips it to a Add.",
+            CardOperator.Multiply => "Sets a player's active operator to Multiply. Future number cards will multiply their score. Playing this on a player with a Multiply active operator flips it to a Divide.",
+            CardOperator.Divide => "Sets a player's active operator to Divide. Future number cards will divide their score. Playing this on a player with a Divide active operator flips it to a Multiply.",
+            _ => "Unknown operator."
         };
     }
 
@@ -54,9 +54,8 @@ public sealed class OperatorCard(CardOperator operatorValue = CardOperator.None)
 
     public IEnumerable<OperatorPlayerState> GetPotentialTargets(OperatorGameContext context, OperatorPlayerState thisPlayer)
     {
-        // Can't replace active operator if operators are the same type
-        return context.GamePlayers.Values.Where((player)
-            => player.ActiveOperator != OperatorValue && !player.IsAudited);
+        // Can target any player as long as they are not audited
+        return context.GamePlayers.Values.Where(player => !player.IsAudited);
     }
 
     public override bool IsPlayable(OperatorGameContext context, OperatorPlayerState thisPlayer)

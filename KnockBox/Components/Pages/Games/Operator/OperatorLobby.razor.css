@@ -218,3 +218,53 @@
     padding: 2px 6px;
     border-radius: 4px;
 }
+
+
+/* -- Deep Holo Effect (Audit) -- */
+::deep .holo-effect {
+    position: relative;
+    overflow: hidden;
+    background: linear-gradient(135deg, 
+        #f5f3ff 0%, 
+        #ede9fe 25%, 
+        #fae8ff 50%, 
+        #ede9fe 75%, 
+        #f5f3ff 100%
+    ) !important;
+    background-size: 400% 400% !important;
+    animation: op-holo-shimmer 3s infinite linear !important;
+    box-shadow: 0 0 20px rgba(168, 85, 247, 0.6), 0 0 40px rgba(168, 85, 247, 0.3) !important;
+    border: 2px solid rgba(168, 85, 247, 0.8) !important;
+}
+
+::deep .holo-effect::after {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: linear-gradient(
+        to right,
+        rgba(255, 255, 255, 0) 0%,
+        rgba(255, 255, 255, 0) 40%,
+        rgba(255, 255, 255, 0.7) 50%,
+        rgba(255, 255, 255, 0) 60%,
+        rgba(255, 255, 255, 0) 100%
+    );
+    transform: rotate(30deg);
+    animation: op-holo-sweep 2s infinite;
+    pointer-events: none;
+}
+
+@keyframes op-holo-shimmer {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+
+@keyframes op-holo-sweep {
+    0% { transform: rotate(30deg) translateX(-100%); }
+    100% { transform: rotate(30deg) translateX(100%); }
+}
+

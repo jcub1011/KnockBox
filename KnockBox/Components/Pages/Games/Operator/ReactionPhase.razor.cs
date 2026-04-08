@@ -26,7 +26,7 @@ namespace KnockBox.Components.Pages.Games.Operator
 
         protected bool IsTargeted => GameState.ReactionTargetPlayerId == UserService.CurrentUser?.Id;
 
-        protected bool CanRedirectHotPotato => GameState.PendingHotPotatoCard != null;
+        protected bool CanRedirectHotPotato => GameState.PendingHotPotatoCards.Count > 0;
 
         protected async Task PlayShield(Guid cardId)
         {
@@ -126,19 +126,14 @@ namespace KnockBox.Components.Pages.Games.Operator
             {
                 if (pendingCard is HotPotatoCard)
                 {
-                    if (GameState.PendingActionCommand is PlayCardsCommand playCmd)
+                    if (GameState.PendingHotPotatoCards.Count > 0)
                     {
                         decimal val = 0;
-                        var numCards = playCmd.CardIds
-                            .Select(id => GameState.DiscardPile.FirstOrDefault(c => c.Id == id))
-                            .OfType<NumberCard>()
-                            .ToList();
-
-                        if (numCards.Count > 0)
+                        foreach (var num in GameState.PendingHotPotatoCards.OfType<NumberCard>())
                         {
-                            foreach (var num in numCards) val = val * 10 + num.NumberValue;
-                            return $"Hot Potato with the value {val}";
+                            val = val * 10 + num.NumberValue;
                         }
+                        return $"Hot Potato with the value {val}";
                     }
                 }
                 if (pendingCard is KnockBox.Operator.Models.OperatorCard opCard)

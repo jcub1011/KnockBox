@@ -5,7 +5,7 @@
     <div class="op-player-info-main">
         <span class="op-player-name">@Name</span>
         <div class="op-player-score-container">
-            <div class="op-player-operator-card @(_opChanged ? "op-op-changed" : "")">
+            <div class="op-player-operator-card @(_opChanged ? "op-op-changed" : "") @(IsAudited ? "holo-effect" : "") @(IsDivideBroken ? "broken-operator" : "")">
                 <span class="op-player-operator-card-symbol">@GetOperatorSymbol()</span>
             </div>
             <span class="op-player-score @(_scoreChanged ? "op-score-changed" : "")">@Score.ToString("F1")</span>
@@ -14,12 +14,19 @@
     
     <div class="op-player-status-row">
         <div class="op-hand-size" title="Hand Size">🎴 @HandSize</div>
-        @if (IsAudited) { <span class="op-status-badge" title="Audited">📝</span> }
+        @if (IsAudited) { <span class="op-status-badge" title="Audited (Operator Locked)">📝</span> }
     </div>
 
     @if (IsActive)
     {
         <div class="op-active-indicator">TURN</div>
+    }
+
+    @if (IsBeingStolenFrom)
+    {
+        <div class="op-stolen-card-anim">
+            <div class="op-mini-card-back"></div>
+        </div>
     }
 </div>
 
@@ -30,6 +37,8 @@
     [Parameter] public int HandSize { get; set; }
     [Parameter] public bool IsActive { get; set; }
     [Parameter] public bool IsAudited { get; set; }
+    [Parameter] public bool IsDivideBroken { get; set; }
+    [Parameter] public bool IsBeingStolenFrom { get; set; }
     [Parameter] public bool IsTargetable { get; set; }
     [Parameter] public bool IsTargeted { get; set; }
     [Parameter] public EventCallback OnClick { get; set; }

@@ -45,26 +45,109 @@
     color: rgba(255,255,255,0.5);
 }
 
-/* ── Deck Display ── */
+/* ── Attacker Blocked Animation ── */
+.op-attacker-blocked-overlay {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 4000;
+    pointer-events: none;
+}
+
+.op-blocked-stamp {
+    font-size: 6rem;
+    font-weight: 900;
+    color: #e63946;
+    border: 10px solid #e63946;
+    padding: 20px 40px;
+    border-radius: 20px;
+    text-transform: uppercase;
+    letter-spacing: 10px;
+    transform: rotate(-15deg);
+    opacity: 0;
+    animation: op-blocked-slam 1s forwards cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    background: rgba(0,0,0,0.4);
+    backdrop-filter: blur(4px);
+    box-shadow: 0 0 50px rgba(230,57,70,0.5);
+}
+
+@keyframes op-blocked-slam {
+    0% { transform: translate(-50%, -50%) scale(3) rotate(-45deg); opacity: 0; }
+    20% { transform: translate(-50%, -50%) scale(1) rotate(-15deg); opacity: 1; }
+    80% { transform: translate(-50%, -50%) scale(1) rotate(-15deg); opacity: 1; }
+    100% { transform: translate(-50%, -50%) scale(0.8) rotate(-15deg); opacity: 0; }
+}
+
+/* ── Deck & Discard Display ── */
 
 .op-deck-area {
     display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 10px;
-    margin: 10px auto;
+    justify-content: center;
+    align-items: flex-end;
+    gap: 40px;
+    margin: 20px auto;
 }
 
-.op-deck-stack {
+.op-deck-stack-container, .op-discard-stack-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+
+.op-discard-stack-container {
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.op-discard-stack-container:hover {
+    transform: translateY(-5px);
+}
+
+.op-deck-stack, .op-discard-card {
     position: relative;
-    width: 120px;
-    height: 168px;
+    width: 100px;
+    height: 140px;
+}
+
+.op-discard-card {
+    background: #333;
+    border: 3px solid #ffd166;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 3px 3px 0 rgba(0,0,0,0.5);
+    overflow: hidden;
+}
+
+.op-card-mini {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 8px;
+    color: #fff;
+}
+
+.op-card-mini-icon {
+    font-size: 2.5rem;
+    font-weight: 900;
+}
+
+.op-card-mini-name {
+    font-size: 0.6rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    opacity: 0.8;
 }
 
 .op-deck-card {
     position: absolute;
-    width: 120px;
-    height: 168px;
+    width: 100px;
+    height: 140px;
     border: 3px solid #000;
     border-radius: 12px;
     background: linear-gradient(135deg, #3d0000 0%, #1a0a0a 50%, #3d0000 100%);
@@ -109,53 +192,148 @@
     50% { transform: scale(1.02); }
 }
 
-/* ── Deck Info ── */
-
-.op-deck-info {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 4px;
-}
-
 .op-deck-count {
     font-family: var(--font-mono);
-    font-size: 1.8rem;
+    font-size: 1.4rem;
     font-weight: 900;
     color: #ffd166;
 }
 
 .op-deck-label {
-    font-size: 0.6rem;
-    font-weight: 800;
+    font-size: 0.7rem;
+    font-weight: 900;
     text-transform: uppercase;
-    letter-spacing: 1px;
-    color: rgba(255,255,255,0.4);
+    letter-spacing: 1.5px;
+    color: rgba(255,255,255,0.6);
 }
 
-/* ── Deck Progress Bar ── */
-
-.op-deck-bar {
-    width: 120px;
-    height: 6px;
-    background: rgba(255,255,255,0.08);
-    border-radius: 3px;
-    overflow: hidden;
-    margin-top: 2px;
+/* ── Blocked Banner ── */
+.op-blocked-banner {
+    position: absolute;
+    top: 150px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(230, 57, 70, 0.95);
+    color: white;
+    padding: 12px 24px;
+    border-radius: 50px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    box-shadow: 0 0 30px rgba(230, 57, 70, 0.6);
+    z-index: 1000;
+    animation: op-blocked-fade 4s forwards;
+    border: 2px solid rgba(255,255,255,0.3);
 }
 
-.op-deck-bar-fill {
-    height: 100%;
-    background: linear-gradient(90deg, #e63946, #ff2d55);
-    border-radius: 3px;
-    transition: width 0.5s ease-out;
+.op-blocked-icon { font-size: 1.5rem; }
+.op-blocked-text { font-weight: 800; text-transform: uppercase; letter-spacing: 1px; }
+
+@keyframes op-blocked-fade {
+    0% { opacity: 0; transform: translate(-50%, -20px); }
+    10% { opacity: 1; transform: translate(-50%, 0); }
+    85% { opacity: 1; transform: translate(-50%, 0); }
+    100% { opacity: 0; transform: translate(-50%, 20px); }
 }
+
+/* ── History Modal ── */
+.op-history-modal-overlay {
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.85);
+    backdrop-filter: blur(8px);
+    z-index: 3000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.op-history-modal {
+    background: #1a1a1a;
+    width: 90%;
+    max-width: 650px;
+    max-height: 85vh;
+    border: 3px solid #333;
+    border-radius: 16px;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 0 60px rgba(0,0,0,1);
+    animation: op-modal-in 0.3s ease-out;
+}
+
+@keyframes op-modal-in {
+    from { opacity: 0; transform: scale(0.9); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+.op-history-header {
+    padding: 20px;
+    border-bottom: 2px solid #333;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.op-history-header h3 { margin: 0; color: #ffd166; letter-spacing: 3px; font-weight: 900; }
+
+.op-history-close {
+    background: none; border: none; color: #666; font-size: 2.5rem; cursor: pointer; line-height: 1;
+}
+.op-history-close:hover { color: #fff; }
+
+.op-history-content {
+    padding: 20px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.op-history-entry {
+    background: #252525;
+    padding: 12px;
+    border-radius: 8px;
+    border-left: 5px solid #ffd166;
+    display: flex;
+    gap: 15px;
+    align-items: flex-start;
+}
+
+.op-history-time { color: #555; font-family: var(--font-mono); font-size: 0.8rem; padding-top: 2px; }
+.op-history-msg { color: #eee; font-size: 0.95rem; line-height: 1.4; }
+
+.op-history-divider {
+    margin: 30px 0 10px;
+    text-align: center;
+    font-size: 0.75rem;
+    font-weight: 900;
+    color: #444;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    border-bottom: 2px solid #222;
+    line-height: 0.1em;
+}
+
+.op-history-card-item {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 12px;
+    border-radius: 8px;
+    background: rgba(255,255,255,0.03);
+}
+
+.op-history-card-icon { font-size: 1.8rem; min-width: 40px; text-align: center; }
+.op-history-card-name { font-weight: 900; color: #fff; min-width: 140px; text-transform: uppercase; font-size: 0.85rem; }
+.op-history-card-desc { color: #888; font-size: 0.85rem; flex: 1; }
+
+.op-history-empty { text-align: center; color: #444; padding: 40px; font-style: italic; }
 
 /* ── Deck Empty State ── */
 
 .op-deck-empty {
-    width: 120px;
-    height: 168px;
+    width: 100px;
+    height: 140px;
     border: 3px dashed rgba(255,255,255,0.15);
     border-radius: 12px;
     display: flex;

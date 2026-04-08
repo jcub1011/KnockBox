@@ -296,7 +296,7 @@ public class ReactionStateTests
     {
         var hpCard = new HotPotatoCard();
         _state.GamePlayers["p2"].Hand.Add(hpCard);
-        _state.PendingHotPotatoCard = new NumberCard(5m);
+        _state.PendingHotPotatoCards = new List<Card> { new NumberCard(5m) };
         _state.PendingActionCommand = new PlayCardsCommand("p1", new List<Guid>(), "p2");
 
         var cmd = new RedirectHotPotatoCommand("p2", hpCard.Id, "p2");
@@ -309,7 +309,7 @@ public class ReactionStateTests
     {
         var hpCard = new HotPotatoCard();
         _state.GamePlayers["p2"].Hand.Add(hpCard);
-        _state.PendingHotPotatoCard = new NumberCard(5m);
+        _state.PendingHotPotatoCards = new List<Card> { new NumberCard(5m) };
         _state.PendingActionCommand = new PlayCardsCommand("p1", new List<Guid>(), "p2");
 
         var cmd = new RedirectHotPotatoCommand("p2", hpCard.Id, "nonexistent");

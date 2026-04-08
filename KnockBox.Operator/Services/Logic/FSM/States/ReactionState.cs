@@ -51,6 +51,17 @@ public class ReactionState : IOperatorGameState, ITimedGameState<OperatorGameCon
             pState.Hand.RemoveAt(shieldIdx);
             context.State.DiscardPile.Add(shield);
 
+            string reactorName = context.State.Players.FirstOrDefault(p => p.Id == react.PlayerId)?.Name ?? "Unknown";
+            string attackerName = context.State.Players.FirstOrDefault(p => p.Id == context.State.TurnManager.CurrentPlayer)?.Name ?? "Unknown";
+
+            context.State.LastBlockedActionMessage = $"{reactorName} blocked the action!";
+            context.State.BlockedAttackerId = context.State.TurnManager.CurrentPlayer;
+            context.State.ActionLog.Add(new ActionLogEntry(
+                $"{reactorName} used a Shield to block {attackerName}'s action.",
+                DateTimeOffset.UtcNow,
+                react.PlayerId,
+                context.State.TurnManager.CurrentPlayer));
+
             ResolvePendingAction(context, true);
             ClearPendingState(context);
 
@@ -75,7 +86,7 @@ public class ReactionState : IOperatorGameState, ITimedGameState<OperatorGameCon
         OperatorGameContext context, RedirectHotPotatoCommand redirect)
     {
         // Verify pending action is a Hot Potato
-        if (context.State.PendingHotPotatoCard is null)
+        if (context.State.PendingHotPotatoCards.Count == 0)
             return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromError("No Hot Potato to redirect.");
 
         // Verify the reactor has a Hot Potato card
@@ -124,11 +135,57 @@ public class ReactionState : IOperatorGameState, ITimedGameState<OperatorGameCon
                 }
             }
 
-            // Re-add the Hot Potato number card so ResolvePlayedCards can find it
-            if (context.State.PendingHotPotatoCard is { } hpCard && !playedCards.Any(c => c.Id == hpCard.Id))
+            bool isHotPotato = playedCards.Any(c => c is HotPotatoCard);
+            bool isLiabilityTransfer = playedCards.Any(c => c is LiabilityTransferCard);
+
+            if (actionBlocked && (context.State.PendingHotPotatoCards.Count > 0 || isLiabilityTransfer))
             {
-                playedCards.Add(hpCard);
-                context.State.DiscardPile.Add(hpCard);
+                // Return cards to the sender's hand
+                if (context.GamePlayers.TryGetValue(playCommand.PlayerId, out var sender))
+                {
+                    List<Card> cardsToReturn = new();
+                    if (isLiabilityTransfer)
+                    {
+                        var numbers = playedCards.Where(c => c.Type == CardType.Number).ToList();
+                        cardsToReturn.AddRange(numbers);
+                        // Remove from discard and resolution list
+                        foreach (var card in numbers)
+                        {
+                            context.State.DiscardPile.Remove(card);
+                            playedCards.Remove(card);
+                        }
+                    }
+                    else // Hot Potato
+                    {
+                        cardsToReturn.AddRange(context.State.PendingHotPotatoCards);
+                        // Hot Potato numbers were already removed from discard in PlayPhaseState
+                    }
+
+                    if (cardsToReturn.Count > 0)
+                    {
+                        sender.Hand.AddRange(cardsToReturn);
+                        
+                        string senderName = context.State.Players.FirstOrDefault(p => p.Id == playCommand.PlayerId)?.Name ?? "Unknown";
+                        string actionName = isLiabilityTransfer ? "Liability Transfer" : "Hot Potato";
+                        context.State.ActionLog.Add(new ActionLogEntry(
+                            $"{actionName} was blocked! The number cards were returned to {senderName}'s hand.",
+                            DateTimeOffset.UtcNow,
+                            null,
+                            playCommand.PlayerId));
+                    }
+                }
+            }
+            else
+            {
+                // Re-add the Hot Potato number cards so ResolvePlayedCards can find them
+                foreach (var hpCard in context.State.PendingHotPotatoCards)
+                {
+                    if (!playedCards.Any(c => c.Id == hpCard.Id))
+                    {
+                        playedCards.Add(hpCard);
+                        context.State.DiscardPile.Add(hpCard);
+                    }
+                }
             }
 
             if (playedCards.Count > 0)
@@ -136,14 +193,14 @@ public class ReactionState : IOperatorGameState, ITimedGameState<OperatorGameCon
                 PlayPhaseState.ResolvePlayedCards(context, playCommand, playedCards, actionBlocked);
             }
         }
-        context.State.PendingHotPotatoCard = null;
+        context.State.PendingHotPotatoCards.Clear();
     }
 
     private static void ClearPendingState(OperatorGameContext context)
     {
         context.State.PendingActionCommand = null;
         context.State.ReactionTargetPlayerId = null;
-        context.State.PendingHotPotatoCard = null;
+        context.State.PendingHotPotatoCards.Clear();
     }
 
     private bool TargetCanReact(OperatorGameContext context)

@@ -11,6 +11,9 @@ public class OperatorPlayerState
     public List<Card> Hand { get; set; } = new();
     public bool IsAudited { get; set; }
     public int AuditExpiresTurnCount { get; set; }
+    public int DivideUses { get; set; }
+    public bool IsDivideBroken { get; set; }
+    public bool IsBeingStolenFrom { get; set; }
     public DateTimeOffset ScoreTimestamp { get; set; } = DateTimeOffset.UtcNow;
     public HashSet<Guid> PreDrawCardIds { get; set; } = new();
     public bool HasPlayedCardThisTurn { get; set; } = false;
