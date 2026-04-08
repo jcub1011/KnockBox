@@ -348,14 +348,8 @@ public class ActionCardTests
         var playCmd = new PlayCardsCommand("p1", new List<Guid> { crashCard.Id });
         _playPhase.HandleCommand(_context, playCmd);
 
-        // Transition to ReactionState
-        Assert.AreEqual(OperatorGamePhase.Reaction, _state.Phase);
-        
-        // Pass for all targets (except p1)
-        foreach (var targetId in _state.ReactionTargetPlayerIds.ToList())
-        {
-            _reactionPhase.HandleCommand(_context, new PassReactionCommand(targetId));
-        }
+        // Should resolve immediately because only target (p2) is audited
+        Assert.AreNotEqual(OperatorGamePhase.Reaction, _state.Phase);
 
         Assert.AreEqual(CardOperator.Divide, _state.GamePlayers["p1"].ActiveOperator);
         Assert.AreEqual(CardOperator.Add, _state.GamePlayers["p2"].ActiveOperator);

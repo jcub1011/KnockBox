@@ -15,10 +15,17 @@ public class GlobalActionCommand(
 {
     private readonly ActionCard _actionCard = actionCard;
 
-    public override bool RequiresReaction => true;
+    public override bool RequiresReaction => GetReactionTargetIds().Any();
 
-    public override IEnumerable<string> GetReactionTargetIds() =>
-        Context.GamePlayers.Keys.Where(id => id != PlayCommand.PlayerId);
+    public override IEnumerable<string> GetReactionTargetIds()
+    {
+        var targets = Context.GamePlayers.Values.Where(p => p.UserId != PlayCommand.PlayerId);
+        if (_actionCard.IsOperatorOnlyAction)
+        {
+            targets = targets.Where(p => !p.IsAudited);
+        }
+        return targets.Select(p => p.UserId);
+    }
 
     public override void Execute()
     {

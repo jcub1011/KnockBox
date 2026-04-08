@@ -16,6 +16,8 @@ public abstract class ActionCard(CardAction actionValue = CardAction.None)
     public abstract override string TooltipName();
     public abstract override string TooltipDescription();
 
+    public virtual bool IsOperatorOnlyAction => false;
+
     public abstract IEnumerable<Card> GetPotentialReactionCards(OperatorGameContext context, OperatorPlayerState thisPlayer);
 
     public abstract IGameActionCommand CreateCommand(OperatorGameContext context, PlayCardsCommand playCommand, List<Card> playedCards);

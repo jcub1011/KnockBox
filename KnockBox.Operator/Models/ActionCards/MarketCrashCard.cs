@@ -12,6 +12,8 @@ public sealed class MarketCrashCard() : ActionCard(CardAction.MarketCrash)
     public override string TooltipName() => "Market Crash";
     public override string TooltipDescription() => "Forces ALL players to switch to the Divide operator. Audited players are unaffected.";
 
+    public override bool IsOperatorOnlyAction => true;
+
     public override IGameActionCommand CreateCommand(OperatorGameContext context, PlayCardsCommand playCommand, List<Card> playedCards)
         => new GlobalActionCommand(context, playCommand, playedCards, this);
 

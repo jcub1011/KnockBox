@@ -15,10 +15,21 @@ public class TargetedActionCommand(
 {
     private readonly ActionCard _actionCard = actionCard;
 
-    public override bool RequiresReaction => !string.IsNullOrEmpty(PlayCommand.TargetPlayerId);
+    public override bool RequiresReaction => GetReactionTargetIds().Any();
 
-    public override IEnumerable<string> GetReactionTargetIds() =>
-        !string.IsNullOrEmpty(PlayCommand.TargetPlayerId) ? [PlayCommand.TargetPlayerId] : [];
+    public override IEnumerable<string> GetReactionTargetIds()
+    {
+        if (string.IsNullOrEmpty(PlayCommand.TargetPlayerId) || PlayCommand.TargetPlayerId == PlayCommand.PlayerId)
+            return [];
+
+        if (_actionCard.IsOperatorOnlyAction)
+        {
+            if (Context.GamePlayers.TryGetValue(PlayCommand.TargetPlayerId, out var target) && target.IsAudited)
+                return [];
+        }
+
+        return [PlayCommand.TargetPlayerId];
+    }
 
     public override void Execute()
     {

@@ -12,6 +12,8 @@ public sealed class HostileTakeoverCard() : ActionCard(CardAction.HostileTakeove
     public override string TooltipName() => "Hostile Takeover";
     public override string TooltipDescription() => "Swap your active operator with a target player's. Blocked by Audit.";
 
+    public override bool IsOperatorOnlyAction => true;
+
     public override IGameActionCommand CreateCommand(OperatorGameContext context, PlayCardsCommand playCommand, List<Card> playedCards)
         => new TargetedActionCommand(context, playCommand, playedCards, this);
 

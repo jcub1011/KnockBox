@@ -12,6 +12,8 @@ public sealed class CompCard() : ActionCard(CardAction.Comp)
     public override string TooltipName() => "Comp";
     public override string TooltipDescription() => "Changes your operator. Positive scores get Subtract, negative scores get Add. Blocked by Audit.";
 
+    public override bool IsOperatorOnlyAction => true;
+
     public override IGameActionCommand CreateCommand(OperatorGameContext context, PlayCardsCommand playCommand, List<Card> playedCards)
         => new TargetedActionCommand(context, playCommand, playedCards, this);
 

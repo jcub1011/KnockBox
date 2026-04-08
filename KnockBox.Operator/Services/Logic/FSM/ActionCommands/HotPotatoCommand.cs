@@ -15,10 +15,10 @@ public class HotPotatoCommand(
 {
     private List<Card> _pendingNumbers = [];
 
-    public override bool RequiresReaction => true;
+    public override bool RequiresReaction => GetReactionTargetIds().Any();
 
     public override IEnumerable<string> GetReactionTargetIds() =>
-        !string.IsNullOrEmpty(PlayCommand.TargetPlayerId) ? [PlayCommand.TargetPlayerId] : [];
+        (!string.IsNullOrEmpty(PlayCommand.TargetPlayerId) && PlayCommand.TargetPlayerId != PlayCommand.PlayerId) ? [PlayCommand.TargetPlayerId] : [];
 
     public override void SetupPendingState()
     {
