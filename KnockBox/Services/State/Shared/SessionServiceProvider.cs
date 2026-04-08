@@ -113,10 +113,10 @@ public class SessionServiceProvider(
 
     private void EvictionCallback(object key, object? value, EvictionReason reason, object? state)
     {
-        // Always dispose the CTS if it was passed in the state to avoid leaking timer resources.
-        if (state is CancellationTokenSource cts)
+        // Always dispose the state to avoid leaking resources.
+        if (state is IDisposable disposable)
         {
-            cts.Dispose();
+            disposable.Dispose();
         }
 
         var regKey = (RegistrationKey)key;
