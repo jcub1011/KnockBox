@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using KnockBox.Core.Services.State.Games.Shared;
 using KnockBox.Extensions.Returns;
 using KnockBox.Operator.Models;
+using KnockBox.Operator.Services.Logic.FSM.ActionCommands;
 using KnockBox.Operator.Services.Logic.FSM.Commands;
 
 namespace KnockBox.Operator.Services.Logic.FSM.States;
@@ -126,58 +127,29 @@ public class PlayPhaseState : IOperatorGameState, ITimedGameState<OperatorGameCo
             pState.HasPlayedCardThisTurn = true;
             context.State.StateStartTime = DateTimeOffset.UtcNow;
 
-            bool hasTargetedAction = playedCards.Any(c => c is ActionCard && c is ITargetableCard);
-
-            bool hasTargetedOperator = playedCards.Any(c => c.Type == CardType.Operator)
-                && !string.IsNullOrEmpty(play.TargetPlayerId)
-                && play.TargetPlayerId != play.PlayerId;
-
-            bool isBlueShell = playedCards.Any(c => c is BlueShellCard);
-
-            if (isBlueShell)
+            var actionCard = playedCards.OfType<ActionCard>().FirstOrDefault();
+            if (actionCard != null)
             {
-                var zeroPlayers = context.GamePlayers.Values.Where(p => p.CurrentPoints == 0m).Select(p => p.UserId).ToList();
-                if (zeroPlayers.Any())
+                var actionCommand = actionCard.CreateCommand(context, play, playedCards);
+                if (actionCommand.RequiresReaction)
                 {
-                    context.State.PendingActionCommand = play;
-                    context.State.ReactionTargetPlayerIds = new HashSet<string>(zeroPlayers);
+                    actionCommand.SetupPendingState();
+                    context.State.PendingGameActionCommand = actionCommand;
+                    context.State.ReactionTargetPlayerIds = new HashSet<string>(actionCommand.GetReactionTargetIds());
                     context.State.PlayerReactions.Clear();
                     context.State.Phase = OperatorGamePhase.Reaction;
                     return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromValue(new ReactionState());
                 }
-            }
-
-            if ((hasTargetedAction || hasTargetedOperator) && !string.IsNullOrEmpty(play.TargetPlayerId) && play.TargetPlayerId != play.PlayerId)
-            {
-                if (!context.GamePlayers.ContainsKey(play.TargetPlayerId))
-                    return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromError("Target player not found.");
-
-                context.State.PendingActionCommand = play;
-                context.State.ReactionTargetPlayerIds = new HashSet<string> { play.TargetPlayerId };
-
-                // If Hot Potato is in play, extract the number cards for redirect tracking
-                bool hasHotPotato = playedCards.Any(c => c is HotPotatoCard);
-                if (hasHotPotato)
+                else
                 {
-                    var numbers = playedCards.Where(c => c.Type == CardType.Number).ToList();
-                    if (numbers.Count > 0)
-                    {
-                        context.State.PendingHotPotatoCards = new List<Card>(numbers);
-                        // Remove from discard — it will be resolved by ReactionState
-                        foreach (var num in numbers)
-                        {
-                            var inDiscard = context.State.DiscardPile.FindLastIndex(c => c.Id == num.Id);
-                            if (inDiscard != -1) context.State.DiscardPile.RemoveAt(inDiscard);
-                        }
-                    }
+                    actionCommand.Execute();
                 }
-
-                context.State.Phase = OperatorGamePhase.Reaction;
-                return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromValue(new ReactionState());
             }
-
-            // Resolve immediate logic if no reaction needed
-            ResolvePlayedCards(context, play, playedCards, false);
+            else
+            {
+                // Resolve immediate logic for standard number/operator plays
+                ResolvePlayedCards(context, play, playedCards, false);
+            }
 
             if (pState.Hand.Count == 0)
             {

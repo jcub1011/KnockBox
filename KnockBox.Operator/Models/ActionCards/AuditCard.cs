@@ -1,5 +1,7 @@
 using KnockBox.Extensions.Returns;
 using KnockBox.Operator.Services.Logic.FSM;
+using KnockBox.Operator.Services.Logic.FSM.ActionCommands;
+using KnockBox.Operator.Services.Logic.FSM.Commands;
 using KnockBox.Operator.Services.State;
 
 namespace KnockBox.Operator.Models;
@@ -9,6 +11,9 @@ public sealed class AuditCard() : ActionCard(CardAction.Audit), ITargetableCard
     public override string CardIcon() => "\ud83d\udcdd";
     public override string TooltipName() => "Audit";
     public override string TooltipDescription() => "Locks a target player's operator for a full round. They cannot change it until the audit expires.";
+
+    public override IGameActionCommand CreateCommand(OperatorGameContext context, PlayCardsCommand playCommand, List<Card> playedCards)
+        => new TargetedActionCommand(context, playCommand, playedCards, this);
 
     public override IEnumerable<Card> GetPotentialReactionCards(OperatorGameContext context, OperatorPlayerState thisPlayer)
     {

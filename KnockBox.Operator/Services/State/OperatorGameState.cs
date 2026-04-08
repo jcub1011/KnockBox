@@ -5,6 +5,7 @@ using KnockBox.Services.State.Games.Shared.Components;
 using KnockBox.Services.State.Games.Shared.Interfaces;
 using KnockBox.Operator.Models;
 using KnockBox.Operator.Services.Logic.FSM;
+using KnockBox.Operator.Services.Logic.FSM.ActionCommands;
 using KnockBox.Services.State.Users;
 using Microsoft.Extensions.Logging;
 
@@ -33,8 +34,7 @@ public class OperatorGameState(
     
     public TurnManager TurnManager { get; } = new();
 
-    public OperatorCommand? PendingActionCommand { get; set; }
-    public List<Card> PendingHotPotatoCards { get; set; } = new();
+    public IGameActionCommand? PendingGameActionCommand { get; set; }
     public HashSet<string> ReactionTargetPlayerIds { get; set; } = new();
     public List<PlayerReaction> PlayerReactions { get; set; } = new();
 

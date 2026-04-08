@@ -1,5 +1,7 @@
 using KnockBox.Extensions.Returns;
 using KnockBox.Operator.Services.Logic.FSM;
+using KnockBox.Operator.Services.Logic.FSM.ActionCommands;
+using KnockBox.Operator.Services.Logic.FSM.Commands;
 using KnockBox.Operator.Services.State;
 
 namespace KnockBox.Operator.Models;
@@ -9,6 +11,9 @@ public sealed class BlueShellCard() : ActionCard(CardAction.BlueShell)
     public override string CardIcon() => "\ud83d\udc22";
     public override string TooltipName() => "Blue Shell";
     public override string TooltipDescription() => "Resets ALL players with a score of 0.0 to 10.0 and sets their operator to (+). Only playable if someone is at 0.0. Each affected player can block this individually.";
+
+    public override IGameActionCommand CreateCommand(OperatorGameContext context, PlayCardsCommand playCommand, List<Card> playedCards)
+        => new BlueShellCommand(context, playCommand, playedCards);
 
     public override IEnumerable<Card> GetPotentialReactionCards(OperatorGameContext context, OperatorPlayerState thisPlayer)
     {

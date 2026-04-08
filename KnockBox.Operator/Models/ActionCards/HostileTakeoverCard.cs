@@ -1,5 +1,7 @@
 using KnockBox.Extensions.Returns;
 using KnockBox.Operator.Services.Logic.FSM;
+using KnockBox.Operator.Services.Logic.FSM.ActionCommands;
+using KnockBox.Operator.Services.Logic.FSM.Commands;
 using KnockBox.Operator.Services.State;
 
 namespace KnockBox.Operator.Models;
@@ -9,6 +11,9 @@ public sealed class HostileTakeoverCard() : ActionCard(CardAction.HostileTakeove
     public override string CardIcon() => "\ud83e\udd1d";
     public override string TooltipName() => "Hostile Takeover";
     public override string TooltipDescription() => "Swap your active operator with a target player's. Blocked by Audit.";
+
+    public override IGameActionCommand CreateCommand(OperatorGameContext context, PlayCardsCommand playCommand, List<Card> playedCards)
+        => new TargetedActionCommand(context, playCommand, playedCards, this);
 
     public override IEnumerable<Card> GetPotentialReactionCards(OperatorGameContext context, OperatorPlayerState thisPlayer)
     {

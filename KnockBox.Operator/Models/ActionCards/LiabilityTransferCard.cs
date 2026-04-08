@@ -1,5 +1,7 @@
 using KnockBox.Extensions.Returns;
 using KnockBox.Operator.Services.Logic.FSM;
+using KnockBox.Operator.Services.Logic.FSM.ActionCommands;
+using KnockBox.Operator.Services.Logic.FSM.Commands;
 using KnockBox.Operator.Services.State;
 
 namespace KnockBox.Operator.Models;
@@ -10,6 +12,9 @@ public sealed class LiabilityTransferCard()
     public override string CardIcon() => "\ud83d\udce4";
     public override string TooltipName() => "Liability Transfer";
     public override string TooltipDescription() => "Play with number cards to pass them to the target player.";
+
+    public override IGameActionCommand CreateCommand(OperatorGameContext context, PlayCardsCommand playCommand, List<Card> playedCards)
+        => new LiabilityTransferCommand(context, playCommand, playedCards);
 
     public override IEnumerable<Card> GetPotentialReactionCards(OperatorGameContext context, OperatorPlayerState thisPlayer)
     {

@@ -55,15 +55,15 @@ public class ActionReactionTests
     }
 
     [TestMethod]
-    public void LiabilityTransfer_Passed_RedirectsScoreMutation()
+    public void HotPotato_Passed_RedirectsScoreMutation()
     {
-        var liabilityCard = new LiabilityTransferCard();
+        var hpCard = new HotPotatoCard();
         var numberCard = new NumberCard(5m);
         
-        _state.GamePlayers["p1"].Hand.Add(liabilityCard);
+        _state.GamePlayers["p1"].Hand.Add(hpCard);
         _state.GamePlayers["p1"].Hand.Add(numberCard);
 
-        var playCmd = new PlayCardsCommand("p1", new List<Guid> { liabilityCard.Id, numberCard.Id }, "p2");
+        var playCmd = new PlayCardsCommand("p1", new List<Guid> { hpCard.Id, numberCard.Id }, "p2");
         _playPhase.HandleCommand(_context, playCmd);
 
         var passCmd = new PassReactionCommand("p2");

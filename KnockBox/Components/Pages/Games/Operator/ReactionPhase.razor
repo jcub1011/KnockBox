@@ -1,4 +1,5 @@
 @using KnockBox.Operator.Models
+@using KnockBox.Operator.Services.Logic.FSM.ActionCommands
 
 <div class="op-reaction-overlay">
     <div class="op-reaction-backdrop"></div>
@@ -24,10 +25,10 @@
                 </div>
             </div>
 
-            @if (GameState.PendingHotPotatoCards.Count > 0)
+            @if (GameState.PendingGameActionCommand is HotPotatoCommand hpCmd)
             {
                 decimal totalVal = 0;
-                foreach (var card in GameState.PendingHotPotatoCards.OfType<NumberCard>())
+                foreach (var card in hpCmd.PlayedCards.OfType<NumberCard>())
                 {
                     totalVal = totalVal * 10 + card.NumberValue;
                 }

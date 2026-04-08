@@ -222,6 +222,15 @@ public class ActionCardTests
         var playCmd = new PlayCardsCommand("p1", new List<Guid> { floodCard.Id });
         _playPhase.HandleCommand(_context, playCmd);
 
+        // Transition to ReactionState for global actions
+        Assert.AreEqual(OperatorGamePhase.Reaction, _state.Phase);
+        
+        // Pass for all targets (except p1)
+        foreach (var targetId in _state.ReactionTargetPlayerIds.ToList())
+        {
+            _reactionPhase.HandleCommand(_context, new PassReactionCommand(targetId));
+        }
+
         // Both players should have received 2 cards
         Assert.AreEqual(2, _state.GamePlayers["p1"].Hand.Count);
         Assert.AreEqual(2, _state.GamePlayers["p2"].Hand.Count);
@@ -241,8 +250,8 @@ public class ActionCardTests
         var playCmd = new PlayCardsCommand("p1", new List<Guid> { floodCard.Id });
         var result = _playPhase.HandleCommand(_context, playCmd);
 
-        // Should not transition to reaction state
-        Assert.IsNotInstanceOfType(result.Value, typeof(ReactionState));
+        // Flash Flood is a global action and SHOULD transition to reaction state
+        Assert.IsInstanceOfType(result.Value, typeof(ReactionState));
     }
 
     // ── CookTheBooks ──
@@ -315,6 +324,15 @@ public class ActionCardTests
         var playCmd = new PlayCardsCommand("p1", new List<Guid> { crashCard.Id });
         _playPhase.HandleCommand(_context, playCmd);
 
+        // Transition to ReactionState
+        Assert.AreEqual(OperatorGamePhase.Reaction, _state.Phase);
+        
+        // Pass for all targets (except p1)
+        foreach (var targetId in _state.ReactionTargetPlayerIds.ToList())
+        {
+            _reactionPhase.HandleCommand(_context, new PassReactionCommand(targetId));
+        }
+
         Assert.AreEqual(CardOperator.Divide, _state.GamePlayers["p1"].ActiveOperator);
         Assert.AreEqual(CardOperator.Divide, _state.GamePlayers["p2"].ActiveOperator);
     }
@@ -329,6 +347,15 @@ public class ActionCardTests
 
         var playCmd = new PlayCardsCommand("p1", new List<Guid> { crashCard.Id });
         _playPhase.HandleCommand(_context, playCmd);
+
+        // Transition to ReactionState
+        Assert.AreEqual(OperatorGamePhase.Reaction, _state.Phase);
+        
+        // Pass for all targets (except p1)
+        foreach (var targetId in _state.ReactionTargetPlayerIds.ToList())
+        {
+            _reactionPhase.HandleCommand(_context, new PassReactionCommand(targetId));
+        }
 
         Assert.AreEqual(CardOperator.Divide, _state.GamePlayers["p1"].ActiveOperator);
         Assert.AreEqual(CardOperator.Add, _state.GamePlayers["p2"].ActiveOperator);

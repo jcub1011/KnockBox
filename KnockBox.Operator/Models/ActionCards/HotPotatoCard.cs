@@ -1,5 +1,7 @@
 using KnockBox.Extensions.Returns;
 using KnockBox.Operator.Services.Logic.FSM;
+using KnockBox.Operator.Services.Logic.FSM.ActionCommands;
+using KnockBox.Operator.Services.Logic.FSM.Commands;
 using KnockBox.Operator.Services.State;
 
 namespace KnockBox.Operator.Models;
@@ -10,6 +12,9 @@ public sealed class HotPotatoCard()
     public override string CardIcon() => "\ud83e\udd54";
     public override string TooltipName() => "Hot Potato";
     public override string TooltipDescription() => "Play with number cards to apply it to the target player's score using their operator. They can redirect it with their own Hot Potato.";
+
+    public override IGameActionCommand CreateCommand(OperatorGameContext context, PlayCardsCommand playCommand, List<Card> playedCards)
+        => new HotPotatoCommand(context, playCommand, playedCards);
 
     public override IEnumerable<Card> GetPotentialReactionCards(OperatorGameContext context, OperatorPlayerState thisPlayer)
     {

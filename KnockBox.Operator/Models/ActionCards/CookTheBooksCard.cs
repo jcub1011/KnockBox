@@ -1,5 +1,7 @@
 using KnockBox.Extensions.Returns;
 using KnockBox.Operator.Services.Logic.FSM;
+using KnockBox.Operator.Services.Logic.FSM.ActionCommands;
+using KnockBox.Operator.Services.Logic.FSM.Commands;
 using KnockBox.Operator.Services.State;
 
 namespace KnockBox.Operator.Models;
@@ -10,6 +12,9 @@ public sealed class CookTheBooksCard()
     public override string CardIcon() => "\ud83e\uddd1\u200d\ud83c\udf73";
     public override string TooltipName() => "Cook the Books";
     public override string TooltipDescription() => "Play with a number card to divide your score by that number.";
+
+    public override IGameActionCommand CreateCommand(OperatorGameContext context, PlayCardsCommand playCommand, List<Card> playedCards)
+        => new TargetedActionCommand(context, playCommand, playedCards, this);
 
     public override IEnumerable<Card> GetPotentialReactionCards(OperatorGameContext context, OperatorPlayerState thisPlayer) => [];
 

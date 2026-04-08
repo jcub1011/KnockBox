@@ -1,5 +1,7 @@
 using KnockBox.Extensions.Returns;
 using KnockBox.Operator.Services.Logic.FSM;
+using KnockBox.Operator.Services.Logic.FSM.ActionCommands;
+using KnockBox.Operator.Services.Logic.FSM.Commands;
 using KnockBox.Operator.Services.State;
 
 namespace KnockBox.Operator.Models;
@@ -9,6 +11,9 @@ public sealed class CompCard() : ActionCard(CardAction.Comp)
     public override string CardIcon() => "\u2696\ufe0f";
     public override string TooltipName() => "Comp";
     public override string TooltipDescription() => "Changes your operator. Positive scores get Subtract, negative scores get Add. Blocked by Audit.";
+
+    public override IGameActionCommand CreateCommand(OperatorGameContext context, PlayCardsCommand playCommand, List<Card> playedCards)
+        => new TargetedActionCommand(context, playCommand, playedCards, this);
 
     public override IEnumerable<Card> GetPotentialReactionCards(OperatorGameContext context, OperatorPlayerState thisPlayer) => [];
 
