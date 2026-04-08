@@ -24,7 +24,13 @@ namespace KnockBox.Components.Pages.Games.Operator
         protected OperatorPlayerState? CurrentPlayerState =>
             UserService.CurrentUser != null ? GameState.Context?.GamePlayers.GetValueOrDefault(UserService.CurrentUser.Id) : null;
 
-        protected bool IsTargeted => GameState.ReactionTargetPlayerId == UserService.CurrentUser?.Id;
+        protected bool IsTargeted =>
+            GameState.ReactionTargetPlayerIds.Contains(UserService.CurrentUser?.Id ?? "")
+            && !GameState.PlayerReactions.Any(r => r.PlayerId == (UserService.CurrentUser?.Id ?? ""));
+
+        protected bool HasReacted =>
+            GameState.ReactionTargetPlayerIds.Contains(UserService.CurrentUser?.Id ?? "")
+            && GameState.PlayerReactions.Any(r => r.PlayerId == (UserService.CurrentUser?.Id ?? ""));
 
         protected bool CanRedirectHotPotato => GameState.PendingHotPotatoCards.Count > 0;
 

@@ -32,7 +32,7 @@
                 var entry = sortedPlayers[i];
                 var isCurrentTurn = entry.Player.Id == GameState.TurnManager.CurrentPlayer;
                 var isReactionTarget = GameState.Phase == OperatorGamePhase.Reaction
-                    && entry.Player.Id == GameState.ReactionTargetPlayerId;
+                    && GameState.ReactionTargetPlayerIds.Contains(entry.Player.Id);
 
                 <div class="op-spectator-entry @(isCurrentTurn ? "active-turn" : "") @(isReactionTarget ? "targeted" : "")">
                     <span class="op-spectator-rank">#@(i + 1)</span>

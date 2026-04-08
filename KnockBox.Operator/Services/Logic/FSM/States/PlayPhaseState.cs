@@ -140,8 +140,8 @@ public class PlayPhaseState : IOperatorGameState, ITimedGameState<OperatorGameCo
                 if (zeroPlayers.Any())
                 {
                     context.State.PendingActionCommand = play;
-                    context.State.BlueShellBlockedPlayerIds.Clear();
-                    context.State.ReactionTargetPlayerId = zeroPlayers[0]; // Start with first zero player
+                    context.State.ReactionTargetPlayerIds = new HashSet<string>(zeroPlayers);
+                    context.State.PlayerReactions.Clear();
                     context.State.Phase = OperatorGamePhase.Reaction;
                     return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromValue(new ReactionState());
                 }
@@ -153,7 +153,7 @@ public class PlayPhaseState : IOperatorGameState, ITimedGameState<OperatorGameCo
                     return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromError("Target player not found.");
 
                 context.State.PendingActionCommand = play;
-                context.State.ReactionTargetPlayerId = play.TargetPlayerId;
+                context.State.ReactionTargetPlayerIds = new HashSet<string> { play.TargetPlayerId };
 
                 // If Hot Potato is in play, extract the number cards for redirect tracking
                 bool hasHotPotato = playedCards.Any(c => c is HotPotatoCard);
@@ -288,7 +288,10 @@ public class PlayPhaseState : IOperatorGameState, ITimedGameState<OperatorGameCo
                 }
                 else if (action.ActionValue == CardAction.BlueShell)
                 {
-                    context.ResolveBlueShell(context.State.BlueShellBlockedPlayerIds);
+                    context.ResolveBlueShell(context.State.PlayerReactions
+                        .Where(r => r.ReactionCard != null)
+                        .Select(r => r.PlayerId)
+                        .ToHashSet());
                 }
             }
         }

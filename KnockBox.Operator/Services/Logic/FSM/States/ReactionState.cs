@@ -21,6 +21,8 @@ public class ReactionState : IOperatorGameState, ITimedGameState<OperatorGameCon
         return Result.Success;
     }
 
+    private bool IsMultiTarget(OperatorGameContext context) => context.State.ReactionTargetPlayerIds.Count > 1;
+
     private ValueResult<IGameState<OperatorGameContext, OperatorCommand>?> TransitionAfterReaction(OperatorGameContext context)
     {
         var currentPlayerId = context.State.TurnManager.CurrentPlayer;
@@ -34,9 +36,28 @@ public class ReactionState : IOperatorGameState, ITimedGameState<OperatorGameCon
         return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromValue(new PlayPhaseState());
     }
 
+    private ValueResult<IGameState<OperatorGameContext, OperatorCommand>?> CheckMultiTargetComplete(OperatorGameContext context)
+    {
+        if (context.State.PlayerReactions.Count >= context.State.ReactionTargetPlayerIds.Count)
+        {
+            // All targeted players have responded — resolve with actionBlocked=false
+            // because multi-target blocking is tracked per-player via PlayerReactions
+            ResolvePendingAction(context, false);
+            ClearPendingState(context);
+            return TransitionAfterReaction(context);
+        }
+
+        // Still waiting for other players — stay in ReactionState
+        return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromValue(null);
+    }
+
     public ValueResult<IGameState<OperatorGameContext, OperatorCommand>?> HandleCommand(OperatorGameContext context, OperatorCommand command)
     {
-        if (command.PlayerId != context.State.ReactionTargetPlayerId)
+        bool isMultiTarget = IsMultiTarget(context);
+
+        // Validate the commanding player is allowed to react
+        if (!context.State.ReactionTargetPlayerIds.Contains(command.PlayerId)
+            || context.State.PlayerReactions.Any(r => r.PlayerId == command.PlayerId))
             return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromError("Not your reaction.");
 
         if (command is PlayReactionCommand react)
@@ -54,13 +75,20 @@ public class ReactionState : IOperatorGameState, ITimedGameState<OperatorGameCon
             string reactorName = context.State.Players.FirstOrDefault(p => p.Id == react.PlayerId)?.Name ?? "Unknown";
             string attackerName = context.State.Players.FirstOrDefault(p => p.Id == context.State.TurnManager.CurrentPlayer)?.Name ?? "Unknown";
 
-            context.State.LastBlockedActionMessage = "Your action was blocked!";
-            context.State.BlockedAttackerId = context.State.TurnManager.CurrentPlayer;
             context.State.ActionLog.Add(new ActionLogEntry(
                 $"{reactorName} used a Shield to block {attackerName}'s action.",
                 DateTimeOffset.UtcNow,
                 react.PlayerId,
                 context.State.TurnManager.CurrentPlayer));
+
+            if (isMultiTarget)
+            {
+                context.State.PlayerReactions.Add(new PlayerReaction(react.PlayerId, shield));
+                return CheckMultiTargetComplete(context);
+            }
+
+            context.State.LastBlockedActionMessage = "Your action was blocked!";
+            context.State.BlockedAttackerId = context.State.TurnManager.CurrentPlayer;
 
             ResolvePendingAction(context, true);
             ClearPendingState(context);
@@ -73,6 +101,12 @@ public class ReactionState : IOperatorGameState, ITimedGameState<OperatorGameCon
         }
         else if (command is PassReactionCommand)
         {
+            if (isMultiTarget)
+            {
+                context.State.PlayerReactions.Add(new PlayerReaction(command.PlayerId, null));
+                return CheckMultiTargetComplete(context);
+            }
+
             ResolvePendingAction(context, false);
             ClearPendingState(context);
 
@@ -110,7 +144,7 @@ public class ReactionState : IOperatorGameState, ITimedGameState<OperatorGameCon
         context.State.DiscardPile.Add(hpCard);
 
         // Redirect to new target — re-enter reaction state
-        context.State.ReactionTargetPlayerId = redirect.NewTargetPlayerId;
+        context.State.ReactionTargetPlayerIds = new HashSet<string> { redirect.NewTargetPlayerId };
         context.State.StateStartTime = DateTimeOffset.UtcNow;
         if (context.State.PendingActionCommand is PlayCardsCommand playCmd)
         {
@@ -164,7 +198,7 @@ public class ReactionState : IOperatorGameState, ITimedGameState<OperatorGameCon
                     if (cardsToReturn.Count > 0)
                     {
                         sender.Hand.AddRange(cardsToReturn);
-                        
+
                         string senderName = context.State.Players.FirstOrDefault(p => p.Id == playCommand.PlayerId)?.Name ?? "Unknown";
                         string actionName = isLiabilityTransfer ? "Liability Transfer" : "Hot Potato";
                         context.State.ActionLog.Add(new ActionLogEntry(
@@ -199,22 +233,29 @@ public class ReactionState : IOperatorGameState, ITimedGameState<OperatorGameCon
     private static void ClearPendingState(OperatorGameContext context)
     {
         context.State.PendingActionCommand = null;
-        context.State.ReactionTargetPlayerId = null;
+        context.State.ReactionTargetPlayerIds.Clear();
+        context.State.PlayerReactions.Clear();
         context.State.PendingHotPotatoCards.Clear();
     }
 
     private bool TargetCanReact(OperatorGameContext context)
     {
-        if (context.State.ReactionTargetPlayerId != null && context.GamePlayers.TryGetValue(context.State.ReactionTargetPlayerId, out var targetPlayer))
+        Card? pendingAction = null;
+        if (context.State.PendingActionCommand is PlayCardsCommand playCmd)
         {
-            Card? pendingAction = null;
-            if (context.State.PendingActionCommand is PlayCardsCommand playCmd)
+            pendingAction = context.State.DiscardPile.FirstOrDefault(c => playCmd.CardIds.Contains(c.Id) && (c is ActionCard || c is OperatorCard));
+        }
+
+        if (pendingAction is not IBlockableCard blockable)
+            return false;
+
+        var reactedPlayerIds = context.State.PlayerReactions.Select(r => r.PlayerId).ToHashSet();
+        foreach (var playerId in context.State.ReactionTargetPlayerIds.Except(reactedPlayerIds))
+        {
+            if (context.GamePlayers.TryGetValue(playerId, out var player))
             {
-                pendingAction = context.State.DiscardPile.FirstOrDefault(c => playCmd.CardIds.Contains(c.Id) && (c is ActionCard || c is OperatorCard));
-            }
-            if (pendingAction is IBlockableCard blockable)
-            {
-                return blockable.GetPotentialReactionCards(context, targetPlayer).Any();
+                if (blockable.GetPotentialReactionCards(context, player).Any())
+                    return true;
             }
         }
         return false;
@@ -254,6 +295,7 @@ public class ReactionState : IOperatorGameState, ITimedGameState<OperatorGameCon
 
         if (isTimeout)
         {
+            // For multi-target, auto-pass all unreacted players
             ResolvePendingAction(context, false);
             ClearPendingState(context);
 

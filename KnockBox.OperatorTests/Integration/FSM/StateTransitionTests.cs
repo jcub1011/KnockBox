@@ -236,7 +236,7 @@ public class ReactionStateTests
         _state.GamePlayers.TryAdd("p2", new OperatorPlayerState { UserId = "p2", CurrentPoints = 10m, ActiveOperator = CardOperator.Add });
 
         _state.TurnManager.SetTurnOrder(new List<string> { "p1", "p2" });
-        _state.ReactionTargetPlayerId = "p2";
+        _state.ReactionTargetPlayerIds = new HashSet<string> { "p2" };
 
         _reactionState = new ReactionState();
     }

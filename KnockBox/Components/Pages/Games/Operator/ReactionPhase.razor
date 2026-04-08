@@ -105,12 +105,28 @@
                 </div>
             }
         }
+        else if (HasReacted)
+        {
+            <div class="op-reaction-waiting-content">
+                <h2 class="op-reaction-title" style="font-size: 1.2rem;">Waiting for others...</h2>
+                <p class="op-reaction-subtitle">
+                    You have responded. Waiting for other players to react.
+                </p>
+            </div>
+        }
         else
         {
             <div class="op-reaction-waiting-content">
                 <h2 class="op-reaction-title" style="font-size: 1.2rem;">Waiting for reaction...</h2>
                 <p class="op-reaction-subtitle">
-                    Waiting for <strong>@(GameState.Players.FirstOrDefault(p => p.Id == GameState.ReactionTargetPlayerId)?.Name ?? "the target")</strong> to respond.
+                    @{
+                        var reactedIds = GameState.PlayerReactions.Select(r => r.PlayerId).ToHashSet();
+                        var targetNames = GameState.Players
+                            .Where(p => GameState.ReactionTargetPlayerIds.Contains(p.Id) && !reactedIds.Contains(p.Id))
+                            .Select(p => p.Name)
+                            .ToList();
+                    }
+                    <text>Waiting for <strong>@(string.Join(", ", targetNames))</strong> to respond.</text>
                 </p>
             </div>
         }

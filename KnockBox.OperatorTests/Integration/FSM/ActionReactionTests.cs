@@ -51,7 +51,7 @@ public class ActionReactionTests
 
         Assert.IsInstanceOfType(result.Value, typeof(ReactionState));
         Assert.AreEqual(OperatorGamePhase.Reaction, _state.Phase);
-        Assert.AreEqual("p2", _state.ReactionTargetPlayerId);
+        Assert.IsTrue(_state.ReactionTargetPlayerIds.Contains("p2"));
     }
 
     [TestMethod]
