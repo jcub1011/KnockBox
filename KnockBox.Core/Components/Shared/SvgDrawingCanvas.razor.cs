@@ -227,6 +227,24 @@ namespace KnockBox.Core.Components.Shared
             }
         }
 
+        /// <summary>Restores the most recently undone action.</summary>
+        public async Task RedoAsync()
+        {
+            if (_jsModule is null)
+            {
+                Logger.LogWarning("[SVGCanvas] RedoAsync: JS module not initialized — svgId={SvgId}", _svgId);
+                return;
+            }
+            try
+            {
+                _strokeCount = await _jsModule.InvokeAsync<int>("redo", _svgId);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "[SVGCanvas] RedoAsync failed — svgId={SvgId}", _svgId);
+            }
+        }
+
         /// <summary>Removes all strokes from the canvas.</summary>
         public async Task ClearAsync()
         {

@@ -14,7 +14,6 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
     /// - Timer expiry → <see cref="VotingRoundSetupState"/> (next round) or
     ///   <see cref="FinalResultsState"/> (last round)
     /// - <see cref="PauseGameCommand"/> (host only) → <see cref="PausedState"/>
-    /// - <see cref="AbandonGameCommand"/> (host only) → <see cref="AbandonedState"/>
     /// </summary>
     public sealed class VotingRoundResultsState : ITimedDrawnToDressGameState
     {
@@ -76,9 +75,6 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
             {
                 case PauseGameCommand:
                     return new PausedState(this);
-
-                case AbandonGameCommand:
-                    return new AbandonedState();
 
                 default:
                     context.Logger.LogWarning(

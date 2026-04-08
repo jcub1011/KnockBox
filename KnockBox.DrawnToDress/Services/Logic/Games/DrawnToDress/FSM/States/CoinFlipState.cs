@@ -19,7 +19,6 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
     /// - <see cref="CoinFlipCallCommand"/> → resolves current flip, advances
     /// - Timer expiry → auto-resolves current flip, advances
     /// - <see cref="PauseGameCommand"/> (host only) → <see cref="PausedState"/>
-    /// - <see cref="AbandonGameCommand"/> → <see cref="AbandonedState"/>
     /// </summary>
     public sealed class CoinFlipState(IDrawnToDressGameState returnState) : ITimedDrawnToDressGameState
     {
@@ -69,9 +68,6 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
                         return null;
                     }
                     return new PausedState(this);
-
-                case AbandonGameCommand:
-                    return new AbandonedState();
 
                 default:
                     context.Logger.LogWarning(

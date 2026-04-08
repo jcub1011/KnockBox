@@ -99,9 +99,6 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
         public ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?> HandleCommand(
             DrawnToDressGameContext context, DrawnToDressCommand command)
         {
-            if (command is AbandonGameCommand)
-                return new AbandonedState();
-
             return null;
         }
     }

@@ -96,9 +96,6 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
                 case PauseGameCommand:
                     return new PausedState(this);
 
-                case AbandonGameCommand:
-                    return new AbandonedState();
-
                 default:
                     context.Logger.LogWarning(
                         "PoolRevealState: unrecognized command [{type}] from player [{id}].",

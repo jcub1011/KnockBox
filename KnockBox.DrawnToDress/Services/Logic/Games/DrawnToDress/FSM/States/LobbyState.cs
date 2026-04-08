@@ -11,7 +11,6 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
     /// Transition ownership:
     /// - <see cref="StartGameCommand"/> (host only) → <see cref="ThemeSelectionState"/>
     /// - <see cref="PauseGameCommand"/> (host only) → <see cref="PausedState"/>
-    /// - <see cref="AbandonGameCommand"/> (host only) → <see cref="AbandonedState"/>
     /// </summary>
     public sealed class LobbyState : IDrawnToDressGameState
     {
@@ -57,9 +56,6 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
 
                 case PauseGameCommand:
                     return new PausedState(this);
-
-                case AbandonGameCommand:
-                    return new AbandonedState();
 
                 default:
                     context.Logger.LogWarning(

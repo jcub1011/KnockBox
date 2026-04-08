@@ -157,7 +157,4 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM
 
     /// <summary>Host resumes a previously paused game.</summary>
     public record ResumeGameCommand(string PlayerId) : DrawnToDressCommand(PlayerId);
-
-    /// <summary>Host (or server) permanently ends the session.</summary>
-    public record AbandonGameCommand(string PlayerId) : DrawnToDressCommand(PlayerId);
 }

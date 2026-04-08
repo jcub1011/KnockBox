@@ -16,7 +16,6 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
     /// - <see cref="CastVoteCommand"/> → vote recorded; may trigger early advance
     /// - <see cref="RequestCoinFlipCommand"/> → <see cref="CoinFlipState"/>
     /// - <see cref="PauseGameCommand"/> (host only) → <see cref="PausedState"/>
-    /// - <see cref="AbandonGameCommand"/> (host only) → <see cref="AbandonedState"/>
     /// </summary>
     public sealed class VotingMatchupState : ITimedDrawnToDressGameState
     {
@@ -57,8 +56,6 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
                 case PauseGameCommand:
                     return new PausedState(this);
 
-                case AbandonGameCommand:
-                    return new AbandonedState();
 
                 default:
                     context.Logger.LogWarning(

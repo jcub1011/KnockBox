@@ -30,7 +30,6 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
     ///
     /// Other commands:
     /// - <see cref="PauseGameCommand"/> (host only) → <see cref="PausedState"/>
-    /// - <see cref="AbandonGameCommand"/> (host only) → <see cref="AbandonedState"/>
     /// </summary>
     public sealed class ThemeSelectionState : IDrawnToDressGameState
     {
@@ -101,9 +100,6 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
 
                 case PauseGameCommand:
                     return new PausedState(this);
-
-                case AbandonGameCommand:
-                    return new AbandonedState();
 
                 default:
                     context.Logger.LogWarning(

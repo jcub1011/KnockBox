@@ -18,7 +18,6 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
     /// - All players mark ready early → same advance logic as timer expiry
     /// - <see cref="SubmitDrawingCommand"/> → stored; no transition until all ready or timer fires
     /// - <see cref="PauseGameCommand"/> (host only) → <see cref="PausedState"/>
-    /// - <see cref="AbandonGameCommand"/> (host only) → <see cref="AbandonedState"/>
     /// </summary>
     public sealed class DrawingRoundState : ITimedDrawnToDressGameState
     {
@@ -74,9 +73,6 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
 
                 case PauseGameCommand:
                     return new PausedState(this);
-
-                case AbandonGameCommand:
-                    return new AbandonedState();
 
                 default:
                     context.Logger.LogWarning(
