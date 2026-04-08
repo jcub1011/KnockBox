@@ -104,7 +104,9 @@
                             StateHasChanged();
                         });
 
-                        await Task.Delay(600); // Match entry speed (0.5s) + buffer
+                        // Animation takes 0.5s + (150ms * (cardCount - 1))
+                        int totalDelay = 500 + (150 * (newToHand.Count - 1)) + 100; // +100ms buffer
+                        await Task.Delay(totalDelay);
 
                         await InvokeAsync(() => 
                         {
