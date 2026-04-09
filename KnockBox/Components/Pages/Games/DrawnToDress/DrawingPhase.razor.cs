@@ -39,13 +39,10 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
 
         private string GetMannequinSvg(string currentTypeId)
         {
-            var ct = GameState.Config.ClothingTypes.FirstOrDefault(c => c.Id == currentTypeId);
-            int canvasWidth = ct?.CanvasWidth ?? 400;
-            int canvasHeight = ct?.CanvasHeight ?? 400;
-            int partCenterY = ct?.MannequinAnchorY ?? 440;
-            int yOffset = (canvasHeight / 2) - partCenterY;
-
-            return MannequinSvgHelper.Build(canvasWidth, yOffset, currentTypeId);
+            return MannequinSvgHelper.Build(
+                CurrentTypeCanvasWidth,
+                CurrentTypeCanvasHeight,
+                currentTypeId);
         }
 
         /// <summary>Display name for the clothing type of the current round.</summary>

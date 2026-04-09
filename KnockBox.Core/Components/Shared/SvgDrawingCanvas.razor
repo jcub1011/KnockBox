@@ -94,6 +94,15 @@
              <rect width="100%" height="100%" fill="none" stroke="#64748b" stroke-width="2" stroke-dasharray="8 8" vector-effect="non-scaling-stroke" />
         </svg>
 
+        @if (_trustedBackground is not null)
+        {
+            <svg class="svg-canvas-bg" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"
+                 width="@ViewBoxWidth" height="@ViewBoxHeight"
+                 viewBox="@ViewBoxAttribute" preserveAspectRatio="@(ViewBoxAttribute is not null ? "xMidYMid meet" : null)">
+                @((MarkupString)_trustedBackground)
+            </svg>
+        }
+
         @if (_sanitizedBackground is not null)
         {
             <svg class="svg-canvas-bg" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"

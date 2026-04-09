@@ -28,6 +28,7 @@
     // Build a composite background SVG from the player's selected outfit items, applying
     // any position overrides set via the drag/manual-input layer.
     string? outfitBackground = null;
+    string? mannequinSvg = null;
     if (!isHost && !hasSubmitted && myOutfit is not null)
     {
         var bgParts = new System.Text.StringBuilder();
@@ -57,7 +58,7 @@
 
         if (_showMannequin && GameState.Config.ShowMannequin)
         {
-            bgParts.Insert(0, MannequinSvgHelper.Build(canvasWidth, 200));
+            mannequinSvg = MannequinSvgHelper.Build(canvasWidth, totalOutfitHeight);
         }
 
         if (bgParts.Length > 0)
@@ -196,6 +197,7 @@
                                           ViewBoxWidth="@canvasWidth"
                                           ViewBoxHeight="@totalOutfitHeight"
                                           BackgroundColor="#ffffff"
+                                          TrustedBackgroundSvgContent="@mannequinSvg"
                                           BackgroundSvgContent="@outfitBackground"
                                           ShowToolbar="@(_mode == InteractionMode.Draw)">
                             <OverlayContent>
