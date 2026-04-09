@@ -62,29 +62,30 @@
         // Update previous hand immediately to prevent re-processing
         _previousHand = Hand.ToList();
 
+        // Immediately add removed cards to _exitingCards so the first render
+        // includes them with the exit animation class (prevents flash).
+        if (removed.Any())
+        {
+            foreach (var card in removed)
+            {
+                if (!_exitingCards.Any(e => e.Id == card.Id))
+                    _exitingCards.Add(card);
+            }
+        }
+
         if (removed.Any() || newToHand.Any())
         {
-            _ = Task.Run(async () => 
+            _ = Task.Run(async () =>
             {
                 await _animationLock.WaitAsync();
-                try 
+                try
                 {
-                    // 1. Exit Animations First
+                    // 1. Wait for exit animation to complete, then clean up
                     if (removed.Any())
                     {
-                        await InvokeAsync(() => 
-                        {
-                            foreach (var card in removed)
-                            {
-                                if (!_exitingCards.Any(e => e.Id == card.Id))
-                                    _exitingCards.Add(card);
-                            }
-                            StateHasChanged();
-                        });
-
                         await Task.Delay(250); // Match fast exit speed (0.2s) + buffer
 
-                        await InvokeAsync(() => 
+                        await InvokeAsync(() =>
                         {
                             _exitingCards.Clear();
                             StateHasChanged();
@@ -94,7 +95,7 @@
                     // 2. Entry Animations Second
                     if (newToHand.Any())
                     {
-                        await InvokeAsync(() => 
+                        await InvokeAsync(() =>
                         {
                             foreach (var id in newToHand)
                             {
@@ -108,14 +109,14 @@
                         int totalDelay = 500 + (150 * (newToHand.Count - 1)) + 100; // +100ms buffer
                         await Task.Delay(totalDelay);
 
-                        await InvokeAsync(() => 
+                        await InvokeAsync(() =>
                         {
                             _internalNewCardIds.Clear();
                             StateHasChanged();
                         });
                     }
                 }
-                finally 
+                finally
                 {
                     _animationLock.Release();
                 }
