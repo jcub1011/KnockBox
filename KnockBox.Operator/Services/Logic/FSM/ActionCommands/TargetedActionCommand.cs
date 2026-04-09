@@ -33,8 +33,11 @@ public class TargetedActionCommand(
 
     public override void Execute()
     {
-        var pState = Context.GamePlayers[PlayCommand.PlayerId];
+        if (!Context.GamePlayers.TryGetValue(PlayCommand.PlayerId, out var pState))
+            return;
+
         var actionBlocked = Context.State.PlayerReactions.Any(r => r.ReactionCard != null);
+        LogPlay(actionBlocked);
 
         var val = CalculateNumberValue();
         var numbers = PlayedCards.OfType<NumberCard>().ToList();
@@ -49,16 +52,5 @@ public class TargetedActionCommand(
         );
 
         _actionCard.Play(playContext);
-    }
-
-    private decimal CalculateNumberValue()
-    {
-        decimal val = 0;
-        var numbers = PlayedCards.OfType<NumberCard>().ToList();
-        foreach (var num in numbers)
-        {
-            val = val * 10 + num.NumberValue;
-        }
-        return val;
     }
 }

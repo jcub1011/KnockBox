@@ -29,7 +29,10 @@ public class GlobalActionCommand(
 
     public override void Execute()
     {
-        var pState = Context.GamePlayers[PlayCommand.PlayerId];
+        if (!Context.GamePlayers.TryGetValue(PlayCommand.PlayerId, out var pState))
+            return;
+
+        LogPlay(false);
 
         var playContext = new CardPlayContext(
             GameContext: Context,

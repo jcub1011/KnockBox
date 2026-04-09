@@ -20,7 +20,12 @@ public class LiabilityTransferCommand(
 
     public override void Execute()
     {
-        var pState = Context.GamePlayers[PlayCommand.PlayerId];
+        if (!Context.GamePlayers.TryGetValue(PlayCommand.PlayerId, out var pState))
+            return;
+
+        var actionBlocked = Context.State.PlayerReactions.Any(r => r.ReactionCard != null);
+        LogPlay(actionBlocked);
+
         var val = CalculateNumberValue();
         var numbers = PlayedCards.OfType<NumberCard>().ToList();
 
@@ -49,23 +54,12 @@ public class LiabilityTransferCommand(
                 Context.State.DiscardPile.Remove(card);
             }
 
-            string senderName = Context.State.Players.FirstOrDefault(p => p.Id == PlayCommand.PlayerId)?.Name ?? "Unknown";
+            string senderName = GetPlayerName(PlayCommand.PlayerId);
             Context.State.ActionLog.Add(new ActionLogEntry(
                 $"Liability Transfer was blocked! The number cards were returned to {senderName}'s hand.",
                 DateTimeOffset.UtcNow,
                 null,
                 PlayCommand.PlayerId));
         }
-    }
-
-    private decimal CalculateNumberValue()
-    {
-        decimal val = 0;
-        var numbers = PlayedCards.OfType<NumberCard>().ToList();
-        foreach (var num in numbers)
-        {
-            val = val * 10 + num.NumberValue;
-        }
-        return val;
     }
 }

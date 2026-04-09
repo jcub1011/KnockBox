@@ -19,7 +19,11 @@ public class BlueShellCommand(
 
     public override void Execute()
     {
-        var pState = Context.GamePlayers[PlayCommand.PlayerId];
+        if (!Context.GamePlayers.TryGetValue(PlayCommand.PlayerId, out var pState))
+            return;
+
+        LogPlay(false);
+
         var blockedPlayerIds = Context.State.PlayerReactions
             .Where(r => r.ReactionCard != null)
             .Select(r => r.PlayerId)

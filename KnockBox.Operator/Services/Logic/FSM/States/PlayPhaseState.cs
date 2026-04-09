@@ -53,27 +53,27 @@ public class PlayPhaseState : IOperatorGameState, ITimedGameState<OperatorGameCo
 
         if (command is SkipTurnCommand skip)
         {
-            if (!context.GamePlayers.TryGetValue(skip.PlayerId, out var pState))
-                return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromError("Player not found.");
+            var pState = GetPlayerState(context, skip.PlayerId);
+            if (pState == null) return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromError("Player not found.");
+            
             if (!pState.Hand.Any(c => c.IsPlayable(context, pState)))
             {
-                context.State.Phase = OperatorGamePhase.Draw;
-                return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromValue(new DrawPhaseState());
+                return TransitionToDrawPhase(context);
             }
             return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromError("Cannot skip if you have playable cards.");
         }
 
         if (command is EndTurnCommand end)
         {
-            if (!context.GamePlayers.TryGetValue(end.PlayerId, out var pState))
-                return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromError("Player not found.");
+            var pState = GetPlayerState(context, end.PlayerId);
+            if (pState == null) return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromError("Player not found.");
+
             if (!pState.HasPlayedCardThisTurn)
                 return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromError("Cannot end turn before playing a card.");
             if (pState.Hand.Count > context.State.Config.MaxHandSize)
                 return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromError($"Cannot end turn with more than {context.State.Config.MaxHandSize} cards.");
 
-            context.State.Phase = OperatorGamePhase.Draw;
-            return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromValue(new DrawPhaseState());
+            return TransitionToDrawPhase(context);
         }
 
         if (command is PlayCardsCommand play)
@@ -84,10 +84,10 @@ public class PlayPhaseState : IOperatorGameState, ITimedGameState<OperatorGameCo
             context.State.LastBlockedActionMessage = null;
             context.State.BlockedAttackerId = null;
 
-            if (!context.GamePlayers.TryGetValue(play.PlayerId, out var pState))
-                return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromError("Player not found.");
-            var playedCards = new List<Card>();
+            var pState = GetPlayerState(context, play.PlayerId);
+            if (pState == null) return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromError("Player not found.");
 
+            var playedCards = new List<Card>();
             foreach (var id in play.CardIds)
             {
                 var cardIdx = pState.Hand.FindIndex(c => c.Id == id);
@@ -127,163 +127,40 @@ public class PlayPhaseState : IOperatorGameState, ITimedGameState<OperatorGameCo
             pState.HasPlayedCardThisTurn = true;
             context.State.StateStartTime = DateTimeOffset.UtcNow;
 
+            IGameActionCommand actionCommand;
             var actionCard = playedCards.OfType<ActionCard>().FirstOrDefault();
             if (actionCard != null)
             {
-                var actionCommand = actionCard.CreateCommand(context, play, playedCards);
-                if (actionCommand.RequiresReaction)
-                {
-                    actionCommand.SetupPendingState();
-                    context.State.PendingGameActionCommand = actionCommand;
-                    context.State.ReactionTargetPlayerIds = new HashSet<string>(actionCommand.GetReactionTargetIds());
-                    context.State.PlayerReactions.Clear();
-                    context.State.Phase = OperatorGamePhase.Reaction;
-                    return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromValue(new ReactionState());
-                }
-                else
-                {
-                    actionCommand.Execute();
-                }
+                actionCommand = actionCard.CreateCommand(context, play, playedCards);
             }
             else
             {
-                // Resolve immediate logic for standard number/operator plays
-                ResolvePlayedCards(context, play, playedCards, false);
+                actionCommand = new StandardPlayCommand(context, play, playedCards);
+            }
+
+            if (actionCommand.RequiresReaction)
+            {
+                actionCommand.SetupPendingState();
+                context.State.PendingGameActionCommand = actionCommand;
+                context.State.ReactionTargetPlayerIds = new HashSet<string>(actionCommand.GetReactionTargetIds());
+                context.State.PlayerReactions.Clear();
+                context.State.Phase = OperatorGamePhase.Reaction;
+                return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromValue(new ReactionState());
+            }
+            else
+            {
+                actionCommand.Execute();
             }
 
             if (pState.Hand.Count == 0)
             {
-                context.State.Phase = OperatorGamePhase.Draw;
-                return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromValue(new DrawPhaseState());
+                return TransitionToDrawPhase(context);
             }
 
             return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromValue(null);
         }
 
         return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromError("Invalid command for PlayPhase.");
-    }
-
-    public static void ResolvePlayedCards(OperatorGameContext context, PlayCardsCommand play, List<Card> playedCards, bool actionBlocked)
-    {
-        if (!context.GamePlayers.TryGetValue(play.PlayerId, out var pState))
-            return;
-
-        var actionCards = playedCards.OfType<ActionCard>().ToList();
-        var numbers = playedCards.OfType<NumberCard>().ToList();
-        var opCard = playedCards.OfType<OperatorCard>().LastOrDefault();
-
-        // Log the base play
-        string sourceName = context.State.Players.FirstOrDefault(p => p.Id == play.PlayerId)?.Name ?? "Unknown";
-        string targetName = play.TargetPlayerId != null ? context.State.Players.FirstOrDefault(p => p.Id == play.TargetPlayerId)?.Name ?? "Unknown" : "themselves";
-        string cardNames = string.Join(", ", playedCards.Select(c => c.TooltipName()));
-
-        context.State.ActionLog.Add(new ActionLogEntry(
-            $"{sourceName} played {cardNames} targeting {targetName}",
-            DateTimeOffset.UtcNow,
-            play.PlayerId,
-            play.TargetPlayerId));
-
-        if (actionBlocked)
-        {
-            context.State.ActionLog.Add(new ActionLogEntry(
-                $"{targetName} blocked the action!",
-                DateTimeOffset.UtcNow,
-                play.TargetPlayerId,
-                play.PlayerId));
-        }
-
-        // Calculate combined number value
-        decimal val = 0;
-        foreach (var num in numbers)
-        {
-            val = val * 10 + num.NumberValue;
-        }
-
-        // Build shared play context
-        var playContext = new CardPlayContext(
-            GameContext: context,
-            ThisPlayer: pState,
-            TargetPlayerId: play.TargetPlayerId,
-            CombinedNumberValue: val,
-            PairedNumbers: numbers,
-            ActionBlocked: actionBlocked
-        );
-
-        // Dispatch to action cards — each handles its own blocking
-        bool numbersConsumed = false;
-        foreach (var action in actionCards)
-        {
-            var result = action.Play(playContext);
-            if (result.TryGetSuccess(out var playResult) && playResult.ConsumedNumbers)
-                numbersConsumed = true;
-        }
-
-        // Apply standard number score logic if not consumed by an action card
-        if (!numbersConsumed && numbers.Count > 0)
-        {
-            if (context.GamePlayers.TryGetValue(play.PlayerId, out var targetPlayerState))
-            {
-                // Divide breaking mechanic
-                if (targetPlayerState.ActiveOperator == CardOperator.Divide)
-                {
-                    targetPlayerState.DivideUses++;
-                    if (targetPlayerState.DivideUses >= 4 || val == 0m)
-                    {
-                        targetPlayerState.IsDivideBroken = true;
-                        targetPlayerState.ActiveOperator = CardOperator.Add;
-                        targetPlayerState.DivideUses = 0;
-
-                        string targetPlayerName = context.State.Players.FirstOrDefault(p => p.Id == targetPlayerState.UserId)?.Name ?? "Unknown";
-                        context.State.ActionLog.Add(new ActionLogEntry(
-                            $"The Divide operator shattered! {targetPlayerName}'s operator reverted to Plus.",
-                            DateTimeOffset.UtcNow,
-                            null,
-                            targetPlayerState.UserId));
-
-                        if (val == 0m)
-                        {
-                            targetPlayerState.CurrentPoints = 0m;
-                        }
-                        else
-                        {
-                            var (newScore, newOp) = OperatorGameContext.CalculateNewScore(targetPlayerState.CurrentPoints, CardOperator.Divide, val);
-                            targetPlayerState.CurrentPoints = newScore;
-                        }
-                    }
-                    else
-                    {
-                        var (newScore, newOp) = OperatorGameContext.CalculateNewScore(targetPlayerState.CurrentPoints, targetPlayerState.ActiveOperator, val);
-                        targetPlayerState.CurrentPoints = newScore;
-                        targetPlayerState.ActiveOperator = newOp;
-                    }
-                }
-                else
-                {
-                    var (newScore, newOp) = OperatorGameContext.CalculateNewScore(targetPlayerState.CurrentPoints, targetPlayerState.ActiveOperator, val);
-                    targetPlayerState.CurrentPoints = newScore;
-                    targetPlayerState.ActiveOperator = newOp;
-                }
-                targetPlayerState.ScoreTimestamp = DateTimeOffset.UtcNow;
-            }
-        }
-
-        // Dispatch to operator card
-        if (opCard != null)
-        {
-            var opResult = opCard.Play(playContext);
-            if (opResult.TryGetSuccess(out var opPlayResult) && opPlayResult.Toggled && opPlayResult.OperatorTargetId != null)
-            {
-                if (context.GamePlayers.TryGetValue(opPlayResult.OperatorTargetId, out var opTarget))
-                {
-                    string targetNameLog = context.State.Players.FirstOrDefault(p => p.Id == opTarget.UserId)?.Name ?? "Unknown";
-                    context.State.ActionLog.Add(new ActionLogEntry(
-                        $"Operator toggled to opposite! {targetNameLog} is now {opTarget.ActiveOperator}.",
-                        DateTimeOffset.UtcNow,
-                        null,
-                        opTarget.UserId));
-                }
-            }
-        }
     }
 
     public ValueResult<TimeSpan> GetRemainingTime(OperatorGameContext context, DateTimeOffset now)
@@ -302,11 +179,21 @@ public class PlayPhaseState : IOperatorGameState, ITimedGameState<OperatorGameCo
         if (elapsed >= context.State.Config.PlayPhaseTimeout)
         {
             AutoPlayOnTimeout(context);
-            context.State.Phase = OperatorGamePhase.Draw;
-            return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromValue(new DrawPhaseState());
+            return TransitionToDrawPhase(context);
         }
 
         return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromValue(null);
+    }
+
+    private static ValueResult<IGameState<OperatorGameContext, OperatorCommand>?> TransitionToDrawPhase(OperatorGameContext context)
+    {
+        context.State.Phase = OperatorGamePhase.Draw;
+        return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromValue(new DrawPhaseState());
+    }
+
+    private static OperatorPlayerState? GetPlayerState(OperatorGameContext context, string playerId)
+    {
+        return context.GamePlayers.TryGetValue(playerId, out var pState) ? pState : null;
     }
 
     private static void AutoPlayOnTimeout(OperatorGameContext context)
@@ -332,7 +219,7 @@ public class PlayPhaseState : IOperatorGameState, ITimedGameState<OperatorGameCo
             context.State.DiscardPile.Add(numberCard);
 
             var playCommand = new PlayCardsCommand(playerId, new List<Guid> { numberCard.Id }, null);
-            ResolvePlayedCards(context, playCommand, new List<Card> { numberCard }, false);
+            new StandardPlayCommand(context, playCommand, new List<Card> { numberCard }).Execute();
         }
         else if (operatorCard != null)
         {
@@ -340,7 +227,7 @@ public class PlayPhaseState : IOperatorGameState, ITimedGameState<OperatorGameCo
             context.State.DiscardPile.Add(operatorCard);
 
             var playCommand = new PlayCardsCommand(playerId, new List<Guid> { operatorCard.Id }, null);
-            ResolvePlayedCards(context, playCommand, new List<Card> { operatorCard }, false);
+            new StandardPlayCommand(context, playCommand, new List<Card> { operatorCard }).Execute();
         }
         else
         {
