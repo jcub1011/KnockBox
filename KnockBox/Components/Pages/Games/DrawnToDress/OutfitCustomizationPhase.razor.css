@@ -354,3 +354,50 @@
         width: 100%;
     }
 }
+
+@media (max-width: 600px) {
+    .dtd-customization {
+        padding: 12px;
+        gap: 12px;
+    }
+
+    .dtd-customization-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .dtd-customization-phase-badge {
+        justify-content: center;
+    }
+
+    .dtd-customization-progress-pill {
+        text-align: center;
+    }
+
+    .dtd-customization-controls-panel {
+        padding: 12px;
+        gap: 12px;
+    }
+
+    .dtd-customization-field {
+        min-width: 150px;
+    }
+
+    .dtd-customization-canvas-panel {
+        min-height: 300px;
+    }
+
+    .dtd-customization-host-panel {
+        padding: 20px;
+        border-radius: 24px;
+    }
+
+    .dtd-customization-player-grid {
+        grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    }
+
+    .dtd-customization-waiting-card {
+        padding: 24px;
+        border-radius: 28px;
+    }
+}

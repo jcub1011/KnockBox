@@ -250,9 +250,7 @@
     place-items: center;
 }
 
-.has-viewbox > .svg-canvas-surface,
-.has-viewbox > .svg-canvas-bg,
-.has-viewbox > .svg-canvas-base {
+.has-viewbox > svg {
     width: auto;
     height: auto;
     max-width: 100%;

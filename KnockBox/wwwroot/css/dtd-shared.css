@@ -218,6 +218,26 @@
     border: 3px solid var(--dtd-color-bg-soft);
 }
 
+/* ── Mobile Sizing ─────────────────────────────────────────────────────────── */
+
+@media (max-width: 600px) {
+    .dtd-btn {
+        font-size: 1rem;
+        padding: 10px 20px;
+    }
+
+    .dtd-btn-lg {
+        font-size: 1.2rem;
+        padding: 14px 28px;
+        border-radius: 16px;
+    }
+
+    .dtd-timer {
+        font-size: 1.1rem;
+        padding: 6px 14px;
+    }
+}
+
 /* ── Reduced Motion ─────────────────────────────────────────────────────────── */
 
 @media (prefers-reduced-motion: reduce) {

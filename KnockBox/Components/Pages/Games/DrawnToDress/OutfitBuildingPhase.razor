@@ -233,11 +233,12 @@
                                             bool isMyDrawing = item.CreatorPlayerId == myId;
                                             bool claimedByMe = item.ClaimedByPlayerId == myId;
                                             bool claimedByOther = item.ClaimedByPlayerId is not null && !claimedByMe;
-                                            bool isAvailable = !isMyDrawing && item.ClaimedByPlayerId is null;
+                                            bool canSelectOwn = GameState.Config.AllowSelectOwnDrawings;
+                                            bool isAvailable = (!isMyDrawing || canSelectOwn) && item.ClaimedByPlayerId is null;
 
                                             string stateClass = claimedByMe ? "dtd-pool-item-mine"
                                                 : claimedByOther ? "dtd-pool-item-taken"
-                                                : isMyDrawing ? "dtd-pool-item-own"
+                                                : isMyDrawing && !canSelectOwn ? "dtd-pool-item-own"
                                                 : "dtd-pool-item-available";
 
                                             bool clickable = isAvailable || claimedByMe;

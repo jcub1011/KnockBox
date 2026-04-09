@@ -105,6 +105,14 @@ namespace KnockBox.Services.State.Games.DrawnToDress.Data
         public bool AllowReuseOwnItems { get; set; } = true;
 
         /// <summary>
+        /// When <see langword="true"/>, players may actively select (claim) their own
+        /// drawings from the pool during outfit building, just like any other player's
+        /// items. When <see langword="false"/> (default), own drawings cannot be claimed
+        /// and are only used as automatic fallbacks (see <see cref="AllowReuseOwnItems"/>).
+        /// </summary>
+        public bool AllowSelectOwnDrawings { get; set; } = false;
+
+        /// <summary>
         /// When <see langword="true"/>, each outfit slot must be filled by a distinct
         /// clothing item (no item may appear twice in the same outfit).
         /// GDD default: <see langword="true"/>.

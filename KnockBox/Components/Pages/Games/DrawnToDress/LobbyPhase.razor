@@ -194,6 +194,11 @@
                         <input type="checkbox" class="dtd-setting-checkbox"
                                @bind="EditConfig.AllowReuseOwnItems" @bind:after="ApplyConfig" />
                     </label>
+                    <label class="dtd-setting-label dtd-setting-label-row" title="Players may actively select their own drawings from the pool">
+                        <span>Allow Selecting Own Drawings:</span>
+                        <input type="checkbox" class="dtd-setting-checkbox"
+                               @bind="EditConfig.AllowSelectOwnDrawings" @bind:after="ApplyConfig" />
+                    </label>
                     <label class="dtd-setting-label dtd-setting-label-row" title="Each outfit slot must contain a unique item">
                         <span>Require Distinct Items Per Slot:</span>
                         <input type="checkbox" class="dtd-setting-checkbox"

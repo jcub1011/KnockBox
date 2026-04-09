@@ -406,17 +406,38 @@
     .dtd-outfit {
         padding: 12px;
     }
-    
+
     .dtd-outfit-header {
         flex-direction: column;
         align-items: stretch;
     }
-    
+
     .dtd-outfit-phase-badge {
         justify-content: center;
     }
-    
+
     .dtd-outfit-progress-pill {
         text-align: center;
+    }
+
+    .dtd-outfit-slot {
+        flex: 0 0 140px;
+    }
+
+    .dtd-pool-grid {
+        grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+        gap: 10px;
+    }
+
+    .dtd-outfit-right-panel {
+        padding: 16px;
+    }
+
+    .dtd-outfit-actions-panel {
+        padding: 14px;
+    }
+
+    .dtd-outfit-left-panel {
+        padding: 12px;
     }
 }

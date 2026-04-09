@@ -124,8 +124,9 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
                 return null;
             }
 
-            // Players may not claim items they drew themselves.
-            if (string.Equals(item.CreatorPlayerId, cmd.PlayerId, StringComparison.Ordinal))
+            // Players may not claim items they drew themselves (unless the config allows it).
+            if (!context.Config.AllowSelectOwnDrawings
+                && string.Equals(item.CreatorPlayerId, cmd.PlayerId, StringComparison.Ordinal))
             {
                 context.Logger.LogWarning(
                     "ClaimPoolItem: player [{id}] attempted to claim their own item [{itemId}].",
