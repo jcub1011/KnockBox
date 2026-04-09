@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Components;
 
 namespace KnockBox.Components.Pages.Games.Operator
 {
-    public partial class PlayPhase : ComponentBase
+    public partial class PlayPhase : ComponentBase, IDisposable
     {
         [Inject] protected OperatorGameEngine GameEngine { get; set; } = default!;
 
@@ -27,6 +27,49 @@ namespace KnockBox.Components.Pages.Games.Operator
         private string? _targetPlayerId;
         private bool _waitingForTarget;
         private bool _showDiscardHistory;
+
+        private decimal? _prevSelfScore;
+        private bool _selfScoreChanged;
+        private CardOperator? _prevSelfOp;
+        private bool _selfOpChanged;
+        private CancellationTokenSource _cts = new();
+
+        protected override void OnParametersSet()
+        {
+            var ps = CurrentPlayerState;
+            if (ps != null)
+            {
+                if (_prevSelfScore.HasValue && _prevSelfScore.Value != ps.CurrentPoints)
+                {
+                    _selfScoreChanged = true;
+                    var token = _cts.Token;
+                    _ = Task.Delay(1000, token).ContinueWith(_ =>
+                    {
+                        if (!token.IsCancellationRequested)
+                        {
+                            _selfScoreChanged = false;
+                            InvokeAsync(StateHasChanged);
+                        }
+                    }, token, TaskContinuationOptions.OnlyOnRanToCompletion, TaskScheduler.Default);
+                }
+                _prevSelfScore = ps.CurrentPoints;
+
+                if (_prevSelfOp.HasValue && _prevSelfOp.Value != ps.ActiveOperator)
+                {
+                    _selfOpChanged = true;
+                    var token = _cts.Token;
+                    _ = Task.Delay(1000, token).ContinueWith(_ =>
+                    {
+                        if (!token.IsCancellationRequested)
+                        {
+                            _selfOpChanged = false;
+                            InvokeAsync(StateHasChanged);
+                        }
+                    }, token, TaskContinuationOptions.OnlyOnRanToCompletion, TaskScheduler.Default);
+                }
+                _prevSelfOp = ps.ActiveOperator;
+            }
+        }
 
         protected OperatorPlayerState? CurrentPlayerState =>
             UserService.CurrentUser != null ? GameState.Context?.GamePlayers.GetValueOrDefault(UserService.CurrentUser.Id) : null;
@@ -412,5 +455,11 @@ namespace KnockBox.Components.Pages.Games.Operator
 
         protected string GetActiveOperatorSymbol() =>
             CurrentPlayerState?.ActiveOperator.ToSymbol() ?? "?";
+
+        public void Dispose()
+        {
+            _cts.Cancel();
+            _cts.Dispose();
+        }
     }
 }

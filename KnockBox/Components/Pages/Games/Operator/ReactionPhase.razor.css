@@ -123,6 +123,19 @@
     color: #ffd166;
 }
 
+.op-reaction-card-desc {
+    background: rgba(255, 255, 255, 0.05);
+    border-left: 4px solid #ffd166;
+    padding: 12px 20px;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    color: rgba(255, 255, 255, 0.7);
+    font-style: italic;
+    line-height: 1.4;
+    text-align: center;
+    width: 100%;
+}
+
 .op-reaction-player-status {
     margin: 10px 0;
     padding: 15px 25px;

@@ -14,6 +14,13 @@
                 <strong>@GetAttackerName()</strong> played <strong>@GetActionDescription()</strong> against you!
             </p>
 
+            @if (GetPendingActionCard() is var pendingCard && pendingCard != null)
+            {
+                <div class="op-reaction-card-desc">
+                    @pendingCard.TooltipDescription()
+                </div>
+            }
+
             <div class="op-reaction-player-status">
                 <div class="op-status-item">
                     <span class="op-status-label">YOUR SCORE:</span>
