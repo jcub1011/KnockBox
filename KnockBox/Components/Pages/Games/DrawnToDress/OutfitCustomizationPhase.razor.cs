@@ -271,6 +271,11 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
                 try
                 {
                     await _dragModule.InvokeVoidAsync("dispose", _dragSvgId);
+                }
+                catch (JSDisconnectedException) { }
+
+                try
+                {
                     await _dragModule.DisposeAsync();
                 }
                 catch (JSDisconnectedException) { }

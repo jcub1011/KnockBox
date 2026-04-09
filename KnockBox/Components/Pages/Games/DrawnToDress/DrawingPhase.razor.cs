@@ -5,10 +5,11 @@ using KnockBox.Services.State.Games.DrawnToDress;
 using KnockBox.Services.State.Games.DrawnToDress.Data;
 using KnockBox.Services.State.Users;
 using Microsoft.AspNetCore.Components;
+using Microsoft.JSInterop;
 
 namespace KnockBox.Components.Pages.Games.DrawnToDress
 {
-    public partial class DrawingPhase : ComponentBase
+    public partial class DrawingPhase : ComponentBase, IAsyncDisposable
     {
         [Inject] protected DrawnToDressGameEngine GameEngine { get; set; } = default!;
 
@@ -258,6 +259,18 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
             {
                 _submitting = false;
                 StateHasChanged();
+            }
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            if (_canvas is not null)
+            {
+                try
+                {
+                    await _canvas.DisposeAsync();
+                }
+                catch (JSDisconnectedException) { }
             }
         }
     }

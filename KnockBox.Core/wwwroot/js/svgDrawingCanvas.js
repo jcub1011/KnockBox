@@ -350,9 +350,13 @@ export function initialize(svgId, dotNetRef, initialColor, initialStrokeWidth, i
         return;
     }
 
+    const abortController = new AbortController();
+    const signal = abortController.signal;
+
     const state = {
         svg,
         dotNetRef,
+        abortController,
         color: initialColor,
         strokeWidth: initialStrokeWidth,
         backgroundColor: initialBackgroundColor || 'white',
@@ -639,7 +643,7 @@ export function initialize(svgId, dotNetRef, initialColor, initialStrokeWidth, i
             updateSwatchActive(container, e.target.value);
             state.dotNetRef.invokeMethodAsync('OnColorChanged', e.target.value)
                 .catch(err => console.error('[SVGCanvas] OnColorChanged failed.', err));
-        });
+        }, { signal });
     } else {
         console.warn('[SVGCanvas] initialize: .toolbar-color not found — color picker will not work.');
     }
@@ -656,7 +660,7 @@ export function initialize(svgId, dotNetRef, initialColor, initialStrokeWidth, i
             updateSizeActive(container, width);
             state.dotNetRef.invokeMethodAsync('OnStrokeWidthChanged', width)
                 .catch(err => console.error('[SVGCanvas] OnStrokeWidthChanged failed.', err));
-        });
+        }, { signal });
     }
 
     // Delegated click handler for swatches, undo, and export.
@@ -816,7 +820,7 @@ export function initialize(svgId, dotNetRef, initialColor, initialStrokeWidth, i
                 });
                 return;
             }
-        });
+        }, { signal });
     }
 
     // Pointer events (unified mouse + touch with sub-pixel precision)
@@ -825,10 +829,10 @@ export function initialize(svgId, dotNetRef, initialColor, initialStrokeWidth, i
         if (e.button !== 0) return;
         e.preventDefault();
         startStroke(e.clientX, e.clientY);
-    });
-    svg.addEventListener('pointermove', (e) => continueStroke(e.clientX, e.clientY));
-    svg.addEventListener('pointerup', () => endStroke());
-    svg.addEventListener('pointerleave', () => endStroke());
+    }, { signal });
+    svg.addEventListener('pointermove', (e) => continueStroke(e.clientX, e.clientY), { signal });
+    svg.addEventListener('pointerup', () => endStroke(), { signal });
+    svg.addEventListener('pointerleave', () => endStroke(), { signal });
 }
 
 /**
@@ -1192,6 +1196,15 @@ export function isInitialized(svgId) {
  * @param {string} svgId
  */
 export function dispose(svgId) {
+    const state = instances.get(svgId);
+    if (state) {
+        state.abortController?.abort();
+        state.dotNetRef = null;
+        state.svg = null;
+        state.paths = [];
+        state.undoStack = [];
+        state.redoStack = [];
+    }
     instances.delete(svgId);
 }
 

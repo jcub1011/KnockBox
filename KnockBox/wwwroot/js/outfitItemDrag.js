@@ -41,9 +41,13 @@ export function initialize(svgId, dotNetRef, items, viewBoxWidth, viewBoxHeight)
         return;
     }
 
+    const abortController = new AbortController();
+    const signal = abortController.signal;
+
     const state = {
         svg,
         dotNetRef,
+        abortController,
         items: new Map(),          // typeId → { group, x, y, width, height }
         viewBoxWidth,
         viewBoxHeight,
@@ -166,24 +170,24 @@ export function initialize(svgId, dotNetRef, items, viewBoxWidth, viewBoxHeight)
         if (e.button !== 0) return;
         e.preventDefault();
         startDrag(e.clientX, e.clientY);
-    });
-    svg.addEventListener('mousemove', (e) => moveDrag(e.clientX, e.clientY));
-    svg.addEventListener('mouseup', () => endDrag());
-    svg.addEventListener('mouseleave', () => endDrag());
+    }, { signal });
+    svg.addEventListener('mousemove', (e) => moveDrag(e.clientX, e.clientY), { signal });
+    svg.addEventListener('mouseup', () => endDrag(), { signal });
+    svg.addEventListener('mouseleave', () => endDrag(), { signal });
 
     // Touch events
     svg.addEventListener('touchstart', (e) => {
         e.preventDefault();
         startDrag(e.touches[0].clientX, e.touches[0].clientY);
-    }, { passive: false });
+    }, { passive: false, signal });
     svg.addEventListener('touchmove', (e) => {
         e.preventDefault();
         moveDrag(e.touches[0].clientX, e.touches[0].clientY);
-    }, { passive: false });
+    }, { passive: false, signal });
     svg.addEventListener('touchend', (e) => {
         e.preventDefault();
         endDrag();
-    }, { passive: false });
+    }, { passive: false, signal });
 }
 
 /**
@@ -258,5 +262,12 @@ export function getPositions(svgId) {
  * @param {string} svgId
  */
 export function dispose(svgId) {
+    const state = instances.get(svgId);
+    if (state) {
+        state.abortController?.abort();
+        state.dotNetRef = null;
+        state.svg = null;
+        state.items.clear();
+    }
     instances.delete(svgId);
 }
