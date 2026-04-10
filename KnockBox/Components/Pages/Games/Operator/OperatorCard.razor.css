@@ -300,10 +300,20 @@
         font-size: 0.5rem;
     }
 
+    /* Fixed-position tooltip so it escapes the scroll container's overflow clip */
     .op-card-tooltip {
-        width: 180px;
-        padding: 8px;
-        bottom: calc(100% + 8px);
+        position: fixed;
+        bottom: auto;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        width: 200px;
+        padding: 10px;
+        z-index: 5000;
+    }
+
+    .op-card-tooltip::after {
+        display: none;
     }
 
     .op-card-tooltip-title {
