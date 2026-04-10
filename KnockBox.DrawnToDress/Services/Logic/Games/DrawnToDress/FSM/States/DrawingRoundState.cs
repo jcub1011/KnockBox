@@ -42,7 +42,11 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
             DrawnToDressGameContext context)
         {
             _deadline = DateTimeOffset.UtcNow.AddSeconds(context.Config.DrawingTimeSec);
-            context.State.PhaseDeadlineUtc = _deadline;
+            if (context.Config.EnableTimer)
+            {
+                context.State.PhaseDeadlineUtc = _deadline;
+            }
+
             context.State.CurrentDrawingClothingTypeIndex = _clothingTypeIndex;
             context.State.SetPhase(GamePhase.Drawing);
             context.ResetReadyFlags();

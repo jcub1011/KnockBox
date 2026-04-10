@@ -235,6 +235,11 @@
     .dtd-timer {
         font-size: 1.1rem;
         padding: 6px 14px;
+        display: flex;
+    }
+
+    .dtd-timer span {
+        margin: auto;
     }
 }
 

@@ -5,8 +5,6 @@
 <div class="dtd-lobby">
     @{
         bool isHost = UserService.CurrentUser?.Id == GameState.Host.Id;
-        // Players property excludes the host. The host cannot participate in the game,
-        // so the player count only reflects active participants.
         int playerCount = GameState.Players.Count;
         bool belowMinimum = playerCount < DrawnToDressConfig.RecommendedMinimumPlayers;
     }

@@ -66,9 +66,7 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress
                 state.UpdateJoinableStatus(false);
 
                 // Snapshot all registered players into GamePlayers so FSM states can look
-                // them up by ID.  This mirrors the CardCounter pattern and must happen before
-                // the FSM transitions so that commands processed on the very first tick
-                // (e.g. SubmitDrawingCommand) find their player state.
+                // them up by ID.
                 foreach (var player in gameState.Players)
                 {
                     gameState.GamePlayers[player.Id] = new DrawnToDressPlayerState
@@ -78,13 +76,17 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress
                     };
                 }
 
-                // Transition from LobbyState → ThemeSelectionState.
-                // ThemeSelectionState will chain immediately to DrawingRoundState when
-                // ThemeSource is Random (the default).
-                context.Fsm.TransitionTo(context, new ThemeSelectionState());
+                // Process the start command through the FSM.
+                var fsmResult = context.Fsm.HandleCommand(context, new StartGameCommand(host.Id));
+                if (fsmResult.TryGetFailure(out var err))
+                {
+                    logger.LogError("StartAsync: FSM start command error: {msg}", err.PublicMessage);
+                    return Result.FromError(err.PublicMessage, err.InternalMessage);
+                }
+                return Result.Success;
             });
 
-            if (executeResult.IsFailure) return Task.FromResult(executeResult);
+            if (executeResult.TryGetFailure(out var error)) return Task.FromResult(Result.FromError(error));
             return Task.FromResult(Result.Success);
         }
 

@@ -20,7 +20,7 @@
             <div class="dtd-timer @(secs <= 10 ? "dtd-timer-urgent" : "")"
                  role="timer"
                  aria-label="@secs seconds remaining">
-                @secs s
+                <span>@secs s</span>
             </div>
         </CountdownClock>
     }

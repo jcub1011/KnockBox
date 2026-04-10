@@ -29,23 +29,31 @@
         </div>
 
         <div class="dtd-drawing-round-info">
-            Round @(GameState.CurrentDrawingClothingTypeIndex + 1) of @GameState.Config.ClothingTypes.Count
+            <span>Round @(GameState.CurrentDrawingClothingTypeIndex + 1) of @GameState.Config.ClothingTypes.Count</span>
+            <span>|</span>
+            <span>Drawing @mySubmitted@(myMax > 0 ? $" of {myMax}" : "")</span>
+            @if (!canSubmit)
+            {
+                <span class="dtd-drawing-counter-full">✅</span>
+            }
         </div>
 
-        <button class="dtd-btn dtd-btn-secondary dtd-btn-mannequin @(_showMannequin ? "dtd-btn-mannequin-active" : "")"
-                @onclick="ToggleMannequin"
-                aria-label="Toggle mannequin reference"
-                title="Toggle mannequin reference">
-            👤
-        </button>
+        <div class="dtd-drawing-round-info-row">
+            <button class="dtd-btn dtd-btn-secondary dtd-btn-mannequin @(_showMannequin ? "dtd-btn-mannequin-active" : "")"
+                    @onclick="ToggleMannequin"
+                    aria-label="Toggle mannequin reference"
+                    title="Toggle mannequin reference">
+                👤
+            </button>
 
-        <TimerDisplay GameState="GameState" />
+            <TimerDisplay GameState="GameState" />
+        </div>
     </div>
 
     @if (isHost)
     {
         <div class="dtd-drawing-host-panel">
-            <h3 class="dtd-drawing-host-title">Players are drawing: <em>@CurrentTypeName</em></h3>
+            <h3 class="dtd-drawing-host-title">Players are drawing: @CurrentTypeName</h3>
 
             <div class="dtd-drawing-player-grid">
                 @foreach (var kv in GameState.GamePlayers)
@@ -87,14 +95,6 @@
                 </div>
 
                 <div class="dtd-drawing-footer">
-                    <div class="dtd-drawing-counter" role="status">
-                        <span>Drawing: @mySubmitted@(myMax > 0 ? $" / {myMax}" : "")</span>
-                        @if (!canSubmit)
-                        {
-                            <span class="dtd-drawing-counter-full">✅</span>
-                        }
-                    </div>
-
                     <div class="dtd-drawing-actions">
                         @if (canSubmit)
                         {

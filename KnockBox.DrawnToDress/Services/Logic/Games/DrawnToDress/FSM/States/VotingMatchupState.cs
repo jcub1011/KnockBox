@@ -27,7 +27,11 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
             DrawnToDressGameContext context)
         {
             _deadline = DateTimeOffset.UtcNow.AddSeconds(context.Config.VotingTimeSec);
-            context.State.PhaseDeadlineUtc = _deadline;
+            if (context.Config.EnableTimer)
+            {
+                context.State.PhaseDeadlineUtc = _deadline;
+            }
+
             context.State.SetPhase(GamePhase.Voting);
             context.ResetReadyFlags();
             context.Logger.LogInformation(
