@@ -269,29 +269,41 @@
 
 @media (max-width: 480px) {
     .op-card {
-        padding: 5px;
-        border-radius: 8px;
+        padding: 6px;
+        border-radius: 10px;
+        flex-shrink: 0;
+        scroll-snap-align: center;
+    }
+
+    .op-card:hover {
+        transform: none;
+        box-shadow: 4px 4px 0 rgba(0,0,0,0.5);
+    }
+
+    .op-card.selected {
+        transform: translateY(-12px) scale(1.05);
     }
 
     .op-card-value {
-        font-size: 1.5rem;
+        font-size: 1.8rem;
     }
 
     .op-card-icon {
-        font-size: 1.3rem;
+        font-size: 1.5rem;
     }
 
     .op-card-name {
-        font-size: 0.6rem;
+        font-size: 0.7rem;
     }
 
     .op-card-label {
-        font-size: 0.45rem;
+        font-size: 0.5rem;
     }
 
     .op-card-tooltip {
         width: 180px;
         padding: 8px;
+        bottom: calc(100% + 8px);
     }
 
     .op-card-tooltip-title {

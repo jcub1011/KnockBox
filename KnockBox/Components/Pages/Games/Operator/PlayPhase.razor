@@ -3,6 +3,35 @@
 
 <div class="op-play-phase">
 <div class="op-game-board">
+    @* Mobile-only compact info bar *@
+    <div class="op-mobile-info-bar">
+        <div class="op-mobile-opponents-strip">
+            @foreach (var player in GameState.Players.Where(p => p.Id != UserService.CurrentUser?.Id))
+            {
+                var pState = GameState.Context?.GamePlayers.GetValueOrDefault(player.Id);
+                if (pState != null)
+                {
+                    <div class="op-mobile-opponent-pill @(GameState.TurnManager.CurrentPlayer == player.Id ? "active" : "") @(IsPlayerTargetable(player.Id, pState) ? "targetable" : "") @(_targetPlayerId == player.Id ? "targeted" : "")"
+                         @onclick="@(() => SelectTarget(player.Id))">
+                        <span class="op-pill-name">@player.Name</span>
+                        <span class="op-pill-score">@pState.CurrentPoints.ToString("F1")</span>
+                        <span class="op-pill-op">@pState.ActiveOperator.ToSymbol()</span>
+                    </div>
+                }
+            }
+        </div>
+        <div class="op-mobile-deck-badges">
+            <div class="op-deck-badge" @onclick="() => _showDiscardHistory = true">
+                <span class="op-badge-label">DECK</span>
+                <span class="op-badge-count">@GameState.Deck.Count</span>
+            </div>
+            <div class="op-discard-badge" @onclick="() => _showDiscardHistory = true">
+                <span class="op-badge-label">DISC</span>
+                <span class="op-badge-count">@GameState.DiscardPile.Count</span>
+            </div>
+        </div>
+    </div>
+
     @* Opponents *@
     <div class="op-opponents-grid">
         @foreach (var player in GameState.Players.Where(p => p.Id != UserService.CurrentUser?.Id))

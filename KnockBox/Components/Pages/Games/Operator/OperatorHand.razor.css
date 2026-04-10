@@ -11,6 +11,18 @@
 
 @media (max-width: 480px) {
     .op-hand {
-        padding: 4px 0;
+        flex-wrap: nowrap;
+        overflow: visible;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        padding: 4px 12px;
+        justify-content: flex-start;
+        gap: 8px;
+        scroll-snap-type: x proximity;
+    }
+
+    .op-hand::-webkit-scrollbar {
+        display: none;
     }
 }
