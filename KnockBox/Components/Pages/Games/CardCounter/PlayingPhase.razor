@@ -10,7 +10,15 @@
     var isHost = IsHost();
     // Show all game players in the player list (including self; host has no player state)
     var allPlayers = GameState.GamePlayers.Values.ToList();
+    // Leaderboard ranking (used by both host and player views)
+    var leaderboardRanked = GameState.Config.FlipWinCondition
+        ? GameState.GamePlayers.Values.OrderByDescending(p => Math.Abs(p.Balance)).ToList()
+        : GameState.GamePlayers.Values.OrderBy(p => Math.Abs(p.Balance)).ToList();
 }
+
+@* ═══════════════════════════════════════════════════════════════════════════ *@
+@* ══ SHARED OVERLAYS (host + player) ════════════════════════════════════════ *@
+@* ═══════════════════════════════════════════════════════════════════════════ *@
 
 @* ── Discard Overlay ── *@
 @if (myPlayer != null && IsOverHandLimit())
@@ -138,8 +146,8 @@ else if (GameState.GamePlayers.Values.Any(p => p.ActionHand.Count > GameState.Co
     bool isPendingReaction = !isFeelingLucky && isAnyPendingReaction;
     bool isSkim = isPendingReaction && GameState.PendingReaction?.PlayedCard.Action == ActionType.Skim;
 
-    string sourceId = isFeelingLucky 
-        ? (GameState.ForceDrawStack.Count > 0 ? GameState.ForceDrawStack.Peek() : GameState.LastPlayedAction?.PlayerId ?? "") 
+    string sourceId = isFeelingLucky
+        ? (GameState.ForceDrawStack.Count > 0 ? GameState.ForceDrawStack.Peek() : GameState.LastPlayedAction?.PlayerId ?? "")
         : (GameState.PendingReaction?.SourceId ?? "");
 
     string theTargetId = isFeelingLucky ? (GameState.FeelingLuckyTargetId ?? "") : (GameState.PendingReaction?.TargetId ?? "");
@@ -262,7 +270,7 @@ else if (GameState.GamePlayers.Values.Any(p => p.ActionHand.Count > GameState.Co
                         {
                             <span class="cc-reaction-accept-hint">or wait for them to select digits...</span>
                         }
-                        <button class="cc-btn cc-btn-danger cc-btn-lg cc-reaction-accept-btn" 
+                        <button class="cc-btn cc-btn-danger cc-btn-lg cc-reaction-accept-btn"
                                 @onclick="@(isFeelingLucky ? DrawCard : AcceptPending)">
                             @(isFeelingLucky ? "Accept (Draw)" : "Accept Effect")
                         </button>
@@ -424,7 +432,7 @@ else if (GameState.GamePlayers.Values.Any(p => p.ActionHand.Count > GameState.Co
     </div>
 }
 
-@* ── Operator Result Overlay / Balance Change Toast ── *@
+@* ── Operator Result Overlay / Balance Change Toast (PLAYER only) ── *@
 @if (myPlayer != null && !_operatorResultDismissed && GameState.LastOperatorResult is { } opResult && opResult.PlayerId == myId)
 {
     double opDelta = opResult.BalanceAfter - opResult.BalanceBefore;
@@ -506,6 +514,25 @@ else if (GameState.GamePlayers.Values.Any(p => p.ActionHand.Count > GameState.Co
     }
 }
 
+@* ── Host Broadcast: Operator Result Toast (shows ALL operator results) ── *@
+@if (isHost && !_operatorResultDismissed && GameState.LastOperatorResult is { } hostOpResult)
+{
+    double hostOpDelta = hostOpResult.BalanceAfter - hostOpResult.BalanceBefore;
+    <div @key="_toastKey"
+         class="cc-host-op-toast @(hostOpDelta > 0 ? "cc-balance-change-gain" : hostOpDelta < 0 ? "cc-balance-change-loss" : "")"
+         @onanimationend="DismissOperatorResult">
+        <span class="cc-host-op-toast-player">⚡ @hostOpResult.PlayerName</span>
+        <div class="cc-host-op-toast-row">
+            <span class="@(hostOpResult.BalanceBefore >= 0 ? "cc-positive" : "cc-negative")">@hostOpResult.BalanceBefore.FormatBalance()</span>
+            <span class="cc-host-op-toast-arrow">→</span>
+            <span class="@(hostOpResult.BalanceAfter >= 0 ? "cc-positive" : "cc-negative")">@hostOpResult.BalanceAfter.FormatBalance()</span>
+        </div>
+        <span class="cc-host-op-toast-delta @(hostOpDelta > 0 ? "cc-positive" : hostOpDelta < 0 ? "cc-negative" : "")">
+            @(hostOpDelta > 0 ? "▲ +" + hostOpDelta.ToString("N0") : hostOpDelta < 0 ? "▼ −" + Math.Abs(hostOpDelta).ToString("N0") : "No change")
+        </span>
+    </div>
+}
+
 @* ── Operator Change Toast (Active Operator Mode — operator card drawn) ── *@
 @if (myPlayer != null && !_operatorChangeDismissed && GameState.LastOperatorChange is { } opChange && opChange.PlayerId == myId && GameState.Config.ActiveOperatorMode)
 {
@@ -528,10 +555,292 @@ else if (GameState.GamePlayers.Values.Any(p => p.ActionHand.Count > GameState.Co
     </div>
 }
 
-@* ── Poker Table Area ── *@
-<div class="cc-table-area">
+@* ═══════════════════════════════════════════════════════════════════════════ *@
+@* ══ TABLE AREA — HOST vs PLAYER FORK ══════════════════════════════════════ *@
+@* ═══════════════════════════════════════════════════════════════════════════ *@
 
-    @* ── Player List (all players, including self) ── *@
+<div class="cc-table-area">
+@if (isHost)
+{
+    @* ════════════════════════════════════════════════════════════════════════ *@
+    @* ══ HOST SPECTATOR VIEW — 3 Column Broadcast Layout ════════════════════ *@
+    @* ════════════════════════════════════════════════════════════════════════ *@
+
+    var activePlayer = GameState.GamePlayers.TryGetValue(activeId, out var ap) ? ap : null;
+    var nextPlayer = GetNextPlayer();
+    int numCards = GameState.ShoeCardCounts.GetValueOrDefault(CardType.Number);
+    int opCards = GameState.ShoeCardCounts.GetValueOrDefault(CardType.Operator);
+    int totalShoeCards = numCards + opCards;
+    double numPercent = totalShoeCards > 0 ? (double)numCards / totalShoeCards * 100 : 50;
+
+    <div class="cc-host-spectator">
+        @* ── Top Bar ── *@
+        <div class="cc-host-topbar">
+            <span class="cc-host-timer">⏱ @GameTime.ToString(@"hh\:mm\:ss")</span>
+            <div class="cc-host-shoe-info">
+                <span class="cc-host-shoe-badge">SHOE #@GameState.ShoeIndex</span>
+                <div class="cc-host-shoe-bar" title="@numCards Numbers / @opCards Operators">
+                    <div class="cc-host-shoe-bar-num" style="width: @(numPercent.ToString("F0"))%"></div>
+                    <div class="cc-host-shoe-bar-op" style="width: @((100 - numPercent).ToString("F0"))%"></div>
+                </div>
+                <span class="cc-host-shoe-counts">@numCards NUM / @opCards OPS</span>
+            </div>
+            <div class="cc-host-deck-info">
+                <span class="cc-host-deck-label">DECK</span>
+                <span class="cc-host-deck-count">@GameState.MainDeck.Count</span>
+            </div>
+        </div>
+
+        @* ── 3-Column Body ── *@
+        <div class="cc-host-body">
+            @* ── Left: Live Standings ── *@
+            <div class="cc-host-standings">
+                <h2 class="cc-host-standings-title">LIVE STANDINGS</h2>
+                <div class="cc-host-standings-list">
+                    @for (int i = 0; i < leaderboardRanked.Count; i++)
+                    {
+                        var lp = leaderboardRanked[i];
+                        bool lpActive = lp.PlayerId == activeId;
+                        bool lpTargeted = GameState.FeelingLuckyTargetId == lp.PlayerId
+                            || GameState.PendingReaction?.TargetId == lp.PlayerId;
+                        string medal = i switch { 0 => "🥇", 1 => "🥈", 2 => "🥉", _ => $"#{i + 1}" };
+
+                        <div class="cc-host-standing-row @(lpActive ? "cc-host-row-active" : "") @(lpTargeted ? "cc-host-row-targeted" : "")">
+                            <span class="cc-host-rank">@medal</span>
+                            <div class="cc-host-player-info">
+                                <span class="cc-host-player-name">@lp.DisplayName</span>
+                                <div class="cc-host-player-details">
+                                    <span class="cc-host-player-balance @(lp.Balance >= 0 ? "cc-positive" : "cc-negative")">@lp.Balance.FormatBalance()</span>
+                                    @if (GameState.Config.ActiveOperatorMode)
+                                    {
+                                        <span class="cc-host-player-op">
+                                            @if (lp.ActiveOperator.HasValue)
+                                            {
+                                                <span>⚡ @GetOperatorSymbol(lp.ActiveOperator.Value)</span>
+                                            }
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="cc-host-player-pot">
+                                            @if (lp.Pot.Count > 0)
+                                            {
+                                                @string.Join("", lp.Pot) <span class="cc-pot-value">(@lp.PotValue)</span>
+                                            }
+                                        </span>
+                                    }
+                                </div>
+                            </div>
+                            <div class="cc-host-player-badges">
+                                @if (lp.ExtraTurns > 0)
+                                {
+                                    <span class="cc-extra-turns-badge">🔁 +@lp.ExtraTurns</span>
+                                }
+                                @if (GameState.HedgeYourBetPlayerId == lp.PlayerId)
+                                {
+                                    <span class="cc-hedge-badge">🎯</span>
+                                }
+                                <span class="cc-host-player-cards">@lp.ActionHand.Count 🂠</span>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            @* ── Center: Spotlight ── *@
+            <div class="cc-host-spotlight">
+                @if (activePlayer != null)
+                {
+                    <div class="cc-host-spotlight-player" @key="activeId">
+                        <div class="cc-host-spotlight-name">@activePlayer.DisplayName's Turn</div>
+                        <div class="cc-host-spotlight-stats">
+                            <div class="cc-host-spotlight-stat">
+                                <span class="cc-host-spotlight-stat-label">BALANCE</span>
+                                <span class="cc-host-spotlight-stat-val @(activePlayer.Balance >= 0 ? "cc-positive" : "cc-negative")">@activePlayer.Balance.FormatBalance()</span>
+                            </div>
+                            @if (GameState.Config.ActiveOperatorMode)
+                            {
+                                <div class="cc-host-spotlight-stat">
+                                    <span class="cc-host-spotlight-stat-label">OPERATOR</span>
+                                    <span class="cc-host-spotlight-stat-val">
+                                        @if (activePlayer.ActiveOperator.HasValue)
+                                        {
+                                            @GetOperatorSymbol(activePlayer.ActiveOperator.Value)
+                                        }
+                                        else
+                                        {
+                                            <span class="cc-empty-pot">—</span>
+                                        }
+                                    </span>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="cc-host-spotlight-stat">
+                                    <span class="cc-host-spotlight-stat-label">POT</span>
+                                    <span class="cc-host-spotlight-stat-val">
+                                        @if (activePlayer.Pot.Count > 0)
+                                        {
+                                            <span class="cc-host-pot-digits">
+                                                @foreach (var d in activePlayer.Pot)
+                                                {
+                                                    <span class="cc-host-pot-digit">@d</span>
+                                                }
+                                            </span>
+                                            <span class="cc-pot-value">(@activePlayer.PotValue)</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="cc-empty-pot">empty</span>
+                                        }
+                                    </span>
+                                </div>
+                            }
+                        </div>
+
+                        @* ── Last Drawn Card (scaled-up flip animation) ── *@
+                        <div class="cc-host-last-card">
+                            @if (GameState.DiscardHistory.Count > 0 && GameState.DiscardHistory[^1].IsActionCard && GameState.LastPlayedAction is { } lastAction)
+                            {
+                                <div class="cc-host-card-event" @key="@($"host-action-{GameState.DiscardHistory.Count}")">
+                                    <div class="cc-card-event-card">
+                                        <div class="cc-card-event-card-inner">
+                                            <div class="cc-card-event-card-face cc-card-event-card-back">🂠</div>
+                                            <div class="cc-card-event-card-face cc-card-event-card-front cc-card-event-card-front-action">
+                                                <span class="cc-card-event-icon">@GetActionCardIcon(lastAction.Action)</span>
+                                                <span class="cc-card-event-label">@GetActionCardName(lastAction.Action)</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="cc-host-card-caption">
+                                        <strong>@lastAction.PlayerName</strong> played <strong>@GetActionCardName(lastAction.Action)</strong>
+                                        @if (lastAction.TargetName != null)
+                                        {
+                                            <span> on <strong>@lastAction.TargetName</strong></span>
+                                        }
+                                    </div>
+                                </div>
+                            }
+                            else if (GameState.DiscardHistory.Count > 0 && !GameState.DiscardHistory[^1].IsActionCard && GameState.LastDrawnCard is { } drawnCard)
+                            {
+                                <div class="cc-host-card-event" @key="@($"host-draw-{GameState.DiscardHistory.Count}")">
+                                    <div class="cc-card-event-card">
+                                        <div class="cc-card-event-card-inner">
+                                            <div class="cc-card-event-card-face cc-card-event-card-back">🂠</div>
+                                            <div class="cc-card-event-card-face cc-card-event-card-front @(drawnCard.Card is OperatorCard ? "cc-card-event-card-front-operator" : "cc-card-event-card-front-number")">
+                                                <span class="cc-card-event-value">@FormatBaseCardDisplay(drawnCard.Card)</span>
+                                                <span class="cc-card-event-label">@GetBaseCardTypeLabel(drawnCard.Card)</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="cc-host-card-caption">
+                                        <strong>@drawnCard.DrawerName</strong> drew <strong>@FormatBaseCardDisplay(drawnCard.Card)</strong>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+
+                        @if (activePlayer.ExtraTurns > 0)
+                        {
+                            <div class="cc-host-spotlight-badges">
+                                <span class="cc-extra-turns-badge">🔁 +@activePlayer.ExtraTurns Extra Turn(s)</span>
+                            </div>
+                        }
+                    </div>
+                }
+
+                @if (nextPlayer != null)
+                {
+                    <div class="cc-host-next-up">
+                        Next up: <strong>@nextPlayer.DisplayName</strong>
+                    </div>
+                }
+            </div>
+
+            @* ── Right: Activity Feed ── *@
+            <div class="cc-host-feed">
+                <h2 class="cc-host-feed-title">ACTIVITY</h2>
+                <div class="cc-host-feed-list">
+                    @{
+                        var feedEntries = GameState.DiscardHistory.Count > 12
+                            ? GameState.DiscardHistory.Skip(GameState.DiscardHistory.Count - 12).Reverse().ToList()
+                            : GameState.DiscardHistory.AsEnumerable().Reverse().ToList();
+                    }
+                    @foreach (var entry in feedEntries)
+                    {
+                        <div class="cc-host-feed-entry @(entry.IsActionCard ? "cc-host-feed-action" : "cc-host-feed-draw")"
+                             @key="@($"feed-{entry.GetHashCode()}")">
+                            <span class="cc-host-feed-desc">@entry.Description</span>
+                            @if (entry.PlayerName != null)
+                            {
+                                <span class="cc-host-feed-player">@entry.PlayerName</span>
+                            }
+                        </div>
+                    }
+                    @if (GameState.DiscardHistory.Count == 0)
+                    {
+                        <div class="cc-host-feed-empty">Waiting for first draw...</div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+}
+else
+{
+    @* ════════════════════════════════════════════════════════════════════════ *@
+    @* ══ PLAYER VIEW ════════════════════════════════════════════════════════ *@
+    @* ════════════════════════════════════════════════════════════════════════ *@
+
+    @* ── Mobile: Compact Opponent Strip (visible on mobile only via CSS) ── *@
+    <div class="cc-mobile-opponent-strip">
+        @foreach (var pl in allPlayers)
+        {
+            bool plActive = pl.PlayerId == activeId;
+            bool plIsMe = pl.PlayerId == myId;
+            bool plExpanded = _expandedOpponentId == pl.PlayerId;
+            <div class="cc-mobile-opp-pill-wrap">
+                <div class="cc-mobile-opp-pill @(plActive ? "cc-mobile-opp-active" : "") @(plIsMe ? "cc-mobile-opp-me" : "")"
+                     @onclick="() => ToggleOpponentPopover(pl.PlayerId)">
+                    <span class="cc-mobile-opp-name">@(plIsMe ? "You" : pl.DisplayName)</span>
+                    <span class="cc-mobile-opp-bal @(pl.Balance >= 0 ? "cc-positive" : "cc-negative")">@pl.Balance.FormatBalance()</span>
+                </div>
+                @if (plExpanded)
+                {
+                    <div class="cc-mobile-opp-popover">
+                        <div class="cc-mobile-opp-popover-name">@pl.DisplayName @(plIsMe ? "(you)" : "")</div>
+                        <div class="cc-mobile-opp-popover-stat">
+                            <span>💰</span>
+                            <span class="@(pl.Balance >= 0 ? "cc-positive" : "cc-negative")">@pl.Balance.FormatBalance()</span>
+                        </div>
+                        @if (GameState.Config.ActiveOperatorMode)
+                        {
+                            <div class="cc-mobile-opp-popover-stat">
+                                <span>⚡</span>
+                                <span>@(pl.ActiveOperator.HasValue ? GetOperatorSymbol(pl.ActiveOperator.Value) : "—")</span>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="cc-mobile-opp-popover-stat">
+                                <span>🎰</span>
+                                <span>@(pl.Pot.Count > 0 ? $"{string.Join("", pl.Pot)} ({pl.PotValue})" : "—")</span>
+                            </div>
+                        }
+                        <div class="cc-mobile-opp-popover-stat">
+                            <span>🂠</span>
+                            <span>@pl.ActionHand.Count cards</span>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+        <div class="cc-mobile-shoe-badge" title="Shoe composition">
+            @(GameState.ShoeCardCounts.GetValueOrDefault(CardType.Number))N / @(GameState.ShoeCardCounts.GetValueOrDefault(CardType.Operator))O
+        </div>
+    </div>
+
+    @* ── Desktop: Player List (hidden on mobile via CSS) ── *@
     <div class="cc-opponents-row">
         @foreach (var pl in allPlayers)
         {
@@ -542,7 +851,6 @@ else if (GameState.GamePlayers.Values.Any(p => p.ActionHand.Count > GameState.Co
             bool isSkimSource = GameState.PendingReaction?.SourceId == pl.PlayerId
                 && GameState.PendingReaction?.PlayedCard.Action == ActionType.Skim;
 
-            // Check if this player is an invalid target for the pending action card
             bool isInvalidSkimTarget = _pendingActionCardIndex.HasValue
                 && myPlayer != null
                 && myPlayer.ActionHand.ElementAtOrDefault(_pendingActionCardIndex.Value)?.Action == ActionType.Skim
@@ -635,6 +943,52 @@ else if (GameState.GamePlayers.Values.Any(p => p.ActionHand.Count > GameState.Co
         }
     </div>
 
+    @* ── Mobile: My Stats Bar (visible on mobile only via CSS) ── *@
+    @if (myPlayer != null)
+    {
+        <div class="cc-mobile-stats-bar">
+            <div class="cc-mobile-turn-indicator">
+                @if (activeId == myId)
+                {
+                    <span class="cc-mobile-your-turn">YOUR TURN</span>
+                }
+                else
+                {
+                    var activeName = GameState.GamePlayers.TryGetValue(activeId, out var turnPl) ? turnPl.DisplayName : "...";
+                    <span class="cc-mobile-waiting-turn">@activeName's turn</span>
+                }
+            </div>
+            <div class="cc-mobile-my-stats">
+                <div class="cc-mobile-stat">
+                    <span class="cc-mobile-stat-label">💰</span>
+                    <span class="cc-mobile-stat-val @(myPlayer.Balance >= 0 ? "cc-positive" : "cc-negative")">@myPlayer.Balance.FormatBalance()</span>
+                </div>
+                @if (GameState.Config.ActiveOperatorMode)
+                {
+                    <div class="cc-mobile-stat">
+                        <span class="cc-mobile-stat-label">⚡</span>
+                        <span class="cc-mobile-stat-val">@(myPlayer.ActiveOperator.HasValue ? GetOperatorSymbol(myPlayer.ActiveOperator.Value) : "—")</span>
+                    </div>
+                }
+                else
+                {
+                    <div class="cc-mobile-stat">
+                        <span class="cc-mobile-stat-label">🎰</span>
+                        <span class="cc-mobile-stat-val">@(myPlayer.Pot.Count > 0 ? $"{string.Join("", myPlayer.Pot)} ({myPlayer.PotValue})" : "empty")</span>
+                    </div>
+                }
+                @if (myPlayer.ExtraTurns > 0)
+                {
+                    <div class="cc-mobile-stat">
+                        <span class="cc-mobile-stat-label">🔁</span>
+                        <span class="cc-mobile-stat-val cc-positive">+@myPlayer.ExtraTurns</span>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+
+    @* ── Table Center (discard + shoe + deck) ── *@
     <div class="cc-table-center-wrap">
         @* ── Discard Pile (left of shoe) ── *@
         <div class="cc-deck-pile cc-discard-pile @(GameState.DiscardHistory.Count > 1 ? "cc-discard-pile-active" : "")"
@@ -681,7 +1035,7 @@ else if (GameState.GamePlayers.Values.Any(p => p.ActionHand.Count > GameState.Co
             <div class="cc-pile-label">DISCARD</div>
             <div class="cc-pile-count">@GameState.DiscardHistory.Count</div>
         </div>
-        
+
         <div class="cc-card-table-group">
             @* ── Center Info (Shoe stats) ── *@
             <div class="cc-shoe-stats">
@@ -717,6 +1071,10 @@ else if (GameState.GamePlayers.Values.Any(p => p.ActionHand.Count > GameState.Co
                     }
                     <div class="cc-pile-label">SHOE</div>
                     <div class="cc-pile-count">@GameState.CurrentShoe.Count</div>
+                    @if (CanDrawCard())
+                    {
+                        <div class="cc-mobile-draw-label">TAP TO DRAW</div>
+                    }
                 </div>
 
                 @* ── Main Deck ── *@
@@ -784,7 +1142,7 @@ else if (GameState.GamePlayers.Values.Any(p => p.ActionHand.Count > GameState.Co
                 }
                 else if (activeId != myId && myPlayer.PrivateReveal == null && !IsOverHandLimit())
                 {
-                    var activeName = GameState.GamePlayers.TryGetValue(activeId, out var ap) ? ap.DisplayName : "...";
+                    var activeName = GameState.GamePlayers.TryGetValue(activeId, out var waitPl) ? waitPl.DisplayName : "...";
                     <div class="cc-waiting-turn">
                         <span>⌛ Waiting for <strong>@activeName</strong></span>
                     </div>
@@ -872,9 +1230,6 @@ else if (GameState.GamePlayers.Values.Any(p => p.ActionHand.Count > GameState.Co
                             bool isPending = _pendingActionCardIndex == idx;
                             bool isDiscardSelected = _selectedDiscardIndices.Contains(idx);
 
-                            // The card can be played when:
-                            // (a) It is the player's turn (active) with no blocking conditions, OR
-                            // (b) The player is the target of a pending blockable reaction and the card is Comp'd
                             bool isMyTurn = activeId == myId
                             && myPlayer.PrivateReveal == null
                             && !IsOverHandLimit()
@@ -890,19 +1245,15 @@ else if (GameState.GamePlayers.Values.Any(p => p.ActionHand.Count > GameState.Co
 
                             bool canPlay = isMyTurn || isReactionCompd || isFeelingLuckyCompd;
 
-                            // Comp'd can only be played as a reaction
                             if (card.Action == ActionType.Compd)
                                 canPlay = isReactionCompd || isFeelingLuckyCompd;
 
-                            // Skim has extra restrictions: cannot play with empty pot
                             if (card.Action == ActionType.Skim && !CanPlaySkim())
                                 canPlay = false;
 
-                            // Hedge Your Bet requires at least one card in the shoe
                             if (card.Action == ActionType.HedgeYourBet && !CanPlayHedgeYourBet())
                                 canPlay = false;
 
-                            // Not My Money cannot be clicked normally. It triggers automatically.
                             if (card.Action == ActionType.NotMyMoney)
                                 canPlay = false;
 
@@ -931,35 +1282,11 @@ else if (GameState.GamePlayers.Values.Any(p => p.ActionHand.Count > GameState.Co
             }
         </div>
     }
+}
 </div>
 
-@* ── Host Leaderboard ── *@
-@if (isHost && GameState.GamePlayers.Count > 0)
-{
-    var leaderboardRanked = GameState.Config.FlipWinCondition
-        ? GameState.GamePlayers.Values.OrderByDescending(p => Math.Abs(p.Balance)).ToList()
-        : GameState.GamePlayers.Values.OrderBy(p => Math.Abs(p.Balance)).ToList();
-    <div class="cc-host-leaderboard">
-        <div class="cc-host-leaderboard-title">🏆 Standings</div>
-        <div class="cc-host-leaderboard-rows">
-            @for (int i = 0; i < leaderboardRanked.Count; i++)
-            {
-                var lp = leaderboardRanked[i];
-                string lMedal = i switch { 0 => "🥇", 1 => "🥈", 2 => "🥉", _ => $"#{i + 1}" };
-                <div class="cc-host-leaderboard-row @(i == 0 ? "cc-host-leaderboard-leader" : "")">
-                    <span class="cc-host-lb-rank">@lMedal</span>
-                    <span class="cc-host-lb-name">@lp.DisplayName</span>
-                    <span class="cc-host-lb-balance @(lp.Balance >= 0 ? "cc-positive" : "cc-negative")">
-                        @lp.Balance.FormatBalance()
-                    </span>
-                </div>
-            }
-        </div>
-    </div>
-}
-
-@* ── Target Select UI ── *@
-@if (_pendingActionCardIndex.HasValue)
+@* ── Target Select UI (player only) ── *@
+@if (!isHost && _pendingActionCardIndex.HasValue)
 {
     var me = GetMyPlayer();
     var card = me?.ActionHand.ElementAtOrDefault(_pendingActionCardIndex.Value);
