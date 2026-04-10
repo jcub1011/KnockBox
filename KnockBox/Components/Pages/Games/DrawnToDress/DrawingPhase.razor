@@ -58,23 +58,49 @@
         <div class="dtd-drawing-host-panel">
             <h3 class="dtd-drawing-host-title">Players are drawing: @CurrentTypeName</h3>
 
-            <div class="dtd-drawing-player-grid">
-                @foreach (var kv in GameState.GamePlayers)
-                {
-                    var ps = kv.Value;
-                    int submitted = CountSubmittedForCurrentType(ps);
-                    int maxItems = CurrentTypeMaxItems;
-                    string statusIcon = ps.IsReady ? "✅" : submitted > 0 ? "🖊️" : "⏳";
-                    <div class="dtd-drawing-player-card @(ps.IsReady ? "dtd-drawing-player-ready" : "")">
-                        <span class="dtd-drawing-player-status">@statusIcon</span>
-                        <span class="dtd-drawing-player-name">@ps.DisplayName</span>
-                        <span class="dtd-drawing-player-count">
-                            @submitted@(maxItems > 0 ? $"/{maxItems}" : "") drawings
-                        </span>
-                    </div>
-                }
-            </div>
+            @{
+                var drawings = GameState.ClothingPool.Values.Where(item => item.ClothingTypeId == CurrentTypeId).ToList();
+                int totalPossible = GameState.GamePlayers.Count * (CurrentTypeMaxItems > 0 ? CurrentTypeMaxItems : 1); // Assuming 1 min if 0
+                int totalSubmitted = drawings.Count;
+            }
 
+            @if (GameState.Config.ShowDrawingsOnHostScreen)
+            {
+                <div class="dtd-drawing-gallery">
+                    @foreach (var drawing in drawings)
+                    {
+                        <div class="dtd-card dtd-drawing-thumbnail-card">
+                            <div class="dtd-drawing-thumbnail">
+                                @((MarkupString)(SafeSvgContent(drawing.SvgContent) ?? ""))
+                            </div>
+                            <div class="dtd-drawing-creator">
+                                @(GameState.GamePlayers.GetValueOrDefault(drawing.CreatorPlayerId)?.DisplayName ?? "Unknown")
+                            </div>
+                        </div>
+                    }
+                    @for (int i = 0; i < totalPossible - totalSubmitted; i++)
+                    {
+                        <div class="dtd-card dtd-drawing-thumbnail-placeholder">
+                            <div class="dtd-drawing-placeholder-icon">?</div>
+                        </div>
+                    }
+                </div>
+            }
+            else
+            {
+                <div class="dtd-drawing-progress-mode">
+                    <div class="dtd-drawing-progress-counter">
+                        <span class="dtd-drawing-count">@totalSubmitted / @totalPossible</span>
+                        <span class="dtd-drawing-count-label">drawings</span>
+                    </div>
+                    <div class="dtd-drawing-progress-subtitle">Artists at work...</div>
+                </div>
+            }
+
+            <div class="dtd-drawing-progress-container">
+                <div class="dtd-drawing-progress-bar" style="width: @(totalPossible > 0 ? (totalSubmitted * 100.0 / totalPossible) : 100)%"></div>
+            </div>
+            
             <p class="dtd-drawing-host-hint">
                 The round advances automatically when the timer expires or all players are done.
             </p>

@@ -47,6 +47,25 @@
         @if (isHost)
         {
             <div class="dtd-outfit-host-panel">
+                <div class="dtd-outfit-host-stats">
+                    @{
+                        int totalItemsClaimed = GameState.ClothingPool.Values.Count(i => i.ClaimedByPlayerId != null);
+                        int totalItemsAvailable = GameState.ClothingPool.Values.Count(i => i.IsInPool && i.ClaimedByPlayerId == null);
+                    }
+                    <div class="dtd-card dtd-stat-card dtd-stat-mint">
+                        <div class="dtd-stat-value">@lockedCount / @totalPlayers</div>
+                        <div class="dtd-stat-label">Players Locked</div>
+                    </div>
+                    <div class="dtd-card dtd-stat-card dtd-stat-lavender">
+                        <div class="dtd-stat-value">@totalItemsClaimed</div>
+                        <div class="dtd-stat-label">Items Claimed</div>
+                    </div>
+                    <div class="dtd-card dtd-stat-card dtd-stat-yellow">
+                        <div class="dtd-stat-value">@totalItemsAvailable</div>
+                        <div class="dtd-stat-label">Items Available</div>
+                    </div>
+                </div>
+
                 <h3 class="dtd-outfit-section-title">Player Progress</h3>
                 <div class="dtd-outfit-player-grid">
                     @foreach (var kv in GameState.GamePlayers)
@@ -58,18 +77,36 @@
                                          && item.ClaimedByPlayerId == ps.PlayerId);
                         string statusIcon = locked ? "✅" : claimed > 0 ? "🧩" : "⏳";
                         <div @key="ps.PlayerId" class="dtd-outfit-player-card @(locked ? "dtd-outfit-player-locked" : "")">
-                            <span class="dtd-outfit-player-status" aria-hidden="true">@statusIcon</span>
-                            <span class="dtd-outfit-player-name">@ps.DisplayName</span>
-                            <span class="dtd-outfit-player-detail">
-                                @if (locked)
+                            <div class="dtd-outfit-player-info">
+                                <span class="dtd-outfit-player-status" aria-hidden="true">@statusIcon</span>
+                                <span class="dtd-outfit-player-name">@ps.DisplayName</span>
+                            </div>
+                            <div class="dtd-outfit-player-progress">
+                                <div class="dtd-outfit-progress-bar">
+                                    @foreach(var ct in GameState.Config.ClothingTypes)
+                                    {
+                                        bool hasType = ps.OwnedClothingItemIds.Any(id => GameState.ClothingPool.TryGetValue(id, out var item) && item.ClothingTypeId == ct.Id);
+                                        <div class="dtd-outfit-progress-segment @(hasType ? "dtd-segment-filled" : "")" title="@ct.DisplayName"></div>
+                                    }
+                                </div>
+                            </div>
+                            <div class="dtd-outfit-player-mini-thumbnails">
+                                @foreach(var itemId in ps.OwnedClothingItemIds)
                                 {
-                                    <span>Locked in</span>
+                                    if(GameState.ClothingPool.TryGetValue(itemId, out var item) && SafeSvgContent(item.SvgContent) is string safeSvg)
+                                    {
+                                        var clothingType = GameState.Config.ClothingTypes.FirstOrDefault(ct => ct.Id == item.ClothingTypeId);
+                                        if (clothingType != null)
+                                        {
+                                            <div class="dtd-mini-thumbnail">
+                                                <svg viewBox="0 0 @clothingType.CanvasWidth @clothingType.CanvasHeight" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
+                                                    @((MarkupString)safeSvg)
+                                                </svg>
+                                            </div>
+                                        }
+                                    }
                                 }
-                                else
-                                {
-                                    <span>@claimed claimed</span>
-                                }
-                            </span>
+                            </div>
                         </div>
                     }
                 </div>
@@ -107,9 +144,10 @@
                                                         @((MarkupString)safeSvg)
                                                     </svg>
                                                 }
+                                                <div class="dtd-pool-item-creator-name">by @(item.CreatorPlayerId != null && GameState.GamePlayers.TryGetValue(item.CreatorPlayerId, out var c) ? c.DisplayName : "Unknown")</div>
                                                 @if (taken)
                                                 {
-                                                    <span class="dtd-pool-item-badge dtd-badge-taken">Taken</span>
+                                                    <span class="dtd-pool-item-badge dtd-badge-taken">Taken by @(item.ClaimedByPlayerId != null && GameState.GamePlayers.TryGetValue(item.ClaimedByPlayerId, out var cl) ? cl.DisplayName : "Unknown")</span>
                                                 }
                                             </div>
                                         }

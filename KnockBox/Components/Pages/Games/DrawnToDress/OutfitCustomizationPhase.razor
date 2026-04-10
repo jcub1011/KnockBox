@@ -87,16 +87,44 @@
         @if (isHost)
         {
             <div class="dtd-customization-host-panel">
-                <h3 class="dtd-customization-section-title">Player Progress</h3>
+                <h3 class="dtd-customization-section-title">Outfit Runway</h3>
                 <div class="dtd-customization-player-grid">
                     @foreach (var kv in GameState.GamePlayers)
                     {
                         var ps = kv.Value;
                         string statusIcon = ps.IsReady ? "✅" : "⏳";
-                        string outfitName = ps.GetOutfit(OutfitRound)?.Customization.OutfitName ?? "(unnamed)";
+                        var outfit = ps.GetOutfit(OutfitRound);
+                        string? outfitName = outfit?.Customization.OutfitName;
+                        if (string.IsNullOrWhiteSpace(outfitName)) outfitName = "Naming outfit…";
                         <div class="dtd-customization-player-card @(ps.IsReady ? "dtd-customization-player-ready" : "")">
-                            <span class="dtd-customization-player-status" aria-hidden="true">@statusIcon</span>
                             <span class="dtd-customization-player-name">@ps.DisplayName</span>
+                            <div class="dtd-customization-runway-preview">
+                                @if (outfit != null)
+                                {
+                                    <svg viewBox="0 0 @canvasWidth @totalOutfitHeight" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
+                                        @foreach (var ct in GameState.Config.ClothingTypes)
+                                        {
+                                            if (outfit.SelectedItemsByType.TryGetValue(ct.Id, out var itemId)
+                                                && GameState.ClothingPool.TryGetValue(itemId, out var item))
+                                            {
+                                                if (KnockBox.Core.Services.Drawing.SvgContentSanitizer.Sanitize(item.SvgContent) is string safeSvg)
+                                                {
+                                                    var (defX, defY) = CompositeCanvasLayout.GetDefaultItemPosition(
+                                                        ct.Id, ct.CanvasWidth, ct.CanvasHeight, canvasWidth, totalOutfitHeight);
+                                                    double itemY = ct.Id == "hat" ? 160 : ct.Id == "top" ? 440 : ct.Id == "bottom" ? 820 : ct.Id == "shoes" ? 1070 : defY;
+                                                    <g transform="translate(@defX,@itemY)">
+                                                        @((MarkupString)safeSvg)
+                                                    </g>
+                                                }
+                                            }
+                                        }
+                                        @if (outfit.Customization.SketchSvgContent is not null && KnockBox.Core.Services.Drawing.SvgContentSanitizer.Sanitize(outfit.Customization.SketchSvgContent) is string sketchSvg)
+                                        {
+                                            @((MarkupString)sketchSvg)
+                                        }
+                                    </svg>
+                                }
+                            </div>
                             <span class="dtd-customization-player-detail">
                                 @if (ps.IsReady)
                                 {
@@ -104,8 +132,11 @@
                                 }
                                 else
                                 {
-                                    <span>Naming outfit…</span>
+                                    <span>@outfitName</span>
                                 }
+                            </span>
+                            <span class="dtd-customization-player-status-badge">
+                                @(ps.IsReady ? "Finalized" : "Customizing...")
                             </span>
                         </div>
                     }

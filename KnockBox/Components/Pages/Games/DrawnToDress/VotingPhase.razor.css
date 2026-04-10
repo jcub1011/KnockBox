@@ -94,8 +94,88 @@
     display: flex;
     flex-direction: column;
     gap: 32px;
-    max-width: 800px;
+    max-width: 1000px;
     margin: 0 auto;
+}
+
+.dtd-voting-progress-container {
+    height: 32px;
+    background: var(--dtd-color-bg-soft);
+    border-radius: 16px;
+    border: 3px solid var(--dtd-color-mint-deep);
+    overflow: hidden;
+    margin: 0 auto 24px;
+    max-width: 1000px;
+    width: 100%;
+    position: relative;
+}
+
+.dtd-voting-progress-bar {
+    height: 100%;
+    background: var(--dtd-color-mint);
+    transition: width 0.3s ease;
+}
+
+.dtd-voting-progress-text {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-mono);
+    font-weight: 800;
+    color: var(--dtd-color-dark);
+}
+
+.dtd-voting-matchup-breakdown {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 24px;
+    padding-top: 24px;
+    border-top: 3px dashed var(--dtd-color-bg-soft);
+}
+
+.dtd-voting-breakdown-row {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.dtd-voting-breakdown-label {
+    font-family: var(--font-primary);
+    font-weight: 800;
+    text-align: center;
+    color: var(--dtd-color-dark);
+}
+
+.dtd-voting-breakdown-bar-container {
+    display: flex;
+    height: 16px;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.dtd-voting-breakdown-bar-a {
+    background: var(--dtd-color-pink);
+    transition: width 0.3s ease;
+}
+
+.dtd-voting-breakdown-bar-b {
+    background: var(--dtd-color-lavender);
+    transition: width 0.3s ease;
+}
+
+/* Make outfits larger for host view */
+.dtd-voting-host-matchup-card .dtd-voting-outfit-preview {
+    min-height: 400px;
+}
+
+.dtd-voting-host-matchup-card .dtd-voting-vs {
+    font-size: 3.5rem;
 }
 
 .dtd-voting-host-matchup-card {

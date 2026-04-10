@@ -1,4 +1,5 @@
 using KnockBox.Core.Components.Shared;
+using KnockBox.Core.Services.Drawing;
 using KnockBox.Services.Logic.Games.DrawnToDress;
 using KnockBox.Services.Logic.Games.DrawnToDress.FSM;
 using KnockBox.Services.State.Games.DrawnToDress;
@@ -25,6 +26,8 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
         private bool _showMannequin;
 
         protected string? MannequinSvg => _showMannequin ? GetMannequinSvg(CurrentTypeId) : null;
+        
+        protected static string? SafeSvgContent(string? raw) => SvgContentSanitizer.Sanitize(raw);
 
         protected void ToggleMannequin()
         {

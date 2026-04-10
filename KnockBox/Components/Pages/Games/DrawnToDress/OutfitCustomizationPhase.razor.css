@@ -97,6 +97,7 @@
 
 .dtd-customization-player-card {
     display: flex;
+    flex-direction: column;
     align-items: center;
     gap: 12px;
     background: var(--dtd-color-bg-soft);
@@ -104,6 +105,27 @@
     border-radius: 20px;
     padding: 16px;
     transition: all 0.2s var(--dtd-bounce);
+}
+
+.dtd-customization-runway-preview {
+    width: 100%;
+    aspect-ratio: 3/4;
+    background: white;
+    border-radius: 16px;
+    border: 3px solid var(--dtd-color-lavender);
+    padding: 8px;
+    margin-top: 8px;
+    margin-bottom: 8px;
+}
+
+.dtd-customization-player-status-badge {
+    background: var(--dtd-color-lavender);
+    color: #fff;
+    padding: 6px 16px;
+    border-radius: 16px;
+    font-size: 0.9rem;
+    font-weight: 800;
+    margin-top: 4px;
 }
 
 .dtd-customization-player-ready {

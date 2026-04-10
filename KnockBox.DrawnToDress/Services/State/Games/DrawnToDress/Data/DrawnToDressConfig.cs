@@ -29,6 +29,14 @@ namespace KnockBox.Services.State.Games.DrawnToDress.Data
         /// </summary>
         public bool AllowSketchingDuringOutfitBuilding { get; set; } = false;
 
+        /// <summary>
+        /// When <see langword="true"/>, the host screen displays a live gallery of
+        /// submitted drawings during the drawing phase. When <see langword="false"/>,
+        /// only player progress indicators are shown (no SVG previews).
+        /// Default: <see langword="true"/>.
+        /// </summary>
+        public bool ShowDrawingsOnHostScreen { get; set; } = true;
+
         // ── Clothing types ────────────────────────────────────────────────────
 
         /// <summary>

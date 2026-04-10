@@ -127,6 +127,11 @@
                         <input type="checkbox" class="dtd-setting-checkbox"
                                @bind="EditConfig.AllowSketchingDuringOutfitBuilding" @bind:after="ApplyConfig" />
                     </label>
+                    <label class="dtd-setting-label dtd-setting-label-row" title="Show a live gallery of drawings on the host screen during the drawing phase">
+                        <span>Show Drawings on Host Screen:</span>
+                        <input type="checkbox" class="dtd-setting-checkbox"
+                               @bind="EditConfig.ShowDrawingsOnHostScreen" @bind:after="ApplyConfig" />
+                    </label>
                 </div>
 
                 <!-- ── Clothing Types ─────────────────────────────────────── -->
