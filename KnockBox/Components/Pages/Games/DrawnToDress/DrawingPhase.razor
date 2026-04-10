@@ -71,7 +71,11 @@
                     {
                         <div class="dtd-card dtd-drawing-thumbnail-card">
                             <div class="dtd-drawing-thumbnail">
-                                @((MarkupString)(SafeSvgContent(drawing.SvgContent) ?? ""))
+                                <svg viewBox="0 0 @CurrentTypeCanvasWidth @CurrentTypeCanvasHeight"
+                                     preserveAspectRatio="xMidYMid meet"
+                                     xmlns="http://www.w3.org/2000/svg">
+                                    @((MarkupString)(SafeSvgContent(drawing.SvgContent) ?? ""))
+                                </svg>
                             </div>
                             <div class="dtd-drawing-creator">
                                 @(GameState.GamePlayers.GetValueOrDefault(drawing.CreatorPlayerId)?.DisplayName ?? "Unknown")

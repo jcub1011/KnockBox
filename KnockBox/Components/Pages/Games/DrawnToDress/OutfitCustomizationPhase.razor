@@ -14,7 +14,7 @@
     int submittedCount = GameState.GamePlayers.Values.Count(p => p.IsReady);
     int totalPlayers = GameState.GamePlayers.Count;
 
-    string phaseName = OutfitRound == 1 ? "Customize Outift" : $"Customize Outfit {OutfitRound}";
+    string phaseName = OutfitRound == 1 ? "Customize Outfit" : $"Customize Outfit {OutfitRound}";
     string nameLabel = OutfitRound == 1 ? "Outfit Name" : $"Outfit {OutfitRound} Name";
     string finalizeLabel = OutfitRound == 1 ? "Finalize Outfit" : $"Finalize Outfit {OutfitRound}";
     string finalizedMessage = OutfitRound == 1 ? "Outfit finalized! Waiting for the others\u2026" : $"Outfit {OutfitRound} finalized! Waiting for the others\u2026";
@@ -109,10 +109,10 @@
                                             {
                                                 if (KnockBox.Core.Services.Drawing.SvgContentSanitizer.Sanitize(item.SvgContent) is string safeSvg)
                                                 {
-                                                    var (defX, defY) = CompositeCanvasLayout.GetDefaultItemPosition(
-                                                        ct.Id, ct.CanvasWidth, ct.CanvasHeight, canvasWidth, totalOutfitHeight);
-                                                    double itemY = ct.Id == "hat" ? 160 : ct.Id == "top" ? 440 : ct.Id == "bottom" ? 820 : ct.Id == "shoes" ? 1070 : defY;
-                                                    <g transform="translate(@defX,@itemY)">
+                                                    var (itemX, itemY) = CompositeCanvasLayout.GetItemPosition(
+                                                        ct.Id, ct.CanvasWidth, ct.CanvasHeight, canvasWidth, totalOutfitHeight,
+                                                        outfit.Customization.ItemPositionOverrides);
+                                                    <g transform="translate(@itemX,@itemY)">
                                                         @((MarkupString)safeSvg)
                                                     </g>
                                                 }

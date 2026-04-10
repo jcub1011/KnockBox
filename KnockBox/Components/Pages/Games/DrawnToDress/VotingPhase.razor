@@ -186,15 +186,9 @@
                         {
                             if (SafeSvgContent(item.SvgContent) is string safeSvg)
                             {
-                                var (defX, defY) = CompositeCanvasLayout.GetDefaultItemPosition(
-                                    ct.Id, ct.CanvasWidth, ct.CanvasHeight, TotalOutfitWidth, TotalOutfitHeight);
-                                double itemX = defX;
-                                double itemY = defY;
-                                if (outfit.Customization.ItemPositionOverrides.TryGetValue(ct.Id, out var pos))
-                                {
-                                    itemX = pos.X;
-                                    itemY = pos.Y;
-                                }
+                                var (itemX, itemY) = CompositeCanvasLayout.GetItemPosition(
+                                    ct.Id, ct.CanvasWidth, ct.CanvasHeight, TotalOutfitWidth, TotalOutfitHeight,
+                                    outfit.Customization.ItemPositionOverrides);
                                 <g transform="translate(@itemX,@itemY)">@((MarkupString)safeSvg)</g>
                             }
                         }

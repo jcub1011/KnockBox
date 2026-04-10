@@ -1,4 +1,5 @@
 using KnockBox.Services.State.Games.DrawnToDress.Data;
+using System.Collections.Generic;
 
 namespace KnockBox.Services.Logic.Games.DrawnToDress
 {
@@ -86,6 +87,24 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress
                 X: (compositeWidth - itemCanvasWidth) / 2.0,
                 Y: bodyPartCenterY - itemCanvasHeight / 2.0
             );
+        }
+
+        /// <summary>
+        /// Returns the item position, applying any player-set override if present,
+        /// otherwise falling back to <see cref="GetDefaultItemPosition"/>.
+        /// </summary>
+        public static (double X, double Y) GetItemPosition(
+            string clothingTypeId,
+            int itemCanvasWidth,
+            int itemCanvasHeight,
+            int compositeWidth,
+            int compositeHeight,
+            IReadOnlyDictionary<string, ItemPositionOverride>? overrides = null)
+        {
+            var (x, y) = GetDefaultItemPosition(clothingTypeId, itemCanvasWidth, itemCanvasHeight, compositeWidth, compositeHeight);
+            if (overrides?.TryGetValue(clothingTypeId, out var pos) == true)
+                return (pos.X, pos.Y);
+            return (x, y);
         }
     }
 }

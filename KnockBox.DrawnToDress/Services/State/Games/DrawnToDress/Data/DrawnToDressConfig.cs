@@ -69,9 +69,9 @@ namespace KnockBox.Services.State.Games.DrawnToDress.Data
 
         /// <summary>
         /// Number of seconds the theme is displayed before drawing begins.
-        /// GDD default: 10 s.
+        /// GDD default: 6 s.
         /// </summary>
-        public int ThemeAnnouncementTimeSec { get; set; } = 10;
+        public int ThemeAnnouncementTimeSec { get; set; } = 6;
 
         /// <summary>
         /// Number of candidate themes presented to players for voting when
@@ -99,9 +99,9 @@ namespace KnockBox.Services.State.Games.DrawnToDress.Data
 
         /// <summary>
         /// Number of seconds players have to add a custom name and finalize their outfit.
-        /// GDD default: 60 s.
+        /// GDD default: 75 s.
         /// </summary>
-        public int OutfitCustomizationTimeSec { get; set; } = 60;
+        public int OutfitCustomizationTimeSec { get; set; } = 75;
 
         // ── Pool / reuse / distinctness ───────────────────────────────────────
 
