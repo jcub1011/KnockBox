@@ -1,3 +1,4 @@
+@using KnockBox.Services.Logic.Games.DrawnToDress
 @using KnockBox.Services.State.Games.DrawnToDress
 @using KnockBox.Services.State.Games.DrawnToDress.Data
 @using KnockBox.Services.State.Users
@@ -19,6 +20,10 @@
     string poolTitle = OutfitRound == 1 ? "Clothing Pool" : $"Clothing Pool (Round {OutfitRound})";
     string lockInLabel = OutfitRound == 1 ? "Lock In Outfit" : $"Lock In Outfit {OutfitRound}";
     string lockedMessage = OutfitRound == 1 ? "Outfit locked in! Waiting for the others\u2026" : $"Outfit {OutfitRound} locked in! Waiting for the others\u2026";
+
+    int filledSlots = GameState.Config.ClothingTypes
+        .Count(ct => myPlayer is not null && GetSelectedItemForType(myPlayer, ct.Id).HasValue);
+    int totalSlots = GameState.Config.ClothingTypes.Count;
 }
 
 <div class="dtd-outfit">
@@ -155,46 +160,55 @@
         {
             <!-- Player active building view -->
             <div class="dtd-outfit-player-layout">
-                <section class="dtd-outfit-left-panel">
-                    <h3 class="dtd-outfit-section-title">@yourOutfitTitle</h3>
-                    <div class="dtd-outfit-slots-container">
-                        @foreach (var clothingType in GameState.Config.ClothingTypes)
-                        {
-                            Guid? slotItemId = myPlayer is not null ? GetSelectedItemForType(myPlayer, clothingType.Id) : null;
-                            DrawnClothingItem? slotItem = slotItemId.HasValue && GameState.ClothingPool.TryGetValue(slotItemId.Value, out var si) ? si : null;
+                <section class="dtd-outfit-preview-panel">
+                    <div class="dtd-outfit-preview-header">
+                        <h3 class="dtd-outfit-section-title">@yourOutfitTitle</h3>
+                        <span class="dtd-outfit-slot-count">@filledSlots / @totalSlots</span>
+                    </div>
 
-                            <div @key="clothingType.Id" class="dtd-outfit-slot @(slotItem is not null ? "dtd-outfit-slot-filled" : "dtd-outfit-slot-empty")">
-                                <span class="dtd-outfit-slot-label">@clothingType.DisplayName</span>
-                                @if (slotItem is not null)
+                    <div class="dtd-outfit-preview-svg-container">
+                        <svg class="dtd-outfit-composed-preview"
+                             viewBox="0 0 @ComposedOutfitWidth @ComposedOutfitHeight"
+                             preserveAspectRatio="xMidYMid meet"
+                             xmlns="http://www.w3.org/2000/svg"
+                             role="img" aria-label="Your outfit preview">
+                            @foreach (var clothingType in GameState.Config.ClothingTypes)
+                            {
+                                var (defX, defY) = CompositeCanvasLayout.GetDefaultItemPosition(
+                                    clothingType.Id, clothingType.CanvasWidth, clothingType.CanvasHeight,
+                                    ComposedOutfitWidth, ComposedOutfitHeight);
+                                Guid? slotItemId = myPlayer is not null
+                                    ? GetSelectedItemForType(myPlayer, clothingType.Id) : null;
+
+                                if (slotItemId.HasValue
+                                    && GameState.ClothingPool.TryGetValue(slotItemId.Value, out var slotItem)
+                                    && SafeSvgContent(slotItem.SvgContent) is string safeSvgSlot)
                                 {
-                                    bool slotItemIsClaimed = slotItem.ClaimedByPlayerId == myId;
-                                    <div class="dtd-pool-item dtd-pool-item-selected @(slotItemIsClaimed ? "dtd-pool-item-clickable" : "")"
-                                         role="@(slotItemIsClaimed ? "button" : null)"
-                                         aria-label="@(slotItemIsClaimed ? "Release selection" : null)"
-                                         tabindex="@(slotItemIsClaimed ? 0 : -1)"
-                                         @onclick="() => { if(slotItemIsClaimed) UnclaimItem(slotItem.Id); }"
-                                         @onkeydown="(e) => { if(slotItemIsClaimed) HandleUnclaimKeydown(e, slotItem.Id); }">
-                                        @if (SafeSvgContent(slotItem.SvgContent) is string safeSvgSlot)
-                                        {
-                                            <svg class="dtd-pool-item-preview" viewBox="0 0 @clothingType.CanvasWidth @clothingType.CanvasHeight"
-                                                 preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
-                                                @((MarkupString)safeSvgSlot)
-                                            </svg>
-                                        }
-                                        @if (slotItemIsClaimed)
-                                        {
-                                            <span class="dtd-pool-item-action" aria-hidden="true">✕</span>
-                                        }
-                                    </div>
+                                    <g transform="translate(@defX,@defY)">
+                                        @((MarkupString)safeSvgSlot)
+                                    </g>
                                 }
                                 else
                                 {
-                                    <div class="dtd-outfit-slot-placeholder">Choose Below</div>
+                                    <g transform="translate(@defX,@defY)">
+                                        <rect x="50" y="50"
+                                              width="@(clothingType.CanvasWidth - 100)"
+                                              height="@(clothingType.CanvasHeight - 100)"
+                                              rx="20" fill="none" stroke="#cbd5e1"
+                                              stroke-width="4" stroke-dasharray="12,8" />
+                                        <text x="@(clothingType.CanvasWidth / 2)"
+                                              y="@(clothingType.CanvasHeight / 2)"
+                                              text-anchor="middle" dominant-baseline="central"
+                                              font-family="Lexend, sans-serif" font-size="36"
+                                              font-weight="700" fill="#cbd5e1">
+                                            @clothingType.DisplayName
+                                        </text>
+                                    </g>
                                 }
-                            </div>
-                        }
+                            }
+                        </svg>
                     </div>
-                    
+
                     <div class="dtd-outfit-actions-panel">
                         @if (_errorMessage is not null)
                         {

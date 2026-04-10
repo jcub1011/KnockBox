@@ -14,7 +14,7 @@
     int submittedCount = GameState.GamePlayers.Values.Count(p => p.IsReady);
     int totalPlayers = GameState.GamePlayers.Count;
 
-    string phaseName = OutfitRound == 1 ? "Outfit Customization" : $"Outfit {OutfitRound} Customization";
+    string phaseName = OutfitRound == 1 ? "Customize Outift" : $"Customize Outfit {OutfitRound}";
     string nameLabel = OutfitRound == 1 ? "Outfit Name" : $"Outfit {OutfitRound} Name";
     string finalizeLabel = OutfitRound == 1 ? "Finalize Outfit" : $"Finalize Outfit {OutfitRound}";
     string finalizedMessage = OutfitRound == 1 ? "Outfit finalized! Waiting for the others\u2026" : $"Outfit {OutfitRound} finalized! Waiting for the others\u2026";
@@ -75,9 +75,9 @@
             <h2 class="dtd-customization-phase-name">@phaseName</h2>
         </div>
 
-        <div class="dtd-customization-progress-pill" aria-label="Player progress">
+        @* <div class="dtd-customization-progress-pill" aria-label="Player progress">
             @submittedCount / @totalPlayers finalized
-        </div>
+        </div> *@
 
         <TimerDisplay GameState="GameState" />
     </header>
@@ -164,16 +164,6 @@
                         </div>
                     </div>
 
-                    @if (GameState.Config.ShowMannequin)
-                    {
-                        <div class="dtd-customization-field">
-                            <label class="dtd-customization-checkbox-label">
-                                <input type="checkbox" @bind="_showMannequin" />
-                                Show Mannequin Reference
-                            </label>
-                        </div>
-                    }
-
                     @if (_mode == InteractionMode.MoveItems)
                     {
                         <div class="dtd-customization-field">
@@ -204,8 +194,18 @@
                         <button class="dtd-btn dtd-btn-primary dtd-btn-lg"
                                 @onclick="SubmitCustomizationAsync"
                                 disabled="@_submitting">
-                            @(_submitting ? "Finalizing..." : "🔒 Finalize")
+                            @(_submitting ? "Finalizing..." : "Finalize")
                         </button>
+
+                        @if (GameState.Config.ShowMannequin)
+                        {
+                            <div class="dtd-customization-field">
+                                <label class="dtd-customization-checkbox-label">
+                                    <input type="checkbox" @bind="_showMannequin" />
+                                    Show Mannequin Reference
+                                </label>
+                            </div>
+                        }
                     </div>
                 </section>
 
@@ -240,7 +240,7 @@
                         </SvgDrawingCanvas>
                     </div>
 
-                    @if (_mode == InteractionMode.MoveItems)
+                    @if (_mode == InteractionMode.MoveItems && false) // Keep hidden
                     {
                         <div class="dtd-customization-manual-pos">
                             <details class="dtd-card">
