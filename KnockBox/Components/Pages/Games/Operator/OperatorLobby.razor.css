@@ -17,6 +17,7 @@
     overflow-y: auto;
 }
 
+
 /* Subtle diamond pattern overlay */
 .op-page::before {
     content: '';

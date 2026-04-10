@@ -8,3 +8,9 @@
     justify-content: center;
     flex-wrap: wrap;
 }
+
+@media (max-width: 480px) {
+    .op-hand {
+        padding: 4px 0;
+    }
+}

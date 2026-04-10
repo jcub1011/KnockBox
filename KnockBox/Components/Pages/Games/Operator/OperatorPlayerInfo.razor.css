@@ -196,29 +196,43 @@
 
 @media (max-width: 480px) {
     .op-player-info {
-        padding: 8px;
-        gap: 6px;
+        padding: 6px 8px;
+        gap: 4px;
+        min-width: 110px;
+        flex-shrink: 0;
     }
 
     .op-player-name {
-        font-size: 0.8rem;
+        font-size: 0.7rem;
     }
 
     .op-player-score {
-        font-size: 1.4rem;
+        font-size: 1.2rem;
+    }
+
+    .op-player-score-container {
+        padding: 2px;
+        gap: 6px;
     }
 
     .op-player-operator-card {
-        width: 26px;
-        height: 32px;
+        width: 22px;
+        height: 28px;
     }
 
     .op-player-operator-card-symbol {
-        font-size: 0.9rem;
+        font-size: 0.8rem;
     }
 
     .op-player-status-row {
-        font-size: 0.7rem;
+        font-size: 0.65rem;
+        gap: 4px;
+    }
+
+    .op-active-indicator {
+        font-size: 0.5rem;
+        padding: 1px 6px;
+        top: -8px;
     }
 }
 
