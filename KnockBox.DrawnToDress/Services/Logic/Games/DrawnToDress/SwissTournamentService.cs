@@ -60,6 +60,10 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress
                     else if (bVotes > aVotes)
                         wins[matchup.EntrantBId] = wins.GetValueOrDefault(matchup.EntrantBId, 0) + 1;
                 }
+
+                // Bye entrants receive a free win.
+                foreach (var byeEntrant in round.Byes)
+                    wins[byeEntrant] = wins.GetValueOrDefault(byeEntrant, 0) + 1;
             }
 
             return wins;
@@ -69,21 +73,38 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress
 
         /// <summary>
         /// Generates a single Swiss-system voting round.
+        /// When there is an odd number of entrants, the lowest-ranked entrant
+        /// who has not yet received a bye is given a bye (free win).
         /// </summary>
         public static VotingRound GenerateRound(
             int roundNumber,
             IReadOnlyList<EntrantId> entrantIds,
             IReadOnlyList<VotingRound> previousRounds,
-            IReadOnlyDictionary<EntrantId, int>? winsByEntrantId = null)
+            IReadOnlyDictionary<EntrantId, double>? winsByEntrantId = null)
         {
-            var wins = winsByEntrantId ?? new Dictionary<EntrantId, int>();
+            var wins = winsByEntrantId ?? new Dictionary<EntrantId, double>();
             var previousPairs = CollectPreviousPairs(previousRounds);
 
             // Sort: highest wins first; break ties by entrant ID string for determinism.
             var sorted = entrantIds
-                .OrderByDescending(id => wins.TryGetValue(id, out var w) ? w : 0)
+                .OrderByDescending(id => wins.TryGetValue(id, out var w) ? w : 0.0)
                 .ThenBy(id => id.ToString(), StringComparer.Ordinal)
                 .ToList();
+
+            // Handle bye for odd entrant count.
+            var byes = new List<EntrantId>();
+            if (sorted.Count % 2 == 1 && sorted.Count >= 1)
+            {
+                var previousByeSet = previousRounds
+                    .SelectMany(r => r.Byes)
+                    .ToHashSet();
+
+                // Pick the lowest-ranked entrant who hasn't had a bye yet.
+                int byeIndex = sorted.FindLastIndex(id => !previousByeSet.Contains(id));
+                var byeCandidate = byeIndex >= 0 ? sorted[byeIndex] : sorted[^1];
+                sorted.Remove(byeCandidate);
+                byes.Add(byeCandidate);
+            }
 
             var matchups = PairGreedy(sorted, previousPairs, roundNumber);
 
@@ -91,6 +112,7 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress
             {
                 RoundNumber = roundNumber,
                 Matchups = matchups,
+                Byes = byes,
             };
         }
 

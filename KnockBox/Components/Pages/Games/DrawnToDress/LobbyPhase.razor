@@ -231,8 +231,12 @@
                 <div class="dtd-settings-grid">
                     <label class="dtd-setting-label">
                         Voting Rounds:
-                        <input type="number" min="1" class="dtd-setting-input"
+                        <input type="number" min="0" class="dtd-setting-input"
                                @bind="EditConfig.VotingRounds" @bind:after="ApplyConfig" />
+                        @if (EditConfig.VotingRounds == 0)
+                        {
+                            <span class="dtd-setting-hint">(Auto)</span>
+                        }
                     </label>
                     <label class="dtd-setting-label">
                         Bonus Points for Complete Outfit:

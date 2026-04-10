@@ -65,6 +65,19 @@
             </div>
         }
 
+        <!-- ── Byes ────────────────────────────────────────────────────── -->
+        @if (currentRound.Byes.Count > 0)
+        {
+            <div class="dtd-round-results-byes">
+                @foreach (var byeEntrant in currentRound.Byes)
+                {
+                    <span class="dtd-round-results-bye-badge">
+                        @GetEntrantLabel(byeEntrant) — Bye (free win)
+                    </span>
+                }
+            </div>
+        }
+
         <!-- ── Round leaders ───────────────────────────────────────────── -->
         @if (GetRoundLeaders(currentRound).Count > 0)
         {

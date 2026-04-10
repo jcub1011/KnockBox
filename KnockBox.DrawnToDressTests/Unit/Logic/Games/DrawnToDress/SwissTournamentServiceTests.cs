@@ -192,14 +192,15 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress
         }
 
         [TestMethod]
-        public void GenerateRound_Round1_OddPlayerCount_LeavesOneUnpaired()
+        public void GenerateRound_Round1_OddPlayerCount_AssignsBye()
         {
             var entrants = new List<EntrantId> { new("pA", 1), new("pB", 1), new("pC", 1) };
 
             var round = SwissTournamentService.GenerateRound(1, entrants, [], null);
 
-            // One matchup (2 players); one player has no matchup in this round.
+            // One matchup (2 players); one player receives a bye.
             Assert.AreEqual(1, round.Matchups.Count);
+            Assert.AreEqual(1, round.Byes.Count, "Exactly one entrant should receive a bye.");
         }
 
         [TestMethod]
@@ -268,7 +269,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress
             };
 
             // All even wins; no preference from scores.
-            var round2 = SwissTournamentService.GenerateRound(2, [new EntrantId("pA", 1), new EntrantId("pB", 1), new EntrantId("pC", 1), new EntrantId("pD", 1)], previousRounds, new Dictionary<EntrantId, int>());
+            var round2 = SwissTournamentService.GenerateRound(2, [new EntrantId("pA", 1), new EntrantId("pB", 1), new EntrantId("pC", 1), new EntrantId("pD", 1)], previousRounds, new Dictionary<EntrantId, double>());
 
             // pA must not face pB again; pC must not face pD again.
             foreach (var matchup in round2.Matchups)
@@ -302,7 +303,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress
                 },
             };
 
-            var wins = new Dictionary<EntrantId, int> { [new EntrantId("pA", 1)] = 1, [new EntrantId("pC", 1)] = 1 };
+            var wins = new Dictionary<EntrantId, double> { [new EntrantId("pA", 1)] = 1.0, [new EntrantId("pC", 1)] = 1.0 };
 
             var round2 = SwissTournamentService.GenerateRound(2, [new EntrantId("pA", 1), new EntrantId("pB", 1), new EntrantId("pC", 1), new EntrantId("pD", 1)], previousRounds, wins);
 
@@ -332,10 +333,76 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress
         }
 
         [TestMethod]
-        public void GenerateRound_SingleEntrant_ProducesEmptyRound()
+        public void GenerateRound_SingleEntrant_ProducesEmptyRoundWithBye()
         {
             var round = SwissTournamentService.GenerateRound(1, [new EntrantId("pA", 1)], [], null);
             Assert.AreEqual(0, round.Matchups.Count);
+            Assert.AreEqual(1, round.Byes.Count, "Single entrant should receive a bye.");
+            Assert.AreEqual(new EntrantId("pA", 1), round.Byes[0]);
+        }
+
+        // ── Bye rotation ─────────────────────────────────────────────────────
+
+        [TestMethod]
+        public void GenerateRound_OddEntrants_ByeGoesToLowestRanked()
+        {
+            // With no previous wins, lowest-ranked = last alphabetically.
+            var entrants = new List<EntrantId> { new("pA", 1), new("pB", 1), new("pC", 1) };
+
+            var round = SwissTournamentService.GenerateRound(1, entrants, [], null);
+
+            // pC is last alphabetically (lowest ranked with equal wins), should get bye.
+            Assert.AreEqual(new EntrantId("pC", 1), round.Byes[0],
+                "Bye should go to the lowest-ranked entrant.");
+        }
+
+        [TestMethod]
+        public void GenerateRound_OddEntrants_ByeRotatesAcrossRounds()
+        {
+            var entrants = new List<EntrantId> { new("pA", 1), new("pB", 1), new("pC", 1) };
+
+            // Round 1: pC gets bye.
+            var round1 = SwissTournamentService.GenerateRound(1, entrants, [], null);
+            Assert.AreEqual(new EntrantId("pC", 1), round1.Byes[0]);
+
+            // Round 2: pC already had a bye, so next lowest should get it.
+            var round2 = SwissTournamentService.GenerateRound(2, entrants, [round1], new Dictionary<EntrantId, double>());
+            Assert.AreNotEqual(new EntrantId("pC", 1), round2.Byes[0],
+                "Bye should rotate to a different entrant in round 2.");
+        }
+
+        // ── Bye win accounting ───────────────────────────────────────────────
+
+        [TestMethod]
+        public void CalculateWins_ByeEntrant_ReceivesOneWin()
+        {
+            var rounds = new List<VotingRound>
+            {
+                new()
+                {
+                    RoundNumber = 1,
+                    Matchups = [new(Guid.NewGuid(), new EntrantId("pA", 1), new EntrantId("pB", 1), 1)],
+                    Byes = [new EntrantId("pC", 1)],
+                },
+            };
+
+            var wins = SwissTournamentService.CalculateWins(rounds, []);
+
+            Assert.AreEqual(1, wins.GetValueOrDefault(new EntrantId("pC", 1), 0),
+                "Bye entrant should have 1 win.");
+        }
+
+        // ── Even entrants: no bye ────────────────────────────────────────────
+
+        [TestMethod]
+        public void GenerateRound_EvenEntrants_NoByes()
+        {
+            var entrants = new List<EntrantId> { new("pA", 1), new("pB", 1), new("pC", 1), new("pD", 1) };
+
+            var round = SwissTournamentService.GenerateRound(1, entrants, [], null);
+
+            Assert.AreEqual(2, round.Matchups.Count);
+            Assert.AreEqual(0, round.Byes.Count, "Even entrant count should produce no byes.");
         }
     }
 }

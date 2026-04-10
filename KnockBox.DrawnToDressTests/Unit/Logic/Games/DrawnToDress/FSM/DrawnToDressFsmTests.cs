@@ -813,7 +813,8 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
 
-            // Pre-fill all configured voting rounds so the timer expiry ends the game.
+            // Set explicit round count and pre-fill all voting rounds so the timer expiry ends the game.
+            state.Config.VotingRounds = 3;
             for (int i = 0; i < state.Config.VotingRounds; i++)
                 state.VotingRounds.Add(new() { RoundNumber = i + 1 });
 
@@ -834,8 +835,9 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
 
-            // Leave fewer completed rounds than configured (default 3).
+            // Set explicit round count and add fewer than configured.
             // Add 2 rounds, so one more should remain.
+            state.Config.VotingRounds = 3;
             state.VotingRounds.Add(new() { RoundNumber = 1 });
             state.VotingRounds.Add(new() { RoundNumber = 2 });
 
@@ -1270,14 +1272,14 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
             var invalidConfig = new KnockBox.Services.State.Games.DrawnToDress.Data.DrawnToDressConfig
             {
                 DrawingTimeSec = 1,     // below minimum of 30
-                VotingRounds = 0,       // below minimum of 1
+                VotingRounds = -1,      // below minimum of 0
                 BonusPointsForCompleteOutfit = -10, // negative
             };
 
             _engine.ProcessCommand(context, new UpdateConfigCommand(_host.Id, invalidConfig));
 
             Assert.AreEqual(30, state.Config.DrawingTimeSec);
-            Assert.AreEqual(1, state.Config.VotingRounds);
+            Assert.AreEqual(0, state.Config.VotingRounds);
             Assert.AreEqual(0, state.Config.BonusPointsForCompleteOutfit);
         }
 

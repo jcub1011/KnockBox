@@ -201,7 +201,7 @@ namespace KnockBox.Services.State.Games.DrawnToDress.Data
         /// Number of Swiss voting rounds to run.
         /// GDD default: 3.
         /// </summary>
-        public int VotingRounds { get; set; } = 3;
+        public int VotingRounds { get; set; } = 0;
 
         // ── Bonus points ──────────────────────────────────────────────────────
 
@@ -293,7 +293,7 @@ namespace KnockBox.Services.State.Games.DrawnToDress.Data
 
             // ── Voting ─────────────────────────────────────────────────────────
             if (VotingTimeSec < 15) VotingTimeSec = 15;
-            if (VotingRounds < 1)  VotingRounds = 1;
+            if (VotingRounds < 0)  VotingRounds = 0;
 
             // Ensure voting criteria have non-negative weights; remove any with empty Id.
             VotingCriteria.RemoveAll(c => string.IsNullOrWhiteSpace(c.Id));

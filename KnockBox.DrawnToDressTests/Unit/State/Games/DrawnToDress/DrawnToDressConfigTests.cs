@@ -166,10 +166,10 @@ namespace KnockBox.DrawnToDressTests.Unit.State.Games.DrawnToDress
         // ── Tournament format defaults ────────────────────────────────────────
 
         [TestMethod]
-        public void Default_VotingRounds_Is3()
+        public void Default_VotingRounds_Is0_Auto()
         {
             var config = new DrawnToDressConfig();
-            Assert.AreEqual(3, config.VotingRounds);
+            Assert.AreEqual(0, config.VotingRounds);
         }
 
         // ── Bonus points defaults ─────────────────────────────────────────────
@@ -264,11 +264,11 @@ namespace KnockBox.DrawnToDressTests.Unit.State.Games.DrawnToDress
         }
 
         [TestMethod]
-        public void Normalize_VotingRounds_BelowMinimum_ClampsTo1()
+        public void Normalize_VotingRounds_BelowMinimum_ClampsTo0()
         {
-            var config = new DrawnToDressConfig { VotingRounds = 0 };
+            var config = new DrawnToDressConfig { VotingRounds = -1 };
             config.Normalize();
-            Assert.AreEqual(1, config.VotingRounds);
+            Assert.AreEqual(0, config.VotingRounds);
         }
 
         [TestMethod]
@@ -360,7 +360,7 @@ namespace KnockBox.DrawnToDressTests.Unit.State.Games.DrawnToDress
             Assert.AreEqual(90, config.OutfitBuildingTimeSec);
             Assert.AreEqual(60, config.OutfitCustomizationTimeSec);
             Assert.AreEqual(60, config.VotingTimeSec);
-            Assert.AreEqual(3, config.VotingRounds);
+            Assert.AreEqual(0, config.VotingRounds);
             Assert.AreEqual(1, config.BonusPointsForCompleteOutfit);
             Assert.AreEqual(120, config.HostDisconnectTimeoutSec);
             Assert.AreEqual(4, config.ClothingTypes.Count);

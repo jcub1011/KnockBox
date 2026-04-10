@@ -28,6 +28,9 @@ namespace KnockBox.Services.State.Games.DrawnToDress.Data
         /// </summary>
         public double MatchupWins { get; set; }
 
+        /// <summary>Number of byes (free wins) received across all voting rounds.</summary>
+        public int ByeCount { get; set; }
+
         /// <summary>Final rank on the leaderboard (1 = first place).</summary>
         public int Rank { get; set; }
 

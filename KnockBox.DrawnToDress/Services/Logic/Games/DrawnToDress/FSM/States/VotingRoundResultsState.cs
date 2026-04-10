@@ -25,9 +25,11 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
 
             context.State.PhaseDeadlineUtc = DateTimeOffset.UtcNow.AddSeconds(context.Config.VotingRoundResultsTimeSec);
 
+            int totalRounds = SwissTournamentService.ResolveRoundCount(
+                context.GetTournamentEntrantIds().Count, context.Config.VotingRounds);
             context.Logger.LogInformation(
                 "FSM → VotingRoundResultsState. Round {n} of {total} complete. Auto-advance in {sec}s.",
-                context.State.CurrentVotingRoundIndex + 1, context.Config.VotingRounds,
+                context.State.CurrentVotingRoundIndex + 1, totalRounds,
                 context.Config.VotingRoundResultsTimeSec);
 
             // Compute round scores and award round leader bonus.

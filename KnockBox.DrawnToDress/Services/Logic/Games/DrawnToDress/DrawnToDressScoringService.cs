@@ -174,6 +174,13 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress
                         wins[matchup.EntrantBId] += 0.5;
                     }
                 }
+
+                // Bye entrants receive a free win.
+                foreach (var byeEntrant in round.Byes)
+                {
+                    wins.TryAdd(byeEntrant, 0);
+                    wins[byeEntrant] += 1.0;
+                }
             }
 
             return wins;
@@ -266,6 +273,17 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress
                 playerSwissLosses[pid] = playerSwissLosses.GetValueOrDefault(pid) + entrantLosses;
             }
 
+            // Count byes per player.
+            var playerByeCount = new Dictionary<string, int>();
+            foreach (var round in rounds)
+            {
+                foreach (var byeEntrant in round.Byes)
+                {
+                    var pid = byeEntrant.PlayerId;
+                    playerByeCount[pid] = playerByeCount.GetValueOrDefault(pid) + 1;
+                }
+            }
+
             // Build entries.
             var entries = new List<LeaderboardEntry>();
             foreach (var (playerId, playerState) in players)
@@ -279,6 +297,7 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress
                     MatchupWins = playerMatchupWins.GetValueOrDefault(playerId),
                     Wins = playerSwissWins.GetValueOrDefault(playerId),
                     Losses = playerSwissLosses.GetValueOrDefault(playerId),
+                    ByeCount = playerByeCount.GetValueOrDefault(playerId),
                 });
             }
 

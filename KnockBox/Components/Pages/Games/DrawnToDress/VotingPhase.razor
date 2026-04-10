@@ -12,7 +12,11 @@
         ? GameState.VotingRounds[roundIndex]
         : null;
 
-    int totalConfiguredRounds = GameState.Config.VotingRounds;
+    int entrantCount = GameState.GamePlayers.Values
+        .SelectMany(p => p.SubmittedOutfits.Keys)
+        .Count();
+    int totalConfiguredRounds = SwissTournamentService.ResolveRoundCount(
+        entrantCount, GameState.Config.VotingRounds);
 }
 
 <div class="dtd-voting">
