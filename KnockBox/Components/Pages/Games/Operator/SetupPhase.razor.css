@@ -241,3 +241,29 @@
     color: #ffd166;
     letter-spacing: 2px;
 }
+
+/* ── Responsive ── */
+
+@media (max-width: 480px) {
+    .op-setup {
+        gap: 24px;
+        padding: 0 12px;
+    }
+
+    .op-setup-choices {
+        flex-direction: column;
+        gap: 14px;
+        max-width: 280px;
+    }
+
+    .op-choice-btn {
+        flex: auto;
+        height: 90px;
+        border-radius: 12px;
+        box-shadow: 4px 4px 0 #000;
+    }
+
+    .op-choice-value {
+        font-size: 2rem;
+    }
+}
