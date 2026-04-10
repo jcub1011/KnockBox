@@ -2,7 +2,7 @@
 
 .op-hand {
     display: flex;
-    gap: 12px;
+    gap: calc(12px * var(--card-scale, 1));
     padding: 10px 0;
     width: 100%;
     justify-content: center;

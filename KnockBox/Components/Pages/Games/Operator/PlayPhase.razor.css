@@ -1,9 +1,18 @@
+/* ── Play Phase Wrapper ────────────────────────────────────────────────────── */
+
+.op-play-phase {
+    display: flex;
+    flex-direction: column;
+    min-height: 100%;
+    --card-scale: 1;
+}
+
 /* ── Play Board ───────────────────────────────────────────────────────────── */
 
 .op-game-board {
     display: flex;
     flex-direction: column;
-    height: 100%;
+    flex: 1;
     padding: 90px 20px 20px 20px;
     gap: 20px;
     position: relative;
@@ -15,26 +24,36 @@
     gap: 16px;
 }
 
-/* ── Your Score Display (bottom-left) ── */
+/* ── Your Status (centered between deck and tray) ── */
 
-.op-self-score-display {
-    position: absolute;
-    bottom: 16px;
-    left: 16px;
+.op-self-status {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 48px;
+    padding: 20px 16px;
+    margin-top: auto;
+    background: rgba(15, 5, 5, 0.4);
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.op-self-score-section,
+.op-self-operator-section {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 4px;
-    pointer-events: none;
-    z-index: 5;
+    gap: 6px;
+    position: relative;
 }
 
 .op-self-score-value {
     font-family: var(--font-mono);
-    font-size: 2.4rem;
+    font-size: 3rem;
     font-weight: 900;
     color: #fff;
     text-shadow: 0 0 20px rgba(230,57,70,0.4);
+    transition: transform 0.3s ease;
 }
 
 .op-self-score-label {
@@ -45,7 +64,133 @@
     color: rgba(255,255,255,0.5);
 }
 
+/* ── Score Change Animation ── */
+
+.op-self-score-value.op-score-animating {
+    animation: op-score-pulse 2s ease-out;
+}
+
+@keyframes op-score-pulse {
+    0% { transform: scale(1); }
+    10% { transform: scale(1.3); text-shadow: 0 0 30px rgba(255,209,102,0.8); }
+    25% { transform: scale(1); }
+    40% { transform: scale(1.1); }
+    100% { transform: scale(1); text-shadow: 0 0 20px rgba(230,57,70,0.4); }
+}
+
+/* ── Score Delta Indicator ── */
+
+.op-score-delta {
+    position: absolute;
+    top: 10px;
+    right: -50px;
+    font-family: var(--font-mono);
+    font-size: 1.6rem;
+    font-weight: 900;
+    pointer-events: none;
+    animation: op-delta-float 2s ease-out forwards;
+    white-space: nowrap;
+}
+
+.op-delta-positive {
+    color: #2ecc71;
+    text-shadow: 0 0 12px rgba(46,204,113,0.6);
+}
+
+.op-delta-negative {
+    color: #e63946;
+    text-shadow: 0 0 12px rgba(230,57,70,0.6);
+}
+
+@keyframes op-delta-float {
+    0% { opacity: 0; transform: translateY(10px) scale(0.5); }
+    12% { opacity: 1; transform: translateY(0) scale(1.3); }
+    25% { opacity: 1; transform: translateY(-5px) scale(1); }
+    75% { opacity: 1; transform: translateY(-20px); }
+    100% { opacity: 0; transform: translateY(-35px); }
+}
+
+/* ── Operator Display ── */
+
+.op-operator-display-container {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.op-active-operator-symbol {
+    width: 80px;
+    height: 112px;
+    background: #fffbeb;
+    border: 3px solid #000;
+    border-left: 5px solid #ffd166;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 3rem;
+    font-weight: 900;
+    color: #000;
+    box-shadow: 3px 3px 0 rgba(0,0,0,0.4);
+}
+
+.op-active-operator-label {
+    font-size: 0.65rem;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: rgba(255,255,255,0.5);
+}
+
+/* ── Operator Change Animation ── */
+
+.op-old-operator-symbol {
+    width: 64px;
+    height: 90px;
+    background: #fffbeb;
+    border: 3px solid #000;
+    border-left: 5px solid #999;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2.2rem;
+    font-weight: 900;
+    color: #999;
+    filter: grayscale(0.5);
+    animation: op-old-op-fade 2s ease-out forwards;
+}
+
+@keyframes op-old-op-fade {
+    0% { opacity: 0.9; transform: scale(1); }
+    25% { opacity: 0.6; transform: scale(0.95); }
+    100% { opacity: 0; transform: scale(0.7) translateX(-10px); }
+}
+
+.op-operator-arrow {
+    font-size: 1.5rem;
+    color: #ffd166;
+    animation: op-arrow-pulse 1s ease-in-out infinite;
+}
+
+@keyframes op-arrow-pulse {
+    0%, 100% { opacity: 0.4; }
+    50% { opacity: 1; }
+}
+
+.op-active-operator-symbol.op-op-animating {
+    animation: op-new-op-enter 2s ease-out;
+}
+
+@keyframes op-new-op-enter {
+    0% { transform: scale(0.4) rotate(-180deg); opacity: 0; }
+    25% { transform: scale(1.15) rotate(10deg); opacity: 1; box-shadow: 0 0 25px rgba(255,209,102,0.7); }
+    45% { transform: scale(1) rotate(0deg); }
+    100% { transform: scale(1) rotate(0deg); box-shadow: 3px 3px 0 rgba(0,0,0,0.4); }
+}
+
 /* ── Attacker Blocked Animation ── */
+
 .op-attacker-blocked-overlay {
     position: fixed;
     top: 50%;
@@ -107,8 +252,8 @@
 
 .op-deck-stack, .op-discard-card {
     position: relative;
-    width: 100px;
-    height: 140px;
+    width: calc(100px * var(--card-scale, 1));
+    height: calc(140px * var(--card-scale, 1));
 }
 
 .op-discard-card {
@@ -146,8 +291,8 @@
 
 .op-deck-card {
     position: absolute;
-    width: 100px;
-    height: 140px;
+    width: calc(100px * var(--card-scale, 1));
+    height: calc(140px * var(--card-scale, 1));
     border: 3px solid #000;
     border-radius: 12px;
     background: linear-gradient(135deg, #3d0000 0%, #1a0a0a 50%, #3d0000 100%);
@@ -208,6 +353,7 @@
 }
 
 /* ── Blocked Banner ── */
+
 .op-blocked-banner {
     position: absolute;
     top: 150px;
@@ -237,6 +383,7 @@
 }
 
 /* ── History Modal ── */
+
 .op-history-modal-overlay {
     position: fixed;
     top: 0; left: 0; width: 100%; height: 100%;
@@ -332,8 +479,8 @@
 /* ── Deck Empty State ── */
 
 .op-deck-empty {
-    width: 100px;
-    height: 140px;
+    width: calc(100px * var(--card-scale, 1));
+    height: calc(140px * var(--card-scale, 1));
     border: 3px dashed rgba(255,255,255,0.15);
     border-radius: 12px;
     display: flex;
@@ -368,66 +515,6 @@
     align-items: center;
 }
 
-/* ── Your Active Operator Display (bottom-right) ── */
-
-.op-active-operator-display {
-    position: absolute;
-    bottom: 16px;
-    right: 16px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 4px;
-    pointer-events: none;
-    z-index: 5;
-}
-
-.op-active-operator-symbol {
-    width: 80px;
-    height: 112px;
-    background: #fffbeb;
-    border: 3px solid #000;
-    border-left: 5px solid #ffd166;
-    border-radius: 12px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 3rem;
-    font-weight: 900;
-    color: #000;
-    box-shadow: 3px 3px 0 rgba(0,0,0,0.4);
-}
-
-.op-active-operator-label {
-    font-size: 0.65rem;
-    font-weight: 900;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    color: rgba(255,255,255,0.5);
-}
-
-/* ── Animations ── */
-
-.op-score-changed {
-    animation: op-score-flash 1s;
-}
-
-@keyframes op-score-flash {
-    0% { color: #fff; text-shadow: none; transform: scale(1); }
-    20% { color: #fff; text-shadow: 0 0 15px #ffd166, 0 0 30px #e63946; transform: scale(1.3); }
-    100% { color: #fff; text-shadow: 0 0 20px rgba(230,57,70,0.4); transform: scale(1); }
-}
-
-.op-op-changed {
-    animation: op-op-flash 1s;
-}
-
-@keyframes op-op-flash {
-    0% { transform: scale(1); background: #fffbeb; }
-    20% { transform: scale(1.3) rotate(10deg); background: #ffd166; box-shadow: 0 0 15px #ffd166; }
-    100% { transform: scale(1) rotate(0deg); background: #fffbeb; box-shadow: 3px 3px 0 rgba(0,0,0,0.4); }
-}
-
 /* ── Concatenation Preview ── */
 
 .op-concat-preview {
@@ -440,4 +527,140 @@
     border-radius: 8px;
     padding: 4px 12px;
     letter-spacing: 1px;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Responsive Breakpoints
+   ══════════════════════════════════════════════════════════════════════════ */
+
+@media (max-width: 768px) {
+    .op-play-phase {
+        --card-scale: 0.85;
+    }
+
+    .op-game-board {
+        padding: 80px 12px 12px;
+        gap: 14px;
+    }
+
+    .op-opponents-grid {
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        gap: 10px;
+    }
+
+    .op-self-status {
+        gap: 24px;
+        padding: 14px 12px;
+    }
+
+    .op-self-score-value {
+        font-size: 2.4rem;
+    }
+
+    .op-score-delta {
+        font-size: 1.3rem;
+        right: -40px;
+    }
+
+    .op-active-operator-symbol {
+        width: 68px;
+        height: 95px;
+        font-size: 2.4rem;
+    }
+
+    .op-old-operator-symbol {
+        width: 54px;
+        height: 76px;
+        font-size: 1.8rem;
+    }
+
+    .op-deck-area {
+        gap: 28px;
+        margin: 12px auto;
+    }
+
+    .op-deck-count {
+        font-size: 1.2rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .op-play-phase {
+        --card-scale: 0.7;
+    }
+
+    .op-game-board {
+        padding: 70px 8px 8px;
+        gap: 10px;
+    }
+
+    .op-opponents-grid {
+        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+        gap: 8px;
+    }
+
+    .op-self-status {
+        flex-direction: column;
+        gap: 12px;
+        padding: 12px 10px;
+    }
+
+    .op-self-score-value {
+        font-size: 2rem;
+    }
+
+    .op-score-delta {
+        font-size: 1.1rem;
+        right: -35px;
+    }
+
+    .op-active-operator-symbol {
+        width: 60px;
+        height: 84px;
+        font-size: 2rem;
+    }
+
+    .op-old-operator-symbol {
+        width: 48px;
+        height: 67px;
+        font-size: 1.5rem;
+    }
+
+    .op-operator-arrow {
+        font-size: 1.2rem;
+    }
+
+    .op-deck-area {
+        gap: 20px;
+        margin: 8px auto;
+    }
+
+    .op-deck-count {
+        font-size: 1.1rem;
+    }
+
+    .op-bottom-tray {
+        padding: 10px;
+        gap: 10px;
+    }
+
+    .op-controls {
+        gap: 8px;
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+
+    .op-concat-preview {
+        font-size: 1.1rem;
+    }
+
+    .op-blocked-banner {
+        top: 110px;
+        padding: 8px 16px;
+        font-size: 0.85rem;
+    }
+
+    .op-card-mini-icon {
+        font-size: 1.8rem;
+    }
 }

@@ -30,8 +30,11 @@ namespace KnockBox.Components.Pages.Games.Operator
 
         private decimal? _prevSelfScore;
         private bool _selfScoreChanged;
+        private decimal? _scoreDelta;
+        private int _scoreDeltaKey;
         private CardOperator? _prevSelfOp;
         private bool _selfOpChanged;
+        private CardOperator? _prevDisplayOp;
         private CancellationTokenSource _cts = new();
 
         protected override void OnParametersSet()
@@ -41,13 +44,16 @@ namespace KnockBox.Components.Pages.Games.Operator
             {
                 if (_prevSelfScore.HasValue && _prevSelfScore.Value != ps.CurrentPoints)
                 {
+                    _scoreDelta = ps.CurrentPoints - _prevSelfScore.Value;
+                    _scoreDeltaKey++;
                     _selfScoreChanged = true;
                     var token = _cts.Token;
-                    _ = Task.Delay(1000, token).ContinueWith(_ =>
+                    _ = Task.Delay(2000, token).ContinueWith(_ =>
                     {
                         if (!token.IsCancellationRequested)
                         {
                             _selfScoreChanged = false;
+                            _scoreDelta = null;
                             InvokeAsync(StateHasChanged);
                         }
                     }, token, TaskContinuationOptions.OnlyOnRanToCompletion, TaskScheduler.Default);
@@ -56,13 +62,15 @@ namespace KnockBox.Components.Pages.Games.Operator
 
                 if (_prevSelfOp.HasValue && _prevSelfOp.Value != ps.ActiveOperator)
                 {
+                    _prevDisplayOp = _prevSelfOp.Value;
                     _selfOpChanged = true;
                     var token = _cts.Token;
-                    _ = Task.Delay(1000, token).ContinueWith(_ =>
+                    _ = Task.Delay(2000, token).ContinueWith(_ =>
                     {
                         if (!token.IsCancellationRequested)
                         {
                             _selfOpChanged = false;
+                            _prevDisplayOp = null;
                             InvokeAsync(StateHasChanged);
                         }
                     }, token, TaskContinuationOptions.OnlyOnRanToCompletion, TaskScheduler.Default);

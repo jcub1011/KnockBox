@@ -1,6 +1,7 @@
 @using KnockBox.Operator.Models
 @using KnockBox.Operator.Services.State
 
+<div class="op-play-phase">
 <div class="op-game-board">
     @* Opponents *@
     <div class="op-opponents-grid">
@@ -120,16 +121,33 @@
 
     @if (CurrentPlayerState != null)
     {
-        @* Your Score (bottom-left) *@
-        <div class="op-self-score-display">
-            <div class="op-self-score-value @(_selfScoreChanged ? "op-score-changed" : "")">@CurrentPlayerState.CurrentPoints.ToString("F1")</div>
-            <div class="op-self-score-label">YOUR SCORE</div>
-        </div>
+        <div class="op-self-status">
+            <div class="op-self-score-section">
+                <div class="op-self-score-label">YOUR SCORE</div>
+                <div class="op-self-score-value @(_selfScoreChanged ? "op-score-animating" : "")">
+                    @CurrentPlayerState.CurrentPoints.ToString("F1")
+                </div>
+                @if (_selfScoreChanged && _scoreDelta.HasValue)
+                {
+                    <div @key="_scoreDeltaKey" class="op-score-delta @(_scoreDelta.Value >= 0 ? "op-delta-positive" : "op-delta-negative")">
+                        @(_scoreDelta.Value >= 0 ? "+" : "")@_scoreDelta.Value.ToString("F1")
+                    </div>
+                }
+            </div>
 
-        @* Your Active Operator (bottom-right) *@
-        <div class="op-active-operator-display">
-            <div class="op-active-operator-symbol @(_selfOpChanged ? "op-op-changed" : "") @(CurrentPlayerState.IsAudited ? "holo-effect" : "")">@GetActiveOperatorSymbol()</div>
-            <div class="op-active-operator-label">YOUR OPERATOR</div>
+            <div class="op-self-operator-section">
+                <div class="op-active-operator-label">YOUR OPERATOR</div>
+                <div class="op-operator-display-container">
+                    @if (_selfOpChanged && _prevDisplayOp.HasValue)
+                    {
+                        <div class="op-old-operator-symbol">@_prevDisplayOp.Value.ToSymbol()</div>
+                        <div class="op-operator-arrow">&#x2192;</div>
+                    }
+                    <div class="op-active-operator-symbol @(_selfOpChanged ? "op-op-animating" : "") @(CurrentPlayerState.IsAudited ? "holo-effect" : "")">
+                        @GetActiveOperatorSymbol()
+                    </div>
+                </div>
+            </div>
         </div>
     }
 
@@ -202,4 +220,5 @@
                       NewCardIds="@NewCardIds"
                       OnCardToggled="ToggleCard" />
     }
+</div>
 </div>

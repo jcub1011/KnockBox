@@ -1,8 +1,8 @@
 /* ── Card Base ────────────────────────────────────────────────────────────── */
 
 .op-card {
-    width: 100px;
-    height: 140px;
+    width: calc(100px * var(--card-scale, 1));
+    height: calc(140px * var(--card-scale, 1));
     border: 3px solid #000;
     border-radius: 12px;
     background: #fff;
@@ -245,4 +245,60 @@
     animation: op-card-exit 0.2s ease-in forwards;
     pointer-events: none;
     z-index: -1;
+}
+
+/* ── Responsive ── */
+
+@media (max-width: 768px) {
+    .op-card-value {
+        font-size: 1.8rem;
+    }
+
+    .op-card-icon {
+        font-size: 1.6rem;
+    }
+
+    .op-card-name {
+        font-size: 0.65rem;
+    }
+
+    .op-card-label {
+        font-size: 0.5rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .op-card {
+        padding: 5px;
+        border-radius: 8px;
+    }
+
+    .op-card-value {
+        font-size: 1.5rem;
+    }
+
+    .op-card-icon {
+        font-size: 1.3rem;
+    }
+
+    .op-card-name {
+        font-size: 0.6rem;
+    }
+
+    .op-card-label {
+        font-size: 0.45rem;
+    }
+
+    .op-card-tooltip {
+        width: 180px;
+        padding: 8px;
+    }
+
+    .op-card-tooltip-title {
+        font-size: 0.7rem;
+    }
+
+    .op-card-tooltip-desc {
+        font-size: 0.6rem;
+    }
 }
