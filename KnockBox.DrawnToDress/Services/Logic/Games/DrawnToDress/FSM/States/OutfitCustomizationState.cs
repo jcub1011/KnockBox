@@ -33,10 +33,7 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
         /// </summary>
         private const double HeightScaleFactor = 0.8;
 
-        public bool IsTimerOptional => true;
-
         private readonly int _outfitRound;
-        private DateTimeOffset _deadline;
 
         public OutfitCustomizationState(int outfitRound = 1)
         {
@@ -46,17 +43,16 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
         public ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?> OnEnter(
             DrawnToDressGameContext context)
         {
-            _deadline = DateTimeOffset.UtcNow.AddSeconds(context.Config.OutfitCustomizationTimeSec);
             if (context.Config.EnableTimer)
             {
-                context.State.PhaseDeadlineUtc = _deadline;
+                context.State.PhaseDeadlineUtc = DateTimeOffset.UtcNow.AddSeconds(context.Config.OutfitCustomizationTimeSec);
             }
 
             context.State.SetPhase(GamePhase.OutfitCustomization);
             context.CurrentOutfitRound = _outfitRound;
             context.ResetReadyFlags();
             context.Logger.LogInformation(
-                "FSM → OutfitCustomizationState (round {round}). Deadline: {deadline}.", _outfitRound, _deadline);
+                "FSM → OutfitCustomizationState (round {round}). Deadline: {deadline}.", _outfitRound, context.State.PhaseDeadlineUtc);
             return null;
         }
 
@@ -90,12 +86,14 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
 
         public ValueResult<TimeSpan> GetRemainingTime(
             DrawnToDressGameContext context, DateTimeOffset now)
-            => _deadline - now;
+            => context.State.PhaseDeadlineUtc is { } deadline
+                ? deadline - now
+                : new ResultError("No timer active.");
 
         public ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?> Tick(
             DrawnToDressGameContext context, DateTimeOffset now)
         {
-            if (now < _deadline) return null;
+            if (context.State.PhaseDeadlineUtc is not { } deadline || now < deadline) return null;
 
             context.Logger.LogInformation("Customization timer expired (round {round}).", _outfitRound);
             return ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?>.FromValue(ChooseNextState(context));

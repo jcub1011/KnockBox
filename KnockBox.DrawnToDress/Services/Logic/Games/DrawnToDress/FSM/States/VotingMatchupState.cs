@@ -19,24 +19,19 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
     /// </summary>
     public sealed class VotingMatchupState : ITimedDrawnToDressGameState
     {
-        public bool IsTimerOptional => true;
-
-        private DateTimeOffset _deadline;
-
         public ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?> OnEnter(
             DrawnToDressGameContext context)
         {
-            _deadline = DateTimeOffset.UtcNow.AddSeconds(context.Config.VotingTimeSec);
             if (context.Config.EnableTimer)
             {
-                context.State.PhaseDeadlineUtc = _deadline;
+                context.State.PhaseDeadlineUtc = DateTimeOffset.UtcNow.AddSeconds(context.Config.VotingTimeSec);
             }
 
             context.State.SetPhase(GamePhase.Voting);
             context.ResetReadyFlags();
             context.Logger.LogInformation(
                 "FSM → VotingMatchupState. Round {n}. Deadline: {deadline}.",
-                context.State.CurrentVotingRoundIndex + 1, _deadline);
+                context.State.CurrentVotingRoundIndex + 1, context.State.PhaseDeadlineUtc);
             return null;
         }
 
@@ -71,12 +66,14 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
 
         public ValueResult<TimeSpan> GetRemainingTime(
             DrawnToDressGameContext context, DateTimeOffset now)
-            => _deadline - now;
+            => context.State.PhaseDeadlineUtc is { } deadline
+                ? deadline - now
+                : new ResultError("No timer active.");
 
         public ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?> Tick(
             DrawnToDressGameContext context, DateTimeOffset now)
         {
-            if (now < _deadline) return null;
+            if (context.State.PhaseDeadlineUtc is not { } deadline || now < deadline) return null;
 
             context.Logger.LogInformation("Voting timer expired.");
             return ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?>.FromValue(ChooseNextState(context));
@@ -147,7 +144,7 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
             if (existingKey != Guid.Empty)
                 context.State.Votes.TryRemove(existingKey, out _);
 
-            bool isLate = DateTimeOffset.UtcNow > _deadline;
+            bool isLate = context.State.PhaseDeadlineUtc is { } voteDeadline && DateTimeOffset.UtcNow > voteDeadline;
             var submission = new VoteSubmission
             {
                 VoterPlayerId = cmd.PlayerId,

@@ -33,9 +33,6 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
     /// </summary>
     public sealed class ThemeSelectionState : ITimedDrawnToDressGameState
     {
-        public bool IsTimerOptional => false;
-
-        private DateTimeOffset _deadline;
 
         /// <summary>
         /// Placeholder theme list used when no themes have been configured.
@@ -61,8 +58,7 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
             context.State.SetPhase(GamePhase.ThemeSelection);
             context.Logger.LogInformation("FSM → ThemeSelectionState");
 
-            _deadline = DateTimeOffset.UtcNow.AddSeconds(context.Config.ThemeAnnouncementTimeSec);
-            context.State.PhaseDeadlineUtc = _deadline;
+            context.State.PhaseDeadlineUtc = DateTimeOffset.UtcNow.AddSeconds(context.Config.ThemeAnnouncementTimeSec);
 
             switch (context.Config.ThemeSource)
             {
@@ -97,7 +93,9 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
         }
 
         public ValueResult<TimeSpan> GetRemainingTime(DrawnToDressGameContext context, DateTimeOffset now)
-            => _deadline - now;
+            => context.State.PhaseDeadlineUtc is { } deadline
+                ? deadline - now
+                : new ResultError("No timer active.");
 
         public ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?> Tick(
             DrawnToDressGameContext context, DateTimeOffset now)
@@ -109,7 +107,7 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
                  context.Config.ThemeSource == ThemeSource.PlayerWritten && context.GamePlayers.Keys.All(id => context.State.PlayerThemeSubmissions.ContainsKey(id)) ||
                  context.Config.ThemeSource == ThemeSource.HostPick))
             {
-                if (now >= _deadline)
+                if (context.State.PhaseDeadlineUtc is { } deadline && now >= deadline)
                 {
                     return ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?>.FromValue(new DrawingRoundState());
                 }

@@ -23,7 +23,6 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
     public sealed class CoinFlipState(IDrawnToDressGameState returnState) : ITimedDrawnToDressGameState
     {
         private readonly IDrawnToDressGameState _returnState = returnState;
-        private DateTimeOffset _deadline;
 
         public ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?> OnEnter(
             DrawnToDressGameContext context)
@@ -79,12 +78,14 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
 
         public ValueResult<TimeSpan> GetRemainingTime(
             DrawnToDressGameContext context, DateTimeOffset now)
-            => _deadline - now;
+            => context.State.PhaseDeadlineUtc is { } deadline
+                ? deadline - now
+                : new ResultError("No timer active.");
 
         public ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?> Tick(
             DrawnToDressGameContext context, DateTimeOffset now)
         {
-            if (now < _deadline) return null;
+            if (context.State.PhaseDeadlineUtc is not { } deadline || now < deadline) return null;
 
             var flip = GetCurrentFlip(context);
             if (flip is null || flip.IsResolved) return null;
@@ -206,15 +207,14 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
 
             flip.CallerPlayerId = context.Random.GetRandomInt(2) == 0 ? playerA : playerB;
 
-            _deadline = DateTimeOffset.UtcNow.AddSeconds(context.Config.CoinFlipTimeSec);
-            context.State.PhaseDeadlineUtc = _deadline;
+            context.State.PhaseDeadlineUtc = DateTimeOffset.UtcNow.AddSeconds(context.Config.CoinFlipTimeSec);
 
             context.Logger.LogInformation(
                 "Coin flip {index} of {total}: caller is [{caller}]. Deadline: {deadline}.",
                 context.State.CurrentCoinFlipIndex + 1,
                 context.State.PendingCoinFlipQueue.Count,
                 flip.CallerPlayerId,
-                _deadline);
+                context.State.PhaseDeadlineUtc);
         }
 
         private static PendingCoinFlipEntry? GetCurrentFlip(DrawnToDressGameContext context)

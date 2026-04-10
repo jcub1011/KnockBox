@@ -15,10 +15,7 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
     /// </summary>
     public sealed class OutfitBuildingState : ITimedDrawnToDressGameState
     {
-        public bool IsTimerOptional => true;
-
         private readonly int _outfitRound;
-        private DateTimeOffset _deadline;
 
         public OutfitBuildingState(int outfitRound = 1)
         {
@@ -28,10 +25,9 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
         public ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?> OnEnter(
             DrawnToDressGameContext context)
         {
-            _deadline = DateTimeOffset.UtcNow.AddSeconds(context.Config.OutfitBuildingTimeSec);
             if (context.Config.EnableTimer)
             {
-                context.State.PhaseDeadlineUtc = _deadline;
+                context.State.PhaseDeadlineUtc = DateTimeOffset.UtcNow.AddSeconds(context.Config.OutfitBuildingTimeSec);
             }
 
             context.State.SetPhase(GamePhase.OutfitBuilding);
@@ -43,12 +39,12 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
                 context.ResetPoolForRound(_outfitRound);
                 context.Logger.LogInformation(
                     "FSM → OutfitBuildingState (round {round}). Pool has {count} item(s) after previous picks removed. Deadline: {deadline}.",
-                    _outfitRound, context.ClothingPool.Values.Count(i => i.IsInPool), _deadline);
+                    _outfitRound, context.ClothingPool.Values.Count(i => i.IsInPool), context.State.PhaseDeadlineUtc);
             }
             else
             {
                 context.Logger.LogInformation(
-                    "FSM → OutfitBuildingState. Deadline: {deadline}.", _deadline);
+                    "FSM → OutfitBuildingState. Deadline: {deadline}.", context.State.PhaseDeadlineUtc);
             }
 
             return null;
@@ -87,12 +83,14 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
 
         public ValueResult<TimeSpan> GetRemainingTime(
             DrawnToDressGameContext context, DateTimeOffset now)
-            => _deadline - now;
+            => context.State.PhaseDeadlineUtc is { } deadline
+                ? deadline - now
+                : new ResultError("No timer active.");
 
         public ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?> Tick(
             DrawnToDressGameContext context, DateTimeOffset now)
         {
-            if (now < _deadline) return null;
+            if (context.State.PhaseDeadlineUtc is not { } deadline || now < deadline) return null;
 
             context.Logger.LogInformation(
                 "Outfit building timer expired (round {round}). Auto-filling incomplete outfits and moving to customization.",

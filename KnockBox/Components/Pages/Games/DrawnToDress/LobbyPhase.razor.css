@@ -308,6 +308,20 @@
     color: var(--dtd-color-dark);
 }
 
+.dtd-setting-label-row {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.dtd-setting-checkbox {
+    width: 20px;
+    height: 20px;
+    accent-color: var(--dtd-color-mint);
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
 .dtd-setting-input,
 .dtd-setting-select {
     border: 3px solid var(--dtd-color-bg-soft);

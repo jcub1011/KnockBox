@@ -17,16 +17,13 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
     /// </summary>
     public sealed class VotingRoundResultsState : ITimedDrawnToDressGameState
     {
-        private DateTimeOffset _deadline;
-
         public ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?> OnEnter(
             DrawnToDressGameContext context)
         {
             context.State.SetPhase(GamePhase.VotingRoundResults);
             context.ResetReadyFlags();
 
-            _deadline = DateTimeOffset.UtcNow.AddSeconds(context.Config.VotingRoundResultsTimeSec);
-            context.State.PhaseDeadlineUtc = _deadline;
+            context.State.PhaseDeadlineUtc = DateTimeOffset.UtcNow.AddSeconds(context.Config.VotingRoundResultsTimeSec);
 
             context.Logger.LogInformation(
                 "FSM → VotingRoundResultsState. Round {n} of {total} complete. Auto-advance in {sec}s.",
@@ -86,12 +83,14 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
 
         public ValueResult<TimeSpan> GetRemainingTime(
             DrawnToDressGameContext context, DateTimeOffset now)
-            => _deadline - now;
+            => context.State.PhaseDeadlineUtc is { } deadline
+                ? deadline - now
+                : new ResultError("No timer active.");
 
         public ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?> Tick(
             DrawnToDressGameContext context, DateTimeOffset now)
         {
-            if (now < _deadline) return null;
+            if (context.State.PhaseDeadlineUtc is not { } deadline || now < deadline) return null;
 
             context.Logger.LogInformation("Voting round results timer expired. Advancing.");
             return ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?>

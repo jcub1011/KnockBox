@@ -39,12 +39,15 @@
         </div>
 
         <div class="dtd-drawing-round-info-row">
-            <button class="dtd-btn dtd-btn-secondary dtd-btn-mannequin @(_showMannequin ? "dtd-btn-mannequin-active" : "")"
-                    @onclick="ToggleMannequin"
-                    aria-label="Toggle mannequin reference"
-                    title="Toggle mannequin reference">
-                👤
-            </button>
+            @if (!isHost)
+            {
+                <button class="dtd-btn dtd-btn-secondary dtd-btn-mannequin @(_showMannequin ? "dtd-btn-mannequin-active" : "")"
+                        @onclick="ToggleMannequin"
+                        aria-label="Toggle mannequin reference"
+                        title="Toggle mannequin reference">
+                    👤
+                </button>
+            }
 
             <TimerDisplay GameState="GameState" />
         </div>
