@@ -362,6 +362,7 @@
     background: rgba(230, 57, 70, 0.95);
     color: white;
     padding: 12px 24px;
+    width: 90%;
     border-radius: 50px;
     display: flex;
     align-items: center;
@@ -464,6 +465,8 @@
 .op-history-card-item {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
+    justify-content: safe center;
     gap: 15px;
     padding: 12px;
     border-radius: 8px;
@@ -471,7 +474,7 @@
 }
 
 .op-history-card-icon { font-size: 1.8rem; min-width: 40px; text-align: center; }
-.op-history-card-name { font-weight: 900; color: #fff; min-width: 140px; text-transform: uppercase; font-size: 0.85rem; }
+.op-history-card-name { font-weight: 900; color: #fff; min-width: 100px; text-transform: uppercase; font-size: 0.85rem; }
 .op-history-card-desc { color: #888; font-size: 0.85rem; flex: 1; }
 
 .op-history-empty { text-align: center; color: #444; padding: 40px; font-style: italic; }
@@ -596,12 +599,23 @@
     }
 
     .op-game-board {
-        padding: 0;
+        padding: 80px 0px 0px 0px;
         gap: 0;
     }
 
-    /* Hide desktop opponents grid and deck area on mobile */
+    /* Show desktop opponents grid as a horizontal scroll on mobile */
     .op-opponents-grid {
+        display: flex;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        scrollbar-width: none;
+        -webkit-overflow-scrolling: touch;
+        gap: 8px;
+        padding: 16px 10px;
+        border-bottom: 1px solid rgba(230, 57, 70, 0.2);
+    }
+
+    .op-opponents-grid::-webkit-scrollbar {
         display: none;
     }
 
@@ -609,84 +623,16 @@
         display: none;
     }
 
-    /* ── Mobile Info Bar ── */
+    /* ── Mobile Info Bar (Header) ── */
 
     .op-mobile-info-bar {
         display: flex;
         align-items: center;
-        justify-content: space-between;
+        justify-content: center;
         padding: 6px 10px;
         background: rgba(15, 5, 5, 0.85);
         backdrop-filter: blur(8px);
         border-bottom: 1px solid rgba(230, 57, 70, 0.2);
-        gap: 8px;
-    }
-
-    .op-mobile-opponents-strip {
-        display: flex;
-        gap: 6px;
-        overflow-x: auto;
-        scrollbar-width: none;
-        flex: 1;
-        min-width: 0;
-        -webkit-overflow-scrolling: touch;
-    }
-
-    .op-mobile-opponents-strip::-webkit-scrollbar {
-        display: none;
-    }
-
-    .op-mobile-opponent-pill {
-        display: flex;
-        align-items: center;
-        gap: 4px;
-        padding: 4px 8px;
-        background: rgba(255, 255, 255, 0.06);
-        border: 1.5px solid rgba(255, 255, 255, 0.1);
-        border-radius: 20px;
-        flex-shrink: 0;
-        cursor: default;
-        transition: all 0.15s;
-    }
-
-    .op-mobile-opponent-pill.active {
-        border-color: #e63946;
-        box-shadow: 0 0 8px rgba(230, 57, 70, 0.4);
-    }
-
-    .op-mobile-opponent-pill.targetable {
-        cursor: pointer;
-        border-color: rgba(255, 255, 255, 0.25);
-    }
-
-    .op-mobile-opponent-pill.targeted {
-        border-color: #ff4757;
-        background: rgba(255, 71, 87, 0.15);
-        box-shadow: 0 0 12px rgba(255, 71, 87, 0.5);
-    }
-
-    .op-pill-name {
-        font-size: 0.65rem;
-        font-weight: 800;
-        color: rgba(255, 255, 255, 0.7);
-        text-transform: uppercase;
-        max-width: 56px;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-    }
-
-    .op-pill-score {
-        font-family: var(--font-mono);
-        font-size: 0.7rem;
-        font-weight: 900;
-        color: #fff;
-    }
-
-    .op-pill-op {
-        font-size: 0.7rem;
-        font-weight: 900;
-        color: #ffd166;
     }
 
     .op-mobile-deck-badges {
@@ -699,7 +645,7 @@
     .op-discard-badge {
         display: flex;
         align-items: center;
-        gap: 3px;
+        gap: 6px;
         padding: 3px 6px;
         background: rgba(255, 255, 255, 0.04);
         border: 1px solid rgba(255, 255, 255, 0.08);
@@ -708,7 +654,7 @@
     }
 
     .op-badge-label {
-        font-size: 0.5rem;
+        font-size: 1rem;
         font-weight: 800;
         color: rgba(255, 255, 255, 0.35);
         text-transform: uppercase;
@@ -717,7 +663,7 @@
 
     .op-badge-count {
         font-family: var(--font-mono);
-        font-size: 0.65rem;
+        font-size: 1.25rem;
         font-weight: 800;
         color: #ffd166;
     }
@@ -728,7 +674,7 @@
         flex-direction: column;
         gap: 0;
         padding: 16px 16px 12px;
-        margin: auto 12px 0;
+        margin: auto 12px;
         background: linear-gradient(
             180deg,
             rgba(15, 5, 5, 0.0) 0%,

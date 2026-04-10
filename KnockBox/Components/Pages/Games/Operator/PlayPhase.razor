@@ -5,21 +5,6 @@
 <div class="op-game-board">
     @* Mobile-only compact info bar *@
     <div class="op-mobile-info-bar">
-        <div class="op-mobile-opponents-strip">
-            @foreach (var player in GameState.Players.Where(p => p.Id != UserService.CurrentUser?.Id))
-            {
-                var pState = GameState.Context?.GamePlayers.GetValueOrDefault(player.Id);
-                if (pState != null)
-                {
-                    <div class="op-mobile-opponent-pill @(GameState.TurnManager.CurrentPlayer == player.Id ? "active" : "") @(IsPlayerTargetable(player.Id, pState) ? "targetable" : "") @(_targetPlayerId == player.Id ? "targeted" : "")"
-                         @onclick="@(() => SelectTarget(player.Id))">
-                        <span class="op-pill-name">@player.Name</span>
-                        <span class="op-pill-score">@pState.CurrentPoints.ToString("F1")</span>
-                        <span class="op-pill-op">@pState.ActiveOperator.ToSymbol()</span>
-                    </div>
-                }
-            }
-        </div>
         <div class="op-mobile-deck-badges">
             <div class="op-deck-badge" @onclick="() => _showDiscardHistory = true">
                 <span class="op-badge-label">DECK</span>
@@ -31,7 +16,7 @@
             </div>
         </div>
     </div>
-
+    
     @* Opponents *@
     <div class="op-opponents-grid">
         @foreach (var player in GameState.Players.Where(p => p.Id != UserService.CurrentUser?.Id))
@@ -39,22 +24,21 @@
             var pState = GameState.Context?.GamePlayers.GetValueOrDefault(player.Id);
             if (pState != null)
             {
-                <OperatorPlayerInfo
-                    Name="@player.Name"
-                    Score="@pState.CurrentPoints"
-                    ActiveOperator="@pState.ActiveOperator"
-                    HandSize="@pState.Hand.Count"
-                    IsActive="@(GameState.TurnManager.CurrentPlayer == player.Id)"
-                    IsAudited="@pState.IsAudited"
-                    IsDivideBroken="@pState.IsDivideBroken"
-                    IsBeingStolenFrom="@pState.IsBeingStolenFrom"
-                    IsTargetable="@IsPlayerTargetable(player.Id, pState)"
-                    IsTargeted="@(_targetPlayerId == player.Id)"
-                    OnClick="@(() => SelectTarget(player.Id))" />
+                <OperatorPlayerInfo Name="@player.Name"
+                                    Score="@pState.CurrentPoints"
+                                    ActiveOperator="@pState.ActiveOperator"
+                                    HandSize="@pState.Hand.Count"
+                                    IsActive="@(GameState.TurnManager.CurrentPlayer == player.Id)"
+                                    IsAudited="@pState.IsAudited"
+                                    IsDivideBroken="@pState.IsDivideBroken"
+                                    IsBeingStolenFrom="@pState.IsBeingStolenFrom"
+                                    IsTargetable="@IsPlayerTargetable(player.Id, pState)"
+                                    IsTargeted="@(_targetPlayerId == player.Id)"
+                                    OnClick="@(() => SelectTarget(player.Id))" />
             }
         }
     </div>
-
+    
     @* Blocked Animation for Attacker *@
     @if (GameState.LastBlockedActionMessage != null && GameState.BlockedAttackerId == UserService.CurrentUser?.Id)
     {
