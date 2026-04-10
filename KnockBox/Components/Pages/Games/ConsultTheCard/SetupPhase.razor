@@ -1,33 +1,57 @@
 @using KnockBox.Services.State.Users
 @using KnockBox.Services.State.Games.ConsultTheCard
 
-<div class="ctc-setup-area">
-    <div class="ctc-setup-panel">
-        <h2 class="ctc-setup-title glitch" data-text="[ CLASSIFIED INTEL ]">[ CLASSIFIED INTEL ]</h2>
-        @{
-            var myPlayer = GetMyPlayer();
-        }
-        @if (myPlayer is not null)
-        {
-            @if (myPlayer.Role == Role.Informant)
+@{
+    var myId = UserService.CurrentUser?.Id ?? string.Empty;
+    var isHost = GameState.Host.Id == myId;
+}
+
+@if (isHost)
+{
+    @* ══════ HOST SPECTATOR VIEW ══════ *@
+    <div class="ctc-setup-area">
+        <div class="ctc-setup-panel ctc-host-panel">
+            <h2 class="ctc-setup-title glitch" data-text="[ CLASSIFIED INTEL ]">[ CLASSIFIED INTEL ]</h2>
+            <div class="ctc-host-setup-briefing">
+                <span class="ctc-host-setup-status glitch" data-text="[ ROLES ASSIGNED ]">[ ROLES ASSIGNED ]</span>
+                <span class="ctc-host-setup-sub">BRIEFING IN PROGRESS</span>
+                <p class="ctc-host-setup-desc">Operatives receiving their assignments<span class="ctc-blink-dots">...</span></p>
+            </div>
+            <p class="ctc-setup-auto-advance">Terminal access granted shortly...</p>
+        </div>
+    </div>
+}
+else
+{
+    @* ══════ PLAYER VIEW ══════ *@
+    <div class="ctc-setup-area">
+        <div class="ctc-setup-panel">
+            <h2 class="ctc-setup-title glitch" data-text="[ CLASSIFIED INTEL ]">[ CLASSIFIED INTEL ]</h2>
+            @{
+                var myPlayer = GetMyPlayer();
+            }
+            @if (myPlayer is not null)
             {
-                <div class="ctc-word-card ctc-word-card-informant">
-                    <span class="ctc-word-value glitch" data-text="NO INTEL">NO INTEL</span>
-                    <span class="ctc-word-hint">CRITICAL: NO INTEL DETECTED. BLEND IN. DO NOT BREAK COVER.</span>
-                </div>
+                @if (myPlayer.Role == Role.Informant)
+                {
+                    <div class="ctc-word-card ctc-word-card-informant">
+                        <span class="ctc-word-value glitch" data-text="NO INTEL">NO INTEL</span>
+                        <span class="ctc-word-hint">CRITICAL: NO INTEL DETECTED. BLEND IN. DO NOT BREAK COVER.</span>
+                    </div>
+                }
+                else
+                {
+                    <div class="ctc-word-card">
+                        <span class="ctc-word-value">@myPlayer.SecretWord</span>
+                        <span class="ctc-word-hint">Keep this secret. Issue clues to identify your allies.</span>
+                    </div>
+                }
             }
             else
             {
-                <div class="ctc-word-card">
-                    <span class="ctc-word-value">@myPlayer.SecretWord</span>
-                    <span class="ctc-word-hint">Keep this secret. Issue clues to identify your allies.</span>
-                </div>
+                <p class="ctc-waiting-text">Establishing secure connection...</p>
             }
-        }
-        else
-        {
-            <p class="ctc-waiting-text">Establishing secure connection...</p>
-        }
-        <p class="ctc-setup-auto-advance">Terminal access granted shortly...</p>
+            <p class="ctc-setup-auto-advance">Terminal access granted shortly...</p>
+        </div>
     </div>
-</div>
+}
