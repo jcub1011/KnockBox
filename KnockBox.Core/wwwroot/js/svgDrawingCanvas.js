@@ -248,6 +248,9 @@ function updateSwatchActive(container, color) {
             customSwatch.classList.remove('toolbar-swatch-active');
         }
     }
+    // Sync mobile color trigger
+    const colorTrigger = container?.querySelector('.toolbar-color-trigger');
+    if (colorTrigger) colorTrigger.style.backgroundColor = color;
 }
 
 /**
@@ -260,6 +263,12 @@ function updateSizeActive(container, size) {
         s.classList.toggle('toolbar-size-btn-active',
             parseInt(s.dataset.size, 10) === size);
     });
+    // Sync mobile size trigger
+    const sizeTrigger = container?.querySelector('.toolbar-size-trigger');
+    if (sizeTrigger) {
+        const activeBtn = container.querySelector('.toolbar-size-btn-active');
+        sizeTrigger.textContent = activeBtn ? activeBtn.textContent : size;
+    }
 }
 
 /**
@@ -624,6 +633,28 @@ export function initialize(svgId, dotNetRef, initialColor, initialStrokeWidth, i
     setUndoDisabled(container, true);
     setRedoDisabled(container, true);
 
+    // ── Mobile collapsible dropdowns ────────────────────────────────────────
+    function closeAllDropdowns() {
+        container?.querySelectorAll('.toolbar-collapsible.open').forEach(el => {
+            el.classList.remove('open');
+            el.querySelector('.toolbar-collapse-trigger')
+                ?.setAttribute('aria-expanded', 'false');
+        });
+    }
+
+    // Close dropdowns when clicking outside
+    document.addEventListener('pointerdown', (e) => {
+        const openCollapsibles = container?.querySelectorAll('.toolbar-collapsible.open');
+        if (!openCollapsibles?.length) return;
+        openCollapsibles.forEach(el => {
+            if (!el.contains(e.target)) {
+                el.classList.remove('open');
+                el.querySelector('.toolbar-collapse-trigger')
+                    ?.setAttribute('aria-expanded', 'false');
+            }
+        });
+    }, { signal });
+
     function deselectToolsIfActive() {
         if (state.currentTool !== 'brush') {
             state.currentTool = 'brush';
@@ -666,6 +697,31 @@ export function initialize(svgId, dotNetRef, initialColor, initialStrokeWidth, i
     // Delegated click handler for swatches, undo, and export.
     if (container) {
         container.addEventListener('click', (e) => {
+            // Mobile dropdown trigger toggle
+            const trigger = e.target.closest('.toolbar-collapse-trigger');
+            if (trigger) {
+                const collapsible = trigger.closest('.toolbar-collapsible');
+                if (collapsible) {
+                    const isOpen = collapsible.classList.toggle('open');
+                    trigger.setAttribute('aria-expanded', isOpen);
+                    // Close other open dropdowns
+                    container.querySelectorAll('.toolbar-collapsible.open').forEach(el => {
+                        if (el !== collapsible) {
+                            el.classList.remove('open');
+                            el.querySelector('.toolbar-collapse-trigger')
+                                ?.setAttribute('aria-expanded', 'false');
+                        }
+                    });
+                }
+                return;
+            }
+
+            // Auto-close dropdowns after selecting an item inside a panel
+            // (but not when interacting with inputs like the size number or color picker)
+            if (e.target.closest('.toolbar-collapse-panel') && e.target.tagName !== 'INPUT') {
+                requestAnimationFrame(() => closeAllDropdowns());
+            }
+
             // Custom swatch — select it with its current color
             const customSwatchEl = e.target.closest('.toolbar-swatch-custom');
             if (customSwatchEl) {

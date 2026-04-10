@@ -167,6 +167,7 @@ namespace KnockBox.Core.Components.Shared
             {
                 _customSwatchColor = color;
             }
+            StateHasChanged();
         }
 
         /// <summary>Called from JavaScript when the stroke width changes.</summary>
@@ -174,7 +175,12 @@ namespace KnockBox.Core.Components.Shared
         public void OnStrokeWidthChanged(double width)
         {
             _currentStrokeWidth = width;
+            StateHasChanged();
         }
+
+        private string CurrentSizeLabel =>
+            _sizePresets.FirstOrDefault(p => p.Size == (int)_currentStrokeWidth).Label
+            ?? ((int)_currentStrokeWidth).ToString();
 
         /// <summary>
         /// Called from JavaScript when the Copy toolbar button is clicked.
