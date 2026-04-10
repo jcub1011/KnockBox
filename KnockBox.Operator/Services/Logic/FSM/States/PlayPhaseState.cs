@@ -135,7 +135,16 @@ public class PlayPhaseState : IOperatorGameState, ITimedGameState<OperatorGameCo
             }
             else
             {
-                actionCommand = new StandardPlayCommand(context, play, playedCards);
+                var opCard = playedCards.OfType<OperatorCard>().FirstOrDefault();
+                if (opCard != null && !string.IsNullOrEmpty(play.TargetPlayerId)
+                    && play.TargetPlayerId != play.PlayerId)
+                {
+                    actionCommand = new OperatorCardCommand(context, play, playedCards, opCard);
+                }
+                else
+                {
+                    actionCommand = new StandardPlayCommand(context, play, playedCards);
+                }
             }
 
             if (actionCommand.RequiresReaction)
