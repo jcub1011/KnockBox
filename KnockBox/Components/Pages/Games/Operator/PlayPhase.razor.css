@@ -830,10 +830,9 @@
 
     .op-bottom-tray {
         padding: 8px 0;
-        gap: 32px;
+        gap: 8px;
         border-top: 1.5px solid rgba(230, 57, 70, 0.25);
-        background: rgba(15, 5, 5, 0.9);
-        backdrop-filter: blur(16px);
+        background: #0f0505;
     }
 
     .op-controls {

@@ -2,7 +2,7 @@
 @using System.Threading
 
 <div class="op-hand">
-    @{ 
+    @{
         var combined = Hand.Select(c => (Card: c, Exiting: false))
             .Concat(_exitingCards.Select(c => (Card: c, Exiting: true)))
             .ToList();
@@ -13,7 +13,7 @@
             .ThenBy(i => i.Card is KnockBox.Operator.Models.OperatorCard o ? (int)o.OperatorValue : int.MaxValue)
             .ThenBy(i => i.Card is ActionCard a ? (int)a.ActionValue : int.MaxValue)
             .ToList();
-            
+
        int newIndex = 0;
     }
     @foreach (var item in sorted)
@@ -21,7 +21,7 @@
         bool isNew = _internalNewCardIds.Contains(item.Card.Id);
         bool isDisabled = DisabledCards.Contains(item.Card.Id);
         int delay = isNew ? newIndex++ : 0;
-        
+
         <OperatorCard @key="item.Card.Id"
             Card="item.Card"
             IsSelected="@SelectedCards.Contains(item.Card.Id)"
