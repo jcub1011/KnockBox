@@ -15,24 +15,6 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
     /// </summary>
     public sealed class OutfitCustomizationState : ITimedDrawnToDressGameState
     {
-        /// <summary>
-        /// Default canvas width when no clothing types are configured.
-        /// Must match the client-side default in OutfitCustomizationPhase.razor.
-        /// </summary>
-        private const int DefaultCanvasWidth = 600;
-
-        /// <summary>
-        /// Horizontal padding added to the max clothing-type canvas width to produce
-        /// the composite canvas width. Must match the client-side value in OutfitCustomizationPhase.razor.
-        /// </summary>
-        private const int CanvasWidthPadding = 100;
-
-        /// <summary>
-        /// Scale factor applied to each clothing type's canvas height when computing the
-        /// composite total height. Must match the client-side value in OutfitCustomizationPhase.razor.
-        /// </summary>
-        private const double HeightScaleFactor = 0.8;
-
         private readonly int _outfitRound;
 
         public OutfitCustomizationState(int outfitRound = 1)
@@ -142,13 +124,8 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
 
             if (cmd.ItemPositionOverrides is { Count: > 0 })
             {
-                // Match the client composite-canvas dimensions exactly:
-                // width = max clothing type canvas width + 100 padding
-                // height = sum of each type's canvas height scaled to 80%
-                int canvasWidth = (context.Config.ClothingTypes.Any()
-                    ? context.Config.ClothingTypes.Max(ct => ct.CanvasWidth)
-                    : DefaultCanvasWidth) + CanvasWidthPadding;
-                int totalHeight = context.Config.ClothingTypes.Sum(ct => (int)(ct.CanvasHeight * HeightScaleFactor));
+                int canvasWidth = CompositeCanvasLayout.ComputeCompositeWidth(context.Config.ClothingTypes);
+                int totalHeight = CompositeCanvasLayout.ComputeCompositeHeight(context.Config.ClothingTypes);
 
                 var clothingTypeById = context.Config.ClothingTypes.ToDictionary(ct => ct.Id);
 

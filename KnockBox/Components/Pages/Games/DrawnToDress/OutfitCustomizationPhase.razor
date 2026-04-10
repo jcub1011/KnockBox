@@ -1,4 +1,5 @@
 @using KnockBox.Core.Components.Shared
+@using KnockBox.Services.Logic.Games.DrawnToDress
 @using KnockBox.Services.State.Games.DrawnToDress
 @using KnockBox.Services.State.Games.DrawnToDress.Data
 @using KnockBox.Services.State.Users
@@ -20,10 +21,9 @@
 
     var myOutfit = myPlayer?.GetOutfit(OutfitRound);
 
-    int canvasWidth = (GameState.Config.ClothingTypes.Any()
-        ? GameState.Config.ClothingTypes.Max(ct => ct.CanvasWidth)
-        : 600) + 100;
-    int totalOutfitHeight = GameState.Config.ClothingTypes.Sum(ct => (int)(ct.CanvasHeight * 0.8));
+    int canvasWidth = CompositeCanvasLayout.ComputeCompositeWidth(GameState.Config.ClothingTypes);
+    int totalOutfitHeight = CompositeCanvasLayout.ComputeCompositeHeight(GameState.Config.ClothingTypes);
+    double mannequinSize = CompositeCanvasLayout.MannequinDisplaySize(GameState.Config.ClothingTypes);
 
     // Build a composite background SVG from the player's selected outfit items, applying
     // any position overrides set via the drag/manual-input layer.
@@ -58,7 +58,7 @@
 
         if (_showMannequin && GameState.Config.ShowMannequin)
         {
-            mannequinSvg = MannequinSvgHelper.Build(canvasWidth, totalOutfitHeight);
+            mannequinSvg = MannequinSvgHelper.Build(canvasWidth, totalOutfitHeight, overrideDisplaySize: mannequinSize);
         }
 
         if (bgParts.Length > 0)
@@ -174,6 +174,26 @@
                         </div>
                     }
 
+                    @if (_mode == InteractionMode.MoveItems)
+                    {
+                        <div class="dtd-customization-field">
+                            <label class="dtd-customization-label">Select Item</label>
+                            <div class="dtd-customization-item-selector">
+                                @foreach (var ct in GameState.Config.ClothingTypes)
+                                {
+                                    var typeId = ct.Id;
+                                    bool isSelected = _selectedTypeId == typeId;
+                                    <button class="dtd-item-select-btn @(isSelected ? "dtd-item-select-btn-active" : "")"
+                                            aria-pressed="@(isSelected ? "true" : "false")"
+                                            @onclick="() => SelectItemAsync(typeId)">
+                                        <span class="dtd-item-select-icon" aria-hidden="true">@GetClothingTypeIcon(ct.Id)</span>
+                                        <span class="dtd-item-select-name">@ct.DisplayName</span>
+                                    </button>
+                                }
+                            </div>
+                        </div>
+                    }
+
                     <div class="dtd-customization-spacer"></div>
 
                     <div class="dtd-customization-actions">
@@ -205,10 +225,15 @@
                                 {
                                     <svg id="@_dragSvgId"
                                          class="dtd-customization-drag-layer"
+                                         style="z-index: 3;"
                                          width="@canvasWidth" height="@totalOutfitHeight"
                                          viewBox="0 0 @canvasWidth @totalOutfitHeight"
                                          preserveAspectRatio="xMidYMid meet"
                                          xmlns="http://www.w3.org/2000/svg">
+                                        @if (mannequinSvg is not null)
+                                        {
+                                            @((MarkupString)mannequinSvg)
+                                        }
                                     </svg>
                                 }
                             </OverlayContent>

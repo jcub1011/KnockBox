@@ -108,26 +108,18 @@ export function initialize(svgId, dotNetRef, items, viewBoxWidth, viewBoxHeight)
 
     // ── Drag handlers ──────────────────────────────────────────────────────
 
-    function findItemAtPoint(clientX, clientY) {
-        const pt = getSvgCoords(svg, state.svgPoint, clientX, clientY);
-        // Check items in reverse (top-most first)
-        const entries = [...state.items.entries()].reverse();
-        for (const [typeId, info] of entries) {
-            if (pt.x >= info.x && pt.x <= info.x + info.width &&
-                pt.y >= info.y && pt.y <= info.y + info.height) {
-                return { typeId, offsetX: pt.x - info.x, offsetY: pt.y - info.y };
-            }
-        }
-        return null;
-    }
-
     function startDrag(clientX, clientY) {
-        const hit = findItemAtPoint(clientX, clientY);
-        if (!hit) return;
-        state.dragging = hit;
-        const info = state.items.get(hit.typeId);
-        if (info) info.group.style.cursor = 'grabbing';
-        setSelectedItem(svgId, hit.typeId);
+        // Always drag the currently selected item (selected via icon buttons).
+        if (!state.selectedTypeId) return;
+        const info = state.items.get(state.selectedTypeId);
+        if (!info) return;
+        const pt = getSvgCoords(svg, state.svgPoint, clientX, clientY);
+        state.dragging = {
+            typeId: state.selectedTypeId,
+            offsetX: pt.x - info.x,
+            offsetY: pt.y - info.y,
+        };
+        info.group.style.cursor = 'grabbing';
     }
 
     function moveDrag(clientX, clientY) {
@@ -163,6 +155,11 @@ export function initialize(svgId, dotNetRef, items, viewBoxWidth, viewBoxHeight)
                 .catch(err => console.error('[OutfitItemDrag] OnItemMoved failed.', err));
         }
         state.dragging = null;
+    }
+
+    // Auto-select the first item so dragging works immediately.
+    if (items.length > 0) {
+        setSelectedItem(svgId, items[0].typeId);
     }
 
     // Mouse events

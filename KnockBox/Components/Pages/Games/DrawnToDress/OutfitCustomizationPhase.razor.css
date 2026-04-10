@@ -241,6 +241,52 @@
     accent-color: var(--dtd-color-lavender);
 }
 
+/* ── Item Selector (Move mode) ─────────────────────────────────────────── */
+
+.dtd-customization-item-selector {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.dtd-item-select-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border: 3px solid var(--dtd-color-bg-soft);
+    border-radius: 14px;
+    background: #fff;
+    font-family: var(--font-primary);
+    font-size: 0.85rem;
+    font-weight: 800;
+    color: var(--dtd-color-dark);
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.dtd-item-select-btn:hover {
+    border-color: var(--dtd-color-lavender);
+    background: var(--dtd-color-bg-soft);
+}
+
+.dtd-item-select-btn-active {
+    border-color: var(--dtd-color-lavender);
+    background: var(--dtd-color-lavender);
+    color: #fff;
+    box-shadow: 0 3px 0 var(--dtd-color-lavender-deep);
+    transform: translateY(-1px);
+}
+
+.dtd-item-select-icon {
+    font-size: 1.1rem;
+    line-height: 1;
+}
+
+.dtd-item-select-name {
+    line-height: 1;
+}
+
 .dtd-customization-spacer {
     flex: 1;
 }

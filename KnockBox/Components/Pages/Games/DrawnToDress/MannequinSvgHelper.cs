@@ -1,4 +1,5 @@
 using System.Globalization;
+using KnockBox.Services.Logic.Games.DrawnToDress;
 
 namespace KnockBox.Components.Pages.Games.DrawnToDress
 {
@@ -12,19 +13,7 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
         private const string ImagePath = "/content/drawn-to-dress-assets/mannequin-blank.png";
 
         /// <summary>Native pixel dimensions of mannequin-blank.png.</summary>
-        private const double NativeSize = 1416.0;
-
-        /// <summary>
-        /// Approximate Y-center of each body region on the 1416×1416 mannequin PNG.
-        /// These may need calibration after visual testing.
-        /// </summary>
-        private static readonly Dictionary<string, double> NativeAnchorY = new()
-        {
-            ["hat"]    = 170,
-            ["top"]    = 470,
-            ["bottom"] = 870,
-            ["shoes"]  = 1130,
-        };
+        private const double NativeSize = CompositeCanvasLayout.NativeMannequinSize;
 
         /// <summary>
         /// Builds the mannequin SVG markup as an <c>&lt;image&gt;</c> element.
@@ -33,26 +22,31 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
         /// <param name="canvasHeight">Height of the SVG viewBox coordinate space.</param>
         /// <param name="activeTypeId">
         /// Clothing type ID whose body region should be vertically centered in the viewport.
-        /// When <see langword="null"/>, the mannequin is positioned with a small top margin
+        /// When <see langword="null"/>, the mannequin is positioned centered vertically
         /// (suitable for the full-body outfit customization view).
         /// </param>
-        public static string Build(int canvasWidth, int canvasHeight, string? activeTypeId = null)
+        /// <param name="overrideDisplaySize">
+        /// When provided, overrides the default <c>canvasWidth * 0.85</c> display size.
+        /// Used by the composite canvas to keep the mannequin the same size relative to
+        /// items as it was during the drawing phase.
+        /// </param>
+        public static string Build(int canvasWidth, int canvasHeight, string? activeTypeId = null, double? overrideDisplaySize = null)
         {
-            double displayWidth = canvasWidth * 0.85;
+            double displayWidth = overrideDisplaySize ?? canvasWidth * 0.85;
             double displayHeight = displayWidth; // 1:1 aspect ratio
             double scale = displayWidth / NativeSize;
             double xOffset = (canvasWidth - displayWidth) / 2.0;
 
             double yOffset;
-            if (activeTypeId is not null && NativeAnchorY.TryGetValue(activeTypeId, out double nativeY))
+            if (activeTypeId is not null && CompositeCanvasLayout.NativeAnchorY.TryGetValue(activeTypeId, out double nativeY))
             {
                 // Center the body region vertically in the canvas viewport.
                 yOffset = (canvasHeight / 2.0) - (nativeY * scale);
             }
             else
             {
-                // Full-body view: small top margin.
-                yOffset = canvasHeight * 0.05;
+                // Full-body view: center the mannequin vertically (300 px padding each side).
+                yOffset = (canvasHeight - displayHeight) / 2.0;
             }
 
             return string.Create(CultureInfo.InvariantCulture,

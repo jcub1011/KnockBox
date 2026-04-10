@@ -1,3 +1,4 @@
+@using KnockBox.Services.Logic.Games.DrawnToDress
 @using KnockBox.Services.State.Games.DrawnToDress
 @using KnockBox.Services.State.Games.DrawnToDress.Data
 @using KnockBox.Services.State.Users
@@ -157,10 +158,10 @@
                         {
                             if (SafeSvgContent(item.SvgContent) is string safeSvg)
                             {
-                                int viewCenterY = ct.CanvasHeight / 2;
-                                int partCenterY = ct.Id switch { "hat" => 160, "bottom" => 820, "shoes" => 1070, _ => 440 };
-                                double itemX = 50;
-                                double itemY = (partCenterY - viewCenterY) + 200;
+                                var (defX, defY) = CompositeCanvasLayout.GetDefaultItemPosition(
+                                    ct.Id, ct.CanvasWidth, ct.CanvasHeight, TotalOutfitWidth, TotalOutfitHeight);
+                                double itemX = defX;
+                                double itemY = defY;
                                 if (outfit.Customization.ItemPositionOverrides.TryGetValue(ct.Id, out var pos))
                                 {
                                     itemX = pos.X;

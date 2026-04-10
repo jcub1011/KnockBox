@@ -3,7 +3,6 @@
     flex-direction: column;
     border: 1px solid #ccc;
     border-radius: 8px;
-    overflow: hidden;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
 }
 
@@ -19,6 +18,7 @@
     padding: 6px 10px;
     background: #f5f5f5;
     border-bottom: 1px solid #ddd;
+    border-radius: 7px 7px 0 0;
     flex-wrap: wrap;
     min-height: 40px;
 }
@@ -269,6 +269,7 @@
     display: grid;
     position: relative;
     overflow: hidden;
+    border-radius: 0 0 7px 7px;
     min-height: 0;
     min-width: 0;
     background-color: #f1f5f9;
