@@ -114,6 +114,13 @@ else
                         <p class="ctc-reveal-text">No target eliminated -- tied vote</p>
                     </div>
                 }
+                else if (elimination.PlayerId == myId)
+                {
+                    <div class="ctc-reveal-result ctc-reveal-eliminated">
+                        <span class="ctc-reveal-icon">[ TERMINATED ]</span>
+                        <p class="ctc-reveal-text">You were eliminated.</p>
+                    </div>
+                }
                 else
                 {
                     <div class="ctc-reveal-result ctc-reveal-eliminated">
