@@ -32,14 +32,13 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress
 
         /// <summary>
         /// Derives a win count for each entrant from the votes recorded across all matchups.
-        /// The entrant who received strictly more criterion votes in a matchup is credited
-        /// with one win. Ties award no win to either entrant.
+        /// Win=1.0, tie=0.5, loss=0.0 per matchup.
         /// </summary>
-        public static Dictionary<EntrantId, int> CalculateWins(
+        public static Dictionary<EntrantId, double> CalculateWins(
             IReadOnlyList<VotingRound> previousRounds,
             IEnumerable<VoteSubmission> votes)
         {
-            var wins = new Dictionary<EntrantId, int>();
+            var wins = new Dictionary<EntrantId, double>();
             var voteList = votes.ToList();
 
             foreach (var round in previousRounds)
@@ -56,14 +55,20 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress
                     int bVotes = matchupVotes.Count(v => v.ChosenEntrantId == matchup.EntrantBId);
 
                     if (aVotes > bVotes)
-                        wins[matchup.EntrantAId] = wins.GetValueOrDefault(matchup.EntrantAId, 0) + 1;
+                        wins[matchup.EntrantAId] = wins.GetValueOrDefault(matchup.EntrantAId, 0.0) + 1.0;
                     else if (bVotes > aVotes)
-                        wins[matchup.EntrantBId] = wins.GetValueOrDefault(matchup.EntrantBId, 0) + 1;
+                        wins[matchup.EntrantBId] = wins.GetValueOrDefault(matchup.EntrantBId, 0.0) + 1.0;
+                    else
+                    {
+                        // Tie: both get 0.5.
+                        wins[matchup.EntrantAId] = wins.GetValueOrDefault(matchup.EntrantAId, 0.0) + 0.5;
+                        wins[matchup.EntrantBId] = wins.GetValueOrDefault(matchup.EntrantBId, 0.0) + 0.5;
+                    }
                 }
 
                 // Bye entrants receive a free win.
                 foreach (var byeEntrant in round.Byes)
-                    wins[byeEntrant] = wins.GetValueOrDefault(byeEntrant, 0) + 1;
+                    wins[byeEntrant] = wins.GetValueOrDefault(byeEntrant, 0.0) + 1.0;
             }
 
             return wins;

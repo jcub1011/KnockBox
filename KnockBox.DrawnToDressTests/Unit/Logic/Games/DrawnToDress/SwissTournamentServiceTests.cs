@@ -99,12 +99,12 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress
 
             var wins = SwissTournamentService.CalculateWins(rounds, votes);
 
-            Assert.AreEqual(1, wins.GetValueOrDefault(new EntrantId("pA", 1), 0), "pA should have 1 win.");
-            Assert.AreEqual(0, wins.GetValueOrDefault(new EntrantId("pB", 1), 0), "pB should have 0 wins.");
+            Assert.AreEqual(1.0, wins.GetValueOrDefault(new EntrantId("pA", 1), 0.0), "pA should have 1 win.");
+            Assert.AreEqual(0.0, wins.GetValueOrDefault(new EntrantId("pB", 1), 0.0), "pB should have 0 wins.");
         }
 
         [TestMethod]
-        public void CalculateWins_Tie_NeitherPlayerReceivesWin()
+        public void CalculateWins_Tie_BothPlayersReceiveHalfWin()
         {
             var matchupId = Guid.NewGuid();
             var rounds = new List<VotingRound>
@@ -123,8 +123,8 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress
 
             var wins = SwissTournamentService.CalculateWins(rounds, votes);
 
-            Assert.AreEqual(0, wins.GetValueOrDefault(new EntrantId("pA", 1), 0));
-            Assert.AreEqual(0, wins.GetValueOrDefault(new EntrantId("pB", 1), 0));
+            Assert.AreEqual(0.5, wins.GetValueOrDefault(new EntrantId("pA", 1), 0.0));
+            Assert.AreEqual(0.5, wins.GetValueOrDefault(new EntrantId("pB", 1), 0.0));
         }
 
         [TestMethod]
@@ -158,9 +158,9 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress
 
             var wins = SwissTournamentService.CalculateWins(rounds, votes);
 
-            Assert.AreEqual(1, wins.GetValueOrDefault(new EntrantId("pA", 1), 0));
-            Assert.AreEqual(0, wins.GetValueOrDefault(new EntrantId("pB", 1), 0));
-            Assert.AreEqual(1, wins.GetValueOrDefault(new EntrantId("pC", 1), 0));
+            Assert.AreEqual(1.0, wins.GetValueOrDefault(new EntrantId("pA", 1), 0.0));
+            Assert.AreEqual(0.0, wins.GetValueOrDefault(new EntrantId("pB", 1), 0.0));
+            Assert.AreEqual(1.0, wins.GetValueOrDefault(new EntrantId("pC", 1), 0.0));
         }
 
         // ── GenerateRound – round 1 (no previous rounds) ─────────────────────

@@ -1,15 +1,18 @@
 ﻿using KnockBox.Extensions.Returns;
+using System.Diagnostics.CodeAnalysis;
 
 namespace KnockBox.Services.State.Shared;
 
 /// <summary>
 /// The token used associate services with a particular session.
 /// </summary>
-public readonly struct SessionToken
+public readonly struct SessionToken : IEquatable<SessionToken>
 {
     public readonly string Token = string.Empty;
     public readonly int HashCode = 0;
 
+    public bool Equals(SessionToken other) => Token == other.Token;
+    public override bool Equals([NotNullWhen(true)] object? obj) => obj is SessionToken other && Equals(other);
     public override int GetHashCode() => HashCode;
 
     public SessionToken(Guid guid)
@@ -23,6 +26,10 @@ public readonly struct SessionToken
         Token = token;
         HashCode = Token.GetHashCode();
     }
+
+    public static bool operator ==(SessionToken left, SessionToken right) => left.Equals(right);
+
+    public static bool operator !=(SessionToken left, SessionToken right) => !(left == right);
 }
 
 /// <typeparam name="TService"></typeparam>

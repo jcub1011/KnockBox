@@ -12,10 +12,10 @@ namespace KnockBox.Services.State.Games.DrawnToDress.Data
         public string DisplayName { get; set; } = string.Empty;
 
         /// <summary>Number of head-to-head matchup wins across all voting rounds.</summary>
-        public int Wins { get; set; }
+        public double Wins { get; set; }
 
         /// <summary>Number of head-to-head matchup losses across all voting rounds.</summary>
-        public int Losses { get; set; }
+        public double Losses { get; set; }
 
         /// <summary>Aggregated weighted voting score across all rounds and criteria.</summary>
         public double TotalScore { get; set; }

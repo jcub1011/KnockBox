@@ -246,8 +246,8 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress
 
             // Calculate Swiss W/L from SwissTournamentService for display.
             var swissWins = SwissTournamentService.CalculateWins(rounds, voteList);
-            var playerSwissWins = new Dictionary<string, int>();
-            var playerSwissLosses = new Dictionary<string, int>();
+            var playerSwissWins = new Dictionary<string, double>();
+            var playerSwissLosses = new Dictionary<string, double>();
             // Count total matchups per entrant to derive losses.
             var totalMatchupsPerEntrant = new Dictionary<EntrantId, int>();
             foreach (var round in rounds)
@@ -268,8 +268,8 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress
             foreach (var (entrantId, total) in totalMatchupsPerEntrant)
             {
                 var pid = entrantId.PlayerId;
-                int entrantWins = swissWins.GetValueOrDefault(entrantId);
-                int entrantLosses = total - entrantWins;
+                double entrantWins = swissWins.GetValueOrDefault(entrantId);
+                double entrantLosses = total - entrantWins;
                 playerSwissLosses[pid] = playerSwissLosses.GetValueOrDefault(pid) + entrantLosses;
             }
 
