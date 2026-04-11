@@ -1324,6 +1324,10 @@
     margin: 0;
 }
 
+::deep .ctc-gameover-title-failed {
+    color: #e74c3c;
+}
+
 ::deep .ctc-winner-announcement {
     text-align: center;
     display: flex;
@@ -1384,6 +1388,18 @@
 ::deep .ctc-leaderboard-me {
     border-color: #a78bfa;
     background: rgba(167,139,250,0.08);
+}
+
+::deep .ctc-leaderboard-eliminated {
+    opacity: 0.6;
+}
+
+::deep .ctc-leaderboard-eliminated .ctc-player-result-name,
+::deep .ctc-leaderboard-eliminated .ctc-player-result-score,
+::deep .ctc-leaderboard-eliminated .ctc-rank {
+    color: #e74c3c !important;
+    text-decoration: line-through;
+    text-decoration-thickness: 2px;
 }
 
 ::deep .ctc-rank {

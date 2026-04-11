@@ -38,15 +38,11 @@
                     {
                         int cumulativeScore = GameState.GameScores.TryGetValue(ps.PlayerId, out var cs) ? cs : 0;
                         bool isWinner = hostRank == 1;
-                        <div class="ctc-leaderboard-row ctc-host-scoreboard-row @(isWinner ? "ctc-leaderboard-winner" : "")">
+                        <div class="ctc-leaderboard-row ctc-host-scoreboard-row @(isWinner ? "ctc-leaderboard-winner" : "") @(ps.IsEliminated ? "ctc-leaderboard-eliminated" : "")">
                             <span class="ctc-rank">@(hostRank == 1 ? "🥇" : hostRank == 2 ? "🥈" : hostRank == 3 ? "🥉" : $"#{hostRank}")</span>
                             <span class="ctc-player-result-name">@ps.DisplayName</span>
                             <span class="ctc-player-role ctc-role-@ps.Role.ToString().ToLowerInvariant()">@ps.Role</span>
                             <span class="ctc-player-result-score">@cumulativeScore pts</span>
-                            @if (ps.IsEliminated)
-                            {
-                                <span class="ctc-status-badge ctc-status-eliminated">TERMINATED</span>
-                            }
                         </div>
                         hostRank++;
                     }
@@ -87,10 +83,14 @@
 }
 else
 {
+    var myPlayerState = GameState.GamePlayers.TryGetValue(myId, out var mp) ? mp : null;
+    bool isMissionSuccess = winResult?.WinningTeam is not null && myPlayerState?.Role == winResult.WinningTeam;
+    string missionText = isMissionSuccess ? "[ MISSION COMPLETE ]" : "[ MISSION FAILED ]";
+
     @* ══════ PLAYER VIEW ══════ *@
     <div class="ctc-gameover-area">
         <div class="ctc-gameover-panel">
-            <h2 class="ctc-gameover-title glitch" data-text="[ MISSION COMPLETE ]">[ MISSION COMPLETE ]</h2>
+            <h2 class="ctc-gameover-title glitch @(isMissionSuccess ? "" : "ctc-gameover-title-failed")" data-text="@missionText">@missionText</h2>
 
             @* ── Winner announcement ── *@
             @if (winResult is not null)
@@ -113,15 +113,11 @@ else
                         bool isMe = ps.PlayerId == myId;
                         int cumulativeScore = GameState.GameScores.TryGetValue(ps.PlayerId, out var cs) ? cs : 0;
                         bool isWinner = playerRank == 1;
-                        <div class="ctc-leaderboard-row @(isWinner ? "ctc-leaderboard-winner" : "") @(isMe ? "ctc-leaderboard-me" : "")">
+                        <div class="ctc-leaderboard-row @(isWinner ? "ctc-leaderboard-winner" : "") @(isMe ? "ctc-leaderboard-me" : "") @(ps.IsEliminated ? "ctc-leaderboard-eliminated" : "")">
                             <span class="ctc-rank">@(playerRank == 1 ? "🥇" : playerRank == 2 ? "🥈" : playerRank == 3 ? "🥉" : $"#{playerRank}")</span>
                             <span class="ctc-player-result-name">@ps.DisplayName</span>
                             <span class="ctc-player-role ctc-role-@ps.Role.ToString().ToLowerInvariant()">@ps.Role</span>
                             <span class="ctc-player-result-score">@cumulativeScore pts</span>
-                            @if (ps.IsEliminated)
-                            {
-                                <span class="ctc-status-badge ctc-status-eliminated">Eliminated</span>
-                            }
                         </div>
                         playerRank++;
                     }
