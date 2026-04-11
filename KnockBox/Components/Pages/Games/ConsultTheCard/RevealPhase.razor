@@ -17,7 +17,7 @@
             <h2 class="ctc-phase-title glitch" data-text="[ AFTER-ACTION REPORT ]">[ AFTER-ACTION REPORT ]</h2>
 
             @* ── Dramatic elimination result ── *@
-            @if (elimination is not null)
+            @if (elimination is not null && !awaitingGuess)
             {
                 @if (elimination.WasTie)
                 {
@@ -105,7 +105,7 @@ else
             <h2 class="ctc-phase-title glitch" data-text="[ AFTER-ACTION REPORT ]">[ AFTER-ACTION REPORT ]</h2>
 
             @* ── Elimination result ── *@
-            @if (elimination is not null)
+            @if (elimination is not null && !awaitingGuess)
             {
                 @if (elimination.WasTie)
                 {
