@@ -39,7 +39,7 @@
                         int cumulativeScore = GameState.GameScores.TryGetValue(ps.PlayerId, out var cs) ? cs : 0;
                         bool isWinner = hostRank == 1;
                         <div class="ctc-leaderboard-row ctc-host-scoreboard-row @(isWinner ? "ctc-leaderboard-winner" : "")">
-                            <span class="ctc-rank">@(hostRank == 1 ? "&#x2588;1" : hostRank == 2 ? "&#x2588;2" : hostRank == 3 ? "&#x2588;3" : $"#{hostRank}")</span>
+                            <span class="ctc-rank">@(hostRank == 1 ? "🥇" : hostRank == 2 ? "🥈" : hostRank == 3 ? "🥉" : $"#{hostRank}")</span>
                             <span class="ctc-player-result-name">@ps.DisplayName</span>
                             <span class="ctc-player-role ctc-role-@ps.Role.ToString().ToLowerInvariant()">@ps.Role</span>
                             <span class="ctc-player-result-score">@cumulativeScore pts</span>
@@ -114,7 +114,7 @@ else
                         int cumulativeScore = GameState.GameScores.TryGetValue(ps.PlayerId, out var cs) ? cs : 0;
                         bool isWinner = playerRank == 1;
                         <div class="ctc-leaderboard-row @(isWinner ? "ctc-leaderboard-winner" : "") @(isMe ? "ctc-leaderboard-me" : "")">
-                            <span class="ctc-rank">@(playerRank == 1 ? "&#x1F947;" : playerRank == 2 ? "&#x1F948;" : playerRank == 3 ? "&#x1F949;" : $"#{playerRank}")</span>
+                            <span class="ctc-rank">@(playerRank == 1 ? "🥇" : playerRank == 2 ? "🥈" : playerRank == 3 ? "🥉" : $"#{playerRank}")</span>
                             <span class="ctc-player-result-name">@ps.DisplayName</span>
                             <span class="ctc-player-role ctc-role-@ps.Role.ToString().ToLowerInvariant()">@ps.Role</span>
                             <span class="ctc-player-result-score">@cumulativeScore pts</span>
