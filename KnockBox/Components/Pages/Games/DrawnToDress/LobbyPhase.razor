@@ -5,8 +5,6 @@
 <div class="dtd-lobby">
     @{
         bool isHost = UserService.CurrentUser?.Id == GameState.Host.Id;
-        // Players property excludes the host. The host cannot participate in the game,
-        // so the player count only reflects active participants.
         int playerCount = GameState.Players.Count;
         bool belowMinimum = playerCount < DrawnToDressConfig.RecommendedMinimumPlayers;
     }
@@ -109,13 +107,15 @@
                         <input type="number" min="30" max="600" step="10" class="dtd-setting-input"
                                @bind="EditConfig.DrawingTimeSec" @bind:after="ApplyConfig" />
                     </label>
-                    <label class="dtd-setting-label">
-                        <input type="checkbox" @bind="EditConfig.ShowMannequin" @bind:after="ApplyConfig" />
-                        Show Mannequin Reference
+                    <label class="dtd-setting-label dtd-setting-label-row" title="Display a mannequin outline as a drawing reference">
+                        <span>Show Mannequin Reference:</span>
+                        <input type="checkbox" class="dtd-setting-checkbox"
+                               @bind="EditConfig.ShowMannequin" @bind:after="ApplyConfig" />
                     </label>
-                    <label class="dtd-setting-label">
-                        <input type="checkbox" @bind="EditConfig.EnableTimer" @bind:after="ApplyConfig" />
-                        Enable Game Timers
+                    <label class="dtd-setting-label dtd-setting-label-row" title="Automatically advance phases when the timer expires">
+                        <span>Enable Game Timers:</span>
+                        <input type="checkbox" class="dtd-setting-checkbox"
+                               @bind="EditConfig.EnableTimer" @bind:after="ApplyConfig" />
                     </label>
                     <label class="dtd-setting-label">
                         Theme Announcement Time (seconds):
@@ -126,6 +126,11 @@
                         <span>Allow Sketching During Outfit Building:</span>
                         <input type="checkbox" class="dtd-setting-checkbox"
                                @bind="EditConfig.AllowSketchingDuringOutfitBuilding" @bind:after="ApplyConfig" />
+                    </label>
+                    <label class="dtd-setting-label dtd-setting-label-row" title="Show a live gallery of drawings on the host screen during the drawing phase">
+                        <span>Show Drawings on Host Screen:</span>
+                        <input type="checkbox" class="dtd-setting-checkbox"
+                               @bind="EditConfig.ShowDrawingsOnHostScreen" @bind:after="ApplyConfig" />
                     </label>
                 </div>
 
@@ -194,6 +199,11 @@
                         <input type="checkbox" class="dtd-setting-checkbox"
                                @bind="EditConfig.AllowReuseOwnItems" @bind:after="ApplyConfig" />
                     </label>
+                    <label class="dtd-setting-label dtd-setting-label-row" title="Players may actively select their own drawings from the pool">
+                        <span>Allow Selecting Own Drawings:</span>
+                        <input type="checkbox" class="dtd-setting-checkbox"
+                               @bind="EditConfig.AllowSelectOwnDrawings" @bind:after="ApplyConfig" />
+                    </label>
                     <label class="dtd-setting-label dtd-setting-label-row" title="Each outfit slot must contain a unique item">
                         <span>Require Distinct Items Per Slot:</span>
                         <input type="checkbox" class="dtd-setting-checkbox"
@@ -221,8 +231,12 @@
                 <div class="dtd-settings-grid">
                     <label class="dtd-setting-label">
                         Voting Rounds:
-                        <input type="number" min="1" class="dtd-setting-input"
+                        <input type="number" min="0" class="dtd-setting-input"
                                @bind="EditConfig.VotingRounds" @bind:after="ApplyConfig" />
+                        @if (EditConfig.VotingRounds == 0)
+                        {
+                            <span class="dtd-setting-hint">(Auto)</span>
+                        }
                     </label>
                     <label class="dtd-setting-label">
                         Bonus Points for Complete Outfit:

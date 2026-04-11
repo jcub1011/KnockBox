@@ -25,9 +25,11 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
             var round = BuildRound(context);
             context.State.VotingRounds.Add(round);
 
+            int totalRounds = SwissTournamentService.ResolveRoundCount(
+                context.GetTournamentEntrantIds().Count, context.Config.VotingRounds);
             context.Logger.LogInformation(
-                "FSM → VotingRoundSetupState. Round {n} of {total}. {count} matchup(s) generated.",
-                round.RoundNumber, context.Config.VotingRounds, round.Matchups.Count);
+                "FSM → VotingRoundSetupState. Round {n} of {total}. {count} matchup(s), {byes} bye(s) generated.",
+                round.RoundNumber, totalRounds, round.Matchups.Count, round.Byes.Count);
 
             // Chain immediately into the voting matchup.
             return new VotingMatchupState();
@@ -54,10 +56,12 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
             var entrantIds = context.GetTournamentEntrantIds();
 
             var wins = roundNumber > 1
-                ? SwissTournamentService.CalculateWins(
+                ? DrawnToDressScoringService.CalculateMatchupWins(
                     context.State.VotingRounds,
-                    context.State.Votes.Values)
-                : new Dictionary<EntrantId, int>();
+                    context.Config.VotingCriteria,
+                    context.State.Votes.Values,
+                    context.State.CriterionCoinFlipResults)
+                : new Dictionary<EntrantId, double>();
 
             return SwissTournamentService.GenerateRound(
                 roundNumber,

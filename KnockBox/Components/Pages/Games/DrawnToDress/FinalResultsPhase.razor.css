@@ -183,6 +183,17 @@
     color: white;
 }
 
+.dtd-final-results-bye-note {
+    font-size: 0.75rem;
+    opacity: 0.7;
+    white-space: nowrap;
+}
+
+.dtd-final-results-detail-bye td {
+    opacity: 0.6;
+    font-style: italic;
+}
+
 .dtd-final-results-row-clickable {
     cursor: pointer;
     transition: transform 0.1s var(--dtd-bounce);

@@ -41,9 +41,13 @@ export function initialize(svgId, dotNetRef, items, viewBoxWidth, viewBoxHeight)
         return;
     }
 
+    const abortController = new AbortController();
+    const signal = abortController.signal;
+
     const state = {
         svg,
         dotNetRef,
+        abortController,
         items: new Map(),          // typeId → { group, x, y, width, height }
         viewBoxWidth,
         viewBoxHeight,
@@ -104,26 +108,18 @@ export function initialize(svgId, dotNetRef, items, viewBoxWidth, viewBoxHeight)
 
     // ── Drag handlers ──────────────────────────────────────────────────────
 
-    function findItemAtPoint(clientX, clientY) {
-        const pt = getSvgCoords(svg, state.svgPoint, clientX, clientY);
-        // Check items in reverse (top-most first)
-        const entries = [...state.items.entries()].reverse();
-        for (const [typeId, info] of entries) {
-            if (pt.x >= info.x && pt.x <= info.x + info.width &&
-                pt.y >= info.y && pt.y <= info.y + info.height) {
-                return { typeId, offsetX: pt.x - info.x, offsetY: pt.y - info.y };
-            }
-        }
-        return null;
-    }
-
     function startDrag(clientX, clientY) {
-        const hit = findItemAtPoint(clientX, clientY);
-        if (!hit) return;
-        state.dragging = hit;
-        const info = state.items.get(hit.typeId);
-        if (info) info.group.style.cursor = 'grabbing';
-        setSelectedItem(svgId, hit.typeId);
+        // Always drag the currently selected item (selected via icon buttons).
+        if (!state.selectedTypeId) return;
+        const info = state.items.get(state.selectedTypeId);
+        if (!info) return;
+        const pt = getSvgCoords(svg, state.svgPoint, clientX, clientY);
+        state.dragging = {
+            typeId: state.selectedTypeId,
+            offsetX: pt.x - info.x,
+            offsetY: pt.y - info.y,
+        };
+        info.group.style.cursor = 'grabbing';
     }
 
     function moveDrag(clientX, clientY) {
@@ -161,29 +157,34 @@ export function initialize(svgId, dotNetRef, items, viewBoxWidth, viewBoxHeight)
         state.dragging = null;
     }
 
+    // Auto-select the first item so dragging works immediately.
+    if (items.length > 0) {
+        setSelectedItem(svgId, items[0].typeId);
+    }
+
     // Mouse events
     svg.addEventListener('mousedown', (e) => {
         if (e.button !== 0) return;
         e.preventDefault();
         startDrag(e.clientX, e.clientY);
-    });
-    svg.addEventListener('mousemove', (e) => moveDrag(e.clientX, e.clientY));
-    svg.addEventListener('mouseup', () => endDrag());
-    svg.addEventListener('mouseleave', () => endDrag());
+    }, { signal });
+    svg.addEventListener('mousemove', (e) => moveDrag(e.clientX, e.clientY), { signal });
+    svg.addEventListener('mouseup', () => endDrag(), { signal });
+    svg.addEventListener('mouseleave', () => endDrag(), { signal });
 
     // Touch events
     svg.addEventListener('touchstart', (e) => {
         e.preventDefault();
         startDrag(e.touches[0].clientX, e.touches[0].clientY);
-    }, { passive: false });
+    }, { passive: false, signal });
     svg.addEventListener('touchmove', (e) => {
         e.preventDefault();
         moveDrag(e.touches[0].clientX, e.touches[0].clientY);
-    }, { passive: false });
+    }, { passive: false, signal });
     svg.addEventListener('touchend', (e) => {
         e.preventDefault();
         endDrag();
-    }, { passive: false });
+    }, { passive: false, signal });
 }
 
 /**
@@ -258,5 +259,12 @@ export function getPositions(svgId) {
  * @param {string} svgId
  */
 export function dispose(svgId) {
+    const state = instances.get(svgId);
+    if (state) {
+        state.abortController?.abort();
+        state.dotNetRef = null;
+        state.svg = null;
+        state.items.clear();
+    }
     instances.delete(svgId);
 }

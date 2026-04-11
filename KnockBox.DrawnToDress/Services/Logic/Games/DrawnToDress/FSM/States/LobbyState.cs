@@ -11,7 +11,6 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
     /// Transition ownership:
     /// - <see cref="StartGameCommand"/> (host only) → <see cref="ThemeSelectionState"/>
     /// - <see cref="PauseGameCommand"/> (host only) → <see cref="PausedState"/>
-    /// - <see cref="AbandonGameCommand"/> (host only) → <see cref="AbandonedState"/>
     /// </summary>
     public sealed class LobbyState : IDrawnToDressGameState
     {
@@ -19,8 +18,59 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
             DrawnToDressGameContext context)
         {
             context.State.SetPhase(GamePhase.Lobby);
-            context.Logger.LogInformation("FSM → LobbyState");
+
+            // Reset game-specific state when re-entering the lobby (Play Again).
+            // Config and registered Players are preserved; all per-game data is cleared.
+            if (context.State.GamePlayers.Count > 0 || context.State.VotingRounds.Count > 0)
+            {
+                context.Logger.LogInformation("FSM → LobbyState (Play Again). Resetting game state.");
+                ResetGameState(context);
+            }
+            else
+            {
+                context.Logger.LogInformation("FSM → LobbyState");
+            }
+
             return null;
+        }
+
+        private static void ResetGameState(DrawnToDressGameContext context)
+        {
+            var state = context.State;
+
+            // Allow new players to join.
+            state.UpdateJoinableStatus(true);
+
+            // Clear per-game player data (players stay registered via state.Players).
+            state.GamePlayers.Clear();
+
+            // Clear timer.
+            state.PhaseDeadlineUtc = null;
+
+            // Clear theme state.
+            state.CurrentTheme = null;
+            state.ThemeRevealedToPlayers = false;
+            state.PlayerThemeSubmissions.Clear();
+            state.ThemeCandidates.Clear();
+            state.ThemeVotes.Clear();
+
+            // Clear drawing state.
+            state.CurrentDrawingClothingTypeIndex = 0;
+            state.ClothingPool.Clear();
+
+            // Clear voting state.
+            state.VotingRounds.Clear();
+            state.CurrentVotingRoundIndex = 0;
+            state.Votes.Clear();
+            state.PendingCoinFlipMatchupId = null;
+            state.CriterionCoinFlipResults.Clear();
+            state.PendingCoinFlips.Clear();
+            state.PendingCoinFlipQueue.Clear();
+            state.CurrentCoinFlipIndex = 0;
+            state.Leaderboard.Clear();
+
+            // Reset ready flags.
+            context.ResetReadyFlags();
         }
 
         public Result OnExit(DrawnToDressGameContext context) => Result.Success;
@@ -57,9 +107,6 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
 
                 case PauseGameCommand:
                     return new PausedState(this);
-
-                case AbandonGameCommand:
-                    return new AbandonedState();
 
                 default:
                     context.Logger.LogWarning(

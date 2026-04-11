@@ -101,3 +101,92 @@
     flex-wrap: wrap;
     justify-content: center;
 }
+
+/* ── Host TV Game Over View ───────────────────────────────────────────────── */
+
+.cc-gameover-host-panel {
+    max-width: 800px;
+}
+
+.cc-gameover-host-title {
+    font-size: 3rem;
+    letter-spacing: 5px;
+    animation: winnerGlow 2s ease-in-out infinite alternate;
+}
+
+@keyframes winnerGlow {
+    from { text-shadow: 3px 3px 0 #000, 0 0 20px rgba(247, 213, 71, 0.3); }
+    to   { text-shadow: 3px 3px 0 #000, 0 0 40px rgba(247, 213, 71, 0.6); }
+}
+
+.cc-gameover-host-leaderboard {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.cc-gameover-host-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 16px 24px;
+    transition: all 0.3s ease;
+}
+
+.cc-gameover-host-winner {
+    background: rgba(247, 213, 71, 0.12);
+    border-color: #f7d547;
+    box-shadow: 0 0 30px rgba(247, 213, 71, 0.3);
+    animation: winnerGlow 2s ease-in-out infinite alternate;
+}
+
+.cc-gameover-host-rank {
+    font-size: 2rem;
+    min-width: 48px;
+    text-align: center;
+}
+
+.cc-gameover-host-name {
+    flex: 1;
+    font-size: 1.6rem;
+    font-weight: 800;
+    color: #fff;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+}
+
+.cc-gameover-host-balance {
+    font-size: 2rem;
+    font-weight: 900;
+    font-family: var(--font-mono);
+}
+
+/* ── Mobile Game Over ─────────────────────────────────────────────────────── */
+
+@media (max-width: 768px) {
+    .cc-gameover-area {
+        padding: 16px;
+    }
+    .cc-gameover-panel {
+        padding: 24px 20px;
+    }
+    .cc-gameover-title {
+        font-size: 1.6rem;
+    }
+    .cc-leaderboard-row {
+        padding: 10px 14px;
+    }
+    .cc-gameover-actions {
+        flex-direction: column;
+        width: 100%;
+    }
+    .cc-gameover-actions .cc-btn {
+        width: 100%;
+        min-height: 48px;
+        justify-content: center;
+    }
+}

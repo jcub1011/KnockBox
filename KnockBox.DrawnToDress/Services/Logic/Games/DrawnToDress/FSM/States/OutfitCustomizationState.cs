@@ -15,28 +15,7 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
     /// </summary>
     public sealed class OutfitCustomizationState : ITimedDrawnToDressGameState
     {
-        /// <summary>
-        /// Default canvas width when no clothing types are configured.
-        /// Must match the client-side default in OutfitCustomizationPhase.razor.
-        /// </summary>
-        private const int DefaultCanvasWidth = 600;
-
-        /// <summary>
-        /// Horizontal padding added to the max clothing-type canvas width to produce
-        /// the composite canvas width. Must match the client-side value in OutfitCustomizationPhase.razor.
-        /// </summary>
-        private const int CanvasWidthPadding = 100;
-
-        /// <summary>
-        /// Scale factor applied to each clothing type's canvas height when computing the
-        /// composite total height. Must match the client-side value in OutfitCustomizationPhase.razor.
-        /// </summary>
-        private const double HeightScaleFactor = 0.8;
-
-        public bool IsTimerOptional => true;
-
         private readonly int _outfitRound;
-        private DateTimeOffset _deadline;
 
         public OutfitCustomizationState(int outfitRound = 1)
         {
@@ -46,13 +25,16 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
         public ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?> OnEnter(
             DrawnToDressGameContext context)
         {
-            _deadline = DateTimeOffset.UtcNow.AddSeconds(context.Config.OutfitCustomizationTimeSec);
-            context.State.PhaseDeadlineUtc = _deadline;
+            if (context.Config.EnableTimer)
+            {
+                context.State.PhaseDeadlineUtc = DateTimeOffset.UtcNow.AddSeconds(context.Config.OutfitCustomizationTimeSec);
+            }
+
             context.State.SetPhase(GamePhase.OutfitCustomization);
             context.CurrentOutfitRound = _outfitRound;
             context.ResetReadyFlags();
             context.Logger.LogInformation(
-                "FSM → OutfitCustomizationState (round {round}). Deadline: {deadline}.", _outfitRound, _deadline);
+                "FSM → OutfitCustomizationState (round {round}). Deadline: {deadline}.", _outfitRound, context.State.PhaseDeadlineUtc);
             return null;
         }
 
@@ -76,9 +58,6 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
                 case PauseGameCommand:
                     return new PausedState(this);
 
-                case AbandonGameCommand:
-                    return new AbandonedState();
-
                 default:
                     context.Logger.LogWarning(
                         "OutfitCustomizationState: unrecognized command [{type}] from player [{id}].",
@@ -89,12 +68,14 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
 
         public ValueResult<TimeSpan> GetRemainingTime(
             DrawnToDressGameContext context, DateTimeOffset now)
-            => _deadline - now;
+            => context.State.PhaseDeadlineUtc is { } deadline
+                ? deadline - now
+                : new ResultError("No timer active.");
 
         public ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?> Tick(
             DrawnToDressGameContext context, DateTimeOffset now)
         {
-            if (now < _deadline) return null;
+            if (context.State.PhaseDeadlineUtc is not { } deadline || now < deadline) return null;
 
             context.Logger.LogInformation("Customization timer expired (round {round}).", _outfitRound);
             return ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?>.FromValue(ChooseNextState(context));
@@ -143,13 +124,8 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
 
             if (cmd.ItemPositionOverrides is { Count: > 0 })
             {
-                // Match the client composite-canvas dimensions exactly:
-                // width = max clothing type canvas width + 100 padding
-                // height = sum of each type's canvas height scaled to 80%
-                int canvasWidth = (context.Config.ClothingTypes.Any()
-                    ? context.Config.ClothingTypes.Max(ct => ct.CanvasWidth)
-                    : DefaultCanvasWidth) + CanvasWidthPadding;
-                int totalHeight = context.Config.ClothingTypes.Sum(ct => (int)(ct.CanvasHeight * HeightScaleFactor));
+                int canvasWidth = CompositeCanvasLayout.ComputeCompositeWidth(context.Config.ClothingTypes);
+                int totalHeight = CompositeCanvasLayout.ComputeCompositeHeight(context.Config.ClothingTypes);
 
                 var clothingTypeById = context.Config.ClothingTypes.ToDictionary(ct => ct.Id);
 

@@ -20,6 +20,12 @@ namespace KnockBox.Components.Pages.Games.CardCounter
             return GameState.GamePlayers.TryGetValue(UserService.CurrentUser.Id, out var state) ? state : null;
         }
 
+        protected bool IsHost()
+        {
+            if (GameState == null || UserService.CurrentUser == null) return false;
+            return GameState.Host.Id == UserService.CurrentUser.Id;
+        }
+
         protected void SetBuyIn(bool isNegative)
         {
             if (UserService.CurrentUser == null) return;

@@ -362,27 +362,5 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
 
             Assert.IsInstanceOfType<PausedState>(context.Fsm.CurrentState);
         }
-
-        [TestMethod]
-        public async Task AbandonGameCommand_TransitionsToAbandonedState()
-        {
-            var (state, context) = await CreateGameAsync();
-            state.PendingCoinFlipQueue =
-            [
-                new PendingCoinFlipEntry
-                {
-                    Context = CoinFlipContext.CriterionTie,
-                    MatchupId = Guid.NewGuid(),
-                    CriterionId = "creativity",
-                    EntrantAId = new EntrantId("pA", 1),
-                    EntrantBId = new EntrantId("pB", 1),
-                }
-            ];
-
-            context.Fsm.TransitionTo(context, new CoinFlipState(new VotingRoundResultsState()));
-            _engine.ProcessCommand(context, new AbandonGameCommand("host1"));
-
-            Assert.IsInstanceOfType<AbandonedState>(context.Fsm.CurrentState);
-        }
     }
 }

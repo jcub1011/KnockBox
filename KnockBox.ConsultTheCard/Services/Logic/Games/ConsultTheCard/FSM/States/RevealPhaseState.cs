@@ -112,8 +112,7 @@ namespace KnockBox.Services.Logic.Games.ConsultTheCard.FSM.States
                 return new GameOverState();
             }
 
-            // Game continues — reset for next cycle.
-            context.ResetEliminationCycleState();
+            // Game continues — set reveal timeout.
             _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.State.Config.RevealPhaseTimeoutMs);
 
             return null;
@@ -144,7 +143,6 @@ namespace KnockBox.Services.Logic.Games.ConsultTheCard.FSM.States
                     context.State.WinResult = winResult;
                     return new GameOverState();
                 }
-
 
                 _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.State.Config.RevealPhaseTimeoutMs);
                 return null;

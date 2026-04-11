@@ -6,6 +6,7 @@ using KnockBox.Services.State.Games.DrawnToDress.Data;
 using KnockBox.Services.State.Users;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
+using static KnockBox.Services.Logic.Games.DrawnToDress.CompositeCanvasLayout;
 
 namespace KnockBox.Components.Pages.Games.DrawnToDress
 {
@@ -36,6 +37,7 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
 
         private InteractionMode _mode = InteractionMode.Draw;
         private bool _showMannequin;
+        private string? _selectedTypeId;
         private Dictionary<string, ItemPositionOverride> _itemPositions = new();
         private IJSObjectReference? _dragModule;
         private DotNetObjectReference<OutfitCustomizationPhase>? _dotNetRef;
@@ -51,23 +53,17 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
             var myPlayer = GameState.GamePlayers.GetValueOrDefault(CurrentPlayerId);
             _outfitName = myPlayer?.DraftOutfitName ?? string.Empty;
 
-            // Initialize default scaled positions to natively match the mannequin
+            // Compute default positions so each item's center aligns with the
+            // corresponding mannequin body-part center in the composite canvas.
+            int cw = ComputeCompositeWidth(GameState.Config.ClothingTypes);
+            int ch = ComputeCompositeHeight(GameState.Config.ClothingTypes);
             foreach (var ct in GameState.Config.ClothingTypes)
             {
-                int viewCenterY = ct.CanvasHeight / 2;
-                int partCenterY = 440;
-                switch (ct.Id)
-                {
-                    case "hat": partCenterY = 160; break;
-                    case "top": partCenterY = 440; break;
-                    case "bottom": partCenterY = 820; break;
-                    case "shoes": partCenterY = 1070; break;
-                }
-                
-                // Since the item was drawn centered in its respective canvas height,
-                // translating it natively here maps it perfectly.
-                _itemPositions[ct.Id] = new ItemPositionOverride { X = 50, Y = (partCenterY - viewCenterY) + 200 };
+                var (x, y) = GetDefaultItemPosition(ct.Id, ct.CanvasWidth, ct.CanvasHeight, cw, ch);
+                _itemPositions[ct.Id] = new ItemPositionOverride { X = x, Y = y };
             }
+
+            _selectedTypeId = GameState.Config.ClothingTypes.FirstOrDefault()?.Id;
         }
 
         private async Task OnOutfitNameChangedAsync(string newName)
@@ -144,8 +140,8 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
                 }
             }
 
-            int canvasWidth = (GameState.Config.ClothingTypes.FirstOrDefault()?.CanvasWidth ?? 600) + 100;
-            int totalHeight = GameState.Config.ClothingTypes.Sum(ct => (int)(ct.CanvasHeight * 0.8));
+            int canvasWidth = ComputeCompositeWidth(GameState.Config.ClothingTypes);
+            int totalHeight = ComputeCompositeHeight(GameState.Config.ClothingTypes);
             await _dragModule.InvokeVoidAsync("initialize", _dragSvgId, _dotNetRef, items, canvasWidth, totalHeight);
             _dragInitialized = true;
         }
@@ -159,6 +155,30 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
             _itemPositions[typeId] = new ItemPositionOverride { X = x, Y = y };
             InvokeAsync(StateHasChanged);
         }
+
+        /// <summary>
+        /// Selects a clothing item for move mode via the icon buttons.
+        /// </summary>
+        protected async Task SelectItemAsync(string typeId)
+        {
+            _selectedTypeId = typeId;
+            if (_dragModule is not null && _dragInitialized)
+            {
+                await _dragModule.InvokeVoidAsync("setSelectedItem", _dragSvgId, typeId);
+            }
+        }
+
+        /// <summary>
+        /// Returns a representative emoji for a clothing type id.
+        /// </summary>
+        protected static string GetClothingTypeIcon(string typeId) => typeId switch
+        {
+            "hat" => "\U0001F3A9",       // 🎩
+            "top" => "\U0001F455",       // 👕
+            "bottom" => "\U0001F456",    // 👖
+            "shoes" => "\U0001F45F",     // 👟
+            _ => "\U0001F457",           // 👗
+        };
 
         /// <summary>
         /// Called when a manual X or Y input changes.
@@ -271,6 +291,11 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
                 try
                 {
                     await _dragModule.InvokeVoidAsync("dispose", _dragSvgId);
+                }
+                catch (JSDisconnectedException) { }
+
+                try
+                {
                     await _dragModule.DisposeAsync();
                 }
                 catch (JSDisconnectedException) { }

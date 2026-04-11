@@ -1,20 +1,30 @@
-/* ── Spectator View ───────────────────────────────────────────────────────── */
+/* ══════════════════════════════════════════════════════════════════════════
+   SpectatorView.razor.css — Host Dashboard Layout
+   ══════════════════════════════════════════════════════════════════════════ */
 
 .op-spectator {
     flex: 1;
     display: flex;
     flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 24px;
-    gap: 30px;
+    padding: 20px 32px;
+    gap: 20px;
+    max-width: 1200px;
+    width: 100%;
+    margin: 0 auto;
 }
 
-/* ── Header ── */
+/* ── Top Bar ─────────────────────────────────────────────────────────────── */
 
-.op-spectator-header {
+.op-spectator-top-bar {
     display: flex;
-    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.op-spectator-top-left {
+    display: flex;
     align-items: center;
     gap: 12px;
 }
@@ -23,43 +33,343 @@
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    background: rgba(230,57,70,0.15);
-    border: 2px solid rgba(230,57,70,0.3);
+    background: rgba(230, 57, 70, 0.15);
+    border: 2px solid rgba(230, 57, 70, 0.3);
     border-radius: 20px;
-    padding: 6px 16px;
-    font-size: 0.8rem;
+    padding: 8px 20px;
+    font-size: 0.9rem;
     font-weight: 900;
     text-transform: uppercase;
     letter-spacing: 2px;
     color: #e63946;
 }
 
-.op-spectator-turn {
-    font-size: 1.1rem;
-    color: rgba(255,255,255,0.7);
+.op-spectator-turn-counter {
+    font-family: var(--font-mono);
+    font-size: 1rem;
+    font-weight: 900;
+    color: #ffd166;
+    letter-spacing: 2px;
 }
 
-.op-spectator-turn strong {
+/* ── Deck Visualization ── */
+
+.op-spectator-deck {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    transition: filter 0.3s;
+}
+
+.op-spectator-deck.deck-low {
+    animation: op-deck-warn 1.5s ease-in-out infinite;
+}
+
+@keyframes op-deck-warn {
+    0%, 100% { filter: drop-shadow(0 0 4px rgba(230, 57, 70, 0.2)); }
+    50% { filter: drop-shadow(0 0 12px rgba(230, 57, 70, 0.6)); }
+}
+
+.op-spectator-deck-stack {
+    position: relative;
+    width: 32px;
+    height: 42px;
+}
+
+.op-spectator-card-back {
+    position: absolute;
+    width: 28px;
+    height: 38px;
+    background: linear-gradient(135deg, #3d0000, #1a0a0a, #3d0000);
+    border: 2px solid rgba(230, 57, 70, 0.3);
+    border-radius: 4px;
+}
+
+.op-spectator-card-back.cb-3 {
+    top: 0;
+    left: 0;
+}
+
+.op-spectator-card-back.cb-2 {
+    top: 2px;
+    left: 2px;
+}
+
+.op-spectator-card-back.cb-1 {
+    top: 4px;
+    left: 4px;
+}
+
+.op-spectator-deck-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.op-spectator-deck-count {
+    font-family: var(--font-mono);
+    font-size: 1.4rem;
+    font-weight: 900;
     color: #ffd166;
 }
 
-/* ── Leaderboard ── */
+.op-spectator-deck-bar {
+    width: 80px;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 2px;
+    overflow: hidden;
+}
 
-.op-spectator-leaderboard {
-    background: rgba(15,5,5,0.6);
-    backdrop-filter: blur(8px);
-    border: 3px solid rgba(230,57,70,0.3);
-    border-radius: 24px;
-    padding: 30px;
-    width: 100%;
-    max-width: 600px;
+.op-spectator-deck-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #e63946, #ff2d55);
+    border-radius: 2px;
+    transition: width 0.5s ease-out;
+}
+
+/* ── Two-Column Body ─────────────────────────────────────────────────────── */
+
+.op-spectator-body {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    flex: 1;
+    min-height: 0;
+}
+
+/* ── Left Column ── */
+
+.op-spectator-left {
     display: flex;
     flex-direction: column;
     gap: 16px;
 }
 
+/* ── Spotlight Panel ─────────────────────────────────────────────────────── */
+
+.op-spectator-spotlight {
+    background: rgba(15, 5, 5, 0.6);
+    backdrop-filter: blur(8px);
+    border: 3px solid rgba(230, 57, 70, 0.3);
+    border-radius: 24px;
+    padding: 32px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+    flex: 1;
+}
+
+.op-spotlight-header {
+    text-align: center;
+}
+
+.op-spotlight-name {
+    display: block;
+    font-size: 2rem;
+    font-weight: 900;
+    color: #ffd166;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+}
+
+.op-spotlight-label {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.5);
+    text-transform: uppercase;
+    letter-spacing: 3px;
+}
+
+/* ── Holo (Audited) text overrides ── */
+
+.op-spectator-spotlight.holo-effect .op-spotlight-name {
+    color: #b8860b;
+}
+
+.op-spectator-spotlight.holo-effect .op-spotlight-label {
+    color: rgba(26, 10, 10, 0.5);
+}
+
+.op-spectator-spotlight.holo-effect .op-spotlight-stat-value {
+    color: #1a0a0a;
+}
+
+.op-spectator-spotlight.holo-effect .op-spotlight-operator {
+    color: #b8860b;
+}
+
+.op-spectator-spotlight.holo-effect .op-spotlight-stat-label {
+    color: rgba(26, 10, 10, 0.45);
+}
+
+.op-spectator-spotlight.holo-effect .op-spotlight-audit-badge {
+    background: rgba(26, 10, 10, 0.12);
+    border-color: rgba(26, 10, 10, 0.3);
+    color: #4a1d8a;
+}
+
+/* ── Stats Row ── */
+
+.op-spotlight-stats {
+    display: flex;
+    gap: 32px;
+    justify-content: center;
+}
+
+.op-spotlight-stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+}
+
+.op-spotlight-stat-value {
+    font-family: var(--font-mono);
+    font-size: 2.2rem;
+    font-weight: 900;
+    color: #fff;
+}
+
+.op-spotlight-operator {
+    color: #ffd166;
+}
+
+.op-spotlight-stat-label {
+    font-size: 0.65rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: rgba(255, 255, 255, 0.35);
+}
+
+/* ── Hand (face-down cards) ── */
+
+.op-spotlight-hand {
+    display: flex;
+    justify-content: center;
+    padding: 8px 0;
+}
+
+.op-spotlight-card-back {
+    width: 36px;
+    height: 50px;
+    background: linear-gradient(135deg, #3d0000, #1a0a0a, #3d0000);
+    border: 2px solid rgba(230, 57, 70, 0.25);
+    border-radius: 4px;
+    margin-left: -8px;
+    transition: transform 0.2s;
+    animation: op-card-fan-in 0.3s ease-out both;
+    animation-delay: calc(var(--ci) * 60ms);
+}
+
+.op-spotlight-card-back:first-child {
+    margin-left: 0;
+}
+
+@keyframes op-card-fan-in {
+    from {
+        opacity: 0;
+        transform: translateY(10px) rotate(-5deg);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) rotate(0);
+    }
+}
+
+/* ── Status Badges ── */
+
+.op-spotlight-audit-badge {
+    background: rgba(168, 85, 247, 0.2);
+    border: 1px solid rgba(168, 85, 247, 0.4);
+    color: #a855f7;
+    font-size: 0.7rem;
+    font-weight: 900;
+    padding: 4px 12px;
+    border-radius: 12px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+}
+
+.op-spotlight-broken-badge {
+    background: rgba(255, 45, 85, 0.2);
+    border: 1px solid rgba(255, 45, 85, 0.4);
+    color: #ff2d55;
+    font-size: 0.7rem;
+    font-weight: 900;
+    padding: 4px 12px;
+    border-radius: 12px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+}
+
+/* ── Last Action Bar ─────────────────────────────────────────────────────── */
+
+.op-spectator-last-action {
+    background: rgba(15, 5, 5, 0.5);
+    backdrop-filter: blur(4px);
+    border-left: 4px solid #ffd166;
+    border-radius: 0 12px 12px 0;
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.op-spectator-last-action.blocked {
+    border-left-color: #ff2d55;
+}
+
+.op-last-action-badge {
+    font-size: 0.6rem;
+    font-weight: 900;
+    padding: 2px 8px;
+    border-radius: 8px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    flex-shrink: 0;
+}
+
+.op-last-action-badge.blocked-badge {
+    background: #ff2d55;
+    color: #fff;
+}
+
+.op-last-action-text {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ── Right Column ────────────────────────────────────────────────────────── */
+
+.op-spectator-right {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-height: 0;
+}
+
+/* ── Leaderboard ─────────────────────────────────────────────────────────── */
+
+.op-spectator-leaderboard {
+    background: rgba(15, 5, 5, 0.6);
+    backdrop-filter: blur(8px);
+    border: 3px solid rgba(230, 57, 70, 0.3);
+    border-radius: 24px;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
 .op-spectator-title {
-    font-size: 1rem;
+    font-size: 0.85rem;
     font-weight: 900;
     color: #e63946;
     text-transform: uppercase;
@@ -71,35 +381,36 @@
 .op-spectator-entries {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
 }
 
 .op-spectator-entry {
     display: flex;
     align-items: center;
-    gap: 16px;
-    padding: 12px 16px;
-    background: rgba(255,255,255,0.03);
+    gap: 12px;
+    padding: 10px 14px;
+    background: rgba(255, 255, 255, 0.03);
     border: 2px solid transparent;
     border-radius: 12px;
     transition: all 0.3s;
 }
 
 .op-spectator-entry.active-turn {
-    border-color: rgba(230,57,70,0.4);
-    background: rgba(230,57,70,0.08);
-    box-shadow: 0 0 15px rgba(230,57,70,0.15);
+    border-color: rgba(255, 209, 102, 0.3);
+    border-left: 4px solid #ffd166;
+    background: rgba(255, 209, 102, 0.06);
+    box-shadow: 0 0 15px rgba(255, 209, 102, 0.1);
 }
 
 .op-spectator-entry.targeted {
-    border-color: rgba(255,71,87,0.5);
-    background: rgba(255,71,87,0.1);
+    border-color: rgba(255, 71, 87, 0.5);
+    background: rgba(255, 71, 87, 0.1);
     animation: op-spectator-target-pulse 1.5s ease-in-out infinite;
 }
 
 @keyframes op-spectator-target-pulse {
-    0%, 100% { box-shadow: 0 0 10px rgba(255,71,87,0.2); }
-    50% { box-shadow: 0 0 20px rgba(255,71,87,0.4); }
+    0%, 100% { box-shadow: 0 0 10px rgba(255, 71, 87, 0.2); }
+    50% { box-shadow: 0 0 20px rgba(255, 71, 87, 0.4); }
 }
 
 /* ── Entry Details ── */
@@ -107,8 +418,8 @@
 .op-spectator-rank {
     font-size: 1.2rem;
     font-weight: 900;
-    min-width: 36px;
-    color: rgba(255,255,255,0.5);
+    min-width: 32px;
+    color: rgba(255, 255, 255, 0.5);
 }
 
 .op-spectator-entry:first-child .op-spectator-rank {
@@ -119,53 +430,68 @@
     flex: 1;
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 3px;
+    min-width: 0;
 }
 
 .op-spectator-player-name {
     font-weight: 800;
     font-size: 0.9rem;
     text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.op-target-icon::before {
+    content: "\2316";
+    color: #ff4757;
+    font-size: 0.85rem;
 }
 
 .op-spectator-player-details {
     display: flex;
     align-items: center;
-    gap: 10px;
-    font-size: 0.85rem;
+    gap: 8px;
+    font-size: 0.8rem;
 }
 
 .op-spectator-operator {
     font-weight: 900;
-    font-size: 1rem;
+    font-size: 0.95rem;
     color: #ffd166;
 }
 
 .op-spectator-score {
     font-family: var(--font-mono);
     font-weight: 900;
-    font-size: 1.1rem;
+    font-size: 1rem;
 }
 
 .op-spectator-hand-count {
-    color: rgba(255,255,255,0.5);
-    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.4);
+    font-size: 0.75rem;
 }
 
 .op-spectator-badge {
-    font-size: 0.7rem;
-    color: rgba(255,255,255,0.5);
+    font-size: 0.6rem;
+    font-weight: 800;
+    color: #a855f7;
+    background: rgba(168, 85, 247, 0.15);
+    padding: 1px 6px;
+    border-radius: 6px;
 }
 
 .op-spectator-turn-badge {
-    background: #e63946;
-    color: #fff;
+    background: #ffd166;
+    color: #000;
     font-size: 0.6rem;
     font-weight: 900;
     padding: 2px 8px;
     border-radius: 10px;
     text-transform: uppercase;
     letter-spacing: 1px;
+    flex-shrink: 0;
 }
 
 .op-spectator-target-badge {
@@ -177,46 +503,114 @@
     border-radius: 10px;
     text-transform: uppercase;
     letter-spacing: 1px;
+    flex-shrink: 0;
 }
 
-/* ── Deck Status ── */
+/* ── Activity Log ────────────────────────────────────────────────────────── */
 
-.op-spectator-deck {
+.op-spectator-activity-log {
+    background: rgba(15, 5, 5, 0.6);
+    backdrop-filter: blur(8px);
+    border: 3px solid rgba(230, 57, 70, 0.15);
+    border-radius: 24px;
+    padding: 20px 24px;
     display: flex;
-    align-items: center;
-    gap: 12px;
-    background: rgba(15,5,5,0.4);
-    border: 2px solid rgba(255,255,255,0.08);
-    border-radius: 12px;
-    padding: 12px 20px;
-}
-
-.op-spectator-deck-label {
-    font-size: 0.7rem;
-    font-weight: 900;
-    text-transform: uppercase;
-    letter-spacing: 2px;
-    color: rgba(255,255,255,0.4);
-}
-
-.op-spectator-deck-count {
-    font-family: var(--font-mono);
-    font-size: 1.4rem;
-    font-weight: 900;
-    color: #ffd166;
-}
-
-.op-spectator-deck-bar {
-    width: 120px;
-    height: 6px;
-    background: rgba(255,255,255,0.08);
-    border-radius: 3px;
+    flex-direction: column;
+    gap: 10px;
+    flex: 1;
+    min-height: 0;
     overflow: hidden;
 }
 
-.op-spectator-deck-bar-fill {
-    height: 100%;
-    background: linear-gradient(90deg, #e63946, #ff2d55);
-    border-radius: 3px;
-    transition: width 0.5s ease-out;
+.op-spectator-log-entries {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    overflow-y: auto;
+    max-height: 220px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(230, 57, 70, 0.3) transparent;
+}
+
+.op-spectator-log-entries::-webkit-scrollbar {
+    width: 4px;
+}
+
+.op-spectator-log-entries::-webkit-scrollbar-thumb {
+    background: rgba(230, 57, 70, 0.3);
+    border-radius: 2px;
+}
+
+.op-spectator-log-entry {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.78rem;
+    color: rgba(255, 255, 255, 0.6);
+    animation: op-log-slide-in 0.25s ease-out;
+}
+
+@keyframes op-log-slide-in {
+    from {
+        opacity: 0;
+        transform: translateY(-8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.op-log-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    background: #ffd166;
+}
+
+.op-spectator-log-entry.log-attack .op-log-dot {
+    background: #ff4757;
+}
+
+.op-spectator-log-entry.log-card .op-log-dot {
+    background: #2ecc71;
+}
+
+.op-log-message {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.op-log-time {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    color: rgba(255, 255, 255, 0.25);
+    flex-shrink: 0;
+}
+
+/* ── Responsive ──────────────────────────────────────────────────────────── */
+
+@media (max-width: 768px) {
+    .op-spectator {
+        padding: 16px;
+    }
+
+    .op-spectator-body {
+        grid-template-columns: 1fr;
+    }
+
+    .op-spectator-activity-log {
+        display: none;
+    }
+
+    .op-spotlight-name {
+        font-size: 1.4rem;
+    }
+
+    .op-spotlight-stat-value {
+        font-size: 1.6rem;
+    }
 }

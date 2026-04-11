@@ -21,6 +21,8 @@
 
 header {
     display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
     background-color: white;
     justify-content: space-between;
     font-family: var(--font-primary);
@@ -36,6 +38,10 @@ header {
 header a {
     text-decoration: none;
     color: inherit;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
 }
 
 .main {
@@ -61,6 +67,14 @@ article {
 
 .room-code {
     font-weight: 500;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+@media (max-width: 480px) {
+    .room-code-label {
+        display: none;
+    }
 }
 
 .room-code-btn {

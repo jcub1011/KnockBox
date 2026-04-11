@@ -58,7 +58,15 @@
                             @entry.DisplayName
                         </td>
                         <td class="dtd-final-results-pts">@entry.TotalScore.ToString("0.#")</td>
-                        <td class="dtd-final-results-wl">@entry.Wins–@entry.Losses</td>
+                        <td class="dtd-final-results-wl">
+                            @entry.Wins–@entry.Losses
+                            @if (entry.ByeCount > 0)
+                            {
+                                <span class="dtd-final-results-bye-note" title="@entry.ByeCount bye(s) received">
+                                    (@entry.ByeCount bye@(entry.ByeCount > 1 ? "s" : ""))
+                                </span>
+                            }
+                        </td>
                         <td class="dtd-final-results-mw">@entry.MatchupWins.ToString("0.#")</td>
                         <td class="dtd-final-results-bonus">@entry.BonusPoints</td>
                         <td class="dtd-final-results-tiebreak">
@@ -93,6 +101,13 @@
                                                     <tr>
                                                         <td>Round @outfit.RoundNumber</td>
                                                         <td>@outfit.Score.ToString("0.#")</td>
+                                                    </tr>
+                                                }
+                                                @foreach (var byeRound in breakdown.ByeRounds)
+                                                {
+                                                    <tr class="dtd-final-results-detail-bye">
+                                                        <td>Round @byeRound</td>
+                                                        <td>Bye</td>
                                                     </tr>
                                                 }
                                             </tbody>

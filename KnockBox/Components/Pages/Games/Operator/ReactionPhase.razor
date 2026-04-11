@@ -1,15 +1,73 @@
 @using KnockBox.Operator.Models
+@using KnockBox.Operator.Services.Logic.FSM.ActionCommands
 
 <div class="op-reaction-overlay">
     <div class="op-reaction-backdrop"></div>
     <div class="op-reaction-panel">
         @if (IsTargeted)
         {
+            var ltCards = GetPendingLiabilityTransferCards();
+
             <div class="op-reaction-alert-icon">&#x26A0;&#xFE0F;</div>
             <h2 class="op-reaction-title">YOU ARE BEING TARGETED!</h2>
             <p class="op-reaction-subtitle">
                 <strong>@GetAttackerName()</strong> played <strong>@GetActionDescription()</strong> against you!
             </p>
+
+            @if (GetPendingActionCard() is var pendingCard && pendingCard != null)
+            {
+                <div class="op-reaction-card-desc">
+                    @pendingCard.TooltipDescription()
+                </div>
+            }
+
+            <div class="op-reaction-player-status">
+                <div class="op-status-item">
+                    <span class="op-status-label">YOUR SCORE:</span>
+                    <span class="op-status-value">@(CurrentPlayerState?.CurrentPoints.ToString("F1") ?? "0.0")</span>
+                </div>
+                <div class="op-status-item">
+                    <span class="op-status-label">YOUR OPERATOR:</span>
+                    <span class="op-status-value">@(CurrentPlayerState?.ActiveOperator.ToSymbol() ?? "+")</span>
+                </div>
+            </div>
+
+            @if (GameState.PendingGameActionCommand is HotPotatoCommand hpCmd)
+            {
+                decimal totalVal = 0;
+                foreach (var card in hpCmd.PlayedCards.OfType<NumberCard>())
+                {
+                    totalVal = totalVal * 10 + card.NumberValue;
+                }
+
+                <div class="op-hp-preview">
+                    <div class="op-hp-preview-label">POTENTIAL IMPACT:</div>
+                    <div class="op-hp-preview-value">@totalVal</div>
+                    <div class="op-hp-preview-hint">Cards in this set will be applied to your score using your current operator.</div>
+                </div>
+            }
+            else if (ltCards.Count > 0)
+            {
+                <div class="op-lt-preview">
+                    <div class="op-lt-preview-label">INCOMING CARDS:</div>
+                    <div class="op-lt-preview-cards">
+                        @foreach (var card in ltCards)
+                        {
+                            <div class="op-lt-preview-card">@card.NumberValue</div>
+                        }
+                    </div>
+                    <div class="op-lt-preview-hint">
+                        @if (GetPendingActionCard() is SurchargeCard)
+                        {
+                            <text>These cards will be added to your score.</text>
+                        }
+                        else
+                        {
+                            <text>These cards will be added to your hand if you don't block.</text>
+                        }
+                    </div>
+                </div>
+            }
 
             var reactionCards = GetPotentialReactionCards();
 
@@ -63,12 +121,28 @@
                 </div>
             }
         }
+        else if (HasReacted)
+        {
+            <div class="op-reaction-waiting-content">
+                <h2 class="op-reaction-title" style="font-size: 1.2rem;">Waiting for others...</h2>
+                <p class="op-reaction-subtitle">
+                    You have responded. Waiting for other players to react.
+                </p>
+            </div>
+        }
         else
         {
             <div class="op-reaction-waiting-content">
                 <h2 class="op-reaction-title" style="font-size: 1.2rem;">Waiting for reaction...</h2>
                 <p class="op-reaction-subtitle">
-                    Waiting for <strong>@(GameState.Players.FirstOrDefault(p => p.Id == GameState.ReactionTargetPlayerId)?.Name ?? "the target")</strong> to respond.
+                    @{
+                        var reactedIds = GameState.PlayerReactions.Select(r => r.PlayerId).ToHashSet();
+                        var targetNames = GameState.Players
+                            .Where(p => GameState.ReactionTargetPlayerIds.Contains(p.Id) && !reactedIds.Contains(p.Id))
+                            .Select(p => p.Name)
+                            .ToList();
+                    }
+                    <text>Waiting for <strong>@(string.Join(", ", targetNames))</strong> to respond.</text>
                 </p>
             </div>
         }

@@ -31,8 +31,8 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
         /// <summary>Per-outfit score for a single voting round.</summary>
         protected record OutfitRoundScore(int RoundNumber, EntrantId EntrantId, double Score);
 
-        /// <summary>Full breakdown for a player: per-round outfit scores and bonus points.</summary>
-        protected record PlayerBreakdown(List<OutfitRoundScore> OutfitScores, int BonusPoints);
+        /// <summary>Full breakdown for a player: per-round outfit scores, bonus points, and bye rounds.</summary>
+        protected record PlayerBreakdown(List<OutfitRoundScore> OutfitScores, int BonusPoints, List<int> ByeRounds);
 
         protected void ToggleBreakdown(string playerId)
         {
@@ -63,10 +63,18 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
                 }
             }
 
+            // Collect bye rounds for this player.
+            var byeRounds = new List<int>();
+            foreach (var round in GameState.VotingRounds)
+            {
+                if (round.Byes.Any(b => b.PlayerId == playerId))
+                    byeRounds.Add(round.RoundNumber);
+            }
+
             var player = GameState.GamePlayers.GetValueOrDefault(playerId);
             int bonus = player?.BonusPoints ?? 0;
 
-            return new PlayerBreakdown(outfitScores, bonus);
+            return new PlayerBreakdown(outfitScores, bonus, byeRounds);
         }
 
         protected async Task PlayAgainAsync()

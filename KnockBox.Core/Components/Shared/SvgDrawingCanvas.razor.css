@@ -3,8 +3,12 @@
     flex-direction: column;
     border: 1px solid #ccc;
     border-radius: 8px;
-    overflow: hidden;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+
+.toolbar-container {
+    container-type: inline-size;
+    flex-shrink: 0;
 }
 
 .svg-canvas-toolbar {
@@ -14,7 +18,7 @@
     padding: 6px 10px;
     background: #f5f5f5;
     border-bottom: 1px solid #ddd;
-    flex-shrink: 0;
+    border-radius: 7px 7px 0 0;
     flex-wrap: wrap;
     min-height: 40px;
 }
@@ -184,6 +188,58 @@
         border-color: #ccc;
     }
 
+/* ── Collapsible toolbar dropdowns ────────────────────────────────────────── */
+
+.toolbar-collapsible {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+
+.toolbar-collapse-trigger {
+    display: none;
+    width: 36px;
+    height: 36px;
+    border: 1px solid #ccc;
+    border-radius: 10px;
+    background: #fff;
+    cursor: pointer;
+    padding: 0;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s, border-color 0.15s;
+}
+
+    .toolbar-collapse-trigger:hover {
+        background: #e8e8e8;
+        border-color: #aaa;
+    }
+
+.toolbar-color-trigger {
+    border-radius: 50%;
+    border: 2px solid #333;
+    box-shadow: 0 0 0 1px #fff, 0 0 0 3px #333;
+}
+
+.toolbar-size-trigger {
+    font-size: 1rem;
+    font-weight: 600;
+    background: #333;
+    color: #fff;
+    border-color: #333;
+}
+
+.toolbar-overflow-trigger {
+    line-height: 1;
+}
+
+.toolbar-collapse-panel {
+    display: contents;
+}
+
 /* ── Copy/paste toast ────────────────────────────────────────────────────── */
 
 .toolbar-copy-toast {
@@ -213,6 +269,7 @@
     display: grid;
     position: relative;
     overflow: hidden;
+    border-radius: 0 0 7px 7px;
     min-height: 0;
     min-width: 0;
     background-color: #f1f5f9;
@@ -250,9 +307,7 @@
     place-items: center;
 }
 
-.has-viewbox > .svg-canvas-surface,
-.has-viewbox > .svg-canvas-bg,
-.has-viewbox > .svg-canvas-base {
+.has-viewbox > svg {
     width: auto;
     height: auto;
     max-width: 100%;
@@ -261,12 +316,88 @@
 
 /* ── Responsive ────────────────────────────────────────────────────────────── */
 
-@media (max-width: 480px) {
+@container (max-width: 540px) {
     .svg-canvas-toolbar {
         gap: 6px;
+        flex-wrap: nowrap;
+        overflow: visible;
     }
 
     .toolbar-actions {
-        margin-left: 0;
+        margin-left: auto;
     }
+
+    .toolbar-separator-desktop {
+        display: none;
+    }
+
+    .toolbar-collapse-trigger {
+        display: inline-flex;
+    }
+
+    .toolbar-collapse-panel {
+        display: none;
+        position: absolute;
+        top: calc(100% + 6px);
+        left: 0;
+        z-index: 100;
+        background: #f5f5f5;
+        border: 1px solid #ddd;
+        border-radius: 10px;
+        padding: 8px;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+        flex-wrap: wrap;
+        gap: 4px;
+        min-width: max-content;
+    }
+
+    .toolbar-collapsible.open > .toolbar-collapse-panel {
+        display: flex;
+    }
+
+    .toolbar-collapsible.open > .toolbar-collapse-trigger {
+        background: #e0e0e0;
+        border-color: #999;
+    }
+
+    .toolbar-color-collapsible.open > .toolbar-color-trigger {
+        background: inherit;
+    }
+
+    .toolbar-size-collapsible.open > .toolbar-size-trigger {
+        background: #222;
+    }
+
+    /* Color panel: swatches in a grid */
+    .toolbar-color-panel {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 6px;
+    }
+
+        .toolbar-color-panel .toolbar-swatches {
+            display: grid;
+            grid-template-columns: repeat(3, 36px);
+            gap: 4px;
+        }
+
+    /* Size panel: horizontal row */
+    .toolbar-size-panel {
+        flex-direction: row;
+        align-items: center;
+    }
+
+    /* Overflow panel: right-aligned */
+    .toolbar-overflow-panel {
+        right: 0;
+        left: auto;
+        flex-direction: row;
+        flex-wrap: wrap;
+        max-width: 180px;
+    }
+
+        .toolbar-overflow-panel .toolbar-separator {
+            width: 100%;
+            height: 1px;
+        }
 }

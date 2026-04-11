@@ -7,6 +7,7 @@
     align-items: center;
     padding: 32px 24px;
     overflow-y: auto;
+    position: relative;
     background: radial-gradient(circle at 10% 20%, rgba(255, 133, 161, 0.05) 0%, transparent 20%),
                 radial-gradient(circle at 90% 80%, rgba(132, 224, 193, 0.05) 0%, transparent 20%);
 }
@@ -189,7 +190,7 @@
 /* ── Settings toggle button ─────────────────────────────────────────────────── */
 
 .dtd-settings-toggle-btn {
-    position: fixed;
+    position: absolute;
     top: 24px;
     right: 24px;
     background: white;
@@ -307,6 +308,20 @@
     color: var(--dtd-color-dark);
 }
 
+.dtd-setting-label-row {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.dtd-setting-checkbox {
+    width: 20px;
+    height: 20px;
+    accent-color: var(--dtd-color-mint);
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
 .dtd-setting-input,
 .dtd-setting-select {
     border: 3px solid var(--dtd-color-bg-soft);
@@ -323,6 +338,13 @@
 .dtd-setting-select:focus {
     outline: none;
     border-color: var(--dtd-color-mint);
+}
+
+.dtd-setting-hint {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--dtd-color-mint-deep);
+    opacity: 0.8;
 }
 
 .dtd-clothing-type-row {

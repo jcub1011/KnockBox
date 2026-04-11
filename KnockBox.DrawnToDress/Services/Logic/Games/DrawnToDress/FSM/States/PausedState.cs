@@ -10,7 +10,6 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
     ///
     /// Transition ownership:
     /// - <see cref="ResumeGameCommand"/> (host only) → returns to <see cref="_resumeState"/>
-    /// - <see cref="AbandonGameCommand"/> (host only) → <see cref="AbandonedState"/>
     /// </summary>
     public sealed class PausedState(IDrawnToDressGameState resumeState) : IDrawnToDressGameState
     {
@@ -46,8 +45,6 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
                         _resumeState.GetType().Name);
                     return ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?>.FromValue(_resumeState);
 
-                case AbandonGameCommand:
-                    return new AbandonedState();
 
                 default:
                     return null;

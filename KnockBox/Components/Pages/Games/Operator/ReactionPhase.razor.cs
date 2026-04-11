@@ -1,4 +1,5 @@
 using KnockBox.Operator.Models;
+using KnockBox.Operator.Services.Logic.FSM.ActionCommands;
 using KnockBox.Operator.Services.Logic.FSM.Commands;
 using KnockBox.Services.Logic.Games.Operator;
 using KnockBox.Operator.Services.State;
@@ -24,9 +25,20 @@ namespace KnockBox.Components.Pages.Games.Operator
         protected OperatorPlayerState? CurrentPlayerState =>
             UserService.CurrentUser != null ? GameState.Context?.GamePlayers.GetValueOrDefault(UserService.CurrentUser.Id) : null;
 
-        protected bool IsTargeted => GameState.ReactionTargetPlayerId == UserService.CurrentUser?.Id;
+        protected bool IsTargeted =>
+            GameState.ReactionTargetPlayerIds.Contains(UserService.CurrentUser?.Id ?? "")
+            && !GameState.PlayerReactions.Any(r => r.PlayerId == (UserService.CurrentUser?.Id ?? ""));
 
-        protected bool CanRedirectHotPotato => GameState.PendingHotPotatoCard != null;
+        protected bool HasReacted =>
+            GameState.ReactionTargetPlayerIds.Contains(UserService.CurrentUser?.Id ?? "")
+            && GameState.PlayerReactions.Any(r => r.PlayerId == (UserService.CurrentUser?.Id ?? ""));
+
+        protected bool CanRedirectHotPotato => GameState.PendingGameActionCommand is HotPotatoCommand;
+
+        protected List<NumberCard> GetPendingLiabilityTransferCards()
+        {
+            return GameState.PendingGameActionCommand?.PlayedCards.OfType<NumberCard>().ToList() ?? new();
+        }
 
         protected async Task PlayShield(Guid cardId)
         {
@@ -82,21 +94,7 @@ namespace KnockBox.Components.Pages.Games.Operator
             }
         }
 
-        protected Card? GetPendingActionCard()
-        {
-            if (GameState.PendingActionCommand is PlayCardsCommand play)
-            {
-                foreach (var cardId in play.CardIds)
-                {
-                    var card = GameState.DiscardPile.FirstOrDefault(c => c.Id == cardId);
-                    if (card is ActionCard || card is KnockBox.Operator.Models.OperatorCard)
-                    {
-                        return card;
-                    }
-                }
-            }
-            return null;
-        }
+        protected Card? GetPendingActionCard() => GameState.PendingGameActionCommand?.PrimaryCard;
 
         protected List<Card> GetPotentialReactionCards()
         {
@@ -112,11 +110,9 @@ namespace KnockBox.Components.Pages.Games.Operator
 
         protected string GetAttackerName()
         {
-            if (GameState.PendingActionCommand is PlayCardsCommand play)
-            {
-                return GameState.Players.FirstOrDefault(p => p.Id == play.PlayerId)?.Name ?? "Unknown";
-            }
-            return "Unknown";
+            return GameState.PendingGameActionCommand != null 
+                ? GameState.Players.FirstOrDefault(p => p.Id == GameState.PendingGameActionCommand.InitiatorPlayerId)?.Name ?? "Unknown" 
+                : "Unknown";
         }
 
         protected string GetActionDescription()
@@ -124,21 +120,17 @@ namespace KnockBox.Components.Pages.Games.Operator
             var pendingCard = GetPendingActionCard();
             if (pendingCard != null)
             {
-                if (pendingCard is HotPotatoCard)
+                if (pendingCard is HotPotatoCard && GameState.PendingGameActionCommand != null)
                 {
-                    if (GameState.PendingActionCommand is PlayCardsCommand playCmd)
+                    var numbers = GameState.PendingGameActionCommand.PlayedCards.OfType<NumberCard>().ToList();
+                    if (numbers.Count > 0)
                     {
                         decimal val = 0;
-                        var numCards = playCmd.CardIds
-                            .Select(id => GameState.DiscardPile.FirstOrDefault(c => c.Id == id))
-                            .OfType<NumberCard>()
-                            .ToList();
-
-                        if (numCards.Count > 0)
+                        foreach (var num in numbers)
                         {
-                            foreach (var num in numCards) val = val * 10 + num.NumberValue;
-                            return $"Hot Potato with the value {val}";
+                            val = val * 10 + num.NumberValue;
                         }
+                        return $"Hot Potato with the value {val}";
                     }
                 }
                 if (pendingCard is KnockBox.Operator.Models.OperatorCard opCard)

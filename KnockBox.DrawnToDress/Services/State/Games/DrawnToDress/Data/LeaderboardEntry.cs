@@ -12,10 +12,10 @@ namespace KnockBox.Services.State.Games.DrawnToDress.Data
         public string DisplayName { get; set; } = string.Empty;
 
         /// <summary>Number of head-to-head matchup wins across all voting rounds.</summary>
-        public int Wins { get; set; }
+        public double Wins { get; set; }
 
         /// <summary>Number of head-to-head matchup losses across all voting rounds.</summary>
-        public int Losses { get; set; }
+        public double Losses { get; set; }
 
         /// <summary>Aggregated weighted voting score across all rounds and criteria.</summary>
         public double TotalScore { get; set; }
@@ -27,6 +27,9 @@ namespace KnockBox.Services.State.Games.DrawnToDress.Data
         /// Weighted matchup wins used as a tiebreaker. Win=1.0, tie=0.5, loss=0.0 per matchup.
         /// </summary>
         public double MatchupWins { get; set; }
+
+        /// <summary>Number of byes (free wins) received across all voting rounds.</summary>
+        public int ByeCount { get; set; }
 
         /// <summary>Final rank on the leaderboard (1 = first place).</summary>
         public int Rank { get; set; }

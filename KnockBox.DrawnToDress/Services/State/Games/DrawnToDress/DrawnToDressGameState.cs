@@ -223,6 +223,5 @@ namespace KnockBox.Services.State.Games.DrawnToDress
 
         // ── Game control ──────────────────────────────────────────────────────
         Paused = 12,
-        Abandoned = 13,
     }
 }

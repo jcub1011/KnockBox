@@ -50,7 +50,7 @@ public class OperatorGameContext(OperatorGameState state, IRandomNumberService r
         AddCards(deck, CardType.Operator, CardOperator.Add, 4);
         AddCards(deck, CardType.Operator, CardOperator.Subtract, 4);
         AddCards(deck, CardType.Operator, CardOperator.Multiply, 2);
-        AddCards(deck, CardType.Operator, CardOperator.Divide, 2);
+        AddCards(deck, CardType.Operator, CardOperator.Divide, 0);
 
         // Actions (20)
         AddCards(deck, CardType.Action, CardAction.Shield, 4);
@@ -63,6 +63,8 @@ public class OperatorGameContext(OperatorGameState state, IRandomNumberService r
         AddCards(deck, CardType.Action, CardAction.HostileTakeover, 1);
         AddCards(deck, CardType.Action, CardAction.Audit, 1);
         AddCards(deck, CardType.Action, CardAction.MarketCrash, 1);
+        AddCards(deck, CardType.Action, CardAction.Surcharge, 2);
+        AddCards(deck, CardType.Action, CardAction.BlueShell, 2);
     }
 
     private static void AddCards(List<Card> deck, CardType type, decimal value, int count)
@@ -91,6 +93,8 @@ public class OperatorGameContext(OperatorGameState state, IRandomNumberService r
                 CardAction.HostileTakeover => new HostileTakeoverCard(),
                 CardAction.Audit => new AuditCard(),
                 CardAction.MarketCrash => new MarketCrashCard(),
+                CardAction.Surcharge => new SurchargeCard(),
+                CardAction.BlueShell => new BlueShellCard(),
                 _ => throw new NotImplementedException()
             };
             deck.Add(card);
@@ -127,85 +131,4 @@ public class OperatorGameContext(OperatorGameState state, IRandomNumberService r
         return (Math.Round(newScore, 1, MidpointRounding.AwayFromZero), op);
     }
 
-    public void ResolveComp(string playerId)
-    {
-        if (GamePlayers.TryGetValue(playerId, out var player) && !player.IsAudited)
-        {
-            if (player.CurrentPoints < 0) player.ActiveOperator = CardOperator.Add;
-            else if (player.CurrentPoints > 0) player.ActiveOperator = CardOperator.Subtract;
-        }
-    }
-
-    public void ResolveMarketCrash()
-    {
-        foreach (var player in GamePlayers.Values)
-        {
-            if (!player.IsAudited) player.ActiveOperator = CardOperator.Divide;
-        }
-    }
-
-    public void ResolveCookTheBooks(string playerId, decimal incomingValue)
-    {
-        if (GamePlayers.TryGetValue(playerId, out var player))
-        {
-            var (newScore, newOp) = CalculateNewScore(player.CurrentPoints, CardOperator.Divide, incomingValue);
-            player.CurrentPoints = newScore;
-            if (incomingValue == 0m) player.ActiveOperator = newOp;
-            player.ScoreTimestamp = DateTimeOffset.UtcNow;
-        }
-    }
-
-    public void ResolveSteal(string sourcePlayerId, string targetPlayerId)
-    {
-        if (GamePlayers.TryGetValue(sourcePlayerId, out var source) && GamePlayers.TryGetValue(targetPlayerId, out var target))
-        {
-            if (target.Hand.Count > 0)
-            {
-                var cardIdx = Rng.GetRandomInt(target.Hand.Count);
-                var stolen = target.Hand[cardIdx];
-                target.Hand.RemoveAt(cardIdx);
-                source.Hand.Add(stolen);
-            }
-        }
-    }
-
-    public void ResolveHotPotato(string targetPlayerId, decimal value)
-    {
-        if (GamePlayers.TryGetValue(targetPlayerId, out var target))
-        {
-            var (newScore, newOp) = CalculateNewScore(target.CurrentPoints, target.ActiveOperator, value);
-            target.CurrentPoints = newScore;
-            target.ActiveOperator = newOp;
-            target.ScoreTimestamp = DateTimeOffset.UtcNow;
-        }
-    }
-
-    public void ResolveFlashFlood()
-    {
-        foreach (var player in GamePlayers.Values)
-        {
-            DealCards(player, 2);
-        }
-    }
-
-    public void ResolveHostileTakeover(string sourcePlayerId, string targetPlayerId)
-    {
-        if (GamePlayers.TryGetValue(sourcePlayerId, out var source) && GamePlayers.TryGetValue(targetPlayerId, out var target))
-        {
-            if (!source.IsAudited && !target.IsAudited)
-            {
-                (target.ActiveOperator, source.ActiveOperator) = (source.ActiveOperator, target.ActiveOperator);
-            }
-        }
-    }
-
-    public void ResolveAudit(string targetPlayerId)
-    {
-        if (GamePlayers.TryGetValue(targetPlayerId, out var target))
-        {
-            target.IsAudited = true;
-            // Audit expires after 1 full round (number of players' turns)
-            target.AuditExpiresTurnCount = State.TurnCount + GamePlayers.Count;
-        }
-    }
 }

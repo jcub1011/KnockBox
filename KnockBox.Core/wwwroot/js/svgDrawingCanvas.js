@@ -218,6 +218,16 @@ function setUndoDisabled(container, disabled) {
 }
 
 /**
+ * Sets or clears the visual disabled state on the redo button.
+ * @param {Element|null} container
+ * @param {boolean} disabled
+ */
+function setRedoDisabled(container, disabled) {
+    container?.querySelector('.toolbar-btn-redo')
+        ?.classList.toggle('toolbar-btn-disabled', disabled);
+}
+
+/**
  * Updates which swatch button bears the active highlight.
  * @param {Element|null} container
  * @param {string} color - hex or CSS color string
@@ -238,6 +248,9 @@ function updateSwatchActive(container, color) {
             customSwatch.classList.remove('toolbar-swatch-active');
         }
     }
+    // Sync mobile color trigger
+    const colorTrigger = container?.querySelector('.toolbar-color-trigger');
+    if (colorTrigger) colorTrigger.style.backgroundColor = color;
 }
 
 /**
@@ -250,6 +263,12 @@ function updateSizeActive(container, size) {
         s.classList.toggle('toolbar-size-btn-active',
             parseInt(s.dataset.size, 10) === size);
     });
+    // Sync mobile size trigger
+    const sizeTrigger = container?.querySelector('.toolbar-size-trigger');
+    if (sizeTrigger) {
+        const activeBtn = container.querySelector('.toolbar-size-btn-active');
+        sizeTrigger.textContent = activeBtn ? activeBtn.textContent : size;
+    }
 }
 
 /**
@@ -340,9 +359,13 @@ export function initialize(svgId, dotNetRef, initialColor, initialStrokeWidth, i
         return;
     }
 
+    const abortController = new AbortController();
+    const signal = abortController.signal;
+
     const state = {
         svg,
         dotNetRef,
+        abortController,
         color: initialColor,
         strokeWidth: initialStrokeWidth,
         backgroundColor: initialBackgroundColor || 'white',
@@ -354,7 +377,8 @@ export function initialize(svgId, dotNetRef, initialColor, initialStrokeWidth, i
          *  0 = no simplification; 0.5 = subtle; 2 = balanced (default); 8 = aggressive. */
         simplifyMinArea: 2,
         currentTool: 'brush', // 'brush', 'eraser', or 'fill'
-        undoStack: [], // Stores actions: { type: 'draw'|'erase'|'fill', element, index, previousBg }
+        undoStack: [], // Stores actions: { type: 'draw'|'erase'|'clear', element/elements, index }
+        redoStack: [],
     };
 
     instances.set(svgId, state);
@@ -380,9 +404,11 @@ export function initialize(svgId, dotNetRef, initialColor, initialStrokeWidth, i
                 state.paths.splice(idx, 1);
                 el.remove();
                 state.undoStack.push({ type: 'erase', element: el, index: idx });
+                state.redoStack = [];
+                setUndoDisabled(container, false);
+                setRedoDisabled(container, true);
                 state.dotNetRef.invokeMethodAsync('OnStrokeCompleted', state.paths.length)
                     .catch(err => console.error('[SVGCanvas] OnStrokeCompleted failed.', err));
-                setUndoDisabled(container, false);
             }
         }
     }
@@ -482,7 +508,9 @@ export function initialize(svgId, dotNetRef, initialColor, initialStrokeWidth, i
         state.paths.splice(insertionIdx, 0, path);
         
         state.undoStack.push({ type: 'draw', element: path });
+        state.redoStack = [];
         setUndoDisabled(container, false);
+        setRedoDisabled(container, true);
         state.dotNetRef.invokeMethodAsync('OnStrokeCompleted', state.paths.length)
             .catch(err => console.error('[SVGCanvas] OnStrokeCompleted failed.', err));
     }
@@ -592,20 +620,46 @@ export function initialize(svgId, dotNetRef, initialColor, initialStrokeWidth, i
 
         state.paths.push(element);
         state.undoStack.push({ type: 'draw', element });
+        state.redoStack = [];
         state.currentPath = null;
         state.currentPoints = [];
         setUndoDisabled(container, false);
+        setRedoDisabled(container, true);
         state.dotNetRef.invokeMethodAsync('OnStrokeCompleted', state.paths.length)
             .catch(err => console.error('[SVGCanvas] OnStrokeCompleted failed.', err));
     }
 
-    // Undo starts disabled; first completed stroke enables it.
+    // Undo/Redo starts disabled
     setUndoDisabled(container, true);
+    setRedoDisabled(container, true);
 
-    function deselectEraserIfActive() {
-        if (state.currentTool === 'eraser') {
+    // ── Mobile collapsible dropdowns ────────────────────────────────────────
+    function closeAllDropdowns() {
+        container?.querySelectorAll('.toolbar-collapsible.open').forEach(el => {
+            el.classList.remove('open');
+            el.querySelector('.toolbar-collapse-trigger')
+                ?.setAttribute('aria-expanded', 'false');
+        });
+    }
+
+    // Close dropdowns when clicking outside
+    document.addEventListener('pointerdown', (e) => {
+        const openCollapsibles = container?.querySelectorAll('.toolbar-collapsible.open');
+        if (!openCollapsibles?.length) return;
+        openCollapsibles.forEach(el => {
+            if (!el.contains(e.target)) {
+                el.classList.remove('open');
+                el.querySelector('.toolbar-collapse-trigger')
+                    ?.setAttribute('aria-expanded', 'false');
+            }
+        });
+    }, { signal });
+
+    function deselectToolsIfActive() {
+        if (state.currentTool !== 'brush') {
             state.currentTool = 'brush';
             container.querySelector('.toolbar-btn-eraser')?.classList.remove('toolbar-btn-active');
+            container.querySelector('.toolbar-btn-fill')?.classList.remove('toolbar-btn-active');
             state.dotNetRef.invokeMethodAsync('OnToolChanged', 'brush')
                 .catch(err => console.error('[SVGCanvas] OnToolChanged failed.', err));
         }
@@ -615,12 +669,12 @@ export function initialize(svgId, dotNetRef, initialColor, initialStrokeWidth, i
     const colorInput = container?.querySelector('.toolbar-color');
     if (colorInput) {
         colorInput.addEventListener('input', (e) => {
-            deselectEraserIfActive();
+            deselectToolsIfActive();
             state.color = e.target.value;
             updateSwatchActive(container, e.target.value);
             state.dotNetRef.invokeMethodAsync('OnColorChanged', e.target.value)
                 .catch(err => console.error('[SVGCanvas] OnColorChanged failed.', err));
-        });
+        }, { signal });
     } else {
         console.warn('[SVGCanvas] initialize: .toolbar-color not found — color picker will not work.');
     }
@@ -637,16 +691,41 @@ export function initialize(svgId, dotNetRef, initialColor, initialStrokeWidth, i
             updateSizeActive(container, width);
             state.dotNetRef.invokeMethodAsync('OnStrokeWidthChanged', width)
                 .catch(err => console.error('[SVGCanvas] OnStrokeWidthChanged failed.', err));
-        });
+        }, { signal });
     }
 
     // Delegated click handler for swatches, undo, and export.
     if (container) {
         container.addEventListener('click', (e) => {
+            // Mobile dropdown trigger toggle
+            const trigger = e.target.closest('.toolbar-collapse-trigger');
+            if (trigger) {
+                const collapsible = trigger.closest('.toolbar-collapsible');
+                if (collapsible) {
+                    const isOpen = collapsible.classList.toggle('open');
+                    trigger.setAttribute('aria-expanded', isOpen);
+                    // Close other open dropdowns
+                    container.querySelectorAll('.toolbar-collapsible.open').forEach(el => {
+                        if (el !== collapsible) {
+                            el.classList.remove('open');
+                            el.querySelector('.toolbar-collapse-trigger')
+                                ?.setAttribute('aria-expanded', 'false');
+                        }
+                    });
+                }
+                return;
+            }
+
+            // Auto-close dropdowns after selecting an item inside a panel
+            // (but not when interacting with inputs like the size number or color picker)
+            if (e.target.closest('.toolbar-collapse-panel') && e.target.tagName !== 'INPUT') {
+                requestAnimationFrame(() => closeAllDropdowns());
+            }
+
             // Custom swatch — select it with its current color
             const customSwatchEl = e.target.closest('.toolbar-swatch-custom');
             if (customSwatchEl) {
-                deselectEraserIfActive();
+                deselectToolsIfActive();
                 const rgb = getComputedStyle(customSwatchEl).backgroundColor;
                 const hex = rgbToHex(rgb) || state.color;
                 state.color = hex;
@@ -660,7 +739,7 @@ export function initialize(svgId, dotNetRef, initialColor, initialStrokeWidth, i
             // Swatch
             const swatchEl = e.target.closest('.toolbar-swatch[data-color]');
             if (swatchEl) {
-                deselectEraserIfActive();
+                deselectToolsIfActive();
                 const color = swatchEl.dataset.color;
                 state.color = color;
                 if (colorInput) colorInput.value = color;
@@ -716,6 +795,15 @@ export function initialize(svgId, dotNetRef, initialColor, initialStrokeWidth, i
             const undoBtn = e.target.closest('.toolbar-btn-undo');
             if (undoBtn) {
                 undo(svgId);
+                state.dotNetRef.invokeMethodAsync('OnStrokeCompleted', state.paths.length)
+                    .catch(err => console.error('[SVGCanvas] OnStrokeCompleted failed.', err));
+                return;
+            }
+
+            // Redo
+            const redoBtn = e.target.closest('.toolbar-btn-redo');
+            if (redoBtn) {
+                redo(svgId);
                 state.dotNetRef.invokeMethodAsync('OnStrokeCompleted', state.paths.length)
                     .catch(err => console.error('[SVGCanvas] OnStrokeCompleted failed.', err));
                 return;
@@ -788,7 +876,7 @@ export function initialize(svgId, dotNetRef, initialColor, initialStrokeWidth, i
                 });
                 return;
             }
-        });
+        }, { signal });
     }
 
     // Pointer events (unified mouse + touch with sub-pixel precision)
@@ -797,10 +885,10 @@ export function initialize(svgId, dotNetRef, initialColor, initialStrokeWidth, i
         if (e.button !== 0) return;
         e.preventDefault();
         startStroke(e.clientX, e.clientY);
-    });
-    svg.addEventListener('pointermove', (e) => continueStroke(e.clientX, e.clientY));
-    svg.addEventListener('pointerup', () => endStroke());
-    svg.addEventListener('pointerleave', () => endStroke());
+    }, { signal });
+    svg.addEventListener('pointermove', (e) => continueStroke(e.clientX, e.clientY), { signal });
+    svg.addEventListener('pointerup', () => endStroke(), { signal });
+    svg.addEventListener('pointerleave', () => endStroke(), { signal });
 }
 
 /**
@@ -854,7 +942,10 @@ export function undo(svgId) {
     const action = state.undoStack.pop();
     if (action.type === 'draw') {
         const idx = state.paths.indexOf(action.element);
-        if (idx !== -1) state.paths.splice(idx, 1);
+        if (idx !== -1) {
+            action.index = idx; // Store actual index before removing
+            state.paths.splice(idx, 1);
+        }
         action.element.remove();
     } else if (action.type === 'erase') {
         state.paths.splice(action.index, 0, action.element);
@@ -867,9 +958,54 @@ export function undo(svgId) {
             }
         }
         state.svg.insertBefore(action.element, nextEl);
+    } else if (action.type === 'clear') {
+        state.paths = [...action.elements];
+        for (const el of state.paths) {
+            state.svg.appendChild(el);
+        }
     }
 
-    setUndoDisabled(state.svg.closest('.svg-drawing-canvas'), state.undoStack.length === 0);
+    state.redoStack.push(action);
+    const container = state.svg.closest('.svg-drawing-canvas');
+    setUndoDisabled(container, state.undoStack.length === 0);
+    setRedoDisabled(container, false);
+    return state.paths.length;
+}
+
+/**
+ * Restores the most recently undone action. Returns the remaining stroke count.
+ * @param {string} svgId
+ * @returns {number}
+ */
+export function redo(svgId) {
+    const state = instances.get(svgId);
+    if (!state || state.redoStack.length === 0) return 0;
+
+    const action = state.redoStack.pop();
+    if (action.type === 'draw') {
+        const idx = action.index !== undefined ? action.index : state.paths.length;
+        state.paths.splice(idx, 0, action.element);
+        let nextEl = null;
+        for (let i = idx + 1; i < state.paths.length; i++) {
+            if (state.paths[i].parentNode === state.svg) {
+                nextEl = state.paths[i];
+                break;
+            }
+        }
+        state.svg.insertBefore(action.element, nextEl);
+    } else if (action.type === 'erase') {
+        const idx = state.paths.indexOf(action.element);
+        if (idx !== -1) state.paths.splice(idx, 1);
+        action.element.remove();
+    } else if (action.type === 'clear') {
+        for (const path of state.paths) path.remove();
+        state.paths = [];
+    }
+
+    state.undoStack.push(action);
+    const container = state.svg.closest('.svg-drawing-canvas');
+    setUndoDisabled(container, false);
+    setRedoDisabled(container, state.redoStack.length === 0);
     return state.paths.length;
 }
 
@@ -879,11 +1015,15 @@ export function undo(svgId) {
  */
 export function clear(svgId) {
     const state = instances.get(svgId);
-    if (!state) return;
+    if (!state || state.paths.length === 0) return;
+    const pathsCopy = [...state.paths];
     for (const path of state.paths) path.remove();
     state.paths = [];
-    state.undoStack = [];
-    setUndoDisabled(state.svg.closest('.svg-drawing-canvas'), true);
+    state.undoStack.push({ type: 'clear', elements: pathsCopy });
+    state.redoStack = [];
+    const container = state.svg.closest('.svg-drawing-canvas');
+    setUndoDisabled(container, false);
+    setRedoDisabled(container, true);
 }
 
 /**
@@ -1055,6 +1195,7 @@ export function loadSvgContent(svgId, svgContent) {
     for (const p of state.paths) p.remove();
     state.paths = [];
     state.undoStack = [];
+    state.redoStack = [];
     state.currentPath = null;
     state.currentPoints = [];
 
@@ -1062,6 +1203,7 @@ export function loadSvgContent(svgId, svgContent) {
 
     if (!svgContent) {
         setUndoDisabled(container, true);
+        setRedoDisabled(container, true);
         return 0;
     }
 
@@ -1089,6 +1231,7 @@ export function loadSvgContent(svgId, svgContent) {
     }
 
     setUndoDisabled(container, state.paths.length === 0);
+    setRedoDisabled(container, true);
     return state.paths.length;
 }
 
@@ -1109,6 +1252,15 @@ export function isInitialized(svgId) {
  * @param {string} svgId
  */
 export function dispose(svgId) {
+    const state = instances.get(svgId);
+    if (state) {
+        state.abortController?.abort();
+        state.dotNetRef = null;
+        state.svg = null;
+        state.paths = [];
+        state.undoStack = [];
+        state.redoStack = [];
+    }
     instances.delete(svgId);
 }
 
