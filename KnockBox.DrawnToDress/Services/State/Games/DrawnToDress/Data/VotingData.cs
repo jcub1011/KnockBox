@@ -64,6 +64,9 @@ namespace KnockBox.Services.State.Games.DrawnToDress.Data
 
         /// <summary>All head-to-head matchups for this round.</summary>
         public List<SwissMatchup> Matchups { get; set; } = [];
+
+        /// <summary>Entrants who received a bye (free win) this round due to odd count.</summary>
+        public List<EntrantId> Byes { get; set; } = [];
     }
 
     /// <summary>

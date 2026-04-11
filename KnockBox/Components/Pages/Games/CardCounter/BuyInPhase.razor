@@ -4,54 +4,95 @@
 
 @{
     var myPlayer = GetMyPlayer();
+    var isHost = IsHost();
 }
 
-<div class="cc-buyin-area">
-    <div class="cc-buyin-panel">
-        <h3 class="cc-panel-title">♦ CHOOSE YOUR SIDE ♦</h3>
-        <p class="cc-buyin-subtitle">Will you play it safe or go all in?</p>
+@if (isHost)
+{
+    @* ── HOST VIEW: TV-friendly Buy-In ── *@
+    <div class="cc-buyin-area">
+        <div class="cc-buyin-panel cc-buyin-host-panel">
+            <h3 class="cc-panel-title cc-buyin-host-title">♦ BUY-IN PHASE ♦</h3>
+            <p class="cc-buyin-subtitle">Players are choosing their starting balance</p>
 
-        <div class="cc-buyin-players">
-            @foreach (var p in GameState.GamePlayers.Values)
+            <div class="cc-buyin-host-grid">
+                @foreach (var p in GameState.GamePlayers.Values)
+                {
+                    <div class="cc-buyin-host-card @(p.HasSetBuyIn ? "cc-buyin-host-ready" : "cc-buyin-host-choosing")">
+                        <div class="cc-buyin-host-name">@p.DisplayName</div>
+                        <div class="cc-buyin-host-roll">
+                            <span class="cc-buyin-host-dice">🎲</span>
+                            <span class="cc-buyin-host-roll-val">@(p.BuyInRoll * 8)</span>
+                        </div>
+                        @if (p.HasSetBuyIn)
+                        {
+                            <div class="cc-buyin-host-status">
+                                <span class="cc-buyin-host-balance @(p.Balance >= 0 ? "cc-positive" : "cc-negative")">@p.Balance.FormatBalance()</span>
+                                <span class="cc-buyin-host-check">✅</span>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="cc-buyin-host-status">
+                                <span class="cc-buyin-host-pending">Choosing...</span>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+}
+else
+{
+    @* ── PLAYER VIEW ── *@
+    <div class="cc-buyin-area">
+        <div class="cc-buyin-panel">
+            <h3 class="cc-panel-title">♦ CHOOSE YOUR SIDE ♦</h3>
+            <p class="cc-buyin-subtitle">Will you play it safe or go all in?</p>
+
+            <div class="cc-buyin-players">
+                @foreach (var p in GameState.GamePlayers.Values)
+                {
+                    <div class="cc-buyin-player-row">
+                        <span class="cc-buyin-player-name">@p.DisplayName</span>
+                        @if (p.HasSetBuyIn)
+                        {
+                            <span class="cc-buyin-status cc-buyin-done">✅ Ready</span>
+                        }
+                        else
+                        {
+                            <span class="cc-buyin-status cc-buyin-pending">⏳ Choosing...</span>
+                        }
+                    </div>
+                }
+            </div>
+
+            @if (myPlayer != null && !myPlayer.HasSetBuyIn)
             {
-                <div class="cc-buyin-player-row">
-                    <span class="cc-buyin-player-name">@p.DisplayName</span>
-                    @if (p.HasSetBuyIn)
-                    {
-                        <span class="cc-buyin-status cc-buyin-done">✅ Ready</span>
-                    }
-                    else
-                    {
-                        <span class="cc-buyin-status cc-buyin-pending">⏳ Choosing...</span>
-                    }
+                <div class="cc-buyin-roll">
+                    <span class="cc-buyin-roll-label">🎲 Your roll</span>
+                    <span class="cc-buyin-roll-value">×8 = @(myPlayer.BuyInRoll * 8)</span>
+                </div>
+                <p class="cc-buyin-choice-label">Choose your starting balance:</p>
+                <div class="cc-buyin-buttons">
+                    <button class="cc-btn cc-btn-positive cc-btn-lg" @onclick="() => SetBuyIn(false)">
+                        ➕ +@(myPlayer.BuyInRoll * 8)
+                    </button>
+                    <button class="cc-btn cc-btn-negative cc-btn-lg" @onclick="() => SetBuyIn(true)">
+                        ➖ -@(myPlayer.BuyInRoll * 8)
+                    </button>
+                </div>
+            }
+            else if (myPlayer != null && myPlayer.HasSetBuyIn)
+            {
+                <div class="cc-buyin-waiting">
+                    <span>Your starting balance: </span>
+                    <span class="cc-balance @(myPlayer.Balance >= 0 ? "cc-positive" : "cc-negative")">@myPlayer.Balance.FormatBalance()</span>
+                    <br />
+                    <span class="cc-waiting-text">Waiting for other players...</span>
                 </div>
             }
         </div>
-
-        @if (myPlayer != null && !myPlayer.HasSetBuyIn)
-        {
-            <div class="cc-buyin-roll">
-                <span class="cc-buyin-roll-label">🎲 Your roll</span>
-                <span class="cc-buyin-roll-value">×8 = @(myPlayer.BuyInRoll * 8)</span>
-            </div>
-            <p class="cc-buyin-choice-label">Choose your starting balance:</p>
-            <div class="cc-buyin-buttons">
-                <button class="cc-btn cc-btn-positive cc-btn-lg" @onclick="() => SetBuyIn(false)">
-                    ➕ +@(myPlayer.BuyInRoll * 8)
-                </button>
-                <button class="cc-btn cc-btn-negative cc-btn-lg" @onclick="() => SetBuyIn(true)">
-                    ➖ -@(myPlayer.BuyInRoll * 8)
-                </button>
-            </div>
-        }
-        else if (myPlayer != null && myPlayer.HasSetBuyIn)
-        {
-            <div class="cc-buyin-waiting">
-                <span>Your starting balance: </span>
-                <span class="cc-balance @(myPlayer.Balance >= 0 ? "cc-positive" : "cc-negative")">@myPlayer.Balance.FormatBalance()</span>
-                <br />
-                <span class="cc-waiting-text">Waiting for other players...</span>
-            </div>
-        }
     </div>
-</div>
+}

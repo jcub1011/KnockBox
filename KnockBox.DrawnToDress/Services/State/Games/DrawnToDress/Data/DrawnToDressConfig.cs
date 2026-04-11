@@ -29,6 +29,14 @@ namespace KnockBox.Services.State.Games.DrawnToDress.Data
         /// </summary>
         public bool AllowSketchingDuringOutfitBuilding { get; set; } = false;
 
+        /// <summary>
+        /// When <see langword="true"/>, the host screen displays a live gallery of
+        /// submitted drawings during the drawing phase. When <see langword="false"/>,
+        /// only player progress indicators are shown (no SVG previews).
+        /// Default: <see langword="true"/>.
+        /// </summary>
+        public bool ShowDrawingsOnHostScreen { get; set; } = true;
+
         // ── Clothing types ────────────────────────────────────────────────────
 
         /// <summary>
@@ -61,9 +69,9 @@ namespace KnockBox.Services.State.Games.DrawnToDress.Data
 
         /// <summary>
         /// Number of seconds the theme is displayed before drawing begins.
-        /// GDD default: 10 s.
+        /// GDD default: 6 s.
         /// </summary>
-        public int ThemeAnnouncementTimeSec { get; set; } = 10;
+        public int ThemeAnnouncementTimeSec { get; set; } = 6;
 
         /// <summary>
         /// Number of candidate themes presented to players for voting when
@@ -91,9 +99,9 @@ namespace KnockBox.Services.State.Games.DrawnToDress.Data
 
         /// <summary>
         /// Number of seconds players have to add a custom name and finalize their outfit.
-        /// GDD default: 60 s.
+        /// GDD default: 75 s.
         /// </summary>
-        public int OutfitCustomizationTimeSec { get; set; } = 60;
+        public int OutfitCustomizationTimeSec { get; set; } = 75;
 
         // ── Pool / reuse / distinctness ───────────────────────────────────────
 
@@ -103,6 +111,14 @@ namespace KnockBox.Services.State.Games.DrawnToDress.Data
         /// GDD default: <see langword="true"/>.
         /// </summary>
         public bool AllowReuseOwnItems { get; set; } = true;
+
+        /// <summary>
+        /// When <see langword="true"/>, players may actively select (claim) their own
+        /// drawings from the pool during outfit building, just like any other player's
+        /// items. When <see langword="false"/> (default), own drawings cannot be claimed
+        /// and are only used as automatic fallbacks (see <see cref="AllowReuseOwnItems"/>).
+        /// </summary>
+        public bool AllowSelectOwnDrawings { get; set; } = false;
 
         /// <summary>
         /// When <see langword="true"/>, each outfit slot must be filled by a distinct
@@ -185,7 +201,7 @@ namespace KnockBox.Services.State.Games.DrawnToDress.Data
         /// Number of Swiss voting rounds to run.
         /// GDD default: 3.
         /// </summary>
-        public int VotingRounds { get; set; } = 3;
+        public int VotingRounds { get; set; } = 0;
 
         // ── Bonus points ──────────────────────────────────────────────────────
 
@@ -277,7 +293,7 @@ namespace KnockBox.Services.State.Games.DrawnToDress.Data
 
             // ── Voting ─────────────────────────────────────────────────────────
             if (VotingTimeSec < 15) VotingTimeSec = 15;
-            if (VotingRounds < 1)  VotingRounds = 1;
+            if (VotingRounds < 0)  VotingRounds = 0;
 
             // Ensure voting criteria have non-negative weights; remove any with empty Id.
             VotingCriteria.RemoveAll(c => string.IsNullOrWhiteSpace(c.Id));

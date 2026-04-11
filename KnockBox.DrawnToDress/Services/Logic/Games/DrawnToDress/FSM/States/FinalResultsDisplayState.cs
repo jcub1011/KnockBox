@@ -14,8 +14,6 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
     ///
     /// Transition ownership:
     /// - <see cref="PlayAgainCommand"/> (host only) → <see cref="LobbyState"/>
-    /// - <see cref="ReturnToMenuCommand"/> → <see cref="AbandonedState"/>
-    /// - <see cref="AbandonGameCommand"/> → <see cref="AbandonedState"/>
     /// </summary>
     public sealed class FinalResultsDisplayState : IDrawnToDressGameState
     {
@@ -64,12 +62,6 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
                     }
                     context.Logger.LogInformation("Host [{id}] requested Play Again.", cmd.PlayerId);
                     return new LobbyState();
-
-                case ReturnToMenuCommand:
-                    return new AbandonedState();
-
-                case AbandonGameCommand:
-                    return new AbandonedState();
 
                 default:
                     context.Logger.LogWarning(

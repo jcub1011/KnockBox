@@ -14,24 +14,22 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
     /// - Timer expiry → <see cref="VotingRoundSetupState"/> (next round) or
     ///   <see cref="FinalResultsState"/> (last round)
     /// - <see cref="PauseGameCommand"/> (host only) → <see cref="PausedState"/>
-    /// - <see cref="AbandonGameCommand"/> (host only) → <see cref="AbandonedState"/>
     /// </summary>
     public sealed class VotingRoundResultsState : ITimedDrawnToDressGameState
     {
-        private DateTimeOffset _deadline;
-
         public ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?> OnEnter(
             DrawnToDressGameContext context)
         {
             context.State.SetPhase(GamePhase.VotingRoundResults);
             context.ResetReadyFlags();
 
-            _deadline = DateTimeOffset.UtcNow.AddSeconds(context.Config.VotingRoundResultsTimeSec);
-            context.State.PhaseDeadlineUtc = _deadline;
+            context.State.PhaseDeadlineUtc = DateTimeOffset.UtcNow.AddSeconds(context.Config.VotingRoundResultsTimeSec);
 
+            int totalRounds = SwissTournamentService.ResolveRoundCount(
+                context.GetTournamentEntrantIds().Count, context.Config.VotingRounds);
             context.Logger.LogInformation(
                 "FSM → VotingRoundResultsState. Round {n} of {total} complete. Auto-advance in {sec}s.",
-                context.State.CurrentVotingRoundIndex + 1, context.Config.VotingRounds,
+                context.State.CurrentVotingRoundIndex + 1, totalRounds,
                 context.Config.VotingRoundResultsTimeSec);
 
             // Compute round scores and award round leader bonus.
@@ -77,9 +75,6 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
                 case PauseGameCommand:
                     return new PausedState(this);
 
-                case AbandonGameCommand:
-                    return new AbandonedState();
-
                 default:
                     context.Logger.LogWarning(
                         "VotingRoundResultsState: unrecognized command [{type}] from player [{id}].",
@@ -90,12 +85,14 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
 
         public ValueResult<TimeSpan> GetRemainingTime(
             DrawnToDressGameContext context, DateTimeOffset now)
-            => _deadline - now;
+            => context.State.PhaseDeadlineUtc is { } deadline
+                ? deadline - now
+                : new ResultError("No timer active.");
 
         public ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?> Tick(
             DrawnToDressGameContext context, DateTimeOffset now)
         {
-            if (now < _deadline) return null;
+            if (context.State.PhaseDeadlineUtc is not { } deadline || now < deadline) return null;
 
             context.Logger.LogInformation("Voting round results timer expired. Advancing.");
             return ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?>

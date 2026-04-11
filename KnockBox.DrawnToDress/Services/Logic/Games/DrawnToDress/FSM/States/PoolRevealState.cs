@@ -16,7 +16,6 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
     public sealed class PoolRevealState : ITimedDrawnToDressGameState
     {
         private readonly int _outfitRound;
-        private DateTimeOffset _deadline;
 
         public PoolRevealState(int outfitRound = 1)
         {
@@ -26,8 +25,7 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
         public ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?> OnEnter(
             DrawnToDressGameContext context)
         {
-            _deadline = DateTimeOffset.UtcNow.AddSeconds(context.Config.PoolRevealTimeSec);
-            context.State.PhaseDeadlineUtc = _deadline;
+            context.State.PhaseDeadlineUtc = DateTimeOffset.UtcNow.AddSeconds(context.Config.PoolRevealTimeSec);
             context.State.SetPhase(GamePhase.PoolReveal);
             context.CurrentOutfitRound = _outfitRound;
             context.ResetReadyFlags();
@@ -36,7 +34,7 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
             {
                 context.Logger.LogInformation(
                     "FSM → PoolRevealState. Pool contains {count} item(s). Deadline: {deadline}.",
-                    context.ClothingPool.Count, _deadline);
+                    context.ClothingPool.Count, context.State.PhaseDeadlineUtc);
 
                 // In AfterDrawing mode the theme is revealed now that drawing is complete.
                 if (context.Config.ThemeAnnouncement == ThemeAnnouncement.AfterDrawing &&
@@ -53,7 +51,7 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
                 context.ResetPoolForRound(_outfitRound);
                 context.Logger.LogInformation(
                     "FSM → PoolRevealState (round {round}). Pool has {count} item(s). Deadline: {deadline}.",
-                    _outfitRound, context.ClothingPool.Values.Count(i => i.IsInPool), _deadline);
+                    _outfitRound, context.ClothingPool.Values.Count(i => i.IsInPool), context.State.PhaseDeadlineUtc);
             }
 
             return null;
@@ -67,12 +65,14 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
 
         public ValueResult<TimeSpan> GetRemainingTime(
             DrawnToDressGameContext context, DateTimeOffset now)
-            => _deadline - now;
+            => context.State.PhaseDeadlineUtc is { } deadline
+                ? deadline - now
+                : new ResultError("No timer active.");
 
         public ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?> Tick(
             DrawnToDressGameContext context, DateTimeOffset now)
         {
-            if (now < _deadline) return null;
+            if (context.State.PhaseDeadlineUtc is not { } deadline || now < deadline) return null;
 
             context.Logger.LogInformation(
                 "Pool reveal timer expired (round {round}). Advancing to outfit building.", _outfitRound);
@@ -95,9 +95,6 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
 
                 case PauseGameCommand:
                     return new PausedState(this);
-
-                case AbandonGameCommand:
-                    return new AbandonedState();
 
                 default:
                     context.Logger.LogWarning(

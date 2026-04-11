@@ -1,4 +1,8 @@
-/* ── Game Over ────────────────────────────────────────────────────────────── */
+/* ══════════════════════════════════════════════════════════════════════════
+   GameOverPhase.razor.css
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Shared Game Over Container ──────────────────────────────────────────── */
 
 .op-game-over {
     display: flex;
@@ -12,10 +16,10 @@
     overflow: hidden;
 }
 
-/* ── Confetti effect ── */
+/* ── Player View: Original Confetti ──────────────────────────────────────── */
 
-.op-game-over::before,
-.op-game-over::after {
+.op-game-over:not(.host-view)::before,
+.op-game-over:not(.host-view)::after {
     content: '';
     position: absolute;
     top: -10%;
@@ -25,7 +29,7 @@
     pointer-events: none;
 }
 
-.op-game-over::before {
+.op-game-over:not(.host-view)::before {
     left: 20%;
     background: #e63946;
     box-shadow:
@@ -38,7 +42,7 @@
     animation: op-confetti-fall 4s linear infinite;
 }
 
-.op-game-over::after {
+.op-game-over:not(.host-view)::after {
     left: 35%;
     background: #ffd166;
     box-shadow:
@@ -49,6 +53,59 @@
         310px 45px 0 #ffd166,
         380px 25px 0 #e63946;
     animation: op-confetti-fall 4s linear infinite 1s;
+}
+
+/* ── Host View: Enhanced Confetti Layers ─────────────────────────────────── */
+
+.op-confetti-layer {
+    position: absolute;
+    top: -10%;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    pointer-events: none;
+}
+
+.op-confetti-layer.c1 {
+    left: 10%;
+    background: #e63946;
+    box-shadow:
+        50px 10px 0 #ffd166,
+        110px 25px 0 #2ecc71,
+        180px 8px 0 #ff2d55,
+        260px 35px 0 #a855f7,
+        340px 15px 0 #e63946,
+        420px 28px 0 #ffd166,
+        500px 12px 0 #2ecc71,
+        580px 38px 0 #ff2d55;
+    animation: op-confetti-fall 3.5s linear infinite;
+}
+
+.op-confetti-layer.c2 {
+    left: 30%;
+    background: #ffd166;
+    box-shadow:
+        35px 18px 0 #e63946,
+        90px 7px 0 #a855f7,
+        155px 30px 0 #2ecc71,
+        225px 12px 0 #ff2d55,
+        295px 40px 0 #ffd166,
+        365px 22px 0 #e63946,
+        440px 8px 0 #a855f7;
+    animation: op-confetti-fall 4.5s linear infinite 0.8s;
+}
+
+.op-confetti-layer.c3 {
+    left: 55%;
+    background: #2ecc71;
+    box-shadow:
+        45px 14px 0 #ffd166,
+        100px 32px 0 #e63946,
+        165px 6px 0 #ff2d55,
+        235px 28px 0 #a855f7,
+        305px 18px 0 #2ecc71,
+        375px 36px 0 #ffd166;
+    animation: op-confetti-fall 5s linear infinite 1.5s;
 }
 
 @keyframes op-confetti-fall {
@@ -69,10 +126,122 @@
     100% { transform: scale(1); opacity: 1; }
 }
 
-/* ── Leaderboard ── */
+/* ══════════════════════════════════════════════════════════════════════════
+   HOST VIEW: Winner Pedestal
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.op-winner-pedestal {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 40px 60px;
+    border-radius: 24px;
+    max-width: 420px;
+    width: 100%;
+    text-align: center;
+    animation: op-trophy-bounce 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275) 0.3s both;
+    position: relative;
+    z-index: 1;
+}
+
+.op-winner-label {
+    font-size: 0.85rem;
+    font-weight: 900;
+    color: #b8860b;
+    text-transform: uppercase;
+    letter-spacing: 4px;
+    text-shadow: 0 0 20px rgba(255, 209, 102, 0.5);
+}
+
+.op-winner-name {
+    font-size: 2.5rem;
+    font-weight: 900;
+    color: #1a0a0a;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    line-height: 1.1;
+}
+
+.op-winner-score {
+    font-family: var(--font-mono);
+    font-size: 3rem;
+    font-weight: 900;
+    color: #b8860b;
+}
+
+.op-winner-turns {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: rgba(26, 10, 10, 0.5);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+/* ── Runner-up Row ── */
+
+.op-runner-up-row {
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    flex-wrap: wrap;
+    max-width: 700px;
+    position: relative;
+    z-index: 1;
+}
+
+.op-runner-up {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 16px 24px;
+    background: rgba(15, 5, 5, 0.6);
+    backdrop-filter: blur(4px);
+    border: 2px solid rgba(255, 255, 255, 0.08);
+    border-radius: 16px;
+    min-width: 130px;
+    animation: op-runner-enter 0.4s ease-out both;
+    animation-delay: calc(0.6s + var(--ri) * 120ms);
+}
+
+@keyframes op-runner-enter {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.op-runner-rank {
+    font-size: 1.1rem;
+    font-weight: 900;
+    color: rgba(255, 255, 255, 0.4);
+}
+
+.op-runner-name {
+    font-size: 0.85rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.op-runner-score {
+    font-family: var(--font-mono);
+    font-size: 1rem;
+    font-weight: 900;
+    color: rgba(255, 255, 255, 0.6);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   PLAYER VIEW: Original Leaderboard (unchanged)
+   ══════════════════════════════════════════════════════════════════════════ */
 
 .op-leaderboard {
-    background: rgba(15,5,5,0.6);
+    background: rgba(15, 5, 5, 0.6);
     backdrop-filter: blur(8px);
     border: 3px solid #e63946;
     border-radius: 24px;
@@ -82,7 +251,7 @@
     display: flex;
     flex-direction: column;
     gap: 12px;
-    box-shadow: 0 0 30px rgba(230,57,70,0.15);
+    box-shadow: 0 0 30px rgba(230, 57, 70, 0.15);
 }
 
 .op-leaderboard-entry {
@@ -90,16 +259,16 @@
     align-items: center;
     gap: 16px;
     padding: 12px 20px;
-    background: rgba(255,255,255,0.03);
+    background: rgba(255, 255, 255, 0.03);
     border-radius: 12px;
     border: 2px solid transparent;
     transition: all 0.3s;
 }
 
 .op-leaderboard-entry.winner {
-    background: rgba(230,57,70,0.12);
+    background: rgba(230, 57, 70, 0.12);
     border-color: #e63946;
-    box-shadow: 0 0 20px rgba(230,57,70,0.2);
+    box-shadow: 0 0 20px rgba(230, 57, 70, 0.2);
 }
 
 .op-entry-rank {
@@ -128,4 +297,6 @@
 
 .op-game-over-actions {
     margin-top: 10px;
+    position: relative;
+    z-index: 1;
 }

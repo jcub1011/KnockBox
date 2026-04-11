@@ -52,8 +52,17 @@ namespace KnockBox.Core.Components.Shared
         /// drawing surface. Rendered as a non-interactive underlay so the player can draw
         /// on top of an existing image (e.g. a composite of their selected outfit items).
         /// When <see langword="null"/> (the default) no background is shown.
+        /// <para>Content is sanitized — only safe SVG elements are retained.</para>
         /// </summary>
         [Parameter] public string? BackgroundSvgContent { get; set; }
+
+        /// <summary>
+        /// Optional SVG inner markup rendered as a trusted (unsanitized) background layer.
+        /// Use only for server-generated content (e.g. mannequin image references) that
+        /// requires tags not in the sanitizer allowlist such as <c>&lt;image&gt;</c>.
+        /// Renders behind <see cref="BackgroundSvgContent"/> in DOM order.
+        /// </summary>
+        [Parameter] public string? TrustedBackgroundSvgContent { get; set; }
 
         /// <summary>Width of the SVG viewBox coordinate space (device-independent units).</summary>
         [Parameter] public int? ViewBoxWidth { get; set; }
@@ -67,6 +76,9 @@ namespace KnockBox.Core.Components.Shared
 
         // Sanitized version of BackgroundSvgContent, computed in OnParametersSet.
         private string? _sanitizedBackground;
+
+        // Unsanitized trusted background, assigned directly in OnParametersSet.
+        private string? _trustedBackground;
 
         private IJSObjectReference? _jsModule;
         private DotNetObjectReference<SvgDrawingCanvas>? _dotNetRef;
@@ -105,6 +117,7 @@ namespace KnockBox.Core.Components.Shared
         protected override void OnParametersSet()
         {
             _sanitizedBackground = SvgContentSanitizer.Sanitize(BackgroundSvgContent);
+            _trustedBackground = TrustedBackgroundSvgContent;
         }
 
         protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -154,6 +167,7 @@ namespace KnockBox.Core.Components.Shared
             {
                 _customSwatchColor = color;
             }
+            StateHasChanged();
         }
 
         /// <summary>Called from JavaScript when the stroke width changes.</summary>
@@ -161,7 +175,12 @@ namespace KnockBox.Core.Components.Shared
         public void OnStrokeWidthChanged(double width)
         {
             _currentStrokeWidth = width;
+            StateHasChanged();
         }
+
+        private string CurrentSizeLabel =>
+            _sizePresets.FirstOrDefault(p => p.Size == (int)_currentStrokeWidth).Label
+            ?? ((int)_currentStrokeWidth).ToString();
 
         /// <summary>
         /// Called from JavaScript when the Copy toolbar button is clicked.
@@ -224,6 +243,24 @@ namespace KnockBox.Core.Components.Shared
             catch (Exception ex)
             {
                 Logger.LogError(ex, "[SVGCanvas] UndoAsync failed — svgId={SvgId}", _svgId);
+            }
+        }
+
+        /// <summary>Restores the most recently undone action.</summary>
+        public async Task RedoAsync()
+        {
+            if (_jsModule is null)
+            {
+                Logger.LogWarning("[SVGCanvas] RedoAsync: JS module not initialized — svgId={SvgId}", _svgId);
+                return;
+            }
+            try
+            {
+                _strokeCount = await _jsModule.InvokeAsync<int>("redo", _svgId);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "[SVGCanvas] RedoAsync failed — svgId={SvgId}", _svgId);
             }
         }
 
@@ -359,12 +396,18 @@ namespace KnockBox.Core.Components.Shared
                 try
                 {
                     await _jsModule.InvokeVoidAsync("dispose", _svgId);
-                    await _jsModule.DisposeAsync();
                 }
+                catch (JSDisconnectedException) { }
                 catch (Exception ex)
                 {
                     Logger.LogWarning(ex, "[SVGCanvas] DisposeAsync: error during JS dispose — svgId={SvgId}", _svgId);
                 }
+
+                try
+                {
+                    await _jsModule.DisposeAsync();
+                }
+                catch (JSDisconnectedException) { }
             }
             _dotNetRef?.Dispose();
         }

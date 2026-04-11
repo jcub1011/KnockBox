@@ -1,7 +1,8 @@
-﻿using KnockBox.Extensions.Returns;
+using KnockBox.Extensions.Returns;
 using KnockBox.Services.Logic.Games.Shared;
 using KnockBox.Services.Navigation;
 using KnockBox.Services.State.Users;
+using KnockBox.Services.State.Shared;
 using System.Diagnostics.CodeAnalysis;
 
 namespace KnockBox.Services.State.Games.Shared
@@ -11,7 +12,7 @@ namespace KnockBox.Services.State.Games.Shared
     /// <para>
     /// Acts as a thin proxy: all persistent session state lives in a
     /// <see cref="GameSessionState"/> instance that is cached by
-    /// <see cref="IIDBackedServiceProvider"/> under the current user's id, so the state
+    /// <see cref="ISessionServiceProvider"/> under the current user's id, so the state
     /// survives Blazor circuit breaks (temporary disconnects or page refreshes) for up to
     /// the provider's configured disposal grace period (default 1 minute).
     /// </para>
@@ -21,19 +22,44 @@ namespace KnockBox.Services.State.Games.Shared
     /// </para>
     /// </summary>
     public class GameSessionService(
-        IIDBackedServiceProvider idBackedServiceProvider,
+        ISessionServiceProvider sessionServiceProvider,
         INavigationService navigationService,
         IUserService userService,
-        ILogger<GameSessionService> logger) : IGameSessionService
+        ILogger<GameSessionService> logger) : IGameSessionService, IDisposable
     {
+        private IDisposable? _lifecycleToken;
+        private GameSessionState? _sessionState;
+        private string? _currentUserId;
+
         /// <summary>
         /// Returns the <see cref="GameSessionState"/> cached for the current user, or
         /// <see langword="null"/> when the user identity has not yet been initialized.
         /// </summary>
-        private GameSessionState? GetSessionState() =>
-            userService.CurrentUser?.Id is string id
-                ? idBackedServiceProvider.GetService<GameSessionState>(id)
-                : null;
+        private GameSessionState? GetSessionState()
+        {
+            var user = userService.CurrentUser;
+            if (user is null) return null;
+
+            if (_currentUserId != user.Id)
+            {
+                _lifecycleToken?.Dispose();
+                _lifecycleToken = null;
+                _sessionState = null;
+                _currentUserId = user.Id;
+            }
+
+            if (_sessionState is null)
+            {
+                var result = sessionServiceProvider.GetService<GameSessionState>(new SessionToken(user.Id));
+                if (result.IsSuccess)
+                {
+                    _sessionState = result.Value.Service;
+                    _lifecycleToken = result.Value.LifecycleToken;
+                }
+            }
+
+            return _sessionState;
+        }
 
         public bool TryGetCurrentSession([NotNullWhen(true)] out UserRegistration? currentSession)
         {
@@ -96,6 +122,12 @@ namespace KnockBox.Services.State.Games.Shared
             }
 
             return Result.Success;
+        }
+
+        public void Dispose()
+        {
+            _lifecycleToken?.Dispose();
+            GC.SuppressFinalize(this);
         }
     }
 }

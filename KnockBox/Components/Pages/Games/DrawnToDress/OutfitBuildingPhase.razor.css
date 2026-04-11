@@ -76,39 +76,142 @@
     min-height: 0;
 }
 
+.dtd-outfit-host-stats {
+    display: flex;
+    flex-direction: row;
+    gap: 16px;
+    justify-content: center;
+}
+
+.dtd-stat-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 16px 24px;
+    border-radius: 16px;
+    border-width: 3px;
+    border-style: solid;
+    background: white;
+}
+
+.dtd-stat-mint {
+    border-color: var(--dtd-color-mint);
+    box-shadow: 0 4px 0 var(--dtd-color-mint-deep);
+}
+
+.dtd-stat-lavender {
+    border-color: var(--dtd-color-lavender);
+    box-shadow: 0 4px 0 var(--dtd-color-lavender-deep);
+}
+
+.dtd-stat-yellow {
+    border-color: var(--dtd-color-yellow);
+    box-shadow: 0 4px 0 var(--dtd-color-yellow-deep);
+}
+
+.dtd-stat-value {
+    font-size: 2.5rem;
+    font-family: var(--font-primary);
+    font-weight: 900;
+    line-height: 1;
+}
+
+.dtd-stat-label {
+    font-size: 1rem;
+    font-weight: 800;
+    color: var(--dtd-color-dark);
+}
+
 .dtd-outfit-player-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
     gap: 16px;
     flex-shrink: 0;
 }
 
 .dtd-outfit-player-card {
     display: flex;
-    align-items: center;
+    flex-direction: column;
     gap: 12px;
     background: #fff;
     border: 3px solid var(--dtd-color-bg-soft);
     border-radius: 20px;
-    padding: 12px 16px;
+    padding: 16px;
     transition: all 0.2s var(--dtd-bounce);
 }
 
 .dtd-outfit-player-locked {
     border-color: var(--dtd-color-mint);
-    box-shadow: 0 6px 0 var(--dtd-color-mint-deep);
-    transform: translateY(-2px);
+    box-shadow: 0 8px 0 var(--dtd-color-mint-deep);
+    transform: translateY(-4px);
+}
+
+.dtd-outfit-player-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
 }
 
 .dtd-outfit-player-name {
     font-weight: 800;
+    font-size: 1.1rem;
     flex: 1;
 }
 
-.dtd-outfit-player-detail {
-    font-size: 0.8rem;
-    font-family: var(--font-mono);
-    opacity: 0.7;
+.dtd-outfit-player-progress {
+    width: 100%;
+    height: 12px;
+    background: var(--dtd-color-bg-soft);
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.dtd-outfit-progress-bar {
+    display: flex;
+    width: 100%;
+    height: 100%;
+    gap: 2px;
+}
+
+.dtd-outfit-progress-segment {
+    flex: 1;
+    background: transparent;
+    border-radius: 4px;
+}
+
+.dtd-segment-filled {
+    background: var(--dtd-color-lavender);
+}
+
+.dtd-outfit-player-mini-thumbnails {
+    display: flex;
+    flex-direction: row;
+    gap: 8px;
+    min-height: 40px;
+}
+
+.dtd-mini-thumbnail {
+    width: 40px;
+    height: 40px;
+    border: 2px solid var(--dtd-color-bg-soft);
+    border-radius: 8px;
+    background: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.dtd-mini-thumbnail svg {
+    max-width: 100%;
+    max-height: 100%;
+}
+
+.dtd-pool-item-creator-name {
+    font-size: 0.7rem;
+    font-weight: 800;
+    color: var(--dtd-color-lavender-deep);
+    margin-top: 4px;
+    text-align: center;
 }
 
 .dtd-outfit-pool-preview-section {
@@ -127,16 +230,53 @@
 .dtd-outfit-player-layout {
     flex: 1;
     display: grid;
-    grid-template-columns: 320px 1fr;
+    grid-template-columns: 260px 1fr;
     gap: 24px;
     min-height: 0;
 }
 
-.dtd-outfit-left-panel {
+.dtd-outfit-preview-panel {
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 12px;
     min-height: 0;
+}
+
+.dtd-outfit-preview-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.dtd-outfit-slot-count {
+    font-family: var(--font-mono);
+    font-weight: 800;
+    font-size: 0.85rem;
+    background: var(--dtd-color-lavender);
+    color: #fff;
+    padding: 4px 10px;
+    border-radius: 10px;
+    white-space: nowrap;
+}
+
+.dtd-outfit-preview-svg-container {
+    flex: 1;
+    min-height: 0;
+    background: #fff;
+    border: 3px solid var(--dtd-color-bg-soft);
+    border-radius: 20px;
+    padding: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+.dtd-outfit-composed-preview {
+    width: 100%;
+    height: 100%;
+    display: block;
 }
 
 .dtd-outfit-right-panel {
@@ -148,6 +288,7 @@
     border-radius: 32px;
     border: 4px solid var(--dtd-color-bg-soft);
     padding: 24px;
+    min-width: 100px;
 }
 
 .dtd-outfit-section-title {
@@ -160,16 +301,7 @@
     margin: 0;
 }
 
-/* ── Slots ─────────────────────────────────────────────────────────────────── */
-
-.dtd-outfit-slots-container {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    overflow-y: auto;
-    padding-right: 8px;
-}
+/* ── Slots (waiting view) ─────────────────────────────────────────────────── */
 
 .dtd-outfit-slot {
     display: flex;
@@ -183,23 +315,12 @@
     transition: all 0.2s var(--dtd-bounce);
 }
 
-.dtd-outfit-slot-filled {
-    border: 3px solid var(--dtd-color-lavender);
-    box-shadow: 0 6px 0 var(--dtd-color-lavender-deep);
-}
-
 .dtd-outfit-slot-label {
     font-family: var(--font-primary);
     font-size: 0.85rem;
     font-weight: 900;
     text-transform: uppercase;
     color: var(--dtd-color-lavender-deep);
-}
-
-.dtd-outfit-slot-placeholder {
-    font-family: var(--font-mono);
-    font-size: 0.8rem;
-    color: #cbd5e1;
 }
 
 /* ── Pool Items ────────────────────────────────────────────────────────────── */
@@ -211,29 +332,31 @@
 }
 
 .dtd-pool-type-group {
-    margin-bottom: 32px;
+    margin-bottom: 20px;
 }
 
 .dtd-pool-type-label {
     font-family: var(--font-primary);
     font-size: 1rem;
     font-weight: 900;
-    margin-bottom: 12px;
+    margin-bottom: 8px;
     color: var(--dtd-color-dark);
 }
 
 .dtd-pool-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-    gap: 16px;
+    display: flex;
+    gap: 12px;
+    padding-bottom: 8px;
+    -webkit-overflow-scrolling: touch;
 }
 
 .dtd-pool-item {
-    aspect-ratio: 1;
+    flex: 0 0 120px;
+    height: 120px;
     background: #fff;
     border: 3px solid var(--dtd-color-bg-soft);
     border-radius: 20px;
-    padding: 12px;
+    padding: 10px;
     position: relative;
     display: flex;
     flex-direction: column;
@@ -380,43 +503,78 @@
         grid-template-columns: 1fr;
         grid-template-rows: auto 1fr;
     }
-    
-    .dtd-outfit-slots-container {
-        flex-direction: row;
-        overflow-x: auto;
-        padding-bottom: 12px;
-    }
-    
-    .dtd-outfit-slot {
-        flex: 0 0 180px;
-        flex-direction: column;
-        justify-content: center;
-        text-align: center;
-    }
 
-    .dtd-outfit-left-panel {
+    .dtd-outfit-preview-panel {
+        flex-direction: row;
+        align-items: stretch;
+        gap: 12px;
         background: #fff;
         border-radius: 24px;
-        padding: 16px;
+        padding: 12px;
         border: 3px solid var(--dtd-color-bg-soft);
+    }
+
+    .dtd-outfit-preview-header {
+        display: none;
+    }
+
+    .dtd-outfit-preview-svg-container {
+        flex: 0 0 auto;
+        width: 120px;
+        height: 120px;
+        border: none;
+        padding: 4px;
+        border-radius: 16px;
+        background: var(--dtd-color-bg-soft);
+    }
+
+    .dtd-outfit-actions-panel {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: stretch;
+        gap: 8px;
+        box-shadow: none;
+        border: none;
+        padding: 0;
     }
 }
 
 @media (max-width: 600px) {
     .dtd-outfit {
         padding: 12px;
+        gap: 12px;
     }
-    
+
     .dtd-outfit-header {
         flex-direction: column;
         align-items: stretch;
     }
-    
+
     .dtd-outfit-phase-badge {
         justify-content: center;
     }
-    
+
     .dtd-outfit-progress-pill {
         text-align: center;
+    }
+
+    .dtd-outfit-preview-svg-container {
+        width: 100px;
+        height: 100px;
+    }
+
+    .dtd-pool-item {
+        flex: 0 0 100px;
+        height: 100px;
+    }
+
+    .dtd-outfit-right-panel {
+        padding: 16px;
+    }
+
+    .dtd-outfit-actions-panel {
+        padding: 0;
     }
 }

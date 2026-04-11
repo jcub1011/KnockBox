@@ -1,3 +1,4 @@
+@using KnockBox.Services.Logic.Games.DrawnToDress
 @using KnockBox.Services.State.Games.DrawnToDress
 @using KnockBox.Services.State.Games.DrawnToDress.Data
 @using KnockBox.Services.State.Users
@@ -11,7 +12,11 @@
         ? GameState.VotingRounds[roundIndex]
         : null;
 
-    int totalConfiguredRounds = GameState.Config.VotingRounds;
+    int entrantCount = GameState.GamePlayers.Values
+        .SelectMany(p => p.SubmittedOutfits.Keys)
+        .Count();
+    int totalConfiguredRounds = SwissTournamentService.ResolveRoundCount(
+        entrantCount, GameState.Config.VotingRounds);
 }
 
 <div class="dtd-voting">
@@ -40,6 +45,16 @@
             {
                 <div class="dtd-voting-host-panel">
                     <h3 class="dtd-voting-section-title">Current Matchups</h3>
+                    
+                    @{
+                        int totalPossibleVotes = GameState.GamePlayers.Count * currentRound.Matchups.Count * GameState.Config.VotingCriteria.Count;
+                        int totalCastVotes = GameState.Votes.Count;
+                    }
+                    <div class="dtd-voting-progress-container">
+                        <div class="dtd-voting-progress-bar" style="width: @(totalPossibleVotes > 0 ? (totalCastVotes * 100.0 / totalPossibleVotes) : 100)%"></div>
+                        <div class="dtd-voting-progress-text">@totalCastVotes / @totalPossibleVotes votes cast</div>
+                    </div>
+
                     <div class="dtd-voting-host-scroll">
                         <div class="dtd-voting-host-matchup-grid">
                             @foreach (var matchup in currentRound.Matchups)
@@ -55,6 +70,24 @@
                                         <div class="dtd-voting-vs" aria-hidden="true">VS</div>
                                         @RenderEntrant(matchup.EntrantBId, "B")
                                     </div>
+                                    @if (GameState.Config.VoteVisibility != VoteVisibilityMode.Hidden)
+                                    {
+                                        <div class="dtd-voting-matchup-breakdown">
+                                            @foreach (var criterion in GameState.Config.VotingCriteria)
+                                            {
+                                                int votesA = GameState.Votes.Values.Count(v => v.MatchupId == matchup.Id && v.CriterionId == criterion.Id && v.ChosenEntrantId == matchup.EntrantAId);
+                                                int votesB = GameState.Votes.Values.Count(v => v.MatchupId == matchup.Id && v.CriterionId == criterion.Id && v.ChosenEntrantId == matchup.EntrantBId);
+                                                int total = votesA + votesB;
+                                                <div class="dtd-voting-breakdown-row">
+                                                    <span class="dtd-voting-breakdown-label">@criterion.DisplayName</span>
+                                                    <div class="dtd-voting-breakdown-bar-container">
+                                                        <div class="dtd-voting-breakdown-bar-a" style="width: @(total > 0 ? (votesA * 100.0 / total) : 50)%"></div>
+                                                        <div class="dtd-voting-breakdown-bar-b" style="width: @(total > 0 ? (votesB * 100.0 / total) : 50)%"></div>
+                                                    </div>
+                                                </div>
+                                            }
+                                        </div>
+                                    }
                                 </div>
                             }
                         </div>
@@ -157,15 +190,9 @@
                         {
                             if (SafeSvgContent(item.SvgContent) is string safeSvg)
                             {
-                                int viewCenterY = ct.CanvasHeight / 2;
-                                int partCenterY = ct.Id switch { "hat" => 160, "bottom" => 820, "shoes" => 1070, _ => 440 };
-                                double itemX = 50;
-                                double itemY = (partCenterY - viewCenterY) + 200;
-                                if (outfit.Customization.ItemPositionOverrides.TryGetValue(ct.Id, out var pos))
-                                {
-                                    itemX = pos.X;
-                                    itemY = pos.Y;
-                                }
+                                var (itemX, itemY) = CompositeCanvasLayout.GetItemPosition(
+                                    ct.Id, ct.CanvasWidth, ct.CanvasHeight, TotalOutfitWidth, TotalOutfitHeight,
+                                    outfit.Customization.ItemPositionOverrides);
                                 <g transform="translate(@itemX,@itemY)">@((MarkupString)safeSvg)</g>
                             }
                         }

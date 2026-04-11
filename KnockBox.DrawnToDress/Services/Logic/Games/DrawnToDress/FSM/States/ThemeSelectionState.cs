@@ -30,10 +30,10 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
     ///
     /// Other commands:
     /// - <see cref="PauseGameCommand"/> (host only) → <see cref="PausedState"/>
-    /// - <see cref="AbandonGameCommand"/> (host only) → <see cref="AbandonedState"/>
     /// </summary>
-    public sealed class ThemeSelectionState : IDrawnToDressGameState
+    public sealed class ThemeSelectionState : ITimedDrawnToDressGameState
     {
+
         /// <summary>
         /// Placeholder theme list used when no themes have been configured.
         /// Later issues will populate this from a proper theme repository.
@@ -58,6 +58,8 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
             context.State.SetPhase(GamePhase.ThemeSelection);
             context.Logger.LogInformation("FSM → ThemeSelectionState");
 
+            context.State.PhaseDeadlineUtc = DateTimeOffset.UtcNow.AddSeconds(context.Config.ThemeAnnouncementTimeSec);
+
             switch (context.Config.ThemeSource)
             {
                 case ThemeSource.Random:
@@ -66,7 +68,8 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
                     context.Logger.LogInformation(
                         "Random theme selected: [{id}] \"{name}\".",
                         context.State.CurrentTheme?.Id, context.State.CurrentTheme?.DisplayName);
-                    return ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?>.FromValue(new DrawingRoundState());
+                    
+                    return null;
 
                 case ThemeSource.RandomVoting:
                     PopulateThemeCandidates(context);
@@ -83,7 +86,35 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
             }
         }
 
-        public Result OnExit(DrawnToDressGameContext context) => Result.Success;
+        public Result OnExit(DrawnToDressGameContext context)
+        {
+            context.State.PhaseDeadlineUtc = null;
+            return Result.Success;
+        }
+
+        public ValueResult<TimeSpan> GetRemainingTime(DrawnToDressGameContext context, DateTimeOffset now)
+            => context.State.PhaseDeadlineUtc is { } deadline
+                ? deadline - now
+                : new ResultError("No timer active.");
+
+        public ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?> Tick(
+            DrawnToDressGameContext context, DateTimeOffset now)
+        {
+            // Only auto-advance if we have a selected theme and we're not waiting for votes/input.
+            if (context.State.CurrentTheme != null && 
+                (context.Config.ThemeSource == ThemeSource.Random || 
+                 context.Config.ThemeSource == ThemeSource.RandomVoting && context.GamePlayers.Keys.All(id => context.State.ThemeVotes.ContainsKey(id)) ||
+                 context.Config.ThemeSource == ThemeSource.PlayerWritten && context.GamePlayers.Keys.All(id => context.State.PlayerThemeSubmissions.ContainsKey(id)) ||
+                 context.Config.ThemeSource == ThemeSource.HostPick))
+            {
+                if (context.State.PhaseDeadlineUtc is { } deadline && now >= deadline)
+                {
+                    return ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?>.FromValue(new DrawingRoundState());
+                }
+            }
+
+            return null;
+        }
 
         public ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?> HandleCommand(
             DrawnToDressGameContext context, DrawnToDressCommand command)
@@ -101,9 +132,6 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
 
                 case PauseGameCommand:
                     return new PausedState(this);
-
-                case AbandonGameCommand:
-                    return new AbandonedState();
 
                 default:
                     context.Logger.LogWarning(

@@ -1,26 +1,35 @@
 @using KnockBox.Operator.Models
+@using System.Threading
 
 <div class="op-hand">
-    @{ var sorted = Hand
-        .OrderBy(c => c.Type)
-        .ThenBy(c => c is NumberCard n ? n.NumberValue : decimal.MaxValue)
-        .ThenBy(c => c is KnockBox.Operator.Models.OperatorCard o ? (int)o.OperatorValue : int.MaxValue)
-        .ThenBy(c => c is ActionCard a ? (int)a.ActionValue : int.MaxValue)
-        .ToList();
+    @{
+        var combined = Hand.Select(c => (Card: c, Exiting: false))
+            .Concat(_exitingCards.Select(c => (Card: c, Exiting: true)))
+            .ToList();
+
+        var sorted = combined
+            .OrderBy(i => i.Card.Type)
+            .ThenBy(i => i.Card is NumberCard n ? n.NumberValue : decimal.MaxValue)
+            .ThenBy(i => i.Card is KnockBox.Operator.Models.OperatorCard o ? (int)o.OperatorValue : int.MaxValue)
+            .ThenBy(i => i.Card is ActionCard a ? (int)a.ActionValue : int.MaxValue)
+            .ToList();
+
        int newIndex = 0;
     }
-    @foreach (var card in sorted)
+    @foreach (var item in sorted)
     {
-        bool isNew = NewCardIds.Contains(card.Id);
-        bool isDisabled = DisabledCards.Contains(card.Id);
+        bool isNew = _internalNewCardIds.Contains(item.Card.Id);
+        bool isDisabled = DisabledCards.Contains(item.Card.Id);
         int delay = isNew ? newIndex++ : 0;
-        <OperatorCard @key="card.Id"
-            Card="card"
-            IsSelected="@SelectedCards.Contains(card.Id)"
+
+        <OperatorCard @key="item.Card.Id"
+            Card="item.Card"
+            IsSelected="@SelectedCards.Contains(item.Card.Id)"
             IsDisabled="isDisabled"
             IsNew="isNew"
+            IsExiting="item.Exiting"
             AnimationDelay="delay"
-            OnClick="@(() => ToggleCard(card.Id))" />
+            OnClick="@(() => ToggleCard(item.Card.Id))" />
     }
 </div>
 
@@ -30,6 +39,90 @@
     [Parameter] public HashSet<Guid> DisabledCards { get; set; } = new();
     [Parameter] public HashSet<Guid> NewCardIds { get; set; } = new();
     [Parameter] public EventCallback<Guid> OnCardToggled { get; set; }
+
+    private List<Card> _previousHand = new();
+    private List<Card> _exitingCards = new();
+    private HashSet<Guid> _internalNewCardIds = new();
+    private HashSet<Guid> _processedNewIds = new();
+    private readonly SemaphoreSlim _animationLock = new(1, 1);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var currentIds = Hand.Select(c => c.Id).ToHashSet();
+        
+        // Detect changes
+        var removed = _previousHand.Where(c => !currentIds.Contains(c.Id)).ToList();
+        var newToHand = NewCardIds.Where(id => !_processedNewIds.Contains(id) && currentIds.Contains(id)).ToList();
+        
+        if (NewCardIds.Count == 0)
+        {
+            _processedNewIds.Clear();
+        }
+        
+        // Update previous hand immediately to prevent re-processing
+        _previousHand = Hand.ToList();
+
+        // Immediately add removed cards to _exitingCards so the first render
+        // includes them with the exit animation class (prevents flash).
+        if (removed.Any())
+        {
+            foreach (var card in removed)
+            {
+                if (!_exitingCards.Any(e => e.Id == card.Id))
+                    _exitingCards.Add(card);
+            }
+        }
+
+        if (removed.Any() || newToHand.Any())
+        {
+            _ = Task.Run(async () =>
+            {
+                await _animationLock.WaitAsync();
+                try
+                {
+                    // 1. Wait for exit animation to complete, then clean up
+                    if (removed.Any())
+                    {
+                        await Task.Delay(250); // Match fast exit speed (0.2s) + buffer
+
+                        await InvokeAsync(() =>
+                        {
+                            _exitingCards.Clear();
+                            StateHasChanged();
+                        });
+                    }
+
+                    // 2. Entry Animations Second
+                    if (newToHand.Any())
+                    {
+                        await InvokeAsync(() =>
+                        {
+                            foreach (var id in newToHand)
+                            {
+                                _internalNewCardIds.Add(id);
+                                _processedNewIds.Add(id);
+                            }
+                            StateHasChanged();
+                        });
+
+                        // Animation takes 0.5s + (150ms * (cardCount - 1))
+                        int totalDelay = 500 + (150 * (newToHand.Count - 1)) + 100; // +100ms buffer
+                        await Task.Delay(totalDelay);
+
+                        await InvokeAsync(() =>
+                        {
+                            _internalNewCardIds.Clear();
+                            StateHasChanged();
+                        });
+                    }
+                }
+                finally
+                {
+                    _animationLock.Release();
+                }
+            });
+        }
+    }
 
     private async Task ToggleCard(Guid cardId)
     {

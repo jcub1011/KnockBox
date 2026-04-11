@@ -25,8 +25,10 @@ namespace KnockBox.Services.Logic.Games.Shared
             if (user.Id != registration.State.Host.Id)
                 return Result.FromError("You cannot close a lobby you aren't the host of.", $"User [{user.Name}] is not the host of the lobby and cannot close it.");
 
-            if (!_lobbies.TryRemove(NormalizeLobbyCode(registration.Code), out _))
+            if (!_lobbies.TryRemove(NormalizeLobbyCode(registration.Code), out var removed))
                 return Result.FromError($"Lobby with code [{registration.Code}] not found.");
+
+            removed.State.Dispose();
 
             var releaseResult = await lobbyCodeService.ReleaseLobbyCodeAsync(registration.Code, ct);
             if (releaseResult.IsCanceled)

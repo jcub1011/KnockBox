@@ -6,6 +6,7 @@ using KnockBox.Services.State.Games.DrawnToDress.Data;
 using KnockBox.Services.State.Users;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
+using static KnockBox.Services.Logic.Games.DrawnToDress.CompositeCanvasLayout;
 
 namespace KnockBox.Components.Pages.Games.DrawnToDress
 {
@@ -20,6 +21,12 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
         [Parameter] public DrawnToDressGameState GameState { get; set; } = default!;
 
         [Parameter] public int OutfitRound { get; set; } = 1;
+
+        protected int ComposedOutfitWidth =>
+            ComputeCompositeWidth(GameState.Config.ClothingTypes);
+
+        protected int ComposedOutfitHeight =>
+            ComputeCompositeHeight(GameState.Config.ClothingTypes);
 
         private bool _submitting;
         private string? _errorMessage;

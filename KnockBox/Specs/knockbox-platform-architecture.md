@@ -258,11 +258,11 @@ public interface IUserService
 
 ### IGameSessionService / GameSessionState
 
-`IGameSessionService` is a **scoped** proxy (one per Blazor circuit) that provides circuit-level concerns — navigation via `INavigationService` — while delegating all persistent session state to a user-id-backed `GameSessionState` instance retrieved from `IIDBackedServiceProvider`.
+`IGameSessionService` is a **scoped** proxy (one per Blazor circuit) that provides circuit-level concerns — navigation via `INavigationService` — while delegating all persistent session state to a user-id-backed `GameSessionState` instance retrieved from `ISessionServiceProvider`.
 
-`GameSessionState` is a **transient** state holder registered in the DI container so `IIDBackedServiceProvider` can cache exactly one instance per user session id, surviving Blazor circuit breaks. It owns the `UserRegistration` field and implements `IDisposable`: when the ID-backed provider disposes it after the post-disconnect grace period, it removes the user from the game state without requiring an active circuit.
+`GameSessionState` is a **transient** state holder registered in the DI container so `ISessionServiceProvider` can cache exactly one instance per user session id, surviving Blazor circuit breaks. It owns the `UserRegistration` field and implements `IDisposable`: when the session provider disposes it after the post-disconnect grace period, it removes the user from the game state without requiring an active circuit.
 
-This two-layer design means a user who temporarily loses their WebSocket connection (network hiccup, page refresh) is **not** removed from the game lobby — the `GameSessionState` instance persists in `IIDBackedServiceProvider` until a new circuit connects for the same user id, cancelling the disposal timer.
+This two-layer design means a user who temporarily loses their WebSocket connection (network hiccup, page refresh) is **not** removed from the game lobby — the `GameSessionState` instance persists in `ISessionServiceProvider` until a new circuit connects for the same user id, keeping the lifecycle token active.
 
 ```csharp
 public interface IGameSessionService
@@ -287,10 +287,6 @@ public interface INavigationService
     void ToGame(LobbyRegistration lobbyRegistration);
 }
 ```
-
-### IDBackedCircuitHandler
-
-A scoped `CircuitHandler` that bridges Blazor circuit lifecycle events to `IIDBackedServiceProvider`. On `OnConnectionUpAsync` it calls `NotifyCircuitActive`, and on `OnCircuitClosedAsync` it calls `NotifyCircuitClosed`, using the id from `IUserService.CurrentUser`. When all circuits for a user close, `IIDBackedServiceProvider` starts its 1-minute disposal timer; if the user reconnects within that window the timer is cancelled and the per-user services (including `GameSessionState`) are retained.
 
 ### DisposableComponent
 
@@ -483,10 +479,11 @@ Players cannot join a lobby once the game state's `IsJoinable` is set to `false`
 ### Player Disconnect
 
 1. A player's browser tab closes or their circuit drops.
-2. `IDBackedCircuitHandler.OnCircuitClosedAsync` calls `NotifyCircuitClosed`, which starts `IIDBackedServiceProvider`'s 1-minute grace period timer for the user's id.
-3. If the user reconnects within 1 minute (new circuit with the same session id), `NotifyCircuitActive` cancels the timer and the `GameSessionState` is retained — the player rejoins the game lobby seamlessly.
-4. If the timer expires, `IDBackedServiceProvider` disposes all cached services for that id, including `GameSessionState`. `GameSessionState.Dispose()` calls `TakeCurrentSession()?.Dispose()`, which disposes the `UserRegistration`. The unregistration token disposes, removing the player from the game state and notifying subscribers. The `PlayerUnregistered` event is also fired, allowing game engines to react (e.g., `CardCounterGameEngine` uses this to advance the turn order).
-5. The host is fixed — there is no host transfer on disconnect.
+2. `GameSessionService` is disposed, disposing the `LifecycleToken` that keeps the `GameSessionState` alive.
+3. If no other circuit is holding a token for the user, `ISessionServiceProvider` starts a 1-minute grace period timer.
+4. If the user reconnects within 1 minute (new circuit with the same session id), the `LifecycleToken` is re-acquired, cancelling the timer and the `GameSessionState` is retained — the player rejoins the game lobby seamlessly.
+5. If the timer expires, `ISessionServiceProvider` disposes all cached services for that token, including `GameSessionState`. `GameSessionState.Dispose()` calls `TakeCurrentSession()?.Dispose()`, which disposes the `UserRegistration`. The unregistration token disposes, removing the player from the game state and notifying subscribers. The `PlayerUnregistered` event is also fired, allowing game engines to react (e.g., `CardCounterGameEngine` uses this to advance the turn order).
+6. The host is fixed — there is no host transfer on disconnect.
 
 ---
 
@@ -535,11 +532,10 @@ DI is organized into registration extension methods called from `Program.cs`:
 | Interface | Implementation | Lifetime | Purpose |
 |---|---|---|---|
 | `ILobbyService` | `LobbyService` | Singleton | Lobby registry |
-| `IIDBackedServiceProvider` | `IDBackedServiceProvider` | Singleton | ID-keyed persistent service cache |
+| `ISessionServiceProvider` | `SessionServiceProvider` | Singleton | Session-scoped persistent service cache |
 | `IUserService` | `UserService` | Scoped | Per-circuit user identity |
 | `IGameSessionService` | `GameSessionService` | Scoped | Per-circuit session proxy; delegates state to `GameSessionState` |
-| *(concrete)* | `GameSessionState` | Transient | User-id-backed session state; cached by `IIDBackedServiceProvider` |
-| `CircuitHandler` | `IDBackedCircuitHandler` | Scoped | Notifies `IIDBackedServiceProvider` of circuit lifecycle |
+| *(concrete)* | `GameSessionState` | Transient | User-id-backed session state; cached by `ISessionServiceProvider` |
 
 ### RegisterRepositories() — Mixed
 
@@ -564,9 +560,9 @@ DI is organized into registration extension methods called from `Program.cs`:
 | `IDbContextFactory<ApplicationDbContext>` | EF Core + Npgsql | Factory | Database context creation |
 
 **Lifetime rules:**
-- Lobby state (`LobbyService`, `IDBackedServiceProvider`, game engines, lobby code service) is **Singleton** — all users share the same active lobby registrations, engine instances, and ID-backed service cache.
-- Per-circuit concerns (`UserService`, `GameSessionService`, `IDBackedCircuitHandler`, `NavigationService`, client storage) are **Scoped** (one instance per Blazor circuit / browser connection).
-- Per-user session state (`GameSessionState`) is **Transient** in the DI container but cached as a single instance per user id by `IIDBackedServiceProvider`, surviving circuit breaks.
+- Lobby state (`LobbyService`, `ISessionServiceProvider`, game engines, lobby code service) is **Singleton** — all users share the same active lobby registrations, engine instances, and session-scoped service cache.
+- Per-circuit concerns (`UserService`, `GameSessionService`, `NavigationService`, client storage) are **Scoped** (one instance per Blazor circuit / browser connection).
+- Per-user session state (`GameSessionState`) is **Transient** in the DI container but cached as a single instance per user id by `ISessionServiceProvider`, surviving circuit breaks.
 - Infrastructure (repositories, key providers) are **Singleton** because `IDbContextFactory` handles per-operation context lifetime.
 
 ---
@@ -605,7 +601,7 @@ _stateSubscription?.Dispose();
 
 **Fixed host.** The host is the player who created the lobby and is set at creation time. There is no host transfer if the host disconnects.
 
-**1-minute disconnect grace period.** When a circuit drops, the player is not immediately removed. `IIDBackedServiceProvider` starts a 1-minute timer before disposing the user's cached services (including `GameSessionState`). If the user reconnects within that window their session is preserved seamlessly.
+**1-minute disconnect grace period.** When a circuit drops, the player is not immediately removed. `ISessionServiceProvider` starts a 1-minute timer before disposing the user's cached services (including `GameSessionState`). If the user reconnects within that window their session is preserved seamlessly.
 
 **JS interop for client storage and file export.** Browser `localStorage` is used for persisting the user's display name across sessions, and a JS module handles CSV file downloads for the Dice Simulator.
 
@@ -625,6 +621,24 @@ _stateSubscription?.Dispose();
 | Game plugin system | .NET dependency injection (`AbstractGameEngine` subclasses) |
 | Game UI | Game-owned Razor pages at `/room/{game-type}/{obfuscated-code}` |
 | Database | PostgreSQL via EF Core (Npgsql) |
+| Logging | Serilog (structured, console sink) |
+| Validation | FluentValidation |
+| Deployment | Docker (docker-compose) |
+| Language | C# 13 / .NET 10 |
+e | PostgreSQL via EF Core (Npgsql) |
+| Logging | Serilog (structured, console sink) |
+| Validation | FluentValidation |
+| Deployment | Docker (docker-compose) |
+| Language | C# 13 / .NET 10 |
+ameState` (returns `CancellationTokenSource`) |
+| Game plugin system | .NET dependency injection (`AbstractGameEngine` subclasses) |
+| Game UI | Game-owned Razor pages at `/room/{game-type}/{obfuscated-code}` |
+| Database | PostgreSQL via EF Core (Npgsql) |
+| Logging | Serilog (structured, console sink) |
+| Validation | FluentValidation |
+| Deployment | Docker (docker-compose) |
+| Language | C# 13 / .NET 10 |
+e | PostgreSQL via EF Core (Npgsql) |
 | Logging | Serilog (structured, console sink) |
 | Validation | FluentValidation |
 | Deployment | Docker (docker-compose) |

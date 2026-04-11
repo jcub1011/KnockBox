@@ -5,6 +5,7 @@ using KnockBox.Services.State.Games.Shared.Components;
 using KnockBox.Services.State.Games.Shared.Interfaces;
 using KnockBox.Operator.Models;
 using KnockBox.Operator.Services.Logic.FSM;
+using KnockBox.Operator.Services.Logic.FSM.ActionCommands;
 using KnockBox.Services.State.Users;
 using Microsoft.Extensions.Logging;
 
@@ -22,6 +23,9 @@ public class OperatorGameState(
     
     public List<Card> Deck { get; set; } = new();
     public List<Card> DiscardPile { get; set; } = new();
+    public List<ActionLogEntry> ActionLog { get; set; } = new();
+    public string? LastBlockedActionMessage { get; set; }
+    public string? BlockedAttackerId { get; set; }
     
     public OperatorGamePhase Phase { get; set; } = OperatorGamePhase.Setup;
     
@@ -30,9 +34,9 @@ public class OperatorGameState(
     
     public TurnManager TurnManager { get; } = new();
 
-    public OperatorCommand? PendingActionCommand { get; set; }
-    public string? ReactionTargetPlayerId { get; set; }
-    public Card? PendingHotPotatoCard { get; set; }
+    public IGameActionCommand? PendingGameActionCommand { get; set; }
+    public HashSet<string> ReactionTargetPlayerIds { get; set; } = new();
+    public List<PlayerReaction> PlayerReactions { get; set; } = new();
 
     public int TurnCount { get; set; }
 

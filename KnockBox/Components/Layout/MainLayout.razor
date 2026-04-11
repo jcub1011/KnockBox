@@ -15,7 +15,7 @@
                 @(currentSession.LobbyRegistration.GameType.TryGetDescription(out var description)
                     ? description : currentSession.LobbyRegistration.GameType.ToString())</a>
                 <span class="room-code">
-                    Join Code: 
+                    <span class="room-code-label">Join Code: </span>
                     <button class="room-code-btn"
                             @onclick="ToggleRoomCode" 
                             @onmouseup="OnMouseUp"

@@ -1,4 +1,5 @@
 @using KnockBox.Core.Components.Shared
+@using KnockBox.Services.Logic.Games.DrawnToDress
 @using KnockBox.Services.State.Games.DrawnToDress
 @using KnockBox.Services.State.Games.DrawnToDress.Data
 @using KnockBox.Services.State.Users
@@ -13,21 +14,21 @@
     int submittedCount = GameState.GamePlayers.Values.Count(p => p.IsReady);
     int totalPlayers = GameState.GamePlayers.Count;
 
-    string phaseName = OutfitRound == 1 ? "Outfit Customization" : $"Outfit {OutfitRound} Customization";
+    string phaseName = OutfitRound == 1 ? "Customize Outfit" : $"Customize Outfit {OutfitRound}";
     string nameLabel = OutfitRound == 1 ? "Outfit Name" : $"Outfit {OutfitRound} Name";
     string finalizeLabel = OutfitRound == 1 ? "Finalize Outfit" : $"Finalize Outfit {OutfitRound}";
     string finalizedMessage = OutfitRound == 1 ? "Outfit finalized! Waiting for the others\u2026" : $"Outfit {OutfitRound} finalized! Waiting for the others\u2026";
 
     var myOutfit = myPlayer?.GetOutfit(OutfitRound);
 
-    int canvasWidth = (GameState.Config.ClothingTypes.Any()
-        ? GameState.Config.ClothingTypes.Max(ct => ct.CanvasWidth)
-        : 600) + 100;
-    int totalOutfitHeight = GameState.Config.ClothingTypes.Sum(ct => (int)(ct.CanvasHeight * 0.8));
+    int canvasWidth = CompositeCanvasLayout.ComputeCompositeWidth(GameState.Config.ClothingTypes);
+    int totalOutfitHeight = CompositeCanvasLayout.ComputeCompositeHeight(GameState.Config.ClothingTypes);
+    double mannequinSize = CompositeCanvasLayout.MannequinDisplaySize(GameState.Config.ClothingTypes);
 
     // Build a composite background SVG from the player's selected outfit items, applying
     // any position overrides set via the drag/manual-input layer.
     string? outfitBackground = null;
+    string? mannequinSvg = null;
     if (!isHost && !hasSubmitted && myOutfit is not null)
     {
         var bgParts = new System.Text.StringBuilder();
@@ -57,7 +58,7 @@
 
         if (_showMannequin && GameState.Config.ShowMannequin)
         {
-            bgParts.Insert(0, MannequinSvgHelper.Build(canvasWidth, 200));
+            mannequinSvg = MannequinSvgHelper.Build(canvasWidth, totalOutfitHeight, overrideDisplaySize: mannequinSize);
         }
 
         if (bgParts.Length > 0)
@@ -74,9 +75,9 @@
             <h2 class="dtd-customization-phase-name">@phaseName</h2>
         </div>
 
-        <div class="dtd-customization-progress-pill" aria-label="Player progress">
+        @* <div class="dtd-customization-progress-pill" aria-label="Player progress">
             @submittedCount / @totalPlayers finalized
-        </div>
+        </div> *@
 
         <TimerDisplay GameState="GameState" />
     </header>
@@ -86,16 +87,44 @@
         @if (isHost)
         {
             <div class="dtd-customization-host-panel">
-                <h3 class="dtd-customization-section-title">Player Progress</h3>
+                <h3 class="dtd-customization-section-title">Outfit Runway</h3>
                 <div class="dtd-customization-player-grid">
                     @foreach (var kv in GameState.GamePlayers)
                     {
                         var ps = kv.Value;
                         string statusIcon = ps.IsReady ? "✅" : "⏳";
-                        string outfitName = ps.GetOutfit(OutfitRound)?.Customization.OutfitName ?? "(unnamed)";
+                        var outfit = ps.GetOutfit(OutfitRound);
+                        string? outfitName = outfit?.Customization.OutfitName;
+                        if (string.IsNullOrWhiteSpace(outfitName)) outfitName = "Naming outfit…";
                         <div class="dtd-customization-player-card @(ps.IsReady ? "dtd-customization-player-ready" : "")">
-                            <span class="dtd-customization-player-status" aria-hidden="true">@statusIcon</span>
                             <span class="dtd-customization-player-name">@ps.DisplayName</span>
+                            <div class="dtd-customization-runway-preview">
+                                @if (outfit != null)
+                                {
+                                    <svg viewBox="0 0 @canvasWidth @totalOutfitHeight" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
+                                        @foreach (var ct in GameState.Config.ClothingTypes)
+                                        {
+                                            if (outfit.SelectedItemsByType.TryGetValue(ct.Id, out var itemId)
+                                                && GameState.ClothingPool.TryGetValue(itemId, out var item))
+                                            {
+                                                if (KnockBox.Core.Services.Drawing.SvgContentSanitizer.Sanitize(item.SvgContent) is string safeSvg)
+                                                {
+                                                    var (itemX, itemY) = CompositeCanvasLayout.GetItemPosition(
+                                                        ct.Id, ct.CanvasWidth, ct.CanvasHeight, canvasWidth, totalOutfitHeight,
+                                                        outfit.Customization.ItemPositionOverrides);
+                                                    <g transform="translate(@itemX,@itemY)">
+                                                        @((MarkupString)safeSvg)
+                                                    </g>
+                                                }
+                                            }
+                                        }
+                                        @if (outfit.Customization.SketchSvgContent is not null && KnockBox.Core.Services.Drawing.SvgContentSanitizer.Sanitize(outfit.Customization.SketchSvgContent) is string sketchSvg)
+                                        {
+                                            @((MarkupString)sketchSvg)
+                                        }
+                                    </svg>
+                                }
+                            </div>
                             <span class="dtd-customization-player-detail">
                                 @if (ps.IsReady)
                                 {
@@ -103,8 +132,11 @@
                                 }
                                 else
                                 {
-                                    <span>Naming outfit…</span>
+                                    <span>@outfitName</span>
                                 }
+                            </span>
+                            <span class="dtd-customization-player-status-badge">
+                                @(ps.IsReady ? "Finalized" : "Customizing...")
                             </span>
                         </div>
                     }
@@ -163,13 +195,23 @@
                         </div>
                     </div>
 
-                    @if (GameState.Config.ShowMannequin)
+                    @if (_mode == InteractionMode.MoveItems)
                     {
                         <div class="dtd-customization-field">
-                            <label class="dtd-customization-checkbox-label">
-                                <input type="checkbox" @bind="_showMannequin" />
-                                Show Mannequin Reference
-                            </label>
+                            <label class="dtd-customization-label">Select Item</label>
+                            <div class="dtd-customization-item-selector">
+                                @foreach (var ct in GameState.Config.ClothingTypes)
+                                {
+                                    var typeId = ct.Id;
+                                    bool isSelected = _selectedTypeId == typeId;
+                                    <button class="dtd-item-select-btn @(isSelected ? "dtd-item-select-btn-active" : "")"
+                                            aria-pressed="@(isSelected ? "true" : "false")"
+                                            @onclick="() => SelectItemAsync(typeId)">
+                                        <span class="dtd-item-select-icon" aria-hidden="true">@GetClothingTypeIcon(ct.Id)</span>
+                                        <span class="dtd-item-select-name">@ct.DisplayName</span>
+                                    </button>
+                                }
+                            </div>
                         </div>
                     }
 
@@ -183,8 +225,18 @@
                         <button class="dtd-btn dtd-btn-primary dtd-btn-lg"
                                 @onclick="SubmitCustomizationAsync"
                                 disabled="@_submitting">
-                            @(_submitting ? "Finalizing..." : "🔒 Finalize")
+                            @(_submitting ? "Finalizing..." : "Finalize")
                         </button>
+
+                        @if (GameState.Config.ShowMannequin)
+                        {
+                            <div class="dtd-customization-field">
+                                <label class="dtd-customization-checkbox-label">
+                                    <input type="checkbox" @bind="_showMannequin" />
+                                    Show Mannequin Reference
+                                </label>
+                            </div>
+                        }
                     </div>
                 </section>
 
@@ -196,6 +248,7 @@
                                           ViewBoxWidth="@canvasWidth"
                                           ViewBoxHeight="@totalOutfitHeight"
                                           BackgroundColor="#ffffff"
+                                          TrustedBackgroundSvgContent="@mannequinSvg"
                                           BackgroundSvgContent="@outfitBackground"
                                           ShowToolbar="@(_mode == InteractionMode.Draw)">
                             <OverlayContent>
@@ -203,17 +256,22 @@
                                 {
                                     <svg id="@_dragSvgId"
                                          class="dtd-customization-drag-layer"
+                                         style="z-index: 3;"
                                          width="@canvasWidth" height="@totalOutfitHeight"
                                          viewBox="0 0 @canvasWidth @totalOutfitHeight"
                                          preserveAspectRatio="xMidYMid meet"
                                          xmlns="http://www.w3.org/2000/svg">
+                                        @if (mannequinSvg is not null)
+                                        {
+                                            @((MarkupString)mannequinSvg)
+                                        }
                                     </svg>
                                 }
                             </OverlayContent>
                         </SvgDrawingCanvas>
                     </div>
 
-                    @if (_mode == InteractionMode.MoveItems)
+                    @if (_mode == InteractionMode.MoveItems && false) // Keep hidden
                     {
                         <div class="dtd-customization-manual-pos">
                             <details class="dtd-card">

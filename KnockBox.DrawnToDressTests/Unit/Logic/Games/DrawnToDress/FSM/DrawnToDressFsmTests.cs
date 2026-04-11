@@ -813,7 +813,8 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
 
-            // Pre-fill all configured voting rounds so the timer expiry ends the game.
+            // Set explicit round count and pre-fill all voting rounds so the timer expiry ends the game.
+            state.Config.VotingRounds = 3;
             for (int i = 0; i < state.Config.VotingRounds; i++)
                 state.VotingRounds.Add(new() { RoundNumber = i + 1 });
 
@@ -834,8 +835,9 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
 
-            // Leave fewer completed rounds than configured (default 3).
+            // Set explicit round count and add fewer than configured.
             // Add 2 rounds, so one more should remain.
+            state.Config.VotingRounds = 3;
             state.VotingRounds.Add(new() { RoundNumber = 1 });
             state.VotingRounds.Add(new() { RoundNumber = 2 });
 
@@ -920,86 +922,6 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
             _engine.ProcessCommand(context, new ResumeGameCommand("nonhost_id"));
 
             Assert.IsInstanceOfType<PausedState>(context.Fsm.CurrentState);
-        }
-
-        [TestMethod]
-        public async Task AbandonGame_FromDrawingRound_TransitionsToAbandonedState()
-        {
-            var stateResult = await _engine.CreateStateAsync(_host);
-            var state = (DrawnToDressGameState)stateResult.Value!;
-            await _engine.StartAsync(_host, state);
-            var context = state.Context!;
-
-            _engine.ProcessCommand(context, new AbandonGameCommand(_host.Id));
-
-            Assert.IsInstanceOfType<AbandonedState>(context.Fsm.CurrentState);
-            Assert.AreEqual(GamePhase.Abandoned, state.Phase);
-        }
-
-        [TestMethod]
-        public async Task AbandonGame_FromPausedState_TransitionsToAbandonedState()
-        {
-            var stateResult = await _engine.CreateStateAsync(_host);
-            var state = (DrawnToDressGameState)stateResult.Value!;
-            await _engine.StartAsync(_host, state);
-            var context = state.Context!;
-
-            _engine.ProcessCommand(context, new PauseGameCommand(_host.Id));
-            _engine.ProcessCommand(context, new AbandonGameCommand(_host.Id));
-
-            Assert.IsInstanceOfType<AbandonedState>(context.Fsm.CurrentState);
-            Assert.AreEqual(GamePhase.Abandoned, state.Phase);
-        }
-
-        [TestMethod]
-        public async Task AbandonGame_FromFinalResults_TransitionsToAbandonedState()
-        {
-            var stateResult = await _engine.CreateStateAsync(_host);
-            var state = (DrawnToDressGameState)stateResult.Value!;
-            await _engine.StartAsync(_host, state);
-            var context = state.Context!;
-
-            context.Fsm.TransitionTo(context, new FinalResultsState());
-            Assert.AreEqual(GamePhase.Results, state.Phase);
-
-            _engine.ProcessCommand(context, new AbandonGameCommand(_host.Id));
-
-            Assert.IsInstanceOfType<AbandonedState>(context.Fsm.CurrentState);
-            Assert.AreEqual(GamePhase.Abandoned, state.Phase);
-        }
-
-        [TestMethod]
-        public async Task AbandonedState_AcceptsNoFurtherCommands()
-        {
-            var stateResult = await _engine.CreateStateAsync(_host);
-            var state = (DrawnToDressGameState)stateResult.Value!;
-            await _engine.StartAsync(_host, state);
-            var context = state.Context!;
-
-            _engine.ProcessCommand(context, new AbandonGameCommand(_host.Id));
-            Assert.IsInstanceOfType<AbandonedState>(context.Fsm.CurrentState);
-
-            // Any subsequent command should be a no-op.
-            _engine.ProcessCommand(context, new StartGameCommand(_host.Id));
-            Assert.IsInstanceOfType<AbandonedState>(context.Fsm.CurrentState);
-            Assert.AreEqual(GamePhase.Abandoned, state.Phase);
-        }
-
-        // ── Theme selection ───────────────────────────────────────────────────
-
-        [TestMethod]
-        public async Task LobbyState_StartGameCommand_ByNonHost_IsRejected()
-        {
-            var stateResult = await _engine.CreateStateAsync(_host);
-            var state = (DrawnToDressGameState)stateResult.Value!;
-            var context = state.Context!;
-
-            // Attempt to start from a non-host player ID.
-            _engine.ProcessCommand(context, new StartGameCommand("nonhost_id"));
-
-            // Should remain in lobby.
-            Assert.IsInstanceOfType<LobbyState>(context.Fsm.CurrentState);
-            Assert.AreEqual(GamePhase.Lobby, state.Phase);
         }
 
         [TestMethod]
@@ -1350,14 +1272,14 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
             var invalidConfig = new KnockBox.Services.State.Games.DrawnToDress.Data.DrawnToDressConfig
             {
                 DrawingTimeSec = 1,     // below minimum of 30
-                VotingRounds = 0,       // below minimum of 1
+                VotingRounds = -1,      // below minimum of 0
                 BonusPointsForCompleteOutfit = -10, // negative
             };
 
             _engine.ProcessCommand(context, new UpdateConfigCommand(_host.Id, invalidConfig));
 
             Assert.AreEqual(30, state.Config.DrawingTimeSec);
-            Assert.AreEqual(1, state.Config.VotingRounds);
+            Assert.AreEqual(0, state.Config.VotingRounds);
             Assert.AreEqual(0, state.Config.BonusPointsForCompleteOutfit);
         }
 

@@ -18,14 +18,10 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
     /// - All players mark ready early → same advance logic as timer expiry
     /// - <see cref="SubmitDrawingCommand"/> → stored; no transition until all ready or timer fires
     /// - <see cref="PauseGameCommand"/> (host only) → <see cref="PausedState"/>
-    /// - <see cref="AbandonGameCommand"/> (host only) → <see cref="AbandonedState"/>
     /// </summary>
     public sealed class DrawingRoundState : ITimedDrawnToDressGameState
     {
-        public bool IsTimerOptional => true;
-
         private readonly int _clothingTypeIndex;
-        private DateTimeOffset _deadline;
 
         /// <summary>
         /// Initialises the drawing round for the specified clothing-type slot.
@@ -42,8 +38,11 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
         public ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?> OnEnter(
             DrawnToDressGameContext context)
         {
-            _deadline = DateTimeOffset.UtcNow.AddSeconds(context.Config.DrawingTimeSec);
-            context.State.PhaseDeadlineUtc = _deadline;
+            if (context.Config.EnableTimer)
+            {
+                context.State.PhaseDeadlineUtc = DateTimeOffset.UtcNow.AddSeconds(context.Config.DrawingTimeSec);
+            }
+
             context.State.CurrentDrawingClothingTypeIndex = _clothingTypeIndex;
             context.State.SetPhase(GamePhase.Drawing);
             context.ResetReadyFlags();
@@ -51,7 +50,7 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
             var typeName = GetCurrentTypeName(context);
             context.Logger.LogInformation(
                 "FSM → DrawingRoundState [{index}] ({type}). Deadline: {deadline}.",
-                _clothingTypeIndex, typeName, _deadline);
+                _clothingTypeIndex, typeName, context.State.PhaseDeadlineUtc);
             return null;
         }
 
@@ -75,9 +74,6 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
                 case PauseGameCommand:
                     return new PausedState(this);
 
-                case AbandonGameCommand:
-                    return new AbandonedState();
-
                 default:
                     context.Logger.LogWarning(
                         "DrawingRoundState: unrecognized command [{type}] from player [{id}].",
@@ -88,12 +84,14 @@ namespace KnockBox.Services.Logic.Games.DrawnToDress.FSM.States
 
         public ValueResult<TimeSpan> GetRemainingTime(
             DrawnToDressGameContext context, DateTimeOffset now)
-            => _deadline - now;
+            => context.State.PhaseDeadlineUtc is { } deadline
+                ? deadline - now
+                : new ResultError("No timer active.");
 
         public ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?> Tick(
             DrawnToDressGameContext context, DateTimeOffset now)
         {
-            if (now < _deadline) return null;
+            if (context.State.PhaseDeadlineUtc is not { } deadline || now < deadline) return null;
 
             var typeName = GetCurrentTypeName(context);
             context.Logger.LogInformation(

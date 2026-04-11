@@ -1,3 +1,4 @@
+using KnockBox.Extensions.Returns;
 using KnockBox.Operator.Services.Logic.FSM;
 
 namespace KnockBox.Operator.Models;
@@ -30,7 +31,9 @@ public enum CardAction
     FlashFlood,
     HostileTakeover,
     Audit,
-    MarketCrash
+    MarketCrash,
+    Surcharge,
+    BlueShell
 }
 
 public static class CardOperatorExtensions
@@ -87,6 +90,12 @@ public interface IPlayableCard
     /// <param name="thisPlayer"></param>
     /// <returns></returns>
     bool IsPlayable(OperatorGameContext context, OperatorPlayerState thisPlayer);
+
+    /// <summary>
+    /// Performs the action of this card.
+    /// </summary>
+    /// <param name="playContext"></param>
+    ValueResult<CardPlayResult> Play(CardPlayContext playContext);
 }
 
 public abstract class Card : IPlayableCard
@@ -120,4 +129,10 @@ public abstract class Card : IPlayableCard
     /// <param name="thisPlayer"></param>
     /// <returns></returns>
     public abstract bool IsPlayable(OperatorGameContext context, OperatorPlayerState thisPlayer);
+
+    /// <summary>
+    /// Performs the action of this card.
+    /// </summary>
+    /// <param name="playContext"></param>
+    public virtual ValueResult<CardPlayResult> Play(CardPlayContext playContext) => ValueResult<CardPlayResult>.FromValue(CardPlayResult.Ok());
 }

@@ -1,104 +1,200 @@
 @using KnockBox.Services.State.Users
 @using KnockBox.Services.State.Games.ConsultTheCard
 
-<div class="ctc-reveal-area">
-    @{
-        var myId = UserService.CurrentUser?.Id ?? "";
-        var elimination = GameState.LastElimination;
-        var informantGuess = GameState.LastInformantGuess;
-        bool awaitingGuess = GameState.AwaitingInformantGuess;
-        bool isEliminatedInformant = elimination is not null
-            && !elimination.WasTie
-            && elimination.Role == Role.Informant
-            && elimination.PlayerId == myId;
-    }
+@{
+    var myId = UserService.CurrentUser?.Id ?? "";
+    var isHost = GameState.Host.Id == myId;
+    var elimination = GameState.LastElimination;
+    var informantGuess = GameState.LastInformantGuess;
+    bool awaitingGuess = GameState.AwaitingInformantGuess;
+}
 
-    <div class="ctc-reveal-panel">
-        <h2 class="ctc-phase-title glitch" data-text="[ AFTER-ACTION REPORT ]">[ AFTER-ACTION REPORT ]</h2>
+@if (isHost)
+{
+    @* ══════ HOST SPECTATOR VIEW ══════ *@
+    <div class="ctc-reveal-area">
+        <div class="ctc-reveal-panel ctc-host-panel">
+            <h2 class="ctc-phase-title glitch" data-text="[ AFTER-ACTION REPORT ]">[ AFTER-ACTION REPORT ]</h2>
 
-        @* ── Elimination result ── *@
-        @if (elimination is not null)
-        {
-            @if (elimination.WasTie)
+            @* ── Dramatic elimination result ── *@
+            @if (elimination is not null && !awaitingGuess)
             {
-                <div class="ctc-reveal-result ctc-reveal-tie">
-                    <span class="ctc-reveal-icon">[ INCONCLUSIVE ]</span>
-                    <p class="ctc-reveal-text">No target eliminated — tied vote</p>
-                </div>
-            }
-            else
-            {
-                <div class="ctc-reveal-result ctc-reveal-eliminated">
-                    <span class="ctc-reveal-icon">[ TERMINATED ]</span>
-                    <p class="ctc-reveal-text"><strong>@elimination.PlayerName</strong> has been eliminated.</p>
-                </div>
-            }
-        }
-
-        @* ── Informant guess mechanic ── *@
-        @if (awaitingGuess)
-        {
-            @if (isEliminatedInformant)
-            {
-                <div class="ctc-informant-guess">
-                    <h3 class="ctc-section-title">[ INTERROGATE: IDENTIFY INTEL ]</h3>
-                    <p class="ctc-hint-text">You have been compromised. As a final act, attempt to identify the target intel.</p>
-                    <div class="ctc-clue-input-area">
-                        <input type="text" class="ctc-clue-input" placeholder="Input target intel..."
-                               @bind="_guessText" @bind:event="oninput" maxlength="50" />
-                        <button class="ctc-btn ctc-btn-primary" @onclick="SubmitGuess"
-                                disabled="@(string.IsNullOrWhiteSpace(_guessText))">
-                            [ SUBMIT INTEL ]
-                        </button>
+                @if (elimination.WasTie)
+                {
+                    <div class="ctc-host-reveal-dramatic">
+                        <pre class="ctc-ascii-border">&#x2554;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2557;
+&#x2551;          INCONCLUSIVE             &#x2551;
+&#x255A;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x255D;</pre>
+                        <div class="ctc-host-reveal-name ctc-host-reveal-tie-text">TIED VOTE</div>
+                        <div class="ctc-host-reveal-status ctc-host-reveal-tie-status">NO TARGET ELIMINATED</div>
                     </div>
-                </div>
-            }
-            else
-            {
-                <div class="ctc-informant-waiting">
-                    <span class="ctc-reveal-icon">[ AWAITING ]</span>
-                    <p class="ctc-waiting-text">Awaiting Informant's final transmission...</p>
-                </div>
-            }
-        }
-
-        @* ── Informant guess result ── *@
-        @if (informantGuess is not null)
-        {
-            <div class="ctc-informant-result @(informantGuess.WasCorrect ? "ctc-guess-correct" : "ctc-guess-wrong")">
-                @if (informantGuess.WasCorrect)
-                {
-                    <p>[ INTEL COMPROMISED ] <strong>@informantGuess.PlayerName</strong> (Informant) correctly identified the intel: <strong>@informantGuess.GuessedWord</strong></p>
-                }
-                else if (string.IsNullOrEmpty(informantGuess.GuessedWord))
-                {
-                    <p>[ TIMEOUT ] Connection lost — no intel provided.</p>
                 }
                 else
                 {
-                    <p>[ INTEL SECURE ] <strong>@informantGuess.PlayerName</strong> (Informant) failed to identify the intel ("<strong>@informantGuess.GuessedWord</strong>").</p>
+                    <div class="ctc-host-reveal-dramatic">
+                        <pre class="ctc-ascii-border ctc-ascii-border-red">&#x2554;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2557;
+&#x2551;      OPERATIVE COMPROMISED        &#x2551;
+&#x255A;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x255D;</pre>
+                        <div class="ctc-host-reveal-name glitch" data-text="@elimination.PlayerName.ToUpper()">@elimination.PlayerName.ToUpper()</div>
+                        <div class="ctc-host-reveal-status">STATUS: TERMINATED</div>
+                    </div>
                 }
-            </div>
-        }
+            }
 
-        @* ── Vote tally breakdown ── *@
-        @if (GameState.CurrentRoundVotes.Count > 0)
-        {
-            <div class="ctc-vote-tally">
-                <h3 class="ctc-section-title">[ VOTE LOG ]</h3>
-                <div class="ctc-tally-list">
-                    @foreach (var vote in GameState.CurrentRoundVotes)
+            @* ── Informant guess ── *@
+            @if (awaitingGuess)
+            {
+                <div class="ctc-informant-waiting">
+                    <span class="ctc-reveal-icon">[ AWAITING ]</span>
+                    <p class="ctc-host-active-status">AWAITING INFORMANT FINAL TRANSMISSION<span class="ctc-blink-dots">...</span></p>
+                </div>
+            }
+
+            @if (informantGuess is not null)
+            {
+                <div class="ctc-informant-result @(informantGuess.WasCorrect ? "ctc-guess-correct" : "ctc-guess-wrong")">
+                    @if (informantGuess.WasCorrect)
                     {
-                        <div class="ctc-tally-entry">
-                            <span class="ctc-tally-voter">@vote.VoterName</span>
-                            <span class="ctc-tally-arrow">→</span>
-                            <span class="ctc-tally-target">@vote.TargetName</span>
-                        </div>
+                        <p>[ INTEL COMPROMISED ] <strong>@informantGuess.PlayerName</strong> (Informant) correctly identified the intel: <strong>@informantGuess.GuessedWord</strong></p>
+                    }
+                    else if (string.IsNullOrEmpty(informantGuess.GuessedWord))
+                    {
+                        <p>[ TIMEOUT ] Connection lost -- no intel provided.</p>
+                    }
+                    else
+                    {
+                        <p>[ INTEL SECURE ] <strong>@informantGuess.PlayerName</strong> (Informant) failed to identify the intel ("<strong>@informantGuess.GuessedWord</strong>").</p>
                     }
                 </div>
-            </div>
+            }
+
+            @* ── Vote tally ── *@
+            @if (GameState.CurrentRoundVotes.Count > 0)
+            {
+                <div class="ctc-vote-tally">
+                    <h3 class="ctc-section-title">[ VOTE LOG ]</h3>
+                    <div class="ctc-tally-list">
+                        @foreach (var vote in GameState.CurrentRoundVotes)
+                        {
+                            <div class="ctc-tally-entry ctc-tally-entry-host">
+                                <span class="ctc-tally-voter">@vote.VoterName</span>
+                                <span class="ctc-tally-arrow">&#x2192;</span>
+                                <span class="ctc-tally-target">@vote.TargetName</span>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+
+            <p class="ctc-setup-auto-advance">Proceeding to next phase...</p>
+        </div>
+    </div>
+}
+else
+{
+    @* ══════ PLAYER VIEW ══════ *@
+    <div class="ctc-reveal-area">
+        @{
+            bool isEliminatedInformant = elimination is not null
+                && !elimination.WasTie
+                && elimination.Role == Role.Informant
+                && elimination.PlayerId == myId;
         }
 
-        <p class="ctc-setup-auto-advance">Proceeding to next phase...</p>
+        <div class="ctc-reveal-panel">
+            <h2 class="ctc-phase-title glitch" data-text="[ AFTER-ACTION REPORT ]">[ AFTER-ACTION REPORT ]</h2>
+
+            @* ── Elimination result ── *@
+            @if (elimination is not null && !awaitingGuess)
+            {
+                @if (elimination.WasTie)
+                {
+                    <div class="ctc-reveal-result ctc-reveal-tie">
+                        <span class="ctc-reveal-icon">[ INCONCLUSIVE ]</span>
+                        <p class="ctc-reveal-text">No target eliminated -- tied vote</p>
+                    </div>
+                }
+                else if (elimination.PlayerId == myId)
+                {
+                    <div class="ctc-reveal-result ctc-reveal-eliminated">
+                        <span class="ctc-reveal-icon">[ TERMINATED ]</span>
+                        <p class="ctc-reveal-text">You were eliminated.</p>
+                    </div>
+                }
+                else
+                {
+                    <div class="ctc-reveal-result ctc-reveal-eliminated">
+                        <span class="ctc-reveal-icon">[ TERMINATED ]</span>
+                        <p class="ctc-reveal-text"><strong>@elimination.PlayerName</strong> has been eliminated.</p>
+                    </div>
+                }
+            }
+
+            @* ── Informant guess mechanic ── *@
+            @if (awaitingGuess)
+            {
+                @if (isEliminatedInformant)
+                {
+                    <div class="ctc-informant-guess">
+                        <h3 class="ctc-section-title">[ INTERROGATE: IDENTIFY INTEL ]</h3>
+                        <p class="ctc-hint-text">You have been compromised. As a final act, attempt to identify the target intel.</p>
+                        <div class="ctc-clue-input-area">
+                            <input type="text" class="ctc-clue-input" placeholder="Input target intel..."
+                                   @bind="_guessText" @bind:event="oninput" maxlength="50" />
+                            <button class="ctc-btn ctc-btn-primary" @onclick="SubmitGuess"
+                                    disabled="@(string.IsNullOrWhiteSpace(_guessText))">
+                                [ SUBMIT INTEL ]
+                            </button>
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <div class="ctc-informant-waiting">
+                        <span class="ctc-reveal-icon">[ AWAITING ]</span>
+                        <p class="ctc-waiting-text">Awaiting Informant's final transmission...</p>
+                    </div>
+                }
+            }
+
+            @* ── Informant guess result ── *@
+            @if (informantGuess is not null)
+            {
+                <div class="ctc-informant-result @(informantGuess.WasCorrect ? "ctc-guess-correct" : "ctc-guess-wrong")">
+                    @if (informantGuess.WasCorrect)
+                    {
+                        <p>[ INTEL COMPROMISED ] <strong>@informantGuess.PlayerName</strong> (Informant) correctly identified the intel: <strong>@informantGuess.GuessedWord</strong></p>
+                    }
+                    else if (string.IsNullOrEmpty(informantGuess.GuessedWord))
+                    {
+                        <p>[ TIMEOUT ] Connection lost -- no intel provided.</p>
+                    }
+                    else
+                    {
+                        <p>[ INTEL SECURE ] <strong>@informantGuess.PlayerName</strong> (Informant) failed to identify the intel ("<strong>@informantGuess.GuessedWord</strong>").</p>
+                    }
+                </div>
+            }
+
+            @* ── Vote tally breakdown ── *@
+            @if (GameState.CurrentRoundVotes.Count > 0)
+            {
+                <div class="ctc-vote-tally">
+                    <h3 class="ctc-section-title">[ VOTE LOG ]</h3>
+                    <div class="ctc-tally-list">
+                        @foreach (var vote in GameState.CurrentRoundVotes)
+                        {
+                            <div class="ctc-tally-entry">
+                                <span class="ctc-tally-voter">@vote.VoterName</span>
+                                <span class="ctc-tally-arrow">&#x2192;</span>
+                                <span class="ctc-tally-target">@vote.TargetName</span>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+
+            <p class="ctc-setup-auto-advance">Proceeding to next phase...</p>
+        </div>
     </div>
-</div>
+}

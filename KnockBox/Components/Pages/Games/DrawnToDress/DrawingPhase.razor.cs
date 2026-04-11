@@ -1,14 +1,16 @@
 using KnockBox.Core.Components.Shared;
+using KnockBox.Core.Services.Drawing;
 using KnockBox.Services.Logic.Games.DrawnToDress;
 using KnockBox.Services.Logic.Games.DrawnToDress.FSM;
 using KnockBox.Services.State.Games.DrawnToDress;
 using KnockBox.Services.State.Games.DrawnToDress.Data;
 using KnockBox.Services.State.Users;
 using Microsoft.AspNetCore.Components;
+using Microsoft.JSInterop;
 
 namespace KnockBox.Components.Pages.Games.DrawnToDress
 {
-    public partial class DrawingPhase : ComponentBase
+    public partial class DrawingPhase : ComponentBase, IAsyncDisposable
     {
         [Inject] protected DrawnToDressGameEngine GameEngine { get; set; } = default!;
 
@@ -24,6 +26,8 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
         private bool _showMannequin;
 
         protected string? MannequinSvg => _showMannequin ? GetMannequinSvg(CurrentTypeId) : null;
+        
+        protected static string? SafeSvgContent(string? raw) => SvgContentSanitizer.Sanitize(raw);
 
         protected void ToggleMannequin()
         {
@@ -38,13 +42,10 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
 
         private string GetMannequinSvg(string currentTypeId)
         {
-            var ct = GameState.Config.ClothingTypes.FirstOrDefault(c => c.Id == currentTypeId);
-            int canvasWidth = ct?.CanvasWidth ?? 400;
-            int canvasHeight = ct?.CanvasHeight ?? 400;
-            int partCenterY = ct?.MannequinAnchorY ?? 440;
-            int yOffset = (canvasHeight / 2) - partCenterY;
-
-            return MannequinSvgHelper.Build(canvasWidth, yOffset, currentTypeId);
+            return MannequinSvgHelper.Build(
+                CurrentTypeCanvasWidth,
+                CurrentTypeCanvasHeight,
+                currentTypeId);
         }
 
         /// <summary>Display name for the clothing type of the current round.</summary>
@@ -258,6 +259,18 @@ namespace KnockBox.Components.Pages.Games.DrawnToDress
             {
                 _submitting = false;
                 StateHasChanged();
+            }
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            if (_canvas is not null)
+            {
+                try
+                {
+                    await _canvas.DisposeAsync();
+                }
+                catch (JSDisconnectedException) { }
             }
         }
     }

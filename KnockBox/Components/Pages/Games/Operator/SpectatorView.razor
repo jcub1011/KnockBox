@@ -9,64 +9,172 @@
         .ThenBy(x => x.State!.ScoreTimestamp)
         .ToList();
 
-    var currentPlayerName = GameState.Players.FirstOrDefault(p => p.Id == GameState.TurnManager.CurrentPlayer)?.Name ?? "...";
+    var currentPlayer = GameState.Players.FirstOrDefault(p => p.Id == GameState.TurnManager.CurrentPlayer);
+    var currentPlayerName = currentPlayer?.Name ?? "...";
+    var currentPlayerState = currentPlayer != null
+        ? GameState.GamePlayers.GetValueOrDefault(currentPlayer.Id)
+        : null;
+
+    var deckPercent = GetDeckPercentage();
+    var deckLow = deckPercent < 25;
+    var recentLogs = GameState.ActionLog.TakeLast(8).Reverse().ToList();
 }
 
 <div class="op-spectator">
-    @* Phase & Turn Indicator *@
-    <div class="op-spectator-header">
-        <div class="op-spectator-phase-badge">
-            @GetPhaseIcon() @GetPhaseName()
+    @* ── Top Bar ── *@
+    <div class="op-spectator-top-bar">
+        <div class="op-spectator-top-left">
+            <div class="op-spectator-phase-badge">
+                @GetPhaseIcon() @GetPhaseName()
+            </div>
+            <div class="op-spectator-turn-counter">
+                TURN @GameState.TurnCount
+            </div>
         </div>
-        <div class="op-spectator-turn">
-            It's <strong>@currentPlayerName</strong>'s turn
+
+        <div class="op-spectator-deck @(deckLow ? "deck-low" : "")">
+            <div class="op-spectator-deck-stack">
+                <div class="op-spectator-card-back cb-3"></div>
+                <div class="op-spectator-card-back cb-2"></div>
+                <div class="op-spectator-card-back cb-1"></div>
+            </div>
+            <div class="op-spectator-deck-info">
+                <span class="op-spectator-deck-count">@GameState.Deck.Count</span>
+                <div class="op-spectator-deck-bar">
+                    <div class="op-spectator-deck-bar-fill" style="width: @(deckPercent)%"></div>
+                </div>
+            </div>
         </div>
     </div>
 
-    @* Live Leaderboard *@
-    <div class="op-spectator-leaderboard">
-        <h2 class="op-spectator-title">LIVE STANDINGS</h2>
-        <div class="op-spectator-entries">
-            @for (int i = 0; i < sortedPlayers.Count; i++)
-            {
-                var entry = sortedPlayers[i];
-                var isCurrentTurn = entry.Player.Id == GameState.TurnManager.CurrentPlayer;
-                var isReactionTarget = GameState.Phase == OperatorGamePhase.Reaction
-                    && entry.Player.Id == GameState.ReactionTargetPlayerId;
+    @* ── Two-Column Body ── *@
+    <div class="op-spectator-body">
+        @* ── Left Column: Spotlight ── *@
+        <div class="op-spectator-left">
+            <div class="op-spectator-spotlight @(currentPlayerState?.IsAudited == true ? "holo-effect" : "")">
+                <div class="op-spotlight-header">
+                    <span class="op-spotlight-name">@currentPlayerName</span>
+                    <span class="op-spotlight-label">'S TURN</span>
+                </div>
 
-                <div class="op-spectator-entry @(isCurrentTurn ? "active-turn" : "") @(isReactionTarget ? "targeted" : "")">
-                    <span class="op-spectator-rank">#@(i + 1)</span>
-                    <div class="op-spectator-player-info">
-                        <span class="op-spectator-player-name">@entry.Player.Name</span>
-                        <div class="op-spectator-player-details">
-                            <span class="op-spectator-operator">@GetOperatorSymbol(entry.State!.ActiveOperator)</span>
-                            <span class="op-spectator-score">@entry.State!.CurrentPoints.ToString("F1")</span>
-                            <span class="op-spectator-hand-count">🎴 @entry.State!.Hand.Count</span>
-                            @if (entry.State!.IsAudited)
-                            {
-                                <span class="op-spectator-badge">📝 AUDITED</span>
-                            }
+                @if (currentPlayerState != null)
+                {
+                    <div class="op-spotlight-stats">
+                        <div class="op-spotlight-stat">
+                            <span class="op-spotlight-stat-value">@currentPlayerState.CurrentPoints.ToString("F1")</span>
+                            <span class="op-spotlight-stat-label">SCORE</span>
+                        </div>
+                        <div class="op-spotlight-stat">
+                            <span class="op-spotlight-stat-value op-spotlight-operator">@GetOperatorSymbol(currentPlayerState.ActiveOperator)</span>
+                            <span class="op-spotlight-stat-label">OPERATOR</span>
+                        </div>
+                        <div class="op-spotlight-stat">
+                            <span class="op-spotlight-stat-value">@currentPlayerState.Hand.Count</span>
+                            <span class="op-spotlight-stat-label">CARDS</span>
                         </div>
                     </div>
-                    @if (isCurrentTurn)
+
+                    @if (currentPlayerState.Hand.Count > 0)
                     {
-                        <span class="op-spectator-turn-badge">TURN</span>
+                        <div class="op-spotlight-hand">
+                            @for (int i = 0; i < currentPlayerState.Hand.Count; i++)
+                            {
+                                <div class="op-spotlight-card-back" style="--ci: @i"></div>
+                            }
+                        </div>
                     }
-                    @if (isReactionTarget)
+
+                    @if (currentPlayerState.IsAudited)
                     {
-                        <span class="op-spectator-target-badge">TARGETED</span>
+                        <span class="op-spotlight-audit-badge">AUDITED</span>
                     }
+                    @if (currentPlayerState.IsDivideBroken)
+                    {
+                        <span class="op-spotlight-broken-badge">DIVIDE BROKEN</span>
+                    }
+                }
+            </div>
+
+            @* ── Last Action ── *@
+            @if (!string.IsNullOrEmpty(GameState.LastBlockedActionMessage))
+            {
+                <div class="op-spectator-last-action blocked">
+                    <span class="op-last-action-badge blocked-badge">BLOCKED</span>
+                    <span class="op-last-action-text">@GameState.LastBlockedActionMessage</span>
+                </div>
+            }
+            else if (GameState.ActionLog.Count > 0)
+            {
+                <div class="op-spectator-last-action">
+                    <span class="op-last-action-text">@GameState.ActionLog[^1].Message</span>
                 </div>
             }
         </div>
-    </div>
 
-    @* Deck Status *@
-    <div class="op-spectator-deck">
-        <div class="op-spectator-deck-label">DECK</div>
-        <div class="op-spectator-deck-count">@GameState.Deck.Count</div>
-        <div class="op-spectator-deck-bar">
-            <div class="op-spectator-deck-bar-fill" style="width: @(GetDeckPercentage())%"></div>
+        @* ── Right Column: Leaderboard + Log ── *@
+        <div class="op-spectator-right">
+            @* ── Leaderboard ── *@
+            <div class="op-spectator-leaderboard">
+                <h2 class="op-spectator-title">LIVE STANDINGS</h2>
+                <div class="op-spectator-entries">
+                    @for (int i = 0; i < sortedPlayers.Count; i++)
+                    {
+                        var entry = sortedPlayers[i];
+                        var isCurrentTurn = entry.Player.Id == GameState.TurnManager.CurrentPlayer;
+                        var isReactionTarget = GameState.Phase == OperatorGamePhase.Reaction
+                            && GameState.ReactionTargetPlayerIds.Contains(entry.Player.Id);
+
+                        <div class="op-spectator-entry @(isCurrentTurn ? "active-turn" : "") @(isReactionTarget ? "targeted" : "")">
+                            <span class="op-spectator-rank">#@(i + 1)</span>
+                            <div class="op-spectator-player-info">
+                                <span class="op-spectator-player-name">
+                                    @if (isReactionTarget) { <span class="op-target-icon"></span> }
+                                    @entry.Player.Name
+                                </span>
+                                <div class="op-spectator-player-details">
+                                    <span class="op-spectator-operator">@GetOperatorSymbol(entry.State!.ActiveOperator)</span>
+                                    <span class="op-spectator-score">@entry.State!.CurrentPoints.ToString("F1")</span>
+                                    <span class="op-spectator-hand-count">@entry.State!.Hand.Count cards</span>
+                                    @if (entry.State!.IsAudited)
+                                    {
+                                        <span class="op-spectator-badge">AUDITED</span>
+                                    }
+                                </div>
+                            </div>
+                            @if (isCurrentTurn)
+                            {
+                                <span class="op-spectator-turn-badge">TURN</span>
+                            }
+                            @if (isReactionTarget)
+                            {
+                                <span class="op-spectator-target-badge">TARGETED</span>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+
+            @* ── Activity Log ── *@
+            @if (recentLogs.Count > 0)
+            {
+                <div class="op-spectator-activity-log">
+                    <h2 class="op-spectator-title">ACTIVITY LOG</h2>
+                    <div class="op-spectator-log-entries">
+                        @foreach (var log in recentLogs)
+                        {
+                            var logClass = log.TargetPlayerId != null ? "log-attack"
+                                : log.CardId != null ? "log-card"
+                                : "log-default";
+
+                            <div class="op-spectator-log-entry @logClass">
+                                <span class="op-log-dot"></span>
+                                <span class="op-log-message">@log.Message</span>
+                                <span class="op-log-time">@GetRelativeTime(log.Timestamp)</span>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
         </div>
     </div>
 </div>
@@ -76,10 +184,10 @@
 
     private string GetPhaseIcon() => GameState.Phase switch
     {
-        OperatorGamePhase.Play => "🎯",
-        OperatorGamePhase.Reaction => "⚡",
-        OperatorGamePhase.Draw => "🎴",
-        _ => "🧮"
+        OperatorGamePhase.Play => "\ud83c\udfaf",
+        OperatorGamePhase.Reaction => "\u26a1",
+        OperatorGamePhase.Draw => "\ud83c\udccf",
+        _ => "\ud83e\uddee"
     };
 
     private string GetPhaseName() => GameState.Phase switch
@@ -96,5 +204,15 @@
     {
         var total = GameState.Deck.Count + GameState.DiscardPile.Count;
         return total > 0 ? (int)(100.0 * GameState.Deck.Count / total) : 0;
+    }
+
+    private string GetRelativeTime(DateTimeOffset timestamp)
+    {
+        var elapsed = DateTimeOffset.UtcNow - timestamp;
+        if (elapsed.TotalSeconds < 60)
+            return $"{(int)elapsed.TotalSeconds}s ago";
+        if (elapsed.TotalMinutes < 60)
+            return $"{(int)elapsed.TotalMinutes}m ago";
+        return $"{(int)elapsed.TotalHours}h ago";
     }
 }

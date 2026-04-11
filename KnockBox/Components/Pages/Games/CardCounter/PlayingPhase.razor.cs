@@ -51,6 +51,9 @@ namespace KnockBox.Components.Pages.Games.CardCounter
         // ── Discard state ─────────────────────────────────────────────────────
         private HashSet<int> _selectedDiscardIndices = new();
 
+        // ── Mobile opponent popover state ─────────────────────────────────────
+        private string? _expandedOpponentId;
+
         protected TimeSpan GameTime => GameState != null ? DateTime.UtcNow - GameState.CreatedAt : TimeSpan.Zero;
 
         protected override void OnParametersSet()
@@ -357,6 +360,28 @@ namespace KnockBox.Components.Pages.Games.CardCounter
                 GameEngine.SubmitReorder(UserService.CurrentUser, GameState, SelectedReorderIndices.ToArray());
                 SelectedReorderIndices.Clear();
             }
+        }
+
+        // ── Host / Mobile helpers ─────────────────────────────────────────────
+
+        protected PlayerState? GetNextPlayer()
+        {
+            if (GameState == null) return null;
+            var tm = GameState.TurnManager;
+            if (tm.TurnOrder.Count == 0) return null;
+            var nextIndex = (tm.CurrentPlayerIndex + 1) % tm.TurnOrder.Count;
+            var nextId = tm.TurnOrder[nextIndex];
+            return GameState.GamePlayers.TryGetValue(nextId, out var ps) ? ps : null;
+        }
+
+        protected void ToggleOpponentPopover(string playerId)
+        {
+            _expandedOpponentId = _expandedOpponentId == playerId ? null : playerId;
+        }
+
+        protected void CloseOpponentPopover()
+        {
+            _expandedOpponentId = null;
         }
 
         // ── Static helpers ────────────────────────────────────────────────────

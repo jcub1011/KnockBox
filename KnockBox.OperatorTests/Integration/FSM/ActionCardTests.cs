@@ -222,6 +222,15 @@ public class ActionCardTests
         var playCmd = new PlayCardsCommand("p1", new List<Guid> { floodCard.Id });
         _playPhase.HandleCommand(_context, playCmd);
 
+        // Transition to ReactionState for global actions
+        Assert.AreEqual(OperatorGamePhase.Reaction, _state.Phase);
+        
+        // Pass for all targets (except p1)
+        foreach (var targetId in _state.ReactionTargetPlayerIds.ToList())
+        {
+            _reactionPhase.HandleCommand(_context, new PassReactionCommand(targetId));
+        }
+
         // Both players should have received 2 cards
         Assert.AreEqual(2, _state.GamePlayers["p1"].Hand.Count);
         Assert.AreEqual(2, _state.GamePlayers["p2"].Hand.Count);
@@ -241,8 +250,8 @@ public class ActionCardTests
         var playCmd = new PlayCardsCommand("p1", new List<Guid> { floodCard.Id });
         var result = _playPhase.HandleCommand(_context, playCmd);
 
-        // Should not transition to reaction state
-        Assert.IsNotInstanceOfType(result.Value, typeof(ReactionState));
+        // Flash Flood is a global action and SHOULD transition to reaction state
+        Assert.IsInstanceOfType(result.Value, typeof(ReactionState));
     }
 
     // ── CookTheBooks ──
@@ -315,6 +324,15 @@ public class ActionCardTests
         var playCmd = new PlayCardsCommand("p1", new List<Guid> { crashCard.Id });
         _playPhase.HandleCommand(_context, playCmd);
 
+        // Transition to ReactionState
+        Assert.AreEqual(OperatorGamePhase.Reaction, _state.Phase);
+        
+        // Pass for all targets (except p1)
+        foreach (var targetId in _state.ReactionTargetPlayerIds.ToList())
+        {
+            _reactionPhase.HandleCommand(_context, new PassReactionCommand(targetId));
+        }
+
         Assert.AreEqual(CardOperator.Divide, _state.GamePlayers["p1"].ActiveOperator);
         Assert.AreEqual(CardOperator.Divide, _state.GamePlayers["p2"].ActiveOperator);
     }
@@ -329,6 +347,9 @@ public class ActionCardTests
 
         var playCmd = new PlayCardsCommand("p1", new List<Guid> { crashCard.Id });
         _playPhase.HandleCommand(_context, playCmd);
+
+        // Should resolve immediately because only target (p2) is audited
+        Assert.AreNotEqual(OperatorGamePhase.Reaction, _state.Phase);
 
         Assert.AreEqual(CardOperator.Divide, _state.GamePlayers["p1"].ActiveOperator);
         Assert.AreEqual(CardOperator.Add, _state.GamePlayers["p2"].ActiveOperator);
@@ -422,5 +443,224 @@ public class ActionCardTests
         var result = _playPhase.HandleCommand(_context, skipCmd);
 
         Assert.IsInstanceOfType(result.Value, typeof(DrawPhaseState));
+    }
+
+    // ── Blue Shell ──
+
+    [TestMethod]
+    public void BlueShell_SingleZeroPlayer_Pass_ResetsScore()
+    {
+        _state.GamePlayers["p2"].CurrentPoints = 0m;
+        _state.GamePlayers["p2"].ActiveOperator = CardOperator.Multiply;
+        var blueShell = new BlueShellCard();
+        _state.GamePlayers["p1"].Hand.Add(blueShell);
+
+        var playCmd = new PlayCardsCommand("p1", new List<Guid> { blueShell.Id }, null);
+        var result = _playPhase.HandleCommand(_context, playCmd);
+
+        Assert.IsInstanceOfType(result.Value, typeof(ReactionState));
+        Assert.IsTrue(_state.ReactionTargetPlayerIds.Contains("p2"));
+
+        var passCmd = new PassReactionCommand("p2");
+        _reactionPhase.HandleCommand(_context, passCmd);
+
+        Assert.AreEqual(10m, _state.GamePlayers["p2"].CurrentPoints);
+        Assert.AreEqual(CardOperator.Add, _state.GamePlayers["p2"].ActiveOperator);
+    }
+
+    [TestMethod]
+    public void BlueShell_SingleZeroPlayer_Shield_ScoreStaysZero()
+    {
+        _state.GamePlayers["p2"].CurrentPoints = 0m;
+        _state.GamePlayers["p2"].ActiveOperator = CardOperator.Multiply;
+        var blueShell = new BlueShellCard();
+        var shield = new ShieldCard();
+        _state.GamePlayers["p1"].Hand.Add(blueShell);
+        _state.GamePlayers["p2"].Hand.Add(shield);
+
+        var playCmd = new PlayCardsCommand("p1", new List<Guid> { blueShell.Id }, null);
+        _playPhase.HandleCommand(_context, playCmd);
+
+        var reactCmd = new PlayReactionCommand("p2", shield.Id);
+        _reactionPhase.HandleCommand(_context, reactCmd);
+
+        Assert.AreEqual(0m, _state.GamePlayers["p2"].CurrentPoints);
+        Assert.AreEqual(CardOperator.Multiply, _state.GamePlayers["p2"].ActiveOperator);
+    }
+
+    [TestMethod]
+    public void BlueShell_MultipleZeroPlayers_AllPass_AllReset()
+    {
+        _state.GamePlayers.TryAdd("p3", new OperatorPlayerState { UserId = "p3", CurrentPoints = 0m, ActiveOperator = CardOperator.Subtract });
+        _state.GamePlayers["p2"].CurrentPoints = 0m;
+        _state.GamePlayers["p2"].ActiveOperator = CardOperator.Multiply;
+        var blueShell = new BlueShellCard();
+        _state.GamePlayers["p1"].Hand.Add(blueShell);
+
+        var playCmd = new PlayCardsCommand("p1", new List<Guid> { blueShell.Id }, null);
+        _playPhase.HandleCommand(_context, playCmd);
+
+        Assert.AreEqual(2, _state.ReactionTargetPlayerIds.Count);
+
+        // Both pass
+        _reactionPhase.HandleCommand(_context, new PassReactionCommand("p2"));
+        // After first pass, should still be in reaction (waiting for p3)
+        Assert.AreEqual(1, _state.PlayerReactions.Count);
+
+        _reactionPhase.HandleCommand(_context, new PassReactionCommand("p3"));
+
+        Assert.AreEqual(10m, _state.GamePlayers["p2"].CurrentPoints);
+        Assert.AreEqual(CardOperator.Add, _state.GamePlayers["p2"].ActiveOperator);
+        Assert.AreEqual(10m, _state.GamePlayers["p3"].CurrentPoints);
+        Assert.AreEqual(CardOperator.Add, _state.GamePlayers["p3"].ActiveOperator);
+    }
+
+    [TestMethod]
+    public void BlueShell_MultipleZeroPlayers_OneBlocks_OthersReset()
+    {
+        _state.GamePlayers.TryAdd("p3", new OperatorPlayerState { UserId = "p3", CurrentPoints = 0m, ActiveOperator = CardOperator.Subtract });
+        _state.GamePlayers["p2"].CurrentPoints = 0m;
+        _state.GamePlayers["p2"].ActiveOperator = CardOperator.Multiply;
+        var blueShell = new BlueShellCard();
+        var shield = new ShieldCard();
+        _state.GamePlayers["p1"].Hand.Add(blueShell);
+        _state.GamePlayers["p2"].Hand.Add(shield);
+
+        var playCmd = new PlayCardsCommand("p1", new List<Guid> { blueShell.Id }, null);
+        _playPhase.HandleCommand(_context, playCmd);
+
+        // p2 shields, p3 passes
+        _reactionPhase.HandleCommand(_context, new PlayReactionCommand("p2", shield.Id));
+        _reactionPhase.HandleCommand(_context, new PassReactionCommand("p3"));
+
+        // p2 blocked — stays at 0
+        Assert.AreEqual(0m, _state.GamePlayers["p2"].CurrentPoints);
+        Assert.AreEqual(CardOperator.Multiply, _state.GamePlayers["p2"].ActiveOperator);
+
+        // p3 didn't block — reset to 10
+        Assert.AreEqual(10m, _state.GamePlayers["p3"].CurrentPoints);
+        Assert.AreEqual(CardOperator.Add, _state.GamePlayers["p3"].ActiveOperator);
+    }
+
+    [TestMethod]
+    public void BlueShell_MultipleZeroPlayers_AllBlock_NoneReset()
+    {
+        _state.GamePlayers.TryAdd("p3", new OperatorPlayerState { UserId = "p3", CurrentPoints = 0m, ActiveOperator = CardOperator.Subtract });
+        _state.GamePlayers["p2"].CurrentPoints = 0m;
+        _state.GamePlayers["p2"].ActiveOperator = CardOperator.Multiply;
+        var blueShell = new BlueShellCard();
+        var shield1 = new ShieldCard();
+        var shield2 = new ShieldCard();
+        _state.GamePlayers["p1"].Hand.Add(blueShell);
+        _state.GamePlayers["p2"].Hand.Add(shield1);
+        _state.GamePlayers["p3"].Hand.Add(shield2);
+
+        var playCmd = new PlayCardsCommand("p1", new List<Guid> { blueShell.Id }, null);
+        _playPhase.HandleCommand(_context, playCmd);
+
+        _reactionPhase.HandleCommand(_context, new PlayReactionCommand("p2", shield1.Id));
+        _reactionPhase.HandleCommand(_context, new PlayReactionCommand("p3", shield2.Id));
+
+        Assert.AreEqual(0m, _state.GamePlayers["p2"].CurrentPoints);
+        Assert.AreEqual(CardOperator.Multiply, _state.GamePlayers["p2"].ActiveOperator);
+        Assert.AreEqual(0m, _state.GamePlayers["p3"].CurrentPoints);
+        Assert.AreEqual(CardOperator.Subtract, _state.GamePlayers["p3"].ActiveOperator);
+    }
+
+    [TestMethod]
+    public void BlueShell_MultiTarget_PlayersCanReactInAnyOrder()
+    {
+        _state.GamePlayers.TryAdd("p3", new OperatorPlayerState { UserId = "p3", CurrentPoints = 0m, ActiveOperator = CardOperator.Subtract });
+        _state.GamePlayers["p2"].CurrentPoints = 0m;
+        var blueShell = new BlueShellCard();
+        _state.GamePlayers["p1"].Hand.Add(blueShell);
+
+        var playCmd = new PlayCardsCommand("p1", new List<Guid> { blueShell.Id }, null);
+        _playPhase.HandleCommand(_context, playCmd);
+
+        // p3 reacts first (before p2) — order shouldn't matter
+        _reactionPhase.HandleCommand(_context, new PassReactionCommand("p3"));
+        Assert.AreEqual(1, _state.PlayerReactions.Count);
+
+        _reactionPhase.HandleCommand(_context, new PassReactionCommand("p2"));
+
+        Assert.AreEqual(10m, _state.GamePlayers["p2"].CurrentPoints);
+        Assert.AreEqual(10m, _state.GamePlayers["p3"].CurrentPoints);
+    }
+
+    [TestMethod]
+    public void BlueShell_DoubleReact_Rejected()
+    {
+        _state.GamePlayers["p2"].CurrentPoints = 0m;
+        var blueShell = new BlueShellCard();
+        _state.GamePlayers["p1"].Hand.Add(blueShell);
+
+        var playCmd = new PlayCardsCommand("p1", new List<Guid> { blueShell.Id }, null);
+        _playPhase.HandleCommand(_context, playCmd);
+
+        _reactionPhase.HandleCommand(_context, new PassReactionCommand("p2"));
+
+        // p2 tries to react again
+        var result = _reactionPhase.HandleCommand(_context, new PassReactionCommand("p2"));
+        Assert.IsTrue(result.TryGetFailure(out _));
+    }
+
+    [TestMethod]
+    public void BlueShell_NonTargetedPlayer_CannotReact()
+    {
+        _state.GamePlayers["p2"].CurrentPoints = 0m;
+        _state.GamePlayers["p1"].CurrentPoints = 10m; // p1 not at 0
+        var blueShell = new BlueShellCard();
+        _state.GamePlayers["p1"].Hand.Add(blueShell);
+
+        var playCmd = new PlayCardsCommand("p1", new List<Guid> { blueShell.Id }, null);
+        _playPhase.HandleCommand(_context, playCmd);
+
+        // p1 is not targeted (not at 0)
+        var result = _reactionPhase.HandleCommand(_context, new PassReactionCommand("p1"));
+        Assert.IsTrue(result.TryGetFailure(out _));
+    }
+
+    // ── Surcharge ──
+
+    [TestMethod]
+    public void Surcharge_Passed_AddsDirectlyToTargetScore()
+    {
+        _state.GamePlayers["p2"].CurrentPoints = 5m;
+        _state.GamePlayers["p2"].ActiveOperator = CardOperator.Multiply;
+        var surchargeCard = new SurchargeCard();
+        var numCard = new NumberCard(3m);
+        _state.GamePlayers["p1"].Hand.Add(surchargeCard);
+        _state.GamePlayers["p1"].Hand.Add(numCard);
+
+        var playCmd = new PlayCardsCommand("p1", new List<Guid> { surchargeCard.Id, numCard.Id }, "p2");
+        _playPhase.HandleCommand(_context, playCmd);
+
+        var passCmd = new PassReactionCommand("p2");
+        _reactionPhase.HandleCommand(_context, passCmd);
+
+        // Surcharge adds directly, ignoring operator
+        Assert.AreEqual(8m, _state.GamePlayers["p2"].CurrentPoints);
+        Assert.AreEqual(CardOperator.Multiply, _state.GamePlayers["p2"].ActiveOperator);
+    }
+
+    [TestMethod]
+    public void Surcharge_BlockedByShield_DoesNotAdd()
+    {
+        _state.GamePlayers["p2"].CurrentPoints = 5m;
+        var surchargeCard = new SurchargeCard();
+        var numCard = new NumberCard(3m);
+        var shieldCard = new ShieldCard();
+        _state.GamePlayers["p1"].Hand.Add(surchargeCard);
+        _state.GamePlayers["p1"].Hand.Add(numCard);
+        _state.GamePlayers["p2"].Hand.Add(shieldCard);
+
+        var playCmd = new PlayCardsCommand("p1", new List<Guid> { surchargeCard.Id, numCard.Id }, "p2");
+        _playPhase.HandleCommand(_context, playCmd);
+
+        var reactCmd = new PlayReactionCommand("p2", shieldCard.Id);
+        _reactionPhase.HandleCommand(_context, reactCmd);
+
+        Assert.AreEqual(5m, _state.GamePlayers["p2"].CurrentPoints);
     }
 }

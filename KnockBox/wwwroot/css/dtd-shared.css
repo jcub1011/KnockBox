@@ -203,7 +203,7 @@
 
 .dtd-scrollable {
     overflow-y: auto;
-    overflow-x: hidden;
+    overflow-x: auto;
     -webkit-overflow-scrolling: touch;
 }
 
@@ -216,6 +216,31 @@
     padding: 24px;
     box-shadow: 0 8px 0 rgba(0,0,0,0.05);
     border: 3px solid var(--dtd-color-bg-soft);
+}
+
+/* ── Mobile Sizing ─────────────────────────────────────────────────────────── */
+
+@media (max-width: 600px) {
+    .dtd-btn {
+        font-size: 1rem;
+        padding: 10px 20px;
+    }
+
+    .dtd-btn-lg {
+        font-size: 1.2rem;
+        padding: 14px 28px;
+        border-radius: 16px;
+    }
+
+    .dtd-timer {
+        font-size: 1.1rem;
+        padding: 6px 14px;
+        display: flex;
+    }
+
+    .dtd-timer span {
+        margin: auto;
+    }
 }
 
 /* ── Reduced Motion ─────────────────────────────────────────────────────────── */
