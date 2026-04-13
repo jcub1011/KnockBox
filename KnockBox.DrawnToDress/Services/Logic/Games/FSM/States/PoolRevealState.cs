@@ -14,14 +14,9 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
     /// For round 1, optionally reveals the theme (AfterDrawing mode).
     /// For round > 1, resets the pool (removes previous round picks).
     /// </summary>
-    public sealed class PoolRevealState : ITimedDrawnToDressGameState
+    public sealed class PoolRevealState(int outfitRound = 1) : ITimedDrawnToDressGameState
     {
-        private readonly int _outfitRound;
-
-        public PoolRevealState(int outfitRound = 1)
-        {
-            _outfitRound = outfitRound;
-        }
+        private readonly int _outfitRound = outfitRound;
 
         public ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?> OnEnter(
             DrawnToDressGameContext context)

@@ -14,14 +14,9 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
     /// For round > 1, the pool is reset on entry (previous round picks removed) and
     /// submitted outfits are validated for distinctness against earlier outfits.
     /// </summary>
-    public sealed class OutfitBuildingState : ITimedDrawnToDressGameState
+    public sealed class OutfitBuildingState(int outfitRound = 1) : ITimedDrawnToDressGameState
     {
-        private readonly int _outfitRound;
-
-        public OutfitBuildingState(int outfitRound = 1)
-        {
-            _outfitRound = outfitRound;
-        }
+        private readonly int _outfitRound = outfitRound;
 
         public ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?> OnEnter(
             DrawnToDressGameContext context)
@@ -309,11 +304,10 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
             }
 
             var allPreviousOutfits = _outfitRound > 1
-                ? context.GamePlayers.Values
+                ? [.. context.GamePlayers.Values
                     .SelectMany(p => p.SubmittedOutfits
                         .Where(kv => kv.Key < _outfitRound)
-                        .Select(kv => kv.Value))
-                    .ToList()
+                        .Select(kv => kv.Value))]
                 : new List<OutfitSubmission>();
 
             int threshold = context.Config.Outfit2DistinctnessThreshold;

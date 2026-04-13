@@ -291,7 +291,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
                 (indices[i], indices[j]) = (indices[j], indices[i]);
             }
 
-            context.State.ThemeCandidates = indices.Take(count).Select(i => allThemes[i]).ToList();
+            context.State.ThemeCandidates = [.. indices.Take(count).Select(i => allThemes[i])];
         }
 
         private static void SelectThemeFromPlayerSubmissions(DrawnToDressGameContext context)

@@ -11,29 +11,22 @@ namespace KnockBox.ConsultTheCard.Services.Logic.Games.FSM
     /// Per-game context that holds shared data and helpers used by FSM states.
     /// Created when the game starts and stored on <see cref="ConsultTheCardGameState.Context"/>.
     /// </summary>
-    public class ConsultTheCardGameContext
+    public class ConsultTheCardGameContext(
+        ConsultTheCardGameState state,
+        IRandomNumberService rng,
+        ILogger logger)
     {
-        public ConsultTheCardGameContext(
-            ConsultTheCardGameState state,
-            IRandomNumberService rng,
-            ILogger logger)
-        {
-            State = state;
-            Rng = rng;
-            Logger = logger;
-            WordBank = Data.WordBank.Load(logger);
-        }
 
         // ── Core references ───────────────────────────────────────────────────
 
         /// <summary>The underlying game state for this game instance.</summary>
-        public ConsultTheCardGameState State { get; }
+        public ConsultTheCardGameState State { get; } = state;
 
         /// <summary>Random number service shared by all FSM states.</summary>
-        public IRandomNumberService Rng { get; }
+        public IRandomNumberService Rng { get; } = rng;
 
         /// <summary>Logger shared by all FSM states.</summary>
-        public ILogger Logger { get; }
+        public ILogger Logger { get; } = logger;
 
         /// <summary>The FSM that manages state transitions for this game.</summary>
         public IFiniteStateMachine<ConsultTheCardGameContext, ConsultTheCardCommand> Fsm { get; set; } = null!;
@@ -47,7 +40,7 @@ namespace KnockBox.ConsultTheCard.Services.Logic.Games.FSM
         /// <summary>
         /// The word bank providing word groups, loaded from <c>WordPairs.csv</c>.
         /// </summary>
-        public IReadOnlyList<WordGroup> WordBank { get; set; } = [];
+        public IReadOnlyList<WordGroup> WordBank { get; set; } = Data.WordBank.Load(logger);
 
         // ── Convenience accessors (delegate to State) ─────────────────────────
 
@@ -141,7 +134,7 @@ namespace KnockBox.ConsultTheCard.Services.Logic.Games.FSM
             {
                 Logger.LogWarning("SelectWordPair: all word groups used; resetting used indices.");
                 UsedWordPairIndices.Clear();
-                available = Enumerable.Range(0, bank.Count).ToList();
+                available = [.. Enumerable.Range(0, bank.Count)];
             }
 
             // Pick a random available group.
@@ -169,7 +162,7 @@ namespace KnockBox.ConsultTheCard.Services.Logic.Games.FSM
 
         /// <summary>Returns all players who have not been eliminated.</summary>
         public List<ConsultTheCardPlayerState> GetAlivePlayers()
-            => GamePlayers.Values.Where(p => !p.IsEliminated).ToList();
+            => [.. GamePlayers.Values.Where(p => !p.IsEliminated)];
 
         /// <summary>Returns the number of players who have not been eliminated.</summary>
         public int GetAlivePlayerCount()

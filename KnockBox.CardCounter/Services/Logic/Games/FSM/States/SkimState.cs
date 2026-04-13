@@ -8,23 +8,16 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM.States
     /// Waiting for the Skim source player to select which digit in their pot to swap
     /// with a digit in the target's pot. The target may still block with Comp'd.
     /// </summary>
-    public sealed class SkimState : ITimedCardCounterGameState
+    public sealed class SkimState(string sourceId, string targetId, ActionCard pendingCard) : ITimedCardCounterGameState
     {
-        private readonly string _sourceId;
-        private readonly string _targetId;
-        private readonly ActionCard _pendingCard;
+        private readonly string _sourceId = sourceId;
+        private readonly string _targetId = targetId;
+        private readonly ActionCard _pendingCard = pendingCard;
         private DateTimeOffset _expiresAt;
         private bool _targetAccepted;
         private bool _sourceSelected;
         private int _selectedSourceDigit = -1;
         private int _selectedTargetDigit = -1;
-
-        public SkimState(string sourceId, string targetId, ActionCard pendingCard)
-        {
-            _sourceId = sourceId;
-            _targetId = targetId;
-            _pendingCard = pendingCard;
-        }
 
         public ValueResult<IGameState<CardCounterGameContext, CardCounterCommand>?> OnEnter(CardCounterGameContext context)
         {

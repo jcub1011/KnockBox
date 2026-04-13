@@ -9,21 +9,13 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM.States
     /// to respond. The target may play Comp'd to negate the effect or accept it.
     /// A server-side timeout causes automatic acceptance.
     /// </summary>
-    public sealed class WaitingForReactionState : ITimedCardCounterGameState
+    public sealed class WaitingForReactionState(string sourceId, string targetId, ActionCard pendingCard, OperatorCard? notMyMoneyOperator = null) : ITimedCardCounterGameState
     {
-        private readonly string _sourceId;
-        private readonly string _targetId;
-        private readonly ActionCard _pendingCard;
-        private readonly OperatorCard? _notMyMoneyOperator;
+        private readonly string _sourceId = sourceId;
+        private readonly string _targetId = targetId;
+        private readonly ActionCard _pendingCard = pendingCard;
+        private readonly OperatorCard? _notMyMoneyOperator = notMyMoneyOperator;
         private DateTimeOffset _expiresAt;
-
-        public WaitingForReactionState(string sourceId, string targetId, ActionCard pendingCard, OperatorCard? notMyMoneyOperator = null)
-        {
-            _sourceId = sourceId;
-            _targetId = targetId;
-            _pendingCard = pendingCard;
-            _notMyMoneyOperator = notMyMoneyOperator;
-        }
 
         public ValueResult<IGameState<CardCounterGameContext, CardCounterCommand>?> OnEnter(CardCounterGameContext context)
         {

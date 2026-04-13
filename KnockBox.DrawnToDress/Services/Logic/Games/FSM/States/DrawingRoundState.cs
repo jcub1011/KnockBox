@@ -20,21 +20,16 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
     /// - <see cref="SubmitDrawingCommand"/> → stored; no transition until all ready or timer fires
     /// - <see cref="PauseGameCommand"/> (host only) → <see cref="PausedState"/>
     /// </summary>
-    public sealed class DrawingRoundState : ITimedDrawnToDressGameState
+    /// <remarks>
+    /// Initialises the drawing round for the specified clothing-type slot.
+    /// </remarks>
+    /// <param name="clothingTypeIndex">
+    /// 0-based index into <see cref="DrawnToDressConfig.ClothingTypes"/> for the type
+    /// players will draw during this round.  Defaults to <c>0</c> (first type).
+    /// </param>
+    public sealed class DrawingRoundState(int clothingTypeIndex = 0) : ITimedDrawnToDressGameState
     {
-        private readonly int _clothingTypeIndex;
-
-        /// <summary>
-        /// Initialises the drawing round for the specified clothing-type slot.
-        /// </summary>
-        /// <param name="clothingTypeIndex">
-        /// 0-based index into <see cref="DrawnToDressConfig.ClothingTypes"/> for the type
-        /// players will draw during this round.  Defaults to <c>0</c> (first type).
-        /// </param>
-        public DrawingRoundState(int clothingTypeIndex = 0)
-        {
-            _clothingTypeIndex = clothingTypeIndex;
-        }
+        private readonly int _clothingTypeIndex = clothingTypeIndex;
 
         public ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?> OnEnter(
             DrawnToDressGameContext context)

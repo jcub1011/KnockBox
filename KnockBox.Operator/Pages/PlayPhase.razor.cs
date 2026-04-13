@@ -90,10 +90,9 @@ namespace KnockBox.Operator.Pages
             {
                 var ps = CurrentPlayerState;
                 if (ps?.PreDrawCardIds == null || ps.PreDrawCardIds.Count == 0) return new();
-                return ps.Hand
+                return [.. ps.Hand
                     .Where(c => !ps.PreDrawCardIds.Contains(c.Id))
-                    .Select(c => c.Id)
-                    .ToHashSet();
+                    .Select(c => c.Id)];
             }
         }
 

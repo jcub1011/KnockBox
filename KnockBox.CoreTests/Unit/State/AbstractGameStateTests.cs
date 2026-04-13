@@ -9,9 +9,8 @@ namespace KnockBox.Tests.Unit.State;
 [TestClass]
 public sealed class AbstractGameStateTests
 {
-    private sealed class TestGameState : AbstractGameState
+    private sealed class TestGameState(User host, ILogger logger) : AbstractGameState(host, logger)
     {
-        public TestGameState(User host, ILogger logger) : base(host, logger) { }
     }
 
     private static User MakeUser(string name = "TestUser") =>

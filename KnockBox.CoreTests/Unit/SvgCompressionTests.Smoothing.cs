@@ -397,7 +397,7 @@ public partial class SvgCompressionTests
         Console.WriteLine();
         Console.WriteLine("  SVG totals:");
 
-        var origSvg = WrapInSvg(wobblyPaths.Select(p => BuildPath(engine, p.Points)).ToList());
+        var origSvg = WrapInSvg([.. wobblyPaths.Select(p => BuildPath(engine, p.Points))]);
         var origSize = Encoding.UTF8.GetByteCount(origSvg);
 
         foreach (var (label, process) in variants)

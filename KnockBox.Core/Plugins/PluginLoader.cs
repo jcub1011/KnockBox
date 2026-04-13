@@ -11,32 +11,19 @@ namespace KnockBox.Core.Plugins
         IReadOnlyList<Assembly> Assemblies)
     {
         public static PluginLoadResult Empty { get; } =
-            new(Array.Empty<IGameModule>(), Array.Empty<Assembly>());
+            new([], []);
     }
 
     /// <summary>
     /// Discovers <see cref="IGameModule"/> implementations from DLLs in a plugins directory.
     /// </summary>
-    public sealed class PluginLoader
+    public sealed class PluginLoader(ILogger<PluginLoader> logger)
     {
-        private readonly ILogger<PluginLoader> _logger;
-
-        public PluginLoader(ILogger<PluginLoader> logger)
-        {
-            _logger = logger;
-        }
-
-        /// <summary>
-        /// Loads all plugin assemblies from <paramref name="pluginsDirectory"/> and returns
-        /// the discovered <see cref="IGameModule"/> instances along with their assemblies.
-        /// Errors during load, type scan, activation, or duplicate route-identifier collisions
-        /// are logged and skipped; they do not throw.
-        /// </summary>
         public PluginLoadResult LoadModules(string pluginsDirectory)
         {
             if (!Directory.Exists(pluginsDirectory))
             {
-                _logger.LogWarning(
+                logger.LogWarning(
                     "Plugins directory [{PluginsDirectory}] does not exist; no game modules will be loaded.",
                     pluginsDirectory);
                 return PluginLoadResult.Empty;
@@ -57,7 +44,7 @@ namespace KnockBox.Core.Plugins
 
                     if (routeIdentifiers.TryGetValue(module.RouteIdentifier, out var existing))
                     {
-                        _logger.LogError(
+                        logger.LogError(
                             "Duplicate game module route identifier [{RouteIdentifier}]. " +
                             "Keeping [{ExistingType}] from [{ExistingAssembly}]; skipping [{SkippedType}] from [{SkippedAssembly}].",
                             module.RouteIdentifier,
@@ -72,18 +59,19 @@ namespace KnockBox.Core.Plugins
                     modules.Add(module);
                     moduleAssemblies.Add(moduleType.Assembly);
 
-                    _logger.LogInformation(
-                        "Loaded game module [{Name}] with route identifier [{RouteIdentifier}] from [{Assembly}].",
-                        module.Name,
-                        module.RouteIdentifier,
-                        moduleType.Assembly.GetName().Name);
+                    if (logger.IsEnabled(LogLevel.Information))
+                        logger.LogInformation(
+                            "Loaded game module [{Name}] with route identifier [{RouteIdentifier}] from [{Assembly}].",
+                            module.Name,
+                            module.RouteIdentifier,
+                            moduleType.Assembly.GetName().Name);
                 }
             }
 
-            return new PluginLoadResult(modules, moduleAssemblies.ToList());
+            return new PluginLoadResult(modules, [.. moduleAssemblies]);
         }
 
-        private IReadOnlyList<Assembly> LoadAssemblies(string pluginsDirectory)
+        private List<Assembly> LoadAssemblies(string pluginsDirectory)
         {
             var dllPaths = Directory.GetFiles(pluginsDirectory, "*.dll", SearchOption.AllDirectories);
             var assemblies = new List<Assembly>(dllPaths.Length);
@@ -103,7 +91,7 @@ namespace KnockBox.Core.Plugins
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(
+                    logger.LogError(
                         ex,
                         "Failed to load plugin assembly [{DllPath}].",
                         dllPath);
@@ -124,7 +112,7 @@ namespace KnockBox.Core.Plugins
             {
                 foreach (var loaderException in ex.LoaderExceptions.Where(e => e is not null))
                 {
-                    _logger.LogError(
+                    logger.LogError(
                         loaderException,
                         "Loader exception while scanning [{Assembly}] for game modules.",
                         assembly.GetName().Name);
@@ -133,7 +121,7 @@ namespace KnockBox.Core.Plugins
             }
             catch (Exception ex)
             {
-                _logger.LogError(
+                logger.LogError(
                     ex,
                     "Failed to scan [{Assembly}] for game modules.",
                     assembly.GetName().Name);
@@ -160,14 +148,14 @@ namespace KnockBox.Core.Plugins
                 if (Activator.CreateInstance(moduleType) is IGameModule module)
                     return module;
 
-                _logger.LogError(
+                logger.LogError(
                     "Type [{Type}] implements IGameModule but could not be activated as one.",
                     moduleType.FullName);
                 return null;
             }
             catch (Exception ex)
             {
-                _logger.LogError(
+                logger.LogError(
                     ex,
                     "Failed to activate game module [{Type}] from [{Assembly}]. " +
                     "Ensure it has a public parameterless constructor.",

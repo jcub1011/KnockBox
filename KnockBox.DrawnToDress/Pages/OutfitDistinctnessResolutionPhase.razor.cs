@@ -63,12 +63,11 @@ namespace KnockBox.DrawnToDress.Pages
             var player = GameState.GamePlayers.GetValueOrDefault(myId);
             if (player is null) return [];
 
-            return player.OwnedClothingItemIds
+            return [.. player.OwnedClothingItemIds
                 .Where(id => id != conflictingItemId
                              && GameState.ClothingPool.TryGetValue(id, out var item)
                              && item.ClothingTypeId == typeId)
-                .Select(id => GameState.ClothingPool[id])
-                .ToList();
+                .Select(id => GameState.ClothingPool[id])];
         }
 
         protected async Task SubmitReplacementAsync(Guid replacementItemId)

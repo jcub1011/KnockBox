@@ -14,14 +14,9 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
     /// If conflicts exist, moves to <see cref="OutfitDistinctnessResolutionState"/>;
     /// otherwise proceeds to the next round's pool reveal or voting.
     /// </summary>
-    public sealed class OutfitCustomizationState : ITimedDrawnToDressGameState
+    public sealed class OutfitCustomizationState(int outfitRound = 1) : ITimedDrawnToDressGameState
     {
-        private readonly int _outfitRound;
-
-        public OutfitCustomizationState(int outfitRound = 1)
-        {
-            _outfitRound = outfitRound;
-        }
+        private readonly int _outfitRound = outfitRound;
 
         public ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?> OnEnter(
             DrawnToDressGameContext context)

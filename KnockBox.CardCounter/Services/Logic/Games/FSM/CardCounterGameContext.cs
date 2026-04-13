@@ -10,7 +10,10 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM
     /// Per-game context that holds shared data and helpers used by FSM states.
     /// Created when the game starts and stored on <see cref="CardCounterGameState.Context"/>.
     /// </summary>
-    public class CardCounterGameContext
+    public class CardCounterGameContext(
+        CardCounterGameState state,
+        IRandomNumberService rng,
+        ILogger logger)
     {
         /// <summary>
         /// One <see cref="ActionCard"/> per <see cref="ActionType"/>. Rarity is enforced via
@@ -18,7 +21,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM
         /// so no extra memory is allocated per draw.
         /// </summary>
         private static readonly ActionCard[] ActionCardPool =
-            Enum.GetValues<ActionType>().Select(t => new ActionCard(t)).ToArray();
+            [.. Enum.GetValues<ActionType>().Select(t => new ActionCard(t))];
 
         /// <summary>
         /// Filtered pool used when Active Operator Mode is enabled: excludes
@@ -29,13 +32,12 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM
         /// target's balance digits instead of reversing a pot.
         /// </summary>
         private static readonly ActionCard[] ActionCardPoolActiveOperator =
-            Enum.GetValues<ActionType>()
+            [.. Enum.GetValues<ActionType>()
                 .Where(t => t != ActionType.Skim
                          && t != ActionType.TurnTheTable
                          && t != ActionType.Launder
                          && t != ActionType.NotMyMoney)
-                .Select(t => new ActionCard(t))
-                .ToArray();
+                .Select(t => new ActionCard(t))];
 
         /// <summary>
         /// Returns the relative draw weight for <paramref name="card"/> from the game config.
@@ -58,23 +60,13 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM
             _                       => 10
         };
 
-        public CardCounterGameContext(
-            CardCounterGameState state,
-            IRandomNumberService rng,
-            ILogger logger)
-        {
-            State = state;
-            Rng = rng;
-            Logger = logger;
-        }
-
         // ── Core references ───────────────────────────────────────────────────
 
         /// <summary>The underlying AbstractGameState subclass for this game instance.</summary>
-        public CardCounterGameState State { get; }
+        public CardCounterGameState State { get; } = state;
 
-        public IRandomNumberService Rng { get; }
-        public ILogger Logger { get; }
+        public IRandomNumberService Rng { get; } = rng;
+        public ILogger Logger { get; } = logger;
 
         /// <summary>The FSM that manages state transitions for this game.</summary>
         public IFiniteStateMachine<CardCounterGameContext, CardCounterCommand> Fsm { get; set; } = null!;

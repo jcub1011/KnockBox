@@ -135,7 +135,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
             // Discard the extra cards to bring under limit
             int currentCount = p1.ActionHand.Count;
             int excessCount = currentCount - limit;
-            int[] indicesToDiscard = Enumerable.Range(limit, excessCount).ToArray();
+            int[] indicesToDiscard = [.. Enumerable.Range(limit, excessCount)];
 
             var next = fsmState.HandleCommand(_context, new DiscardActionCardsCommand("p1", indicesToDiscard));
 
