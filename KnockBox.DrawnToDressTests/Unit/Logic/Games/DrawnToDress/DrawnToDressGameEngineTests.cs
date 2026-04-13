@@ -64,6 +64,10 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress
 
             Assert.IsTrue((bool)startResult.IsSuccess);
             Assert.IsFalse(state.IsJoinable);
+            // Theme selection is the first phase after lobby.
+            Assert.AreEqual(GamePhase.ThemeSelection, state.Phase);
+
+            _engine.Tick(state.Context!, DateTimeOffset.UtcNow.AddHours(1));
             Assert.AreEqual(GamePhase.Drawing, state.Phase);
         }
 

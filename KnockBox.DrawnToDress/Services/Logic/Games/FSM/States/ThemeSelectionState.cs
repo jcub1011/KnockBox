@@ -164,7 +164,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
             context.State.CurrentTheme = new ThemeDefinition(cmd.ThemeId, cmd.ThemeId);
             ApplyAnnouncementTiming(context);
             context.Logger.LogInformation("Host selected theme [{id}].", cmd.ThemeId);
-            return ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?>.FromValue(new DrawingRoundState());
+            return null;
         }
 
         private static ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?> HandleSubmitPlayerTheme(
@@ -206,7 +206,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
                 context.Logger.LogInformation(
                     "All players submitted themes. Selected: [{id}] \"{name}\".",
                     context.State.CurrentTheme?.Id, context.State.CurrentTheme?.DisplayName);
-                return ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?>.FromValue(new DrawingRoundState());
+                return null;
             }
 
             return null;
@@ -254,7 +254,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
                 context.Logger.LogInformation(
                     "All players voted. Winning theme: [{id}] \"{name}\".",
                     context.State.CurrentTheme?.Id, context.State.CurrentTheme?.DisplayName);
-                return ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?>.FromValue(new DrawingRoundState());
+                return null;
             }
 
             return null;

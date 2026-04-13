@@ -64,10 +64,10 @@ namespace KnockBox.DrawnToDress.Tests.Unit.State.Games.DrawnToDress
         }
 
         [TestMethod]
-        public void Default_ThemeAnnouncementTimeSec_Is10()
+        public void Default_ThemeAnnouncementTimeSec_Is6()
         {
             var config = new DrawnToDressConfig();
-            Assert.AreEqual(10, config.ThemeAnnouncementTimeSec);
+            Assert.AreEqual(6, config.ThemeAnnouncementTimeSec);
         }
 
         // ── Outfit Building phase defaults ────────────────────────────────────
@@ -80,10 +80,10 @@ namespace KnockBox.DrawnToDress.Tests.Unit.State.Games.DrawnToDress
         }
 
         [TestMethod]
-        public void Default_OutfitCustomizationTimeSec_Is60()
+        public void Default_OutfitCustomizationTimeSec_Is75()
         {
             var config = new DrawnToDressConfig();
-            Assert.AreEqual(60, config.OutfitCustomizationTimeSec);
+            Assert.AreEqual(75, config.OutfitCustomizationTimeSec);
         }
 
         // ── Pool / reuse defaults ─────────────────────────────────────────────
@@ -356,9 +356,9 @@ namespace KnockBox.DrawnToDress.Tests.Unit.State.Games.DrawnToDress
             config.Normalize();
 
             Assert.AreEqual(180, config.DrawingTimeSec);
-            Assert.AreEqual(10, config.ThemeAnnouncementTimeSec);
+            Assert.AreEqual(6, config.ThemeAnnouncementTimeSec);
             Assert.AreEqual(90, config.OutfitBuildingTimeSec);
-            Assert.AreEqual(60, config.OutfitCustomizationTimeSec);
+            Assert.AreEqual(75, config.OutfitCustomizationTimeSec);
             Assert.AreEqual(60, config.VotingTimeSec);
             Assert.AreEqual(0, config.VotingRounds);
             Assert.AreEqual(1, config.BonusPointsForCompleteOutfit);
