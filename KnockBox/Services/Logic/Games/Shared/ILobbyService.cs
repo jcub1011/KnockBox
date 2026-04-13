@@ -5,7 +5,7 @@ using KnockBox.Services.State.Users;
 
 namespace KnockBox.Services.Logic.Games.Shared
 {
-    public class LobbyRegistration(string lobbyCode, string lobbyUri, GameType gameType, AbstractGameState state)
+    public class LobbyRegistration(string lobbyCode, string lobbyUri, string gameName, string routeIdentifier, AbstractGameState state)
     {
         /// <summary>
         /// The code for this lobby.
@@ -18,9 +18,14 @@ namespace KnockBox.Services.Logic.Games.Shared
         public readonly string Uri = lobbyUri;
 
         /// <summary>
-        /// The type of the lobby.
+        /// The name of the game.
         /// </summary>
-        public readonly GameType GameType = gameType;
+        public readonly string GameName = gameName;
+
+        /// <summary>
+        /// The route identifier for this game.
+        /// </summary>
+        public readonly string RouteIdentifier = routeIdentifier;
 
         /// <summary>
         /// The game state for this lobby.
@@ -36,13 +41,13 @@ namespace KnockBox.Services.Logic.Games.Shared
     public interface ILobbyService
     {
         /// <summary>
-        /// Creates a lobby with the provided user as host and game type.
+        /// Creates a lobby with the provided user as host and game route identifier.
         /// </summary>
         /// <param name="host"></param>
-        /// <param name="gameType"></param>
+        /// <param name="routeIdentifier"></param>
         /// <param name="ct"></param>
         /// <returns></returns>
-        Task<ValueResult<LobbyRegistration>> CreateLobbyAsync(User host, GameType gameType, CancellationToken ct = default);
+        Task<ValueResult<LobbyRegistration>> CreateLobbyAsync(User host, string routeIdentifier, CancellationToken ct = default);
 
         /// <summary>
         /// Closes the lobby.

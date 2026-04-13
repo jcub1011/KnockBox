@@ -3,11 +3,8 @@ using KnockBox.Services.Logic.Games.Engines.Shared;
 using KnockBox.Services.Navigation.Games;
 using KnockBox.Services.State.Users;
 using System.Collections.Concurrent;
-using KnockBox.Services.Logic.Games.CardCounter;
-using KnockBox.Services.Logic.Games.DiceSimulator;
-using KnockBox.Services.Logic.Games.DrawnToDress;
-using KnockBox.Services.Logic.Games.ConsultTheCard;
-using KnockBox.Services.Logic.Games.Operator;
+using Microsoft.Extensions.DependencyInjection;
+using KnockBox.Core.Plugins;
 
 namespace KnockBox.Services.Logic.Games.Shared
 {
@@ -42,23 +39,13 @@ namespace KnockBox.Services.Logic.Games.Shared
 
         public async Task<ValueResult<LobbyRegistration>> CreateLobbyAsync(
             User host, 
-            GameType gameType, 
+            string routeIdentifier, 
             CancellationToken ct = default)
         {
-            // TODO: Create implementations of these engines
-            AbstractGameEngine? engine = gameType switch
-            {
-                GameType.SplitTheDeck => null,
-                GameType.DiceSimulator => serviceProvider.GetService<DiceSimulatorGameEngine>(),
-                GameType.CardCounter => serviceProvider.GetService<CardCounterGameEngine>(),
-                GameType.DrawnToDress => serviceProvider.GetService<DrawnToDressGameEngine>(),
-                GameType.ConsultTheCard => serviceProvider.GetService<ConsultTheCardGameEngine>(),
-                GameType.Operator => serviceProvider.GetService<OperatorGameEngine>(),
-                _ => null
-            };
+            AbstractGameEngine? engine = serviceProvider.GetKeyedService<AbstractGameEngine>(routeIdentifier);
 
             if (engine is null)
-                return ValueResult<LobbyRegistration>.FromError($"No game engine is registered for [{gameType}].");
+                return ValueResult<LobbyRegistration>.FromError($"No game engine is registered for [{routeIdentifier}].");
 
             try
             {
@@ -67,7 +54,7 @@ namespace KnockBox.Services.Logic.Games.Shared
                 if (!stateResult.TryGetSuccess(out var gameState))
                     return ValueResult<LobbyRegistration>.FromError(stateResult.Error.Error);
 
-                var lobbyUriResult = CreateLobbyUri(gameType);
+                var lobbyUriResult = CreateLobbyUri(routeIdentifier);
                 if (!lobbyUriResult.TryGetSuccess(out var lobbyUri))
                     return ValueResult<LobbyRegistration>.FromError(lobbyUriResult.Error.Error);
 
@@ -75,7 +62,12 @@ namespace KnockBox.Services.Logic.Games.Shared
                 if (!lobbyCodeResult.TryGetSuccess(out var lobbyCode)) // Service garauntees that lobby code is normalized
                     return ValueResult<LobbyRegistration>.FromError(lobbyCodeResult.Error.Error);
 
-                var lobbyRegistration = new LobbyRegistration(lobbyCode, lobbyUri, gameType, gameState);
+                var modules = serviceProvider.GetServices<IGameModule>();
+                var module = modules.FirstOrDefault(m => m.RouteIdentifier == routeIdentifier);
+                if (module is null)
+                    return ValueResult<LobbyRegistration>.FromError($"Unknown game route identifier [{routeIdentifier}].");
+
+                var lobbyRegistration = new LobbyRegistration(lobbyCode, lobbyUri, module.Name, routeIdentifier, gameState);
                 if (!_lobbies.TryAdd(lobbyCode, lobbyRegistration))
                     return ValueResult<LobbyRegistration>.FromError($"Game with lobby code [{lobbyCode}] already exists.");
 
@@ -116,17 +108,14 @@ namespace KnockBox.Services.Logic.Games.Shared
             return lobbyCode.Trim().ToUpperInvariant();
         }
 
-        private static ValueResult<string> CreateLobbyUri(GameType gameType)
+        private static ValueResult<string> CreateLobbyUri(string routeIdentifier)
         {
-            if (!gameType.TryGetNavigationString(out var navigationString))
-                return ValueResult<string>.FromError("Failed to generate a uri for the lobby.", $"Game type [{gameType}] does not have a defined navigation string attribute.");
-
             var guidA = Guid.NewGuid();
             var guidB = Guid.NewGuid();
 
             string lobbyId = $"{guidA}-{guidB}";
 
-            return $"room/{navigationString}/{lobbyId}";
+            return $"room/{routeIdentifier}/{lobbyId}";
         }
     }
 }

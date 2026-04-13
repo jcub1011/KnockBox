@@ -3,10 +3,10 @@ using KnockBox.Extensions.Disposable;
 using KnockBox.Extensions.Exceptions;
 using KnockBox.Services.Logic.Games.Shared;
 using KnockBox.Services.Logic.RandomGeneration;
-using KnockBox.Services.Navigation.Games;
 using KnockBox.Services.State.Games.Shared;
 using KnockBox.Services.State.Users;
 using Microsoft.AspNetCore.Components;
+using KnockBox.Core.Plugins;
 
 namespace KnockBox.Components.Pages.Home
 {
@@ -18,6 +18,7 @@ namespace KnockBox.Components.Pages.Home
         [Inject] IGameSessionService GameSessionService { get; set; } = default!;
         [Inject] IRandomNumberService RandomNumberService { get; set; } = default!;
         [Inject] ILogger<Home> Logger { get; set; } = default!;
+        [Inject] IEnumerable<IGameModule> GameModules { get; set; } = default!;
 
         [Parameter]
         [SupplyParameterFromQuery(Name = "join")]
@@ -116,7 +117,7 @@ namespace KnockBox.Components.Pages.Home
             GameSessionService.SetCurrentSession(registration);
         }
 
-        private async Task CreateLobby(GameType gameType)
+        private async Task CreateLobby(string routeIdentifier)
         {
             if (!CanJoinOrCreate) return;
 
@@ -127,7 +128,7 @@ namespace KnockBox.Components.Pages.Home
                 return;
             }
 
-            var createResult = await LobbyService.CreateLobbyAsync(user, gameType, ComponentDetached);
+            var createResult = await LobbyService.CreateLobbyAsync(user, routeIdentifier, ComponentDetached);
             if (!createResult.TryGetSuccess(out var lobby))
             {
                 // TODO: Notify user lobby creation failed
