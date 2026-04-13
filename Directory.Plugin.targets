@@ -5,25 +5,52 @@
 
     Imported by each plugin .csproj to publish build output into the host app's
     games/{TargetName}/ folder so the host can discover and load it at runtime.
+
+    We deliberately copy ONLY plugin-owned outputs, not the full $(TargetDir).
+    Rationale: plugins share the default AssemblyLoadContext with the host, so
+      (a) any transitive dep the host already ships is shadowed at load time by
+          the host's TPA; copies under games/{Plugin}/ are dead disk weight,
+          and
+      (b) any plugin-private transitive dep is not found by default-ALC probing
+          from the games/{Plugin}/ folder regardless, so copying it there does
+          not make it loadable. Plugin-private deps must be promoted to the
+          host's bin by some other mechanism if they are truly needed.
+
     Copies:
-      1. The primary assembly and its transitive dependencies (TargetDir\**\*.*)
-      2. The scoped-CSS bundle (if produced)
-      3. The plugin's wwwroot assets (if present)
+      1. The primary assembly, its PDB, and its deps.json.
+      2. Static-web-assets manifests (if produced).
+      3. The scoped-CSS bundle (if produced).
+      4. The plugin's wwwroot assets (if present).
   -->
   <Target Name="PublishPlugin" AfterTargets="Build">
     <Message Text="Publishing plugin $(TargetName) to KnockBox app..." Importance="high" />
+    <PropertyGroup>
+      <!--
+        Anchor on $(MSBuildThisFileDirectory) (the repo root, since this
+        targets file lives there) instead of $(SolutionDir). The latter is
+        undefined when dotnet publish is invoked on a single .csproj without
+        a solution context.
+      -->
+      <PluginDestDir>$(MSBuildThisFileDirectory)KnockBox\bin\$(Configuration)\$(TargetFramework)\games\$(TargetName)\</PluginDestDir>
+    </PropertyGroup>
     <ItemGroup>
-      <PluginOutput Include="$(TargetDir)**\*.*" />
+      <PluginPrimary Include="$(TargetDir)$(TargetName).dll" />
+      <PluginPrimary Include="$(TargetDir)$(TargetName).pdb" Condition="Exists('$(TargetDir)$(TargetName).pdb')" />
+      <PluginPrimary Include="$(TargetDir)$(TargetName).deps.json" Condition="Exists('$(TargetDir)$(TargetName).deps.json')" />
+      <PluginPrimary Include="$(TargetDir)$(TargetName).staticwebassets.endpoints.json"
+                     Condition="Exists('$(TargetDir)$(TargetName).staticwebassets.endpoints.json')" />
+      <PluginPrimary Include="$(TargetDir)$(TargetName).staticwebassets.runtime.json"
+                     Condition="Exists('$(TargetDir)$(TargetName).staticwebassets.runtime.json')" />
       <ScopedCss Include="$(IntermediateOutputPath)scopedcss\bundle\$(TargetName).styles.css" />
       <WwwRootFiles Include="wwwroot\**\*.*" />
     </ItemGroup>
-    <Copy SourceFiles="@(PluginOutput)"
-          DestinationFolder="$(SolutionDir)KnockBox\bin\$(Configuration)\$(TargetFramework)\games\$(TargetName)\%(RecursiveDir)" />
+    <Copy SourceFiles="@(PluginPrimary)"
+          DestinationFolder="$(PluginDestDir)" />
     <Copy SourceFiles="@(ScopedCss)"
-          DestinationFiles="$(SolutionDir)KnockBox\bin\$(Configuration)\$(TargetFramework)\games\$(TargetName)\wwwroot\$(TargetName).styles.css"
+          DestinationFiles="$(PluginDestDir)wwwroot\$(TargetName).styles.css"
           Condition="Exists('@(ScopedCss)')" />
     <Copy SourceFiles="@(WwwRootFiles)"
-          DestinationFolder="$(SolutionDir)KnockBox\bin\$(Configuration)\$(TargetFramework)\games\$(TargetName)\wwwroot\%(RecursiveDir)"
+          DestinationFolder="$(PluginDestDir)wwwroot\%(RecursiveDir)"
           Condition="'@(WwwRootFiles)' != ''" />
   </Target>
 

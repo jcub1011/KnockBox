@@ -78,10 +78,11 @@ public sealed class PluginLoaderTests
     }
 
     [TestMethod]
-    public void LoadModules_NonPluginBytesAtTopLevel_DoesNotThrow()
+    public void LoadModules_LooseDllAtTopLevel_IsIgnored()
     {
-        // A file named like a DLL but containing garbage bytes must not crash
-        // the loader; it should be logged and skipped.
+        // Only per-subdirectory plugin layouts are supported; a DLL placed
+        // loose at the plugins root must be ignored entirely (not even
+        // inspected), so no error is logged because no load is attempted.
         var logger = MakeLogger();
         var loader = new PluginLoader(logger.Object);
         var tempDir = MakeTempDir();
@@ -93,8 +94,7 @@ public sealed class PluginLoaderTests
             var result = loader.LoadModules(tempDir);
 
             Assert.IsEmpty(result.Modules);
-            // Loader logged an error for the bad DLL rather than throwing.
-            VerifyLogged(logger, LogLevel.Error, Times.AtLeastOnce());
+            Assert.IsEmpty(result.Assemblies);
         }
         finally
         {
@@ -131,6 +131,8 @@ public sealed class PluginLoaderTests
         // Copies this test assembly into a subdirectory named to match, simulating
         // the per-plugin publish layout, and verifies the loader discovers the
         // IGameModule types defined in this file.
+        AssertFixtureIsolation();
+
         var logger = MakeLogger();
         var loader = new PluginLoader(logger.Object);
         var tempDir = MakeTempDir();
@@ -161,6 +163,8 @@ public sealed class PluginLoaderTests
         // Both TestPluginModuleA and TestPluginModuleDuplicateA share the same
         // RouteIdentifier and live in the same (test) assembly, so a single load
         // pass exercises the duplicate-detection branch.
+        AssertFixtureIsolation();
+
         var logger = MakeLogger();
         var loader = new PluginLoader(logger.Object);
         var tempDir = MakeTempDir();
@@ -183,6 +187,26 @@ public sealed class PluginLoaderTests
         {
             SafeDelete(tempDir);
         }
+    }
+
+    /// <summary>
+    /// Guard: if a future change adds another IGameModule to this assembly,
+    /// these tests' fixture is no longer isolated and assertions about counts
+    /// by RouteIdentifier may silently over- or under-count. Fail fast with a
+    /// clear remediation hint instead.
+    /// </summary>
+    private static void AssertFixtureIsolation()
+    {
+        var moduleTypesInAssembly = typeof(PluginLoaderTests).Assembly.GetTypes()
+            .Where(t => !t.IsAbstract && !t.IsInterface && typeof(IGameModule).IsAssignableFrom(t))
+            .ToArray();
+        CollectionAssert.AreEquivalent(
+            new[] { typeof(TestPluginModuleA), typeof(TestPluginModuleDuplicateA) },
+            moduleTypesInAssembly,
+            "PluginLoaderTests fixture is no longer isolated -- the test assembly declares " +
+            "IGameModule types beyond TestPluginModuleA/TestPluginModuleDuplicateA. Move new " +
+            "IGameModule test types into a dedicated fixture assembly, or scope the duplicate " +
+            "RouteIdentifier to a nested-class fixture, before relying on these tests.");
     }
 
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1873:Avoid potentially expensive logging", Justification = "It's not a big deal.")]

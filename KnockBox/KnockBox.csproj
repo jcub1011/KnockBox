@@ -44,6 +44,25 @@
 
   <ItemGroup>
     <ProjectReference Include="..\KnockBox.Core\KnockBox.Core.csproj" />
+    <!--
+      Plugin projects are loaded at runtime, not linked at compile time.
+      ReferenceOutputAssembly="false" keeps the host from taking a compile-time
+      dependency on plugin types (preserving the runtime-discovery architecture);
+      Private="false" keeps plugin binaries out of the host's bin root (they are
+      staged to bin/.../games/{Plugin}/ via Directory.Plugin.targets instead).
+      These references exist so that building or publishing the host transitively
+      builds every plugin, ensuring games/ is populated before CopyPluginsToPublish runs.
+    -->
+    <ProjectReference Include="..\KnockBox.CardCounter\KnockBox.CardCounter.csproj"
+                      ReferenceOutputAssembly="false" Private="false" />
+    <ProjectReference Include="..\KnockBox.ConsultTheCard\KnockBox.ConsultTheCard.csproj"
+                      ReferenceOutputAssembly="false" Private="false" />
+    <ProjectReference Include="..\KnockBox.DiceSimulator\KnockBox.DiceSimulator.csproj"
+                      ReferenceOutputAssembly="false" Private="false" />
+    <ProjectReference Include="..\KnockBox.DrawnToDress\KnockBox.DrawnToDress.csproj"
+                      ReferenceOutputAssembly="false" Private="false" />
+    <ProjectReference Include="..\KnockBox.Operator\KnockBox.Operator.csproj"
+                      ReferenceOutputAssembly="false" Private="false" />
   </ItemGroup>
 
   <!--
@@ -60,8 +79,8 @@
     <ItemGroup>
       <PluginPublishFiles Include="$(PluginStagingDir)**\*.*" />
     </ItemGroup>
-    <Warning Text="No plugin files found at '$(PluginStagingDir)'. Run 'dotnet build' on the solution before publishing so plugins are staged."
-             Condition="'@(PluginPublishFiles)' == ''" />
+    <Error Text="No plugin files found at '$(PluginStagingDir)'. Plugin project references did not stage output to the host bin; check that Directory.Plugin.targets ran for each plugin project."
+           Condition="'@(PluginPublishFiles)' == ''" />
     <Copy SourceFiles="@(PluginPublishFiles)"
           DestinationFiles="@(PluginPublishFiles->'$(PublishDir)games\%(RecursiveDir)%(Filename)%(Extension)')"
           SkipUnchangedFiles="true"

@@ -74,10 +74,14 @@ namespace KnockBox.Core.Plugins
         private List<Assembly> LoadAssemblies(string pluginsDirectory)
         {
             // Each plugin lives in its own subfolder (games/{TargetName}/) and publishes
-            // its primary assembly as {TargetName}.dll alongside its transitive deps.
-            // Only load the primary assembly per folder; dependencies are resolved on
-            // demand via AssemblyLoadContext, avoiding redundant loads and version
-            // conflicts from scanning every DLL in the tree.
+            // its primary assembly as {TargetName}.dll. Only the primary assembly per
+            // folder is loaded here. Transitive dependencies must either already be
+            // loaded by the host (deduped via the AppDomain.CurrentDomain.GetAssemblies
+            // check below) or be present in the host's publish output -- plugins share
+            // the default AssemblyLoadContext with the host, so host-provided assemblies
+            // always win on version conflicts. Isolated per-plugin ALCs are not yet
+            // implemented. Loose DLLs dropped directly under the plugins root are
+            // ignored; the per-subdirectory layout is the only supported shape.
             var pluginDllPaths = new List<string>();
             foreach (var subdir in Directory.GetDirectories(pluginsDirectory))
             {
@@ -94,9 +98,6 @@ namespace KnockBox.Core.Plugins
                         Path.GetFileName(expected));
                 }
             }
-
-            // Also accept loose DLLs directly under the plugins root (legacy layout).
-            pluginDllPaths.AddRange(Directory.GetFiles(pluginsDirectory, "*.dll", SearchOption.TopDirectoryOnly));
 
             var assemblies = new List<Assembly>(pluginDllPaths.Count);
 

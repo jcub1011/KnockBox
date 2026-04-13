@@ -99,9 +99,12 @@ namespace KnockBoxTests.Unit.Plugins
             var tempDir = CreateStagingDirWithThisAssembly();
             try
             {
-                // Drop a bogus dll that cannot be loaded as an assembly.
-                var bogusDll = Path.Combine(tempDir, "not-an-assembly.dll");
-                File.WriteAllText(bogusDll, "this is not a valid assembly");
+                // Drop a bogus dll in its own subdirectory matching the loader's
+                // expected per-plugin layout (subdir/{subdir}.dll).
+                var bogusSubdir = Path.Combine(tempDir, "not-an-assembly");
+                Directory.CreateDirectory(bogusSubdir);
+                File.WriteAllText(Path.Combine(bogusSubdir, "not-an-assembly.dll"),
+                    "this is not a valid assembly");
 
                 var result = _loader.LoadModules(tempDir);
 
@@ -124,9 +127,13 @@ namespace KnockBoxTests.Unit.Plugins
             var dir = Path.Combine(Path.GetTempPath(), "knockbox-plugin-test-" + Guid.NewGuid());
             Directory.CreateDirectory(dir);
 
+            // Stage under the per-plugin subdirectory layout required by the
+            // loader: {plugins-root}/{AssemblyName}/{AssemblyName}.dll.
             var source = typeof(PluginLoaderTests).Assembly.Location;
-            var dest = Path.Combine(dir, Path.GetFileName(source));
-            File.Copy(source, dest, overwrite: true);
+            var assemblyFileName = Path.GetFileNameWithoutExtension(source);
+            var pluginSubdir = Path.Combine(dir, assemblyFileName);
+            Directory.CreateDirectory(pluginSubdir);
+            File.Copy(source, Path.Combine(pluginSubdir, assemblyFileName + ".dll"), overwrite: true);
             return dir;
         }
 

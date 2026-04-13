@@ -19,6 +19,9 @@ jobs:
   verify-main:
     name: Verify tag is on main
     runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.resolve.outputs.tag }}
+      sha: ${{ steps.resolve.outputs.sha }}
     steps:
       - name: Checkout (full history)
         uses: actions/checkout@v4
@@ -130,7 +133,7 @@ jobs:
 
   release:
     name: Publish GitHub Release
-    needs: build
+    needs: [verify-main, build]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -147,7 +150,9 @@ jobs:
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
+          name: ${{ needs.verify-main.outputs.tag }}
+          tag_name: ${{ needs.verify-main.outputs.tag }}
           files: artifacts/*.zip
           generate_release_notes: true
           draft: false
-          prerelease: ${{ contains(github.ref_name, '-') }}
+          prerelease: ${{ contains(needs.verify-main.outputs.tag, '-') }}

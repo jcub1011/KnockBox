@@ -40,21 +40,27 @@ namespace KnockBox.ConsultTheCard.Services.Logic.Games.FSM
         /// <summary>
         /// Lazily loads the word bank from <c>WordPairs.csv</c> on first access so that
         /// file I/O stays off the DI construction path; failures surface at the first
-        /// game start rather than at service resolution.
+        /// game start rather than at service resolution. The setter replaces the lazy
+        /// with a pre-materialized one so tests can inject a deterministic bank without
+        /// the CSV loader ever running.
         /// </summary>
-        private readonly Lazy<IReadOnlyList<WordGroup>> _wordBankLoader =
-            new(() => Data.WordBank.Load(logger));
+        private Lazy<IReadOnlyList<WordGroup>>? _wordBank;
 
-        private IReadOnlyList<WordGroup>? _wordBankOverride;
+        private Lazy<IReadOnlyList<WordGroup>> DefaultWordBankLoader()
+            => new(() => Data.WordBank.Load(Logger));
 
         /// <summary>
         /// The word bank providing word groups, loaded from <c>WordPairs.csv</c> on
-        /// first access. Setter is retained so tests can inject a deterministic bank.
+        /// first access. Setting a non-null value replaces the loader entirely so
+        /// subsequent reads skip file I/O; setting <c>null</c> resets to the default
+        /// file-backed loader.
         /// </summary>
         public IReadOnlyList<WordGroup> WordBank
         {
-            get => _wordBankOverride ?? _wordBankLoader.Value;
-            set => _wordBankOverride = value;
+            get => (_wordBank ??= DefaultWordBankLoader()).Value;
+            set => _wordBank = value is null
+                ? DefaultWordBankLoader()
+                : new Lazy<IReadOnlyList<WordGroup>>(value);
         }
 
         // ── Convenience accessors (delegate to State) ─────────────────────────
