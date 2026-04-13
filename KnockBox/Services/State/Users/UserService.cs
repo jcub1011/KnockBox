@@ -1,5 +1,6 @@
 ﻿namespace KnockBox.Services.State.Users
 {
+    using KnockBox.Core.Services.State.Users;
     using KnockBox.Data.Services.ClientStorage;
 
     public class UserService(ILocalStorageService localStorageService, ISessionStorageService sessionStorageService, ILogger<UserService> logger) : IUserService, IDisposable

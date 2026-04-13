@@ -1,4 +1,4 @@
-namespace KnockBox.Extensions.Events
+namespace KnockBox.Core.Extensions.Events
 {
     public interface IThreadSafeEventManager
     {

@@ -3,15 +3,15 @@ using KnockBox.Operator.Services.Logic.FSM;
 using KnockBox.Operator.Services.Logic.FSM.Commands;
 using KnockBox.Operator.Services.Logic.FSM.States;
 using KnockBox.Operator.Services.State;
-using KnockBox.Services.Logic.RandomGeneration;
-using KnockBox.Services.State.Users;
+using KnockBox.Core.Services.Logic.RandomGeneration;
+using KnockBox.Core.Services.State.Users;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using System.Collections.Generic;
 using System;
 
-namespace KnockBox.OperatorTests.Integration.FSM;
+namespace KnockBox.Operator.Tests.Integration.FSM;
 
 [TestClass]
 public class ActionReactionTests

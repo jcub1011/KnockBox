@@ -1,4 +1,4 @@
-namespace KnockBox.Services.State.Games.Shared.Interfaces;
+namespace KnockBox.Core.Services.State.Games.Shared.Interfaces;
 
 public interface IFsmContextGameState<TContext>
 {

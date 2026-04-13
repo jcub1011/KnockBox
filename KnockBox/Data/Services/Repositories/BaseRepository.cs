@@ -1,6 +1,6 @@
 ﻿using KnockBox.Data.DbContexts;
 using KnockBox.Data.Services.KeyProviders;
-using KnockBox.Extensions.Exceptions;
+using KnockBox.Core.Extensions.Exceptions;
 using Microsoft.EntityFrameworkCore;
 
 namespace KnockBox.Data.Services.Repositories

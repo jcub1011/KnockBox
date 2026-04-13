@@ -1,48 +1,19 @@
-﻿using KnockBox.Extensions.Returns;
-using KnockBox.Services.Navigation.Games;
-using KnockBox.Services.State.Games.Shared;
-using KnockBox.Services.State.Users;
+﻿using KnockBox.Core.Extensions.Returns;
+using KnockBox.Core.Services.Logic.Games.Shared;
+using KnockBox.Core.Services.State.Users;
 
 namespace KnockBox.Services.Logic.Games.Shared
 {
-    public class LobbyRegistration(string lobbyCode, string lobbyUri, GameType gameType, AbstractGameState state)
-    {
-        /// <summary>
-        /// The code for this lobby.
-        /// </summary>
-        public readonly string Code = lobbyCode;
-
-        /// <summary>
-        /// The uri for this lobby. Formatted as "room/{gameType}/{obfuscatedRoomCode}".
-        /// </summary>
-        public readonly string Uri = lobbyUri;
-
-        /// <summary>
-        /// The type of the lobby.
-        /// </summary>
-        public readonly GameType GameType = gameType;
-
-        /// <summary>
-        /// The game state for this lobby.
-        /// </summary>
-        public readonly AbstractGameState State = state;
-    }
-
-    public record class UserRegistration(User User, IDisposable UnregistrationToken, LobbyRegistration LobbyRegistration) : IDisposable
-    {
-        public void Dispose() => UnregistrationToken.Dispose();
-    }
-
     public interface ILobbyService
     {
         /// <summary>
-        /// Creates a lobby with the provided user as host and game type.
+        /// Creates a lobby with the provided user as host and game route identifier.
         /// </summary>
         /// <param name="host"></param>
-        /// <param name="gameType"></param>
+        /// <param name="routeIdentifier"></param>
         /// <param name="ct"></param>
         /// <returns></returns>
-        Task<ValueResult<LobbyRegistration>> CreateLobbyAsync(User host, GameType gameType, CancellationToken ct = default);
+        Task<ValueResult<LobbyRegistration>> CreateLobbyAsync(User host, string routeIdentifier, CancellationToken ct = default);
 
         /// <summary>
         /// Closes the lobby.

@@ -1,12 +1,12 @@
-using KnockBox.Services.Logic.Games.DrawnToDress;
-using KnockBox.Services.Logic.RandomGeneration;
-using KnockBox.Services.State.Games.DrawnToDress;
-using KnockBox.Services.State.Users;
+using KnockBox.DrawnToDress.Services.Logic.Games;
+using KnockBox.Core.Services.Logic.RandomGeneration;
+using KnockBox.DrawnToDress.Services.State.Games;
+using KnockBox.Core.Services.State.Users;
 using Microsoft.Extensions.Logging;
 using Moq;
 using System.Threading.Tasks;
 
-namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress
+namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress
 {
     [TestClass]
     public class DrawnToDressGameEngineTests
@@ -64,6 +64,10 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress
 
             Assert.IsTrue((bool)startResult.IsSuccess);
             Assert.IsFalse(state.IsJoinable);
+            // Theme selection is the first phase after lobby.
+            Assert.AreEqual(GamePhase.ThemeSelection, state.Phase);
+
+            _engine.Tick(state.Context!, DateTimeOffset.UtcNow.AddHours(1));
             Assert.AreEqual(GamePhase.Drawing, state.Phase);
         }
 

@@ -1,0 +1,87 @@
+@using KnockBox.Operator.Models
+@using KnockBox.Operator.Services.State
+
+@{
+    var sortedPlayers = GameState.Players
+        .Select(p => new { Player = p, State = GameState.Context?.GamePlayers.GetValueOrDefault(p.Id) })
+        .Where(x => x.State != null)
+        .OrderBy(x => Math.Abs(x.State!.CurrentPoints))
+        .ThenBy(x => x.State!.ScoreTimestamp)
+        .ToList();
+}
+
+@if (IsHost())
+{
+    @* ── Host: Enhanced Winner Pedestal Layout ── *@
+    <div class="op-game-over host-view">
+        <div class="op-confetti-layer c1"></div>
+        <div class="op-confetti-layer c2"></div>
+        <div class="op-confetti-layer c3"></div>
+
+        <h1 class="op-phase-title">GAME OVER</h1>
+
+        @if (sortedPlayers.Count > 0)
+        {
+            var winner = sortedPlayers[0];
+
+            <div class="op-winner-pedestal holo-effect">
+                <span class="op-winner-label">WINNER</span>
+                <span class="op-winner-name">@winner.Player.Name</span>
+                <span class="op-winner-score">@winner.State!.CurrentPoints.ToString("F1")</span>
+                <span class="op-winner-turns">@GameState.TurnCount turns played</span>
+            </div>
+
+            @if (sortedPlayers.Count > 1)
+            {
+                <div class="op-runner-up-row">
+                    @for (int i = 1; i < sortedPlayers.Count; i++)
+                    {
+                        var entry = sortedPlayers[i];
+                        <div class="op-runner-up" style="--ri: @(i - 1)">
+                            <span class="op-runner-rank">#@(i + 1)</span>
+                            <span class="op-runner-name">@entry.Player.Name</span>
+                            <span class="op-runner-score">@entry.State!.CurrentPoints.ToString("F1")</span>
+                        </div>
+                    }
+                </div>
+            }
+        }
+
+        <div class="op-game-over-actions">
+            <button class="op-btn op-btn-primary op-btn-lg" @onclick="GoHome">
+                RETURN TO LOBBY
+            </button>
+        </div>
+    </div>
+}
+else
+{
+    @* ── Player: Original Layout (unchanged) ── *@
+    <div class="op-game-over">
+        <h1 class="op-phase-title">GAME OVER</h1>
+
+        <div class="op-leaderboard">
+            @for (int i = 0; i < sortedPlayers.Count; i++)
+            {
+                var entry = sortedPlayers[i];
+                var isWinner = i == 0;
+
+                <div class="op-leaderboard-entry @(isWinner ? "winner" : "")">
+                    <span class="op-entry-rank">#@(i + 1)</span>
+                    <span class="op-entry-name">@entry.Player.Name</span>
+                    <div class="op-entry-score-col">
+                        <span class="op-entry-score">@entry.State!.CurrentPoints.ToString("F1")</span>
+                        @if (isWinner) { <span class="op-host-badge">WINNER</span> }
+                    </div>
+                </div>
+            }
+        </div>
+
+        <div class="op-game-over-actions">
+            <button class="op-btn op-btn-primary op-btn-lg" @onclick="GoHome">
+                RETURN TO LOBBY
+            </button>
+        </div>
+    </div>
+}
+
