@@ -81,6 +81,24 @@ namespace KnockBox
             app.UseAntiforgery();
 
             app.MapStaticAssets();
+
+            if (Directory.Exists(pluginsPath))
+            {
+                foreach (var dir in Directory.GetDirectories(pluginsPath))
+                {
+                    var pluginName = Path.GetFileName(dir);
+                    var wwwrootPath = Path.Combine(dir, "wwwroot");
+                    if (Directory.Exists(wwwrootPath))
+                    {
+                        app.UseStaticFiles(new StaticFileOptions
+                        {
+                            FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(wwwrootPath),
+                            RequestPath = $"/_content/{pluginName}"
+                        });
+                    }
+                }
+            }
+
             app.MapRazorComponents<App>()
                 .AddInteractiveServerRenderMode();
 

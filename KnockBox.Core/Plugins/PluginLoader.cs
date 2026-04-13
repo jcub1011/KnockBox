@@ -85,7 +85,7 @@ namespace KnockBox.Core.Plugins
 
         private IReadOnlyList<Assembly> LoadAssemblies(string pluginsDirectory)
         {
-            var dllPaths = Directory.GetFiles(pluginsDirectory, "*.dll");
+            var dllPaths = Directory.GetFiles(pluginsDirectory, "*.dll", SearchOption.AllDirectories);
             var assemblies = new List<Assembly>(dllPaths.Length);
 
             foreach (var dllPath in dllPaths)
