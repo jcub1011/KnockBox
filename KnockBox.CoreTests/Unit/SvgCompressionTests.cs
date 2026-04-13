@@ -8,6 +8,8 @@ namespace KnockBox.CoreTests.Unit;
 [TestClass]
 public partial class SvgCompressionTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
     private static string? _jsSource;
 
     /// <summary>
@@ -245,7 +247,7 @@ public partial class SvgCompressionTests
         var points = GenerateSineWave(0, 100, 500, 400, 50, 5);
         var simplified = Compress(engine, points);
 
-        Assert.IsTrue(simplified.Count >= 3, "Should retain at least minPoints (3)");
+        Assert.IsGreaterThanOrEqualTo(3, simplified.Count, "Should retain at least minPoints (3)");
         Assert.AreEqual(points[0].X, simplified[0].X, 0.01, "First point X preserved");
         Assert.AreEqual(points[0].Y, simplified[0].Y, 0.01, "First point Y preserved");
         Assert.AreEqual(points[^1].X, simplified[^1].X, 0.01, "Last point X preserved");
@@ -260,7 +262,7 @@ public partial class SvgCompressionTests
         var points = GenerateSpiral(400, 300, 800, 200, 5);
         var simplified = Compress(engine, points);
 
-        Assert.IsTrue(simplified.Count < points.Count,
+        Assert.IsLessThan(points.Count, simplified.Count,
             $"Expected fewer points after compression. Original: {points.Count}, Compressed: {simplified.Count}");
     }
 
@@ -273,7 +275,7 @@ public partial class SvgCompressionTests
         var points = new List<(double X, double Y)> { (0, 0), (50, 50), (100, 0) };
         var simplified = Compress(engine, points);
 
-        Assert.AreEqual(3, simplified.Count);
+        Assert.HasCount(3, simplified);
     }
 
     [TestMethod]
@@ -285,7 +287,7 @@ public partial class SvgCompressionTests
         var subtleSimplified = Compress(engine, points, minArea: 0.5);
         var aggressiveSimplified = Compress(engine, points, minArea: 8);
 
-        Assert.IsTrue(aggressiveSimplified.Count < subtleSimplified.Count,
+        Assert.IsLessThan(subtleSimplified.Count, aggressiveSimplified.Count,
             $"Aggressive (minArea=8) should remove more points. Subtle: {subtleSimplified.Count}, Aggressive: {aggressiveSimplified.Count}");
     }
 
@@ -298,7 +300,7 @@ public partial class SvgCompressionTests
         var points = GenerateDiagonalLine(0, 0, 500, 500, 800);
         var simplified = Compress(engine, points);
 
-        Assert.AreEqual(3, simplified.Count,
+        Assert.HasCount(3, simplified,
             $"A perfectly straight line should collapse to minPoints. Got {simplified.Count}");
     }
 
@@ -313,7 +315,7 @@ public partial class SvgCompressionTests
         var straightSimplified = Compress(engine, straight);
         var wobblySimplified = Compress(engine, wobbly);
 
-        Assert.IsTrue(wobblySimplified.Count > straightSimplified.Count,
+        Assert.IsGreaterThan(straightSimplified.Count, wobblySimplified.Count,
             $"Wobbly line ({wobblySimplified.Count} points) should retain more detail than " +
             $"a perfect line ({straightSimplified.Count} points)");
     }
@@ -328,7 +330,7 @@ public partial class SvgCompressionTests
         var simplified = Compress(engine, points);
 
         var ratio = (double)simplified.Count / points.Count;
-        Assert.IsTrue(ratio < 0.5,
+        Assert.IsLessThan(0.5, ratio,
             $"Subtle wobble (3px) should compress to under 50% of original. " +
             $"Got {simplified.Count}/{points.Count} = {ratio:P1}");
     }
@@ -348,8 +350,8 @@ public partial class SvgCompressionTests
         var engine = CreateEngine();
 
         var result = BuildPath(engine, [(0, 0), (100, 200)]);
-        Assert.IsTrue(result.StartsWith("M 0 0"), "Should start with MoveTo");
-        Assert.IsTrue(result.Contains("L 100 200"), "Should end with LineTo for last point");
+        Assert.StartsWith("M 0 0", result, "Should start with MoveTo");
+        Assert.Contains("L 100 200", result, "Should end with LineTo for last point");
     }
 
     [TestMethod]
@@ -392,7 +394,7 @@ public partial class SvgCompressionTests
             totalOriginalPoints += points.Count;
             totalCompressedPoints += simplified.Count;
 
-            Console.WriteLine($"  {name}: {points.Count} -> {simplified.Count} points " +
+            TestContext.WriteLine($"  {name}: {points.Count} -> {simplified.Count} points " +
                               $"({100.0 * simplified.Count / points.Count:F1}%)");
         }
 
@@ -402,9 +404,9 @@ public partial class SvgCompressionTests
         var originalBytes = Encoding.UTF8.GetByteCount(originalSvg);
         var compressedBytes = Encoding.UTF8.GetByteCount(compressedSvg);
 
-        Console.WriteLine($"\n  Total points: {totalOriginalPoints} -> {totalCompressedPoints} " +
+        TestContext.WriteLine($"\n  Total points: {totalOriginalPoints} -> {totalCompressedPoints} " +
                           $"({100.0 * totalCompressedPoints / totalOriginalPoints:F1}%)");
-        Console.WriteLine($"  SVG size: {originalBytes:N0} bytes -> {compressedBytes:N0} bytes " +
+        TestContext.WriteLine($"  SVG size: {originalBytes:N0} bytes -> {compressedBytes:N0} bytes " +
                           $"({100.0 * compressedBytes / originalBytes:F1}%)");
 
         // Write output files for visual comparison.
@@ -417,19 +419,19 @@ public partial class SvgCompressionTests
         File.WriteAllText(originalPath, originalSvg);
         File.WriteAllText(compressedPath, compressedSvg);
 
-        Console.WriteLine($"\n  Output written to:");
-        Console.WriteLine($"    {originalPath}");
-        Console.WriteLine($"    {compressedPath}");
+        TestContext.WriteLine($"\n  Output written to:");
+        TestContext.WriteLine($"    {originalPath}");
+        TestContext.WriteLine($"    {compressedPath}");
 
         // Assertions
-        Assert.IsTrue(originalBytes >= 40_000,
+        Assert.IsGreaterThanOrEqualTo(40_000, originalBytes,
             $"Original SVG should be ~50kb for a meaningful test, got {originalBytes:N0} bytes");
-        Assert.IsTrue(compressedBytes < originalBytes,
+        Assert.IsLessThan(originalBytes, compressedBytes,
             $"Compressed SVG ({compressedBytes:N0} bytes) should be smaller than original ({originalBytes:N0} bytes)");
-        Assert.IsTrue(totalCompressedPoints < totalOriginalPoints,
+        Assert.IsLessThan(totalOriginalPoints, totalCompressedPoints,
             "Total compressed point count should be less than original");
-        Assert.IsTrue(compressedSvg.Contains("<svg"), "Compressed output should be valid SVG");
-        Assert.IsTrue(compressedSvg.Contains("<path"), "Compressed output should contain path elements");
+        Assert.Contains("<svg", compressedSvg, "Compressed output should be valid SVG");
+        Assert.Contains("<path", compressedSvg, "Compressed output should contain path elements");
     }
 
     [GeneratedRegex(@"export\s+function\s+")]

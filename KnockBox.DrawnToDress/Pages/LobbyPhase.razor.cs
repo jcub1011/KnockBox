@@ -41,14 +41,14 @@ namespace KnockBox.DrawnToDress.Pages
                 ShowMannequin = src.ShowMannequin,
                 EnableTimer = src.EnableTimer,
                 AllowSketchingDuringOutfitBuilding = src.AllowSketchingDuringOutfitBuilding,
-                ClothingTypes = src.ClothingTypes.Select(t => new ClothingTypeDefinition
+                ClothingTypes = [.. src.ClothingTypes.Select(t => new ClothingTypeDefinition
                 {
                     Id = t.Id,
                     DisplayName = t.DisplayName,
                     AllowMultiple = t.AllowMultiple,
                     CanvasWidth = t.CanvasWidth,
                     CanvasHeight = t.CanvasHeight,
-                }).ToList(),
+                })],
                 ThemeSource = src.ThemeSource,
                 ThemeAnnouncement = src.ThemeAnnouncement,
                 ThemeAnnouncementTimeSec = src.ThemeAnnouncementTimeSec,
@@ -60,12 +60,12 @@ namespace KnockBox.DrawnToDress.Pages
                 CanReuseOutfit1Items = src.CanReuseOutfit1Items,
                 Outfit2DistinctnessThreshold = src.Outfit2DistinctnessThreshold,
                 SketchingRequired = src.SketchingRequired,
-                VotingCriteria = src.VotingCriteria.Select(c => new VotingCriterionDefinition
+                VotingCriteria = [.. src.VotingCriteria.Select(c => new VotingCriterionDefinition
                 {
                     Id = c.Id,
                     DisplayName = c.DisplayName,
                     Weight = c.Weight,
-                }).ToList(),
+                })],
                 VotingTimeSec = src.VotingTimeSec,
                 ShowCreatorDuringVoting = src.ShowCreatorDuringVoting,
                 VoteVisibility = src.VoteVisibility,

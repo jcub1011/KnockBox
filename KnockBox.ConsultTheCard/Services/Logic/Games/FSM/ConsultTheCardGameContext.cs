@@ -11,29 +11,22 @@ namespace KnockBox.ConsultTheCard.Services.Logic.Games.FSM
     /// Per-game context that holds shared data and helpers used by FSM states.
     /// Created when the game starts and stored on <see cref="ConsultTheCardGameState.Context"/>.
     /// </summary>
-    public class ConsultTheCardGameContext
+    public class ConsultTheCardGameContext(
+        ConsultTheCardGameState state,
+        IRandomNumberService rng,
+        ILogger logger)
     {
-        public ConsultTheCardGameContext(
-            ConsultTheCardGameState state,
-            IRandomNumberService rng,
-            ILogger logger)
-        {
-            State = state;
-            Rng = rng;
-            Logger = logger;
-            WordBank = Data.WordBank.Load(logger);
-        }
 
         // ── Core references ───────────────────────────────────────────────────
 
         /// <summary>The underlying game state for this game instance.</summary>
-        public ConsultTheCardGameState State { get; }
+        public ConsultTheCardGameState State { get; } = state;
 
         /// <summary>Random number service shared by all FSM states.</summary>
-        public IRandomNumberService Rng { get; }
+        public IRandomNumberService Rng { get; } = rng;
 
         /// <summary>Logger shared by all FSM states.</summary>
-        public ILogger Logger { get; }
+        public ILogger Logger { get; } = logger;
 
         /// <summary>The FSM that manages state transitions for this game.</summary>
         public IFiniteStateMachine<ConsultTheCardGameContext, ConsultTheCardCommand> Fsm { get; set; } = null!;
@@ -45,9 +38,43 @@ namespace KnockBox.ConsultTheCard.Services.Logic.Games.FSM
         public HashSet<int> UsedWordPairIndices { get; } = [];
 
         /// <summary>
-        /// The word bank providing word groups, loaded from <c>WordPairs.csv</c>.
+        /// Lazily loads the word bank from <c>WordPairs.csv</c> on first access so that
+        /// file I/O stays off the DI construction path; failures surface at the first
+        /// game start rather than at service resolution. Tests can inject a
+        /// deterministic bank via <see cref="UseWordBank"/>.
         /// </summary>
-        public IReadOnlyList<WordGroup> WordBank { get; set; } = [];
+        private Lazy<IReadOnlyList<WordGroup>>? _wordBank;
+
+        private Lazy<IReadOnlyList<WordGroup>> DefaultWordBankLoader()
+            => new(() => Data.WordBank.Load(Logger));
+
+        /// <summary>
+        /// The word bank providing word groups, loaded from <c>WordPairs.csv</c> on
+        /// first access. Use <see cref="UseWordBank"/> to override and
+        /// <see cref="ResetWordBank"/> to return to the default file-backed loader.
+        /// </summary>
+        public IReadOnlyList<WordGroup> WordBank
+            => (_wordBank ??= DefaultWordBankLoader()).Value;
+
+        /// <summary>
+        /// Replaces the word bank with a pre-materialized list. Subsequent reads of
+        /// <see cref="WordBank"/> return the provided list directly without touching
+        /// the CSV loader. Intended for tests that need a deterministic bank.
+        /// </summary>
+        public void UseWordBank(IReadOnlyList<WordGroup> wordBank)
+        {
+            ArgumentNullException.ThrowIfNull(wordBank);
+            _wordBank = new Lazy<IReadOnlyList<WordGroup>>(wordBank);
+        }
+
+        /// <summary>
+        /// Restores the default file-backed word-bank loader. The next read of
+        /// <see cref="WordBank"/> will load <c>WordPairs.csv</c> from disk.
+        /// </summary>
+        public void ResetWordBank()
+        {
+            _wordBank = DefaultWordBankLoader();
+        }
 
         // ── Convenience accessors (delegate to State) ─────────────────────────
 
@@ -99,7 +126,7 @@ namespace KnockBox.ConsultTheCard.Services.Logic.Games.FSM
                 ps.SecretWord = null;
             }
 
-            Logger.LogInformation(
+            Logger.LogDebug(
                 "AssignRoles: {count}p → {agents}A/{insiders}I/{informants}Inf. AgentWord=[{aw}], InsiderWord=[{iw}].",
                 count, agents, insiders, informants, agentWord, insiderWord);
         }
@@ -141,7 +168,7 @@ namespace KnockBox.ConsultTheCard.Services.Logic.Games.FSM
             {
                 Logger.LogWarning("SelectWordPair: all word groups used; resetting used indices.");
                 UsedWordPairIndices.Clear();
-                available = Enumerable.Range(0, bank.Count).ToList();
+                available = [.. Enumerable.Range(0, bank.Count)];
             }
 
             // Pick a random available group.
@@ -150,13 +177,18 @@ namespace KnockBox.ConsultTheCard.Services.Logic.Games.FSM
 
             var group = bank[pick];
 
-            // Select 2 distinct words from the group.
-            int wordIndex1 = Rng.GetRandomInt(group.Words.Length);
-            int wordIndex2;
-            do
-            {
-                wordIndex2 = Rng.GetRandomInt(group.Words.Length);
-            } while (wordIndex2 == wordIndex1);
+            // Select 2 distinct words from the group. Groups with < 2 words are
+            // filtered out by the CSV loader, but a test-injected bank could
+            // violate this, so guard explicitly rather than risking a livelock.
+            int wordCount = group.Words.Length;
+            if (wordCount < 2)
+                throw new InvalidOperationException(
+                    $"Word group at index {pick} has fewer than 2 words ({wordCount}); cannot select a pair.");
+
+            // Pick two distinct indices without a rejection loop: pick the first
+            // index uniformly, then offset by a non-zero amount mod wordCount.
+            int wordIndex1 = Rng.GetRandomInt(wordCount);
+            int wordIndex2 = (wordIndex1 + 1 + Rng.GetRandomInt(wordCount - 1)) % wordCount;
 
             // Randomly assign which is Agent vs Insider.
             bool swap = Rng.GetRandomInt(2) == 0;
@@ -169,7 +201,7 @@ namespace KnockBox.ConsultTheCard.Services.Logic.Games.FSM
 
         /// <summary>Returns all players who have not been eliminated.</summary>
         public List<ConsultTheCardPlayerState> GetAlivePlayers()
-            => GamePlayers.Values.Where(p => !p.IsEliminated).ToList();
+            => [.. GamePlayers.Values.Where(p => !p.IsEliminated)];
 
         /// <summary>Returns the number of players who have not been eliminated.</summary>
         public int GetAlivePlayerCount()
@@ -297,14 +329,14 @@ namespace KnockBox.ConsultTheCard.Services.Logic.Games.FSM
                         if (target.Role == Role.Agent)
                         {
                             voter.Score -= 1;
-                            Logger.LogInformation(
+                            Logger.LogDebug(
                                 "ApplyCycleScoring: Agent [{voter}] voted for Agent [{target}]; −1 point.",
                                 voter.PlayerId, target.PlayerId);
                         }
                         else if (target.Role == Role.Insider || target.Role == Role.Informant)
                         {
                             voter.Score += 1;
-                            Logger.LogInformation(
+                            Logger.LogDebug(
                                 "ApplyCycleScoring: Agent [{voter}] correctly voted for [{role}] [{target}]; +1 point.",
                                 voter.PlayerId, target.Role, target.PlayerId);
                         }
@@ -319,14 +351,14 @@ namespace KnockBox.ConsultTheCard.Services.Logic.Games.FSM
                     if (player.PlayerId == eliminatedId)
                     {
                         player.Score -= 1;
-                        Logger.LogInformation(
+                        Logger.LogDebug(
                             "ApplyCycleScoring: [{role}] [{id}] was voted out; −1 point.",
                             player.Role, player.PlayerId);
                     }
                     else
                     {
                         player.Score += 1;
-                        Logger.LogInformation(
+                        Logger.LogDebug(
                             "ApplyCycleScoring: [{role}] [{id}] survived the round; +1 point.",
                             player.Role, player.PlayerId);
                     }
@@ -347,7 +379,7 @@ namespace KnockBox.ConsultTheCard.Services.Logic.Games.FSM
                 if (!ps.IsEliminated)
                 {
                     ps.Score += 2;
-                    Logger.LogInformation(
+                    Logger.LogDebug(
                         "ApplyEndOfGameScoring: [{id}] survived; +2 points.", ps.PlayerId);
                 }
 
@@ -355,7 +387,7 @@ namespace KnockBox.ConsultTheCard.Services.Logic.Games.FSM
                 if (winResult.WinningTeam is not null && ps.Role == winResult.WinningTeam)
                 {
                     ps.Score += 1;
-                    Logger.LogInformation(
+                    Logger.LogDebug(
                         "ApplyEndOfGameScoring: [{id}] on winning team [{team}]; +1 point.",
                         ps.PlayerId, winResult.WinningTeam);
                 }
@@ -368,7 +400,7 @@ namespace KnockBox.ConsultTheCard.Services.Logic.Games.FSM
                 if (informant is not null)
                 {
                     informant.Score += 3;
-                    Logger.LogInformation(
+                    Logger.LogDebug(
                         "ApplyEndOfGameScoring: Informant [{id}] correctly guessed; +3 points.",
                         informant.PlayerId);
                 }

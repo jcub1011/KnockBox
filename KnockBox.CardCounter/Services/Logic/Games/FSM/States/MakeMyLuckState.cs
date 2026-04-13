@@ -9,20 +9,15 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM.States
     /// The player sees the top-3 shoe cards in <see cref="PlayerState.PrivateReveal"/> and
     /// must select an order via <see cref="SubmitReorderCommand"/>.
     /// </summary>
-    public sealed class MakeMyLuckState : ITimedCardCounterGameState
+    public sealed class MakeMyLuckState(string playerId) : ITimedCardCounterGameState
     {
-        private readonly string _playerId;
+        private readonly string _playerId = playerId;
         private DateTimeOffset _expiresAt;
-
-        public MakeMyLuckState(string playerId)
-        {
-            _playerId = playerId;
-        }
 
         public ValueResult<IGameState<CardCounterGameContext, CardCounterCommand>?> OnEnter(CardCounterGameContext context)
         {
             _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.Config.MakeMyLuckTimeoutMs);
-            context.Logger.LogInformation(
+            context.Logger.LogDebug(
                 "FSM → MakeMyLuckState for [{id}]. Expires {exp}.", _playerId, _expiresAt);
             return null;
         }
@@ -64,7 +59,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM.States
                 context.CurrentShoe.Push(reordered[i]);
 
             player.PrivateReveal = null;
-            context.Logger.LogInformation("MakeMyLuck: player [{id}] reordered top {n} cards.", _playerId, revealCount);
+            context.Logger.LogDebug("MakeMyLuck: player [{id}] reordered top {n} cards.", _playerId, revealCount);
             return new PlayerTurnState();
         }
 
@@ -72,7 +67,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM.States
         {
             if (now < _expiresAt) return null;
 
-            context.Logger.LogInformation("MakeMyLuck: timeout for [{id}]; keeping original order.", _playerId);
+            context.Logger.LogDebug("MakeMyLuck: timeout for [{id}]; keeping original order.", _playerId);
             var player = context.GetPlayer(_playerId);
             return ResolveDefault(context, player);
         }

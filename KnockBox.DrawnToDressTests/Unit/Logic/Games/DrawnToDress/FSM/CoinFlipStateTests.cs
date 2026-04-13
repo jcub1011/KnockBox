@@ -306,7 +306,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             var caller = state.PendingCoinFlipQueue[0].CallerPlayerId;
             _engine.ProcessCommand(context, new CoinFlipCallCommand(caller, true));
 
-            Assert.AreEqual(1, state.CriterionCoinFlipResults.Count);
+            Assert.HasCount(1, state.CriterionCoinFlipResults);
             var result = state.CriterionCoinFlipResults[0];
             Assert.AreEqual(matchupId, result.MatchupId);
             Assert.AreEqual("creativity", result.CriterionId);

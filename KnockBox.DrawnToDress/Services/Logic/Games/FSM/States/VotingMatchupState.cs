@@ -29,7 +29,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
 
             context.State.SetPhase(GamePhase.Voting);
             context.ResetReadyFlags();
-            context.Logger.LogInformation(
+            context.Logger.LogDebug(
                 "FSM → VotingMatchupState. Round {n}. Deadline: {deadline}.",
                 context.State.CurrentVotingRoundIndex + 1, context.State.PhaseDeadlineUtc);
             return null;
@@ -75,7 +75,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
         {
             if (context.State.PhaseDeadlineUtc is not { } deadline || now < deadline) return null;
 
-            context.Logger.LogInformation("Voting timer expired.");
+            context.Logger.LogDebug("Voting timer expired.");
             return ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?>.FromValue(ChooseNextState(context));
         }
 
@@ -157,18 +157,18 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
             context.State.Votes[Guid.NewGuid()] = submission;
 
             if (isLate)
-                context.Logger.LogInformation(
+                context.Logger.LogDebug(
                     "Player [{voter}] voted LATE for [{chosen}] in matchup [{matchup}] on criterion [{criterion}].",
                     cmd.PlayerId, cmd.ChosenPlayerId, cmd.MatchupId, cmd.CriterionId);
             else
-                context.Logger.LogInformation(
+                context.Logger.LogDebug(
                     "Player [{voter}] voted for [{chosen}] in matchup [{matchup}] on criterion [{criterion}].",
                     cmd.PlayerId, cmd.ChosenPlayerId, cmd.MatchupId, cmd.CriterionId);
 
             // Advance early when all expected votes for this round have been cast.
             if (AllVotesCast(context))
             {
-                context.Logger.LogInformation("All votes cast. Advancing.");
+                context.Logger.LogDebug("All votes cast. Advancing.");
                 return ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?>.FromValue(ChooseNextState(context));
             }
 
@@ -179,7 +179,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
             DrawnToDressGameContext context, RequestCoinFlipCommand cmd)
         {
             context.State.PendingCoinFlipMatchupId = cmd.MatchupId;
-            context.Logger.LogInformation(
+            context.Logger.LogDebug(
                 "Coin-flip requested for matchup [{matchupId}] by [{id}].",
                 cmd.MatchupId, cmd.PlayerId);
 
@@ -241,7 +241,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
 
                     context.State.PendingCoinFlipQueue = queue;
 
-                    context.Logger.LogInformation(
+                    context.Logger.LogDebug(
                         "Found {count} tied criteria in round {round}. Moving to coin flip.",
                         tiedCriteria.Count, roundIndex + 1);
                     return new CoinFlipState(new VotingRoundResultsState());

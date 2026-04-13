@@ -75,7 +75,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress
 
             var wins = SwissTournamentService.CalculateWins(rounds, []);
 
-            Assert.AreEqual(0, wins.Count);
+            Assert.IsEmpty(wins);
         }
 
         [TestMethod]
@@ -173,7 +173,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress
             var round = SwissTournamentService.GenerateRound(1, entrants, [], null);
 
             Assert.AreEqual(1, round.RoundNumber);
-            Assert.AreEqual(1, round.Matchups.Count);
+            Assert.HasCount(1, round.Matchups);
             var matchup = round.Matchups[0];
             Assert.IsTrue(
                 (matchup.PlayerAId == "pA" && matchup.PlayerBId == "pB") ||
@@ -188,7 +188,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress
 
             var round = SwissTournamentService.GenerateRound(1, entrants, [], null);
 
-            Assert.AreEqual(2, round.Matchups.Count);
+            Assert.HasCount(2, round.Matchups);
         }
 
         [TestMethod]
@@ -199,8 +199,8 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress
             var round = SwissTournamentService.GenerateRound(1, entrants, [], null);
 
             // One matchup (2 players); one player receives a bye.
-            Assert.AreEqual(1, round.Matchups.Count);
-            Assert.AreEqual(1, round.Byes.Count, "Exactly one entrant should receive a bye.");
+            Assert.HasCount(1, round.Matchups);
+            Assert.HasCount(1, round.Byes, "Exactly one entrant should receive a bye.");
         }
 
         [TestMethod]
@@ -226,7 +226,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress
                 .SelectMany(m => new[] { m.PlayerAId, m.PlayerBId })
                 .ToList();
 
-            Assert.AreEqual(allParticipants.Count, allParticipants.Distinct().Count(),
+            Assert.HasCount(allParticipants.Count, allParticipants.Distinct(),
                 "Each player must appear in at most one matchup per round.");
         }
 
@@ -239,7 +239,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress
             var round2 = SwissTournamentService.GenerateRound(1, entrants, [], null);
 
             // Same entrant list → same pairings.
-            Assert.AreEqual(round1.Matchups.Count, round2.Matchups.Count);
+            Assert.HasCount(round1.Matchups.Count, round2.Matchups);
             for (int i = 0; i < round1.Matchups.Count; i++)
             {
                 Assert.AreEqual(round1.Matchups[i].PlayerAId, round2.Matchups[i].PlayerAId);
@@ -322,22 +322,22 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress
             var round = SwissTournamentService.GenerateRound(1, entrants, [], null);
 
             var ids = round.Matchups.Select(m => m.Id).ToList();
-            Assert.AreEqual(ids.Count, ids.Distinct().Count(), "All matchup IDs must be unique.");
+            Assert.HasCount(ids.Count, ids.Distinct(), "All matchup IDs must be unique.");
         }
 
         [TestMethod]
         public void GenerateRound_EmptyEntrantList_ProducesEmptyRound()
         {
             var round = SwissTournamentService.GenerateRound(1, new List<EntrantId>(), [], null);
-            Assert.AreEqual(0, round.Matchups.Count);
+            Assert.IsEmpty(round.Matchups);
         }
 
         [TestMethod]
         public void GenerateRound_SingleEntrant_ProducesEmptyRoundWithBye()
         {
             var round = SwissTournamentService.GenerateRound(1, [new EntrantId("pA", 1)], [], null);
-            Assert.AreEqual(0, round.Matchups.Count);
-            Assert.AreEqual(1, round.Byes.Count, "Single entrant should receive a bye.");
+            Assert.IsEmpty(round.Matchups);
+            Assert.HasCount(1, round.Byes, "Single entrant should receive a bye.");
             Assert.AreEqual(new EntrantId("pA", 1), round.Byes[0]);
         }
 
@@ -401,8 +401,8 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress
 
             var round = SwissTournamentService.GenerateRound(1, entrants, [], null);
 
-            Assert.AreEqual(2, round.Matchups.Count);
-            Assert.AreEqual(0, round.Byes.Count, "Even entrant count should produce no byes.");
+            Assert.HasCount(2, round.Matchups);
+            Assert.IsEmpty(round.Byes, "Even entrant count should produce no byes.");
         }
     }
 }

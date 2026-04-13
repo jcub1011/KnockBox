@@ -103,7 +103,7 @@ namespace KnockBox.Operator.Pages
             var pendingCard = GetPendingActionCard();
             if (pendingCard is IBlockableCard blockable)
             {
-                return blockable.GetPotentialReactionCards(GameState.Context, CurrentPlayerState).ToList();
+                return [.. blockable.GetPotentialReactionCards(GameState.Context, CurrentPlayerState)];
             }
             return new();
         }

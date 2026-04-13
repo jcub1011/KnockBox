@@ -174,7 +174,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
             var player2 = new User("Player2", "p2-id");
             using var state = await CreateStartedActiveOperatorGameAsync(_player1, player2);
 
-            Assert.AreEqual(2, state.GamePlayers.Count);
+            Assert.HasCount(2, state.GamePlayers);
             foreach (var ps in state.GamePlayers.Values)
                 Assert.AreEqual(10.0, ps.Balance,
                     $"All players should start with balance 10 in Active Operator Mode.");
@@ -333,7 +333,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
 
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
 
-            Assert.AreEqual(potBefore, p1.Pot.Count, "No card should be auto-drawn when the action timer is disabled.");
+            Assert.HasCount(potBefore, p1.Pot, "No card should be auto-drawn when the action timer is disabled.");
             Assert.AreSame(playerTurnState, context.Fsm.CurrentState, "FSM state should not change when action timer is disabled.");
         }
 
@@ -394,7 +394,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
 
             _engine.ResetGame(_host, state);
 
-            Assert.AreEqual(0, state.DiscardHistory.Count, "Discard history should be cleared on reset.");
+            Assert.IsEmpty(state.DiscardHistory, "Discard history should be cleared on reset.");
         }
 
         [TestMethod]
@@ -521,7 +521,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
 
             _engine.ReturnToLobby(_host, state);
 
-            Assert.AreEqual(0, state.GamePlayers.Count, "GamePlayers should be cleared when returning to the lobby.");
+            Assert.IsEmpty(state.GamePlayers, "GamePlayers should be cleared when returning to the lobby.");
         }
 
         [TestMethod]
@@ -533,7 +533,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
 
             _engine.ReturnToLobby(_host, state);
 
-            Assert.AreEqual(0, state.DiscardHistory.Count, "Discard history should be cleared when returning to the lobby.");
+            Assert.IsEmpty(state.DiscardHistory, "Discard history should be cleared when returning to the lobby.");
         }
 
         [TestMethod]

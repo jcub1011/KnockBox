@@ -34,7 +34,7 @@ namespace KnockBox.ConsultTheCard.Services.Logic.Games.FSM.States
             context.State.SetPhase(ConsultTheCardGamePhase.Setup);
             _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.State.Config.SetupPhaseTimeoutMs);
 
-            context.Logger.LogInformation(
+            context.Logger.LogDebug(
                 "FSM → SetupState (cycle {cycle})", context.State.CurrentEliminationCycle);
 
             return null;

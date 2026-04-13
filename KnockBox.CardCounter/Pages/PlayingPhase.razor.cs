@@ -333,7 +333,7 @@ namespace KnockBox.CardCounter.Pages
         {
             if (GameState == null || UserService.CurrentUser == null) return;
             if (!CanConfirmDiscard()) return;
-            GameEngine.DiscardActionCards(UserService.CurrentUser, GameState, _selectedDiscardIndices.ToArray());
+            GameEngine.DiscardActionCards(UserService.CurrentUser, GameState, [.. _selectedDiscardIndices]);
             _selectedDiscardIndices.Clear();
         }
 
@@ -357,7 +357,7 @@ namespace KnockBox.CardCounter.Pages
             if (player == null || player.PrivateReveal == null) return;
             if (SelectedReorderIndices.Count == player.PrivateReveal.Count)
             {
-                GameEngine.SubmitReorder(UserService.CurrentUser, GameState, SelectedReorderIndices.ToArray());
+                GameEngine.SubmitReorder(UserService.CurrentUser, GameState, [.. SelectedReorderIndices]);
                 SelectedReorderIndices.Clear();
             }
         }

@@ -1,13 +1,12 @@
 using KnockBox.Components;
 using KnockBox.Core.Plugins;
 using KnockBox.Core.Services.Drawing;
-using KnockBox.Data.DbContexts;
 using KnockBox.Core.Services.Navigation;
 using KnockBox.Services.Registrations.Logic;
 using KnockBox.Services.Registrations.Repositories;
 using KnockBox.Services.Registrations.States;
 using KnockBox.Services.Registrations.Validators;
-using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.FileProviders;
 using Serilog;
 using Serilog.Extensions.Logging;
 
@@ -21,20 +20,26 @@ namespace KnockBox
         {
             var builder = WebApplication.CreateBuilder(args);
 
+            var logPath = Path.Combine(AppContext.BaseDirectory, "logs", "knockbox-.log");
+            const string outputTemplate =
+                "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {SourceContext}{NewLine}  {Message:lj}{NewLine}{Exception}";
+
             builder.Host.UseSerilog((context, services, loggerConfig) =>
                 loggerConfig
                     .ReadFrom.Configuration(context.Configuration)
                     .ReadFrom.Services(services)
                     .Enrich.FromLogContext()
-                    .WriteTo.Console());
+                    .WriteTo.Console(outputTemplate: outputTemplate)
+                    .WriteTo.File(
+                        logPath,
+                        rollingInterval: RollingInterval.Day,
+                        retainedFileCountLimit: 31,
+                        shared: true,
+                        outputTemplate: outputTemplate));
 
             // Add services to the container.
             builder.Services.AddRazorComponents()
                 .AddInteractiveServerComponents();
-
-            // Add dbcontext
-            builder.Services.AddDbContextFactory<ApplicationDbContext>(options =>
-                options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
             // Add repositories
             builder.Services.RegisterRepositories();
@@ -49,7 +54,13 @@ namespace KnockBox
             var bootstrapSerilog = new Serilog.LoggerConfiguration()
                 .ReadFrom.Configuration(builder.Configuration)
                 .Enrich.FromLogContext()
-                .WriteTo.Console()
+                .WriteTo.Console(outputTemplate: outputTemplate)
+                .WriteTo.File(
+                    logPath,
+                    rollingInterval: RollingInterval.Day,
+                    retainedFileCountLimit: 31,
+                    shared: true,
+                    outputTemplate: outputTemplate)
                 .CreateLogger();
             using var bootstrapLoggerFactory = new SerilogLoggerFactory(bootstrapSerilog, dispose: true);
             var pluginLogger = bootstrapLoggerFactory.CreateLogger<PluginLoader>();
@@ -67,6 +78,8 @@ namespace KnockBox
 
             var app = builder.Build();
 
+            app.UseSerilogRequestLogging();
+
             // Configure the HTTP request pipeline.
             if (!app.Environment.IsDevelopment())
             {
@@ -81,10 +94,76 @@ namespace KnockBox
             app.UseAntiforgery();
 
             app.MapStaticAssets();
+
+            MapPluginStaticAssets(app, pluginsPath);
+
             app.MapRazorComponents<App>()
                 .AddInteractiveServerRenderMode();
 
             app.Run();
+        }
+
+        /// <summary>
+        /// Mounts each discovered plugin's <c>wwwroot</c> folder under <c>/_content/{PluginName}</c>
+        /// so that static assets (scoped CSS bundles, images, scripts) referenced by
+        /// the plugin's Razor components resolve at runtime. Each mount is isolated
+        /// by try/catch so a single misconfigured plugin doesn't prevent the host
+        /// from starting. Duplicate plugin folder names are skipped with a warning.
+        /// </summary>
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1873:Avoid potentially expensive logging", Justification = "It's not a big deal.")]
+        private static void MapPluginStaticAssets(WebApplication app, string pluginsPath)
+        {
+            var logger = app.Services.GetRequiredService<ILogger<Program>>();
+
+            if (!Directory.Exists(pluginsPath))
+            {
+                logger.LogInformation(
+                    "Plugins directory [{PluginsPath}] does not exist; no plugin static assets will be mounted.",
+                    pluginsPath);
+                return;
+            }
+
+            var mountedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var dir in Directory.GetDirectories(pluginsPath))
+            {
+                var pluginName = Path.GetFileName(dir);
+                var wwwrootPath = Path.Combine(dir, "wwwroot");
+                if (!Directory.Exists(wwwrootPath))
+                    continue;
+
+                var requestPath = $"/_content/{pluginName}";
+
+                if (!mountedPaths.Add(requestPath))
+                {
+                    logger.LogWarning(
+                        "Duplicate plugin folder name [{PluginName}] detected at [{Dir}]; skipping to avoid route collision.",
+                        pluginName,
+                        dir);
+                    continue;
+                }
+
+                try
+                {
+                    app.UseStaticFiles(new StaticFileOptions
+                    {
+                        FileProvider = new PhysicalFileProvider(wwwrootPath),
+                        RequestPath = requestPath,
+                    });
+                    logger.LogInformation(
+                        "Mounted plugin static assets for [{PluginName}] at [{RequestPath}].",
+                        pluginName,
+                        requestPath);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(
+                        ex,
+                        "Failed to mount plugin static assets for [{PluginName}] from [{WwwRootPath}].",
+                        pluginName,
+                        wwwrootPath);
+                }
+            }
         }
     }
 }

@@ -24,7 +24,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
         {
             context.State.SetPhase(GamePhase.OutfitDistinctnessResolution);
             context.ResetReadyFlags();
-            context.Logger.LogInformation("FSM → OutfitDistinctnessResolutionState");
+            context.Logger.LogDebug("FSM → OutfitDistinctnessResolutionState");
             return null;
         }
 
@@ -83,13 +83,13 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
             player.SubmittedOutfit.SelectedItemsByType[typeId] = replacement.Id;
             player.IsReady = true;
 
-            context.Logger.LogInformation(
+            context.Logger.LogDebug(
                 "Player [{id}] resolved distinctness conflict: type [{type}] → item [{itemId}].",
                 cmd.PlayerId, typeId, replacement.Id);
 
             if (context.AllPlayersReady())
             {
-                context.Logger.LogInformation("All conflicts resolved. Moving to next outfit round pool reveal.");
+                context.Logger.LogDebug("All conflicts resolved. Moving to next outfit round pool reveal.");
                 return new PoolRevealState(2);
             }
 

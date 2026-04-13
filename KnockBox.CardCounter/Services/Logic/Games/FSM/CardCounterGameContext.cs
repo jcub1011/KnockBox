@@ -10,7 +10,10 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM
     /// Per-game context that holds shared data and helpers used by FSM states.
     /// Created when the game starts and stored on <see cref="CardCounterGameState.Context"/>.
     /// </summary>
-    public class CardCounterGameContext
+    public class CardCounterGameContext(
+        CardCounterGameState state,
+        IRandomNumberService rng,
+        ILogger logger)
     {
         /// <summary>
         /// One <see cref="ActionCard"/> per <see cref="ActionType"/>. Rarity is enforced via
@@ -18,7 +21,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM
         /// so no extra memory is allocated per draw.
         /// </summary>
         private static readonly ActionCard[] ActionCardPool =
-            Enum.GetValues<ActionType>().Select(t => new ActionCard(t)).ToArray();
+            [.. Enum.GetValues<ActionType>().Select(t => new ActionCard(t))];
 
         /// <summary>
         /// Filtered pool used when Active Operator Mode is enabled: excludes
@@ -29,13 +32,12 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM
         /// target's balance digits instead of reversing a pot.
         /// </summary>
         private static readonly ActionCard[] ActionCardPoolActiveOperator =
-            Enum.GetValues<ActionType>()
+            [.. Enum.GetValues<ActionType>()
                 .Where(t => t != ActionType.Skim
                          && t != ActionType.TurnTheTable
                          && t != ActionType.Launder
                          && t != ActionType.NotMyMoney)
-                .Select(t => new ActionCard(t))
-                .ToArray();
+                .Select(t => new ActionCard(t))];
 
         /// <summary>
         /// Returns the relative draw weight for <paramref name="card"/> from the game config.
@@ -58,23 +60,13 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM
             _                       => 10
         };
 
-        public CardCounterGameContext(
-            CardCounterGameState state,
-            IRandomNumberService rng,
-            ILogger logger)
-        {
-            State = state;
-            Rng = rng;
-            Logger = logger;
-        }
-
         // ── Core references ───────────────────────────────────────────────────
 
         /// <summary>The underlying AbstractGameState subclass for this game instance.</summary>
-        public CardCounterGameState State { get; }
+        public CardCounterGameState State { get; } = state;
 
-        public IRandomNumberService Rng { get; }
-        public ILogger Logger { get; }
+        public IRandomNumberService Rng { get; } = rng;
+        public ILogger Logger { get; } = logger;
 
         /// <summary>The FSM that manages state transitions for this game.</summary>
         public IFiniteStateMachine<CardCounterGameContext, CardCounterCommand> Fsm { get; set; } = null!;
@@ -256,7 +248,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM
             {
                 var previousOperator = player.ActiveOperator;
                 player.ActiveOperator = card.Op;
-                Logger.LogInformation(
+                Logger.LogDebug(
                     "ActiveOperatorMode: [{id}] set active operator to [{op}].", player.PlayerId, card.Op);
                 State.LastOperatorChange = new OperatorChangeInfo(
                     player.PlayerId, player.DisplayName, previousOperator, card.Op);
@@ -278,14 +270,14 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM
                 return;
             }
 
+            // The divide-by-zero case is handled by the early return above, so the
+            // Divide branch here is always safe to divide.
             player.Balance = card.Op switch
             {
                 Operator.Add => player.Balance + potValue,
                 Operator.Subtract => player.Balance - potValue,
                 Operator.Multiply => Math.Round(player.Balance * potValue, MidpointRounding.AwayFromZero),
-                Operator.Divide => potValue == 0
-                    ? player.Balance
-                    : Math.Round(player.Balance / potValue, MidpointRounding.AwayFromZero),
+                Operator.Divide => Math.Round(player.Balance / potValue, MidpointRounding.AwayFromZero),
                 _ => player.Balance + potValue
             };
 
@@ -298,13 +290,22 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM
         /// <summary>
         /// Reverses the digit order of a balance value, preserving its sign.
         /// Used by Turn The Table in Active Operator Mode.
-        /// E.g., 123 → 321, -42 → -24, 0 → 0.
+        /// <para>
+        /// Balances are treated as integers: any fractional component is rounded
+        /// to the nearest whole number (away from zero) before reversal, so the
+        /// result is always an integer.
+        /// </para>
+        /// <para>
+        /// E.g., 123 → 321, -42 → -24, 0 → 0, 12.5 → round(13) → 31, -12.5 → -31.
+        /// </para>
         /// </summary>
         public static double ReverseBalanceDigits(double balance)
         {
             if (balance == 0) return 0;
             double sign = balance < 0 ? -1 : 1;
-            string digits = ((long)Math.Abs(balance)).ToString();
+            long magnitude = (long)Math.Round(Math.Abs(balance), MidpointRounding.AwayFromZero);
+            if (magnitude == 0) return 0;
+            string digits = magnitude.ToString();
             char[] arr = digits.ToCharArray();
             Array.Reverse(arr);
             return sign * long.Parse(new string(arr));
@@ -411,11 +412,11 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM
             {
                 case 0:
                     player.PassesRemaining++;
-                    Logger.LogInformation("Div/0: player [{id}] gains a pass.", player.PlayerId);
+                    Logger.LogDebug("Div/0: player [{id}] gains a pass.", player.PlayerId);
                     break;
                 case 1:
                     if (player.PassesRemaining > 0) player.PassesRemaining--;
-                    Logger.LogInformation("Div/0: player [{id}] loses a pass.", player.PlayerId);
+                    Logger.LogDebug("Div/0: player [{id}] loses a pass.", player.PlayerId);
                     break;
                 case 2:
                     if (player.ActionHand.Count < Config.ActionHandLimit)
@@ -423,7 +424,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM
                         var card = GetRandomActionCard();
                         if (card is not null) player.ActionHand.Add(card);
                     }
-                    Logger.LogInformation("Div/0: player [{id}] gains an action card.", player.PlayerId);
+                    Logger.LogDebug("Div/0: player [{id}] gains an action card.", player.PlayerId);
                     break;
                 case 3:
                     if (player.ActionHand.Count > 0)
@@ -431,7 +432,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM
                         int idx = Rng.GetRandomInt(0, player.ActionHand.Count, RandomType.Secure);
                         player.ActionHand.RemoveAt(idx);
                     }
-                    Logger.LogInformation("Div/0: player [{id}] loses an action card.", player.PlayerId);
+                    Logger.LogDebug("Div/0: player [{id}] loses an action card.", player.PlayerId);
                     break;
             }
         }

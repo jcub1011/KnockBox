@@ -51,7 +51,7 @@ namespace KnockBox.DiceSimulator.Tests.Integration
             Assert.IsTrue((bool)rollResult.IsSuccess);
 
             // Check State
-            Assert.AreEqual(1, state.RollHistory.Count);
+            Assert.HasCount(1, state.RollHistory);
             
             var rollEntry = state.RollHistory.Last();
             Assert.AreEqual("p1", rollEntry.PlayerId); // Correct assertion using ID or Name
@@ -71,8 +71,8 @@ namespace KnockBox.DiceSimulator.Tests.Integration
             // Clear history
             var clearRes = engine.ClearHistory(host, state);
             Assert.IsTrue((bool)clearRes.IsSuccess);
-            Assert.AreEqual(0, state.RollHistory.Count);
-            Assert.AreEqual(0, state.PlayerStats.Count);
+            Assert.IsEmpty(state.RollHistory);
+            Assert.IsEmpty(state.PlayerStats);
         }
         
         [TestMethod]

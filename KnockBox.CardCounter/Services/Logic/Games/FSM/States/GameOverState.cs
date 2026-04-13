@@ -26,7 +26,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM.States
                     : player.Balance + potValue;
             }
 
-            context.Logger.LogInformation("FSM → GameOverState. Game ended.");
+            context.Logger.LogDebug("FSM → GameOverState. Game ended.");
             return null;
         }
 

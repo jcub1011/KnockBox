@@ -20,21 +20,16 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
     /// - <see cref="SubmitDrawingCommand"/> → stored; no transition until all ready or timer fires
     /// - <see cref="PauseGameCommand"/> (host only) → <see cref="PausedState"/>
     /// </summary>
-    public sealed class DrawingRoundState : ITimedDrawnToDressGameState
+    /// <remarks>
+    /// Initialises the drawing round for the specified clothing-type slot.
+    /// </remarks>
+    /// <param name="clothingTypeIndex">
+    /// 0-based index into <see cref="DrawnToDressConfig.ClothingTypes"/> for the type
+    /// players will draw during this round.  Defaults to <c>0</c> (first type).
+    /// </param>
+    public sealed class DrawingRoundState(int clothingTypeIndex = 0) : ITimedDrawnToDressGameState
     {
-        private readonly int _clothingTypeIndex;
-
-        /// <summary>
-        /// Initialises the drawing round for the specified clothing-type slot.
-        /// </summary>
-        /// <param name="clothingTypeIndex">
-        /// 0-based index into <see cref="DrawnToDressConfig.ClothingTypes"/> for the type
-        /// players will draw during this round.  Defaults to <c>0</c> (first type).
-        /// </param>
-        public DrawingRoundState(int clothingTypeIndex = 0)
-        {
-            _clothingTypeIndex = clothingTypeIndex;
-        }
+        private readonly int _clothingTypeIndex = clothingTypeIndex;
 
         public ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?> OnEnter(
             DrawnToDressGameContext context)
@@ -49,7 +44,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
             context.ResetReadyFlags();
 
             var typeName = GetCurrentTypeName(context);
-            context.Logger.LogInformation(
+            context.Logger.LogDebug(
                 "FSM → DrawingRoundState [{index}] ({type}). Deadline: {deadline}.",
                 _clothingTypeIndex, typeName, context.State.PhaseDeadlineUtc);
             return null;
@@ -95,7 +90,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
             if (context.State.PhaseDeadlineUtc is not { } deadline || now < deadline) return null;
 
             var typeName = GetCurrentTypeName(context);
-            context.Logger.LogInformation(
+            context.Logger.LogDebug(
                 "Drawing timer expired for type [{index}] ({type}).", _clothingTypeIndex, typeName);
             return ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?>.FromValue(
                 AdvanceToNextRound(context));
@@ -121,12 +116,12 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
             int nextIndex = _clothingTypeIndex + 1;
             if (nextIndex < context.Config.ClothingTypes.Count)
             {
-                context.Logger.LogInformation(
+                context.Logger.LogDebug(
                     "Advancing to DrawingRoundState [{index}].", nextIndex);
                 return new DrawingRoundState(nextIndex);
             }
 
-            context.Logger.LogInformation("All clothing types drawn. Moving to pool reveal.");
+            context.Logger.LogDebug("All clothing types drawn. Moving to pool reveal.");
             return new PoolRevealState();
         }
 
@@ -186,7 +181,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
             context.ClothingPool[item.Id] = item;
             player.OwnedClothingItemIds.Add(item.Id);
 
-            context.Logger.LogInformation(
+            context.Logger.LogDebug(
                 "Player [{id}] submitted a [{type}] drawing (item {itemId}).",
                 cmd.PlayerId, cmd.ClothingTypeId, item.Id);
 
@@ -205,13 +200,13 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
             }
 
             player.IsReady = true;
-            context.Logger.LogInformation(
+            context.Logger.LogDebug(
                 "Player [{id}] marked ready in DrawingRoundState [{index}].",
                 cmd.PlayerId, _clothingTypeIndex);
 
             if (context.AllPlayersReady())
             {
-                context.Logger.LogInformation(
+                context.Logger.LogDebug(
                     "All players ready at type [{index}]. Advancing early.", _clothingTypeIndex);
                 return ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?>.FromValue(
                     AdvanceToNextRound(context));

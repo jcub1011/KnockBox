@@ -21,7 +21,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
             DrawnToDressGameContext context)
         {
             context.State.SetPhase(GamePhase.Results);
-            context.Logger.LogInformation("FSM → FinalResultsDisplayState. Game complete.");
+            context.Logger.LogDebug("FSM → FinalResultsDisplayState. Game complete.");
 
             // If returning from coin flip, re-rank the leaderboard.
             var resolvedFlips = context.State.PendingCoinFlipQueue
@@ -30,7 +30,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
 
             if (resolvedFlips.Count > 0)
             {
-                context.Logger.LogInformation(
+                context.Logger.LogDebug(
                     "Re-ranking leaderboard with {count} resolved final standings coin flips.",
                     resolvedFlips.Count);
 
@@ -60,7 +60,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
                             "PlayAgain rejected: player [{id}] is not the host.", cmd.PlayerId);
                         return null;
                     }
-                    context.Logger.LogInformation("Host [{id}] requested Play Again.", cmd.PlayerId);
+                    context.Logger.LogDebug("Host [{id}] requested Play Again.", cmd.PlayerId);
                     return new LobbyState();
 
                 default:

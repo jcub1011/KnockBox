@@ -144,7 +144,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games
             playerState.IsReady = true;
             playerState.IsDisconnected = true;
 
-            logger.LogInformation(
+            logger.LogDebug(
                 "Player [{id}] auto-readied due to disconnect. Phase: {phase}.",
                 player.Id, state.Phase);
         }

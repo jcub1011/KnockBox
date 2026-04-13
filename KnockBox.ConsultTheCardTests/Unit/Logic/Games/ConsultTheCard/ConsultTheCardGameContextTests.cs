@@ -115,15 +115,15 @@ namespace KnockBox.ConsultTheCard.Tests.Unit.Logic.Games.ConsultTheCard
             // Agent and Insider words should be different.
             var agentWords = players.Where(p => p.Role == Role.Agent).Select(p => p.SecretWord).Distinct().ToList();
             var insiderWords = players.Where(p => p.Role == Role.Insider).Select(p => p.SecretWord).Distinct().ToList();
-            Assert.AreEqual(1, agentWords.Count, "All agents should share the same word.");
+            Assert.HasCount(1, agentWords, "All agents should share the same word.");
             if (insiderWords.Count > 0)
             {
-                Assert.AreEqual(1, insiderWords.Count, "All insiders should share the same word.");
+                Assert.HasCount(1, insiderWords, "All insiders should share the same word.");
                 Assert.AreNotEqual(agentWords[0], insiderWords[0], "Agent and Insider words must differ.");
             }
 
             Assert.IsNotNull(_state.CurrentWordPair);
-            Assert.AreEqual(2, _state.CurrentWordPair.Length);
+            Assert.HasCount(2, _state.CurrentWordPair);
         }
 
         // ── SelectWordPair ────────────────────────────────────────────────────
@@ -161,14 +161,14 @@ namespace KnockBox.ConsultTheCard.Tests.Unit.Logic.Games.ConsultTheCard
                 });
 
             _context.SelectWordPair();
-            Assert.AreEqual(1, _context.UsedWordPairIndices.Count);
+            Assert.HasCount(1, _context.UsedWordPairIndices);
         }
 
         [TestMethod]
         public void SelectWordPair_ResetsWhenAllUsed()
         {
             // Use a small word bank for this test.
-            _context.WordBank = [new WordGroup(["A", "B"]), new WordGroup(["C", "D"])];
+            _context.UseWordBank([new WordGroup(["A", "B"]), new WordGroup(["C", "D"])]);
 
             int callCount = 0;
             _randomMock
@@ -182,11 +182,11 @@ namespace KnockBox.ConsultTheCard.Tests.Unit.Logic.Games.ConsultTheCard
             // Use all available groups.
             _context.SelectWordPair();
             _context.SelectWordPair();
-            Assert.AreEqual(2, _context.UsedWordPairIndices.Count);
+            Assert.HasCount(2, _context.UsedWordPairIndices);
 
             // Third call should reset and succeed.
             _context.SelectWordPair();
-            Assert.IsTrue(_context.UsedWordPairIndices.Count >= 1);
+            Assert.IsGreaterThanOrEqualTo(1, _context.UsedWordPairIndices.Count);
         }
 
         // ── GetAlivePlayers / GetAlivePlayerCount ─────────────────────────────
@@ -200,9 +200,9 @@ namespace KnockBox.ConsultTheCard.Tests.Unit.Logic.Games.ConsultTheCard
             p2.IsEliminated = true;
 
             var alive = _context.GetAlivePlayers();
-            Assert.AreEqual(2, alive.Count);
-            Assert.IsTrue(alive.Any(p => p.PlayerId == "p1"));
-            Assert.IsTrue(alive.Any(p => p.PlayerId == "p3"));
+            Assert.HasCount(2, alive);
+            Assert.Contains(p => p.PlayerId == "p1", alive);
+            Assert.Contains(p => p.PlayerId == "p3", alive);
         }
 
         [TestMethod]
@@ -405,8 +405,8 @@ namespace KnockBox.ConsultTheCard.Tests.Unit.Logic.Games.ConsultTheCard
             Assert.IsFalse(p1.HasVoted);
             Assert.IsFalse(p1.HasVotedToEndGame);
 
-            Assert.AreEqual(0, _state.CurrentRoundClues.Count);
-            Assert.AreEqual(0, _state.CurrentRoundVotes.Count);
+            Assert.IsEmpty(_state.CurrentRoundClues);
+            Assert.IsEmpty(_state.CurrentRoundVotes);
             Assert.IsFalse(_state.AwaitingInformantGuess);
         }
 
@@ -558,11 +558,11 @@ namespace KnockBox.ConsultTheCard.Tests.Unit.Logic.Games.ConsultTheCard
         public void SelectWordPair_WorksWithVariableSizeGroups()
         {
             // Provide groups with 2, 3, and 5 words.
-            _context.WordBank = [
+            _context.UseWordBank([
                 new WordGroup(["A", "B"]),
                 new WordGroup(["C", "D", "E"]),
                 new WordGroup(["F", "G", "H", "I", "J"]),
-            ];
+            ]);
 
             int callCount = 0;
             _randomMock
@@ -582,7 +582,7 @@ namespace KnockBox.ConsultTheCard.Tests.Unit.Logic.Games.ConsultTheCard
                 Assert.AreNotEqual(agentWord, insiderWord);
             }
 
-            Assert.AreEqual(3, _context.UsedWordPairIndices.Count);
+            Assert.HasCount(3, _context.UsedWordPairIndices);
         }
     }
 }

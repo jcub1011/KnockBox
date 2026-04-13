@@ -17,7 +17,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM.States
         {
             _expirationTime = DateTimeOffset.Now.AddMilliseconds(context.Config.BuyInTimeoutMs);
             context.State.SetPhase(GamePhase.BuyIn);
-            context.Logger.LogInformation("FSM → BuyInState");
+            context.Logger.LogDebug("FSM → BuyInState");
             return null;
         }
 
@@ -45,7 +45,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM.States
             player.Balance = cmd.IsNegative ? -balance : balance;
             player.HasSetBuyIn = true;
 
-            context.Logger.LogInformation(
+            context.Logger.LogDebug(
                 "Player [{id}] set buy-in: {sign}{value}.",
                 cmd.PlayerId, cmd.IsNegative ? "-" : "+", balance);
 

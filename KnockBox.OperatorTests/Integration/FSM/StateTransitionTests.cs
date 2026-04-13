@@ -100,8 +100,8 @@ public class SetupStateTests
         _setupState.HandleCommand(_context, new SubmitSetupChoiceCommand("p1", 10m));
         _setupState.HandleCommand(_context, new SubmitSetupChoiceCommand("p2", -10m));
 
-        Assert.AreEqual(5, _state.GamePlayers["p1"].Hand.Count);
-        Assert.AreEqual(5, _state.GamePlayers["p2"].Hand.Count);
+        Assert.HasCount(5, _state.GamePlayers["p1"].Hand);
+        Assert.HasCount(5, _state.GamePlayers["p2"].Hand);
     }
 
     [TestMethod]
@@ -162,7 +162,7 @@ public class DrawPhaseStateTests
         var drawPhase = new DrawPhaseState();
         drawPhase.OnEnter(_context);
 
-        Assert.AreEqual(5, _state.GamePlayers["p1"].Hand.Count);
+        Assert.HasCount(5, _state.GamePlayers["p1"].Hand);
     }
 
     [TestMethod]
@@ -383,7 +383,7 @@ public class PlayPhaseTimeoutTests
 
         Assert.IsInstanceOfType(result.Value, typeof(DrawPhaseState));
         // Shield should still be in hand (not played)
-        Assert.AreEqual(1, _state.GamePlayers["p1"].Hand.Count);
+        Assert.HasCount(1, _state.GamePlayers["p1"].Hand);
     }
 
     [TestMethod]

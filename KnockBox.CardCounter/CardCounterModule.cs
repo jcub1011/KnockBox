@@ -1,5 +1,4 @@
 using KnockBox.Core.Plugins;
-using KnockBox.Core.Services.Logic.Games.Engines.Shared;
 using KnockBox.CardCounter.Services.Logic.Games;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -13,7 +12,7 @@ namespace KnockBox.CardCounter
 
         public void RegisterServices(IServiceCollection services)
         {
-            services.AddKeyedSingleton<AbstractGameEngine, CardCounterGameEngine>(RouteIdentifier);
+            services.AddGameEngine<CardCounterGameEngine>(RouteIdentifier);
         }
     }
 }

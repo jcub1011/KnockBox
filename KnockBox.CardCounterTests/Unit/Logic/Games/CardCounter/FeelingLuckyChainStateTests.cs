@@ -71,7 +71,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
 
             Assert.IsNotNull(next.Value);
             Assert.IsInstanceOfType(next.Value, typeof(PlayerTurnState));
-            Assert.AreEqual(1, target.Pot.Count, "Target should have received the drawn digit.");
+            Assert.HasCount(1, target.Pot, "Target should have received the drawn digit.");
             Assert.AreEqual(9, target.Pot[0]);
         }
 
@@ -93,7 +93,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
             fsmState.HandleCommand(_context, new DrawCardCommand("tgt"));
 
             Assert.AreEqual(105.0, target.Balance);
-            Assert.AreEqual(0, target.Pot.Count, "Pot should be cleared after operator applied.");
+            Assert.IsEmpty(target.Pot, "Pot should be cleared after operator applied.");
         }
 
         [TestMethod]
@@ -112,8 +112,8 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
 
             Assert.IsNotNull(next.Value);
             Assert.IsInstanceOfType(next.Value, typeof(PlayerTurnState));
-            Assert.AreEqual(0, target.ActionHand.Count, "Comp'd should be consumed.");
-            Assert.AreEqual(0, target.Pot.Count, "Target should not have been forced to draw.");
+            Assert.IsEmpty(target.ActionHand, "Comp'd should be consumed.");
+            Assert.IsEmpty(target.Pot, "Target should not have been forced to draw.");
         }
 
         [TestMethod]
@@ -189,7 +189,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
             var next = fsmState.HandleCommand(_context, new DrawCardCommand("other"));
 
             Assert.IsNull(next.Value, "Commands from unrelated players should be ignored.");
-            Assert.AreEqual(0, other.Pot.Count);
+            Assert.IsEmpty(other.Pot);
         }
 
         [TestMethod]

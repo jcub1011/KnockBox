@@ -84,7 +84,7 @@ namespace KnockBox.ConsultTheCard.Tests.Unit.Logic.Games.ConsultTheCard.States
             gameOver.OnEnter(_context);
 
             Assert.IsTrue(_state.GameScores.ContainsKey("p0"));
-            Assert.IsTrue(_state.GameScores["p0"] > 0);
+            Assert.IsGreaterThan(0, _state.GameScores["p0"]);
         }
 
         [TestMethod]
@@ -168,9 +168,9 @@ namespace KnockBox.ConsultTheCard.Tests.Unit.Logic.Games.ConsultTheCard.States
             Assert.AreEqual(0, _state.CurrentEliminationCycle);
             Assert.AreEqual(0, _state.TurnManager.CurrentPlayerIndex);
             Assert.IsNull(_state.CurrentWordPair);
-            Assert.AreEqual(0, _state.CurrentRoundClues.Count);
-            Assert.AreEqual(0, _state.CurrentRoundVotes.Count);
-            Assert.AreEqual(0, _state.UsedClues.Count);
+            Assert.IsEmpty(_state.CurrentRoundClues);
+            Assert.IsEmpty(_state.CurrentRoundVotes);
+            Assert.IsEmpty(_state.UsedClues);
             Assert.IsNull(_state.LastElimination);
             Assert.IsNull(_state.LastInformantGuess);
             Assert.IsFalse(_state.AwaitingInformantGuess);
@@ -189,7 +189,7 @@ namespace KnockBox.ConsultTheCard.Tests.Unit.Logic.Games.ConsultTheCard.States
             gameOver.OnEnter(_context);
             gameOver.HandleCommand(_context, new StartNextGameCommand("host-id"));
 
-            Assert.AreEqual(2, _context.UsedWordPairIndices.Count);
+            Assert.HasCount(2, _context.UsedWordPairIndices);
         }
 
         [TestMethod]
@@ -275,7 +275,7 @@ namespace KnockBox.ConsultTheCard.Tests.Unit.Logic.Games.ConsultTheCard.States
 
             // p0: Agent, alive → +2 + +1 = 3. GameScores["p0"] = 3.
             int game1Score = _state.GameScores.GetValueOrDefault("p0", 0);
-            Assert.IsTrue(game1Score > 0, "Game 1 score should be > 0.");
+            Assert.IsGreaterThan(0, game1Score, "Game 1 score should be > 0.");
 
             // Start next game → resets player Score but preserves GameScores.
             gameOver1.HandleCommand(_context, new StartNextGameCommand("host-id"));
@@ -290,7 +290,7 @@ namespace KnockBox.ConsultTheCard.Tests.Unit.Logic.Games.ConsultTheCard.States
             gameOver2.OnEnter(_context);
 
             int game2Cumulative = _state.GameScores.GetValueOrDefault("p0", 0);
-            Assert.IsTrue(game2Cumulative > game1Score, "Cumulative scores should increase across games.");
+            Assert.IsGreaterThan(game1Score, game2Cumulative, "Cumulative scores should increase across games.");
         }
     }
 }

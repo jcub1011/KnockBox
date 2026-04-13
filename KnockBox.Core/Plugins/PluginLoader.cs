@@ -1,5 +1,4 @@
 using System.Reflection;
-using System.Runtime.Loader;
 
 namespace KnockBox.Core.Plugins
 {
@@ -11,32 +10,20 @@ namespace KnockBox.Core.Plugins
         IReadOnlyList<Assembly> Assemblies)
     {
         public static PluginLoadResult Empty { get; } =
-            new(Array.Empty<IGameModule>(), Array.Empty<Assembly>());
+            new([], []);
     }
 
     /// <summary>
     /// Discovers <see cref="IGameModule"/> implementations from DLLs in a plugins directory.
     /// </summary>
-    public sealed class PluginLoader
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1873:Avoid potentially expensive logging", Justification = "It's not a big deal.")]
+    public sealed class PluginLoader(ILogger<PluginLoader> logger)
     {
-        private readonly ILogger<PluginLoader> _logger;
-
-        public PluginLoader(ILogger<PluginLoader> logger)
-        {
-            _logger = logger;
-        }
-
-        /// <summary>
-        /// Loads all plugin assemblies from <paramref name="pluginsDirectory"/> and returns
-        /// the discovered <see cref="IGameModule"/> instances along with their assemblies.
-        /// Errors during load, type scan, activation, or duplicate route-identifier collisions
-        /// are logged and skipped; they do not throw.
-        /// </summary>
         public PluginLoadResult LoadModules(string pluginsDirectory)
         {
             if (!Directory.Exists(pluginsDirectory))
             {
-                _logger.LogWarning(
+                logger.LogWarning(
                     "Plugins directory [{PluginsDirectory}] does not exist; no game modules will be loaded.",
                     pluginsDirectory);
                 return PluginLoadResult.Empty;
@@ -57,7 +44,7 @@ namespace KnockBox.Core.Plugins
 
                     if (routeIdentifiers.TryGetValue(module.RouteIdentifier, out var existing))
                     {
-                        _logger.LogError(
+                        logger.LogError(
                             "Duplicate game module route identifier [{RouteIdentifier}]. " +
                             "Keeping [{ExistingType}] from [{ExistingAssembly}]; skipping [{SkippedType}] from [{SkippedAssembly}].",
                             module.RouteIdentifier,
@@ -72,7 +59,7 @@ namespace KnockBox.Core.Plugins
                     modules.Add(module);
                     moduleAssemblies.Add(moduleType.Assembly);
 
-                    _logger.LogInformation(
+                    logger.LogInformation(
                         "Loaded game module [{Name}] with route identifier [{RouteIdentifier}] from [{Assembly}].",
                         module.Name,
                         module.RouteIdentifier,
@@ -80,30 +67,86 @@ namespace KnockBox.Core.Plugins
                 }
             }
 
-            return new PluginLoadResult(modules, moduleAssemblies.ToList());
+            return new PluginLoadResult(modules, [.. moduleAssemblies]);
         }
 
-        private IReadOnlyList<Assembly> LoadAssemblies(string pluginsDirectory)
+        private List<Assembly> LoadAssemblies(string pluginsDirectory)
         {
-            var dllPaths = Directory.GetFiles(pluginsDirectory, "*.dll");
-            var assemblies = new List<Assembly>(dllPaths.Length);
+            // Each plugin lives in its own subfolder (games/{TargetName}/) and publishes
+            // its primary assembly as {TargetName}.dll alongside its transitive deps.
+            // Each plugin gets its own PluginLoadContext so its transitive deps resolve
+            // from its own folder via AssemblyDependencyResolver ({PluginName}.deps.json),
+            // isolating version conflicts between plugins. Assemblies already loaded by
+            // the host (shared contracts like KnockBox.Core, logging/DI abstractions,
+            // BCL) are deferred to the default ALC so type identity is preserved across
+            // the host/plugin boundary. Loose DLLs dropped directly under the plugins
+            // root are ignored; the per-subdirectory layout is the only supported shape.
+            var pluginDllPaths = new List<string>();
+            foreach (var subdir in Directory.GetDirectories(pluginsDirectory))
+            {
+                var expected = Path.Combine(subdir, Path.GetFileName(subdir) + ".dll");
+                if (File.Exists(expected))
+                {
+                    pluginDllPaths.Add(expected);
+                }
+                else
+                {
+                    logger.LogWarning(
+                        "Plugin subdirectory [{Subdirectory}] is missing expected primary assembly [{ExpectedDll}]; skipping.",
+                        subdir,
+                        Path.GetFileName(expected));
+                }
+            }
 
-            foreach (var dllPath in dllPaths)
+            // Snapshot host-loaded assembly names ONCE, before any plugin loads. Using a
+            // frozen snapshot makes IsSharedContract deterministic: every plugin sees the
+            // same contract surface regardless of load order, and we avoid an O(N)
+            // AppDomain scan on every assembly resolution. Anything loaded into the
+            // default ALC *after* this point (including by earlier plugins) will be
+            // treated as plugin-private by later plugins -- which is exactly what we
+            // want for isolation.
+            var hostAssemblyNames = new HashSet<string>(
+                AppDomain.CurrentDomain.GetAssemblies()
+                    .Select(a => a.GetName().Name)
+                    .Where(n => n is not null)!,
+                StringComparer.OrdinalIgnoreCase);
+
+            var assemblies = new List<Assembly>(pluginDllPaths.Count);
+
+            foreach (var dllPath in pluginDllPaths)
             {
                 try
                 {
-                    var assemblyName = AssemblyName.GetAssemblyName(dllPath);
-                    var existing = AppDomain.CurrentDomain.GetAssemblies()
-                        .FirstOrDefault(a => a.GetName().Name == assemblyName.Name);
+                    var primaryAssemblyName = AssemblyName.GetAssemblyName(dllPath).Name;
+                    if (string.IsNullOrEmpty(primaryAssemblyName))
+                    {
+                        logger.LogWarning(
+                            "Plugin assembly at [{DllPath}] has no readable AssemblyName; skipping.",
+                            dllPath);
+                        continue;
+                    }
 
-                    var assembly = existing
-                        ?? AssemblyLoadContext.Default.LoadFromAssemblyPath(dllPath);
+                    bool IsSharedContract(AssemblyName name)
+                    {
+                        if (string.IsNullOrEmpty(name.Name))
+                            return false;
+                        // Never share the plugin's own primary assembly -- each plugin
+                        // must load into its own ALC even if something with the same
+                        // name is already in the default ALC.
+                        if (string.Equals(name.Name, primaryAssemblyName, StringComparison.OrdinalIgnoreCase))
+                            return false;
+                        // Host-owned contracts (KnockBox.Core, logging/DI abstractions,
+                        // BCL) must share type identity across the host/plugin boundary.
+                        return hostAssemblyNames.Contains(name.Name);
+                    }
 
+                    var alc = new PluginLoadContext(dllPath, IsSharedContract);
+                    var assembly = alc.LoadFromAssemblyPath(dllPath);
                     assemblies.Add(assembly);
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(
+                    logger.LogError(
                         ex,
                         "Failed to load plugin assembly [{DllPath}].",
                         dllPath);
@@ -122,18 +165,22 @@ namespace KnockBox.Core.Plugins
             }
             catch (ReflectionTypeLoadException ex)
             {
+                // Fail the whole assembly on partial-load failures. Partial activation
+                // of a broken plugin is worse than skipping it entirely: it leaves
+                // ops with a confusing mix of logged errors and seemingly-working
+                // modules that will blow up later when missing types are touched.
                 foreach (var loaderException in ex.LoaderExceptions.Where(e => e is not null))
                 {
-                    _logger.LogError(
+                    logger.LogError(
                         loaderException,
-                        "Loader exception while scanning [{Assembly}] for game modules.",
+                        "Loader exception while scanning [{Assembly}] for game modules; skipping the entire assembly.",
                         assembly.GetName().Name);
                 }
-                types = ex.Types;
+                yield break;
             }
             catch (Exception ex)
             {
-                _logger.LogError(
+                logger.LogError(
                     ex,
                     "Failed to scan [{Assembly}] for game modules.",
                     assembly.GetName().Name);
@@ -160,14 +207,14 @@ namespace KnockBox.Core.Plugins
                 if (Activator.CreateInstance(moduleType) is IGameModule module)
                     return module;
 
-                _logger.LogError(
+                logger.LogError(
                     "Type [{Type}] implements IGameModule but could not be activated as one.",
                     moduleType.FullName);
                 return null;
             }
             catch (Exception ex)
             {
-                _logger.LogError(
+                logger.LogError(
                     ex,
                     "Failed to activate game module [{Type}] from [{Assembly}]. " +
                     "Ensure it has a public parameterless constructor.",

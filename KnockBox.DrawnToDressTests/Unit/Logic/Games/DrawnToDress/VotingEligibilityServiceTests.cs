@@ -89,7 +89,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress
 
             var eligible = VotingEligibilityService.GetEligibleVoterIds(matchup, allPlayers);
 
-            Assert.AreEqual(0, eligible.Count);
+            Assert.IsEmpty(eligible);
         }
 
         [TestMethod]
@@ -101,7 +101,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress
             var eligible = VotingEligibilityService.GetEligibleVoterIds(matchup, allPlayers);
 
             // 5 total − 2 participants = 3 eligible.
-            Assert.AreEqual(3, eligible.Count);
+            Assert.HasCount(3, eligible);
         }
 
         [TestMethod]
@@ -111,7 +111,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress
 
             var eligible = VotingEligibilityService.GetEligibleVoterIds(matchup, []);
 
-            Assert.AreEqual(0, eligible.Count);
+            Assert.IsEmpty(eligible);
         }
     }
 }

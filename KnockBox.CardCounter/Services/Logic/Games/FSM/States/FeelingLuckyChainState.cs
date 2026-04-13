@@ -9,23 +9,17 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM.States
     /// pass the force to the next player with another Feeling Lucky card, or play Comp'd.
     /// Once resolved the game resumes from the originator.
     /// </summary>
-    public sealed class FeelingLuckyChainState : ITimedCardCounterGameState
+    public sealed class FeelingLuckyChainState(string originatorId, string firstTargetId) : ITimedCardCounterGameState
     {
-        private readonly string _originatorId;
-        private string _currentTargetId;
+        private readonly string _originatorId = originatorId;
+        private string _currentTargetId = firstTargetId;
         private DateTimeOffset _expiresAt;
-
-        public FeelingLuckyChainState(string originatorId, string firstTargetId)
-        {
-            _originatorId = originatorId;
-            _currentTargetId = firstTargetId;
-        }
 
         public ValueResult<IGameState<CardCounterGameContext, CardCounterCommand>?> OnEnter(CardCounterGameContext context)
         {
             _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.Config.FeelingLuckyChainTimeoutMs);
             context.State.FeelingLuckyTargetId = _currentTargetId;
-            context.Logger.LogInformation(
+            context.Logger.LogDebug(
                 "FSM → FeelingLuckyChainState: originator [{orig}], target [{tgt}].",
                 _originatorId, _currentTargetId);
             return null;
@@ -51,7 +45,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM.States
         {
             if (now >= _expiresAt)
             {
-                context.Logger.LogInformation(
+                context.Logger.LogDebug(
                     "FeelingLucky: timeout; forcing draw for [{tgt}].", _currentTargetId);
                 return ForceTargetDraw(context);
             }
@@ -80,7 +74,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM.States
                     null,
                     null);
                 context.RecordActionCardPlay(target, card);
-                context.Logger.LogInformation("FeelingLucky: [{id}] blocked with Comp'd.", _currentTargetId);
+                context.Logger.LogDebug("FeelingLucky: [{id}] blocked with Comp'd.", _currentTargetId);
                 // Chain is resolved — return to originator's turn
                 return ReturnToOriginator(context);
             }
@@ -104,7 +98,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM.States
                 if (nextTarget == _originatorId)
                     return ForceTargetDraw(context);
 
-                context.Logger.LogInformation(
+                context.Logger.LogDebug(
                     "FeelingLucky: chain passed from [{from}] to [{to}].", _currentTargetId, nextTarget);
                 _currentTargetId = nextTarget;
                 context.State.FeelingLuckyTargetId = _currentTargetId;
@@ -133,7 +127,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM.States
 
                     context.RecordDraw(target, card);
 
-                    context.Logger.LogInformation(
+                    context.Logger.LogDebug(
                         "FeelingLucky: [{id}] force-drew [{card}].", _currentTargetId, card);
                 }
             }

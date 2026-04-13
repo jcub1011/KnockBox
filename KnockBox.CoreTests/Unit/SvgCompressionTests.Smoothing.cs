@@ -226,16 +226,16 @@ public partial class SvgCompressionTests
         var pipelineDAttrs = pipelines.Select(_ => new List<string>()).ToList();
 
         // Print per-path d-attribute sizes.
-        Console.WriteLine();
-        Console.WriteLine("  d-attribute byte sizes per path and pipeline:");
-        Console.WriteLine();
+        TestContext.WriteLine(string.Empty);
+        TestContext.WriteLine("  d-attribute byte sizes per path and pipeline:");
+        TestContext.WriteLine(string.Empty);
 
         // Header
         var header = $"  {"Path",-16}";
         foreach (var (label, _) in pipelines)
             header += $" | {label,18}";
-        Console.WriteLine(header);
-        Console.WriteLine("  " + new string('-', header.Length - 2));
+        TestContext.WriteLine(header);
+        TestContext.WriteLine("  " + new string('-', header.Length - 2));
 
         foreach (var (name, points) in allPaths)
         {
@@ -247,12 +247,12 @@ public partial class SvgCompressionTests
                 var size = Encoding.UTF8.GetByteCount(d);
                 line += $" | {size,18:N0}";
             }
-            Console.WriteLine(line);
+            TestContext.WriteLine(line);
         }
 
         // Build SVGs and print totals.
-        Console.WriteLine();
-        Console.WriteLine("  Total SVG sizes:");
+        TestContext.WriteLine(string.Empty);
+        TestContext.WriteLine("  Total SVG sizes:");
 
         var repoRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", ".."));
         var outputDir = Path.Combine(repoRoot, "TestResults", "SvgCompression", "Smoothing");
@@ -268,7 +268,7 @@ public partial class SvgCompressionTests
             if (p == 0) originalBytes = bytes;
 
             var pct = originalBytes > 0 ? $" ({100.0 * bytes / originalBytes:F1}%)" : "";
-            Console.WriteLine($"    {pipelines[p].Label,-22} {bytes,10:N0} bytes{pct}");
+            TestContext.WriteLine($"    {pipelines[p].Label,-22} {bytes,10:N0} bytes{pct}");
 
             var fileName = pipelines[p].Label
                 .Replace(" ", "_").Replace("(", "").Replace(")", "").Replace("+", "then").Replace(",", "_")
@@ -276,15 +276,15 @@ public partial class SvgCompressionTests
             File.WriteAllText(Path.Combine(outputDir, $"{fileName}.svg"), svg);
         }
 
-        Console.WriteLine();
-        Console.WriteLine($"  Output written to: {outputDir}");
+        TestContext.WriteLine(string.Empty);
+        TestContext.WriteLine($"  Output written to: {outputDir}");
 
         // Assertions: every pipeline with smoothing should produce smaller SVG than original.
         for (var p = 1; p < pipelines.Count; p++)
         {
             var svg = WrapInSvg(pipelineDAttrs[p]);
             var bytes = Encoding.UTF8.GetByteCount(svg);
-            Assert.IsTrue(bytes < originalBytes,
+            Assert.IsLessThan(originalBytes, bytes,
                 $"Pipeline '{pipelines[p].Label}' ({bytes:N0} bytes) should be smaller than original ({originalBytes:N0} bytes)");
         }
     }
@@ -355,16 +355,16 @@ public partial class SvgCompressionTests
         var outputDir = Path.Combine(repoRoot, "TestResults", "SvgCompression", "WobblySmoothing");
         Directory.CreateDirectory(outputDir);
 
-        Console.WriteLine();
-        Console.WriteLine("  Wobbly line smoothing comparison (d-attribute bytes):");
-        Console.WriteLine();
+        TestContext.WriteLine(string.Empty);
+        TestContext.WriteLine("  Wobbly line smoothing comparison (d-attribute bytes):");
+        TestContext.WriteLine(string.Empty);
 
         // Header
         var header = $"  {"Path",-14}";
         foreach (var (label, _) in variants)
             header += $" | {label,17}";
-        Console.WriteLine(header);
-        Console.WriteLine("  " + new string('-', header.Length - 2));
+        TestContext.WriteLine(header);
+        TestContext.WriteLine("  " + new string('-', header.Length - 2));
 
         foreach (var variant in variants)
         {
@@ -391,13 +391,13 @@ public partial class SvgCompressionTests
                 var d = process(points);
                 line += $" | {Encoding.UTF8.GetByteCount(d),17:N0}";
             }
-            Console.WriteLine(line);
+            TestContext.WriteLine(line);
         }
 
-        Console.WriteLine();
-        Console.WriteLine("  SVG totals:");
+        TestContext.WriteLine(string.Empty);
+        TestContext.WriteLine("  SVG totals:");
 
-        var origSvg = WrapInSvg(wobblyPaths.Select(p => BuildPath(engine, p.Points)).ToList());
+        var origSvg = WrapInSvg([.. wobblyPaths.Select(p => BuildPath(engine, p.Points))]);
         var origSize = Encoding.UTF8.GetByteCount(origSvg);
 
         foreach (var (label, process) in variants)
@@ -405,11 +405,11 @@ public partial class SvgCompressionTests
             var dAttrs = wobblyPaths.Select(p => process(p.Points)).ToList();
             var svg = WrapInSvg(dAttrs);
             var size = Encoding.UTF8.GetByteCount(svg);
-            Console.WriteLine($"    {label,-22} {size,8:N0} bytes ({100.0 * size / origSize:F1}%)");
+            TestContext.WriteLine($"    {label,-22} {size,8:N0} bytes ({100.0 * size / origSize:F1}%)");
         }
 
-        Console.WriteLine();
-        Console.WriteLine($"  Output written to: {outputDir}");
+        TestContext.WriteLine(string.Empty);
+        TestContext.WriteLine($"  Output written to: {outputDir}");
 
         // Assertions
         var emaVwDAttrs = wobblyPaths.Select(p =>
@@ -419,7 +419,7 @@ public partial class SvgCompressionTests
             return BuildPath(engine, simplified);
         }).ToList();
         var emaVwSvg = WrapInSvg(emaVwDAttrs);
-        Assert.IsTrue(Encoding.UTF8.GetByteCount(emaVwSvg) < origSize,
+        Assert.IsLessThan(origSize, Encoding.UTF8.GetByteCount(emaVwSvg),
             "EMA + VW smoothed output should be smaller than unprocessed original");
     }
 }

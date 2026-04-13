@@ -78,7 +78,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
             Assert.IsNotNull(next.Value);
             Assert.IsInstanceOfType(next.Value, typeof(PlayerTurnState));
             CollectionAssert.AreEqual(new[] { 1, 2, 3 }, target.Pot, "Blocked: pot should NOT be reversed.");
-            Assert.AreEqual(0, target.ActionHand.Count, "Comp'd card should be consumed.");
+            Assert.IsEmpty(target.ActionHand, "Comp'd card should be consumed.");
         }
 
         [TestMethod]
@@ -217,7 +217,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
             var next = fsmState.HandleCommand(_context, new PlayActionCardCommand("tgt", 0));
 
             Assert.IsNull(next.Value, "A non-Comp'd response should be ignored.");
-            Assert.AreEqual(1, target.ActionHand.Count, "Non-Comp'd card should not be consumed.");
+            Assert.HasCount(1, target.ActionHand, "Non-Comp'd card should not be consumed.");
         }
     }
 }

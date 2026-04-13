@@ -21,7 +21,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
             DrawnToDressGameContext context)
         {
             context.State.SetPhase(GamePhase.Paused);
-            context.Logger.LogInformation(
+            context.Logger.LogDebug(
                 "FSM → PausedState (will resume to [{state}]).",
                 _resumeState.GetType().Name);
             return null;
@@ -41,7 +41,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
                             "ResumeGame rejected: player [{id}] is not the host.", cmd.PlayerId);
                         return null;
                     }
-                    context.Logger.LogInformation(
+                    context.Logger.LogDebug(
                         "Host resumed game. Returning to [{state}].",
                         _resumeState.GetType().Name);
                     return ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?>.FromValue(_resumeState);

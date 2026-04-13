@@ -57,7 +57,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
             DrawnToDressGameContext context)
         {
             context.State.SetPhase(GamePhase.ThemeSelection);
-            context.Logger.LogInformation("FSM → ThemeSelectionState");
+            context.Logger.LogDebug("FSM → ThemeSelectionState");
 
             context.State.PhaseDeadlineUtc = DateTimeOffset.UtcNow.AddSeconds(context.Config.ThemeAnnouncementTimeSec);
 
@@ -66,7 +66,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
                 case ThemeSource.Random:
                     SelectRandomTheme(context);
                     ApplyAnnouncementTiming(context);
-                    context.Logger.LogInformation(
+                    context.Logger.LogDebug(
                         "Random theme selected: [{id}] \"{name}\".",
                         context.State.CurrentTheme?.Id, context.State.CurrentTheme?.DisplayName);
                     
@@ -74,7 +74,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
 
                 case ThemeSource.RandomVoting:
                     PopulateThemeCandidates(context);
-                    context.Logger.LogInformation(
+                    context.Logger.LogDebug(
                         "RandomVoting: {count} candidate(s) presented.", context.State.ThemeCandidates.Count);
                     // Remain in this state until all players have voted.
                     return null;
@@ -163,7 +163,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
 
             context.State.CurrentTheme = new ThemeDefinition(cmd.ThemeId, cmd.ThemeId);
             ApplyAnnouncementTiming(context);
-            context.Logger.LogInformation("Host selected theme [{id}].", cmd.ThemeId);
+            context.Logger.LogDebug("Host selected theme [{id}].", cmd.ThemeId);
             return null;
         }
 
@@ -193,7 +193,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
             }
 
             context.State.PlayerThemeSubmissions[cmd.PlayerId] = cmd.ThemeText;
-            context.Logger.LogInformation(
+            context.Logger.LogDebug(
                 "Player [{id}] submitted theme: \"{text}\".", cmd.PlayerId, cmd.ThemeText);
             context.State.StateChangedEventManager.Notify();
 
@@ -203,7 +203,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
             {
                 SelectThemeFromPlayerSubmissions(context);
                 ApplyAnnouncementTiming(context);
-                context.Logger.LogInformation(
+                context.Logger.LogDebug(
                     "All players submitted themes. Selected: [{id}] \"{name}\".",
                     context.State.CurrentTheme?.Id, context.State.CurrentTheme?.DisplayName);
                 return null;
@@ -241,7 +241,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
             }
 
             context.State.ThemeVotes[cmd.PlayerId] = cmd.ThemeId;
-            context.Logger.LogInformation(
+            context.Logger.LogDebug(
                 "Player [{id}] voted for theme [{themeId}].", cmd.PlayerId, cmd.ThemeId);
             context.State.StateChangedEventManager.Notify();
 
@@ -251,7 +251,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
             {
                 SelectThemeByVote(context);
                 ApplyAnnouncementTiming(context);
-                context.Logger.LogInformation(
+                context.Logger.LogDebug(
                     "All players voted. Winning theme: [{id}] \"{name}\".",
                     context.State.CurrentTheme?.Id, context.State.CurrentTheme?.DisplayName);
                 return null;
@@ -291,7 +291,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
                 (indices[i], indices[j]) = (indices[j], indices[i]);
             }
 
-            context.State.ThemeCandidates = indices.Take(count).Select(i => allThemes[i]).ToList();
+            context.State.ThemeCandidates = [.. indices.Take(count).Select(i => allThemes[i])];
         }
 
         private static void SelectThemeFromPlayerSubmissions(DrawnToDressGameContext context)

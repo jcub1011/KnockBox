@@ -134,10 +134,9 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games
             if (roundScores.Count == 0) return [];
 
             double maxScore = roundScores.Values.Max();
-            return roundScores
+            return [.. roundScores
                 .Where(kv => kv.Value == maxScore)
-                .Select(kv => kv.Key)
-                .ToHashSet();
+                .Select(kv => kv.Key)];
         }
 
         /// <summary>
@@ -302,11 +301,10 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games
             }
 
             // Sort by total score desc, then matchup wins desc.
-            entries = entries
+            entries = [.. entries
                 .OrderByDescending(e => e.TotalScore)
                 .ThenByDescending(e => e.MatchupWins)
-                .ThenBy(e => e.PlayerId, StringComparer.Ordinal)
-                .ToList();
+                .ThenBy(e => e.PlayerId, StringComparer.Ordinal)];
 
             // Assign ranks (tied players share the same rank).
             var tiedPairs = new List<(string, string)>();

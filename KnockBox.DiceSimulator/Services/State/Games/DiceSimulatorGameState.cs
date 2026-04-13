@@ -21,7 +21,7 @@ namespace KnockBox.DiceSimulator.Services.State.Games
             {
                 lock (_rollHistory)
                 {
-                    return _rollHistory.ToList();
+                    return [.. _rollHistory];
                 }
             } 
         }

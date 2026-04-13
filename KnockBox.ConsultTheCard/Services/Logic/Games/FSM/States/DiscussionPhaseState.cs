@@ -31,7 +31,7 @@ namespace KnockBox.ConsultTheCard.Services.Logic.Games.FSM.States
 
             _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.State.Config.DiscussionPhaseTimeoutMs);
 
-            context.Logger.LogInformation("FSM → DiscussionPhaseState");
+            context.Logger.LogDebug("FSM → DiscussionPhaseState");
             return null;
         }
 
@@ -60,7 +60,7 @@ namespace KnockBox.ConsultTheCard.Services.Logic.Games.FSM.States
                 return null;
 
             // Auto-advance: tally locked-in votes and transition to reveal.
-            context.Logger.LogInformation("DiscussionPhase: timed out; tallying votes and advancing to RevealPhaseState.");
+            context.Logger.LogDebug("DiscussionPhase: timed out; tallying votes and advancing to RevealPhaseState.");
             return TallyAndTransition(context);
         }
 
@@ -82,7 +82,7 @@ namespace KnockBox.ConsultTheCard.Services.Logic.Games.FSM.States
                 player.HasVotedToEndGame = false;
                 context.State.EndGameVoteStatus.VotedToEnd.Remove(cmd.PlayerId);
 
-                context.Logger.LogInformation(
+                context.Logger.LogDebug(
                     "DiscussionPhase: [{pid}] rescinded vote to end game ({count}/{required}).",
                     cmd.PlayerId,
                     context.State.EndGameVoteStatus.VotedToEnd.Count,
@@ -94,7 +94,7 @@ namespace KnockBox.ConsultTheCard.Services.Logic.Games.FSM.States
             player.HasVotedToEndGame = true;
             context.State.EndGameVoteStatus.VotedToEnd.Add(cmd.PlayerId);
 
-            context.Logger.LogInformation(
+            context.Logger.LogDebug(
                 "DiscussionPhase: [{pid}] voted to end game ({count}/{required}).",
                 cmd.PlayerId,
                 context.State.EndGameVoteStatus.VotedToEnd.Count,
@@ -125,7 +125,7 @@ namespace KnockBox.ConsultTheCard.Services.Logic.Games.FSM.States
                 player.HasVotedToSkipTime = false;
                 context.State.SkipTimeVoteStatus.VotedToEnd.Remove(cmd.PlayerId);
 
-                context.Logger.LogInformation(
+                context.Logger.LogDebug(
                     "DiscussionPhase: [{pid}] rescinded vote to skip time ({count}/{required}).",
                     cmd.PlayerId,
                     context.State.SkipTimeVoteStatus.VotedToEnd.Count,
@@ -137,7 +137,7 @@ namespace KnockBox.ConsultTheCard.Services.Logic.Games.FSM.States
             player.HasVotedToSkipTime = true;
             context.State.SkipTimeVoteStatus.VotedToEnd.Add(cmd.PlayerId);
 
-            context.Logger.LogInformation(
+            context.Logger.LogDebug(
                 "DiscussionPhase: [{pid}] voted to skip time ({count}/{required}).",
                 cmd.PlayerId,
                 context.State.SkipTimeVoteStatus.VotedToEnd.Count,
@@ -147,7 +147,7 @@ namespace KnockBox.ConsultTheCard.Services.Logic.Games.FSM.States
             var status = context.State.SkipTimeVoteStatus;
             if (status.VotedToEnd.Count >= status.RequiredVotes)
             {
-                context.Logger.LogInformation("DiscussionPhase: majority voted to skip time; tallying votes.");
+                context.Logger.LogDebug("DiscussionPhase: majority voted to skip time; tallying votes.");
                 return TallyAndTransition(context);
             }
 
@@ -161,7 +161,7 @@ namespace KnockBox.ConsultTheCard.Services.Logic.Games.FSM.States
             if (cmd.PlayerId != context.State.Host.Id)
                 return new ResultError("Only the host can advance the phase.");
 
-            context.Logger.LogInformation("DiscussionPhase: host advanced; tallying votes and transitioning to RevealPhaseState.");
+            context.Logger.LogDebug("DiscussionPhase: host advanced; tallying votes and transitioning to RevealPhaseState.");
             return TallyAndTransition(context);
         }
 
@@ -189,14 +189,14 @@ namespace KnockBox.ConsultTheCard.Services.Logic.Games.FSM.States
             {
                 voter.VoteTargetId = null;
 
-                context.Logger.LogInformation(
+                context.Logger.LogDebug(
                     "DiscussionPhase: [{voter}] removed vote target [{target}].", cmd.PlayerId, cmd.TargetPlayerId);
             }
             else
             {
                 voter.VoteTargetId = cmd.TargetPlayerId;
 
-                context.Logger.LogInformation(
+                context.Logger.LogDebug(
                     "DiscussionPhase: [{voter}] selected vote target [{target}].", cmd.PlayerId, cmd.TargetPlayerId);
             }
 
@@ -224,13 +224,13 @@ namespace KnockBox.ConsultTheCard.Services.Logic.Games.FSM.States
             context.State.CurrentRoundVotes.Add(
                 new VoteEntry(voter.PlayerId, voter.DisplayName, target.PlayerId, target.DisplayName));
 
-            context.Logger.LogInformation(
+            context.Logger.LogDebug(
                 "DiscussionPhase: [{voter}] locked in vote for [{target}].", cmd.PlayerId, voter.VoteTargetId);
 
             // Check if all alive players have locked in.
             if (context.GetAlivePlayers().All(p => p.HasVoted))
             {
-                context.Logger.LogInformation("DiscussionPhase: all alive players voted; tallying.");
+                context.Logger.LogDebug("DiscussionPhase: all alive players voted; tallying.");
                 return TallyAndTransition(context);
             }
 
@@ -251,7 +251,7 @@ namespace KnockBox.ConsultTheCard.Services.Logic.Games.FSM.States
             {
                 player.HasVoted = true;
                 player.VoteTargetId = null; // discard unconfirmed vote
-                context.Logger.LogInformation(
+                context.Logger.LogDebug(
                     "DiscussionPhase: [{pid}] abstained.", player.PlayerId);
             }
 
@@ -264,7 +264,7 @@ namespace KnockBox.ConsultTheCard.Services.Logic.Games.FSM.States
                 context.State.LastElimination = new EliminationResult(
                     eliminated.PlayerId, eliminated.DisplayName, eliminated.Role, WasTie: false);
 
-                context.Logger.LogInformation(
+                context.Logger.LogDebug(
                     "DiscussionPhase: [{pid}] eliminated.", eliminatedId);
             }
             else
@@ -273,7 +273,7 @@ namespace KnockBox.ConsultTheCard.Services.Logic.Games.FSM.States
                 context.State.LastElimination = new EliminationResult(
                     string.Empty, string.Empty, default, WasTie: true);
 
-                context.Logger.LogInformation("DiscussionPhase: vote resulted in a tie.");
+                context.Logger.LogDebug("DiscussionPhase: vote resulted in a tie.");
             }
 
             return new RevealPhaseState();

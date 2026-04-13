@@ -9,24 +9,18 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM.States
     /// Not My Money effect. The player selects a target to receive the operator,
     /// or cancels to apply it to themselves.
     /// </summary>
-    public sealed class NotMyMoneyState : ITimedCardCounterGameState
+    public sealed class NotMyMoneyState(string playerId, OperatorCard operatorCard) : ITimedCardCounterGameState
     {
-        private readonly string _playerId;
-        private readonly OperatorCard _operatorCard;
+        private readonly string _playerId = playerId;
+        private readonly OperatorCard _operatorCard = operatorCard;
         private DateTimeOffset _expiresAt;
-
-        public NotMyMoneyState(string playerId, OperatorCard operatorCard)
-        {
-            _playerId = playerId;
-            _operatorCard = operatorCard;
-        }
 
         public ValueResult<IGameState<CardCounterGameContext, CardCounterCommand>?> OnEnter(CardCounterGameContext context)
         {
             _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.Config.NotMyMoneyTimeoutMs);
             context.State.IsNotMyMoneySelecting = true;
             context.State.PendingNotMyMoneyOperator = _operatorCard.Op;
-            context.Logger.LogInformation(
+            context.Logger.LogDebug(
                 "FSM → NotMyMoneyState: [{id}] redirecting operator [{op}]. Expires {exp}.",
                 _playerId, _operatorCard.Op, _expiresAt);
             return null;
@@ -83,7 +77,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM.States
                     context.ApplyOperatorCard(player, _operatorCard);
                 }
 
-                context.Logger.LogInformation(
+                context.Logger.LogDebug(
                     "NotMyMoney: [{id}] cancelled; operator applied to self.", _playerId);
                 return FinishTurn(context);
             }
@@ -95,7 +89,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM.States
         {
             if (now >= _expiresAt)
             {
-                context.Logger.LogInformation(
+                context.Logger.LogDebug(
                     "NotMyMoney: timeout; applying operator to self for [{id}].", _playerId);
                 var player = context.GetPlayer(_playerId);
                 if (player is not null)

@@ -159,8 +159,8 @@ namespace KnockBox.ConsultTheCard.Tests.Unit.Logic.Games.ConsultTheCard
         {
             using var state = await CreateStartedGameAsync(4);
 
-            Assert.AreEqual(4, state.GamePlayers.Count);
-            Assert.AreEqual(4, state.TurnManager.TurnOrder.Count);
+            Assert.HasCount(4, state.GamePlayers);
+            Assert.HasCount(4, state.TurnManager.TurnOrder);
         }
 
         [TestMethod]
@@ -279,8 +279,8 @@ namespace KnockBox.ConsultTheCard.Tests.Unit.Logic.Games.ConsultTheCard
 
             _engine.ReturnToLobby(_host, state);
 
-            Assert.AreEqual(0, state.GamePlayers.Count);
-            Assert.AreEqual(0, state.TurnManager.TurnOrder.Count);
+            Assert.IsEmpty(state.GamePlayers);
+            Assert.IsEmpty(state.TurnManager.TurnOrder);
             Assert.AreEqual(0, state.TurnManager.CurrentPlayerIndex);
         }
 
@@ -347,8 +347,8 @@ namespace KnockBox.ConsultTheCard.Tests.Unit.Logic.Games.ConsultTheCard
 
             _engine.HandlePlayerLeft(leavingPlayer, state);
 
-            Assert.AreEqual(initialCount - 1, state.TurnManager.TurnOrder.Count);
-            Assert.IsFalse(state.TurnManager.TurnOrder.Contains(leavingPlayer.Id));
+            Assert.HasCount(initialCount - 1, state.TurnManager.TurnOrder);
+            Assert.DoesNotContain(leavingPlayer.Id, state.TurnManager.TurnOrder);
         }
 
         [TestMethod]

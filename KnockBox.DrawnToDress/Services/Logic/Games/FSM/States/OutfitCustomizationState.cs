@@ -14,14 +14,9 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
     /// If conflicts exist, moves to <see cref="OutfitDistinctnessResolutionState"/>;
     /// otherwise proceeds to the next round's pool reveal or voting.
     /// </summary>
-    public sealed class OutfitCustomizationState : ITimedDrawnToDressGameState
+    public sealed class OutfitCustomizationState(int outfitRound = 1) : ITimedDrawnToDressGameState
     {
-        private readonly int _outfitRound;
-
-        public OutfitCustomizationState(int outfitRound = 1)
-        {
-            _outfitRound = outfitRound;
-        }
+        private readonly int _outfitRound = outfitRound;
 
         public ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?> OnEnter(
             DrawnToDressGameContext context)
@@ -34,7 +29,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
             context.State.SetPhase(GamePhase.OutfitCustomization);
             context.CurrentOutfitRound = _outfitRound;
             context.ResetReadyFlags();
-            context.Logger.LogInformation(
+            context.Logger.LogDebug(
                 "FSM → OutfitCustomizationState (round {round}). Deadline: {deadline}.", _outfitRound, context.State.PhaseDeadlineUtc);
             return null;
         }
@@ -78,7 +73,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
         {
             if (context.State.PhaseDeadlineUtc is not { } deadline || now < deadline) return null;
 
-            context.Logger.LogInformation("Customization timer expired (round {round}).", _outfitRound);
+            context.Logger.LogDebug("Customization timer expired (round {round}).", _outfitRound);
             return ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?>.FromValue(ChooseNextState(context));
         }
 
@@ -150,13 +145,13 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
 
             player.IsReady = true;
 
-            context.Logger.LogInformation(
+            context.Logger.LogDebug(
                 "Player [{id}] submitted customization (round {round}). Outfit name: \"{name}\". Has sketch: {hasSketch}.",
                 cmd.PlayerId, _outfitRound, cmd.OutfitName, cmd.SketchSvgContent is not null);
 
             if (context.AllPlayersReady())
             {
-                context.Logger.LogInformation(
+                context.Logger.LogDebug(
                     "All players submitted customization (round {round}). Advancing.", _outfitRound);
                 return ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?>.FromValue(ChooseNextState(context));
             }
@@ -188,7 +183,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
                     if (outfit is not null && !string.IsNullOrWhiteSpace(player.DraftOutfitName))
                     {
                         outfit.Customization.OutfitName = player.DraftOutfitName.Trim();
-                        context.Logger.LogInformation(
+                        context.Logger.LogDebug(
                             "Applying draft name \"{name}\" for player [{id}] (timer expired).",
                             outfit.Customization.OutfitName, player.PlayerId);
                     }
@@ -203,7 +198,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
                 // More outfit rounds to go — check distinctness, then proceed to next round.
                 if (_outfitRound == 1 && context.Config.RequireDistinctItemsPerSlot && HasDistinctnessConflict(context))
                 {
-                    context.Logger.LogInformation(
+                    context.Logger.LogDebug(
                         "Distinctness conflict detected. Moving to resolution state.");
                     return new OutfitDistinctnessResolutionState();
                 }

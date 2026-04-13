@@ -92,7 +92,7 @@ namespace KnockBox.ConsultTheCard.Tests.Unit.Logic.Games.ConsultTheCard
 
             // Submit clues for all alive players to advance to Discussion.
             var alivePlayers = context.GetAlivePlayers();
-            Assert.AreEqual(5, alivePlayers.Count, "Expected 5 alive players.");
+            Assert.HasCount(5, alivePlayers, "Expected 5 alive players.");
             string[] clues = ["wave", "splash", "tide", "fish", "coral"];
             for (int i = 0; i < alivePlayers.Count; i++)
             {

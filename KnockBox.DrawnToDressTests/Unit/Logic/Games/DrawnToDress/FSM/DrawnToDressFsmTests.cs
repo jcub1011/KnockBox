@@ -318,7 +318,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             _engine.ProcessCommand(context,
                 new SubmitDrawingCommand("p1", "top", "<svg/>"));
 
-            Assert.AreEqual(0, state.ClothingPool.Count, "Wrong-type submission must be discarded.");
+            Assert.IsEmpty(state.ClothingPool, "Wrong-type submission must be discarded.");
         }
 
         [TestMethod]
@@ -338,11 +338,11 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             // Submit up to the max.
             _engine.ProcessCommand(context, new SubmitDrawingCommand("p1", "hat", "<svg>1</svg>"));
             _engine.ProcessCommand(context, new SubmitDrawingCommand("p1", "hat", "<svg>2</svg>"));
-            Assert.AreEqual(2, state.ClothingPool.Count);
+            Assert.HasCount(2, state.ClothingPool);
 
             // Third submission should be rejected.
             _engine.ProcessCommand(context, new SubmitDrawingCommand("p1", "hat", "<svg>3</svg>"));
-            Assert.AreEqual(2, state.ClothingPool.Count, "Submission beyond MaxItemsPerRound must be discarded.");
+            Assert.HasCount(2, state.ClothingPool, "Submission beyond MaxItemsPerRound must be discarded.");
         }
 
         [TestMethod]
@@ -359,19 +359,19 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
 
             // Player draws nothing — pool stays empty.
-            Assert.AreEqual(0, state.ClothingPool.Count);
+            Assert.IsEmpty(state.ClothingPool);
 
             // Timer still advances the game → PoolReveal.
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
 
             Assert.IsInstanceOfType<PoolRevealState>(context.Fsm.CurrentState);
-            Assert.AreEqual(0, state.ClothingPool.Count, "Pool must remain empty when nothing was drawn.");
+            Assert.IsEmpty(state.ClothingPool, "Pool must remain empty when nothing was drawn.");
 
             // Advance through pool reveal timer → OutfitBuilding.
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
 
             Assert.IsInstanceOfType<OutfitBuildingState>(context.Fsm.CurrentState);
-            Assert.AreEqual(0, state.ClothingPool.Count, "Pool must remain empty when nothing was drawn.");
+            Assert.IsEmpty(state.ClothingPool, "Pool must remain empty when nothing was drawn.");
         }
 
         [TestMethod]
@@ -391,7 +391,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             _engine.ProcessCommand(context,
                 new SubmitDrawingCommand("p1", "hat", "<svg>my hat</svg>"));
 
-            Assert.AreEqual(1, state.ClothingPool.Count);
+            Assert.HasCount(1, state.ClothingPool);
             var item = state.ClothingPool.Values.Single();
             Assert.AreEqual("p1", item.CreatorPlayerId);
             Assert.AreEqual("hat", item.ClothingTypeId);
@@ -417,7 +417,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             _engine.ProcessCommand(context, new SubmitDrawingCommand("p1", "hat", "<svg>p1 hat</svg>"));
             _engine.ProcessCommand(context, new SubmitDrawingCommand("p2", "hat", "<svg>p2 hat</svg>"));
 
-            Assert.AreEqual(2, state.ClothingPool.Count);
+            Assert.HasCount(2, state.ClothingPool);
             Assert.IsTrue(state.ClothingPool.Values.All(i => i.ClothingTypeId == "hat"));
             Assert.IsTrue(state.ClothingPool.Values.All(i => i.IsInPool));
         }
@@ -666,7 +666,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
 
             Assert.IsInstanceOfType<PoolRevealState>(context.Fsm.CurrentState);
-            Assert.AreEqual(4, state.ClothingPool.Count, "Pool should contain items from all drawing rounds.");
+            Assert.HasCount(4, state.ClothingPool, "Pool should contain items from all drawing rounds.");
             Assert.AreEqual(2, state.ClothingPool.Values.Count(i => i.ClothingTypeId == "hat"),
                 "Pool should contain 2 hat items.");
             Assert.AreEqual(2, state.ClothingPool.Values.Count(i => i.ClothingTypeId == "top"),
@@ -728,8 +728,8 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
 
             Assert.IsTrue(byType.ContainsKey("hat"), "Pool should have items grouped under 'hat'.");
             Assert.IsTrue(byType.ContainsKey("top"), "Pool should have items grouped under 'top'.");
-            Assert.AreEqual(1, byType["hat"].Count);
-            Assert.AreEqual(1, byType["top"].Count);
+            Assert.HasCount(1, byType["hat"]);
+            Assert.HasCount(1, byType["top"]);
         }
 
         [TestMethod]
@@ -1086,10 +1086,10 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             context.Fsm.TransitionTo(context, new ThemeSelectionState());
 
             Assert.IsInstanceOfType<ThemeSelectionState>(context.Fsm.CurrentState);
-            Assert.AreEqual(3, state.ThemeCandidates.Count);
+            Assert.HasCount(3, state.ThemeCandidates);
             // Candidates should be distinct.
             var ids = state.ThemeCandidates.Select(t => t.Id).ToList();
-            Assert.AreEqual(ids.Count, ids.Distinct().Count());
+            Assert.HasCount(ids.Count, ids.Distinct());
         }
 
         [TestMethod]
@@ -1391,7 +1391,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
 
             Assert.IsNull(state.ClothingPool[itemId].ClaimedByPlayerId,
                 "A player must not be able to claim an item they created.");
-            Assert.IsFalse(state.GamePlayers["p1"].OwnedClothingItemIds.Contains(itemId),
+            Assert.DoesNotContain(itemId, state.GamePlayers["p1"].OwnedClothingItemIds,
                 "Self-drawn items must not be added to OwnedClothingItemIds via ClaimPoolItemCommand.");
         }
 
@@ -1426,7 +1426,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
 
             Assert.AreEqual("p1", state.ClothingPool[itemId].ClaimedByPlayerId,
                 "First claim must win; subsequent claims must fail.");
-            Assert.IsFalse(state.GamePlayers["p2"].OwnedClothingItemIds.Contains(itemId),
+            Assert.DoesNotContain(itemId, state.GamePlayers["p2"].OwnedClothingItemIds,
                 "Losing claimer must not have the item in their owned list.");
         }
 
@@ -1458,7 +1458,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
 
             Assert.AreEqual("p2", state.ClothingPool[itemId].ClaimedByPlayerId,
                 "Claim by a different player must succeed.");
-            Assert.IsTrue(state.GamePlayers["p2"].OwnedClothingItemIds.Contains(itemId),
+            Assert.Contains(itemId, state.GamePlayers["p2"].OwnedClothingItemIds,
                 "Claimed item must appear in the claimer's OwnedClothingItemIds.");
         }
 
@@ -1492,7 +1492,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
 
             Assert.IsNull(state.ClothingPool[itemId].ClaimedByPlayerId,
                 "Unclaimed item must have its ClaimedByPlayerId cleared.");
-            Assert.IsFalse(state.GamePlayers["p2"].OwnedClothingItemIds.Contains(itemId),
+            Assert.DoesNotContain(itemId, state.GamePlayers["p2"].OwnedClothingItemIds,
                 "Item must be removed from the unclaimer's OwnedClothingItemIds.");
         }
 
@@ -1558,8 +1558,8 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
 
             Assert.AreEqual("p2", state.ClothingPool[itemId].ClaimedByPlayerId,
                 "After an unclaim the item must be available for a new claimer.");
-            Assert.IsTrue(state.GamePlayers["p2"].OwnedClothingItemIds.Contains(itemId));
-            Assert.IsFalse(state.GamePlayers["p1"].OwnedClothingItemIds.Contains(itemId),
+            Assert.Contains(itemId, state.GamePlayers["p2"].OwnedClothingItemIds);
+            Assert.DoesNotContain(itemId, state.GamePlayers["p1"].OwnedClothingItemIds,
                 "Previous claimer must not retain ownership after unclaiming.");
         }
 
@@ -1855,7 +1855,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             // Assert: the host must not appear in GamePlayers.
             Assert.IsFalse(state.GamePlayers.ContainsKey(_host.Id),
                 "The host must not be added to GamePlayers.");
-            Assert.AreEqual(1, state.GamePlayers.Count,
+            Assert.HasCount(1, state.GamePlayers,
                 "Only the registered non-host player should be in GamePlayers.");
         }
 
@@ -1883,7 +1883,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
 
             // Assert: submission succeeds and the item is added to the pool.
             Assert.IsTrue((bool)result.IsSuccess);
-            Assert.AreEqual(1, state.ClothingPool.Count,
+            Assert.HasCount(1, state.ClothingPool,
                 "One drawing should be in the pool after submission.");
             var item = state.ClothingPool.Values.Single();
             Assert.AreEqual("alice1", item.CreatorPlayerId);
@@ -1910,11 +1910,11 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
 
             // First submission should succeed.
             _engine.ProcessCommand(context, new SubmitDrawingCommand("alice1", "hat", "<svg/>"));
-            Assert.AreEqual(1, state.ClothingPool.Count);
+            Assert.HasCount(1, state.ClothingPool);
 
             // Second submission must be rejected (limit = 1).
             _engine.ProcessCommand(context, new SubmitDrawingCommand("alice1", "hat", "<svg/>"));
-            Assert.AreEqual(1, state.ClothingPool.Count,
+            Assert.HasCount(1, state.ClothingPool,
                 "A second submission beyond the per-round limit must not add another item.");
         }
 
@@ -2463,7 +2463,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
 
             context.Fsm.TransitionTo(context, new OutfitBuildingState(outfitRound: 2));
 
-            Assert.IsTrue(state.GamePlayers["p1"].OwnedClothingItemIds.Contains(selfHat),
+            Assert.Contains(selfHat, state.GamePlayers["p1"].OwnedClothingItemIds,
                 "A self-drawn item that is still in the pool must remain in the player's owned set.");
         }
 
@@ -2503,7 +2503,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
 
             context.Fsm.TransitionTo(context, new OutfitBuildingState(outfitRound: 2));
 
-            Assert.IsFalse(state.GamePlayers["p1"].OwnedClothingItemIds.Contains(selfHat),
+            Assert.DoesNotContain(selfHat, state.GamePlayers["p1"].OwnedClothingItemIds,
                 "A self-drawn item used in Outfit 1 must not be in the player's Outfit 2 owned set " +
                 "when CanReuseOutfit1Items is false.");
         }
@@ -2543,7 +2543,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             context.Fsm.TransitionTo(context, new OutfitBuildingState(outfitRound: 2));
 
             // The hat was in Outfit 1 (now IsInPool=false), but CanReuseOutfit1Items allows it back.
-            Assert.IsTrue(state.GamePlayers["p1"].OwnedClothingItemIds.Contains(hatId),
+            Assert.Contains(hatId, state.GamePlayers["p1"].OwnedClothingItemIds,
                 "When CanReuseOutfit1Items is true the player's own Outfit 1 picks must remain owned.");
         }
 
@@ -2579,7 +2579,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
 
             context.Fsm.TransitionTo(context, new OutfitBuildingState(outfitRound: 2));
 
-            Assert.IsFalse(state.GamePlayers["p1"].OwnedClothingItemIds.Contains(hatId),
+            Assert.DoesNotContain(hatId, state.GamePlayers["p1"].OwnedClothingItemIds,
                 "When CanReuseOutfit1Items is false the player's Outfit 1 picks must not be owned for Outfit 2.");
         }
 
@@ -2610,7 +2610,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             _engine.ProcessCommand(context, new ClaimPoolItemCommand("p1", hatId));
 
             Assert.AreEqual("p1", state.ClothingPool[hatId].ClaimedByPlayerId);
-            Assert.IsTrue(state.GamePlayers["p1"].OwnedClothingItemIds.Contains(hatId));
+            Assert.Contains(hatId, state.GamePlayers["p1"].OwnedClothingItemIds);
         }
 
         [TestMethod]
@@ -2650,7 +2650,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
 
             Assert.IsNull(state.ClothingPool[hatId].ClaimedByPlayerId,
                 "An item removed from the Outfit 2 pool must not be claimable.");
-            Assert.IsFalse(state.GamePlayers["p1"].OwnedClothingItemIds.Contains(hatId));
+            Assert.DoesNotContain(hatId, state.GamePlayers["p1"].OwnedClothingItemIds);
         }
 
         // ── Outfit 2: submit validation ───────────────────────────────────────
@@ -3350,7 +3350,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             int votesBefore = state.Votes.Count;
             _engine.ProcessCommand(context,
                 new CastVoteCommand("pA", pAMatchup.Id, "creativity", pAMatchup.EntrantBId));
-            Assert.AreEqual(votesBefore, state.Votes.Count,
+            Assert.HasCount(votesBefore, state.Votes,
                 "A participant's vote on their own matchup must be ignored.");
         }
 
@@ -3382,7 +3382,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             int votesBefore = state.Votes.Count;
             _engine.ProcessCommand(context,
                 new CastVoteCommand(outsider, firstMatchup.Id, "creativity", firstMatchup.EntrantAId));
-            Assert.AreEqual(votesBefore + 1, state.Votes.Count,
+            Assert.HasCount(votesBefore + 1, state.Votes,
                 "A non-participant's vote must be recorded.");
         }
 
@@ -3758,11 +3758,11 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             });
             state.Votes[Guid.NewGuid()] = new() { MatchupId = matchupId, CriterionId = "c1", ChosenEntrantId = new EntrantId("pA", 1) };
 
-            Assert.AreEqual(0, state.Leaderboard.Count, "Leaderboard must be empty before FinalResultsState.");
+            Assert.IsEmpty(state.Leaderboard, "Leaderboard must be empty before FinalResultsState.");
 
             context.Fsm.TransitionTo(context, new FinalResultsState());
 
-            Assert.IsTrue(state.Leaderboard.Count > 0,
+            Assert.IsNotEmpty(state.Leaderboard,
                 "FinalResultsState must populate the leaderboard on entry.");
         }
 
@@ -3907,12 +3907,12 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
 
             // p1 claims the only available item.
             _engine.ProcessCommand(context, new ClaimPoolItemCommand("p1", itemId));
-            Assert.IsTrue(state.GamePlayers["p1"].OwnedClothingItemIds.Contains(itemId));
+            Assert.Contains(itemId, state.GamePlayers["p1"].OwnedClothingItemIds);
 
             // p2 tries to claim the same (now exhausted) item — must be rejected gracefully.
             _engine.ProcessCommand(context, new ClaimPoolItemCommand("p2", itemId));
 
-            Assert.IsFalse(state.GamePlayers["p2"].OwnedClothingItemIds.Contains(itemId),
+            Assert.DoesNotContain(itemId, state.GamePlayers["p2"].OwnedClothingItemIds,
                 "Claiming an already-claimed item must be rejected; pool is effectively exhausted for that slot.");
             Assert.AreEqual("p1", state.ClothingPool[itemId].ClaimedByPlayerId,
                 "First claimer's ownership must remain intact after a rejected second claim.");

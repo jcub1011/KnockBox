@@ -222,7 +222,7 @@ public class ActionCardTests
 
         Assert.IsTrue(result.TryGetSuccess(out var playResult));
         Assert.IsTrue(playResult.ConsumedNumbers);
-        Assert.AreEqual(0, target.Hand.Count);
+        Assert.IsEmpty(target.Hand);
     }
 
     [TestMethod]
@@ -242,8 +242,8 @@ public class ActionCardTests
 
         Assert.IsTrue(result.TryGetSuccess(out var playResult));
         Assert.IsTrue(playResult.ConsumedNumbers);
-        Assert.AreEqual(1, target.Hand.Count);
-        Assert.AreEqual(0, _state.DiscardPile.Count);
+        Assert.HasCount(1, target.Hand);
+        Assert.IsEmpty(_state.DiscardPile);
     }
 
     [TestMethod]
@@ -276,8 +276,8 @@ public class ActionCardTests
 
         card.Play(ctx);
 
-        Assert.AreEqual(0, player.Hand.Count);
-        Assert.AreEqual(1, target.Hand.Count);
+        Assert.IsEmpty(player.Hand);
+        Assert.HasCount(1, target.Hand);
     }
 
     [TestMethod]
@@ -293,8 +293,8 @@ public class ActionCardTests
 
         card.Play(ctx);
 
-        Assert.AreEqual(1, player.Hand.Count);
-        Assert.AreEqual(1, target.Hand.Count);
+        Assert.HasCount(1, player.Hand);
+        Assert.HasCount(1, target.Hand);
         Assert.IsTrue(target.IsBeingStolenFrom);
     }
 
@@ -309,7 +309,7 @@ public class ActionCardTests
 
         card.Play(ctx);
 
-        Assert.AreEqual(0, p1.Hand.Count);
+        Assert.IsEmpty(p1.Hand);
     }
 
     [TestMethod]

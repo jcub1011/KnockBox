@@ -1,0 +1,64 @@
+<Project>
+
+  <!--
+    Shared MSBuild target for game-plugin projects.
+
+    Imported by each plugin .csproj to publish build output into the host app's
+    games/{TargetName}/ folder so the host can discover and load it at runtime.
+
+    Each plugin is loaded into its own PluginLoadContext (ALC) at runtime, and
+    that ALC uses an AssemblyDependencyResolver rooted at games/{TargetName}/
+    to resolve transitive deps. In principle, any dep dropped into this folder
+    alongside a matching {Plugin}.deps.json entry is resolvable.
+
+    We still deliberately copy ONLY plugin-owned outputs, not the full
+    $(TargetDir). Rationale:
+      (a) Host-owned contracts (KnockBox.Core, logging/DI abstractions, BCL)
+          are classified as shared at load time and deferred to the default
+          ALC so type identity is preserved across the host/plugin boundary.
+          Copies under games/{Plugin}/ for those assemblies are dead disk
+          weight; they will never be loaded from there.
+      (b) Current plugins have no host-unknown transitive deps. If a future
+          plugin genuinely needs a private dep that the host does NOT ship,
+          extend this targets file to include it explicitly; the ALC will
+          pick it up via AssemblyDependencyResolver.
+
+    Copies:
+      1. The primary assembly, its PDB, and its deps.json.
+      2. Static-web-assets manifests (if produced).
+      3. The scoped-CSS bundle (if produced).
+      4. The plugin's wwwroot assets (if present).
+  -->
+  <Target Name="PublishPlugin" AfterTargets="Build">
+    <Message Text="Publishing plugin $(TargetName) to KnockBox app..." Importance="high" />
+    <PropertyGroup>
+      <!--
+        Anchor on $(MSBuildThisFileDirectory) (the repo root, since this
+        targets file lives there) instead of $(SolutionDir). The latter is
+        undefined when dotnet publish is invoked on a single .csproj without
+        a solution context.
+      -->
+      <PluginDestDir>$(MSBuildThisFileDirectory)KnockBox\bin\$(Configuration)\$(TargetFramework)\games\$(TargetName)\</PluginDestDir>
+    </PropertyGroup>
+    <ItemGroup>
+      <PluginPrimary Include="$(TargetDir)$(TargetName).dll" />
+      <PluginPrimary Include="$(TargetDir)$(TargetName).pdb" Condition="Exists('$(TargetDir)$(TargetName).pdb')" />
+      <PluginPrimary Include="$(TargetDir)$(TargetName).deps.json" Condition="Exists('$(TargetDir)$(TargetName).deps.json')" />
+      <PluginPrimary Include="$(TargetDir)$(TargetName).staticwebassets.endpoints.json"
+                     Condition="Exists('$(TargetDir)$(TargetName).staticwebassets.endpoints.json')" />
+      <PluginPrimary Include="$(TargetDir)$(TargetName).staticwebassets.runtime.json"
+                     Condition="Exists('$(TargetDir)$(TargetName).staticwebassets.runtime.json')" />
+      <ScopedCss Include="$(IntermediateOutputPath)scopedcss\bundle\$(TargetName).styles.css" />
+      <WwwRootFiles Include="wwwroot\**\*.*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(PluginPrimary)"
+          DestinationFolder="$(PluginDestDir)" />
+    <Copy SourceFiles="@(ScopedCss)"
+          DestinationFiles="$(PluginDestDir)wwwroot\$(TargetName).styles.css"
+          Condition="Exists('@(ScopedCss)')" />
+    <Copy SourceFiles="@(WwwRootFiles)"
+          DestinationFolder="$(PluginDestDir)wwwroot\%(RecursiveDir)"
+          Condition="'@(WwwRootFiles)' != ''" />
+  </Target>
+
+</Project>

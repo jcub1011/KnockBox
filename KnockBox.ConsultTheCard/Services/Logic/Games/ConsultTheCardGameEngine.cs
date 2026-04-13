@@ -318,7 +318,7 @@ namespace KnockBox.ConsultTheCard.Services.Logic.Games
                         {
                             ps.VoteTargetId = null;
                             ps.HasVoted = false;
-                            logger.LogInformation(
+                            logger.LogDebug(
                                 "HandlePlayerLeft: voided vote from [{voter}] targeting disconnected [{target}].",
                                 ps.PlayerId, player.Id);
                         }

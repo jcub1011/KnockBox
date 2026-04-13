@@ -16,9 +16,6 @@
     <Using Include="Microsoft.Extensions.Logging" />
   </ItemGroup>
 
-  <Target Name="CopyPlugin" AfterTargets="Build">
-    <Message Text="Copying plugin $(TargetName) to KnockBox app..." Importance="high" />
-    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(SolutionDir)KnockBox\bin\$(Configuration)\$(TargetFramework)\games\" />
-  </Target>
+  <Import Project="..\Directory.Plugin.targets" />
 
 </Project>

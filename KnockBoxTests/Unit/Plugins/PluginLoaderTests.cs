@@ -26,8 +26,8 @@ namespace KnockBoxTests.Unit.Plugins
 
             var result = _loader.LoadModules(missing);
 
-            Assert.AreEqual(0, result.Modules.Count);
-            Assert.AreEqual(0, result.Assemblies.Count);
+            Assert.IsEmpty(result.Modules);
+            Assert.IsEmpty(result.Assemblies);
             VerifyLogged(LogLevel.Warning, Times.Once());
         }
 
@@ -36,14 +36,21 @@ namespace KnockBoxTests.Unit.Plugins
         {
             // Stage this test assembly into a temp "games" directory so the
             // loader scans it via its public API surface.
+            //
+            // Assertions match on RouteIdentifier (a string), not on the
+            // concrete type: plugins load into a per-plugin PluginLoadContext,
+            // so the type identity of ValidFakeModule in the ALC differs from
+            // this test's default-ALC view. The IGameModule contract itself
+            // is a shared-contract interface, so the route-id string is the
+            // stable identity across the boundary.
             var tempDir = CreateStagingDirWithThisAssembly();
             try
             {
                 var result = _loader.LoadModules(tempDir);
 
-                // Must find at least our valid fake module.
-                Assert.IsTrue(result.Modules.Any(m => m is ValidFakeModule),
-                    "Expected ValidFakeModule to be discovered.");
+                Assert.Contains(
+                    m => m.RouteIdentifier == ValidRoute, result.Modules,
+                    "Expected ValidFakeModule (by route id) to be discovered.");
             }
             finally
             {
@@ -63,7 +70,7 @@ namespace KnockBoxTests.Unit.Plugins
                     .Where(m => string.Equals(m.RouteIdentifier, DuplicateRoute, StringComparison.OrdinalIgnoreCase))
                     .ToList();
 
-                Assert.AreEqual(1, dupMatches.Count,
+                Assert.HasCount(1, dupMatches,
                     "Only one module per duplicate route should be kept.");
                 VerifyLogged(LogLevel.Error, Times.AtLeastOnce());
             }
@@ -81,9 +88,11 @@ namespace KnockBoxTests.Unit.Plugins
             {
                 var result = _loader.LoadModules(tempDir);
 
-                Assert.IsFalse(result.Modules.Any(m => m is ThrowingCtorModule),
+                Assert.DoesNotContain(
+                    m => m.RouteIdentifier == ThrowingRoute, result.Modules,
                     "Module whose ctor throws should be skipped.");
-                Assert.IsTrue(result.Modules.Any(m => m is ValidFakeModule),
+                Assert.Contains(
+                    m => m.RouteIdentifier == ValidRoute, result.Modules,
                     "Valid modules should still load when another module's ctor throws.");
                 VerifyLogged(LogLevel.Error, Times.AtLeastOnce());
             }
@@ -99,14 +108,18 @@ namespace KnockBoxTests.Unit.Plugins
             var tempDir = CreateStagingDirWithThisAssembly();
             try
             {
-                // Drop a bogus dll that cannot be loaded as an assembly.
-                var bogusDll = Path.Combine(tempDir, "not-an-assembly.dll");
-                File.WriteAllText(bogusDll, "this is not a valid assembly");
+                // Drop a bogus dll in its own subdirectory matching the loader's
+                // expected per-plugin layout (subdir/{subdir}.dll).
+                var bogusSubdir = Path.Combine(tempDir, "not-an-assembly");
+                Directory.CreateDirectory(bogusSubdir);
+                File.WriteAllText(Path.Combine(bogusSubdir, "not-an-assembly.dll"),
+                    "this is not a valid assembly");
 
                 var result = _loader.LoadModules(tempDir);
 
                 // Valid modules still come through.
-                Assert.IsTrue(result.Modules.Any(m => m is ValidFakeModule));
+                Assert.Contains(
+                    m => m.RouteIdentifier == ValidRoute, result.Modules);
                 VerifyLogged(LogLevel.Error, Times.AtLeastOnce());
             }
             finally
@@ -117,16 +130,22 @@ namespace KnockBoxTests.Unit.Plugins
 
         // --- helpers ---
 
+        private const string ValidRoute = "valid-fake";
         private const string DuplicateRoute = "duplicate-route";
+        private const string ThrowingRoute = "throws";
 
         private static string CreateStagingDirWithThisAssembly()
         {
             var dir = Path.Combine(Path.GetTempPath(), "knockbox-plugin-test-" + Guid.NewGuid());
             Directory.CreateDirectory(dir);
 
+            // Stage under the per-plugin subdirectory layout required by the
+            // loader: {plugins-root}/{AssemblyName}/{AssemblyName}.dll.
             var source = typeof(PluginLoaderTests).Assembly.Location;
-            var dest = Path.Combine(dir, Path.GetFileName(source));
-            File.Copy(source, dest, overwrite: true);
+            var assemblyFileName = Path.GetFileNameWithoutExtension(source);
+            var pluginSubdir = Path.Combine(dir, assemblyFileName);
+            Directory.CreateDirectory(pluginSubdir);
+            File.Copy(source, Path.Combine(pluginSubdir, assemblyFileName + ".dll"), overwrite: true);
             return dir;
         }
 
@@ -154,7 +173,7 @@ namespace KnockBoxTests.Unit.Plugins
         {
             public string Name => "Valid Fake";
             public string Description => "Used by PluginLoader tests.";
-            public string RouteIdentifier => "valid-fake";
+            public string RouteIdentifier => ValidRoute;
             public void RegisterServices(IServiceCollection services) { }
         }
 
@@ -179,7 +198,7 @@ namespace KnockBoxTests.Unit.Plugins
             public ThrowingCtorModule() => throw new InvalidOperationException("boom");
             public string Name => "Throws";
             public string Description => "Ctor throws.";
-            public string RouteIdentifier => "throws";
+            public string RouteIdentifier => ThrowingRoute;
             public void RegisterServices(IServiceCollection services) { }
         }
     }

@@ -14,14 +14,9 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
     /// For round > 1, the pool is reset on entry (previous round picks removed) and
     /// submitted outfits are validated for distinctness against earlier outfits.
     /// </summary>
-    public sealed class OutfitBuildingState : ITimedDrawnToDressGameState
+    public sealed class OutfitBuildingState(int outfitRound = 1) : ITimedDrawnToDressGameState
     {
-        private readonly int _outfitRound;
-
-        public OutfitBuildingState(int outfitRound = 1)
-        {
-            _outfitRound = outfitRound;
-        }
+        private readonly int _outfitRound = outfitRound;
 
         public ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?> OnEnter(
             DrawnToDressGameContext context)
@@ -38,13 +33,13 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
             if (_outfitRound > 1)
             {
                 context.ResetPoolForRound(_outfitRound);
-                context.Logger.LogInformation(
+                context.Logger.LogDebug(
                     "FSM → OutfitBuildingState (round {round}). Pool has {count} item(s) after previous picks removed. Deadline: {deadline}.",
                     _outfitRound, context.ClothingPool.Values.Count(i => i.IsInPool), context.State.PhaseDeadlineUtc);
             }
             else
             {
-                context.Logger.LogInformation(
+                context.Logger.LogDebug(
                     "FSM → OutfitBuildingState. Deadline: {deadline}.", context.State.PhaseDeadlineUtc);
             }
 
@@ -93,7 +88,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
         {
             if (context.State.PhaseDeadlineUtc is not { } deadline || now < deadline) return null;
 
-            context.Logger.LogInformation(
+            context.Logger.LogDebug(
                 "Outfit building timer expired (round {round}). Auto-filling incomplete outfits and moving to customization.",
                 _outfitRound);
             AutoFillIncompleteOutfits(context);
@@ -151,7 +146,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
             item.ClaimedByPlayerId = cmd.PlayerId;
             player.OwnedClothingItemIds.Add(item.Id);
 
-            context.Logger.LogInformation(
+            context.Logger.LogDebug(
                 "Player [{id}] claimed pool item [{itemId}].", cmd.PlayerId, item.Id);
             return null;
         }
@@ -186,7 +181,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
             item.ClaimedByPlayerId = null;
             player.OwnedClothingItemIds.Remove(item.Id);
 
-            context.Logger.LogInformation(
+            context.Logger.LogDebug(
                 "Player [{id}] released claim on pool item [{itemId}].", cmd.PlayerId, item.Id);
             return null;
         }
@@ -273,13 +268,13 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
                 SubmittedAt = DateTimeOffset.UtcNow,
             });
 
-            context.Logger.LogInformation(
+            context.Logger.LogDebug(
                 "Player [{id}] submitted outfit round {round} ({count} items).",
                 cmd.PlayerId, _outfitRound, cmd.SelectedItemsByType.Count);
 
             if (context.AllOutfitsSubmittedForRound(_outfitRound))
             {
-                context.Logger.LogInformation(
+                context.Logger.LogDebug(
                     "All outfits submitted for round {round}. Moving to customization.", _outfitRound);
                 return new OutfitCustomizationState(_outfitRound);
             }
@@ -309,11 +304,10 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
             }
 
             var allPreviousOutfits = _outfitRound > 1
-                ? context.GamePlayers.Values
+                ? [.. context.GamePlayers.Values
                     .SelectMany(p => p.SubmittedOutfits
                         .Where(kv => kv.Key < _outfitRound)
-                        .Select(kv => kv.Value))
-                    .ToList()
+                        .Select(kv => kv.Value))]
                 : new List<OutfitSubmission>();
 
             int threshold = context.Config.Outfit2DistinctnessThreshold;
@@ -395,7 +389,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
                 }
                 else
                 {
-                    context.Logger.LogInformation(
+                    context.Logger.LogDebug(
                         "Auto-filled outfit round {round} for player [{id}] ({count} item(s)).",
                         _outfitRound, player.PlayerId, selectedItems.Count);
                 }

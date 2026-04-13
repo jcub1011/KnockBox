@@ -18,12 +18,12 @@ Refactor the `KnockBox` application to use a true plugin architecture. The main 
 
 ### Acceptance Criteria
 
-- [ ] `IGameModule` interface exists in `KnockBox.Core.Plugins` (or similar namespace).
-- [ ] The interface contains properties: `string Name`, `string Description`, `string RouteIdentifier`.
-- [ ] The interface contains method: `void RegisterServices(IServiceCollection services)`.
-- [ ] `KnockBox\Services\Logic\Games\Shared\ILobbyService.cs` updates `LobbyRegistration` to use strings for `GameName` and `RouteIdentifier` instead of `GameType`.
-- [ ] `LobbyService.CreateLobbyAsync` uses `IServiceProvider.GetKeyedService<AbstractGameEngine>(routeIdentifier)` instead of a hardcoded switch statement.
-- [ ] The existing `GameType` enum (`KnockBox\Services\Navigation\Games\GameTypes.cs`) is deprecated.
+- [x] `IGameModule` interface exists in `KnockBox.Core.Plugins` (or similar namespace).
+- [x] The interface contains properties: `string Name`, `string Description`, `string RouteIdentifier`.
+- [x] The interface contains method: `void RegisterServices(IServiceCollection services)`.
+- [x] `KnockBox\Services\Logic\Games\Shared\ILobbyService.cs` updates `LobbyRegistration` to use strings for `GameName` and `RouteIdentifier` instead of `GameType`.
+- [x] `LobbyService.CreateLobbyAsync` uses `IServiceProvider.GetKeyedService<AbstractGameEngine>(routeIdentifier)` instead of a hardcoded switch statement.
+- [x] The existing `GameType` enum (`KnockBox\Services\Navigation\Games\GameTypes.cs`) is deprecated.
 
 ---
 
@@ -38,20 +38,20 @@ Refactor the `KnockBox` application to use a true plugin architecture. The main 
 
 ### Acceptance Criteria
 
-- [ ] The following `.csproj` files use `<Project Sdk="Microsoft.NET.Sdk.Razor">` and reference ASP.NET Core (`<FrameworkReference Include="Microsoft.AspNetCore.App" />`):
+- [x] The following `.csproj` files use `<Project Sdk="Microsoft.NET.Sdk.Razor">` and reference ASP.NET Core (`<FrameworkReference Include="Microsoft.AspNetCore.App" />`):
   - `KnockBox.CardCounter\KnockBox.CardCounter.csproj`
   - `KnockBox.ConsultTheCard\KnockBox.ConsultTheCard.csproj`
   - `KnockBox.DiceSimulator\KnockBox.DiceSimulator.csproj`
   - `KnockBox.DrawnToDress\KnockBox.DrawnToDress.csproj`
   - `KnockBox.Operator\KnockBox.Operator.csproj`
-- [ ] All files under `KnockBox\Components\Pages\Games\{GameName}\` are moved to `{GameProject}\Pages\`.
-- [ ] A new `_Imports.razor` is added to each game project to ensure the moved components still compile with global usings.
-- [ ] The `@page` directives in the relocated `.razor` files exactly match the `RouteIdentifier` defined in their respective `IGameModule`.
-- [ ] Namespaces in the moved `.razor` and `.razor.cs` files are updated to match the game project (e.g., `KnockBox.CardCounter.Pages`).
-- [ ] Any static assets (e.g., CSS, images) required by the games are moved to the `{GameProject}\wwwroot\` directory.
-- [ ] References to static assets in the `.razor` files are updated to use the RCL convention: `_content/{ProjectName}/{AssetPath}`.
-- [ ] Each game project contains a class (e.g., `CardCounterModule.cs`) implementing `IGameModule`.
-- [ ] Game-specific registrations (e.g., `services.AddKeyedSingleton<AbstractGameEngine, CardCounterGameEngine>("card-counter");`) are moved from `KnockBox\Services\Registrations\Logic\LogicRegistrations.cs` into the respective `IGameModule.RegisterServices` methods.
+- [x] All files under `KnockBox\Components\Pages\Games\{GameName}\` are moved to `{GameProject}\Pages\`.
+- [x] A new `_Imports.razor` is added to each game project to ensure the moved components still compile with global usings.
+- [x] The `@page` directives in the relocated `.razor` files exactly match the `RouteIdentifier` defined in their respective `IGameModule`.
+- [x] Namespaces in the moved `.razor` and `.razor.cs` files are updated to match the game project (e.g., `KnockBox.CardCounter.Pages`).
+- [x] Any static assets (e.g., CSS, images) required by the games are moved to the `{GameProject}\wwwroot\` directory.
+- [x] References to static assets in the `.razor` files are updated to use the RCL convention: `_content/{ProjectName}/{AssetPath}`.
+- [x] Each game project contains a class (e.g., `CardCounterModule.cs`) implementing `IGameModule`.
+- [x] Game-specific registrations (e.g., `services.AddKeyedSingleton<AbstractGameEngine, CardCounterGameEngine>("card-counter");`) are moved from `KnockBox\Services\Registrations\Logic\LogicRegistrations.cs` into the respective `IGameModule.RegisterServices` methods.
 
 ---
 
@@ -66,10 +66,10 @@ Refactor the `KnockBox` application to use a true plugin architecture. The main 
 
 ### Acceptance Criteria
 
-- [ ] `KnockBox\KnockBox.csproj` no longer contains `<ProjectReference>` entries for the 5 game projects.
-- [ ] `Program.cs` contains logic to scan a `Plugins` directory (e.g., `Path.Combine(AppContext.BaseDirectory, "Plugins")`), load assemblies, find `IGameModule` implementations, and register them.
-- [ ] A singleton service or static collection of discovered `Assembly` and `IGameModule` objects is created so the router and DI container can access them.
-- [ ] `KnockBox\Components\Routes.razor` binds its `AdditionalAssemblies` parameter to the collection of discovered game assemblies.
+- [x] `KnockBox\KnockBox.csproj` no longer contains `<ProjectReference>` entries for the 5 game projects.
+- [x] `Program.cs` contains logic to scan a `Plugins` directory (e.g., `Path.Combine(AppContext.BaseDirectory, "Plugins")`), load assemblies, find `IGameModule` implementations, and register them.
+- [x] A singleton service or static collection of discovered `Assembly` and `IGameModule` objects is created so the router and DI container can access them.
+- [x] `KnockBox\Components\Routes.razor` binds its `AdditionalAssemblies` parameter to the collection of discovered game assemblies.
 
 ---
 
@@ -82,9 +82,9 @@ Refactor the `KnockBox` application to use a true plugin architecture. The main 
 
 ### Acceptance Criteria
 
-- [ ] `KnockBox\Components\Pages\Home\Home.razor` and its code-behind no longer hardcode the game list. They inject the collection of discovered `IGameModule`s and iterate over them to render the game selection buttons.
-- [ ] `CreateLobby` method uses the string `RouteIdentifier` from `IGameModule` instead of `GameType`.
-- [ ] `KnockBox\Components\Layout\MainLayout.razor` determines the current game name for the header using `currentSession.LobbyRegistration.GameName`.
+- [x] `KnockBox\Components\Pages\Home\Home.razor` and its code-behind no longer hardcode the game list. They inject the collection of discovered `IGameModule`s and iterate over them to render the game selection buttons.
+- [x] `CreateLobby` method uses the string `RouteIdentifier` from `IGameModule` instead of `GameType`.
+- [x] `KnockBox\Components\Layout\MainLayout.razor` determines the current game name for the header using `currentSession.LobbyRegistration.GameName`.
 
 ---
 

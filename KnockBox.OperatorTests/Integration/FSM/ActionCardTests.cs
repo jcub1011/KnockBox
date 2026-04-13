@@ -58,9 +58,9 @@ public class ActionCardTests
         var passCmd = new PassReactionCommand("p2");
         _reactionPhase.HandleCommand(_context, passCmd);
 
-        Assert.AreEqual(1, _state.GamePlayers["p1"].Hand.Count);
+        Assert.HasCount(1, _state.GamePlayers["p1"].Hand);
         Assert.AreEqual(targetCard.Id, _state.GamePlayers["p1"].Hand[0].Id);
-        Assert.AreEqual(0, _state.GamePlayers["p2"].Hand.Count);
+        Assert.IsEmpty(_state.GamePlayers["p2"].Hand);
     }
 
     [TestMethod]
@@ -79,8 +79,8 @@ public class ActionCardTests
         var reactCmd = new PlayReactionCommand("p2", shieldCard.Id);
         _reactionPhase.HandleCommand(_context, reactCmd);
 
-        Assert.AreEqual(0, _state.GamePlayers["p1"].Hand.Count);
-        Assert.AreEqual(1, _state.GamePlayers["p2"].Hand.Count);
+        Assert.IsEmpty(_state.GamePlayers["p1"].Hand);
+        Assert.HasCount(1, _state.GamePlayers["p2"].Hand);
         Assert.AreEqual(targetCard.Id, _state.GamePlayers["p2"].Hand[0].Id);
     }
 
@@ -232,8 +232,8 @@ public class ActionCardTests
         }
 
         // Both players should have received 2 cards
-        Assert.AreEqual(2, _state.GamePlayers["p1"].Hand.Count);
-        Assert.AreEqual(2, _state.GamePlayers["p2"].Hand.Count);
+        Assert.HasCount(2, _state.GamePlayers["p1"].Hand);
+        Assert.HasCount(2, _state.GamePlayers["p2"].Hand);
     }
 
     [TestMethod]
@@ -459,7 +459,7 @@ public class ActionCardTests
         var result = _playPhase.HandleCommand(_context, playCmd);
 
         Assert.IsInstanceOfType(result.Value, typeof(ReactionState));
-        Assert.IsTrue(_state.ReactionTargetPlayerIds.Contains("p2"));
+        Assert.Contains("p2", _state.ReactionTargetPlayerIds);
 
         var passCmd = new PassReactionCommand("p2");
         _reactionPhase.HandleCommand(_context, passCmd);
@@ -500,12 +500,12 @@ public class ActionCardTests
         var playCmd = new PlayCardsCommand("p1", new List<Guid> { blueShell.Id }, null);
         _playPhase.HandleCommand(_context, playCmd);
 
-        Assert.AreEqual(2, _state.ReactionTargetPlayerIds.Count);
+        Assert.HasCount(2, _state.ReactionTargetPlayerIds);
 
         // Both pass
         _reactionPhase.HandleCommand(_context, new PassReactionCommand("p2"));
         // After first pass, should still be in reaction (waiting for p3)
-        Assert.AreEqual(1, _state.PlayerReactions.Count);
+        Assert.HasCount(1, _state.PlayerReactions);
 
         _reactionPhase.HandleCommand(_context, new PassReactionCommand("p3"));
 
@@ -580,7 +580,7 @@ public class ActionCardTests
 
         // p3 reacts first (before p2) — order shouldn't matter
         _reactionPhase.HandleCommand(_context, new PassReactionCommand("p3"));
-        Assert.AreEqual(1, _state.PlayerReactions.Count);
+        Assert.HasCount(1, _state.PlayerReactions);
 
         _reactionPhase.HandleCommand(_context, new PassReactionCommand("p2"));
 

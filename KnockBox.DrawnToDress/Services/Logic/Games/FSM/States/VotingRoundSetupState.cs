@@ -28,7 +28,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
 
             int totalRounds = SwissTournamentService.ResolveRoundCount(
                 context.GetTournamentEntrantIds().Count, context.Config.VotingRounds);
-            context.Logger.LogInformation(
+            context.Logger.LogDebug(
                 "FSM → VotingRoundSetupState. Round {n} of {total}. {count} matchup(s), {byes} bye(s) generated.",
                 round.RoundNumber, totalRounds, round.Matchups.Count, round.Byes.Count);
 
