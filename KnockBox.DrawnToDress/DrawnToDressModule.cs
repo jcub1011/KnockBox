@@ -1,5 +1,4 @@
 using KnockBox.Core.Plugins;
-using KnockBox.Core.Services.Logic.Games.Engines.Shared;
 using KnockBox.DrawnToDress.Services.Logic.Games;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -13,8 +12,7 @@ namespace KnockBox.DrawnToDress
 
         public void RegisterServices(IServiceCollection services)
         {
-            services.AddSingleton<DrawnToDressGameEngine>();
-            services.AddKeyedSingleton<AbstractGameEngine>(RouteIdentifier, (sp, key) => sp.GetRequiredService<DrawnToDressGameEngine>());
+            services.AddGameEngine<DrawnToDressGameEngine>(RouteIdentifier);
         }
     }
 }

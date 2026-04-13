@@ -38,9 +38,24 @@ namespace KnockBox.ConsultTheCard.Services.Logic.Games.FSM
         public HashSet<int> UsedWordPairIndices { get; } = [];
 
         /// <summary>
-        /// The word bank providing word groups, loaded from <c>WordPairs.csv</c>.
+        /// Lazily loads the word bank from <c>WordPairs.csv</c> on first access so that
+        /// file I/O stays off the DI construction path; failures surface at the first
+        /// game start rather than at service resolution.
         /// </summary>
-        public IReadOnlyList<WordGroup> WordBank { get; set; } = Data.WordBank.Load(logger);
+        private readonly Lazy<IReadOnlyList<WordGroup>> _wordBankLoader =
+            new(() => Data.WordBank.Load(logger));
+
+        private IReadOnlyList<WordGroup>? _wordBankOverride;
+
+        /// <summary>
+        /// The word bank providing word groups, loaded from <c>WordPairs.csv</c> on
+        /// first access. Setter is retained so tests can inject a deterministic bank.
+        /// </summary>
+        public IReadOnlyList<WordGroup> WordBank
+        {
+            get => _wordBankOverride ?? _wordBankLoader.Value;
+            set => _wordBankOverride = value;
+        }
 
         // ── Convenience accessors (delegate to State) ─────────────────────────
 

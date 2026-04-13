@@ -1,5 +1,4 @@
 using KnockBox.Core.Plugins;
-using KnockBox.Core.Services.Logic.Games.Engines.Shared;
 using KnockBox.ConsultTheCard.Services.Logic.Games;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -13,8 +12,7 @@ namespace KnockBox.ConsultTheCard
 
         public void RegisterServices(IServiceCollection services)
         {
-            services.AddSingleton<ConsultTheCardGameEngine>();
-            services.AddKeyedSingleton<AbstractGameEngine>(RouteIdentifier, (sp, key) => sp.GetRequiredService<ConsultTheCardGameEngine>());
+            services.AddGameEngine<ConsultTheCardGameEngine>(RouteIdentifier);
         }
     }
 }

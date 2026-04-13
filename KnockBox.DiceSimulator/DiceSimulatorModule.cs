@@ -1,5 +1,4 @@
 using KnockBox.Core.Plugins;
-using KnockBox.Core.Services.Logic.Games.Engines.Shared;
 using KnockBox.DiceSimulator.Services.Logic.Games;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -13,8 +12,7 @@ namespace KnockBox.DiceSimulator
 
         public void RegisterServices(IServiceCollection services)
         {
-            services.AddSingleton<DiceSimulatorGameEngine>();
-            services.AddKeyedSingleton<AbstractGameEngine>(RouteIdentifier, (sp, key) => sp.GetRequiredService<DiceSimulatorGameEngine>());
+            services.AddGameEngine<DiceSimulatorGameEngine>(RouteIdentifier);
         }
     }
 }

@@ -1,0 +1,30 @@
+<Project>
+
+  <!--
+    Shared MSBuild target for game-plugin projects.
+
+    Imported by each plugin .csproj to publish build output into the host app's
+    games/{TargetName}/ folder so the host can discover and load it at runtime.
+    Copies:
+      1. The primary assembly and its transitive dependencies (TargetDir\**\*.*)
+      2. The scoped-CSS bundle (if produced)
+      3. The plugin's wwwroot assets (if present)
+  -->
+  <Target Name="PublishPlugin" AfterTargets="Build">
+    <Message Text="Publishing plugin $(TargetName) to KnockBox app..." Importance="high" />
+    <ItemGroup>
+      <PluginOutput Include="$(TargetDir)**\*.*" />
+      <ScopedCss Include="$(IntermediateOutputPath)scopedcss\bundle\$(TargetName).styles.css" />
+      <WwwRootFiles Include="wwwroot\**\*.*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(PluginOutput)"
+          DestinationFolder="$(SolutionDir)KnockBox\bin\$(Configuration)\$(TargetFramework)\games\$(TargetName)\%(RecursiveDir)" />
+    <Copy SourceFiles="@(ScopedCss)"
+          DestinationFiles="$(SolutionDir)KnockBox\bin\$(Configuration)\$(TargetFramework)\games\$(TargetName)\wwwroot\$(TargetName).styles.css"
+          Condition="Exists('@(ScopedCss)')" />
+    <Copy SourceFiles="@(WwwRootFiles)"
+          DestinationFolder="$(SolutionDir)KnockBox\bin\$(Configuration)\$(TargetFramework)\games\$(TargetName)\wwwroot\%(RecursiveDir)"
+          Condition="'@(WwwRootFiles)' != ''" />
+  </Target>
+
+</Project>

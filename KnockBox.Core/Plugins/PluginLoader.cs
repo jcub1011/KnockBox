@@ -59,12 +59,11 @@ namespace KnockBox.Core.Plugins
                     modules.Add(module);
                     moduleAssemblies.Add(moduleType.Assembly);
 
-                    if (logger.IsEnabled(LogLevel.Information))
-                        logger.LogInformation(
-                            "Loaded game module [{Name}] with route identifier [{RouteIdentifier}] from [{Assembly}].",
-                            module.Name,
-                            module.RouteIdentifier,
-                            moduleType.Assembly.GetName().Name);
+                    logger.LogInformation(
+                        "Loaded game module [{Name}] with route identifier [{RouteIdentifier}] from [{Assembly}].",
+                        module.Name,
+                        module.RouteIdentifier,
+                        moduleType.Assembly.GetName().Name);
                 }
             }
 
@@ -73,10 +72,34 @@ namespace KnockBox.Core.Plugins
 
         private List<Assembly> LoadAssemblies(string pluginsDirectory)
         {
-            var dllPaths = Directory.GetFiles(pluginsDirectory, "*.dll", SearchOption.AllDirectories);
-            var assemblies = new List<Assembly>(dllPaths.Length);
+            // Each plugin lives in its own subfolder (games/{TargetName}/) and publishes
+            // its primary assembly as {TargetName}.dll alongside its transitive deps.
+            // Only load the primary assembly per folder; dependencies are resolved on
+            // demand via AssemblyLoadContext, avoiding redundant loads and version
+            // conflicts from scanning every DLL in the tree.
+            var pluginDllPaths = new List<string>();
+            foreach (var subdir in Directory.GetDirectories(pluginsDirectory))
+            {
+                var expected = Path.Combine(subdir, Path.GetFileName(subdir) + ".dll");
+                if (File.Exists(expected))
+                {
+                    pluginDllPaths.Add(expected);
+                }
+                else
+                {
+                    logger.LogWarning(
+                        "Plugin subdirectory [{Subdirectory}] is missing expected primary assembly [{ExpectedDll}]; skipping.",
+                        subdir,
+                        Path.GetFileName(expected));
+                }
+            }
 
-            foreach (var dllPath in dllPaths)
+            // Also accept loose DLLs directly under the plugins root (legacy layout).
+            pluginDllPaths.AddRange(Directory.GetFiles(pluginsDirectory, "*.dll", SearchOption.TopDirectoryOnly));
+
+            var assemblies = new List<Assembly>(pluginDllPaths.Count);
+
+            foreach (var dllPath in pluginDllPaths)
             {
                 try
                 {

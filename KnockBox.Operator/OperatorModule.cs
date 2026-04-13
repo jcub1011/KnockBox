@@ -1,5 +1,4 @@
 using KnockBox.Core.Plugins;
-using KnockBox.Core.Services.Logic.Games.Engines.Shared;
 using KnockBox.Operator.Services.Logic.Games;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -13,8 +12,7 @@ namespace KnockBox.Operator
 
         public void RegisterServices(IServiceCollection services)
         {
-            services.AddSingleton<OperatorGameEngine>();
-            services.AddKeyedSingleton<AbstractGameEngine>(RouteIdentifier, (sp, key) => sp.GetRequiredService<OperatorGameEngine>());
+            services.AddGameEngine<OperatorGameEngine>(RouteIdentifier);
         }
     }
 }
