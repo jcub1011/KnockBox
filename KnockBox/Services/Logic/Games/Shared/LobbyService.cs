@@ -10,7 +10,8 @@ namespace KnockBox.Services.Logic.Games.Shared
 {
     public class LobbyService(
         IServiceProvider serviceProvider,
-        ILobbyCodeService lobbyCodeService) : ILobbyService
+        ILobbyCodeService lobbyCodeService,
+        IEnumerable<IGameModule> gameModules) : ILobbyService
     {
         private readonly ConcurrentDictionary<string, LobbyRegistration> _lobbies = [];
 
@@ -62,8 +63,7 @@ namespace KnockBox.Services.Logic.Games.Shared
                 if (!lobbyCodeResult.TryGetSuccess(out var lobbyCode)) // Service garauntees that lobby code is normalized
                     return ValueResult<LobbyRegistration>.FromError(lobbyCodeResult.Error.Error);
 
-                var modules = serviceProvider.GetServices<IGameModule>();
-                var module = modules.FirstOrDefault(m => m.RouteIdentifier == routeIdentifier);
+                var module = gameModules.FirstOrDefault(m => m.RouteIdentifier == routeIdentifier);
                 if (module is null)
                     return ValueResult<LobbyRegistration>.FromError($"Unknown game route identifier [{routeIdentifier}].");
 

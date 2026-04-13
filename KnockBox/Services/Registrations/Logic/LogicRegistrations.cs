@@ -14,6 +14,28 @@ namespace KnockBox.Services.Registrations.Logic
             services.AddSingleton<IRandomNumberService, RandomNumberService>();
 
             // Dynamically discover and register game modules
+            var pluginsPath = Path.Combine(AppContext.BaseDirectory, "games");
+            if (Directory.Exists(pluginsPath))
+            {
+                var dllFiles = Directory.GetFiles(pluginsPath, "*.dll");
+                foreach (var dll in dllFiles)
+                {
+                    try
+                    {
+                        var assemblyName = System.Reflection.AssemblyName.GetAssemblyName(dll);
+                        if (!AppDomain.CurrentDomain.GetAssemblies().Any(a => a.GetName().Name == assemblyName.Name))
+                        {
+                            System.Runtime.Loader.AssemblyLoadContext.Default.LoadFromAssemblyPath(dll);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        // Log or handle assembly loading errors
+                        Console.WriteLine($"Error loading plugin assembly: {dll}. Exception: {ex.Message}");
+                    }
+                }
+            }
+
             var moduleTypes = AppDomain.CurrentDomain.GetAssemblies()
                 .SelectMany(a => a.GetTypes())
                 .Where(t => typeof(IGameModule).IsAssignableFrom(t) && !t.IsInterface && !t.IsAbstract);
@@ -23,7 +45,7 @@ namespace KnockBox.Services.Registrations.Logic
                 if (Activator.CreateInstance(moduleType) is IGameModule module)
                 {
                     module.RegisterServices(services);
-                    services.AddSingleton(module);
+                    services.AddSingleton(typeof(IGameModule), module);
                 }
             }
 
