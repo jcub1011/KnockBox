@@ -1,4 +1,4 @@
-using KnockBox.Core.Extensions.Events;
+using KnockBox.Extensions.Events;
 
 namespace KnockBox.Tests.Unit.Extensions.Events;
 

@@ -1,14 +1,14 @@
-using KnockBox.DrawnToDress.Services.Logic.Games;
-using KnockBox.DrawnToDress.Services.Logic.Games.FSM;
-using KnockBox.DrawnToDress.Services.Logic.Games.FSM.States;
-using KnockBox.Core.Services.Logic.RandomGeneration;
-using KnockBox.DrawnToDress.Services.State.Games;
-using KnockBox.DrawnToDress.Services.State.Games.Data;
-using KnockBox.Core.Services.State.Users;
+using KnockBox.Services.Logic.Games.DrawnToDress;
+using KnockBox.Services.Logic.Games.DrawnToDress.FSM;
+using KnockBox.Services.Logic.Games.DrawnToDress.FSM.States;
+using KnockBox.Services.Logic.RandomGeneration;
+using KnockBox.Services.State.Games.DrawnToDress;
+using KnockBox.Services.State.Games.DrawnToDress.Data;
+using KnockBox.Services.State.Users;
 using Microsoft.Extensions.Logging;
 using Moq;
 
-namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress
+namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress
 {
     [TestClass]
     public class ErrorPropagationTests
@@ -45,7 +45,6 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress
             ];
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
-            _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
 
             // Add a player so we can advance through ready.
             state.GamePlayers["p1"] = new DrawnToDressPlayerState { PlayerId = "p1" };
@@ -99,7 +98,6 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress
             ];
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
-            _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
 
             state.GamePlayers["p1"] = new DrawnToDressPlayerState { PlayerId = "p1" };
             Assert.IsInstanceOfType<DrawingRoundState>(context.Fsm.CurrentState);
@@ -147,7 +145,6 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress
             ];
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
-            _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
 
             state.GamePlayers["p1"] = new DrawnToDressPlayerState { PlayerId = "p1" };
             Assert.IsInstanceOfType<DrawingRoundState>(context.Fsm.CurrentState);
@@ -172,7 +169,6 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress
             ];
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
-            _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
 
             state.GamePlayers["p1"] = new DrawnToDressPlayerState { PlayerId = "p1" };
             Assert.IsInstanceOfType<DrawingRoundState>(context.Fsm.CurrentState);

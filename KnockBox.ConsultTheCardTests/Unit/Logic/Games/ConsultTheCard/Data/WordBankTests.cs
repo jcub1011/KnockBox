@@ -1,9 +1,9 @@
-using KnockBox.ConsultTheCard.Services.Logic.Games.Data;
+using KnockBox.Services.Logic.Games.ConsultTheCard.Data;
 using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 
-namespace KnockBox.ConsultTheCard.Tests.Unit.Logic.Games.ConsultTheCard.Data
+namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard.Data
 {
     [TestClass]
     [DoNotParallelize]
@@ -19,7 +19,7 @@ namespace KnockBox.ConsultTheCard.Tests.Unit.Logic.Games.ConsultTheCard.Data
         {
             _csvPath = Path.Combine(
                 AppContext.BaseDirectory,
-                "Services/Logic/Games/Data/WordPairs.csv");
+                "Services/Logic/Games/ConsultTheCard/Data/WordPairs.csv");
             _originalCsvContent = File.ReadAllText(_csvPath);
         }
 

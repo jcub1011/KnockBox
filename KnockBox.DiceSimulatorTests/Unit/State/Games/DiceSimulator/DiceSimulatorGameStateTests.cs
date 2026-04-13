@@ -1,11 +1,11 @@
-using KnockBox.DiceSimulator.Services.State.Games;
-using KnockBox.DiceSimulator.Services.State.Games.Data;
-using KnockBox.Core.Services.State.Users;
+using KnockBox.Services.State.Games.DiceSimulator;
+using KnockBox.Services.State.Games.DiceSimulator.Data;
+using KnockBox.Services.State.Users;
 using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 
-namespace KnockBox.DiceSimulator.Tests.Unit.State
+namespace KnockBoxTests.Unit.State.Games.DiceSimulator
 {
     [TestClass]
     public class DiceSimulatorGameStateTests

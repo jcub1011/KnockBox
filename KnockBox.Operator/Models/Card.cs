@@ -1,4 +1,4 @@
-using KnockBox.Core.Extensions.Returns;
+using KnockBox.Extensions.Returns;
 using KnockBox.Operator.Services.Logic.FSM;
 
 namespace KnockBox.Operator.Models;

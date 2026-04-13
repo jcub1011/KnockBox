@@ -1,14 +1,12 @@
-﻿<Project Sdk="Microsoft.NET.Sdk.Razor">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <AddRazorSupportForMvc>true</AddRazorSupportForMvc>
   </PropertyGroup>
 
   <ItemGroup>
-    <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <ProjectReference Include="..\KnockBox.Core\KnockBox.Core.csproj" />
   </ItemGroup>
 
@@ -21,10 +19,5 @@
       <_Parameter1>KnockBox.CardCounterTests</_Parameter1>
     </AssemblyAttribute>
   </ItemGroup>
-
-  <Target Name="CopyPlugin" AfterTargets="Build">
-    <Message Text="Copying plugin $(TargetName) to KnockBox app..." Importance="high" />
-    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(SolutionDir)KnockBox\bin\$(Configuration)\$(TargetFramework)\games\" />
-  </Target>
 
 </Project>

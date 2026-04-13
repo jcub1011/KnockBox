@@ -1,6 +1,6 @@
 using System.Collections.Concurrent;
 
-namespace KnockBox.Core.Services.State.Games.Shared.Interfaces;
+namespace KnockBox.Services.State.Games.Shared.Interfaces;
 
 public interface IPlayerTrackedGameState<TPlayerState>
 {

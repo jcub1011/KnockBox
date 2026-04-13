@@ -1,0 +1,237 @@
+@using KnockBox.Operator.Models
+@using KnockBox.Operator.Services.State
+
+<div class="op-play-phase">
+<div class="op-game-board">
+    @* Mobile-only compact info bar *@
+    <div class="op-mobile-info-bar">
+        <div class="op-mobile-deck-badges">
+            <div class="op-deck-badge" @onclick="() => _showDiscardHistory = true">
+                <span class="op-badge-label">DECK</span>
+                <span class="op-badge-count">@GameState.Deck.Count</span>
+            </div>
+            <div class="op-discard-badge" @onclick="() => _showDiscardHistory = true">
+                <span class="op-badge-label">DISC</span>
+                <span class="op-badge-count">@GameState.DiscardPile.Count</span>
+            </div>
+        </div>
+    </div>
+    
+    @* Opponents *@
+    <div class="op-opponents-grid">
+        @foreach (var player in GameState.Players.Where(p => p.Id != UserService.CurrentUser?.Id))
+        {
+            var pState = GameState.Context?.GamePlayers.GetValueOrDefault(player.Id);
+            if (pState != null)
+            {
+                <OperatorPlayerInfo Name="@player.Name"
+                                    Score="@pState.CurrentPoints"
+                                    ActiveOperator="@pState.ActiveOperator"
+                                    HandSize="@pState.Hand.Count"
+                                    IsActive="@(GameState.TurnManager.CurrentPlayer == player.Id)"
+                                    IsAudited="@pState.IsAudited"
+                                    IsDivideBroken="@pState.IsDivideBroken"
+                                    IsBeingStolenFrom="@pState.IsBeingStolenFrom"
+                                    IsTargetable="@IsPlayerTargetable(player.Id, pState)"
+                                    IsTargeted="@(_targetPlayerId == player.Id)"
+                                    OnClick="@(() => SelectTarget(player.Id))" />
+            }
+        }
+    </div>
+    
+    @* Blocked Animation for Attacker *@
+    @if (GameState.LastBlockedActionMessage != null && GameState.BlockedAttackerId == UserService.CurrentUser?.Id)
+    {
+        <div @key="GameState.LastBlockedActionMessage" class="op-blocked-banner">
+            <div class="op-blocked-icon">&#x1F6E1;&#xFE0F;</div>
+            <div class="op-blocked-text">@GameState.LastBlockedActionMessage</div>
+        </div>
+    }
+
+    @* Deck & Discard *@
+    <div class="op-deck-area">
+        <div class="op-deck-stack-container">
+            <div class="op-deck-label">DECK</div>
+            @if (GameState.Deck.Count > 0)
+            {
+                <div class="op-deck-stack">
+                    @if (GameState.Deck.Count > 2)
+                    {
+                        <div class="op-deck-card op-deck-card-3"></div>
+                    }
+                    @if (GameState.Deck.Count > 1)
+                    {
+                        <div class="op-deck-card op-deck-card-2"></div>
+                    }
+                    <div class="op-deck-card op-deck-card-1"></div>
+                </div>
+            }
+            else
+            {
+                <div class="op-deck-empty">EMPTY</div>
+            }
+            <div class="op-deck-count">@GameState.Deck.Count</div>
+        </div>
+
+        <div class="op-discard-stack-container" @onclick="() => _showDiscardHistory = true">
+            <div class="op-deck-label">DISCARD</div>
+            @if (GameState.DiscardPile.Count > 0)
+            {
+                var topCard = GameState.DiscardPile.Last();
+                <div class="op-discard-card">
+                    <div class="op-card-mini">
+                        <div class="op-card-mini-icon">@topCard.CardIcon()</div>
+                        <div class="op-card-mini-name">@topCard.TooltipName()</div>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="op-deck-empty">EMPTY</div>
+            }
+            <div class="op-deck-count">@GameState.DiscardPile.Count</div>
+        </div>
+    </div>
+
+    @if (_showDiscardHistory)
+    {
+        <div class="op-history-modal-overlay" @onclick="() => _showDiscardHistory = false">
+            <div class="op-history-modal" @onclick:stopPropagation>
+                <div class="op-history-header">
+                    <h3>GAME HISTORY</h3>
+                    <button class="op-history-close" @onclick="() => _showDiscardHistory = false">&times;</button>
+                </div>
+                <div class="op-history-content">
+                    @if (GameState.ActionLog.Count == 0 && GameState.DiscardPile.Count == 0)
+                    {
+                        <p class="op-history-empty">No history yet.</p>
+                    }
+                    else
+                    {
+                        var historyItems = GameState.ActionLog.OrderByDescending(l => l.Timestamp).ToList();
+                        @foreach (var entry in historyItems)
+                        {
+                            <div class="op-history-entry">
+                                <span class="op-history-time">@entry.Timestamp.ToString("HH:mm:ss")</span>
+                                <span class="op-history-msg">@entry.Message</span>
+                            </div>
+                        }
+                        
+                        <div class="op-history-divider">Discarded Cards (Most Recent First)</div>
+                        @foreach (var card in GameState.DiscardPile.AsEnumerable().Reverse())
+                        {
+                            <div class="op-history-card-item">
+                                <span class="op-history-card-icon">@card.CardIcon()</span>
+                                <span class="op-history-card-name">@card.TooltipName()</span>
+                                <span class="op-history-card-desc">@card.TooltipDescription()</span>
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+        </div>
+    }
+
+    @if (CurrentPlayerState != null)
+    {
+        <div class="op-self-status">
+            <div class="op-self-score-section">
+                <div class="op-self-score-label">YOUR SCORE</div>
+                <div class="op-self-score-value @(_selfScoreChanged ? "op-score-animating" : "")">
+                    @CurrentPlayerState.CurrentPoints.ToString("F1")
+                </div>
+                @if (_selfScoreChanged && _scoreDelta.HasValue)
+                {
+                    <div @key="_scoreDeltaKey" class="op-score-delta @(_scoreDelta.Value >= 0 ? "op-delta-positive" : "op-delta-negative")">
+                        @(_scoreDelta.Value >= 0 ? "+" : "")@_scoreDelta.Value.ToString("F1")
+                    </div>
+                }
+            </div>
+
+            <div class="op-self-operator-section">
+                <div class="op-active-operator-label">YOUR OPERATOR</div>
+                <div class="op-operator-display-container">
+                    @if (_selfOpChanged && _prevDisplayOp.HasValue)
+                    {
+                        <div class="op-old-operator-symbol">@_prevDisplayOp.Value.ToSymbol()</div>
+                        <div class="op-operator-arrow">&#x2192;</div>
+                    }
+                    <div class="op-active-operator-symbol @(_selfOpChanged ? "op-op-animating" : "") @(CurrentPlayerState.IsAudited ? "holo-effect" : "")">
+                        @GetActiveOperatorSymbol()
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+</div>
+
+@* Controls & Hand *@
+<div class="op-bottom-tray">
+    <div class="op-controls">
+        @if (IsMyTurn)
+        {
+            @if (ConcatenatedValue != null)
+            {
+                <div class="op-concat-preview">@ConcatenatedValue</div>
+            }
+
+            @if (ShowSubmit)
+            {
+                <button class="op-btn op-btn-primary op-btn-lg" @onclick="Submit">
+                    SUBMIT
+                </button>
+            }
+
+            @if (_pendingAction != null || _selectedNumberIds.Count > 0 || _selectedOperatorId != null || _waitingForTarget)
+            {
+                <button class="op-btn op-btn-secondary" @onclick="CancelSelection">
+                    CANCEL
+                </button>
+            }
+
+            @if (NeedsTargetSelection && CanTargetSelf)
+            {
+                <button class="op-btn op-btn-secondary" @onclick="() => SelectTarget(UserService.CurrentUser!.Id)">
+                    TARGET SELF
+                </button>
+            }
+
+            @if (SelectionHint != null)
+            {
+                <div class="op-section-title">@SelectionHint</div>
+            }
+            else if (!ShowSubmit && _pendingAction == null && _selectedOperatorId == null && !_waitingForTarget)
+            {
+                @if (CanSkip())
+                {
+                    <button class="op-btn op-btn-secondary" @onclick="SkipTurn">
+                        SKIP TURN
+                    </button>
+                }
+                
+                <button class="op-btn op-btn-secondary" @onclick="EndTurn" disabled="@(!CanEndTurn())">
+                    END TURN
+                </button>
+
+                <div class="op-section-title">Select a card to play</div>
+            }
+        }
+        else
+        {
+            <div class="op-waiting-text">
+                Waiting for @(GameState.Players.FirstOrDefault(p => p.Id == GameState.TurnManager.CurrentPlayer)?.Name ?? "another player")...
+            </div>
+        }
+    </div>
+
+    @if (CurrentPlayerState != null)
+    {
+        <OperatorHand Hand="@CurrentPlayerState.Hand"
+                      SelectedCards="@SelectedCardIds"
+                      DisabledCards="@DisabledCardIds"
+                      NewCardIds="@NewCardIds"
+                      OnCardToggled="ToggleCard" />
+    }
+</div>
+</div>

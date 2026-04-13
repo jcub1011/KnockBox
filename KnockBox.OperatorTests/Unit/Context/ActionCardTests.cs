@@ -1,13 +1,13 @@
 using KnockBox.Operator.Models;
 using KnockBox.Operator.Services.Logic.FSM;
 using KnockBox.Operator.Services.State;
-using KnockBox.Core.Services.Logic.RandomGeneration;
+using KnockBox.Services.Logic.RandomGeneration;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Microsoft.Extensions.Logging;
 using Moq;
 using System.Collections.Concurrent;
 
-namespace KnockBox.Operator.Tests.Unit.Context;
+namespace KnockBox.OperatorTests.Unit.Context;
 
 [TestClass]
 public class ActionCardTests
@@ -21,7 +21,7 @@ public class ActionCardTests
     public void Setup()
     {
         _loggerMock = new Mock<ILogger<OperatorGameState>>();
-        var host = new KnockBox.Core.Services.State.Users.User("host", "Host");
+        var host = new KnockBox.Services.State.Users.User("host", "Host");
         _state = new OperatorGameState(host, _loggerMock.Object);
         _rngMock = new Mock<IRandomNumberService>();
         _context = new OperatorGameContext(_state, _rngMock.Object);

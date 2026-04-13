@@ -1,6 +1,7 @@
-﻿@using KnockBox.Core.Services.Navigation
-@using KnockBox.Core.Services.State.Games.Shared
-@using KnockBox.Core.Services.State.Users
+﻿@using KnockBox.Services.Navigation
+@using KnockBox.Services.Navigation.Games
+@using KnockBox.Services.State.Games.Shared
+@using KnockBox.Services.State.Users
 @using Microsoft.AspNetCore.Components.Routing
 
 @inherits LayoutComponentBase
@@ -11,7 +12,8 @@
         @if (!_isOnHomePage && GameSessionService.TryGetCurrentSession(out var currentSession))
         {
             <a href="@NavigationService.GetHomeUri()" title="Click to return home">
-                @currentSession.LobbyRegistration.GameName</a>
+                @(currentSession.LobbyRegistration.GameType.TryGetDescription(out var description)
+                    ? description : currentSession.LobbyRegistration.GameType.ToString())</a>
                 <span class="room-code">
                     <span class="room-code-label">Join Code: </span>
                     <button class="room-code-btn"

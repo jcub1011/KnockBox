@@ -1,16 +1,16 @@
-using KnockBox.Core.Extensions.Returns;
-using KnockBox.DiceSimulator.Services.Logic.Games;
-using KnockBox.Core.Services.Logic.RandomGeneration;
-using KnockBox.DiceSimulator.Services.State.Games;
-using KnockBox.DiceSimulator.Services.State.Games.Data;
-using KnockBox.Core.Services.State.Users;
+using KnockBox.Extensions.Returns;
+using KnockBox.Services.Logic.Games.DiceSimulator;
+using KnockBox.Services.Logic.RandomGeneration;
+using KnockBox.Services.State.Games.DiceSimulator;
+using KnockBox.Services.State.Games.DiceSimulator.Data;
+using KnockBox.Services.State.Users;
 using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using System;
 using System.Threading.Tasks;
 
-namespace KnockBox.DiceSimulator.Tests.Unit.Logic
+namespace KnockBoxTests.Unit.Logic.Games.DiceSimulator
 {
     [TestClass]
     public class DiceSimulatorGameEngineTests

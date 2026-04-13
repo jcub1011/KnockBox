@@ -1,4 +1,4 @@
-using KnockBox.Core.Services.Logic.RandomGeneration;
+using KnockBox.Services.Logic.RandomGeneration;
 
 namespace KnockBox.Core.Extensions.Collections;
 

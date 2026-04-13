@@ -1,4 +1,4 @@
-﻿namespace KnockBox.Core.Extensions.Returns
+﻿namespace KnockBox.Extensions.Returns
 {
     public readonly record struct ResultError
     {

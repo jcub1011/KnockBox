@@ -1,14 +1,14 @@
-using KnockBox.CardCounter.Services.Logic.Games.FSM;
-using KnockBox.CardCounter.Services.Logic.Games.FSM.States;
-using KnockBox.Core.Services.Logic.RandomGeneration;
-using KnockBox.CardCounter.Services.State.Games;
-using KnockBox.CardCounter.Services.State.Games.Data;
-using KnockBox.Core.Services.State.Users;
+using KnockBox.Services.Logic.Games.CardCounter.FSM;
+using KnockBox.Services.Logic.Games.CardCounter.FSM.States;
+using KnockBox.Services.Logic.RandomGeneration;
+using KnockBox.Services.State.Games.CardCounter;
+using KnockBox.Services.State.Games.CardCounter.Data;
+using KnockBox.Services.State.Users;
 using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 
-namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
+namespace KnockBoxTests.Unit.Logic.Games.CardCounter
 {
     /// <summary>
     /// Tests for Active Operator Mode rules: number cards apply directly to balance using

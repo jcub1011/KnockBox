@@ -1,6 +1,6 @@
-using KnockBox.DrawnToDress.Services.State.Games.Data;
+using KnockBox.Services.State.Games.DrawnToDress.Data;
 
-namespace KnockBox.DrawnToDress.Tests.Unit.State.Games.DrawnToDress
+namespace KnockBox.DrawnToDressTests.Unit.State.Games.DrawnToDress
 {
     [TestClass]
     public class DrawnToDressConfigTests
@@ -64,10 +64,10 @@ namespace KnockBox.DrawnToDress.Tests.Unit.State.Games.DrawnToDress
         }
 
         [TestMethod]
-        public void Default_ThemeAnnouncementTimeSec_Is6()
+        public void Default_ThemeAnnouncementTimeSec_Is10()
         {
             var config = new DrawnToDressConfig();
-            Assert.AreEqual(6, config.ThemeAnnouncementTimeSec);
+            Assert.AreEqual(10, config.ThemeAnnouncementTimeSec);
         }
 
         // ── Outfit Building phase defaults ────────────────────────────────────
@@ -80,10 +80,10 @@ namespace KnockBox.DrawnToDress.Tests.Unit.State.Games.DrawnToDress
         }
 
         [TestMethod]
-        public void Default_OutfitCustomizationTimeSec_Is75()
+        public void Default_OutfitCustomizationTimeSec_Is60()
         {
             var config = new DrawnToDressConfig();
-            Assert.AreEqual(75, config.OutfitCustomizationTimeSec);
+            Assert.AreEqual(60, config.OutfitCustomizationTimeSec);
         }
 
         // ── Pool / reuse defaults ─────────────────────────────────────────────
@@ -356,9 +356,9 @@ namespace KnockBox.DrawnToDress.Tests.Unit.State.Games.DrawnToDress
             config.Normalize();
 
             Assert.AreEqual(180, config.DrawingTimeSec);
-            Assert.AreEqual(6, config.ThemeAnnouncementTimeSec);
+            Assert.AreEqual(10, config.ThemeAnnouncementTimeSec);
             Assert.AreEqual(90, config.OutfitBuildingTimeSec);
-            Assert.AreEqual(75, config.OutfitCustomizationTimeSec);
+            Assert.AreEqual(60, config.OutfitCustomizationTimeSec);
             Assert.AreEqual(60, config.VotingTimeSec);
             Assert.AreEqual(0, config.VotingRounds);
             Assert.AreEqual(1, config.BonusPointsForCompleteOutfit);

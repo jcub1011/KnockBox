@@ -2,7 +2,7 @@ using KnockBox.Operator.Models;
 using KnockBox.Operator.Services.Logic.FSM;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
-namespace KnockBox.Operator.Tests.Unit.Context;
+namespace KnockBox.OperatorTests.Unit.Context;
 
 [TestClass]
 public class MathEvaluationTests

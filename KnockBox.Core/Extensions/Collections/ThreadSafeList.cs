@@ -1,7 +1,7 @@
-﻿using KnockBox.Core.Extensions.ThreadSafety;
+﻿using KnockBox.Extensions.ThreadSafety;
 using System.Collections;
 
-namespace KnockBox.Core.Extensions.Collections
+namespace KnockBox.Extensions.Collections
 {
     public class ThreadSafeList<TElement> : IDisposable, IList<TElement>
     {

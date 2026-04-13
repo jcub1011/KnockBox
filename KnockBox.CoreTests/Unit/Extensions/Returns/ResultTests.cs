@@ -1,4 +1,4 @@
-using KnockBox.Core.Extensions.Returns;
+using KnockBox.Extensions.Returns;
 
 namespace KnockBox.Tests.Unit.Extensions.Returns;
 

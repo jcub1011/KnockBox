@@ -4,7 +4,6 @@ using System.Reflection;
 
 namespace KnockBox.Services.Navigation.Games
 {
-    [Obsolete("Use IGameModule and string identifiers for games instead.")]
     public enum GameType
     {
         [Description("Split The Deck")]
