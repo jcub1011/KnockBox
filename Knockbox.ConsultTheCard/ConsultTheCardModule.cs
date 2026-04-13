@@ -13,7 +13,8 @@ namespace KnockBox.ConsultTheCard
 
         public void RegisterServices(IServiceCollection services)
         {
-            services.AddKeyedSingleton<AbstractGameEngine, ConsultTheCardGameEngine>(RouteIdentifier);
+            services.AddSingleton<ConsultTheCardGameEngine>();
+            services.AddKeyedSingleton<AbstractGameEngine>(RouteIdentifier, (sp, key) => sp.GetRequiredService<ConsultTheCardGameEngine>());
         }
     }
 }

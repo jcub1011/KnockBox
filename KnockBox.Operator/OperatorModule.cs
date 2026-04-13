@@ -13,7 +13,8 @@ namespace KnockBox.Operator
 
         public void RegisterServices(IServiceCollection services)
         {
-            services.AddKeyedSingleton<AbstractGameEngine, OperatorGameEngine>(RouteIdentifier);
+            services.AddSingleton<OperatorGameEngine>();
+            services.AddKeyedSingleton<AbstractGameEngine>(RouteIdentifier, (sp, key) => sp.GetRequiredService<OperatorGameEngine>());
         }
     }
 }

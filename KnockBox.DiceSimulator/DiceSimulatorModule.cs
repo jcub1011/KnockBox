@@ -13,7 +13,8 @@ namespace KnockBox.DiceSimulator
 
         public void RegisterServices(IServiceCollection services)
         {
-            services.AddKeyedSingleton<AbstractGameEngine, DiceSimulatorGameEngine>(RouteIdentifier);
+            services.AddSingleton<DiceSimulatorGameEngine>();
+            services.AddKeyedSingleton<AbstractGameEngine>(RouteIdentifier, (sp, key) => sp.GetRequiredService<DiceSimulatorGameEngine>());
         }
     }
 }

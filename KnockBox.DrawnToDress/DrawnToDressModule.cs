@@ -13,7 +13,8 @@ namespace KnockBox.DrawnToDress
 
         public void RegisterServices(IServiceCollection services)
         {
-            services.AddKeyedSingleton<AbstractGameEngine, DrawnToDressGameEngine>(RouteIdentifier);
+            services.AddSingleton<DrawnToDressGameEngine>();
+            services.AddKeyedSingleton<AbstractGameEngine>(RouteIdentifier, (sp, key) => sp.GetRequiredService<DrawnToDressGameEngine>());
         }
     }
 }

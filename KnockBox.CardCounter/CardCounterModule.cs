@@ -13,7 +13,8 @@ namespace KnockBox.CardCounter
 
         public void RegisterServices(IServiceCollection services)
         {
-            services.AddKeyedSingleton<AbstractGameEngine, CardCounterGameEngine>(RouteIdentifier);
+            services.AddSingleton<CardCounterGameEngine>();
+            services.AddKeyedSingleton<AbstractGameEngine>(RouteIdentifier, (sp, key) => sp.GetRequiredService<CardCounterGameEngine>());
         }
     }
 }
