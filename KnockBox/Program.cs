@@ -1,13 +1,11 @@
 using KnockBox.Components;
 using KnockBox.Core.Plugins;
 using KnockBox.Core.Services.Drawing;
-using KnockBox.Data.DbContexts;
 using KnockBox.Core.Services.Navigation;
 using KnockBox.Services.Registrations.Logic;
 using KnockBox.Services.Registrations.Repositories;
 using KnockBox.Services.Registrations.States;
 using KnockBox.Services.Registrations.Validators;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
 using Serilog;
 using Serilog.Extensions.Logging;
@@ -32,10 +30,6 @@ namespace KnockBox
             // Add services to the container.
             builder.Services.AddRazorComponents()
                 .AddInteractiveServerComponents();
-
-            // Add dbcontext
-            builder.Services.AddDbContextFactory<ApplicationDbContext>(options =>
-                options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
             // Add repositories
             builder.Services.RegisterRepositories();

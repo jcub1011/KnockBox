@@ -23,14 +23,7 @@
 
   <ItemGroup>
     <PackageReference Include="FluentValidation" Version="12.1.1" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.3" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Analyzers" Version="10.0.3" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.3">
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-    </PackageReference>
     <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.23.0" />
-    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.0" />
     <PackageReference Include="Serilog" Version="4.3.1" />
     <PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
   </ItemGroup>
@@ -51,5 +44,27 @@
   <ItemGroup>
     <ProjectReference Include="..\KnockBox.Core\KnockBox.Core.csproj" />
   </ItemGroup>
+
+  <!--
+    Copy game plugins into the publish output so `dotnet publish` produces
+    a runnable folder layout. Each plugin project's PublishPlugin target in
+    Directory.Plugin.targets writes to KnockBox/bin/$(Configuration)/$(TargetFramework)/games/
+    (no runtime-identifier subfolder) during Build. This target mirrors that
+    folder into $(PublishDir)games\ so it ships inside the published output.
+  -->
+  <PropertyGroup>
+    <PluginStagingDir>$(MSBuildProjectDirectory)\bin\$(Configuration)\$(TargetFramework)\games\</PluginStagingDir>
+  </PropertyGroup>
+  <Target Name="CopyPluginsToPublish" AfterTargets="Publish">
+    <ItemGroup>
+      <PluginPublishFiles Include="$(PluginStagingDir)**\*.*" />
+    </ItemGroup>
+    <Warning Text="No plugin files found at '$(PluginStagingDir)'. Run 'dotnet build' on the solution before publishing so plugins are staged."
+             Condition="'@(PluginPublishFiles)' == ''" />
+    <Copy SourceFiles="@(PluginPublishFiles)"
+          DestinationFiles="@(PluginPublishFiles->'$(PublishDir)games\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true"
+          Condition="'@(PluginPublishFiles)' != ''" />
+  </Target>
 
 </Project>
