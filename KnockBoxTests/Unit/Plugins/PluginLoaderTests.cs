@@ -26,8 +26,8 @@ namespace KnockBoxTests.Unit.Plugins
 
             var result = _loader.LoadModules(missing);
 
-            Assert.AreEqual(0, result.Modules.Count);
-            Assert.AreEqual(0, result.Assemblies.Count);
+            Assert.IsEmpty(result.Modules);
+            Assert.IsEmpty(result.Assemblies);
             VerifyLogged(LogLevel.Warning, Times.Once());
         }
 
@@ -42,7 +42,7 @@ namespace KnockBoxTests.Unit.Plugins
                 var result = _loader.LoadModules(tempDir);
 
                 // Must find at least our valid fake module.
-                Assert.IsTrue(result.Modules.Any(m => m is ValidFakeModule),
+                Assert.Contains(m => m is ValidFakeModule, result.Modules,
                     "Expected ValidFakeModule to be discovered.");
             }
             finally
@@ -63,7 +63,7 @@ namespace KnockBoxTests.Unit.Plugins
                     .Where(m => string.Equals(m.RouteIdentifier, DuplicateRoute, StringComparison.OrdinalIgnoreCase))
                     .ToList();
 
-                Assert.AreEqual(1, dupMatches.Count,
+                Assert.HasCount(1, dupMatches,
                     "Only one module per duplicate route should be kept.");
                 VerifyLogged(LogLevel.Error, Times.AtLeastOnce());
             }
@@ -81,9 +81,9 @@ namespace KnockBoxTests.Unit.Plugins
             {
                 var result = _loader.LoadModules(tempDir);
 
-                Assert.IsFalse(result.Modules.Any(m => m is ThrowingCtorModule),
+                Assert.DoesNotContain(m => m is ThrowingCtorModule, result.Modules,
                     "Module whose ctor throws should be skipped.");
-                Assert.IsTrue(result.Modules.Any(m => m is ValidFakeModule),
+                Assert.Contains(m => m is ValidFakeModule, result.Modules,
                     "Valid modules should still load when another module's ctor throws.");
                 VerifyLogged(LogLevel.Error, Times.AtLeastOnce());
             }
@@ -106,7 +106,7 @@ namespace KnockBoxTests.Unit.Plugins
                 var result = _loader.LoadModules(tempDir);
 
                 // Valid modules still come through.
-                Assert.IsTrue(result.Modules.Any(m => m is ValidFakeModule));
+                Assert.Contains(m => m is ValidFakeModule, result.Modules);
                 VerifyLogged(LogLevel.Error, Times.AtLeastOnce());
             }
             finally

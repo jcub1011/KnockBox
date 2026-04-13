@@ -84,7 +84,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
             var fsmState = new RoundEndState();
             fsmState.OnEnter(_context);
 
-            Assert.IsTrue(_state.CurrentShoe.Count > 0, "Current shoe should be populated from the main deck.");
+            Assert.IsNotEmpty(_state.CurrentShoe, "Current shoe should be populated from the main deck.");
         }
 
         [TestMethod]
@@ -96,7 +96,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
             var fsmState = new RoundEndState();
             fsmState.OnEnter(_context);
 
-            Assert.AreEqual(_state.Config.ActionsDealtPerRound, p1.ActionHand.Count,
+            Assert.HasCount(_state.Config.ActionsDealtPerRound, p1.ActionHand,
                 "Each player should receive action cards on round end.");
         }
 
@@ -139,7 +139,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
 
             var next = fsmState.HandleCommand(_context, new DiscardActionCardsCommand("p1", indicesToDiscard));
 
-            Assert.AreEqual(limit, p1.ActionHand.Count, "Player should be at the action hand limit after discarding.");
+            Assert.HasCount(limit, p1.ActionHand, "Player should be at the action hand limit after discarding.");
         }
 
         [TestMethod]
@@ -156,7 +156,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
             // Pass an out-of-range index
             fsmState.HandleCommand(_context, new DiscardActionCardsCommand("p1", [999]));
 
-            Assert.AreEqual(countBefore, p1.ActionHand.Count, "Invalid indices should leave hand unchanged.");
+            Assert.HasCount(countBefore, p1.ActionHand, "Invalid indices should leave hand unchanged.");
         }
 
         [TestMethod]
@@ -173,7 +173,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
             // Duplicate index (same card twice)
             fsmState.HandleCommand(_context, new DiscardActionCardsCommand("p1", [0, 0]));
 
-            Assert.AreEqual(countBefore, p1.ActionHand.Count, "Duplicate indices should be rejected.");
+            Assert.HasCount(countBefore, p1.ActionHand, "Duplicate indices should be rejected.");
         }
 
         [TestMethod]
@@ -191,7 +191,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
             // Only discard one — still over limit, so command should be rejected
             fsmState.HandleCommand(_context, new DiscardActionCardsCommand("p1", [0]));
 
-            Assert.AreEqual(countBefore, p1.ActionHand.Count,
+            Assert.HasCount(countBefore, p1.ActionHand,
                 "Discarding too few cards (still over limit) should be rejected.");
         }
 

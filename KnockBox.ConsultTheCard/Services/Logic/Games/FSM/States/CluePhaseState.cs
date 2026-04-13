@@ -30,7 +30,7 @@ namespace KnockBox.ConsultTheCard.Services.Logic.Games.FSM.States
 
             _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.State.Config.CluePhaseTimeoutMs);
 
-            context.Logger.LogInformation(
+            context.Logger.LogDebug(
                 "FSM → CluePhaseState (current player index: {idx}, player: {pid})",
                 context.State.TurnManager.CurrentPlayerIndex,
                 context.State.TurnManager.CurrentPlayer);
@@ -83,7 +83,7 @@ namespace KnockBox.ConsultTheCard.Services.Logic.Games.FSM.States
             context.State.CurrentRoundClues.Add(
                 new ClueEntry(player.PlayerId, player.DisplayName, clue));
 
-            context.Logger.LogInformation(
+            context.Logger.LogDebug(
                 "CluePhase: [{pid}] submitted clue [{clue}].", cmd.PlayerId, clue);
 
             // Check if all alive players have submitted.
@@ -119,7 +119,7 @@ namespace KnockBox.ConsultTheCard.Services.Logic.Games.FSM.States
                 context.State.CurrentRoundClues.Add(
                     new ClueEntry(player.PlayerId, player.DisplayName, clue));
 
-                context.Logger.LogInformation(
+                context.Logger.LogDebug(
                     "CluePhase: [{pid}] timed out; auto-submitted '{clue}'.", currentPlayerId, clue);
             }
 

@@ -24,12 +24,12 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
             // Config and registered Players are preserved; all per-game data is cleared.
             if (context.State.GamePlayers.Count > 0 || context.State.VotingRounds.Count > 0)
             {
-                context.Logger.LogInformation("FSM → LobbyState (Play Again). Resetting game state.");
+                context.Logger.LogDebug("FSM → LobbyState (Play Again). Resetting game state.");
                 ResetGameState(context);
             }
             else
             {
-                context.Logger.LogInformation("FSM → LobbyState");
+                context.Logger.LogDebug("FSM → LobbyState");
             }
 
             return null;
@@ -89,7 +89,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
                             "StartGame rejected: player [{id}] is not the host.", cmd.PlayerId);
                         return null;
                     }
-                    context.Logger.LogInformation("Host [{id}] started the game.", cmd.PlayerId);
+                    context.Logger.LogDebug("Host [{id}] started the game.", cmd.PlayerId);
                     return new ThemeSelectionState();
 
                 case UpdateConfigCommand cmd:
@@ -103,7 +103,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
                     cmd.Config.Normalize();
                     context.State.Config = cmd.Config;
                     context.State.StateChangedEventManager.Notify();
-                    context.Logger.LogInformation("Host [{id}] updated config.", cmd.PlayerId);
+                    context.Logger.LogDebug("Host [{id}] updated config.", cmd.PlayerId);
                     return null;
 
                 case PauseGameCommand:

@@ -66,8 +66,8 @@ namespace KnockBox.ConsultTheCard.Tests.Unit.Logic.Games.ConsultTheCard.States
             var discussion = new DiscussionPhaseState();
             discussion.OnEnter(_context);
 
-            Assert.AreEqual(0, _state.EndGameVoteStatus.VotedToEnd.Count);
-            Assert.IsTrue(_state.EndGameVoteStatus.RequiredVotes > 0);
+            Assert.IsEmpty(_state.EndGameVoteStatus.VotedToEnd);
+            Assert.IsGreaterThan(0, _state.EndGameVoteStatus.RequiredVotes);
         }
 
         [TestMethod]
@@ -78,7 +78,7 @@ namespace KnockBox.ConsultTheCard.Tests.Unit.Logic.Games.ConsultTheCard.States
 
             var result = discussion.HandleCommand(_context, new VoteToEndGameCommand("p0"));
             Assert.IsTrue(result.IsSuccess);
-            Assert.IsTrue(_state.EndGameVoteStatus.VotedToEnd.Contains("p0"));
+            Assert.Contains("p0", _state.EndGameVoteStatus.VotedToEnd);
         }
 
         [TestMethod]
@@ -88,13 +88,13 @@ namespace KnockBox.ConsultTheCard.Tests.Unit.Logic.Games.ConsultTheCard.States
             discussion.OnEnter(_context);
 
             discussion.HandleCommand(_context, new VoteToEndGameCommand("p0"));
-            Assert.IsTrue(_state.EndGameVoteStatus.VotedToEnd.Contains("p0"));
+            Assert.Contains("p0", _state.EndGameVoteStatus.VotedToEnd);
             Assert.IsTrue(_state.GamePlayers["p0"].HasVotedToEndGame);
 
             // Second vote rescinds.
             var result = discussion.HandleCommand(_context, new VoteToEndGameCommand("p0"));
             Assert.IsTrue(result.IsSuccess);
-            Assert.IsFalse(_state.EndGameVoteStatus.VotedToEnd.Contains("p0"));
+            Assert.DoesNotContain("p0", _state.EndGameVoteStatus.VotedToEnd);
             Assert.IsFalse(_state.GamePlayers["p0"].HasVotedToEndGame);
         }
 
@@ -192,7 +192,7 @@ namespace KnockBox.ConsultTheCard.Tests.Unit.Logic.Games.ConsultTheCard.States
 
             var result = discussion.HandleCommand(_context, new SkipRemainingTimeCommand("p0"));
             Assert.IsTrue(result.IsSuccess);
-            Assert.IsTrue(_state.SkipTimeVoteStatus.VotedToEnd.Contains("p0"));
+            Assert.Contains("p0", _state.SkipTimeVoteStatus.VotedToEnd);
             Assert.IsTrue(_state.GamePlayers["p0"].HasVotedToSkipTime);
         }
 
@@ -203,12 +203,12 @@ namespace KnockBox.ConsultTheCard.Tests.Unit.Logic.Games.ConsultTheCard.States
             discussion.OnEnter(_context);
 
             discussion.HandleCommand(_context, new SkipRemainingTimeCommand("p0"));
-            Assert.IsTrue(_state.SkipTimeVoteStatus.VotedToEnd.Contains("p0"));
+            Assert.Contains("p0", _state.SkipTimeVoteStatus.VotedToEnd);
 
             // Second vote rescinds.
             var result = discussion.HandleCommand(_context, new SkipRemainingTimeCommand("p0"));
             Assert.IsTrue(result.IsSuccess);
-            Assert.IsFalse(_state.SkipTimeVoteStatus.VotedToEnd.Contains("p0"));
+            Assert.DoesNotContain("p0", _state.SkipTimeVoteStatus.VotedToEnd);
             Assert.IsFalse(_state.GamePlayers["p0"].HasVotedToSkipTime);
         }
 
@@ -306,7 +306,7 @@ namespace KnockBox.ConsultTheCard.Tests.Unit.Logic.Games.ConsultTheCard.States
 
             var voter = _context.GetPlayer("p0")!;
             Assert.IsTrue(voter.HasVoted);
-            Assert.AreEqual(1, _state.CurrentRoundVotes.Count);
+            Assert.HasCount(1, _state.CurrentRoundVotes);
         }
 
         [TestMethod]
@@ -359,7 +359,7 @@ namespace KnockBox.ConsultTheCard.Tests.Unit.Logic.Games.ConsultTheCard.States
             var result = discussion.HandleCommand(_context, new VoteToEndGameCommand("p0")); // re-vote
 
             Assert.IsTrue(result.IsSuccess);
-            Assert.IsTrue(_state.EndGameVoteStatus.VotedToEnd.Contains("p0"));
+            Assert.Contains("p0", _state.EndGameVoteStatus.VotedToEnd);
             Assert.IsTrue(_state.GamePlayers["p0"].HasVotedToEndGame);
         }
     }

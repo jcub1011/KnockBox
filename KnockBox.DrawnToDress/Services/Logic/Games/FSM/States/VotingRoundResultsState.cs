@@ -27,7 +27,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
 
             int totalRounds = SwissTournamentService.ResolveRoundCount(
                 context.GetTournamentEntrantIds().Count, context.Config.VotingRounds);
-            context.Logger.LogInformation(
+            context.Logger.LogDebug(
                 "FSM → VotingRoundResultsState. Round {n} of {total} complete. Auto-advance in {sec}s.",
                 context.State.CurrentVotingRoundIndex + 1, totalRounds,
                 context.Config.VotingRoundResultsTimeSec);
@@ -51,7 +51,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
                     if (player is not null)
                     {
                         player.BonusPoints += context.Config.RoundLeaderBonusPoints;
-                        context.Logger.LogInformation(
+                        context.Logger.LogDebug(
                             "Round leader bonus (+{bonus}) awarded to player [{playerId}] via entrant [{entrantId}].",
                             context.Config.RoundLeaderBonusPoints, playerId, entrantId);
                     }
@@ -94,7 +94,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
         {
             if (context.State.PhaseDeadlineUtc is not { } deadline || now < deadline) return null;
 
-            context.Logger.LogInformation("Voting round results timer expired. Advancing.");
+            context.Logger.LogDebug("Voting round results timer expired. Advancing.");
             return ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?>
                 .FromValue(ChooseNextState(context));
         }
@@ -109,11 +109,11 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
             bool moreRounds = context.State.VotingRounds.Count < totalRounds;
             if (moreRounds)
             {
-                context.Logger.LogInformation("Advancing to next voting round.");
+                context.Logger.LogDebug("Advancing to next voting round.");
                 return new VotingRoundSetupState();
             }
 
-            context.Logger.LogInformation("All voting rounds complete. Moving to final results.");
+            context.Logger.LogDebug("All voting rounds complete. Moving to final results.");
             return new FinalResultsState();
         }
     }

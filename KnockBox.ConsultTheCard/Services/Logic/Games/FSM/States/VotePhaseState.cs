@@ -18,7 +18,7 @@ namespace KnockBox.ConsultTheCard.Services.Logic.Games.FSM.States
             context.State.SetPhase(ConsultTheCardGamePhase.Voting);
             _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.State.Config.VotePhaseTimeoutMs);
 
-            context.Logger.LogInformation("FSM → VotePhaseState");
+            context.Logger.LogDebug("FSM → VotePhaseState");
             return null;
         }
 
@@ -56,7 +56,7 @@ namespace KnockBox.ConsultTheCard.Services.Logic.Games.FSM.States
                     return entry.VoterId == cmd.PlayerId && entry.TargetId == cmd.TargetPlayerId;
                 });
 
-                context.Logger.LogInformation(
+                context.Logger.LogDebug(
                     "VotePhase: [{voter}] rescinded vote for [{target}].", cmd.PlayerId, cmd.TargetPlayerId);
             }
             else
@@ -66,7 +66,7 @@ namespace KnockBox.ConsultTheCard.Services.Logic.Games.FSM.States
                 context.State.CurrentRoundVotes.Add(
                     new VoteEntry(voter.PlayerId, voter.DisplayName, target.PlayerId, target.DisplayName));
 
-                context.Logger.LogInformation(
+                context.Logger.LogDebug(
                     "VotePhase: [{voter}] voted for [{target}].", cmd.PlayerId, cmd.TargetPlayerId);
             }
 
@@ -90,7 +90,7 @@ namespace KnockBox.ConsultTheCard.Services.Logic.Games.FSM.States
             {
                 player.HasVoted = true;
                 player.VoteTargetId = null; // discard unconfirmed vote
-                context.Logger.LogInformation(
+                context.Logger.LogDebug(
                     "VotePhase: [{pid}] timed out; abstaining.", player.PlayerId);
             }
 
@@ -114,7 +114,7 @@ namespace KnockBox.ConsultTheCard.Services.Logic.Games.FSM.States
                 context.State.LastElimination = new EliminationResult(
                     eliminated.PlayerId, eliminated.DisplayName, eliminated.Role, WasTie: false);
 
-                context.Logger.LogInformation(
+                context.Logger.LogDebug(
                     "VotePhase: [{pid}] eliminated.", eliminatedId);
             }
             else
@@ -123,7 +123,7 @@ namespace KnockBox.ConsultTheCard.Services.Logic.Games.FSM.States
                 context.State.LastElimination = new EliminationResult(
                     string.Empty, string.Empty, default, WasTie: true);
 
-                context.Logger.LogInformation("VotePhase: vote resulted in a tie.");
+                context.Logger.LogDebug("VotePhase: vote resulted in a tie.");
             }
 
             return new RevealPhaseState();

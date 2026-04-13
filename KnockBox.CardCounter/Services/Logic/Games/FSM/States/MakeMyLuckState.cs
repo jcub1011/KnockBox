@@ -17,7 +17,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM.States
         public ValueResult<IGameState<CardCounterGameContext, CardCounterCommand>?> OnEnter(CardCounterGameContext context)
         {
             _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.Config.MakeMyLuckTimeoutMs);
-            context.Logger.LogInformation(
+            context.Logger.LogDebug(
                 "FSM → MakeMyLuckState for [{id}]. Expires {exp}.", _playerId, _expiresAt);
             return null;
         }
@@ -59,7 +59,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM.States
                 context.CurrentShoe.Push(reordered[i]);
 
             player.PrivateReveal = null;
-            context.Logger.LogInformation("MakeMyLuck: player [{id}] reordered top {n} cards.", _playerId, revealCount);
+            context.Logger.LogDebug("MakeMyLuck: player [{id}] reordered top {n} cards.", _playerId, revealCount);
             return new PlayerTurnState();
         }
 
@@ -67,7 +67,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM.States
         {
             if (now < _expiresAt) return null;
 
-            context.Logger.LogInformation("MakeMyLuck: timeout for [{id}]; keeping original order.", _playerId);
+            context.Logger.LogDebug("MakeMyLuck: timeout for [{id}]; keeping original order.", _playerId);
             var player = context.GetPlayer(_playerId);
             return ResolveDefault(context, player);
         }

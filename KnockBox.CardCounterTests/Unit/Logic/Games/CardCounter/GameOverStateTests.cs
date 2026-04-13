@@ -114,7 +114,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
             var gameOver = new GameOverState();
             gameOver.OnEnter(_context);
 
-            Assert.AreEqual(0, p1.Pot.Count, "Pot should be cleared after applying to balance.");
+            Assert.IsEmpty(p1.Pot, "Pot should be cleared after applying to balance.");
         }
 
         [TestMethod]

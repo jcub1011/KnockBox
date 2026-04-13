@@ -27,7 +27,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.State.Games.DrawnToDress
         public void Default_ClothingTypes_HasFiveEntries()
         {
             var config = new DrawnToDressConfig();
-            Assert.AreEqual(4, config.ClothingTypes.Count);
+            Assert.HasCount(4, config.ClothingTypes);
         }
 
         [TestMethod]
@@ -124,7 +124,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.State.Games.DrawnToDress
         public void Default_VotingCriteria_HasThreeEntries()
         {
             var config = new DrawnToDressConfig();
-            Assert.AreEqual(3, config.VotingCriteria.Count);
+            Assert.HasCount(3, config.VotingCriteria);
         }
 
         [TestMethod]
@@ -308,7 +308,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.State.Games.DrawnToDress
         {
             var config = new DrawnToDressConfig { ClothingTypes = [] };
             config.Normalize();
-            Assert.AreEqual(1, config.ClothingTypes.Count);
+            Assert.HasCount(1, config.ClothingTypes);
         }
 
         [TestMethod]
@@ -316,7 +316,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.State.Games.DrawnToDress
         {
             var config = new DrawnToDressConfig { VotingCriteria = [] };
             config.Normalize();
-            Assert.AreEqual(1, config.VotingCriteria.Count);
+            Assert.HasCount(1, config.VotingCriteria);
         }
 
         [TestMethod]
@@ -345,7 +345,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.State.Games.DrawnToDress
                 ]
             };
             config.Normalize();
-            Assert.AreEqual(1, config.VotingCriteria.Count);
+            Assert.HasCount(1, config.VotingCriteria);
             Assert.AreEqual("creativity", config.VotingCriteria[0].Id);
         }
 
@@ -363,8 +363,8 @@ namespace KnockBox.DrawnToDress.Tests.Unit.State.Games.DrawnToDress
             Assert.AreEqual(0, config.VotingRounds);
             Assert.AreEqual(1, config.BonusPointsForCompleteOutfit);
             Assert.AreEqual(120, config.HostDisconnectTimeoutSec);
-            Assert.AreEqual(4, config.ClothingTypes.Count);
-            Assert.AreEqual(3, config.VotingCriteria.Count);
+            Assert.HasCount(4, config.ClothingTypes);
+            Assert.HasCount(3, config.VotingCriteria);
         }
     }
 }

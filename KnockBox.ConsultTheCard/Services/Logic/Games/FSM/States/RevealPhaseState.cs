@@ -37,7 +37,7 @@ namespace KnockBox.ConsultTheCard.Services.Logic.Games.FSM.States
                         context.State.Config.InformantGuessTimeoutMs);
                     _expiresAt = _informantGuessExpiresAt;
 
-                    context.Logger.LogInformation(
+                    context.Logger.LogDebug(
                         "RevealPhase: Informant [{pid}] eliminated; awaiting guess.", elimination.PlayerId);
                     return null;
                 }
@@ -61,7 +61,7 @@ namespace KnockBox.ConsultTheCard.Services.Logic.Games.FSM.States
 
             _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.State.Config.RevealPhaseTimeoutMs);
 
-            context.Logger.LogInformation("FSM → RevealPhaseState");
+            context.Logger.LogDebug("FSM → RevealPhaseState");
             return null;
         }
 
@@ -93,7 +93,7 @@ namespace KnockBox.ConsultTheCard.Services.Logic.Games.FSM.States
             context.State.LastInformantGuess = new InformantGuessResult(
                 player.PlayerId, player.DisplayName, cmd.GuessedWord, isCorrect);
 
-            context.Logger.LogInformation(
+            context.Logger.LogDebug(
                 "RevealPhase: Informant [{pid}] guessed [{guess}]; correct={correct}.",
                 cmd.PlayerId, cmd.GuessedWord, isCorrect);
 
@@ -135,7 +135,7 @@ namespace KnockBox.ConsultTheCard.Services.Logic.Games.FSM.States
                         elimination.PlayerId, elimination.PlayerName, string.Empty, WasCorrect: false);
                 }
 
-                context.Logger.LogInformation("RevealPhase: Informant guess timed out; forfeited.");
+                context.Logger.LogDebug("RevealPhase: Informant guess timed out; forfeited.");
 
                 var winResult = context.CheckWinConditions();
                 if (winResult.GameOver)

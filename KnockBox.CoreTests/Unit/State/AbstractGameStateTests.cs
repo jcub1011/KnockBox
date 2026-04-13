@@ -109,7 +109,7 @@ public sealed class AbstractGameStateTests
     {
         using var state = MakeState();
 
-        Assert.AreEqual(0, state.Players.Count);
+        Assert.IsEmpty(state.Players);
     }
 
     // ── RegisterPlayer ───────────────────────────────────────────────────────
@@ -125,8 +125,8 @@ public sealed class AbstractGameStateTests
 
         Assert.IsTrue(result.IsSuccess);
         Assert.IsTrue(result.TryGetSuccess(out _));
-        Assert.AreEqual(1, state.Players.Count);
-        Assert.IsTrue(state.Players.Contains(player));
+        Assert.HasCount(1, state.Players);
+        Assert.Contains(player, state.Players);
     }
 
     [TestMethod]
@@ -138,7 +138,7 @@ public sealed class AbstractGameStateTests
         var result = state.RegisterPlayer(player);
 
         Assert.IsTrue(result.IsFailure);
-        Assert.AreEqual(0, state.Players.Count);
+        Assert.IsEmpty(state.Players);
     }
 
     [TestMethod]
@@ -151,7 +151,7 @@ public sealed class AbstractGameStateTests
         var result = state.RegisterPlayer(host);
 
         Assert.IsTrue(result.IsFailure);
-        Assert.AreEqual(0, state.Players.Count);
+        Assert.IsEmpty(state.Players);
     }
 
     [TestMethod]
@@ -165,7 +165,7 @@ public sealed class AbstractGameStateTests
         var result = state.RegisterPlayer(player);
 
         Assert.IsTrue(result.IsSuccess, "Re-registering a player already in the lobby should succeed.");
-        Assert.AreEqual(1, state.Players.Count, "Player should not be duplicated in the player list.");
+        Assert.HasCount(1, state.Players, "Player should not be duplicated in the player list.");
     }
 
     [TestMethod]
@@ -188,7 +188,7 @@ public sealed class AbstractGameStateTests
         // The old token (still held by the previous UserRegistration) is now stale.
         oldToken.Dispose();
 
-        Assert.AreEqual(1, state.Players.Count, "Disposing the stale token should not remove the player.");
+        Assert.HasCount(1, state.Players, "Disposing the stale token should not remove the player.");
     }
 
     [TestMethod]
@@ -204,7 +204,7 @@ public sealed class AbstractGameStateTests
 
         newToken.Dispose();
 
-        Assert.AreEqual(0, state.Players.Count, "Disposing the current token should properly remove the player.");
+        Assert.IsEmpty(state.Players, "Disposing the current token should properly remove the player.");
     }
 
     [TestMethod]
@@ -255,7 +255,7 @@ public sealed class AbstractGameStateTests
 
         unsubscriber.Dispose();
 
-        Assert.AreEqual(0, state.Players.Count);
+        Assert.IsEmpty(state.Players);
     }
 
     [TestMethod]
@@ -300,7 +300,7 @@ public sealed class AbstractGameStateTests
         var result = state.KickPlayer(player);
 
         Assert.IsTrue(result.IsSuccess);
-        Assert.IsFalse(state.Players.Contains(player));
+        Assert.DoesNotContain(player, state.Players);
         Assert.IsTrue(state.IsKicked(player));
     }
 
@@ -621,7 +621,7 @@ public sealed class AbstractGameStateTests
         using var state = MakeState();
         var after = DateTime.UtcNow;
 
-        Assert.IsTrue(state.CreatedAt >= before);
-        Assert.IsTrue(state.CreatedAt <= after);
+        Assert.IsGreaterThanOrEqualTo(before, state.CreatedAt);
+        Assert.IsLessThanOrEqualTo(after, state.CreatedAt);
     }
 }

@@ -28,7 +28,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
 
             if (_outfitRound == 1)
             {
-                context.Logger.LogInformation(
+                context.Logger.LogDebug(
                     "FSM → PoolRevealState. Pool contains {count} item(s). Deadline: {deadline}.",
                     context.ClothingPool.Count, context.State.PhaseDeadlineUtc);
 
@@ -37,7 +37,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
                     !context.State.ThemeRevealedToPlayers)
                 {
                     context.State.ThemeRevealedToPlayers = true;
-                    context.Logger.LogInformation(
+                    context.Logger.LogDebug(
                         "AfterDrawing: theme revealed: [{id}] \"{name}\".",
                         context.State.CurrentTheme?.Id, context.State.CurrentTheme?.DisplayName);
                 }
@@ -45,7 +45,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
             else
             {
                 context.ResetPoolForRound(_outfitRound);
-                context.Logger.LogInformation(
+                context.Logger.LogDebug(
                     "FSM → PoolRevealState (round {round}). Pool has {count} item(s). Deadline: {deadline}.",
                     _outfitRound, context.ClothingPool.Values.Count(i => i.IsInPool), context.State.PhaseDeadlineUtc);
             }
@@ -70,7 +70,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
         {
             if (context.State.PhaseDeadlineUtc is not { } deadline || now < deadline) return null;
 
-            context.Logger.LogInformation(
+            context.Logger.LogDebug(
                 "Pool reveal timer expired (round {round}). Advancing to outfit building.", _outfitRound);
             return ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?>.FromValue(
                 new OutfitBuildingState(_outfitRound));
@@ -114,12 +114,12 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
             }
 
             player.IsReady = true;
-            context.Logger.LogInformation(
+            context.Logger.LogDebug(
                 "Player [{id}] marked ready during pool reveal (round {round}).", cmd.PlayerId, _outfitRound);
 
             if (context.AllPlayersReady())
             {
-                context.Logger.LogInformation(
+                context.Logger.LogDebug(
                     "All players ready during pool reveal (round {round}). Advancing early to outfit building.",
                     _outfitRound);
                 return ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?>.FromValue(

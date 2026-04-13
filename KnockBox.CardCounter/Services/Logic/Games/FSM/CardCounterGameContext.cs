@@ -248,7 +248,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM
             {
                 var previousOperator = player.ActiveOperator;
                 player.ActiveOperator = card.Op;
-                Logger.LogInformation(
+                Logger.LogDebug(
                     "ActiveOperatorMode: [{id}] set active operator to [{op}].", player.PlayerId, card.Op);
                 State.LastOperatorChange = new OperatorChangeInfo(
                     player.PlayerId, player.DisplayName, previousOperator, card.Op);
@@ -403,11 +403,11 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM
             {
                 case 0:
                     player.PassesRemaining++;
-                    Logger.LogInformation("Div/0: player [{id}] gains a pass.", player.PlayerId);
+                    Logger.LogDebug("Div/0: player [{id}] gains a pass.", player.PlayerId);
                     break;
                 case 1:
                     if (player.PassesRemaining > 0) player.PassesRemaining--;
-                    Logger.LogInformation("Div/0: player [{id}] loses a pass.", player.PlayerId);
+                    Logger.LogDebug("Div/0: player [{id}] loses a pass.", player.PlayerId);
                     break;
                 case 2:
                     if (player.ActionHand.Count < Config.ActionHandLimit)
@@ -415,7 +415,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM
                         var card = GetRandomActionCard();
                         if (card is not null) player.ActionHand.Add(card);
                     }
-                    Logger.LogInformation("Div/0: player [{id}] gains an action card.", player.PlayerId);
+                    Logger.LogDebug("Div/0: player [{id}] gains an action card.", player.PlayerId);
                     break;
                 case 3:
                     if (player.ActionHand.Count > 0)
@@ -423,7 +423,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM
                         int idx = Rng.GetRandomInt(0, player.ActionHand.Count, RandomType.Secure);
                         player.ActionHand.RemoveAt(idx);
                     }
-                    Logger.LogInformation("Div/0: player [{id}] loses an action card.", player.PlayerId);
+                    Logger.LogDebug("Div/0: player [{id}] loses an action card.", player.PlayerId);
                     break;
             }
         }

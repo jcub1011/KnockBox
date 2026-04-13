@@ -29,13 +29,13 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
             DrawnToDressGameContext context)
         {
             context.State.SetPhase(GamePhase.CoinFlip);
-            context.Logger.LogInformation(
+            context.Logger.LogDebug(
                 "FSM → CoinFlipState. {count} pending coin flips. Return state: {returnState}.",
                 context.State.PendingCoinFlipQueue.Count, _returnState.GetType().Name);
 
             if (context.State.PendingCoinFlipQueue.Count == 0)
             {
-                context.Logger.LogInformation("No pending coin flips. Chaining to return state.");
+                context.Logger.LogDebug("No pending coin flips. Chaining to return state.");
                 return ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?>
                     .FromValue(_returnState);
             }
@@ -94,7 +94,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
             // Auto-resolve: random choice on timeout.
             bool autoChoice = context.Random.GetRandomInt(2) == 0;
             flip.IsAutoResolved = true;
-            context.Logger.LogInformation(
+            context.Logger.LogDebug(
                 "Coin flip timer expired. Auto-selecting {choice} for caller [{caller}].",
                 autoChoice ? "Heads" : "Tails", flip.CallerPlayerId);
 
@@ -164,7 +164,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
 
             flip.IsResolved = true;
 
-            context.Logger.LogInformation(
+            context.Logger.LogDebug(
                 "Coin flip [{id}] resolved: caller chose {choice}, result is {result} → winner [{winner}].",
                 flip.Id,
                 callerChoseHeads ? "Heads" : "Tails",
@@ -179,7 +179,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
 
             if (context.State.CurrentCoinFlipIndex >= context.State.PendingCoinFlipQueue.Count)
             {
-                context.Logger.LogInformation("All coin flips resolved. Transitioning to return state.");
+                context.Logger.LogDebug("All coin flips resolved. Transitioning to return state.");
                 return ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?>
                     .FromValue(_returnState);
             }
@@ -210,7 +210,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
 
             context.State.PhaseDeadlineUtc = DateTimeOffset.UtcNow.AddSeconds(context.Config.CoinFlipTimeSec);
 
-            context.Logger.LogInformation(
+            context.Logger.LogDebug(
                 "Coin flip {index} of {total}: caller is [{caller}]. Deadline: {deadline}.",
                 context.State.CurrentCoinFlipIndex + 1,
                 context.State.PendingCoinFlipQueue.Count,

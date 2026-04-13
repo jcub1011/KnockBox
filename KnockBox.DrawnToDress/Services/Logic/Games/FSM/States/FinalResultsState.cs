@@ -22,7 +22,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
         public ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?> OnEnter(
             DrawnToDressGameContext context)
         {
-            context.Logger.LogInformation("FSM → FinalResultsState. Computing leaderboard.");
+            context.Logger.LogDebug("FSM → FinalResultsState. Computing leaderboard.");
 
             var players = context.GamePlayers.ToDictionary(
                 kv => kv.Key, kv => kv.Value) as IReadOnlyDictionary<string, DrawnToDressPlayerState>;
@@ -48,7 +48,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
                         if (player is not null)
                         {
                             player.BonusPoints += context.Config.TournamentWinnerBonusPoints;
-                            context.Logger.LogInformation(
+                            context.Logger.LogDebug(
                                 "Tournament winner bonus (+{bonus}) awarded to player [{playerId}].",
                                 context.Config.TournamentWinnerBonusPoints, playerId);
                         }
@@ -71,7 +71,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
             // 5. If tied pairs exist, resolve via coin flip.
             if (tiedPairs.Count > 0)
             {
-                context.Logger.LogInformation(
+                context.Logger.LogDebug(
                     "Leaderboard has {count} tied pair(s). Setting up coin flip resolution.",
                     tiedPairs.Count);
 

@@ -3,7 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
 
-namespace KnockBox.Tests.Unit.Plugins;
+namespace KnockBox.CoreTests.Unit.Plugins;
 
 /// <summary>
 /// Internal test-only <see cref="IGameModule"/> implementations used by
@@ -53,8 +53,8 @@ public sealed class PluginLoaderTests
 
         var result = loader.LoadModules(missingPath);
 
-        Assert.AreEqual(0, result.Modules.Count);
-        Assert.AreEqual(0, result.Assemblies.Count);
+        Assert.IsEmpty(result.Modules);
+        Assert.IsEmpty(result.Assemblies);
     }
 
     [TestMethod]
@@ -68,8 +68,8 @@ public sealed class PluginLoaderTests
         {
             var result = loader.LoadModules(tempDir);
 
-            Assert.AreEqual(0, result.Modules.Count);
-            Assert.AreEqual(0, result.Assemblies.Count);
+            Assert.IsEmpty(result.Modules);
+            Assert.IsEmpty(result.Assemblies);
         }
         finally
         {
@@ -92,7 +92,7 @@ public sealed class PluginLoaderTests
 
             var result = loader.LoadModules(tempDir);
 
-            Assert.AreEqual(0, result.Modules.Count);
+            Assert.IsEmpty(result.Modules);
             // Loader logged an error for the bad DLL rather than throwing.
             VerifyLogged(logger, LogLevel.Error, Times.AtLeastOnce());
         }
@@ -116,7 +116,7 @@ public sealed class PluginLoaderTests
 
             var result = loader.LoadModules(tempDir);
 
-            Assert.AreEqual(0, result.Modules.Count);
+            Assert.IsEmpty(result.Modules);
             VerifyLogged(logger, LogLevel.Warning, Times.AtLeastOnce());
         }
         finally
@@ -145,8 +145,8 @@ public sealed class PluginLoaderTests
 
             var result = loader.LoadModules(tempDir);
 
-            Assert.IsTrue(
-                result.Modules.Any(m => m.RouteIdentifier == "pluginloader-tests-route-a"),
+            Assert.Contains(
+                m => m.RouteIdentifier == "pluginloader-tests-route-a", result.Modules,
                 "Expected TestPluginModuleA to be discovered.");
         }
         finally
@@ -185,6 +185,7 @@ public sealed class PluginLoaderTests
         }
     }
 
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1873:Avoid potentially expensive logging", Justification = "It's not a big deal.")]
     private static void VerifyLogged(Mock<ILogger<PluginLoader>> logger, LogLevel level, Times times)
     {
         logger.Verify(l => l.Log(

@@ -20,7 +20,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM.States
             _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.Config.NotMyMoneyTimeoutMs);
             context.State.IsNotMyMoneySelecting = true;
             context.State.PendingNotMyMoneyOperator = _operatorCard.Op;
-            context.Logger.LogInformation(
+            context.Logger.LogDebug(
                 "FSM → NotMyMoneyState: [{id}] redirecting operator [{op}]. Expires {exp}.",
                 _playerId, _operatorCard.Op, _expiresAt);
             return null;
@@ -77,7 +77,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM.States
                     context.ApplyOperatorCard(player, _operatorCard);
                 }
 
-                context.Logger.LogInformation(
+                context.Logger.LogDebug(
                     "NotMyMoney: [{id}] cancelled; operator applied to self.", _playerId);
                 return FinishTurn(context);
             }
@@ -89,7 +89,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM.States
         {
             if (now >= _expiresAt)
             {
-                context.Logger.LogInformation(
+                context.Logger.LogDebug(
                     "NotMyMoney: timeout; applying operator to self for [{id}].", _playerId);
                 var player = context.GetPlayer(_playerId);
                 if (player is not null)

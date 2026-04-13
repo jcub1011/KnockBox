@@ -157,7 +157,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress
                 new SubmitDrawingCommand("p1", "nonexistent-type", "<svg>drawing</svg>"));
 
             // Assert: no item was added to the pool for the invalid type.
-            Assert.IsFalse(context.ClothingPool.Values.Any(i => i.ClothingTypeId == "nonexistent-type"));
+            Assert.DoesNotContain(i => i.ClothingTypeId == "nonexistent-type", context.ClothingPool.Values);
         }
 
         [TestMethod]

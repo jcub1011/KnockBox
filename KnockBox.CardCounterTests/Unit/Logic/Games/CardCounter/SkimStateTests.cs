@@ -112,7 +112,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
             Assert.IsInstanceOfType(next.Value, typeof(PlayerTurnState));
             CollectionAssert.AreEqual(new[] { 1, 2 }, source.Pot, "Source pot should be unchanged after Comp'd block.");
             CollectionAssert.AreEqual(new[] { 3, 4 }, target.Pot, "Target pot should be unchanged after Comp'd block.");
-            Assert.AreEqual(0, target.ActionHand.Count, "Comp'd card should be consumed.");
+            Assert.IsEmpty(target.ActionHand, "Comp'd card should be consumed.");
         }
 
         [TestMethod]

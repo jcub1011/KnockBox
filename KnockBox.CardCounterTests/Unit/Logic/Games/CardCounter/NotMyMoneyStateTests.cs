@@ -86,7 +86,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
 
             fsmState.HandleCommand(_context, new NotMyMoneySelectTargetCommand("p1", "p2"));
 
-            Assert.AreEqual(0, player.ActionHand.Count, "Not My Money card should be consumed when redirecting.");
+            Assert.IsEmpty(player.ActionHand, "Not My Money card should be consumed when redirecting.");
         }
 
         [TestMethod]

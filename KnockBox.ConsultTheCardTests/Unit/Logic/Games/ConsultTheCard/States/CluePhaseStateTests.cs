@@ -118,7 +118,7 @@ namespace KnockBox.ConsultTheCard.Tests.Unit.Logic.Games.ConsultTheCard.States
             var player = _context.GetPlayer(currentPlayer)!;
             Assert.IsTrue(player.HasSubmittedClue);
             Assert.AreEqual("wave", player.CurrentClue);
-            Assert.IsTrue(_state.UsedClues.Contains("wave"));
+            Assert.Contains("wave", _state.UsedClues);
         }
 
         [TestMethod]

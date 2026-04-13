@@ -26,7 +26,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM.States
                 _targetId,
                 _pendingCard,
                 NotMyMoneyOperator: _notMyMoneyOperator?.Op);
-            context.Logger.LogInformation(
+            context.Logger.LogDebug(
                 "FSM → WaitingForReactionState: [{src}] played [{card}] on [{tgt}]. Expires {exp}.",
                 _sourceId, _pendingCard.Action, _targetId, _expiresAt);
             return null;
@@ -57,7 +57,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM.States
                     null,
                     null);
                 context.RecordActionCardPlay(target, responseCard);
-                context.Logger.LogInformation("Player [{id}] blocked with Comp'd.", _targetId);
+                context.Logger.LogDebug("Player [{id}] blocked with Comp'd.", _targetId);
                 return ResolveEffect(context, blocked: true);
             }
 
@@ -71,7 +71,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM.States
         {
             if (now >= _expiresAt)
             {
-                context.Logger.LogInformation(
+                context.Logger.LogDebug(
                     "Reaction window expired for [{tgt}]; auto-accepting.", _targetId);
                 return ResolveEffect(context, blocked: false);
             }
@@ -167,7 +167,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM.States
                     break;
             }
 
-            context.Logger.LogInformation(
+            context.Logger.LogDebug(
                 "Action [{card}] applied: [{src}] → [{tgt}].",
                 _pendingCard.Action, _sourceId, _targetId);
         }

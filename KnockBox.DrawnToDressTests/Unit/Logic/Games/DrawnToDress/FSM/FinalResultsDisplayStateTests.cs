@@ -59,7 +59,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
 
             Assert.IsInstanceOfType<FinalResultsDisplayState>(context.Fsm.CurrentState);
             Assert.AreEqual(GamePhase.Results, state.Phase);
-            Assert.AreEqual(2, state.Leaderboard.Count);
+            Assert.HasCount(2, state.Leaderboard);
             Assert.AreEqual(1, state.Leaderboard[0].Rank);
         }
 
@@ -93,7 +93,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             // Winner should have a better rank.
             var winnerEntry = state.Leaderboard.First(e => e.PlayerId == "pA");
             var loserEntry = state.Leaderboard.First(e => e.PlayerId == "pB");
-            Assert.IsTrue(winnerEntry.Rank < loserEntry.Rank,
+            Assert.IsLessThan(loserEntry.Rank, winnerEntry.Rank,
                 "Coin flip winner should have a better (lower) rank.");
             Assert.AreEqual("coin_flip", winnerEntry.TiebreakMethod);
             Assert.AreEqual("coin_flip", loserEntry.TiebreakMethod);

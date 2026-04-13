@@ -16,7 +16,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM.States
         public ValueResult<IGameState<CardCounterGameContext, CardCounterCommand>?> OnEnter(CardCounterGameContext context)
         {
             _expirationTime = DateTimeOffset.Now.AddMilliseconds(context.Config.RoundEndTimeoutMs);
-            context.Logger.LogInformation("FSM → RoundEndState (shoe {n} exhausted).", context.State.ShoeIndex);
+            context.Logger.LogDebug("FSM → RoundEndState (shoe {n} exhausted).", context.State.ShoeIndex);
 
             var hasShoe = context.DealNextShoe();
             if (!hasShoe)
@@ -98,7 +98,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM.States
             foreach (var idx in indices.OrderByDescending(i => i))
                 player.ActionHand.RemoveAt(idx);
 
-            context.Logger.LogInformation(
+            context.Logger.LogDebug(
                 "Player [{id}] discarded {n} action cards.", cmd.PlayerId, indices.Length);
         }
     }

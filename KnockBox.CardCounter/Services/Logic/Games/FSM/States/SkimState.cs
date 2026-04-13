@@ -27,7 +27,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM.States
                 context.GetPlayer(_sourceId)?.DisplayName ?? _sourceId,
                 _targetId,
                 _pendingCard);
-            context.Logger.LogInformation(
+            context.Logger.LogDebug(
                 "FSM → SkimState: [{src}] selecting digit to swap with [{tgt}]. Expires {exp}.",
                 _sourceId, _targetId, _expiresAt);
             return null;
@@ -59,7 +59,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM.States
                     null,
                     null);
                 context.RecordActionCardPlay(target, responseCard);
-                context.Logger.LogInformation("Player [{id}] blocked Skim with Comp'd.", _targetId);
+                context.Logger.LogDebug("Player [{id}] blocked Skim with Comp'd.", _targetId);
                 return new PlayerTurnState();
             }
 
@@ -104,7 +104,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM.States
         {
             if (now >= _expiresAt)
             {
-                context.Logger.LogInformation(
+                context.Logger.LogDebug(
                     "Skim: timeout; auto-applying last-digit swap for [{src}].", _sourceId);
                 // On timeout swap last digits of each pot (default behaviour)
                 return ResolveEffect(context, _sourceSelected ? _selectedSourceDigit : -1, _sourceSelected ? _selectedTargetDigit : -1);
@@ -130,7 +130,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM.States
                     : target.Pot.Count - 1;
 
                 (source.Pot[si], target.Pot[ti]) = (target.Pot[ti], source.Pot[si]);
-                context.Logger.LogInformation(
+                context.Logger.LogDebug(
                     "Skim applied: [{src}] digit[{si}] ↔ [{tgt}] digit[{ti}].",
                     _sourceId, si, _targetId, ti);
             }

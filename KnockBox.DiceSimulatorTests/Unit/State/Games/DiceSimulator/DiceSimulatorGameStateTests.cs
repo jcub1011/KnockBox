@@ -48,7 +48,7 @@ namespace KnockBox.DiceSimulator.Tests.Unit.State
 
             state.AddRoll(entry);
 
-            Assert.AreEqual(1, state.RollHistory.Count);
+            Assert.HasCount(1, state.RollHistory);
             Assert.AreEqual(entry.Id, state.RollHistory[0].Id);
         }
 
@@ -74,13 +74,13 @@ namespace KnockBox.DiceSimulator.Tests.Unit.State
             state.AddRoll(CreateValidEntry());
             state.GetOrAddPlayerStats("player1", "Player One");
 
-            Assert.AreEqual(1, state.RollHistory.Count);
-            Assert.AreEqual(1, state.PlayerStats.Count);
+            Assert.HasCount(1, state.RollHistory);
+            Assert.HasCount(1, state.PlayerStats);
 
             state.ClearHistory();
 
-            Assert.AreEqual(0, state.RollHistory.Count);
-            Assert.AreEqual(0, state.PlayerStats.Count);
+            Assert.IsEmpty(state.RollHistory);
+            Assert.IsEmpty(state.PlayerStats);
         }
     }
 }

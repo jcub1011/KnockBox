@@ -343,9 +343,9 @@ public partial class SvgCompressionTests
         var vwDAttrs = new List<string>();
         var bezierDAttrs = new List<string>();
 
-        Console.WriteLine();
-        Console.WriteLine("  Path             | Orig Pts  | VW Pts     (%)  | VW d-size  | Bezier Segs   (%)  | Bez d-size");
-        Console.WriteLine("  -----------------+-----------+-----------------+------------+--------------------+-----------");
+        TestContext.WriteLine(string.Empty);
+        TestContext.WriteLine("  Path             | Orig Pts  | VW Pts     (%)  | VW d-size  | Bezier Segs   (%)  | Bez d-size");
+        TestContext.WriteLine("  -----------------+-----------+-----------------+------------+--------------------+-----------");
 
         foreach (var (name, points) in allPaths)
         {
@@ -366,7 +366,7 @@ public partial class SvgCompressionTests
             var vwDSize = Encoding.UTF8.GetByteCount(vwD);
             var bezDSize = Encoding.UTF8.GetByteCount(bezD);
 
-            Console.WriteLine(
+            TestContext.WriteLine(
                 $"  {name,-16} | {points.Count,9} | " +
                 $"{vwSimplified.Count,9} {100.0 * vwSimplified.Count / points.Count,4:F0}% | " +
                 $"{vwDSize,10:N0} | " +
@@ -382,11 +382,11 @@ public partial class SvgCompressionTests
         var vwBytes = Encoding.UTF8.GetByteCount(vwSvg);
         var bezBytes = Encoding.UTF8.GetByteCount(bezSvg);
 
-        Console.WriteLine();
-        Console.WriteLine($"  Total SVG sizes:");
-        Console.WriteLine($"    Original:  {origBytes,10:N0} bytes");
-        Console.WriteLine($"    VW:        {vwBytes,10:N0} bytes ({100.0 * vwBytes / origBytes:F1}%)");
-        Console.WriteLine($"    Bézier:    {bezBytes,10:N0} bytes ({100.0 * bezBytes / origBytes:F1}%)");
+        TestContext.WriteLine(string.Empty);
+        TestContext.WriteLine($"  Total SVG sizes:");
+        TestContext.WriteLine($"    Original:  {origBytes,10:N0} bytes");
+        TestContext.WriteLine($"    VW:        {vwBytes,10:N0} bytes ({100.0 * vwBytes / origBytes:F1}%)");
+        TestContext.WriteLine($"    Bézier:    {bezBytes,10:N0} bytes ({100.0 * bezBytes / origBytes:F1}%)");
 
         // Write output files for visual comparison.
         var repoRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", ".."));
@@ -397,18 +397,18 @@ public partial class SvgCompressionTests
         File.WriteAllText(Path.Combine(outputDir, "comparison_vw.svg"), vwSvg);
         File.WriteAllText(Path.Combine(outputDir, "comparison_bezier.svg"), bezSvg);
 
-        Console.WriteLine();
-        Console.WriteLine($"  Output written to: {outputDir}");
-        Console.WriteLine($"    comparison_original.svg");
-        Console.WriteLine($"    comparison_vw.svg");
-        Console.WriteLine($"    comparison_bezier.svg");
+        TestContext.WriteLine(string.Empty);
+        TestContext.WriteLine($"  Output written to: {outputDir}");
+        TestContext.WriteLine($"    comparison_original.svg");
+        TestContext.WriteLine($"    comparison_vw.svg");
+        TestContext.WriteLine($"    comparison_bezier.svg");
 
         // Assertions
-        Assert.IsTrue(bezBytes < origBytes,
+        Assert.IsLessThan(origBytes, bezBytes,
             $"Bézier SVG ({bezBytes:N0} bytes) should be smaller than original ({origBytes:N0} bytes)");
-        Assert.IsTrue(vwBytes < origBytes,
+        Assert.IsLessThan(origBytes, vwBytes,
             $"VW SVG ({vwBytes:N0} bytes) should be smaller than original ({origBytes:N0} bytes)");
-        Assert.IsTrue(bezSvg.Contains("<path"), "Bézier SVG should contain path elements");
+        Assert.Contains("<path", bezSvg, "Bézier SVG should contain path elements");
         Assert.IsTrue(bezierDAttrs.TrueForAll(d => d.Contains('C')),
             "All Bézier path d-attributes should contain C (cubic) commands");
     }

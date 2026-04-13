@@ -20,7 +20,7 @@ namespace KnockBox.ConsultTheCard.Services.Logic.Games.FSM.States
             context.ApplyEndOfGameScoring(context.State.WinResult);
             context.State.SetPhase(ConsultTheCardGamePhase.GameOver);
 
-            context.Logger.LogInformation(
+            context.Logger.LogDebug(
                 "FSM → GameOverState (game {num}, winner: {team})",
                 context.State.CurrentGameNumber,
                 context.State.WinResult.WinningTeam);
@@ -93,7 +93,7 @@ namespace KnockBox.ConsultTheCard.Services.Logic.Games.FSM.States
 
             // Preserve: UsedWordPairIndices, GameScores (cumulative).
 
-            context.Logger.LogInformation(
+            context.Logger.LogDebug(
                 "GameOver: starting game {num}.", context.State.CurrentGameNumber);
 
             return new SetupState();
@@ -106,7 +106,7 @@ namespace KnockBox.ConsultTheCard.Services.Logic.Games.FSM.States
             if (cmd.PlayerId != context.State.Host.Id)
                 return new ResultError("Only the host can return to the lobby.");
 
-            context.Logger.LogInformation("GameOver: returning to lobby.");
+            context.Logger.LogDebug("GameOver: returning to lobby.");
 
             // Return null to signal a lobby transition. The engine handles the actual
             // lobby state creation externally.

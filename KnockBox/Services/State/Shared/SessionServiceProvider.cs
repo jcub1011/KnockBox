@@ -134,8 +134,8 @@ public class SessionServiceProvider(
             if (value is Lazy<CacheRegistration> lazyReg && lazyReg.IsValueCreated)
             {
                 lazyReg.Value.Dispose();
-                logger.LogInformation(
-                    "Session service {Type} for {Token} expired and was disposed. (Reason: {Reason})", 
+                logger.LogDebug(
+                    "Session service {Type} for {Token} expired and was disposed. (Reason: {Reason})",
                     regKey.ServiceType.Name, 
                     regKey.SessionToken.Token,
                     reason);

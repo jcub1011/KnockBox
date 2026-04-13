@@ -110,10 +110,10 @@ namespace KnockBox.DiceSimulator.Tests.Unit.Logic
 
             Assert.IsTrue((bool)result.IsSuccess);
 
-            Assert.AreEqual(1, state.RollHistory.Count);
+            Assert.HasCount(1, state.RollHistory);
             var roll = state.RollHistory[0];
             Assert.AreEqual(22, roll.Result); // 10 + 10 + 2 = 22
-            Assert.AreEqual(2, roll.RawRolls.Length);
+            Assert.HasCount(2, roll.RawRolls);
             Assert.IsNull(roll.AltRolls);
 
             var stats = state.PlayerStats["p1"];
@@ -209,12 +209,12 @@ namespace KnockBox.DiceSimulator.Tests.Unit.Logic
             var state = (DiceSimulatorGameState)stateResult.Value!;
             
             _engine.RollDice(_host, state, new DiceRollAction());
-            Assert.AreEqual(1, state.RollHistory.Count);
+            Assert.HasCount(1, state.RollHistory);
 
             var result = _engine.ClearHistory(_host, state);
             Assert.IsTrue((bool)result.IsSuccess);
-            Assert.AreEqual(0, state.RollHistory.Count);
-            Assert.AreEqual(0, state.PlayerStats.Count);
+            Assert.IsEmpty(state.RollHistory);
+            Assert.IsEmpty(state.PlayerStats);
         }
         
         [TestMethod]

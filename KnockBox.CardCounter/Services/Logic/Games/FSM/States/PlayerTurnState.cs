@@ -20,7 +20,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM.States
             context.State.FeelingLuckyTargetId = null;
             context.State.IsNotMyMoneySelecting = false;
             context.State.PendingNotMyMoneyOperator = null;
-            context.Logger.LogInformation(
+            context.Logger.LogDebug(
                 "FSM → PlayerTurnState (active: {id})", context.CurrentPlayerId);
             return null;
         }
@@ -44,7 +44,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM.States
             if (now < _expiresAt) return null;
             var currentPlayerId = context.CurrentPlayerId;
             if (currentPlayerId is null) return null;
-            context.Logger.LogInformation("PlayerTurn: auto-drawing for [{id}] after timeout.", currentPlayerId);
+            context.Logger.LogDebug("PlayerTurn: auto-drawing for [{id}] after timeout.", currentPlayerId);
             // Always return a state so the engine calls TransitionTo, which invokes OnEnter
             // and resets _expiresAt for the next player's turn. If the draw itself triggers a
             // state change (e.g. RoundEndState), pass that through; otherwise start a fresh turn.
@@ -85,7 +85,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM.States
                 {
                     var op = hedger.Balance < 0 ? Operator.Add : Operator.Subtract;
                     card = new OperatorCard(op);
-                    context.Logger.LogInformation(
+                    context.Logger.LogDebug(
                         "HedgeYourBet: [{hedgeId}] converted drawn card to [{op}] operator.",
                         hedgePlayerId, op);
                 }
@@ -116,7 +116,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM.States
             if (player.ExtraTurns > 0)
             {
                 player.ExtraTurns--;
-                context.Logger.LogInformation(
+                context.Logger.LogDebug(
                     "LetItRide: [{id}] takes an extra turn ({remaining} remaining).",
                     player.PlayerId, player.ExtraTurns);
             }
@@ -220,7 +220,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM.States
 
             player.ActionHand.RemoveAt(cmd.CardIndex);
 
-            context.Logger.LogInformation(
+            context.Logger.LogDebug(
                 "Player [{id}] played action card [{action}].", cmd.PlayerId, card.Action);
 
             context.State.LastPlayedAction = new LastPlayedActionInfo(
@@ -312,7 +312,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM.States
             // Self-targeting: apply the effect immediately without a reaction window.
             if (cmd.PlayerId == cmd.TargetPlayerId)
             {
-                context.Logger.LogInformation(
+                context.Logger.LogDebug(
                     "Blockable action [{a}]: self-targeted by [{id}]; applying immediately.", card.Action, cmd.PlayerId);
                 switch (card.Action)
                 {
@@ -370,7 +370,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM.States
                     player.Pot.Add(allDigits[digitIndex++]);
             }
 
-            context.Logger.LogInformation(
+            context.Logger.LogDebug(
                 "Tilt: [{id}] shuffled and redistributed {total} digits across {players} players.",
                 sourceId, allDigits.Count, playerCount);
 
@@ -420,7 +420,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM.States
             }
 
             context.State.HedgeYourBetPlayerId = sourceId;
-            context.Logger.LogInformation(
+            context.Logger.LogDebug(
                 "HedgeYourBet: [{id}] has hedged the next drawn card.", sourceId);
             return null; // stay in PlayerTurnState
         }
@@ -431,7 +431,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM.States
             if (player is null) return null;
 
             player.ExtraTurns++;
-            context.Logger.LogInformation(
+            context.Logger.LogDebug(
                 "LetItRide: [{id}] gains an extra turn ({total} total extra turns banked).",
                 sourceId, player.ExtraTurns);
             return null; // stay in PlayerTurnState

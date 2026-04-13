@@ -20,12 +20,22 @@ namespace KnockBox
         {
             var builder = WebApplication.CreateBuilder(args);
 
+            var logPath = Path.Combine(AppContext.BaseDirectory, "logs", "knockbox-.log");
+            const string outputTemplate =
+                "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {SourceContext}{NewLine}  {Message:lj}{NewLine}{Exception}";
+
             builder.Host.UseSerilog((context, services, loggerConfig) =>
                 loggerConfig
                     .ReadFrom.Configuration(context.Configuration)
                     .ReadFrom.Services(services)
                     .Enrich.FromLogContext()
-                    .WriteTo.Console());
+                    .WriteTo.Console(outputTemplate: outputTemplate)
+                    .WriteTo.File(
+                        logPath,
+                        rollingInterval: RollingInterval.Day,
+                        retainedFileCountLimit: 31,
+                        shared: true,
+                        outputTemplate: outputTemplate));
 
             // Add services to the container.
             builder.Services.AddRazorComponents()
@@ -44,7 +54,13 @@ namespace KnockBox
             var bootstrapSerilog = new Serilog.LoggerConfiguration()
                 .ReadFrom.Configuration(builder.Configuration)
                 .Enrich.FromLogContext()
-                .WriteTo.Console()
+                .WriteTo.Console(outputTemplate: outputTemplate)
+                .WriteTo.File(
+                    logPath,
+                    rollingInterval: RollingInterval.Day,
+                    retainedFileCountLimit: 31,
+                    shared: true,
+                    outputTemplate: outputTemplate)
                 .CreateLogger();
             using var bootstrapLoggerFactory = new SerilogLoggerFactory(bootstrapSerilog, dispose: true);
             var pluginLogger = bootstrapLoggerFactory.CreateLogger<PluginLoader>();
@@ -61,6 +77,8 @@ namespace KnockBox
             builder.Services.AddSingleton<ISvgClipboardService, SvgClipboardService>();
 
             var app = builder.Build();
+
+            app.UseSerilogRequestLogging();
 
             // Configure the HTTP request pipeline.
             if (!app.Environment.IsDevelopment())
@@ -92,6 +110,7 @@ namespace KnockBox
         /// by try/catch so a single misconfigured plugin doesn't prevent the host
         /// from starting. Duplicate plugin folder names are skipped with a warning.
         /// </summary>
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1873:Avoid potentially expensive logging", Justification = "It's not a big deal.")]
         private static void MapPluginStaticAssets(WebApplication app, string pluginsPath)
         {
             var logger = app.Services.GetRequiredService<ILogger<Program>>();

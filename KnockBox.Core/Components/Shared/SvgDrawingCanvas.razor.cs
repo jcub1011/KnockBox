@@ -131,7 +131,7 @@ namespace KnockBox.Core.Components.Shared
                         "import", "/_content/KnockBox.Core/js/svgDrawingCanvas.js");
                     await _jsModule.InvokeVoidAsync(
                         "initialize", _svgId, _dotNetRef, _currentColor, _currentStrokeWidth, BackgroundColor);
-                    Logger.LogInformation("[SVGCanvas] Initialized — svgId={SvgId}", _svgId);
+                    Logger.LogDebug("[SVGCanvas] Initialized — svgId={SvgId}", _svgId);
                 }
                 catch (Exception ex)
                 {

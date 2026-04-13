@@ -107,7 +107,7 @@ namespace KnockBox.ConsultTheCard.Services.Logic.Games.FSM
                 ps.SecretWord = null;
             }
 
-            Logger.LogInformation(
+            Logger.LogDebug(
                 "AssignRoles: {count}p → {agents}A/{insiders}I/{informants}Inf. AgentWord=[{aw}], InsiderWord=[{iw}].",
                 count, agents, insiders, informants, agentWord, insiderWord);
         }
@@ -305,14 +305,14 @@ namespace KnockBox.ConsultTheCard.Services.Logic.Games.FSM
                         if (target.Role == Role.Agent)
                         {
                             voter.Score -= 1;
-                            Logger.LogInformation(
+                            Logger.LogDebug(
                                 "ApplyCycleScoring: Agent [{voter}] voted for Agent [{target}]; −1 point.",
                                 voter.PlayerId, target.PlayerId);
                         }
                         else if (target.Role == Role.Insider || target.Role == Role.Informant)
                         {
                             voter.Score += 1;
-                            Logger.LogInformation(
+                            Logger.LogDebug(
                                 "ApplyCycleScoring: Agent [{voter}] correctly voted for [{role}] [{target}]; +1 point.",
                                 voter.PlayerId, target.Role, target.PlayerId);
                         }
@@ -327,14 +327,14 @@ namespace KnockBox.ConsultTheCard.Services.Logic.Games.FSM
                     if (player.PlayerId == eliminatedId)
                     {
                         player.Score -= 1;
-                        Logger.LogInformation(
+                        Logger.LogDebug(
                             "ApplyCycleScoring: [{role}] [{id}] was voted out; −1 point.",
                             player.Role, player.PlayerId);
                     }
                     else
                     {
                         player.Score += 1;
-                        Logger.LogInformation(
+                        Logger.LogDebug(
                             "ApplyCycleScoring: [{role}] [{id}] survived the round; +1 point.",
                             player.Role, player.PlayerId);
                     }
@@ -355,7 +355,7 @@ namespace KnockBox.ConsultTheCard.Services.Logic.Games.FSM
                 if (!ps.IsEliminated)
                 {
                     ps.Score += 2;
-                    Logger.LogInformation(
+                    Logger.LogDebug(
                         "ApplyEndOfGameScoring: [{id}] survived; +2 points.", ps.PlayerId);
                 }
 
@@ -363,7 +363,7 @@ namespace KnockBox.ConsultTheCard.Services.Logic.Games.FSM
                 if (winResult.WinningTeam is not null && ps.Role == winResult.WinningTeam)
                 {
                     ps.Score += 1;
-                    Logger.LogInformation(
+                    Logger.LogDebug(
                         "ApplyEndOfGameScoring: [{id}] on winning team [{team}]; +1 point.",
                         ps.PlayerId, winResult.WinningTeam);
                 }
@@ -376,7 +376,7 @@ namespace KnockBox.ConsultTheCard.Services.Logic.Games.FSM
                 if (informant is not null)
                 {
                     informant.Score += 3;
-                    Logger.LogInformation(
+                    Logger.LogDebug(
                         "ApplyEndOfGameScoring: Informant [{id}] correctly guessed; +3 points.",
                         informant.PlayerId);
                 }
