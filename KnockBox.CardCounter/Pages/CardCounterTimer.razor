@@ -1,0 +1,52 @@
+@using KnockBox.Services.State.Games.CardCounter
+@using KnockBox.Services.Logic.Games.CardCounter.FSM
+@using KnockBox.Core.Services.State.Games.Shared
+
+@if (GameState.Config.EnableActionTimer && GameState.Context?.Fsm?.CurrentState is ITimedGameState<CardCounterGameContext, CardCounterCommand> timedState)
+{
+    var remaining = timedState.GetRemainingTime(GameState.Context!, DateTimeOffset.UtcNow);
+    if (remaining.IsSuccess && remaining.Value.TotalSeconds >= 0)
+    {
+        var endTime = DateTimeOffset.UtcNow.Add(remaining.Value);
+        var duration = GetTotalDuration();
+
+        <CountdownClock EndTimeUtc="endTime" Duration="duration" Context="countdown">
+            @{
+                var seconds = (int)Math.Ceiling(countdown.RemainingSeconds);
+            }
+            <div class="cc-timer-container">
+                <div class="cc-timer-card @(seconds < 5 ? "cc-timer-urgent" : "")">
+                    ⏳ @seconds
+                </div>
+            </div>
+        </CountdownClock>
+    }
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public CardCounterGameState GameState { get; set; } = default!;
+
+    private TimeSpan GetTotalDuration() => GameState.Phase switch
+    {
+        GamePhase.BuyIn => TimeSpan.FromMilliseconds(GameState.Config.BuyInTimeoutMs),
+        GamePhase.Playing => GetPlayingPhaseTimeout(),
+        _ => TimeSpan.FromSeconds(30)
+    };
+
+    private TimeSpan GetPlayingPhaseTimeout()
+    {
+        // For Card Counter, the timeout depends on the specific FSM state within the Playing phase.
+        return GameState.Context?.Fsm?.CurrentState switch
+        {
+            KnockBox.Services.Logic.Games.CardCounter.FSM.States.FeelingLuckyChainState => TimeSpan.FromMilliseconds(GameState.Config.FeelingLuckyChainTimeoutMs),
+            KnockBox.Services.Logic.Games.CardCounter.FSM.States.MakeMyLuckState => TimeSpan.FromMilliseconds(GameState.Config.MakeMyLuckTimeoutMs),
+            KnockBox.Services.Logic.Games.CardCounter.FSM.States.NotMyMoneyState => TimeSpan.FromMilliseconds(GameState.Config.NotMyMoneyTimeoutMs),
+            KnockBox.Services.Logic.Games.CardCounter.FSM.States.SkimState => TimeSpan.FromMilliseconds(GameState.Config.SkimTimeoutMs),
+            KnockBox.Services.Logic.Games.CardCounter.FSM.States.WaitingForReactionState => TimeSpan.FromMilliseconds(GameState.Config.WaitingForReactionTimeoutMs),
+            KnockBox.Services.Logic.Games.CardCounter.FSM.States.RoundEndState => TimeSpan.FromMilliseconds(GameState.Config.RoundEndTimeoutMs),
+            _ => TimeSpan.FromMilliseconds(GameState.Config.PlayerTurnTimeoutMs)
+        };
+    }
+}
+

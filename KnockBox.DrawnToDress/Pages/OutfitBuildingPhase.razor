@@ -1,0 +1,336 @@
+@using KnockBox.Services.Logic.Games.DrawnToDress
+@using KnockBox.Services.State.Games.DrawnToDress
+@using KnockBox.Services.State.Games.DrawnToDress.Data
+@using KnockBox.Services.State.Users
+
+@{
+    bool isHost = UserService.CurrentUser?.Id == GameState.Host.Id;
+
+    string? myId = UserService.CurrentUser?.Id;
+    var myPlayer = myId is not null && GameState.GamePlayers.TryGetValue(myId, out var pOut) ? pOut : null;
+    // Capture submitted outfit once so its value stays consistent throughout this render pass
+    // even if the FSM updates player state concurrently from the timer loop.
+    var mySubmittedOutfit = myPlayer?.GetOutfit(OutfitRound);
+
+    int lockedCount = GameState.GamePlayers.Values.Count(p => p.GetOutfit(OutfitRound) is not null);
+    int totalPlayers = GameState.GamePlayers.Count;
+
+    string phaseName = OutfitRound == 1 ? "Outfit Building" : $"Outfit {OutfitRound} Building";
+    string yourOutfitTitle = OutfitRound == 1 ? "Your Outfit" : $"Your Outfit {OutfitRound}";
+    string poolTitle = OutfitRound == 1 ? "Clothing Pool" : $"Clothing Pool (Round {OutfitRound})";
+    string lockInLabel = OutfitRound == 1 ? "Lock In Outfit" : $"Lock In Outfit {OutfitRound}";
+    string lockedMessage = OutfitRound == 1 ? "Outfit locked in! Waiting for the others\u2026" : $"Outfit {OutfitRound} locked in! Waiting for the others\u2026";
+
+    int filledSlots = GameState.Config.ClothingTypes
+        .Count(ct => myPlayer is not null && GetSelectedItemForType(myPlayer, ct.Id).HasValue);
+    int totalSlots = GameState.Config.ClothingTypes.Count;
+}
+
+<div class="dtd-outfit">
+
+    <!-- ── Header ────────────────────────────────────────────────────────── -->
+    <header class="dtd-outfit-header">
+        <div class="dtd-outfit-phase-badge">
+            <span class="dtd-outfit-phase-icon" aria-hidden="true">👗</span>
+            <h2 class="dtd-outfit-phase-name">@phaseName</h2>
+        </div>
+
+        <div class="dtd-outfit-progress-pill" aria-label="Player progress">
+            @lockedCount / @totalPlayers locked in
+        </div>
+
+        <TimerDisplay GameState="GameState" />
+    </header>
+
+    <main class="dtd-outfit-main">
+        <!-- ── Host view ─────────────────────────────────────────────────────── -->
+        @if (isHost)
+        {
+            <div class="dtd-outfit-host-panel">
+                <div class="dtd-outfit-host-stats">
+                    @{
+                        int totalItemsClaimed = GameState.ClothingPool.Values.Count(i => i.ClaimedByPlayerId != null);
+                        int totalItemsAvailable = GameState.ClothingPool.Values.Count(i => i.IsInPool && i.ClaimedByPlayerId == null);
+                    }
+                    <div class="dtd-card dtd-stat-card dtd-stat-mint">
+                        <div class="dtd-stat-value">@lockedCount / @totalPlayers</div>
+                        <div class="dtd-stat-label">Players Locked</div>
+                    </div>
+                    <div class="dtd-card dtd-stat-card dtd-stat-lavender">
+                        <div class="dtd-stat-value">@totalItemsClaimed</div>
+                        <div class="dtd-stat-label">Items Claimed</div>
+                    </div>
+                    <div class="dtd-card dtd-stat-card dtd-stat-yellow">
+                        <div class="dtd-stat-value">@totalItemsAvailable</div>
+                        <div class="dtd-stat-label">Items Available</div>
+                    </div>
+                </div>
+
+                <h3 class="dtd-outfit-section-title">Player Progress</h3>
+                <div class="dtd-outfit-player-grid">
+                    @foreach (var kv in GameState.GamePlayers)
+                    {
+                        var ps = kv.Value;
+                        bool locked = ps.GetOutfit(OutfitRound) is not null;
+                        int claimed = ps.OwnedClothingItemIds
+                            .Count(id => GameState.ClothingPool.TryGetValue(id, out var item)
+                                         && item.ClaimedByPlayerId == ps.PlayerId);
+                        string statusIcon = locked ? "✅" : claimed > 0 ? "🧩" : "⏳";
+                        <div @key="ps.PlayerId" class="dtd-outfit-player-card @(locked ? "dtd-outfit-player-locked" : "")">
+                            <div class="dtd-outfit-player-info">
+                                <span class="dtd-outfit-player-status" aria-hidden="true">@statusIcon</span>
+                                <span class="dtd-outfit-player-name">@ps.DisplayName</span>
+                            </div>
+                            <div class="dtd-outfit-player-progress">
+                                <div class="dtd-outfit-progress-bar">
+                                    @foreach(var ct in GameState.Config.ClothingTypes)
+                                    {
+                                        bool hasType = ps.OwnedClothingItemIds.Any(id => GameState.ClothingPool.TryGetValue(id, out var item) && item.ClothingTypeId == ct.Id);
+                                        <div class="dtd-outfit-progress-segment @(hasType ? "dtd-segment-filled" : "")" title="@ct.DisplayName"></div>
+                                    }
+                                </div>
+                            </div>
+                            <div class="dtd-outfit-player-mini-thumbnails">
+                                @foreach(var itemId in ps.OwnedClothingItemIds)
+                                {
+                                    if(GameState.ClothingPool.TryGetValue(itemId, out var item) && SafeSvgContent(item.SvgContent) is string safeSvg)
+                                    {
+                                        var clothingType = GameState.Config.ClothingTypes.FirstOrDefault(ct => ct.Id == item.ClothingTypeId);
+                                        if (clothingType != null)
+                                        {
+                                            <div class="dtd-mini-thumbnail">
+                                                <svg viewBox="0 0 @clothingType.CanvasWidth @clothingType.CanvasHeight" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
+                                                    @((MarkupString)safeSvg)
+                                                </svg>
+                                            </div>
+                                        }
+                                    }
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+                
+                <div class="dtd-outfit-pool-preview-section">
+                    <h3 class="dtd-outfit-section-title">@poolTitle Overview</h3>
+                    <div class="dtd-pool-scroll-area">
+                        @{
+                            var hostPoolByType = GameState.Config.ClothingTypes
+                                .ToDictionary(
+                                    ct => ct,
+                                    ct => GameState.ClothingPool.Values
+                                        .Where(item => item.ClothingTypeId == ct.Id && item.IsInPool)
+                                        .ToList());
+                        }
+                        @foreach (var (clothingType, items) in hostPoolByType)
+                        {
+                            <div @key="clothingType.Id" class="dtd-pool-type-group">
+                                <h4 class="dtd-pool-type-label">@clothingType.DisplayName</h4>
+                                @if (items.Count == 0)
+                                {
+                                    <p class="dtd-pool-empty-hint">No items drawn.</p>
+                                }
+                                else
+                                {
+                                    <div class="dtd-pool-grid">
+                                        @foreach (var item in items)
+                                        {
+                                            bool taken = item.ClaimedByPlayerId is not null;
+                                            <div @key="item.Id" class="dtd-pool-item @(taken ? "dtd-pool-item-taken" : "dtd-pool-item-available")">
+                                                @if (SafeSvgContent(item.SvgContent) is string safeSvg)
+                                                {
+                                                    <svg class="dtd-pool-item-preview" viewBox="0 0 @clothingType.CanvasWidth @clothingType.CanvasHeight"
+                                                         preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
+                                                        @((MarkupString)safeSvg)
+                                                    </svg>
+                                                }
+                                                <div class="dtd-pool-item-creator-name">by @(item.CreatorPlayerId != null && GameState.GamePlayers.TryGetValue(item.CreatorPlayerId, out var c) ? c.DisplayName : "Unknown")</div>
+                                                @if (taken)
+                                                {
+                                                    <span class="dtd-pool-item-badge dtd-badge-taken">Taken by @(item.ClaimedByPlayerId != null && GameState.GamePlayers.TryGetValue(item.ClaimedByPlayerId, out var cl) ? cl.DisplayName : "Unknown")</span>
+                                                }
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+        else if (mySubmittedOutfit != null)
+        {
+            <div class="dtd-outfit-waiting-card">
+                <div class="dtd-outfit-waiting-header">
+                    <span class="dtd-outfit-waiting-icon">✨</span>
+                    <p class="dtd-outfit-waiting-text">@lockedMessage</p>
+                </div>
+                
+                <div class="dtd-outfit-locked-grid">
+                    @foreach (var clothingType in GameState.Config.ClothingTypes)
+                    {
+                        bool hasSlot = mySubmittedOutfit!.SelectedItemsByType.TryGetValue(clothingType.Id, out var selectedId);
+                        <div @key="clothingType.Id" class="dtd-outfit-slot dtd-outfit-slot-locked">
+                            <span class="dtd-outfit-slot-label">@clothingType.DisplayName</span>
+                            @if (hasSlot && GameState.ClothingPool.TryGetValue(selectedId, out var selectedItem))
+                            {
+                                <div class="dtd-pool-item dtd-pool-item-selected">
+                                    @if (SafeSvgContent(selectedItem.SvgContent) is string safeSvgSelected)
+                                    {
+                                        <svg class="dtd-pool-item-preview" viewBox="0 0 @clothingType.CanvasWidth @clothingType.CanvasHeight"
+                                             preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
+                                            @((MarkupString)safeSvgSelected)
+                                        </svg>
+                                    }
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="dtd-outfit-slot-empty">—</div>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+        else
+        {
+            <!-- Player active building view -->
+            <div class="dtd-outfit-player-layout">
+                <section class="dtd-outfit-preview-panel">
+                    <div class="dtd-outfit-preview-header">
+                        <h3 class="dtd-outfit-section-title">@yourOutfitTitle</h3>
+                        <span class="dtd-outfit-slot-count">@filledSlots / @totalSlots</span>
+                    </div>
+
+                    <div class="dtd-outfit-preview-svg-container">
+                        <svg class="dtd-outfit-composed-preview"
+                             viewBox="0 0 @ComposedOutfitWidth @ComposedOutfitHeight"
+                             preserveAspectRatio="xMidYMid meet"
+                             xmlns="http://www.w3.org/2000/svg"
+                             role="img" aria-label="Your outfit preview">
+                            @foreach (var clothingType in GameState.Config.ClothingTypes)
+                            {
+                                var (defX, defY) = CompositeCanvasLayout.GetDefaultItemPosition(
+                                    clothingType.Id, clothingType.CanvasWidth, clothingType.CanvasHeight,
+                                    ComposedOutfitWidth, ComposedOutfitHeight);
+                                Guid? slotItemId = myPlayer is not null
+                                    ? GetSelectedItemForType(myPlayer, clothingType.Id) : null;
+
+                                if (slotItemId.HasValue
+                                    && GameState.ClothingPool.TryGetValue(slotItemId.Value, out var slotItem)
+                                    && SafeSvgContent(slotItem.SvgContent) is string safeSvgSlot)
+                                {
+                                    <g transform="translate(@defX,@defY)">
+                                        @((MarkupString)safeSvgSlot)
+                                    </g>
+                                }
+                                else
+                                {
+                                    <g transform="translate(@defX,@defY)">
+                                        <rect x="50" y="50"
+                                              width="@(clothingType.CanvasWidth - 100)"
+                                              height="@(clothingType.CanvasHeight - 100)"
+                                              rx="20" fill="none" stroke="#cbd5e1"
+                                              stroke-width="4" stroke-dasharray="12,8" />
+                                        <text x="@(clothingType.CanvasWidth / 2)"
+                                              y="@(clothingType.CanvasHeight / 2)"
+                                              text-anchor="middle" dominant-baseline="central"
+                                              font-family="Lexend, sans-serif" font-size="36"
+                                              font-weight="700" fill="#cbd5e1">
+                                            @clothingType.DisplayName
+                                        </text>
+                                    </g>
+                                }
+                            }
+                        </svg>
+                    </div>
+
+                    <div class="dtd-outfit-actions-panel">
+                        @if (_errorMessage is not null)
+                        {
+                            <p class="dtd-outfit-error" role="alert">@_errorMessage</p>
+                        }
+                        <button class="dtd-btn dtd-btn-primary dtd-btn-lg" @onclick="SubmitOutfitAsync" disabled="@_submitting">
+                            @(_submitting ? "Locking in..." : "🔒 Lock In")
+                        </button>
+                    </div>
+                </section>
+
+                <section class="dtd-outfit-right-panel">
+                    <h3 class="dtd-outfit-section-title">@poolTitle</h3>
+                    <div class="dtd-pool-scroll-area">
+                        @{
+                            var poolByType = GameState.Config.ClothingTypes
+                                .ToDictionary(
+                                    ct => ct,
+                                    ct => GameState.ClothingPool.Values
+                                        .Where(item => item.ClothingTypeId == ct.Id && item.IsInPool)
+                                        .ToList());
+                        }
+                        @foreach (var (clothingType, items) in poolByType)
+                        {
+                            <div @key="clothingType.Id" class="dtd-pool-type-group">
+                                <h4 class="dtd-pool-type-label">@clothingType.DisplayName</h4>
+                                @if (items.Count == 0)
+                                {
+                                    <p class="dtd-pool-empty-hint">No items available.</p>
+                                }
+                                else
+                                {
+                                    <div class="dtd-pool-grid">
+                                        @foreach (var item in items)
+                                        {
+                                            bool isMyDrawing = item.CreatorPlayerId == myId;
+                                            bool claimedByMe = item.ClaimedByPlayerId == myId;
+                                            bool claimedByOther = item.ClaimedByPlayerId is not null && !claimedByMe;
+                                            bool canSelectOwn = GameState.Config.AllowSelectOwnDrawings;
+                                            bool isAvailable = (!isMyDrawing || canSelectOwn) && item.ClaimedByPlayerId is null;
+
+                                            string stateClass = claimedByMe ? "dtd-pool-item-mine"
+                                                : claimedByOther ? "dtd-pool-item-taken"
+                                                : isMyDrawing && !canSelectOwn ? "dtd-pool-item-own"
+                                                : "dtd-pool-item-available";
+
+                                            bool clickable = isAvailable || claimedByMe;
+
+                                            <div @key="item.Id" class="dtd-pool-item @stateClass @(clickable ? "dtd-pool-item-clickable" : "")"
+                                                 role="@(clickable ? "button" : null)"
+                                                 aria-pressed="@(claimedByMe ? "true" : "false")"
+                                                 tabindex="@(clickable ? 0 : -1)"
+                                                 @onclick="() => ToggleClaim(item, claimedByMe, isAvailable)"
+                                                 @onkeydown="(e) => HandlePoolItemKeydown(e, item, claimedByMe, isAvailable)">
+                                                @if (SafeSvgContent(item.SvgContent) is string safeSvgItem)
+                                                {
+                                                    <svg class="dtd-pool-item-preview" viewBox="0 0 @clothingType.CanvasWidth @clothingType.CanvasHeight"
+                                                         preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
+                                                        @((MarkupString)safeSvgItem)
+                                                    </svg>
+                                                }
+                                                @if (isMyDrawing)
+                                                {
+                                                    <span class="dtd-pool-item-creator">Yours</span>
+                                                }
+                                                @if (claimedByMe)
+                                                {
+                                                    <span class="dtd-pool-item-badge dtd-badge-mine">Selected</span>
+                                                }
+                                                else if (claimedByOther)
+                                                {
+                                                    <span class="dtd-pool-item-badge dtd-badge-taken">Taken</span>
+                                                }
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                </section>
+            </div>
+        }
+    </main>
+</div>
+
+

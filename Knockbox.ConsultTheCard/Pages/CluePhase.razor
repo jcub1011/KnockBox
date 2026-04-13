@@ -1,0 +1,212 @@
+@using KnockBox.Services.State.Users
+@using KnockBox.Services.State.Games.ConsultTheCard
+
+@{
+    var myId = UserService.CurrentUser?.Id ?? string.Empty;
+    var isHost = GameState.Host.Id == myId;
+    GameState.GamePlayers.TryGetValue(myId, out var playerState);
+    var activeId = GameState.TurnManager.CurrentPlayer ?? "";
+    var isMyTurn = !isHost && myId == activeId;
+    var activePlayerName = GameState.GamePlayers.TryGetValue(activeId, out var activePs) ? activePs.DisplayName : "...";
+}
+
+@if (isHost)
+{
+    @* ══════ HOST SPECTATOR VIEW ══════ *@
+    <div class="ctc-clue-area">
+        <div class="ctc-clue-panel ctc-host-panel">
+            <h2 class="ctc-phase-title glitch" data-text="[ INTERCEPTING CLUES ]">[ INTERCEPTING CLUES ]</h2>
+
+            @* ── Transmission Queue ── *@
+            <div class="ctc-host-transmission-board">
+                <div class="ctc-board-header">
+                    <span class="ctc-board-label">[ TRANSMISSION QUEUE ]</span>
+                    <span class="ctc-board-cycle">CYCLE @(GameState.CurrentEliminationCycle + 1)</span>
+                </div>
+                <div class="ctc-board-queue">
+                    @for (int i = 0; i < GameState.TurnManager.TurnOrder.Count; i++)
+                    {
+                        var playerId = GameState.TurnManager.TurnOrder[i];
+                        if (!GameState.GamePlayers.TryGetValue(playerId, out var qps)) continue;
+                        bool isCurrent = i == GameState.TurnManager.CurrentPlayerIndex;
+                        bool hasGone = qps.HasSubmittedClue;
+                        <div class="ctc-queue-slot @(isCurrent ? "ctc-queue-active" : "") @(hasGone ? "ctc-queue-done" : "") @(qps.IsEliminated ? "ctc-queue-eliminated" : "")">
+                            <span class="ctc-queue-name">@qps.DisplayName</span>
+                            @if (qps.IsEliminated)
+                            {
+                                <span class="ctc-queue-status ctc-queue-status-dead">COMPROMISED</span>
+                            }
+                            else if (hasGone)
+                            {
+                                <span class="ctc-queue-status ctc-queue-status-done">TRANSMITTED</span>
+                            }
+                            else if (isCurrent)
+                            {
+                                <span class="ctc-queue-status ctc-queue-status-live">LIVE</span>
+                            }
+                            else
+                            {
+                                <span class="ctc-queue-status">STANDBY</span>
+                            }
+                            @if (hasGone && !string.IsNullOrEmpty(qps.CurrentClue))
+                            {
+                                <span class="ctc-queue-clue">@qps.CurrentClue</span>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+
+            @* ── Active Transmission ── *@
+            <div class="ctc-host-active-transmission">
+                <span class="ctc-host-active-label">[ ACTIVE CHANNEL ]</span>
+                <span class="ctc-host-active-name glitch" data-text="@activePlayerName.ToUpper()">@activePlayerName.ToUpper()</span>
+                <span class="ctc-host-active-status">TRANSMITTING<span class="ctc-blink-dots">...</span></span>
+            </div>
+
+            @* ── Current round clues ── *@
+            @if (GameState.CurrentRoundClues.Count > 0)
+            {
+                <div class="ctc-clue-history">
+                    <h3 class="ctc-section-title">[ RECENT TRANSMISSIONS ]</h3>
+                    <div class="ctc-clue-list">
+                        @foreach (var clue in GameState.CurrentRoundClues)
+                        {
+                            <div class="ctc-clue-entry ctc-clue-entry-host typewriter-entry">
+                                <span class="ctc-clue-player">[@clue.PlayerName]:</span>
+                                <span class="ctc-clue-word">@clue.Clue</span>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+
+            @* ── Previously used clues ── *@
+            @if (GameState.UsedClues.Count > 0)
+            {
+                <div class="ctc-used-clues">
+                    <h3 class="ctc-section-title">[ ARCHIVED INTEL (REDACTED) ]</h3>
+                    <div class="ctc-used-clue-list">
+                        @foreach (var usedClue in GameState.UsedClues)
+                        {
+                            <span class="ctc-used-clue-tag redacted-text">@usedClue</span>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+}
+else
+{
+    @* ══════ PLAYER VIEW ══════ *@
+    <div class="ctc-clue-area @(isMyTurn ? "ctc-my-turn-active" : "")">
+        @{
+            bool isEliminated = playerState is null || playerState.IsEliminated;
+        }
+
+        <div class="ctc-clue-panel">
+            <h2 class="ctc-phase-title glitch" data-text="[ INTERCEPTING CLUES ]">[ INTERCEPTING CLUES ]</h2>
+
+            @if (playerState is not null && !string.IsNullOrEmpty(playerState.SecretWord))
+            {
+                if (playerState.Role != Role.Informant)
+                {
+                    <div class="ctc-secret-word-banner">
+                        <span class="ctc-secret-word-label">Target Intel:</span>
+                        <span class="ctc-secret-word-value">@playerState.SecretWord</span>
+                    </div>
+                }
+                else
+                {
+                    <div class="ctc-secret-word-banner ctc-secret-word-banner-informant">
+                        <span class="ctc-secret-word-label">[ STATUS: COMPROMISED ]</span>
+                        <span class="ctc-secret-word-value glitch" data-text="INTEL: NULL">NULL</span>
+                    </div>
+                }
+            }
+            else if (playerState is not null && playerState.Role == Role.Informant)
+            {
+                <div class="ctc-secret-word-banner ctc-secret-word-banner-informant">
+                    <span class="ctc-secret-word-label">[ STATUS: COMPROMISED ]</span>
+                    <span class="ctc-secret-word-value glitch" data-text="INTEL: NULL">NULL</span>
+                </div>
+            }
+
+            @if (isEliminated)
+            {
+                <div class="ctc-eliminated-banner">
+                    <span class="ctc-eliminated-icon"></span>
+                    <div class="ctc-eliminated-text">
+                        <h3>CONNECTION TERMINATED</h3>
+                        <p>You have been eliminated. Transmission capabilities disabled.</p>
+                    </div>
+                </div>
+            }
+
+            @* ── Turn indicator ── *@
+            @if (isMyTurn)
+            {
+                <div class="ctc-turn-alert">
+                    <span class="ctc-turn-alert-text glitch" data-text="&gt;&gt;&gt; YOUR TURN &lt;&lt;&lt;">&gt;&gt;&gt; YOUR TURN &lt;&lt;&lt;</span>
+                    <span class="ctc-turn-alert-sub">TRANSMIT YOUR CLUE NOW</span>
+                </div>
+            }
+            else
+            {
+                <div class="ctc-turn-waiting-display">
+                    <span class="ctc-transmitting-icon">&#x2588;&#x2588;&#x2588;</span>
+                    <span class="ctc-turn-badge">Intercepting transmission from @activePlayerName...</span>
+                </div>
+            }
+
+            @* ── Clue input (active player only) ── *@
+            @if (isMyTurn)
+            {
+                <form class="ctc-clue-input-area" @onsubmit="SubmitClue" @onsubmit:preventDefault="true">
+                    <input type="text" class="ctc-clue-input" placeholder="Input sequence (max 50 chars)..."
+                           value="@_clueText" @oninput="OnClueInput" maxlength="50" />
+                    <button type="submit" class="ctc-btn ctc-btn-primary"
+                            disabled="@(string.IsNullOrWhiteSpace(_clueText))">
+                        [ TRANSMIT CLUE ]
+                    </button>
+                </form>
+            }
+            else if (!isEliminated)
+            {
+                <p class="ctc-waiting-text">[ AWAITING TRANSMISSION FROM @activePlayerName.ToUpper() ]</p>
+            }
+
+            @* ── Current round clues ── *@
+            @if (GameState.CurrentRoundClues.Count > 0)
+            {
+                <div class="ctc-clue-history">
+                    <h3 class="ctc-section-title">[ RECENT TRANSMISSIONS ]</h3>
+                    <div class="ctc-clue-list">
+                        @foreach (var clue in GameState.CurrentRoundClues)
+                        {
+                            <div class="ctc-clue-entry typewriter-entry">
+                                <span class="ctc-clue-player">[@clue.PlayerName]:</span>
+                                <span class="ctc-clue-word">@clue.Clue</span>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+
+            @* ── Previously used clues ── *@
+            @if (GameState.UsedClues.Count > 0)
+            {
+                <div class="ctc-used-clues">
+                    <h3 class="ctc-section-title">[ ARCHIVED INTEL (REDACTED) ]</h3>
+                    <div class="ctc-used-clue-list">
+                        @foreach (var usedClue in GameState.UsedClues)
+                        {
+                            <span class="ctc-used-clue-tag redacted-text">@usedClue</span>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+}

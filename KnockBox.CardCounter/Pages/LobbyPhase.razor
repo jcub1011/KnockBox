@@ -1,0 +1,225 @@
+@using KnockBox.Services.State.Users
+@using KnockBox.Services.State.Games.CardCounter
+
+<div class="cc-lobby">
+    @if (UserService.CurrentUser?.Id == GameState.Host.Id)
+    {
+        <button class="cc-settings-gear-btn" @onclick="ToggleSettings" title="House Rules">
+            🎰
+        </button>
+    }
+
+    <div class="cc-lobby-table-container">
+        <div class="cc-lobby-table">
+            <h2 class="cc-lobby-title">♠ WAITING FOR PLAYERS ♥</h2>
+            <div class="cc-lobby-players">
+                @{
+                    bool isUserHost = GameState.Host.Id == UserService.CurrentUser?.Id;
+                }
+
+                @foreach (var player in GameState.Players.Prepend(GameState.Host))
+                {
+                    bool isHost = player.Id == GameState.Host.Id;
+                    bool isMe = player.Id == UserService.CurrentUser?.Id;
+                    @if (isHost)
+                    {
+                        <div class="cc-lobby-player @(isMe ? "cc-lobby-player-me" : "")">
+                            <span class="cc-player-avatar">👑</span>
+                            <span class="cc-player-lobbyname">@player.Name</span>
+                            <span class="cc-host-badge">HOST</span>
+                        </div>
+                    }
+                    else if (isUserHost)
+                    {
+                        <button class="cc-lobby-player @(isMe ? "cc-lobby-player-me" : "")" 
+                                @onclick="() => KickPlayer(player.Id)" title="Click to kick player">
+                            <span class="cc-player-avatar">🃏</span>
+                            <span class="cc-player-lobbyname">@player.Name</span>
+                        </button>
+                    }
+                    else
+                    {
+                        <div class="cc-lobby-player @(isMe ? "cc-lobby-player-me" : "")">
+                            <span class="cc-player-avatar">🃏</span>
+                            <span class="cc-player-lobbyname">@player.Name</span>
+                        </div>
+                    }
+                }
+            </div>
+            @if (UserService.CurrentUser?.Id == GameState.Host.Id)
+            {
+                bool canStart = GameState.Players.Count > 0;
+                <button class="cc-btn cc-btn-primary cc-btn-lg" @onclick="StartGame" disabled="@(!canStart)"
+                        title="@(!canStart ? "Need at least 1 more player to start" : "Deal cards and start the game")">
+                    🃏 DEAL CARDS
+                </button>
+                @if (!canStart)
+                {
+                    <p class="cc-lobby-min-players">⚠️ Need at least 1 more player to start</p>
+                }
+            }
+            else
+            {
+                <p class="cc-waiting-text">Waiting for host to start...</p>
+            }
+        </div>
+    </div>
+
+    @if (UserService.CurrentUser?.Id == GameState.Host.Id)
+    {
+        @if (SettingsOpen)
+        {
+            <div class="cc-settings-backdrop" @onclick="ToggleSettings"></div>
+        }
+        <div class="cc-settings-drawer @(SettingsOpen ? "cc-settings-drawer-open" : "")">
+            <div class="cc-settings-drawer-header">
+                <h3 class="cc-config-title">🎰 House Rules</h3>
+                <button class="cc-settings-close-btn" @onclick="ToggleSettings" title="Close settings">✕</button>
+            </div>
+            <div class="cc-settings-drawer-body">
+
+                <h4 class="cc-config-section-title">🃏 Deck &amp; Cards</h4>
+                <div class="cc-config-grid">
+                    <label class="cc-config-label">
+                        Deck Size:
+                        <input type="number" class="cc-config-input" @bind="GameState.Config.DeckSize" @bind:after="NotifyConfigChanged" />
+                    </label>
+                    <label class="cc-config-label">
+                        Number to Operator Ratio:
+                        <input type="number" step="0.1" class="cc-config-input" @bind="GameState.Config.NumberToOperatorRatio" @bind:after="NotifyConfigChanged" />
+                    </label>
+                    <label class="cc-config-label">
+                        Add/Sub to Mul/Div Ratio:
+                        <input type="number" step="0.1" class="cc-config-input" @bind="GameState.Config.AddSubToMulDivRatio" @bind:after="NotifyConfigChanged" />
+                    </label>
+                    <label class="cc-config-label">
+                        Min Shoe Size:
+                        <input type="number" class="cc-config-input" @bind="GameState.Config.MinShoeSize" @bind:after="NotifyConfigChanged" />
+                    </label>
+                    <label class="cc-config-label">
+                        Max Shoe Size:
+                        <input type="number" class="cc-config-input" @bind="GameState.Config.MaxShoeSize" @bind:after="NotifyConfigChanged" />
+                    </label>
+                </div>
+
+                <h4 class="cc-config-section-title">🎮 Gameplay</h4>
+                <div class="cc-config-grid">
+                    <label class="cc-config-label">
+                        Actions Dealt Per Round:
+                        <input type="number" class="cc-config-input" @bind="GameState.Config.ActionsDealtPerRound" @bind:after="NotifyConfigChanged" />
+                    </label>
+                    <label class="cc-config-label">
+                        Action Hand Limit:
+                        <input type="number" class="cc-config-input" @bind="GameState.Config.ActionHandLimit" @bind:after="NotifyConfigChanged" />
+                    </label>
+                    <label class="cc-config-label">
+                        Passes Per Player:
+                        <input type="number" class="cc-config-input" @bind="GameState.Config.TotalPassesPerPlayer" @bind:after="NotifyConfigChanged" />
+                    </label>
+                    <label class="cc-config-label cc-config-label-row" title="Highest absolute score wins rather than closest to 0">
+                        <span>Flip Win Condition:</span>
+                        <input type="checkbox" class="cc-config-checkbox" @bind="GameState.Config.FlipWinCondition" @bind:after="NotifyConfigChanged" />
+                    </label>
+                    <label class="cc-config-label cc-config-label-row" title="Show the operator used by the Not My Money card">
+                        <span>Show NMM Operator:</span>
+                        <input type="checkbox" class="cc-config-checkbox" @bind="GameState.Config.ShowMakeMyMoneyOperator" @bind:after="NotifyConfigChanged" />
+                    </label>
+                    <label class="cc-config-label cc-config-label-row" title="Number cards apply directly to balance using a player's active operator instead of building a pot">
+                        <span>Active Operator Mode:</span>
+                        <input type="checkbox" class="cc-config-checkbox" @bind="GameState.Config.ActiveOperatorMode" @bind:after="NotifyConfigChanged" />
+                    </label>
+                </div>
+
+                <h4 class="cc-config-section-title">⏱️ Timers</h4>
+                <div class="cc-config-grid">
+                    <label class="cc-config-label cc-config-label-row">
+                        <span>Enable Action Timer:</span>
+                        <input type="checkbox" class="cc-config-checkbox" @bind="GameState.Config.EnableActionTimer" @bind:after="NotifyConfigChanged" />
+                    </label>
+                    <label class="cc-config-label">
+                        Player Turn Timeout (ms):
+                        <input type="number" class="cc-config-input" @bind="GameState.Config.PlayerTurnTimeoutMs" @bind:after="NotifyConfigChanged" />
+                    </label>
+                    <label class="cc-config-label">
+                        Buy-in Timeout (ms):
+                        <input type="number" class="cc-config-input" @bind="GameState.Config.BuyInTimeoutMs" @bind:after="NotifyConfigChanged" />
+                    </label>
+                    <label class="cc-config-label">
+                        Round End Timeout (ms):
+                        <input type="number" class="cc-config-input" @bind="GameState.Config.RoundEndTimeoutMs" @bind:after="NotifyConfigChanged" />
+                    </label>
+                    <label class="cc-config-label">
+                        Reaction Timeout (ms):
+                        <input type="number" class="cc-config-input" @bind="GameState.Config.WaitingForReactionTimeoutMs" @bind:after="NotifyConfigChanged" />
+                    </label>
+                    <label class="cc-config-label">
+                        Feeling Lucky Timeout (ms):
+                        <input type="number" class="cc-config-input" @bind="GameState.Config.FeelingLuckyChainTimeoutMs" @bind:after="NotifyConfigChanged" />
+                    </label>
+                    <label class="cc-config-label">
+                        Make My Luck Timeout (ms):
+                        <input type="number" class="cc-config-input" @bind="GameState.Config.MakeMyLuckTimeoutMs" @bind:after="NotifyConfigChanged" />
+                    </label>
+                    <label class="cc-config-label">
+                        Not My Money Timeout (ms):
+                        <input type="number" class="cc-config-input" @bind="GameState.Config.NotMyMoneyTimeoutMs" @bind:after="NotifyConfigChanged" />
+                    </label>
+                    <label class="cc-config-label">
+                        Skim Timeout (ms):
+                        <input type="number" class="cc-config-input" @bind="GameState.Config.SkimTimeoutMs" @bind:after="NotifyConfigChanged" />
+                    </label>
+                </div>
+
+                <h4 class="cc-config-section-title">🎴 Action Card Rarities</h4>
+                <div class="cc-config-grid">
+                    <label class="cc-config-label">
+                        Feeling Lucky Weight:
+                        <input type="number" min="0" class="cc-config-input" @bind="GameState.Config.FeelingLuckyWeight" @bind:after="NotifyConfigChanged" />
+                    </label>
+                    <label class="cc-config-label">
+                        Make My Luck Weight:
+                        <input type="number" min="0" class="cc-config-input" @bind="GameState.Config.MakeMyLuckWeight" @bind:after="NotifyConfigChanged" />
+                    </label>
+                    <label class="cc-config-label">
+                        Skim Weight:
+                        <input type="number" min="0" class="cc-config-input" @bind="GameState.Config.SkimWeight" @bind:after="NotifyConfigChanged" />
+                    </label>
+                    <label class="cc-config-label">
+                        Burn Weight:
+                        <input type="number" min="0" class="cc-config-input" @bind="GameState.Config.BurnWeight" @bind:after="NotifyConfigChanged" />
+                    </label>
+                    <label class="cc-config-label">
+                        Turn The Table Weight:
+                        <input type="number" min="0" class="cc-config-input" @bind="GameState.Config.TurnTheTableWeight" @bind:after="NotifyConfigChanged" />
+                    </label>
+                    <label class="cc-config-label">
+                        Comp'd Weight:
+                        <input type="number" min="0" class="cc-config-input" @bind="GameState.Config.CompdWeight" @bind:after="NotifyConfigChanged" />
+                    </label>
+                    <label class="cc-config-label">
+                        Not My Money Weight:
+                        <input type="number" min="0" class="cc-config-input" @bind="GameState.Config.NotMyMoneyWeight" @bind:after="NotifyConfigChanged" />
+                    </label>
+                    <label class="cc-config-label">
+                        Launder Weight:
+                        <input type="number" min="0" class="cc-config-input" @bind="GameState.Config.LaunderWeight" @bind:after="NotifyConfigChanged" />
+                    </label>
+                    <label class="cc-config-label">
+                        Tilt Weight:
+                        <input type="number" min="0" class="cc-config-input" @bind="GameState.Config.TiltWeight" @bind:after="NotifyConfigChanged" />
+                    </label>
+                    <label class="cc-config-label">
+                        Hedge Your Bet Weight:
+                        <input type="number" min="0" class="cc-config-input" @bind="GameState.Config.HedgeYourBetWeight" @bind:after="NotifyConfigChanged" />
+                    </label>
+                    <label class="cc-config-label">
+                        Let It Ride Weight:
+                        <input type="number" min="0" class="cc-config-input" @bind="GameState.Config.LetItRideWeight" @bind:after="NotifyConfigChanged" />
+                    </label>
+                </div>
+
+            </div>
+        </div>
+    }
+</div>
+
