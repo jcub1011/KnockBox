@@ -1,3 +1,5 @@
+@namespace KnockBox.Components.Shared
+@using Microsoft.JSInterop
 @implements IAsyncDisposable
 @inject IJSRuntime JSRuntime
 
@@ -40,12 +42,12 @@
         // Only restart if the time changed significantly (more than 100ms)
         // or if the total duration changed (e.g. phase change with same expiration).
         var timeChanged = Math.Abs((EndTimeUtc - _lastEndTimeUtc).TotalMilliseconds) > 100;
-        
+
         if (timeChanged)
         {
             _lastEndTimeUtc = EndTimeUtc;
             _needsRestart = true;
-            
+
             // Re-sync initial values to avoid large jumps if the render is delayed
             DurationSeconds = (float)Duration.TotalSeconds;
             RemainingSeconds = (float)Math.Max(0, (EndTimeUtc - DateTimeOffset.UtcNow).TotalSeconds);
@@ -61,7 +63,7 @@
             if (firstRender)
             {
                 _dotNetRef = DotNetObjectReference.Create(this);
-                _jsModule = await JSRuntime.InvokeAsync<IJSObjectReference>("import", "./js/countdownClock.js");
+                _jsModule = await JSRuntime.InvokeAsync<IJSObjectReference>("import", "./_content/KnockBox.Core/js/countdownClock.js");
             }
 
             if (_jsModule is not null)

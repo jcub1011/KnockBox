@@ -1,4 +1,4 @@
-﻿using KnockBox.Extensions.Returns;
+using KnockBox.Extensions.Returns;
 
 namespace KnockBox.Services.State.Shared;
 

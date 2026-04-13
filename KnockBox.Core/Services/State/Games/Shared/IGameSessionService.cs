@@ -1,4 +1,4 @@
-﻿using KnockBox.Extensions.Returns;
+using KnockBox.Extensions.Returns;
 using KnockBox.Services.Logic.Games.Shared;
 using System.Diagnostics.CodeAnalysis;
 

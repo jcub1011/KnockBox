@@ -1,4 +1,4 @@
-﻿using KnockBox.Extensions.Returns;
+using KnockBox.Extensions.Returns;
 using System.Diagnostics.CodeAnalysis;
 
 namespace KnockBox.Services.State.Shared;
@@ -44,7 +44,7 @@ public readonly record struct ServiceRegistration<TService>(SessionToken Session
 public interface ISessionServiceProvider
 {
     /// <summary>
-    /// Gets or creates a service scoped to the session token. 
+    /// Gets or creates a service scoped to the session token.
     /// Disposes the returned service after 1 minute of the lifecycle token being disposed.
     /// Service won't be disposed as long as one lifecycle token exists.
     /// </summary>

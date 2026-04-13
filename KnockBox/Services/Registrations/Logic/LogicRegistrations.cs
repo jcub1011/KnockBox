@@ -38,7 +38,10 @@ namespace KnockBox.Services.Registrations.Logic
 
             var moduleTypes = AppDomain.CurrentDomain.GetAssemblies()
                 .SelectMany(a => a.GetTypes())
-                .Where(t => typeof(IGameModule).IsAssignableFrom(t) && !t.IsInterface && !t.IsAbstract);
+                .Where(t => typeof(IGameModule).IsAssignableFrom(t) && !t.IsInterface && !t.IsAbstract)
+                .ToList();
+
+            var pluginAssemblies = new HashSet<System.Reflection.Assembly>();
 
             foreach (var moduleType in moduleTypes)
             {
@@ -46,8 +49,11 @@ namespace KnockBox.Services.Registrations.Logic
                 {
                     module.RegisterServices(services);
                     services.AddSingleton(typeof(IGameModule), module);
+                    pluginAssemblies.Add(moduleType.Assembly);
                 }
             }
+
+            services.AddSingleton(new GamePluginAssemblies(pluginAssemblies));
 
             return services;
         }
