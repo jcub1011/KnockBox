@@ -1,10 +1,10 @@
-using KnockBox.Core.Extensions.Disposable;
-using KnockBox.Core.Extensions.Events;
-using KnockBox.Core.Extensions.Returns;
-using KnockBox.Core.Services.State.Users;
+using KnockBox.Extensions.Disposable;
+using KnockBox.Extensions.Events;
+using KnockBox.Extensions.Returns;
+using KnockBox.Services.State.Users;
 using System.Diagnostics.CodeAnalysis;
 
-namespace KnockBox.Core.Services.State.Games.Shared
+namespace KnockBox.Services.State.Games.Shared
 {
     public abstract class AbstractGameState(User host, ILogger logger) : IDisposable
     {

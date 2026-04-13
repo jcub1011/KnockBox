@@ -120,12 +120,12 @@ Key points: the `LobbyService` is not involved during gameplay. The Razor page i
 
 A singleton service that acts as the lobby registry. Owns a `ConcurrentDictionary<string, LobbyRegistration>` of all active lobbies. Responsibilities include creating lobbies (delegating state creation to the appropriate `AbstractGameEngine`), issuing unique lobby codes via `ILobbyCodeService`, constructing obfuscated lobby URIs, validating join requests, registering players on the game state, and closing lobbies when the host requests it. The `LobbyService` is not involved during gameplay — once a player has joined and received the game state reference, all gameplay flows directly between the Razor page, the game engine, and the state.
 
-Game engine resolution is performed dynamically at runtime. At startup, the platform scans for classes implementing `IGameModule`, which register their respective `AbstractGameEngine` into the DI container as a keyed service. Lobby codes are 6-character uppercase alphanumeric strings, generated cryptographically and filtered through `IProfanityFilter`. Code generation and release are handled by `ILobbyCodeService`.
+Game engine resolution uses `IServiceProvider.GetService<T>()` with a `GameType` switch expression. Lobby codes are 6-character uppercase alphanumeric strings, generated cryptographically and filtered through `IProfanityFilter`. Code generation and release are handled by `ILobbyCodeService`.
 
 ```csharp
 public interface ILobbyService
 {
-    Task<ValueResult<LobbyRegistration>> CreateLobbyAsync(User host, string routeIdentifier, CancellationToken ct = default);
+    Task<ValueResult<LobbyRegistration>> CreateLobbyAsync(User host, GameType gameType, CancellationToken ct = default);
     Task<ValueResult<UserRegistration>> JoinLobbyAsync(User user, string lobbyCode, CancellationToken ct = default);
     Task<Result> CloseLobbyAsync(User user, LobbyRegistration registration, CancellationToken ct = default);
 }
@@ -133,15 +133,14 @@ public interface ILobbyService
 
 ### LobbyRegistration
 
-A lightweight container representing a single game session. Holds the lobby code (6-char string), the lobby URI (used for navigation), the game's name and its `RouteIdentifier`, and a reference to the `AbstractGameState`. The lobby does not track a status enum — the game's joinability is owned by the state via the `IsJoinable` property, and lobby lifetime is tied to the host's circuit. When a player joins, the lobby provides them with the game state reference via `UserRegistration`.
+A lightweight container representing a single game session. Holds the lobby code (6-char string), the lobby URI (used for navigation), the `GameType` enum value, and a reference to the `AbstractGameState`. The lobby does not track a status enum — the game's joinability is owned by the state via the `IsJoinable` property, and lobby lifetime is tied to the host's circuit. When a player joins, the lobby provides them with the game state reference via `UserRegistration`.
 
 ```csharp
-public class LobbyRegistration(string lobbyCode, string lobbyUri, string gameName, string routeIdentifier, AbstractGameState state)
+public class LobbyRegistration(string lobbyCode, string lobbyUri, GameType gameType, AbstractGameState state)
 {
     public readonly string Code = lobbyCode;
     public readonly string Uri = lobbyUri;       // e.g. "room/dice-simulator/{guidA}-{guidB}"
-    public readonly string GameName = gameName;
-    public readonly string RouteIdentifier = routeIdentifier;
+    public readonly GameType GameType = gameType;
     public readonly AbstractGameState State = state;
 }
 ```
@@ -206,7 +205,7 @@ An abstract base class that defines the minimal contract shared across all games
 
 The game state instance is created when the lobby is created via the engine's `CreateStateAsync()` factory method, and the same instance is used from lobby through gameplay. Players join and subscribe to this state immediately. When the host starts the game, `StartAsync` mutates the existing state in place — there is no state replacement or re-subscription required.
 
-All state mutations go through `Execute` (sync) or `ExecuteAsync` (async), which acquire a per-state `SemaphoreSlim(1, 1)`, execute the mutation, release the lock, and then notify all subscribers. Notification happens *after* the lock is released to keep lock duration minimal and to prevent reentrant deadlocks from listener callbacks. Each listener is invoked with error isolation so that a failing subscriber does not prevent others from being notified.
+All state mutations go through `Execute` (sync) or `ExecuteAsync` (async), which acquire a per-state `SemaphoreSlim(1, 1)`, execute the mutation, release the lock, and then notify all subscribers. Notification happens *after* the lock is released to keep lock duration minimal and to prevent reentrant deadlocks if a listener callback triggers another mutation. Each listener is invoked with error isolation so that a failing subscriber does not prevent others from being notified.
 
 Subscriptions are obtained via `state.StateChangedEventManager.Subscribe(Func<ValueTask>)`, which returns an `IDisposable`. Razor components store the subscription and dispose it when the component is detached, preventing dead callbacks from accumulating.
 
@@ -355,9 +354,26 @@ Thread safety is first-class throughout the application:
 
 ## Routing & Game-Owned Pages
 
-Each game owns its own routable Razor pages. Lobby URIs are constructed as `room/{routeIdentifier}/{guidA}-{guidB}` where `{routeIdentifier}` comes from the `IGameModule` implementation.
+Each game owns its own routable Razor pages. Lobby URIs are constructed as `room/{gameType}/{guidA}-{guidB}` where `{gameType}` comes from the `NavigationString` attribute on the `GameType` enum and the GUID pair is an opaque identifier (it does *not* contain the lobby join code).
 
-Game pages declare matching `@page` directives, e.g., `@page "/room/dice-simulator/{ObfuscatedRoomCode}"`. The route identifier must match the route segment used in the game's page directive.
+```csharp
+public enum GameType
+{
+    [Description("Split The Deck")]
+    [NavigationString("split-the-deck")]
+    SplitTheDeck,
+
+    [Description("Dice Simulator")]
+    [NavigationString("dice-simulator")]
+    DiceSimulator,
+
+    [Description("Card Counter")]
+    [NavigationString("card-counter")]
+    CardCounter,
+}
+```
+
+Game pages declare matching `@page` directives, e.g., `@page "/room/dice-simulator/{ObfuscatedRoomCode}"`. The `NavigationString` attribute value must match the route segment used in the game's page directive.
 
 Each game controls its full user experience: the lobby layout, gameplay phases, transitions, and any game-specific sub-flows. The platform imposes no UI constraints on games.
 
@@ -432,8 +448,8 @@ The following diagram shows the complete lifecycle from a player joining an exis
 
 ### Create Lobby
 
-1. Player selects a game type from the home page (dynamically generated from `IGameModule` implementations).
-2. `LobbyService.CreateLobbyAsync` resolves the selected game's `AbstractGameEngine` from DI via `IServiceProvider.GetKeyedService<AbstractGameEngine>(routeIdentifier)`, calls `engine.CreateStateAsync(host)` to obtain the concrete game state, generates a unique 6-character lobby code via `ILobbyCodeService` (cryptographically random, profanity-filtered), constructs an obfuscated lobby URI (`room/{routeIdentifier}/{guidA}-{guidB}`), creates a `LobbyRegistration`, and stores it in the `ConcurrentDictionary`.
+1. Player selects a game type from the home page.
+2. `LobbyService.CreateLobbyAsync` resolves the selected game's `AbstractGameEngine` from DI via `IServiceProvider`, calls `engine.CreateStateAsync(host)` to obtain the concrete game state, generates a unique 6-character lobby code via `ILobbyCodeService` (cryptographically random, profanity-filtered), constructs an obfuscated lobby URI (`room/{gameType}/{guidA}-{guidB}`), creates a `LobbyRegistration`, and stores it in the `ConcurrentDictionary`.
 3. The host's `GameSessionService.SetCurrentSession` stores the `LobbyRegistration` reference and navigates to the game page.
 4. The game page loads, subscribes to the state, and renders the lobby view.
 
@@ -479,11 +495,21 @@ Adding a game requires these steps:
 
 2. **Subclass `AbstractGameEngine`** — implement `CreateStateAsync(User host)` to return the concrete state instance (wrapped in `ValueResult`), implement `StartAsync(User host, AbstractGameState state)` to begin gameplay, and add game-specific action methods. Each method calls `state.Execute`/`state.ExecuteAsync` — locking and notification are handled automatically.
 
-3. **Create Razor page(s)** — add one or more pages inheriting `DisposableComponent` with `@page "/room/{route-identifier}/{ObfuscatedRoomCode}"`. Inject the concrete engine via DI, subscribe to `state.StateChangedEventManager`, validate the session in `OnInitializedAsync`, and dispose the subscription in `Dispose()`.
+3. **Create Razor page(s)** — add one or more pages inheriting `DisposableComponent` with `@page "/room/{navigation-string}/{ObfuscatedRoomCode}"`. Inject the concrete engine via DI, subscribe to `state.StateChangedEventManager`, validate the session in `OnInitializedAsync`, and dispose the subscription in `Dispose()`.
 
-4. **Implement `IGameModule`** — Create a class in the game project that implements `IGameModule` to provide the game's metadata and register its engine as a keyed service.
+4. **Add the `GameType` enum value** — add an entry to the `GameType` enum with `[Description("...")]` and `[NavigationString("...")]` attributes.
 
-No changes to the lobby service interface, join flow, navigation infrastructure, home page, or any other game's code are required. The platform dynamically discovers the new module at runtime.
+5. **Register in DI** — add the engine to `LogicRegistrations.RegisterLogic()`:
+   ```csharp
+   services.AddSingleton<MyGameEngine>();
+   ```
+
+6. **Add the engine resolution** — add the case to the `GameType` switch in `LobbyService.CreateLobbyAsync`:
+   ```csharp
+   GameType.MyGame => serviceProvider.GetService<MyGameEngine>(),
+   ```
+
+No changes to the lobby service interface, join flow, navigation infrastructure, or any other game's code.
 
 ---
 
@@ -498,8 +524,8 @@ DI is organized into registration extension methods called from `Program.cs`:
 | `IProfanityFilter` | `ProfanityFilter` | Aho-Corasick profanity detection |
 | `ILobbyCodeService` | `LobbyCodeService` | Lobby code generation and release |
 | `IRandomNumberService` | `RandomNumberService` | Fast and secure random number generation |
-| `IGameModule` | *(discovered at runtime)* | Metadata and service registration for individual games |
-| `AbstractGameEngine` | *(keyed per game)* | Keyed game logic engines |
+| *(concrete)* | `DiceSimulatorGameEngine` | Dice simulator game logic |
+| *(concrete)* | `CardCounterGameEngine` | Card counter game logic |
 
 ### RegisterStateServices() — Mixed
 
@@ -579,7 +605,7 @@ _stateSubscription?.Dispose();
 
 **JS interop for client storage and file export.** Browser `localStorage` is used for persisting the user's display name across sessions, and a JS module handles CSV file downloads for the Dice Simulator.
 
-**Route convention is runtime-enforced.** The route identifier from the `IGameModule` must match the route segment used in the game's Razor page `@page` directive. A mismatch will result in a 404 at navigation time.
+**Route convention is runtime-enforced.** The `NavigationString` attribute on the `GameType` enum must match the route segment used in the game's Razor page `@page` directive. A mismatch will result in a 404 at navigation time.
 
 ---
 
@@ -592,9 +618,27 @@ _stateSubscription?.Dispose();
 | Real-time updates | `IDisposable` event subscriptions via `ThreadSafeEventManager` |
 | State storage | In-memory (`ConcurrentDictionary`, per-state `SemaphoreSlim` locking) |
 | Scheduled transitions | `ScheduleCallback` on `AbstractGameState` (returns `CancellationTokenSource`) |
-| Game plugin system | .NET dynamic assembly scanning (`IGameModule` implementations) |
-| Game UI | Game-owned Razor pages at `/room/{route-identifier}/{obfuscated-code}` |
+| Game plugin system | .NET dependency injection (`AbstractGameEngine` subclasses) |
+| Game UI | Game-owned Razor pages at `/room/{game-type}/{obfuscated-code}` |
 | Database | PostgreSQL via EF Core (Npgsql) |
+| Logging | Serilog (structured, console sink) |
+| Validation | FluentValidation |
+| Deployment | Docker (docker-compose) |
+| Language | C# 13 / .NET 10 |
+e | PostgreSQL via EF Core (Npgsql) |
+| Logging | Serilog (structured, console sink) |
+| Validation | FluentValidation |
+| Deployment | Docker (docker-compose) |
+| Language | C# 13 / .NET 10 |
+ameState` (returns `CancellationTokenSource`) |
+| Game plugin system | .NET dependency injection (`AbstractGameEngine` subclasses) |
+| Game UI | Game-owned Razor pages at `/room/{game-type}/{obfuscated-code}` |
+| Database | PostgreSQL via EF Core (Npgsql) |
+| Logging | Serilog (structured, console sink) |
+| Validation | FluentValidation |
+| Deployment | Docker (docker-compose) |
+| Language | C# 13 / .NET 10 |
+e | PostgreSQL via EF Core (Npgsql) |
 | Logging | Serilog (structured, console sink) |
 | Validation | FluentValidation |
 | Deployment | Docker (docker-compose) |

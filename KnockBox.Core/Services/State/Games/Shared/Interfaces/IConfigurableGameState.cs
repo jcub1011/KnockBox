@@ -1,4 +1,4 @@
-namespace KnockBox.Core.Services.State.Games.Shared.Interfaces;
+namespace KnockBox.Services.State.Games.Shared.Interfaces;
 
 public interface IConfigurableGameState<TConfig> where TConfig : class, new()
 {

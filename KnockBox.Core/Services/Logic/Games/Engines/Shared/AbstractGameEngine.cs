@@ -1,8 +1,8 @@
-﻿using KnockBox.Core.Extensions.Returns;
-using KnockBox.Core.Services.State.Games.Shared;
-using KnockBox.Core.Services.State.Users;
+﻿using KnockBox.Extensions.Returns;
+using KnockBox.Services.State.Games.Shared;
+using KnockBox.Services.State.Users;
 
-namespace KnockBox.Core.Services.Logic.Games.Engines.Shared
+namespace KnockBox.Services.Logic.Games.Engines.Shared
 {
     public abstract class AbstractGameEngine
     {

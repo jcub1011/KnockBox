@@ -1,14 +1,14 @@
-using KnockBox.CardCounter.Services.Logic.Games;
-using KnockBox.CardCounter.Services.Logic.Games.FSM.States;
-using KnockBox.Core.Services.Logic.RandomGeneration;
-using KnockBox.CardCounter.Services.State.Games;
-using KnockBox.Core.Services.State.Users;
+using KnockBox.Services.Logic.Games.CardCounter;
+using KnockBox.Services.Logic.Games.CardCounter.FSM.States;
+using KnockBox.Services.Logic.RandomGeneration;
+using KnockBox.Services.State.Games.CardCounter;
+using KnockBox.Services.State.Users;
 using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using System.Threading.Tasks;
 
-namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
+namespace KnockBoxTests.Unit.Logic.Games.CardCounter
 {
     /// <summary>
     /// Tests for <see cref="CardCounterGameEngine.HandlePlayerLeft"/> covering turn-order

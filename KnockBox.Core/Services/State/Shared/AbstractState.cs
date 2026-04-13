@@ -1,7 +1,7 @@
-﻿using KnockBox.Core.Extensions.Exceptions;
+﻿using KnockBox.Extensions.Exceptions;
 using System.Collections.Concurrent;
 
-namespace KnockBox.Core.Services.State.Shared
+namespace KnockBox.Services.State.Shared
 {
     public abstract class AbstractState<TSelf> : IState<TSelf>
         where TSelf : class

@@ -1,6 +1,6 @@
-﻿using KnockBox.Core.Extensions.Exceptions;
+﻿using KnockBox.Extensions.Exceptions;
 
-namespace KnockBox.Core.Services.State.Shared
+namespace KnockBox.Services.State.Shared
 {
     #region Enums
 

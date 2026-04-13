@@ -1,6 +1,6 @@
-using KnockBox.Core.Extensions.Disposable;
+using KnockBox.Extensions.Disposable;
 
-namespace KnockBox.Core.Extensions.Events
+namespace KnockBox.Extensions.Events
 {
     public sealed class ThreadSafeEventManager(ILogger? logger = null)
         : IThreadSafeEventManager

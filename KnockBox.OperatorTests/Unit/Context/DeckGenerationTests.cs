@@ -1,11 +1,11 @@
 using KnockBox.Operator.Models;
 using KnockBox.Operator.Services.Logic.FSM;
-using KnockBox.Core.Services.Logic.RandomGeneration;
+using KnockBox.Services.Logic.RandomGeneration;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using System.Linq;
 
-namespace KnockBox.Operator.Tests.Unit.Context;
+namespace KnockBox.OperatorTests.Unit.Context;
 
 [TestClass]
 public class DeckGenerationTests

@@ -1,6 +1,6 @@
-using KnockBox.Core.Extensions.Returns;
-using KnockBox.Core.Services.State.Games.Shared;
-using KnockBox.Core.Services.State.Users;
+using KnockBox.Extensions.Returns;
+using KnockBox.Services.State.Games.Shared;
+using KnockBox.Services.State.Users;
 using Microsoft.Extensions.Logging;
 using Moq;
 

@@ -1,6 +1,5 @@
-using KnockBox.Core.Extensions.Disposable;
-using KnockBox.Core.Extensions.Returns;
-using KnockBox.Core.Services.State.Shared;
+using KnockBox.Extensions.Disposable;
+using KnockBox.Extensions.Returns;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Primitives;
 

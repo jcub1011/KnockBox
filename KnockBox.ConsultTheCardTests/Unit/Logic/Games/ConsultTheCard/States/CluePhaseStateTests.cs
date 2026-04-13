@@ -1,14 +1,14 @@
-using KnockBox.ConsultTheCard.Services.Logic.Games.FSM;
-using KnockBox.ConsultTheCard.Services.Logic.Games.FSM.States;
-using KnockBox.Core.Services.Logic.RandomGeneration;
-using KnockBox.ConsultTheCard.Services.State.Games;
-using KnockBox.ConsultTheCard.Services.State.Games.Data;
-using KnockBox.Core.Services.State.Users;
+using KnockBox.Services.Logic.Games.ConsultTheCard.FSM;
+using KnockBox.Services.Logic.Games.ConsultTheCard.FSM.States;
+using KnockBox.Services.Logic.RandomGeneration;
+using KnockBox.Services.State.Games.ConsultTheCard;
+using KnockBox.Services.State.Games.ConsultTheCard.Data;
+using KnockBox.Services.State.Users;
 using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 
-namespace KnockBox.ConsultTheCard.Tests.Unit.Logic.Games.ConsultTheCard.States
+namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard.States
 {
     [TestClass]
     public class CluePhaseStateTests

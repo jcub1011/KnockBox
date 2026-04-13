@@ -3,8 +3,8 @@ using KnockBox.Operator.Services.Logic.FSM;
 using KnockBox.Operator.Services.Logic.FSM.Commands;
 using KnockBox.Operator.Services.Logic.FSM.States;
 using KnockBox.Operator.Services.State;
-using KnockBox.Core.Services.Logic.RandomGeneration;
-using KnockBox.Core.Services.State.Users;
+using KnockBox.Services.Logic.RandomGeneration;
+using KnockBox.Services.State.Users;
 using KnockBox.Core.Services.State.Games.Shared;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -13,7 +13,7 @@ using System.Collections.Generic;
 using System;
 using System.Linq;
 
-namespace KnockBox.Operator.Tests.Integration.FSM;
+namespace KnockBox.OperatorTests.Integration.FSM;
 
 [TestClass]
 public class GameFlowTests

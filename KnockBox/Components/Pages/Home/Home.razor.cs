@@ -1,13 +1,12 @@
-using KnockBox.Core.Components.Shared;
-using KnockBox.Core.Extensions.Disposable;
-using KnockBox.Core.Extensions.Exceptions;
-using KnockBox.Core.Services.Logic.Games.Shared;
-using KnockBox.Core.Services.Logic.RandomGeneration;
-using KnockBox.Core.Services.State.Games.Shared;
-using KnockBox.Core.Services.State.Users;
+using KnockBox.Components.Shared;
+using KnockBox.Extensions.Disposable;
+using KnockBox.Extensions.Exceptions;
 using KnockBox.Services.Logic.Games.Shared;
+using KnockBox.Services.Logic.RandomGeneration;
+using KnockBox.Services.Navigation.Games;
+using KnockBox.Services.State.Games.Shared;
+using KnockBox.Services.State.Users;
 using Microsoft.AspNetCore.Components;
-using KnockBox.Core.Plugins;
 
 namespace KnockBox.Components.Pages.Home
 {
@@ -19,7 +18,6 @@ namespace KnockBox.Components.Pages.Home
         [Inject] IGameSessionService GameSessionService { get; set; } = default!;
         [Inject] IRandomNumberService RandomNumberService { get; set; } = default!;
         [Inject] ILogger<Home> Logger { get; set; } = default!;
-        [Inject] IEnumerable<IGameModule> GameModules { get; set; } = default!;
 
         [Parameter]
         [SupplyParameterFromQuery(Name = "join")]
@@ -118,7 +116,7 @@ namespace KnockBox.Components.Pages.Home
             GameSessionService.SetCurrentSession(registration);
         }
 
-        private async Task CreateLobby(string routeIdentifier)
+        private async Task CreateLobby(GameType gameType)
         {
             if (!CanJoinOrCreate) return;
 
@@ -129,7 +127,7 @@ namespace KnockBox.Components.Pages.Home
                 return;
             }
 
-            var createResult = await LobbyService.CreateLobbyAsync(user, routeIdentifier, ComponentDetached);
+            var createResult = await LobbyService.CreateLobbyAsync(user, gameType, ComponentDetached);
             if (!createResult.TryGetSuccess(out var lobby))
             {
                 // TODO: Notify user lobby creation failed

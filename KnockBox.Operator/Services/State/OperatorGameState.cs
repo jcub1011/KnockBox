@@ -1,12 +1,12 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using KnockBox.Core.Services.State.Games.Shared;
-using KnockBox.Core.Services.State.Games.Shared.Components;
-using KnockBox.Core.Services.State.Games.Shared.Interfaces;
+using KnockBox.Services.State.Games.Shared;
+using KnockBox.Services.State.Games.Shared.Components;
+using KnockBox.Services.State.Games.Shared.Interfaces;
 using KnockBox.Operator.Models;
 using KnockBox.Operator.Services.Logic.FSM;
 using KnockBox.Operator.Services.Logic.FSM.ActionCommands;
-using KnockBox.Core.Services.State.Users;
+using KnockBox.Services.State.Users;
 using Microsoft.Extensions.Logging;
 
 namespace KnockBox.Operator.Services.State;

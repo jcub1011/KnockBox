@@ -1,6 +1,6 @@
 ﻿using System.Runtime.CompilerServices;
 
-namespace KnockBox.Core.Extensions.ThreadSafety
+namespace KnockBox.Extensions.ThreadSafety
 {
     public static class ReaderWriterLockSlimExtensions
     {

@@ -1,4 +1,4 @@
-using KnockBox.Core.Extensions.Math;
+using KnockBox.Extensions.Math;
 
 namespace KnockBox.Tests.Unit.Extensions.Math;
 
