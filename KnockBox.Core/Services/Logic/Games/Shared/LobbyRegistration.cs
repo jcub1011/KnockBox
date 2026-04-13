@@ -8,27 +8,27 @@ namespace KnockBox.Core.Services.Logic.Games.Shared
         /// <summary>
         /// The code for this lobby.
         /// </summary>
-        public readonly string Code = lobbyCode;
+        public string Code { get; } = lobbyCode;
 
         /// <summary>
-        /// The uri for this lobby. Formatted as "room/{gameType}/{obfuscatedRoomCode}".
+        /// The uri for this lobby. Formatted as "room/{routeIdentifier}/{obfuscatedRoomCode}".
         /// </summary>
-        public readonly string Uri = lobbyUri;
+        public string Uri { get; } = lobbyUri;
 
         /// <summary>
         /// The name of the game.
         /// </summary>
-        public readonly string GameName = gameName;
+        public string GameName { get; } = gameName;
 
         /// <summary>
         /// The route identifier for this game.
         /// </summary>
-        public readonly string RouteIdentifier = routeIdentifier;
+        public string RouteIdentifier { get; } = routeIdentifier;
 
         /// <summary>
         /// The game state for this lobby.
         /// </summary>
-        public readonly AbstractGameState State = state;
+        public AbstractGameState State { get; } = state;
     }
 
     public record class UserRegistration(User User, IDisposable UnregistrationToken, LobbyRegistration LobbyRegistration) : IDisposable
