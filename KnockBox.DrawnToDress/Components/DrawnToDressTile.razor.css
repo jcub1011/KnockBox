@@ -1,0 +1,88 @@
+.dtd-tile {
+    width: 100%;
+    min-height: 160px;
+    padding: 18px 20px;
+    background:
+        repeating-linear-gradient(0deg, transparent 0 23px, rgba(126, 87, 194, 0.18) 23px 24px),
+        repeating-linear-gradient(90deg, transparent 0 23px, rgba(126, 87, 194, 0.18) 23px 24px),
+        linear-gradient(135deg, #fff5fa 0%, #ffe1ef 100%);
+    border: 5px solid #000;
+    border-radius: 16px;
+    box-shadow: 8px 8px 0 #000;
+    color: #4a235a;
+    font-family: var(--font-primary);
+    text-align: center;
+    transition: transform 0.1s, box-shadow 0.1s;
+    position: relative;
+}
+
+.dtd-mannequin {
+    position: relative;
+    width: 50px;
+    height: 64px;
+    margin: 0 auto 8px auto;
+}
+
+.dtd-head {
+    width: 22px;
+    height: 22px;
+    margin: 0 auto;
+    background: #fff;
+    border: 3px solid #000;
+    border-radius: 50%;
+}
+
+.dtd-body {
+    width: 50px;
+    height: 38px;
+    margin: 4px auto 0 auto;
+    background: #ff6fa5;
+    border: 3px solid #000;
+    border-radius: 6px 6px 24px 24px;
+    box-shadow: 2px 2px 0 #000;
+}
+
+.dtd-pencil {
+    position: absolute;
+    bottom: -6px;
+    right: -14px;
+    font-size: 1.6rem;
+    color: #4a235a;
+    transform: rotate(20deg);
+}
+
+.dtd-tile-name {
+    font-size: 1.7rem;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: #4a235a;
+    text-shadow: 2px 2px 0 #fff;
+}
+
+.dtd-tile-tag {
+    margin-top: 4px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: #7e57c2;
+}
+
+.dtd-tile:hover {
+    transform: translate(-3px, -3px);
+    box-shadow: 11px 11px 0 #000;
+}
+
+.dtd-tile:hover .dtd-pencil {
+    transform: rotate(40deg) translate(-2px, -3px);
+}
+
+.dtd-pencil {
+    transition: transform 0.15s ease;
+}
+
+.dtd-tile:active {
+    transform: translate(3px, 3px);
+    box-shadow: 2px 2px 0 #000;
+}

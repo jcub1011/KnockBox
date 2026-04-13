@@ -1,5 +1,7 @@
 using KnockBox.Core.Plugins;
+using KnockBox.Operator.Components;
 using KnockBox.Operator.Services.Logic.Games;
+using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace KnockBox.Operator
@@ -14,5 +16,11 @@ namespace KnockBox.Operator
         {
             services.AddGameEngine<OperatorGameEngine>(RouteIdentifier);
         }
+
+        public RenderFragment GetButtonContent() => builder =>
+        {
+            builder.OpenComponent<OperatorTile>(0);
+            builder.CloseComponent();
+        };
     }
 }

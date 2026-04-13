@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace KnockBox.Core.Plugins
@@ -27,5 +28,13 @@ namespace KnockBox.Core.Plugins
         /// </summary>
         /// <param name="services">The service collection to register services into.</param>
         void RegisterServices(IServiceCollection services);
+
+        /// <summary>
+        /// Returns the inner content rendered inside the game's tile button on the Home screen.
+        /// The host owns the surrounding <c>&lt;button&gt;</c> wrapper (click handler, disabled state,
+        /// aria-label, layout sizing); this fragment owns the visual design that distinguishes the
+        /// game from other tiles.
+        /// </summary>
+        RenderFragment GetButtonContent();
     }
 }

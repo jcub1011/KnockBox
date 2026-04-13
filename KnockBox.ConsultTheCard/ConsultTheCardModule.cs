@@ -1,5 +1,7 @@
-using KnockBox.Core.Plugins;
+using KnockBox.ConsultTheCard.Components;
 using KnockBox.ConsultTheCard.Services.Logic.Games;
+using KnockBox.Core.Plugins;
+using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace KnockBox.ConsultTheCard
@@ -14,5 +16,11 @@ namespace KnockBox.ConsultTheCard
         {
             services.AddGameEngine<ConsultTheCardGameEngine>(RouteIdentifier);
         }
+
+        public RenderFragment GetButtonContent() => builder =>
+        {
+            builder.OpenComponent<ConsultTheCardTile>(0);
+            builder.CloseComponent();
+        };
     }
 }

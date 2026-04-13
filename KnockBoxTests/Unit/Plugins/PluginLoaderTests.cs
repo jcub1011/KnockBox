@@ -1,5 +1,6 @@
 using System.Reflection;
 using KnockBox.Core.Plugins;
+using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -175,6 +176,7 @@ namespace KnockBoxTests.Unit.Plugins
             public string Description => "Used by PluginLoader tests.";
             public string RouteIdentifier => ValidRoute;
             public void RegisterServices(IServiceCollection services) { }
+            public RenderFragment GetButtonContent() => _ => { };
         }
 
         public sealed class DuplicateRouteModuleA : IGameModule
@@ -183,6 +185,7 @@ namespace KnockBoxTests.Unit.Plugins
             public string Description => "First of two duplicates.";
             public string RouteIdentifier => DuplicateRoute;
             public void RegisterServices(IServiceCollection services) { }
+            public RenderFragment GetButtonContent() => _ => { };
         }
 
         public sealed class DuplicateRouteModuleB : IGameModule
@@ -191,6 +194,7 @@ namespace KnockBoxTests.Unit.Plugins
             public string Description => "Second of two duplicates.";
             public string RouteIdentifier => DuplicateRoute;
             public void RegisterServices(IServiceCollection services) { }
+            public RenderFragment GetButtonContent() => _ => { };
         }
 
         public sealed class ThrowingCtorModule : IGameModule
@@ -200,6 +204,7 @@ namespace KnockBoxTests.Unit.Plugins
             public string Description => "Ctor throws.";
             public string RouteIdentifier => ThrowingRoute;
             public void RegisterServices(IServiceCollection services) { }
+            public RenderFragment GetButtonContent() => _ => { };
         }
     }
 }

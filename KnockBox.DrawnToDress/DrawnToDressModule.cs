@@ -1,5 +1,7 @@
 using KnockBox.Core.Plugins;
+using KnockBox.DrawnToDress.Components;
 using KnockBox.DrawnToDress.Services.Logic.Games;
+using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace KnockBox.DrawnToDress
@@ -14,5 +16,11 @@ namespace KnockBox.DrawnToDress
         {
             services.AddGameEngine<DrawnToDressGameEngine>(RouteIdentifier);
         }
+
+        public RenderFragment GetButtonContent() => builder =>
+        {
+            builder.OpenComponent<DrawnToDressTile>(0);
+            builder.CloseComponent();
+        };
     }
 }

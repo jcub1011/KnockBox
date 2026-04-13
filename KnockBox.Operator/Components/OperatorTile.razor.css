@@ -1,0 +1,101 @@
+.op-tile {
+    width: 100%;
+    min-height: 160px;
+    padding: 16px 20px;
+    background: linear-gradient(160deg, #0a1a2f 0%, #0e2a4a 60%, #061226 100%);
+    border: 5px solid #000;
+    border-radius: 16px;
+    box-shadow: 8px 8px 0 #000;
+    color: #ff8a3d;
+    font-family: var(--font-mono, monospace);
+    text-align: center;
+    transition: transform 0.1s, box-shadow 0.1s;
+    position: relative;
+    overflow: hidden;
+}
+
+.op-screen {
+    width: 100%;
+    height: 56px;
+    margin-bottom: 10px;
+    background: #021018;
+    border: 2px solid #ff8a3d;
+    border-radius: 4px;
+    box-shadow: inset 0 0 12px rgba(255, 138, 61, 0.35);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-around;
+    align-items: center;
+    padding: 6px 10px;
+}
+
+.op-wave {
+    width: 100%;
+    height: 14px;
+    background: linear-gradient(90deg,
+        transparent 0%,
+        #ff8a3d 20%,
+        transparent 40%,
+        #ff8a3d 60%,
+        transparent 80%,
+        #ff8a3d 100%);
+    mask: linear-gradient(180deg, transparent 40%, black 50%, transparent 60%);
+    -webkit-mask: linear-gradient(180deg, transparent 40%, black 50%, transparent 60%);
+    opacity: 0.85;
+    animation: op-scan 2s linear infinite;
+}
+
+@keyframes op-scan {
+    0%   { background-position: 0 0; }
+    100% { background-position: 40px 0; }
+}
+
+.op-morse {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+}
+
+.op-dot {
+    width: 6px;
+    height: 6px;
+    background: #ff8a3d;
+    border-radius: 50%;
+    box-shadow: 0 0 4px rgba(255, 138, 61, 0.8);
+}
+
+.op-dash {
+    width: 14px;
+    height: 4px;
+    background: #ff8a3d;
+    border-radius: 2px;
+    box-shadow: 0 0 4px rgba(255, 138, 61, 0.8);
+}
+
+.op-tile-name {
+    font-size: 1.7rem;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 4px;
+    color: #ff8a3d;
+    text-shadow: 2px 2px 0 #000;
+}
+
+.op-tile-tag {
+    margin-top: 4px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: rgba(255, 138, 61, 0.7);
+}
+
+.op-tile:hover {
+    transform: translate(-3px, -3px);
+    box-shadow: 11px 11px 0 #000;
+}
+
+.op-tile:active {
+    transform: translate(3px, 3px);
+    box-shadow: 2px 2px 0 #000;
+}

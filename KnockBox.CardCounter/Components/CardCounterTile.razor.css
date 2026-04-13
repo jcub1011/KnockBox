@@ -1,0 +1,70 @@
+.cc-tile {
+    width: 100%;
+    min-height: 160px;
+    padding: 24px 20px;
+    background: linear-gradient(145deg, #0a0a0a 0%, #1c0008 60%, #2a000c 100%);
+    border: 5px solid #000;
+    border-radius: 16px;
+    box-shadow: 8px 8px 0 #000, inset 0 0 30px rgba(212, 175, 55, 0.15);
+    color: #f5d76e;
+    font-family: var(--font-primary);
+    text-align: center;
+    transition: transform 0.1s, box-shadow 0.1s;
+    position: relative;
+    overflow: hidden;
+}
+
+.cc-tile::before {
+    content: "";
+    position: absolute;
+    inset: 8px;
+    border: 1px dashed rgba(245, 215, 110, 0.35);
+    border-radius: 10px;
+    pointer-events: none;
+}
+
+.cc-tile-suits {
+    display: flex;
+    justify-content: space-between;
+    font-size: 1.4rem;
+    margin-bottom: 12px;
+    line-height: 1;
+}
+
+.cc-suit-spade,
+.cc-suit-club {
+    color: #f5d76e;
+}
+
+.cc-suit-heart,
+.cc-suit-diamond {
+    color: #d83a3a;
+}
+
+.cc-tile-name {
+    font-size: 1.8rem;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: #f5d76e;
+    text-shadow: 2px 2px 0 #000;
+}
+
+.cc-tile-tag {
+    margin-top: 6px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: rgba(245, 215, 110, 0.7);
+}
+
+.cc-tile:hover {
+    transform: translate(-3px, -3px);
+    box-shadow: 11px 11px 0 #000, inset 0 0 40px rgba(212, 175, 55, 0.25);
+}
+
+.cc-tile:active {
+    transform: translate(3px, 3px);
+    box-shadow: 2px 2px 0 #000, inset 0 0 30px rgba(212, 175, 55, 0.15);
+}

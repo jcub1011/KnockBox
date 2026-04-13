@@ -138,41 +138,22 @@ h1 {
     margin: 0 auto;
 }
 
-.game {
+/* Structural shell only — each game module owns its own visual design via GetButtonContent(). */
+.game-tile {
     flex: 1;
     min-width: 200px;
-    padding: 40px 20px;
-    font-family: var(--font-primary);
-    font-size: 1.8rem;
-    font-weight: 900;
-    text-transform: uppercase;
-    color: #fff;
-    background-color: #ff0055;
-    border: 5px solid #000;
-    border-radius: 16px;
-    box-shadow: 8px 8px 0px #000;
+    padding: 0;
+    border: 0;
+    background: transparent;
     cursor: pointer;
-    transition: transform 0.1s, box-shadow 0.1s;
-    text-shadow: 2px 2px 0 #000;
+    display: block;
+    font: inherit;
+    color: inherit;
 }
 
-.game:hover:not(:disabled) {
-    transform: translate(-3px, -3px);
-    box-shadow: 11px 11px 0px #000;
-    background-color: #ff3377;
-}
-
-.game:active:not(:disabled) {
-    transform: translate(3px, 3px);
-    box-shadow: 2px 2px 0px #000;
-}
-
-.game:disabled {
-    background-color: #888;
-    color: #ccc;
-    box-shadow: none;
-    transform: none;
+.game-tile:disabled {
+    opacity: 0.5;
+    filter: grayscale(1);
     cursor: not-allowed;
-    border-color: #666;
-    text-shadow: none;
+    pointer-events: none;
 }

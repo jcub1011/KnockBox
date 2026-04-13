@@ -1,5 +1,7 @@
-using KnockBox.Core.Plugins;
+using KnockBox.CardCounter.Components;
 using KnockBox.CardCounter.Services.Logic.Games;
+using KnockBox.Core.Plugins;
+using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace KnockBox.CardCounter
@@ -14,5 +16,11 @@ namespace KnockBox.CardCounter
         {
             services.AddGameEngine<CardCounterGameEngine>(RouteIdentifier);
         }
+
+        public RenderFragment GetButtonContent() => builder =>
+        {
+            builder.OpenComponent<CardCounterTile>(0);
+            builder.CloseComponent();
+        };
     }
 }

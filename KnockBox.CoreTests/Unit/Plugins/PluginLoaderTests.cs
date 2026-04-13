@@ -1,4 +1,5 @@
 using KnockBox.Core.Plugins;
+using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -16,6 +17,7 @@ public sealed class TestPluginModuleA : IGameModule
     public string Description => "A test plugin module.";
     public string RouteIdentifier => "pluginloader-tests-route-a";
     public void RegisterServices(IServiceCollection services) { }
+    public RenderFragment GetButtonContent() => _ => { };
 }
 
 public sealed class TestPluginModuleDuplicateA : IGameModule
@@ -24,6 +26,7 @@ public sealed class TestPluginModuleDuplicateA : IGameModule
     public string Description => "A test plugin module with a duplicate route id.";
     public string RouteIdentifier => "pluginloader-tests-route-a";
     public void RegisterServices(IServiceCollection services) { }
+    public RenderFragment GetButtonContent() => _ => { };
 }
 
 [TestClass]
