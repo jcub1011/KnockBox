@@ -158,11 +158,16 @@ public sealed class PluginLoaderTests
     }
 
     [TestMethod]
-    public void LoadModules_DuplicateRouteIdentifier_KeepsOneAndLogsError()
+    public void LoadModules_DuplicateRouteIdentifier_KeepsOneAndLogsErrorNamingBoth()
     {
         // Both TestPluginModuleA and TestPluginModuleDuplicateA share the same
         // RouteIdentifier and live in the same (test) assembly, so a single load
         // pass exercises the duplicate-detection branch.
+        //
+        // Type.GetTypes() does not guarantee ordering, so we don't assert *which*
+        // duplicate wins. Instead we lock in the documented contract: exactly one
+        // module survives, and the error log names BOTH type full names so ops
+        // can identify the collision from the log alone.
         AssertFixtureIsolation();
 
         var logger = MakeLogger();
@@ -181,7 +186,11 @@ public sealed class PluginLoaderTests
 
             int matches = result.Modules.Count(m => m.RouteIdentifier == "pluginloader-tests-route-a");
             Assert.AreEqual(1, matches, "Duplicate route identifiers must collapse to a single registration.");
-            VerifyLogged(logger, LogLevel.Error, Times.AtLeastOnce());
+
+            VerifyErrorLoggedContainingBoth(
+                logger,
+                typeof(TestPluginModuleA).FullName!,
+                typeof(TestPluginModuleDuplicateA).FullName!);
         }
         finally
         {
@@ -219,5 +228,28 @@ public sealed class PluginLoaderTests
             It.IsAny<Exception?>(),
             It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
             times);
+    }
+
+    /// <summary>
+    /// Verifies that at least one Error-level log entry's formatted message
+    /// contains both of the given type names. Using the rendered message is
+    /// robust to template-argument ordering and lets us pin the "error names
+    /// both types" contract without depending on the specific template shape.
+    /// </summary>
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1873:Avoid potentially expensive logging", Justification = "It's not a big deal.")]
+    private static void VerifyErrorLoggedContainingBoth(
+        Mock<ILogger<PluginLoader>> logger,
+        string firstTypeName,
+        string secondTypeName)
+    {
+        logger.Verify(l => l.Log(
+            LogLevel.Error,
+            It.IsAny<EventId>(),
+            It.Is<It.IsAnyType>((state, _) =>
+                state.ToString()!.Contains(firstTypeName) &&
+                state.ToString()!.Contains(secondTypeName)),
+            It.IsAny<Exception?>(),
+            It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.AtLeastOnce());
     }
 }

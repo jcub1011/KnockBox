@@ -168,7 +168,7 @@ namespace KnockBox.ConsultTheCard.Tests.Unit.Logic.Games.ConsultTheCard
         public void SelectWordPair_ResetsWhenAllUsed()
         {
             // Use a small word bank for this test.
-            _context.WordBank = [new WordGroup(["A", "B"]), new WordGroup(["C", "D"])];
+            _context.UseWordBank([new WordGroup(["A", "B"]), new WordGroup(["C", "D"])]);
 
             int callCount = 0;
             _randomMock
@@ -558,11 +558,11 @@ namespace KnockBox.ConsultTheCard.Tests.Unit.Logic.Games.ConsultTheCard
         public void SelectWordPair_WorksWithVariableSizeGroups()
         {
             // Provide groups with 2, 3, and 5 words.
-            _context.WordBank = [
+            _context.UseWordBank([
                 new WordGroup(["A", "B"]),
                 new WordGroup(["C", "D", "E"]),
                 new WordGroup(["F", "G", "H", "I", "J"]),
-            ];
+            ]);
 
             int callCount = 0;
             _randomMock

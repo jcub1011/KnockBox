@@ -270,14 +270,14 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM
                 return;
             }
 
+            // The divide-by-zero case is handled by the early return above, so the
+            // Divide branch here is always safe to divide.
             player.Balance = card.Op switch
             {
                 Operator.Add => player.Balance + potValue,
                 Operator.Subtract => player.Balance - potValue,
                 Operator.Multiply => Math.Round(player.Balance * potValue, MidpointRounding.AwayFromZero),
-                Operator.Divide => potValue == 0
-                    ? player.Balance
-                    : Math.Round(player.Balance / potValue, MidpointRounding.AwayFromZero),
+                Operator.Divide => Math.Round(player.Balance / potValue, MidpointRounding.AwayFromZero),
                 _ => player.Balance + potValue
             };
 
@@ -290,13 +290,22 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM
         /// <summary>
         /// Reverses the digit order of a balance value, preserving its sign.
         /// Used by Turn The Table in Active Operator Mode.
-        /// E.g., 123 → 321, -42 → -24, 0 → 0.
+        /// <para>
+        /// Balances are treated as integers: any fractional component is rounded
+        /// to the nearest whole number (away from zero) before reversal, so the
+        /// result is always an integer.
+        /// </para>
+        /// <para>
+        /// E.g., 123 → 321, -42 → -24, 0 → 0, 12.5 → round(13) → 31, -12.5 → -31.
+        /// </para>
         /// </summary>
         public static double ReverseBalanceDigits(double balance)
         {
             if (balance == 0) return 0;
             double sign = balance < 0 ? -1 : 1;
-            string digits = ((long)Math.Abs(balance)).ToString();
+            long magnitude = (long)Math.Round(Math.Abs(balance), MidpointRounding.AwayFromZero);
+            if (magnitude == 0) return 0;
+            string digits = magnitude.ToString();
             char[] arr = digits.ToCharArray();
             Array.Reverse(arr);
             return sign * long.Parse(new string(arr));

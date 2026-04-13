@@ -51,9 +51,39 @@ jobs:
           fi
           echo "Tag '${{ steps.resolve.outputs.tag }}' is on main. Proceeding."
 
-  build:
-    name: Build ${{ matrix.rid }} (${{ matrix.mode }})
+  # Plugins are built once and shared across every RID/mode in the publish
+  # matrix. The plugin build itself is RID-agnostic (pure managed code targeting
+  # net10.0), so rebuilding it per matrix leg is wasted CI time.
+  build-plugins:
+    name: Build plugins (shared)
     needs: verify-main
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore KnockBox.slnx
+
+      - name: Build solution (populates plugin games/ folder)
+        run: dotnet build KnockBox.slnx -c Release --no-restore
+
+      - name: Upload games/ artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: knockbox-plugins
+          path: KnockBox/bin/Release/net10.0/games/
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    name: Publish ${{ matrix.rid }} (${{ matrix.mode }})
+    needs: [verify-main, build-plugins]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -79,10 +109,13 @@ jobs:
           fi
 
       - name: Restore
-        run: dotnet restore KnockBox.slnx
+        run: dotnet restore KnockBox/KnockBox.csproj
 
-      - name: Build solution (populates plugin games/ folder)
-        run: dotnet build KnockBox.slnx -c Release --no-restore
+      - name: Download prebuilt games/ artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: knockbox-plugins
+          path: KnockBox/bin/Release/net10.0/games/
 
       - name: Publish host
         run: |
@@ -94,6 +127,7 @@ jobs:
           dotnet publish KnockBox/KnockBox.csproj \
             -c Release \
             -r ${{ matrix.rid }} \
+            --no-restore \
             --self-contained $SELF_CONTAINED \
             -p:PublishSingleFile=false \
             -p:UseAppHost=true \
@@ -133,15 +167,16 @@ jobs:
 
   release:
     name: Publish GitHub Release
-    needs: [verify-main, build]
+    needs: [verify-main, publish]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - name: Download all artifacts
+      - name: Download all publish artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
+          pattern: knockbox-*
           merge-multiple: true
 
       - name: List artifacts

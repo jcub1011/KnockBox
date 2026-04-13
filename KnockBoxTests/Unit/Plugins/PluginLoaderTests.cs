@@ -36,14 +36,21 @@ namespace KnockBoxTests.Unit.Plugins
         {
             // Stage this test assembly into a temp "games" directory so the
             // loader scans it via its public API surface.
+            //
+            // Assertions match on RouteIdentifier (a string), not on the
+            // concrete type: plugins load into a per-plugin PluginLoadContext,
+            // so the type identity of ValidFakeModule in the ALC differs from
+            // this test's default-ALC view. The IGameModule contract itself
+            // is a shared-contract interface, so the route-id string is the
+            // stable identity across the boundary.
             var tempDir = CreateStagingDirWithThisAssembly();
             try
             {
                 var result = _loader.LoadModules(tempDir);
 
-                // Must find at least our valid fake module.
-                Assert.Contains(m => m is ValidFakeModule, result.Modules,
-                    "Expected ValidFakeModule to be discovered.");
+                Assert.Contains(
+                    m => m.RouteIdentifier == ValidRoute, result.Modules,
+                    "Expected ValidFakeModule (by route id) to be discovered.");
             }
             finally
             {
@@ -81,9 +88,11 @@ namespace KnockBoxTests.Unit.Plugins
             {
                 var result = _loader.LoadModules(tempDir);
 
-                Assert.DoesNotContain(m => m is ThrowingCtorModule, result.Modules,
+                Assert.DoesNotContain(
+                    m => m.RouteIdentifier == ThrowingRoute, result.Modules,
                     "Module whose ctor throws should be skipped.");
-                Assert.Contains(m => m is ValidFakeModule, result.Modules,
+                Assert.Contains(
+                    m => m.RouteIdentifier == ValidRoute, result.Modules,
                     "Valid modules should still load when another module's ctor throws.");
                 VerifyLogged(LogLevel.Error, Times.AtLeastOnce());
             }
@@ -109,7 +118,8 @@ namespace KnockBoxTests.Unit.Plugins
                 var result = _loader.LoadModules(tempDir);
 
                 // Valid modules still come through.
-                Assert.Contains(m => m is ValidFakeModule, result.Modules);
+                Assert.Contains(
+                    m => m.RouteIdentifier == ValidRoute, result.Modules);
                 VerifyLogged(LogLevel.Error, Times.AtLeastOnce());
             }
             finally
@@ -120,7 +130,9 @@ namespace KnockBoxTests.Unit.Plugins
 
         // --- helpers ---
 
+        private const string ValidRoute = "valid-fake";
         private const string DuplicateRoute = "duplicate-route";
+        private const string ThrowingRoute = "throws";
 
         private static string CreateStagingDirWithThisAssembly()
         {
@@ -161,7 +173,7 @@ namespace KnockBoxTests.Unit.Plugins
         {
             public string Name => "Valid Fake";
             public string Description => "Used by PluginLoader tests.";
-            public string RouteIdentifier => "valid-fake";
+            public string RouteIdentifier => ValidRoute;
             public void RegisterServices(IServiceCollection services) { }
         }
 
@@ -186,7 +198,7 @@ namespace KnockBoxTests.Unit.Plugins
             public ThrowingCtorModule() => throw new InvalidOperationException("boom");
             public string Name => "Throws";
             public string Description => "Ctor throws.";
-            public string RouteIdentifier => "throws";
+            public string RouteIdentifier => ThrowingRoute;
             public void RegisterServices(IServiceCollection services) { }
         }
     }

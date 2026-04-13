@@ -98,6 +98,19 @@ namespace KnockBox.Core.Plugins
                 }
             }
 
+            // Snapshot host-loaded assembly names ONCE, before any plugin loads. Using a
+            // frozen snapshot makes IsSharedContract deterministic: every plugin sees the
+            // same contract surface regardless of load order, and we avoid an O(N)
+            // AppDomain scan on every assembly resolution. Anything loaded into the
+            // default ALC *after* this point (including by earlier plugins) will be
+            // treated as plugin-private by later plugins -- which is exactly what we
+            // want for isolation.
+            var hostAssemblyNames = new HashSet<string>(
+                AppDomain.CurrentDomain.GetAssemblies()
+                    .Select(a => a.GetName().Name)
+                    .Where(n => n is not null)!,
+                StringComparer.OrdinalIgnoreCase);
+
             var assemblies = new List<Assembly>(pluginDllPaths.Count);
 
             foreach (var dllPath in pluginDllPaths)
@@ -105,22 +118,26 @@ namespace KnockBox.Core.Plugins
                 try
                 {
                     var primaryAssemblyName = AssemblyName.GetAssemblyName(dllPath).Name;
+                    if (string.IsNullOrEmpty(primaryAssemblyName))
+                    {
+                        logger.LogWarning(
+                            "Plugin assembly at [{DllPath}] has no readable AssemblyName; skipping.",
+                            dllPath);
+                        continue;
+                    }
 
                     bool IsSharedContract(AssemblyName name)
                     {
-                        if (name.Name is null)
+                        if (string.IsNullOrEmpty(name.Name))
                             return false;
                         // Never share the plugin's own primary assembly -- each plugin
                         // must load into its own ALC even if something with the same
                         // name is already in the default ALC.
                         if (string.Equals(name.Name, primaryAssemblyName, StringComparison.OrdinalIgnoreCase))
                             return false;
-                        // If the host already has it loaded, share it. This preserves
-                        // type identity for contracts (KnockBox.Core, logging/DI
-                        // abstractions, BCL) and keeps "host wins on conflict"
-                        // semantics for anything else the host has resolved.
-                        return AppDomain.CurrentDomain.GetAssemblies()
-                            .Any(a => string.Equals(a.GetName().Name, name.Name, StringComparison.OrdinalIgnoreCase));
+                        // Host-owned contracts (KnockBox.Core, logging/DI abstractions,
+                        // BCL) must share type identity across the host/plugin boundary.
+                        return hostAssemblyNames.Contains(name.Name);
                     }
 
                     var alc = new PluginLoadContext(dllPath, IsSharedContract);
@@ -148,14 +165,18 @@ namespace KnockBox.Core.Plugins
             }
             catch (ReflectionTypeLoadException ex)
             {
+                // Fail the whole assembly on partial-load failures. Partial activation
+                // of a broken plugin is worse than skipping it entirely: it leaves
+                // ops with a confusing mix of logged errors and seemingly-working
+                // modules that will blow up later when missing types are touched.
                 foreach (var loaderException in ex.LoaderExceptions.Where(e => e is not null))
                 {
                     logger.LogError(
                         loaderException,
-                        "Loader exception while scanning [{Assembly}] for game modules.",
+                        "Loader exception while scanning [{Assembly}] for game modules; skipping the entire assembly.",
                         assembly.GetName().Name);
                 }
-                types = ex.Types;
+                yield break;
             }
             catch (Exception ex)
             {

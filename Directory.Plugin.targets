@@ -6,15 +6,22 @@
     Imported by each plugin .csproj to publish build output into the host app's
     games/{TargetName}/ folder so the host can discover and load it at runtime.
 
-    We deliberately copy ONLY plugin-owned outputs, not the full $(TargetDir).
-    Rationale: plugins share the default AssemblyLoadContext with the host, so
-      (a) any transitive dep the host already ships is shadowed at load time by
-          the host's TPA; copies under games/{Plugin}/ are dead disk weight,
-          and
-      (b) any plugin-private transitive dep is not found by default-ALC probing
-          from the games/{Plugin}/ folder regardless, so copying it there does
-          not make it loadable. Plugin-private deps must be promoted to the
-          host's bin by some other mechanism if they are truly needed.
+    Each plugin is loaded into its own PluginLoadContext (ALC) at runtime, and
+    that ALC uses an AssemblyDependencyResolver rooted at games/{TargetName}/
+    to resolve transitive deps. In principle, any dep dropped into this folder
+    alongside a matching {Plugin}.deps.json entry is resolvable.
+
+    We still deliberately copy ONLY plugin-owned outputs, not the full
+    $(TargetDir). Rationale:
+      (a) Host-owned contracts (KnockBox.Core, logging/DI abstractions, BCL)
+          are classified as shared at load time and deferred to the default
+          ALC so type identity is preserved across the host/plugin boundary.
+          Copies under games/{Plugin}/ for those assemblies are dead disk
+          weight; they will never be loaded from there.
+      (b) Current plugins have no host-unknown transitive deps. If a future
+          plugin genuinely needs a private dep that the host does NOT ship,
+          extend this targets file to include it explicitly; the ALC will
+          pick it up via AssemblyDependencyResolver.
 
     Copies:
       1. The primary assembly, its PDB, and its deps.json.

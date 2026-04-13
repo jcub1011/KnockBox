@@ -40,9 +40,8 @@ namespace KnockBox.ConsultTheCard.Services.Logic.Games.FSM
         /// <summary>
         /// Lazily loads the word bank from <c>WordPairs.csv</c> on first access so that
         /// file I/O stays off the DI construction path; failures surface at the first
-        /// game start rather than at service resolution. The setter replaces the lazy
-        /// with a pre-materialized one so tests can inject a deterministic bank without
-        /// the CSV loader ever running.
+        /// game start rather than at service resolution. Tests can inject a
+        /// deterministic bank via <see cref="UseWordBank"/>.
         /// </summary>
         private Lazy<IReadOnlyList<WordGroup>>? _wordBank;
 
@@ -51,16 +50,30 @@ namespace KnockBox.ConsultTheCard.Services.Logic.Games.FSM
 
         /// <summary>
         /// The word bank providing word groups, loaded from <c>WordPairs.csv</c> on
-        /// first access. Setting a non-null value replaces the loader entirely so
-        /// subsequent reads skip file I/O; setting <c>null</c> resets to the default
-        /// file-backed loader.
+        /// first access. Use <see cref="UseWordBank"/> to override and
+        /// <see cref="ResetWordBank"/> to return to the default file-backed loader.
         /// </summary>
         public IReadOnlyList<WordGroup> WordBank
+            => (_wordBank ??= DefaultWordBankLoader()).Value;
+
+        /// <summary>
+        /// Replaces the word bank with a pre-materialized list. Subsequent reads of
+        /// <see cref="WordBank"/> return the provided list directly without touching
+        /// the CSV loader. Intended for tests that need a deterministic bank.
+        /// </summary>
+        public void UseWordBank(IReadOnlyList<WordGroup> wordBank)
         {
-            get => (_wordBank ??= DefaultWordBankLoader()).Value;
-            set => _wordBank = value is null
-                ? DefaultWordBankLoader()
-                : new Lazy<IReadOnlyList<WordGroup>>(value);
+            ArgumentNullException.ThrowIfNull(wordBank);
+            _wordBank = new Lazy<IReadOnlyList<WordGroup>>(wordBank);
+        }
+
+        /// <summary>
+        /// Restores the default file-backed word-bank loader. The next read of
+        /// <see cref="WordBank"/> will load <c>WordPairs.csv</c> from disk.
+        /// </summary>
+        public void ResetWordBank()
+        {
+            _wordBank = DefaultWordBankLoader();
         }
 
         // ── Convenience accessors (delegate to State) ─────────────────────────
@@ -164,13 +177,18 @@ namespace KnockBox.ConsultTheCard.Services.Logic.Games.FSM
 
             var group = bank[pick];
 
-            // Select 2 distinct words from the group.
-            int wordIndex1 = Rng.GetRandomInt(group.Words.Length);
-            int wordIndex2;
-            do
-            {
-                wordIndex2 = Rng.GetRandomInt(group.Words.Length);
-            } while (wordIndex2 == wordIndex1);
+            // Select 2 distinct words from the group. Groups with < 2 words are
+            // filtered out by the CSV loader, but a test-injected bank could
+            // violate this, so guard explicitly rather than risking a livelock.
+            int wordCount = group.Words.Length;
+            if (wordCount < 2)
+                throw new InvalidOperationException(
+                    $"Word group at index {pick} has fewer than 2 words ({wordCount}); cannot select a pair.");
+
+            // Pick two distinct indices without a rejection loop: pick the first
+            // index uniformly, then offset by a non-zero amount mod wordCount.
+            int wordIndex1 = Rng.GetRandomInt(wordCount);
+            int wordIndex2 = (wordIndex1 + 1 + Rng.GetRandomInt(wordCount - 1)) % wordCount;
 
             // Randomly assign which is Agent vs Insider.
             bool swap = Rng.GetRandomInt(2) == 0;
