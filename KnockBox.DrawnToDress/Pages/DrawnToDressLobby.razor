@@ -21,50 +21,50 @@
     {
         <LobbyPhase GameState="GameState" />
     }
-    else if (GameState.Phase == KnockBox.Services.State.Games.DrawnToDress.GamePhase.ThemeSelection)
+    else if (GameState.Phase == KnockBox.DrawnToDress.Services.State.Games.GamePhase.ThemeSelection)
     {
         <ThemeSelectionPhase GameState="GameState" />
     }
-    else if (GameState.Phase == KnockBox.Services.State.Games.DrawnToDress.GamePhase.Drawing)
+    else if (GameState.Phase == KnockBox.DrawnToDress.Services.State.Games.GamePhase.Drawing)
     {
         <DrawingPhase GameState="GameState" />
     }
-    else if (GameState.Phase == KnockBox.Services.State.Games.DrawnToDress.GamePhase.PoolReveal
+    else if (GameState.Phase == KnockBox.DrawnToDress.Services.State.Games.GamePhase.PoolReveal
              && (GameState.Context?.CurrentOutfitRound ?? 1) > 1)
     {
         <PoolRevealPhase GameState="GameState"
                          HeadingText="@($"Get Ready for Round {GameState.Context!.CurrentOutfitRound}!")"
                          SubText="@($"Outfit {GameState.Context!.CurrentOutfitRound} building starts in\u2026")" />
     }
-    else if (GameState.Phase == KnockBox.Services.State.Games.DrawnToDress.GamePhase.PoolReveal)
+    else if (GameState.Phase == KnockBox.DrawnToDress.Services.State.Games.GamePhase.PoolReveal)
     {
         <PoolRevealPhase GameState="GameState" />
     }
-    else if (GameState.Phase == KnockBox.Services.State.Games.DrawnToDress.GamePhase.OutfitBuilding)
+    else if (GameState.Phase == KnockBox.DrawnToDress.Services.State.Games.GamePhase.OutfitBuilding)
     {
         <OutfitBuildingPhase GameState="GameState" OutfitRound="@(GameState.Context?.CurrentOutfitRound ?? 1)" />
     }
-    else if (GameState.Phase == KnockBox.Services.State.Games.DrawnToDress.GamePhase.OutfitCustomization)
+    else if (GameState.Phase == KnockBox.DrawnToDress.Services.State.Games.GamePhase.OutfitCustomization)
     {
         <OutfitCustomizationPhase GameState="GameState" OutfitRound="@(GameState.Context?.CurrentOutfitRound ?? 1)" />
     }
-    else if (GameState.Phase == KnockBox.Services.State.Games.DrawnToDress.GamePhase.OutfitDistinctnessResolution)
+    else if (GameState.Phase == KnockBox.DrawnToDress.Services.State.Games.GamePhase.OutfitDistinctnessResolution)
     {
         <OutfitDistinctnessResolutionPhase GameState="GameState" />
     }
-    else if (GameState.Phase == KnockBox.Services.State.Games.DrawnToDress.GamePhase.Voting)
+    else if (GameState.Phase == KnockBox.DrawnToDress.Services.State.Games.GamePhase.Voting)
     {
         <VotingPhase GameState="GameState" />
     }
-    else if (GameState.Phase == KnockBox.Services.State.Games.DrawnToDress.GamePhase.CoinFlip)
+    else if (GameState.Phase == KnockBox.DrawnToDress.Services.State.Games.GamePhase.CoinFlip)
     {
         <CoinFlipPhase GameState="GameState" />
     }
-    else if (GameState.Phase == KnockBox.Services.State.Games.DrawnToDress.GamePhase.VotingRoundResults)
+    else if (GameState.Phase == KnockBox.DrawnToDress.Services.State.Games.GamePhase.VotingRoundResults)
     {
         <VotingRoundResultsPhase GameState="GameState" />
     }
-    else if (GameState.Phase == KnockBox.Services.State.Games.DrawnToDress.GamePhase.Results)
+    else if (GameState.Phase == KnockBox.DrawnToDress.Services.State.Games.GamePhase.Results)
     {
         <FinalResultsPhase GameState="GameState" />
     }

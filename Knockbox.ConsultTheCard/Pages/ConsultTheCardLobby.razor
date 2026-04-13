@@ -1,10 +1,10 @@
 @page "/room/consult-the-card/{ObfuscatedRoomCode}"
 
 @inherits DisposableComponent
-@using KnockBox.Services.State.Games.ConsultTheCard
-@using KnockBox.Services.Logic.Games.ConsultTheCard.FSM
+@using KnockBox.ConsultTheCard.Services.State.Games
+@using KnockBox.ConsultTheCard.Services.Logic.Games.FSM
 @using KnockBox.Core.Services.State.Games.Shared
-@using KnockBox.Components.Shared
+@using KnockBox.Core.Components.Shared
 
 <PageTitle>Consult The Card</PageTitle>
 
@@ -20,7 +20,7 @@ else
     var isInformant = false;
     if (UserService.CurrentUser != null && GameState.GamePlayers.TryGetValue(UserService.CurrentUser.Id, out var p))
     {
-        isInformant = p.Role == KnockBox.Services.State.Games.ConsultTheCard.Role.Informant;
+        isInformant = p.Role == KnockBox.ConsultTheCard.Services.State.Games.Role.Informant;
     }
     
     <div class="ctc-crt-bezel">

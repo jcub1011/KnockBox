@@ -1,6 +1,6 @@
 using KnockBox.Core.Plugins;
-using KnockBox.Services.Logic.Games.Engines.Shared;
-using KnockBox.Services.Logic.Games.DrawnToDress;
+using KnockBox.Core.Services.Logic.Games.Engines.Shared;
+using KnockBox.DrawnToDress.Services.Logic.Games;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace KnockBox.DrawnToDress

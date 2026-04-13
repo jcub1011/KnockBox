@@ -1,4 +1,4 @@
-using KnockBox.Extensions.Collections;
+using KnockBox.Core.Extensions.Collections;
 
 namespace KnockBox.Tests.Unit.Extensions.Collections;
 

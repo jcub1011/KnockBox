@@ -1,9 +1,9 @@
-using KnockBox.Services.Logic.Games.CardCounter;
-using KnockBox.Services.State.Games.CardCounter;
-using KnockBox.Services.State.Games.CardCounter.Data;
-using KnockBox.Services.State.Users;
+using KnockBox.CardCounter.Services.Logic.Games;
+using KnockBox.CardCounter.Services.State.Games;
+using KnockBox.CardCounter.Services.State.Games.Data;
+using KnockBox.Core.Services.State.Users;
 using Microsoft.AspNetCore.Components;
-using CardCounterOperator = KnockBox.Services.State.Games.CardCounter.Operator;
+using CardCounterOperator = KnockBox.CardCounter.Services.State.Games.Operator;
 
 namespace KnockBox.CardCounter.Pages
 {

@@ -1,7 +1,7 @@
-using KnockBox.Extensions.Collections;
-using KnockBox.Services.Logic.Games.CardCounter;
-using KnockBox.Services.State.Games.CardCounter;
-using KnockBox.Services.State.Users;
+using KnockBox.Core.Extensions.Collections;
+using KnockBox.CardCounter.Services.Logic.Games;
+using KnockBox.CardCounter.Services.State.Games;
+using KnockBox.Core.Services.State.Users;
 using Microsoft.AspNetCore.Components;
 
 namespace KnockBox.CardCounter.Pages

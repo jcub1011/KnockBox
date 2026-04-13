@@ -1,0 +1,107 @@
+@namespace KnockBox.Core.Components.Shared
+@using Microsoft.JSInterop
+@implements IAsyncDisposable
+@inject IJSRuntime JSRuntime
+
+@ChildContent(new CountdownState(Fraction, RemainingSeconds, DurationSeconds))
+
+@code {
+    /// <summary>
+    /// Render fragment receiving the current <see cref="CountdownState"/>.
+    /// </summary>
+    [Parameter, EditorRequired]
+    public RenderFragment<CountdownState> ChildContent { get; set; } = default!;
+
+    /// <summary>UTC time when the countdown expires.</summary>
+    [Parameter, EditorRequired]
+    public DateTimeOffset EndTimeUtc { get; set; }
+
+    /// <summary>Total countdown duration.</summary>
+    [Parameter, EditorRequired]
+    public TimeSpan Duration { get; set; }
+
+    private string _clockId = $"cc-{Guid.NewGuid():N}";
+    private IJSObjectReference? _jsModule;
+    private DotNetObjectReference<CountdownClock>? _dotNetRef;
+    private DateTimeOffset _lastEndTimeUtc;
+    private bool _needsRestart;
+
+    private float Fraction { get; set; } = 1f;
+    private float RemainingSeconds { get; set; }
+    private float DurationSeconds { get; set; }
+
+    protected override void OnInitialized()
+    {
+        DurationSeconds = (float)Duration.TotalSeconds;
+        RemainingSeconds = DurationSeconds;
+        _lastEndTimeUtc = EndTimeUtc;
+    }
+
+    protected override void OnParametersSet()
+    {
+        // Only restart if the time changed significantly (more than 100ms)
+        // or if the total duration changed (e.g. phase change with same expiration).
+        var timeChanged = Math.Abs((EndTimeUtc - _lastEndTimeUtc).TotalMilliseconds) > 100;
+
+        if (timeChanged)
+        {
+            _lastEndTimeUtc = EndTimeUtc;
+            _needsRestart = true;
+
+            // Re-sync initial values to avoid large jumps if the render is delayed
+            DurationSeconds = (float)Duration.TotalSeconds;
+            RemainingSeconds = (float)Math.Max(0, (EndTimeUtc - DateTimeOffset.UtcNow).TotalSeconds);
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender || _needsRestart)
+        {
+            _needsRestart = false;
+
+            if (firstRender)
+            {
+                _dotNetRef = DotNetObjectReference.Create(this);
+                _jsModule = await JSRuntime.InvokeAsync<IJSObjectReference>("import", "./_content/KnockBox.Core/js/countdownClock.js");
+            }
+
+            if (_jsModule is not null)
+            {
+                await _jsModule.InvokeVoidAsync("start",
+                    _clockId,
+                    _dotNetRef,
+                    Math.Max(0, (EndTimeUtc - DateTimeOffset.UtcNow).TotalMilliseconds),
+                    Duration.TotalMilliseconds);
+            }
+        }
+    }
+
+    [JSInvokable]
+    public void OnCountdownTick(float fraction, float remainingSeconds, float durationSeconds)
+    {
+        Fraction = fraction;
+        RemainingSeconds = remainingSeconds;
+        DurationSeconds = durationSeconds;
+        StateHasChanged();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_jsModule is not null)
+        {
+            try
+            {
+                await _jsModule.InvokeVoidAsync("stop", _clockId);
+                await _jsModule.DisposeAsync();
+            }
+            catch (Exception) { }
+        }
+        _dotNetRef?.Dispose();
+    }
+
+    /// <summary>
+    /// Snapshot of the countdown state passed to the child render fragment.
+    /// </summary>
+    public readonly record struct CountdownState(float Fraction, float RemainingSeconds, float DurationSeconds);
+}

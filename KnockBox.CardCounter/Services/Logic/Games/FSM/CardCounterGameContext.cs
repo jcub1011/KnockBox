@@ -1,0 +1,439 @@
+using KnockBox.Core.Services.State.Games.Shared;
+using KnockBox.Core.Extensions.Collections;
+using KnockBox.Core.Services.Logic.RandomGeneration;
+using KnockBox.CardCounter.Services.State.Games;
+using KnockBox.CardCounter.Services.State.Games.Data;
+
+namespace KnockBox.CardCounter.Services.Logic.Games.FSM
+{
+    /// <summary>
+    /// Per-game context that holds shared data and helpers used by FSM states.
+    /// Created when the game starts and stored on <see cref="CardCounterGameState.Context"/>.
+    /// </summary>
+    public class CardCounterGameContext
+    {
+        /// <summary>
+        /// One <see cref="ActionCard"/> per <see cref="ActionType"/>. Rarity is enforced via
+        /// <see cref="GetActionCardWeight"/> instead of by duplicating entries in this array,
+        /// so no extra memory is allocated per draw.
+        /// </summary>
+        private static readonly ActionCard[] ActionCardPool =
+            Enum.GetValues<ActionType>().Select(t => new ActionCard(t)).ToArray();
+
+        /// <summary>
+        /// Filtered pool used when Active Operator Mode is enabled: excludes
+        /// <see cref="ActionType.Skim"/>, <see cref="ActionType.TurnTheTable"/>,
+        /// <see cref="ActionType.Launder"/>, and <see cref="ActionType.NotMyMoney"/> from the
+        /// deal pool since those cards operate on the pot, which does not exist in Active
+        /// Operator Mode. Note: TurnTheTable is still handled if played and will reverse the
+        /// target's balance digits instead of reversing a pot.
+        /// </summary>
+        private static readonly ActionCard[] ActionCardPoolActiveOperator =
+            Enum.GetValues<ActionType>()
+                .Where(t => t != ActionType.Skim
+                         && t != ActionType.TurnTheTable
+                         && t != ActionType.Launder
+                         && t != ActionType.NotMyMoney)
+                .Select(t => new ActionCard(t))
+                .ToArray();
+
+        /// <summary>
+        /// Returns the relative draw weight for <paramref name="card"/> from the game config.
+        /// Higher weight → more likely to be dealt. All weights default to 10 except
+        /// <see cref="ActionType.Tilt"/> which defaults to 1 (10× rarer).
+        /// </summary>
+        private int GetActionCardWeight(ActionCard card) => card.Action switch
+        {
+            ActionType.FeelingLucky => State.Config.FeelingLuckyWeight,
+            ActionType.MakeMyLuck   => State.Config.MakeMyLuckWeight,
+            ActionType.Skim         => State.Config.SkimWeight,
+            ActionType.Burn         => State.Config.BurnWeight,
+            ActionType.TurnTheTable => State.Config.TurnTheTableWeight,
+            ActionType.Compd        => State.Config.CompdWeight,
+            ActionType.NotMyMoney   => State.Config.NotMyMoneyWeight,
+            ActionType.Launder      => State.Config.LaunderWeight,
+            ActionType.Tilt         => State.Config.TiltWeight,
+            ActionType.HedgeYourBet => State.Config.HedgeYourBetWeight,
+            ActionType.LetItRide    => State.Config.LetItRideWeight,
+            _                       => 10
+        };
+
+        public CardCounterGameContext(
+            CardCounterGameState state,
+            IRandomNumberService rng,
+            ILogger logger)
+        {
+            State = state;
+            Rng = rng;
+            Logger = logger;
+        }
+
+        // ── Core references ───────────────────────────────────────────────────
+
+        /// <summary>The underlying AbstractGameState subclass for this game instance.</summary>
+        public CardCounterGameState State { get; }
+
+        public IRandomNumberService Rng { get; }
+        public ILogger Logger { get; }
+
+        /// <summary>The FSM that manages state transitions for this game.</summary>
+        public IFiniteStateMachine<CardCounterGameContext, CardCounterCommand> Fsm { get; set; } = null!;
+
+        /// <summary>
+        /// Resolution stack used for multi-step interactions such as the Feeling Lucky chain
+        /// and Comp'd responses. Bottom entry is the chain originator.
+        /// </summary>
+        public Stack<string> ResolutionStack { get; } = new();
+
+        // ── Convenience accessors (delegate to State) ─────────────────────────
+
+        public System.Collections.Concurrent.ConcurrentDictionary<string, PlayerState> GamePlayers => State.GamePlayers;
+        public Stack<BaseCard> MainDeck => State.MainDeck;
+        public Stack<BaseCard> CurrentShoe => State.CurrentShoe;
+        public Stack<BaseCard> DiscardPile => State.DiscardPile;
+        public Stack<string> ForceDrawStack => State.ForceDrawStack;
+        public List<string> TurnOrder => State.TurnManager.TurnOrder;
+        public GameConfig Config => State.Config;
+
+        // ── Turn helpers ──────────────────────────────────────────────────────
+
+        /// <summary>Player ID of the currently active player, or null if there are no players.</summary>
+        public string? CurrentPlayerId => State.TurnManager.CurrentPlayer;
+
+        public bool IsCurrentPlayer(string playerId) => CurrentPlayerId == playerId;
+
+        public PlayerState? GetCurrentPlayer() => State.CurrentPlayerState;
+
+        public PlayerState? GetPlayer(string playerId) =>
+            GamePlayers.TryGetValue(playerId, out var ps) ? ps : null;
+
+        /// <summary>Advances the turn pointer to the next player in TurnOrder (wraps around).</summary>
+        public void AdvanceTurn() => State.TurnManager.NextTurn();
+
+        // ── Card / deck helpers ───────────────────────────────────────────────
+
+        /// <summary>Returns a random action card from the pool using configurable per-card weights.
+        /// Cards whose weight is 0 are excluded from the pool.
+        /// When <see cref="GameConfig.ActiveOperatorMode"/> is enabled, Skim, Turn The Table,
+        /// Launder, and Not My Money are also excluded from the pool.
+        /// Returns <c>null</c> if no cards remain after filtering (all weights are 0).</summary>
+        public ActionCard? GetRandomActionCard()
+        {
+            var basePool = State.Config.ActiveOperatorMode ? ActionCardPoolActiveOperator : ActionCardPool;
+            var pool = basePool.Where(c => GetActionCardWeight(c) > 0).ToArray();
+            if (pool.Length == 0)
+            {
+                Logger.LogWarning("GetRandomActionCard: all action cards have weight 0; no card dealt.");
+                return null;
+            }
+            return pool.GetRandomWeightedItem(GetActionCardWeight, Rng, RandomType.Secure);
+        }
+
+        /// <summary>
+        /// Deals <see cref="GameConfig.ActionsDealtPerRound"/> action cards to every player.
+        /// Cards are always dealt; players with more than <see cref="GameConfig.ActionHandLimit"/>
+        /// cards afterward must discard via <see cref="CardCounterCommand.DiscardActionCardsCommand"/>.
+        /// </summary>
+        public void DealActionCards()
+        {
+            foreach (var player in GamePlayers.Values)
+            {
+                for (int i = 0; i < Config.ActionsDealtPerRound; i++)
+                {
+                    var card = GetRandomActionCard();
+                    if (card is not null) player.ActionHand.Add(card);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Deals the next shoe from the main deck, updating <see cref="CardCounterGameState.ShoeCardCounts"/>.
+        /// Returns <c>true</c> if a shoe was dealt; <c>false</c> if the main deck is exhausted.
+        /// </summary>
+        public bool DealNextShoe()
+        {
+            CurrentShoe.Clear();
+            State.ShoeCardCounts.Clear();
+
+            if (MainDeck.Count == 0)
+                return false;
+
+            State.ShoeIndex++;
+            int shoeSize = ComputeShoeSize();
+            CurrentShoe.PushRange(MainDeck.PopRange(shoeSize));
+            RecalculateShoeCounts();
+            return true;
+        }
+
+        private int ComputeShoeSize()
+        {
+            int remaining = MainDeck.Count;
+            int min = Config.MinShoeSize;
+            int max = Config.MaxShoeSize;
+
+            if (remaining <= min) return remaining;
+
+            int maxAllowed = Math.Min(max, remaining - min);
+            if (maxAllowed < min) return remaining;
+
+            return Rng.GetRandomInt(min, maxAllowed + 1, RandomType.Secure);
+        }
+
+        /// <summary>Recomputes <see cref="CardCounterGameState.ShoeCardCounts"/> from the current shoe.</summary>
+        public void RecalculateShoeCounts()
+        {
+            State.ShoeCardCounts.Clear();
+            foreach (var card in CurrentShoe)
+            {
+                var type = card is NumberCard ? CardType.Number : CardType.Operator;
+                State.ShoeCardCounts.TryGetValue(type, out int current);
+                State.ShoeCardCounts[type] = current + 1;
+            }
+        }
+
+        /// <summary>
+        /// Decrements the shoe card count for a card that was just drawn or discarded.
+        /// </summary>
+        public void DecrementShoeCount(BaseCard drawn)
+        {
+            var type = drawn is NumberCard ? CardType.Number : CardType.Operator;
+            if (State.ShoeCardCounts.TryGetValue(type, out int count))
+            {
+                if (count <= 1) State.ShoeCardCounts.Remove(type);
+                else State.ShoeCardCounts[type] = count - 1;
+            }
+        }
+
+        // ── Card application ──────────────────────────────────────────────────
+
+        /// <summary>
+        /// In normal mode, appends a number card digit to the target player's pot.
+        /// In Active Operator Mode, applies the number card value directly to the player's
+        /// balance using their <see cref="PlayerState.ActiveOperator"/>.
+        /// </summary>
+        public void ApplyNumberCard(PlayerState player, NumberCard card)
+        {
+            if (State.Config.ActiveOperatorMode && player.ActiveOperator.HasValue)
+            {
+                double cardValue = card.Value;
+                double balanceBefore = player.Balance;
+
+                if (cardValue == 0 && player.ActiveOperator.Value == Operator.Divide)
+                {
+                    HandleDivisionByZero(player);
+                    State.LastOperatorResult = new OperatorResultInfo(
+                        player.PlayerId, player.DisplayName, player.ActiveOperator.Value, balanceBefore, player.Balance);
+                    return;
+                }
+
+                player.Balance = player.ActiveOperator.Value switch
+                {
+                    Operator.Add => player.Balance + cardValue,
+                    Operator.Subtract => player.Balance - cardValue,
+                    Operator.Multiply => Math.Round(player.Balance * cardValue, MidpointRounding.AwayFromZero),
+                    Operator.Divide => Math.Round(player.Balance / cardValue, MidpointRounding.AwayFromZero),
+                    _ => player.Balance + cardValue
+                };
+
+                State.LastOperatorResult = new OperatorResultInfo(
+                    player.PlayerId, player.DisplayName, player.ActiveOperator.Value, balanceBefore, player.Balance);
+                return;
+            }
+
+            player.Pot.Add(card.Value);
+        }
+
+        /// <summary>
+        /// In normal mode, applies an operator card to the target player: computes the new
+        /// balance from the pot, then clears the pot. If the pot is empty, this is a no-op.
+        /// Handles division by zero with a random event.
+        /// In Active Operator Mode, replaces the player's <see cref="PlayerState.ActiveOperator"/>
+        /// with the drawn operator instead.
+        /// </summary>
+        public void ApplyOperatorCard(PlayerState player, OperatorCard card)
+        {
+            if (State.Config.ActiveOperatorMode)
+            {
+                var previousOperator = player.ActiveOperator;
+                player.ActiveOperator = card.Op;
+                Logger.LogInformation(
+                    "ActiveOperatorMode: [{id}] set active operator to [{op}].", player.PlayerId, card.Op);
+                State.LastOperatorChange = new OperatorChangeInfo(
+                    player.PlayerId, player.DisplayName, previousOperator, card.Op);
+                return;
+            }
+
+            if (player.Pot.Count == 0)
+                return;
+
+            double potValue = player.PotValue;
+            double balanceBefore = player.Balance;
+            player.Pot.Clear();
+
+            if (potValue == 0 && card.Op == Operator.Divide)
+            {
+                HandleDivisionByZero(player);
+                State.LastOperatorResult = new OperatorResultInfo(
+                    player.PlayerId, player.DisplayName, card.Op, balanceBefore, player.Balance);
+                return;
+            }
+
+            player.Balance = card.Op switch
+            {
+                Operator.Add => player.Balance + potValue,
+                Operator.Subtract => player.Balance - potValue,
+                Operator.Multiply => Math.Round(player.Balance * potValue, MidpointRounding.AwayFromZero),
+                Operator.Divide => potValue == 0
+                    ? player.Balance
+                    : Math.Round(player.Balance / potValue, MidpointRounding.AwayFromZero),
+                _ => player.Balance + potValue
+            };
+
+            State.LastOperatorResult = new OperatorResultInfo(
+                player.PlayerId, player.DisplayName, card.Op, balanceBefore, player.Balance);
+        }
+
+        // ── Discard history helpers ───────────────────────────────────────────
+
+        /// <summary>
+        /// Reverses the digit order of a balance value, preserving its sign.
+        /// Used by Turn The Table in Active Operator Mode.
+        /// E.g., 123 → 321, -42 → -24, 0 → 0.
+        /// </summary>
+        public static double ReverseBalanceDigits(double balance)
+        {
+            if (balance == 0) return 0;
+            double sign = balance < 0 ? -1 : 1;
+            string digits = ((long)Math.Abs(balance)).ToString();
+            char[] arr = digits.ToCharArray();
+            Array.Reverse(arr);
+            return sign * long.Parse(new string(arr));
+        }
+
+        /// <summary>Records a shoe card drawn by a player into the discard history.</summary>
+        public void RecordDraw(PlayerState player, BaseCard card)
+        {
+            string desc = FormatBaseCard(card);
+            string symbol = GetBaseCardSymbol(card);
+            State.DiscardHistory.Add(new DiscardHistoryEntry(desc, symbol, player.DisplayName, false));
+            State.LastDrawnCard = new LastDrawnCardInfo(player.PlayerId, player.DisplayName, card);
+        }
+
+        /// <summary>Records a shoe card drawn by a player (redirected by Not My Money) into the discard history.</summary>
+        public void RecordRedirectedDraw(PlayerState drawer, PlayerState target, BaseCard card)
+        {
+            string desc = FormatBaseCard(card);
+            string symbol = GetBaseCardSymbol(card);
+            State.DiscardHistory.Add(new DiscardHistoryEntry(desc, symbol, drawer.DisplayName, false));
+            State.LastDrawnCard = new LastDrawnCardInfo(drawer.PlayerId, drawer.DisplayName, card, target.PlayerId, target.DisplayName);
+        }
+
+        /// <summary>Records a shoe card burned (discarded without being drawn) into the discard history.</summary>
+        public void RecordBurn(BaseCard card)
+        {
+            string desc = FormatBaseCard(card);
+            string symbol = GetBaseCardSymbol(card);
+            State.DiscardHistory.Add(new DiscardHistoryEntry($"{desc} (Burned)", "🔥", null, true));
+        }
+
+        /// <summary>Records an action card played by a player into the discard history.</summary>
+        public void RecordActionCardPlay(PlayerState player, ActionCard card)
+        {
+            string name = GetActionCardName(card.Action);
+            string symbol = GetActionCardSymbol(card.Action);
+            State.DiscardHistory.Add(new DiscardHistoryEntry(name, symbol, player.DisplayName, true));
+        }
+
+        private static string FormatBaseCard(BaseCard card) => card switch
+        {
+            NumberCard nc => $"# {nc.Value}",
+            OperatorCard oc => oc.Op switch
+            {
+                Operator.Add => "+",
+                Operator.Subtract => "−",
+                Operator.Multiply => "×",
+                Operator.Divide => "÷",
+                _ => "?"
+            },
+            _ => "?"
+        };
+
+        private static string GetBaseCardSymbol(BaseCard card) => card switch
+        {
+            NumberCard => "🔢",
+            OperatorCard oc => oc.Op switch
+            {
+                Operator.Add => "➕",
+                Operator.Subtract => "➖",
+                Operator.Multiply => "✖️",
+                Operator.Divide => "➗",
+                _ => "➕"
+            },
+            _ => "🃏"
+        };
+
+        private static string GetActionCardName(ActionType action) => action switch
+        {
+            ActionType.FeelingLucky => "Feeling Lucky",
+            ActionType.MakeMyLuck => "Make My Luck",
+            ActionType.Skim => "Skim",
+            ActionType.Burn => "Burn",
+            ActionType.TurnTheTable => "Turn The Table",
+            ActionType.Compd => "Comp'd",
+            ActionType.NotMyMoney => "Not My Money",
+            ActionType.Launder => "Launder",
+            ActionType.Tilt => "Tilt",
+            ActionType.HedgeYourBet => "Hedge Your Bet",
+            ActionType.LetItRide => "Let It Ride",
+            _ => action.ToString()
+        };
+
+        private static string GetActionCardSymbol(ActionType action) => action switch
+        {
+            ActionType.FeelingLucky => "🎲",
+            ActionType.MakeMyLuck => "⭐",
+            ActionType.Skim => "✂️",
+            ActionType.Burn => "🔥",
+            ActionType.TurnTheTable => "🔄",
+            ActionType.Compd => "🛡️",
+            ActionType.NotMyMoney => "💸",
+            ActionType.Launder => "🧺",
+            ActionType.Tilt => "🎰",
+            ActionType.HedgeYourBet => "🎯",
+            ActionType.LetItRide => "🔁",
+            _ => "🃏"
+        };
+
+        private void HandleDivisionByZero(PlayerState player)
+        {
+            int roll = Rng.GetRandomInt(0, 4, RandomType.Secure);
+            switch (roll)
+            {
+                case 0:
+                    player.PassesRemaining++;
+                    Logger.LogInformation("Div/0: player [{id}] gains a pass.", player.PlayerId);
+                    break;
+                case 1:
+                    if (player.PassesRemaining > 0) player.PassesRemaining--;
+                    Logger.LogInformation("Div/0: player [{id}] loses a pass.", player.PlayerId);
+                    break;
+                case 2:
+                    if (player.ActionHand.Count < Config.ActionHandLimit)
+                    {
+                        var card = GetRandomActionCard();
+                        if (card is not null) player.ActionHand.Add(card);
+                    }
+                    Logger.LogInformation("Div/0: player [{id}] gains an action card.", player.PlayerId);
+                    break;
+                case 3:
+                    if (player.ActionHand.Count > 0)
+                    {
+                        int idx = Rng.GetRandomInt(0, player.ActionHand.Count, RandomType.Secure);
+                        player.ActionHand.RemoveAt(idx);
+                    }
+                    Logger.LogInformation("Div/0: player [{id}] loses an action card.", player.PlayerId);
+                    break;
+            }
+        }
+    }
+}

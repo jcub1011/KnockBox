@@ -1,53 +1,25 @@
-﻿using KnockBox.Services.Logic.Filtering;
+using KnockBox.Services.Logic.Filtering;
 using KnockBox.Services.Logic.Games.Shared;
-using KnockBox.Services.Logic.RandomGeneration;
+using KnockBox.Core.Services.Logic.RandomGeneration;
 using KnockBox.Core.Plugins;
 
 namespace KnockBox.Services.Registrations.Logic
 {
     public static class LogicRegistrations
     {
-        public static IServiceCollection RegisterLogic(this IServiceCollection services)
+        public static IServiceCollection RegisterLogic(this IServiceCollection services, PluginLoadResult pluginLoadResult)
         {
             services.AddSingleton<IProfanityFilter, ProfanityFilter>();
             services.AddSingleton<ILobbyCodeService, LobbyCodeService>();
             services.AddSingleton<IRandomNumberService, RandomNumberService>();
 
-            // Dynamically discover and register game modules
-            var pluginsPath = Path.Combine(AppContext.BaseDirectory, "games");
-            if (Directory.Exists(pluginsPath))
+            foreach (var module in pluginLoadResult.Modules)
             {
-                var dllFiles = Directory.GetFiles(pluginsPath, "*.dll");
-                foreach (var dll in dllFiles)
-                {
-                    try
-                    {
-                        var assemblyName = System.Reflection.AssemblyName.GetAssemblyName(dll);
-                        if (!AppDomain.CurrentDomain.GetAssemblies().Any(a => a.GetName().Name == assemblyName.Name))
-                        {
-                            System.Runtime.Loader.AssemblyLoadContext.Default.LoadFromAssemblyPath(dll);
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        // Log or handle assembly loading errors
-                        Console.WriteLine($"Error loading plugin assembly: {dll}. Exception: {ex.Message}");
-                    }
-                }
+                module.RegisterServices(services);
+                services.AddSingleton(typeof(IGameModule), module);
             }
 
-            var moduleTypes = AppDomain.CurrentDomain.GetAssemblies()
-                .SelectMany(a => a.GetTypes())
-                .Where(t => typeof(IGameModule).IsAssignableFrom(t) && !t.IsInterface && !t.IsAbstract);
-
-            foreach (var moduleType in moduleTypes)
-            {
-                if (Activator.CreateInstance(moduleType) is IGameModule module)
-                {
-                    module.RegisterServices(services);
-                    services.AddSingleton(typeof(IGameModule), module);
-                }
-            }
+            services.AddSingleton(new GamePluginAssemblies(pluginLoadResult.Assemblies));
 
             return services;
         }

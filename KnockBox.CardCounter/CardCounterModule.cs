@@ -1,6 +1,6 @@
 using KnockBox.Core.Plugins;
-using KnockBox.Services.Logic.Games.Engines.Shared;
-using KnockBox.Services.Logic.Games.CardCounter;
+using KnockBox.Core.Services.Logic.Games.Engines.Shared;
+using KnockBox.CardCounter.Services.Logic.Games;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace KnockBox.CardCounter

@@ -1,6 +1,6 @@
 @using KnockBox.Core.Services.State.Games.Shared
-@using KnockBox.Services.Logic.Games.DrawnToDress.FSM
-@using KnockBox.Services.State.Games.DrawnToDress
+@using KnockBox.DrawnToDress.Services.Logic.Games.FSM
+@using KnockBox.DrawnToDress.Services.State.Games
 
 @if (GameState.PhaseDeadlineUtc.HasValue &&
      GameState.Context?.Fsm?.CurrentState is ITimedDrawnToDressGameState timed)

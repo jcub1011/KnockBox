@@ -1,5 +1,5 @@
-using KnockBox.Extensions.Collections;
-using KnockBox.Extensions.ThreadSafety;
+using KnockBox.Core.Extensions.Collections;
+using KnockBox.Core.Extensions.ThreadSafety;
 
 namespace KnockBox.Tests.Unit.Extensions.Collections;
 

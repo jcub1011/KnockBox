@@ -1,10 +1,10 @@
-using KnockBox.Components.Shared;
-using KnockBox.Services.Logic.Games.DiceSimulator;
-using KnockBox.Services.Navigation;
-using KnockBox.Services.State.Games.DiceSimulator;
-using KnockBox.Services.State.Games.DiceSimulator.Data;
-using KnockBox.Services.State.Games.Shared;
-using KnockBox.Services.State.Users;
+using KnockBox.Core.Components.Shared;
+using KnockBox.DiceSimulator.Services.Logic.Games;
+using KnockBox.Core.Services.Navigation;
+using KnockBox.DiceSimulator.Services.State.Games;
+using KnockBox.DiceSimulator.Services.State.Games.Data;
+using KnockBox.Core.Services.State.Games.Shared;
+using KnockBox.Core.Services.State.Users;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 using System.Diagnostics.CodeAnalysis;
@@ -32,7 +32,7 @@ namespace KnockBox.DiceSimulator.Pages
         protected override async Task OnInitializedAsync()
         {
             // Ensure the user is initialized so GameSessionService can look up the
-            // ID-backed session � required for page-refresh rejoins where the user
+            // ID-backed session ï¿½ required for page-refresh rejoins where the user
             // service starts uninitialized on the fresh circuit.
             if (UserService.CurrentUser is null)
                 await UserService.InitializeCurrentUserAsync(ComponentDetached);
@@ -156,7 +156,7 @@ namespace KnockBox.DiceSimulator.Pages
 
         protected async Task ExportCsv()
         {
-            var csvBytes = KnockBox.Services.Logic.Games.DiceSimulator.CsvExportService.GenerateCsv(GameState.RollHistory);
+            var csvBytes = KnockBox.DiceSimulator.Services.Logic.Games.CsvExportService.GenerateCsv(GameState.RollHistory);
             var base64 = Convert.ToBase64String(csvBytes);
             var timestamp = DateTimeOffset.UtcNow.ToString("yyyyMMddTHHmmssZ");
             var filename = $"DnD-Rolls-{ObfuscatedRoomCode}-{timestamp}.csv";

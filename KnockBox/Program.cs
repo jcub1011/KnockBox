@@ -1,13 +1,15 @@
 using KnockBox.Components;
+using KnockBox.Core.Plugins;
 using KnockBox.Core.Services.Drawing;
 using KnockBox.Data.DbContexts;
-using KnockBox.Services.Navigation;
+using KnockBox.Core.Services.Navigation;
 using KnockBox.Services.Registrations.Logic;
 using KnockBox.Services.Registrations.Repositories;
 using KnockBox.Services.Registrations.States;
 using KnockBox.Services.Registrations.Validators;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
+using Serilog.Extensions.Logging;
 
 [assembly: System.Runtime.CompilerServices.InternalsVisibleTo("KnockBoxTests")]
 
@@ -43,8 +45,19 @@ namespace KnockBox
             // Add states
             builder.Services.RegisterStateServices();
 
+            // Discover game plugins before registering logic
+            var bootstrapSerilog = new Serilog.LoggerConfiguration()
+                .ReadFrom.Configuration(builder.Configuration)
+                .Enrich.FromLogContext()
+                .WriteTo.Console()
+                .CreateLogger();
+            using var bootstrapLoggerFactory = new SerilogLoggerFactory(bootstrapSerilog, dispose: true);
+            var pluginLogger = bootstrapLoggerFactory.CreateLogger<PluginLoader>();
+            var pluginsPath = Path.Combine(AppContext.BaseDirectory, "games");
+            var pluginLoadResult = new PluginLoader(pluginLogger).LoadModules(pluginsPath);
+
             // Add logic
-            builder.Services.RegisterLogic();
+            builder.Services.RegisterLogic(pluginLoadResult);
 
             // Add navigation
             builder.Services.AddScoped<INavigationService, NavigationService>();

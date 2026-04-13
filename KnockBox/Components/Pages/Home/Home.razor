@@ -32,7 +32,7 @@
     </form>
 
     <div class="game-grid">
-        @foreach (var module in GameModules)
+        @foreach (var module in GameModules.OrderBy(m => m.Name))
         {
             <button class="game" aria-label="@module.Name" disabled="@(!CanJoinOrCreate)" @onclick="() => CreateLobby(module.RouteIdentifier)">
                 @module.Name

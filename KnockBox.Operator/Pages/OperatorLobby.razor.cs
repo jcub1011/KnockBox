@@ -1,9 +1,9 @@
-using KnockBox.Components.Shared;
+using KnockBox.Core.Components.Shared;
 using KnockBox.Core.Services.State.Shared;
-using KnockBox.Services.Navigation;
-using KnockBox.Services.State.Users;
-using KnockBox.Services.State.Games.Shared;
-using KnockBox.Services.Logic.Games.Operator;
+using KnockBox.Core.Services.Navigation;
+using KnockBox.Core.Services.State.Users;
+using KnockBox.Core.Services.State.Games.Shared;
+using KnockBox.Operator.Services.Logic.Games;
 using KnockBox.Operator.Services.State;
 using Microsoft.AspNetCore.Components;
 

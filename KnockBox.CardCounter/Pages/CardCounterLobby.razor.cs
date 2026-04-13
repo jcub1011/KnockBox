@@ -1,10 +1,10 @@
-using KnockBox.Components.Shared;
+using KnockBox.Core.Components.Shared;
 using KnockBox.Core.Services.State.Shared;
-using KnockBox.Services.Logic.Games.CardCounter;
-using KnockBox.Services.Navigation;
-using KnockBox.Services.State.Games.CardCounter;
-using KnockBox.Services.State.Games.Shared;
-using KnockBox.Services.State.Users;
+using KnockBox.CardCounter.Services.Logic.Games;
+using KnockBox.Core.Services.Navigation;
+using KnockBox.CardCounter.Services.State.Games;
+using KnockBox.Core.Services.State.Games.Shared;
+using KnockBox.Core.Services.State.Users;
 using Microsoft.AspNetCore.Components;
 
 namespace KnockBox.CardCounter.Pages

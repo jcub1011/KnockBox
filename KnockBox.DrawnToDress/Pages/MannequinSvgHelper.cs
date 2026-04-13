@@ -1,5 +1,5 @@
 using System.Globalization;
-using KnockBox.Services.Logic.Games.DrawnToDress;
+using KnockBox.DrawnToDress.Services.Logic.Games;
 
 namespace KnockBox.DrawnToDress.Pages
 {

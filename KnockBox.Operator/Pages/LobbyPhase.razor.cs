@@ -1,7 +1,7 @@
-using KnockBox.Extensions.Collections;
-using KnockBox.Services.Logic.Games.Operator;
+using KnockBox.Core.Extensions.Collections;
+using KnockBox.Operator.Services.Logic.Games;
 using KnockBox.Operator.Services.State;
-using KnockBox.Services.State.Users;
+using KnockBox.Core.Services.State.Users;
 using Microsoft.AspNetCore.Components;
 
 namespace KnockBox.Operator.Pages
