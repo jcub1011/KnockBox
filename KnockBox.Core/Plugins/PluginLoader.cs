@@ -1,5 +1,4 @@
 using System.Reflection;
-using System.Runtime.Loader;
 
 namespace KnockBox.Core.Plugins
 {
@@ -74,14 +73,14 @@ namespace KnockBox.Core.Plugins
         private List<Assembly> LoadAssemblies(string pluginsDirectory)
         {
             // Each plugin lives in its own subfolder (games/{TargetName}/) and publishes
-            // its primary assembly as {TargetName}.dll. Only the primary assembly per
-            // folder is loaded here. Transitive dependencies must either already be
-            // loaded by the host (deduped via the AppDomain.CurrentDomain.GetAssemblies
-            // check below) or be present in the host's publish output -- plugins share
-            // the default AssemblyLoadContext with the host, so host-provided assemblies
-            // always win on version conflicts. Isolated per-plugin ALCs are not yet
-            // implemented. Loose DLLs dropped directly under the plugins root are
-            // ignored; the per-subdirectory layout is the only supported shape.
+            // its primary assembly as {TargetName}.dll alongside its transitive deps.
+            // Each plugin gets its own PluginLoadContext so its transitive deps resolve
+            // from its own folder via AssemblyDependencyResolver ({PluginName}.deps.json),
+            // isolating version conflicts between plugins. Assemblies already loaded by
+            // the host (shared contracts like KnockBox.Core, logging/DI abstractions,
+            // BCL) are deferred to the default ALC so type identity is preserved across
+            // the host/plugin boundary. Loose DLLs dropped directly under the plugins
+            // root are ignored; the per-subdirectory layout is the only supported shape.
             var pluginDllPaths = new List<string>();
             foreach (var subdir in Directory.GetDirectories(pluginsDirectory))
             {
@@ -105,13 +104,27 @@ namespace KnockBox.Core.Plugins
             {
                 try
                 {
-                    var assemblyName = AssemblyName.GetAssemblyName(dllPath);
-                    var existing = AppDomain.CurrentDomain.GetAssemblies()
-                        .FirstOrDefault(a => a.GetName().Name == assemblyName.Name);
+                    var primaryAssemblyName = AssemblyName.GetAssemblyName(dllPath).Name;
 
-                    var assembly = existing
-                        ?? AssemblyLoadContext.Default.LoadFromAssemblyPath(dllPath);
+                    bool IsSharedContract(AssemblyName name)
+                    {
+                        if (name.Name is null)
+                            return false;
+                        // Never share the plugin's own primary assembly -- each plugin
+                        // must load into its own ALC even if something with the same
+                        // name is already in the default ALC.
+                        if (string.Equals(name.Name, primaryAssemblyName, StringComparison.OrdinalIgnoreCase))
+                            return false;
+                        // If the host already has it loaded, share it. This preserves
+                        // type identity for contracts (KnockBox.Core, logging/DI
+                        // abstractions, BCL) and keeps "host wins on conflict"
+                        // semantics for anything else the host has resolved.
+                        return AppDomain.CurrentDomain.GetAssemblies()
+                            .Any(a => string.Equals(a.GetName().Name, name.Name, StringComparison.OrdinalIgnoreCase));
+                    }
 
+                    var alc = new PluginLoadContext(dllPath, IsSharedContract);
+                    var assembly = alc.LoadFromAssemblyPath(dllPath);
                     assemblies.Add(assembly);
                 }
                 catch (Exception ex)

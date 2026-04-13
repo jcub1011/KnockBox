@@ -54,7 +54,7 @@ KnockBox/bin/{Config}/{TFM}/
         └── ...
 ```
 
-`PluginLoader` loads only the primary assembly `{PluginName}.dll` per folder; transitive dependencies are resolved on demand via `AssemblyLoadContext` to avoid redundant loads and version conflicts. Loose DLLs directly under `games/` are also accepted as a legacy layout.
+`PluginLoader` loads only the primary assembly `{PluginName}.dll` per folder into a dedicated per-plugin `PluginLoadContext`. Transitive dependencies are resolved from the plugin's own folder via `AssemblyDependencyResolver` (`{PluginName}.deps.json`), isolating version conflicts between plugins. Shared-contract assemblies already loaded by the host (`KnockBox.Core`, logging/DI abstractions, BCL) are deferred to the default `AssemblyLoadContext` so type identity is preserved across the host/plugin boundary. Loose DLLs directly under `games/` are ignored; the per-subdirectory layout is the only supported shape.
 
 ### `IGameModule` Contract
 
@@ -88,7 +88,7 @@ public class CardCounterModule : IGameModule
 
 `PluginLoader` (`KnockBox.Core/Plugins/PluginLoader.cs`) is invoked from `Program.cs` before `RegisterLogic`. It:
 
-1. Scans subdirectories of `games/`, loads each `{PluginName}.dll` via `AssemblyLoadContext.Default.LoadFromAssemblyPath`, reusing an already-loaded assembly when one exists.
+1. Scans subdirectories of `games/` and loads each `{PluginName}.dll` into its own `PluginLoadContext` (`KnockBox.Core/Plugins/PluginLoadContext.cs`), which uses `AssemblyDependencyResolver` to satisfy transitive deps from the plugin folder while deferring shared-contract assemblies (anything already resolved by the host) to the default ALC.
 2. Reflects over each assembly for non-abstract, non-interface types assignable to `IGameModule`, handling `ReflectionTypeLoadException` gracefully.
 3. Activates each module via `Activator.CreateInstance` (parameterless constructor required).
 4. De-duplicates by `RouteIdentifier` (case-insensitive) — first wins, subsequent duplicates are logged as errors.
