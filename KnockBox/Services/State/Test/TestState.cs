@@ -1,4 +1,4 @@
-﻿using KnockBox.Services.State.Shared;
+﻿using KnockBox.Core.Services.State.Shared;
 
 namespace KnockBox.Services.State.Test
 {

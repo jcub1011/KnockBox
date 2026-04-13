@@ -1,6 +1,6 @@
-using KnockBox.Services.Logic.Games.Shared;
+using KnockBox.Core.Services.Logic.Games.Shared;
 
-namespace KnockBox.Services.Navigation
+namespace KnockBox.Core.Services.Navigation
 {
     public interface INavigationService
     {

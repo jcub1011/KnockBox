@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Components;
 
-namespace KnockBox.Components.Shared
+namespace KnockBox.Core.Components.Shared
 {
     /// <summary>
     /// A component that provides a ComponentDetached cancellation token that cancels when the component is detached.

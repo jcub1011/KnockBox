@@ -1,6 +1,6 @@
 using KnockBox.Operator.Services.State;
-using KnockBox.Services.Navigation;
-using KnockBox.Services.State.Users;
+using KnockBox.Core.Services.Navigation;
+using KnockBox.Core.Services.State.Users;
 using Microsoft.AspNetCore.Components;
 
 namespace KnockBox.Operator.Pages

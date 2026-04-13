@@ -1,0 +1,152 @@
+using KnockBox.Core.Services.State.Games.Shared;
+using KnockBox.Core.Extensions.Returns;
+using KnockBox.DrawnToDress.Services.Logic.Games.FSM;
+using KnockBox.DrawnToDress.Services.Logic.Games.FSM.States;
+using KnockBox.Core.Services.Logic.Games.Engines.Shared;
+using KnockBox.Core.Services.Logic.RandomGeneration;
+using KnockBox.DrawnToDress.Services.State.Games;
+using KnockBox.DrawnToDress.Services.State.Games.Data;
+using KnockBox.Core.Services.State.Users;
+
+namespace KnockBox.DrawnToDress.Services.Logic.Games
+{
+    /// <summary>
+    /// Server-authoritative engine for Drawn To Dress.
+    /// The engine is a singleton; all mutable game state lives in
+    /// <see cref="DrawnToDressGameState"/> (and its <see cref="DrawnToDressGameContext"/>),
+    /// which is created per game session.
+    /// </summary>
+    public class DrawnToDressGameEngine(
+        ILogger<DrawnToDressGameEngine> logger,
+        ILogger<DrawnToDressGameState> stateLogger,
+        IRandomNumberService randomNumberService) : AbstractGameEngine
+    {
+        // ── AbstractGameEngine lifecycle ──────────────────────────────────────
+
+        public override Task<ValueResult<AbstractGameState>> CreateStateAsync(
+            User host, CancellationToken ct = default)
+        {
+            if (host is null)
+                return Task.FromResult(ValueResult<AbstractGameState>.FromError(
+                    "Failed to create game state.", $"Parameter {nameof(host)} was null."));
+
+            var gameState = new DrawnToDressGameState(host, stateLogger);
+            gameState.UpdateJoinableStatus(true);
+            gameState.PlayerUnregistered += player => HandlePlayerLeft(player, gameState);
+
+            // Create the context and FSM so the lobby state is active from the start.
+            var context = new DrawnToDressGameContext(gameState, logger, randomNumberService);
+            var fsm = new FiniteStateMachine<DrawnToDressGameContext, DrawnToDressCommand>(logger);
+            context.Fsm = fsm;
+            gameState.Context = context;
+            fsm.TransitionTo(context, new LobbyState());
+
+            logger.LogInformation("Created DrawnToDress state with host [{id}].", host.Id);
+            return Task.FromResult<ValueResult<AbstractGameState>>(gameState);
+        }
+
+        public override Task<Result> StartAsync(
+            User host, AbstractGameState state, CancellationToken ct = default)
+        {
+            if (state is not DrawnToDressGameState gameState)
+                return Task.FromResult(Result.FromError("Error starting game.",
+                    $"Game state of type [{state?.GetType().Name ?? "null"}] couldn't be cast to [{nameof(DrawnToDressGameState)}]."));
+
+            if (host != gameState.Host)
+                return Task.FromResult(Result.FromError("Only the host can start the game."));
+
+            if (gameState.Context is null)
+                return Task.FromResult(Result.FromError("Game context is not initialized."));
+
+            var context = gameState.Context;
+
+            var executeResult = state.Execute(() =>
+            {
+                state.UpdateJoinableStatus(false);
+
+                // Snapshot all registered players into GamePlayers so FSM states can look
+                // them up by ID.
+                foreach (var player in gameState.Players)
+                {
+                    gameState.GamePlayers[player.Id] = new DrawnToDressPlayerState
+                    {
+                        PlayerId = player.Id,
+                        DisplayName = player.Name,
+                    };
+                }
+
+                // Process the start command through the FSM.
+                var fsmResult = context.Fsm.HandleCommand(context, new StartGameCommand(host.Id));
+                if (fsmResult.TryGetFailure(out var err))
+                {
+                    logger.LogError("StartAsync: FSM start command error: {msg}", err.PublicMessage);
+                    return Result.FromError(err.PublicMessage, err.InternalMessage);
+                }
+                return Result.Success;
+            });
+
+            if (executeResult.TryGetFailure(out var error)) return Task.FromResult(Result.FromError(error));
+            return Task.FromResult(Result.Success);
+        }
+
+        // ── FSM core ──────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Processes a player command by delegating to the current FSM state inside the
+        /// game's execute lock. State transitions are handled automatically.
+        /// </summary>
+        public Result ProcessCommand(DrawnToDressGameContext context, DrawnToDressCommand command)
+        {
+            var executeResult = context.State.Execute(() =>
+            {
+                var fsmResult = context.Fsm.HandleCommand(context, command);
+                if (fsmResult.TryGetFailure(out var err))
+                {
+                    logger.LogError("FSM command error: {msg}", err.PublicMessage);
+                    return Result.FromError(err.PublicMessage, err.InternalMessage);
+                }
+                return Result.Success;
+            });
+
+            if (!executeResult.IsSuccess) return executeResult.Error.Error;
+            return executeResult.Value;
+        }
+
+        /// <summary>
+        /// Drives time-based transitions (e.g., drawing timer, outfit building timer).
+        /// Call periodically from a timer or background service.
+        /// </summary>
+        public Result Tick(DrawnToDressGameContext context, DateTimeOffset now)
+        {
+            return context.State.Execute(() =>
+            {
+                var fsmResult = context.Fsm.Tick(context, now);
+                if (fsmResult.TryGetFailure(out var err))
+                    logger.LogError("FSM tick error: {msg}", err.PublicMessage);
+            });
+        }
+
+        // ── Player-leave handling ─────────────────────────────────────────────
+
+        /// <summary>
+        /// Called whenever a player unregisters from the game (disconnect, tab close, or kick).
+        /// </summary>
+        internal void HandlePlayerLeft(User player, DrawnToDressGameState state)
+        {
+            logger.LogInformation("Player [{id}] left DrawnToDress game hosted by [{hostId}].",
+                player.Id, state.Host.Id);
+
+            if (state.Context is null) return;
+            if (!state.GamePlayers.TryGetValue(player.Id, out var playerState)) return;
+
+            // Mark the departed player as ready so that AllPlayersReady() checks pass
+            // and the game doesn't hang waiting for them.
+            playerState.IsReady = true;
+            playerState.IsDisconnected = true;
+
+            logger.LogInformation(
+                "Player [{id}] auto-readied due to disconnect. Phase: {phase}.",
+                player.Id, state.Phase);
+        }
+    }
+}

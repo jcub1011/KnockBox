@@ -1,12 +1,11 @@
-using KnockBox.Components.Shared;
+using KnockBox.Core.Components.Shared;
 using KnockBox.Core.Services.State.Shared;
-using KnockBox.Services.Logic.Games.DrawnToDress;
-using KnockBox.Services.Navigation;
-using KnockBox.Services.State.Games.DrawnToDress;
-using KnockBox.Services.State.Games.Shared;
-using KnockBox.Services.State.Users;
+using KnockBox.DrawnToDress.Services.Logic.Games;
+using KnockBox.Core.Services.Navigation;
+using KnockBox.DrawnToDress.Services.State.Games;
 using KnockBox.Core.Services.State.Games.Shared;
-using KnockBox.Services.Logic.Games.DrawnToDress.FSM;
+using KnockBox.Core.Services.State.Users;
+using KnockBox.DrawnToDress.Services.Logic.Games.FSM;
 using Microsoft.AspNetCore.Components;
 using System.Diagnostics.CodeAnalysis;
 

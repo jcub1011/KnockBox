@@ -1,7 +1,7 @@
 using KnockBox.Components;
 using KnockBox.Core.Services.Drawing;
 using KnockBox.Data.DbContexts;
-using KnockBox.Services.Navigation;
+using KnockBox.Core.Services.Navigation;
 using KnockBox.Services.Registrations.Logic;
 using KnockBox.Services.Registrations.Repositories;
 using KnockBox.Services.Registrations.States;

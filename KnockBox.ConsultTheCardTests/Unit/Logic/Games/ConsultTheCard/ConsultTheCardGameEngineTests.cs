@@ -1,15 +1,15 @@
-using KnockBox.Services.Logic.Games.ConsultTheCard;
-using KnockBox.Services.Logic.Games.ConsultTheCard.FSM;
-using KnockBox.Services.Logic.Games.ConsultTheCard.FSM.States;
-using KnockBox.Services.Logic.RandomGeneration;
-using KnockBox.Services.State.Games.ConsultTheCard;
-using KnockBox.Services.State.Games.ConsultTheCard.Data;
-using KnockBox.Services.State.Users;
+using KnockBox.ConsultTheCard.Services.Logic.Games;
+using KnockBox.ConsultTheCard.Services.Logic.Games.FSM;
+using KnockBox.ConsultTheCard.Services.Logic.Games.FSM.States;
+using KnockBox.Core.Services.Logic.RandomGeneration;
+using KnockBox.ConsultTheCard.Services.State.Games;
+using KnockBox.ConsultTheCard.Services.State.Games.Data;
+using KnockBox.Core.Services.State.Users;
 using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 
-namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard
+namespace KnockBox.ConsultTheCard.Tests.Unit.Logic.Games.ConsultTheCard
 {
     /// <summary>
     /// Tests for <see cref="ConsultTheCardGameEngine"/> public-facing API methods,
@@ -110,7 +110,7 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard
         [TestMethod]
         public async Task StartAsync_WithWrongStateType_ReturnsError()
         {
-            var mockState = new Mock<KnockBox.Services.State.Games.Shared.AbstractGameState>(
+            var mockState = new Mock<KnockBox.Core.Services.State.Games.Shared.AbstractGameState>(
                 _host, Mock.Of<ILogger>());
 
             var result = await _engine.StartAsync(_host, mockState.Object);

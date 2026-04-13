@@ -1,5 +1,6 @@
-﻿using KnockBox.Extensions.Returns;
-using KnockBox.Services.State.Users;
+﻿using KnockBox.Core.Extensions.Returns;
+using KnockBox.Core.Services.Logic.Games.Shared;
+using KnockBox.Core.Services.State.Users;
 
 namespace KnockBox.Services.Logic.Games.Shared
 {

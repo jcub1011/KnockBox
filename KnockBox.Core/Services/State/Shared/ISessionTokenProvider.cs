@@ -1,6 +1,6 @@
-using KnockBox.Extensions.Returns;
+using KnockBox.Core.Extensions.Returns;
 
-namespace KnockBox.Services.State.Shared;
+namespace KnockBox.Core.Services.State.Shared;
 
 /// <summary>
 /// A service used to get the session token for this user.

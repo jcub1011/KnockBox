@@ -1,5 +1,5 @@
-@using KnockBox.Services.State.Users
-@using KnockBox.Services.State.Games.CardCounter
+@using KnockBox.Core.Services.State.Users
+@using KnockBox.CardCounter.Services.State.Games
 
 <div class="cc-lobby">
     @if (UserService.CurrentUser?.Id == GameState.Host.Id)

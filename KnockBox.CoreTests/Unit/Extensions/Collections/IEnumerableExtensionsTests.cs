@@ -1,5 +1,5 @@
-using KnockBox.Extensions.Collections;
-using KnockBox.Services.Logic.RandomGeneration;
+using KnockBox.Core.Extensions.Collections;
+using KnockBox.Core.Services.Logic.RandomGeneration;
 using Moq;
 
 namespace KnockBox.Tests.Unit.Extensions.Collections;

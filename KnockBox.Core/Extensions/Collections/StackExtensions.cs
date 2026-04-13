@@ -1,4 +1,4 @@
-﻿namespace KnockBox.Extensions.Collections
+﻿namespace KnockBox.Core.Extensions.Collections
 {
     public static class StackExtensions
     {

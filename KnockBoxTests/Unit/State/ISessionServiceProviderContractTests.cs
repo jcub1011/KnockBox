@@ -1,5 +1,5 @@
 using System;
-using KnockBox.Services.State.Shared;
+using KnockBox.Core.Services.State.Shared;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace KnockBox.Tests.Unit.State;

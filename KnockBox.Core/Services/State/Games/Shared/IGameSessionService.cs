@@ -1,8 +1,8 @@
-using KnockBox.Extensions.Returns;
-using KnockBox.Services.Logic.Games.Shared;
+using KnockBox.Core.Extensions.Returns;
+using KnockBox.Core.Services.Logic.Games.Shared;
 using System.Diagnostics.CodeAnalysis;
 
-namespace KnockBox.Services.State.Games.Shared
+namespace KnockBox.Core.Services.State.Games.Shared
 {
     public interface IGameSessionService
     {

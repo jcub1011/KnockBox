@@ -1,6 +1,6 @@
-using KnockBox.Services.Logic.Games.ConsultTheCard;
-using KnockBox.Services.State.Games.ConsultTheCard;
-using KnockBox.Services.State.Users;
+using KnockBox.ConsultTheCard.Services.Logic.Games;
+using KnockBox.ConsultTheCard.Services.State.Games;
+using KnockBox.Core.Services.State.Users;
 using Microsoft.AspNetCore.Components;
 
 namespace KnockBox.ConsultTheCard.Pages

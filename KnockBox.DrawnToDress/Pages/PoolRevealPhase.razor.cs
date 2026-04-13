@@ -1,4 +1,4 @@
-using KnockBox.Services.State.Games.DrawnToDress;
+using KnockBox.DrawnToDress.Services.State.Games;
 using Microsoft.AspNetCore.Components;
 
 namespace KnockBox.DrawnToDress.Pages

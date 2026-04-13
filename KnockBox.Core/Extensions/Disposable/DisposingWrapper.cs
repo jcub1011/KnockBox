@@ -1,4 +1,4 @@
-namespace KnockBox.Extensions.Disposable
+namespace KnockBox.Core.Extensions.Disposable
 {
     /// <summary>
     /// Wraps an <see cref="IDisposable"/> object and automatically disposes it when the wrapper is

@@ -1,5 +1,5 @@
-@using KnockBox.Services.State.Games.CardCounter
-@using KnockBox.Services.Logic.Games.CardCounter.FSM
+@using KnockBox.CardCounter.Services.State.Games
+@using KnockBox.CardCounter.Services.Logic.Games.FSM
 @using KnockBox.Core.Services.State.Games.Shared
 
 @if (GameState.Config.EnableActionTimer && GameState.Context?.Fsm?.CurrentState is ITimedGameState<CardCounterGameContext, CardCounterCommand> timedState)
@@ -39,12 +39,12 @@
         // For Card Counter, the timeout depends on the specific FSM state within the Playing phase.
         return GameState.Context?.Fsm?.CurrentState switch
         {
-            KnockBox.Services.Logic.Games.CardCounter.FSM.States.FeelingLuckyChainState => TimeSpan.FromMilliseconds(GameState.Config.FeelingLuckyChainTimeoutMs),
-            KnockBox.Services.Logic.Games.CardCounter.FSM.States.MakeMyLuckState => TimeSpan.FromMilliseconds(GameState.Config.MakeMyLuckTimeoutMs),
-            KnockBox.Services.Logic.Games.CardCounter.FSM.States.NotMyMoneyState => TimeSpan.FromMilliseconds(GameState.Config.NotMyMoneyTimeoutMs),
-            KnockBox.Services.Logic.Games.CardCounter.FSM.States.SkimState => TimeSpan.FromMilliseconds(GameState.Config.SkimTimeoutMs),
-            KnockBox.Services.Logic.Games.CardCounter.FSM.States.WaitingForReactionState => TimeSpan.FromMilliseconds(GameState.Config.WaitingForReactionTimeoutMs),
-            KnockBox.Services.Logic.Games.CardCounter.FSM.States.RoundEndState => TimeSpan.FromMilliseconds(GameState.Config.RoundEndTimeoutMs),
+            KnockBox.CardCounter.Services.Logic.Games.FSM.States.FeelingLuckyChainState => TimeSpan.FromMilliseconds(GameState.Config.FeelingLuckyChainTimeoutMs),
+            KnockBox.CardCounter.Services.Logic.Games.FSM.States.MakeMyLuckState => TimeSpan.FromMilliseconds(GameState.Config.MakeMyLuckTimeoutMs),
+            KnockBox.CardCounter.Services.Logic.Games.FSM.States.NotMyMoneyState => TimeSpan.FromMilliseconds(GameState.Config.NotMyMoneyTimeoutMs),
+            KnockBox.CardCounter.Services.Logic.Games.FSM.States.SkimState => TimeSpan.FromMilliseconds(GameState.Config.SkimTimeoutMs),
+            KnockBox.CardCounter.Services.Logic.Games.FSM.States.WaitingForReactionState => TimeSpan.FromMilliseconds(GameState.Config.WaitingForReactionTimeoutMs),
+            KnockBox.CardCounter.Services.Logic.Games.FSM.States.RoundEndState => TimeSpan.FromMilliseconds(GameState.Config.RoundEndTimeoutMs),
             _ => TimeSpan.FromMilliseconds(GameState.Config.PlayerTurnTimeoutMs)
         };
     }

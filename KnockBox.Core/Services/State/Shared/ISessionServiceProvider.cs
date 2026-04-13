@@ -1,7 +1,7 @@
-using KnockBox.Extensions.Returns;
+using KnockBox.Core.Extensions.Returns;
 using System.Diagnostics.CodeAnalysis;
 
-namespace KnockBox.Services.State.Shared;
+namespace KnockBox.Core.Services.State.Shared;
 
 /// <summary>
 /// The token used associate services with a particular session.

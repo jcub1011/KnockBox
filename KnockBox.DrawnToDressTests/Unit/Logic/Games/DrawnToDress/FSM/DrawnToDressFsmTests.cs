@@ -1,15 +1,15 @@
 using KnockBox.Core.Services.State.Games.Shared;
-using KnockBox.Services.Logic.Games.DrawnToDress;
-using KnockBox.Services.Logic.Games.DrawnToDress.FSM;
-using KnockBox.Services.Logic.Games.DrawnToDress.FSM.States;
-using KnockBox.Services.Logic.RandomGeneration;
-using KnockBox.Services.State.Games.DrawnToDress;
-using KnockBox.Services.State.Games.DrawnToDress.Data;
-using KnockBox.Services.State.Users;
+using KnockBox.DrawnToDress.Services.Logic.Games;
+using KnockBox.DrawnToDress.Services.Logic.Games.FSM;
+using KnockBox.DrawnToDress.Services.Logic.Games.FSM.States;
+using KnockBox.Core.Services.Logic.RandomGeneration;
+using KnockBox.DrawnToDress.Services.State.Games;
+using KnockBox.DrawnToDress.Services.State.Games.Data;
+using KnockBox.Core.Services.State.Users;
 using Microsoft.Extensions.Logging;
 using Moq;
 
-namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
+namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
 {
     /// <summary>
     /// Tests FSM creation, state entry, and nominal phase transitions for Drawn To Dress.
@@ -743,7 +743,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
             var state = (DrawnToDressGameState)stateResult.Value!;
             var context = state.Context!;
 
-            var invalidConfig = new KnockBox.Services.State.Games.DrawnToDress.Data.DrawnToDressConfig
+            var invalidConfig = new KnockBox.DrawnToDress.Services.State.Games.Data.DrawnToDressConfig
             {
                 PoolRevealTimeSec = 1, // below minimum of 5
             };
@@ -933,7 +933,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
             var context = state.Context!;
 
             // Force back to ThemeSelectionState with HostPick mode.
-            state.Config.ThemeSource = KnockBox.Services.State.Games.DrawnToDress.Data.ThemeSource.HostPick;
+            state.Config.ThemeSource = KnockBox.DrawnToDress.Services.State.Games.Data.ThemeSource.HostPick;
             context.Fsm.TransitionTo(context, new ThemeSelectionState());
 
             Assert.IsInstanceOfType<ThemeSelectionState>(context.Fsm.CurrentState);
@@ -952,7 +952,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
-            state.Config.ThemeSource = KnockBox.Services.State.Games.DrawnToDress.Data.ThemeSource.Random;
+            state.Config.ThemeSource = KnockBox.DrawnToDress.Services.State.Games.Data.ThemeSource.Random;
             var context = state.Context!;
 
             context.Fsm.TransitionTo(context, new ThemeSelectionState());
@@ -969,7 +969,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
             var context = state.Context!;
-            state.Config.ThemeSource = KnockBox.Services.State.Games.DrawnToDress.Data.ThemeSource.PlayerWritten;
+            state.Config.ThemeSource = KnockBox.DrawnToDress.Services.State.Games.Data.ThemeSource.PlayerWritten;
 
             state.GamePlayers["p1"] = new() { PlayerId = "p1" };
             state.GamePlayers["p2"] = new() { PlayerId = "p2" };
@@ -989,7 +989,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
             var context = state.Context!;
-            state.Config.ThemeSource = KnockBox.Services.State.Games.DrawnToDress.Data.ThemeSource.PlayerWritten;
+            state.Config.ThemeSource = KnockBox.DrawnToDress.Services.State.Games.Data.ThemeSource.PlayerWritten;
 
             state.GamePlayers["p1"] = new() { PlayerId = "p1" };
             state.GamePlayers["p2"] = new() { PlayerId = "p2" };
@@ -1012,7 +1012,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
             var context = state.Context!;
-            state.Config.ThemeSource = KnockBox.Services.State.Games.DrawnToDress.Data.ThemeSource.PlayerWritten;
+            state.Config.ThemeSource = KnockBox.DrawnToDress.Services.State.Games.Data.ThemeSource.PlayerWritten;
 
             state.GamePlayers["p1"] = new() { PlayerId = "p1" };
             state.GamePlayers["p2"] = new() { PlayerId = "p2" };
@@ -1031,7 +1031,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
             var context = state.Context!;
-            state.Config.ThemeSource = KnockBox.Services.State.Games.DrawnToDress.Data.ThemeSource.RandomVoting;
+            state.Config.ThemeSource = KnockBox.DrawnToDress.Services.State.Games.Data.ThemeSource.RandomVoting;
             state.Config.RandomVotingCandidateCount = 3;
 
             context.Fsm.TransitionTo(context, new ThemeSelectionState());
@@ -1049,7 +1049,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
             var context = state.Context!;
-            state.Config.ThemeSource = KnockBox.Services.State.Games.DrawnToDress.Data.ThemeSource.RandomVoting;
+            state.Config.ThemeSource = KnockBox.DrawnToDress.Services.State.Games.Data.ThemeSource.RandomVoting;
             state.Config.RandomVotingCandidateCount = 3;
 
             state.GamePlayers["p1"] = new() { PlayerId = "p1" };
@@ -1076,7 +1076,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
             var context = state.Context!;
-            state.Config.ThemeSource = KnockBox.Services.State.Games.DrawnToDress.Data.ThemeSource.RandomVoting;
+            state.Config.ThemeSource = KnockBox.DrawnToDress.Services.State.Games.Data.ThemeSource.RandomVoting;
             state.Config.RandomVotingCandidateCount = 3;
 
             state.GamePlayers["p1"] = new() { PlayerId = "p1" };
@@ -1099,8 +1099,8 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
             var context = state.Context!;
-            state.Config.ThemeSource = KnockBox.Services.State.Games.DrawnToDress.Data.ThemeSource.Random;
-            state.Config.ThemeAnnouncement = KnockBox.Services.State.Games.DrawnToDress.Data.ThemeAnnouncement.BeforeDrawing;
+            state.Config.ThemeSource = KnockBox.DrawnToDress.Services.State.Games.Data.ThemeSource.Random;
+            state.Config.ThemeAnnouncement = KnockBox.DrawnToDress.Services.State.Games.Data.ThemeAnnouncement.BeforeDrawing;
 
             context.Fsm.TransitionTo(context, new ThemeSelectionState());
 
@@ -1116,8 +1116,8 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
             var context = state.Context!;
-            state.Config.ThemeSource = KnockBox.Services.State.Games.DrawnToDress.Data.ThemeSource.Random;
-            state.Config.ThemeAnnouncement = KnockBox.Services.State.Games.DrawnToDress.Data.ThemeAnnouncement.AfterDrawing;
+            state.Config.ThemeSource = KnockBox.DrawnToDress.Services.State.Games.Data.ThemeSource.Random;
+            state.Config.ThemeAnnouncement = KnockBox.DrawnToDress.Services.State.Games.Data.ThemeAnnouncement.AfterDrawing;
 
             context.Fsm.TransitionTo(context, new ThemeSelectionState());
 
@@ -1133,8 +1133,8 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
             var context = state.Context!;
-            state.Config.ThemeSource = KnockBox.Services.State.Games.DrawnToDress.Data.ThemeSource.Random;
-            state.Config.ThemeAnnouncement = KnockBox.Services.State.Games.DrawnToDress.Data.ThemeAnnouncement.AfterDrawing;
+            state.Config.ThemeSource = KnockBox.DrawnToDress.Services.State.Games.Data.ThemeSource.Random;
+            state.Config.ThemeAnnouncement = KnockBox.DrawnToDress.Services.State.Games.Data.ThemeAnnouncement.AfterDrawing;
             // Use a single clothing type so one tick exhausts the drawing phase.
             state.Config.ClothingTypes =
             [
@@ -1231,7 +1231,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
             var state = (DrawnToDressGameState)stateResult.Value!;
             var context = state.Context!;
 
-            var updatedConfig = new KnockBox.Services.State.Games.DrawnToDress.Data.DrawnToDressConfig
+            var updatedConfig = new KnockBox.DrawnToDress.Services.State.Games.Data.DrawnToDressConfig
             {
                 DrawingTimeSec = 240,
             };
@@ -1251,7 +1251,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
             var context = state.Context!;
             int originalDrawingTime = state.Config.DrawingTimeSec;
 
-            var updatedConfig = new KnockBox.Services.State.Games.DrawnToDress.Data.DrawnToDressConfig
+            var updatedConfig = new KnockBox.DrawnToDress.Services.State.Games.Data.DrawnToDressConfig
             {
                 DrawingTimeSec = 999,
             };
@@ -1269,7 +1269,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
             var state = (DrawnToDressGameState)stateResult.Value!;
             var context = state.Context!;
 
-            var invalidConfig = new KnockBox.Services.State.Games.DrawnToDress.Data.DrawnToDressConfig
+            var invalidConfig = new KnockBox.DrawnToDress.Services.State.Games.Data.DrawnToDressConfig
             {
                 DrawingTimeSec = 1,     // below minimum of 30
                 VotingRounds = -1,      // below minimum of 0

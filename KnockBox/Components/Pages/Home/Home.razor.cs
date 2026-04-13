@@ -1,10 +1,11 @@
-using KnockBox.Components.Shared;
-using KnockBox.Extensions.Disposable;
-using KnockBox.Extensions.Exceptions;
+using KnockBox.Core.Components.Shared;
+using KnockBox.Core.Extensions.Disposable;
+using KnockBox.Core.Extensions.Exceptions;
+using KnockBox.Core.Services.Logic.Games.Shared;
+using KnockBox.Core.Services.Logic.RandomGeneration;
+using KnockBox.Core.Services.State.Games.Shared;
+using KnockBox.Core.Services.State.Users;
 using KnockBox.Services.Logic.Games.Shared;
-using KnockBox.Services.Logic.RandomGeneration;
-using KnockBox.Services.State.Games.Shared;
-using KnockBox.Services.State.Users;
 using Microsoft.AspNetCore.Components;
 using KnockBox.Core.Plugins;
 

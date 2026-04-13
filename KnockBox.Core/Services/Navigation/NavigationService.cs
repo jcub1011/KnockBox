@@ -1,7 +1,7 @@
-using KnockBox.Services.Logic.Games.Shared;
+using KnockBox.Core.Services.Logic.Games.Shared;
 using Microsoft.AspNetCore.Components;
 
-namespace KnockBox.Services.Navigation
+namespace KnockBox.Core.Services.Navigation
 {
     public class NavigationService(NavigationManager navigationManager)
         : INavigationService

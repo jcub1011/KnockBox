@@ -1,8 +1,8 @@
 using KnockBox.Operator.Models;
 using KnockBox.Operator.Services.Logic.FSM.Commands;
-using KnockBox.Services.Logic.Games.Operator;
+using KnockBox.Operator.Services.Logic.Games;
 using KnockBox.Operator.Services.State;
-using KnockBox.Services.State.Users;
+using KnockBox.Core.Services.State.Users;
 using Microsoft.AspNetCore.Components;
 
 namespace KnockBox.Operator.Pages

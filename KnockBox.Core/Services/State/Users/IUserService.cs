@@ -1,4 +1,4 @@
-﻿namespace KnockBox.Services.State.Users
+﻿namespace KnockBox.Core.Services.State.Users
 {
     public record class UserNameChangedArgs(string PreviousName, string NewName);
 

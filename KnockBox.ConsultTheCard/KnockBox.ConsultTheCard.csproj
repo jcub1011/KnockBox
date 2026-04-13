@@ -9,7 +9,7 @@
 
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
-    <Content Include="Services\Logic\Games\ConsultTheCard\Data\WordPairs.csv" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Services\Logic\Games\Data\WordPairs.csv" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

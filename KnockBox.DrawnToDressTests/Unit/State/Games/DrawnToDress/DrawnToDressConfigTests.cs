@@ -1,6 +1,6 @@
-using KnockBox.Services.State.Games.DrawnToDress.Data;
+using KnockBox.DrawnToDress.Services.State.Games.Data;
 
-namespace KnockBox.DrawnToDressTests.Unit.State.Games.DrawnToDress
+namespace KnockBox.DrawnToDress.Tests.Unit.State.Games.DrawnToDress
 {
     [TestClass]
     public class DrawnToDressConfigTests

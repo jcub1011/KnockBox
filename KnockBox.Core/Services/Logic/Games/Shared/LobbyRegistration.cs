@@ -1,7 +1,7 @@
-using KnockBox.Services.State.Games.Shared;
-using KnockBox.Services.State.Users;
+using KnockBox.Core.Services.State.Games.Shared;
+using KnockBox.Core.Services.State.Users;
 
-namespace KnockBox.Services.Logic.Games.Shared
+namespace KnockBox.Core.Services.Logic.Games.Shared
 {
     public class LobbyRegistration(string lobbyCode, string lobbyUri, string gameName, string routeIdentifier, AbstractGameState state)
     {
