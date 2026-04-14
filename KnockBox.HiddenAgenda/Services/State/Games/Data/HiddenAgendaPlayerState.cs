@@ -34,6 +34,12 @@ public class HiddenAgendaPlayerState
     public int TurnsTakenThisRound { get; set; }
     public int GuessCountdownTurnsRemaining { get; set; } // Set when countdown triggers
 
+    /// <summary>
+    /// For Rivalry task R6: the randomly assigned player to shadow.
+    /// Set at task draw time if R6 is in the player's tasks.
+    /// </summary>
+    public string? RivalryTargetPlayerId { get; set; }
+
     // Spin/movement history
     public int LastSpinResult { get; set; }
     public int? LastMoveDestination { get; set; }
