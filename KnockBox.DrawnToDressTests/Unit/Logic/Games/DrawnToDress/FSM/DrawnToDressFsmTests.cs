@@ -101,7 +101,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             // directly to PoolReveal → OutfitBuilding.
             state.Config.ClothingTypes =
             [
-                new() { Id = "hat", DisplayName = "Hat", MaxItemsPerRound = 3 },
+                new() { Id = ClothingType.Hat, DisplayName = "Hat", MaxItemsPerRound = 3 },
             ];
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
@@ -131,7 +131,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             // Use a single clothing type so all-ready skips straight to OutfitBuilding.
             state.Config.ClothingTypes =
             [
-                new() { Id = "hat", DisplayName = "Hat", MaxItemsPerRound = 3 },
+                new() { Id = ClothingType.Hat, DisplayName = "Hat", MaxItemsPerRound = 3 },
             ];
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
@@ -160,9 +160,9 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             var state = (DrawnToDressGameState)stateResult.Value!;
             state.Config.ClothingTypes =
             [
-                new() { Id = "hat",  DisplayName = "Hat",  MaxItemsPerRound = 3 },
-                new() { Id = "top",  DisplayName = "Top",  MaxItemsPerRound = 3 },
-                new() { Id = "shoes", DisplayName = "Shoes", MaxItemsPerRound = 3 },
+                new() { Id = ClothingType.Hat,  DisplayName = "Hat",  MaxItemsPerRound = 3 },
+                new() { Id = ClothingType.Top,  DisplayName = "Top",  MaxItemsPerRound = 3 },
+                new() { Id = ClothingType.Shoes, DisplayName = "Shoes", MaxItemsPerRound = 3 },
             ];
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
@@ -186,8 +186,8 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             var state = (DrawnToDressGameState)stateResult.Value!;
             state.Config.ClothingTypes =
             [
-                new() { Id = "hat",  DisplayName = "Hat",  MaxItemsPerRound = 3 },
-                new() { Id = "top",  DisplayName = "Top",  MaxItemsPerRound = 3 },
+                new() { Id = ClothingType.Hat,  DisplayName = "Hat",  MaxItemsPerRound = 3 },
+                new() { Id = ClothingType.Top,  DisplayName = "Top",  MaxItemsPerRound = 3 },
             ];
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
@@ -217,8 +217,8 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             var state = (DrawnToDressGameState)stateResult.Value!;
             state.Config.ClothingTypes =
             [
-                new() { Id = "hat", DisplayName = "Hat", MaxItemsPerRound = 3 },
-                new() { Id = "top", DisplayName = "Top", MaxItemsPerRound = 3 },
+                new() { Id = ClothingType.Hat, DisplayName = "Hat", MaxItemsPerRound = 3 },
+                new() { Id = ClothingType.Top, DisplayName = "Top", MaxItemsPerRound = 3 },
             ];
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
@@ -241,8 +241,8 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             var state = (DrawnToDressGameState)stateResult.Value!;
             state.Config.ClothingTypes =
             [
-                new() { Id = "hat", DisplayName = "Hat", MaxItemsPerRound = 3 },
-                new() { Id = "top", DisplayName = "Top", MaxItemsPerRound = 3 },
+                new() { Id = ClothingType.Hat, DisplayName = "Hat", MaxItemsPerRound = 3 },
+                new() { Id = ClothingType.Top, DisplayName = "Top", MaxItemsPerRound = 3 },
             ];
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
@@ -273,9 +273,9 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             var state = (DrawnToDressGameState)stateResult.Value!;
             state.Config.ClothingTypes =
             [
-                new() { Id = "hat",    DisplayName = "Hat",    MaxItemsPerRound = 3 },
-                new() { Id = "top",    DisplayName = "Top",    MaxItemsPerRound = 3 },
-                new() { Id = "bottom", DisplayName = "Bottom", MaxItemsPerRound = 3 },
+                new() { Id = ClothingType.Hat,    DisplayName = "Hat",    MaxItemsPerRound = 3 },
+                new() { Id = ClothingType.Top,    DisplayName = "Top",    MaxItemsPerRound = 3 },
+                new() { Id = ClothingType.Bottom, DisplayName = "Bottom", MaxItemsPerRound = 3 },
             ];
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
@@ -306,8 +306,8 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             var state = (DrawnToDressGameState)stateResult.Value!;
             state.Config.ClothingTypes =
             [
-                new() { Id = "hat", DisplayName = "Hat", MaxItemsPerRound = 3 },
-                new() { Id = "top", DisplayName = "Top", MaxItemsPerRound = 3 },
+                new() { Id = ClothingType.Hat, DisplayName = "Hat", MaxItemsPerRound = 3 },
+                new() { Id = ClothingType.Top, DisplayName = "Top", MaxItemsPerRound = 3 },
             ];
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
@@ -316,7 +316,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
 
             // Currently in hat round; submitting "top" should be ignored.
             _engine.ProcessCommand(context,
-                new SubmitDrawingCommand("p1", "top", "<svg/>"));
+                new SubmitDrawingCommand("p1", ClothingType.Top, "<svg/>"));
 
             Assert.IsEmpty(state.ClothingPool, "Wrong-type submission must be discarded.");
         }
@@ -328,7 +328,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             var state = (DrawnToDressGameState)stateResult.Value!;
             state.Config.ClothingTypes =
             [
-                new() { Id = "hat", DisplayName = "Hat", MaxItemsPerRound = 2 },
+                new() { Id = ClothingType.Hat, DisplayName = "Hat", MaxItemsPerRound = 2 },
             ];
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
@@ -336,12 +336,12 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             state.GamePlayers["p1"] = new() { PlayerId = "p1" };
 
             // Submit up to the max.
-            _engine.ProcessCommand(context, new SubmitDrawingCommand("p1", "hat", "<svg>1</svg>"));
-            _engine.ProcessCommand(context, new SubmitDrawingCommand("p1", "hat", "<svg>2</svg>"));
+            _engine.ProcessCommand(context, new SubmitDrawingCommand("p1", ClothingType.Hat, "<svg>1</svg>"));
+            _engine.ProcessCommand(context, new SubmitDrawingCommand("p1", ClothingType.Hat, "<svg>2</svg>"));
             Assert.HasCount(2, state.ClothingPool);
 
             // Third submission should be rejected.
-            _engine.ProcessCommand(context, new SubmitDrawingCommand("p1", "hat", "<svg>3</svg>"));
+            _engine.ProcessCommand(context, new SubmitDrawingCommand("p1", ClothingType.Hat, "<svg>3</svg>"));
             Assert.HasCount(2, state.ClothingPool, "Submission beyond MaxItemsPerRound must be discarded.");
         }
 
@@ -352,7 +352,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             var state = (DrawnToDressGameState)stateResult.Value!;
             state.Config.ClothingTypes =
             [
-                new() { Id = "hat", DisplayName = "Hat", MaxItemsPerRound = 3 },
+                new() { Id = ClothingType.Hat, DisplayName = "Hat", MaxItemsPerRound = 3 },
             ];
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
@@ -381,7 +381,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             var state = (DrawnToDressGameState)stateResult.Value!;
             state.Config.ClothingTypes =
             [
-                new() { Id = "hat", DisplayName = "Hat", MaxItemsPerRound = 3 },
+                new() { Id = ClothingType.Hat, DisplayName = "Hat", MaxItemsPerRound = 3 },
             ];
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
@@ -389,12 +389,12 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             state.GamePlayers["p1"] = new() { PlayerId = "p1" };
 
             _engine.ProcessCommand(context,
-                new SubmitDrawingCommand("p1", "hat", "<svg>my hat</svg>"));
+                new SubmitDrawingCommand("p1", ClothingType.Hat, "<svg>my hat</svg>"));
 
             Assert.HasCount(1, state.ClothingPool);
             var item = state.ClothingPool.Values.Single();
             Assert.AreEqual("p1", item.CreatorPlayerId);
-            Assert.AreEqual("hat", item.ClothingTypeId);
+            Assert.AreEqual(ClothingType.Hat, item.ClothingTypeId);
             Assert.AreEqual("<svg>my hat</svg>", item.SvgContent);
             Assert.IsTrue(item.IsInPool);
         }
@@ -406,7 +406,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             var state = (DrawnToDressGameState)stateResult.Value!;
             state.Config.ClothingTypes =
             [
-                new() { Id = "hat", DisplayName = "Hat", MaxItemsPerRound = 3 },
+                new() { Id = ClothingType.Hat, DisplayName = "Hat", MaxItemsPerRound = 3 },
             ];
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
@@ -414,11 +414,11 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             state.GamePlayers["p1"] = new() { PlayerId = "p1" };
             state.GamePlayers["p2"] = new() { PlayerId = "p2" };
 
-            _engine.ProcessCommand(context, new SubmitDrawingCommand("p1", "hat", "<svg>p1 hat</svg>"));
-            _engine.ProcessCommand(context, new SubmitDrawingCommand("p2", "hat", "<svg>p2 hat</svg>"));
+            _engine.ProcessCommand(context, new SubmitDrawingCommand("p1", ClothingType.Hat, "<svg>p1 hat</svg>"));
+            _engine.ProcessCommand(context, new SubmitDrawingCommand("p2", ClothingType.Hat, "<svg>p2 hat</svg>"));
 
             Assert.HasCount(2, state.ClothingPool);
-            Assert.IsTrue(state.ClothingPool.Values.All(i => i.ClothingTypeId == "hat"));
+            Assert.IsTrue(state.ClothingPool.Values.All(i => i.ClothingTypeId == ClothingType.Hat));
             Assert.IsTrue(state.ClothingPool.Values.All(i => i.IsInPool));
         }
 
@@ -429,8 +429,8 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             var state = (DrawnToDressGameState)stateResult.Value!;
             state.Config.ClothingTypes =
             [
-                new() { Id = "hat", DisplayName = "Hat", MaxItemsPerRound = 3 },
-                new() { Id = "top", DisplayName = "Top", MaxItemsPerRound = 3 },
+                new() { Id = ClothingType.Hat, DisplayName = "Hat", MaxItemsPerRound = 3 },
+                new() { Id = ClothingType.Top, DisplayName = "Top", MaxItemsPerRound = 3 },
             ];
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
@@ -551,7 +551,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             var itemId = Guid.NewGuid();
             state.ClothingPool[itemId] = new()
             {
-                ClothingTypeId = "hat",
+                ClothingTypeId = ClothingType.Hat,
                 CreatorPlayerId = "p1",
                 SvgContent = "<svg/>",
                 IsInPool = true,
@@ -640,8 +640,8 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             var state = (DrawnToDressGameState)stateResult.Value!;
             state.Config.ClothingTypes =
             [
-                new() { Id = "hat", DisplayName = "Hat", MaxItemsPerRound = 3 },
-                new() { Id = "top", DisplayName = "Top", MaxItemsPerRound = 3 },
+                new() { Id = ClothingType.Hat, DisplayName = "Hat", MaxItemsPerRound = 3 },
+                new() { Id = ClothingType.Top, DisplayName = "Top", MaxItemsPerRound = 3 },
             ];
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
@@ -651,25 +651,25 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             state.GamePlayers["p2"] = new() { PlayerId = "p2" };
 
             // Submit hats in round 0.
-            _engine.ProcessCommand(context, new SubmitDrawingCommand("p1", "hat", "<svg>p1 hat</svg>"));
-            _engine.ProcessCommand(context, new SubmitDrawingCommand("p2", "hat", "<svg>p2 hat</svg>"));
+            _engine.ProcessCommand(context, new SubmitDrawingCommand("p1", ClothingType.Hat, "<svg>p1 hat</svg>"));
+            _engine.ProcessCommand(context, new SubmitDrawingCommand("p2", ClothingType.Hat, "<svg>p2 hat</svg>"));
 
             // Advance to top round.
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
             Assert.AreEqual(1, state.CurrentDrawingClothingTypeIndex);
 
             // Submit tops in round 1.
-            _engine.ProcessCommand(context, new SubmitDrawingCommand("p1", "top", "<svg>p1 top</svg>"));
-            _engine.ProcessCommand(context, new SubmitDrawingCommand("p2", "top", "<svg>p2 top</svg>"));
+            _engine.ProcessCommand(context, new SubmitDrawingCommand("p1", ClothingType.Top, "<svg>p1 top</svg>"));
+            _engine.ProcessCommand(context, new SubmitDrawingCommand("p2", ClothingType.Top, "<svg>p2 top</svg>"));
 
             // Advance through top round → PoolReveal.
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
 
             Assert.IsInstanceOfType<PoolRevealState>(context.Fsm.CurrentState);
             Assert.HasCount(4, state.ClothingPool, "Pool should contain items from all drawing rounds.");
-            Assert.AreEqual(2, state.ClothingPool.Values.Count(i => i.ClothingTypeId == "hat"),
+            Assert.AreEqual(2, state.ClothingPool.Values.Count(i => i.ClothingTypeId == ClothingType.Hat),
                 "Pool should contain 2 hat items.");
-            Assert.AreEqual(2, state.ClothingPool.Values.Count(i => i.ClothingTypeId == "top"),
+            Assert.AreEqual(2, state.ClothingPool.Values.Count(i => i.ClothingTypeId == ClothingType.Top),
                 "Pool should contain 2 top items.");
         }
 
@@ -680,7 +680,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             var state = (DrawnToDressGameState)stateResult.Value!;
             state.Config.ClothingTypes =
             [
-                new() { Id = "hat", DisplayName = "Hat", MaxItemsPerRound = 3 },
+                new() { Id = ClothingType.Hat, DisplayName = "Hat", MaxItemsPerRound = 3 },
             ];
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
@@ -689,8 +689,8 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             state.GamePlayers["p1"] = new() { PlayerId = "p1" };
             state.GamePlayers["p2"] = new() { PlayerId = "p2" };
 
-            _engine.ProcessCommand(context, new SubmitDrawingCommand("p1", "hat", "<svg>p1</svg>"));
-            _engine.ProcessCommand(context, new SubmitDrawingCommand("p2", "hat", "<svg>p2</svg>"));
+            _engine.ProcessCommand(context, new SubmitDrawingCommand("p1", ClothingType.Hat, "<svg>p1</svg>"));
+            _engine.ProcessCommand(context, new SubmitDrawingCommand("p2", ClothingType.Hat, "<svg>p2</svg>"));
 
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
 
@@ -706,8 +706,8 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             var state = (DrawnToDressGameState)stateResult.Value!;
             state.Config.ClothingTypes =
             [
-                new() { Id = "hat", DisplayName = "Hat", MaxItemsPerRound = 3 },
-                new() { Id = "top", DisplayName = "Top", MaxItemsPerRound = 3 },
+                new() { Id = ClothingType.Hat, DisplayName = "Hat", MaxItemsPerRound = 3 },
+                new() { Id = ClothingType.Top, DisplayName = "Top", MaxItemsPerRound = 3 },
             ];
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
@@ -715,9 +715,9 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
 
             state.GamePlayers["p1"] = new() { PlayerId = "p1" };
 
-            _engine.ProcessCommand(context, new SubmitDrawingCommand("p1", "hat", "<svg>hat</svg>"));
+            _engine.ProcessCommand(context, new SubmitDrawingCommand("p1", ClothingType.Hat, "<svg>hat</svg>"));
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1)); // hat → top
-            _engine.ProcessCommand(context, new SubmitDrawingCommand("p1", "top", "<svg>top</svg>"));
+            _engine.ProcessCommand(context, new SubmitDrawingCommand("p1", ClothingType.Top, "<svg>top</svg>"));
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1)); // top → PoolReveal
 
             Assert.IsInstanceOfType<PoolRevealState>(context.Fsm.CurrentState);
@@ -726,10 +726,10 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
                 .GroupBy(i => i.ClothingTypeId)
                 .ToDictionary(g => g.Key, g => g.ToList());
 
-            Assert.IsTrue(byType.ContainsKey("hat"), "Pool should have items grouped under 'hat'.");
-            Assert.IsTrue(byType.ContainsKey("top"), "Pool should have items grouped under 'top'.");
-            Assert.HasCount(1, byType["hat"]);
-            Assert.HasCount(1, byType["top"]);
+            Assert.IsTrue(byType.ContainsKey(ClothingType.Hat), "Pool should have items grouped under 'hat'.");
+            Assert.IsTrue(byType.ContainsKey(ClothingType.Top), "Pool should have items grouped under 'top'.");
+            Assert.HasCount(1, byType[ClothingType.Hat]);
+            Assert.HasCount(1, byType[ClothingType.Top]);
         }
 
         [TestMethod]
@@ -1198,7 +1198,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             // Use a single clothing type so one tick exhausts the drawing phase.
             state.Config.ClothingTypes =
             [
-                new() { Id = "hat", DisplayName = "Hat", MaxItemsPerRound = 3 },
+                new() { Id = ClothingType.Hat, DisplayName = "Hat", MaxItemsPerRound = 3 },
             ];
 
             // Enter ThemeSelectionState → auto-selects theme but does not reveal.
@@ -1267,7 +1267,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
                 SubmittedOutfit = new()
                 {
                     PlayerId = "p1",
-                    SelectedItemsByType = new() { ["hat"] = sharedId },
+                    SelectedItemsByType = new() { [ClothingType.Hat] = sharedId },
                 }
             };
             state.GamePlayers["p2"] = new()
@@ -1276,7 +1276,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
                 SubmittedOutfit = new()
                 {
                     PlayerId = "p2",
-                    SelectedItemsByType = new() { ["hat"] = sharedId },
+                    SelectedItemsByType = new() { [ClothingType.Hat] = sharedId },
                 }
             };
 
@@ -1379,7 +1379,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             // Item created BY p1 – p1 must not be able to claim it via ClaimPoolItemCommand.
             state.ClothingPool[itemId] = new()
             {
-                ClothingTypeId = "hat",
+                ClothingTypeId = ClothingType.Hat,
                 CreatorPlayerId = "p1",
                 SvgContent = "<svg/>",
                 IsInPool = true,
@@ -1409,7 +1409,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             var itemId = Guid.NewGuid();
             state.ClothingPool[itemId] = new()
             {
-                ClothingTypeId = "hat",
+                ClothingTypeId = ClothingType.Hat,
                 CreatorPlayerId = "p3",      // drawn by a third player
                 SvgContent = "<svg/>",
                 IsInPool = true,
@@ -1445,7 +1445,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             state.ClothingPool[itemId] = new()
             {
                 Id = itemId,
-                ClothingTypeId = "hat",
+                ClothingTypeId = ClothingType.Hat,
                 CreatorPlayerId = "p1",      // drawn by p1
                 SvgContent = "<svg/>",
                 IsInPool = true,
@@ -1476,7 +1476,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             var itemId = Guid.NewGuid();
             state.ClothingPool[itemId] = new()
             {
-                ClothingTypeId = "hat",
+                ClothingTypeId = ClothingType.Hat,
                 CreatorPlayerId = "p1",
                 SvgContent = "<svg/>",
                 IsInPool = true,
@@ -1510,7 +1510,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             var itemId = Guid.NewGuid();
             state.ClothingPool[itemId] = new()
             {
-                ClothingTypeId = "hat",
+                ClothingTypeId = ClothingType.Hat,
                 CreatorPlayerId = "p3",
                 SvgContent = "<svg/>",
                 IsInPool = true,
@@ -1543,7 +1543,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             state.ClothingPool[itemId] = new()
             {
                 Id = itemId,
-                ClothingTypeId = "hat",
+                ClothingTypeId = ClothingType.Hat,
                 CreatorPlayerId = "p3",
                 SvgContent = "<svg/>",
                 IsInPool = true,
@@ -1578,7 +1578,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             var hatId = Guid.NewGuid();
             state.ClothingPool[hatId] = new()
             {
-                ClothingTypeId = "hat",
+                ClothingTypeId = ClothingType.Hat,
                 CreatorPlayerId = "p2",
                 SvgContent = "<svg/>",
                 IsInPool = true,
@@ -1588,7 +1588,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             context.Fsm.TransitionTo(context, new OutfitBuildingState());
 
             _engine.ProcessCommand(context, new SubmitOutfitCommand("p1",
-                new Dictionary<string, Guid> { ["hat"] = hatId }));
+                new Dictionary<ClothingType, Guid> { [ClothingType.Hat] = hatId }));
 
             Assert.IsNull(state.GamePlayers["p1"].SubmittedOutfit,
                 "SubmitOutfit must be rejected when the player does not own the item.");
@@ -1607,7 +1607,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             var hatId = Guid.NewGuid();
             state.ClothingPool[hatId] = new()
             {
-                ClothingTypeId = "hat",
+                ClothingTypeId = ClothingType.Hat,
                 CreatorPlayerId = "p1",   // player owns it (self-drawn)
                 SvgContent = "<svg/>",
                 IsInPool = true,
@@ -1618,7 +1618,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
 
             // Submitting the hat item under the "top" slot – type mismatch.
             _engine.ProcessCommand(context, new SubmitOutfitCommand("p1",
-                new Dictionary<string, Guid> { ["top"] = hatId }));
+                new Dictionary<ClothingType, Guid> { [ClothingType.Top] = hatId }));
 
             Assert.IsNull(state.GamePlayers["p1"].SubmittedOutfit,
                 "SubmitOutfit must be rejected when the item's clothing type does not match the slot.");
@@ -1637,7 +1637,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             var hatId = Guid.NewGuid();
             state.ClothingPool[hatId] = new()
             {
-                ClothingTypeId = "hat",
+                ClothingTypeId = ClothingType.Hat,
                 CreatorPlayerId = "p2",   // drawn by another player
                 SvgContent = "<svg/>",
                 IsInPool = true,
@@ -1648,11 +1648,11 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             context.Fsm.TransitionTo(context, new OutfitBuildingState());
 
             _engine.ProcessCommand(context, new SubmitOutfitCommand("p1",
-                new Dictionary<string, Guid> { ["hat"] = hatId }));
+                new Dictionary<ClothingType, Guid> { [ClothingType.Hat] = hatId }));
 
             Assert.IsNotNull(state.GamePlayers["p1"].SubmittedOutfit,
                 "A valid outfit with owned items must be accepted.");
-            Assert.AreEqual(hatId, state.GamePlayers["p1"].SubmittedOutfit!.SelectedItemsByType["hat"]);
+            Assert.AreEqual(hatId, state.GamePlayers["p1"].SubmittedOutfit!.SelectedItemsByType[ClothingType.Hat]);
         }
 
         // ── Outfit building – auto-fill ───────────────────────────────────────
@@ -1664,7 +1664,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             var state = (DrawnToDressGameState)stateResult.Value!;
             state.Config.ClothingTypes =
             [
-                new() { Id = "hat", DisplayName = "Hat" },
+                new() { Id = ClothingType.Hat, DisplayName = "Hat" },
             ];
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
@@ -1674,7 +1674,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             var hatId = Guid.NewGuid();
             state.ClothingPool[hatId] = new()
             {
-                ClothingTypeId = "hat",
+                ClothingTypeId = ClothingType.Hat,
                 CreatorPlayerId = "p2",
                 SvgContent = "<svg/>",
                 IsInPool = true,
@@ -1691,7 +1691,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             Assert.IsInstanceOfType<OutfitCustomizationState>(context.Fsm.CurrentState);
             Assert.IsNotNull(state.GamePlayers["p1"].SubmittedOutfit,
                 "Auto-fill must produce an outfit when the timer expires.");
-            Assert.IsTrue(state.GamePlayers["p1"].SubmittedOutfit!.SelectedItemsByType.ContainsKey("hat"),
+            Assert.IsTrue(state.GamePlayers["p1"].SubmittedOutfit!.SelectedItemsByType.ContainsKey(ClothingType.Hat),
                 "Auto-filled outfit must include the available hat slot.");
         }
 
@@ -1702,7 +1702,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             var state = (DrawnToDressGameState)stateResult.Value!;
             state.Config.ClothingTypes =
             [
-                new() { Id = "hat", DisplayName = "Hat" },
+                new() { Id = ClothingType.Hat, DisplayName = "Hat" },
             ];
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
@@ -1714,7 +1714,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             state.ClothingPool[selfDrawnHat] = new()
             {
                 Id = selfDrawnHat,
-                ClothingTypeId = "hat",
+                ClothingTypeId = ClothingType.Hat,
                 CreatorPlayerId = "p1",   // self-drawn
                 SvgContent = "<svg self/>",
                 IsInPool = true,
@@ -1725,7 +1725,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             state.ClothingPool[claimedHat] = new()
             {
                 Id = claimedHat,
-                ClothingTypeId = "hat",
+                ClothingTypeId = ClothingType.Hat,
                 CreatorPlayerId = "p2",   // drawn by p2, claimed by p1
                 SvgContent = "<svg other/>",
                 IsInPool = true,
@@ -1736,7 +1736,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             context.Fsm.TransitionTo(context, new OutfitBuildingState());
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
 
-            var chosen = state.GamePlayers["p1"].SubmittedOutfit!.SelectedItemsByType["hat"];
+            var chosen = state.GamePlayers["p1"].SubmittedOutfit!.SelectedItemsByType[ClothingType.Hat];
             Assert.AreEqual(claimedHat, chosen,
                 "Auto-fill must prefer a non-self-drawn (claimed) item over a self-drawn one.");
         }
@@ -1748,7 +1748,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             var state = (DrawnToDressGameState)stateResult.Value!;
             state.Config.ClothingTypes =
             [
-                new() { Id = "hat", DisplayName = "Hat" },
+                new() { Id = ClothingType.Hat, DisplayName = "Hat" },
             ];
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
@@ -1759,7 +1759,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             state.ClothingPool[selfDrawnHat] = new()
             {
                 Id = selfDrawnHat,
-                ClothingTypeId = "hat",
+                ClothingTypeId = ClothingType.Hat,
                 CreatorPlayerId = "p1",
                 SvgContent = "<svg/>",
                 IsInPool = true,
@@ -1772,7 +1772,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             Assert.IsNotNull(state.GamePlayers["p1"].SubmittedOutfit,
                 "Auto-fill must fall back to the self-drawn item when no other options exist.");
             Assert.AreEqual(selfDrawnHat,
-                state.GamePlayers["p1"].SubmittedOutfit!.SelectedItemsByType["hat"]);
+                state.GamePlayers["p1"].SubmittedOutfit!.SelectedItemsByType[ClothingType.Hat]);
         }
 
         [TestMethod]
@@ -1782,7 +1782,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             var state = (DrawnToDressGameState)stateResult.Value!;
             state.Config.ClothingTypes =
             [
-                new() { Id = "hat", DisplayName = "Hat" },
+                new() { Id = ClothingType.Hat, DisplayName = "Hat" },
             ];
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
@@ -1792,7 +1792,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             var hatId = Guid.NewGuid();
             state.ClothingPool[hatId] = new()
             {
-                ClothingTypeId = "hat",
+                ClothingTypeId = ClothingType.Hat,
                 CreatorPlayerId = "p2",
                 SvgContent = "<svg/>",
                 IsInPool = true,
@@ -1804,7 +1804,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
 
             // Player submits before the timer runs out.
             _engine.ProcessCommand(context, new SubmitOutfitCommand("p1",
-                new Dictionary<string, Guid> { ["hat"] = hatId }));
+                new Dictionary<ClothingType, Guid> { [ClothingType.Hat] = hatId }));
 
             var originalOutfit = state.GamePlayers["p1"].SubmittedOutfit;
             Assert.IsNotNull(originalOutfit);
@@ -1867,7 +1867,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             var state = (DrawnToDressGameState)stateResult.Value!;
             state.Config.ClothingTypes =
             [
-                new() { Id = "hat", DisplayName = "Hat", MaxItemsPerRound = 3 },
+                new() { Id = ClothingType.Hat, DisplayName = "Hat", MaxItemsPerRound = 3 },
             ];
 
             var player = new User("Alice", "alice1");
@@ -1879,7 +1879,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
 
             // Act: the registered player submits a drawing.
             var result = _engine.ProcessCommand(context,
-                new SubmitDrawingCommand("alice1", "hat", "<svg/>"));
+                new SubmitDrawingCommand("alice1", ClothingType.Hat, "<svg/>"));
 
             // Assert: submission succeeds and the item is added to the pool.
             Assert.IsTrue((bool)result.IsSuccess);
@@ -1887,7 +1887,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
                 "One drawing should be in the pool after submission.");
             var item = state.ClothingPool.Values.Single();
             Assert.AreEqual("alice1", item.CreatorPlayerId);
-            Assert.AreEqual("hat", item.ClothingTypeId);
+            Assert.AreEqual(ClothingType.Hat, item.ClothingTypeId);
             Assert.IsTrue(item.IsInPool);
         }
 
@@ -1899,7 +1899,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             var state = (DrawnToDressGameState)stateResult.Value!;
             state.Config.ClothingTypes =
             [
-                new() { Id = "hat", DisplayName = "Hat", MaxItemsPerRound = 1 },
+                new() { Id = ClothingType.Hat, DisplayName = "Hat", MaxItemsPerRound = 1 },
             ];
 
             var player = new User("Alice", "alice1");
@@ -1909,11 +1909,11 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
 
             // First submission should succeed.
-            _engine.ProcessCommand(context, new SubmitDrawingCommand("alice1", "hat", "<svg/>"));
+            _engine.ProcessCommand(context, new SubmitDrawingCommand("alice1", ClothingType.Hat, "<svg/>"));
             Assert.HasCount(1, state.ClothingPool);
 
             // Second submission must be rejected (limit = 1).
-            _engine.ProcessCommand(context, new SubmitDrawingCommand("alice1", "hat", "<svg/>"));
+            _engine.ProcessCommand(context, new SubmitDrawingCommand("alice1", ClothingType.Hat, "<svg/>"));
             Assert.HasCount(1, state.ClothingPool,
                 "A second submission beyond the per-round limit must not add another item.");
         }
@@ -2187,7 +2187,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             state.ClothingPool[itemId] = new()
             {
                 Id = itemId,
-                ClothingTypeId = "hat",
+                ClothingTypeId = ClothingType.Hat,
                 CreatorPlayerId = "p1",
                 SvgContent = "<svg/>",
                 IsInPool = true,
@@ -2198,7 +2198,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
                 SubmittedOutfit = new()
                 {
                     PlayerId = "p1",
-                    SelectedItemsByType = new() { ["hat"] = itemId },
+                    SelectedItemsByType = new() { [ClothingType.Hat] = itemId },
                 },
             };
 
@@ -2210,9 +2210,9 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             var submission = state.GamePlayers["p1"].SubmittedOutfit!;
             Assert.AreEqual("Hat Outfit", submission.Customization.OutfitName);
             Assert.AreEqual("<svg>overlay</svg>", submission.Customization.SketchSvgContent);
-            Assert.IsTrue(submission.SelectedItemsByType.ContainsKey("hat"),
+            Assert.IsTrue(submission.SelectedItemsByType.ContainsKey(ClothingType.Hat),
                 "Original selected items must be preserved after customization.");
-            Assert.AreEqual(itemId, submission.SelectedItemsByType["hat"]);
+            Assert.AreEqual(itemId, submission.SelectedItemsByType[ClothingType.Hat]);
         }
 
         // ── Pool 2 Reveal state ───────────────────────────────────────────────
@@ -2279,7 +2279,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             var hatId = Guid.NewGuid();
             state.ClothingPool[hatId] = new()
             {
-                Id = hatId, ClothingTypeId = "hat", CreatorPlayerId = "p2",
+                Id = hatId, ClothingTypeId = ClothingType.Hat, CreatorPlayerId = "p2",
                 SvgContent = "<svg/>", IsInPool = true,
             };
             state.GamePlayers["p1"] = new() { PlayerId = "p1" };
@@ -2300,7 +2300,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             var state = (DrawnToDressGameState)stateResult.Value!;
             state.Config.ClothingTypes =
             [
-                new() { Id = "hat", DisplayName = "Hat" },
+                new() { Id = ClothingType.Hat, DisplayName = "Hat" },
             ];
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
@@ -2310,12 +2310,12 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             var freeHat = Guid.NewGuid();
             state.ClothingPool[usedHat] = new()
             {
-                Id = usedHat, ClothingTypeId = "hat", CreatorPlayerId = "p2",
+                Id = usedHat, ClothingTypeId = ClothingType.Hat, CreatorPlayerId = "p2",
                 SvgContent = "<svg/>", IsInPool = true,
             };
             state.ClothingPool[freeHat] = new()
             {
-                Id = freeHat, ClothingTypeId = "hat", CreatorPlayerId = "p3",
+                Id = freeHat, ClothingTypeId = ClothingType.Hat, CreatorPlayerId = "p3",
                 SvgContent = "<svg/>", IsInPool = true,
             };
 
@@ -2325,7 +2325,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
                 SubmittedOutfit = new()
                 {
                     PlayerId = "p1",
-                    SelectedItemsByType = new() { ["hat"] = usedHat },
+                    SelectedItemsByType = new() { [ClothingType.Hat] = usedHat },
                 },
             };
 
@@ -2346,7 +2346,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             var state = (DrawnToDressGameState)stateResult.Value!;
             state.Config.ClothingTypes =
             [
-                new() { Id = "hat", DisplayName = "Hat" },
+                new() { Id = ClothingType.Hat, DisplayName = "Hat" },
             ];
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
@@ -2358,7 +2358,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             state.ClothingPool[usedHat] = new()
             {
                 Id = usedHat,
-                ClothingTypeId = "hat",
+                ClothingTypeId = ClothingType.Hat,
                 CreatorPlayerId = "p2",
                 SvgContent = "<svg/>",
                 IsInPool = true,
@@ -2366,7 +2366,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             state.ClothingPool[unusedHat] = new()
             {
                 Id = unusedHat,
-                ClothingTypeId = "hat",
+                ClothingTypeId = ClothingType.Hat,
                 CreatorPlayerId = "p3",
                 SvgContent = "<svg/>",
                 IsInPool = true,
@@ -2378,7 +2378,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
                 SubmittedOutfit = new()
                 {
                     PlayerId = "p1",
-                    SelectedItemsByType = new() { ["hat"] = usedHat },
+                    SelectedItemsByType = new() { [ClothingType.Hat] = usedHat },
                 },
             };
 
@@ -2404,7 +2404,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             state.ClothingPool[itemId] = new()
             {
                 Id = itemId,
-                ClothingTypeId = "hat",
+                ClothingTypeId = ClothingType.Hat,
                 CreatorPlayerId = "p2",
                 SvgContent = "<svg/>",
                 IsInPool = true,
@@ -2416,7 +2416,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
                 SubmittedOutfit = new()
                 {
                     PlayerId = "p1",
-                    SelectedItemsByType = new Dictionary<string, Guid>(), // different item selected
+                    SelectedItemsByType = new Dictionary<ClothingType, Guid>(), // different item selected
                 },
                 OwnedClothingItemIds = [itemId],
             };
@@ -2434,7 +2434,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             var state = (DrawnToDressGameState)stateResult.Value!;
             state.Config.ClothingTypes =
             [
-                new() { Id = "hat", DisplayName = "Hat" },
+                new() { Id = ClothingType.Hat, DisplayName = "Hat" },
             ];
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
@@ -2445,7 +2445,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             state.ClothingPool[selfHat] = new()
             {
                 Id = selfHat,
-                ClothingTypeId = "hat",
+                ClothingTypeId = ClothingType.Hat,
                 CreatorPlayerId = "p1",
                 SvgContent = "<svg/>",
                 IsInPool = true,
@@ -2456,7 +2456,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
                 SubmittedOutfit = new()
                 {
                     PlayerId = "p1",
-                    SelectedItemsByType = new Dictionary<string, Guid>(), // selfHat not selected
+                    SelectedItemsByType = new Dictionary<ClothingType, Guid>(), // selfHat not selected
                 },
                 OwnedClothingItemIds = [selfHat],
             };
@@ -2474,7 +2474,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             var state = (DrawnToDressGameState)stateResult.Value!;
             state.Config.ClothingTypes =
             [
-                new() { Id = "hat", DisplayName = "Hat" },
+                new() { Id = ClothingType.Hat, DisplayName = "Hat" },
             ];
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
@@ -2485,7 +2485,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             state.ClothingPool[selfHat] = new()
             {
                 Id = selfHat,
-                ClothingTypeId = "hat",
+                ClothingTypeId = ClothingType.Hat,
                 CreatorPlayerId = "p1",
                 SvgContent = "<svg/>",
                 IsInPool = true,
@@ -2496,7 +2496,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
                 SubmittedOutfit = new()
                 {
                     PlayerId = "p1",
-                    SelectedItemsByType = new() { ["hat"] = selfHat },
+                    SelectedItemsByType = new() { [ClothingType.Hat] = selfHat },
                 },
                 OwnedClothingItemIds = [selfHat],
             };
@@ -2524,7 +2524,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             state.ClothingPool[hatId] = new()
             {
                 Id = hatId,
-                ClothingTypeId = "hat",
+                ClothingTypeId = ClothingType.Hat,
                 CreatorPlayerId = "p2",
                 SvgContent = "<svg/>",
                 IsInPool = true,
@@ -2535,7 +2535,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
                 SubmittedOutfit = new()
                 {
                     PlayerId = "p1",
-                    SelectedItemsByType = new() { ["hat"] = hatId },
+                    SelectedItemsByType = new() { [ClothingType.Hat] = hatId },
                 },
                 OwnedClothingItemIds = [hatId],
             };
@@ -2561,7 +2561,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             state.ClothingPool[hatId] = new()
             {
                 Id = hatId,
-                ClothingTypeId = "hat",
+                ClothingTypeId = ClothingType.Hat,
                 CreatorPlayerId = "p2",
                 SvgContent = "<svg/>",
                 IsInPool = true,
@@ -2572,7 +2572,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
                 SubmittedOutfit = new()
                 {
                     PlayerId = "p1",
-                    SelectedItemsByType = new() { ["hat"] = hatId },
+                    SelectedItemsByType = new() { [ClothingType.Hat] = hatId },
                 },
                 OwnedClothingItemIds = [hatId],
             };
@@ -2598,7 +2598,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             state.ClothingPool[hatId] = new()
             {
                 Id = hatId,
-                ClothingTypeId = "hat",
+                ClothingTypeId = ClothingType.Hat,
                 CreatorPlayerId = "p2",
                 SvgContent = "<svg/>",
                 IsInPool = true,
@@ -2626,7 +2626,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             state.ClothingPool[hatId] = new()
             {
                 Id = hatId,
-                ClothingTypeId = "hat",
+                ClothingTypeId = ClothingType.Hat,
                 CreatorPlayerId = "p2",
                 SvgContent = "<svg/>",
                 IsInPool = true,
@@ -2639,7 +2639,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
                 SubmittedOutfit = new()
                 {
                     PlayerId = "p2",
-                    SelectedItemsByType = new() { ["hat"] = hatId },
+                    SelectedItemsByType = new() { [ClothingType.Hat] = hatId },
                 },
             };
 
@@ -2662,7 +2662,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             var state = (DrawnToDressGameState)stateResult.Value!;
             state.Config.ClothingTypes =
             [
-                new() { Id = "hat", DisplayName = "Hat" },
+                new() { Id = ClothingType.Hat, DisplayName = "Hat" },
             ];
             state.Config.Outfit2DistinctnessThreshold = 3;
             await _engine.StartAsync(_host, state);
@@ -2674,12 +2674,12 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
 
             state.ClothingPool[outfit1Hat] = new()
             {
-                Id = outfit1Hat, ClothingTypeId = "hat", CreatorPlayerId = "p2", SvgContent = "<svg/>", IsInPool = false,
+                Id = outfit1Hat, ClothingTypeId = ClothingType.Hat, CreatorPlayerId = "p2", SvgContent = "<svg/>", IsInPool = false,
             };
             // outfit2Hat is self-drawn by p1 → after pool reset it will be auto-owned.
             state.ClothingPool[outfit2Hat] = new()
             {
-                Id = outfit2Hat, ClothingTypeId = "hat", CreatorPlayerId = "p1", SvgContent = "<svg/>", IsInPool = true,
+                Id = outfit2Hat, ClothingTypeId = ClothingType.Hat, CreatorPlayerId = "p1", SvgContent = "<svg/>", IsInPool = true,
             };
 
             state.GamePlayers["p1"] = new()
@@ -2688,18 +2688,18 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
                 SubmittedOutfit = new()
                 {
                     PlayerId = "p1",
-                    SelectedItemsByType = new() { ["hat"] = outfit1Hat },
+                    SelectedItemsByType = new() { [ClothingType.Hat] = outfit1Hat },
                 },
             };
 
             // Pool reset: outfit1Hat excluded (in Outfit 1 picks); outfit2Hat stays (self-drawn by p1).
             context.Fsm.TransitionTo(context, new OutfitBuildingState(outfitRound: 2));
             _engine.ProcessCommand(context, new SubmitOutfitCommand("p1",
-                new Dictionary<string, Guid> { ["hat"] = outfit2Hat }));
+                new Dictionary<ClothingType, Guid> { [ClothingType.Hat] = outfit2Hat }));
 
             Assert.IsNotNull(state.GamePlayers["p1"].SubmittedOutfit2,
                 "A valid, distinct Outfit 2 submission must be accepted.");
-            Assert.AreEqual(outfit2Hat, state.GamePlayers["p1"].SubmittedOutfit2!.SelectedItemsByType["hat"]);
+            Assert.AreEqual(outfit2Hat, state.GamePlayers["p1"].SubmittedOutfit2!.SelectedItemsByType[ClothingType.Hat]);
         }
 
         [TestMethod]
@@ -2709,9 +2709,9 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             var state = (DrawnToDressGameState)stateResult.Value!;
             state.Config.ClothingTypes =
             [
-                new() { Id = "hat", DisplayName = "Hat" },
-                new() { Id = "top", DisplayName = "Top" },
-                new() { Id = "shoes", DisplayName = "Shoes" },
+                new() { Id = ClothingType.Hat, DisplayName = "Hat" },
+                new() { Id = ClothingType.Top, DisplayName = "Top" },
+                new() { Id = ClothingType.Shoes, DisplayName = "Shoes" },
             ];
             state.Config.Outfit2DistinctnessThreshold = 3;
             // Allow reuse so the player still owns their Outfit 1 picks in Outfit 2.
@@ -2724,7 +2724,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             var topId = Guid.NewGuid();
             var shoesId = Guid.NewGuid();
 
-            foreach (var (id, type) in new[] { (hatId, "hat"), (topId, "top"), (shoesId, "shoes") })
+            foreach (var (id, type) in new[] { (hatId, ClothingType.Hat), (topId, ClothingType.Top), (shoesId, ClothingType.Shoes) })
             {
                 state.ClothingPool[id] = new()
                 {
@@ -2741,13 +2741,13 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
                 SubmittedOutfit = new()
                 {
                     PlayerId = "p1",
-                    SelectedItemsByType = new() { ["hat"] = hatId, ["top"] = topId, ["shoes"] = shoesId },
+                    SelectedItemsByType = new() { [ClothingType.Hat] = hatId, [ClothingType.Top] = topId, [ClothingType.Shoes] = shoesId },
                 },
             };
 
             context.Fsm.TransitionTo(context, new OutfitBuildingState(outfitRound: 2));
             _engine.ProcessCommand(context, new SubmitOutfitCommand("p1",
-                new Dictionary<string, Guid> { ["hat"] = hatId, ["top"] = topId, ["shoes"] = shoesId }));
+                new Dictionary<ClothingType, Guid> { [ClothingType.Hat] = hatId, [ClothingType.Top] = topId, [ClothingType.Shoes] = shoesId }));
 
             Assert.IsNull(state.GamePlayers["p1"].SubmittedOutfit2,
                 "An Outfit 2 that shares 3+ items with any Outfit 1 must be rejected.");
@@ -2760,9 +2760,9 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             var state = (DrawnToDressGameState)stateResult.Value!;
             state.Config.ClothingTypes =
             [
-                new() { Id = "hat", DisplayName = "Hat" },
-                new() { Id = "top", DisplayName = "Top" },
-                new() { Id = "shoes", DisplayName = "Shoes" },
+                new() { Id = ClothingType.Hat, DisplayName = "Hat" },
+                new() { Id = ClothingType.Top, DisplayName = "Top" },
+                new() { Id = ClothingType.Shoes, DisplayName = "Shoes" },
             ];
             state.Config.Outfit2DistinctnessThreshold = 3;
             await _engine.StartAsync(_host, state);
@@ -2773,7 +2773,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             var topId = Guid.NewGuid();
             var shoesId = Guid.NewGuid();
 
-            foreach (var (id, type) in new[] { (hatId, "hat"), (topId, "top"), (shoesId, "shoes") })
+            foreach (var (id, type) in new[] { (hatId, ClothingType.Hat), (topId, ClothingType.Top), (shoesId, ClothingType.Shoes) })
             {
                 state.ClothingPool[id] = new()
                 {
@@ -2794,7 +2794,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
                 SubmittedOutfit = new()
                 {
                     PlayerId = "p2",
-                    SelectedItemsByType = new() { ["hat"] = hatId, ["top"] = topId, ["shoes"] = shoesId },
+                    SelectedItemsByType = new() { [ClothingType.Hat] = hatId, [ClothingType.Top] = topId, [ClothingType.Shoes] = shoesId },
                 },
             };
 
@@ -2807,7 +2807,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             state.GamePlayers["p1"].OwnedClothingItemIds.AddRange([hatId, topId, shoesId]);
 
             _engine.ProcessCommand(context, new SubmitOutfitCommand("p1",
-                new Dictionary<string, Guid> { ["hat"] = hatId, ["top"] = topId, ["shoes"] = shoesId }));
+                new Dictionary<ClothingType, Guid> { [ClothingType.Hat] = hatId, [ClothingType.Top] = topId, [ClothingType.Shoes] = shoesId }));
 
             Assert.IsNull(state.GamePlayers["p1"].SubmittedOutfit2,
                 "An Outfit 2 must be rejected when it is too similar to another player's Outfit 1.");
@@ -2820,9 +2820,9 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             var state = (DrawnToDressGameState)stateResult.Value!;
             state.Config.ClothingTypes =
             [
-                new() { Id = "hat", DisplayName = "Hat" },
-                new() { Id = "top", DisplayName = "Top" },
-                new() { Id = "shoes", DisplayName = "Shoes" },
+                new() { Id = ClothingType.Hat, DisplayName = "Hat" },
+                new() { Id = ClothingType.Top, DisplayName = "Top" },
+                new() { Id = ClothingType.Shoes, DisplayName = "Shoes" },
             ];
             state.Config.Outfit2DistinctnessThreshold = 0; // disabled
             // Allow reuse so the player still owns their Outfit 1 picks in Outfit 2.
@@ -2835,7 +2835,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             var topId = Guid.NewGuid();
             var shoesId = Guid.NewGuid();
 
-            foreach (var (id, type) in new[] { (hatId, "hat"), (topId, "top"), (shoesId, "shoes") })
+            foreach (var (id, type) in new[] { (hatId, ClothingType.Hat), (topId, ClothingType.Top), (shoesId, ClothingType.Shoes) })
             {
                 state.ClothingPool[id] = new()
                 {
@@ -2851,13 +2851,13 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
                 SubmittedOutfit = new()
                 {
                     PlayerId = "p1",
-                    SelectedItemsByType = new() { ["hat"] = hatId, ["top"] = topId, ["shoes"] = shoesId },
+                    SelectedItemsByType = new() { [ClothingType.Hat] = hatId, [ClothingType.Top] = topId, [ClothingType.Shoes] = shoesId },
                 },
             };
 
             context.Fsm.TransitionTo(context, new OutfitBuildingState(outfitRound: 2));
             _engine.ProcessCommand(context, new SubmitOutfitCommand("p1",
-                new Dictionary<string, Guid> { ["hat"] = hatId, ["top"] = topId, ["shoes"] = shoesId }));
+                new Dictionary<ClothingType, Guid> { [ClothingType.Hat] = hatId, [ClothingType.Top] = topId, [ClothingType.Shoes] = shoesId }));
 
             Assert.IsNotNull(state.GamePlayers["p1"].SubmittedOutfit2,
                 "When distinctness is disabled (threshold=0) identical outfits must be accepted.");
@@ -2870,9 +2870,9 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             var state = (DrawnToDressGameState)stateResult.Value!;
             state.Config.ClothingTypes =
             [
-                new() { Id = "hat", DisplayName = "Hat" },
-                new() { Id = "top", DisplayName = "Top" },
-                new() { Id = "shoes", DisplayName = "Shoes" },
+                new() { Id = ClothingType.Hat, DisplayName = "Hat" },
+                new() { Id = ClothingType.Top, DisplayName = "Top" },
+                new() { Id = ClothingType.Shoes, DisplayName = "Shoes" },
             ];
             state.Config.Outfit2DistinctnessThreshold = 3;
             // CanReuseOutfit1Items so hatId/topId/outfit1Shoes are re-owned after pool reset.
@@ -2889,7 +2889,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
 
             foreach (var (id, type) in new[]
             {
-                (hatId, "hat"), (topId, "top"), (outfit1Shoes, "shoes"),
+                (hatId, ClothingType.Hat), (topId, ClothingType.Top), (outfit1Shoes, ClothingType.Shoes),
             })
             {
                 state.ClothingPool[id] = new()
@@ -2900,7 +2900,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             }
             state.ClothingPool[outfit2Shoes] = new()
             {
-                Id = outfit2Shoes, ClothingTypeId = "shoes", CreatorPlayerId = "p1",
+                Id = outfit2Shoes, ClothingTypeId = ClothingType.Shoes, CreatorPlayerId = "p1",
                 SvgContent = "<svg/>", IsInPool = true,
             };
 
@@ -2914,13 +2914,13 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
                 SubmittedOutfit = new()
                 {
                     PlayerId = "p1",
-                    SelectedItemsByType = new() { ["hat"] = hatId, ["top"] = topId, ["shoes"] = outfit1Shoes },
+                    SelectedItemsByType = new() { [ClothingType.Hat] = hatId, [ClothingType.Top] = topId, [ClothingType.Shoes] = outfit1Shoes },
                 },
             };
 
             context.Fsm.TransitionTo(context, new OutfitBuildingState(outfitRound: 2));
             _engine.ProcessCommand(context, new SubmitOutfitCommand("p1",
-                new Dictionary<string, Guid> { ["hat"] = hatId, ["top"] = topId, ["shoes"] = outfit2Shoes }));
+                new Dictionary<ClothingType, Guid> { [ClothingType.Hat] = hatId, [ClothingType.Top] = topId, [ClothingType.Shoes] = outfit2Shoes }));
 
             Assert.IsNotNull(state.GamePlayers["p1"].SubmittedOutfit2,
                 "Outfit 2 sharing fewer than the threshold items with Outfit 1 must be accepted.");
@@ -2935,7 +2935,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             var state = (DrawnToDressGameState)stateResult.Value!;
             state.Config.ClothingTypes =
             [
-                new() { Id = "hat", DisplayName = "Hat" },
+                new() { Id = ClothingType.Hat, DisplayName = "Hat" },
             ];
             state.Config.Outfit2DistinctnessThreshold = 0; // disable to simplify
             await _engine.StartAsync(_host, state);
@@ -2946,11 +2946,11 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             var hatB = Guid.NewGuid();
             state.ClothingPool[hatA] = new()
             {
-                Id = hatA, ClothingTypeId = "hat", CreatorPlayerId = "p2", SvgContent = "<svg/>", IsInPool = true,
+                Id = hatA, ClothingTypeId = ClothingType.Hat, CreatorPlayerId = "p2", SvgContent = "<svg/>", IsInPool = true,
             };
             state.ClothingPool[hatB] = new()
             {
-                Id = hatB, ClothingTypeId = "hat", CreatorPlayerId = "p1", SvgContent = "<svg/>", IsInPool = true,
+                Id = hatB, ClothingTypeId = ClothingType.Hat, CreatorPlayerId = "p1", SvgContent = "<svg/>", IsInPool = true,
             };
 
             state.GamePlayers["p1"] = new()
@@ -2969,12 +2969,12 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             context.Fsm.TransitionTo(context, new OutfitBuildingState(outfitRound: 2));
 
             _engine.ProcessCommand(context, new SubmitOutfitCommand("p1",
-                new Dictionary<string, Guid> { ["hat"] = hatB }));
+                new Dictionary<ClothingType, Guid> { [ClothingType.Hat] = hatB }));
             Assert.IsInstanceOfType<OutfitBuildingState>(context.Fsm.CurrentState,
                 "Should not advance until all players have submitted Outfit 2.");
 
             _engine.ProcessCommand(context, new SubmitOutfitCommand("p2",
-                new Dictionary<string, Guid> { ["hat"] = hatA }));
+                new Dictionary<ClothingType, Guid> { [ClothingType.Hat] = hatA }));
             Assert.IsInstanceOfType<OutfitCustomizationState>(context.Fsm.CurrentState,
                 "Should advance to Outfit 2 customization once all players submit Outfit 2.");
         }
@@ -3108,7 +3108,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             var state = (DrawnToDressGameState)stateResult.Value!;
             state.Config.ClothingTypes =
             [
-                new() { Id = "hat", DisplayName = "Hat" },
+                new() { Id = ClothingType.Hat, DisplayName = "Hat" },
             ];
             state.Config.Outfit2DistinctnessThreshold = 0; // disable to keep auto-fill simple
             await _engine.StartAsync(_host, state);
@@ -3120,7 +3120,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             var hatId = Guid.NewGuid();
             state.ClothingPool[hatId] = new()
             {
-                Id = hatId, ClothingTypeId = "hat", CreatorPlayerId = "p1", SvgContent = "<svg/>", IsInPool = true,
+                Id = hatId, ClothingTypeId = ClothingType.Hat, CreatorPlayerId = "p1", SvgContent = "<svg/>", IsInPool = true,
             };
             state.GamePlayers["p1"] = new()
             {
@@ -3136,7 +3136,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             Assert.IsInstanceOfType<OutfitCustomizationState>(context.Fsm.CurrentState);
             Assert.IsNotNull(state.GamePlayers["p1"].SubmittedOutfit2,
                 "Auto-fill must produce an Outfit 2 when the timer expires.");
-            Assert.IsTrue(state.GamePlayers["p1"].SubmittedOutfit2!.SelectedItemsByType.ContainsKey("hat"));
+            Assert.IsTrue(state.GamePlayers["p1"].SubmittedOutfit2!.SelectedItemsByType.ContainsKey(ClothingType.Hat));
         }
 
         [TestMethod]
@@ -3146,7 +3146,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             var state = (DrawnToDressGameState)stateResult.Value!;
             state.Config.ClothingTypes =
             [
-                new() { Id = "hat", DisplayName = "Hat" },
+                new() { Id = ClothingType.Hat, DisplayName = "Hat" },
             ];
             state.Config.Outfit2DistinctnessThreshold = 1; // any shared item is a violation
             // Allow reuse so p1 owns both conflictHat and distinctHat after reset.
@@ -3163,12 +3163,12 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             // distinctHat is self-drawn by p1 and not in any Outfit 1 → stays in pool.
             state.ClothingPool[conflictHat] = new()
             {
-                Id = conflictHat, ClothingTypeId = "hat", CreatorPlayerId = "p2",
+                Id = conflictHat, ClothingTypeId = ClothingType.Hat, CreatorPlayerId = "p2",
                 SvgContent = "<svg conflict/>", IsInPool = true,
             };
             state.ClothingPool[distinctHat] = new()
             {
-                Id = distinctHat, ClothingTypeId = "hat", CreatorPlayerId = "p1",
+                Id = distinctHat, ClothingTypeId = ClothingType.Hat, CreatorPlayerId = "p1",
                 SvgContent = "<svg distinct/>", IsInPool = true,
             };
 
@@ -3178,7 +3178,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
                 SubmittedOutfit = new()
                 {
                     PlayerId = "p1",
-                    SelectedItemsByType = new() { ["hat"] = conflictHat },
+                    SelectedItemsByType = new() { [ClothingType.Hat] = conflictHat },
                 },
             };
 
@@ -3189,7 +3189,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             context.Fsm.TransitionTo(context, new OutfitBuildingState(outfitRound: 2));
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
 
-            var chosenHat = state.GamePlayers["p1"].SubmittedOutfit2!.SelectedItemsByType["hat"];
+            var chosenHat = state.GamePlayers["p1"].SubmittedOutfit2!.SelectedItemsByType[ClothingType.Hat];
             Assert.AreEqual(distinctHat, chosenHat,
                 "Auto-fill must prefer an item that does not appear in any Outfit 1 over one that does.");
         }
@@ -3202,8 +3202,8 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             var hat1 = Guid.NewGuid();
             var hat2 = Guid.NewGuid();
 
-            var outfit1 = new OutfitSubmission { SelectedItemsByType = new() { ["hat"] = hat1 } };
-            var outfit2 = new OutfitSubmission { SelectedItemsByType = new() { ["hat"] = hat2 } };
+            var outfit1 = new OutfitSubmission { SelectedItemsByType = new() { [ClothingType.Hat] = hat1 } };
+            var outfit2 = new OutfitSubmission { SelectedItemsByType = new() { [ClothingType.Hat] = hat2 } };
 
             Assert.AreEqual(0, OutfitDistinctnessEvaluator.CountSharedItems(outfit1, outfit2));
         }
@@ -3216,11 +3216,11 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
 
             var outfit1 = new OutfitSubmission
             {
-                SelectedItemsByType = new() { ["hat"] = hatId, ["top"] = topId },
+                SelectedItemsByType = new() { [ClothingType.Hat] = hatId, [ClothingType.Top] = topId },
             };
             var outfit2 = new OutfitSubmission
             {
-                SelectedItemsByType = new() { ["hat"] = hatId, ["top"] = topId },
+                SelectedItemsByType = new() { [ClothingType.Hat] = hatId, [ClothingType.Top] = topId },
             };
 
             Assert.AreEqual(2, OutfitDistinctnessEvaluator.CountSharedItems(outfit1, outfit2));
@@ -3232,8 +3232,8 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             var hatA = Guid.NewGuid();
             var hatB = Guid.NewGuid();
 
-            var outfit1 = new OutfitSubmission { SelectedItemsByType = new() { ["hat"] = hatA } };
-            var outfit2 = new OutfitSubmission { SelectedItemsByType = new() { ["hat"] = hatB } };
+            var outfit1 = new OutfitSubmission { SelectedItemsByType = new() { [ClothingType.Hat] = hatA } };
+            var outfit2 = new OutfitSubmission { SelectedItemsByType = new() { [ClothingType.Hat] = hatB } };
 
             Assert.AreEqual(0, OutfitDistinctnessEvaluator.CountSharedItems(outfit1, outfit2),
                 "Items in the same slot but with different IDs must not count as shared.");
@@ -3243,8 +3243,8 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
         public void OutfitDistinctnessEvaluator_ViolatesDistinctnessRule_Disabled_ReturnsFalse()
         {
             var hatId = Guid.NewGuid();
-            var outfit1 = new OutfitSubmission { SelectedItemsByType = new() { ["hat"] = hatId } };
-            var outfit2 = new OutfitSubmission { SelectedItemsByType = new() { ["hat"] = hatId } };
+            var outfit1 = new OutfitSubmission { SelectedItemsByType = new() { [ClothingType.Hat] = hatId } };
+            var outfit2 = new OutfitSubmission { SelectedItemsByType = new() { [ClothingType.Hat] = hatId } };
 
             Assert.IsFalse(
                 OutfitDistinctnessEvaluator.ViolatesDistinctnessRule(outfit2, [outfit1], threshold: 0),
@@ -3260,11 +3260,11 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
 
             var outfit1 = new OutfitSubmission
             {
-                SelectedItemsByType = new() { ["hat"] = hatId, ["top"] = topId, ["shoes"] = shoesId },
+                SelectedItemsByType = new() { [ClothingType.Hat] = hatId, [ClothingType.Top] = topId, [ClothingType.Shoes] = shoesId },
             };
             var outfit2 = new OutfitSubmission
             {
-                SelectedItemsByType = new() { ["hat"] = hatId, ["top"] = topId, ["shoes"] = shoesId },
+                SelectedItemsByType = new() { [ClothingType.Hat] = hatId, [ClothingType.Top] = topId, [ClothingType.Shoes] = shoesId },
             };
 
             Assert.IsTrue(
@@ -3281,11 +3281,11 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
 
             var outfit1 = new OutfitSubmission
             {
-                SelectedItemsByType = new() { ["hat"] = hatId, ["top"] = topId, ["shoes"] = Guid.NewGuid() },
+                SelectedItemsByType = new() { [ClothingType.Hat] = hatId, [ClothingType.Top] = topId, [ClothingType.Shoes] = Guid.NewGuid() },
             };
             var outfit2 = new OutfitSubmission
             {
-                SelectedItemsByType = new() { ["hat"] = hatId, ["top"] = topId, ["shoes"] = newShoes },
+                SelectedItemsByType = new() { [ClothingType.Hat] = hatId, [ClothingType.Top] = topId, [ClothingType.Shoes] = newShoes },
             };
 
             Assert.IsFalse(
@@ -3303,15 +3303,15 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             // Outfit2 only shares 3 items with outfit1B (not outfit1A).
             var outfit1A = new OutfitSubmission
             {
-                SelectedItemsByType = new() { ["hat"] = Guid.NewGuid(), ["top"] = Guid.NewGuid() },
+                SelectedItemsByType = new() { [ClothingType.Hat] = Guid.NewGuid(), [ClothingType.Top] = Guid.NewGuid() },
             };
             var outfit1B = new OutfitSubmission
             {
-                SelectedItemsByType = new() { ["hat"] = hatId, ["top"] = topId, ["shoes"] = shoesId },
+                SelectedItemsByType = new() { [ClothingType.Hat] = hatId, [ClothingType.Top] = topId, [ClothingType.Shoes] = shoesId },
             };
             var outfit2 = new OutfitSubmission
             {
-                SelectedItemsByType = new() { ["hat"] = hatId, ["top"] = topId, ["shoes"] = shoesId },
+                SelectedItemsByType = new() { [ClothingType.Hat] = hatId, [ClothingType.Top] = topId, [ClothingType.Shoes] = shoesId },
             };
 
             Assert.IsTrue(
@@ -3459,7 +3459,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
-            state.Config.ClothingTypes = [new() { Id = "hat", DisplayName = "Hat" }];
+            state.Config.ClothingTypes = [new() { Id = ClothingType.Hat, DisplayName = "Hat" }];
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
@@ -3469,7 +3469,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             state.ClothingPool[replacementId] = new()
             {
                 Id = replacementId,
-                ClothingTypeId = "hat",
+                ClothingTypeId = ClothingType.Hat,
                 CreatorPlayerId = "p2",
                 SvgContent = "<svg/>",
                 IsInPool = true,
@@ -3477,12 +3477,12 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             state.GamePlayers["p1"] = new()
             {
                 PlayerId = "p1",
-                SubmittedOutfit = new() { PlayerId = "p1", SelectedItemsByType = new() { ["hat"] = Guid.NewGuid() } },
+                SubmittedOutfit = new() { PlayerId = "p1", SelectedItemsByType = new() { [ClothingType.Hat] = Guid.NewGuid() } },
             };
             state.GamePlayers["p2"] = new()
             {
                 PlayerId = "p2",
-                SubmittedOutfit = new() { PlayerId = "p2", SelectedItemsByType = new() { ["hat"] = Guid.NewGuid() } },
+                SubmittedOutfit = new() { PlayerId = "p2", SelectedItemsByType = new() { [ClothingType.Hat] = Guid.NewGuid() } },
             };
 
             context.Fsm.TransitionTo(context, new OutfitDistinctnessResolutionState());
@@ -3492,7 +3492,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
 
             Assert.IsTrue(state.GamePlayers["p1"].IsReady,
                 "Player must be marked ready after successfully resolving a distinctness conflict.");
-            Assert.AreEqual(replacementId, state.GamePlayers["p1"].SubmittedOutfit!.SelectedItemsByType["hat"],
+            Assert.AreEqual(replacementId, state.GamePlayers["p1"].SubmittedOutfit!.SelectedItemsByType[ClothingType.Hat],
                 "The player's outfit must use the replacement item after resolving.");
         }
 
@@ -3501,7 +3501,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
-            state.Config.ClothingTypes = [new() { Id = "hat", DisplayName = "Hat" }];
+            state.Config.ClothingTypes = [new() { Id = ClothingType.Hat, DisplayName = "Hat" }];
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
@@ -3510,7 +3510,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             state.ClothingPool[replacementId] = new()
             {
                 Id = replacementId,
-                ClothingTypeId = "hat",
+                ClothingTypeId = ClothingType.Hat,
                 CreatorPlayerId = "p2",
                 SvgContent = "<svg/>",
                 IsInPool = true,
@@ -3518,7 +3518,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             state.GamePlayers["p1"] = new()
             {
                 PlayerId = "p1",
-                SubmittedOutfit = new() { PlayerId = "p1", SelectedItemsByType = new() { ["hat"] = Guid.NewGuid() } },
+                SubmittedOutfit = new() { PlayerId = "p1", SelectedItemsByType = new() { [ClothingType.Hat] = Guid.NewGuid() } },
             };
 
             context.Fsm.TransitionTo(context, new OutfitDistinctnessResolutionState());
@@ -3843,11 +3843,11 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             // A player's own Outfit 1 and Outfit 2 share the same items.
             var outfit1 = new OutfitSubmission
             {
-                SelectedItemsByType = new() { ["hat"] = hatId, ["top"] = topId },
+                SelectedItemsByType = new() { [ClothingType.Hat] = hatId, [ClothingType.Top] = topId },
             };
             var outfit2 = new OutfitSubmission
             {
-                SelectedItemsByType = new() { ["hat"] = hatId, ["top"] = topId },
+                SelectedItemsByType = new() { [ClothingType.Hat] = hatId, [ClothingType.Top] = topId },
             };
 
             int shared = OutfitDistinctnessEvaluator.CountSharedItems(outfit1, outfit2);
@@ -3865,11 +3865,11 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
 
             var outfit1 = new OutfitSubmission
             {
-                SelectedItemsByType = new() { ["hat"] = hatId, ["top"] = topId, ["shoes"] = shoesId },
+                SelectedItemsByType = new() { [ClothingType.Hat] = hatId, [ClothingType.Top] = topId, [ClothingType.Shoes] = shoesId },
             };
             var outfit2 = new OutfitSubmission
             {
-                SelectedItemsByType = new() { ["hat"] = hatId, ["top"] = topId, ["shoes"] = shoesId },
+                SelectedItemsByType = new() { [ClothingType.Hat] = hatId, [ClothingType.Top] = topId, [ClothingType.Shoes] = shoesId },
             };
 
             Assert.IsTrue(
@@ -3897,7 +3897,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             state.ClothingPool[itemId] = new()
             {
                 Id = itemId,
-                ClothingTypeId = "hat",
+                ClothingTypeId = ClothingType.Hat,
                 CreatorPlayerId = "p3",
                 SvgContent = "<svg/>",
                 IsInPool = true,
@@ -3936,7 +3936,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             state.ClothingPool[itemId] = new()
             {
                 Id = itemId,
-                ClothingTypeId = "hat",
+                ClothingTypeId = ClothingType.Hat,
                 CreatorPlayerId = "p3",
                 SvgContent = "<svg/>",
                 IsInPool = true,

@@ -79,7 +79,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
             }
 
             // Swap out the conflicting item in the player's outfit for the chosen replacement.
-            string typeId = replacement.ClothingTypeId;
+            var typeId = replacement.ClothingTypeId;
             player.SubmittedOutfit.SelectedItemsByType[typeId] = replacement.Id;
             player.IsReady = true;
 

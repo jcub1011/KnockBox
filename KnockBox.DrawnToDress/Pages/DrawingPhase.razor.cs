@@ -40,12 +40,15 @@ namespace KnockBox.DrawnToDress.Pages
             _showMannequin = GameState.Config.ShowMannequin;
         }
 
-        private string GetMannequinSvg(string currentTypeId)
+        private string GetMannequinSvg(ClothingType currentTypeId)
         {
+            int yOffset = (GameState.Config.ClothingTypes.FirstOrDefault((def) => def.Id == currentTypeId)?.MannequinAnchorY) ?? 0;
             return MannequinSvgHelper.Build(
                 CurrentTypeCanvasWidth,
                 CurrentTypeCanvasHeight,
-                currentTypeId);
+                yOffset,
+                GameState.Config.MannequinDimensions.X,
+                GameState.Config.MannequinScaleFactor);
         }
 
         /// <summary>Display name for the clothing type of the current round.</summary>
@@ -62,15 +65,15 @@ namespace KnockBox.DrawnToDress.Pages
         }
 
         /// <summary>
-        /// The ID of the clothing type for the current round.
+        /// The clothing type for the current round.
         /// </summary>
-        private string CurrentTypeId
+        private ClothingType CurrentTypeId
         {
             get
             {
                 var types = GameState.Config.ClothingTypes;
                 int idx = GameState.CurrentDrawingClothingTypeIndex;
-                return idx >= 0 && idx < types.Count ? types[idx].Id : string.Empty;
+                return idx >= 0 && idx < types.Count ? types[idx].Id : default;
             }
         }
 

@@ -212,9 +212,10 @@
                              role="img" aria-label="Your outfit preview">
                             @foreach (var clothingType in GameState.Config.ClothingTypes)
                             {
-                                var (defX, defY) = CompositeCanvasLayout.GetDefaultItemPosition(
-                                    clothingType.Id, clothingType.CanvasWidth, clothingType.CanvasHeight,
-                                    ComposedOutfitWidth, ComposedOutfitHeight);
+                                var (defX, defY) = CompositeCanvasLayout.GetItemPosition(
+                                    clothingType.CanvasWidth, clothingType.CanvasHeight,
+                                    clothingType.MannequinAnchorY, ComposedOutfitWidth, ComposedOutfitHeight,
+                                    GameState.Config.MannequinDimensions.X);
                                 Guid? slotItemId = myPlayer is not null
                                     ? GetSelectedItemForType(myPlayer, clothingType.Id) : null;
 

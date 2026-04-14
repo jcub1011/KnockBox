@@ -30,6 +30,10 @@ namespace KnockBox.Components.Pages.Home
         public int? Fresh { get; set; }
 
         private string? LobbyCode { get; set; }
+        private bool _isTransitioning;
+        private bool _isReturning;
+        private string? _errorMessage;
+        private int _errorKey;
 
         private string? _playerName;
         private string? PlayerName
@@ -77,7 +81,7 @@ namespace KnockBox.Components.Pages.Home
                         PlayerName = $"Tester {RandomNumberService.GetRandomInt(1000, 9999)}";
                     }
 
-                    await JoinLobby(JoinCode);
+                    await JoinLobby(JoinCode, animate: false);
                 }
             }
             catch (Exception ex)
@@ -87,29 +91,37 @@ namespace KnockBox.Components.Pages.Home
             }
         }
 
-        private async Task JoinLobby(string lobbyCode)
+        private async Task JoinLobby(string lobbyCode, bool animate = true)
         {
-            if (!CanJoinOrCreate) return;
+            if (!CanJoinOrCreate || _isTransitioning) return;
 
             if (string.IsNullOrWhiteSpace(lobbyCode))
             {
-                // TODO: Notify user their code is invalid
+                ShowError("Please enter a valid room code.");
                 return;
             }
 
             var user = UserService.CurrentUser;
             if (user is null)
             {
-                // TODO: Notify user they are null
+                ShowError("Could not identify your session. Please refresh the page.");
                 return;
             }
 
+            if (animate) _isTransitioning = true;
+
+            var animationDelay = animate ? Task.Delay(500) : Task.CompletedTask;
             var joinResult = await LobbyService.JoinLobbyAsync(user, lobbyCode, ComponentDetached);
             if (!joinResult.TryGetSuccess(out var registration))
             {
-                // TODO: Notify user join failed
+                _isTransitioning = false;
+                _isReturning = animate;
+                var errorMsg = joinResult.TryGetFailure(out var failure) ? failure.PublicMessage : "Failed to join lobby.";
+                ShowError(errorMsg);
                 return;
             }
+
+            await animationDelay;
 
             // Leave any prior session before claiming the new slot.  If the player is
             // re-joining the same lobby, RegisterPlayer has already issued a fresh token;
@@ -120,21 +132,29 @@ namespace KnockBox.Components.Pages.Home
 
         private async Task CreateLobby(string routeIdentifier)
         {
-            if (!CanJoinOrCreate) return;
+            if (!CanJoinOrCreate || _isTransitioning) return;
 
             var user = UserService.CurrentUser;
             if (user is null)
             {
-                // TODO: Notify user they are null
+                ShowError("Could not identify your session. Please refresh the page.");
                 return;
             }
 
+            _isTransitioning = true;
+
+            var animationDelay = Task.Delay(500);
             var createResult = await LobbyService.CreateLobbyAsync(user, routeIdentifier, ComponentDetached);
             if (!createResult.TryGetSuccess(out var lobby))
             {
-                // TODO: Notify user lobby creation failed
+                _isTransitioning = false;
+                _isReturning = true;
+                var errorMsg = createResult.TryGetFailure(out var failure) ? failure.PublicMessage : "Failed to create lobby.";
+                ShowError(errorMsg);
                 return;
             }
+
+            await animationDelay;
 
             var disposeAction = new DisposableAction(() =>
             {
@@ -146,6 +166,25 @@ namespace KnockBox.Components.Pages.Home
             // Leave any prior session before claiming the new slot.
             GameSessionService.LeaveCurrentSession(navigateHome: false);
             GameSessionService.SetCurrentSession(new UserRegistration(user, disposeAction, createResult.Value));
+        }
+
+        // ── Error toast ───────────────────────────────────────────────────────
+
+        private void ShowError(string message)
+        {
+            _errorMessage = message;
+            _errorKey++;
+            StateHasChanged();
+        }
+
+        private void DismissError()
+        {
+            _errorMessage = null;
+        }
+
+        private void OnReturnAnimationEnd()
+        {
+            _isReturning = false;
         }
     }
 }

@@ -136,26 +136,17 @@
 
                 <!-- ── Clothing Types ─────────────────────────────────────── -->
                 <h4 class="dtd-settings-section">👕 Clothing Categories</h4>
-                <div class="dtd-clothing-types-editor">
-                    @foreach (var ct in EditConfig.ClothingTypes)
+                <div class="dtd-settings-grid">
+                    @foreach (var ct in DrawnToDressConfig.DefaultClothingTypes)
                     {
-                        <div class="dtd-clothing-type-row">
-                            <input type="text" class="dtd-setting-input dtd-ct-name" @bind="ct.DisplayName" @bind:after="ApplyConfig" placeholder="Name" />
-                            <div class="dtd-ct-dims">
-                                <input type="number" class="dtd-setting-input dtd-ct-dim" @bind="ct.CanvasWidth" @bind:after="ApplyConfig" title="Width" />
-                                <span>×</span>
-                                <input type="number" class="dtd-setting-input dtd-ct-dim" @bind="ct.CanvasHeight" @bind:after="ApplyConfig" title="Height" />
-                            </div>
-                            <div class="dtd-ct-actions">
-                                <button class="dtd-btn-icon" @onclick="() => MoveClothingType(ct.Id, -1)" title="Move Up">↑</button>
-                                <button class="dtd-btn-icon" @onclick="() => MoveClothingType(ct.Id, 1)" title="Move Down">↓</button>
-                                <button class="dtd-btn-icon dtd-btn-delete" @onclick="() => RemoveClothingType(ct.Id)" title="Remove">✕</button>
-                            </div>
-                        </div>
+                        var typeId = ct.Id;
+                        <label class="dtd-setting-label dtd-setting-label-row" title="Include @ct.DisplayName drawings in the game">
+                            <span>@ct.DisplayName:</span>
+                            <input type="checkbox" class="dtd-setting-checkbox"
+                                   checked="@IsClothingTypeEnabled(typeId)"
+                                   @onchange="() => ToggleClothingType(typeId)" />
+                        </label>
                     }
-                    <button class="dtd-btn dtd-btn-secondary dtd-btn-sm" @onclick="AddClothingType">
-                        ＋ Add Category
-                    </button>
                 </div>
 
                 <!-- ── Theme ────────────────────────────────────────────── -->

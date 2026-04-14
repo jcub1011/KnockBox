@@ -56,7 +56,8 @@ namespace KnockBox
             var pluginLoadResult = new PluginLoader(pluginLogger).LoadModules(pluginsPath);
 
             // Add logic
-            builder.Services.RegisterLogic(pluginLoadResult);
+            var registrationLogger = bootstrapLoggerFactory.CreateLogger("KnockBox.Services.Registrations.Logic.LogicRegistrations");
+            builder.Services.RegisterLogic(pluginLoadResult, registrationLogger);
 
             // Add navigation
             builder.Services.AddScoped<INavigationService, NavigationService>();

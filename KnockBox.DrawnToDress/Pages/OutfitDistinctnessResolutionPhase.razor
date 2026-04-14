@@ -24,7 +24,7 @@
             <div class="dtd-distinctness-conflicts">
                 @foreach (var (typeId, conflictingItemId) in conflicts)
                 {
-                    var typeName = GameState.Config.ClothingTypes.FirstOrDefault(c => c.Id == typeId)?.DisplayName ?? typeId;
+                    var typeName = GameState.Config.ClothingTypes.FirstOrDefault(c => c.Id == typeId)?.DisplayName ?? typeId.ToString();
                     var candidates = GetReplacementCandidates(typeId, conflictingItemId);
 
                     <div class="dtd-distinctness-conflict-slot">

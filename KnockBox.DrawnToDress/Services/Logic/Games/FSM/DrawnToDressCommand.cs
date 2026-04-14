@@ -52,7 +52,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM
     /// </summary>
     public record SubmitDrawingCommand(
         string PlayerId,
-        string ClothingTypeId,
+        ClothingType ClothingTypeId,
         string SvgContent) : DrawnToDressCommand(PlayerId);
 
     /// <summary>
@@ -78,7 +78,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM
     /// </summary>
     public record SubmitOutfitCommand(
         string PlayerId,
-        Dictionary<string, Guid> SelectedItemsByType) : DrawnToDressCommand(PlayerId);
+        Dictionary<ClothingType, Guid> SelectedItemsByType) : DrawnToDressCommand(PlayerId);
 
     // ── Outfit customization ──────────────────────────────────────────────────
 
@@ -91,7 +91,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM
         string PlayerId,
         string? OutfitName,
         string? SketchSvgContent = null,
-        Dictionary<string, ItemPositionOverride>? ItemPositionOverrides = null) : DrawnToDressCommand(PlayerId);
+        Dictionary<ClothingType, ItemPositionOverride>? ItemPositionOverrides = null) : DrawnToDressCommand(PlayerId);
 
     /// <summary>Updates the draft outfit name for the player while they are typing.</summary>
     public record UpdateDraftOutfitNameCommand(

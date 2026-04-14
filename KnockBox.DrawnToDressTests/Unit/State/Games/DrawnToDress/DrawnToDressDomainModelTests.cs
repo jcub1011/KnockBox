@@ -56,13 +56,13 @@ namespace KnockBox.DrawnToDress.Tests.Unit.State.Games.DrawnToDress
             var submission = new OutfitSubmission
             {
                 PlayerId = "player1",
-                SelectedItemsByType = new Dictionary<string, Guid>
+                SelectedItemsByType = new Dictionary<ClothingType, Guid>
                 {
-                    ["hat"] = itemId,
+                    [ClothingType.Hat] = itemId,
                 }
             };
 
-            Assert.AreEqual(itemId, submission.SelectedItemsByType["hat"]);
+            Assert.AreEqual(itemId, submission.SelectedItemsByType[ClothingType.Hat]);
         }
 
         // ── ThemeDefinition ───────────────────────────────────────────────────
@@ -224,12 +224,12 @@ namespace KnockBox.DrawnToDress.Tests.Unit.State.Games.DrawnToDress
         {
             var type = new ClothingTypeDefinition
             {
-                Id = "hat",
+                Id = ClothingType.Hat,
                 DisplayName = "Hat",
                 AllowMultiple = false,
             };
 
-            Assert.AreEqual("hat", type.Id);
+            Assert.AreEqual(ClothingType.Hat, type.Id);
             Assert.AreEqual("Hat", type.DisplayName);
             Assert.IsFalse(type.AllowMultiple);
         }

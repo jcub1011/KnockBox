@@ -41,7 +41,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress
             var state = (DrawnToDressGameState)stateResult.Value!;
             state.Config.ClothingTypes =
             [
-                new() { Id = "hat", DisplayName = "Hat", MaxItemsPerRound = 3 },
+                new() { Id = ClothingType.Hat, DisplayName = "Hat", MaxItemsPerRound = 3 },
             ];
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
@@ -70,7 +70,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress
             // Create an item drawn by p1 and place it in the pool.
             var item = new DrawnClothingItem
             {
-                ClothingTypeId = "hat",
+                ClothingTypeId = ClothingType.Hat,
                 CreatorPlayerId = "p1",
                 SvgContent = "<svg>hat</svg>",
                 IsInPool = true,
@@ -95,7 +95,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress
             var state = (DrawnToDressGameState)stateResult.Value!;
             state.Config.ClothingTypes =
             [
-                new() { Id = "hat", DisplayName = "Hat", MaxItemsPerRound = 10 },
+                new() { Id = ClothingType.Hat, DisplayName = "Hat", MaxItemsPerRound = 10 },
             ];
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
@@ -106,7 +106,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress
 
             // Act
             var result = _engine.ProcessCommand(context,
-                new SubmitDrawingCommand("p1", "hat", "<svg>valid drawing</svg>"));
+                new SubmitDrawingCommand("p1", ClothingType.Hat, "<svg>valid drawing</svg>"));
 
             // Assert
             Assert.IsTrue(result.IsSuccess);
@@ -120,7 +120,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress
 
             var item = new DrawnClothingItem
             {
-                ClothingTypeId = "hat",
+                ClothingTypeId = ClothingType.Hat,
                 CreatorPlayerId = "p1",
                 SvgContent = "<svg>hat</svg>",
                 IsInPool = true,
@@ -143,7 +143,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress
             var state = (DrawnToDressGameState)stateResult.Value!;
             state.Config.ClothingTypes =
             [
-                new() { Id = "hat", DisplayName = "Hat", MaxItemsPerRound = 10 },
+                new() { Id = ClothingType.Hat, DisplayName = "Hat", MaxItemsPerRound = 10 },
             ];
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
@@ -152,12 +152,12 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress
             state.GamePlayers["p1"] = new DrawnToDressPlayerState { PlayerId = "p1" };
             Assert.IsInstanceOfType<DrawingRoundState>(context.Fsm.CurrentState);
 
-            // Act: submit a drawing for a clothing type that doesn't exist.
+            // Act: submit a drawing for a clothing type that isn't in the config.
             _engine.ProcessCommand(context,
-                new SubmitDrawingCommand("p1", "nonexistent-type", "<svg>drawing</svg>"));
+                new SubmitDrawingCommand("p1", ClothingType.Top, "<svg>drawing</svg>"));
 
-            // Assert: no item was added to the pool for the invalid type.
-            Assert.DoesNotContain(i => i.ClothingTypeId == "nonexistent-type", context.ClothingPool.Values);
+            // Assert: no item was added to the pool for the unconfigured type.
+            Assert.DoesNotContain(i => i.ClothingTypeId == ClothingType.Top, context.ClothingPool.Values);
         }
 
         [TestMethod]
@@ -168,7 +168,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress
             var state = (DrawnToDressGameState)stateResult.Value!;
             state.Config.ClothingTypes =
             [
-                new() { Id = "hat", DisplayName = "Hat", MaxItemsPerRound = 10 },
+                new() { Id = ClothingType.Hat, DisplayName = "Hat", MaxItemsPerRound = 10 },
             ];
             await _engine.StartAsync(_host, state);
             var context = state.Context!;

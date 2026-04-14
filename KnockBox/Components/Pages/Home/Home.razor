@@ -5,7 +5,7 @@
 
 <PageTitle>Knockbox Games</PageTitle>
 
-<div class="home-container">
+<div class="home-container @(_isTransitioning ? "transitioning" : "") @(_isReturning ? "returning" : "")">
     <div class="hero">
         <h1 class="title">
             <span class="title-letter" aria-hidden="true">K</span>
@@ -43,7 +43,7 @@
         </div>
     </form>
 
-    <div class="games-section">
+    <div class="games-section" @onanimationend="OnReturnAnimationEnd">
         <h2 class="games-heading">
             <span class="games-heading-icon" aria-hidden="true">&#127922;</span>
             Pick a Game
@@ -57,4 +57,12 @@
             }
         </div>
     </div>
+
+    @if (_errorMessage is not null)
+    {
+        <div @key="_errorKey" class="home-error-toast" @onanimationend="DismissError">
+            <span class="home-error-icon" aria-hidden="true">&#9888;&#65039;</span>
+            <span>@_errorMessage</span>
+        </div>
+    }
 </div>

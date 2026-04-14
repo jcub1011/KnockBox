@@ -7,29 +7,27 @@
 @implements IDisposable
 
 <div class="main">
-    <header class="@(_isOnHomePage ? "home-header" : "")">
+    <header class="@(_isOnHomePage ? "home-header" : "") @(_isEnteringGame ? "entering-from-home" : "") @(_isExitingGame ? "exiting-to-home" : "")">
         @if (!_isOnHomePage && GameSessionService.TryGetCurrentSession(out var currentSession))
         {
             <a href="@NavigationService.GetHomeUri()" title="Click to return home">
                 @currentSession.LobbyRegistration.GameName</a>
-                <span class="room-code">
-                    <span class="room-code-label">Join Code: </span>
-                    <button class="room-code-btn"
-                            @onclick="ToggleRoomCode" 
-                            @onmouseup="OnMouseUp"
-                            @oncontextmenu="@(() => CopyRoomCodeAsync(currentSession.LobbyRegistration.Code))" 
-                            @oncontextmenu:preventDefault="true"
-                            title="Click to reveal. Right-click/Long-press to copy. Middle-click to join in a new tab.">
-                        @(_isRoomCodeRevealed ? currentSession.LobbyRegistration.Code : "••••••")
-                    </button>
-                </span>
+                <button class="room-code-btn @(_isRoomCodeRevealed ? "revealed" : "")"
+                        @onclick="ToggleRoomCode"
+                        @onmouseup="OnMouseUp"
+                        @oncontextmenu="@(() => CopyRoomCodeAsync(currentSession.LobbyRegistration.Code))"
+                        @oncontextmenu:preventDefault="true"
+                        title="Click to reveal. Right-click/Long-press to copy. Middle-click to join in a new tab.">
+                    <span class="room-code-cover">Join Code</span>
+                    <span class="room-code-value">@currentSession.LobbyRegistration.Code</span>
+                </button>
             }
         else
         {
             <span>Knockbox</span>
         }
     </header>
-    <article>
+    <article class="@(_isEnteringGame ? "entering-from-home" : "") @(_isExitingGame ? "exiting-to-home" : "")">
         @Body
         <div id="blazor-error-ui" data-nosnippet>
             An unhandled error has occurred.
@@ -49,12 +47,30 @@
 
     private bool _isRoomCodeRevealed;
     private bool _isOnHomePage;
+    private bool _isEnteringGame;
+    private bool _isExitingGame;
+    private IDisposable? _locationChangingRegistration;
+    private CancellationTokenSource _cts = new();
 
     protected override void OnInitialized()
     {
         _isOnHomePage = IsHomePage();
         NavigationManager.LocationChanged += OnLocationChanged;
         UserService.UserInitialized += OnUserInitialized;
+        _locationChangingRegistration = NavigationManager.RegisterLocationChangingHandler(OnLocationChanging);
+    }
+
+    private async ValueTask OnLocationChanging(LocationChangingContext context)
+    {
+        if (_isOnHomePage || _isExitingGame) return;
+
+        var targetRelPath = NavigationManager.ToBaseRelativePath(context.TargetLocation).TrimEnd('/');
+        if (targetRelPath is not ("" or "home")) return;
+
+        _isExitingGame = true;
+        await InvokeAsync(StateHasChanged);
+        await Task.Delay(400);
+        _isExitingGame = false;
     }
 
     private bool IsHomePage()
@@ -65,9 +81,23 @@
 
     private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
     {
+        var wasHome = _isOnHomePage;
         _isOnHomePage = IsHomePage();
         // Reset the room-code reveal state when the user navigates away from/to a room.
         _isRoomCodeRevealed = false;
+        _isExitingGame = false;
+
+        if (wasHome && !_isOnHomePage)
+        {
+            _isEnteringGame = true;
+            var token = _cts.Token;
+            _ = Task.Delay(600, token).ContinueWith(_ => InvokeAsync(() =>
+            {
+                _isEnteringGame = false;
+                StateHasChanged();
+            }), token, TaskContinuationOptions.OnlyOnRanToCompletion, TaskScheduler.Current);
+        }
+
         _ = InvokeAsync(StateHasChanged).ContinueWith(
             t => Logger.LogError(t.Exception, "Error refreshing layout after navigation."),
             TaskContinuationOptions.OnlyOnFaulted);
@@ -82,8 +112,11 @@
 
     public void Dispose()
     {
+        _cts.Cancel();
+        _cts.Dispose();
         NavigationManager.LocationChanged -= OnLocationChanged;
         UserService.UserInitialized -= OnUserInitialized;
+        _locationChangingRegistration?.Dispose();
     }
 
     private void ToggleRoomCode() => _isRoomCodeRevealed = !_isRoomCodeRevealed;

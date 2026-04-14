@@ -23,7 +23,7 @@ namespace KnockBox.DrawnToDress.Pages
         /// <summary>
         /// Finds clothing types where the current player shares an item with another player.
         /// </summary>
-        protected List<(string TypeId, Guid ConflictingItemId)> GetConflictsForCurrentPlayer()
+        protected List<(ClothingType TypeId, Guid ConflictingItemId)> GetConflictsForCurrentPlayer()
         {
             var myId = UserService.CurrentUser?.Id;
             if (myId is null) return [];
@@ -31,7 +31,7 @@ namespace KnockBox.DrawnToDress.Pages
             var myOutfit = GameState.GamePlayers.GetValueOrDefault(myId)?.SubmittedOutfit;
             if (myOutfit is null) return [];
 
-            var conflicts = new List<(string, Guid)>();
+            var conflicts = new List<(ClothingType, Guid)>();
 
             foreach (var (typeId, itemId) in myOutfit.SelectedItemsByType)
             {
@@ -55,7 +55,7 @@ namespace KnockBox.DrawnToDress.Pages
         /// <summary>
         /// Gets available replacement items for a given clothing type that the player owns.
         /// </summary>
-        protected List<DrawnClothingItem> GetReplacementCandidates(string typeId, Guid conflictingItemId)
+        protected List<DrawnClothingItem> GetReplacementCandidates(ClothingType typeId, Guid conflictingItemId)
         {
             var myId = UserService.CurrentUser?.Id;
             if (myId is null) return [];

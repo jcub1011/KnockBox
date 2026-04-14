@@ -29,10 +29,10 @@ namespace KnockBox.DrawnToDress.Services.State.Games.Data
         public string? SketchSvgContent { get; set; }
 
         /// <summary>
-        /// Per-item position overrides keyed by clothing type ID. Stores absolute viewBox
+        /// Per-item position overrides keyed by clothing type. Stores absolute viewBox
         /// coordinates. An empty dictionary means the default stacked layout is used.
         /// </summary>
-        public Dictionary<string, ItemPositionOverride> ItemPositionOverrides { get; set; } = new();
+        public Dictionary<ClothingType, ItemPositionOverride> ItemPositionOverrides { get; set; } = new();
     }
 
     /// <summary>
@@ -46,10 +46,10 @@ namespace KnockBox.DrawnToDress.Services.State.Games.Data
         public string PlayerId { get; set; } = string.Empty;
 
         /// <summary>
-        /// The selected clothing items keyed by clothing type ID. Each value is the
+        /// The selected clothing items keyed by clothing type. Each value is the
         /// <see cref="DrawnClothingItem.Id"/> of the chosen item for that type.
         /// </summary>
-        public Dictionary<string, Guid> SelectedItemsByType { get; set; } = [];
+        public Dictionary<ClothingType, Guid> SelectedItemsByType { get; set; } = [];
 
         /// <summary>Player-supplied overlay data (name, etc.) for this outfit.</summary>
         public OutfitCustomization Customization { get; set; } = new();

@@ -7,8 +7,8 @@ namespace KnockBox.DrawnToDress.Services.State.Games.Data
     /// </summary>
     public class ClothingTypeDefinition
     {
-        /// <summary>Unique identifier for this clothing type (e.g. "hat", "top").</summary>
-        public string Id { get; set; } = string.Empty;
+        /// <summary>Identifies which clothing category this definition represents.</summary>
+        public ClothingType Id { get; set; }
 
         /// <summary>Human-readable name shown in the UI (e.g. "Hat", "Top").</summary>
         public string DisplayName { get; set; } = string.Empty;

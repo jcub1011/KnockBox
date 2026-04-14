@@ -69,25 +69,128 @@ article {
     margin: 0px;
 }
 
-.room-code {
-    font-weight: 500;
-    white-space: nowrap;
-    flex-shrink: 0;
-}
-
-@media (max-width: 480px) {
-    .room-code-label {
-        display: none;
-    }
-}
-
 .room-code-btn {
-    font-family: var(--font-mono);
+    display: inline-grid;
+    overflow: hidden;
+    font-family: var(--font-primary);
     font-size: 1em;
-    font-weight: 600;
+    font-weight: 500;
     margin: 0px;
-    padding: 0px;
+    padding: 0px 8px;
     background: none;
     border: none;
     cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+    -webkit-mask-image: linear-gradient(to right, transparent, black 8px, black calc(100% - 8px), transparent);
+    mask-image: linear-gradient(to right, transparent, black 8px, black calc(100% - 8px), transparent);
+}
+
+/* ── Join Code Slide Animation ───────────────────────────────────────── */
+
+.room-code-cover,
+.room-code-value {
+    grid-area: 1 / 1;
+    transition: transform 0.3s ease-out;
+}
+
+.room-code-cover {
+    background: white;
+    width: 100%;
+    padding: 0px 8px;
+    z-index: 1;
+    transform: translateX(0);
+}
+
+.room-code-value {
+    font-family: var(--font-mono);
+    font-weight: 600;
+    padding: 0px 8px;
+    transform: translateX(100%);
+}
+
+.room-code-btn.revealed .room-code-cover {
+    transform: translateX(-100%);
+}
+
+.room-code-btn.revealed .room-code-value {
+    transform: translateX(0);
+}
+
+/* ── Game Entrance Animation ──────────────────────────────────────────── */
+
+article.entering-from-home {
+    animation: content-enter 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes content-enter {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+header.entering-from-home {
+    animation: header-enter 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes header-enter {
+    from {
+        opacity: 0;
+        transform: translateY(-100%);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ── Game Exit Animation (back to home) ───────────────────────────────── */
+
+article.exiting-to-home {
+    animation: content-exit 0.4s ease-in both;
+}
+
+@keyframes content-exit {
+    from {
+        opacity: 1;
+        transform: translateY(0);
+    }
+    to {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+}
+
+header.exiting-to-home {
+    animation: header-exit 0.35s ease-in both;
+}
+
+@keyframes header-exit {
+    from {
+        opacity: 1;
+        transform: translateY(0);
+    }
+    to {
+        opacity: 0;
+        transform: translateY(-100%);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    article.entering-from-home,
+    header.entering-from-home,
+    article.exiting-to-home,
+    header.exiting-to-home {
+        animation: none;
+    }
+
+    .room-code-cover,
+    .room-code-value {
+        transition: none;
+    }
 }

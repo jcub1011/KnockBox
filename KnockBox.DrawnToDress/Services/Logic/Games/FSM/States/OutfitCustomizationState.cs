@@ -120,8 +120,8 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
 
             if (cmd.ItemPositionOverrides is { Count: > 0 })
             {
-                int canvasWidth = CompositeCanvasLayout.ComputeCompositeWidth(context.Config.ClothingTypes);
-                int totalHeight = CompositeCanvasLayout.ComputeCompositeHeight(context.Config.ClothingTypes);
+                int canvasWidth = CompositeCanvasLayout.ComputeCompositeWidth(context.Config);
+                int totalHeight = CompositeCanvasLayout.ComputeCompositeHeight(context.Config);
 
                 var clothingTypeById = context.Config.ClothingTypes.ToDictionary(ct => ct.Id);
 
@@ -216,7 +216,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
         /// </summary>
         private static bool HasDistinctnessConflict(DrawnToDressGameContext context)
         {
-            var seenItems = new HashSet<(string typeId, Guid itemId)>();
+            var seenItems = new HashSet<(ClothingType typeId, Guid itemId)>();
             foreach (var player in context.GamePlayers.Values)
             {
                 if (player.SubmittedOutfit is null) continue;

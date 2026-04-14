@@ -21,9 +21,9 @@
 
     var myOutfit = myPlayer?.GetOutfit(OutfitRound);
 
-    int canvasWidth = CompositeCanvasLayout.ComputeCompositeWidth(GameState.Config.ClothingTypes);
-    int totalOutfitHeight = CompositeCanvasLayout.ComputeCompositeHeight(GameState.Config.ClothingTypes);
-    double mannequinSize = CompositeCanvasLayout.MannequinDisplaySize(GameState.Config.ClothingTypes);
+    int canvasWidth = CompositeCanvasLayout.ComputeCompositeWidth(GameState.Config);
+    int totalOutfitHeight = CompositeCanvasLayout.ComputeCompositeHeight(GameState.Config);
+    double mannequinSize = CompositeCanvasLayout.MannequinDisplaySize(GameState.Config);
 
     // Build a composite background SVG from the player's selected outfit items, applying
     // any position overrides set via the drag/manual-input layer.
@@ -58,7 +58,8 @@
 
         if (_showMannequin && GameState.Config.ShowMannequin)
         {
-            mannequinSvg = MannequinSvgHelper.Build(canvasWidth, totalOutfitHeight, overrideDisplaySize: mannequinSize);
+            mannequinSvg = MannequinSvgHelper.Build(canvasWidth, totalOutfitHeight, GameState.Config.MannequinDimensions.Y / 2,
+                GameState.Config.MannequinDimensions.X, GameState.Config.MannequinScaleFactor, overrideDisplaySize: mannequinSize);
         }
 
         if (bgParts.Length > 0)
@@ -110,8 +111,8 @@
                                                 if (KnockBox.Core.Services.Drawing.SvgContentSanitizer.Sanitize(item.SvgContent) is string safeSvg)
                                                 {
                                                     var (itemX, itemY) = CompositeCanvasLayout.GetItemPosition(
-                                                        ct.Id, ct.CanvasWidth, ct.CanvasHeight, canvasWidth, totalOutfitHeight,
-                                                        outfit.Customization.ItemPositionOverrides);
+                                                        ct.CanvasWidth, ct.CanvasHeight, ct.MannequinAnchorY, canvasWidth, totalOutfitHeight,
+                                                        GameState.Config.MannequinDimensions.X);
                                                     <g transform="translate(@itemX,@itemY)">
                                                         @((MarkupString)safeSvg)
                                                     </g>
