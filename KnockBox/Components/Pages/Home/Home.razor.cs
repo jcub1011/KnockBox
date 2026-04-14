@@ -31,6 +31,9 @@ namespace KnockBox.Components.Pages.Home
 
         private string? LobbyCode { get; set; }
         private bool _isTransitioning;
+        private bool _isReturning;
+        private string? _errorMessage;
+        private int _errorKey;
 
         private string? _playerName;
         private string? PlayerName
@@ -94,14 +97,14 @@ namespace KnockBox.Components.Pages.Home
 
             if (string.IsNullOrWhiteSpace(lobbyCode))
             {
-                // TODO: Notify user their code is invalid
+                ShowError("Please enter a valid room code.");
                 return;
             }
 
             var user = UserService.CurrentUser;
             if (user is null)
             {
-                // TODO: Notify user they are null
+                ShowError("Could not identify your session. Please refresh the page.");
                 return;
             }
 
@@ -112,7 +115,9 @@ namespace KnockBox.Components.Pages.Home
             if (!joinResult.TryGetSuccess(out var registration))
             {
                 _isTransitioning = false;
-                // TODO: Notify user join failed
+                _isReturning = animate;
+                var errorMsg = joinResult.TryGetFailure(out var failure) ? failure.PublicMessage : "Failed to join lobby.";
+                ShowError(errorMsg);
                 return;
             }
 
@@ -132,7 +137,7 @@ namespace KnockBox.Components.Pages.Home
             var user = UserService.CurrentUser;
             if (user is null)
             {
-                // TODO: Notify user they are null
+                ShowError("Could not identify your session. Please refresh the page.");
                 return;
             }
 
@@ -143,7 +148,9 @@ namespace KnockBox.Components.Pages.Home
             if (!createResult.TryGetSuccess(out var lobby))
             {
                 _isTransitioning = false;
-                // TODO: Notify user lobby creation failed
+                _isReturning = true;
+                var errorMsg = createResult.TryGetFailure(out var failure) ? failure.PublicMessage : "Failed to create lobby.";
+                ShowError(errorMsg);
                 return;
             }
 
@@ -159,6 +166,25 @@ namespace KnockBox.Components.Pages.Home
             // Leave any prior session before claiming the new slot.
             GameSessionService.LeaveCurrentSession(navigateHome: false);
             GameSessionService.SetCurrentSession(new UserRegistration(user, disposeAction, createResult.Value));
+        }
+
+        // ── Error toast ───────────────────────────────────────────────────────
+
+        private void ShowError(string message)
+        {
+            _errorMessage = message;
+            _errorKey++;
+            StateHasChanged();
+        }
+
+        private void DismissError()
+        {
+            _errorMessage = null;
+        }
+
+        private void OnReturnAnimationEnd()
+        {
+            _isReturning = false;
         }
     }
 }

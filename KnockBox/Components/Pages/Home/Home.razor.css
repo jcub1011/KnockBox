@@ -290,6 +290,12 @@
     pointer-events: none;
 }
 
+.game-tile:focus-visible {
+    outline: 3px solid var(--accent-color);
+    outline-offset: 3px;
+    border-radius: 14px;
+}
+
 /* ── Exit Transition ────────────────────────────────────────────────────── */
 
 .home-container.transitioning {
@@ -338,6 +344,62 @@
         opacity: 0;
         transform: translateY(20px);
     }
+}
+
+/* ── Return Animation (after failed lobby operation) ───────────────────── */
+
+.home-container.returning .title-letter {
+    animation: letter-bounce 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.home-container.returning .title-letter:nth-child(1) { animation-delay: 0.05s; }
+.home-container.returning .title-letter:nth-child(2) { animation-delay: 0.10s; }
+.home-container.returning .title-letter:nth-child(3) { animation-delay: 0.15s; }
+.home-container.returning .title-letter:nth-child(4) { animation-delay: 0.20s; }
+.home-container.returning .title-letter:nth-child(5) { animation-delay: 0.25s; }
+.home-container.returning .title-letter:nth-child(6) { animation-delay: 0.30s; }
+.home-container.returning .title-letter:nth-child(7) { animation-delay: 0.35s; }
+.home-container.returning .title-letter:nth-child(8) { animation-delay: 0.40s; }
+
+.home-container.returning .join-section {
+    animation: fade-in-up 0.6s ease-out 0.1s both;
+}
+
+.home-container.returning .games-section {
+    animation: fade-in-up 0.7s ease-out 0.15s both;
+}
+
+/* ── Error Toast ────────────────────────────────────────────────────────── */
+
+.home-error-toast {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #e74c3c;
+    color: #fff;
+    padding: 12px 24px;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(231, 76, 60, 0.4);
+    z-index: 20000;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font-primary);
+    font-weight: 600;
+    animation: home-toast-slide 3s ease-in-out forwards;
+    pointer-events: none;
+}
+
+.home-error-icon {
+    font-size: 1.2rem;
+}
+
+@keyframes home-toast-slide {
+    0% { opacity: 0; transform: translateX(-50%) translateY(-20px); }
+    10% { opacity: 1; transform: translateX(-50%) translateY(0); }
+    80% { opacity: 1; transform: translateX(-50%) translateY(0); }
+    100% { opacity: 0; transform: translateX(-50%) translateY(-20px); }
 }
 
 /* ── Responsive ─────────────────────────────────────────────────────────── */
@@ -411,5 +473,19 @@
     .home-container.transitioning .games-section {
         animation: none;
         opacity: 0;
+    }
+
+    .home-container.returning .title-letter,
+    .home-container.returning .join-section,
+    .home-container.returning .games-section {
+        animation: none;
+        opacity: 1;
+        transform: none;
+    }
+
+    .home-error-toast {
+        animation: none;
+        opacity: 1;
+        transform: translateX(-50%);
     }
 }

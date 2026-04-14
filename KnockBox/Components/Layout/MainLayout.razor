@@ -50,6 +50,7 @@
     private bool _isEnteringGame;
     private bool _isExitingGame;
     private IDisposable? _locationChangingRegistration;
+    private CancellationTokenSource _cts = new();
 
     protected override void OnInitialized()
     {
@@ -69,6 +70,7 @@
         _isExitingGame = true;
         await InvokeAsync(StateHasChanged);
         await Task.Delay(400);
+        _isExitingGame = false;
     }
 
     private bool IsHomePage()
@@ -88,11 +90,12 @@
         if (wasHome && !_isOnHomePage)
         {
             _isEnteringGame = true;
-            _ = Task.Delay(600).ContinueWith(_ => InvokeAsync(() =>
+            var token = _cts.Token;
+            _ = Task.Delay(600, token).ContinueWith(_ => InvokeAsync(() =>
             {
                 _isEnteringGame = false;
                 StateHasChanged();
-            }), TaskContinuationOptions.OnlyOnRanToCompletion);
+            }), token, TaskContinuationOptions.OnlyOnRanToCompletion, TaskScheduler.Current);
         }
 
         _ = InvokeAsync(StateHasChanged).ContinueWith(
@@ -109,6 +112,8 @@
 
     public void Dispose()
     {
+        _cts.Cancel();
+        _cts.Dispose();
         NavigationManager.LocationChanged -= OnLocationChanged;
         UserService.UserInitialized -= OnUserInitialized;
         _locationChangingRegistration?.Dispose();
