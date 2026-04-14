@@ -30,6 +30,7 @@ namespace KnockBox.Components.Pages.Home
         public int? Fresh { get; set; }
 
         private string? LobbyCode { get; set; }
+        private bool _isTransitioning;
 
         private string? _playerName;
         private string? PlayerName
@@ -77,7 +78,7 @@ namespace KnockBox.Components.Pages.Home
                         PlayerName = $"Tester {RandomNumberService.GetRandomInt(1000, 9999)}";
                     }
 
-                    await JoinLobby(JoinCode);
+                    await JoinLobby(JoinCode, animate: false);
                 }
             }
             catch (Exception ex)
@@ -87,9 +88,9 @@ namespace KnockBox.Components.Pages.Home
             }
         }
 
-        private async Task JoinLobby(string lobbyCode)
+        private async Task JoinLobby(string lobbyCode, bool animate = true)
         {
-            if (!CanJoinOrCreate) return;
+            if (!CanJoinOrCreate || _isTransitioning) return;
 
             if (string.IsNullOrWhiteSpace(lobbyCode))
             {
@@ -104,12 +105,18 @@ namespace KnockBox.Components.Pages.Home
                 return;
             }
 
+            if (animate) _isTransitioning = true;
+
+            var animationDelay = animate ? Task.Delay(500) : Task.CompletedTask;
             var joinResult = await LobbyService.JoinLobbyAsync(user, lobbyCode, ComponentDetached);
             if (!joinResult.TryGetSuccess(out var registration))
             {
+                _isTransitioning = false;
                 // TODO: Notify user join failed
                 return;
             }
+
+            await animationDelay;
 
             // Leave any prior session before claiming the new slot.  If the player is
             // re-joining the same lobby, RegisterPlayer has already issued a fresh token;
@@ -120,7 +127,7 @@ namespace KnockBox.Components.Pages.Home
 
         private async Task CreateLobby(string routeIdentifier)
         {
-            if (!CanJoinOrCreate) return;
+            if (!CanJoinOrCreate || _isTransitioning) return;
 
             var user = UserService.CurrentUser;
             if (user is null)
@@ -129,12 +136,18 @@ namespace KnockBox.Components.Pages.Home
                 return;
             }
 
+            _isTransitioning = true;
+
+            var animationDelay = Task.Delay(500);
             var createResult = await LobbyService.CreateLobbyAsync(user, routeIdentifier, ComponentDetached);
             if (!createResult.TryGetSuccess(out var lobby))
             {
+                _isTransitioning = false;
                 // TODO: Notify user lobby creation failed
                 return;
             }
+
+            await animationDelay;
 
             var disposeAction = new DisposableAction(() =>
             {

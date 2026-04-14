@@ -7,7 +7,7 @@
 @implements IDisposable
 
 <div class="main">
-    <header class="@(_isOnHomePage ? "home-header" : "")">
+    <header class="@(_isOnHomePage ? "home-header" : "") @(_isEnteringGame ? "entering-from-home" : "")">
         @if (!_isOnHomePage && GameSessionService.TryGetCurrentSession(out var currentSession))
         {
             <a href="@NavigationService.GetHomeUri()" title="Click to return home">
@@ -29,7 +29,7 @@
             <span>Knockbox</span>
         }
     </header>
-    <article>
+    <article class="@(_isEnteringGame ? "entering-from-home" : "")">
         @Body
         <div id="blazor-error-ui" data-nosnippet>
             An unhandled error has occurred.
@@ -49,6 +49,7 @@
 
     private bool _isRoomCodeRevealed;
     private bool _isOnHomePage;
+    private bool _isEnteringGame;
 
     protected override void OnInitialized()
     {
@@ -65,9 +66,21 @@
 
     private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
     {
+        var wasHome = _isOnHomePage;
         _isOnHomePage = IsHomePage();
         // Reset the room-code reveal state when the user navigates away from/to a room.
         _isRoomCodeRevealed = false;
+
+        if (wasHome && !_isOnHomePage)
+        {
+            _isEnteringGame = true;
+            _ = Task.Delay(600).ContinueWith(_ => InvokeAsync(() =>
+            {
+                _isEnteringGame = false;
+                StateHasChanged();
+            }), TaskContinuationOptions.OnlyOnRanToCompletion);
+        }
+
         _ = InvokeAsync(StateHasChanged).ContinueWith(
             t => Logger.LogError(t.Exception, "Error refreshing layout after navigation."),
             TaskContinuationOptions.OnlyOnFaulted);

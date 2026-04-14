@@ -290,6 +290,56 @@
     pointer-events: none;
 }
 
+/* ── Exit Transition ────────────────────────────────────────────────────── */
+
+.home-container.transitioning {
+    pointer-events: none;
+}
+
+.home-container.transitioning .title-letter {
+    animation: letter-exit 0.4s cubic-bezier(0.55, 0.085, 0.68, 0.53) forwards;
+}
+
+/* Reverse stagger: last letter exits first */
+.home-container.transitioning .title-letter:nth-child(1) { animation-delay: 0.28s; }
+.home-container.transitioning .title-letter:nth-child(2) { animation-delay: 0.24s; }
+.home-container.transitioning .title-letter:nth-child(3) { animation-delay: 0.20s; }
+.home-container.transitioning .title-letter:nth-child(4) { animation-delay: 0.16s; }
+.home-container.transitioning .title-letter:nth-child(5) { animation-delay: 0.12s; }
+.home-container.transitioning .title-letter:nth-child(6) { animation-delay: 0.08s; }
+.home-container.transitioning .title-letter:nth-child(7) { animation-delay: 0.04s; }
+.home-container.transitioning .title-letter:nth-child(8) { animation-delay: 0.00s; }
+
+@keyframes letter-exit {
+    0% {
+        opacity: 1;
+        transform: translateY(0) rotate(0deg) scale(1);
+    }
+    100% {
+        opacity: 0;
+        transform: translateY(-40px) rotate(10deg) scale(0.7);
+    }
+}
+
+.home-container.transitioning .join-section {
+    animation: fade-out-down 0.35s ease-in 0.05s forwards;
+}
+
+.home-container.transitioning .games-section {
+    animation: fade-out-down 0.4s ease-in 0.1s forwards;
+}
+
+@keyframes fade-out-down {
+    from {
+        opacity: 1;
+        transform: translateY(0);
+    }
+    to {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+}
+
 /* ── Responsive ─────────────────────────────────────────────────────────── */
 
 @media (max-width: 600px) {
@@ -354,5 +404,12 @@
 
     .home-container::before {
         animation: none;
+    }
+
+    .home-container.transitioning .title-letter,
+    .home-container.transitioning .join-section,
+    .home-container.transitioning .games-section {
+        animation: none;
+        opacity: 0;
     }
 }
