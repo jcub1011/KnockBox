@@ -58,7 +58,7 @@ namespace KnockBox.HiddenAgenda.Tests.Unit.Logic
 
             Assert.IsTrue((bool)result.IsSuccess);
             Assert.IsFalse(state.IsJoinable);
-            Assert.AreEqual(GamePhase.Playing, state.Phase);
+            Assert.AreEqual(GamePhase.RoundSetup, state.Phase);
         }
 
         [TestMethod]

@@ -33,7 +33,7 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games
             var executeResult = state.Execute(() =>
             {
                 state.UpdateJoinableStatus(false);
-                gameState.SetPhase(GamePhase.Playing);
+                gameState.SetPhase(GamePhase.RoundSetup);
             });
 
             if (executeResult.IsFailure) return executeResult;
