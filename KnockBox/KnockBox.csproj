@@ -63,6 +63,10 @@
                       ReferenceOutputAssembly="false" Private="false" />
     <ProjectReference Include="..\KnockBox.Operator\KnockBox.Operator.csproj"
                       ReferenceOutputAssembly="false" Private="false" />
+    <ProjectReference Include="..\KnockBox.HiddenAgenda\KnockBox.HiddenAgenda.csproj"
+                      ReferenceOutputAssembly="false" Private="false" />
+    <ProjectReference Include="..\KnockBox.TaskMaster\KnockBox.TaskMaster.csproj"
+                      ReferenceOutputAssembly="false" Private="false" />
   </ItemGroup>
 
   <!--

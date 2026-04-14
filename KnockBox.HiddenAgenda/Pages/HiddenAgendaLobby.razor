@@ -1,0 +1,45 @@
+@page "/room/hidden-agenda/{ObfuscatedRoomCode}"
+
+@inherits DisposableComponent
+
+<PageTitle>Hidden Agenda</PageTitle>
+
+<HeadContent>
+    <link href="_content/KnockBox.HiddenAgenda/KnockBox.HiddenAgenda.styles.css" rel="stylesheet" />
+</HeadContent>
+
+<div class="content">
+@if (GameState == null)
+{
+    <div>Loading...</div>
+}
+else
+{
+    @if (GameState.IsJoinable)
+    {
+        <div class="card">
+            <div class="joinable-state">
+                <h4>Players</h4>
+                <div class="player-list">
+                    @foreach (var player in GameState.Players)
+                    {
+                        <button class="btn" title="Click to kick player."
+                                @onclick="() => GameState.KickPlayer(player)">@player.Name @(player.Id == GameState.Host.Id ? "(Host)" : "")</button>
+                    }
+                </div>
+                @if (UserService.CurrentUser?.Id == GameState.Host.Id)
+                {
+                    <button class="btn btn-primary start-btn mt-3" @onclick="StartGame">Start Game</button>
+                }
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="card">
+            <h3>Hidden Agenda</h3>
+            <p>Game is in progress.</p>
+        </div>
+    }
+}
+</div>
