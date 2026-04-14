@@ -146,7 +146,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
             }
 
             var currentType = types[_clothingTypeIndex];
-            if (!string.Equals(cmd.ClothingTypeId, currentType.Id, StringComparison.Ordinal))
+            if (cmd.ClothingTypeId != currentType.Id)
             {
                 context.Logger.LogWarning(
                     "SubmitDrawing: player [{id}] submitted type [{submitted}] but current round is [{current}].",

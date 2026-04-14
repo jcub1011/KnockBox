@@ -36,19 +36,18 @@ namespace KnockBox.DrawnToDress.Tests.Unit.State.Games.DrawnToDress
             var config = new DrawnToDressConfig();
             var ids = config.ClothingTypes.Select(t => t.Id).ToList();
 
-            CollectionAssert.Contains(ids, "hat");
-            CollectionAssert.Contains(ids, "top");
-            CollectionAssert.Contains(ids, "bottom");
-            CollectionAssert.Contains(ids, "shoes");
+            CollectionAssert.Contains(ids, ClothingType.Hat);
+            CollectionAssert.Contains(ids, ClothingType.Top);
+            CollectionAssert.Contains(ids, ClothingType.Bottom);
+            CollectionAssert.Contains(ids, ClothingType.Shoes);
         }
 
         [TestMethod]
-        public void Default_NonAccessoryClothingTypes_DoNotAllowMultiple()
+        public void Default_ClothingTypes_DoNotAllowMultiple()
         {
             var config = new DrawnToDressConfig();
-            var nonAccessories = config.ClothingTypes.Where(t => t.Id != "accessory");
 
-            foreach (var type in nonAccessories)
+            foreach (var type in config.ClothingTypes)
             {
                 Assert.IsFalse(type.AllowMultiple, $"Expected AllowMultiple=false for type '{type.Id}'.");
             }

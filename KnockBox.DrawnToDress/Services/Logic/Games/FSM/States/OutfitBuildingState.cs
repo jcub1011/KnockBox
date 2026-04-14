@@ -217,7 +217,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
                     return null;
                 }
 
-                if (!string.Equals(item.ClothingTypeId, typeId, StringComparison.Ordinal))
+                if (item.ClothingTypeId != typeId)
                 {
                     context.Logger.LogWarning(
                         "SubmitOutfit: item [{itemId}] has type [{actual}] but was submitted for slot [{slot}].",
@@ -235,7 +235,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
                     var candidate = new OutfitSubmission
                     {
                         PlayerId = cmd.PlayerId,
-                        SelectedItemsByType = new Dictionary<string, Guid>(cmd.SelectedItemsByType),
+                        SelectedItemsByType = new Dictionary<ClothingType, Guid>(cmd.SelectedItemsByType),
                     };
 
                     var allPreviousOutfits = context.GamePlayers.Values
@@ -264,7 +264,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
             player.SetOutfit(_outfitRound, new OutfitSubmission
             {
                 PlayerId = cmd.PlayerId,
-                SelectedItemsByType = new Dictionary<string, Guid>(cmd.SelectedItemsByType),
+                SelectedItemsByType = new Dictionary<ClothingType, Guid>(cmd.SelectedItemsByType),
                 SubmittedAt = DateTimeOffset.UtcNow,
             });
 
@@ -289,7 +289,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
         private void AutoFillIncompleteOutfits(DrawnToDressGameContext context)
         {
             // Pre-index previously used items by (typeId, itemId) for O(1) conflict lookups.
-            var previouslyUsedItems = new HashSet<(string typeId, Guid itemId)>();
+            var previouslyUsedItems = new HashSet<(ClothingType typeId, Guid itemId)>();
             if (_outfitRound > 1)
             {
                 foreach (var p in context.GamePlayers.Values)
@@ -314,7 +314,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
 
             // Pre-index pool items by clothing type for efficient lookup.
             // Use dictionary key (not item.Id) since callers may store items with mismatched keys.
-            var poolByType = new Dictionary<string, List<(Guid Key, DrawnClothingItem Item)>>();
+            var poolByType = new Dictionary<ClothingType, List<(Guid Key, DrawnClothingItem Item)>>();
             foreach (var (key, item) in context.ClothingPool)
             {
                 if (!poolByType.TryGetValue(item.ClothingTypeId, out var list))
@@ -330,7 +330,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
                 if (player.GetOutfit(_outfitRound) is not null) continue;
 
                 var ownedSet = player.OwnedClothingItemIds.ToHashSet();
-                var selectedItems = new Dictionary<string, Guid>();
+                var selectedItems = new Dictionary<ClothingType, Guid>();
 
                 foreach (var clothingType in context.Config.ClothingTypes)
                 {

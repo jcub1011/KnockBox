@@ -216,7 +216,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
         /// </summary>
         private static bool HasDistinctnessConflict(DrawnToDressGameContext context)
         {
-            var seenItems = new HashSet<(string typeId, Guid itemId)>();
+            var seenItems = new HashSet<(ClothingType typeId, Guid itemId)>();
             foreach (var player in context.GamePlayers.Values)
             {
                 if (player.SubmittedOutfit is null) continue;

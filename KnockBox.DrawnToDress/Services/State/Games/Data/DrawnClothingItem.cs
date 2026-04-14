@@ -11,10 +11,10 @@ namespace KnockBox.DrawnToDress.Services.State.Games.Data
         public Guid Id { get; set; } = Guid.NewGuid();
 
         /// <summary>
-        /// The ID of the clothing type this item belongs to (matches
+        /// The clothing type this item belongs to (matches
         /// <see cref="ClothingTypeDefinition.Id"/>).
         /// </summary>
-        public string ClothingTypeId { get; set; } = string.Empty;
+        public ClothingType ClothingTypeId { get; set; }
 
         /// <summary>The player ID of the player who drew this item.</summary>
         public string CreatorPlayerId { get; set; } = string.Empty;

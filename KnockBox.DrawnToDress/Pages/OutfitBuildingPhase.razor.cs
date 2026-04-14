@@ -36,7 +36,7 @@ namespace KnockBox.DrawnToDress.Pages
         /// given clothing type.  The selection is the claimed item of that type, or the
         /// player's own drawing of that type when no claimed item exists.
         /// </summary>
-        protected Guid? GetSelectedItemForType(DrawnToDressPlayerState player, string clothingTypeId)
+        protected Guid? GetSelectedItemForType(DrawnToDressPlayerState player, ClothingType clothingTypeId)
         {
             // Prefer a claimed (non-self-drawn) item for this type.
             foreach (var id in player.OwnedClothingItemIds)
@@ -174,9 +174,9 @@ namespace KnockBox.DrawnToDress.Pages
         /// the player owns for that type.  For each type the selection prefers claimed
         /// items over self-drawn fallbacks.
         /// </summary>
-        private Dictionary<string, Guid> BuildSelectedItems(DrawnToDressPlayerState player)
+        private Dictionary<ClothingType, Guid> BuildSelectedItems(DrawnToDressPlayerState player)
         {
-            var result = new Dictionary<string, Guid>();
+            var result = new Dictionary<ClothingType, Guid>();
 
             foreach (var clothingType in GameState.Config.ClothingTypes)
             {
