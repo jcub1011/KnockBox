@@ -59,7 +59,7 @@ namespace KnockBox.DrawnToDress.Pages
             int ch = ComputeCompositeHeight(GameState.Config.ClothingTypes);
             foreach (var ct in GameState.Config.ClothingTypes)
             {
-                var (x, y) = GetDefaultItemPosition(ct.Id, ct.CanvasWidth, ct.CanvasHeight, cw, ch);
+                var (x, y) = GetItemPosition(ct.CanvasWidth, ct.CanvasHeight, ct.MannequinAnchorY, cw, ch);
                 _itemPositions[ct.Id] = new ItemPositionOverride { X = x, Y = y };
             }
 

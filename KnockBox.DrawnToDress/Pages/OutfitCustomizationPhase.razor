@@ -58,7 +58,7 @@
 
         if (_showMannequin && GameState.Config.ShowMannequin)
         {
-            mannequinSvg = MannequinSvgHelper.Build(canvasWidth, totalOutfitHeight, overrideDisplaySize: mannequinSize);
+            mannequinSvg = MannequinSvgHelper.Build(canvasWidth, totalOutfitHeight, GameState.Config.MannequinDimensions.Y / 2, overrideDisplaySize: mannequinSize);
         }
 
         if (bgParts.Length > 0)
@@ -110,8 +110,7 @@
                                                 if (KnockBox.Core.Services.Drawing.SvgContentSanitizer.Sanitize(item.SvgContent) is string safeSvg)
                                                 {
                                                     var (itemX, itemY) = CompositeCanvasLayout.GetItemPosition(
-                                                        ct.Id, ct.CanvasWidth, ct.CanvasHeight, canvasWidth, totalOutfitHeight,
-                                                        outfit.Customization.ItemPositionOverrides);
+                                                        ct.CanvasWidth, ct.CanvasHeight, ct.MannequinAnchorY, canvasWidth, totalOutfitHeight);
                                                     <g transform="translate(@itemX,@itemY)">
                                                         @((MarkupString)safeSvg)
                                                     </g>

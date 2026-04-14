@@ -1,3 +1,5 @@
+using System.Numerics;
+
 namespace KnockBox.DrawnToDress.Services.State.Games.Data
 {
     public class DrawnToDressConfig
@@ -47,10 +49,15 @@ namespace KnockBox.DrawnToDress.Services.State.Games.Data
         public List<ClothingTypeDefinition> ClothingTypes { get; set; } =
         [
             new() { Id = "hat",        DisplayName = "Hat",       AllowMultiple = false, CanvasWidth = 600, CanvasHeight = 450, MannequinAnchorY = 160 },
-            new() { Id = "top",        DisplayName = "Top",       AllowMultiple = false, CanvasWidth = 600, CanvasHeight = 450, MannequinAnchorY = 440 },
-            new() { Id = "bottom",     DisplayName = "Bottom",    AllowMultiple = false, CanvasWidth = 600, CanvasHeight = 850, MannequinAnchorY = 820 },
-            new() { Id = "shoes",      DisplayName = "Shoes",     AllowMultiple = false, CanvasWidth = 600, CanvasHeight = 450, MannequinAnchorY = 1070 },
+            new() { Id = "top",        DisplayName = "Top",       AllowMultiple = false, CanvasWidth = 600, CanvasHeight = 450, MannequinAnchorY = 700 },
+            new() { Id = "bottom",     DisplayName = "Bottom",    AllowMultiple = false, CanvasWidth = 600, CanvasHeight = 450, MannequinAnchorY = 1080 },
+            new() { Id = "shoes",      DisplayName = "Shoes",     AllowMultiple = false, CanvasWidth = 600, CanvasHeight = 350, MannequinAnchorY = 1270 },
         ];
+
+        /// <summary>
+        /// The dimensions of the reference mannequin image.
+        /// </summary>
+        public (int X, int Y) MannequinDimensions { get; set; } = (1416, 1416);
 
         // ── Theme ─────────────────────────────────────────────────────────────
 

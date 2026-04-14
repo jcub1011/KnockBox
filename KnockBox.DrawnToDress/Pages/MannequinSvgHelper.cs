@@ -30,24 +30,14 @@ namespace KnockBox.DrawnToDress.Pages
         /// Used by the composite canvas to keep the mannequin the same size relative to
         /// items as it was during the drawing phase.
         /// </param>
-        public static string Build(int canvasWidth, int canvasHeight, string? activeTypeId = null, double? overrideDisplaySize = null)
+        public static string Build(int canvasWidth, int canvasHeight, int itemAnchorY, double? overrideDisplaySize = null)
         {
             double displayWidth = overrideDisplaySize ?? canvasWidth * 0.85;
             double displayHeight = displayWidth; // 1:1 aspect ratio
             double scale = displayWidth / NativeSize;
             double xOffset = (canvasWidth - displayWidth) / 2.0;
 
-            double yOffset;
-            if (activeTypeId is not null && CompositeCanvasLayout.NativeAnchorY.TryGetValue(activeTypeId, out double nativeY))
-            {
-                // Center the body region vertically in the canvas viewport.
-                yOffset = (canvasHeight / 2.0) - (nativeY * scale);
-            }
-            else
-            {
-                // Full-body view: center the mannequin vertically (300 px padding each side).
-                yOffset = (canvasHeight - displayHeight) / 2.0;
-            }
+            double yOffset = (canvasHeight / 2.0) - (itemAnchorY * scale);
 
             return string.Create(CultureInfo.InvariantCulture,
                 $"""<image href="{ImagePath}" x="{xOffset:F1}" y="{yOffset:F1}" width="{displayWidth:F1}" height="{displayHeight:F1}" opacity="0.3" />""");

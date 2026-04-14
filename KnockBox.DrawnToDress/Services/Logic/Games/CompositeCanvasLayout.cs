@@ -1,5 +1,4 @@
 using KnockBox.DrawnToDress.Services.State.Games.Data;
-using System.Collections.Generic;
 
 namespace KnockBox.DrawnToDress.Services.Logic.Games
 {
@@ -26,20 +25,6 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games
         /// <summary>Total vertical padding (200 px top + 200 px bottom).</summary>
         private const int VerticalPadding = 400;
 
-        /// <summary>
-        /// Approximate Y-center of each body region on the 1416×1416 mannequin PNG.
-        /// Shared with <c>MannequinSvgHelper</c> so that item positioning and mannequin
-        /// rendering use the same anchor points.
-        /// </summary>
-        public static readonly IReadOnlyDictionary<string, double> NativeAnchorY =
-            new Dictionary<string, double>
-            {
-                ["hat"] = 170,
-                ["top"] = 470,
-                ["bottom"] = 870,
-                ["shoes"] = 1130,
-            };
-
         /// <summary>Default anchor Y for clothing types not listed in <see cref="NativeAnchorY"/>.</summary>
         private const double FallbackAnchorY = 470;
 
@@ -64,14 +49,14 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games
             => (int)MannequinDisplaySize(clothingTypes) + VerticalPadding;
 
         /// <summary>
-        /// Returns the default (X, Y) translation for a clothing item in the composite
+        /// Returns the (X, Y) translation for a clothing item in the composite
         /// canvas, aligned so the item's visual center matches the corresponding mannequin
         /// body-part center.
         /// </summary>
-        public static (double X, double Y) GetDefaultItemPosition(
-            string clothingTypeId,
+        public static (double X, double Y) GetItemPosition(
             int itemCanvasWidth,
             int itemCanvasHeight,
+            int itemAnchorY,
             int compositeWidth,
             int compositeHeight)
         {
@@ -80,31 +65,12 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games
             double scale = mannequinDisplaySize / NativeMannequinSize;
             double mannequinYOffset = (compositeHeight - mannequinDisplaySize) / 2.0;
 
-            double nativeY = NativeAnchorY.TryGetValue(clothingTypeId, out var y) ? y : FallbackAnchorY;
-            double bodyPartCenterY = mannequinYOffset + nativeY * scale;
+            double bodyPartCenterY = mannequinYOffset + itemAnchorY * scale;
 
             return (
                 X: (compositeWidth - itemCanvasWidth) / 2.0,
                 Y: bodyPartCenterY - itemCanvasHeight / 2.0
             );
-        }
-
-        /// <summary>
-        /// Returns the item position, applying any player-set override if present,
-        /// otherwise falling back to <see cref="GetDefaultItemPosition"/>.
-        /// </summary>
-        public static (double X, double Y) GetItemPosition(
-            string clothingTypeId,
-            int itemCanvasWidth,
-            int itemCanvasHeight,
-            int compositeWidth,
-            int compositeHeight,
-            IReadOnlyDictionary<string, ItemPositionOverride>? overrides = null)
-        {
-            var (x, y) = GetDefaultItemPosition(clothingTypeId, itemCanvasWidth, itemCanvasHeight, compositeWidth, compositeHeight);
-            if (overrides?.TryGetValue(clothingTypeId, out var pos) == true)
-                return (pos.X, pos.Y);
-            return (x, y);
         }
     }
 }
