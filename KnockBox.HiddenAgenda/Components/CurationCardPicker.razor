@@ -1,27 +1,27 @@
 @using KnockBox.HiddenAgenda.Services.State.Games
 @using KnockBox.HiddenAgenda.Services.Logic.Games.Data
 
-<div class="curation-card-picker">
-    <h4>Select a Curation Card</h4>
-    <div class="cards-container">
+<div class="ha-card-picker">
+    <h4 class="ha-heading">Select a Curation Card</h4>
+    <div class="ha-card-picker-cards">
         @for (int i = 0; i < Cards.Count; i++)
         {
             var index = i;
             var card = Cards[i];
-            <div class="card curation-card @(card.Type.ToString().ToLower())" @onclick="() => OnCardSelected?.Invoke(index)">
-                <div class="card-header">@card.Type</div>
-                <div class="card-body">
-                    <p class="description">@card.Description</p>
-                    <ul class="effects-list">
+            <div class="ha-curation-card ha-curation-card-@card.Type.ToString().ToLower()" @onclick="() => OnCardSelected?.Invoke(index)">
+                <div class="ha-curation-card-header">@card.Type</div>
+                <div class="ha-curation-card-body">
+                    <p class="ha-curation-card-desc">@card.Description</p>
+                    <ul class="ha-curation-card-effects">
                         @foreach (var effect in card.Effects)
                         {
-                            <li>@effect.Collection @(effect.Delta > 0 ? "+" : "")@effect.Delta</li>
+                            <li class="@(effect.Delta > 0 ? "ha-positive" : "ha-negative")">@effect.Collection @(effect.Delta > 0 ? "+" : "")@effect.Delta</li>
                         }
                     </ul>
                 </div>
                 @if (card.Type == CurationCardType.Trade)
                 {
-                    <div class="trade-info badge badge-info">Trade Card</div>
+                    <div class="ha-curation-card-trade-badge">Trade Card</div>
                 }
             </div>
         }

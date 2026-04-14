@@ -1,33 +1,34 @@
-.hidden-agenda-tile {
+.ha-tile {
     width: 100%;
     height: 100%;
-    background: #4a0404; /* Deep burgundy */
+    background: #4a0404;
     padding: 15px;
-    color: #f1d3a1; /* Gold */
+    color: #f1d3a1;
     display: flex;
     align-items: center;
     justify-content: center;
 }
 
-.art-frame {
-    border: 8px solid #c5a059; /* Gold frame */
+.ha-tile-frame {
+    border: 8px solid #c5a059;
     padding: 20px;
-    background: #fdf6e3; /* Cream */
+    background: #fdf6e3;
     color: #3d2b1f;
-    box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
+    box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5);
 }
 
-.game-title {
-    font-family: 'Playfair Display', serif;
+.ha-tile-title {
+    font-family: 'Playfair Display', Georgia, serif;
     font-size: 1.5rem;
     font-weight: bold;
     text-align: center;
     margin: 0;
 }
 
-.tagline {
+.ha-tile-tagline {
     font-size: 0.8rem;
     text-align: center;
     font-style: italic;
     margin-top: 5px;
+    margin-bottom: 0;
 }

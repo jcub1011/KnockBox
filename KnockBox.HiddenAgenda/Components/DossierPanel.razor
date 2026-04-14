@@ -1,25 +1,25 @@
 @using KnockBox.HiddenAgenda.Services.State.Games
 
-<div class="dossier-panel card">
-    <div class="card-header d-flex justify-content-between align-items-center" @onclick="Toggle">
-        <h5 class="mb-0">Dossier</h5>
-        <button class="btn btn-link btn-sm">@(_isCollapsed ? "Expand" : "Collapse")</button>
+<div class="ha-dossier">
+    <div class="ha-dossier-header" @onclick="Toggle">
+        <h5 class="ha-dossier-title">Dossier</h5>
+        <button class="ha-btn ha-btn-ghost ha-btn-sm">@(_isCollapsed ? "Expand" : "Collapse")</button>
     </div>
-    
+
     @if (!_isCollapsed)
     {
-        <div class="card-body dossier-content">
+        <div class="ha-dossier-body">
             @foreach (var category in Categories)
             {
-                <div class="category-section mb-3">
-                    <h6 class="category-title text-uppercase font-weight-bold">@category</h6>
-                    <ul class="list-group list-group-flush">
+                <div class="ha-dossier-category">
+                    <h6 class="ha-dossier-category-title">@category</h6>
+                    <ul class="ha-task-list">
                         @foreach (var task in GetTasksByCategory(category))
                         {
-                            <li class="list-group-item task-item @(IsPlayerTask(task.Id) ? "my-task" : "")">
-                                <span class="task-id badge badge-secondary mr-2">@task.Id</span>
-                                <span class="task-desc">@task.Description</span>
-                                <span class="task-points badge badge-light float-right">@task.PointValue pts</span>
+                            <li class="ha-task-row @(IsPlayerTask(task.Id) ? "ha-task-mine" : "")">
+                                <span class="ha-task-id">@task.Id</span>
+                                <span class="ha-task-desc">@task.Description</span>
+                                <span class="ha-task-points">@task.PointValue pts</span>
                             </li>
                         }
                     </ul>

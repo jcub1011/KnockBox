@@ -3,21 +3,19 @@
 @using KnockBox.HiddenAgenda.Services.Logic.Games
 @using KnockBox.Core.Services.State.Users
 
-<div class="match-over-phase card">
-    <h3>Game Over</h3>
-    
-    <div class="winner-announcement text-center mt-4">
-        <h2>Winner: @WinnerName!</h2>
-        <p class="lead">With a total score of @WinnerScore points.</p>
+<div class="ha-match-over">
+    <div class="ha-winner-announcement">
+        <h2 class="ha-winner-name">@WinnerName</h2>
+        <p class="ha-winner-subtitle">Master Curator with <span class="ha-score">@WinnerScore</span> points</p>
     </div>
 
-    <div class="final-standings mt-5">
-        <h4>Final Standings</h4>
-        <table class="table table-hover">
+    <div class="ha-final-standings">
+        <h4 class="ha-subheading">Final Standings</h4>
+        <table class="ha-table">
             <thead>
                 <tr>
                     <th>Rank</th>
-                    <th>Player</th>
+                    <th>Curator</th>
                     <th>Total Score</th>
                 </tr>
             </thead>
@@ -27,9 +25,9 @@
                     foreach (var player in GameState.GamePlayers.Values.OrderByDescending(p => p.CumulativeScore))
                     {
                         <tr>
-                            <td>@rank++</td>
+                            <td class="ha-rank-cell">@rank++</td>
                             <td>@player.DisplayName</td>
-                            <td>@player.CumulativeScore</td>
+                            <td class="ha-score ha-text-bold">@player.CumulativeScore</td>
                         </tr>
                     }
                 }
@@ -37,15 +35,15 @@
         </table>
     </div>
 
-    <div class="actions mt-5 text-center">
+    <div class="ha-actions">
         @if (IsHost)
         {
-            <button class="btn btn-primary btn-lg m-2" @onclick="HandleReturnToLobby">Play Again</button>
-            <button class="btn btn-secondary btn-lg m-2" @onclick="HandleExitGame">Exit to Home</button>
+            <button class="ha-btn ha-btn-primary ha-btn-lg" @onclick="HandleReturnToLobby">Play Again</button>
+            <button class="ha-btn ha-btn-secondary ha-btn-lg" @onclick="HandleExitGame">Exit to Home</button>
         }
         else
         {
-            <p class="text-muted">Waiting for host...</p>
+            <p class="ha-waiting-text">Waiting for host...</p>
         }
     </div>
 </div>

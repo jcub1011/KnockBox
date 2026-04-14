@@ -1,81 +1,527 @@
-/* Main Game Theme */
-.ha-app-container {
-    --gallery-burgundy: #4a0404;
-    --gallery-gold: #c5a059;
-    --gallery-cream: #fdf6e3;
-    --gallery-dark: #3d2b1f;
-    
-    background-color: var(--gallery-cream);
-    min-height: 100vh;
-    padding: 20px;
-    font-family: 'Playfair Display', serif;
-}
+/* ── Hidden Agenda Design Token Foundation ─────────────────────────────────── */
 
-::deep .card {
-    background-color: white;
-    border: 1px solid var(--gallery-gold);
-    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-    margin-bottom: 20px;
-}
+.ha-page {
+    --ha-burgundy: #4a0404;
+    --ha-burgundy-light: #6b1515;
+    --ha-gold: #c5a059;
+    --ha-gold-light: #d4b87a;
+    --ha-gold-dim: rgba(197, 160, 89, 0.3);
+    --ha-cream: #fdf6e3;
+    --ha-cream-dark: #f0e6d0;
+    --ha-dark: #3d2b1f;
+    --ha-shadow: rgba(61, 43, 31, 0.3);
+    --ha-success: #2e7d32;
+    --ha-danger: #b71c1c;
+    --ha-warning: #e65100;
+    --ha-info: #1565c0;
 
-::deep .card-header {
-    background-color: var(--gallery-burgundy);
-    color: var(--gallery-gold);
-    font-weight: bold;
-    border-bottom: 2px solid var(--gallery-gold);
-}
-
-::deep .btn-primary {
-    background-color: var(--gallery-burgundy);
-    border-color: var(--gallery-gold);
-    color: var(--gallery-gold);
-}
-
-::deep .btn-primary:hover {
-    background-color: #610505;
-    border-color: #d4b16a;
-}
-
-.error-toast {
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    background: #e74c3c;
-    color: white;
-    padding: 10px 20px;
-    border-radius: 5px;
-    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
-    z-index: 1000;
-    animation: fadeOut 5s forwards;
-}
-
-@keyframes fadeOut {
-    0% { opacity: 1; }
-    80% { opacity: 1; }
-    100% { opacity: 0; }
-}
-
-/* Turn Phase Layout */
-::deep .turn-phase-layout {
     display: flex;
-    gap: 20px;
+    flex-direction: column;
+    min-height: 100%;
+    background: radial-gradient(ellipse at center, #f5ead6 0%, #e8d5b7 60%, #d4c4a8 100%);
+    color: var(--ha-dark);
+    font-family: var(--font-primary), sans-serif;
+    position: relative;
+    overflow-x: hidden;
+    padding: 20px;
 }
 
-::deep .turn-sidebar {
-    flex: 0 0 300px;
+/* Subtle canvas texture overlay */
+.ha-page::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(61, 43, 31, 0.015) 2px,
+        rgba(61, 43, 31, 0.015) 4px
+    );
+    pointer-events: none;
+    z-index: 0;
 }
 
-::deep .turn-main {
-    flex: 1;
+.ha-page > * {
+    position: relative;
+    z-index: 1;
 }
 
-::deep .history-log {
-    max-height: 200px;
-    overflow-y: auto;
+/* ── Loading state ────────────────────────────────────────────────────────── */
+
+.ha-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    gap: 16px;
+    font-size: 1.2rem;
+    color: #4a0404;
+    font-family: 'Playfair Display', Georgia, serif;
+    background: radial-gradient(ellipse at center, #f5ead6 0%, #e8d5b7 60%, #d4c4a8 100%);
+}
+
+.ha-loading-icon {
+    font-size: 3rem;
+    animation: ha-float 2s ease-in-out infinite;
+}
+
+@keyframes ha-float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+}
+
+/* ── Buttons ──────────────────────────────────────────────────────────────── */
+
+::deep .ha-btn {
+    font-family: var(--font-primary), sans-serif;
+    font-size: 0.9rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border: 3px solid var(--ha-dark, #3d2b1f);
+    border-radius: 8px;
+    box-shadow: 4px 4px 0 var(--ha-dark, #3d2b1f);
+    transition: transform 0.1s, box-shadow 0.1s;
+    cursor: pointer;
+    padding: 8px 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    white-space: nowrap;
+    background: none;
+    color: var(--ha-dark, #3d2b1f);
+    text-decoration: none;
+}
+
+::deep .ha-btn:hover:not(:disabled) {
+    transform: translate(-2px, -2px);
+    box-shadow: 6px 6px 0 var(--ha-dark, #3d2b1f);
+}
+
+::deep .ha-btn:active:not(:disabled) {
+    transform: translate(2px, 2px);
+    box-shadow: 2px 2px 0 var(--ha-dark, #3d2b1f);
+}
+
+::deep .ha-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    box-shadow: none;
+    transform: none;
+    filter: grayscale(30%);
+}
+
+::deep .ha-btn-sm {
+    font-size: 0.75rem;
+    padding: 4px 10px;
+    border-width: 2px;
+    box-shadow: 3px 3px 0 var(--ha-dark, #3d2b1f);
+}
+
+::deep .ha-btn-lg {
+    font-size: 1.1rem;
+    padding: 12px 28px;
+    box-shadow: 5px 5px 0 var(--ha-dark, #3d2b1f);
+}
+
+::deep .ha-btn-primary {
+    background: var(--ha-burgundy, #4a0404);
+    color: var(--ha-gold, #c5a059);
+    border-color: var(--ha-dark, #3d2b1f);
+}
+
+::deep .ha-btn-primary:hover:not(:disabled) {
+    background: var(--ha-burgundy-light, #6b1515);
+}
+
+::deep .ha-btn-secondary {
+    background: var(--ha-dark, #3d2b1f);
+    color: var(--ha-cream, #fdf6e3);
+}
+
+::deep .ha-btn-danger {
+    background: var(--ha-danger, #b71c1c);
+    color: #fff;
+}
+
+::deep .ha-btn-ghost {
+    background: transparent;
+    border-color: var(--ha-gold, #c5a059);
+    color: var(--ha-gold, #c5a059);
+    box-shadow: none;
+}
+
+::deep .ha-btn-ghost:hover:not(:disabled) {
+    background: rgba(197, 160, 89, 0.15);
+    box-shadow: none;
+    transform: none;
+}
+
+::deep .ha-btn-gold {
+    background: var(--ha-gold, #c5a059);
+    color: var(--ha-dark, #3d2b1f);
+}
+
+/* ── Panels (replaces Bootstrap .card) ────────────────────────────────────── */
+
+::deep .ha-panel {
+    background: var(--ha-cream, #fdf6e3);
+    border: 2px solid var(--ha-gold, #c5a059);
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(61, 43, 31, 0.15);
+    overflow: hidden;
+}
+
+::deep .ha-panel-header {
+    background: var(--ha-burgundy, #4a0404);
+    color: var(--ha-gold, #c5a059);
+    padding: 10px 16px;
+    font-family: 'Playfair Display', Georgia, serif;
+    font-weight: 700;
+    font-size: 1rem;
+    border-bottom: 2px solid var(--ha-gold, #c5a059);
+}
+
+::deep .ha-panel-body {
+    padding: 16px;
+}
+
+/* ── Badges ───────────────────────────────────────────────────────────────── */
+
+::deep .ha-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    white-space: nowrap;
+    line-height: 1.4;
+}
+
+::deep .ha-badge-success {
+    background: var(--ha-success, #2e7d32);
+    color: #fff;
+}
+
+::deep .ha-badge-danger {
+    background: var(--ha-danger, #b71c1c);
+    color: #fff;
+}
+
+::deep .ha-badge-info {
+    background: var(--ha-info, #1565c0);
+    color: #fff;
+}
+
+::deep .ha-badge-gold {
+    background: var(--ha-gold, #c5a059);
+    color: var(--ha-dark, #3d2b1f);
+}
+
+::deep .ha-badge-muted {
+    background: rgba(61, 43, 31, 0.15);
+    color: var(--ha-dark, #3d2b1f);
+}
+
+/* ── Notices (replaces Bootstrap .alert) ──────────────────────────────────── */
+
+::deep .ha-notice {
+    padding: 12px 16px;
+    border-radius: 8px;
+    border-left: 4px solid;
+    font-size: 0.9rem;
+}
+
+::deep .ha-notice-info {
+    background: rgba(21, 101, 192, 0.08);
+    border-color: var(--ha-info, #1565c0);
+    color: #0d47a1;
+}
+
+::deep .ha-notice-warning {
+    background: rgba(230, 81, 0, 0.08);
+    border-color: var(--ha-warning, #e65100);
+    color: #bf360c;
+}
+
+/* ── Text utilities ───────────────────────────────────────────────────────── */
+
+::deep .ha-text-muted {
+    color: rgba(61, 43, 31, 0.55);
+}
+
+::deep .ha-text-danger {
+    color: var(--ha-danger, #b71c1c);
+}
+
+::deep .ha-text-warning {
+    color: var(--ha-warning, #e65100);
+}
+
+::deep .ha-text-success {
+    color: var(--ha-success, #2e7d32);
+}
+
+::deep .ha-text-center {
+    text-align: center;
+}
+
+::deep .ha-text-bold {
+    font-weight: 700;
+}
+
+::deep .ha-text-sm {
     font-size: 0.85rem;
 }
 
-::deep .history-entry {
-    padding: 5px 0;
-    border-bottom: 1px solid #eee;
+::deep .ha-waiting-text {
+    color: rgba(61, 43, 31, 0.5);
+    font-style: italic;
+    font-size: 0.95rem;
+}
+
+::deep .ha-heading {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-weight: 700;
+    color: var(--ha-burgundy, #4a0404);
+    margin: 0 0 12px 0;
+}
+
+::deep .ha-subheading {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-weight: 600;
+    color: var(--ha-dark, #3d2b1f);
+    margin: 0 0 8px 0;
+    font-size: 1rem;
+}
+
+/* ── Form controls ────────────────────────────────────────────────────────── */
+
+::deep .ha-select,
+::deep .ha-input {
+    font-family: var(--font-primary), sans-serif;
+    font-size: 0.9rem;
+    padding: 8px 12px;
+    border: 2px solid var(--ha-gold, #c5a059);
+    border-radius: 6px;
+    background: #fff;
+    color: var(--ha-dark, #3d2b1f);
+    outline: none;
+    transition: border-color 0.2s;
+    width: 100%;
+}
+
+::deep .ha-select:focus,
+::deep .ha-input:focus {
+    border-color: var(--ha-burgundy, #4a0404);
+    box-shadow: 0 0 0 3px rgba(74, 4, 4, 0.1);
+}
+
+::deep .ha-select:disabled,
+::deep .ha-input:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    background: var(--ha-cream-dark, #f0e6d0);
+}
+
+::deep .ha-form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+::deep .ha-form-group label {
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: var(--ha-dark, #3d2b1f);
+}
+
+::deep .ha-range {
+    width: 100%;
+    accent-color: var(--ha-burgundy, #4a0404);
+    height: 6px;
+    cursor: pointer;
+}
+
+::deep .ha-range:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+::deep .ha-checkbox-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+::deep .ha-checkbox {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--ha-burgundy, #4a0404);
+    cursor: pointer;
+}
+
+::deep .ha-checkbox:disabled {
+    cursor: not-allowed;
+}
+
+::deep .ha-checkbox-label {
+    font-size: 0.9rem;
+    cursor: pointer;
+    user-select: none;
+}
+
+/* ── Tables ───────────────────────────────────────────────────────────────── */
+
+::deep .ha-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 0.9rem;
+}
+
+::deep .ha-table thead th {
+    background: var(--ha-burgundy, #4a0404);
+    color: var(--ha-gold, #c5a059);
+    padding: 10px 14px;
+    text-align: left;
+    font-weight: 700;
+    text-transform: uppercase;
+    font-size: 0.8rem;
+    letter-spacing: 0.5px;
+}
+
+::deep .ha-table thead th:first-child {
+    border-radius: 6px 0 0 0;
+}
+
+::deep .ha-table thead th:last-child {
+    border-radius: 0 6px 0 0;
+}
+
+::deep .ha-table tbody td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--ha-gold-dim, rgba(197, 160, 89, 0.3));
+}
+
+::deep .ha-table tbody tr:nth-child(even) {
+    background: rgba(197, 160, 89, 0.08);
+}
+
+::deep .ha-table tbody tr:hover {
+    background: rgba(197, 160, 89, 0.15);
+}
+
+/* ── Score / data display ─────────────────────────────────────────────────── */
+
+::deep .ha-score {
+    font-family: var(--font-mono), monospace;
+    font-weight: 700;
+}
+
+::deep .ha-positive {
+    color: var(--ha-success, #2e7d32);
+}
+
+::deep .ha-negative {
+    color: var(--ha-danger, #b71c1c);
+}
+
+/* ── Error toast ──────────────────────────────────────────────────────────── */
+
+::deep .error-toast {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: #b71c1c;
+    color: white;
+    padding: 12px 20px;
+    border-radius: 8px;
+    border: 2px solid #7f0000;
+    box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.3);
+    z-index: 1000;
+    font-weight: 600;
+    animation: ha-toast-fade 5s forwards;
+}
+
+@keyframes ha-toast-fade {
+    0% { opacity: 1; transform: translateY(0); }
+    80% { opacity: 1; transform: translateY(0); }
+    100% { opacity: 0; transform: translateY(10px); }
+}
+
+/* ── Misc shared ──────────────────────────────────────────────────────────── */
+
+::deep .ha-sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+::deep .ha-loading-spinner {
+    width: 32px;
+    height: 32px;
+    border: 3px solid var(--ha-gold-dim, rgba(197, 160, 89, 0.3));
+    border-top-color: var(--ha-burgundy, #4a0404);
+    border-radius: 50%;
+    animation: ha-spin 0.8s linear infinite;
+}
+
+@keyframes ha-spin {
+    to { transform: rotate(360deg); }
+}
+
+::deep .ha-auto-advance {
+    text-align: center;
+    padding: 16px;
+    color: rgba(61, 43, 31, 0.55);
+    font-style: italic;
+    font-size: 0.9rem;
+}
+
+::deep .ha-actions {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 16px 0;
+    flex-wrap: wrap;
+}
+
+/* ── Responsive ───────────────────────────────────────────────────────────── */
+
+@media (max-width: 768px) {
+    .ha-page {
+        padding: 12px;
+    }
+
+    ::deep .ha-btn-lg {
+        font-size: 1rem;
+        padding: 10px 20px;
+    }
+}
+
+@media (max-width: 480px) {
+    .ha-page {
+        padding: 8px;
+    }
+
+    ::deep .ha-btn {
+        width: 100%;
+    }
+
+    ::deep .ha-actions {
+        flex-direction: column;
+    }
 }

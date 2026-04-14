@@ -1,0 +1,31 @@
+.ha-guess-phase {
+    max-width: 720px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    padding: 24px;
+}
+
+.ha-guess-title {
+    text-align: center;
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 1.5rem;
+}
+
+.ha-waiting-message {
+    text-align: center;
+    padding: 32px 16px;
+}
+
+.ha-dossier-reference {
+    margin-top: 8px;
+    padding-top: 16px;
+    border-top: 1px solid var(--ha-gold-dim, rgba(197, 160, 89, 0.3));
+}
+
+@media (max-width: 480px) {
+    .ha-guess-phase {
+        padding: 16px;
+    }
+}

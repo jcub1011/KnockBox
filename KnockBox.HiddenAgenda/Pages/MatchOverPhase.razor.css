@@ -1,0 +1,64 @@
+.ha-match-over {
+    max-width: 640px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+    padding: 32px 24px;
+}
+
+/* Winner announcement */
+.ha-winner-announcement {
+    text-align: center;
+    padding: 32px 24px;
+    background: var(--ha-burgundy, #4a0404);
+    border: 4px solid var(--ha-gold, #c5a059);
+    border-radius: 12px;
+    box-shadow: 0 6px 24px rgba(61, 43, 31, 0.25), inset 0 0 40px rgba(197, 160, 89, 0.08);
+}
+
+.ha-winner-name {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 2.2rem;
+    font-weight: 800;
+    color: var(--ha-gold, #c5a059);
+    margin: 0 0 8px 0;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.ha-winner-subtitle {
+    font-size: 1rem;
+    color: var(--ha-cream, #fdf6e3);
+    margin: 0;
+    opacity: 0.9;
+}
+
+/* Final standings */
+.ha-final-standings {
+    background: var(--ha-cream, #fdf6e3);
+    border: 2px solid var(--ha-gold, #c5a059);
+    border-radius: 10px;
+    padding: 20px;
+    box-shadow: 0 4px 12px rgba(61, 43, 31, 0.1);
+}
+
+.ha-rank-cell {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-weight: 700;
+    font-size: 1.1rem;
+    color: var(--ha-burgundy, #4a0404);
+}
+
+@media (max-width: 480px) {
+    .ha-match-over {
+        padding: 20px 16px;
+    }
+
+    .ha-winner-announcement {
+        padding: 24px 16px;
+    }
+
+    .ha-winner-name {
+        font-size: 1.6rem;
+    }
+}

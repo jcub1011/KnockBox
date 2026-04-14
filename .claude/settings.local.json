@@ -14,5 +14,8 @@
       "Bash(find 'C:/Users/Jacob McCormack/source/repos/KnockBox/KnockBox.DrawnToDressTests/' -name *.cs -type f)",
       "WebFetch(domain:api.github.com)"
     ]
+  },
+  "enabledPlugins": {
+    "superpowers@claude-plugins-official": true
   }
 }

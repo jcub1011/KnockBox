@@ -1,0 +1,104 @@
+.ha-lobby {
+    max-width: 560px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    padding: 24px;
+}
+
+.ha-lobby-title {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 1.8rem;
+    text-align: center;
+    color: var(--ha-burgundy, #4a0404);
+    margin: 0;
+}
+
+/* Room code display */
+.ha-lobby-room-code {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 16px;
+    background: var(--ha-cream, #fdf6e3);
+    border: 2px solid var(--ha-gold, #c5a059);
+    border-radius: 8px;
+}
+
+.ha-lobby-room-label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: rgba(61, 43, 31, 0.5);
+    font-weight: 600;
+}
+
+.ha-lobby-room-value {
+    font-family: var(--font-mono), monospace;
+    font-size: 1.6rem;
+    font-weight: 800;
+    color: var(--ha-burgundy, #4a0404);
+    letter-spacing: 3px;
+}
+
+/* Player list */
+.ha-lobby-players {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.ha-lobby-player-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.ha-lobby-player {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    background: var(--ha-cream, #fdf6e3);
+    border: 2px solid var(--ha-gold-dim, rgba(197, 160, 89, 0.3));
+    border-radius: 8px;
+    transition: border-color 0.15s;
+}
+
+.ha-lobby-player:hover {
+    border-color: var(--ha-gold, #c5a059);
+}
+
+.ha-lobby-player-name {
+    flex: 1;
+    font-weight: 600;
+    color: var(--ha-dark, #3d2b1f);
+}
+
+/* Config section */
+.ha-lobby-config {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 20px;
+    background: var(--ha-cream, #fdf6e3);
+    border: 2px solid var(--ha-gold, #c5a059);
+    border-radius: 8px;
+}
+
+@media (max-width: 480px) {
+    .ha-lobby {
+        padding: 16px;
+        gap: 20px;
+    }
+
+    .ha-lobby-title {
+        font-size: 1.4rem;
+    }
+
+    .ha-lobby-room-value {
+        font-size: 1.3rem;
+    }
+}

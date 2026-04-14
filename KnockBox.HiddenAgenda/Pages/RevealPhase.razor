@@ -2,52 +2,56 @@
 @using KnockBox.HiddenAgenda.Services.State.Games.Data
 @using KnockBox.Core.Services.State.Users
 
-<div class="reveal-phase card">
-    <h3>Round @GameState.CurrentRound Results</h3>
-    
+<div class="ha-reveal-phase">
+    <h3 class="ha-heading ha-reveal-title">Round @GameState.CurrentRound Results</h3>
+
     @if (CurrentRoundResult != null)
     {
-        <div class="results-container">
+        <div class="ha-reveal-results">
             @foreach (var playerResult in CurrentRoundResult.PlayerResults.Values)
             {
                 var playerState = GameState.GamePlayers.TryGetValue(playerResult.PlayerId, out var p) ? p : null;
-                <div class="player-reveal card m-3 p-3">
-                    <h4>@playerResult.DisplayName</h4>
-                    <div class="secret-tasks">
-                        <h5>Secret Tasks</h5>
-                        <ul class="list-group">
+                <div class="ha-reveal-player">
+                    <h4 class="ha-reveal-player-name">@playerResult.DisplayName</h4>
+
+                    <div class="ha-reveal-tasks">
+                        <h5 class="ha-subheading">Secret Tasks</h5>
+                        <ul class="ha-reveal-task-list">
                             @foreach (var taskRes in playerResult.TaskResults)
                             {
-                                <li class="list-group-item d-flex justify-content-between align-items-center">
-                                    <span>[@taskRes.Task.Category] @taskRes.Task.Id: @taskRes.Task.Description</span>
+                                <li class="ha-reveal-task-row">
+                                    <span class="ha-reveal-task-desc">
+                                        <span class="ha-badge ha-badge-muted">@taskRes.Task.Category</span>
+                                        @taskRes.Task.Id: @taskRes.Task.Description
+                                    </span>
                                     @if (taskRes.Completed)
                                     {
-                                        <span class="badge badge-success badge-pill">✓ @taskRes.Task.PointValue pts</span>
+                                        <span class="ha-badge ha-badge-success">@taskRes.Task.PointValue pts</span>
                                     }
                                     else
                                     {
-                                        <span class="badge badge-danger badge-pill">✗</span>
+                                        <span class="ha-badge ha-badge-danger">Missed</span>
                                     }
                                 </li>
                             }
                         </ul>
                     </div>
 
-                    <div class="guess-accuracy mt-3">
-                        <h5>Guess Accuracy</h5>
+                    <div class="ha-reveal-guesses">
+                        <h5 class="ha-subheading">Guess Accuracy</h5>
                         @if (playerState?.GuessSubmission is not null)
                         {
-                            <p>Total Correct Guesses: @CalculateCorrectGuesses(playerState)</p>
-                            <p>Guess Points: @playerResult.GuessPoints</p>
+                            <p>Total Correct Guesses: <strong class="ha-score">@CalculateCorrectGuesses(playerState)</strong></p>
+                            <p>Guess Points: <strong class="ha-score ha-positive">@playerResult.GuessPoints</strong></p>
                         }
                         else
                         {
-                            <p class="text-muted">Did not submit guesses.</p>
+                            <p class="ha-text-muted">Did not submit guesses.</p>
                         }
                     </div>
 
-                    <div class="round-score mt-3 font-weight-bold">
-                        Round Score: @playerResult.TotalRoundPoints pts
+                    <div class="ha-reveal-score">
+                        Round Score: <span class="ha-score">@playerResult.TotalRoundPoints pts</span>
                     </div>
                 </div>
             }
@@ -55,12 +59,13 @@
     }
     else
     {
-        <div class="text-center p-5">
-            <p>Calculating results...</p>
+        <div class="ha-waiting-message">
+            <div class="ha-loading-spinner"></div>
+            <p class="ha-text-muted">Calculating results...</p>
         </div>
     }
 
-    <div class="auto-advance text-center mt-4">
+    <div class="ha-auto-advance">
         <p>Next round summary in @((int)(GameState.PhaseEndTime - DateTimeOffset.UtcNow).TotalSeconds)s...</p>
     </div>
 </div>

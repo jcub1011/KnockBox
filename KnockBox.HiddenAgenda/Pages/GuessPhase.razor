@@ -3,32 +3,32 @@
 @using KnockBox.Core.Services.State.Users
 @using KnockBox.HiddenAgenda.Components
 
-<div class="guess-phase card">
-    <h3>Guess Phase</h3>
-    
+<div class="ha-guess-phase">
+    <h3 class="ha-heading ha-guess-title">Guess Phase</h3>
+
     @if (IsCurrentPlayer)
     {
-        <div class="guess-instructions alert alert-info">
+        <div class="ha-notice ha-notice-info">
             <p>Assign 3 tasks from the dossier to each opponent. Earn points for each correct match!</p>
         </div>
-        
-        <GuessForm TaskPool="GameState.CurrentTaskPool" 
-                   Opponents="Opponents" 
+
+        <GuessForm TaskPool="GameState.CurrentTaskPool"
+                   Opponents="Opponents"
                    OnSubmit="HandleSubmit" />
-        
-        <div class="skip-action mt-3 text-center">
-            <button class="btn btn-secondary" @onclick="HandleSkip">Skip Guessing</button>
+
+        <div class="ha-actions">
+            <button class="ha-btn ha-btn-secondary" @onclick="HandleSkip">Skip Guessing</button>
         </div>
     }
     else
     {
-        <div class="waiting-message text-center">
-            <p>Waiting for @CurrentPlayerName to submit their guesses...</p>
+        <div class="ha-waiting-message">
+            <p class="ha-waiting-text">Waiting for @CurrentPlayerName to submit their guesses...</p>
         </div>
     }
 
-    <div class="dossier-reference mt-4">
-        <h4>Dossier Reference</h4>
+    <div class="ha-dossier-reference">
+        <h4 class="ha-subheading">Dossier Reference</h4>
         <DossierPanel TaskPool="GameState.CurrentTaskPool" />
     </div>
 </div>

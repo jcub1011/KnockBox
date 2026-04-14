@@ -3,38 +3,36 @@
 @using KnockBox.Core.Services.State.Users
 @using KnockBox.HiddenAgenda.Components
 
-<div class="final-guess-phase card">
-    <h3>Final Guess Window</h3>
-    
+<div class="ha-final-guess-phase">
+    <h3 class="ha-heading ha-final-guess-title">Final Guess Window</h3>
+
     @if (HasAlreadyGuessed)
     {
-        <div class="waiting-message text-center">
-            <p>You have already submitted your guesses. Waiting for other players...</p>
-            <div class="spinner-border text-primary" role="status">
-                <span class="sr-only">Loading...</span>
-            </div>
+        <div class="ha-waiting-message">
+            <p class="ha-waiting-text">You have already submitted your guesses. Waiting for other players...</p>
+            <div class="ha-loading-spinner"></div>
         </div>
     }
     else
     {
-        <div class="guess-instructions alert alert-warning">
+        <div class="ha-notice ha-notice-warning">
             <p>Final chance! Assign 3 tasks to each opponent. The timer is running!</p>
-            <div class="timer text-danger font-weight-bold">
-                Time Remaining: @((int)(GameState.PhaseEndTime - DateTimeOffset.UtcNow).TotalSeconds)s
+            <div class="ha-timer">
+                Time Remaining: <span class="ha-timer-value">@((int)(GameState.PhaseEndTime - DateTimeOffset.UtcNow).TotalSeconds)s</span>
             </div>
         </div>
-        
-        <GuessForm TaskPool="GameState.CurrentTaskPool" 
-                   Opponents="Opponents" 
+
+        <GuessForm TaskPool="GameState.CurrentTaskPool"
+                   Opponents="Opponents"
                    OnSubmit="HandleSubmit" />
-        
-        <div class="skip-action mt-3 text-center">
-            <button class="btn btn-secondary" @onclick="HandleSkip">Skip Guessing</button>
+
+        <div class="ha-actions">
+            <button class="ha-btn ha-btn-secondary" @onclick="HandleSkip">Skip Guessing</button>
         </div>
     }
 
-    <div class="dossier-reference mt-4">
-        <h4>Dossier Reference</h4>
+    <div class="ha-dossier-reference">
+        <h4 class="ha-subheading">Dossier Reference</h4>
         <DossierPanel TaskPool="GameState.CurrentTaskPool" />
     </div>
 </div>

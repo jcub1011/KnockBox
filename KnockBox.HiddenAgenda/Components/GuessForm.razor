@@ -1,16 +1,16 @@
 @using KnockBox.HiddenAgenda.Services.State.Games
 
-<div class="guess-form card p-3">
+<div class="ha-guess-form">
     @foreach (var opponent in Opponents)
     {
-        <div class="opponent-guess mb-4 border-bottom pb-3">
-            <h5 class="opponent-name">Guess tasks for <strong>@opponent.DisplayName</strong>:</h5>
-            <div class="task-selections d-flex flex-wrap gap-2">
+        <div class="ha-opponent-guess">
+            <h5 class="ha-subheading">Guess tasks for <strong>@opponent.DisplayName</strong>:</h5>
+            <div class="ha-task-selections">
                 @for (int i = 0; i < 3; i++)
                 {
                     var index = i;
-                    <div class="task-select-container flex-grow-1" style="min-width: 250px;">
-                        <select class="form-control" @bind="Guesses[opponent.PlayerId][index]">
+                    <div class="ha-task-select-container">
+                        <select class="ha-select" @bind="Guesses[opponent.PlayerId][index]">
                             <option value="">-- Select Task --</option>
                             @foreach (var task in TaskPool)
                             {
@@ -23,11 +23,11 @@
         </div>
     }
 
-    <div class="submit-section text-center mt-3">
+    <div class="ha-submit-section">
         @if (!Validate())
         {
-            <p class="text-danger">Each opponent must have 3 unique tasks assigned.</p>
+            <p class="ha-text-danger">Each opponent must have 3 unique tasks assigned.</p>
         }
-        <button class="btn btn-primary btn-lg" disabled="@(!Validate())" @onclick="Submit">Submit All Guesses</button>
+        <button class="ha-btn ha-btn-primary ha-btn-lg" disabled="@(!Validate())" @onclick="Submit">Submit All Guesses</button>
     </div>
 </div>

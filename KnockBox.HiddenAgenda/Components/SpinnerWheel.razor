@@ -1,19 +1,19 @@
-<div class="spinner-container">
-    <div class="spinner-wheel @(_isSpinning ? "spinning" : "")">
+<div class="ha-spinner-container">
+    <div class="ha-spinner-wheel @(_isSpinning ? "ha-spinner-spinning" : "")">
         @if (Result.HasValue && !_isSpinning)
         {
-            <div class="spinner-result">@Result.Value</div>
+            <div class="ha-spinner-result">@Result.Value</div>
         }
         else
         {
-            <div class="spinner-placeholder">?</div>
+            <div class="ha-spinner-placeholder">?</div>
         }
     </div>
-    
-    <div class="spinner-actions mt-3">
+
+    <div class="ha-spinner-actions">
         @if (IsCurrentPlayer)
         {
-            <button class="btn btn-primary btn-lg" disabled="@(_isSpinning || Result.HasValue)" @onclick="Spin">
+            <button class="ha-btn ha-btn-primary ha-btn-lg" disabled="@(_isSpinning || Result.HasValue)" @onclick="Spin">
                 @(_isSpinning ? "Spinning..." : "Spin the Wheel")
             </button>
         }

@@ -3,45 +3,51 @@
 @using KnockBox.HiddenAgenda.Services.Logic.Games
 @using KnockBox.Core.Services.State.Users
 
-<div class="lobby-phase card">
-    <h3>Lobby</h3>
-    <div class="room-info">
-        <p>Room Code: <strong>@RoomCode</strong></p>
+<div class="ha-lobby">
+    <h3 class="ha-heading ha-lobby-title">The Gallery Awaits</h3>
+
+    <div class="ha-lobby-room-code">
+        <span class="ha-lobby-room-label">Room Code</span>
+        <span class="ha-lobby-room-value">@RoomCode</span>
     </div>
 
-    <div class="player-list-section">
-        <h4>Players (@GameState.Players.Count / 6)</h4>
-        <ul class="player-list">
+    <div class="ha-lobby-players">
+        <h4 class="ha-subheading">Curators (@GameState.Players.Count / 6)</h4>
+        <div class="ha-lobby-player-grid">
             @foreach (var player in GameState.Players)
             {
-                <li class="player-item">
-                    <span class="player-name">@player.Name @(player.Id == GameState.Host.Id ? "(Host)" : "")</span>
+                <div class="ha-lobby-player">
+                    <span class="ha-lobby-player-name">@player.Name</span>
+                    @if (player.Id == GameState.Host.Id)
+                    {
+                        <span class="ha-badge ha-badge-gold">Host</span>
+                    }
                     @if (IsHost && player.Id != GameState.Host.Id)
                     {
-                        <button class="btn btn-sm btn-danger" @onclick="() => KickPlayer(player)">Kick</button>
+                        <button class="ha-btn ha-btn-danger ha-btn-sm" @onclick="() => KickPlayer(player)">Kick</button>
                     }
-                </li>
+                </div>
             }
-        </ul>
+        </div>
         @if (GameState.Players.Count < 3)
         {
-            <p class="text-warning">Need at least 3 players to start.</p>
+            <p class="ha-text-warning">Need at least 3 curators to begin the exhibition.</p>
         }
     </div>
 
-    <div class="config-section">
-        <h4>Game Settings</h4>
-        <div class="form-group">
+    <div class="ha-lobby-config">
+        <h4 class="ha-subheading">Exhibition Settings</h4>
+        <div class="ha-form-group">
             <label>Rounds: @Config.TotalRounds</label>
-            <input type="range" min="3" max="5" step="1" @bind="Config.TotalRounds" disabled="@(!IsHost)" class="form-control-range" />
+            <input type="range" min="3" max="5" step="1" @bind="Config.TotalRounds" disabled="@(!IsHost)" class="ha-range" />
         </div>
-        <div class="form-check">
-            <input type="checkbox" class="form-check-input" id="timerToggle" @bind="Config.EnableTimers" disabled="@(!IsHost)" />
-            <label class="form-check-label" for="timerToggle">Enable Timers</label>
+        <div class="ha-checkbox-row">
+            <input type="checkbox" id="timerToggle" @bind="Config.EnableTimers" disabled="@(!IsHost)" class="ha-checkbox" />
+            <label class="ha-checkbox-label" for="timerToggle">Enable Timers</label>
         </div>
-        <div class="form-group">
+        <div class="ha-form-group">
             <label for="poolRotation">Pool Rotation</label>
-            <select id="poolRotation" class="form-control" @bind="Config.PoolRotation" disabled="@(!IsHost)">
+            <select id="poolRotation" class="ha-select" @bind="Config.PoolRotation" disabled="@(!IsHost)">
                 @foreach (var type in Enum.GetValues<TaskPoolRotation>())
                 {
                     <option value="@type">@type</option>
@@ -52,12 +58,14 @@
 
     @if (IsHost)
     {
-        <button class="btn btn-primary btn-lg start-btn mt-3" 
-                disabled="@(GameState.Players.Count < 3)"
-                @onclick="StartGame">Start Game</button>
+        <div class="ha-actions">
+            <button class="ha-btn ha-btn-primary ha-btn-lg"
+                    disabled="@(GameState.Players.Count < 3)"
+                    @onclick="StartGame">Open the Exhibition</button>
+        </div>
     }
     else
     {
-        <p class="text-muted">Waiting for host to start the game...</p>
+        <p class="ha-waiting-text">Waiting for the host to open the exhibition...</p>
     }
 </div>

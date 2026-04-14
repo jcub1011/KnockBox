@@ -3,38 +3,43 @@
 @using KnockBox.Core.Services.State.Users
 @using KnockBox.HiddenAgenda.Components
 
-<div class="round-setup card">
-    <h3>Round @GameState.CurrentRound of @GameState.Config.TotalRounds</h3>
-    
-    <div class="dossier-section">
-        <h4>The Full Dossier</h4>
-        <p class="text-muted">All possible tasks in the pool for this round.</p>
+<div class="ha-round-setup">
+    <h3 class="ha-heading ha-round-setup-title">Round @GameState.CurrentRound of @GameState.Config.TotalRounds</h3>
+
+    <div class="ha-round-setup-dossier">
+        <h4 class="ha-subheading">The Full Dossier</h4>
+        <p class="ha-text-muted">All possible tasks in the pool for this round.</p>
         <DossierPanel TaskPool="GameState.CurrentTaskPool" PlayerTasks="PlayerTasks" />
     </div>
 
     @if (PlayerTasks is not null)
     {
-        <div class="private-tasks alert alert-info mt-4">
-            <h4>Your Secret Tasks</h4>
-            <p>Complete these tasks to earn points. Keep them secret!</p>
-            <ul class="task-list">
-                @foreach (var task in PlayerTasks)
-                {
-                    <li class="task-item">
-                        <strong>[@task.Category] @task.Id:</strong> @task.Description (@task.PointValue pts)
-                    </li>
-                }
-            </ul>
+        <div class="ha-round-setup-secrets">
+            <div class="ha-notice ha-notice-info">
+                <h4 class="ha-subheading">Your Secret Tasks</h4>
+                <p>Complete these tasks to earn points. Keep them secret!</p>
+                <ul class="ha-secret-task-list">
+                    @foreach (var task in PlayerTasks)
+                    {
+                        <li class="ha-secret-task-item">
+                            <span class="ha-badge ha-badge-muted">@task.Category</span>
+                            <span class="ha-task-id-inline">@task.Id</span>
+                            <span>@task.Description</span>
+                            <span class="ha-badge ha-badge-gold">@task.PointValue pts</span>
+                        </li>
+                    }
+                </ul>
+            </div>
         </div>
     }
 
-    <div class="collection-targets mt-4">
-        <h4>Collection Targets</h4>
-        <p>Advance collections to these values to complete tasks.</p>
+    <div class="ha-round-setup-collections">
+        <h4 class="ha-subheading">Collection Targets</h4>
+        <p class="ha-text-muted">Advance collections to these values to complete tasks.</p>
         <CollectionTracks Progress="GameState.CollectionProgress" />
     </div>
 
-    <div class="auto-advance text-center mt-4">
-        <p>The game will advance automatically in @((int)(GameState.PhaseEndTime - DateTimeOffset.UtcNow).TotalSeconds) seconds...</p>
+    <div class="ha-auto-advance">
+        <p>The exhibition will begin in @((int)(GameState.PhaseEndTime - DateTimeOffset.UtcNow).TotalSeconds) seconds...</p>
     </div>
 </div>

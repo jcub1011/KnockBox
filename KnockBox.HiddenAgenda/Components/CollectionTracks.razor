@@ -1,21 +1,21 @@
 @using KnockBox.HiddenAgenda.Services.State.Games
 
-<div class="collection-tracks">
+<div class="ha-tracks">
     @foreach (var (type, value) in Progress)
     {
         var target = GetTarget(type);
         var progressPercent = Math.Min(100, (double)value / target * 100);
-        <div class="track @(type.ToString().ToLower())">
-            <div class="track-header">
-                <span class="track-name">@type</span>
-                <span class="track-value">@value / @target</span>
+        <div class="ha-track ha-track-@type.ToString().ToLower()">
+            <div class="ha-track-header">
+                <span class="ha-track-name">@type</span>
+                <span class="ha-track-value">@value / @target</span>
             </div>
-            <div class="progress-bar-bg">
-                <div class="progress-bar-fill" style="width: @progressPercent%"></div>
+            <div class="ha-track-bar-bg">
+                <div class="ha-track-bar-fill" style="width: @progressPercent%"></div>
             </div>
             @if (value >= target)
             {
-                <span class="completion-badge">✓ Complete</span>
+                <span class="ha-track-complete">Complete</span>
             }
         </div>
     }

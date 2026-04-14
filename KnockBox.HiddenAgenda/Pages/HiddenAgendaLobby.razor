@@ -7,15 +7,19 @@
 <PageTitle>Hidden Agenda</PageTitle>
 <HeadContent>
     <link href="_content/KnockBox.HiddenAgenda/KnockBox.HiddenAgenda.styles.css" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap" rel="stylesheet">
 </HeadContent>
 
 @if (GameState == null)
 {
-    <div>Loading...</div>
+    <div class="ha-loading">
+        <span class="ha-loading-icon">🖼️</span>
+        <span>Preparing the gallery...</span>
+    </div>
 }
 else
 {
-    <div class="ha-app-container">
+    <div class="ha-page">
         @switch (GameState.Phase)
         {
             case GamePhase.Lobby:

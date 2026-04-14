@@ -1,21 +1,21 @@
 @using KnockBox.HiddenAgenda.Services.State.Games
 @using KnockBox.HiddenAgenda.Services.Logic.Games.Data
 
-<div class="board-grid">
+<div class="ha-board-grid">
     @foreach (var wing in Wings)
     {
-        <div class="wing wing-@wing.ToLower()">
-            <h5>@wing Wing</h5>
-            <div class="spaces">
+        <div class="ha-board-wing ha-board-wing-@wing.ToLower()">
+            <h5 class="ha-board-wing-title">@wing</h5>
+            <div class="ha-board-spaces">
                 @foreach (var space in GetSpacesForWing(wing))
                 {
-                    <div class="space-node @(space.SpotType == SpotType.Curation ? "curation" : "event") @(IsHighlighted(space.Id) ? "highlighted" : "")"
+                    <div class="ha-board-space @(space.SpotType == SpotType.Curation ? "ha-board-space-curation" : "ha-board-space-event") @(IsHighlighted(space.Id) ? "ha-board-space-highlighted" : "")"
                          @onclick="() => OnSpaceClicked?.Invoke(space.Id)">
-                        <span class="space-id">@space.Id</span>
-                        <div class="player-tokens">
+                        <span class="ha-board-space-id">@space.Id</span>
+                        <div class="ha-board-tokens">
                             @foreach (var player in GetPlayersAtSpace(space.Id))
                             {
-                                <div class="player-token" style="background-color: @GetPlayerColor(player.PlayerId)" title="@player.DisplayName"></div>
+                                <div class="ha-board-token" style="background-color: @GetPlayerColor(player.PlayerId)" title="@player.DisplayName"></div>
                             }
                         </div>
                     </div>
