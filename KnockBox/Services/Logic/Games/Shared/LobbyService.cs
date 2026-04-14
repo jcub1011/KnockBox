@@ -84,12 +84,26 @@ namespace KnockBox.Services.Logic.Games.Shared
                     return ValueResult<LobbyRegistration>.FromError(lobbyUriResult.Error.Error);
 
                 var lobbyCodeResult = await _lobbyCodeService.IssueLobbyCodeAsync(ct);
-                if (!lobbyCodeResult.TryGetSuccess(out var lobbyCode)) // Service garauntees that lobby code is normalized
+                if (!lobbyCodeResult.TryGetSuccess(out var lobbyCode)) // Service guarantees that lobby code is normalized
                     return ValueResult<LobbyRegistration>.FromError(lobbyCodeResult.Error.Error);
 
                 var lobbyRegistration = new LobbyRegistration(lobbyCode, lobbyUri, game.Module.Name, routeIdentifier, gameState);
                 if (!_lobbies.TryAdd(lobbyCode, lobbyRegistration))
+                {
+                    // This branch means LobbyCodeService handed us a code that is
+                    // already in _lobbies -- a broken invariant. Release the code
+                    // back to the issuer on a best-effort basis so we don't leak
+                    // it permanently; log loudly because reaching here is a bug.
+                    var releaseResult = await _lobbyCodeService.ReleaseLobbyCodeAsync(lobbyCode, ct);
+                    if (releaseResult.TryGetFailure(out var releaseError))
+                    {
+                        _logger.LogError(
+                            "Failed to release lobby code [{LobbyCode}] after a TryAdd collision in CreateLobbyAsync: {Error}",
+                            lobbyCode,
+                            releaseError.InternalMessage);
+                    }
                     return ValueResult<LobbyRegistration>.FromError($"Game with lobby code [{lobbyCode}] already exists.");
+                }
 
                 return lobbyRegistration;
             }

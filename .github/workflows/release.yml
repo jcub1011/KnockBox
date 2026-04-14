@@ -51,45 +51,15 @@ jobs:
           fi
           echo "Tag '${{ steps.resolve.outputs.tag }}' is on main. Proceeding."
 
-  # Plugins are built once and shared across every RID/mode in the publish
-  # matrix. The plugin build itself is RID-agnostic (pure managed code targeting
-  # net10.0), so rebuilding it per matrix leg is wasted CI time.
-  build-plugins:
-    name: Build plugins (shared)
-    needs: verify-main
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup .NET 10
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '10.0.x'
-
-      - name: Restore
-        run: dotnet restore KnockBox.slnx
-
-      - name: Build solution (populates plugin games/ folder)
-        run: dotnet build KnockBox.slnx -c Release --no-restore
-
-      - name: Upload games/ artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: knockbox-plugins
-          path: KnockBox/bin/Release/net10.0/games/
-          if-no-files-found: error
-          retention-days: 1
-
   publish:
     name: Publish ${{ matrix.rid }} (${{ matrix.mode }})
-    needs: [verify-main, build-plugins]
+    needs: [verify-main]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         rid: [win-x64, win-arm64, linux-x64, linux-arm64, osx-x64, osx-arm64]
-        mode: [portable, framework-dependent]
+        mode: [self-contained, framework-dependent]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -111,15 +81,9 @@ jobs:
       - name: Restore
         run: dotnet restore KnockBox/KnockBox.csproj
 
-      - name: Download prebuilt games/ artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: knockbox-plugins
-          path: KnockBox/bin/Release/net10.0/games/
-
       - name: Publish host
         run: |
-          if [ "${{ matrix.mode }}" = "portable" ]; then
+          if [ "${{ matrix.mode }}" = "self-contained" ]; then
             SELF_CONTAINED=true
           else
             SELF_CONTAINED=false

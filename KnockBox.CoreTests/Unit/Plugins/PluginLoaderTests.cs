@@ -29,6 +29,23 @@ public sealed class TestPluginModuleDuplicateA : IGameModule
     public RenderFragment GetButtonContent() => _ => { };
 }
 
+/// <summary>
+/// Fixture whose constructor always throws, used to exercise the
+/// <see cref="PluginLoader"/> <c>TryActivate</c> catch branch. Having a
+/// distinct RouteIdentifier lets the test assert that other modules in
+/// the same assembly are still discovered despite this one failing.
+/// </summary>
+public sealed class TestPluginModuleThrowingCtor : IGameModule
+{
+    public TestPluginModuleThrowingCtor() =>
+        throw new InvalidOperationException("boom");
+    public string Name => "Throwing";
+    public string Description => "Ctor throws.";
+    public string RouteIdentifier => "pluginloader-tests-route-throwing";
+    public void RegisterServices(IServiceCollection services) { }
+    public RenderFragment GetButtonContent() => _ => { };
+}
+
 [TestClass]
 public sealed class PluginLoaderTests
 {
@@ -201,6 +218,75 @@ public sealed class PluginLoaderTests
         }
     }
 
+    [TestMethod]
+    public void LoadModules_CorruptPrimaryDll_LogsErrorAndSkips()
+    {
+        // A subdirectory whose primary DLL is junk bytes must be handled by the
+        // LoadAssemblies catch branch: no assembly added, no module registered,
+        // and an Error-level entry logged so ops can see the failure without
+        // aborting the rest of the discovery pass.
+        var logger = MakeLogger();
+        var loader = new PluginLoader(logger.Object);
+        var tempDir = MakeTempDir();
+
+        try
+        {
+            var pluginName = "BrokenPlugin";
+            var pluginSubdir = Path.Combine(tempDir, pluginName);
+            Directory.CreateDirectory(pluginSubdir);
+            File.WriteAllBytes(
+                Path.Combine(pluginSubdir, pluginName + ".dll"),
+                [0x00, 0x01, 0x02, 0x03, 0x04, 0x05]);
+
+            var result = loader.LoadModules(tempDir);
+
+            Assert.IsEmpty(result.Modules);
+            Assert.IsEmpty(result.Assemblies);
+            VerifyLogged(logger, LogLevel.Error, Times.AtLeastOnce());
+        }
+        finally
+        {
+            SafeDelete(tempDir);
+        }
+    }
+
+    [TestMethod]
+    public void LoadModules_ModuleWithThrowingConstructor_LogsErrorAndContinues()
+    {
+        // The ctor on TestPluginModuleThrowingCtor throws. The discovery pass
+        // must log the activation failure, drop that module, and still surface
+        // the other modules defined in the same assembly (TestPluginModuleA /
+        // TestPluginModuleDuplicateA) -- one bad apple must not poison the scan.
+        AssertFixtureIsolation();
+
+        var logger = MakeLogger();
+        var loader = new PluginLoader(logger.Object);
+        var tempDir = MakeTempDir();
+
+        try
+        {
+            var testAssemblyPath = typeof(PluginLoaderTests).Assembly.Location;
+            var assemblyFileName = Path.GetFileNameWithoutExtension(testAssemblyPath);
+            var pluginSubdir = Path.Combine(tempDir, assemblyFileName);
+            Directory.CreateDirectory(pluginSubdir);
+            File.Copy(testAssemblyPath, Path.Combine(pluginSubdir, assemblyFileName + ".dll"), overwrite: true);
+
+            var result = loader.LoadModules(tempDir);
+
+            Assert.IsFalse(
+                result.Modules.Any(m => m.RouteIdentifier == "pluginloader-tests-route-throwing"),
+                "Module with throwing constructor must not appear in the result.");
+            Assert.IsTrue(
+                result.Modules.Any(m => m.RouteIdentifier == "pluginloader-tests-route-a"),
+                "Healthy modules in the same assembly must still be discovered.");
+            VerifyLogged(logger, LogLevel.Error, Times.AtLeastOnce());
+        }
+        finally
+        {
+            SafeDelete(tempDir);
+        }
+    }
+
     /// <summary>
     /// Guard: if a future change adds another IGameModule to this assembly,
     /// these tests' fixture is no longer isolated and assertions about counts
@@ -213,15 +299,23 @@ public sealed class PluginLoaderTests
             .Where(t => !t.IsAbstract && !t.IsInterface && typeof(IGameModule).IsAssignableFrom(t))
             .ToArray();
         CollectionAssert.AreEquivalent(
-            new[] { typeof(TestPluginModuleA), typeof(TestPluginModuleDuplicateA) },
+            new[]
+            {
+                typeof(TestPluginModuleA),
+                typeof(TestPluginModuleDuplicateA),
+                typeof(TestPluginModuleThrowingCtor),
+            },
             moduleTypesInAssembly,
             "PluginLoaderTests fixture is no longer isolated -- the test assembly declares " +
-            "IGameModule types beyond TestPluginModuleA/TestPluginModuleDuplicateA. Move new " +
-            "IGameModule test types into a dedicated fixture assembly, or scope the duplicate " +
-            "RouteIdentifier to a nested-class fixture, before relying on these tests.");
+            "IGameModule types beyond the known fixtures. Move new IGameModule test types into " +
+            "a dedicated fixture assembly, or scope their RouteIdentifier to a nested-class " +
+            "fixture, before relying on these tests.");
     }
 
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1873:Avoid potentially expensive logging", Justification = "It's not a big deal.")]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Performance",
+        "CA1873:Avoid potentially expensive logging",
+        Justification = "Test verification assertion; not a runtime code path.")]
     private static void VerifyLogged(Mock<ILogger<PluginLoader>> logger, LogLevel level, Times times)
     {
         logger.Verify(l => l.Log(
@@ -239,7 +333,10 @@ public sealed class PluginLoaderTests
     /// robust to template-argument ordering and lets us pin the "error names
     /// both types" contract without depending on the specific template shape.
     /// </summary>
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1873:Avoid potentially expensive logging", Justification = "It's not a big deal.")]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Performance",
+        "CA1873:Avoid potentially expensive logging",
+        Justification = "Test verification assertion; not a runtime code path.")]
     private static void VerifyErrorLoggedContainingBoth(
         Mock<ILogger<PluginLoader>> logger,
         string firstTypeName,

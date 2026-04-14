@@ -134,6 +134,16 @@ The repo root contains a shared MSBuild target imported by every game `.csproj`:
 
 After `Build`, the target copies each plugin's `TargetDir` (primary DLL + transitive deps), scoped-CSS bundle, and `wwwroot/` assets into `KnockBox\bin\{Config}\{TFM}\games\{TargetName}\`. This is what makes the host's runtime `games/` folder appear during local dev and in Docker builds without any project-to-project references.
 
+### Plugin Trust Model
+
+The `games/` directory is **trust-equivalent to the host binary**. There is no signature check, no manifest allowlist, and no sandbox: `PluginLoader` activates any type implementing `IGameModule` with a public parameterless constructor that it discovers in `games/{name}/{name}.dll`, and each plugin is loaded into a non-collectible `AssemblyLoadContext` that cannot be unloaded for the lifetime of the process. Adding such a DLL to `games/` is sufficient to execute arbitrary code at host startup, inside the host process, with the host's full privileges.
+
+Deployment consequences:
+
+- **Do not bind-mount `games/`** from a user-writable volume in Docker. Bake plugins into the image at build time so the running container's `games/` is read-only from the host's perspective.
+- Treat `games/` in the published artifact the same way you treat `KnockBox.dll` itself — changes require a full release review, not a hot-patch drop.
+- If third-party plugins ever become part of the story, this section must be revisited; the current model assumes every plugin is first-party and ships in the same release cycle as the host.
+
 ---
 
 ## System Context

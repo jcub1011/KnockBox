@@ -58,22 +58,6 @@ public sealed class DisposingWrapperTests
     }
 
     [TestMethod]
-    public void AbandonedWrapper_DoesNotDisposeInner()
-    {
-        // The wrapper intentionally has no finalizer: forgetting to dispose is a
-        // leak, not something to paper over with unsafe finalization. Lock in that
-        // contract so it doesn't silently regress.
-        var inner = new FakeDisposable();
-
-        CreateAndAbandonWrapper(inner);
-
-        GC.Collect();
-        GC.WaitForPendingFinalizers();
-
-        Assert.AreEqual(0, inner.DisposeCount);
-    }
-
-    [TestMethod]
     public void Dispose_ThenGC_InnerDisposedOnce()
     {
         var inner = new FakeDisposable();

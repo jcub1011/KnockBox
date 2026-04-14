@@ -16,7 +16,10 @@ namespace KnockBox.Core.Plugins
     /// <summary>
     /// Discovers <see cref="IGameModule"/> implementations from DLLs in a plugins directory.
     /// </summary>
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1873:Avoid potentially expensive logging", Justification = "It's not a big deal.")]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Performance",
+        "CA1873:Avoid potentially expensive logging",
+        Justification = "Startup-only discovery path. Log volume is bounded by the number of plugins in games/; readability of structured discovery/error messages is more valuable than LoggerMessage cache wins.")]
     public sealed class PluginLoader(ILogger<PluginLoader> logger)
     {
         public PluginLoadResult LoadModules(string pluginsDirectory)

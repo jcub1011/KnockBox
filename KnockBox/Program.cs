@@ -21,21 +21,10 @@ namespace KnockBox
             var builder = WebApplication.CreateBuilder(args);
 
             var logPath = Path.Combine(AppContext.BaseDirectory, "logs", "knockbox-.log");
-            const string outputTemplate =
-                "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {SourceContext}{NewLine}  {Message:lj}{NewLine}{Exception}";
 
             builder.Host.UseSerilog((context, services, loggerConfig) =>
-                loggerConfig
-                    .ReadFrom.Configuration(context.Configuration)
-                    .ReadFrom.Services(services)
-                    .Enrich.FromLogContext()
-                    .WriteTo.Console(outputTemplate: outputTemplate)
-                    .WriteTo.File(
-                        logPath,
-                        rollingInterval: RollingInterval.Day,
-                        retainedFileCountLimit: 31,
-                        shared: true,
-                        outputTemplate: outputTemplate));
+                ApplySharedLoggerConfiguration(loggerConfig, context.Configuration, logPath)
+                    .ReadFrom.Services(services));
 
             // Add services to the container.
             builder.Services.AddRazorComponents()
@@ -50,17 +39,16 @@ namespace KnockBox
             // Add states
             builder.Services.RegisterStateServices();
 
-            // Discover game plugins before registering logic
-            var bootstrapSerilog = new Serilog.LoggerConfiguration()
-                .ReadFrom.Configuration(builder.Configuration)
-                .Enrich.FromLogContext()
-                .WriteTo.Console(outputTemplate: outputTemplate)
-                .WriteTo.File(
-                    logPath,
-                    rollingInterval: RollingInterval.Day,
-                    retainedFileCountLimit: 31,
-                    shared: true,
-                    outputTemplate: outputTemplate)
+            // Discover game plugins before registering logic. A second Serilog
+            // pipeline is built here because DI (and therefore the host's
+            // ILoggerFactory) is not yet wired up, but we still want plugin
+            // discovery to produce real log entries with matching format. Both
+            // writers target the same rolling file with shared: true -- kept
+            // in sync via ApplySharedLoggerConfiguration.
+            var bootstrapSerilog = ApplySharedLoggerConfiguration(
+                    new Serilog.LoggerConfiguration(),
+                    builder.Configuration,
+                    logPath)
                 .CreateLogger();
             using var bootstrapLoggerFactory = new SerilogLoggerFactory(bootstrapSerilog, dispose: true);
             var pluginLogger = bootstrapLoggerFactory.CreateLogger<PluginLoader>();
@@ -104,13 +92,44 @@ namespace KnockBox
         }
 
         /// <summary>
+        /// Applies the console + rolling-file sinks and formatting shared between
+        /// the bootstrap Serilog logger (used during plugin discovery, before DI
+        /// is built) and the host's <c>UseSerilog</c> configuration. Keeping both
+        /// pipelines in a single helper guarantees they stay in sync -- notably
+        /// <c>shared: true</c> on the file sink, which both writers need in order
+        /// to coexist without file-lock errors.
+        /// </summary>
+        private static LoggerConfiguration ApplySharedLoggerConfiguration(
+            LoggerConfiguration loggerConfig,
+            IConfiguration configuration,
+            string logPath)
+        {
+            const string outputTemplate =
+                "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {SourceContext}{NewLine}  {Message:lj}{NewLine}{Exception}";
+
+            return loggerConfig
+                .ReadFrom.Configuration(configuration)
+                .Enrich.FromLogContext()
+                .WriteTo.Console(outputTemplate: outputTemplate)
+                .WriteTo.File(
+                    logPath,
+                    rollingInterval: RollingInterval.Day,
+                    retainedFileCountLimit: 31,
+                    shared: true,
+                    outputTemplate: outputTemplate);
+        }
+
+        /// <summary>
         /// Mounts each discovered plugin's <c>wwwroot</c> folder under <c>/_content/{PluginName}</c>
         /// so that static assets (scoped CSS bundles, images, scripts) referenced by
         /// the plugin's Razor components resolve at runtime. Each mount is isolated
         /// by try/catch so a single misconfigured plugin doesn't prevent the host
         /// from starting. Duplicate plugin folder names are skipped with a warning.
         /// </summary>
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1873:Avoid potentially expensive logging", Justification = "It's not a big deal.")]
+        [System.Diagnostics.CodeAnalysis.SuppressMessage(
+            "Performance",
+            "CA1873:Avoid potentially expensive logging",
+            Justification = "Startup-only path. Log volume is bounded by the number of plugins in games/; readability of structured mount/error messages is more valuable than LoggerMessage cache wins.")]
         private static void MapPluginStaticAssets(WebApplication app, string pluginsPath)
         {
             var logger = app.Services.GetRequiredService<ILogger<Program>>();
