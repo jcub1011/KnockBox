@@ -1,0 +1,81 @@
+/* Main Game Theme */
+.ha-app-container {
+    --gallery-burgundy: #4a0404;
+    --gallery-gold: #c5a059;
+    --gallery-cream: #fdf6e3;
+    --gallery-dark: #3d2b1f;
+    
+    background-color: var(--gallery-cream);
+    min-height: 100vh;
+    padding: 20px;
+    font-family: 'Playfair Display', serif;
+}
+
+::deep .card {
+    background-color: white;
+    border: 1px solid var(--gallery-gold);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    margin-bottom: 20px;
+}
+
+::deep .card-header {
+    background-color: var(--gallery-burgundy);
+    color: var(--gallery-gold);
+    font-weight: bold;
+    border-bottom: 2px solid var(--gallery-gold);
+}
+
+::deep .btn-primary {
+    background-color: var(--gallery-burgundy);
+    border-color: var(--gallery-gold);
+    color: var(--gallery-gold);
+}
+
+::deep .btn-primary:hover {
+    background-color: #610505;
+    border-color: #d4b16a;
+}
+
+.error-toast {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: #e74c3c;
+    color: white;
+    padding: 10px 20px;
+    border-radius: 5px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+    z-index: 1000;
+    animation: fadeOut 5s forwards;
+}
+
+@keyframes fadeOut {
+    0% { opacity: 1; }
+    80% { opacity: 1; }
+    100% { opacity: 0; }
+}
+
+/* Turn Phase Layout */
+::deep .turn-phase-layout {
+    display: flex;
+    gap: 20px;
+}
+
+::deep .turn-sidebar {
+    flex: 0 0 300px;
+}
+
+::deep .turn-main {
+    flex: 1;
+}
+
+::deep .history-log {
+    max-height: 200px;
+    overflow-y: auto;
+    font-size: 0.85rem;
+}
+
+::deep .history-entry {
+    padding: 5px 0;
+    border-bottom: 1px solid #eee;
+}

@@ -1,0 +1,21 @@
+<div class="spinner-container">
+    <div class="spinner-wheel @(_isSpinning ? "spinning" : "")">
+        @if (Result.HasValue && !_isSpinning)
+        {
+            <div class="spinner-result">@Result.Value</div>
+        }
+        else
+        {
+            <div class="spinner-placeholder">?</div>
+        }
+    </div>
+    
+    <div class="spinner-actions mt-3">
+        @if (IsCurrentPlayer)
+        {
+            <button class="btn btn-primary btn-lg" disabled="@(_isSpinning || Result.HasValue)" @onclick="Spin">
+                @(_isSpinning ? "Spinning..." : "Spin the Wheel")
+            </button>
+        }
+    </div>
+</div>

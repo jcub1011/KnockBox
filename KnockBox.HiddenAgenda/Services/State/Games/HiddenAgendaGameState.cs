@@ -25,6 +25,8 @@ public class HiddenAgendaGameState(User host, ILogger<HiddenAgendaGameState> log
         Phase = phase;
     }
 
+    public DateTimeOffset PhaseEndTime { get; set; }
+
     // FSM context (set when game starts)
     public HiddenAgendaGameContext? Context { get; set; }
 

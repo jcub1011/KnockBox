@@ -1,0 +1,30 @@
+@using KnockBox.HiddenAgenda.Services.State.Games
+
+<div class="dossier-panel card">
+    <div class="card-header d-flex justify-content-between align-items-center" @onclick="Toggle">
+        <h5 class="mb-0">Dossier</h5>
+        <button class="btn btn-link btn-sm">@(_isCollapsed ? "Expand" : "Collapse")</button>
+    </div>
+    
+    @if (!_isCollapsed)
+    {
+        <div class="card-body dossier-content">
+            @foreach (var category in Categories)
+            {
+                <div class="category-section mb-3">
+                    <h6 class="category-title text-uppercase font-weight-bold">@category</h6>
+                    <ul class="list-group list-group-flush">
+                        @foreach (var task in GetTasksByCategory(category))
+                        {
+                            <li class="list-group-item task-item @(IsPlayerTask(task.Id) ? "my-task" : "")">
+                                <span class="task-id badge badge-secondary mr-2">@task.Id</span>
+                                <span class="task-desc">@task.Description</span>
+                                <span class="task-points badge badge-light float-right">@task.PointValue pts</span>
+                            </li>
+                        }
+                    </ul>
+                </div>
+            }
+        </div>
+    }
+</div>

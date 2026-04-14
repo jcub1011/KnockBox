@@ -1,0 +1,45 @@
+.collection-tracks {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.track {
+    display: flex;
+    flex-direction: column;
+    position: relative;
+}
+
+.track-header {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.9rem;
+    margin-bottom: 5px;
+}
+
+.progress-bar-bg {
+    height: 10px;
+    background: #eee;
+    border-radius: 5px;
+    overflow: hidden;
+}
+
+.progress-bar-fill {
+    height: 100%;
+    transition: width 0.3s ease;
+}
+
+.renaissancemasters .progress-bar-fill { background-color: #3498db; }
+.contemporaryshowcase .progress-bar-fill { background-color: #e67e22; }
+.impressionistgallery .progress-bar-fill { background-color: #2ecc71; }
+.marbleandbronze .progress-bar-fill { background-color: #9b59b6; }
+.emergingartists .progress-bar-fill { background-color: #e74c3c; }
+
+.completion-badge {
+    position: absolute;
+    right: 0;
+    top: -5px;
+    font-size: 0.7rem;
+    color: #2ecc71;
+    font-weight: bold;
+}

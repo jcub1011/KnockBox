@@ -1,0 +1,30 @@
+.dossier-panel {
+    border: 2px solid #3d2b1f;
+}
+
+.dossier-content {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.category-title {
+    color: #8b0000;
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 5px;
+}
+
+.task-item {
+    font-size: 0.85rem;
+}
+
+.my-task {
+    background-color: #f0f8ff;
+    border-left: 4px solid #3498db;
+    font-weight: bold;
+}
+
+.task-id {
+    min-width: 30px;
+    display: inline-block;
+    text-align: center;
+}

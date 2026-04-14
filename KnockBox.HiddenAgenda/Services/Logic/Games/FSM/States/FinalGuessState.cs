@@ -25,6 +25,7 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games.FSM.States
             context.State.SetPhase(GamePhase.FinalGuess);
             _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(
                 context.State.Config.FinalGuessTimeoutMs);
+            context.State.PhaseEndTime = _expiresAt;
             return null;
         }
 

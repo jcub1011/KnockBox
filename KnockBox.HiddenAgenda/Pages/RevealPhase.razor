@@ -1,0 +1,66 @@
+@using KnockBox.HiddenAgenda.Services.State.Games
+@using KnockBox.HiddenAgenda.Services.State.Games.Data
+@using KnockBox.Core.Services.State.Users
+
+<div class="reveal-phase card">
+    <h3>Round @GameState.CurrentRound Results</h3>
+    
+    @if (CurrentRoundResult != null)
+    {
+        <div class="results-container">
+            @foreach (var playerResult in CurrentRoundResult.PlayerResults.Values)
+            {
+                var playerState = GameState.GamePlayers.TryGetValue(playerResult.PlayerId, out var p) ? p : null;
+                <div class="player-reveal card m-3 p-3">
+                    <h4>@playerResult.DisplayName</h4>
+                    <div class="secret-tasks">
+                        <h5>Secret Tasks</h5>
+                        <ul class="list-group">
+                            @foreach (var taskRes in playerResult.TaskResults)
+                            {
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <span>[@taskRes.Task.Category] @taskRes.Task.Id: @taskRes.Task.Description</span>
+                                    @if (taskRes.Completed)
+                                    {
+                                        <span class="badge badge-success badge-pill">✓ @taskRes.Task.PointValue pts</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge badge-danger badge-pill">✗</span>
+                                    }
+                                </li>
+                            }
+                        </ul>
+                    </div>
+
+                    <div class="guess-accuracy mt-3">
+                        <h5>Guess Accuracy</h5>
+                        @if (playerState?.GuessSubmission is not null)
+                        {
+                            <p>Total Correct Guesses: @CalculateCorrectGuesses(playerState)</p>
+                            <p>Guess Points: @playerResult.GuessPoints</p>
+                        }
+                        else
+                        {
+                            <p class="text-muted">Did not submit guesses.</p>
+                        }
+                    </div>
+
+                    <div class="round-score mt-3 font-weight-bold">
+                        Round Score: @playerResult.TotalRoundPoints pts
+                    </div>
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="text-center p-5">
+            <p>Calculating results...</p>
+        </div>
+    }
+
+    <div class="auto-advance text-center mt-4">
+        <p>Next round summary in @((int)(GameState.PhaseEndTime - DateTimeOffset.UtcNow).TotalSeconds)s...</p>
+    </div>
+</div>

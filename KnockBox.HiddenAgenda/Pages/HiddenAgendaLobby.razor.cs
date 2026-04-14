@@ -4,6 +4,7 @@ using KnockBox.Core.Services.Navigation;
 using KnockBox.HiddenAgenda.Services.State.Games;
 using KnockBox.Core.Services.State.Games.Shared;
 using KnockBox.Core.Services.State.Users;
+using KnockBox.Core.Services.State.Shared;
 using Microsoft.AspNetCore.Components;
 using System.Diagnostics.CodeAnalysis;
 
@@ -19,11 +20,14 @@ namespace KnockBox.HiddenAgenda.Pages
 
         [Inject] protected IUserService UserService { get; set; } = default!;
 
+        [Inject] protected ITickService TickService { get; set; } = default!;
+
         [Inject] protected ILogger<HiddenAgendaLobby> Logger { get; set; } = default!;
 
         [Parameter] public string ObfuscatedRoomCode { get; set; } = default!;
 
         private IDisposable? _stateSubscription;
+        private IDisposable? _tickSubscription;
 
         protected override async Task OnInitializedAsync()
         {
@@ -66,8 +70,22 @@ namespace KnockBox.HiddenAgenda.Pages
             RoomCode = session.LobbyRegistration.Code;
             _stateSubscription = GameState.StateChangedEventManager.Subscribe(async () => await InvokeAsync(StateHasChanged));
 
+            if (IsHost())
+            {
+                var tickResult = TickService.RegisterTickCallback(() =>
+                {
+                    if (GameState?.Context is not null)
+                        GameEngine.Tick(GameState.Context, DateTimeOffset.UtcNow);
+                }, tickInterval: TickService.TicksPerSecond);
+
+                if (tickResult.TryGetSuccess(out var sub))
+                    _tickSubscription = sub;
+            }
+
             await base.OnInitializedAsync();
         }
+
+        protected bool IsHost() => GameState?.Host?.Id == UserService.CurrentUser?.Id;
 
         protected override void OnAfterRender(bool firstRender)
         {
@@ -95,6 +113,7 @@ namespace KnockBox.HiddenAgenda.Pages
                 GameState.OnStateDisposed -= HandleStateDisposed;
             }
             _stateSubscription?.Dispose();
+            _tickSubscription?.Dispose();
             base.Dispose();
         }
 

@@ -1,0 +1,63 @@
+@using KnockBox.HiddenAgenda.Services.State.Games
+@using KnockBox.HiddenAgenda.Services.State.Games.Data
+@using KnockBox.HiddenAgenda.Services.Logic.Games
+@using KnockBox.Core.Services.State.Users
+
+<div class="lobby-phase card">
+    <h3>Lobby</h3>
+    <div class="room-info">
+        <p>Room Code: <strong>@RoomCode</strong></p>
+    </div>
+
+    <div class="player-list-section">
+        <h4>Players (@GameState.Players.Count / 6)</h4>
+        <ul class="player-list">
+            @foreach (var player in GameState.Players)
+            {
+                <li class="player-item">
+                    <span class="player-name">@player.Name @(player.Id == GameState.Host.Id ? "(Host)" : "")</span>
+                    @if (IsHost && player.Id != GameState.Host.Id)
+                    {
+                        <button class="btn btn-sm btn-danger" @onclick="() => KickPlayer(player)">Kick</button>
+                    }
+                </li>
+            }
+        </ul>
+        @if (GameState.Players.Count < 3)
+        {
+            <p class="text-warning">Need at least 3 players to start.</p>
+        }
+    </div>
+
+    <div class="config-section">
+        <h4>Game Settings</h4>
+        <div class="form-group">
+            <label>Rounds: @Config.TotalRounds</label>
+            <input type="range" min="3" max="5" step="1" @bind="Config.TotalRounds" disabled="@(!IsHost)" class="form-control-range" />
+        </div>
+        <div class="form-check">
+            <input type="checkbox" class="form-check-input" id="timerToggle" @bind="Config.EnableTimers" disabled="@(!IsHost)" />
+            <label class="form-check-label" for="timerToggle">Enable Timers</label>
+        </div>
+        <div class="form-group">
+            <label for="poolRotation">Pool Rotation</label>
+            <select id="poolRotation" class="form-control" @bind="Config.PoolRotation" disabled="@(!IsHost)">
+                @foreach (var type in Enum.GetValues<TaskPoolRotation>())
+                {
+                    <option value="@type">@type</option>
+                }
+            </select>
+        </div>
+    </div>
+
+    @if (IsHost)
+    {
+        <button class="btn btn-primary btn-lg start-btn mt-3" 
+                disabled="@(GameState.Players.Count < 3)"
+                @onclick="StartGame">Start Game</button>
+    }
+    else
+    {
+        <p class="text-muted">Waiting for host to start the game...</p>
+    }
+</div>

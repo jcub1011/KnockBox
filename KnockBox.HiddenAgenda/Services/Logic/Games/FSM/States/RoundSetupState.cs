@@ -16,6 +16,7 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games.FSM.States
         {
             context.State.SetPhase(GamePhase.RoundSetup);
             _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.State.Config.RoundSetupTimeoutMs);
+            context.State.PhaseEndTime = _expiresAt;
 
             context.State.CurrentRound++;
 

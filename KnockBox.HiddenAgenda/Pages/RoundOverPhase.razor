@@ -1,0 +1,53 @@
+@using KnockBox.HiddenAgenda.Services.State.Games
+@using KnockBox.HiddenAgenda.Services.Logic.Games
+@using KnockBox.Core.Services.State.Users
+
+<div class="round-over-phase card">
+    <h3>Round @GameState.CurrentRound Complete</h3>
+    
+    <div class="scoreboard mt-4">
+        <h4>Scoreboard</h4>
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Rank</th>
+                    <th>Player</th>
+                    <th>Round Score</th>
+                    <th>Total Score</th>
+                </tr>
+            </thead>
+            <tbody>
+                @{
+                    int rank = 1;
+                    foreach (var player in GameState.GamePlayers.Values.OrderByDescending(p => p.CumulativeScore))
+                    {
+                        <tr>
+                            <td>@rank++</td>
+                            <td>@player.DisplayName</td>
+                            <td>@player.RoundScore</td>
+                            <td>@player.CumulativeScore</td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <div class="actions mt-5 text-center">
+        @if (IsHost)
+        {
+            @if (GameState.CurrentRound < GameState.Config.TotalRounds)
+            {
+                <button class="btn btn-primary btn-lg" @onclick="HandleNextRound">Start Next Round</button>
+            }
+            else
+            {
+                <button class="btn btn-primary btn-lg" @onclick="HandleNextRound">View Final Results</button>
+            }
+        }
+        else
+        {
+            <p class="text-muted">Waiting for host to proceed...</p>
+        }
+    </div>
+</div>

@@ -1,0 +1,40 @@
+@using KnockBox.HiddenAgenda.Services.State.Games
+@using KnockBox.HiddenAgenda.Services.Logic.Games.Data
+@using KnockBox.Core.Services.State.Users
+@using KnockBox.HiddenAgenda.Components
+
+<div class="round-setup card">
+    <h3>Round @GameState.CurrentRound of @GameState.Config.TotalRounds</h3>
+    
+    <div class="dossier-section">
+        <h4>The Full Dossier</h4>
+        <p class="text-muted">All possible tasks in the pool for this round.</p>
+        <DossierPanel TaskPool="GameState.CurrentTaskPool" PlayerTasks="PlayerTasks" />
+    </div>
+
+    @if (PlayerTasks is not null)
+    {
+        <div class="private-tasks alert alert-info mt-4">
+            <h4>Your Secret Tasks</h4>
+            <p>Complete these tasks to earn points. Keep them secret!</p>
+            <ul class="task-list">
+                @foreach (var task in PlayerTasks)
+                {
+                    <li class="task-item">
+                        <strong>[@task.Category] @task.Id:</strong> @task.Description (@task.PointValue pts)
+                    </li>
+                }
+            </ul>
+        </div>
+    }
+
+    <div class="collection-targets mt-4">
+        <h4>Collection Targets</h4>
+        <p>Advance collections to these values to complete tasks.</p>
+        <CollectionTracks Progress="GameState.CollectionProgress" />
+    </div>
+
+    <div class="auto-advance text-center mt-4">
+        <p>The game will advance automatically in @((int)(GameState.PhaseEndTime - DateTimeOffset.UtcNow).TotalSeconds) seconds...</p>
+    </div>
+</div>
