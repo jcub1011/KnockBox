@@ -1,23 +1,143 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using KnockBox.Core.Extensions.Returns;
 using KnockBox.Core.Services.State.Games.Shared;
+using KnockBox.HiddenAgenda.Services.State.Games;
+using Microsoft.Extensions.Logging;
 
 namespace KnockBox.HiddenAgenda.Services.Logic.Games.FSM.States
 {
     public sealed class GuessPhaseState : ITimedHiddenAgendaGameState
     {
+        private DateTimeOffset _expiresAt;
+
         public ValueResult<IGameState<HiddenAgendaGameContext, HiddenAgendaCommand>?> OnEnter(HiddenAgendaGameContext context)
         {
-            // Placeholder: skip guessing, use shared helper to advance
-            return ValueResult<IGameState<HiddenAgendaGameContext, HiddenAgendaCommand>?>.FromValue(context.AdvanceToNextPlayerOrEndRound());
+            var currentPlayerId = context.State.TurnManager.CurrentPlayer;
+            if (currentPlayerId == null || !context.GamePlayers.TryGetValue(currentPlayerId, out var player))
+                return ValueResult<IGameState<HiddenAgendaGameContext, HiddenAgendaCommand>?>.FromValue(AdvanceToNextPlayer(context));
+
+            // If player already guessed, skip
+            if (player.HasSubmittedGuess)
+                return ValueResult<IGameState<HiddenAgendaGameContext, HiddenAgendaCommand>?>.FromValue(AdvanceToNextPlayer(context));
+
+            context.State.SetPhase(GamePhase.GuessPhase);
+            _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(
+                context.State.Config.GuessPhaseTimeoutMs);
+            return null;
         }
 
         public Result OnExit(HiddenAgendaGameContext context) => Result.Success;
 
-        public ValueResult<IGameState<HiddenAgendaGameContext, HiddenAgendaCommand>?> HandleCommand(HiddenAgendaGameContext context, HiddenAgendaCommand command) => null;
+        public ValueResult<IGameState<HiddenAgendaGameContext, HiddenAgendaCommand>?> HandleCommand(
+            HiddenAgendaGameContext context, HiddenAgendaCommand command)
+        {
+            var currentPlayerId = context.State.TurnManager.CurrentPlayer;
 
-        public ValueResult<IGameState<HiddenAgendaGameContext, HiddenAgendaCommand>?> Tick(HiddenAgendaGameContext context, DateTimeOffset now) => null;
+            switch (command)
+            {
+                case SubmitGuessCommand cmd:
+                {
+                    if (cmd.PlayerId != currentPlayerId)
+                        return ValueResult<IGameState<HiddenAgendaGameContext, HiddenAgendaCommand>?>.FromError("It is not your turn.");
 
-        public ValueResult<TimeSpan> GetRemainingTime(HiddenAgendaGameContext context, DateTimeOffset now) => TimeSpan.Zero;
+                    var player = context.GamePlayers[cmd.PlayerId];
+                    if (player.HasSubmittedGuess)
+                        return ValueResult<IGameState<HiddenAgendaGameContext, HiddenAgendaCommand>?>.FromError("You have already submitted guesses this round.");
+
+                    // Validate guess format
+                    var validationError = ValidateGuesses(context, cmd.PlayerId, cmd.Guesses);
+                    if (validationError != null)
+                        return ValueResult<IGameState<HiddenAgendaGameContext, HiddenAgendaCommand>?>.FromError(validationError);
+
+                    // Store guesses
+                    player.HasSubmittedGuess = true;
+                    player.GuessSubmission = cmd.Guesses;
+
+                    // Trigger countdown if this is the first guess
+                    if (!context.State.GuessCountdownActive)
+                    {
+                        context.State.GuessCountdownActive = true;
+                        context.State.FirstGuessPlayerId = cmd.PlayerId;
+
+                        // Set 2-turn countdown for all other players
+                        foreach (var otherPlayer in context.GamePlayers.Values)
+                        {
+                            if (otherPlayer.PlayerId != cmd.PlayerId)
+                                otherPlayer.GuessCountdownTurnsRemaining = 2;
+                        }
+
+                        context.Logger.LogInformation(
+                            "Guess countdown triggered by player [{pid}].", cmd.PlayerId);
+                    }
+
+                    return ValueResult<IGameState<HiddenAgendaGameContext, HiddenAgendaCommand>?>.FromValue(AdvanceToNextPlayer(context));
+                }
+
+                case SkipGuessCommand cmd:
+                {
+                    if (cmd.PlayerId != currentPlayerId)
+                        return ValueResult<IGameState<HiddenAgendaGameContext, HiddenAgendaCommand>?>.FromError("It is not your turn.");
+                    return ValueResult<IGameState<HiddenAgendaGameContext, HiddenAgendaCommand>?>.FromValue(AdvanceToNextPlayer(context));
+                }
+
+                default:
+                    return null;
+            }
+        }
+
+        public ValueResult<IGameState<HiddenAgendaGameContext, HiddenAgendaCommand>?> Tick(HiddenAgendaGameContext context, DateTimeOffset now)
+        {
+            if (now < _expiresAt) return null;
+            // Auto-skip on timeout
+            return ValueResult<IGameState<HiddenAgendaGameContext, HiddenAgendaCommand>?>.FromValue(AdvanceToNextPlayer(context));
+        }
+
+        public ValueResult<TimeSpan> GetRemainingTime(HiddenAgendaGameContext context, DateTimeOffset now) => _expiresAt - now;
+
+        /// <summary>
+        /// Validates guess submission format:
+        /// - Must include an entry for every opponent (not self)
+        /// - Each entry must have exactly 3 task IDs
+        /// - All task IDs must exist in the current round's task pool (the dossier)
+        /// - No duplicate task IDs within a single opponent's guess
+        /// </summary>
+        private static string? ValidateGuesses(
+            HiddenAgendaGameContext context,
+            string playerId,
+            Dictionary<string, List<string>> guesses)
+        {
+            var opponents = context.GamePlayers.Keys
+                .Where(id => id != playerId).ToHashSet();
+
+            // Must have exactly one entry per opponent
+            if (guesses.Count != opponents.Count)
+                return $"Must guess for all {opponents.Count} opponents.";
+
+            foreach (var (opponentId, taskIds) in guesses)
+            {
+                if (!opponents.Contains(opponentId))
+                    return $"Invalid opponent ID: {opponentId}";
+                if (taskIds.Count != 3)
+                    return $"Must guess exactly 3 tasks for each opponent ({opponentId}).";
+                if (taskIds.Distinct().Count() != 3)
+                    return $"Duplicate task IDs in guess for opponent ({opponentId}).";
+
+                var poolIds = context.State.CurrentTaskPool.Select(t => t.Id).ToHashSet();
+                foreach (var taskId in taskIds)
+                {
+                    if (!poolIds.Contains(taskId))
+                        return $"Task ID '{taskId}' is not in the current dossier.";
+                }
+            }
+
+            return null; // Valid
+        }
+
+        private static IGameState<HiddenAgendaGameContext, HiddenAgendaCommand>? AdvanceToNextPlayer(HiddenAgendaGameContext context)
+        {
+            return context.AdvanceToNextPlayerOrEndRound();
+        }
     }
 }

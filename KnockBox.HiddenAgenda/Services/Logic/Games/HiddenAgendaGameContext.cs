@@ -98,37 +98,25 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games
 
         public RoundEndTrigger CheckRoundEndConditions()
         {
-            // 1. 3 of 5 collections completed
+            // 1. Collection trigger: 3 of 5 collections completed
             if (GetCompletedCollectionCount() >= 3)
                 return RoundEndTrigger.CollectionTrigger;
 
-            // 2. Guess countdown expired
+            // 2. Guess countdown: all non-first-guesser players have exhausted their 2 turns or already guessed
             if (State.GuessCountdownActive)
             {
-                bool allExpired = true;
-                foreach (var player in GamePlayers.Values)
-                {
-                    if (player.GuessCountdownTurnsRemaining > 0)
-                    {
-                        allExpired = false;
-                        break;
-                    }
-                }
-                if (allExpired) return RoundEndTrigger.GuessCountdown;
+                bool allExpired = GamePlayers.Values
+                    .Where(p => p.PlayerId != State.FirstGuessPlayerId)
+                    .All(p => p.HasSubmittedGuess || p.GuessCountdownTurnsRemaining <= 0);
+                
+                if (allExpired)
+                    return RoundEndTrigger.GuessCountdown;
             }
 
-            // 3. Max turns
+            // 3. Max turns: all players at their maximum
             int maxTurns = GetMaxTurnsPerPlayer();
-            bool allAtMax = GamePlayers.Count > 0;
-            foreach (var player in GamePlayers.Values)
-            {
-                if (player.TurnsTakenThisRound < maxTurns)
-                {
-                    allAtMax = false;
-                    break;
-                }
-            }
-            if (allAtMax) return RoundEndTrigger.MaxTurns;
+            if (GamePlayers.Count > 0 && GamePlayers.Values.All(p => p.TurnsTakenThisRound >= maxTurns))
+                return RoundEndTrigger.MaxTurns;
 
             return RoundEndTrigger.None;
         }

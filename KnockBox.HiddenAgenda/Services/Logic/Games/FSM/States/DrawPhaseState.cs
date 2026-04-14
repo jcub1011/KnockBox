@@ -140,7 +140,8 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games.FSM.States
             player.TurnsTakenThisRound++;
             context.State.TotalTurnsTaken++;
 
-            if (context.State.GuessCountdownActive && player.GuessCountdownTurnsRemaining > 0)
+            // Decrement guess countdown if active and player hasn't guessed yet
+            if (context.State.GuessCountdownActive && !player.HasSubmittedGuess && player.GuessCountdownTurnsRemaining > 0)
             {
                 player.GuessCountdownTurnsRemaining--;
             }
