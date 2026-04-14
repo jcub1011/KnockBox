@@ -62,6 +62,10 @@ public class HiddenAgendaGameState(User host, ILogger<HiddenAgendaGameState> log
 
     // Current player's drawn cards during DrawPhase (set by FSM state)
     public List<CurationCard>? DrawnCards { get; set; }
+
+    public int? CurrentSpinResult { get; set; }
+    public EventCard? PendingDrawnEventCard { get; set; }  // Event card pending swap decision
+    public List<CurationCard>? CatalogRevealedCards { get; set; }  // Catalog result for current player
 }
 
 public enum GamePhase

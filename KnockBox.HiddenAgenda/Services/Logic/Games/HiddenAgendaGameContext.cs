@@ -178,5 +178,49 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games
             State.TurnManager.NextTurn();
             return new EventCardPhaseState();
         }
+
+        /// <summary>
+        /// Records a card play in both the player's history and the global round history.
+        /// Determines the EffectiveCardType from applied effects (Acquire if all positive,
+        /// Remove if all negative, Trade if mixed) and snapshots current collection progress
+        /// for R4/R5 task evaluation.
+        /// </summary>
+        public void RecordCardPlay(string playerId, CurationCard card, int selectedIndex,
+            IReadOnlyList<CurationCard> allDrawn, IReadOnlyList<CollectionEffect> appliedEffects)
+        {
+            var player = GamePlayers[playerId];
+            var affected = appliedEffects.Select(e => e.Collection).Distinct().ToArray();
+
+            // Determine effective type from applied effects
+            bool hasPositive = appliedEffects.Any(e => e.Delta > 0);
+            bool hasNegative = appliedEffects.Any(e => e.Delta < 0);
+            var effectiveType = (hasPositive, hasNegative) switch
+            {
+                (true, false) => CurationCardType.Acquire,
+                (false, true) => CurationCardType.Remove,
+                _ => CurationCardType.Trade  // mixed or no effects
+            };
+
+            // Snapshot collection progress at time of play (for R4/R5 evaluation)
+            var progressSnapshot = new Dictionary<CollectionType, int>(CollectionProgress);
+
+            var record = new CardPlayRecord(
+                player.TurnsTakenThisRound + 1,
+                card,
+                selectedIndex,
+                affected,
+                card.Type,
+                effectiveType,
+                progressSnapshot);
+            player.CardPlayHistory.Add(record);
+
+            var space = Board.Spaces[player.CurrentSpaceId];
+            State.RoundPlayHistory.Add(new TurnRecord(
+                State.TotalTurnsTaken + 1,
+                playerId,
+                record,
+                player.CurrentSpaceId,
+                space.Wing));
+        }
     }
 }
