@@ -1,0 +1,157 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag/version label for the release (e.g. v1.2.3)'
+        required: true
+        type: string
+
+jobs:
+  # Releases only ship from main. A tag is not intrinsically tied to a branch,
+  # so we verify the tagged commit is reachable from origin/main before doing
+  # any build work. If the tag was pushed from a feature branch by mistake,
+  # this job fails fast and the rest of the workflow is skipped.
+  verify-main:
+    name: Verify tag is on main
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.resolve.outputs.tag }}
+      sha: ${{ steps.resolve.outputs.sha }}
+    steps:
+      - name: Checkout (full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve commit to verify
+        id: resolve
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ inputs.tag }}"
+            git fetch origin "refs/tags/${TAG}:refs/tags/${TAG}"
+            SHA=$(git rev-list -n 1 "refs/tags/${TAG}")
+          else
+            SHA="$GITHUB_SHA"
+            TAG="$GITHUB_REF_NAME"
+          fi
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Confirm commit is on main
+        run: |
+          git fetch origin main
+          if ! git merge-base --is-ancestor "${{ steps.resolve.outputs.sha }}" origin/main; then
+            echo "::error::Tag '${{ steps.resolve.outputs.tag }}' (${{ steps.resolve.outputs.sha }}) is not reachable from main. Releases only publish from main."
+            exit 1
+          fi
+          echo "Tag '${{ steps.resolve.outputs.tag }}' is on main. Proceeding."
+
+  publish:
+    name: Publish ${{ matrix.rid }} (${{ matrix.mode }})
+    needs: [verify-main]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        rid: [win-x64, win-arm64, linux-x64, linux-arm64, osx-x64, osx-arm64]
+        mode: [self-contained, framework-dependent]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Resolve version label
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "label=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "label=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Restore
+        run: dotnet restore KnockBox/KnockBox.csproj
+
+      - name: Publish host
+        run: |
+          if [ "${{ matrix.mode }}" = "self-contained" ]; then
+            SELF_CONTAINED=true
+          else
+            SELF_CONTAINED=false
+          fi
+          dotnet publish KnockBox/KnockBox.csproj \
+            -c Release \
+            -r ${{ matrix.rid }} \
+            --no-restore \
+            --self-contained $SELF_CONTAINED \
+            -p:PublishSingleFile=false \
+            -p:UseAppHost=true \
+            -o publish/${{ matrix.rid }}-${{ matrix.mode }}
+
+      - name: Verify plugins in publish output
+        run: |
+          PUBLISH_DIR="publish/${{ matrix.rid }}-${{ matrix.mode }}"
+          if [ ! -d "$PUBLISH_DIR/games" ]; then
+            echo "ERROR: games/ folder missing from publish output"
+            exit 1
+          fi
+          GAME_COUNT=$(find "$PUBLISH_DIR/games" -mindepth 1 -maxdepth 1 -type d | wc -l)
+          echo "Found $GAME_COUNT plugin folder(s) in $PUBLISH_DIR/games:"
+          ls -1 "$PUBLISH_DIR/games"
+          if [ "$GAME_COUNT" -lt 1 ]; then
+            echo "ERROR: no plugins published"
+            exit 1
+          fi
+
+      - name: Create archive
+        id: archive
+        run: |
+          ARCHIVE_NAME="knockbox-${{ steps.version.outputs.label }}-${{ matrix.rid }}-${{ matrix.mode }}.zip"
+          cd publish/${{ matrix.rid }}-${{ matrix.mode }}
+          zip -r "../../$ARCHIVE_NAME" .
+          cd ../..
+          echo "name=$ARCHIVE_NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: knockbox-${{ matrix.rid }}-${{ matrix.mode }}
+          path: ${{ steps.archive.outputs.name }}
+          if-no-files-found: error
+          retention-days: 7
+
+  release:
+    name: Publish GitHub Release
+    needs: [verify-main, publish]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all publish artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: knockbox-*
+          merge-multiple: true
+
+      - name: List artifacts
+        run: ls -la artifacts
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ needs.verify-main.outputs.tag }}
+          tag_name: ${{ needs.verify-main.outputs.tag }}
+          files: artifacts/*.zip
+          generate_release_notes: true
+          draft: false
+          prerelease: ${{ contains(needs.verify-main.outputs.tag, '-') }}

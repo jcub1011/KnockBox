@@ -1,5 +1,6 @@
-using KnockBox.Extensions.Disposable;
-using KnockBox.Extensions.Returns;
+using KnockBox.Core.Extensions.Disposable;
+using KnockBox.Core.Extensions.Returns;
+using KnockBox.Core.Services.State.Shared;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Primitives;
 
@@ -133,8 +134,8 @@ public class SessionServiceProvider(
             if (value is Lazy<CacheRegistration> lazyReg && lazyReg.IsValueCreated)
             {
                 lazyReg.Value.Dispose();
-                logger.LogInformation(
-                    "Session service {Type} for {Token} expired and was disposed. (Reason: {Reason})", 
+                logger.LogDebug(
+                    "Session service {Type} for {Token} expired and was disposed. (Reason: {Reason})",
                     regKey.ServiceType.Name, 
                     regKey.SessionToken.Token,
                     reason);

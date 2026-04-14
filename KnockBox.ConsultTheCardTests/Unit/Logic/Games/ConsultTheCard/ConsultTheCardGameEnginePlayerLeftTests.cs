@@ -1,15 +1,15 @@
-using KnockBox.Services.Logic.Games.ConsultTheCard;
-using KnockBox.Services.Logic.Games.ConsultTheCard.FSM;
-using KnockBox.Services.Logic.Games.ConsultTheCard.FSM.States;
-using KnockBox.Services.Logic.RandomGeneration;
-using KnockBox.Services.State.Games.ConsultTheCard;
-using KnockBox.Services.State.Games.ConsultTheCard.Data;
-using KnockBox.Services.State.Users;
+using KnockBox.ConsultTheCard.Services.Logic.Games;
+using KnockBox.ConsultTheCard.Services.Logic.Games.FSM;
+using KnockBox.ConsultTheCard.Services.Logic.Games.FSM.States;
+using KnockBox.Core.Services.Logic.RandomGeneration;
+using KnockBox.ConsultTheCard.Services.State.Games;
+using KnockBox.ConsultTheCard.Services.State.Games.Data;
+using KnockBox.Core.Services.State.Users;
 using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 
-namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard
+namespace KnockBox.ConsultTheCard.Tests.Unit.Logic.Games.ConsultTheCard
 {
     /// <summary>
     /// Tests for player-leave handling across different game phases.
@@ -92,7 +92,7 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard
 
             // Submit clues for all alive players to advance to Discussion.
             var alivePlayers = context.GetAlivePlayers();
-            Assert.AreEqual(5, alivePlayers.Count, "Expected 5 alive players.");
+            Assert.HasCount(5, alivePlayers, "Expected 5 alive players.");
             string[] clues = ["wave", "splash", "tide", "fish", "coral"];
             for (int i = 0; i < alivePlayers.Count; i++)
             {

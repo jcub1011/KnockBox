@@ -1,4 +1,4 @@
-using KnockBox.Extensions.Returns;
+using KnockBox.Core.Extensions.Returns;
 using KnockBox.Operator.Services.Logic.FSM;
 using KnockBox.Operator.Services.Logic.FSM.ActionCommands;
 using KnockBox.Operator.Services.Logic.FSM.Commands;
@@ -40,7 +40,7 @@ public sealed class LiabilityTransferCard()
             return ValueResult<CardPlayResult>.FromValue(CardPlayResult.Ok());
         if (ctx.ActionBlocked || ctx.TargetPlayerId == null)
             return ValueResult<CardPlayResult>.FromValue(CardPlayResult.OkConsumedNumbers());
-        Resolve(ctx.GameContext, ctx.TargetPlayerId, ctx.PairedNumbers.Cast<Card>().ToList());
+        Resolve(ctx.GameContext, ctx.TargetPlayerId, [.. ctx.PairedNumbers.Cast<Card>()]);
         return ValueResult<CardPlayResult>.FromValue(CardPlayResult.OkConsumedNumbers());
     }
 

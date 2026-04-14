@@ -1,8 +1,6 @@
 ﻿@page "/"
 @page "/home"
 
-@using KnockBox.Services.Navigation.Games
-
 @inherits DisposableComponent
 
 <PageTitle>Knockbox Games</PageTitle>
@@ -34,20 +32,11 @@
     </form>
 
     <div class="game-grid">
-        <button class="game" aria-label="Dice Simulator" disabled="@(!CanJoinOrCreate)" @onclick="() => CreateLobby(GameType.DiceSimulator)">
-            Dice Simulator
-        </button>
-        <button class="game" aria-label="Card Counter" disabled="@(!CanJoinOrCreate)" @onclick="() => CreateLobby(GameType.CardCounter)">
-            Card Counter
-        </button>
-        <button class="game" aria-label="Drawn To Dress" disabled="@(!CanJoinOrCreate)" @onclick="() => CreateLobby(GameType.DrawnToDress)">
-            Drawn To Dress
-        </button>
-        <button class="game" aria-label="Consult The Card" disabled="@(!CanJoinOrCreate)" @onclick="() => CreateLobby(GameType.ConsultTheCard)">
-            Consult The Card
-        </button>
-        <button class="game" aria-label="Operator" disabled="@(!CanJoinOrCreate)" @onclick="() => CreateLobby(GameType.Operator)">
-            Operator
-        </button>
+        @foreach (var module in GameModules.OrderBy(m => m.Name))
+        {
+            <button class="game-tile" aria-label="@module.Name" disabled="@(!CanJoinOrCreate)" @onclick="() => CreateLobby(module.RouteIdentifier)">
+                @module.GetButtonContent()
+            </button>
+        }
     </div>
 </div>

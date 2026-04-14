@@ -1,15 +1,15 @@
 using KnockBox.Core.Services.State.Games.Shared;
-using KnockBox.Services.Logic.Games.DrawnToDress;
-using KnockBox.Services.Logic.Games.DrawnToDress.FSM;
-using KnockBox.Services.Logic.Games.DrawnToDress.FSM.States;
-using KnockBox.Services.Logic.RandomGeneration;
-using KnockBox.Services.State.Games.DrawnToDress;
-using KnockBox.Services.State.Games.DrawnToDress.Data;
-using KnockBox.Services.State.Users;
+using KnockBox.DrawnToDress.Services.Logic.Games;
+using KnockBox.DrawnToDress.Services.Logic.Games.FSM;
+using KnockBox.DrawnToDress.Services.Logic.Games.FSM.States;
+using KnockBox.Core.Services.Logic.RandomGeneration;
+using KnockBox.DrawnToDress.Services.State.Games;
+using KnockBox.DrawnToDress.Services.State.Games.Data;
+using KnockBox.Core.Services.State.Users;
 using Microsoft.Extensions.Logging;
 using Moq;
 
-namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
+namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
 {
     [TestClass]
     public class CoinFlipStateTests
@@ -306,7 +306,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
             var caller = state.PendingCoinFlipQueue[0].CallerPlayerId;
             _engine.ProcessCommand(context, new CoinFlipCallCommand(caller, true));
 
-            Assert.AreEqual(1, state.CriterionCoinFlipResults.Count);
+            Assert.HasCount(1, state.CriterionCoinFlipResults);
             var result = state.CriterionCoinFlipResults[0];
             Assert.AreEqual(matchupId, result.MatchupId);
             Assert.AreEqual("creativity", result.CriterionId);

@@ -1,0 +1,174 @@
+/* ── Card Counter Tile — Casino Felt ─────────────────────────────────────── */
+
+.cc-tile {
+    width: 100%;
+    min-height: 160px;
+    padding: 18px 20px 16px 20px;
+    background:
+        radial-gradient(ellipse at 50% 35%, #128a55 0%, #0a5c3b 55%, #053a25 100%);
+    border: 5px solid #000;
+    border-radius: 16px;
+    box-shadow:
+        8px 8px 0 #000,
+        inset 0 0 60px rgba(0, 0, 0, 0.55),
+        inset 0 0 0 2px rgba(247, 213, 71, 0.18);
+    color: #f7d547;
+    font-family: var(--font-primary);
+    text-align: center;
+    transition: transform 0.1s, box-shadow 0.1s;
+    position: relative;
+    overflow: hidden;
+}
+
+/* Faint felt-weave texture using a tight repeating gradient */
+.cc-tile::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image:
+        repeating-linear-gradient(45deg,
+            transparent 0 3px,
+            rgba(0, 0, 0, 0.05) 3px 4px),
+        repeating-linear-gradient(-45deg,
+            transparent 0 3px,
+            rgba(255, 255, 255, 0.02) 3px 4px);
+    pointer-events: none;
+    border-radius: 11px;
+}
+
+.cc-felt-glow {
+    position: absolute;
+    inset: 6px;
+    border: 1px solid rgba(247, 213, 71, 0.35);
+    border-radius: 10px;
+    pointer-events: none;
+    box-shadow: inset 0 0 16px rgba(247, 213, 71, 0.08);
+}
+
+/* ── Fan of three cards ──────────────────────────────────────────────────── */
+
+.cc-fan {
+    position: relative;
+    width: 90px;
+    height: 60px;
+    margin: 6px auto 8px auto;
+}
+
+.cc-card {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    width: 36px;
+    height: 52px;
+    background: linear-gradient(145deg, #162447 0%, #1f4068 100%);
+    border: 2px solid #000;
+    border-radius: 5px;
+    box-shadow: 2px 2px 0 #000;
+    transition: transform 0.25s ease;
+}
+
+.cc-card-trim {
+    position: absolute;
+    inset: 3px;
+    border: 1px solid rgba(247, 213, 71, 0.65);
+    border-radius: 3px;
+    background:
+        repeating-linear-gradient(45deg,
+            transparent 0 3px,
+            rgba(247, 213, 71, 0.12) 3px 4px);
+}
+
+.cc-card-left  { transform: translateX(-50%) translateX(-14px) rotate(-12deg); transform-origin: 50% 100%; }
+.cc-card-mid   { transform: translateX(-50%) translateY(-3px); z-index: 2; }
+.cc-card-right { transform: translateX(-50%) translateX(14px)  rotate(12deg);  transform-origin: 50% 100%; }
+
+/* ── Chip stack (bottom-left) ────────────────────────────────────────────── */
+
+.cc-chips {
+    position: absolute;
+    left: 14px;
+    bottom: 14px;
+    width: 26px;
+    height: 26px;
+    pointer-events: none;
+}
+
+.cc-chip {
+    position: absolute;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 2px solid #000;
+    background:
+        radial-gradient(circle at 50% 50%,
+            #f7d547 0%, #f7d547 38%,
+            #000 38%, #000 42%,
+            #f7d547 42%, #f7d547 60%,
+            #c49a30 60%, #c49a30 100%);
+    box-shadow: 1px 1px 0 #000;
+}
+
+.cc-chip-1 { bottom: 0; left: 0; }
+.cc-chip-2 { bottom: 5px; left: 2px; }
+.cc-chip-3 { bottom: 10px; left: 4px; }
+
+/* ── Typography ──────────────────────────────────────────────────────────── */
+
+.cc-tile-name {
+    position: relative;
+    font-size: 1.55rem;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: #f7d547;
+    text-shadow:
+        2px 2px 0 #000,
+        0 0 16px rgba(247, 213, 71, 0.3);
+}
+
+.cc-tile-tag {
+    position: relative;
+    margin-top: 4px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: rgba(247, 213, 71, 0.72);
+}
+
+/* ── Hover / Active ──────────────────────────────────────────────────────── */
+
+.cc-tile:hover {
+    transform: translate(-3px, -3px);
+    box-shadow:
+        11px 11px 0 #000,
+        inset 0 0 60px rgba(0, 0, 0, 0.55),
+        inset 0 0 0 2px rgba(247, 213, 71, 0.3);
+}
+
+.cc-tile:hover .cc-card-left {
+    transform: translateX(-50%) translateX(-22px) rotate(-22deg);
+}
+
+.cc-tile:hover .cc-card-right {
+    transform: translateX(-50%) translateX(22px) rotate(22deg);
+}
+
+.cc-tile:hover .cc-card-mid {
+    transform: translateX(-50%) translateY(-7px);
+}
+
+.cc-tile:active {
+    transform: translate(3px, 3px);
+    box-shadow:
+        2px 2px 0 #000,
+        inset 0 0 60px rgba(0, 0, 0, 0.55),
+        inset 0 0 0 2px rgba(247, 213, 71, 0.18);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .cc-tile,
+    .cc-card {
+        transition: none;
+    }
+}

@@ -1,14 +1,14 @@
-using KnockBox.Services.Logic.Games.CardCounter.FSM;
-using KnockBox.Services.Logic.Games.CardCounter.FSM.States;
-using KnockBox.Services.Logic.RandomGeneration;
-using KnockBox.Services.State.Games.CardCounter;
-using KnockBox.Services.State.Games.CardCounter.Data;
-using KnockBox.Services.State.Users;
+using KnockBox.CardCounter.Services.Logic.Games.FSM;
+using KnockBox.CardCounter.Services.Logic.Games.FSM.States;
+using KnockBox.Core.Services.Logic.RandomGeneration;
+using KnockBox.CardCounter.Services.State.Games;
+using KnockBox.CardCounter.Services.State.Games.Data;
+using KnockBox.Core.Services.State.Users;
 using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 
-namespace KnockBoxTests.Unit.Logic.Games.CardCounter
+namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
 {
     [TestClass]
     public class CardCounterGameContextBehaviorTests
@@ -43,7 +43,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
                 context.ApplyOperatorCard(player, new OperatorCard(op));
 
                 Assert.AreEqual(42.0, player.Balance);
-                Assert.AreEqual(0, player.Pot.Count);
+                Assert.IsEmpty(player.Pot);
             }
         }
 
@@ -74,7 +74,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             Assert.IsNotNull(state.LastPlayedAction);
             Assert.AreEqual(target.PlayerId, state.LastPlayedAction.PlayerId);
             Assert.AreEqual(ActionType.Compd, state.LastPlayedAction.Action);
-            Assert.AreEqual(1, state.DiscardHistory.Count);
+            Assert.HasCount(1, state.DiscardHistory);
             Assert.IsTrue(state.DiscardHistory[0].IsActionCard);
             Assert.AreEqual("Comp'd", state.DiscardHistory[0].Description);
         }
@@ -88,7 +88,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
 
             context.RecordBurn(new NumberCard(7));
 
-            Assert.AreEqual(1, state.DiscardHistory.Count);
+            Assert.HasCount(1, state.DiscardHistory);
             var burnEntry = state.DiscardHistory[0];
             Assert.IsTrue(burnEntry.IsActionCard);
             Assert.AreEqual("🔥", burnEntry.Symbol);
@@ -121,7 +121,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             // Assert: shoe is empty so the game must advance to RoundEndState
             Assert.IsNotNull(next.Value);
             Assert.IsInstanceOfType(next.Value, typeof(RoundEndState));
-            Assert.AreEqual(0, state.CurrentShoe.Count);
+            Assert.IsEmpty(state.CurrentShoe);
         }
 
         [TestMethod]
@@ -164,9 +164,9 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
 
             // Assert: returns null (stays in PlayerTurnState) and each player gets exactly 2 digits
             Assert.IsNull(next.Value);
-            Assert.AreEqual(2, p1.Pot.Count, "P1 should have 2 digits");
-            Assert.AreEqual(2, p2.Pot.Count, "P2 should have 2 digits");
-            Assert.AreEqual(2, p3.Pot.Count, "P3 should have 2 digits");
+            Assert.HasCount(2, p1.Pot, "P1 should have 2 digits");
+            Assert.HasCount(2, p2.Pot, "P2 should have 2 digits");
+            Assert.HasCount(2, p3.Pot, "P3 should have 2 digits");
             // Total digit count preserved
             Assert.AreEqual(6, p1.Pot.Count + p2.Pot.Count + p3.Pot.Count);
         }
@@ -212,9 +212,9 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
 
             // Assert: 7 total digits, 3 players → base 2, 1 extra → p1 gets 3, p2 gets 2, p3 gets 2
             Assert.IsNull(next.Value);
-            Assert.AreEqual(3, p1.Pot.Count, "P1 (card player) should get the extra digit");
-            Assert.AreEqual(2, p2.Pot.Count);
-            Assert.AreEqual(2, p3.Pot.Count);
+            Assert.HasCount(3, p1.Pot, "P1 (card player) should get the extra digit");
+            Assert.HasCount(2, p2.Pot);
+            Assert.HasCount(2, p3.Pot);
             Assert.AreEqual(7, p1.Pot.Count + p2.Pot.Count + p3.Pot.Count);
         }
 
@@ -258,9 +258,9 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
 
             // Assert: 8 total, 3 players → base 2, 2 extras → p2 gets 3, p3 gets 3, p1 gets 2
             Assert.IsNull(next.Value);
-            Assert.AreEqual(2, p1.Pot.Count, "P1 should get the base amount (no extra)");
-            Assert.AreEqual(3, p2.Pot.Count, "P2 (card player) gets first extra");
-            Assert.AreEqual(3, p3.Pot.Count, "P3 gets second extra");
+            Assert.HasCount(2, p1.Pot, "P1 should get the base amount (no extra)");
+            Assert.HasCount(3, p2.Pot, "P2 (card player) gets first extra");
+            Assert.HasCount(3, p3.Pot, "P3 gets second extra");
             Assert.AreEqual(8, p1.Pot.Count + p2.Pot.Count + p3.Pot.Count);
         }
 
@@ -293,8 +293,8 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
 
             // Assert: stays in PlayerTurnState, all pots still empty
             Assert.IsNull(next.Value);
-            Assert.AreEqual(0, p1.Pot.Count);
-            Assert.AreEqual(0, p2.Pot.Count);
+            Assert.IsEmpty(p1.Pot);
+            Assert.IsEmpty(p2.Pot);
         }
 
         [TestMethod]
@@ -319,7 +319,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
 
             fsmState.HandleCommand(context, new PlayActionCardCommand(p1.PlayerId, 0));
 
-            Assert.AreEqual(1, state.DiscardHistory.Count);
+            Assert.HasCount(1, state.DiscardHistory);
             Assert.IsTrue(state.DiscardHistory[0].IsActionCard);
             Assert.AreEqual("Tilt", state.DiscardHistory[0].Description);
         }

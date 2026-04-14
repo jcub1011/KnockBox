@@ -1,5 +1,5 @@
 using System.Threading.Tasks;
-using KnockBox.Services.State.Shared;
+using KnockBox.Core.Services.State.Shared;
 
 namespace KnockBox.Tests.Unit.State;
 

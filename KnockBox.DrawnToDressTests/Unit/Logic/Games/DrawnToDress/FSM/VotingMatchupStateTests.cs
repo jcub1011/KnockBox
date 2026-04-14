@@ -1,14 +1,14 @@
-using KnockBox.Services.Logic.Games.DrawnToDress;
-using KnockBox.Services.Logic.Games.DrawnToDress.FSM;
-using KnockBox.Services.Logic.Games.DrawnToDress.FSM.States;
-using KnockBox.Services.Logic.RandomGeneration;
-using KnockBox.Services.State.Games.DrawnToDress;
-using KnockBox.Services.State.Games.DrawnToDress.Data;
-using KnockBox.Services.State.Users;
+using KnockBox.DrawnToDress.Services.Logic.Games;
+using KnockBox.DrawnToDress.Services.Logic.Games.FSM;
+using KnockBox.DrawnToDress.Services.Logic.Games.FSM.States;
+using KnockBox.Core.Services.Logic.RandomGeneration;
+using KnockBox.DrawnToDress.Services.State.Games;
+using KnockBox.DrawnToDress.Services.State.Games.Data;
+using KnockBox.Core.Services.State.Users;
 using Microsoft.Extensions.Logging;
 using Moq;
 
-namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
+namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
 {
     /// <summary>
     /// Tests for the voting matchup flow: eligibility enforcement, submit validation,
@@ -83,7 +83,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
             _engine.ProcessCommand(context,
                 new CastVoteCommand(outsider, matchup.Id, "not_a_real_criterion", matchup.EntrantAId));
 
-            Assert.AreEqual(votesBefore, state.Votes.Count,
+            Assert.HasCount(votesBefore, state.Votes,
                 "A vote with an unrecognised criterion ID must not be recorded.");
         }
 
@@ -99,7 +99,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
             _engine.ProcessCommand(context,
                 new CastVoteCommand(outsider, matchup.Id, "creativity", new EntrantId(outsider, 1)));
 
-            Assert.AreEqual(votesBefore, state.Votes.Count,
+            Assert.HasCount(votesBefore, state.Votes,
                 "A vote whose chosen player is not a matchup participant must not be recorded.");
         }
 
@@ -115,7 +115,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
             _engine.ProcessCommand(context,
                 new CastVoteCommand(outsider, nonExistentMatchupId, "creativity", new EntrantId("pA", 1)));
 
-            Assert.AreEqual(votesBefore, state.Votes.Count,
+            Assert.HasCount(votesBefore, state.Votes,
                 "A vote referencing a matchup not in the current round must not be recorded.");
         }
 
@@ -130,7 +130,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
             _engine.ProcessCommand(context,
                 new CastVoteCommand("pUnknown", matchup.Id, "creativity", matchup.EntrantAId));
 
-            Assert.AreEqual(votesBefore, state.Votes.Count,
+            Assert.HasCount(votesBefore, state.Votes,
                 "A vote from an unregistered player must not be recorded.");
         }
 
@@ -144,14 +144,14 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
             // First vote: outsider picks PlayerA on 'creativity'.
             _engine.ProcessCommand(context,
                 new CastVoteCommand(outsider, matchup.Id, "creativity", matchup.EntrantAId));
-            Assert.AreEqual(1, state.Votes.Count,
+            Assert.HasCount(1, state.Votes,
                 "First vote must be recorded.");
 
             // Second vote on the same criterion: outsider changes mind to PlayerB.
             _engine.ProcessCommand(context,
                 new CastVoteCommand(outsider, matchup.Id, "creativity", matchup.EntrantBId));
 
-            Assert.AreEqual(1, state.Votes.Count,
+            Assert.HasCount(1, state.Votes,
                 "Duplicate vote for the same matchup+criterion must replace, not add a second entry.");
 
             var recorded = state.Votes.Values.Single();
@@ -174,7 +174,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
             _engine.ProcessCommand(context,
                 new CastVoteCommand(outsider, matchup.Id, "theme_match", matchup.EntrantAId));
 
-            Assert.AreEqual(2, state.Votes.Count,
+            Assert.HasCount(2, state.Votes,
                 "Votes on different criteria for the same matchup must all be recorded.");
         }
 
@@ -208,7 +208,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
             _engine.ProcessCommand(context,
                 new CastVoteCommand(outsider, matchup.Id, "creativity", matchup.EntrantAId));
 
-            Assert.AreEqual(1, state.Votes.Count,
+            Assert.HasCount(1, state.Votes,
                 "A late vote must still be persisted.");
             var recorded = state.Votes.Values.Single();
             Assert.IsTrue(recorded.IsLate, "A vote submitted after the deadline must be marked late.");
@@ -223,7 +223,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
             _engine.ProcessCommand(context,
                 new CastVoteCommand(outsider, matchup.Id, "creativity", matchup.EntrantAId));
 
-            Assert.AreEqual(1, state.Votes.Count);
+            Assert.HasCount(1, state.Votes);
             var recorded = state.Votes.Values.Single();
             Assert.IsFalse(recorded.IsLate, "A vote submitted before the deadline must not be marked late.");
         }
@@ -339,7 +339,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress.FSM
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
 
             // The vote that was cast must still be persisted even though the round ended.
-            Assert.AreEqual(voteCountBeforeTick, state.Votes.Count,
+            Assert.HasCount(voteCountBeforeTick, state.Votes,
                 "Votes already cast must be preserved after the round ends via timer expiry.");
         }
 

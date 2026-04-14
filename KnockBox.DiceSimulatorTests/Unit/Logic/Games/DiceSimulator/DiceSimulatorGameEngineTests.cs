@@ -1,16 +1,16 @@
-using KnockBox.Extensions.Returns;
-using KnockBox.Services.Logic.Games.DiceSimulator;
-using KnockBox.Services.Logic.RandomGeneration;
-using KnockBox.Services.State.Games.DiceSimulator;
-using KnockBox.Services.State.Games.DiceSimulator.Data;
-using KnockBox.Services.State.Users;
+using KnockBox.Core.Extensions.Returns;
+using KnockBox.DiceSimulator.Services.Logic.Games;
+using KnockBox.Core.Services.Logic.RandomGeneration;
+using KnockBox.DiceSimulator.Services.State.Games;
+using KnockBox.DiceSimulator.Services.State.Games.Data;
+using KnockBox.Core.Services.State.Users;
 using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using System;
 using System.Threading.Tasks;
 
-namespace KnockBoxTests.Unit.Logic.Games.DiceSimulator
+namespace KnockBox.DiceSimulator.Tests.Unit.Logic
 {
     [TestClass]
     public class DiceSimulatorGameEngineTests
@@ -110,10 +110,10 @@ namespace KnockBoxTests.Unit.Logic.Games.DiceSimulator
 
             Assert.IsTrue((bool)result.IsSuccess);
 
-            Assert.AreEqual(1, state.RollHistory.Count);
+            Assert.HasCount(1, state.RollHistory);
             var roll = state.RollHistory[0];
             Assert.AreEqual(22, roll.Result); // 10 + 10 + 2 = 22
-            Assert.AreEqual(2, roll.RawRolls.Length);
+            Assert.HasCount(2, roll.RawRolls);
             Assert.IsNull(roll.AltRolls);
 
             var stats = state.PlayerStats["p1"];
@@ -209,12 +209,12 @@ namespace KnockBoxTests.Unit.Logic.Games.DiceSimulator
             var state = (DiceSimulatorGameState)stateResult.Value!;
             
             _engine.RollDice(_host, state, new DiceRollAction());
-            Assert.AreEqual(1, state.RollHistory.Count);
+            Assert.HasCount(1, state.RollHistory);
 
             var result = _engine.ClearHistory(_host, state);
             Assert.IsTrue((bool)result.IsSuccess);
-            Assert.AreEqual(0, state.RollHistory.Count);
-            Assert.AreEqual(0, state.PlayerStats.Count);
+            Assert.IsEmpty(state.RollHistory);
+            Assert.IsEmpty(state.PlayerStats);
         }
         
         [TestMethod]

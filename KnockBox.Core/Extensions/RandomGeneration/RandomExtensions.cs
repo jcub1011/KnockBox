@@ -1,4 +1,4 @@
-﻿namespace KnockBox.Extensions.RandomGeneration
+﻿namespace KnockBox.Core.Extensions.RandomGeneration
 {
     public static class RandomExtensions
     {

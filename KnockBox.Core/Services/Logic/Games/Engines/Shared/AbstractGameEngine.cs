@@ -1,8 +1,8 @@
-﻿using KnockBox.Extensions.Returns;
-using KnockBox.Services.State.Games.Shared;
-using KnockBox.Services.State.Users;
+﻿using KnockBox.Core.Extensions.Returns;
+using KnockBox.Core.Services.State.Games.Shared;
+using KnockBox.Core.Services.State.Users;
 
-namespace KnockBox.Services.Logic.Games.Engines.Shared
+namespace KnockBox.Core.Services.Logic.Games.Engines.Shared
 {
     public abstract class AbstractGameEngine
     {
@@ -31,7 +31,7 @@ namespace KnockBox.Services.Logic.Games.Engines.Shared
         public int MinPlayerCount { get; }
 
         /// <summary>
-        /// Creates a new initialized state read for players to join.
+        /// Creates a new initialized state ready for players to join.
         /// </summary>
         /// <param name="host"></param>
         /// <param name="ct"></param>

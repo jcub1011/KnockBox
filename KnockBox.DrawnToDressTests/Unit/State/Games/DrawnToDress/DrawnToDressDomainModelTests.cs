@@ -1,6 +1,6 @@
-using KnockBox.Services.State.Games.DrawnToDress.Data;
+using KnockBox.DrawnToDress.Services.State.Games.Data;
 
-namespace KnockBox.DrawnToDressTests.Unit.State.Games.DrawnToDress
+namespace KnockBox.DrawnToDress.Tests.Unit.State.Games.DrawnToDress
 {
     [TestClass]
     public class DrawnToDressDomainModelTests
@@ -38,7 +38,7 @@ namespace KnockBox.DrawnToDressTests.Unit.State.Games.DrawnToDress
         {
             var submission = new OutfitSubmission();
             Assert.IsNotNull(submission.SelectedItemsByType);
-            Assert.AreEqual(0, submission.SelectedItemsByType.Count);
+            Assert.IsEmpty(submission.SelectedItemsByType);
         }
 
         [TestMethod]
@@ -113,7 +113,7 @@ namespace KnockBox.DrawnToDressTests.Unit.State.Games.DrawnToDress
         {
             var round = new VotingRound();
             Assert.IsNotNull(round.Matchups);
-            Assert.AreEqual(0, round.Matchups.Count);
+            Assert.IsEmpty(round.Matchups);
         }
 
         // ── VoteSubmission ────────────────────────────────────────────────────
@@ -145,7 +145,7 @@ namespace KnockBox.DrawnToDressTests.Unit.State.Games.DrawnToDress
             Assert.AreEqual("creativity", vote.CriterionId);
             Assert.AreEqual("playerA", vote.ChosenPlayerId);
             Assert.IsFalse(vote.IsLate);
-            Assert.IsTrue(vote.SubmittedAt >= before);
+            Assert.IsGreaterThanOrEqualTo(before, vote.SubmittedAt);
         }
 
         // ── LeaderboardEntry ──────────────────────────────────────────────────
@@ -200,7 +200,7 @@ namespace KnockBox.DrawnToDressTests.Unit.State.Games.DrawnToDress
         {
             var state = new DrawnToDressPlayerState();
             Assert.IsNotNull(state.OwnedClothingItemIds);
-            Assert.AreEqual(0, state.OwnedClothingItemIds.Count);
+            Assert.IsEmpty(state.OwnedClothingItemIds);
         }
 
         [TestMethod]

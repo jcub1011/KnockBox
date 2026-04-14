@@ -1,11 +1,11 @@
 using KnockBox.Operator.Models;
 using KnockBox.Operator.Services.Logic.FSM;
-using KnockBox.Services.Logic.RandomGeneration;
+using KnockBox.Core.Services.Logic.RandomGeneration;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using System.Linq;
 
-namespace KnockBox.OperatorTests.Unit.Context;
+namespace KnockBox.Operator.Tests.Unit.Context;
 
 [TestClass]
 public class DeckGenerationTests
@@ -26,7 +26,7 @@ public class DeckGenerationTests
     public void GenerateDeck_CreatesCorrectNumberOfCards_BasedOnPlayerCount(int playerCount, int expectedDeckSize)
     {
         var deck = OperatorGameContext.GenerateDeck(playerCount, _rngMock.Object);
-        Assert.AreEqual(expectedDeckSize, deck.Count);
+        Assert.HasCount(expectedDeckSize, deck);
     }
 
     [TestMethod]
@@ -63,8 +63,8 @@ public class DeckGenerationTests
         Assert.AreEqual(0, deck.Count(c => c is OperatorCard o && o.OperatorValue == CardOperator.Divide));
 
         // Audit and HostileTakeover have 1 each
-        Assert.AreEqual(1, deck.Count(c => c is ActionCard a && a.ActionValue == CardAction.Audit));
-        Assert.AreEqual(1, deck.Count(c => c is ActionCard a && a.ActionValue == CardAction.HostileTakeover));
+        Assert.ContainsSingle(c => c is ActionCard a && a.ActionValue == CardAction.Audit, deck);
+        Assert.ContainsSingle(c => c is ActionCard a && a.ActionValue == CardAction.HostileTakeover, deck);
 
         // Surcharge and BlueShell have 2 each
         Assert.AreEqual(2, deck.Count(c => c is ActionCard a && a.ActionValue == CardAction.Surcharge));

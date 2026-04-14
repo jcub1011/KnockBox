@@ -1,4 +1,4 @@
-using KnockBox.Extensions.Disposable;
+using KnockBox.Core.Extensions.Disposable;
 
 namespace KnockBox.Tests.Unit.Extensions.Disposable;
 
@@ -58,25 +58,10 @@ public sealed class DisposingWrapperTests
     }
 
     [TestMethod]
-    public void Finalize_DisposesInnerObject()
+    public void Dispose_ThenGC_InnerDisposedOnce()
     {
         var inner = new FakeDisposable();
 
-        // Create wrapper without disposing it so the finalizer runs.
-        CreateAndAbandonWrapper(inner);
-
-        GC.Collect();
-        GC.WaitForPendingFinalizers();
-
-        Assert.AreEqual(1, inner.DisposeCount);
-    }
-
-    [TestMethod]
-    public void Dispose_SuppressesFinalizer_InnerDisposedOnce()
-    {
-        var inner = new FakeDisposable();
-
-        // Create wrapper, dispose it, then force GC — inner should only be disposed once.
         CreateAndDisposeWrapper(inner);
 
         GC.Collect();

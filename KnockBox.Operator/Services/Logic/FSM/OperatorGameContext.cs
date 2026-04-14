@@ -2,7 +2,7 @@ using KnockBox.Core.Extensions.Collections;
 using KnockBox.Operator.Models;
 using KnockBox.Operator.Services.State;
 using KnockBox.Core.Services.State.Games.Shared;
-using KnockBox.Services.Logic.RandomGeneration;
+using KnockBox.Core.Services.Logic.RandomGeneration;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;

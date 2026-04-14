@@ -1,4 +1,4 @@
-using KnockBox.Extensions.Collections;
+using KnockBox.Core.Extensions.Collections;
 
 namespace KnockBox.Tests.Unit.Extensions.Collections;
 
@@ -28,7 +28,7 @@ public sealed class StackExtensionsTests
 
         stack.PushRange([]);
 
-        Assert.AreEqual(1, stack.Count);
+        Assert.HasCount(1, stack);
         Assert.AreEqual(99, stack.Peek());
     }
 
@@ -41,8 +41,8 @@ public sealed class StackExtensionsTests
 
         var result = stack.PopRange(0);
 
-        Assert.AreEqual(0, result.Length);
-        Assert.AreEqual(3, stack.Count);
+        Assert.IsEmpty(result);
+        Assert.HasCount(3, stack);
     }
 
     [TestMethod]
@@ -54,10 +54,10 @@ public sealed class StackExtensionsTests
         var result = stack.PopRange(2);
 
         // Top two popped first (LIFO): 3, 2
-        Assert.AreEqual(2, result.Length);
+        Assert.HasCount(2, result);
         Assert.AreEqual(3, result[0]);
         Assert.AreEqual(2, result[1]);
-        Assert.AreEqual(1, stack.Count);
+        Assert.HasCount(1, stack);
     }
 
     [TestMethod]
@@ -67,8 +67,8 @@ public sealed class StackExtensionsTests
 
         var result = stack.PopRange(3);
 
-        Assert.AreEqual(3, result.Length);
-        Assert.AreEqual(0, stack.Count);
+        Assert.HasCount(3, result);
+        Assert.IsEmpty(stack);
     }
 
     [TestMethod]
@@ -99,11 +99,11 @@ public sealed class StackExtensionsTests
         stack.PopRange(2, ref output);
 
         // 3 and 2 are popped (LIFO) and appended
-        Assert.AreEqual(3, output.Count);
+        Assert.HasCount(3, output);
         Assert.AreEqual(0, output[0]);
         Assert.AreEqual(3, output[1]);
         Assert.AreEqual(2, output[2]);
-        Assert.AreEqual(1, stack.Count);
+        Assert.HasCount(1, stack);
     }
 
     [TestMethod]

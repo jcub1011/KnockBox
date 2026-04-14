@@ -1,14 +1,14 @@
-using KnockBox.Services.Logic.Games.CardCounter.FSM;
-using KnockBox.Services.Logic.Games.CardCounter.FSM.States;
-using KnockBox.Services.Logic.RandomGeneration;
-using KnockBox.Services.State.Games.CardCounter;
-using KnockBox.Services.State.Games.CardCounter.Data;
-using KnockBox.Services.State.Users;
+using KnockBox.CardCounter.Services.Logic.Games.FSM;
+using KnockBox.CardCounter.Services.Logic.Games.FSM.States;
+using KnockBox.Core.Services.Logic.RandomGeneration;
+using KnockBox.CardCounter.Services.State.Games;
+using KnockBox.CardCounter.Services.State.Games.Data;
+using KnockBox.Core.Services.State.Users;
 using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 
-namespace KnockBoxTests.Unit.Logic.Games.CardCounter
+namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
 {
     /// <summary>
     /// Tests for Active Operator Mode rules: number cards apply directly to balance using
@@ -62,7 +62,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             _context.ApplyNumberCard(player, new NumberCard(5));
 
             Assert.AreEqual(105.0, player.Balance, "Add operator should add digit to balance.");
-            Assert.AreEqual(0, player.Pot.Count, "Pot should remain empty in Active Operator Mode.");
+            Assert.IsEmpty(player.Pot, "Pot should remain empty in Active Operator Mode.");
         }
 
         [TestMethod]
@@ -73,7 +73,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             _context.ApplyNumberCard(player, new NumberCard(7));
 
             Assert.AreEqual(93.0, player.Balance);
-            Assert.AreEqual(0, player.Pot.Count, "Pot should remain empty in Active Operator Mode.");
+            Assert.IsEmpty(player.Pot, "Pot should remain empty in Active Operator Mode.");
         }
 
         [TestMethod]
@@ -167,7 +167,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
 
             _context.ApplyOperatorCard(player, new OperatorCard(Operator.Subtract));
 
-            Assert.AreEqual(1, player.Pot.Count, "Pot should not be consumed in Active Operator Mode.");
+            Assert.HasCount(1, player.Pot, "Pot should not be consumed in Active Operator Mode.");
             Assert.AreEqual(50.0, player.Balance, "Balance should not change when drawing operator in Active Operator Mode.");
         }
 
@@ -182,7 +182,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             _context.ApplyOperatorCard(player, new OperatorCard(Operator.Add));
 
             Assert.AreEqual(125.0, player.Balance, "Normal mode should still compute balance from pot.");
-            Assert.AreEqual(0, player.Pot.Count, "Pot should be cleared after operator in normal mode.");
+            Assert.IsEmpty(player.Pot, "Pot should be cleared after operator in normal mode.");
         }
 
         // ── Action card pool filtering ────────────────────────────────────────
@@ -334,7 +334,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             var p1 = MakePlayer("p1", "P1");
             _context.DealActionCards();
 
-            Assert.AreEqual(0, p1.ActionHand.Count, "No cards should be dealt when all weights are 0.");
+            Assert.IsEmpty(p1.ActionHand, "No cards should be dealt when all weights are 0.");
         }
 
         // ── PlayerState.ActiveOperator initialization ─────────────────────────

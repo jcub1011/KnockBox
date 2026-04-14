@@ -1,14 +1,14 @@
-using KnockBox.Services.Logic.Games.ConsultTheCard.FSM;
-using KnockBox.Services.Logic.Games.ConsultTheCard.FSM.States;
-using KnockBox.Services.Logic.RandomGeneration;
-using KnockBox.Services.State.Games.ConsultTheCard;
-using KnockBox.Services.State.Games.ConsultTheCard.Data;
-using KnockBox.Services.State.Users;
+using KnockBox.ConsultTheCard.Services.Logic.Games.FSM;
+using KnockBox.ConsultTheCard.Services.Logic.Games.FSM.States;
+using KnockBox.Core.Services.Logic.RandomGeneration;
+using KnockBox.ConsultTheCard.Services.State.Games;
+using KnockBox.ConsultTheCard.Services.State.Games.Data;
+using KnockBox.Core.Services.State.Users;
 using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 
-namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard.States
+namespace KnockBox.ConsultTheCard.Tests.Unit.Logic.Games.ConsultTheCard.States
 {
     [TestClass]
     public class CluePhaseStateTests
@@ -118,7 +118,7 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard.States
             var player = _context.GetPlayer(currentPlayer)!;
             Assert.IsTrue(player.HasSubmittedClue);
             Assert.AreEqual("wave", player.CurrentClue);
-            Assert.IsTrue(_state.UsedClues.Contains("wave"));
+            Assert.Contains("wave", _state.UsedClues);
         }
 
         [TestMethod]

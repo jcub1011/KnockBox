@@ -1,0 +1,232 @@
+/* ── Dice Simulator Tile — Fantasy Tavern d20 ────────────────────────────── */
+
+.ds-tile {
+    --ds-bg: #110e1f;
+    --ds-surface: #1c1533;
+    --ds-gold: #e8b849;
+    --ds-gold-dim: #c49a30;
+    --ds-accent: #a855f7;
+    --ds-text: #ede4d3;
+    --ds-text-muted: #9b8ec4;
+    --ds-shadow: #0b0816;
+
+    width: 100%;
+    min-height: 160px;
+    padding: 16px 20px 14px 20px;
+    background:
+        radial-gradient(ellipse at 30% 20%, rgba(168, 85, 247, 0.08) 0%, transparent 60%),
+        radial-gradient(ellipse at 70% 80%, rgba(232, 184, 73, 0.06) 0%, transparent 50%),
+        var(--ds-bg);
+    border: 5px solid #000;
+    border-radius: 16px;
+    box-shadow: 8px 8px 0 #000;
+    color: var(--ds-text);
+    font-family: var(--font-primary);
+    text-align: center;
+    transition: transform 0.1s, box-shadow 0.1s;
+    position: relative;
+    overflow: hidden;
+}
+
+/* Subtle starfield dots */
+.ds-tile::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image:
+        radial-gradient(1px 1px at 14% 22%, rgba(232, 184, 73, 0.6), transparent),
+        radial-gradient(1px 1px at 82% 18%, rgba(232, 184, 73, 0.5), transparent),
+        radial-gradient(1px 1px at 70% 88%, rgba(168, 85, 247, 0.6), transparent),
+        radial-gradient(1px 1px at 24% 78%, rgba(232, 184, 73, 0.4), transparent),
+        radial-gradient(1px 1px at 92% 60%, rgba(168, 85, 247, 0.5), transparent);
+    pointer-events: none;
+    border-radius: 11px;
+}
+
+.ds-bg-glow {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at 50% 38%,
+        rgba(168, 85, 247, 0.25) 0%,
+        rgba(168, 85, 247, 0.08) 25%,
+        transparent 55%);
+    pointer-events: none;
+    transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+/* ── d20 hero die ────────────────────────────────────────────────────────── */
+
+.ds-d20 {
+    position: relative;
+    width: 60px;
+    height: 60px;
+    margin: 4px auto 6px auto;
+}
+
+.ds-d20-glow {
+    position: absolute;
+    inset: -10px;
+    background: radial-gradient(circle, rgba(168, 85, 247, 0.55) 0%, transparent 65%);
+    filter: blur(4px);
+    transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.ds-d20-shape {
+    position: relative;
+    width: 60px;
+    height: 60px;
+    /* Icosahedron silhouette via polygon clip */
+    clip-path: polygon(
+        50% 0%,
+        93% 25%,
+        93% 75%,
+        50% 100%,
+        7% 75%,
+        7% 25%
+    );
+    background:
+        linear-gradient(150deg,
+            #f5e6c4 0%,
+            #e8b849 45%,
+            #c49a30 100%);
+    border: 0;
+    box-shadow:
+        inset 0 0 0 1.5px #0b0816,
+        inset 0 -8px 12px rgba(0, 0, 0, 0.4),
+        inset 0 6px 8px rgba(255, 240, 200, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Inner hex facet etch */
+.ds-d20-shape::before {
+    content: "";
+    position: absolute;
+    inset: 14%;
+    clip-path: polygon(
+        50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%
+    );
+    background: linear-gradient(150deg,
+        rgba(11, 8, 22, 0.15) 0%,
+        transparent 50%,
+        rgba(11, 8, 22, 0.25) 100%);
+    pointer-events: none;
+}
+
+.ds-d20-numeral {
+    position: absolute;
+    font-family: var(--font-mono, 'Google Sans Code', monospace);
+    font-weight: 900;
+    color: #2a1f0a;
+    text-shadow: 0 1px 0 rgba(255, 240, 200, 0.5);
+    line-height: 1;
+    transition: opacity 0.2s ease;
+}
+
+.ds-d20-num-20 {
+    font-size: 1.6rem;
+    letter-spacing: -1px;
+    opacity: 1;
+}
+
+.ds-d20-num-1 {
+    font-size: 1.7rem;
+    color: #6b1010;
+    opacity: 0;
+}
+
+/* ── Typography ──────────────────────────────────────────────────────────── */
+
+.ds-tile-name {
+    position: relative;
+    font-size: 1.45rem;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--ds-gold);
+    text-shadow:
+        2px 2px 0 var(--ds-shadow),
+        0 0 18px rgba(232, 184, 73, 0.3);
+}
+
+.ds-expression {
+    position: relative;
+    margin-top: 2px;
+    font-family: var(--font-mono, 'Google Sans Code', monospace);
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--ds-gold-dim);
+    letter-spacing: 1.5px;
+    text-shadow: 0 0 8px rgba(232, 184, 73, 0.25);
+}
+
+.ds-tile-tag {
+    position: relative;
+    margin-top: 4px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--ds-text-muted);
+}
+
+/* ── Hover / Active ──────────────────────────────────────────────────────── */
+
+.ds-tile:hover {
+    transform: translate(-3px, -3px);
+    box-shadow: 11px 11px 0 #000;
+}
+
+.ds-tile:hover .ds-bg-glow {
+    transform: scale(1.15);
+}
+
+.ds-tile:hover .ds-d20-glow {
+    transform: scale(1.3);
+}
+
+.ds-tile:hover .ds-d20-shape {
+    transform: rotate(28deg);
+    animation: ds-d20-flip 1.2s ease-in-out;
+}
+
+@keyframes ds-d20-flip {
+    0%, 100% { filter: none; }
+    50% { filter: brightness(1.3); }
+}
+
+.ds-tile:hover .ds-d20-num-20 {
+    animation: ds-num-cycle 1.2s ease-in-out;
+}
+
+.ds-tile:hover .ds-d20-num-1 {
+    animation: ds-num-cycle-inv 1.2s ease-in-out;
+}
+
+@keyframes ds-num-cycle {
+    0%, 100% { opacity: 1; }
+    40%, 60% { opacity: 0; }
+}
+
+@keyframes ds-num-cycle-inv {
+    0%, 100% { opacity: 0; }
+    40%, 60% { opacity: 1; }
+}
+
+.ds-tile:active {
+    transform: translate(3px, 3px);
+    box-shadow: 2px 2px 0 #000;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ds-tile,
+    .ds-bg-glow,
+    .ds-d20-glow,
+    .ds-d20-shape,
+    .ds-d20-numeral {
+        animation: none !important;
+        transition: none;
+    }
+}

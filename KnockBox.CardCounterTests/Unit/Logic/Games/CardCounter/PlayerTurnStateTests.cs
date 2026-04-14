@@ -1,14 +1,14 @@
-using KnockBox.Services.Logic.Games.CardCounter.FSM;
-using KnockBox.Services.Logic.Games.CardCounter.FSM.States;
-using KnockBox.Services.Logic.RandomGeneration;
-using KnockBox.Services.State.Games.CardCounter;
-using KnockBox.Services.State.Games.CardCounter.Data;
-using KnockBox.Services.State.Users;
+using KnockBox.CardCounter.Services.Logic.Games.FSM;
+using KnockBox.CardCounter.Services.Logic.Games.FSM.States;
+using KnockBox.Core.Services.Logic.RandomGeneration;
+using KnockBox.CardCounter.Services.State.Games;
+using KnockBox.CardCounter.Services.State.Games.Data;
+using KnockBox.Core.Services.State.Users;
 using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 
-namespace KnockBoxTests.Unit.Logic.Games.CardCounter
+namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
 {
     [TestClass]
     public class PlayerTurnStateTests
@@ -63,7 +63,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             var next = fsmState.Tick(_context, DateTimeOffset.UtcNow.AddHours(1));
 
             Assert.IsNotNull(next.Value, "Tick should return a state transition after timeout when timer is enabled.");
-            Assert.AreEqual(1, p1.Pot.Count, "Card should be auto-drawn after timeout.");
+            Assert.HasCount(1, p1.Pot, "Card should be auto-drawn after timeout.");
         }
 
         // ── DrawCard ──────────────────────────────────────────────────────────
@@ -83,7 +83,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
 
             fsmState.HandleCommand(_context, new DrawCardCommand("p1"));
 
-            Assert.AreEqual(1, p1.Pot.Count, "One digit should be in the pot.");
+            Assert.HasCount(1, p1.Pot, "One digit should be in the pot.");
             Assert.AreEqual(7, p1.Pot[0]);
         }
 
@@ -104,7 +104,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             fsmState.HandleCommand(_context, new DrawCardCommand("p1"));
 
             Assert.AreEqual(105.0, p1.Balance);
-            Assert.AreEqual(0, p1.Pot.Count, "Pot should be cleared after operator applied.");
+            Assert.IsEmpty(p1.Pot, "Pot should be cleared after operator applied.");
         }
 
         [TestMethod]
@@ -119,7 +119,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             var result = fsmState.HandleCommand(_context, new DrawCardCommand("p1"));
 
             Assert.IsNull(result.Value);
-            Assert.AreEqual(0, p1.Pot.Count);
+            Assert.IsEmpty(p1.Pot);
         }
 
         [TestMethod]
@@ -135,8 +135,8 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             fsmState.OnEnter(_context);
             fsmState.HandleCommand(_context, new DrawCardCommand("p2")); // p2 tries to draw
 
-            Assert.AreEqual(0, p2.Pot.Count, "Non-active player should not be able to draw.");
-            Assert.AreEqual(0, p1.Pot.Count, "p1 pot should be unaffected.");
+            Assert.IsEmpty(p2.Pot, "Non-active player should not be able to draw.");
+            Assert.IsEmpty(p1.Pot, "p1 pot should be unaffected.");
         }
 
         [TestMethod]
@@ -183,7 +183,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             fsmState.OnEnter(_context);
             fsmState.HandleCommand(_context, new DrawCardCommand("p1"));
 
-            Assert.AreEqual(1, _state.DiscardHistory.Count);
+            Assert.HasCount(1, _state.DiscardHistory);
         }
 
         [TestMethod]
@@ -218,7 +218,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             var next = fsmState.HandleCommand(_context, new DrawCardCommand("p1"));
 
             Assert.IsInstanceOfType<PlayerTurnState>(next.Value, "Drawing a number card should transition to a fresh PlayerTurnState (resetting the timer).");
-            Assert.AreEqual(1, p1.Pot.Count, "Number card digit should still be added to pot.");
+            Assert.HasCount(1, p1.Pot, "Number card digit should still be added to pot.");
         }
 
         // ── PlayActionCard – restrictions ─────────────────────────────────────
@@ -237,7 +237,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             var next = fsmState.HandleCommand(_context, new PlayActionCardCommand("p2", 0));
 
             Assert.IsNull(next.Value);
-            Assert.AreEqual(1, p2.ActionHand.Count, "Action card should not be consumed.");
+            Assert.HasCount(1, p2.ActionHand, "Action card should not be consumed.");
         }
 
         [TestMethod]
@@ -252,7 +252,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             var next = fsmState.HandleCommand(_context, new PlayActionCardCommand("p1", 0));
 
             Assert.IsNull(next.Value);
-            Assert.AreEqual(1, p1.ActionHand.Count, "Comp'd should remain in hand.");
+            Assert.HasCount(1, p1.ActionHand, "Comp'd should remain in hand.");
         }
 
         [TestMethod]
@@ -267,7 +267,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             var next = fsmState.HandleCommand(_context, new PlayActionCardCommand("p1", 0));
 
             Assert.IsNull(next.Value);
-            Assert.AreEqual(1, p1.ActionHand.Count, "Not My Money should remain in hand.");
+            Assert.HasCount(1, p1.ActionHand, "Not My Money should remain in hand.");
         }
 
         [TestMethod]
@@ -283,7 +283,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             var next = fsmState.HandleCommand(_context, new PlayActionCardCommand("p1", 99));
 
             Assert.IsNull(next.Value);
-            Assert.AreEqual(1, p1.ActionHand.Count);
+            Assert.HasCount(1, p1.ActionHand);
         }
 
         // ── PlayActionCard – FeelingLucky ─────────────────────────────────────
@@ -371,7 +371,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             fsmState.OnEnter(_context);
             fsmState.HandleCommand(_context, new PlayActionCardCommand("p1", 0));
 
-            Assert.AreEqual(initialCount - 1, _state.CurrentShoe.Count);
+            Assert.HasCount(initialCount - 1, _state.CurrentShoe);
         }
 
         // ── PlayActionCard – TurnTheTable ─────────────────────────────────────
@@ -494,7 +494,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
 
             // Card is consumed but no SkimState transition occurs (empty source pot).
             Assert.IsNull(next.Value);
-            Assert.AreEqual(0, p1.Pot.Count, "Source pot should remain empty.");
+            Assert.IsEmpty(p1.Pot, "Source pot should remain empty.");
         }
 
         [TestMethod]
@@ -513,7 +513,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
 
             // Card is consumed but no SkimState transition occurs (empty target pot).
             Assert.IsNull(next.Value);
-            Assert.AreEqual(0, p2.Pot.Count, "Target pot should remain empty.");
+            Assert.IsEmpty(p2.Pot, "Target pot should remain empty.");
         }
 
         // ── PlayActionCard – records LastPlayedAction ─────────────────────────
@@ -581,7 +581,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
 
             Assert.IsNull(next.Value, "HedgeYourBet should stay in PlayerTurnState (return null).");
             Assert.AreEqual("p1", _state.HedgeYourBetPlayerId, "HedgeYourBetPlayerId should be set to the playing player.");
-            Assert.AreEqual(0, p1.ActionHand.Count, "Card should be consumed from hand.");
+            Assert.IsEmpty(p1.ActionHand, "Card should be consumed from hand.");
         }
 
         [TestMethod]
@@ -761,7 +761,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
 
             Assert.IsNull(next.Value, "LetItRide should stay in PlayerTurnState (return null).");
             Assert.AreEqual(1, p1.ExtraTurns, "ExtraTurns should be incremented by 1.");
-            Assert.AreEqual(0, p1.ActionHand.Count, "Card should be consumed from hand.");
+            Assert.IsEmpty(p1.ActionHand, "Card should be consumed from hand.");
         }
 
         [TestMethod]

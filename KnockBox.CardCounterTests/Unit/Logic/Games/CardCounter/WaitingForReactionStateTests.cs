@@ -1,14 +1,14 @@
-using KnockBox.Services.Logic.Games.CardCounter.FSM;
-using KnockBox.Services.Logic.Games.CardCounter.FSM.States;
-using KnockBox.Services.Logic.RandomGeneration;
-using KnockBox.Services.State.Games.CardCounter;
-using KnockBox.Services.State.Games.CardCounter.Data;
-using KnockBox.Services.State.Users;
+using KnockBox.CardCounter.Services.Logic.Games.FSM;
+using KnockBox.CardCounter.Services.Logic.Games.FSM.States;
+using KnockBox.Core.Services.Logic.RandomGeneration;
+using KnockBox.CardCounter.Services.State.Games;
+using KnockBox.CardCounter.Services.State.Games.Data;
+using KnockBox.Core.Services.State.Users;
 using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 
-namespace KnockBoxTests.Unit.Logic.Games.CardCounter
+namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
 {
     [TestClass]
     public class WaitingForReactionStateTests
@@ -78,7 +78,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             Assert.IsNotNull(next.Value);
             Assert.IsInstanceOfType(next.Value, typeof(PlayerTurnState));
             CollectionAssert.AreEqual(new[] { 1, 2, 3 }, target.Pot, "Blocked: pot should NOT be reversed.");
-            Assert.AreEqual(0, target.ActionHand.Count, "Comp'd card should be consumed.");
+            Assert.IsEmpty(target.ActionHand, "Comp'd card should be consumed.");
         }
 
         [TestMethod]
@@ -217,7 +217,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             var next = fsmState.HandleCommand(_context, new PlayActionCardCommand("tgt", 0));
 
             Assert.IsNull(next.Value, "A non-Comp'd response should be ignored.");
-            Assert.AreEqual(1, target.ActionHand.Count, "Non-Comp'd card should not be consumed.");
+            Assert.HasCount(1, target.ActionHand, "Non-Comp'd card should not be consumed.");
         }
     }
 }

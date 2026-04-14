@@ -1,13 +1,13 @@
-using KnockBox.Services.Logic.Games.CardCounter.FSM;
-using KnockBox.Services.Logic.RandomGeneration;
-using KnockBox.Services.State.Games.CardCounter;
-using KnockBox.Services.State.Games.CardCounter.Data;
-using KnockBox.Services.State.Users;
+using KnockBox.CardCounter.Services.Logic.Games.FSM;
+using KnockBox.Core.Services.Logic.RandomGeneration;
+using KnockBox.CardCounter.Services.State.Games;
+using KnockBox.CardCounter.Services.State.Games.Data;
+using KnockBox.Core.Services.State.Users;
 using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 
-namespace KnockBoxTests.Unit.Logic.Games.CardCounter
+namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
 {
     [TestClass]
     public class CardCounterGameContextTests
@@ -50,7 +50,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             _context.ApplyOperatorCard(player, new OperatorCard(Operator.Add));
 
             Assert.AreEqual(125.0, player.Balance);
-            Assert.AreEqual(0, player.Pot.Count, "Pot should be cleared after operator.");
+            Assert.IsEmpty(player.Pot, "Pot should be cleared after operator.");
         }
 
         [TestMethod]
@@ -148,7 +148,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
 
             _context.ApplyOperatorCard(player, new OperatorCard(Operator.Divide));
 
-            Assert.AreEqual(1, player.ActionHand.Count, "Roll=2 should add an action card to hand.");
+            Assert.HasCount(1, player.ActionHand, "Roll=2 should add an action card to hand.");
         }
 
         [TestMethod]
@@ -161,7 +161,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
 
             _context.ApplyOperatorCard(player, new OperatorCard(Operator.Divide));
 
-            Assert.AreEqual(0, player.ActionHand.Count, "Roll=3 should remove an action card from hand.");
+            Assert.IsEmpty(player.ActionHand, "Roll=3 should remove an action card from hand.");
         }
 
         [TestMethod]
@@ -205,7 +205,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
 
             _context.DealNextShoe();
 
-            Assert.IsTrue(_state.CurrentShoe.Count > 0, "Shoe should be populated after dealing.");
+            Assert.IsNotEmpty(_state.CurrentShoe, "Shoe should be populated after dealing.");
         }
 
         [TestMethod]
@@ -234,7 +234,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             // The shoe should only contain cards from the new deal, not the old one
             // (as long as MinShoeSize < old shoe count + new count, we can't verify directly,
             //  but we know DealNextShoe calls CurrentShoe.Clear() first)
-            Assert.IsTrue(_state.CurrentShoe.Count <= _state.Config.MaxShoeSize,
+            Assert.IsLessThanOrEqualTo(_state.Config.MaxShoeSize, _state.CurrentShoe.Count,
                 "Shoe size should not exceed MaxShoeSize.");
         }
 
@@ -248,8 +248,8 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
 
             _context.DealActionCards();
 
-            Assert.AreEqual(_state.Config.ActionsDealtPerRound, p1.ActionHand.Count);
-            Assert.AreEqual(_state.Config.ActionsDealtPerRound, p2.ActionHand.Count);
+            Assert.HasCount(_state.Config.ActionsDealtPerRound, p1.ActionHand);
+            Assert.HasCount(_state.Config.ActionsDealtPerRound, p2.ActionHand);
         }
 
         // ── RecalculateShoeCounts ─────────────────────────────────────────────
@@ -338,7 +338,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
 
             _context.RecordDraw(player, card);
 
-            Assert.AreEqual(1, _state.DiscardHistory.Count);
+            Assert.HasCount(1, _state.DiscardHistory);
             Assert.IsFalse(_state.DiscardHistory[0].IsActionCard);
         }
 
@@ -365,7 +365,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
 
             _context.RecordActionCardPlay(player, card);
 
-            Assert.AreEqual(1, _state.DiscardHistory.Count);
+            Assert.HasCount(1, _state.DiscardHistory);
             Assert.IsTrue(_state.DiscardHistory[0].IsActionCard);
             Assert.AreEqual("Burn", _state.DiscardHistory[0].Description);
         }

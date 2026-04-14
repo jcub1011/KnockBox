@@ -1,5 +1,5 @@
-﻿using KnockBox.Extensions.Events;
-using KnockBox.Extensions.Returns;
+﻿using KnockBox.Core.Extensions.Events;
+using KnockBox.Core.Extensions.Returns;
 
 namespace KnockBox.Core.Services.State.Games.Shared
 {

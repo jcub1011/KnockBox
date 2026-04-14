@@ -1,6 +1,6 @@
-using KnockBox.Extensions.Returns;
-using KnockBox.Services.State.Games.Shared;
-using KnockBox.Services.State.Users;
+using KnockBox.Core.Extensions.Returns;
+using KnockBox.Core.Services.State.Games.Shared;
+using KnockBox.Core.Services.State.Users;
 using Microsoft.Extensions.Logging;
 using Moq;
 
@@ -9,9 +9,8 @@ namespace KnockBox.Tests.Unit.State;
 [TestClass]
 public sealed class PlayerNameRenamingTests
 {
-    private sealed class TestGameState : AbstractGameState
+    private sealed class TestGameState(User host, ILogger logger) : AbstractGameState(host, logger)
     {
-        public TestGameState(User host, ILogger logger) : base(host, logger) { }
     }
 
     private static User MakeUser(string name, string id = "") =>

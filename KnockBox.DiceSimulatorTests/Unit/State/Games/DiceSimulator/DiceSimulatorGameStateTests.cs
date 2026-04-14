@@ -1,11 +1,11 @@
-using KnockBox.Services.State.Games.DiceSimulator;
-using KnockBox.Services.State.Games.DiceSimulator.Data;
-using KnockBox.Services.State.Users;
+using KnockBox.DiceSimulator.Services.State.Games;
+using KnockBox.DiceSimulator.Services.State.Games.Data;
+using KnockBox.Core.Services.State.Users;
 using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 
-namespace KnockBoxTests.Unit.State.Games.DiceSimulator
+namespace KnockBox.DiceSimulator.Tests.Unit.State
 {
     [TestClass]
     public class DiceSimulatorGameStateTests
@@ -48,7 +48,7 @@ namespace KnockBoxTests.Unit.State.Games.DiceSimulator
 
             state.AddRoll(entry);
 
-            Assert.AreEqual(1, state.RollHistory.Count);
+            Assert.HasCount(1, state.RollHistory);
             Assert.AreEqual(entry.Id, state.RollHistory[0].Id);
         }
 
@@ -74,13 +74,13 @@ namespace KnockBoxTests.Unit.State.Games.DiceSimulator
             state.AddRoll(CreateValidEntry());
             state.GetOrAddPlayerStats("player1", "Player One");
 
-            Assert.AreEqual(1, state.RollHistory.Count);
-            Assert.AreEqual(1, state.PlayerStats.Count);
+            Assert.HasCount(1, state.RollHistory);
+            Assert.HasCount(1, state.PlayerStats);
 
             state.ClearHistory();
 
-            Assert.AreEqual(0, state.RollHistory.Count);
-            Assert.AreEqual(0, state.PlayerStats.Count);
+            Assert.IsEmpty(state.RollHistory);
+            Assert.IsEmpty(state.PlayerStats);
         }
     }
 }

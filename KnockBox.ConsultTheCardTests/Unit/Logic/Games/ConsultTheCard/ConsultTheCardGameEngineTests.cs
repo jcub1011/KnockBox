@@ -1,15 +1,15 @@
-using KnockBox.Services.Logic.Games.ConsultTheCard;
-using KnockBox.Services.Logic.Games.ConsultTheCard.FSM;
-using KnockBox.Services.Logic.Games.ConsultTheCard.FSM.States;
-using KnockBox.Services.Logic.RandomGeneration;
-using KnockBox.Services.State.Games.ConsultTheCard;
-using KnockBox.Services.State.Games.ConsultTheCard.Data;
-using KnockBox.Services.State.Users;
+using KnockBox.ConsultTheCard.Services.Logic.Games;
+using KnockBox.ConsultTheCard.Services.Logic.Games.FSM;
+using KnockBox.ConsultTheCard.Services.Logic.Games.FSM.States;
+using KnockBox.Core.Services.Logic.RandomGeneration;
+using KnockBox.ConsultTheCard.Services.State.Games;
+using KnockBox.ConsultTheCard.Services.State.Games.Data;
+using KnockBox.Core.Services.State.Users;
 using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 
-namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard
+namespace KnockBox.ConsultTheCard.Tests.Unit.Logic.Games.ConsultTheCard
 {
     /// <summary>
     /// Tests for <see cref="ConsultTheCardGameEngine"/> public-facing API methods,
@@ -110,7 +110,7 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard
         [TestMethod]
         public async Task StartAsync_WithWrongStateType_ReturnsError()
         {
-            var mockState = new Mock<KnockBox.Services.State.Games.Shared.AbstractGameState>(
+            var mockState = new Mock<KnockBox.Core.Services.State.Games.Shared.AbstractGameState>(
                 _host, Mock.Of<ILogger>());
 
             var result = await _engine.StartAsync(_host, mockState.Object);
@@ -159,8 +159,8 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard
         {
             using var state = await CreateStartedGameAsync(4);
 
-            Assert.AreEqual(4, state.GamePlayers.Count);
-            Assert.AreEqual(4, state.TurnManager.TurnOrder.Count);
+            Assert.HasCount(4, state.GamePlayers);
+            Assert.HasCount(4, state.TurnManager.TurnOrder);
         }
 
         [TestMethod]
@@ -279,8 +279,8 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard
 
             _engine.ReturnToLobby(_host, state);
 
-            Assert.AreEqual(0, state.GamePlayers.Count);
-            Assert.AreEqual(0, state.TurnManager.TurnOrder.Count);
+            Assert.IsEmpty(state.GamePlayers);
+            Assert.IsEmpty(state.TurnManager.TurnOrder);
             Assert.AreEqual(0, state.TurnManager.CurrentPlayerIndex);
         }
 
@@ -347,8 +347,8 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard
 
             _engine.HandlePlayerLeft(leavingPlayer, state);
 
-            Assert.AreEqual(initialCount - 1, state.TurnManager.TurnOrder.Count);
-            Assert.IsFalse(state.TurnManager.TurnOrder.Contains(leavingPlayer.Id));
+            Assert.HasCount(initialCount - 1, state.TurnManager.TurnOrder);
+            Assert.DoesNotContain(leavingPlayer.Id, state.TurnManager.TurnOrder);
         }
 
         [TestMethod]

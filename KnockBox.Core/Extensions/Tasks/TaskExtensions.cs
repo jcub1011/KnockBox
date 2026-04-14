@@ -1,6 +1,6 @@
-﻿using KnockBox.Extensions.Exceptions;
+﻿using KnockBox.Core.Extensions.Exceptions;
 
-namespace KnockBox.Extensions.Tasks
+namespace KnockBox.Core.Extensions.Tasks
 {
     public static class TaskExtensions
     {
