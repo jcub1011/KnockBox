@@ -69,16 +69,52 @@ article {
     margin: 0px;
 }
 
-.room-code {
+.room-code-btn {
+    display: inline-grid;
+    overflow: hidden;
+    font-family: var(--font-primary);
+    font-size: 1em;
     font-weight: 500;
+    margin: 0px;
+    padding: 0px 8px;
+    background: none;
+    border: none;
+    cursor: pointer;
     white-space: nowrap;
     flex-shrink: 0;
+    -webkit-mask-image: linear-gradient(to right, transparent, black 8px, black calc(100% - 8px), transparent);
+    mask-image: linear-gradient(to right, transparent, black 8px, black calc(100% - 8px), transparent);
 }
 
-@media (max-width: 480px) {
-    .room-code-label {
-        display: none;
-    }
+/* ── Join Code Slide Animation ───────────────────────────────────────── */
+
+.room-code-cover,
+.room-code-value {
+    grid-area: 1 / 1;
+    transition: transform 0.3s ease-out;
+}
+
+.room-code-cover {
+    background: white;
+    width: 100%;
+    padding: 0px 8px;
+    z-index: 1;
+    transform: translateX(0);
+}
+
+.room-code-value {
+    font-family: var(--font-mono);
+    font-weight: 600;
+    padding: 0px 8px;
+    transform: translateX(100%);
+}
+
+.room-code-btn.revealed .room-code-cover {
+    transform: translateX(-100%);
+}
+
+.room-code-btn.revealed .room-code-value {
+    transform: translateX(0);
 }
 
 /* ── Game Entrance Animation ──────────────────────────────────────────── */
@@ -152,15 +188,9 @@ header.exiting-to-home {
     header.exiting-to-home {
         animation: none;
     }
-}
 
-.room-code-btn {
-    font-family: var(--font-mono);
-    font-size: 1em;
-    font-weight: 600;
-    margin: 0px;
-    padding: 0px;
-    background: none;
-    border: none;
-    cursor: pointer;
+    .room-code-cover,
+    .room-code-value {
+        transition: none;
+    }
 }

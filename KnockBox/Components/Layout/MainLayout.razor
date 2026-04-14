@@ -12,17 +12,15 @@
         {
             <a href="@NavigationService.GetHomeUri()" title="Click to return home">
                 @currentSession.LobbyRegistration.GameName</a>
-                <span class="room-code">
-                    <span class="room-code-label">Join Code: </span>
-                    <button class="room-code-btn"
-                            @onclick="ToggleRoomCode" 
-                            @onmouseup="OnMouseUp"
-                            @oncontextmenu="@(() => CopyRoomCodeAsync(currentSession.LobbyRegistration.Code))" 
-                            @oncontextmenu:preventDefault="true"
-                            title="Click to reveal. Right-click/Long-press to copy. Middle-click to join in a new tab.">
-                        @(_isRoomCodeRevealed ? currentSession.LobbyRegistration.Code : "••••••")
-                    </button>
-                </span>
+                <button class="room-code-btn @(_isRoomCodeRevealed ? "revealed" : "")"
+                        @onclick="ToggleRoomCode"
+                        @onmouseup="OnMouseUp"
+                        @oncontextmenu="@(() => CopyRoomCodeAsync(currentSession.LobbyRegistration.Code))"
+                        @oncontextmenu:preventDefault="true"
+                        title="Click to reveal. Right-click/Long-press to copy. Middle-click to join in a new tab.">
+                    <span class="room-code-cover">Join Code</span>
+                    <span class="room-code-value">@currentSession.LobbyRegistration.Code</span>
+                </button>
             }
         else
         {
