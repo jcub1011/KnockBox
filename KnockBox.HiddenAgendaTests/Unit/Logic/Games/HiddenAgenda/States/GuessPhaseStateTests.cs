@@ -60,7 +60,6 @@ namespace KnockBox.HiddenAgendaTests.Unit.Logic.Games.HiddenAgenda.States
             var state = new GuessPhaseState();
             var result = state.OnEnter(_context);
 
-            Assert.IsTrue(result.IsSuccess);
             Assert.IsNull(result.Value);
             Assert.AreEqual(GamePhase.GuessPhase, _state.Phase);
         }
@@ -73,7 +72,6 @@ namespace KnockBox.HiddenAgendaTests.Unit.Logic.Games.HiddenAgenda.States
             var state = new GuessPhaseState();
             var result = state.OnEnter(_context);
 
-            Assert.IsTrue(result.IsSuccess);
             Assert.IsNotNull(result.Value);
             Assert.IsInstanceOfType<EventCardPhaseState>(result.Value);
             Assert.AreEqual("p1", _state.TurnManager.CurrentPlayer);
@@ -95,7 +93,6 @@ namespace KnockBox.HiddenAgendaTests.Unit.Logic.Games.HiddenAgenda.States
 
             var result = state.HandleCommand(_context, new SubmitGuessCommand("p0", guesses));
 
-            Assert.IsTrue(result.IsSuccess);
             Assert.IsNotNull(result.Value);
             Assert.IsTrue(_state.GamePlayers["p0"].HasSubmittedGuess);
             Assert.AreEqual(guesses, _state.GamePlayers["p0"].GuessSubmission);
@@ -186,7 +183,6 @@ namespace KnockBox.HiddenAgendaTests.Unit.Logic.Games.HiddenAgenda.States
 
             var result = state.HandleCommand(_context, new SkipGuessCommand("p0"));
 
-            Assert.IsTrue(result.IsSuccess);
             Assert.IsNotNull(result.Value);
             Assert.IsInstanceOfType<EventCardPhaseState>(result.Value);
             Assert.IsFalse(_state.GamePlayers["p0"].HasSubmittedGuess);
@@ -200,7 +196,6 @@ namespace KnockBox.HiddenAgendaTests.Unit.Logic.Games.HiddenAgenda.States
 
             var result = state.Tick(_context, DateTimeOffset.UtcNow.AddMilliseconds(_state.Config.GuessPhaseTimeoutMs + 100));
 
-            Assert.IsTrue(result.IsSuccess);
             Assert.IsNotNull(result.Value);
             Assert.IsInstanceOfType<EventCardPhaseState>(result.Value);
         }

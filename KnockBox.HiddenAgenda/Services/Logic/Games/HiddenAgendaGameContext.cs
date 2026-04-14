@@ -123,7 +123,6 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games
 
         public void ResetForNewRound()
         {
-            State.CurrentRound++;
             State.TotalTurnsTaken = 0;
             State.GuessCountdownActive = false;
             State.FirstGuessPlayerId = null;
@@ -135,15 +134,6 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games
             {
                 CollectionProgress[type] = 0;
             }
-
-            // Rotate task pool
-            int poolSize = GamePlayers.Count <= 3 ? 25 : 30;
-            State.CurrentTaskPool = State.Config.PoolRotation switch
-            {
-                TaskPoolRotation.Full => TaskPool.GetPoolForPlayerCount(GamePlayers.Count),
-                TaskPoolRotation.Partial => TaskPool.AllTasks.OrderBy(_ => Rng.GetRandomInt(10000)).Take(poolSize).ToList(),
-                _ => State.CurrentTaskPool.Count > 0 ? State.CurrentTaskPool : TaskPool.GetPoolForPlayerCount(GamePlayers.Count)
-            };
 
             // Reset player round state
             foreach (var player in GamePlayers.Values)
@@ -162,9 +152,6 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games
                 player.MovementHistory.Clear();
                 player.CardPlayHistory.Clear();
                 player.CardDrawHistory.Clear();
-                
-                // Re-draw tasks
-                DrawTasksForPlayer(player.PlayerId);
             }
         }
 
@@ -176,6 +163,89 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games
 
             State.TurnManager.NextTurn();
             return new EventCardPhaseState();
+        }
+
+        /// <summary>
+        /// Evaluates all tasks and guesses, computes round scores, returns a RoundResult.
+        /// </summary>
+        public RoundResult ScoreRound()
+        {
+            var playerResults = new Dictionary<string, PlayerRoundResult>();
+
+            foreach (var player in GamePlayers.Values)
+            {
+                // Evaluate task completion
+                var taskResults = new List<TaskResult>();
+                int taskPoints = 0;
+                foreach (var task in player.SecretTasks)
+                {
+                    bool completed = EvaluateTaskCompletion(player.PlayerId, task);
+                    taskResults.Add(new TaskResult(task, completed));
+                    if (completed)
+                        taskPoints += task.PointValue;
+                }
+
+                // Evaluate guess accuracy
+                int guessPoints = 0;
+                if (player.GuessSubmission is not null)
+                {
+                    foreach (var (opponentId, guessedTaskIds) in player.GuessSubmission)
+                    {
+                        if (GamePlayers.TryGetValue(opponentId, out var opponent))
+                        {
+                            var actualTaskIds = opponent.SecretTasks
+                                .Select(t => t.Id).ToHashSet();
+                            foreach (var guessedId in guessedTaskIds)
+                            {
+                                if (actualTaskIds.Contains(guessedId))
+                                    guessPoints++;
+                            }
+                        }
+                    }
+                }
+
+                int totalRoundPoints = taskPoints + guessPoints;
+                player.RoundScore = totalRoundPoints;
+
+                playerResults[player.PlayerId] = new PlayerRoundResult(
+                    player.PlayerId,
+                    player.DisplayName,
+                    taskResults,
+                    taskPoints,
+                    guessPoints,
+                    totalRoundPoints);
+            }
+
+            return new RoundResult(State.CurrentRound, playerResults);
+        }
+
+        /// <summary>
+        /// Extracts guess validation into a shared helper usable by both GuessPhaseState and FinalGuessState.
+        /// </summary>
+        public string? ValidateGuessSubmission(string playerId, Dictionary<string, List<string>> guesses)
+        {
+            var opponents = GamePlayers.Keys.Where(id => id != playerId).ToHashSet();
+
+            if (guesses.Count != opponents.Count)
+                return $"Must guess for all {opponents.Count} opponents.";
+
+            var poolIds = State.CurrentTaskPool.Select(t => t.Id).ToHashSet();
+
+            foreach (var (opponentId, taskIds) in guesses)
+            {
+                if (!opponents.Contains(opponentId))
+                    return $"Invalid opponent ID: {opponentId}";
+                if (taskIds.Count != 3)
+                    return "Must guess exactly 3 tasks for each opponent.";
+                if (taskIds.Distinct().Count() != 3)
+                    return "Duplicate task IDs in guess.";
+                foreach (var taskId in taskIds)
+                {
+                    if (!poolIds.Contains(taskId))
+                        return $"Task '{taskId}' is not in the current dossier.";
+                }
+            }
+            return null;
         }
 
         /// <summary>

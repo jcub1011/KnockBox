@@ -66,7 +66,22 @@ public class HiddenAgendaGameState(User host, ILogger<HiddenAgendaGameState> log
     public int? CurrentSpinResult { get; set; }
     public EventCard? PendingDrawnEventCard { get; set; }  // Event card pending swap decision
     public List<CurationCard>? CatalogRevealedCards { get; set; }  // Catalog result for current player
+
+    public List<RoundResult> RoundResults { get; } = [];
+    public string? MatchWinner { get; set; }
 }
+
+public record RoundResult(int RoundNumber, Dictionary<string, PlayerRoundResult> PlayerResults);
+
+public record PlayerRoundResult(
+    string PlayerId,
+    string DisplayName,
+    List<TaskResult> TaskResults,
+    int TaskPoints,
+    int GuessPoints,
+    int TotalRoundPoints);
+
+public record TaskResult(SecretTask Task, bool Completed);
 
 public enum GamePhase
 {

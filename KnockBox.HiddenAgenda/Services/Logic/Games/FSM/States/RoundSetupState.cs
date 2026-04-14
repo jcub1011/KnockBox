@@ -4,6 +4,7 @@ using KnockBox.Core.Extensions.Returns;
 using KnockBox.Core.Services.State.Games.Shared;
 using KnockBox.HiddenAgenda.Services.Logic.Games.Data;
 using KnockBox.HiddenAgenda.Services.State.Games;
+using KnockBox.HiddenAgenda.Services.State.Games.Data;
 
 namespace KnockBox.HiddenAgenda.Services.Logic.Games.FSM.States
 {
@@ -17,8 +18,24 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games.FSM.States
             _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.State.Config.RoundSetupTimeoutMs);
 
             context.State.CurrentRound++;
-            context.State.CurrentTaskPool = TaskPool.GetPoolForPlayerCount(context.GamePlayers.Count);
 
+            // Rotate task pool based on configuration
+            if (context.State.CurrentRound > 1)
+            {
+                int poolSize = context.GamePlayers.Count <= 3 ? 25 : 30;
+                context.State.CurrentTaskPool = context.State.Config.PoolRotation switch
+                {
+                    TaskPoolRotation.Full => TaskPool.GetPoolForPlayerCount(context.GamePlayers.Count),
+                    TaskPoolRotation.Partial => TaskPool.AllTasks.OrderBy(_ => context.Rng.GetRandomInt(10000)).Take(poolSize).ToList(),
+                    _ => context.State.CurrentTaskPool.Count > 0 ? context.State.CurrentTaskPool : TaskPool.GetPoolForPlayerCount(context.GamePlayers.Count)
+                };
+            }
+            else
+            {
+                context.State.CurrentTaskPool = TaskPool.GetPoolForPlayerCount(context.GamePlayers.Count);
+            }
+
+            // Draw tasks for all players
             foreach (var playerId in context.GamePlayers.Keys)
             {
                 context.DrawTasksForPlayer(playerId);
@@ -31,17 +48,20 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games.FSM.States
                 context.State.TurnManager.SetTurnOrder(playerIds);
             }
 
-            // Initialize collection progress
+            // Ensure collection progress is initialized/cleared
             context.State.CollectionProgress.Clear();
             foreach (var type in Enum.GetValues<CollectionType>())
             {
                 context.State.CollectionProgress[type] = 0;
             }
 
-            // Place all players at starting position
-            foreach (var player in context.GamePlayers.Values)
+            // Place all players at starting position at the beginning of the match
+            if (context.State.CurrentRound == 1)
             {
-                player.CurrentSpaceId = 0;
+                foreach (var player in context.GamePlayers.Values)
+                {
+                    player.CurrentSpaceId = 0;
+                }
             }
 
             return null;

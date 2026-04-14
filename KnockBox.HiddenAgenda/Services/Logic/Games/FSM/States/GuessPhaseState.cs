@@ -47,7 +47,7 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games.FSM.States
                         return ValueResult<IGameState<HiddenAgendaGameContext, HiddenAgendaCommand>?>.FromError("You have already submitted guesses this round.");
 
                     // Validate guess format
-                    var validationError = ValidateGuesses(context, cmd.PlayerId, cmd.Guesses);
+                    var validationError = context.ValidateGuessSubmission(cmd.PlayerId, cmd.Guesses);
                     if (validationError != null)
                         return ValueResult<IGameState<HiddenAgendaGameContext, HiddenAgendaCommand>?>.FromError(validationError);
 
@@ -95,45 +95,6 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games.FSM.States
         }
 
         public ValueResult<TimeSpan> GetRemainingTime(HiddenAgendaGameContext context, DateTimeOffset now) => _expiresAt - now;
-
-        /// <summary>
-        /// Validates guess submission format:
-        /// - Must include an entry for every opponent (not self)
-        /// - Each entry must have exactly 3 task IDs
-        /// - All task IDs must exist in the current round's task pool (the dossier)
-        /// - No duplicate task IDs within a single opponent's guess
-        /// </summary>
-        private static string? ValidateGuesses(
-            HiddenAgendaGameContext context,
-            string playerId,
-            Dictionary<string, List<string>> guesses)
-        {
-            var opponents = context.GamePlayers.Keys
-                .Where(id => id != playerId).ToHashSet();
-
-            // Must have exactly one entry per opponent
-            if (guesses.Count != opponents.Count)
-                return $"Must guess for all {opponents.Count} opponents.";
-
-            foreach (var (opponentId, taskIds) in guesses)
-            {
-                if (!opponents.Contains(opponentId))
-                    return $"Invalid opponent ID: {opponentId}";
-                if (taskIds.Count != 3)
-                    return $"Must guess exactly 3 tasks for each opponent ({opponentId}).";
-                if (taskIds.Distinct().Count() != 3)
-                    return $"Duplicate task IDs in guess for opponent ({opponentId}).";
-
-                var poolIds = context.State.CurrentTaskPool.Select(t => t.Id).ToHashSet();
-                foreach (var taskId in taskIds)
-                {
-                    if (!poolIds.Contains(taskId))
-                        return $"Task ID '{taskId}' is not in the current dossier.";
-                }
-            }
-
-            return null; // Valid
-        }
 
         private static IGameState<HiddenAgendaGameContext, HiddenAgendaCommand>? AdvanceToNextPlayer(HiddenAgendaGameContext context)
         {

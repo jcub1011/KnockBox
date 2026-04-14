@@ -56,12 +56,6 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games
                 // Initialize board
                 gameState.BoardGraph = BoardDefinitions.CreateGrandCircuit();
                 
-                // Initialize collections
-                foreach (var collection in CollectionDefinitions.All)
-                {
-                    gameState.CollectionProgress[collection.Type] = 0;
-                }
-
                 // Initialize players
                 foreach (var user in gameState.Players)
                 {
@@ -73,15 +67,6 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games
                     };
                     gameState.GamePlayers[user.Id] = playerState;
                     gameState.TurnManager.TurnOrder.Add(user.Id);
-                }
-
-                // Initialize task pool
-                gameState.CurrentTaskPool = TaskPool.GetPoolForPlayerCount(gameState.Players.Count);
-
-                // Initial task draw
-                foreach (var playerId in gameState.TurnManager.TurnOrder)
-                {
-                    context.DrawTasksForPlayer(playerId);
                 }
 
                 fsm.TransitionTo(context, new RoundSetupState());
@@ -211,7 +196,11 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games
         public Result ReturnToLobby(User player, HiddenAgendaGameState state)
         {
             if (!TryGetContext(state, out var ctx, out var err)) return err;
-            return ProcessCommand(ctx, new ReturnToLobbyCommand(player.Id));
+            var result = ProcessCommand(ctx, new ReturnToLobbyCommand(player.Id));
+            // Dispose outside the Execute lock -- the command sets phase to Lobby as a signal
+            if (result.IsSuccess && state.Phase == GamePhase.Lobby)
+                state.Dispose();
+            return result;
         }
 
         public Result PlayAgain(User player, HiddenAgendaGameState state)
