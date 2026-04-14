@@ -221,12 +221,20 @@ public sealed class MatchOverState : IHiddenAgendaGameState
 {
     public ValueResult<...?> OnEnter(HiddenAgendaGameContext context)
     {
-        // Determine winner (highest cumulative score)
-        var winner = context.GamePlayers.Values
+        // Determine winner with tiebreakers:
+        // 1. Highest cumulative score
+        // 2. Most total correct guesses across all rounds
+        // 3. Most total tasks completed across all rounds
+        var ranked = context.GamePlayers.Values
             .OrderByDescending(p => p.CumulativeScore)
-            .First();
-        context.State.MatchWinner = winner.PlayerId;
+            .ThenByDescending(p => context.State.RoundResults
+                .Sum(r => r.PlayerResults.GetValueOrDefault(p.PlayerId)?.GuessPoints ?? 0))
+            .ThenByDescending(p => context.State.RoundResults
+                .Sum(r => r.PlayerResults.GetValueOrDefault(p.PlayerId)?.TaskResults
+                    .Count(t => t.Completed) ?? 0))
+            .ToList();
 
+        context.State.MatchWinner = ranked.First().PlayerId;
         context.State.SetPhase(GamePhase.MatchOver);
         return null;
     }
@@ -242,9 +250,13 @@ public sealed class MatchOverState : IHiddenAgendaGameState
             {
                 if (cmd.PlayerId != context.State.Host.Id)
                     return new ResultError("Only the host can return to lobby.");
-                // Engine handles the actual navigation
-                // Dispose the state
-                context.State.Dispose();
+                // Signal to the engine that the match is done by setting phase to Lobby.
+                // Do NOT call Dispose() here -- we are inside the Execute lock and
+                // disposing the state (which disposes the semaphore) would cause issues.
+                // The engine's ReturnToLobby method checks for this phase after Execute
+                // completes and disposes outside the lock.
+                context.State.SetPhase(GamePhase.Lobby);
+                context.State.UpdateJoinableStatus(false);
                 return null;
             }
 
@@ -392,7 +404,11 @@ Add handlers for ReturnToLobby and PlayAgain:
 public Result ReturnToLobby(User player, HiddenAgendaGameState state)
 {
     if (!TryGetContext(state, out var ctx, out var err)) return err;
-    return ProcessCommand(ctx, new ReturnToLobbyCommand(player.Id));
+    var result = ProcessCommand(ctx, new ReturnToLobbyCommand(player.Id));
+    // Dispose outside the Execute lock -- the command sets phase to Lobby as a signal
+    if (result.IsSuccess && state.Phase == GamePhase.Lobby)
+        state.Dispose();
+    return result;
 }
 
 public Result PlayAgain(User player, HiddenAgendaGameState state)

@@ -118,12 +118,12 @@ First step of each player's turn. If the current player holds an event card, the
 
 **HandleCommand:**
 - `PlayCatalogCommand`: validate current player, validate holds Catalog, validate target is a different active player. Resolve: store target's `CardDrawHistory` (last entry's DrawnCards) on state so the UI can show it. Consume the card. **Catalog ends the turn** (per GDD) -- advance to next player.
-- `PlayDetourCommand`: validate current player, validate holds Detour, validate target exists. Mark `player.DetourPending = true`. Consume card. Transition to `SpinPhaseState`.
+- `PlayDetourCommand`: validate current player, validate holds Detour, validate target is a different active player with at least one completed move (`LastMoveDestination != null`). Store `player.DetourTargetPlayerId = target`. Mark `player.DetourPending = true`. Consume card (`HeldEventCard = null`). Transition to `SpinPhaseState`.
 - `SkipEventCardCommand`: validate current player. Transition to `SpinPhaseState`.
 
 **Tick:** Auto-skip on timeout (transition to SpinPhaseState).
 
-**AdvanceToNextPlayerTurn helper:** Increment turn counter, check round-end conditions. If triggered -> FinalGuessState. Otherwise advance TurnManager and return new EventCardPhaseState.
+**Catalog turn advancement:** After Catalog resolves, increment `player.TurnsTakenThisRound` and `context.State.TotalTurnsTaken`, then call `context.AdvanceToNextPlayerOrEndRound()` (shared helper from Phase 2's context) to check round-end conditions and advance to the next player.
 
 ### 3. Create `FSM/States/SpinPhaseState.cs`
 
@@ -132,9 +132,11 @@ Player spins the spinner.
 **OnEnter:** Set phase to `GamePhase.SpinPhase`, start timer.
 
 **HandleCommand:**
-- `SpinCommand`: validate current player. If `DetourPending`, use target player's `LastSpinResult` instead of spinning. Clear DetourPending. Store spin result on player and on state (`State.CurrentSpinResult`). Transition to `MovePhaseState`.
+- `SpinCommand`: validate current player.
+  - **If `DetourPending`:** Per GDD, Detour teleports the player to the target's last destination. Look up `context.GamePlayers[player.DetourTargetPlayerId!]`. Set `player.LastSpinResult` to target's `LastSpinResult` (for history). Set `player.CurrentSpaceId` to target's `LastMoveDestination`. Record `MovementRecord` for the destination (with target's spin result). Clear `DetourPending` and `DetourTargetPlayerId`. **Skip MovePhaseState entirely** -- transition directly to `DrawPhaseState`.
+  - **Otherwise:** Normal spin via `context.SpinSpinner()`. Store spin result on player (`player.LastSpinResult`) and on state (`State.CurrentSpinResult`). Transition to `MovePhaseState`.
 
-**Tick:** Auto-spin on timeout using `context.SpinSpinner()`. Clear Detour if pending. Transition to MovePhaseState.
+**Tick:** Auto-spin on timeout using `context.SpinSpinner()`. If Detour pending, apply Detour logic (teleport to target destination, skip MovePhaseState). Transition to MovePhaseState (or DrawPhaseState if Detour).
 
 ### 4. Create `FSM/States/MovePhaseState.cs`
 
@@ -166,12 +168,11 @@ Most complex turn state. Handles two spot types:
 **Tick:** Auto-select first card (index 0) on timeout. Or auto-keep new event card.
 
 **FinishTurn method (private):**
-1. Increment `player.TurnsTakenThisRound` and `State.TotalTurnsTaken`
+1. Increment `player.TurnsTakenThisRound` and `context.State.TotalTurnsTaken`
 2. If guess countdown active and player hasn't guessed, decrement `player.GuessCountdownTurnsRemaining`
 3. Check `context.CheckRoundEndConditions()`:
    - If not None -> transition to `FinalGuessState` (Phase 6 placeholder)
-4. If player hasn't submitted guesses -> transition to `GuessPhaseState` (Phase 5 placeholder)
-5. Else -> advance TurnManager.NextTurn(), return `new EventCardPhaseState()`
+4. Always transition to `GuessPhaseState` -- it handles skip-if-already-guessed in its `OnEnter`
 
 ### 6. Create placeholder `FSM/States/GuessPhaseState.cs`
 
@@ -182,9 +183,8 @@ public sealed class GuessPhaseState : ITimedHiddenAgendaGameState
 {
     public ValueResult<...?> OnEnter(HiddenAgendaGameContext context)
     {
-        // Placeholder: skip guessing, advance to next player
-        context.State.TurnManager.NextTurn();
-        return new EventCardPhaseState();
+        // Placeholder: skip guessing, use shared helper to advance
+        return context.AdvanceToNextPlayerOrEndRound();
     }
     public Result OnExit(...) => Result.Success;
     public ValueResult<...?> HandleCommand(...) => null;
@@ -213,18 +213,37 @@ public sealed class FinalGuessState : ITimedHiddenAgendaGameState
 ```csharp
 /// <summary>
 /// Records a card play in both the player's history and the global round history.
+/// Determines the EffectiveCardType from applied effects (Acquire if all positive,
+/// Remove if all negative, Trade if mixed) and snapshots current collection progress
+/// for R4/R5 task evaluation.
 /// </summary>
 public void RecordCardPlay(string playerId, CurationCard card, int selectedIndex,
     IReadOnlyList<CurationCard> allDrawn, IReadOnlyList<CollectionEffect> appliedEffects)
 {
     var player = GamePlayers[playerId];
     var affected = appliedEffects.Select(e => e.Collection).Distinct().ToArray();
+
+    // Determine effective type from applied effects
+    bool hasPositive = appliedEffects.Any(e => e.Delta > 0);
+    bool hasNegative = appliedEffects.Any(e => e.Delta < 0);
+    var effectiveType = (hasPositive, hasNegative) switch
+    {
+        (true, false) => CurationCardType.Acquire,
+        (false, true) => CurationCardType.Remove,
+        _ => CurationCardType.Trade  // mixed or no effects
+    };
+
+    // Snapshot collection progress at time of play (for R4/R5 evaluation)
+    var progressSnapshot = new Dictionary<CollectionType, int>(CollectionProgress);
+
     var record = new CardPlayRecord(
         player.TurnsTakenThisRound + 1,
         card,
         selectedIndex,
         affected,
-        card.Type);
+        card.Type,
+        effectiveType,
+        progressSnapshot);
     player.CardPlayHistory.Add(record);
 
     var space = Board.Spaces[player.CurrentSpaceId];

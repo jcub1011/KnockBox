@@ -177,12 +177,18 @@ Brief display at round start. Shows:
 - Play history log (scrollable list of past card plays)
 
 **Phase-specific content area:**
-- `GamePhase.EventCardPhase`: Show held event card, Play/Skip buttons, target player selection (for Catalog/Detour). Only current player sees action buttons.
+- `GamePhase.EventCardPhase`: Show held event card, Play/Skip buttons, target player selection (for Catalog/Detour). For Detour: show a player-selection dropdown (excluding self) to choose the target whose last movement to copy; validate target has at least one completed move (`LastMoveDestination != null`). For Catalog: show a player-selection dropdown (excluding self) to choose the target to investigate. Only current player sees action buttons.
 - `GamePhase.SpinPhase`: Spinner animation (SpinnerWheel component), Spin button for current player. Show result after spin.
 - `GamePhase.MovePhase`: Board highlights reachable spaces. Click on a highlighted space to move. Show available destinations list as fallback.
 - `GamePhase.DrawPhase`: At Curation Spot: display 3 drawn cards (CurationCardPicker component). At Event Spot with choice: show current + new card, keep/swap buttons. Show card effects clearly.
 
 **For non-current players:** Show the board/collection state, current player's actions as they happen (via state subscription), and the player's own secret tasks in a collapsible panel (DossierPanel).
+
+**Private information filtering:** The UI must filter private information based on the current user. Use `UserService.CurrentUser.Id == player.PlayerId` checks:
+- `HeldEventCard` -- only show the card type to the holding player; other players see only that a card is held (boolean: `player.HeldEventCard != null`).
+- `SecretTasks` -- only rendered for the owning player.
+- `CatalogRevealedCards` -- only rendered for the player who used Catalog.
+- `GuessSubmission` -- hidden until the Reveal phase.
 
 ### `Pages/GuessPhase.razor` / `.razor.cs`
 

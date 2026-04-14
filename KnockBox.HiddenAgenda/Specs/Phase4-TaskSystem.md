@@ -47,14 +47,14 @@ From the GDD, each task creates a **behavioral pattern** that opponents can obse
 - Y2: Play cards affecting >= 4 different collections across the round. Count distinct CollectionTypes in CardPlayHistory.
 - Y3: Play a card affecting the same collection >= 3 turns in a row. Find max consecutive turns where the same collection appears in AffectedCollections.
 - Y4: Alternate Acquire and Remove for >= 4 consecutive turns. Find max alternating streak in CardPlayHistory.
-- Y5: Play the highest-value card in hand >= 4 turns. Requires access to all 3 drawn cards per turn (from CardDrawRecord). For each turn, check if selected card had the highest total absolute delta among the 3. Count qualifying turns.
+- Y5: Play the highest-value card in hand >= 4 turns. Requires access to all 3 drawn cards per turn (from CardDrawRecord). For each turn, check if selected card had the highest total absolute delta among the 3. "Highest value" = maximum sum of absolute deltas across all effects on the card. For Trade cards, use the higher value between Effects and AlternateEffects. If two or more cards tie for highest, selecting any of the tied cards satisfies the condition for that turn. Count qualifying turns.
 - Y6: Visit an Event Spot >= 3 times during the round. Count MovementRecords where the space's SpotType == Event.
 
 **Movement (M1-M6, Medium, 2pt):** Player must move in recognizable ways.
 - M1: Visit all 4 wings at least once. Check distinct wings in MovementHistory (excluding Corridor).
 - M2: Spend >= 4 turns in the same wing. Find max count of any single wing in MovementHistory.
 - M3: End turn on same spot as another player >= 3 times. Cross-reference with other players' positions each turn (use RoundPlayHistory to find other players' positions per turn).
-- M4: Take the longest available path at every fork for >= 4 consecutive turns. **Complex:** Would need to know what reachable spaces were available and whether the player chose the farthest. Consider simplifying to: "moved the maximum distance (full spin result) for >= 4 consecutive turns" or mark this as deferred.
+- M4: **Simplified from GDD.** "Move the maximum possible distance (use your full spinner result) on at least 4 consecutive turns." Evaluation: for each move, check if `GetShortestDistance(previousPosition, newPosition) == spinResult`. Track the longest consecutive streak. Requires `SpinResult` field on `MovementRecord` (added in Phase 1).
 - M5: Change wings every turn for >= 4 consecutive turns. Check consecutive MovementRecords for distinct Wings.
 - M6: Return to the same spot >= 3 times. Find max count of any single SpaceId in MovementHistory.
 
@@ -66,7 +66,7 @@ From the GDD, each task creates a **behavioral pattern** that opponents can obse
 - R5: Play Acquire on the lowest-progress collection >= 3 times. Similar to R4 but for lowest.
 - R6: Be in the same wing as a specific randomly-assigned player >= 4 turns. At task draw time, a target player is randomly assigned. Check MovementHistory wing overlap per turn.
 
-**Note on R4/R5:** These require knowing collection progress at the time of play, not end-of-round. Either: (a) evaluate based on the global RoundPlayHistory replaying progress forward, or (b) store a snapshot of collection progress with each CardPlayRecord. Option (b) is simpler.
+**Note on R4/R5:** These require knowing collection progress at the time of play, not end-of-round. The `CollectionProgressSnapshot` field on `CardPlayRecord` (added in Phase 1, populated in Phase 3's `RecordCardPlay`) stores this snapshot. R4/R5 evaluation uses `EffectiveCardType` (not `CardType`) to correctly identify Remove/Acquire plays even when the original card was a Trade.
 
 **Note on R6:** The random target assignment happens at task draw time. Store the target player ID on the task assignment (either as part of SecretTask or as a field on HiddenAgendaPlayerState).
 
@@ -94,7 +94,29 @@ public bool EvaluateTaskCompletion(string playerId, SecretTask task)
         "D6" => EvaluateDevotionWing(playerId, Wing.GrandHall, 5),
         "D7" => EvaluateDevotionWing(playerId, Wing.SculptureGarden, 5),
         "N1" => EvaluateNeglectCollection(playerId, CollectionType.RenaissanceMasters),
-        // ... etc for all 31 tasks
+        "N2" => EvaluateNeglectCollection(playerId, CollectionType.ContemporaryShowcase),
+        "N3" => EvaluateNeglectCollection(playerId, CollectionType.ImpressionistGallery),
+        "N4" => EvaluateNeglectWing(playerId, Wing.GrandHall),
+        "N5" => EvaluateNeglectWing(playerId, Wing.ModernWing),
+        "N6" => EvaluateNeglectCardType(playerId, CurationCardType.Remove),
+        "Y1" => EvaluateStyleRemoveCount(playerId, 3),
+        "Y2" => EvaluateStyleCollectionVariety(playerId, 4),
+        "Y3" => EvaluateStyleConsecutiveCollection(playerId, 3),
+        "Y4" => EvaluateStyleAlternating(playerId, 4),
+        "Y5" => EvaluateStyleHighestValue(playerId, 4),
+        "Y6" => EvaluateStyleEventSpotVisits(playerId, 3),
+        "M1" => EvaluateMovementAllWings(playerId),
+        "M2" => EvaluateMovementCamping(playerId, 4),
+        "M3" => EvaluateMovementSameSpot(playerId, 3),
+        "M4" => EvaluateMovementFullDistance(playerId, 4),
+        "M5" => EvaluateMovementWingHopping(playerId, 4),
+        "M6" => EvaluateMovementRevisit(playerId, 3),
+        "R1" => EvaluateRivalryRescue(playerId, 3),
+        "R2" => EvaluateRivalryEcho(playerId, 4),
+        "R3" => EvaluateRivalryAvoid(playerId, 5),
+        "R4" => EvaluateRivalryTopRemove(playerId, 3),
+        "R5" => EvaluateRivalryBottomAcquire(playerId, 3),
+        "R6" => EvaluateRivalryShadow(playerId, 4),
         _ => false
     };
 }
@@ -179,26 +201,76 @@ private bool EvaluateStyleCollectionVariety(string playerId, int threshold)
 }
 
 // Style Y3: same collection >= N turns in a row
+// A card play can affect multiple collections. Y3 is satisfied if there exists
+// some collection C that appears in AffectedCollections on N+ consecutive turns.
 private bool EvaluateStyleConsecutiveCollection(string playerId, int threshold)
 {
     var player = GamePlayers[playerId];
     var ordered = player.CardPlayHistory.OrderBy(r => r.TurnNumber).ToList();
-    // Find max consecutive streak where AffectedCollections overlap
-    // For each pair of consecutive records, check if they share any collection
-    // Track the best streak
-    ...
+    if (ordered.Count < threshold) return false;
+
+    // For each collection, find the longest consecutive run of turns where it appears
+    var allCollections = ordered.SelectMany(r => r.AffectedCollections).Distinct();
+    foreach (var collection in allCollections)
+    {
+        int maxStreak = 0;
+        int currentStreak = 0;
+        int lastTurn = -1;
+        foreach (var record in ordered)
+        {
+            if (record.AffectedCollections.Contains(collection))
+            {
+                if (lastTurn == -1 || record.TurnNumber == lastTurn + 1)
+                    currentStreak++;
+                else
+                    currentStreak = 1;
+                lastTurn = record.TurnNumber;
+                maxStreak = Math.Max(maxStreak, currentStreak);
+            }
+            else
+            {
+                currentStreak = 0;
+                lastTurn = -1;
+            }
+        }
+        if (maxStreak >= threshold) return true;
+    }
+    return false;
 }
 
 // Style Y4: alternate Acquire/Remove for >= N consecutive turns
+// Uses EffectiveCardType (not CardType) so Trade cards that resolve to
+// effectively-Acquire or effectively-Remove participate in the streak.
+// A Trade-effective turn (mixed deltas) breaks the streak.
 private bool EvaluateStyleAlternating(string playerId, int threshold)
 {
     var player = GamePlayers[playerId];
     var ordered = player.CardPlayHistory
-        .Where(r => r.CardType != CurationCardType.Trade) // Only Acquire/Remove
         .OrderBy(r => r.TurnNumber)
         .ToList();
-    // Find max alternating streak
-    ...
+
+    if (ordered.Count < threshold) return false;
+
+    int maxStreak = 1;
+    int currentStreak = 1;
+    for (int i = 1; i < ordered.Count; i++)
+    {
+        var prevType = ordered[i - 1].EffectiveCardType;
+        var currType = ordered[i].EffectiveCardType;
+
+        // Must alternate between Acquire and Remove
+        if ((prevType == CurationCardType.Acquire && currType == CurationCardType.Remove) ||
+            (prevType == CurationCardType.Remove && currType == CurationCardType.Acquire))
+        {
+            currentStreak++;
+            maxStreak = Math.Max(maxStreak, currentStreak);
+        }
+        else
+        {
+            currentStreak = 1;
+        }
+    }
+    return maxStreak >= threshold;
 }
 
 // Movement M1: visit all 4 wings
@@ -224,19 +296,34 @@ private bool EvaluateMovementCamping(string playerId, int threshold)
 }
 
 // Movement M3: same spot as another player >= N times
+// NOTE: Cannot match by TurnNumber since global turn numbers are unique per turn
+// (turns are sequential, not simultaneous). Instead, find each other player's
+// position at the time of this player's move by looking up their most recent
+// movement record at or before this global turn number.
 private bool EvaluateMovementSameSpot(string playerId, int threshold)
 {
-    // Cross-reference with RoundPlayHistory to find other players' positions each turn
     var player = GamePlayers[playerId];
     int count = 0;
     foreach (var move in player.MovementHistory)
     {
-        // Find other players' positions on this turn
-        var otherPositions = State.RoundPlayHistory
-            .Where(r => r.TurnNumber == move.TurnNumber && r.PlayerId != playerId)
-            .Select(r => r.SpaceId);
-        if (otherPositions.Contains(move.SpaceId))
-            count++;
+        // Find the global turn number for this player's move
+        var globalTurn = State.RoundPlayHistory
+            .FirstOrDefault(r => r.PlayerId == playerId && r.SpaceId == move.SpaceId
+                && r.TurnNumber >= move.TurnNumber)?.TurnNumber ?? move.TurnNumber;
+
+        foreach (var other in GamePlayers.Values.Where(p => p.PlayerId != playerId))
+        {
+            // Other player's position at this global turn = their last movement at or before globalTurn
+            var otherPos = State.RoundPlayHistory
+                .Where(r => r.PlayerId == other.PlayerId && r.TurnNumber <= globalTurn)
+                .OrderByDescending(r => r.TurnNumber)
+                .FirstOrDefault();
+            if (otherPos != null && otherPos.SpaceId == move.SpaceId)
+            {
+                count++;
+                break; // Count this turn once even if multiple others share the spot
+            }
+        }
     }
     return count >= threshold;
 }
@@ -246,8 +333,23 @@ private bool EvaluateMovementWingHopping(string playerId, int threshold)
 {
     var player = GamePlayers[playerId];
     var ordered = player.MovementHistory.OrderBy(m => m.TurnNumber).ToList();
-    // Find max consecutive streak where each wing differs from previous
-    ...
+    if (ordered.Count < threshold) return false;
+
+    int maxStreak = 1;
+    int currentStreak = 1;
+    for (int i = 1; i < ordered.Count; i++)
+    {
+        if (ordered[i].Wing != ordered[i - 1].Wing)
+        {
+            currentStreak++;
+            maxStreak = Math.Max(maxStreak, currentStreak);
+        }
+        else
+        {
+            currentStreak = 1;
+        }
+    }
+    return maxStreak >= threshold;
 }
 
 // Rivalry R1: Acquire after another player's Remove on same collection, >= N times
@@ -272,24 +374,33 @@ private bool EvaluateRivalryRescue(string playerId, int threshold)
 }
 
 // Rivalry R2: same collection as player immediately before you, >= N turns
+// Uses RoundPlayHistory (global sequence) to find the previous player's most recent
+// turn before each of this player's turns, rather than matching per-player turn numbers
+// (which don't align when turns are skipped via Catalog).
 private bool EvaluateRivalryEcho(string playerId, int threshold)
 {
-    // "Immediately before you" = previous player in turn order
     var turnOrder = State.TurnManager.TurnOrder;
     int myIndex = turnOrder.IndexOf(playerId);
     int prevIndex = (myIndex - 1 + turnOrder.Count) % turnOrder.Count;
     string prevPlayerId = turnOrder[prevIndex];
 
-    var player = GamePlayers[playerId];
     int count = 0;
-    foreach (var play in player.CardPlayHistory)
+    var myTurns = State.RoundPlayHistory
+        .Where(r => r.PlayerId == playerId && r.CardPlay != null)
+        .OrderBy(r => r.TurnNumber)
+        .ToList();
+
+    foreach (var myTurn in myTurns)
     {
-        // Find the previous player's play on the same turn cycle
-        // (their turn # would be play.TurnNumber - 1 within same round)
-        var prevPlay = GamePlayers[prevPlayerId].CardPlayHistory
-            .FirstOrDefault(r => r.TurnNumber == play.TurnNumber);
-        if (prevPlay is not null
-            && play.AffectedCollections.Intersect(prevPlay.AffectedCollections).Any())
+        // Find the previous player's most recent turn before mine
+        var prevPlayerTurn = State.RoundPlayHistory
+            .Where(r => r.PlayerId == prevPlayerId && r.CardPlay != null && r.TurnNumber < myTurn.TurnNumber)
+            .OrderByDescending(r => r.TurnNumber)
+            .FirstOrDefault();
+
+        if (prevPlayerTurn?.CardPlay != null
+            && myTurn.CardPlay!.AffectedCollections
+                .Intersect(prevPlayerTurn.CardPlay.AffectedCollections).Any())
         {
             count++;
         }
@@ -297,7 +408,109 @@ private bool EvaluateRivalryEcho(string playerId, int threshold)
     return count >= threshold;
 }
 
-// ... Additional evaluation functions for remaining tasks
+// Rivalry R3: never affect same collection as player immediately before you, >= N consecutive turns
+// Inverse of R2 but requires a consecutive streak of non-overlap.
+private bool EvaluateRivalryAvoid(string playerId, int threshold)
+{
+    var turnOrder = State.TurnManager.TurnOrder;
+    int myIndex = turnOrder.IndexOf(playerId);
+    int prevIndex = (myIndex - 1 + turnOrder.Count) % turnOrder.Count;
+    string prevPlayerId = turnOrder[prevIndex];
+
+    var myTurns = State.RoundPlayHistory
+        .Where(r => r.PlayerId == playerId && r.CardPlay != null)
+        .OrderBy(r => r.TurnNumber)
+        .ToList();
+
+    int maxStreak = 0;
+    int currentStreak = 0;
+    foreach (var myTurn in myTurns)
+    {
+        var prevPlayerTurn = State.RoundPlayHistory
+            .Where(r => r.PlayerId == prevPlayerId && r.CardPlay != null && r.TurnNumber < myTurn.TurnNumber)
+            .OrderByDescending(r => r.TurnNumber)
+            .FirstOrDefault();
+
+        if (prevPlayerTurn?.CardPlay == null)
+        {
+            currentStreak++; // No data from prev player = no overlap
+        }
+        else
+        {
+            bool overlaps = myTurn.CardPlay!.AffectedCollections
+                .Intersect(prevPlayerTurn.CardPlay.AffectedCollections).Any();
+            if (!overlaps)
+                currentStreak++;
+            else
+                currentStreak = 0;
+        }
+        maxStreak = Math.Max(maxStreak, currentStreak);
+    }
+    return maxStreak >= threshold;
+}
+
+// Rivalry R4: play Remove on highest-progress collection >= N times
+// Uses CollectionProgressSnapshot stored on each CardPlayRecord to check state at time of play.
+private bool EvaluateRivalryTopRemove(string playerId, int threshold)
+{
+    var player = GamePlayers[playerId];
+    int count = 0;
+    foreach (var play in player.CardPlayHistory.Where(r => r.EffectiveCardType == CurationCardType.Remove))
+    {
+        if (play.CollectionProgressSnapshot == null) continue;
+        var maxProgress = play.CollectionProgressSnapshot.Values.Max();
+        var highestCollections = play.CollectionProgressSnapshot
+            .Where(kv => kv.Value == maxProgress)
+            .Select(kv => kv.Key)
+            .ToHashSet();
+        if (play.AffectedCollections.Any(c => highestCollections.Contains(c)))
+            count++;
+    }
+    return count >= threshold;
+}
+
+// Rivalry R5: play Acquire on lowest-progress collection >= N times
+private bool EvaluateRivalryBottomAcquire(string playerId, int threshold)
+{
+    var player = GamePlayers[playerId];
+    int count = 0;
+    foreach (var play in player.CardPlayHistory.Where(r => r.EffectiveCardType == CurationCardType.Acquire))
+    {
+        if (play.CollectionProgressSnapshot == null) continue;
+        var minProgress = play.CollectionProgressSnapshot.Values.Min();
+        var lowestCollections = play.CollectionProgressSnapshot
+            .Where(kv => kv.Value == minProgress)
+            .Select(kv => kv.Key)
+            .ToHashSet();
+        if (play.AffectedCollections.Any(c => lowestCollections.Contains(c)))
+            count++;
+    }
+    return count >= threshold;
+}
+
+// Rivalry R6: same wing as randomly assigned target player >= N turns
+private bool EvaluateRivalryShadow(string playerId, int threshold)
+{
+    var player = GamePlayers[playerId];
+    if (player.RivalryTargetPlayerId == null) return false;
+    if (!GamePlayers.TryGetValue(player.RivalryTargetPlayerId, out var target)) return false;
+
+    int count = 0;
+    foreach (var move in player.MovementHistory)
+    {
+        // Find target's position at this turn (most recent move at or before this global turn)
+        var globalTurn = State.RoundPlayHistory
+            .FirstOrDefault(r => r.PlayerId == playerId && r.SpaceId == move.SpaceId
+                && r.TurnNumber >= move.TurnNumber)?.TurnNumber ?? move.TurnNumber;
+        var targetPos = State.RoundPlayHistory
+            .Where(r => r.PlayerId == target.PlayerId && r.TurnNumber <= globalTurn)
+            .OrderByDescending(r => r.TurnNumber)
+            .FirstOrDefault();
+        if (targetPos != null && targetPos.Wing == move.Wing)
+            count++;
+    }
+    return count >= threshold;
+}
 ```
 
 ### 2. Modify `Services/State/Games/Data/HiddenAgendaPlayerState.cs`
@@ -311,21 +524,9 @@ Add field for R6 rivalry task target:
 public string? RivalryTargetPlayerId { get; set; }
 ```
 
-### 3. Modify `CardPlayRecord` to include collection progress snapshot
+### 3. `CardPlayRecord` fields (already defined in Phase 1)
 
-For R4/R5 evaluation (highest/lowest progress at time of play):
-```csharp
-public record CardPlayRecord(
-    int TurnNumber,
-    CurationCard Card,
-    int SelectedIndex,
-    CollectionType[] AffectedCollections,
-    CurationCardType CardType,
-    Dictionary<CollectionType, int>? CollectionProgressSnapshot = null  // snapshot at time of play
-);
-```
-
-Update Phase 3's `RecordCardPlay` to include the snapshot.
+Phase 1 defines `CardPlayRecord` with both `EffectiveCardType` and `CollectionProgressSnapshot` fields. Phase 3's `RecordCardPlay` populates both. No additional changes needed here -- this section is a cross-reference.
 
 ### 4. Update `DrawTasksForPlayer` in context
 

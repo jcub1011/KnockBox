@@ -161,16 +161,12 @@ public sealed class GuessPhaseState : ITimedHiddenAgendaGameState
         return null; // Valid
     }
 
+    /// Uses the shared turn-advancement helper from HiddenAgendaGameContext (Phase 2)
+    /// to check round-end conditions and advance to the next player.
     private static IGameState<HiddenAgendaGameContext, HiddenAgendaCommand>
         AdvanceToNextPlayer(HiddenAgendaGameContext context)
     {
-        // Check round-end conditions after potential countdown decrement
-        var trigger = context.CheckRoundEndConditions();
-        if (trigger != RoundEndTrigger.None)
-            return new FinalGuessState();
-
-        context.State.TurnManager.NextTurn();
-        return new EventCardPhaseState();
+        return context.AdvanceToNextPlayerOrEndRound();
     }
 }
 ```

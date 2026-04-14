@@ -216,6 +216,8 @@ Rivalry (Hard, 3pt): R1-R6
 - `static IReadOnlyList<SecretTask> GetPoolForPlayerCount(int playerCount)` -- returns subset per GDD: 25 for 3 players, 30 for 4+
 - `static List<SecretTask> DrawTasks(IRandomNumberService rng, IReadOnlyList<SecretTask> pool, int count)` -- draws N unique tasks from pool without replacement
 
+**Pool exclusion rule:** For 3 players, exclude all 6 Rivalry tasks (R1-R6) since they depend on multi-player interactions that are thin with only 3 players, yielding 25 tasks (31 - 6 = 25). For 4+ players, include all 31 tasks but cap at 30 (exclude 1 random task for ambiguity).
+
 ### 7. `Services/State/Games/Data/HiddenAgendaPlayerState.cs`
 
 Per-player mutable state tracking everything needed for gameplay and task evaluation.
@@ -234,6 +236,10 @@ public class HiddenAgendaPlayerState
 
     // Event card (hold max 1)
     public EventCard? HeldEventCard { get; set; }
+
+    // Detour state
+    public bool DetourPending { get; set; }
+    public string? DetourTargetPlayerId { get; set; }
 
     // Guess submission
     public bool HasSubmittedGuess { get; set; }
@@ -258,14 +264,16 @@ public class HiddenAgendaPlayerState
     public List<CardDrawRecord> CardDrawHistory { get; set; } = [];
 }
 
-public record MovementRecord(int TurnNumber, int SpaceId, Wing Wing);
+public record MovementRecord(int TurnNumber, int SpaceId, Wing Wing, int SpinResult);
 
 public record CardPlayRecord(
     int TurnNumber,
     CurationCard Card,
     int SelectedIndex,           // Which of the 3 drawn cards was selected
     CollectionType[] AffectedCollections,
-    CurationCardType CardType
+    CurationCardType CardType,
+    CurationCardType EffectiveCardType,  // Acquire if all deltas positive, Remove if all negative, Trade if mixed
+    Dictionary<CollectionType, int>? CollectionProgressSnapshot = null  // snapshot at time of play, for R4/R5 evaluation
 );
 
 public record CardDrawRecord(
@@ -374,6 +382,7 @@ public Dictionary<CollectionType, int> CollectionProgress { get; } = new();
 
 // Round tracking
 public int CurrentRound { get; set; }
+public int TotalTurnsTaken { get; set; }
 
 // Guess countdown
 public bool GuessCountdownActive { get; set; }
@@ -403,12 +412,11 @@ public record TurnRecord(
 );
 ```
 
-5. Update `SetPhase` to call `NotifyStateChanged()` (matching Codeword pattern):
+5. `SetPhase` should **not** call `NotifyStateChanged()`. The `Execute`/`ExecuteAsync` wrapper on `AbstractGameState` handles notification after lock release. Calling it inside `SetPhase` (which runs inside the lock) would cause redundant notifications. Keep the simple implementation:
 ```csharp
 public void SetPhase(GamePhase phase)
 {
     Phase = phase;
-    NotifyStateChanged();
 }
 ```
 

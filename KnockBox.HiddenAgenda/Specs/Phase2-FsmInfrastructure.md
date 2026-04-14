@@ -236,7 +236,28 @@ RoundEndTrigger CheckRoundEndConditions()
 
 // Reset for new round: collections to 0, clear histories, clear player round state (keep cumulative scores),
 // rotate task pool per config.
+// Task pool rotation:
+//   Full: re-call GetPoolForPlayerCount (shuffles and selects fresh subset)
+//   Partial: shuffle all 31 tasks, take first N (where N = pool size for player count).
+//            This naturally rotates some tasks in/out each round while keeping most.
+//   Fixed: reuse the same pool from round 1.
 void ResetForNewRound()
+```
+
+**Shared turn-advancement helper:**
+```csharp
+/// Advances to the next player's turn or triggers round end.
+/// Used by EventCardPhaseState (Catalog ends turn), DrawPhaseState (FinishTurn),
+/// and GuessPhaseState (after guess/skip). Centralizes turn-advancement logic
+/// to avoid duplication across FSM states.
+public IGameState<HiddenAgendaGameContext, HiddenAgendaCommand>? AdvanceToNextPlayerOrEndRound()
+{
+    var trigger = CheckRoundEndConditions();
+    if (trigger != RoundEndTrigger.None)
+        return new FinalGuessState();
+    State.TurnManager.NextTurn();
+    return new EventCardPhaseState();
+}
 ```
 
 **Enum:**
