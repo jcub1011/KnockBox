@@ -7,8 +7,8 @@
   </Project>
   <Project Path="KnockBox.CardCounter/KnockBox.CardCounter.csproj" />
   <Project Path="KnockBox.CardCounterTests/KnockBox.CardCounterTests.csproj" />
-  <Project Path="KnockBox.ConsultTheCard/KnockBox.ConsultTheCard.csproj" Id="9f0761ce-ab23-4ee9-9fb5-2fc93b0f84bf" />
-  <Project Path="KnockBox.ConsultTheCardTests/KnockBox.ConsultTheCardTests.csproj" />
+  <Project Path="KnockBox.Codeword/KnockBox.Codeword.csproj" Id="9f0761ce-ab23-4ee9-9fb5-2fc93b0f84bf" />
+  <Project Path="KnockBox.CodewordTests/KnockBox.CodewordTests.csproj" />
   <Project Path="KnockBox.Core/KnockBox.Core.csproj" />
   <Project Path="KnockBox.CoreTests/KnockBox.CoreTests.csproj" />
   <Project Path="KnockBox.DiceSimulator/KnockBox.DiceSimulator.csproj" />

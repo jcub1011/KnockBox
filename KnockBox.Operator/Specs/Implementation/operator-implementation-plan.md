@@ -4,7 +4,7 @@
 This document outlines the architecture and implementation plan for the "Operator" game, a mathematical strategy / card brawler game for the KnockBox platform. The game heavily relies on precise decimal point tracking, complex card action resolution, and a strict turn structure.
 
 ## Architectural Approach
-The game will follow the Finite State Machine (FSM) architecture pattern established in `ConsultTheCard`. This ensures server-authoritative logic, thread-safety, and robust state transitions without direct, ad-hoc state mutations.
+The game will follow the Finite State Machine (FSM) architecture pattern established in `Codeword`. This ensures server-authoritative logic, thread-safety, and robust state transitions without direct, ad-hoc state mutations.
 
 ## Core Components
 1.  **Models**: Enums for Card types (Number, Operator, Action), a `Card` base class/record, and `OperatorPlayerState`.

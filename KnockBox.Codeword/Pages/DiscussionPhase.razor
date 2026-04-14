@@ -1,0 +1,285 @@
+@using KnockBox.Codeword.Services.State.Games.Data
+@using KnockBox.Core.Services.State.Users
+@using KnockBox.Codeword.Services.State.Games
+
+@{
+    var myId = UserService.CurrentUser?.Id ?? "";
+    var isHost = GameState.Host.Id == myId;
+    int aliveCount = GameState.GamePlayers.Values.Count(p => !p.IsEliminated);
+    int lockedInCount = GameState.GamePlayers.Values.Count(p => !p.IsEliminated && p.HasVoted);
+    var endVote = GameState.EndGameVoteStatus;
+    var skipVote = GameState.SkipTimeVoteStatus;
+}
+
+@if (isHost)
+{
+    @* ══════ HOST SPECTATOR VIEW ══════ *@
+    <div class="ctc-discussion-area">
+        <div class="ctc-discussion-panel ctc-host-panel">
+            <h2 class="ctc-phase-title glitch" data-text="[ INTEL ANALYSIS ]">[ INTEL ANALYSIS ]</h2>
+
+            @* ── Operative Dossier Grid ── *@
+            <div class="ctc-host-dossier-grid">
+                <h3 class="ctc-section-title">[ OPERATIVE DOSSIERS ]</h3>
+                <div class="ctc-dossier-cards">
+                    @foreach (var ps in GameState.GamePlayers.Values.OrderBy(p => p.DisplayName))
+                    {
+                        var alivePlayers = GameState.GamePlayers.Values.Where(state => !state.IsEliminated);
+                        int lockedVotes = alivePlayers.Count(state => state.VoteTargetId == ps.PlayerId && state.HasVoted);
+                        <div class="ctc-dossier-card @(ps.IsEliminated ? "ctc-dossier-eliminated" : "") @(ps.HasVoted ? "ctc-dossier-voted" : "")">
+                            <div class="ctc-dossier-name">@ps.DisplayName</div>
+                            @if (ps.ClueHistory.Count > 0)
+                            {
+                                <div class="ctc-dossier-clues">
+                                    @foreach (var clue in ps.ClueHistory)
+                                    {
+                                        <span class="ctc-dossier-clue">@clue</span>
+                                    }
+                                </div>
+                            }
+                            @if (ps.IsEliminated)
+                            {
+                                <div class="ctc-dossier-status ctc-dossier-status-eliminated">COMPROMISED</div>
+                            }
+                            else if (ps.HasVoted)
+                            {
+                                <div class="ctc-dossier-status ctc-dossier-status-voted">VOTE LOCKED</div>
+                            }
+                            else
+                            {
+                                <div class="ctc-dossier-status ctc-dossier-status-active">ACTIVE</div>
+                            }
+                            @if (lockedVotes > 0)
+                            {
+                                <div class="ctc-dossier-votes">@lockedVotes DESIGNATION(S)</div>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+
+            @* ── Vote Progress ── *@
+            @{
+                var barWidth = 20;
+                var filled = aliveCount > 0 ? (int)Math.Ceiling((double)lockedInCount / aliveCount * barWidth) : 0;
+                var empty = barWidth - filled;
+                var bar = new string('\u2588', filled) + new string('\u2591', empty);
+            }
+            <div class="ctc-host-vote-progress">
+                <span class="ctc-host-vote-bar">[@bar]</span>
+                <span class="ctc-host-vote-count">@lockedInCount / @aliveCount VOTES LOCKED</span>
+            </div>
+
+            @* ── End Game / Skip Status ── *@
+            <div class="ctc-host-status-readouts">
+                <div class="ctc-host-readout">
+                    <span class="ctc-host-readout-label">TERMINATION VOTE:</span>
+                    <span class="ctc-host-readout-value">@endVote.VotedToEnd.Count / @endVote.RequiredVotes</span>
+                </div>
+                <div class="ctc-host-readout">
+                    <span class="ctc-host-readout-label">SKIP TIME VOTE:</span>
+                    <span class="ctc-host-readout-value">@skipVote.VotedToEnd.Count / @skipVote.RequiredVotes</span>
+                </div>
+            </div>
+
+            @* ── Admin Control ── *@
+            <div class="ctc-host-actions">
+                <button class="ctc-btn ctc-btn-primary" @onclick="AdvanceToVote">
+                    [ OVERRIDE PROTOCOL ]
+                </button>
+            </div>
+        </div>
+    </div>
+}
+else
+{
+    @* ══════ PLAYER VIEW ══════ *@
+    <div class="ctc-discussion-area">
+        @{
+            var myPlayer = GetMyPlayer();
+            bool hasVotedToEnd = myPlayer is not null && myPlayer.HasVotedToEndGame;
+            bool hasLockedIn = myPlayer is not null && myPlayer.HasVoted;
+            var alivePlayersForVoting = GameState.GamePlayers.Values
+                .Where(p => !p.IsEliminated && p.PlayerId != myId)
+                .ToList();
+        }
+
+        <div class="ctc-discussion-panel">
+            <h2 class="ctc-phase-title glitch" data-text="[ INTEL ANALYSIS ]">[ INTEL ANALYSIS ]</h2>
+
+            @if (myPlayer is not null && myPlayer.Role != Role.Informant && !string.IsNullOrEmpty(myPlayer.SecretWord))
+            {
+                <div class="ctc-secret-word-banner">
+                    <span class="ctc-secret-word-label">Target Intel:</span>
+                    <span class="ctc-secret-word-value">@myPlayer.SecretWord</span>
+                </div>
+            }
+
+            @if (myPlayer is not null && myPlayer.IsEliminated)
+            {
+                <div class="ctc-eliminated-banner">
+                    <span class="ctc-eliminated-icon"></span>
+                    <div class="ctc-eliminated-text">
+                        <h3>CONNECTION TERMINATED</h3>
+                        <p>Transmission capabilities disabled.</p>
+                    </div>
+                </div>
+            }
+
+            @* ── Player List ── *@
+            <div class="ctc-discussion-players">
+                <h3 class="ctc-section-title">[ TARGET DESIGNATION ]</h3>
+                <div class="ctc-player-list">
+                    @foreach (var ps in GameState.GamePlayers.Values.OrderBy(p => p.DisplayName))
+                    {
+                        if (ps is null || myPlayer is null) continue;
+                        bool isMe = ps.PlayerId == myId;
+
+                        string playerRowCss = "ctc-player-row "
+                            + (isMe ? "ctc-player-me" : string.Empty)
+                            + (ps.IsEliminated ? "ctc-player-eliminated" : string.Empty);
+                        string? voteTargetName = GameState.GamePlayers.TryGetValue(ps.VoteTargetId ?? string.Empty, out var targetPlayer) ? targetPlayer.DisplayName : "N/A";
+                        var alivePlayers = GameState.GamePlayers.Values.Where(state => !state.IsEliminated);
+
+                        int lockedVotes = alivePlayers.Count(state => state.VoteTargetId == ps.PlayerId && state.HasVoted);
+
+                        if (isMe || ps.IsEliminated || myPlayer.IsEliminated || myPlayer.HasVoted)
+                        {
+                            <div class="@playerRowCss">
+                                <div class="ctc-player-row-row">
+                                    @if (lockedVotes > 0)
+                                    {
+                                        <span class="ctc-clue-player">@ps.DisplayName - Vote(s) @lockedVotes</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="ctc-clue-player">@ps.DisplayName</span>
+                                    }
+
+                                    @if (ps.IsEliminated)
+                                    {
+                                        <span class="ctc-status-badge ctc-status-eliminated">ELIMINATED</span>
+                                    }
+                                    else if (ps.HasVoted)
+                                    {
+                                        <span class="ctc-status-badge ctc-status-voted">VOTED &#x2192; @voteTargetName</span>
+                                    }
+                                </div>
+                                <div class="ctc-player-row-row">
+                                    <div class="ctc-clue-history-bubbles">
+                                        @foreach (var clue in ps.ClueHistory)
+                                        {
+                                            <span class="ctc-clue-bubble">@clue</span>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                        else
+                        {
+                            bool isSelected = myPlayer.VoteTargetId == ps.PlayerId;
+                            string voteCss = isSelected ? "ctc-vote-target-selected" : string.Empty;
+
+                            <button class="@playerRowCss @voteCss" @onclick="() => SelectTarget(ps.PlayerId)">
+                                <div class="ctc-player-row-row">
+                                    @if (lockedVotes > 0)
+                                    {
+                                        <span class="ctc-clue-player">@ps.DisplayName - Vote(s) @lockedVotes</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="ctc-clue-player">@ps.DisplayName</span>
+                                    }
+
+                                    @if (ps.IsEliminated)
+                                    {
+                                        <span class="ctc-status-badge ctc-status-eliminated">ELIMINATED</span>
+                                    }
+                                    else if (ps.HasVoted)
+                                    {
+                                        <span class="ctc-status-badge ctc-status-voted">VOTED &#x2192; @voteTargetName</span>
+                                    }
+                                </div>
+                                <div class="ctc-player-row-row">
+                                    <div class="ctc-clue-history-bubbles">
+                                        @foreach (var clue in ps.ClueHistory)
+                                        {
+                                            <span class="ctc-clue-bubble">@clue</span>
+                                        }
+                                    </div>
+                                </div>
+                            </button>
+                        }
+                    }
+                </div>
+
+                <div class="ctc-vote-progress-bar">
+                    @lockedInCount / @aliveCount votes locked in
+                </div>
+
+                @if (hasLockedIn)
+                {
+                    <div class="ctc-vote-locked">
+                        <span class="ctc-lock-icon">[ LOCKED ]</span>
+                        <p class="ctc-waiting-text">Designation confirmed. Awaiting squad...</p>
+                    </div>
+                }
+                else if (myPlayer is not null && !myPlayer.IsEliminated)
+                {
+                    CodewordPlayerState? tp = null;
+                    bool targetSelected = myPlayer.VoteTargetId is not null && GameState.GamePlayers.TryGetValue(myPlayer.VoteTargetId, out tp);
+
+                    <div class="ctc-vote-confirm">
+                        @if (targetSelected)
+                        {
+                            <button class="ctc-btn ctc-btn-danger ctc-btn-lg" @onclick="ConfirmVote">
+                                [ LOCK-IN DESIGNATION ]
+                            </button>
+                        }
+                        else
+                        {
+                            <button class="ctc-btn ctc-btn-danger ctc-btn-lg ctc-lock-vote-disabled" disabled @onclick="ConfirmVote">
+                                [ LOCK-IN DESIGNATION ]
+                            </button>
+                        }
+                    </div>
+                }
+                else if (myPlayer is not null && myPlayer.IsEliminated)
+                {
+                    <p class="ctc-waiting-text">You are compromised and cannot vote.</p>
+                }
+
+                @* ── Actions ── *@
+                <div class="ctc-discussion-actions">
+                    @if (myPlayer is not null && !myPlayer.IsEliminated)
+                    {
+                        bool hasVotedToSkip = myPlayer.HasVotedToSkipTime;
+
+                        <div class="ctc-action-group">
+                            <div class="ctc-action-item">
+                                <button class="ctc-btn ctc-btn-warning" @onclick="VoteToEndGame"
+                                        title="@(hasVotedToEnd ? "Click to rescind your vote to end the game" : "Vote to end the game early")">
+                                    @(hasVotedToEnd ? "[ ABORT TERMINATION ]" : "[ INITIATE TERMINATION ]")
+                                </button>
+                                <div class="ctc-vote-small-progress">
+                                    @endVote.VotedToEnd.Count / @endVote.RequiredVotes required
+                                </div>
+                            </div>
+
+                            <div class="ctc-action-item">
+                                <button class="ctc-btn ctc-btn-secondary" @onclick="SkipRemainingTime"
+                                        title="@(hasVotedToSkip ? "Click to rescind your vote to skip time" : "Vote to skip the remaining discussion time")">
+                                    @(hasVotedToSkip ? "[ ABORT SKIP ]" : "[ FAST-FORWARD ]")
+                                </button>
+                                <div class="ctc-vote-small-progress">
+                                    @skipVote.VotedToEnd.Count / @skipVote.RequiredVotes required
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+}
+

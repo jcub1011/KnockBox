@@ -50,9 +50,13 @@
                      Condition="Exists('$(TargetDir)$(TargetName).staticwebassets.runtime.json')" />
       <ScopedCss Include="$(IntermediateOutputPath)scopedcss\projectbundle\$(TargetName).bundle.scp.css" />
       <WwwRootFiles Include="wwwroot\**\*.*" />
+      <PluginContentFiles Include="$(TargetDir)**\*.csv" />
     </ItemGroup>
     <Copy SourceFiles="@(PluginPrimary)"
           DestinationFolder="$(PluginDestDir)" />
+    <Copy SourceFiles="@(PluginContentFiles)"
+          DestinationFolder="$(PluginDestDir)%(RecursiveDir)"
+          Condition="'@(PluginContentFiles)' != ''" />
     <Copy SourceFiles="@(ScopedCss)"
           DestinationFiles="$(PluginDestDir)wwwroot\$(TargetName).styles.css"
           Condition="Exists('@(ScopedCss)')" />

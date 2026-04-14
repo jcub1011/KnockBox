@@ -16,13 +16,13 @@ The solution is split into the host project, a shared core library, one class li
 | `KnockBox.Core` | Class Library | Shared platform infrastructure: `IGameModule` / `PluginLoader`, `AbstractGameState`, `AbstractGameEngine`, session services, navigation, `IRandomNumberService`, result types, thread-safety utilities, `DisposableComponent` |
 | `KnockBox.CardCounter` | Class Library (game plugin) | Card Counter game logic, state, Razor pages |
 | `KnockBox.DiceSimulator` | Class Library (game plugin) | Dice Simulator game logic, state, Razor pages |
-| `KnockBox.ConsultTheCard` | Class Library (game plugin) | Consult The Card game logic, state, Razor pages |
+| `KnockBox.Codeword` | Class Library (game plugin) | Codeword game logic, state, Razor pages |
 | `KnockBox.DrawnToDress` | Class Library (game plugin) | Drawn To Dress game logic, state, Razor pages |
 | `KnockBox.Operator` | Class Library (game plugin) | Operator game logic, state, Razor pages |
 | `KnockBox.CoreTests` | MSTest | Unit tests for `KnockBox.Core` |
 | `KnockBox.CardCounterTests` | MSTest | Unit tests for `KnockBox.CardCounter` |
 | `KnockBox.DiceSimulatorTests` | MSTest | Unit and integration tests for `KnockBox.DiceSimulator` |
-| `KnockBox.ConsultTheCardTests` | MSTest | Unit tests for `KnockBox.ConsultTheCard` |
+| `KnockBox.CodewordTests` | MSTest | Unit tests for `KnockBox.Codeword` |
 | `KnockBox.DrawnToDressTests` | MSTest | Unit tests for `KnockBox.DrawnToDress` |
 | `KnockBox.OperatorTests` | MSTest | Unit tests for `KnockBox.Operator` |
 | `KnockBoxTests` | MSTest | Integration tests for the main `KnockBox` project (repository layer, etc.) |

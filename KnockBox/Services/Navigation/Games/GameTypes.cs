@@ -19,9 +19,9 @@ namespace KnockBox.Services.Navigation.Games
         [Description("Drawn To Dress")]
         [NavigationString("drawn-to-dress")]
         DrawnToDress,
-        [Description("Consult The Card")]
-        [NavigationString("consult-the-card")]
-        ConsultTheCard,
+        [Description("Codeword")]
+        [NavigationString("codeword")]
+        Codeword,
         [Description("Operator")]
         [NavigationString("operator")]
         Operator,

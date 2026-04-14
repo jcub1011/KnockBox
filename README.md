@@ -424,4 +424,4 @@ Building the host transitively builds your plugin and stages it into `KnockBox/b
 
 - [`KnockBox/Specs/knockbox-platform-architecture.md`](KnockBox/Specs/knockbox-platform-architecture.md) — the authoritative architecture reference (ALC isolation, session lifecycle, DI order, lobby routing).
 - [`CLAUDE.md`](CLAUDE.md) — build/test commands and additional contributor notes.
-- Existing plugins (`KnockBox.CardCounter`, `KnockBox.ConsultTheCard`, `KnockBox.DiceSimulator`, `KnockBox.DrawnToDress`, `KnockBox.Operator`) — concrete examples of the patterns above at varying complexity. `KnockBox.DiceSimulator` is the simplest starting reference.
+- Existing plugins (`KnockBox.CardCounter`, `KnockBox.Codeword`, `KnockBox.DiceSimulator`, `KnockBox.DrawnToDress`, `KnockBox.Operator`) — concrete examples of the patterns above at varying complexity. `KnockBox.DiceSimulator` is the simplest starting reference.

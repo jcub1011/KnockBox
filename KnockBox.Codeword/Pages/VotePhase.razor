@@ -1,0 +1,110 @@
+@using KnockBox.Core.Services.State.Users
+@using KnockBox.Codeword.Services.State.Games
+
+@{
+    var myId = UserService.CurrentUser?.Id ?? "";
+    var isHost = GameState.Host.Id == myId;
+    int aliveCount = GameState.GamePlayers.Values.Count(p => !p.IsEliminated);
+    int votedCount = GameState.GamePlayers.Values.Count(p => !p.IsEliminated && p.HasVoted);
+}
+
+@if (isHost)
+{
+    @* ══════ HOST SPECTATOR VIEW ══════ *@
+    <div class="ctc-vote-area">
+        <div class="ctc-vote-panel ctc-host-panel">
+            <h2 class="ctc-phase-title glitch" data-text="[ FINAL DESIGNATION ]">[ FINAL DESIGNATION ]</h2>
+
+            @* ── Vote Progress Bar ── *@
+            @{
+                var barWidth = 20;
+                var filled = aliveCount > 0 ? (int)Math.Ceiling((double)votedCount / aliveCount * barWidth) : 0;
+                var empty = barWidth - filled;
+                var bar = new string('\u2588', filled) + new string('\u2591', empty);
+            }
+            <div class="ctc-host-vote-progress">
+                <span class="ctc-host-vote-bar">[@bar]</span>
+                <span class="ctc-host-vote-count">@votedCount / @aliveCount VOTES LOGGED</span>
+            </div>
+
+            @* ── Live Designation Tracker ── *@
+            <div class="ctc-host-vote-tracker">
+                <h3 class="ctc-section-title">[ LIVE DESIGNATION TRACKER ]</h3>
+                <div class="ctc-vote-tracker-grid">
+                    @foreach (var target in GameState.GamePlayers.Values.Where(p => !p.IsEliminated).OrderBy(p => p.DisplayName))
+                    {
+                        var votes = GameState.GamePlayers.Values.Count(p => !p.IsEliminated && p.HasVoted && p.VoteTargetId == target.PlayerId);
+                        var maxVotes = aliveCount - 1;
+                        var tFilled = maxVotes > 0 ? votes : 0;
+                        var tEmpty = maxVotes > 0 ? maxVotes - votes : 0;
+                        <div class="ctc-vote-tracker-row @(votes > 0 ? "ctc-vote-tracker-targeted" : "")">
+                            <span class="ctc-vote-tracker-name">@target.DisplayName</span>
+                            <span class="ctc-vote-tracker-bar">@(new string('\u2588', tFilled))@(new string('\u2591', tEmpty))</span>
+                            <span class="ctc-vote-tracker-count">@votes</span>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+}
+else
+{
+    @* ══════ PLAYER VIEW ══════ *@
+    <div class="ctc-vote-area">
+        @{
+            var myPlayer = GetMyPlayer();
+            bool hasVoted = myPlayer is not null && myPlayer.HasVoted;
+            var alivePlayers = GameState.GamePlayers.Values
+                .Where(p => !p.IsEliminated && p.PlayerId != myId)
+                .ToList();
+        }
+
+        <div class="ctc-vote-panel">
+            <h2 class="ctc-phase-title glitch" data-text="[ FINAL DESIGNATION ]">[ FINAL DESIGNATION ]</h2>
+
+            <div class="ctc-vote-progress-bar">
+                @votedCount / @aliveCount votes logged
+            </div>
+
+            @if (hasVoted)
+            {
+                <div class="ctc-vote-waiting">
+                    <span class="ctc-lock-icon">[ LOCKED ]</span>
+                    <p class="ctc-waiting-text">Designation confirmed. Awaiting squad...</p>
+                </div>
+            }
+            else if (myPlayer is not null && !myPlayer.IsEliminated)
+            {
+                <div class="ctc-vote-grid">
+                    @foreach (var target in alivePlayers)
+                    {
+                        bool isSelected = _selectedTargetId == target.PlayerId;
+                        <button class="ctc-vote-target @(isSelected ? "ctc-vote-target-selected" : "")"
+                                @onclick="() => SelectTarget(target.PlayerId)">
+                            <span class="ctc-vote-target-name">@target.DisplayName</span>
+                        </button>
+                    }
+                </div>
+
+                @if (_selectedTargetId is not null)
+                {
+                    var targetName = GameState.GamePlayers.TryGetValue(_selectedTargetId, out var tp) ? tp.DisplayName : "...";
+                    <div class="ctc-vote-confirm">
+                        <p>Designate <strong>@targetName</strong> for termination?</p>
+                        <button class="ctc-btn ctc-btn-danger" @onclick="ConfirmVote">
+                            [ CONFIRM TERMINATION ]
+                        </button>
+                        <button class="ctc-btn ctc-btn-secondary" @onclick="CancelSelection">
+                            [ ABORT ]
+                        </button>
+                    </div>
+                }
+            }
+            else
+            {
+                <p class="ctc-waiting-text">You have been terminated and cannot log a designation.</p>
+            }
+        </div>
+    </div>
+}

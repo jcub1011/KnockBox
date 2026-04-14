@@ -55,7 +55,7 @@
     -->
     <ProjectReference Include="..\KnockBox.CardCounter\KnockBox.CardCounter.csproj"
                       ReferenceOutputAssembly="false" Private="false" />
-    <ProjectReference Include="..\KnockBox.ConsultTheCard\KnockBox.ConsultTheCard.csproj"
+    <ProjectReference Include="..\KnockBox.Codeword\KnockBox.Codeword.csproj"
                       ReferenceOutputAssembly="false" Private="false" />
     <ProjectReference Include="..\KnockBox.DiceSimulator\KnockBox.DiceSimulator.csproj"
                       ReferenceOutputAssembly="false" Private="false" />

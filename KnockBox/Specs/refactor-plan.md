@@ -40,7 +40,7 @@ Refactor the `KnockBox` application to use a true plugin architecture. The main 
 
 - [x] The following `.csproj` files use `<Project Sdk="Microsoft.NET.Sdk.Razor">` and reference ASP.NET Core (`<FrameworkReference Include="Microsoft.AspNetCore.App" />`):
   - `KnockBox.CardCounter\KnockBox.CardCounter.csproj`
-  - `KnockBox.ConsultTheCard\KnockBox.ConsultTheCard.csproj`
+  - `KnockBox.Codeword\KnockBox.Codeword.csproj`
   - `KnockBox.DiceSimulator\KnockBox.DiceSimulator.csproj`
   - `KnockBox.DrawnToDress\KnockBox.DrawnToDress.csproj`
   - `KnockBox.Operator\KnockBox.Operator.csproj`

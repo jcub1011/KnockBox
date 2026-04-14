@@ -1,0 +1,128 @@
+@using KnockBox.Core.Services.State.Users
+@using KnockBox.Codeword.Services.State.Games
+
+<div class="ctc-lobby">
+    @if (UserService.CurrentUser?.Id == GameState.Host.Id)
+    {
+        <button class="ctc-settings-gear-btn" @onclick="ToggleSettings" title="Game Settings">
+            ⚙️
+        </button>
+    }
+
+    <div class="ctc-lobby-table-container">
+        <div class="ctc-lobby-table">
+            <h2 class="ctc-lobby-title">WAITING FOR PLAYERS</h2>
+            <div class="ctc-lobby-players">
+                @{
+                    bool isUserHost = GameState.Host.Id == UserService.CurrentUser?.Id;
+                    int playerCount = GameState.Players.Count;
+                }
+
+                @foreach (var player in GameState.Players.Prepend(GameState.Host))
+                {
+                    bool isHost = player.Id == GameState.Host.Id;
+                    bool isMe = player.Id == UserService.CurrentUser?.Id;
+                    @if (isHost)
+                    {
+                        <div class="ctc-lobby-player @(isMe ? "ctc-lobby-player-me" : "")">
+                            <span class="ctc-player-avatar">👑</span>
+                            <span class="ctc-player-lobbyname">@player.Name</span>
+                            <span class="ctc-host-badge">HOST</span>
+                        </div>
+                    }
+                    else if (isUserHost)
+                    {
+                        <button class="ctc-lobby-player @(isMe ? "ctc-lobby-player-me" : "")"
+                                @onclick="() => KickPlayer(player.Id)" title="Click to kick player">
+                            <span class="ctc-player-avatar">🕵️</span>
+                            <span class="ctc-player-lobbyname">@player.Name</span>
+                        </button>
+                    }
+                    else
+                    {
+                        <div class="ctc-lobby-player @(isMe ? "ctc-lobby-player-me" : "")">
+                            <span class="ctc-player-avatar">🕵️</span>
+                            <span class="ctc-player-lobbyname">@player.Name</span>
+                        </div>
+                    }
+                }
+            </div>
+
+            <p class="ctc-lobby-player-count">@playerCount / 8 players (need 4–8)</p>
+
+            @if (isUserHost)
+            {
+                bool canStart = playerCount >= 4 && playerCount <= 8;
+                <button class="ctc-btn ctc-btn-primary ctc-btn-lg" @onclick="StartGame" disabled="@(!canStart)"
+                        title="@(!canStart ? "Need 4-8 players to start" : "Start the game")">
+                    🔍 START GAME
+                </button>
+                @if (!canStart)
+                {
+                    <p class="ctc-lobby-min-players">⚠️ Need 4–8 players to start</p>
+                }
+            }
+            else
+            {
+                <p class="ctc-waiting-text">Waiting for host to start...</p>
+            }
+        </div>
+    </div>
+
+    @if (UserService.CurrentUser?.Id == GameState.Host.Id)
+    {
+        @if (SettingsOpen)
+        {
+            <div class="ctc-settings-backdrop" @onclick="ToggleSettings"></div>
+        }
+        <div class="ctc-settings-drawer @(SettingsOpen ? "ctc-settings-drawer-open" : "")">
+            <div class="ctc-settings-drawer-header">
+                <h3 class="ctc-config-title">⚙️ Game Settings</h3>
+                <button class="ctc-settings-close-btn" @onclick="ToggleSettings" title="Close settings">✕</button>
+            </div>
+            <div class="ctc-settings-drawer-body">
+
+                <h4 class="ctc-config-section-title">⏱️ Timers</h4>
+                <div class="ctc-config-grid">
+                    <label class="ctc-config-label ctc-config-label-row">
+                        <span>Enable Timers:</span>
+                        <input type="checkbox" class="ctc-config-checkbox" @bind="GameState.Config.EnableTimers" @bind:after="NotifyConfigChanged" />
+                    </label>
+                    <label class="ctc-config-label">
+                        Setup Timeout (s):
+                        <input type="number" step="1" class="ctc-config-input" @bind="SetupPhaseTimeoutSeconds" />
+                    </label>
+                    <label class="ctc-config-label">
+                        Clue Phase Timeout (s):
+                        <input type="number" step="1" class="ctc-config-input" @bind="CluePhaseTimeoutSeconds" />
+                    </label>
+                    <label class="ctc-config-label">
+                        Discussion Timeout (s):
+                        <input type="number" step="1" class="ctc-config-input" @bind="DiscussionPhaseTimeoutSeconds" />
+                    </label>
+                    <label class="ctc-config-label">
+                        Vote Timeout (s):
+                        <input type="number" step="1" class="ctc-config-input" @bind="VotePhaseTimeoutSeconds" />
+                    </label>
+                    <label class="ctc-config-label">
+                        Reveal Timeout (s):
+                        <input type="number" step="1" class="ctc-config-input" @bind="RevealPhaseTimeoutSeconds" />
+                    </label>
+                    <label class="ctc-config-label">
+                        Informant Guess Timeout (s):
+                        <input type="number" step="1" class="ctc-config-input" @bind="InformantGuessTimeoutSeconds" />
+                    </label>
+                </div>
+
+                <h4 class="ctc-config-section-title">🎮 Gameplay</h4>
+                <div class="ctc-config-grid">
+                    <label class="ctc-config-label">
+                        Total Games:
+                        <input type="number" min="1" class="ctc-config-input" @bind="GameState.Config.TotalGames" @bind:after="NotifyConfigChanged" />
+                    </label>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+

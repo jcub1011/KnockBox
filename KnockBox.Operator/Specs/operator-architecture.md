@@ -1,2 +1,2 @@
 # Operator Architecture
-Follows architecture patterns established in ConsultTheCard.
+Follows architecture patterns established in Codeword.

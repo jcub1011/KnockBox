@@ -1,7 +1,7 @@
 # Phase 1: Core Models & FSM Scaffolding
 
 ## Context
-This phase establishes the foundational data structures and FSM scaffolding required for the Operator game. It mirrors the `ConsultTheCard` pattern but replaces the phase enums and state data with Operator-specific concepts, while setting up the specific properties needed for reactionary cards.
+This phase establishes the foundational data structures and FSM scaffolding required for the Operator game. It mirrors the `Codeword` pattern but replaces the phase enums and state data with Operator-specific concepts, while setting up the specific properties needed for reactionary cards.
 
 ## Requirements
 *   Define the `Card` data structure supporting Numbers (0-9), Operators (+, -, *, /), and Actions (Shield, Liability Transfer, etc.).

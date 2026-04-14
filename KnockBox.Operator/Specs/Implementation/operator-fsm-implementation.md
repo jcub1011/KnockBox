@@ -1,7 +1,7 @@
 # Implementation Plan: Operator Game
 
 ## Background & Motivation
-The user requested the implementation of "Operator", a mathematical strategy / card brawler game for the KnockBox platform. Based on the provided Game Design Document (GDD), Operator requires precise decimal point tracking, complex card action resolution, and a strict turn structure. The game should follow the Finite State Machine (FSM) architecture pattern established in `ConsultTheCard` to ensure server-authoritative logic, thread safety, and maintainable state transitions.
+The user requested the implementation of "Operator", a mathematical strategy / card brawler game for the KnockBox platform. Based on the provided Game Design Document (GDD), Operator requires precise decimal point tracking, complex card action resolution, and a strict turn structure. The game should follow the Finite State Machine (FSM) architecture pattern established in `Codeword` to ensure server-authoritative logic, thread safety, and maintainable state transitions.
 
 ## Scope & Impact
 *   **Target Project:** `KnockBox.Operator` (Class Library) and its corresponding test project `KnockBox.OperatorTests`.
