@@ -7,7 +7,7 @@
 @implements IDisposable
 
 <div class="main">
-    <header class="@(_isOnHomePage ? "home-header" : "") @(_isEnteringGame ? "entering-from-home" : "")">
+    <header class="@(_isOnHomePage ? "home-header" : "") @(_isEnteringGame ? "entering-from-home" : "") @(_isExitingGame ? "exiting-to-home" : "")">
         @if (!_isOnHomePage && GameSessionService.TryGetCurrentSession(out var currentSession))
         {
             <a href="@NavigationService.GetHomeUri()" title="Click to return home">
@@ -29,7 +29,7 @@
             <span>Knockbox</span>
         }
     </header>
-    <article class="@(_isEnteringGame ? "entering-from-home" : "")">
+    <article class="@(_isEnteringGame ? "entering-from-home" : "") @(_isExitingGame ? "exiting-to-home" : "")">
         @Body
         <div id="blazor-error-ui" data-nosnippet>
             An unhandled error has occurred.
@@ -50,12 +50,27 @@
     private bool _isRoomCodeRevealed;
     private bool _isOnHomePage;
     private bool _isEnteringGame;
+    private bool _isExitingGame;
+    private IDisposable? _locationChangingRegistration;
 
     protected override void OnInitialized()
     {
         _isOnHomePage = IsHomePage();
         NavigationManager.LocationChanged += OnLocationChanged;
         UserService.UserInitialized += OnUserInitialized;
+        _locationChangingRegistration = NavigationManager.RegisterLocationChangingHandler(OnLocationChanging);
+    }
+
+    private async ValueTask OnLocationChanging(LocationChangingContext context)
+    {
+        if (_isOnHomePage || _isExitingGame) return;
+
+        var targetRelPath = NavigationManager.ToBaseRelativePath(context.TargetLocation).TrimEnd('/');
+        if (targetRelPath is not ("" or "home")) return;
+
+        _isExitingGame = true;
+        await InvokeAsync(StateHasChanged);
+        await Task.Delay(400);
     }
 
     private bool IsHomePage()
@@ -70,6 +85,7 @@
         _isOnHomePage = IsHomePage();
         // Reset the room-code reveal state when the user navigates away from/to a room.
         _isRoomCodeRevealed = false;
+        _isExitingGame = false;
 
         if (wasHome && !_isOnHomePage)
         {
@@ -97,6 +113,7 @@
     {
         NavigationManager.LocationChanged -= OnLocationChanged;
         UserService.UserInitialized -= OnUserInitialized;
+        _locationChangingRegistration?.Dispose();
     }
 
     private void ToggleRoomCode() => _isRoomCodeRevealed = !_isRoomCodeRevealed;

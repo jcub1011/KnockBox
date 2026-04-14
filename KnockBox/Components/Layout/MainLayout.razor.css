@@ -113,9 +113,43 @@ header.entering-from-home {
     }
 }
 
+/* ── Game Exit Animation (back to home) ───────────────────────────────── */
+
+article.exiting-to-home {
+    animation: content-exit 0.4s ease-in both;
+}
+
+@keyframes content-exit {
+    from {
+        opacity: 1;
+        transform: translateY(0);
+    }
+    to {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+}
+
+header.exiting-to-home {
+    animation: header-exit 0.35s ease-in both;
+}
+
+@keyframes header-exit {
+    from {
+        opacity: 1;
+        transform: translateY(0);
+    }
+    to {
+        opacity: 0;
+        transform: translateY(-100%);
+    }
+}
+
 @media (prefers-reduced-motion: reduce) {
     article.entering-from-home,
-    header.entering-from-home {
+    header.entering-from-home,
+    article.exiting-to-home,
+    header.exiting-to-home {
         animation: none;
     }
 }
