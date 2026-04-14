@@ -1,25 +1,49 @@
-﻿using KnockBox.Extensions.Returns;
-using KnockBox.Services.Logic.Games.Engines.Shared;
-using KnockBox.Services.Navigation.Games;
-using KnockBox.Services.State.Users;
+using KnockBox.Core.Extensions.Returns;
+using KnockBox.Core.Services.Logic.Games.Engines.Shared;
+using KnockBox.Core.Services.Logic.Games.Shared;
+using KnockBox.Core.Services.State.Users;
 using System.Collections.Concurrent;
-using KnockBox.Services.Logic.Games.CardCounter;
-using KnockBox.Services.Logic.Games.DiceSimulator;
-using KnockBox.Services.Logic.Games.DrawnToDress;
-using KnockBox.Services.Logic.Games.ConsultTheCard;
-using KnockBox.Services.Logic.Games.Operator;
+using Microsoft.Extensions.DependencyInjection;
+using KnockBox.Core.Plugins;
 
 namespace KnockBox.Services.Logic.Games.Shared
 {
-    public class LobbyService(
-        IServiceProvider serviceProvider,
-        ILobbyCodeService lobbyCodeService) : ILobbyService
+    public class LobbyService : ILobbyService
     {
+        private readonly ILobbyCodeService _lobbyCodeService;
+        private readonly ILogger<LobbyService> _logger;
         private readonly ConcurrentDictionary<string, LobbyRegistration> _lobbies = [];
+        private readonly Dictionary<string, GameRegistration> _gamesByRoute;
+
+        public LobbyService(
+            IServiceProvider serviceProvider,
+            ILobbyCodeService lobbyCodeService,
+            IEnumerable<IGameModule> gameModules,
+            ILogger<LobbyService> logger)
+        {
+            _lobbyCodeService = lobbyCodeService;
+            _logger = logger;
+            _gamesByRoute = new Dictionary<string, GameRegistration>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var module in gameModules)
+            {
+                var engine = serviceProvider.GetKeyedService<AbstractGameEngine>(module.RouteIdentifier);
+                if (engine is null)
+                {
+                    _logger.LogError(
+                        "Game module [{Name}] with route identifier [{RouteIdentifier}] did not register an AbstractGameEngine; it will be unavailable.",
+                        module.Name,
+                        module.RouteIdentifier);
+                    continue;
+                }
+
+                _gamesByRoute[module.RouteIdentifier] = new GameRegistration(module, engine);
+            }
+        }
 
         public async Task<Result> CloseLobbyAsync(
-            User user, 
-            LobbyRegistration registration, 
+            User user,
+            LobbyRegistration registration,
             CancellationToken ct = default)
         {
             if (user.Id != registration.State.Host.Id)
@@ -30,7 +54,7 @@ namespace KnockBox.Services.Logic.Games.Shared
 
             removed.State.Dispose();
 
-            var releaseResult = await lobbyCodeService.ReleaseLobbyCodeAsync(registration.Code, ct);
+            var releaseResult = await _lobbyCodeService.ReleaseLobbyCodeAsync(registration.Code, ct);
             if (releaseResult.IsCanceled)
                 return Result.FromCancellation();
 
@@ -41,56 +65,58 @@ namespace KnockBox.Services.Logic.Games.Shared
         }
 
         public async Task<ValueResult<LobbyRegistration>> CreateLobbyAsync(
-            User host, 
-            GameType gameType, 
+            User host,
+            string routeIdentifier,
             CancellationToken ct = default)
         {
-            // TODO: Create implementations of these engines
-            AbstractGameEngine? engine = gameType switch
-            {
-                GameType.SplitTheDeck => null,
-                GameType.DiceSimulator => serviceProvider.GetService<DiceSimulatorGameEngine>(),
-                GameType.CardCounter => serviceProvider.GetService<CardCounterGameEngine>(),
-                GameType.DrawnToDress => serviceProvider.GetService<DrawnToDressGameEngine>(),
-                GameType.ConsultTheCard => serviceProvider.GetService<ConsultTheCardGameEngine>(),
-                GameType.Operator => serviceProvider.GetService<OperatorGameEngine>(),
-                _ => null
-            };
-
-            if (engine is null)
-                return ValueResult<LobbyRegistration>.FromError($"No game engine is registered for [{gameType}].");
+            if (string.IsNullOrWhiteSpace(routeIdentifier) || !_gamesByRoute.TryGetValue(routeIdentifier, out var game))
+                return ValueResult<LobbyRegistration>.FromError($"No game registered for route identifier [{routeIdentifier}].");
 
             try
             {
-                var stateResult = await engine.CreateStateAsync(host, ct);
+                var stateResult = await game.Engine.CreateStateAsync(host, ct);
                 if (stateResult.IsCanceled) return ValueResult<LobbyRegistration>.FromCancellation();
                 if (!stateResult.TryGetSuccess(out var gameState))
                     return ValueResult<LobbyRegistration>.FromError(stateResult.Error.Error);
 
-                var lobbyUriResult = CreateLobbyUri(gameType);
+                var lobbyUriResult = CreateLobbyUri(routeIdentifier);
                 if (!lobbyUriResult.TryGetSuccess(out var lobbyUri))
                     return ValueResult<LobbyRegistration>.FromError(lobbyUriResult.Error.Error);
 
-                var lobbyCodeResult = await lobbyCodeService.IssueLobbyCodeAsync(ct);
-                if (!lobbyCodeResult.TryGetSuccess(out var lobbyCode)) // Service garauntees that lobby code is normalized
+                var lobbyCodeResult = await _lobbyCodeService.IssueLobbyCodeAsync(ct);
+                if (!lobbyCodeResult.TryGetSuccess(out var lobbyCode)) // Service guarantees that lobby code is normalized
                     return ValueResult<LobbyRegistration>.FromError(lobbyCodeResult.Error.Error);
 
-                var lobbyRegistration = new LobbyRegistration(lobbyCode, lobbyUri, gameType, gameState);
+                var lobbyRegistration = new LobbyRegistration(lobbyCode, lobbyUri, game.Module.Name, routeIdentifier, gameState);
                 if (!_lobbies.TryAdd(lobbyCode, lobbyRegistration))
+                {
+                    // This branch means LobbyCodeService handed us a code that is
+                    // already in _lobbies -- a broken invariant. Release the code
+                    // back to the issuer on a best-effort basis so we don't leak
+                    // it permanently; log loudly because reaching here is a bug.
+                    var releaseResult = await _lobbyCodeService.ReleaseLobbyCodeAsync(lobbyCode, ct);
+                    if (releaseResult.TryGetFailure(out var releaseError))
+                    {
+                        _logger.LogError(
+                            "Failed to release lobby code [{LobbyCode}] after a TryAdd collision in CreateLobbyAsync: {Error}",
+                            lobbyCode,
+                            releaseError.InternalMessage);
+                    }
                     return ValueResult<LobbyRegistration>.FromError($"Game with lobby code [{lobbyCode}] already exists.");
+                }
 
                 return lobbyRegistration;
             }
             catch (OperationCanceledException) { return ValueResult<LobbyRegistration>.FromCancellation(); }
-            catch (Exception ex) 
+            catch (Exception ex)
             {
                 return ValueResult<LobbyRegistration>.FromError("Error creating lobby.", $"Exception occured while creating lobby: {ex}");
             }
         }
 
         public async Task<ValueResult<UserRegistration>> JoinLobbyAsync(
-            User user, 
-            string lobbyCode, 
+            User user,
+            string lobbyCode,
             CancellationToken ct = default)
         {
             if (!_lobbies.TryGetValue(NormalizeLobbyCode(lobbyCode), out var registration))
@@ -116,17 +142,19 @@ namespace KnockBox.Services.Logic.Games.Shared
             return lobbyCode.Trim().ToUpperInvariant();
         }
 
-        private static ValueResult<string> CreateLobbyUri(GameType gameType)
+        private ValueResult<string> CreateLobbyUri(string routeIdentifier)
         {
-            if (!gameType.TryGetNavigationString(out var navigationString))
-                return ValueResult<string>.FromError("Failed to generate a uri for the lobby.", $"Game type [{gameType}] does not have a defined navigation string attribute.");
+            if (string.IsNullOrWhiteSpace(routeIdentifier) || !_gamesByRoute.ContainsKey(routeIdentifier))
+                return ValueResult<string>.FromError("Failed to generate a uri for the lobby.", $"Unknown game route identifier [{routeIdentifier}].");
 
             var guidA = Guid.NewGuid();
             var guidB = Guid.NewGuid();
 
             string lobbyId = $"{guidA}-{guidB}";
 
-            return $"room/{navigationString}/{lobbyId}";
+            return $"room/{routeIdentifier}/{lobbyId}";
         }
+
+        private readonly record struct GameRegistration(IGameModule Module, AbstractGameEngine Engine);
     }
 }

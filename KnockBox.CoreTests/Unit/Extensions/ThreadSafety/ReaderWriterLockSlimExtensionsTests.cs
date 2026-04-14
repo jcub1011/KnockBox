@@ -1,4 +1,4 @@
-using KnockBox.Extensions.ThreadSafety;
+using KnockBox.Core.Extensions.ThreadSafety;
 
 namespace KnockBox.Tests.Unit.Extensions.ThreadSafety;
 

@@ -1,0 +1,82 @@
+@page "/room/operator/{ObfuscatedRoomCode}"
+
+@inherits DisposableComponent
+@using KnockBox.Operator.Services.State
+@using KnockBox.Operator.Models
+@using KnockBox.Operator.Services.Logic.FSM
+@using KnockBox.Core.Services.State.Games.Shared
+
+<PageTitle>Operator</PageTitle>
+
+<HeadContent>
+    <link href="_content/KnockBox.Operator/KnockBox.Operator.styles.css" rel="stylesheet" />
+</HeadContent>
+
+@if (GameState == null)
+{
+    <div class="op-loading">
+        <span class="op-loading-icon">🧮</span>
+        <span>Loading room...</span>
+    </div>
+}
+else
+{
+    <div class="op-page">
+
+        @* ── Error toast ── *@
+        @if (_errorMessage is not null)
+        {
+            <div @key="_errorKey" class="op-error-toast" @onanimationend="DismissError">
+                <span class="op-error-icon">⚠️</span>
+                <span>@_errorMessage</span>
+            </div>
+        }
+
+        @if (GameState.IsJoinable)
+        {
+            <LobbyPhase GameState="GameState" />
+        }
+        else if (IsHost())
+        {
+            @* Host spectator routing *@
+            @switch (GameState.Phase)
+            {
+                case OperatorGamePhase.Setup:
+                    <SetupPhase GameState="GameState" />
+                    break;
+                case OperatorGamePhase.GameOver:
+                    <GameOverPhase GameState="GameState" />
+                    break;
+                default:
+                    <SpectatorView GameState="GameState" />
+                    break;
+            }
+        }
+        else
+        {
+            @* Player routing *@
+            @switch (GameState.Phase)
+            {
+                case OperatorGamePhase.Setup:
+                    <SetupPhase GameState="GameState" />
+                    break;
+                case OperatorGamePhase.Play:
+                    <PlayPhase GameState="GameState" OnError="ShowError" />
+                    break;
+                case OperatorGamePhase.Reaction:
+                    <PlayPhase GameState="GameState" OnError="ShowError" IsReadOnly="true" />
+                    <ReactionPhase GameState="GameState" OnError="ShowError" />
+                    break;
+                case OperatorGamePhase.Draw:
+                    <DrawPhase GameState="GameState" />
+                    break;
+                case OperatorGamePhase.GameOver:
+                    <GameOverPhase GameState="GameState" />
+                    break;
+            }
+        }
+
+        <OperatorTimer GameState="GameState" />
+    </div>
+}
+

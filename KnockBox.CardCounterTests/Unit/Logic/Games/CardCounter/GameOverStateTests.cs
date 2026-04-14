@@ -1,14 +1,14 @@
-using KnockBox.Services.Logic.Games.CardCounter.FSM;
-using KnockBox.Services.Logic.Games.CardCounter.FSM.States;
-using KnockBox.Services.Logic.RandomGeneration;
-using KnockBox.Services.State.Games.CardCounter;
-using KnockBox.Services.State.Games.CardCounter.Data;
-using KnockBox.Services.State.Users;
+using KnockBox.CardCounter.Services.Logic.Games.FSM;
+using KnockBox.CardCounter.Services.Logic.Games.FSM.States;
+using KnockBox.Core.Services.Logic.RandomGeneration;
+using KnockBox.CardCounter.Services.State.Games;
+using KnockBox.CardCounter.Services.State.Games.Data;
+using KnockBox.Core.Services.State.Users;
 using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 
-namespace KnockBoxTests.Unit.Logic.Games.CardCounter
+namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
 {
     [TestClass]
     public class GameOverStateTests
@@ -114,7 +114,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             var gameOver = new GameOverState();
             gameOver.OnEnter(_context);
 
-            Assert.AreEqual(0, p1.Pot.Count, "Pot should be cleared after applying to balance.");
+            Assert.IsEmpty(p1.Pot, "Pot should be cleared after applying to balance.");
         }
 
         [TestMethod]

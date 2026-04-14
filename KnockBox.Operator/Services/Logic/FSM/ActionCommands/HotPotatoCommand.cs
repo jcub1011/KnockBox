@@ -23,7 +23,7 @@ public class HotPotatoCommand(
     public override void SetupPendingState()
     {
         // Extract numbers from discard for redirect tracking
-        _pendingNumbers = PlayedCards.Where(c => c.Type == CardType.Number).ToList();
+        _pendingNumbers = [.. PlayedCards.Where(c => c.Type == CardType.Number)];
         foreach (var num in _pendingNumbers)
         {
             var inDiscard = Context.State.DiscardPile.FindLastIndex(c => c.Id == num.Id);

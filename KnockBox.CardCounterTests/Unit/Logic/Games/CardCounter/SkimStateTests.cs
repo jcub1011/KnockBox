@@ -1,14 +1,14 @@
-using KnockBox.Services.Logic.Games.CardCounter.FSM;
-using KnockBox.Services.Logic.Games.CardCounter.FSM.States;
-using KnockBox.Services.Logic.RandomGeneration;
-using KnockBox.Services.State.Games.CardCounter;
-using KnockBox.Services.State.Games.CardCounter.Data;
-using KnockBox.Services.State.Users;
+using KnockBox.CardCounter.Services.Logic.Games.FSM;
+using KnockBox.CardCounter.Services.Logic.Games.FSM.States;
+using KnockBox.Core.Services.Logic.RandomGeneration;
+using KnockBox.CardCounter.Services.State.Games;
+using KnockBox.CardCounter.Services.State.Games.Data;
+using KnockBox.Core.Services.State.Users;
 using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 
-namespace KnockBoxTests.Unit.Logic.Games.CardCounter
+namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
 {
     [TestClass]
     public class SkimStateTests
@@ -112,7 +112,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             Assert.IsInstanceOfType(next.Value, typeof(PlayerTurnState));
             CollectionAssert.AreEqual(new[] { 1, 2 }, source.Pot, "Source pot should be unchanged after Comp'd block.");
             CollectionAssert.AreEqual(new[] { 3, 4 }, target.Pot, "Target pot should be unchanged after Comp'd block.");
-            Assert.AreEqual(0, target.ActionHand.Count, "Comp'd card should be consumed.");
+            Assert.IsEmpty(target.ActionHand, "Comp'd card should be consumed.");
         }
 
         [TestMethod]

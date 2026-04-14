@@ -1,4 +1,4 @@
-using KnockBox.Extensions.Collections;
+using KnockBox.Core.Extensions.Collections;
 
 namespace KnockBox.Tests.Unit.Extensions.Collections;
 
@@ -68,7 +68,7 @@ public sealed class IListExtensionsTests
         var removed = list.Remove(x => x == 99);
 
         Assert.IsFalse(removed);
-        Assert.AreEqual(3, list.Count);
+        Assert.HasCount(3, list);
     }
 
     [TestMethod]
@@ -89,7 +89,7 @@ public sealed class IListExtensionsTests
         var removed = list.Remove(x => x == 5);
 
         Assert.IsTrue(removed);
-        Assert.AreEqual(2, list.Count);
+        Assert.HasCount(2, list);
         CollectionAssert.AreEqual(new[] { 5, 5 }, list);
     }
 }

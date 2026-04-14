@@ -1,4 +1,4 @@
-﻿using KnockBox.Extensions.Returns;
+﻿using KnockBox.Core.Extensions.Returns;
 
 namespace KnockBox.Services.Logic.Games.Shared
 {

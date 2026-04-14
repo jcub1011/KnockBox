@@ -1,15 +1,15 @@
-using KnockBox.Services.Logic.Games.DiceSimulator;
-using KnockBox.Services.Logic.RandomGeneration;
-using KnockBox.Services.State.Games.DiceSimulator;
-using KnockBox.Services.State.Games.DiceSimulator.Data;
-using KnockBox.Services.State.Users;
+using KnockBox.DiceSimulator.Services.Logic.Games;
+using KnockBox.Core.Services.Logic.RandomGeneration;
+using KnockBox.DiceSimulator.Services.State.Games;
+using KnockBox.DiceSimulator.Services.State.Games.Data;
+using KnockBox.Core.Services.State.Users;
 using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace KnockBoxTests.Integration.Games.DiceSimulator
+namespace KnockBox.DiceSimulator.Tests.Integration
 {
     [TestClass]
     public class DiceSimulatorIntegrationTests
@@ -51,7 +51,7 @@ namespace KnockBoxTests.Integration.Games.DiceSimulator
             Assert.IsTrue((bool)rollResult.IsSuccess);
 
             // Check State
-            Assert.AreEqual(1, state.RollHistory.Count);
+            Assert.HasCount(1, state.RollHistory);
             
             var rollEntry = state.RollHistory.Last();
             Assert.AreEqual("p1", rollEntry.PlayerId); // Correct assertion using ID or Name
@@ -71,8 +71,8 @@ namespace KnockBoxTests.Integration.Games.DiceSimulator
             // Clear history
             var clearRes = engine.ClearHistory(host, state);
             Assert.IsTrue((bool)clearRes.IsSuccess);
-            Assert.AreEqual(0, state.RollHistory.Count);
-            Assert.AreEqual(0, state.PlayerStats.Count);
+            Assert.IsEmpty(state.RollHistory);
+            Assert.IsEmpty(state.PlayerStats);
         }
         
         [TestMethod]

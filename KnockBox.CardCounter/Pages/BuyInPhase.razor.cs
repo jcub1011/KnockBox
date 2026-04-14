@@ -1,0 +1,36 @@
+using KnockBox.CardCounter.Services.Logic.Games;
+using KnockBox.CardCounter.Services.State.Games;
+using KnockBox.CardCounter.Services.State.Games.Data;
+using KnockBox.Core.Services.State.Users;
+using Microsoft.AspNetCore.Components;
+
+namespace KnockBox.CardCounter.Pages
+{
+    public partial class BuyInPhase : ComponentBase
+    {
+        [Inject] protected CardCounterGameEngine GameEngine { get; set; } = default!;
+
+        [Inject] protected IUserService UserService { get; set; } = default!;
+
+        [Parameter] public CardCounterGameState GameState { get; set; } = default!;
+
+        protected PlayerState? GetMyPlayer()
+        {
+            if (UserService.CurrentUser == null) return null;
+            return GameState.GamePlayers.TryGetValue(UserService.CurrentUser.Id, out var state) ? state : null;
+        }
+
+        protected bool IsHost()
+        {
+            if (GameState == null || UserService.CurrentUser == null) return false;
+            return GameState.Host.Id == UserService.CurrentUser.Id;
+        }
+
+        protected void SetBuyIn(bool isNegative)
+        {
+            if (UserService.CurrentUser == null) return;
+            GameEngine.SetBuyIn(UserService.CurrentUser, GameState, isNegative);
+        }
+    }
+}
+

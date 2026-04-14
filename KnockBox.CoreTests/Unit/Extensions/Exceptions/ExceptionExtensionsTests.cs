@@ -1,4 +1,4 @@
-using KnockBox.Extensions.Exceptions;
+using KnockBox.Core.Extensions.Exceptions;
 
 namespace KnockBox.Tests.Unit.Extensions.Exceptions;
 

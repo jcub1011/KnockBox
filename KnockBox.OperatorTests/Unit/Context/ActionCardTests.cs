@@ -1,13 +1,13 @@
 using KnockBox.Operator.Models;
 using KnockBox.Operator.Services.Logic.FSM;
 using KnockBox.Operator.Services.State;
-using KnockBox.Services.Logic.RandomGeneration;
+using KnockBox.Core.Services.Logic.RandomGeneration;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Microsoft.Extensions.Logging;
 using Moq;
 using System.Collections.Concurrent;
 
-namespace KnockBox.OperatorTests.Unit.Context;
+namespace KnockBox.Operator.Tests.Unit.Context;
 
 [TestClass]
 public class ActionCardTests
@@ -21,7 +21,7 @@ public class ActionCardTests
     public void Setup()
     {
         _loggerMock = new Mock<ILogger<OperatorGameState>>();
-        var host = new KnockBox.Services.State.Users.User("host", "Host");
+        var host = new KnockBox.Core.Services.State.Users.User("host", "Host");
         _state = new OperatorGameState(host, _loggerMock.Object);
         _rngMock = new Mock<IRandomNumberService>();
         _context = new OperatorGameContext(_state, _rngMock.Object);
@@ -222,7 +222,7 @@ public class ActionCardTests
 
         Assert.IsTrue(result.TryGetSuccess(out var playResult));
         Assert.IsTrue(playResult.ConsumedNumbers);
-        Assert.AreEqual(0, target.Hand.Count);
+        Assert.IsEmpty(target.Hand);
     }
 
     [TestMethod]
@@ -242,8 +242,8 @@ public class ActionCardTests
 
         Assert.IsTrue(result.TryGetSuccess(out var playResult));
         Assert.IsTrue(playResult.ConsumedNumbers);
-        Assert.AreEqual(1, target.Hand.Count);
-        Assert.AreEqual(0, _state.DiscardPile.Count);
+        Assert.HasCount(1, target.Hand);
+        Assert.IsEmpty(_state.DiscardPile);
     }
 
     [TestMethod]
@@ -276,8 +276,8 @@ public class ActionCardTests
 
         card.Play(ctx);
 
-        Assert.AreEqual(0, player.Hand.Count);
-        Assert.AreEqual(1, target.Hand.Count);
+        Assert.IsEmpty(player.Hand);
+        Assert.HasCount(1, target.Hand);
     }
 
     [TestMethod]
@@ -293,8 +293,8 @@ public class ActionCardTests
 
         card.Play(ctx);
 
-        Assert.AreEqual(1, player.Hand.Count);
-        Assert.AreEqual(1, target.Hand.Count);
+        Assert.HasCount(1, player.Hand);
+        Assert.HasCount(1, target.Hand);
         Assert.IsTrue(target.IsBeingStolenFrom);
     }
 
@@ -309,7 +309,7 @@ public class ActionCardTests
 
         card.Play(ctx);
 
-        Assert.AreEqual(0, p1.Hand.Count);
+        Assert.IsEmpty(p1.Hand);
     }
 
     [TestMethod]

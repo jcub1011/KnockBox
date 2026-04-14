@@ -1,14 +1,14 @@
-using KnockBox.Services.Logic.Games.DrawnToDress;
-using KnockBox.Services.Logic.Games.DrawnToDress.FSM;
-using KnockBox.Services.Logic.Games.DrawnToDress.FSM.States;
-using KnockBox.Services.Logic.RandomGeneration;
-using KnockBox.Services.State.Games.DrawnToDress;
-using KnockBox.Services.State.Games.DrawnToDress.Data;
-using KnockBox.Services.State.Users;
+using KnockBox.DrawnToDress.Services.Logic.Games;
+using KnockBox.DrawnToDress.Services.Logic.Games.FSM;
+using KnockBox.DrawnToDress.Services.Logic.Games.FSM.States;
+using KnockBox.Core.Services.Logic.RandomGeneration;
+using KnockBox.DrawnToDress.Services.State.Games;
+using KnockBox.DrawnToDress.Services.State.Games.Data;
+using KnockBox.Core.Services.State.Users;
 using Microsoft.Extensions.Logging;
 using Moq;
 
-namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress
+namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress
 {
     [TestClass]
     public class ErrorPropagationTests
@@ -41,10 +41,11 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress
             var state = (DrawnToDressGameState)stateResult.Value!;
             state.Config.ClothingTypes =
             [
-                new() { Id = "hat", DisplayName = "Hat", MaxItemsPerRound = 3 },
+                new() { Id = ClothingType.Hat, DisplayName = "Hat", MaxItemsPerRound = 3 },
             ];
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
+            _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
 
             // Add a player so we can advance through ready.
             state.GamePlayers["p1"] = new DrawnToDressPlayerState { PlayerId = "p1" };
@@ -69,7 +70,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress
             // Create an item drawn by p1 and place it in the pool.
             var item = new DrawnClothingItem
             {
-                ClothingTypeId = "hat",
+                ClothingTypeId = ClothingType.Hat,
                 CreatorPlayerId = "p1",
                 SvgContent = "<svg>hat</svg>",
                 IsInPool = true,
@@ -94,17 +95,18 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress
             var state = (DrawnToDressGameState)stateResult.Value!;
             state.Config.ClothingTypes =
             [
-                new() { Id = "hat", DisplayName = "Hat", MaxItemsPerRound = 10 },
+                new() { Id = ClothingType.Hat, DisplayName = "Hat", MaxItemsPerRound = 10 },
             ];
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
+            _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
 
             state.GamePlayers["p1"] = new DrawnToDressPlayerState { PlayerId = "p1" };
             Assert.IsInstanceOfType<DrawingRoundState>(context.Fsm.CurrentState);
 
             // Act
             var result = _engine.ProcessCommand(context,
-                new SubmitDrawingCommand("p1", "hat", "<svg>valid drawing</svg>"));
+                new SubmitDrawingCommand("p1", ClothingType.Hat, "<svg>valid drawing</svg>"));
 
             // Assert
             Assert.IsTrue(result.IsSuccess);
@@ -118,7 +120,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress
 
             var item = new DrawnClothingItem
             {
-                ClothingTypeId = "hat",
+                ClothingTypeId = ClothingType.Hat,
                 CreatorPlayerId = "p1",
                 SvgContent = "<svg>hat</svg>",
                 IsInPool = true,
@@ -141,20 +143,21 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress
             var state = (DrawnToDressGameState)stateResult.Value!;
             state.Config.ClothingTypes =
             [
-                new() { Id = "hat", DisplayName = "Hat", MaxItemsPerRound = 10 },
+                new() { Id = ClothingType.Hat, DisplayName = "Hat", MaxItemsPerRound = 10 },
             ];
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
+            _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
 
             state.GamePlayers["p1"] = new DrawnToDressPlayerState { PlayerId = "p1" };
             Assert.IsInstanceOfType<DrawingRoundState>(context.Fsm.CurrentState);
 
-            // Act: submit a drawing for a clothing type that doesn't exist.
+            // Act: submit a drawing for a clothing type that isn't in the config.
             _engine.ProcessCommand(context,
-                new SubmitDrawingCommand("p1", "nonexistent-type", "<svg>drawing</svg>"));
+                new SubmitDrawingCommand("p1", ClothingType.Top, "<svg>drawing</svg>"));
 
-            // Assert: no item was added to the pool for the invalid type.
-            Assert.IsFalse(context.ClothingPool.Values.Any(i => i.ClothingTypeId == "nonexistent-type"));
+            // Assert: no item was added to the pool for the unconfigured type.
+            Assert.DoesNotContain(i => i.ClothingTypeId == ClothingType.Top, context.ClothingPool.Values);
         }
 
         [TestMethod]
@@ -165,10 +168,11 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress
             var state = (DrawnToDressGameState)stateResult.Value!;
             state.Config.ClothingTypes =
             [
-                new() { Id = "hat", DisplayName = "Hat", MaxItemsPerRound = 10 },
+                new() { Id = ClothingType.Hat, DisplayName = "Hat", MaxItemsPerRound = 10 },
             ];
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
+            _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
 
             state.GamePlayers["p1"] = new DrawnToDressPlayerState { PlayerId = "p1" };
             Assert.IsInstanceOfType<DrawingRoundState>(context.Fsm.CurrentState);

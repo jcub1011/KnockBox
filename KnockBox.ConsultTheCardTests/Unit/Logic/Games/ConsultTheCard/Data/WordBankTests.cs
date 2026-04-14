@@ -1,9 +1,9 @@
-using KnockBox.Services.Logic.Games.ConsultTheCard.Data;
+using KnockBox.ConsultTheCard.Services.Logic.Games.Data;
 using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 
-namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard.Data
+namespace KnockBox.ConsultTheCard.Tests.Unit.Logic.Games.ConsultTheCard.Data
 {
     [TestClass]
     [DoNotParallelize]
@@ -19,7 +19,7 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard.Data
         {
             _csvPath = Path.Combine(
                 AppContext.BaseDirectory,
-                "Services/Logic/Games/ConsultTheCard/Data/WordPairs.csv");
+                "Services/Logic/Games/Data/WordPairs.csv");
             _originalCsvContent = File.ReadAllText(_csvPath);
         }
 
@@ -41,8 +41,8 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard.Data
         {
             var groups = WordBank.Load(_loggerMock.Object);
 
-            Assert.IsTrue(groups.Count >= 50, $"Expected at least 50 word groups, got {groups.Count}.");
-            Assert.IsTrue(groups.Count <= 100, $"Expected at most 100 word groups, got {groups.Count}.");
+            Assert.IsGreaterThanOrEqualTo(50, groups.Count, $"Expected at least 50 word groups, got {groups.Count}.");
+            Assert.IsLessThanOrEqualTo(100, groups.Count, $"Expected at most 100 word groups, got {groups.Count}.");
         }
 
         [TestMethod]
@@ -52,7 +52,7 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard.Data
 
             foreach (var group in groups)
             {
-                Assert.IsTrue(group.Words.Length >= 2,
+                Assert.IsGreaterThanOrEqualTo(2, group.Words.Length,
                     $"Word group [{string.Join(", ", group.Words)}] has fewer than 2 words.");
             }
         }
@@ -96,7 +96,7 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard.Data
             // The CSV may or may not have variable-length rows. At minimum, all groups must have ≥2.
             foreach (var group in groups)
             {
-                Assert.IsTrue(group.Words.Length >= 2,
+                Assert.IsGreaterThanOrEqualTo(2, group.Words.Length,
                     $"Group [{string.Join(", ", group.Words)}] must have at least 2 words.");
             }
         }
@@ -107,10 +107,10 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard.Data
             File.WriteAllText(_csvPath, "Apple, Banana\nCat, Dog, Elephant\nFox, Goat, Horse, Iguana, Jaguar\n");
             var groups = WordBank.Load(_loggerMock.Object);
 
-            Assert.AreEqual(3, groups.Count);
-            Assert.AreEqual(2, groups[0].Words.Length);
-            Assert.AreEqual(3, groups[1].Words.Length);
-            Assert.AreEqual(5, groups[2].Words.Length);
+            Assert.HasCount(3, groups);
+            Assert.HasCount(2, groups[0].Words);
+            Assert.HasCount(3, groups[1].Words);
+            Assert.HasCount(5, groups[2].Words);
         }
 
         [TestMethod]
@@ -119,7 +119,7 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard.Data
             File.WriteAllText(_csvPath, "Apple, Banana\n\n   \n\nCat, Dog\n");
             var groups = WordBank.Load(_loggerMock.Object);
 
-            Assert.AreEqual(2, groups.Count);
+            Assert.HasCount(2, groups);
         }
 
         [TestMethod]
@@ -128,7 +128,7 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard.Data
             File.WriteAllText(_csvPath, "Apple, Banana\nSingleWord\nCat, Dog\n");
             var groups = WordBank.Load(_loggerMock.Object);
 
-            Assert.AreEqual(2, groups.Count);
+            Assert.HasCount(2, groups);
         }
 
         [TestMethod]
@@ -137,7 +137,7 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard.Data
             File.WriteAllText(_csvPath, "  Apple  ,  Banana  \n");
             var groups = WordBank.Load(_loggerMock.Object);
 
-            Assert.AreEqual(1, groups.Count);
+            Assert.HasCount(1, groups);
             Assert.AreEqual("Apple", groups[0].Words[0]);
             Assert.AreEqual("Banana", groups[0].Words[1]);
         }
@@ -148,7 +148,7 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard.Data
             File.WriteAllText(_csvPath, "");
             var groups = WordBank.Load(_loggerMock.Object);
 
-            Assert.AreEqual(0, groups.Count);
+            Assert.IsEmpty(groups);
         }
     }
 }

@@ -1,0 +1,218 @@
+using KnockBox.DrawnToDress.Services.Logic.Games;
+using KnockBox.Core.Services.State.Games.Shared;
+using KnockBox.Core.Extensions.Returns;
+using KnockBox.DrawnToDress.Services.State.Games;
+using KnockBox.DrawnToDress.Services.State.Games.Data;
+
+namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
+{
+    /// <summary>
+    /// Timed phase in which every player draws clothing items of the current type before
+    /// the clock expires.  One instance of this state is used per clothing type; when the
+    /// timer (or all-ready shortcut) fires the state either chains to the next
+    /// <see cref="DrawingRoundState"/> (next clothing type) or to <see cref="PoolRevealState"/>
+    /// when all types have been completed.
+    ///
+    /// Transition ownership:
+    /// - Timer expiry (last type) → <see cref="PoolRevealState"/>
+    /// - Timer expiry (not last type) → next <see cref="DrawingRoundState"/>
+    /// - All players mark ready early → same advance logic as timer expiry
+    /// - <see cref="SubmitDrawingCommand"/> → stored; no transition until all ready or timer fires
+    /// - <see cref="PauseGameCommand"/> (host only) → <see cref="PausedState"/>
+    /// </summary>
+    /// <remarks>
+    /// Initialises the drawing round for the specified clothing-type slot.
+    /// </remarks>
+    /// <param name="clothingTypeIndex">
+    /// 0-based index into <see cref="DrawnToDressConfig.ClothingTypes"/> for the type
+    /// players will draw during this round.  Defaults to <c>0</c> (first type).
+    /// </param>
+    public sealed class DrawingRoundState(int clothingTypeIndex = 0) : ITimedDrawnToDressGameState
+    {
+        private readonly int _clothingTypeIndex = clothingTypeIndex;
+
+        public ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?> OnEnter(
+            DrawnToDressGameContext context)
+        {
+            if (context.Config.EnableTimer)
+            {
+                context.State.PhaseDeadlineUtc = DateTimeOffset.UtcNow.AddSeconds(context.Config.DrawingTimeSec);
+            }
+
+            context.State.CurrentDrawingClothingTypeIndex = _clothingTypeIndex;
+            context.State.SetPhase(GamePhase.Drawing);
+            context.ResetReadyFlags();
+
+            var typeName = GetCurrentTypeName(context);
+            context.Logger.LogDebug(
+                "FSM → DrawingRoundState [{index}] ({type}). Deadline: {deadline}.",
+                _clothingTypeIndex, typeName, context.State.PhaseDeadlineUtc);
+            return null;
+        }
+
+        public Result OnExit(DrawnToDressGameContext context)
+        {
+            context.State.PhaseDeadlineUtc = null;
+            return Result.Success;
+        }
+
+        public ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?> HandleCommand(
+            DrawnToDressGameContext context, DrawnToDressCommand command)
+        {
+            switch (command)
+            {
+                case SubmitDrawingCommand cmd:
+                    return HandleSubmitDrawing(context, cmd);
+
+                case MarkReadyCommand cmd:
+                    return HandleMarkReady(context, cmd);
+
+                case PauseGameCommand:
+                    return new PausedState(this);
+
+                default:
+                    context.Logger.LogWarning(
+                        "DrawingRoundState: unrecognized command [{type}] from player [{id}].",
+                        command.GetType().Name, command.PlayerId);
+                    return null;
+            }
+        }
+
+        public ValueResult<TimeSpan> GetRemainingTime(
+            DrawnToDressGameContext context, DateTimeOffset now)
+            => context.State.PhaseDeadlineUtc is { } deadline
+                ? deadline - now
+                : new ResultError("No timer active.");
+
+        public ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?> Tick(
+            DrawnToDressGameContext context, DateTimeOffset now)
+        {
+            if (context.State.PhaseDeadlineUtc is not { } deadline || now < deadline) return null;
+
+            var typeName = GetCurrentTypeName(context);
+            context.Logger.LogDebug(
+                "Drawing timer expired for type [{index}] ({type}).", _clothingTypeIndex, typeName);
+            return ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?>.FromValue(
+                AdvanceToNextRound(context));
+        }
+
+        // ── Helpers ───────────────────────────────────────────────────────────
+
+        private string GetCurrentTypeName(DrawnToDressGameContext context)
+        {
+            var types = context.Config.ClothingTypes;
+            if (_clothingTypeIndex < types.Count)
+                return types[_clothingTypeIndex].DisplayName;
+            return $"[{_clothingTypeIndex}]";
+        }
+
+        /// <summary>
+        /// Returns the next FSM state: a new <see cref="DrawingRoundState"/> for the next
+        /// clothing type, or <see cref="PoolRevealState"/> if all types are done.
+        /// </summary>
+        private IGameState<DrawnToDressGameContext, DrawnToDressCommand> AdvanceToNextRound(
+            DrawnToDressGameContext context)
+        {
+            int nextIndex = _clothingTypeIndex + 1;
+            if (nextIndex < context.Config.ClothingTypes.Count)
+            {
+                context.Logger.LogDebug(
+                    "Advancing to DrawingRoundState [{index}].", nextIndex);
+                return new DrawingRoundState(nextIndex);
+            }
+
+            context.Logger.LogDebug("All clothing types drawn. Moving to pool reveal.");
+            return new PoolRevealState();
+        }
+
+        private ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?> HandleSubmitDrawing(
+            DrawnToDressGameContext context, SubmitDrawingCommand cmd)
+        {
+            var player = context.GetPlayer(cmd.PlayerId);
+            if (player is null)
+            {
+                context.Logger.LogWarning(
+                    "SubmitDrawing: unknown player [{id}].", cmd.PlayerId);
+                return null;
+            }
+
+            // Validate the clothing type matches the CURRENT round.
+            var types = context.Config.ClothingTypes;
+            if (_clothingTypeIndex >= types.Count)
+            {
+                context.Logger.LogWarning(
+                    "SubmitDrawing: clothing type index [{index}] out of range.", _clothingTypeIndex);
+                return null;
+            }
+
+            var currentType = types[_clothingTypeIndex];
+            if (cmd.ClothingTypeId != currentType.Id)
+            {
+                context.Logger.LogWarning(
+                    "SubmitDrawing: player [{id}] submitted type [{submitted}] but current round is [{current}].",
+                    cmd.PlayerId, cmd.ClothingTypeId, currentType.Id);
+                return null;
+            }
+
+            // Enforce max-items-per-round when a limit is configured.
+            if (currentType.MaxItemsPerRound > 0)
+            {
+                int alreadySubmitted = context.ClothingPool.Values
+                    .Count(item => item.CreatorPlayerId == cmd.PlayerId
+                                   && item.ClothingTypeId == currentType.Id);
+
+                if (alreadySubmitted >= currentType.MaxItemsPerRound)
+                {
+                    context.Logger.LogWarning(
+                        "SubmitDrawing: player [{id}] has already submitted the maximum of {max} item(s) for type [{type}].",
+                        cmd.PlayerId, currentType.MaxItemsPerRound, currentType.Id);
+                    return null;
+                }
+            }
+
+            // Store the drawn item and place it into the pool.
+            var item = new DrawnClothingItem
+            {
+                ClothingTypeId = cmd.ClothingTypeId,
+                CreatorPlayerId = cmd.PlayerId,
+                SvgContent = cmd.SvgContent,
+                IsInPool = true,
+            };
+            context.ClothingPool[item.Id] = item;
+            player.OwnedClothingItemIds.Add(item.Id);
+
+            context.Logger.LogDebug(
+                "Player [{id}] submitted a [{type}] drawing (item {itemId}).",
+                cmd.PlayerId, cmd.ClothingTypeId, item.Id);
+
+            return null; // Timer drives the transition.
+        }
+
+        private ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?> HandleMarkReady(
+            DrawnToDressGameContext context, MarkReadyCommand cmd)
+        {
+            var player = context.GetPlayer(cmd.PlayerId);
+            if (player is null)
+            {
+                context.Logger.LogWarning(
+                    "MarkReady: unknown player [{id}].", cmd.PlayerId);
+                return null;
+            }
+
+            player.IsReady = true;
+            context.Logger.LogDebug(
+                "Player [{id}] marked ready in DrawingRoundState [{index}].",
+                cmd.PlayerId, _clothingTypeIndex);
+
+            if (context.AllPlayersReady())
+            {
+                context.Logger.LogDebug(
+                    "All players ready at type [{index}]. Advancing early.", _clothingTypeIndex);
+                return ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?>.FromValue(
+                    AdvanceToNextRound(context));
+            }
+
+            return null;
+        }
+    }
+}

@@ -1,4 +1,4 @@
-﻿namespace KnockBox.Extensions.ThreadSafety
+﻿namespace KnockBox.Core.Extensions.ThreadSafety
 {
     [Flags]
     public enum LockPermissions

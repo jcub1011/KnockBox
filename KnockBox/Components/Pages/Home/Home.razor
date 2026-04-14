@@ -1,53 +1,68 @@
-﻿@page "/"
+@page "/"
 @page "/home"
-
-@using KnockBox.Services.Navigation.Games
 
 @inherits DisposableComponent
 
 <PageTitle>Knockbox Games</PageTitle>
 
-<div class="home-container">
-    <h1>Knockbox</h1>
+<div class="home-container @(_isTransitioning ? "transitioning" : "") @(_isReturning ? "returning" : "")">
+    <div class="hero">
+        <h1 class="title">
+            <span class="title-letter" aria-hidden="true">K</span>
+            <span class="title-letter" aria-hidden="true">n</span>
+            <span class="title-letter" aria-hidden="true">o</span>
+            <span class="title-letter" aria-hidden="true">c</span>
+            <span class="title-letter" aria-hidden="true">k</span>
+            <span class="title-letter" aria-hidden="true">b</span>
+            <span class="title-letter" aria-hidden="true">o</span>
+            <span class="title-letter" aria-hidden="true">x</span>
+            <span class="sr-only">Knockbox</span>
+        </h1>
+    </div>
 
     <form @onsubmit="() => JoinLobby(LobbyCode ?? string.Empty)" @onsubmit:preventDefault="true">
-        <div class="join-form" style="margin-bottom: 24px;">
-            <div class="join-form-room-code text-start">
-                <h2>Player Name:</h2>
-                <input placeholder="Enter name" 
-                       type="text" maxlength="12" name="player-name" 
+        <div class="join-section">
+            <div class="join-card join-card-name">
+                <label class="join-label" for="player-name-input">Player Name</label>
+                <input id="player-name-input"
+                       placeholder="Enter name"
+                       type="text" maxlength="12" name="player-name"
                        @bind="PlayerName" @bind:event="oninput" style="text-transform: none;"/>
             </div>
-        </div>
 
-        <div class="join-form">
-            <div class="join-form-room-code">
-                <h2>
-                    Room Code:
-                </h2>
-                <input placeholder="KN0CK3OX" 
-                       type="text" maxlength="@LobbyCodeService.LobbyCodeLength" name="room-code" 
-                       @bind="LobbyCode"/>
+            <div class="join-card join-card-code">
+                <label class="join-label" for="room-code-input">Room Code</label>
+                <div class="join-code-row">
+                    <input id="room-code-input"
+                           placeholder="KN0CK3OX"
+                           type="text" maxlength="@LobbyCodeService.LobbyCodeLength" name="room-code"
+                           @bind="LobbyCode"/>
+                    <button type="submit" class="join-btn" disabled="@(!CanJoinOrCreate)">Join</button>
+                </div>
             </div>
-            <button type="submit" disabled="@(!CanJoinOrCreate)">Join</button>
         </div>
     </form>
 
-    <div class="game-grid">
-        <button class="game" aria-label="Dice Simulator" disabled="@(!CanJoinOrCreate)" @onclick="() => CreateLobby(GameType.DiceSimulator)">
-            Dice Simulator
-        </button>
-        <button class="game" aria-label="Card Counter" disabled="@(!CanJoinOrCreate)" @onclick="() => CreateLobby(GameType.CardCounter)">
-            Card Counter
-        </button>
-        <button class="game" aria-label="Drawn To Dress" disabled="@(!CanJoinOrCreate)" @onclick="() => CreateLobby(GameType.DrawnToDress)">
-            Drawn To Dress
-        </button>
-        <button class="game" aria-label="Consult The Card" disabled="@(!CanJoinOrCreate)" @onclick="() => CreateLobby(GameType.ConsultTheCard)">
-            Consult The Card
-        </button>
-        <button class="game" aria-label="Operator" disabled="@(!CanJoinOrCreate)" @onclick="() => CreateLobby(GameType.Operator)">
-            Operator
-        </button>
+    <div class="games-section" @onanimationend="OnReturnAnimationEnd">
+        <h2 class="games-heading">
+            <span class="games-heading-icon" aria-hidden="true">&#127922;</span>
+            Pick a Game
+        </h2>
+        <div class="game-grid">
+            @foreach (var module in GameModules.OrderBy(m => m.Name))
+            {
+                <button class="game-tile" aria-label="@module.Name" disabled="@(!CanJoinOrCreate)" @onclick="() => CreateLobby(module.RouteIdentifier)">
+                    @module.GetButtonContent()
+                </button>
+            }
+        </div>
     </div>
+
+    @if (_errorMessage is not null)
+    {
+        <div @key="_errorKey" class="home-error-toast" @onanimationend="DismissError">
+            <span class="home-error-icon" aria-hidden="true">&#9888;&#65039;</span>
+            <span>@_errorMessage</span>
+        </div>
+    }
 </div>

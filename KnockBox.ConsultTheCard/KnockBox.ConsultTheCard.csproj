@@ -1,13 +1,15 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk.Razor">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <AddRazorSupportForMvc>true</AddRazorSupportForMvc>
   </PropertyGroup>
 
   <ItemGroup>
-    <Content Include="Services\Logic\Games\ConsultTheCard\Data\WordPairs.csv" CopyToOutputDirectory="PreserveNewest" />
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <Content Include="Services\Logic\Games\Data\WordPairs.csv" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
@@ -23,5 +25,7 @@
       <_Parameter1>KnockBox.ConsultTheCardTests</_Parameter1>
     </AssemblyAttribute>
   </ItemGroup>
+
+  <Import Project="..\Directory.Plugin.targets" />
 
 </Project>

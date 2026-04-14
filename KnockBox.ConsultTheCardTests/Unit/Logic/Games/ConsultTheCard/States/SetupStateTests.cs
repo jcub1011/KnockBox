@@ -1,14 +1,14 @@
-using KnockBox.Services.Logic.Games.ConsultTheCard.FSM;
-using KnockBox.Services.Logic.Games.ConsultTheCard.FSM.States;
-using KnockBox.Services.Logic.RandomGeneration;
-using KnockBox.Services.State.Games.ConsultTheCard;
-using KnockBox.Services.State.Games.ConsultTheCard.Data;
-using KnockBox.Services.State.Users;
+using KnockBox.ConsultTheCard.Services.Logic.Games.FSM;
+using KnockBox.ConsultTheCard.Services.Logic.Games.FSM.States;
+using KnockBox.Core.Services.Logic.RandomGeneration;
+using KnockBox.ConsultTheCard.Services.State.Games;
+using KnockBox.ConsultTheCard.Services.State.Games.Data;
+using KnockBox.Core.Services.State.Users;
 using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 
-namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard.States
+namespace KnockBox.ConsultTheCard.Tests.Unit.Logic.Games.ConsultTheCard.States
 {
     [TestClass]
     public class SetupStateTests
@@ -63,8 +63,8 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard.States
             setupState.OnEnter(_context);
 
             var players = _state.GamePlayers.Values.ToList();
-            Assert.IsTrue(players.Any(p => p.Role == Role.Agent));
-            Assert.IsTrue(players.Any(p => p.Role == Role.Insider));
+            Assert.Contains(p => p.Role == Role.Agent, players);
+            Assert.Contains(p => p.Role == Role.Insider, players);
         }
 
         [TestMethod]
@@ -81,7 +81,7 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard.States
             var setupState = new SetupState();
             setupState.OnEnter(_context);
             Assert.IsNotNull(_state.CurrentWordPair);
-            Assert.AreEqual(2, _state.CurrentWordPair.Length);
+            Assert.HasCount(2, _state.CurrentWordPair);
         }
 
         [TestMethod]
@@ -114,7 +114,7 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard.States
 
             var remaining = setupState.GetRemainingTime(_context, DateTimeOffset.UtcNow);
             Assert.IsTrue(remaining.IsSuccess);
-            Assert.IsTrue(remaining.Value.TotalMilliseconds > 0);
+            Assert.IsGreaterThan(0, remaining.Value.TotalMilliseconds);
         }
 
         [TestMethod]
@@ -150,7 +150,7 @@ namespace KnockBox.ConsultTheCardTests.Unit.Logic.Games.ConsultTheCard.States
             setupState.OnEnter(_context);
 
             var informants = _state.GamePlayers.Values.Where(p => p.Role == Role.Informant).ToList();
-            Assert.IsTrue(informants.Count > 0, "5 players should have at least 1 Informant.");
+            Assert.IsNotEmpty(informants, "5 players should have at least 1 Informant.");
 
             foreach (var informant in informants)
             {

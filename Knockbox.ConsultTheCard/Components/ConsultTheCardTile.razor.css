@@ -1,0 +1,204 @@
+/* ── Consult The Card Tile — Spy Terminal in Game Palette ────────────────── */
+/* Base background + accent pulled from ConsultTheCardLobby.razor.css         */
+/* (.ctc-page background + .ctc-clue-bubble lavender accent).                  */
+
+.ctc-tile {
+    --ctc-lavender: #a78bfa;
+    --ctc-lavender-soft: rgba(167, 139, 250, 0.55);
+    --ctc-lavender-dim: rgba(167, 139, 250, 0.3);
+    --ctc-lavender-faint: rgba(167, 139, 250, 0.15);
+
+    width: 100%;
+    height: 100%;
+    padding: 14px 18px;
+    background: radial-gradient(ellipse at center, #1a1a2e 0%, #0f0f1a 100%);
+    border: 5px solid #000;
+    border-radius: 16px;
+    box-shadow:
+        8px 8px 0 #000,
+        inset 0 0 30px rgba(0, 0, 0, 0.4),
+        inset 0 0 0 1px var(--ctc-lavender-faint);
+    color: var(--ctc-lavender);
+    font-family: 'Share Tech Mono', 'Google Sans Code', var(--font-mono), monospace;
+    transition: transform 0.1s, box-shadow 0.1s;
+    position: relative;
+    overflow: hidden;
+}
+
+/* Subtle scanlines — kept faint so the navy palette dominates */
+.ctc-scanlines {
+    position: absolute;
+    inset: 0;
+    background:
+        linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.18) 50%);
+    background-size: 100% 2px;
+    pointer-events: none;
+    z-index: 2;
+    border-radius: 11px;
+}
+
+/* Lavender vignette — replaces the green vignette with the brand color */
+.ctc-vignette {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse,
+        rgba(167, 139, 250, 0.06) 0%,
+        rgba(0, 0, 0, 0) 35%,
+        rgba(0, 0, 0, 0.25) 70%,
+        rgba(0, 0, 0, 0.55) 100%);
+    pointer-events: none;
+    z-index: 3;
+    border-radius: 11px;
+}
+
+/* Drop the inner "screen" wrapper visually — the tile IS the screen */
+.ctc-screen {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    padding: 6px;
+    background: transparent;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.ctc-screen-content {
+    position: relative;
+    z-index: 4;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.ctc-prompt-line {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    text-shadow: 0 0 8px var(--ctc-lavender-soft);
+}
+
+.ctc-prompt-char {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--ctc-lavender);
+    opacity: 0.9;
+}
+
+.ctc-tile-name {
+    font-size: 1.05rem;
+    font-weight: 700;
+    letter-spacing: 1px;
+    color: #fff;
+    text-transform: uppercase;
+    text-shadow:
+        0 0 6px var(--ctc-lavender-soft),
+        0 0 14px rgba(167, 139, 250, 0.4);
+}
+
+.ctc-caret {
+    display: inline-block;
+    width: 8px;
+    height: 14px;
+    background: var(--ctc-lavender);
+    box-shadow: 0 0 6px var(--ctc-lavender-soft);
+    animation: ctc-blink 1s steps(1) infinite;
+}
+
+@keyframes ctc-blink {
+    0%, 49%   { opacity: 1; }
+    50%, 100% { opacity: 0; }
+}
+
+/* INTEL row — styled like the in-game .ctc-clue-bubble pill */
+.ctc-classified {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: #fff;
+}
+
+.ctc-classified-label {
+    color: var(--ctc-lavender);
+    letter-spacing: 1.5px;
+    text-shadow: 0 0 4px var(--ctc-lavender-dim);
+}
+
+.ctc-redacted {
+    flex: 1;
+    position: relative;
+    background: var(--ctc-lavender-faint);
+    border: 1px solid var(--ctc-lavender-dim);
+    border-radius: 12px;
+    height: 16px;
+    overflow: hidden;
+    padding: 0 8px;
+}
+
+.ctc-redacted-reveal {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.7rem;
+    color: #fff;
+    letter-spacing: 2px;
+    background: rgba(15, 15, 26, 0.85);
+    text-shadow: 0 0 4px var(--ctc-lavender-soft);
+    opacity: 1;
+    transition: opacity 0.2s;
+}
+
+.ctc-tile-tag {
+    margin-top: 2px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 1px;
+    color: rgba(167, 139, 250, 0.7);
+    text-transform: uppercase;
+    text-shadow: 0 0 4px rgba(167, 139, 250, 0.25);
+}
+
+/* ── Hover / Active ──────────────────────────────────────────────────────── */
+
+.ctc-tile:hover {
+    transform: translate(-3px, -3px);
+    box-shadow:
+        11px 11px 0 #000,
+        inset 0 0 30px rgba(0, 0, 0, 0.4),
+        inset 0 0 0 1px var(--ctc-lavender-dim),
+        0 0 24px rgba(167, 139, 250, 0.2);
+}
+
+.ctc-tile:hover .ctc-caret {
+    animation-duration: 0.3s;
+}
+
+.ctc-tile:hover .ctc-redacted-reveal {
+    animation: ctc-reveal-cycle 1.6s ease-in-out infinite;
+}
+
+@keyframes ctc-reveal-cycle {
+    0%, 70%, 100% { opacity: 1; background: rgba(15, 15, 26, 0.85); }
+    35%, 60%      { opacity: 1; background: transparent; }
+}
+
+.ctc-tile:active {
+    transform: translate(3px, 3px);
+    box-shadow:
+        2px 2px 0 #000,
+        inset 0 0 30px rgba(0, 0, 0, 0.4),
+        inset 0 0 0 1px var(--ctc-lavender-faint);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ctc-tile,
+    .ctc-caret,
+    .ctc-redacted-reveal {
+        animation: none !important;
+        transition: none;
+    }
+}

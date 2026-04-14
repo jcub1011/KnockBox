@@ -1,14 +1,14 @@
-using KnockBox.Services.Logic.Games.CardCounter;
-using KnockBox.Services.Logic.Games.CardCounter.FSM.States;
-using KnockBox.Services.Logic.RandomGeneration;
-using KnockBox.Services.State.Games.CardCounter;
-using KnockBox.Services.State.Users;
+using KnockBox.CardCounter.Services.Logic.Games;
+using KnockBox.CardCounter.Services.Logic.Games.FSM.States;
+using KnockBox.Core.Services.Logic.RandomGeneration;
+using KnockBox.CardCounter.Services.State.Games;
+using KnockBox.Core.Services.State.Users;
 using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using System.Threading.Tasks;
 
-namespace KnockBoxTests.Unit.Logic.Games.CardCounter
+namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
 {
     /// <summary>
     /// Tests for <see cref="CardCounterGameEngine.HandlePlayerLeft"/> covering turn-order
@@ -76,7 +76,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             // p3 (not active) leaves
             _engine.HandlePlayerLeft(_player3, state);
 
-            Assert.IsFalse(state.TurnManager.TurnOrder.Contains(_player3.Id));
+            Assert.DoesNotContain(_player3.Id, state.TurnManager.TurnOrder);
             Assert.IsFalse(state.GamePlayers.ContainsKey(_player3.Id));
         }
 
@@ -126,7 +126,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             _engine.HandlePlayerLeft(_player1, state);
 
             // p1 removed; p2 is now the only player and must be active
-            Assert.IsFalse(state.TurnManager.TurnOrder.Contains(_player1.Id));
+            Assert.DoesNotContain(_player1.Id, state.TurnManager.TurnOrder);
             Assert.AreEqual(GamePhase.Playing, state.Phase);
             Assert.AreEqual(_player2.Id, state.TurnManager.TurnOrder[state.TurnManager.CurrentPlayerIndex]);
         }
@@ -159,7 +159,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             _engine.HandlePlayerLeft(_player1, state);
 
             Assert.AreEqual(GamePhase.GameOver, state.Phase);
-            Assert.AreEqual(0, state.TurnManager.TurnOrder.Count);
+            Assert.IsEmpty(state.TurnManager.TurnOrder);
         }
 
         // ── HandlePlayerLeft – Game not started ───────────────────────────────
@@ -175,7 +175,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             // Should not throw; TurnOrder is empty because the game hasn't initialized it
             _engine.HandlePlayerLeft(_player1, state);
 
-            Assert.AreEqual(0, state.TurnManager.TurnOrder.Count);
+            Assert.IsEmpty(state.TurnManager.TurnOrder);
         }
 
         // ── PlayerUnregistered event wiring ───────────────────────────────────
@@ -196,7 +196,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             await _engine.StartAsync(_host, state);
 
             state.SetPhase(GamePhase.Playing);
-            Assert.IsTrue(state.TurnManager.TurnOrder.Contains(_player2.Id));
+            Assert.Contains(_player2.Id, state.TurnManager.TurnOrder);
 
             // Act: dispose p2's token to simulate disconnect — this triggers PlayerUnregistered
             p2Token.Dispose();
@@ -205,7 +205,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
             await Task.Delay(100);
 
             // Assert: p2 removed from TurnOrder via the event wiring
-            Assert.IsFalse(state.TurnManager.TurnOrder.Contains(_player2.Id));
+            Assert.DoesNotContain(_player2.Id, state.TurnManager.TurnOrder);
             Assert.IsFalse(state.GamePlayers.ContainsKey(_player2.Id));
         }
 
@@ -217,7 +217,7 @@ namespace KnockBoxTests.Unit.Logic.Games.CardCounter
 
             _engine.HandlePlayerLeft(_player2, state);
 
-            Assert.IsFalse(state.TurnManager.TurnOrder.Contains(_player2.Id));
+            Assert.DoesNotContain(_player2.Id, state.TurnManager.TurnOrder);
             Assert.IsFalse(state.GamePlayers.ContainsKey(_player2.Id));
         }
     }

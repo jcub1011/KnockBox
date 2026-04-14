@@ -1,6 +1,6 @@
-using KnockBox.Services.State.Games.DrawnToDress.Data;
+using KnockBox.DrawnToDress.Services.State.Games.Data;
 
-namespace KnockBox.DrawnToDressTests.Unit.State.Games.DrawnToDress
+namespace KnockBox.DrawnToDress.Tests.Unit.State.Games.DrawnToDress
 {
     [TestClass]
     public class DrawnToDressConfigTests
@@ -27,7 +27,7 @@ namespace KnockBox.DrawnToDressTests.Unit.State.Games.DrawnToDress
         public void Default_ClothingTypes_HasFiveEntries()
         {
             var config = new DrawnToDressConfig();
-            Assert.AreEqual(4, config.ClothingTypes.Count);
+            Assert.HasCount(4, config.ClothingTypes);
         }
 
         [TestMethod]
@@ -36,19 +36,18 @@ namespace KnockBox.DrawnToDressTests.Unit.State.Games.DrawnToDress
             var config = new DrawnToDressConfig();
             var ids = config.ClothingTypes.Select(t => t.Id).ToList();
 
-            CollectionAssert.Contains(ids, "hat");
-            CollectionAssert.Contains(ids, "top");
-            CollectionAssert.Contains(ids, "bottom");
-            CollectionAssert.Contains(ids, "shoes");
+            CollectionAssert.Contains(ids, ClothingType.Hat);
+            CollectionAssert.Contains(ids, ClothingType.Top);
+            CollectionAssert.Contains(ids, ClothingType.Bottom);
+            CollectionAssert.Contains(ids, ClothingType.Shoes);
         }
 
         [TestMethod]
-        public void Default_NonAccessoryClothingTypes_DoNotAllowMultiple()
+        public void Default_ClothingTypes_DoNotAllowMultiple()
         {
             var config = new DrawnToDressConfig();
-            var nonAccessories = config.ClothingTypes.Where(t => t.Id != "accessory");
 
-            foreach (var type in nonAccessories)
+            foreach (var type in config.ClothingTypes)
             {
                 Assert.IsFalse(type.AllowMultiple, $"Expected AllowMultiple=false for type '{type.Id}'.");
             }
@@ -64,10 +63,10 @@ namespace KnockBox.DrawnToDressTests.Unit.State.Games.DrawnToDress
         }
 
         [TestMethod]
-        public void Default_ThemeAnnouncementTimeSec_Is10()
+        public void Default_ThemeAnnouncementTimeSec_Is6()
         {
             var config = new DrawnToDressConfig();
-            Assert.AreEqual(10, config.ThemeAnnouncementTimeSec);
+            Assert.AreEqual(6, config.ThemeAnnouncementTimeSec);
         }
 
         // ── Outfit Building phase defaults ────────────────────────────────────
@@ -80,10 +79,10 @@ namespace KnockBox.DrawnToDressTests.Unit.State.Games.DrawnToDress
         }
 
         [TestMethod]
-        public void Default_OutfitCustomizationTimeSec_Is60()
+        public void Default_OutfitCustomizationTimeSec_Is75()
         {
             var config = new DrawnToDressConfig();
-            Assert.AreEqual(60, config.OutfitCustomizationTimeSec);
+            Assert.AreEqual(75, config.OutfitCustomizationTimeSec);
         }
 
         // ── Pool / reuse defaults ─────────────────────────────────────────────
@@ -124,7 +123,7 @@ namespace KnockBox.DrawnToDressTests.Unit.State.Games.DrawnToDress
         public void Default_VotingCriteria_HasThreeEntries()
         {
             var config = new DrawnToDressConfig();
-            Assert.AreEqual(3, config.VotingCriteria.Count);
+            Assert.HasCount(3, config.VotingCriteria);
         }
 
         [TestMethod]
@@ -308,7 +307,7 @@ namespace KnockBox.DrawnToDressTests.Unit.State.Games.DrawnToDress
         {
             var config = new DrawnToDressConfig { ClothingTypes = [] };
             config.Normalize();
-            Assert.AreEqual(1, config.ClothingTypes.Count);
+            Assert.HasCount(1, config.ClothingTypes);
         }
 
         [TestMethod]
@@ -316,7 +315,7 @@ namespace KnockBox.DrawnToDressTests.Unit.State.Games.DrawnToDress
         {
             var config = new DrawnToDressConfig { VotingCriteria = [] };
             config.Normalize();
-            Assert.AreEqual(1, config.VotingCriteria.Count);
+            Assert.HasCount(1, config.VotingCriteria);
         }
 
         [TestMethod]
@@ -345,7 +344,7 @@ namespace KnockBox.DrawnToDressTests.Unit.State.Games.DrawnToDress
                 ]
             };
             config.Normalize();
-            Assert.AreEqual(1, config.VotingCriteria.Count);
+            Assert.HasCount(1, config.VotingCriteria);
             Assert.AreEqual("creativity", config.VotingCriteria[0].Id);
         }
 
@@ -356,15 +355,15 @@ namespace KnockBox.DrawnToDressTests.Unit.State.Games.DrawnToDress
             config.Normalize();
 
             Assert.AreEqual(180, config.DrawingTimeSec);
-            Assert.AreEqual(10, config.ThemeAnnouncementTimeSec);
+            Assert.AreEqual(6, config.ThemeAnnouncementTimeSec);
             Assert.AreEqual(90, config.OutfitBuildingTimeSec);
-            Assert.AreEqual(60, config.OutfitCustomizationTimeSec);
+            Assert.AreEqual(75, config.OutfitCustomizationTimeSec);
             Assert.AreEqual(60, config.VotingTimeSec);
             Assert.AreEqual(0, config.VotingRounds);
             Assert.AreEqual(1, config.BonusPointsForCompleteOutfit);
             Assert.AreEqual(120, config.HostDisconnectTimeoutSec);
-            Assert.AreEqual(4, config.ClothingTypes.Count);
-            Assert.AreEqual(3, config.VotingCriteria.Count);
+            Assert.HasCount(4, config.ClothingTypes);
+            Assert.HasCount(3, config.VotingCriteria);
         }
     }
 }

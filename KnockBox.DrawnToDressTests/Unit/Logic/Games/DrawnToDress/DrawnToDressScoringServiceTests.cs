@@ -1,7 +1,7 @@
-using KnockBox.Services.Logic.Games.DrawnToDress;
-using KnockBox.Services.State.Games.DrawnToDress.Data;
+using KnockBox.DrawnToDress.Services.Logic.Games;
+using KnockBox.DrawnToDress.Services.State.Games.Data;
 
-namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress
+namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress
 {
     [TestClass]
     public class DrawnToDressScoringServiceTests
@@ -115,7 +115,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress
 
             var ties = DrawnToDressScoringService.FindTiedCriteria(round, criteria, votes);
 
-            Assert.AreEqual(0, ties.Count);
+            Assert.IsEmpty(ties);
         }
 
         [TestMethod]
@@ -135,7 +135,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress
 
             var ties = DrawnToDressScoringService.FindTiedCriteria(round, criteria, votes);
 
-            Assert.AreEqual(1, ties.Count);
+            Assert.HasCount(1, ties);
             Assert.AreEqual(matchup.Id, ties[0].MatchupId);
             Assert.AreEqual("creativity", ties[0].CriterionId);
         }
@@ -160,7 +160,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress
 
             var ties = DrawnToDressScoringService.FindTiedCriteria(round, criteria, votes);
 
-            Assert.AreEqual(2, ties.Count);
+            Assert.HasCount(2, ties);
         }
 
         [TestMethod]
@@ -176,7 +176,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress
 
             var ties = DrawnToDressScoringService.FindTiedCriteria(round, criteria, votes);
 
-            Assert.AreEqual(1, ties.Count, "0-0 (all abstain) should be treated as a tie.");
+            Assert.HasCount(1, ties, "0-0 (all abstain) should be treated as a tie.");
         }
 
         [TestMethod]
@@ -200,7 +200,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress
 
             var ties = DrawnToDressScoringService.FindTiedCriteria(round, criteria, votes, existingFlips);
 
-            Assert.AreEqual(0, ties.Count, "Already-resolved ties should not appear.");
+            Assert.IsEmpty(ties, "Already-resolved ties should not appear.");
         }
 
         // ── CalculateMatchupTotals ──────────────────────────────────────────────
@@ -324,8 +324,8 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress
 
             var leaders = DrawnToDressScoringService.GetRoundLeaders(scores);
 
-            Assert.AreEqual(1, leaders.Count);
-            Assert.IsTrue(leaders.Contains(new EntrantId("pA", 1)));
+            Assert.HasCount(1, leaders);
+            Assert.Contains(new EntrantId("pA", 1), leaders);
         }
 
         [TestMethod]
@@ -338,9 +338,9 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress
 
             var leaders = DrawnToDressScoringService.GetRoundLeaders(scores);
 
-            Assert.AreEqual(2, leaders.Count);
-            Assert.IsTrue(leaders.Contains(new EntrantId("pA", 1)));
-            Assert.IsTrue(leaders.Contains(new EntrantId("pB", 1)));
+            Assert.HasCount(2, leaders);
+            Assert.Contains(new EntrantId("pA", 1), leaders);
+            Assert.Contains(new EntrantId("pB", 1), leaders);
         }
 
         // ── CalculateMatchupWins ────────────────────────────────────────────────
@@ -493,7 +493,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress
                 rounds, criteria, votes, [], players, new DrawnToDressConfig());
 
             Assert.AreEqual(entries[0].Rank, entries[1].Rank, "Tied players should share the same rank.");
-            Assert.AreEqual(1, tiedPairs.Count, "Tied pair should be reported.");
+            Assert.HasCount(1, tiedPairs, "Tied pair should be reported.");
         }
 
         // ── Spec fixture verification ───────────────────────────────────────────
@@ -616,7 +616,7 @@ namespace KnockBox.DrawnToDressTests.Unit.Logic.Games.DrawnToDress
 
             var pB = entries.First(e => e.PlayerId == "pB");
             var pA = entries.First(e => e.PlayerId == "pA");
-            Assert.IsTrue(pB.Rank < pA.Rank, "Coin flip winner pB should rank higher.");
+            Assert.IsLessThan(pA.Rank, pB.Rank, "Coin flip winner pB should rank higher.");
             Assert.AreEqual("coin_flip", pB.TiebreakMethod);
             Assert.AreEqual("coin_flip", pA.TiebreakMethod);
         }

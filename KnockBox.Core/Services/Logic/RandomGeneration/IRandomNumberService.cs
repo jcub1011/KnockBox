@@ -1,4 +1,4 @@
-﻿namespace KnockBox.Services.Logic.RandomGeneration
+﻿namespace KnockBox.Core.Services.Logic.RandomGeneration
 {
     public enum RandomType
     {

@@ -1,4 +1,4 @@
-namespace KnockBox.Services.State.Games.Shared.Components;
+namespace KnockBox.Core.Services.State.Games.Shared.Components;
 
 public class TurnManager
 {

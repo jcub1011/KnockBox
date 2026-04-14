@@ -3,15 +3,15 @@ using KnockBox.Operator.Services.Logic.FSM;
 using KnockBox.Operator.Services.Logic.FSM.Commands;
 using KnockBox.Operator.Services.Logic.FSM.States;
 using KnockBox.Operator.Services.State;
-using KnockBox.Services.Logic.RandomGeneration;
-using KnockBox.Services.State.Users;
+using KnockBox.Core.Services.Logic.RandomGeneration;
+using KnockBox.Core.Services.State.Users;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using System.Collections.Generic;
 using System;
 
-namespace KnockBox.OperatorTests.Integration.FSM;
+namespace KnockBox.Operator.Tests.Integration.FSM;
 
 [TestClass]
 public class ActionReactionTests
@@ -51,7 +51,7 @@ public class ActionReactionTests
 
         Assert.IsInstanceOfType(result.Value, typeof(ReactionState));
         Assert.AreEqual(OperatorGamePhase.Reaction, _state.Phase);
-        Assert.IsTrue(_state.ReactionTargetPlayerIds.Contains("p2"));
+        Assert.Contains("p2", _state.ReactionTargetPlayerIds);
     }
 
     [TestMethod]
@@ -94,8 +94,8 @@ public class ActionReactionTests
         _reactionPhase.HandleCommand(_context, reactCmd);
 
         // Steal blocked. P1 hand should be empty (Steal played). P2 should still have the cardToSteal.
-        Assert.AreEqual(0, _state.GamePlayers["p1"].Hand.Count);
-        Assert.AreEqual(1, _state.GamePlayers["p2"].Hand.Count);
+        Assert.IsEmpty(_state.GamePlayers["p1"].Hand);
+        Assert.HasCount(1, _state.GamePlayers["p2"].Hand);
         Assert.AreEqual(cardToSteal.Id, _state.GamePlayers["p2"].Hand[0].Id);
     }
 }

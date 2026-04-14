@@ -1,7 +1,7 @@
-﻿using KnockBox.Extensions.RandomGeneration;
+﻿using KnockBox.Core.Extensions.RandomGeneration;
 using System.Security.Cryptography;
 
-namespace KnockBox.Services.Logic.RandomGeneration
+namespace KnockBox.Core.Services.Logic.RandomGeneration
 {
     public class RandomNumberService : IRandomNumberService
     {

@@ -1,7 +1,6 @@
 ﻿using System.Diagnostics.CodeAnalysis;
-using static System.Runtime.InteropServices.JavaScript.JSType;
 
-namespace KnockBox.Extensions.Returns
+namespace KnockBox.Core.Extensions.Returns
 {
     /// <summary>
     /// A wrapper used to discern between failures and cancellations.
