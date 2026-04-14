@@ -71,6 +71,5 @@ public sealed class DisposingWrapperTests
     }
 
     // Helpers keep the wrapper creation out-of-scope so the GC can collect it.
-    private static void CreateAndAbandonWrapper(IDisposable inner) => _ = new DisposingWrapper(inner);
     private static void CreateAndDisposeWrapper(IDisposable inner) => new DisposingWrapper(inner).Dispose();
 }

@@ -9,7 +9,7 @@
     --ctc-lavender-faint: rgba(167, 139, 250, 0.15);
 
     width: 100%;
-    min-height: 160px;
+    height: 100%;
     padding: 14px 18px;
     background: radial-gradient(ellipse at center, #1a1a2e 0%, #0f0f1a 100%);
     border: 5px solid #000;
@@ -55,7 +55,8 @@
 .ctc-screen {
     position: relative;
     width: 100%;
-    min-height: 132px;
+    height: 100%;
+    padding: 6px;
     background: transparent;
     display: flex;
     flex-direction: column;

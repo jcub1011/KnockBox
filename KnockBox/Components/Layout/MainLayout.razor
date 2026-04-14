@@ -7,7 +7,7 @@
 @implements IDisposable
 
 <div class="main">
-    <header>
+    <header class="@(_isOnHomePage ? "home-header" : "")">
         @if (!_isOnHomePage && GameSessionService.TryGetCurrentSession(out var currentSession))
         {
             <a href="@NavigationService.GetHomeUri()" title="Click to return home">
