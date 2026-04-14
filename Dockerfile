@@ -5,7 +5,10 @@ WORKDIR /src
 COPY KnockBox/KnockBox.csproj KnockBox/
 COPY KnockBox.Core/KnockBox.Core.csproj KnockBox.Core/
 COPY KnockBox.CardCounter/KnockBox.CardCounter.csproj KnockBox.CardCounter/
+COPY KnockBox.ConsultTheCard/KnockBox.ConsultTheCard.csproj KnockBox.ConsultTheCard/
 COPY KnockBox.DiceSimulator/KnockBox.DiceSimulator.csproj KnockBox.DiceSimulator/
+COPY KnockBox.DrawnToDress/KnockBox.DrawnToDress.csproj KnockBox.DrawnToDress/
+COPY KnockBox.Operator/KnockBox.Operator.csproj KnockBox.Operator/
 RUN dotnet restore KnockBox/KnockBox.csproj
 
 COPY . .

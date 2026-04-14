@@ -21,8 +21,8 @@ Rename `IFininteStateMachine` to `IFiniteStateMachine` in the following files:
 ---
 
 ## Acceptance Criteria
-- [ ] Project folder is named `KnockBox.ConsultTheCard` (capital K, capital B)
-- [ ] `KnockBox.slnx` references the renamed project correctly
+- [x] Project folder is named `KnockBox.ConsultTheCard` (capital K, capital B)
+- [x] `KnockBox.slnx` references the renamed project correctly
 - [ ] `IFiniteStateMachine` is correctly spelled across all files listed above
 - [ ] `dotnet build` succeeds with zero errors after all renames
 - [ ] Existing CardCounter and DrawnToDress tests still pass
