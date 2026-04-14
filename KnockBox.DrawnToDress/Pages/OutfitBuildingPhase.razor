@@ -214,7 +214,8 @@
                             {
                                 var (defX, defY) = CompositeCanvasLayout.GetItemPosition(
                                     clothingType.CanvasWidth, clothingType.CanvasHeight,
-                                    clothingType.MannequinAnchorY, ComposedOutfitWidth, ComposedOutfitHeight);
+                                    clothingType.MannequinAnchorY, ComposedOutfitWidth, ComposedOutfitHeight,
+                                    GameState.Config.MannequinDimensions.X);
                                 Guid? slotItemId = myPlayer is not null
                                     ? GetSelectedItemForType(myPlayer, clothingType.Id) : null;
 

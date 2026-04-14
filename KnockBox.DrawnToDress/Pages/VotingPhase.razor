@@ -191,7 +191,8 @@
                             if (SafeSvgContent(item.SvgContent) is string safeSvg)
                             {
                                 var (itemX, itemY) = CompositeCanvasLayout.GetItemPosition(
-                                    ct.CanvasWidth, ct.CanvasHeight, ct.MannequinAnchorY, TotalOutfitWidth, TotalOutfitHeight);
+                                    ct.CanvasWidth, ct.CanvasHeight, ct.MannequinAnchorY, TotalOutfitWidth, TotalOutfitHeight,
+                                    GameState.Config.MannequinDimensions.X);
                                 <g transform="translate(@itemX,@itemY)">@((MarkupString)safeSvg)</g>
                             }
                         }

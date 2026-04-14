@@ -55,11 +55,11 @@ namespace KnockBox.DrawnToDress.Pages
 
             // Compute default positions so each item's center aligns with the
             // corresponding mannequin body-part center in the composite canvas.
-            int cw = ComputeCompositeWidth(GameState.Config.ClothingTypes);
-            int ch = ComputeCompositeHeight(GameState.Config.ClothingTypes);
+            int cw = ComputeCompositeWidth(GameState.Config);
+            int ch = ComputeCompositeHeight(GameState.Config);
             foreach (var ct in GameState.Config.ClothingTypes)
             {
-                var (x, y) = GetItemPosition(ct.CanvasWidth, ct.CanvasHeight, ct.MannequinAnchorY, cw, ch);
+                var (x, y) = GetItemPosition(ct.CanvasWidth, ct.CanvasHeight, ct.MannequinAnchorY, cw, ch, GameState.Config.MannequinDimensions.X);
                 _itemPositions[ct.Id] = new ItemPositionOverride { X = x, Y = y };
             }
 
@@ -140,8 +140,8 @@ namespace KnockBox.DrawnToDress.Pages
                 }
             }
 
-            int canvasWidth = ComputeCompositeWidth(GameState.Config.ClothingTypes);
-            int totalHeight = ComputeCompositeHeight(GameState.Config.ClothingTypes);
+            int canvasWidth = ComputeCompositeWidth(GameState.Config);
+            int totalHeight = ComputeCompositeHeight(GameState.Config);
             await _dragModule.InvokeVoidAsync("initialize", _dragSvgId, _dotNetRef, items, canvasWidth, totalHeight);
             _dragInitialized = true;
         }

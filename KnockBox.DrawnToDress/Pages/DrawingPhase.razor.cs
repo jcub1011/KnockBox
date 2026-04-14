@@ -46,7 +46,9 @@ namespace KnockBox.DrawnToDress.Pages
             return MannequinSvgHelper.Build(
                 CurrentTypeCanvasWidth,
                 CurrentTypeCanvasHeight,
-                yOffset);
+                yOffset,
+                GameState.Config.MannequinDimensions.X,
+                GameState.Config.MannequinScaleFactor);
         }
 
         /// <summary>Display name for the clothing type of the current round.</summary>

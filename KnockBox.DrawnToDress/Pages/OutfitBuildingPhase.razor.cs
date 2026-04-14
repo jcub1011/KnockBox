@@ -23,10 +23,10 @@ namespace KnockBox.DrawnToDress.Pages
         [Parameter] public int OutfitRound { get; set; } = 1;
 
         protected int ComposedOutfitWidth =>
-            ComputeCompositeWidth(GameState.Config.ClothingTypes);
+            ComputeCompositeWidth(GameState.Config);
 
         protected int ComposedOutfitHeight =>
-            ComputeCompositeHeight(GameState.Config.ClothingTypes);
+            ComputeCompositeHeight(GameState.Config);
 
         private bool _submitting;
         private string? _errorMessage;

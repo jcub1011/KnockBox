@@ -1,5 +1,3 @@
-using System.Numerics;
-
 namespace KnockBox.DrawnToDress.Services.State.Games.Data
 {
     public class DrawnToDressConfig
@@ -55,9 +53,15 @@ namespace KnockBox.DrawnToDress.Services.State.Games.Data
         ];
 
         /// <summary>
-        /// The dimensions of the reference mannequin image.
+        /// The native pixel dimensions of the reference mannequin image.
         /// </summary>
         public (int X, int Y) MannequinDimensions { get; set; } = (1416, 1416);
+
+        /// <summary>
+        /// The fraction of the item canvas width used for the mannequin display size.
+        /// Controls how large the mannequin appears relative to drawn items.
+        /// </summary>
+        public double MannequinScaleFactor { get; set; } = 0.85;
 
         // ── Theme ─────────────────────────────────────────────────────────────
 
