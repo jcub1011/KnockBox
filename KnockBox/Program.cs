@@ -54,7 +54,10 @@ namespace KnockBox
                 .CreateLogger();
             using var bootstrapLoggerFactory = new SerilogLoggerFactory(bootstrapSerilog, dispose: true);
             var pluginLogger = bootstrapLoggerFactory.CreateLogger<PluginLoader>();
-            var pluginsPath = Path.Combine(AppContext.BaseDirectory, "games");
+            var configuredPluginsPath = builder.Configuration["Plugins:Path"] ?? "games";
+            var pluginsPath = Path.IsPathRooted(configuredPluginsPath)
+                ? configuredPluginsPath
+                : Path.Combine(AppContext.BaseDirectory, configuredPluginsPath);
             var pluginLoadResult = new PluginLoader(pluginLogger).LoadModules(pluginsPath);
 
             // Add logic
