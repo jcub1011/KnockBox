@@ -1,10 +1,17 @@
+using System.Diagnostics;
+
 namespace KnockBox.Services.Logic.Admin
 {
-    internal sealed class AdminMetricsService : IAdminMetricsService
+    internal sealed class AdminMetricsService : IAdminMetricsService, IDisposable
     {
         private readonly Lock _lock = new();
         private IReadOnlyList<string> _boundAddresses = [];
         private int _activeCircuits;
+
+        private readonly PeriodicTimer _metricsTimer;
+        private readonly CancellationTokenSource _metricsCts;
+        private double _cpuUtilization;
+        private long _memoryUsageBytes;
 
         public DateTime StartedAtUtc { get; } = DateTime.UtcNow;
 
@@ -19,6 +26,50 @@ namespace KnockBox.Services.Logic.Admin
         }
 
         public int ActiveCircuitCount => Volatile.Read(ref _activeCircuits);
+
+        public double CpuUtilization => Volatile.Read(ref _cpuUtilization);
+
+        public long MemoryUsageBytes => Volatile.Read(ref _memoryUsageBytes);
+
+        public AdminMetricsService()
+        {
+            _metricsCts = new CancellationTokenSource();
+            _metricsTimer = new PeriodicTimer(TimeSpan.FromSeconds(2));
+            _ = MetricsLoop(_metricsCts.Token);
+        }
+
+        private async Task MetricsLoop(CancellationToken ct)
+        {
+            try
+            {
+                var process = Process.GetCurrentProcess();
+                var processorCount = Environment.ProcessorCount;
+                var lastTime = DateTime.UtcNow;
+                var lastTotalProcessorTime = process.TotalProcessorTime;
+
+                while (await _metricsTimer.WaitForNextTickAsync(ct))
+                {
+                    // Update Memory
+                    process.Refresh();
+                    Volatile.Write(ref _memoryUsageBytes, process.WorkingSet64);
+
+                    // Update CPU
+                    var currentTime = DateTime.UtcNow;
+                    var currentTotalProcessorTime = process.TotalProcessorTime;
+
+                    var cpuUsedMs = (currentTotalProcessorTime - lastTotalProcessorTime).TotalMilliseconds;
+                    var totalMsPassed = (currentTime - lastTime).TotalMilliseconds;
+                    var cpuUsageTotal = cpuUsedMs / (processorCount * totalMsPassed);
+
+                    Volatile.Write(ref _cpuUtilization, Math.Max(0, Math.Min(1, cpuUsageTotal)));
+
+                    lastTime = currentTime;
+                    lastTotalProcessorTime = currentTotalProcessorTime;
+                }
+            }
+            catch (OperationCanceledException) { /* expected on dispose */ }
+            catch { /* Ignore process errors in sampling loop */ }
+        }
 
         public void SetBoundAddresses(IEnumerable<string> addresses)
         {
@@ -43,6 +94,13 @@ namespace KnockBox.Services.Logic.Admin
                 if (current <= 0) return;
                 next = current - 1;
             } while (Interlocked.CompareExchange(ref _activeCircuits, next, current) != current);
+        }
+
+        public void Dispose()
+        {
+            _metricsCts.Cancel();
+            _metricsCts.Dispose();
+            _metricsTimer.Dispose();
         }
     }
 }

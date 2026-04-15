@@ -24,6 +24,16 @@ namespace KnockBox.Services.Logic.Admin
         int ActiveCircuitCount { get; }
 
         /// <summary>
+        /// Current CPU utilization of the host process (0.0 to 1.0).
+        /// </summary>
+        double CpuUtilization { get; }
+
+        /// <summary>
+        /// Current working set memory size of the host process in bytes.
+        /// </summary>
+        long MemoryUsageBytes { get; }
+
+        /// <summary>
         /// Sets the bound addresses once they are known (called from
         /// <see cref="IHostApplicationLifetime.ApplicationStarted"/>).
         /// </summary>
