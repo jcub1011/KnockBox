@@ -17,13 +17,9 @@
         radial-gradient(ellipse at 30% 20%, rgba(168, 85, 247, 0.08) 0%, transparent 60%),
         radial-gradient(ellipse at 70% 80%, rgba(232, 184, 73, 0.06) 0%, transparent 50%),
         var(--ds-bg);
-    border: 5px solid #000;
-    border-radius: 16px;
-    box-shadow: 8px 8px 0 #000;
     color: var(--ds-text);
     font-family: var(--font-primary);
     text-align: center;
-    transition: transform 0.1s, box-shadow 0.1s;
     position: relative;
     overflow: hidden;
 }
@@ -174,11 +170,6 @@
 
 /* ── Hover / Active ──────────────────────────────────────────────────────── */
 
-.ds-tile:hover {
-    transform: translate(-3px, -3px);
-    box-shadow: 11px 11px 0 #000;
-}
-
 .ds-tile:hover .ds-bg-glow {
     transform: scale(1.15);
 }
@@ -213,11 +204,6 @@
 @keyframes ds-num-cycle-inv {
     0%, 100% { opacity: 0; }
     40%, 60% { opacity: 1; }
-}
-
-.ds-tile:active {
-    transform: translate(3px, 3px);
-    box-shadow: 2px 2px 0 #000;
 }
 
 @media (prefers-reduced-motion: reduce) {

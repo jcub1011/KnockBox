@@ -6,8 +6,6 @@
     padding: 18px 20px 16px 20px;
     background:
         radial-gradient(ellipse at 50% 35%, #128a55 0%, #0a5c3b 55%, #053a25 100%);
-    border: 5px solid #000;
-    border-radius: 16px;
     box-shadow:
         8px 8px 0 #000,
         inset 0 0 60px rgba(0, 0, 0, 0.55),
@@ -15,7 +13,6 @@
     color: #f7d547;
     font-family: var(--font-primary);
     text-align: center;
-    transition: transform 0.1s, box-shadow 0.1s;
     position: relative;
     overflow: hidden;
 }
@@ -139,7 +136,6 @@
 /* ── Hover / Active ──────────────────────────────────────────────────────── */
 
 .cc-tile:hover {
-    transform: translate(-3px, -3px);
     box-shadow:
         11px 11px 0 #000,
         inset 0 0 60px rgba(0, 0, 0, 0.55),
@@ -159,7 +155,6 @@
 }
 
 .cc-tile:active {
-    transform: translate(3px, 3px);
     box-shadow:
         2px 2px 0 #000,
         inset 0 0 60px rgba(0, 0, 0, 0.55),
