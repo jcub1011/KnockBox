@@ -98,8 +98,8 @@ namespace KnockBox.Admin.Pages
 
         private static bool FixedTimeEquals(string left, string right)
         {
-            var l = System.Text.Encoding.UTF8.GetBytes(left);
-            var r = System.Text.Encoding.UTF8.GetBytes(right);
+            var l = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(left));
+            var r = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(right));
             return System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(l, r);
         }
     }

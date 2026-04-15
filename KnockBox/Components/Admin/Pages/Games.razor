@@ -56,10 +56,10 @@
 </table>
 
 @code {
-    private void OnToggle(string routeIdentifier, ChangeEventArgs e)
+    private async Task OnToggle(string routeIdentifier, ChangeEventArgs e)
     {
         var enabled = e.Value is bool b && b;
-        Availability.SetEnabled(routeIdentifier, enabled);
+        await Availability.SetEnabledAsync(routeIdentifier, enabled);
         StateHasChanged();
     }
 }

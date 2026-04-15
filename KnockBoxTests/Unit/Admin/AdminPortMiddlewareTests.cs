@@ -50,6 +50,19 @@ public sealed class AdminPortMiddlewareTests
     }
 
     [TestMethod]
+    public async Task MainPort_DoubleSlashAdmin_Returns404()
+    {
+        var called = false;
+        var middleware = new AdminPortMiddleware(_ => { called = true; return Task.CompletedTask; }, AdminPort);
+
+        var ctx = BuildContext(MainPort, "//admin/login");
+        await middleware.InvokeAsync(ctx);
+
+        Assert.IsFalse(called);
+        Assert.AreEqual(404, ctx.Response.StatusCode);
+    }
+
+    [TestMethod]
     public async Task MainPort_NonAdminPath_Passes()
     {
         var called = false;

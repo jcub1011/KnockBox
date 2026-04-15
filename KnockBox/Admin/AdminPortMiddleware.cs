@@ -45,9 +45,7 @@ namespace KnockBox.Admin
         {
             var isAdminPort = context.Connection.LocalPort == _adminPort;
             var path = context.Request.Path;
-            var isAdminPath = path.StartsWithSegments(
-                "/admin",
-                StringComparison.OrdinalIgnoreCase);
+            var isAdminPath = path.Value?.Contains("/admin", StringComparison.OrdinalIgnoreCase) == true;
 
             if (isAdminPort)
             {

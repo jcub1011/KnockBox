@@ -36,10 +36,10 @@ public sealed class GameAvailabilityServiceTests
     }
 
     [TestMethod]
-    public void SetEnabled_False_PersistsToDisk_AndReloadsDisabled()
+    public async Task SetEnabled_False_PersistsToDisk_AndReloadsDisabled()
     {
         var svc1 = CreateService();
-        svc1.SetEnabled("card-counter", false);
+        await svc1.SetEnabledAsync("card-counter", false);
         Assert.IsFalse(svc1.IsEnabled("card-counter"));
 
         // Fresh instance reads the file back.
@@ -49,11 +49,11 @@ public sealed class GameAvailabilityServiceTests
     }
 
     [TestMethod]
-    public void SetEnabled_TrueAgain_RemovesFromPersistedList()
+    public async Task SetEnabled_TrueAgain_RemovesFromPersistedList()
     {
         var svc = CreateService();
-        svc.SetEnabled("card-counter", false);
-        svc.SetEnabled("card-counter", true);
+        await svc.SetEnabledAsync("card-counter", false);
+        await svc.SetEnabledAsync("card-counter", true);
 
         Assert.IsTrue(svc.IsEnabled("card-counter"));
 
@@ -63,23 +63,23 @@ public sealed class GameAvailabilityServiceTests
     }
 
     [TestMethod]
-    public void IsEnabled_CaseInsensitive()
+    public async Task IsEnabled_CaseInsensitive()
     {
         var svc = CreateService();
-        svc.SetEnabled("Card-Counter", false);
+        await svc.SetEnabledAsync("Card-Counter", false);
         Assert.IsFalse(svc.IsEnabled("card-counter"));
         Assert.IsFalse(svc.IsEnabled("CARD-COUNTER"));
     }
 
     [TestMethod]
-    public void Changed_FiresOnToggle()
+    public async Task Changed_FiresOnToggle()
     {
         var svc = CreateService();
         var fired = 0;
         svc.Changed += () => fired++;
 
-        svc.SetEnabled("card-counter", false);
-        svc.SetEnabled("card-counter", true);
+        await svc.SetEnabledAsync("card-counter", false);
+        await svc.SetEnabledAsync("card-counter", true);
 
         Assert.AreEqual(2, fired);
     }
@@ -107,11 +107,11 @@ public sealed class GameAvailabilityServiceTests
     }
 
     [TestMethod]
-    public void SetEnabled_EmptyOrNullRoute_Throws()
+    public async Task SetEnabled_EmptyOrNullRoute_Throws()
     {
         var svc = CreateService();
-        Assert.ThrowsExactly<ArgumentException>(() => svc.SetEnabled("", false));
-        Assert.ThrowsExactly<ArgumentException>(() => svc.SetEnabled("   ", false));
+        await Assert.ThrowsExactlyAsync<ArgumentException>(async () => await svc.SetEnabledAsync("", false));
+        await Assert.ThrowsExactlyAsync<ArgumentException>(async () => await svc.SetEnabledAsync("   ", false));
     }
 
     private IGameAvailabilityService CreateService()

@@ -55,13 +55,13 @@ namespace KnockBox.Services.Logic.Games.Shared
             return !_state.TryGetValue(routeIdentifier, out var enabled) || enabled;
         }
 
-        public void SetEnabled(string routeIdentifier, bool enabled)
+        public async Task SetEnabledAsync(string routeIdentifier, bool enabled)
         {
             if (string.IsNullOrWhiteSpace(routeIdentifier))
                 throw new ArgumentException("Route identifier must be non-empty.", nameof(routeIdentifier));
 
             _state[routeIdentifier] = enabled;
-            PersistToDisk();
+            await PersistToDiskAsync();
             Changed?.Invoke();
         }
 
@@ -118,9 +118,9 @@ namespace KnockBox.Services.Logic.Games.Shared
             }
         }
 
-        private void PersistToDisk()
+        private async Task PersistToDiskAsync()
         {
-            _fileLock.Wait();
+            await _fileLock.WaitAsync();
             try
             {
                 var directory = Path.GetDirectoryName(_statePath);
@@ -139,9 +139,11 @@ namespace KnockBox.Services.Logic.Games.Shared
                     tempPath,
                     FileMode.Create,
                     FileAccess.Write,
-                    FileShare.None))
+                    FileShare.None,
+                    4096,
+                    FileOptions.Asynchronous))
                 {
-                    JsonSerializer.Serialize(stream, payload, JsonOptions);
+                    await JsonSerializer.SerializeAsync(stream, payload, JsonOptions);
                 }
 
                 // Atomic replace: Move overwrites on Windows .NET via overwrite flag.

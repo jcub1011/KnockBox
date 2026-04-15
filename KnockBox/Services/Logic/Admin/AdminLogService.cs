@@ -70,12 +70,52 @@ namespace KnockBox.Services.Logic.Admin
                 fileLength = stream.Length;
 
                 using var reader = new StreamReader(stream);
-                string? line;
-                while ((line = reader.ReadLine()) is not null)
+                
+                // Fast-forward to start line without allocating strings
+                while (totalLines < startLine && !reader.EndOfStream)
                 {
-                    if (totalLines >= startLine && totalLines < endLineExclusive)
-                        lines.Add(line);
+                    int c;
+                    while ((c = reader.Read()) != -1)
+                    {
+                        if (c == '\n')
+                        {
+                            totalLines++;
+                            break;
+                        }
+                    }
+                }
+
+                // Read actual page
+                string? line;
+                while (totalLines < endLineExclusive && (line = reader.ReadLine()) is not null)
+                {
+                    lines.Add(line);
                     totalLines++;
+                }
+
+                // Fast-forward the rest to count total
+                while (!reader.EndOfStream)
+                {
+                    int c;
+                    while ((c = reader.Read()) != -1)
+                    {
+                        if (c == '\n')
+                        {
+                            totalLines++;
+                            break;
+                        }
+                    }
+                }
+                
+                // Account for potential last line without newline if we didn't end exactly on one
+                if (stream.Position > 0 && stream.Position == stream.Length)
+                {
+                    stream.Position--;
+                    var lastChar = stream.ReadByte();
+                    if (lastChar != '\n')
+                    {
+                         totalLines++;
+                    }
                 }
 
                 return new LogPage(

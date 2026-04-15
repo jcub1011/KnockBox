@@ -19,7 +19,7 @@ namespace KnockBox.Services.Logic.Games.Shared
         /// Flips the enabled state for the given route identifier and persists
         /// the change. Raises <see cref="Changed"/> on successful write.
         /// </summary>
-        void SetEnabled(string routeIdentifier, bool enabled);
+        Task SetEnabledAsync(string routeIdentifier, bool enabled);
 
         /// <summary>
         /// Snapshot of every route identifier the service has observed, mapped

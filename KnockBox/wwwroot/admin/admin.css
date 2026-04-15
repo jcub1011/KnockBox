@@ -17,7 +17,7 @@
 }
 
 body.admin-login-body,
-body.admin-body {
+.admin-shell {
     margin: 0;
     background: var(--admin-bg);
     color: var(--admin-text);
