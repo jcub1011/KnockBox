@@ -1,8 +1,7 @@
 using KnockBox.Core.Extensions.Disposable;
 using KnockBox.Core.Extensions.Returns;
 using KnockBox.Core.Services.State.Shared;
-using Microsoft.Extensions.Caching.Memory;
-using Microsoft.Extensions.Primitives;
+using System.Collections.Concurrent;
 
 namespace KnockBox.Services.State.Shared;
 
@@ -11,94 +10,129 @@ internal readonly record struct RegistrationKey(SessionToken SessionToken, Type 
 internal class CacheRegistration(IServiceScope scope, object service) : IDisposable
 {
     public readonly object Service = service;
-
     public readonly Lock StateLock = new();
+
     public int ReferenceCount = 0;
+    public CancellationTokenSource? EvictionCts;
+
+    public bool IsEvicted = false;
 
     public void Dispose()
     {
-        scope.Dispose();
+        lock (StateLock)
+        {
+            EvictionCts?.Cancel();
+            EvictionCts?.Dispose();
+            scope.Dispose();
+        }
     }
 }
 
 public class SessionServiceProvider(
     IServiceProvider serviceProvider,
-    IMemoryCache cache,
     ILogger<SessionServiceProvider> logger)
     : ISessionServiceProvider, IDisposable
 {
+    private int _disposed = 0;
+    private readonly ConcurrentDictionary<RegistrationKey, Lazy<CacheRegistration>> _services = [];
+
     public ValueResult<ServiceRegistration<TService>> GetService<TService>(SessionToken sessionToken)
+    {
+        if (Volatile.Read(ref _disposed) == 1)
+            return ValueResult<ServiceRegistration<TService>>.FromError("Unable to get service.", $"{nameof(SessionServiceProvider)} is disposed.");
+
+        var key = new RegistrationKey(sessionToken, typeof(TService));
+
+        while (true)
+        {
+            var lazyRegistration = _services.GetOrAdd(key, _ => new Lazy<CacheRegistration>(() => CreateRegistration(key)));
+
+            CacheRegistration registration;
+            try
+            {
+                registration = lazyRegistration.Value;
+            }
+            catch (Exception ex)
+            {
+                var kvp = new KeyValuePair<RegistrationKey, Lazy<CacheRegistration>>(key, lazyRegistration);
+                ((ICollection<KeyValuePair<RegistrationKey, Lazy<CacheRegistration>>>)_services).Remove(kvp);
+
+                logger.LogError(ex, "Failed to resolve session-scoped service.");
+                return new ResultError("Unable to get service.");
+            }
+
+            lock (registration.StateLock)
+            {
+                if (registration.IsEvicted) continue;
+
+                registration.ReferenceCount++;
+
+                if (registration.ReferenceCount == 1 && registration.EvictionCts is not null)
+                {
+                    registration.EvictionCts.Cancel();
+                    registration.EvictionCts.Dispose();
+                    registration.EvictionCts = null;
+                }
+
+                var lifecycleToken = new DisposableAction(() =>
+                {
+                    lock (registration.StateLock)
+                    {
+                        registration.ReferenceCount--;
+
+                        if (registration.ReferenceCount <= 0 && registration.EvictionCts is null)
+                        {
+                            registration.EvictionCts = new CancellationTokenSource();
+                            // Pass both the registration and the exact lazy wrapper for safe removal
+                            _ = StartEvictionTimer(key, registration, lazyRegistration, registration.EvictionCts.Token);
+                        }
+                    }
+                });
+
+                return new ServiceRegistration<TService>(sessionToken, (TService)registration.Service, lifecycleToken);
+            }
+        }
+    }
+
+    private async Task StartEvictionTimer(RegistrationKey key, CacheRegistration registrationToEvict, Lazy<CacheRegistration> lazyRegistration, CancellationToken token)
     {
         try
         {
-            var key = new RegistrationKey(sessionToken, typeof(TService));
+            await Task.Delay(TimeSpan.FromMinutes(1), token);
 
-            // 1. Get existing or create a new Lazy wrapper to prevent double-DI resolution
-            var lazyRegistration = cache.GetOrCreate(key, entry =>
+            bool shouldEvict = false;
+
+            lock (registrationToEvict.StateLock)
             {
-                // Initial creation state: ensure it doesn't expire while we set it up
-                entry.Priority = CacheItemPriority.NeverRemove;
-                entry.RegisterPostEvictionCallback(EvictionCallback);
+                if (token.IsCancellationRequested || registrationToEvict.ReferenceCount > 0) return;
 
-                return new Lazy<CacheRegistration>(() => CreateRegistration(key));
-            });
+                registrationToEvict.IsEvicted = true;
+                shouldEvict = true;
 
-            // 2. Resolve the actual instance
-            var registration = lazyRegistration!.Value;
-
-            // 3. Thread-safe increment and state transition
-            lock (registration.StateLock)
-            {
-                registration.ReferenceCount++;
-
-                // If it just transitioned from 0 -> 1 (or was just created), lock it in the cache
-                if (registration.ReferenceCount == 1)
-                {
-                    var options = new MemoryCacheEntryOptions()
-                        .SetPriority(CacheItemPriority.NeverRemove)
-                        .RegisterPostEvictionCallback(EvictionCallback);
-
-                    cache.Set(key, lazyRegistration, options);
-                }
+                // Atomically remove the exact instance from the dictionary while still under the state lock
+                var entry = new KeyValuePair<RegistrationKey, Lazy<CacheRegistration>>(key, lazyRegistration);
+                ((ICollection<KeyValuePair<RegistrationKey, Lazy<CacheRegistration>>>)_services).Remove(entry);
             }
 
-            // 4. Create the cleanup token
-            var lifecycleToken = new DisposableAction(() =>
+            if (shouldEvict)
             {
-                lock (registration.StateLock)
-                {
-                    registration.ReferenceCount--;
-
-                    // If no one is using it anymore, start the 1-minute countdown.
-                    // We use an ExpirationToken (ChangeToken) to make the eviction proactive,
-                    // otherwise IMemoryCache only evicts during the next cache operation.
-                    if (registration.ReferenceCount <= 0)
-                    {
-                        var cts = new CancellationTokenSource(TimeSpan.FromMinutes(1));
-                        var options = new MemoryCacheEntryOptions()
-                            .SetAbsoluteExpiration(TimeSpan.FromMinutes(1))
-                            .AddExpirationToken(new CancellationChangeToken(cts.Token))
-                            .RegisterPostEvictionCallback(EvictionCallback, state: cts);
-
-                        cache.Set(key, lazyRegistration, options);
-                    }
-                }
-            });
-
-            return new ServiceRegistration<TService>(
-                sessionToken,
-                (TService)registration.Service,
-                lifecycleToken);
+                registrationToEvict.Dispose();
+                logger.LogDebug("Session service {Type} for {Token} expired and was disposed.", key.ServiceType.Name, key.SessionToken.Token);
+            }
         }
+        catch (OperationCanceledException) { }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Failed to resolve session-scoped service.");
-            return new ResultError("Unable to get service.");
+            logger.LogError(ex, "Error handling eviction for session service {Type} with token {Token}.", key.ServiceType.Name, key.SessionToken.Token);
         }
     }
 
     private CacheRegistration CreateRegistration(RegistrationKey key)
     {
+        // Prevent instantiation if disposal has begun
+        if (Volatile.Read(ref _disposed) == 1)
+            throw new ObjectDisposedException(nameof(SessionServiceProvider));
+
         var scope = serviceProvider.CreateScope();
         try
         {
@@ -107,45 +141,25 @@ public class SessionServiceProvider(
         }
         catch
         {
-            scope.Dispose(); // Clean up if DI resolution fails
+            scope.Dispose();
             throw;
-        }
-    }
-
-    private void EvictionCallback(object key, object? value, EvictionReason reason, object? state)
-    {
-        // Always dispose the state to avoid leaking resources.
-        if (state is IDisposable disposable)
-        {
-            disposable.Dispose();
-        }
-
-        var regKey = (RegistrationKey)key;
-        logger.LogDebug("Session cache eviction: {Type} for {Token}. Reason: {Reason}", regKey.ServiceType.Name, regKey.SessionToken.Token, reason);
-
-        // We dispose the service if it expired (absolute time), token expired (CTS timer), 
-        // was manually removed, or evicted due to capacity.
-        // We do NOT dispose if it was Replaced (e.g., a player reconnected and "locked" the entry).
-        if (reason == EvictionReason.Expired || 
-            reason == EvictionReason.TokenExpired || 
-            reason == EvictionReason.Removed || 
-            reason == EvictionReason.Capacity)
-        {
-            if (value is Lazy<CacheRegistration> lazyReg && lazyReg.IsValueCreated)
-            {
-                lazyReg.Value.Dispose();
-                logger.LogDebug(
-                    "Session service {Type} for {Token} expired and was disposed. (Reason: {Reason})",
-                    regKey.ServiceType.Name, 
-                    regKey.SessionToken.Token,
-                    reason);
-            }
         }
     }
 
     public void Dispose()
     {
-        // IMemoryCache doesn't provide a way to clear everything natively without disposing the cache itself, 
-        // but relying on DI to dispose the IMemoryCache at app shutdown will clean this up.
+        if (Interlocked.Exchange(ref _disposed, 1) == 1) return;
+
+        // Take a snapshot to safely dispose items without concurrent modification issues
+        var items = _services.ToArray();
+        _services.Clear();
+
+        foreach (var kvp in items)
+        {
+            if (kvp.Value.IsValueCreated)
+            {
+                kvp.Value.Value.Dispose();
+            }
+        }
     }
 }
