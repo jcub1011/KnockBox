@@ -24,11 +24,15 @@
                     <span class="ctc-board-cycle">CYCLE @(GameState.CurrentEliminationCycle + 1)</span>
                 </div>
                 <div class="ctc-board-queue">
-                    @for (int i = 0; i < GameState.TurnManager.TurnOrder.Count; i++)
+                    @{
+                        var turnOrderSnapshot = GameState.TurnManager.TurnOrder.ToList();
+                        var currentPlayerIndex = GameState.TurnManager.CurrentPlayerIndex;
+                    }
+                    @for (int i = 0; i < turnOrderSnapshot.Count; i++)
                     {
-                        var playerId = GameState.TurnManager.TurnOrder[i];
+                        var playerId = turnOrderSnapshot[i];
                         if (!GameState.GamePlayers.TryGetValue(playerId, out var qps)) continue;
-                        bool isCurrent = i == GameState.TurnManager.CurrentPlayerIndex;
+                        bool isCurrent = i == currentPlayerIndex;
                         bool hasGone = qps.HasSubmittedClue;
                         <div class="ctc-queue-slot @(isCurrent ? "ctc-queue-active" : "") @(hasGone ? "ctc-queue-done" : "") @(qps.IsEliminated ? "ctc-queue-eliminated" : "")">
                             <span class="ctc-queue-name">@qps.DisplayName</span>
@@ -70,7 +74,7 @@
                 <div class="ctc-clue-history">
                     <h3 class="ctc-section-title">[ RECENT TRANSMISSIONS ]</h3>
                     <div class="ctc-clue-list">
-                        @foreach (var clue in GameState.CurrentRoundClues)
+                        @foreach (var clue in GameState.CurrentRoundClues.ToList())
                         {
                             <div class="ctc-clue-entry ctc-clue-entry-host typewriter-entry">
                                 <span class="ctc-clue-player">[@clue.PlayerName]:</span>
@@ -87,7 +91,7 @@
                 <div class="ctc-used-clues">
                     <h3 class="ctc-section-title">[ ARCHIVED INTEL (REDACTED) ]</h3>
                     <div class="ctc-used-clue-list">
-                        @foreach (var usedClue in GameState.UsedClues)
+                        @foreach (var usedClue in GameState.UsedClues.ToList())
                         {
                             <span class="ctc-used-clue-tag redacted-text">@usedClue</span>
                         }
@@ -183,7 +187,7 @@ else
                 <div class="ctc-clue-history">
                     <h3 class="ctc-section-title">[ RECENT TRANSMISSIONS ]</h3>
                     <div class="ctc-clue-list">
-                        @foreach (var clue in GameState.CurrentRoundClues)
+                        @foreach (var clue in GameState.CurrentRoundClues.ToList())
                         {
                             <div class="ctc-clue-entry typewriter-entry">
                                 <span class="ctc-clue-player">[@clue.PlayerName]:</span>
@@ -200,7 +204,7 @@ else
                 <div class="ctc-used-clues">
                     <h3 class="ctc-section-title">[ ARCHIVED INTEL (REDACTED) ]</h3>
                     <div class="ctc-used-clue-list">
-                        @foreach (var usedClue in GameState.UsedClues)
+                        @foreach (var usedClue in GameState.UsedClues.ToList())
                         {
                             <span class="ctc-used-clue-tag redacted-text">@usedClue</span>
                         }
