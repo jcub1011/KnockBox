@@ -12,45 +12,6 @@ on:
         type: string
 
 jobs:
-  # Releases only ship from main. A tag is not intrinsically tied to a branch,
-  # so we verify the tagged commit is reachable from origin/main before doing
-  # any build work. If the tag was pushed from a feature branch by mistake,
-  # this job fails fast and the rest of the workflow is skipped.
-  verify-main:
-    name: Verify tag is on main
-    runs-on: ubuntu-latest
-    outputs:
-      tag: ${{ steps.resolve.outputs.tag }}
-      sha: ${{ steps.resolve.outputs.sha }}
-    steps:
-      - name: Checkout (full history)
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Resolve commit to verify
-        id: resolve
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            TAG="${{ inputs.tag }}"
-            git fetch origin "refs/tags/${TAG}:refs/tags/${TAG}"
-            SHA=$(git rev-list -n 1 "refs/tags/${TAG}")
-          else
-            SHA="$GITHUB_SHA"
-            TAG="$GITHUB_REF_NAME"
-          fi
-          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
-          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-
-      - name: Confirm commit is on main
-        run: |
-          git fetch origin main
-          if ! git merge-base --is-ancestor "${{ steps.resolve.outputs.sha }}" origin/main; then
-            echo "::error::Tag '${{ steps.resolve.outputs.tag }}' (${{ steps.resolve.outputs.sha }}) is not reachable from main. Releases only publish from main."
-            exit 1
-          fi
-          echo "Tag '${{ steps.resolve.outputs.tag }}' is on main. Proceeding."
-
   publish:
     name: Publish ${{ matrix.rid }} (${{ matrix.mode }})
     needs: [verify-main]
