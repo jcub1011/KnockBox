@@ -81,9 +81,57 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+  pack-core:
+    name: Pack & Publish KnockBox.Core
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Resolve version label
+        id: version
+        run: |
+          LABEL="${{ inputs.tag }}"
+          # Strip 'v' prefix for NuGet if present
+          CLEAN_LABEL="${LABEL#v}"
+          echo "label=$CLEAN_LABEL" >> "$GITHUB_OUTPUT"
+
+      - name: Pack
+        run: dotnet pack KnockBox.Core/KnockBox.Core.csproj -c Release -p:PackageVersion=${{ steps.version.outputs.label }} -o nupkg
+
+      - name: Get OIDC token
+        id: oidc
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const token = await core.getIDToken('https://api.nuget.org/v3/index.json');
+            core.setOutput('token', token);
+
+      - name: Publish to NuGet.org
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          # Note: This step uses NuGet.org Trusted Publishing (OIDC).
+          # The repository must be configured as a Trusted Publisher on NuGet.org.
+          dotnet nuget push nupkg/*.nupkg --source https://api.nuget.org/v3/index.json --skip-duplicate --api-key ${{ steps.oidc.outputs.token }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: knockbox-core-nupkg
+          path: nupkg/*.nupkg
+
   release:
     name: Publish GitHub Release
-    needs: [publish]
+    needs: [publish, pack-core]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -103,7 +151,9 @@ jobs:
         with:
           name: ${{ inputs.tag }}
           tag_name: ${{ inputs.tag }}
-          files: artifacts/*.zip
+          files: |
+            artifacts/*.zip
+            artifacts/*.nupkg
           generate_release_notes: true
           draft: false
           prerelease: ${{ contains(inputs.tag, '-') }}

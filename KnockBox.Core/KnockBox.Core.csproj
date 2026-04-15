@@ -4,6 +4,12 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <PackageId>KnockBox.Core</PackageId>
+    <Authors>jcub1011</Authors>
+    <Description>Core abstractions and plugin system for KnockBox party game host.</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <RepositoryUrl>https://github.com/jcub1011/KnockBox</RepositoryUrl>
+    <PackageTags>knockbox partygame plugin-system core</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>
