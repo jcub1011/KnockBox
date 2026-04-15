@@ -32,8 +32,8 @@ else
         <button disabled="@(_page.PageIndex >= TotalPages - 1)" @onclick="() => GoToPage(TotalPages - 1)">Last &raquo;</button>
         <span class="spacer"></span>
         <label style="display:flex; gap:.4rem; align-items:center; color:var(--admin-text-dim); font-size:.88rem">
-            <input type="checkbox" checked="@_liveTail" @onchange="OnToggleTail" />
-            Live tail
+            <input type="checkbox" checked="@_newestFirst" @onchange="OnToggleTail" />
+            Newest First
         </label>
         <a class="btn" href="/admin/logs/download/@FileName">Download</a>
     </div>
@@ -52,14 +52,14 @@ else
     private const int PageSize = 500;
     private LogPage? _page;
     private string? _error;
-    private bool _liveTail;
+    private bool _newestFirst = true;
     private long _tailOffset;
     private readonly List<string> _tailLines = new();
     private CancellationTokenSource? _tailCts;
     private PeriodicTimer? _tailTimer;
 
     private IEnumerable<string> _displayedLines =>
-        _liveTail ? _tailLines : (_page?.Lines ?? []);
+        _newestFirst ? ((IEnumerable<string>)_tailLines).Reverse() : (_page?.Lines ?? []);
 
     private int TotalPages
     {
@@ -77,6 +77,12 @@ else
         _page = null;
         _error = null;
         LoadPage(0);
+
+        if (_newestFirst)
+        {
+            _newestFirst = false; // Temporarily false so StartTail executes
+            StartTail();
+        }
     }
 
     private void LoadPage(int index)
@@ -101,7 +107,7 @@ else
 
     private void GoToPage(int index)
     {
-        if (_liveTail) StopTail();
+        if (_newestFirst) StopTail();
         LoadPage(index);
     }
 
@@ -114,8 +120,8 @@ else
 
     private void StartTail()
     {
-        if (string.IsNullOrWhiteSpace(FileName) || _liveTail) return;
-        _liveTail = true;
+        if (string.IsNullOrWhiteSpace(FileName) || _newestFirst) return;
+        _newestFirst = true;
         _tailLines.Clear();
 
         // Seed the tail with the last page of existing content so the
@@ -160,7 +166,7 @@ else
 
     private void StopTail()
     {
-        _liveTail = false;
+        _newestFirst = false;
         _tailCts?.Cancel();
         _tailCts?.Dispose();
         _tailCts = null;
