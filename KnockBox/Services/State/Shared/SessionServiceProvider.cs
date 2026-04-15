@@ -35,6 +35,7 @@ public class SessionServiceProvider(
 {
     private int _disposed = 0;
     private readonly ConcurrentDictionary<RegistrationKey, Lazy<CacheRegistration>> _services = [];
+    internal TimeSpan EvictionDelay { get; set; } = TimeSpan.FromMinutes(1);
 
     public ValueResult<ServiceRegistration<TService>> GetService<TService>(SessionToken sessionToken)
     {
@@ -98,7 +99,7 @@ public class SessionServiceProvider(
     {
         try
         {
-            await Task.Delay(TimeSpan.FromMinutes(1), token);
+            await Task.Delay(EvictionDelay, token);
 
             bool shouldEvict = false;
 

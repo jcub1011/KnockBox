@@ -32,5 +32,10 @@
             InternalMessage = internalMessage;
             PublicMessage = publicMessage;
         }
+
+        public override string ToString()
+        {
+            return $"Public Message: {PublicMessage}\nInternal Message: {InternalMessage}";
+        }
     }
 }

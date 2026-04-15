@@ -27,38 +27,44 @@ namespace KnockBox.Core.Services.State.Games.Shared
         IUserService userService,
         ILogger<GameSessionService> logger) : IGameSessionService, IDisposable
     {
+        private readonly Lock _lock = new();
         private IDisposable? _lifecycleToken;
         private GameSessionState? _sessionState;
         private string? _currentUserId;
 
         /// <summary>
-        /// Returns the <see cref="GameSessionState"/> cached for the current user, or
-        /// <see langword="null"/> when the user identity has not yet been initialized.
+        /// Lazily resolves the <see cref="GameSessionState"/> cached for the current user
+        /// from <see cref="ISessionServiceProvider"/>. Returns <see langword="null"/> when
+        /// the user identity has not yet been initialized.
         /// </summary>
         private GameSessionState? GetSessionState()
         {
             var user = userService.CurrentUser;
             if (user is null) return null;
 
-            if (_currentUserId != user.Id)
+            lock (_lock)
             {
-                _lifecycleToken?.Dispose();
-                _lifecycleToken = null;
-                _sessionState = null;
-                _currentUserId = user.Id;
-            }
-
-            if (_sessionState is null)
-            {
-                var result = sessionServiceProvider.GetService<GameSessionState>(new SessionToken(user.Id));
-                if (result.IsSuccess)
+                if (_currentUserId != user.Id)
                 {
-                    _sessionState = result.Value.Service;
-                    _lifecycleToken = result.Value.LifecycleToken;
+                    _lifecycleToken?.Dispose();
+                    _lifecycleToken = null;
+                    _sessionState = null;
+                    _currentUserId = user.Id;
                 }
-            }
 
-            return _sessionState;
+                if (_sessionState is null)
+                {
+                    var result = sessionServiceProvider.GetService<GameSessionState>(
+                        new SessionToken(user.Id));
+                    if (result.TryGetSuccess(out var registration))
+                    {
+                        _sessionState = registration.Service;
+                        _lifecycleToken = registration.LifecycleToken;
+                    }
+                }
+
+                return _sessionState;
+            }
         }
 
         public bool TryGetCurrentSession([NotNullWhen(true)] out UserRegistration? currentSession)
@@ -69,14 +75,13 @@ namespace KnockBox.Core.Services.State.Games.Shared
                 currentSession = null;
                 return false;
             }
-
             return state.TryGetCurrentSession(out currentSession);
         }
 
         public Result LeaveCurrentSession(bool navigateHome = true)
         {
             var previousSession = GetSessionState()?.TakeCurrentSession();
-            previousSession?.Dispose(); // Removes the user from the game state
+            previousSession?.Dispose();
 
             logger.LogInformation(
                 "User [{userId}] left session [{sessionId}].",
@@ -109,7 +114,7 @@ namespace KnockBox.Core.Services.State.Games.Shared
 
             logger.LogInformation(
                 "User [{userId}] entered session [{sessionId}].",
-                userService.CurrentUser?.Id ?? "Unknown",
+                session.User.Id ?? "Unknown",
                 session.LobbyRegistration.Uri);
 
             try
@@ -126,7 +131,12 @@ namespace KnockBox.Core.Services.State.Games.Shared
 
         public void Dispose()
         {
-            _lifecycleToken?.Dispose();
+            lock (_lock)
+            {
+                _lifecycleToken?.Dispose();
+                _lifecycleToken = null;
+                _sessionState = null;
+            }
             GC.SuppressFinalize(this);
         }
     }

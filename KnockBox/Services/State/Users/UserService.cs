@@ -1,10 +1,14 @@
 ﻿namespace KnockBox.Services.State.Users
 {
+    using KnockBox.Core.Extensions.Returns;
+    using KnockBox.Core.Services.State.Shared;
     using KnockBox.Core.Services.State.Users;
     using KnockBox.Data.Services.ClientStorage;
 
-    public class UserService(ILocalStorageService localStorageService, ISessionStorageService sessionStorageService, ILogger<UserService> logger) : IUserService, IDisposable
+    public class UserService(ILocalStorageService localStorageService, ISessionTokenProvider sessionTokenProvider, ILogger<UserService> logger) : IUserService, IDisposable
     {
+        const int MAX_SESSION_TOKEN_RETRIEVALS = 5;
+
         public User? CurrentUser { get; private set; }
 
         public event Action? UserInitialized;
@@ -21,14 +25,27 @@
                     name = storedName;
                 }
 
-                var storedId = await sessionStorageService.GetAsync<string>("user", "id", ct);
-                if (!string.IsNullOrWhiteSpace(storedId))
+                int remainingAttempts = MAX_SESSION_TOKEN_RETRIEVALS;
+                ValueResult<SessionToken> tokenResult;
+                do
                 {
-                    id = storedId;
+                    tokenResult = await sessionTokenProvider.GetSessionTokenAsync(ct);
+                    if (tokenResult.TryGetFailure(out var error))
+                    {
+                        logger.LogError("{error}\nError getting session token. Reattempting token retrieval.", error);
+                        await Task.Delay(100, ct); // Space attempts apart
+                    }
+                }
+                while (--remainingAttempts > 0);
+
+                if (tokenResult.TryGetSuccess(out var token))
+                {
+                    id = token.Token;
+                    logger.LogDebug("Initialized user id to [{id}].", id);
                 }
                 else
                 {
-                    await sessionStorageService.SetAsync("user", "id", id, ct);
+                    logger.LogError("Unable to get player session token. Using fallback ID of {id}.", id);
                 }
             }
             catch (Exception ex)
@@ -37,8 +54,7 @@
             }
 
             // Unsubscribe from the previous user (if re-initializing) before replacing it.
-            if (CurrentUser is not null)
-                CurrentUser.NameChanged -= OnNameChanged;
+            CurrentUser?.NameChanged -= OnNameChanged;
 
             CurrentUser = new(name, id);
             CurrentUser.NameChanged += OnNameChanged;
@@ -49,7 +65,7 @@
         {
             try
             {
-                await sessionStorageService.RemoveAsync("user", "id");
+                await sessionTokenProvider.ProvisionNewTokenAsync(ct);
             }
             catch (Exception ex)
             {
@@ -73,8 +89,7 @@
 
         public void Dispose()
         {
-            if (CurrentUser is not null)
-                CurrentUser.NameChanged -= OnNameChanged;
+            CurrentUser?.NameChanged -= OnNameChanged;
         }
     }
 }
