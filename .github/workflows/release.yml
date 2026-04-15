@@ -1,9 +1,6 @@
 name: Release
 
 on:
-  push:
-    tags:
-      - 'v*.*.*'
   workflow_dispatch:
     inputs:
       tag:
@@ -14,7 +11,6 @@ on:
 jobs:
   publish:
     name: Publish ${{ matrix.rid }} (${{ matrix.mode }})
-    needs: [verify-main]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -32,12 +28,7 @@ jobs:
 
       - name: Resolve version label
         id: version
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "label=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
-          else
-            echo "label=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
-          fi
+        run: echo "label=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
 
       - name: Restore
         run: dotnet restore KnockBox/KnockBox.csproj
@@ -92,7 +83,7 @@ jobs:
 
   release:
     name: Publish GitHub Release
-    needs: [verify-main, publish]
+    needs: [publish]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -110,9 +101,9 @@ jobs:
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
-          name: ${{ needs.verify-main.outputs.tag }}
-          tag_name: ${{ needs.verify-main.outputs.tag }}
+          name: ${{ inputs.tag }}
+          tag_name: ${{ inputs.tag }}
           files: artifacts/*.zip
           generate_release_notes: true
           draft: false
-          prerelease: ${{ contains(needs.verify-main.outputs.tag, '-') }}
+          prerelease: ${{ contains(inputs.tag, '-') }}
