@@ -6,6 +6,8 @@ using KnockBox.Services.Registrations.Logic;
 using KnockBox.Services.Registrations.Repositories;
 using KnockBox.Services.Registrations.States;
 using KnockBox.Services.Registrations.Validators;
+using Microsoft.AspNetCore.Hosting.Server;
+using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.Extensions.FileProviders;
 using Serilog;
 using Serilog.Extensions.Logging;
@@ -89,7 +91,39 @@ namespace KnockBox
             app.MapRazorComponents<App>()
                 .AddInteractiveServerRenderMode();
 
+            LogBoundAddresses(app);
+
             app.Run();
+        }
+
+        /// <summary>
+        /// Logs the addresses Kestrel actually bound to once the host has started,
+        /// so the operator immediately sees the URL (e.g. <c>http://localhost:5276</c>)
+        /// at which the web UI is reachable without having to scan Kestrel's default
+        /// "Now listening on" lines or inspect launch settings.
+        /// </summary>
+        private static void LogBoundAddresses(WebApplication app)
+        {
+            var lifetime = app.Services.GetRequiredService<IHostApplicationLifetime>();
+            var logger = app.Services.GetRequiredService<ILogger<Program>>();
+
+            lifetime.ApplicationStarted.Register(() =>
+            {
+                var server = app.Services.GetRequiredService<IServer>();
+                var addressesFeature = server.Features.Get<IServerAddressesFeature>();
+                var addresses = addressesFeature?.Addresses;
+
+                if (addresses is null || addresses.Count == 0)
+                {
+                    logger.LogInformation("KnockBox host started, but no server addresses were reported.");
+                    return;
+                }
+
+                foreach (var address in addresses)
+                {
+                    logger.LogInformation("KnockBox web UI available at {Address}", address);
+                }
+            });
         }
 
         /// <summary>
