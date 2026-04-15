@@ -31,7 +31,7 @@ jobs:
         run: echo "label=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
 
       - name: Restore
-        run: dotnet restore KnockBox/KnockBox.csproj
+        run: dotnet restore KnockBox/KnockBox.csproj -r ${{ matrix.rid }}
 
       - name: Publish host
         run: |
