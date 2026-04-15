@@ -28,7 +28,7 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games
         public BoardGraph Board => State.BoardGraph;
         public Dictionary<CollectionType, int> CollectionProgress => State.CollectionProgress;
 
-        public enum RoundEndTrigger { None, CollectionTrigger, GuessCountdown, MaxTurns }
+        public enum RoundEndTrigger { None, CollectionTrigger, MaxTurns }
 
         public int SpinSpinner()
         {
@@ -102,18 +102,7 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games
             if (GetCompletedCollectionCount() >= 3)
                 return RoundEndTrigger.CollectionTrigger;
 
-            // 2. Guess countdown: all non-first-guesser players have exhausted their 2 turns or already guessed
-            if (State.GuessCountdownActive)
-            {
-                bool allExpired = GamePlayers.Values
-                    .Where(p => p.PlayerId != State.FirstGuessPlayerId)
-                    .All(p => p.HasSubmittedGuess || p.GuessCountdownTurnsRemaining <= 0);
-                
-                if (allExpired)
-                    return RoundEndTrigger.GuessCountdown;
-            }
-
-            // 3. Max turns: all players at their maximum
+            // 2. Max turns: all players at their maximum
             int maxTurns = GetMaxTurnsPerPlayer();
             if (GamePlayers.Count > 0 && GamePlayers.Values.All(p => p.TurnsTakenThisRound >= maxTurns))
                 return RoundEndTrigger.MaxTurns;
@@ -124,8 +113,6 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games
         public void ResetForNewRound()
         {
             State.TotalTurnsTaken = 0;
-            State.GuessCountdownActive = false;
-            State.FirstGuessPlayerId = null;
             State.RoundPlayHistory.Clear();
 
             // Reset collections
@@ -146,7 +133,6 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games
                 player.GuessSubmission = null;
                 player.RoundScore = 0;
                 player.TurnsTakenThisRound = 0;
-                player.GuessCountdownTurnsRemaining = 0;
                 player.LastSpinResult = 0;
                 player.LastMoveDestination = null;
                 player.MovementHistory.Clear();

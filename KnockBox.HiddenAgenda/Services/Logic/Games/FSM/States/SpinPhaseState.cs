@@ -21,6 +21,9 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games.FSM.States
 
         public ValueResult<IGameState<HiddenAgendaGameContext, HiddenAgendaCommand>?> HandleCommand(HiddenAgendaGameContext context, HiddenAgendaCommand command)
         {
+            if (command is CallVoteCommand)
+                return ValueResult<IGameState<HiddenAgendaGameContext, HiddenAgendaCommand>?>.FromValue(new FinalGuessState());
+
             if (command is not SpinCommand) return null;
 
             var currentPlayerId = context.State.TurnManager.CurrentPlayer;
@@ -72,7 +75,8 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games.FSM.States
         public ValueResult<IGameState<HiddenAgendaGameContext, HiddenAgendaCommand>?> Tick(HiddenAgendaGameContext context, DateTimeOffset now)
         {
             if (now < _expiresAt) return null;
-            
+            if (!context.State.Config.EnableTimers) return null;
+
             var currentPlayerId = context.State.TurnManager.CurrentPlayer;
             if (currentPlayerId != null && context.GamePlayers.TryGetValue(currentPlayerId, out var player))
             {

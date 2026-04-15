@@ -169,6 +169,12 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games
             return ProcessCommand(ctx, new SubmitGuessCommand(player.Id, guesses));
         }
 
+        public Result CallVote(User player, HiddenAgendaGameState state)
+        {
+            if (!TryGetContext(state, out var ctx, out var err)) return err;
+            return ProcessCommand(ctx, new CallVoteCommand(player.Id));
+        }
+
         public Result SkipGuess(User player, HiddenAgendaGameState state)
         {
             if (!TryGetContext(state, out var ctx, out var err)) return err;

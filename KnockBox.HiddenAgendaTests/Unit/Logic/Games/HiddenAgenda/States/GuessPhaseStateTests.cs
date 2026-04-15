@@ -99,30 +99,6 @@ namespace KnockBox.HiddenAgendaTests.Unit.Logic.Games.HiddenAgenda.States
         }
 
         [TestMethod]
-        public void SubmitGuess_FirstGuess_TriggersCountdown()
-        {
-            var state = new GuessPhaseState();
-            state.OnEnter(_context);
-
-            var poolIds = _state.CurrentTaskPool.Select(t => t.Id).Take(3).ToList();
-            var guesses = new Dictionary<string, List<string>>
-            {
-                { "p1", [.. poolIds] },
-                { "p2", [.. poolIds] },
-                { "p3", [.. poolIds] }
-            };
-
-            state.HandleCommand(_context, new SubmitGuessCommand("p0", guesses));
-
-            Assert.IsTrue(_state.GuessCountdownActive);
-            Assert.AreEqual("p0", _state.FirstGuessPlayerId);
-            Assert.AreEqual(2, _state.GamePlayers["p1"].GuessCountdownTurnsRemaining);
-            Assert.AreEqual(2, _state.GamePlayers["p2"].GuessCountdownTurnsRemaining);
-            Assert.AreEqual(2, _state.GamePlayers["p3"].GuessCountdownTurnsRemaining);
-            Assert.AreEqual(0, _state.GamePlayers["p0"].GuessCountdownTurnsRemaining);
-        }
-
-        [TestMethod]
         public void SubmitGuess_InvalidOpponent_ReturnsError()
         {
             var state = new GuessPhaseState();

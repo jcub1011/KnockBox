@@ -90,14 +90,37 @@ namespace KnockBox.HiddenAgendaTests.Unit.Logic.Games.HiddenAgenda.States
         [TestMethod]
         public void Tick_AutoSelectsDestinationAfterTimeout()
         {
+            _state.Config.EnableTimers = true;
             var state = new MovePhaseState();
             state.OnEnter(_context);
 
             var result = state.Tick(_context, DateTimeOffset.UtcNow.AddMilliseconds(_state.Config.MovePhaseTimeoutMs + 100));
-            
+
             Assert.IsTrue(result.IsSuccess);
             Assert.IsInstanceOfType<DrawPhaseState>(result.Value);
             Assert.IsNotNull(_state.GamePlayers["p0"].LastMoveDestination);
+        }
+
+        [TestMethod]
+        public void Tick_TimersDisabled_DoesNotAutoAdvance()
+        {
+            var state = new MovePhaseState();
+            state.OnEnter(_context);
+
+            var result = state.Tick(_context, DateTimeOffset.UtcNow.AddMilliseconds(_state.Config.MovePhaseTimeoutMs + 100));
+            Assert.IsTrue(result.IsSuccess);
+            Assert.IsNull(result.Value);
+        }
+
+        [TestMethod]
+        public void CallVote_AnyPlayer_TransitionsToFinalGuess()
+        {
+            var state = new MovePhaseState();
+            state.OnEnter(_context);
+
+            var result = state.HandleCommand(_context, new CallVoteCommand("p1"));
+            Assert.IsTrue(result.IsSuccess);
+            Assert.IsInstanceOfType<FinalGuessState>(result.Value);
         }
     }
 }

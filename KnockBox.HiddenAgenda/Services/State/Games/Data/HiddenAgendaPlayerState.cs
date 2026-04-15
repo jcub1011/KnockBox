@@ -32,7 +32,6 @@ public class HiddenAgendaPlayerState
 
     // Turn tracking
     public int TurnsTakenThisRound { get; set; }
-    public int GuessCountdownTurnsRemaining { get; set; } // Set when countdown triggers
 
     /// <summary>
     /// For Rivalry task R6: the randomly assigned player to shadow.

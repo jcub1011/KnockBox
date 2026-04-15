@@ -132,6 +132,7 @@ namespace KnockBox.HiddenAgendaTests.Unit.Logic.Games.HiddenAgenda.States
         [TestMethod]
         public void Tick_AutoSkipsAfterTimeout()
         {
+            _state.Config.EnableTimers = true;
             _state.GamePlayers["p0"].HeldEventCard = EventCardDefinitions.Catalog;
             var state = new EventCardPhaseState();
             state.OnEnter(_context);
@@ -139,6 +140,30 @@ namespace KnockBox.HiddenAgendaTests.Unit.Logic.Games.HiddenAgenda.States
             var result = state.Tick(_context, DateTimeOffset.UtcNow.AddMilliseconds(_state.Config.EventCardPhaseTimeoutMs + 100));
             Assert.IsTrue(result.IsSuccess);
             Assert.IsInstanceOfType<SpinPhaseState>(result.Value);
+        }
+
+        [TestMethod]
+        public void Tick_TimersDisabled_DoesNotAutoAdvance()
+        {
+            _state.GamePlayers["p0"].HeldEventCard = EventCardDefinitions.Catalog;
+            var state = new EventCardPhaseState();
+            state.OnEnter(_context);
+
+            var result = state.Tick(_context, DateTimeOffset.UtcNow.AddMilliseconds(_state.Config.EventCardPhaseTimeoutMs + 100));
+            Assert.IsTrue(result.IsSuccess);
+            Assert.IsNull(result.Value);
+        }
+
+        [TestMethod]
+        public void CallVote_AnyPlayer_TransitionsToFinalGuess()
+        {
+            _state.GamePlayers["p0"].HeldEventCard = EventCardDefinitions.Catalog;
+            var state = new EventCardPhaseState();
+            state.OnEnter(_context);
+
+            var result = state.HandleCommand(_context, new CallVoteCommand("p1"));
+            Assert.IsTrue(result.IsSuccess);
+            Assert.IsInstanceOfType<FinalGuessState>(result.Value);
         }
     }
 }

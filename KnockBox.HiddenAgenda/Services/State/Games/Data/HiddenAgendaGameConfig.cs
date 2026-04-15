@@ -13,6 +13,6 @@ public class HiddenAgendaGameConfig
     public int GuessPhaseTimeoutMs { get; set; } = 60000;
     public int FinalGuessTimeoutMs { get; set; } = 45000;
     public int RevealTimeoutMs { get; set; } = 15000;
-    public bool EnableTimers { get; set; } = true;
+    public bool EnableTimers { get; set; } = false;
     public TaskPoolRotation PoolRotation { get; set; } = TaskPoolRotation.Partial;
 }

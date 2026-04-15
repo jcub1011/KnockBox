@@ -49,10 +49,6 @@ public class HiddenAgendaGameState(User host, ILogger<HiddenAgendaGameState> log
     public int CurrentRound { get; set; }
     public int TotalTurnsTaken { get; set; }
 
-    // Guess countdown
-    public bool GuessCountdownActive { get; set; }
-    public string? FirstGuessPlayerId { get; set; }
-
     // Task pool for current round
     public IReadOnlyList<SecretTask> CurrentTaskPool { get; set; } = [];
 

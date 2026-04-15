@@ -1,10 +1,7 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using KnockBox.Core.Extensions.Returns;
 using KnockBox.Core.Services.State.Games.Shared;
 using KnockBox.HiddenAgenda.Services.State.Games;
-using Microsoft.Extensions.Logging;
 
 namespace KnockBox.HiddenAgenda.Services.Logic.Games.FSM.States
 {
@@ -54,23 +51,6 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games.FSM.States
                     // Store guesses
                     player.HasSubmittedGuess = true;
                     player.GuessSubmission = cmd.Guesses;
-
-                    // Trigger countdown if this is the first guess
-                    if (!context.State.GuessCountdownActive)
-                    {
-                        context.State.GuessCountdownActive = true;
-                        context.State.FirstGuessPlayerId = cmd.PlayerId;
-
-                        // Set 2-turn countdown for all other players
-                        foreach (var otherPlayer in context.GamePlayers.Values)
-                        {
-                            if (otherPlayer.PlayerId != cmd.PlayerId)
-                                otherPlayer.GuessCountdownTurnsRemaining = 2;
-                        }
-
-                        context.Logger.LogInformation(
-                            "Guess countdown triggered by player [{pid}].", cmd.PlayerId);
-                    }
 
                     return ValueResult<IGameState<HiddenAgendaGameContext, HiddenAgendaCommand>?>.FromValue(AdvanceToNextPlayer(context));
                 }

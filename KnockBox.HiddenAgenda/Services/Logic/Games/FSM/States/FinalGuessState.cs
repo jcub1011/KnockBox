@@ -82,6 +82,7 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games.FSM.States
         public ValueResult<IGameState<HiddenAgendaGameContext, HiddenAgendaCommand>?> Tick(HiddenAgendaGameContext context, DateTimeOffset now)
         {
             if (now < _expiresAt) return null;
+            if (!context.State.Config.EnableTimers) return null;
 
             // Timeout: mark all non-guessing players as skipped
             foreach (var player in context.GamePlayers.Values)

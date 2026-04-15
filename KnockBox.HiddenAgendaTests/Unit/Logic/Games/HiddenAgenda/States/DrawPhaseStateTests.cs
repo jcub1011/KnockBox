@@ -71,7 +71,7 @@ namespace KnockBox.HiddenAgendaTests.Unit.Logic.Games.HiddenAgenda.States
             var result = state.OnEnter(_context);
 
             Assert.IsTrue(result.IsSuccess);
-            Assert.IsInstanceOfType<GuessPhaseState>(result.Value);
+            Assert.IsInstanceOfType<EventCardPhaseState>(result.Value);
             Assert.IsNotNull(_state.GamePlayers["p0"].HeldEventCard);
         }
 
@@ -86,8 +86,8 @@ namespace KnockBox.HiddenAgendaTests.Unit.Logic.Games.HiddenAgenda.States
             var result = state.HandleCommand(_context, new SelectCurationCardCommand("p0", 0));
             
             Assert.IsTrue(result.IsSuccess);
-            Assert.IsInstanceOfType<GuessPhaseState>(result.Value);
-            
+            Assert.IsInstanceOfType<EventCardPhaseState>(result.Value);
+
             // Check collection progress
             foreach (var effect in card.Effects)
             {
@@ -120,7 +120,7 @@ namespace KnockBox.HiddenAgendaTests.Unit.Logic.Games.HiddenAgenda.States
             // Select alternate option
             var result2 = state.HandleCommand(_context, new SelectTradeOptionCommand("p0", true));
             Assert.IsTrue(result2.IsSuccess);
-            Assert.IsInstanceOfType<GuessPhaseState>(result2.Value);
+            Assert.IsInstanceOfType<EventCardPhaseState>(result2.Value);
             
             Assert.AreEqual(2, _state.CollectionProgress[CollectionType.ContemporaryShowcase]);
             Assert.IsFalse(_state.CollectionProgress.ContainsKey(CollectionType.RenaissanceMasters));
@@ -129,15 +129,43 @@ namespace KnockBox.HiddenAgendaTests.Unit.Logic.Games.HiddenAgenda.States
         [TestMethod]
         public void Tick_AutoSelectsFirstCardAfterTimeout()
         {
+            _state.Config.EnableTimers = true;
             _state.GamePlayers["p0"].CurrentSpaceId = 0;
             var state = new DrawPhaseState();
             state.OnEnter(_context);
 
             var result = state.Tick(_context, DateTimeOffset.UtcNow.AddMilliseconds(_state.Config.DrawPhaseTimeoutMs + 100));
-            
+
             Assert.IsTrue(result.IsSuccess);
-            Assert.IsInstanceOfType<GuessPhaseState>(result.Value);
+            Assert.IsInstanceOfType<EventCardPhaseState>(result.Value);
             Assert.AreEqual(1, _state.GamePlayers["p0"].CardPlayHistory.Count);
+        }
+
+        [TestMethod]
+        public void Tick_TimersDisabled_DoesNotAutoAdvance()
+        {
+            _state.GamePlayers["p0"].CurrentSpaceId = 0;
+            var state = new DrawPhaseState();
+            state.OnEnter(_context);
+
+            var result = state.Tick(_context, DateTimeOffset.UtcNow.AddMilliseconds(_state.Config.DrawPhaseTimeoutMs + 100));
+
+            Assert.IsTrue(result.IsSuccess);
+            Assert.IsNull(result.Value);
+        }
+
+        [TestMethod]
+        public void CallVote_AnyPlayer_TransitionsToFinalGuess()
+        {
+            _state.GamePlayers["p0"].CurrentSpaceId = 0;
+            var state = new DrawPhaseState();
+            state.OnEnter(_context);
+
+            // Non-current player calls vote
+            var result = state.HandleCommand(_context, new CallVoteCommand("p1"));
+
+            Assert.IsTrue(result.IsSuccess);
+            Assert.IsInstanceOfType<FinalGuessState>(result.Value);
         }
     }
 }

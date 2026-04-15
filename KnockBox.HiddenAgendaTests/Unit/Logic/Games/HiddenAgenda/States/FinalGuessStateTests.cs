@@ -88,12 +88,22 @@ namespace KnockBox.HiddenAgenda.Tests.Unit.Logic.States
         [TestMethod]
         public void Tick_OnTimeout_TransitionsToReveal()
         {
+            _state.Config.EnableTimers = true;
             _stateLogic.OnEnter(_context);
             var result = _stateLogic.Tick(_context, DateTimeOffset.UtcNow.AddMinutes(5));
-            
+
             Assert.IsInstanceOfType(result.Value, typeof(RevealState));
             Assert.IsTrue(_state.GamePlayers["p2"].HasSubmittedGuess);
             Assert.IsTrue(_state.GamePlayers["p3"].HasSubmittedGuess);
+        }
+
+        [TestMethod]
+        public void Tick_TimersDisabled_DoesNotAutoAdvance()
+        {
+            _stateLogic.OnEnter(_context);
+            var result = _stateLogic.Tick(_context, DateTimeOffset.UtcNow.AddMinutes(5));
+            Assert.IsTrue(result.IsSuccess);
+            Assert.IsNull(result.Value);
         }
     }
 }

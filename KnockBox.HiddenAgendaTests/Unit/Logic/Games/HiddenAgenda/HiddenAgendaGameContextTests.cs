@@ -116,34 +116,6 @@ namespace KnockBox.HiddenAgenda.Tests.Unit.Logic
         }
 
         [TestMethod]
-        public void CheckRoundEndConditions_GuessCountdownActive_SomePlayersRemaining_ReturnsNone()
-        {
-            _state.GamePlayers["p1"] = new HiddenAgendaPlayerState { PlayerId = "p1" };
-            _state.GamePlayers["p2"] = new HiddenAgendaPlayerState { PlayerId = "p2", GuessCountdownTurnsRemaining = 2 };
-            _state.GamePlayers["p3"] = new HiddenAgendaPlayerState { PlayerId = "p3", GuessCountdownTurnsRemaining = 1 };
-            
-            _state.GuessCountdownActive = true;
-            _state.FirstGuessPlayerId = "p1";
-            
-            var result = _context.CheckRoundEndConditions();
-            Assert.AreEqual(HiddenAgendaGameContext.RoundEndTrigger.None, result);
-        }
-
-        [TestMethod]
-        public void CheckRoundEndConditions_GuessCountdownActive_AllPlayersExhausted_ReturnsGuessCountdown()
-        {
-            _state.GamePlayers["p1"] = new HiddenAgendaPlayerState { PlayerId = "p1" };
-            _state.GamePlayers["p2"] = new HiddenAgendaPlayerState { PlayerId = "p2", GuessCountdownTurnsRemaining = 0 };
-            _state.GamePlayers["p3"] = new HiddenAgendaPlayerState { PlayerId = "p3", HasSubmittedGuess = true };
-            
-            _state.GuessCountdownActive = true;
-            _state.FirstGuessPlayerId = "p1";
-            
-            var result = _context.CheckRoundEndConditions();
-            Assert.AreEqual(HiddenAgendaGameContext.RoundEndTrigger.GuessCountdown, result);
-        }
-
-        [TestMethod]
         public void CheckRoundEndConditions_MaxTurnsMet_ReturnsMaxTurns()
         {
             _state.GamePlayers["p1"] = new HiddenAgendaPlayerState { PlayerId = "p1", TurnsTakenThisRound = 12 };

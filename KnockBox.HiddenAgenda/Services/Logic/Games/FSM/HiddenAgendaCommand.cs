@@ -20,6 +20,9 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games.FSM
     public record SelectTradeOptionCommand(string PlayerId, bool UseAlternate) : HiddenAgendaCommand(PlayerId);
     public record SelectEventCardActionCommand(string PlayerId, bool KeepNewCard) : HiddenAgendaCommand(PlayerId);
 
+    // Call Vote (any player, during turn phases)
+    public record CallVoteCommand(string PlayerId) : HiddenAgendaCommand(PlayerId);
+
     // Guess Phase
     public record SubmitGuessCommand(string PlayerId, Dictionary<string, List<string>> Guesses) : HiddenAgendaCommand(PlayerId);
     public record SkipGuessCommand(string PlayerId) : HiddenAgendaCommand(PlayerId);

@@ -93,6 +93,14 @@ namespace KnockBox.HiddenAgenda.Pages
                 ShowError(err.PublicMessage);
         }
 
+        private void HandleCallVote()
+        {
+            if (UserService.CurrentUser == null) return;
+            var result = Engine.CallVote(UserService.CurrentUser, GameState);
+            if (result.IsFailure && result.TryGetFailure(out var err))
+                ShowError(err.PublicMessage);
+        }
+
         private void HandleCardSelected(int cardIndex)
         {
             if (UserService.CurrentUser == null) return;

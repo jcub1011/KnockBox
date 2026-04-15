@@ -12,10 +12,6 @@
             <div class="ha-panel-header">@CurrentPlayerName's Turn</div>
             <div class="ha-panel-body">
                 <div class="ha-sidebar-turn-count">Turn @GameState.TotalTurnsTaken</div>
-                @if (GameState.GuessCountdownActive)
-                {
-                    <div class="ha-guess-countdown">Guess window active!</div>
-                }
             </div>
         </div>
 
@@ -169,6 +165,10 @@
                         <p class="ha-waiting-text">Waiting for @CurrentPlayerName to complete their @GameState.Phase...</p>
                     </div>
                 }
+
+                <div class="ha-vote-controls">
+                    <button class="ha-btn ha-btn-warning" @onclick="HandleCallVote">Call Vote</button>
+                </div>
 
                 <div class="ha-dossier-reference">
                     <h5 class="ha-subheading">Your Dossier</h5>
