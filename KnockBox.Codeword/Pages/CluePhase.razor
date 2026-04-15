@@ -91,9 +91,9 @@
                 <div class="ctc-used-clues">
                     <h3 class="ctc-section-title">[ ARCHIVED INTEL (REDACTED) ]</h3>
                     <div class="ctc-used-clue-list">
-                        @foreach (var usedClue in GameState.UsedClues.ToList())
+                        @foreach (var entry in GameState.UsedClues.ToList())
                         {
-                            <span class="ctc-used-clue-tag redacted-text">@usedClue</span>
+                            <span class="ctc-used-clue-tag redacted-text">[@entry.Value]: @entry.Key</span>
                         }
                     </div>
                 </div>
@@ -204,9 +204,9 @@ else
                 <div class="ctc-used-clues">
                     <h3 class="ctc-section-title">[ ARCHIVED INTEL (REDACTED) ]</h3>
                     <div class="ctc-used-clue-list">
-                        @foreach (var usedClue in GameState.UsedClues.ToList())
+                        @foreach (var entry in GameState.UsedClues.ToList())
                         {
-                            <span class="ctc-used-clue-tag redacted-text">@usedClue</span>
+                            <span class="ctc-used-clue-tag redacted-text">[@entry.Value]: @entry.Key</span>
                         }
                     </div>
                 </div>

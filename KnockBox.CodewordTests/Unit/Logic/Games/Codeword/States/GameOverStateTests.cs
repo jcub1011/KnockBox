@@ -156,7 +156,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
         public void HandleCommand_StartNextGame_ClearsGameLevelState()
         {
             _state.Config.TotalGames = 5;
-            _state.UsedClues.Add("test");
+            _state.UsedClues["test"] = "SomePlayer";
             _state.CurrentRoundClues.Add(new ClueEntry("p0", "P0", "test"));
             _state.CurrentRoundVotes.Add(new VoteEntry("p0", "P0", "p1", "P1"));
             _state.WinResult = new WinConditionResult(true, Role.Agent, "Test");

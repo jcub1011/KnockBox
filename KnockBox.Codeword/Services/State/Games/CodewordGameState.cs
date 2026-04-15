@@ -110,7 +110,7 @@ namespace KnockBox.Codeword.Services.State.Games
         /// All clue words used by any player in the current game.
         /// Prevents reuse across players and cycles.
         /// </summary>
-        public readonly HashSet<string> UsedClues = new(StringComparer.OrdinalIgnoreCase);
+        public readonly Dictionary<string, string> UsedClues = new(StringComparer.OrdinalIgnoreCase);
 
         /// <summary>
         /// Cumulative scores across games, keyed by player ID.
