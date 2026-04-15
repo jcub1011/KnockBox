@@ -44,7 +44,7 @@ namespace KnockBox.Core.Extensions.Events
 
             if (snapshot.Length == 0) return Task.CompletedTask;
 
-            var tasks = new Task[snapshot.Length];
+            Task[]? tasks = null;
             var taskCount = 0;
 
             for (var i = 0; i < snapshot.Length; i++)
@@ -52,14 +52,15 @@ namespace KnockBox.Core.Extensions.Events
                 var task = SafeInvokeAsync(snapshot[i]);
                 if (!task.IsCompletedSuccessfully)
                 {
+                    tasks ??= new Task[snapshot.Length];
                     tasks[taskCount++] = task;
                 }
             }
 
             if (taskCount == 0) return Task.CompletedTask;
-            if (taskCount == 1) return tasks[0];
+            if (taskCount == 1) return tasks![0];
 
-            if (taskCount != tasks.Length)
+            if (taskCount != tasks!.Length)
             {
                 Array.Resize(ref tasks, taskCount);
             }
@@ -160,7 +161,7 @@ namespace KnockBox.Core.Extensions.Events
 
             if (snapshot.Length == 0) return Task.CompletedTask;
 
-            var tasks = new Task[snapshot.Length];
+            Task[]? tasks = null;
             var taskCount = 0;
 
             for (var i = 0; i < snapshot.Length; i++)
@@ -168,14 +169,15 @@ namespace KnockBox.Core.Extensions.Events
                 var task = SafeInvokeAsync(snapshot[i], args);
                 if (!task.IsCompletedSuccessfully)
                 {
+                    tasks ??= new Task[snapshot.Length];
                     tasks[taskCount++] = task;
                 }
             }
 
             if (taskCount == 0) return Task.CompletedTask;
-            if (taskCount == 1) return tasks[0];
+            if (taskCount == 1) return tasks![0];
 
-            if (taskCount != tasks.Length)
+            if (taskCount != tasks!.Length)
             {
                 Array.Resize(ref tasks, taskCount);
             }

@@ -96,15 +96,16 @@
                     return matches;
                 }
 
-                var ordered = matches
-                    .OrderBy(match => match.StartIndex)
-                    .ThenByDescending(match => match.Length)
-                    .ToList();
+                matches.Sort((a, b) =>
+                {
+                    var cmp = a.StartIndex.CompareTo(b.StartIndex);
+                    return cmp != 0 ? cmp : b.Length.CompareTo(a.Length);
+                });
 
-                var filtered = new List<ProfanityMatch>(ordered.Count);
+                var filtered = new List<ProfanityMatch>(matches.Count);
                 var currentMaxEndExclusive = -1;
 
-                foreach (var match in ordered)
+                foreach (var match in matches)
                 {
                     var endExclusive = match.StartIndex + match.Length;
 
