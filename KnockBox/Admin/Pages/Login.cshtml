@@ -1,0 +1,37 @@
+@page "/admin/login"
+@model KnockBox.Admin.Pages.LoginModel
+@{
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>KnockBox Admin - Sign In</title>
+    <link rel="stylesheet" href="~/admin/admin.css" asp-append-version="true" />
+</head>
+<body class="admin-login-body">
+    <main class="admin-login-card">
+        <h1 class="admin-login-title">KnockBox Admin</h1>
+        <p class="admin-login-subtitle">Sign in to manage the host.</p>
+
+        @if (!string.IsNullOrEmpty(Model.Error))
+        {
+            <div class="admin-login-error" role="alert">@Model.Error</div>
+        }
+
+        <form method="post">
+            <label class="admin-login-label" for="username">Username</label>
+            <input id="username" name="Username" type="text" autocomplete="username"
+                   value="@Model.Username" required autofocus />
+
+            <label class="admin-login-label" for="password">Password</label>
+            <input id="password" name="Password" type="password" autocomplete="current-password" required />
+
+            <input type="hidden" name="ReturnUrl" value="@Model.ReturnUrl" />
+            <button class="admin-login-submit" type="submit">Sign in</button>
+        </form>
+    </main>
+</body>
+</html>

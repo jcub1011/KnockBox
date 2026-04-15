@@ -1,0 +1,15 @@
+@inject NavigationManager Nav
+@* Bounces an unauthenticated caller to the admin login page with their
+   original destination preserved in ReturnUrl. ForceLoad gives us a clean
+   HTTP response that lets the cookie auth handler take over. *@
+
+@code {
+    protected override void OnInitialized()
+    {
+        var uri = new Uri(Nav.Uri);
+        var returnPath = uri.PathAndQuery;
+        Nav.NavigateTo(
+            $"/admin/login?ReturnUrl={Uri.EscapeDataString(returnPath)}",
+            forceLoad: true);
+    }
+}

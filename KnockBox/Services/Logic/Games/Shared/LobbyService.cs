@@ -12,6 +12,7 @@ namespace KnockBox.Services.Logic.Games.Shared
     public class LobbyService : ILobbyService
     {
         private readonly ILobbyCodeService _lobbyCodeService;
+        private readonly IGameAvailabilityService _gameAvailability;
         private readonly ILogger<LobbyService> _logger;
         private readonly ConcurrentDictionary<string, LobbyRegistration> _lobbies = [];
         private readonly Dictionary<string, GameRegistration> _gamesByRoute;
@@ -19,10 +20,12 @@ namespace KnockBox.Services.Logic.Games.Shared
         public LobbyService(
             IServiceProvider serviceProvider,
             ILobbyCodeService lobbyCodeService,
+            IGameAvailabilityService gameAvailability,
             IEnumerable<IGameModule> gameModules,
             ILogger<LobbyService> logger)
         {
             _lobbyCodeService = lobbyCodeService;
+            _gameAvailability = gameAvailability;
             _logger = logger;
             _gamesByRoute = new Dictionary<string, GameRegistration>(StringComparer.OrdinalIgnoreCase);
 
@@ -72,6 +75,11 @@ namespace KnockBox.Services.Logic.Games.Shared
         {
             if (string.IsNullOrWhiteSpace(routeIdentifier) || !_gamesByRoute.TryGetValue(routeIdentifier, out var game))
                 return ValueResult<LobbyRegistration>.FromError($"No game registered for route identifier [{routeIdentifier}].");
+
+            if (!_gameAvailability.IsEnabled(routeIdentifier))
+                return ValueResult<LobbyRegistration>.FromError(
+                    "This game is currently disabled.",
+                    $"Lobby creation rejected: game [{routeIdentifier}] is disabled via admin.");
 
             AbstractGameState? gameState = null;
             try
@@ -152,6 +160,15 @@ namespace KnockBox.Services.Logic.Games.Shared
                 return ValueResult<UserRegistration>.FromError(registrationResult.Error.Error);
 
             return new UserRegistration(user, unsubscriber, registration);
+        }
+
+        public IReadOnlyDictionary<string, int> GetLobbyCountsByRoute()
+        {
+            // ConcurrentDictionary.Values is a snapshot; safe to enumerate
+            // from any thread without additional locking.
+            return _lobbies.Values
+                .GroupBy(r => r.RouteIdentifier, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(g => g.Key, g => g.Count(), StringComparer.OrdinalIgnoreCase);
         }
 
         private static string NormalizeLobbyCode(string lobbyCode)

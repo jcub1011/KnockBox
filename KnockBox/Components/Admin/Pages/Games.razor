@@ -1,0 +1,65 @@
+@page "/admin/games"
+@layout AdminLayout
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@using KnockBox.Core.Plugins
+@using KnockBox.Services.Logic.Games.Shared
+@inject IEnumerable<IGameModule> GameModules
+@inject IGameAvailabilityService Availability
+
+<PageTitle>Admin - Games</PageTitle>
+
+<h1 class="admin-h1">Games</h1>
+<p style="color:var(--admin-text-dim); margin-top:-0.75rem;">
+    Toggle a game off to hide its tile on the home page and reject new lobby
+    creation for that route. Existing lobbies continue until their hosts leave.
+</p>
+
+<table class="admin-table">
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Route</th>
+            <th>Description</th>
+            <th>Status</th>
+            <th style="text-align:right">Enabled</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var module in GameModules.OrderBy(m => m.Name))
+        {
+            var enabled = Availability.IsEnabled(module.RouteIdentifier);
+            <tr>
+                <td>@module.Name</td>
+                <td><code>@module.RouteIdentifier</code></td>
+                <td style="color:var(--admin-text-dim)">@module.Description</td>
+                <td>
+                    @if (enabled)
+                    {
+                        <span class="admin-status-enabled">Enabled</span>
+                    }
+                    else
+                    {
+                        <span class="admin-status-disabled">Disabled</span>
+                    }
+                </td>
+                <td style="text-align:right">
+                    <label class="admin-switch">
+                        <input type="checkbox"
+                               checked="@enabled"
+                               @onchange="e => OnToggle(module.RouteIdentifier, e)" />
+                        <span class="admin-switch-slider"></span>
+                    </label>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@code {
+    private void OnToggle(string routeIdentifier, ChangeEventArgs e)
+    {
+        var enabled = e.Value is bool b && b;
+        Availability.SetEnabled(routeIdentifier, enabled);
+        StateHasChanged();
+    }
+}

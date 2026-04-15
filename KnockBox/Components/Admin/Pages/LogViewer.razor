@@ -1,0 +1,179 @@
+@page "/admin/logs/{FileName}"
+@layout AdminLayout
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@using KnockBox.Services.Logic.Admin
+@implements IDisposable
+@inject IAdminLogService LogService
+@inject NavigationManager Nav
+
+<PageTitle>Admin - @(FileName ?? "Log")</PageTitle>
+
+<h1 class="admin-h1">
+    <a href="/admin/logs" style="color:var(--admin-text-dim); text-decoration:none">Logs</a>
+    <span style="color:var(--admin-text-dim); margin:0 .5rem">/</span>
+    @FileName
+</h1>
+
+@if (_error is not null)
+{
+    <div class="admin-login-error">@_error</div>
+}
+else if (_page is null)
+{
+    <p style="color:var(--admin-text-dim)">Loading...</p>
+}
+else
+{
+    <div class="admin-log-toolbar">
+        <button disabled="@(_page.PageIndex == 0)" @onclick="() => GoToPage(0)">&laquo; First</button>
+        <button disabled="@(_page.PageIndex == 0)" @onclick="() => GoToPage(_page.PageIndex - 1)">&lsaquo; Prev</button>
+        <span>Page @(_page.PageIndex + 1) of @TotalPages</span>
+        <button disabled="@(_page.PageIndex >= TotalPages - 1)" @onclick="() => GoToPage(_page.PageIndex + 1)">Next &rsaquo;</button>
+        <button disabled="@(_page.PageIndex >= TotalPages - 1)" @onclick="() => GoToPage(TotalPages - 1)">Last &raquo;</button>
+        <span class="spacer"></span>
+        <label style="display:flex; gap:.4rem; align-items:center; color:var(--admin-text-dim); font-size:.88rem">
+            <input type="checkbox" checked="@_liveTail" @onchange="OnToggleTail" />
+            Live tail
+        </label>
+        <a class="btn" href="/admin/logs/download/@FileName">Download</a>
+    </div>
+
+    <div class="admin-log-pane">
+        @foreach (var line in _displayedLines)
+        {
+            <span class="line @LineClass(line)">@line</span>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public string? FileName { get; set; }
+
+    private const int PageSize = 500;
+    private LogPage? _page;
+    private string? _error;
+    private bool _liveTail;
+    private long _tailOffset;
+    private readonly List<string> _tailLines = new();
+    private CancellationTokenSource? _tailCts;
+    private PeriodicTimer? _tailTimer;
+
+    private IEnumerable<string> _displayedLines =>
+        _liveTail ? _tailLines : (_page?.Lines ?? []);
+
+    private int TotalPages
+    {
+        get
+        {
+            if (_page is null || _page.TotalLines == 0) return 1;
+            return (int)Math.Ceiling(_page.TotalLines / (double)PageSize);
+        }
+    }
+
+    protected override void OnParametersSet()
+    {
+        // Reset whenever the route parameter changes.
+        StopTail();
+        _page = null;
+        _error = null;
+        LoadPage(0);
+    }
+
+    private void LoadPage(int index)
+    {
+        if (string.IsNullOrWhiteSpace(FileName))
+        {
+            _error = "No file selected.";
+            return;
+        }
+
+        var page = LogService.ReadPage(FileName, index, PageSize);
+        if (page is null)
+        {
+            _error = "Log file not found or not readable.";
+            _page = null;
+            return;
+        }
+
+        _page = page;
+        _error = null;
+    }
+
+    private void GoToPage(int index)
+    {
+        if (_liveTail) StopTail();
+        LoadPage(index);
+    }
+
+    private void OnToggleTail(ChangeEventArgs e)
+    {
+        var enabled = e.Value is bool b && b;
+        if (enabled) StartTail();
+        else StopTail();
+    }
+
+    private void StartTail()
+    {
+        if (string.IsNullOrWhiteSpace(FileName) || _liveTail) return;
+        _liveTail = true;
+        _tailLines.Clear();
+
+        // Seed the tail with the last page of existing content so the
+        // operator sees context, not just new lines.
+        var seed = LogService.ReadPage(FileName, Math.Max(0, (int)Math.Ceiling((_page?.TotalLines ?? 0) / (double)PageSize) - 1), PageSize);
+        if (seed is not null)
+        {
+            _tailLines.AddRange(seed.Lines);
+            _tailOffset = seed.FileSizeBytes;
+        }
+
+        _tailCts = new CancellationTokenSource();
+        _tailTimer = new PeriodicTimer(TimeSpan.FromSeconds(2));
+        _ = TailLoop(_tailCts.Token);
+    }
+
+    private async Task TailLoop(CancellationToken ct)
+    {
+        try
+        {
+            while (_tailTimer is not null && await _tailTimer.WaitForNextTickAsync(ct))
+            {
+                if (string.IsNullOrWhiteSpace(FileName)) return;
+
+                var tail = LogService.TailSince(FileName, _tailOffset);
+                if (tail is null) continue;
+
+                if (tail.Lines.Count > 0)
+                {
+                    _tailLines.AddRange(tail.Lines);
+                    // Cap in-memory tail to a reasonable size.
+                    if (_tailLines.Count > 2000)
+                        _tailLines.RemoveRange(0, _tailLines.Count - 2000);
+                }
+
+                _tailOffset = tail.NewOffset;
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (OperationCanceledException) { /* expected on dispose / toggle-off */ }
+    }
+
+    private void StopTail()
+    {
+        _liveTail = false;
+        _tailCts?.Cancel();
+        _tailCts?.Dispose();
+        _tailCts = null;
+        _tailTimer?.Dispose();
+        _tailTimer = null;
+    }
+
+    private static string LineClass(string line)
+    {
+        if (line.Contains("[ERR]", StringComparison.Ordinal)) return "line-err";
+        if (line.Contains("[WRN]", StringComparison.Ordinal)) return "line-wrn";
+        return string.Empty;
+    }
+
+    public void Dispose() => StopTail();
+}
