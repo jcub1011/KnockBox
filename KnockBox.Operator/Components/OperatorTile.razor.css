@@ -6,15 +6,12 @@
     padding: 12px 16px 14px 16px;
     background:
         radial-gradient(ellipse at 50% 60%, #1a0606 0%, #0f0505 60%, #050202 100%);
-    border: 5px solid #000;
-    border-radius: 16px;
     box-shadow:
         8px 8px 0 #000,
         inset 0 0 0 1px rgba(230, 57, 70, 0.25);
     color: #ffd166;
     font-family: var(--font-primary);
     text-align: center;
-    transition: transform 0.1s, box-shadow 0.1s;
     position: relative;
     overflow: hidden;
 }
@@ -203,7 +200,6 @@
 /* ── Hover / Active ──────────────────────────────────────────────────────── */
 
 .op-tile:hover {
-    transform: translate(-3px, -3px);
     box-shadow:
         11px 11px 0 #000,
         inset 0 0 0 1px rgba(230, 57, 70, 0.45),
@@ -228,7 +224,6 @@
 }
 
 .op-tile:active {
-    transform: translate(3px, 3px);
     box-shadow:
         2px 2px 0 #000,
         inset 0 0 0 1px rgba(230, 57, 70, 0.25);

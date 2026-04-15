@@ -1,0 +1,49 @@
+@using KnockBox.HiddenAgenda.Services.State.Games
+@using KnockBox.HiddenAgenda.Services.State.Games.Data
+@using KnockBox.HiddenAgenda.Services.Logic.Games
+@using KnockBox.Core.Services.State.Users
+
+<div class="ha-match-over">
+    <div class="ha-winner-announcement">
+        <h2 class="ha-winner-name">@WinnerName</h2>
+        <p class="ha-winner-subtitle">Master Curator with <span class="ha-score">@WinnerScore</span> points</p>
+    </div>
+
+    <div class="ha-final-standings">
+        <h4 class="ha-subheading">Final Standings</h4>
+        <table class="ha-table">
+            <thead>
+                <tr>
+                    <th>Rank</th>
+                    <th>Curator</th>
+                    <th>Total Score</th>
+                </tr>
+            </thead>
+            <tbody>
+                @{
+                    int rank = 1;
+                    foreach (var player in GameState.GamePlayers.Values.OrderByDescending(p => p.CumulativeScore))
+                    {
+                        <tr>
+                            <td class="ha-rank-cell">@rank++</td>
+                            <td>@player.DisplayName</td>
+                            <td class="ha-score ha-text-bold">@player.CumulativeScore</td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <div class="ha-actions">
+        @if (IsHost)
+        {
+            <button class="ha-btn ha-btn-primary ha-btn-lg" @onclick="HandleReturnToLobby">Play Again</button>
+            <button class="ha-btn ha-btn-secondary ha-btn-lg" @onclick="HandleExitGame">Exit to Home</button>
+        }
+        else
+        {
+            <p class="ha-waiting-text">Waiting for host...</p>
+        }
+    </div>
+</div>

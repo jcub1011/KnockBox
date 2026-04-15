@@ -1,45 +1,61 @@
 @page "/room/hidden-agenda/{ObfuscatedRoomCode}"
-
+@using KnockBox.HiddenAgenda.Services.State.Games
+@using KnockBox.HiddenAgenda.Services.Logic.Games
+@using KnockBox.HiddenAgenda.Components
 @inherits DisposableComponent
 
 <PageTitle>Hidden Agenda</PageTitle>
-
 <HeadContent>
     <link href="_content/KnockBox.HiddenAgenda/KnockBox.HiddenAgenda.styles.css" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap" rel="stylesheet">
 </HeadContent>
 
-<div class="content">
 @if (GameState == null)
 {
-    <div>Loading...</div>
+    <div class="ha-loading">
+        <span class="ha-loading-icon">🖼️</span>
+        <span>Preparing the gallery...</span>
+    </div>
 }
 else
 {
-    @if (GameState.IsJoinable)
-    {
-        <div class="card">
-            <div class="joinable-state">
-                <h4>Players</h4>
-                <div class="player-list">
-                    @foreach (var player in GameState.Players)
-                    {
-                        <button class="btn" title="Click to kick player."
-                                @onclick="() => GameState.KickPlayer(player)">@player.Name @(player.Id == GameState.Host.Id ? "(Host)" : "")</button>
-                    }
-                </div>
-                @if (UserService.CurrentUser?.Id == GameState.Host.Id)
-                {
-                    <button class="btn btn-primary start-btn mt-3" @onclick="StartGame">Start Game</button>
-                }
-            </div>
-        </div>
-    }
-    else
-    {
-        <div class="card">
-            <h3>Hidden Agenda</h3>
-            <p>Game is in progress.</p>
-        </div>
-    }
+    <div class="ha-page">
+        @switch (GameState.Phase)
+        {
+            case GamePhase.Lobby:
+                <LobbyPhase GameState="GameState" Engine="GameEngine"
+                            UserService="UserService" Config="GameState.Config"
+                            RoomCode="@RoomCode" />
+                break;
+            case GamePhase.RoundSetup:
+                <RoundSetupPhase GameState="GameState" UserService="UserService" />
+                break;
+            case GamePhase.EventCardPhase:
+            case GamePhase.SpinPhase:
+            case GamePhase.MovePhase:
+            case GamePhase.DrawPhase:
+                <TurnPhase GameState="GameState" Engine="GameEngine"
+                           UserService="UserService" />
+                break;
+            case GamePhase.GuessPhase:
+                <GuessPhase GameState="GameState" Engine="GameEngine"
+                            UserService="UserService" />
+                break;
+            case GamePhase.FinalGuess:
+                <FinalGuessPhase GameState="GameState" Engine="GameEngine"
+                                 UserService="UserService" />
+                break;
+            case GamePhase.Reveal:
+                <RevealPhase GameState="GameState" UserService="UserService" />
+                break;
+            case GamePhase.RoundOver:
+                <RoundOverPhase GameState="GameState" Engine="GameEngine"
+                                UserService="UserService" />
+                break;
+            case GamePhase.MatchOver:
+                <MatchOverPhase GameState="GameState" Engine="GameEngine"
+                                UserService="UserService" />
+                break;
+        }
+    </div>
 }
-</div>

@@ -106,7 +106,7 @@ namespace KnockBox.Core.Services.State.Shared
         private readonly ConcurrentDictionary<string, Registration> _registrations = new(StringComparer.Ordinal);
         private readonly ConcurrentDictionary<string, PropertyState> _states = new(StringComparer.Ordinal);
         private readonly ConcurrentDictionary<string, SharedUpdate> _inflightUpdates = new(StringComparer.Ordinal);
-        private bool _disposed;
+        private int _disposed;
 
         public event IState<TSelf>.PropertyStateChangedDelegate? PropertyStateChanged;
 
@@ -114,7 +114,7 @@ namespace KnockBox.Core.Services.State.Shared
 
         public PropertyState GetPropertyState(string propertyName)
         {
-            ObjectDisposedException.ThrowIf(_disposed, this);
+            ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) == 1, this);
             return _states.TryGetValue(propertyName, out var state) ? state : PropertyState.Uninitialized;
         }
 
@@ -131,7 +131,7 @@ namespace KnockBox.Core.Services.State.Shared
             params string[] propertiesToUpdate)
         {
             ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxParallelUpdates);
-            ObjectDisposedException.ThrowIf(_disposed, this);
+            ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) == 1, this);
             ct.ThrowIfCancellationRequested();
 
             if (propertiesToUpdate is null || propertiesToUpdate.Length == 0) return [];
@@ -195,7 +195,7 @@ namespace KnockBox.Core.Services.State.Shared
             Func<CancellationToken, Task> updateAction,
             params string[] propertyDependencies)
         {
-            ObjectDisposedException.ThrowIf(_disposed, this);
+            ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) == 1, this);
 
             // Validate
             if (string.IsNullOrWhiteSpace(propertyName)) 
@@ -406,7 +406,7 @@ namespace KnockBox.Core.Services.State.Shared
 
         public void Dispose()
         {
-            if (_disposed) return;
+            if (Interlocked.Exchange(ref _disposed, 1) == 1) return;
 
             foreach (var update in _inflightUpdates.Values)
                 update.Dispose();
@@ -415,7 +415,6 @@ namespace KnockBox.Core.Services.State.Shared
             _registrations.Clear();
             _states.Clear();
 
-            _disposed = true;
             GC.SuppressFinalize(this);
         }
 

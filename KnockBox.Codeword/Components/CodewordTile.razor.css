@@ -12,15 +12,12 @@
     height: 100%;
     padding: 14px 18px;
     background: radial-gradient(ellipse at center, #1a1a2e 0%, #0f0f1a 100%);
-    border: 5px solid #000;
-    border-radius: 16px;
     box-shadow:
         8px 8px 0 #000,
         inset 0 0 30px rgba(0, 0, 0, 0.4),
         inset 0 0 0 1px var(--ctc-lavender-faint);
     color: var(--ctc-lavender);
     font-family: 'Share Tech Mono', 'Google Sans Code', var(--font-mono), monospace;
-    transition: transform 0.1s, box-shadow 0.1s;
     position: relative;
     overflow: hidden;
 }
@@ -165,7 +162,6 @@
 /* ── Hover / Active ──────────────────────────────────────────────────────── */
 
 .ctc-tile:hover {
-    transform: translate(-3px, -3px);
     box-shadow:
         11px 11px 0 #000,
         inset 0 0 30px rgba(0, 0, 0, 0.4),
@@ -187,7 +183,6 @@
 }
 
 .ctc-tile:active {
-    transform: translate(3px, 3px);
     box-shadow:
         2px 2px 0 #000,
         inset 0 0 30px rgba(0, 0, 0, 0.4),

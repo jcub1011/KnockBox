@@ -24,7 +24,7 @@ public class SessionTokenProvider(ISessionStorageService sessionStorageService, 
                     string tokenString = await sessionStorageService.GetAsync<string>(nameof(SessionTokenProvider), "token", ct);
                     if (string.IsNullOrWhiteSpace(tokenString))
                     {
-                        tokenString = Guid.NewGuid().ToString();
+                        tokenString = Guid.CreateVersion7().ToString();
                         await sessionStorageService.SetAsync(nameof(SessionTokenProvider), "token", tokenString, ct);
                     }
                     _cachedToken = new SessionToken(tokenString);

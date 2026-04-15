@@ -118,7 +118,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
             var player = _context.GetPlayer(currentPlayer)!;
             Assert.IsTrue(player.HasSubmittedClue);
             Assert.AreEqual("wave", player.CurrentClue);
-            Assert.Contains("wave", _state.UsedClues);
+            Assert.IsTrue(_state.UsedClues.ContainsKey("wave"));
         }
 
         [TestMethod]
@@ -152,7 +152,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
         [TestMethod]
         public void HandleCommand_RejectsAlreadyUsedClue()
         {
-            _state.UsedClues.Add("wave");
+            _state.UsedClues["wave"] = "SomePlayer";
 
             var clueState = new CluePhaseState();
             clueState.OnEnter(_context);
@@ -265,7 +265,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
         [TestMethod]
         public void HandleCommand_CaseInsensitiveUsedClueCheck()
         {
-            _state.UsedClues.Add("Wave");
+            _state.UsedClues["Wave"] = "SomePlayer";
 
             var clueState = new CluePhaseState();
             clueState.OnEnter(_context);
@@ -332,7 +332,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
         public void Tick_WithPendingClueAlreadyUsed_FallsBackToEllipsis()
         {
             _state.Config.EnableTimers = true;
-            _state.UsedClues.Add("wave");
+            _state.UsedClues["wave"] = "SomePlayer";
 
             var clueState = new CluePhaseState();
             clueState.OnEnter(_context);

@@ -72,14 +72,14 @@ namespace KnockBox.Codeword.Services.Logic.Games.FSM.States
                 return new ResultError("You cannot use your own secret word as a clue.");
 
             // Validate: not previously used by any player in the current game.
-            if (context.State.UsedClues.Contains(clue))
+            if (context.State.UsedClues.ContainsKey(clue))
                 return new ResultError("This clue has already been used in the current game.");
 
             // Store the clue.
             player.HasSubmittedClue = true;
             player.CurrentClue = clue;
             player.ClueHistory.Add(clue);
-            context.State.UsedClues.Add(clue);
+            context.State.UsedClues.TryAdd(clue, player.DisplayName);
             context.State.CurrentRoundClues.Add(
                 new ClueEntry(player.PlayerId, player.DisplayName, clue));
 
@@ -115,7 +115,7 @@ namespace KnockBox.Codeword.Services.Logic.Games.FSM.States
                 player.HasSubmittedClue = true;
                 player.CurrentClue = clue;
                 player.ClueHistory.Add(clue);
-                context.State.UsedClues.Add(clue);
+                context.State.UsedClues.TryAdd(clue, player.DisplayName);
                 context.State.CurrentRoundClues.Add(
                     new ClueEntry(player.PlayerId, player.DisplayName, clue));
 
@@ -154,7 +154,7 @@ namespace KnockBox.Codeword.Services.Logic.Games.FSM.States
             if (player.SecretWord is not null &&
                 string.Equals(pending, player.SecretWord, StringComparison.OrdinalIgnoreCase))
                 return "...";
-            if (context.State.UsedClues.Contains(pending))
+            if (context.State.UsedClues.ContainsKey(pending))
                 return "...";
             return pending;
         }

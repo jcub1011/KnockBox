@@ -1,0 +1,53 @@
+@using KnockBox.HiddenAgenda.Services.State.Games
+@using KnockBox.HiddenAgenda.Services.Logic.Games
+@using KnockBox.Core.Services.State.Users
+
+<div class="ha-round-over">
+    <h3 class="ha-heading ha-round-over-title">Round @GameState.CurrentRound Complete</h3>
+
+    <div class="ha-scoreboard">
+        <h4 class="ha-subheading">Scoreboard</h4>
+        <table class="ha-table">
+            <thead>
+                <tr>
+                    <th>Rank</th>
+                    <th>Curator</th>
+                    <th>Round Score</th>
+                    <th>Total Score</th>
+                </tr>
+            </thead>
+            <tbody>
+                @{
+                    int rank = 1;
+                    foreach (var player in GameState.GamePlayers.Values.OrderByDescending(p => p.CumulativeScore))
+                    {
+                        <tr>
+                            <td class="ha-rank-cell">@rank++</td>
+                            <td>@player.DisplayName</td>
+                            <td class="ha-score">@player.RoundScore</td>
+                            <td class="ha-score ha-text-bold">@player.CumulativeScore</td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <div class="ha-actions">
+        @if (IsHost)
+        {
+            @if (GameState.CurrentRound < GameState.Config.TotalRounds)
+            {
+                <button class="ha-btn ha-btn-primary ha-btn-lg" @onclick="HandleNextRound">Start Next Round</button>
+            }
+            else
+            {
+                <button class="ha-btn ha-btn-primary ha-btn-lg" @onclick="HandleNextRound">View Final Results</button>
+            }
+        }
+        else
+        {
+            <p class="ha-waiting-text">Waiting for host to proceed...</p>
+        }
+    </div>
+</div>

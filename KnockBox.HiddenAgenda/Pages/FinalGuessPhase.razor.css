@@ -1,0 +1,53 @@
+.ha-final-guess-phase {
+    max-width: 720px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    padding: 24px;
+}
+
+.ha-final-guess-title {
+    text-align: center;
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 1.5rem;
+}
+
+.ha-timer {
+    font-weight: 700;
+    margin-top: 8px;
+    font-size: 0.95rem;
+}
+
+.ha-timer-value {
+    font-family: var(--font-mono), monospace;
+    color: var(--ha-danger, #b71c1c);
+    font-size: 1.1rem;
+    animation: ha-timer-pulse 1s ease-in-out infinite;
+}
+
+@keyframes ha-timer-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+}
+
+.ha-waiting-message {
+    text-align: center;
+    padding: 32px 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+}
+
+.ha-dossier-reference {
+    margin-top: 8px;
+    padding-top: 16px;
+    border-top: 1px solid var(--ha-gold-dim, rgba(197, 160, 89, 0.3));
+}
+
+@media (max-width: 480px) {
+    .ha-final-guess-phase {
+        padding: 16px;
+    }
+}

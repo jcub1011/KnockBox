@@ -22,7 +22,7 @@
             <div class="ctc-host-dossier-grid">
                 <h3 class="ctc-section-title">[ OPERATIVE DOSSIERS ]</h3>
                 <div class="ctc-dossier-cards">
-                    @foreach (var ps in GameState.GamePlayers.Values.OrderBy(p => p.DisplayName))
+                    @foreach (var ps in GameState.GamePlayers.Values.OrderBy(p => p.DisplayName).ToList())
                     {
                         var alivePlayers = GameState.GamePlayers.Values.Where(state => !state.IsEliminated);
                         int lockedVotes = alivePlayers.Count(state => state.VoteTargetId == ps.PlayerId && state.HasVoted);
@@ -130,7 +130,7 @@ else
             <div class="ctc-discussion-players">
                 <h3 class="ctc-section-title">[ TARGET DESIGNATION ]</h3>
                 <div class="ctc-player-list">
-                    @foreach (var ps in GameState.GamePlayers.Values.OrderBy(p => p.DisplayName))
+                    @foreach (var ps in GameState.GamePlayers.Values.OrderBy(p => p.DisplayName).ToList())
                     {
                         if (ps is null || myPlayer is null) continue;
                         bool isMe = ps.PlayerId == myId;

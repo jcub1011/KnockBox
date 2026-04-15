@@ -1,0 +1,48 @@
+.ha-guess-form {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    padding: 16px;
+}
+
+.ha-opponent-guess {
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--ha-gold-dim, rgba(197, 160, 89, 0.3));
+}
+
+.ha-opponent-guess:last-of-type {
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+.ha-task-selections {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.ha-task-select-container {
+    flex: 1 1 240px;
+    min-width: 200px;
+}
+
+.ha-submit-section {
+    text-align: center;
+    padding-top: 12px;
+    border-top: 2px solid var(--ha-gold-dim, rgba(197, 160, 89, 0.3));
+}
+
+.ha-submit-section p {
+    margin-bottom: 10px;
+    font-size: 0.85rem;
+}
+
+@media (max-width: 768px) {
+    .ha-task-selections {
+        flex-direction: column;
+    }
+
+    .ha-task-select-container {
+        min-width: 100%;
+    }
+}

@@ -1,0 +1,185 @@
+@using KnockBox.HiddenAgenda.Services.State.Games
+@using KnockBox.HiddenAgenda.Services.State.Games.Data
+@using KnockBox.HiddenAgenda.Services.Logic.Games
+@using KnockBox.HiddenAgenda.Services.Logic.Games.Data
+@using KnockBox.Core.Services.State.Users
+@using KnockBox.HiddenAgenda.Components
+
+<div class="ha-turn-layout">
+    <!-- Sidebar -->
+    <div class="ha-sidebar">
+        <div class="ha-panel ha-sidebar-status">
+            <div class="ha-panel-header">@CurrentPlayerName's Turn</div>
+            <div class="ha-panel-body">
+                <div class="ha-sidebar-turn-count">Turn @GameState.TotalTurnsTaken</div>
+            </div>
+        </div>
+
+        <div class="ha-panel ha-sidebar-players">
+            <div class="ha-panel-header">Curators</div>
+            <div class="ha-panel-body">
+                @foreach (var player in GameState.GamePlayers.Values)
+                {
+                    <div class="ha-player-status">
+                        <span class="ha-player-status-name">@player.DisplayName</span>
+                        @if (player.HeldEventCard is not null)
+                        {
+                            <span class="ha-badge ha-badge-info" title="Holding Event Card">🎴</span>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+
+        <div class="ha-panel ha-sidebar-collections">
+            <div class="ha-panel-header">Collections</div>
+            <div class="ha-panel-body">
+                <CollectionTracks Progress="GameState.CollectionProgress" />
+            </div>
+        </div>
+
+        <div class="ha-panel ha-sidebar-history">
+            <div class="ha-panel-header">History</div>
+            <div class="ha-panel-body ha-history-log">
+                @foreach (var entry in GameState.RoundPlayHistory.AsEnumerable().Reverse().Take(5))
+                {
+                    <div class="ha-history-entry">
+                        <span class="ha-history-turn">Turn @entry.TurnNumber</span>
+                        <span>@(GameState.Players.FirstOrDefault(p => p.Id == entry.PlayerId)?.Name) moved to @entry.SpaceId</span>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Area -->
+    <div class="ha-main-area">
+        <div class="ha-panel ha-board-panel">
+            <BoardView GameState="GameState" OnSpaceClicked="HandleSpaceClicked" />
+        </div>
+
+        <div class="ha-panel ha-controls-panel">
+            <div class="ha-panel-body">
+                @if (IsCurrentPlayer)
+                {
+                    @switch (GameState.Phase)
+                    {
+                        case GamePhase.EventCardPhase:
+                            <div class="ha-event-controls">
+                                @if (CurrentPlayerState?.HeldEventCard is not null)
+                                {
+                                    <h4 class="ha-subheading">Held Event Card: @CurrentPlayerState.HeldEventCard.Type</h4>
+                                    <p class="ha-text-muted">@CurrentPlayerState.HeldEventCard.Description</p>
+
+                                    @if (CurrentPlayerState.HeldEventCard.Type == EventCardType.Catalog ||
+                                         CurrentPlayerState.HeldEventCard.Type == EventCardType.Detour)
+                                    {
+                                        <div class="ha-target-selection">
+                                            <label class="ha-text-bold">Select Target Curator:</label>
+                                            <select class="ha-select" @bind="_selectedTargetPlayerId">
+                                                <option value="">-- Select --</option>
+                                                @foreach (var player in GameState.Players.Where(p => p.Id != UserService.CurrentUser?.Id))
+                                                {
+                                                    <option value="@player.Id">@player.Name</option>
+                                                }
+                                            </select>
+                                        </div>
+                                    }
+
+                                    <div class="ha-actions">
+                                        <button class="ha-btn ha-btn-primary" @onclick="PlayEventCard">Play Card</button>
+                                        <button class="ha-btn ha-btn-secondary" @onclick="SkipEventCard">Skip</button>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <p class="ha-text-muted">No event card to play.</p>
+                                    <div class="ha-actions">
+                                        <button class="ha-btn ha-btn-secondary" @onclick="SkipEventCard">Continue</button>
+                                    </div>
+                                }
+                            </div>
+                            break;
+
+                        case GamePhase.SpinPhase:
+                            <div class="ha-spin-controls">
+                                <SpinnerWheel Result="GameState.CurrentSpinResult"
+                                              OnSpin="HandleSpin"
+                                              IsCurrentPlayer="true" />
+                            </div>
+                            break;
+
+                        case GamePhase.MovePhase:
+                            <div class="ha-move-controls">
+                                <h4 class="ha-subheading">Move Phase</h4>
+                                <p>Move up to <strong>@GameState.CurrentSpinResult</strong> spaces. Click a space on the board or select below.</p>
+                                <div class="ha-move-options">
+                                    @if (GameState.ReachableSpaces is not null)
+                                    {
+                                        @foreach (var space in GameState.ReachableSpaces)
+                                        {
+                                            <button class="ha-btn ha-btn-ghost" @onclick="() => HandleSpaceClicked(space.Id)">Space @space.Id (@space.Wing)</button>
+                                        }
+                                    }
+                                </div>
+                            </div>
+                            break;
+
+                        case GamePhase.DrawPhase:
+                            <div class="ha-draw-controls">
+                                @if (GameState.DrawnCards is not null && GameState.DrawnCards.Any())
+                                {
+                                    <CurationCardPicker Cards="GameState.DrawnCards" OnCardSelected="HandleCardSelected" />
+                                }
+                                else if (GameState.PendingDrawnEventCard is not null)
+                                {
+                                    <div class="ha-event-choice">
+                                        <h4 class="ha-subheading">Event Spot Choice</h4>
+                                        <div class="ha-choice-row">
+                                            <div class="ha-choice-option ha-panel">
+                                                <div class="ha-panel-body">
+                                                    <h5 class="ha-subheading">Keep Current Card</h5>
+                                                    <p class="ha-text-bold">@CurrentPlayerState?.HeldEventCard?.Type</p>
+                                                    <p class="ha-text-muted ha-text-sm">@CurrentPlayerState?.HeldEventCard?.Description</p>
+                                                    <button class="ha-btn ha-btn-secondary" @onclick="() => HandleEventChoice(false)">Keep</button>
+                                                </div>
+                                            </div>
+                                            <div class="ha-choice-option ha-panel">
+                                                <div class="ha-panel-body">
+                                                    <h5 class="ha-subheading">Swap for New Card</h5>
+                                                    <p class="ha-text-bold">@GameState.PendingDrawnEventCard?.Type</p>
+                                                    <p class="ha-text-muted ha-text-sm">@GameState.PendingDrawnEventCard?.Description</p>
+                                                    <button class="ha-btn ha-btn-primary" @onclick="() => HandleEventChoice(true)">Swap</button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                            break;
+                    }
+                }
+                else
+                {
+                    <div class="ha-waiting-message">
+                        <p class="ha-waiting-text">Waiting for @CurrentPlayerName to complete their @GameState.Phase...</p>
+                    </div>
+                }
+
+                <div class="ha-vote-controls">
+                    <button class="ha-btn ha-btn-warning" @onclick="HandleCallVote">Call Vote</button>
+                </div>
+
+                <div class="ha-dossier-reference">
+                    <h5 class="ha-subheading">Your Dossier</h5>
+                    <DossierPanel TaskPool="GameState.CurrentTaskPool" PlayerTasks="PlayerTasks" />
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (_errorMessage != null)
+{
+    <div class="error-toast" @key="_errorKey">@_errorMessage</div>
+}

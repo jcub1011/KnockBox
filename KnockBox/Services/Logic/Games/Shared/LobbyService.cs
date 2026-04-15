@@ -1,6 +1,7 @@
 using KnockBox.Core.Extensions.Returns;
 using KnockBox.Core.Services.Logic.Games.Engines.Shared;
 using KnockBox.Core.Services.Logic.Games.Shared;
+using KnockBox.Core.Services.State.Games.Shared;
 using KnockBox.Core.Services.State.Users;
 using System.Collections.Concurrent;
 using Microsoft.Extensions.DependencyInjection;
@@ -72,20 +73,29 @@ namespace KnockBox.Services.Logic.Games.Shared
             if (string.IsNullOrWhiteSpace(routeIdentifier) || !_gamesByRoute.TryGetValue(routeIdentifier, out var game))
                 return ValueResult<LobbyRegistration>.FromError($"No game registered for route identifier [{routeIdentifier}].");
 
+            AbstractGameState? gameState = null;
             try
             {
                 var stateResult = await game.Engine.CreateStateAsync(host, ct);
                 if (stateResult.IsCanceled) return ValueResult<LobbyRegistration>.FromCancellation();
-                if (!stateResult.TryGetSuccess(out var gameState))
+                if (!stateResult.TryGetSuccess(out var state))
                     return ValueResult<LobbyRegistration>.FromError(stateResult.Error.Error);
+
+                gameState = state;
 
                 var lobbyUriResult = CreateLobbyUri(routeIdentifier);
                 if (!lobbyUriResult.TryGetSuccess(out var lobbyUri))
+                {
+                    gameState.Dispose();
                     return ValueResult<LobbyRegistration>.FromError(lobbyUriResult.Error.Error);
+                }
 
                 var lobbyCodeResult = await _lobbyCodeService.IssueLobbyCodeAsync(ct);
                 if (!lobbyCodeResult.TryGetSuccess(out var lobbyCode)) // Service guarantees that lobby code is normalized
+                {
+                    gameState.Dispose();
                     return ValueResult<LobbyRegistration>.FromError(lobbyCodeResult.Error.Error);
+                }
 
                 var lobbyRegistration = new LobbyRegistration(lobbyCode, lobbyUri, game.Module.Name, routeIdentifier, gameState);
                 if (!_lobbies.TryAdd(lobbyCode, lobbyRegistration))
@@ -94,6 +104,7 @@ namespace KnockBox.Services.Logic.Games.Shared
                     // already in _lobbies -- a broken invariant. Release the code
                     // back to the issuer on a best-effort basis so we don't leak
                     // it permanently; log loudly because reaching here is a bug.
+                    gameState.Dispose();
                     var releaseResult = await _lobbyCodeService.ReleaseLobbyCodeAsync(lobbyCode, ct);
                     if (releaseResult.TryGetFailure(out var releaseError))
                     {
@@ -105,11 +116,17 @@ namespace KnockBox.Services.Logic.Games.Shared
                     return ValueResult<LobbyRegistration>.FromError($"Game with lobby code [{lobbyCode}] already exists.");
                 }
 
+                gameState = null; // Successfully added to _lobbies; ownership transferred.
                 return lobbyRegistration;
             }
-            catch (OperationCanceledException) { return ValueResult<LobbyRegistration>.FromCancellation(); }
+            catch (OperationCanceledException)
+            {
+                gameState?.Dispose();
+                return ValueResult<LobbyRegistration>.FromCancellation();
+            }
             catch (Exception ex)
             {
+                gameState?.Dispose();
                 return ValueResult<LobbyRegistration>.FromError("Error creating lobby.", $"Exception occured while creating lobby: {ex}");
             }
         }

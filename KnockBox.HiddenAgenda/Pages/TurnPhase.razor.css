@@ -1,0 +1,197 @@
+/* ── Turn Phase Layout ─────────────────────────────────────────────────────── */
+
+.ha-turn-layout {
+    display: flex;
+    gap: 20px;
+    min-height: 0;
+}
+
+/* ── Sidebar ──────────────────────────────────────────────────────────────── */
+
+.ha-sidebar {
+    flex: 0 0 280px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.ha-sidebar-turn-count {
+    font-family: var(--font-mono), monospace;
+    font-size: 0.85rem;
+    color: rgba(61, 43, 31, 0.6);
+}
+
+.ha-guess-countdown {
+    color: var(--ha-danger, #b71c1c);
+    font-weight: 700;
+    font-size: 0.85rem;
+    animation: ha-pulse 1.5s ease-in-out infinite;
+    margin-top: 6px;
+}
+
+@keyframes ha-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+.ha-player-status {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--ha-gold-dim, rgba(197, 160, 89, 0.2));
+}
+
+.ha-player-status:last-child {
+    border-bottom: none;
+}
+
+.ha-player-status-name {
+    font-weight: 600;
+    font-size: 0.85rem;
+}
+
+.ha-history-log {
+    max-height: 180px;
+    overflow-y: auto;
+}
+
+.ha-history-entry {
+    display: flex;
+    flex-direction: column;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--ha-gold-dim, rgba(197, 160, 89, 0.2));
+    font-size: 0.8rem;
+}
+
+.ha-history-entry:last-child {
+    border-bottom: none;
+}
+
+.ha-history-turn {
+    font-weight: 700;
+    color: var(--ha-burgundy, #4a0404);
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* ── Main Area ────────────────────────────────────────────────────────────── */
+
+.ha-main-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-width: 0;
+}
+
+.ha-board-panel {
+    overflow: hidden;
+}
+
+.ha-controls-panel {
+    flex: 1;
+}
+
+/* ── Phase Controls ───────────────────────────────────────────────────────── */
+
+.ha-event-controls,
+.ha-spin-controls,
+.ha-move-controls,
+.ha-draw-controls {
+    text-align: center;
+    padding: 8px 0;
+}
+
+.ha-target-selection {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-width: 300px;
+    margin: 12px auto;
+    text-align: left;
+}
+
+.ha-move-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+    margin-top: 12px;
+}
+
+.ha-event-choice {
+    text-align: center;
+}
+
+.ha-choice-row {
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+    margin-top: 12px;
+}
+
+.ha-choice-option {
+    flex: 1;
+    max-width: 260px;
+    text-align: center;
+}
+
+.ha-waiting-message {
+    text-align: center;
+    padding: 20px;
+}
+
+.ha-dossier-reference {
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid var(--ha-gold-dim, rgba(197, 160, 89, 0.3));
+}
+
+/* ── Responsive ───────────────────────────────────────────────────────────── */
+
+@media (max-width: 768px) {
+    .ha-turn-layout {
+        flex-direction: column;
+    }
+
+    .ha-sidebar {
+        flex: none;
+        width: 100%;
+        flex-direction: row;
+        flex-wrap: wrap;
+    }
+
+    .ha-sidebar > * {
+        flex: 1 1 200px;
+    }
+
+    .ha-sidebar-history {
+        display: none;
+    }
+
+    .ha-choice-row {
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .ha-choice-option {
+        max-width: 100%;
+        width: 100%;
+    }
+}
+
+@media (max-width: 480px) {
+    .ha-sidebar {
+        flex-direction: column;
+    }
+
+    .ha-move-options {
+        flex-direction: column;
+    }
+
+    .ha-move-options .ha-btn {
+        width: 100%;
+    }
+}

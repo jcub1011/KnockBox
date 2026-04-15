@@ -33,11 +33,11 @@ namespace KnockBox.HiddenAgenda.Tests.Unit.State
         {
             using var state = new HiddenAgendaGameState(_host, _loggerMock.Object);
 
-            state.SetPhase(GamePhase.Playing);
-            Assert.AreEqual(GamePhase.Playing, state.Phase);
+            state.SetPhase(GamePhase.RoundSetup);
+            Assert.AreEqual(GamePhase.RoundSetup, state.Phase);
 
-            state.SetPhase(GamePhase.GameOver);
-            Assert.AreEqual(GamePhase.GameOver, state.Phase);
+            state.SetPhase(GamePhase.MatchOver);
+            Assert.AreEqual(GamePhase.MatchOver, state.Phase);
         }
     }
 }

@@ -1,0 +1,39 @@
+@using KnockBox.HiddenAgenda.Services.State.Games
+@using KnockBox.HiddenAgenda.Services.Logic.Games
+@using KnockBox.Core.Services.State.Users
+@using KnockBox.HiddenAgenda.Components
+
+<div class="ha-guess-phase">
+    <h3 class="ha-heading ha-guess-title">Guess Phase</h3>
+
+    @if (IsCurrentPlayer)
+    {
+        <div class="ha-notice ha-notice-info">
+            <p>Assign 3 tasks from the dossier to each opponent. Earn points for each correct match!</p>
+        </div>
+
+        <GuessForm TaskPool="GameState.CurrentTaskPool"
+                   Opponents="Opponents"
+                   OnSubmit="HandleSubmit" />
+
+        <div class="ha-actions">
+            <button class="ha-btn ha-btn-secondary" @onclick="HandleSkip">Skip Guessing</button>
+        </div>
+    }
+    else
+    {
+        <div class="ha-waiting-message">
+            <p class="ha-waiting-text">Waiting for @CurrentPlayerName to submit their guesses...</p>
+        </div>
+    }
+
+    <div class="ha-dossier-reference">
+        <h4 class="ha-subheading">Dossier Reference</h4>
+        <DossierPanel TaskPool="GameState.CurrentTaskPool" />
+    </div>
+</div>
+
+@if (_errorMessage != null)
+{
+    <div class="error-toast" @key="_errorKey">@_errorMessage</div>
+}

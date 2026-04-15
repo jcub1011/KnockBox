@@ -14,13 +14,6 @@ namespace KnockBox.Services.Registrations.States
     {
         public static IServiceCollection RegisterStateServices(this IServiceCollection services)
         {
-            // Add memory cache
-            services.AddMemoryCache(options =>
-            {
-                // Ensure proactive expiration tokens are scanned frequently.
-                options.ExpirationScanFrequency = TimeSpan.FromSeconds(5);
-            });
-
             // Add states
             services.AddSingleton<TickService>();
             services.AddSingleton<ITickService>(sp => sp.GetRequiredService<TickService>());

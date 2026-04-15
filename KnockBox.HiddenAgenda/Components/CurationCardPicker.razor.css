@@ -1,0 +1,96 @@
+.ha-card-picker {
+    padding: 16px;
+    text-align: center;
+}
+
+.ha-card-picker-cards {
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.ha-curation-card {
+    width: 210px;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+    background: #fff;
+    border: 3px solid var(--ha-gold, #c5a059);
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 3px 8px rgba(61, 43, 31, 0.12);
+}
+
+.ha-curation-card:hover {
+    transform: translateY(-6px);
+    box-shadow: 0 8px 20px rgba(61, 43, 31, 0.2);
+}
+
+.ha-curation-card-acquire { border-color: var(--ha-success, #2e7d32); }
+.ha-curation-card-remove { border-color: var(--ha-danger, #b71c1c); }
+.ha-curation-card-trade { border-color: var(--ha-info, #1565c0); }
+
+.ha-curation-card-header {
+    padding: 8px 12px;
+    font-weight: 700;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    text-align: center;
+}
+
+.ha-curation-card-acquire .ha-curation-card-header {
+    background: var(--ha-success, #2e7d32);
+    color: #fff;
+}
+
+.ha-curation-card-remove .ha-curation-card-header {
+    background: var(--ha-danger, #b71c1c);
+    color: #fff;
+}
+
+.ha-curation-card-trade .ha-curation-card-header {
+    background: var(--ha-info, #1565c0);
+    color: #fff;
+}
+
+.ha-curation-card-body {
+    padding: 12px;
+}
+
+.ha-curation-card-desc {
+    font-size: 0.8rem;
+    color: rgba(61, 43, 31, 0.7);
+    margin: 0 0 10px 0;
+    line-height: 1.4;
+}
+
+.ha-curation-card-effects {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    font-family: var(--font-mono), monospace;
+}
+
+.ha-curation-card-trade-badge {
+    padding: 4px 8px;
+    background: rgba(21, 101, 192, 0.1);
+    color: var(--ha-info, #1565c0);
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-align: center;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+@media (max-width: 768px) {
+    .ha-curation-card {
+        width: 100%;
+        max-width: 280px;
+    }
+}
