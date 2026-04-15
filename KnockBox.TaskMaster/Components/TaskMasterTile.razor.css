@@ -1,0 +1,71 @@
+.tm-tile {
+    position: relative;
+    background: #2a2a2a;
+    color: #888;
+    filter: grayscale(1) opacity(0.7);
+    transition: filter 0.3s ease;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    min-height: 180px;
+}
+
+.tm-tile:hover {
+    filter: grayscale(0.5) opacity(0.9);
+}
+
+.tm-tile-name {
+    font-size: 1.5rem;
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+}
+
+.tm-tile-tag {
+    font-size: 0.9rem;
+    font-style: italic;
+}
+
+/* ── Construction Theme Overlay ────────────────────────────────────────── */
+
+.tm-wip-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    pointer-events: none;
+}
+
+.tm-hazard-tape {
+    width: 150%;
+    height: 40px;
+    background: repeating-linear-gradient(
+        -45deg,
+        #FFCC00,
+        #FFCC00 20px,
+        #000 20px,
+        #000 40px
+    );
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transform: rotate(-15deg);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+    border-top: 2px solid #000;
+    border-bottom: 2px solid #000;
+}
+
+.tm-wip-text {
+    background: #000;
+    color: #FFCC00;
+    font-weight: 900;
+    padding: 2px 12px;
+    text-transform: uppercase;
+    font-size: 1.1rem;
+    letter-spacing: 1px;
+    border: 1px solid #FFCC00;
+}
