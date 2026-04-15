@@ -97,10 +97,14 @@ namespace KnockBox
         }
 
         /// <summary>
-        /// Logs the addresses Kestrel actually bound to once the host has started,
+        /// Writes the addresses Kestrel actually bound to once the host has started,
         /// so the operator immediately sees the URL (e.g. <c>http://localhost:5276</c>)
-        /// at which the web UI is reachable without having to scan Kestrel's default
-        /// "Now listening on" lines or inspect launch settings.
+        /// at which the web UI is reachable. Written twice: once via
+        /// <see cref="Console.WriteLine(string)"/> so it is always visible on stdout
+        /// regardless of configured Serilog minimum level / sink filters (this is
+        /// vital startup information, not diagnostics), and once via
+        /// <see cref="ILogger"/> so the rolling log file preserves a record of every
+        /// bound address for post-hoc inspection.
         /// </summary>
         private static void LogBoundAddresses(WebApplication app)
         {
@@ -115,12 +119,15 @@ namespace KnockBox
 
                 if (addresses is null || addresses.Count == 0)
                 {
-                    logger.LogInformation("KnockBox host started, but no server addresses were reported.");
+                    const string noAddressMessage = "KnockBox host started, but no server addresses were reported.";
+                    Console.WriteLine(noAddressMessage);
+                    logger.LogInformation(noAddressMessage);
                     return;
                 }
 
                 foreach (var address in addresses)
                 {
+                    Console.WriteLine($"KnockBox web UI available at {address}");
                     logger.LogInformation("KnockBox web UI available at {Address}", address);
                 }
             });
