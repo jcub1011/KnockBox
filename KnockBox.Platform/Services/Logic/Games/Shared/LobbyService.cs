@@ -108,6 +108,10 @@ namespace KnockBox.Services.Logic.Games.Shared
                 var lobbyRegistration = new LobbyRegistration(lobbyCode, lobbyUri, game.Module.Name, routeIdentifier, gameState);
                 if (!_lobbies.TryAdd(lobbyCode, lobbyRegistration))
                 {
+                    // This branch means LobbyCodeService handed us a code that is
+                    // already in _lobbies -- a broken invariant. Release the code
+                    // back to the issuer on a best-effort basis so we don't leak
+                    // it permanently; log loudly because reaching here is a bug.
                     gameState.Dispose();
                     var releaseResult = await _lobbyCodeService.ReleaseLobbyCodeAsync(lobbyCode, ct);
                     if (releaseResult.TryGetFailure(out var releaseError))
@@ -160,6 +164,8 @@ namespace KnockBox.Services.Logic.Games.Shared
 
         public IReadOnlyDictionary<string, int> GetLobbyCountsByRoute()
         {
+            // ConcurrentDictionary.Values is a snapshot; safe to enumerate
+            // from any thread without additional locking.
             return _lobbies.Values
                 .GroupBy(r => r.RouteIdentifier, StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(g => g.Key, g => g.Count(), StringComparer.OrdinalIgnoreCase);

@@ -35,7 +35,16 @@ public static class KnockBoxPlatformExtensions
         var options = new KnockBoxPlatformOptions();
         configure?.Invoke(options);
 
-        builder.Services.AddSingleton(Options.Create(options));
+        builder.Services.Configure<KnockBoxPlatformOptions>(o =>
+        {
+            o.AppTitle = options.AppTitle;
+            o.HomeHeroTitle = options.HomeHeroTitle;
+            o.HomePageTitle = options.HomePageTitle;
+            o.PluginDiscovery = options.PluginDiscovery;
+            o.PluginsPath = options.PluginsPath;
+            o.ExplicitModules.AddRange(options.ExplicitModules);
+            o.ExplicitAssemblies.AddRange(options.ExplicitAssemblies);
+        });
 
         builder.Services.AddRazorComponents()
             .AddInteractiveServerComponents();
@@ -48,6 +57,15 @@ public static class KnockBoxPlatformExtensions
         // Default IGameAvailabilityService — yields to an explicit registration
         // made by the host (e.g. the production host's file-backed service).
         builder.Services.TryAddSingleton<IGameAvailabilityService, AllGamesEnabledService>();
+
+        // Single bootstrap logger factory used for both plugin discovery and
+        // registration-time logging. Console-only here; the host's configured
+        // Serilog pipeline takes over once DI is built.
+        var bootstrapSerilog = new LoggerConfiguration()
+            .Enrich.FromLogContext()
+            .WriteTo.Console()
+            .CreateLogger();
+        using var bootstrapLoggerFactory = new SerilogLoggerFactory(bootstrapSerilog, dispose: true);
 
         // Plugin discovery
         PluginLoadResult pluginLoadResult;
@@ -65,20 +83,12 @@ public static class KnockBoxPlatformExtensions
                 ? configuredPath
                 : Path.Combine(AppContext.BaseDirectory, configuredPath);
 
-            // Create a minimal bootstrap logger for plugin discovery.
-            var bootstrapSerilog = new LoggerConfiguration()
-                .Enrich.FromLogContext()
-                .WriteTo.Console()
-                .CreateLogger();
-            using var bootstrapLoggerFactory = new SerilogLoggerFactory(bootstrapSerilog, dispose: true);
             var pluginLogger = bootstrapLoggerFactory.CreateLogger<PluginLoader>();
-
             pluginLoadResult = new PluginLoader(pluginLogger).LoadModules(pluginsPath);
         }
 
         // Logic registrations (platform version — no admin services)
-        using var registrationLoggerFactory = LoggerFactory.Create(b => b.AddConsole());
-        var registrationLogger = registrationLoggerFactory
+        var registrationLogger = bootstrapLoggerFactory
             .CreateLogger("KnockBox.Services.Registrations.Logic.LogicRegistrations");
         builder.Services.RegisterLogic(pluginLoadResult, registrationLogger);
 

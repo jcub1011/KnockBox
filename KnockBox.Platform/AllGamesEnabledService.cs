@@ -17,6 +17,7 @@ internal sealed class AllGamesEnabledService : IGameAvailabilityService
     public IReadOnlyDictionary<string, bool> GetAll()
         => new Dictionary<string, bool>();
 
+    // No-op: state never changes, so nothing to notify.
     public event Action? Changed
     {
         add { }
