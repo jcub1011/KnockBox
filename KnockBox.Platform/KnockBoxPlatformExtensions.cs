@@ -154,8 +154,17 @@ public static class KnockBoxPlatformExtensions
             MapPluginStaticAssets(app, pluginsPath);
         }
 
+        // The Platform assembly contains routable pages (Home, Error, NotFound).
+        // Game plugin assemblies contain game-specific pages. Both must be
+        // registered so ASP.NET Core endpoint routing discovers them alongside
+        // the root component's own assembly.
+        var gamePluginAssemblies = app.Services.GetRequiredService<GamePluginAssemblies>();
+        var additionalAssemblies = gamePluginAssemblies.Assemblies
+            .Append(typeof(KnockBoxPlatformExtensions).Assembly);
+
         app.MapRazorComponents<TRootComponent>()
-            .AddInteractiveServerRenderMode();
+            .AddInteractiveServerRenderMode()
+            .AddAdditionalAssemblies([.. additionalAssemblies]);
 
         return app;
     }
