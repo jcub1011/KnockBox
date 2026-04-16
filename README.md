@@ -2,7 +2,9 @@
 
 KnockBox is a Blazor Server host that ships party games as **runtime-loaded plugins**. The host (`KnockBox`) has no compile-time knowledge of any game — each game is a standalone Razor Class Library that the host discovers on startup.
 
-This README is the contributor onboarding guide for adding a new game plugin. The authoritative architecture reference is [`KnockBox/Specs/knockbox-platform-architecture.md`](KnockBox/Specs/knockbox-platform-architecture.md) — consult it for the full rationale behind the patterns described here.
+This README is the **in-repo contributor** onboarding guide for adding a new game plugin alongside the host in this solution. If you're building a plugin **externally** against the published NuGet packages (`KnockBox.Core`, `KnockBox.Platform`, `KnockBox.Templates`), use [`docs/making-a-game-plugin.md`](docs/making-a-game-plugin.md) instead — it covers the `dotnet new knockbox-game` scaffold, the DevHost workflow, and shipping plugins into a host's `games/` folder.
+
+The authoritative architecture reference (for both workflows) is [`KnockBox/Specs/knockbox-platform-architecture.md`](KnockBox/Specs/knockbox-platform-architecture.md) — consult it for the full rationale behind the patterns described here.
 
 ## Prerequisites
 

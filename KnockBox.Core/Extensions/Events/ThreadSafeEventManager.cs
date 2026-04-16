@@ -2,6 +2,17 @@ using KnockBox.Core.Extensions.Disposable;
 
 namespace KnockBox.Core.Extensions.Events
 {
+    /// <summary>
+    /// Default <see cref="IThreadSafeEventManager"/> implementation. Subscribers
+    /// are held in an immutable snapshot array swapped under a lock; notifications
+    /// read the snapshot without holding the lock, so handlers can safely
+    /// re-enter (subscribe / unsubscribe / notify) without deadlocking.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="Notify"/> is fire-and-forget: it dispatches to all subscribers
+    /// on the thread pool and swallows/logs exceptions per-handler. Use
+    /// <see cref="NotifyAsync"/> if the caller needs to await completion.
+    /// </remarks>
     public sealed class ThreadSafeEventManager(ILogger? logger = null)
         : IThreadSafeEventManager
     {
@@ -118,8 +129,11 @@ namespace KnockBox.Core.Extensions.Events
     }
 
     /// <summary>
-    /// A thread-safe event manager for a single event type.
+    /// Default <see cref="IThreadSafeEventManager{TEventArgs}"/> implementation
+    /// for a single event type with a typed payload. Uses the same snapshot-
+    /// without-lock dispatch as the non-generic variant.
     /// </summary>
+    /// <typeparam name="TEventArgs">Type of the payload passed to each subscriber.</typeparam>
     public sealed class ThreadSafeEventManager<TEventArgs>(ILogger? logger = null) : IThreadSafeEventManager<TEventArgs>
     {
         private readonly Lock _lock = new();

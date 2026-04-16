@@ -3,6 +3,19 @@ using System.Collections.Concurrent;
 
 namespace KnockBox.Core.Services.State.Shared
 {
+    /// <summary>
+    /// Generic state primitive with dependency-tracked property updates.
+    /// Supports registering named update actions that can depend on each other;
+    /// concurrent callers coalesce onto a shared in-flight update and observe
+    /// <see cref="PropertyUpdateResult"/> on completion.
+    /// </summary>
+    /// <remarks>
+    /// Most games do not subclass this directly — use
+    /// <see cref="Games.Shared.AbstractGameState"/> for per-room state. This
+    /// class powers utility states (session caches, drawing canvases, etc.)
+    /// where property-level change tracking and dependency ordering pay off.
+    /// </remarks>
+    /// <typeparam name="TSelf">The concrete derived type (curiously-recurring pattern).</typeparam>
     public abstract class AbstractState<TSelf> : IState<TSelf>
         where TSelf : class
     {

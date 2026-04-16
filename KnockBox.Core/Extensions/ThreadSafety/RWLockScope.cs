@@ -1,9 +1,14 @@
 ﻿namespace KnockBox.Core.Extensions.ThreadSafety
 {
+    /// <summary>
+    /// Permissions granted by an <see cref="IRWLockScope"/>.
+    /// </summary>
     [Flags]
     public enum LockPermissions
     {
+        /// <summary>The scope allows reading.</summary>
         Read = 1,
+        /// <summary>The scope allows writing (implies <see cref="Read"/>).</summary>
         Write = 2,
     }
 

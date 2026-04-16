@@ -3,6 +3,19 @@ using System.Collections;
 
 namespace KnockBox.Core.Extensions.Collections
 {
+    /// <summary>
+    /// A <see cref="List{T}"/> guarded by a <see cref="ReaderWriterLockSlim"/>.
+    /// All standard <see cref="IList{T}"/> operations are individually
+    /// thread-safe; the scope-taking overloads let callers compose multi-step
+    /// operations (e.g., "find then insert") under a single held lock.
+    /// </summary>
+    /// <remarks>
+    /// Most per-room state does not need this — the room's Execute lock on
+    /// <see cref="Games.Shared.AbstractGameState"/> already serializes access.
+    /// Reach for <see cref="ThreadSafeList{TElement}"/> when a collection is
+    /// shared across states (history buffers, leaderboards) or read by
+    /// background services that run outside any Execute block.
+    /// </remarks>
     public class ThreadSafeList<TElement> : IDisposable, IList<TElement>
     {
         private bool _disposed;

@@ -3,12 +3,18 @@ using System.Reflection;
 namespace KnockBox.Core.Plugins
 {
     /// <summary>
-    /// Result of discovering game plugins from a directory.
+    /// Result of discovering game plugins from a directory. Returned by
+    /// <see cref="PluginLoader.LoadModules(string)"/> and consumed by the
+    /// platform's DI registration code to wire every plugin's services and to
+    /// expose the set of plugin assemblies to Blazor's router.
     /// </summary>
+    /// <param name="Modules">Every discovered <see cref="IGameModule"/>, in discovery order.</param>
+    /// <param name="Assemblies">The distinct plugin assemblies that contributed at least one module.</param>
     public sealed record PluginLoadResult(
         IReadOnlyList<IGameModule> Modules,
         IReadOnlyList<Assembly> Assemblies)
     {
+        /// <summary>An empty result with no modules and no assemblies.</summary>
         public static PluginLoadResult Empty { get; } =
             new([], []);
     }
@@ -22,6 +28,18 @@ namespace KnockBox.Core.Plugins
         Justification = "Startup-only discovery path. Log volume is bounded by the number of plugins in games/; readability of structured discovery/error messages is more valuable than LoggerMessage cache wins.")]
     public sealed class PluginLoader(ILogger<PluginLoader> logger)
     {
+        /// <summary>
+        /// Scans <paramref name="pluginsDirectory"/> for plugin folders, loads
+        /// each into its own <see cref="PluginLoadContext"/>, reflects for
+        /// <see cref="IGameModule"/> implementations, activates them, and
+        /// returns the aggregate result. Modules with duplicate route
+        /// identifiers are rejected (first wins); types that fail to activate
+        /// are skipped with an error log.
+        /// </summary>
+        /// <param name="pluginsDirectory">
+        /// Directory containing one subfolder per plugin. Each subfolder's
+        /// primary DLL is expected to be named after the subfolder.
+        /// </param>
         public PluginLoadResult LoadModules(string pluginsDirectory)
         {
             if (!Directory.Exists(pluginsDirectory))

@@ -4,12 +4,19 @@ using KnockBox.Core.Extensions.Returns;
 namespace KnockBox.Core.Services.State.Games.Shared
 {
     /// <summary>
-    /// The default implementation of a finite state machine.
+    /// Default <see cref="IFiniteStateMachine{TContext,TCommand}"/> implementation.
+    /// Dispatches commands to the currently-active
+    /// <see cref="IGameState{TContext,TCommand}"/> node; node transitions raise
+    /// <see cref="StateChangedManager"/> after the new node's <c>OnEnter</c>
+    /// runs. Used by games that track an explicit FSM context alongside their
+    /// <see cref="AbstractGameState"/>; pair with
+    /// <see cref="Interfaces.IFsmContextGameState{TContext}"/> to keep the
+    /// FSM context on the state.
     /// </summary>
-    /// <typeparam name="TContext"></typeparam>
-    /// <typeparam name="TCommand"></typeparam>
-    /// <param name="logger"></param>
-    public class FiniteStateMachine<TContext, TCommand>(ILogger? logger = null) 
+    /// <typeparam name="TContext">Context record the FSM nodes read and mutate.</typeparam>
+    /// <typeparam name="TCommand">Command union the FSM dispatches on.</typeparam>
+    /// <param name="logger">Optional logger used by the inner event manager.</param>
+    public class FiniteStateMachine<TContext, TCommand>(ILogger? logger = null)
         : IFiniteStateMachine<TContext, TCommand>
     {
         public IThreadSafeEventManager<StateChangeArgs<TContext, TCommand>> StateChangedManager { get; } 

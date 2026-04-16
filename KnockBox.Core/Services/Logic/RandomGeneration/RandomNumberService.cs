@@ -3,6 +3,12 @@ using System.Security.Cryptography;
 
 namespace KnockBox.Core.Services.Logic.RandomGeneration
 {
+    /// <summary>
+    /// Default <see cref="IRandomNumberService"/> implementation. Routes calls
+    /// to <see cref="System.Random.Shared"/> for <see cref="RandomType.Fast"/>
+    /// or <see cref="RandomNumberGenerator"/> for <see cref="RandomType.Secure"/>.
+    /// Registered as a singleton by the platform.
+    /// </summary>
     public class RandomNumberService : IRandomNumberService
     {
         public int GetRandomInt(int exclusiveMax, RandomType type = RandomType.Fast)

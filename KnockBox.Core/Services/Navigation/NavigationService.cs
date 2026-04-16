@@ -3,6 +3,12 @@ using Microsoft.AspNetCore.Components;
 
 namespace KnockBox.Core.Services.Navigation
 {
+    /// <summary>
+    /// Default <see cref="INavigationService"/>. Wraps ASP.NET Core's
+    /// <see cref="NavigationManager"/> so game pages can navigate to typed
+    /// platform routes (<c>home</c>, game URIs, join URIs) without stitching
+    /// URL strings together themselves. Registered as scoped.
+    /// </summary>
     public class NavigationService(NavigationManager navigationManager)
         : INavigationService
     {

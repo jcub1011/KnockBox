@@ -1,3 +1,10 @@
+<!--
+  Test project for the plugin assembly.
+
+  MSTest + Moq are the default test stack across every KnockBox project. Uses
+  InternalsVisibleTo from the plugin assembly to reach internal helpers without
+  exposing them to consumers.
+-->
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -7,7 +14,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- Mocking library for faking loggers, clocks, RNG services, etc. -->
     <PackageReference Include="Moq" Version="4.20.72" />
+    <!-- Test framework + runner. The Microsoft.VisualStudio.TestTools.UnitTesting
+         namespace below is pulled in as an implicit using so tests can use
+         [TestClass] / [TestMethod] / Assert.* without extra usings. -->
     <PackageReference Include="MSTest" Version="4.2.1" />
   </ItemGroup>
 
@@ -16,6 +27,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Targets the plugin assembly. The matching
+         [InternalsVisibleTo("MyGame.Tests")] is declared in MyGame.csproj;
+         if you rename this project, update the attribute there too. -->
     <ProjectReference Include="..\MyGame\MyGame.csproj" />
   </ItemGroup>
 </Project>

@@ -6,6 +6,30 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace KnockBox.Core.Services.State.Games.Shared
 {
+    /// <summary>
+    /// Base class for per-room game state. One instance is created per lobby by
+    /// the owning <c>AbstractGameEngine.CreateStateAsync</c>, stashed on the
+    /// lobby's <c>LobbyRegistration</c>, and consumed by Razor pages and the
+    /// engine's command methods.
+    /// </summary>
+    /// <remarks>
+    /// <para><b>Concurrency contract:</b> mutations must flow through
+    /// <see cref="Execute(Action)"/> / <c>ExecuteAsync</c>, which acquire a
+    /// per-state <c>SemaphoreSlim(1,1)</c>, run the caller's lambda, release
+    /// the lock, and <i>then</i> fire <see cref="StateChangedEventManager"/>.
+    /// Non-mutating serialized reads use
+    /// <c>WithExclusiveRead</c> / <c>WithExclusiveReadAsync</c> — those do not
+    /// notify subscribers. Direct field writes from outside these helpers
+    /// bypass both the lock and the notification and should be avoided.</para>
+    /// <para><b>Why notification fires outside the lock:</b> to keep lock-hold
+    /// time minimal and to let subscribers (e.g., disconnect handlers) call
+    /// <c>Execute</c> reentrantly without deadlocking. The
+    /// <see cref="PlayerUnregistered"/> event is raised with the same
+    /// "outside-the-lock" guarantee for the same reason.</para>
+    /// <para><b>Lifecycle:</b> the owning lobby disposes the state when the
+    /// game ends or the host leaves; the <see cref="OnStateDisposed"/> event
+    /// lets pages and background handlers unsubscribe cleanly.</para>
+    /// </remarks>
     public abstract class AbstractGameState(User host, ILogger logger) : IDisposable
     {
         private readonly Lock _disposeLock = new();
