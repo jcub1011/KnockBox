@@ -149,10 +149,8 @@ namespace KnockBox
 
             MapPluginStaticAssets(app, pluginsPath);
 
-            // Razor Pages host the admin login/logout endpoints. Scope them
-            // to the admin port so the login URL is not reachable from the
-            // public port even if the port middleware is ever reordered.
-            app.MapRazorPages().RequireHost($"*:{adminOptions.Port}");
+            // Razor Pages host the admin login/logout endpoints.
+            app.MapRazorPages();
 
             // Admin log download endpoint. Kept outside the Blazor router
             // because Blazor pages can't cleanly return a file stream.
@@ -175,8 +173,8 @@ namespace KnockBox
         {
             if (adminPort <= 0) return;
 
-            var existing = builder.Configuration["Urls"] ?? "http://localhost:5276";
-            var adminUrl = $"http://localhost:{adminPort}";
+            var existing = builder.Configuration["Urls"] ?? "http://+:5276";
+            var adminUrl = $"http://+:{adminPort}";
 
             // Only append if the port isn't already present in Urls (useful
             // when the operator has overridden Urls explicitly).
@@ -207,13 +205,12 @@ namespace KnockBox
                     fileDownloadName: fileName,
                     enableRangeProcessing: false);
             })
-            .RequireHost($"*:{adminPort}")
             .RequireAuthorization();
         }
 
         /// <summary>
         /// Writes the addresses Kestrel actually bound to once the host has started,
-        /// so the operator immediately sees the URL (e.g. <c>http://localhost:5276</c>)
+        /// so the operator immediately sees the URL (e.g. <c>http://+:5276</c>)
         /// at which the web UI is reachable. Written twice: once via
         /// <see cref="Console.WriteLine(string)"/> so it is always visible on stdout
         /// regardless of configured Serilog minimum level / sink filters (this is
