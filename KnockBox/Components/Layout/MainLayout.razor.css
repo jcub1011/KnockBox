@@ -50,6 +50,32 @@ header a {
     min-width: 0;
 }
 
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
+.leave-session-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 44px;
+    padding: 0;
+    margin: 0;
+    border-radius: 8px;
+    background: white;
+    cursor: pointer;
+    color: #000;
+    border: none;
+}
+
+.leave-session-btn:hover {
+    background: #f0f0f0;
+}
+
 .main {
     display: flex;
     gap: 0px;

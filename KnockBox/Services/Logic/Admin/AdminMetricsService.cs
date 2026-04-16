@@ -51,7 +51,7 @@ namespace KnockBox.Services.Logic.Admin
                 {
                     // Update Memory
                     process.Refresh();
-                    Volatile.Write(ref _memoryUsageBytes, process.WorkingSet64);
+                    Volatile.Write(ref _memoryUsageBytes, process.PrivateMemorySize64);
 
                     // Update CPU
                     var currentTime = DateTime.UtcNow;
