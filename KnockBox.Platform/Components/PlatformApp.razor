@@ -5,16 +5,18 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <base href="/" />
-    <link rel="stylesheet" href="_content/KnockBox.Platform/app.css" />
-    <link rel="stylesheet" href="_content/KnockBox.Platform/KnockBox.Platform.styles.css" />
+    <ResourcePreloader />
+    <link rel="stylesheet" href="@Assets["_content/KnockBox.Platform/app.css"]" />
+    <link rel="stylesheet" href="@Assets["_content/KnockBox.Platform/KnockBox.Platform.styles.css"]" />
     <link href="https://fonts.googleapis.com/css2?family=Google+Sans+Code:ital,wght@0,300..800;1,300..800&family=Lexend:wght@100..900&display=swap" rel="stylesheet">
+    <ImportMap />
     <HeadOutlet @rendermode="InteractiveServer" />
 </head>
 
 <body>
     <PlatformRoutes @rendermode="new InteractiveServerRenderMode(prerender: false)" />
     <ReconnectModal />
-    <script src="_framework/blazor.web.js"></script>
+    <script src="@Assets["_framework/blazor.web.js"]"></script>
 </body>
 
 </html>

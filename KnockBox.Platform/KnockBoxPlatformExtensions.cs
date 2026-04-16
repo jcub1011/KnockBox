@@ -77,8 +77,8 @@ public static class KnockBoxPlatformExtensions
         }
 
         // Logic registrations (platform version — no admin services)
-        var registrationLogger = LoggerFactory
-            .Create(b => b.AddConsole())
+        using var registrationLoggerFactory = LoggerFactory.Create(b => b.AddConsole());
+        var registrationLogger = registrationLoggerFactory
             .CreateLogger("KnockBox.Services.Registrations.Logic.LogicRegistrations");
         builder.Services.RegisterLogic(pluginLoadResult, registrationLogger);
 

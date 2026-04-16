@@ -116,7 +116,6 @@ public sealed class KnockBoxPlatformOptions
     public string PluginsPath { get; set; } = "games";
     internal List<IGameModule> ExplicitModules { get; } = [];
     internal List<Assembly> ExplicitAssemblies { get; } = [];
-    public Action<LoggerConfiguration, IConfiguration>? ConfigureSerilog { get; set; }
 }
 
 public enum PluginDiscoveryMode { Directory, Explicit }
