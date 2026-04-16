@@ -107,21 +107,19 @@ jobs:
       - name: Pack
         run: dotnet pack KnockBox.Core/KnockBox.Core.csproj -c Release -p:PackageVersion=${{ steps.version.outputs.label }} -o nupkg
 
-      - name: Get OIDC token
+      - name: NuGet Login
         id: oidc
         if: github.event_name == 'workflow_dispatch'
-        uses: actions/github-script@v7
+        uses: NuGet/login@v1
         with:
-          script: |
-            const token = await core.getIDToken('https://api.nuget.org/v3/index.json');
-            core.setOutput('token', token);
+          user: ${{ vars.NUGET_USERNAME }}
 
       - name: Publish to NuGet.org
         if: github.event_name == 'workflow_dispatch'
         run: |
           # Note: This step uses NuGet.org Trusted Publishing (OIDC).
           # The repository must be configured as a Trusted Publisher on NuGet.org.
-          dotnet nuget push nupkg/*.nupkg --source https://api.nuget.org/v3/index.json --skip-duplicate --api-key ${{ steps.oidc.outputs.token }}
+          dotnet nuget push nupkg/*.nupkg --source https://api.nuget.org/v3/index.json --skip-duplicate --api-key ${{ steps.oidc.outputs.NUGET_API_KEY }}
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
