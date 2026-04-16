@@ -127,9 +127,95 @@ jobs:
           name: knockbox-core-nupkg
           path: nupkg/*.nupkg
 
+  pack-platform:
+    name: Pack & Publish KnockBox.Platform
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Resolve version label
+        id: version
+        run: |
+          LABEL="${{ inputs.tag }}"
+          CLEAN_LABEL="${LABEL#v}"
+          echo "label=$CLEAN_LABEL" >> "$GITHUB_OUTPUT"
+
+      - name: Pack
+        run: dotnet pack KnockBox.Platform/KnockBox.Platform.csproj -c Release -p:PackageVersion=${{ steps.version.outputs.label }} -o nupkg
+
+      - name: NuGet Login
+        id: oidc
+        if: github.event_name == 'workflow_dispatch'
+        uses: NuGet/login@v1
+        with:
+          user: ${{ vars.NUGET_USERNAME }}
+
+      - name: Publish to NuGet.org
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          dotnet nuget push nupkg/*.nupkg --source https://api.nuget.org/v3/index.json --skip-duplicate --api-key ${{ steps.oidc.outputs.NUGET_API_KEY }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: knockbox-platform-nupkg
+          path: nupkg/*.nupkg
+
+  pack-templates:
+    name: Pack & Publish KnockBox.Templates
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Resolve version label
+        id: version
+        run: |
+          LABEL="${{ inputs.tag }}"
+          CLEAN_LABEL="${LABEL#v}"
+          echo "label=$CLEAN_LABEL" >> "$GITHUB_OUTPUT"
+
+      - name: Pack
+        run: dotnet pack KnockBox.Templates/KnockBox.Templates.csproj -c Release -p:PackageVersion=${{ steps.version.outputs.label }} -o nupkg
+
+      - name: NuGet Login
+        id: oidc
+        if: github.event_name == 'workflow_dispatch'
+        uses: NuGet/login@v1
+        with:
+          user: ${{ vars.NUGET_USERNAME }}
+
+      - name: Publish to NuGet.org
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          dotnet nuget push nupkg/*.nupkg --source https://api.nuget.org/v3/index.json --skip-duplicate --api-key ${{ steps.oidc.outputs.NUGET_API_KEY }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: knockbox-templates-nupkg
+          path: nupkg/*.nupkg
+
   release:
     name: Publish GitHub Release
-    needs: [publish, pack-core]
+    needs: [publish, pack-core, pack-platform, pack-templates]
     runs-on: ubuntu-latest
     permissions:
       contents: write
