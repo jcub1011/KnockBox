@@ -1,0 +1,64 @@
+@page "/"
+@page "/home"
+
+@inherits DisposableComponent
+
+<PageTitle>@PlatformOptions.Value.HomePageTitle</PageTitle>
+
+<div class="home-container @(_isTransitioning ? "transitioning" : "") @(_isReturning ? "returning" : "")">
+    <div class="hero">
+        <h1 class="title">
+            @foreach (var letter in PlatformOptions.Value.HomeHeroTitle)
+            {
+                <span class="title-letter" aria-hidden="true">@letter</span>
+            }
+            <span class="sr-only">@PlatformOptions.Value.HomeHeroTitle</span>
+        </h1>
+    </div>
+
+    <form @onsubmit="() => JoinLobby(LobbyCode ?? string.Empty)" @onsubmit:preventDefault="true">
+        <div class="join-section">
+            <div class="join-card join-card-name">
+                <label class="join-label" for="player-name-input">Player Name</label>
+                <input id="player-name-input"
+                       placeholder="Enter name"
+                       type="text" maxlength="12" name="player-name"
+                       @bind="PlayerName" @bind:event="oninput" style="text-transform: none;"/>
+            </div>
+
+            <div class="join-card join-card-code">
+                <label class="join-label" for="room-code-input">Room Code</label>
+                <div class="join-code-row">
+                    <input id="room-code-input"
+                           placeholder="KN0CK3OX"
+                           type="text" maxlength="@LobbyCodeService.LobbyCodeLength" name="room-code"
+                           @bind="LobbyCode"/>
+                    <button type="submit" class="join-btn" disabled="@(!CanJoinOrCreate)">Join</button>
+                </div>
+            </div>
+        </div>
+    </form>
+
+    <div class="games-section" @onanimationend="OnReturnAnimationEnd">
+        <h2 class="games-heading">
+            <span class="games-heading-icon" aria-hidden="true">&#127922;</span>
+            Pick a Game
+        </h2>
+        <div class="game-grid">
+            @foreach (var module in VisibleGameModules)
+            {
+                <button class="game-tile" aria-label="@module.Name" disabled="@(!CanJoinOrCreate)" @onclick="() => CreateLobby(module.RouteIdentifier)">
+                    @module.GetButtonContent()
+                </button>
+            }
+        </div>
+    </div>
+
+    @if (_errorMessage is not null)
+    {
+        <div @key="_errorKey" class="home-error-toast" @onanimationend="DismissError">
+            <span class="home-error-icon" aria-hidden="true">&#9888;&#65039;</span>
+            <span>@_errorMessage</span>
+        </div>
+    }
+</div>

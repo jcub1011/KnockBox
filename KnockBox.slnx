@@ -21,6 +21,7 @@
   <Project Path="KnockBox.HiddenAgendaTests/KnockBox.HiddenAgendaTests.csproj" />
   <Project Path="KnockBox.TaskMaster/KnockBox.TaskMaster.csproj" />
   <Project Path="KnockBox.TaskMasterTests/KnockBox.TaskMasterTests.csproj" />
+  <Project Path="KnockBox.Platform/KnockBox.Platform.csproj" />
   <Project Path="KnockBox/KnockBox.csproj" />
   <Project Path="KnockBoxTests/KnockBoxTests.csproj" Id="98d86df0-167f-4cde-a3a1-59954fc72bb6" />
 </Solution>

@@ -1,20 +1,15 @@
 using KnockBox.Admin;
 using KnockBox.Components;
 using KnockBox.Core.Plugins;
-using KnockBox.Core.Services.Drawing;
-using KnockBox.Core.Services.Navigation;
+using KnockBox.Platform;
 using KnockBox.Services.Logic.Admin;
-using KnockBox.Services.Registrations.Logic;
-using KnockBox.Services.Registrations.Repositories;
-using KnockBox.Services.Registrations.States;
-using KnockBox.Services.Registrations.Validators;
+using KnockBox.Services.Logic.Games.Shared;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Hosting.Server.Features;
-using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Options;
+using Microsoft.AspNetCore.Components.Server.Circuits;
 using Serilog;
-using Serilog.Extensions.Logging;
 
 [assembly: System.Runtime.CompilerServices.InternalsVisibleTo("KnockBoxTests")]
 
@@ -50,23 +45,32 @@ namespace KnockBox
 
             ConfigureAdminPort(builder, adminOptions.Port);
 
-            // Add services to the container.
-            builder.Services.AddRazorComponents()
-                .AddInteractiveServerComponents();
+            // ── Platform services ────────────────────────────────────────────
+            // Register the file-backed GameAvailabilityService BEFORE Platform
+            // so Platform's TryAddSingleton yields to it.
+            builder.Services.AddSingleton<IGameAvailabilityService, GameAvailabilityService>();
 
-            // Razor Pages is used only for the admin login/logout endpoints,
-            // because cookie auth sign-in must happen during an HTTP request
-            // (not inside a Blazor circuit). Point the scanner at Admin/Pages
-            // so the admin concerns stay colocated under /Admin/ instead of
-            // a top-level /Pages folder used by the player-facing app.
+            builder.AddKnockBoxPlatform(options =>
+            {
+                options.PluginsPath = builder.Configuration["Plugins:Path"] ?? "games";
+            });
+
+            // ── Admin-specific services ──────────────────────────────────────
+            builder.Services.AddSingleton<IAdminLogService, AdminLogService>();
+
+            builder.Services.AddSingleton<AdminMetricsService>();
+            builder.Services.AddSingleton<IAdminMetricsService>(sp => sp.GetRequiredService<AdminMetricsService>());
+            builder.Services.AddHostedService(sp => sp.GetRequiredService<AdminMetricsService>());
+
+            builder.Services.AddScoped<CircuitHandler, AdminCircuitTracker>();
+
+            // Razor Pages is used only for the admin login/logout endpoints.
             builder.Services.AddRazorPages(options =>
             {
                 options.RootDirectory = "/Admin/Pages";
             });
 
-            // Cookie auth + AdminOnly policy. The cookie is named uniquely so it
-            // can't be confused with anything the player-facing surface might
-            // later set.
+            // Cookie auth + AdminOnly policy.
             builder.Services
                 .AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
                 .AddCookie(options =>
@@ -82,82 +86,25 @@ namespace KnockBox
                 });
             builder.Services.AddAuthorization();
 
-            // Add repositories
-            builder.Services.RegisterRepositories();
-
-            // Add validators
-            builder.Services.RegisterValidators();
-
-            // Add states
-            builder.Services.RegisterStateServices();
-
-            // Discover game plugins before registering logic. A second Serilog
-            // pipeline is built here because DI (and therefore the host's
-            // ILoggerFactory) is not yet wired up, but we still want plugin
-            // discovery to produce real log entries with matching format. Both
-            // writers target the same rolling file with shared: true -- kept
-            // in sync via ApplySharedLoggerConfiguration.
-            var bootstrapSerilog = ApplySharedLoggerConfiguration(
-                    new Serilog.LoggerConfiguration(),
-                    builder.Configuration,
-                    logPath)
-                .CreateLogger();
-            using var bootstrapLoggerFactory = new SerilogLoggerFactory(bootstrapSerilog, dispose: true);
-            var pluginLogger = bootstrapLoggerFactory.CreateLogger<PluginLoader>();
-            var configuredPluginsPath = builder.Configuration["Plugins:Path"] ?? "games";
-            var pluginsPath = Path.IsPathRooted(configuredPluginsPath)
-                ? configuredPluginsPath
-                : Path.Combine(AppContext.BaseDirectory, configuredPluginsPath);
-            var pluginLoadResult = new PluginLoader(pluginLogger).LoadModules(pluginsPath);
-
-            // Add logic
-            var registrationLogger = bootstrapLoggerFactory.CreateLogger("KnockBox.Services.Registrations.Logic.LogicRegistrations");
-            builder.Services.RegisterLogic(pluginLoadResult, registrationLogger);
-
-            // Add navigation
-            builder.Services.AddScoped<INavigationService, NavigationService>();
-
-            // Add drawing services
-            builder.Services.AddSingleton<ISvgClipboardService, SvgClipboardService>();
-
             var app = builder.Build();
 
-            app.UseSerilogRequestLogging();
+            // ── Middleware pipeline ───────────────────────────────────────────
+            app.UseKnockBoxPlatformMiddleware();
 
-            // Configure the HTTP request pipeline.
-            if (!app.Environment.IsDevelopment())
-            {
-                app.UseExceptionHandler("/Error");
-                // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
-                app.UseHsts();
-            }
-
-            app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
-            app.UseHttpsRedirection();
-
-            // Port split: admin paths only on admin port, everything else on
-            // the main port. Registered BEFORE anti-forgery/static-assets so
-            // 404s for cross-port access don't leak through auth/cookies.
+            // Port split: admin paths only on admin port.
             app.UseMiddleware<AdminPortMiddleware>(adminOptions.Port);
-
-            app.UseAntiforgery();
 
             app.UseAuthentication();
             app.UseAuthorization();
 
-            app.MapStaticAssets();
-
-            MapPluginStaticAssets(app, pluginsPath);
+            // ── Endpoints ────────────────────────────────────────────────────
+            app.MapKnockBoxPlatformEndpoints<App>();
 
             // Razor Pages host the admin login/logout endpoints.
             app.MapRazorPages();
 
-            // Admin log download endpoint. Kept outside the Blazor router
-            // because Blazor pages can't cleanly return a file stream.
+            // Admin log download endpoint.
             MapAdminLogDownload(app, adminOptions.Port);
-
-            app.MapRazorComponents<App>()
-                .AddInteractiveServerRenderMode();
 
             LogBoundAddresses(app);
 
@@ -166,8 +113,7 @@ namespace KnockBox
 
         /// <summary>
         /// Appends the admin port to the effective <c>Urls</c> configuration so
-        /// Kestrel binds it alongside the main application URL. Called before
-        /// <c>builder.Build()</c> because Kestrel reads <c>Urls</c> at build time.
+        /// Kestrel binds it alongside the main application URL.
         /// </summary>
         private static void ConfigureAdminPort(WebApplicationBuilder builder, int adminPort)
         {
@@ -176,8 +122,6 @@ namespace KnockBox
             var existing = builder.Configuration["Urls"] ?? "http://+:5276";
             var adminUrl = $"http://+:{adminPort}";
 
-            // Only append if the port isn't already present in Urls (useful
-            // when the operator has overridden Urls explicitly).
             if (!existing.Split(';', StringSplitOptions.RemoveEmptyEntries)
                 .Any(u => u.Contains($":{adminPort}", StringComparison.Ordinal)))
             {
@@ -186,10 +130,7 @@ namespace KnockBox
         }
 
         /// <summary>
-        /// Registers the /admin/logs/download/{fileName} endpoint used by the
-        /// admin UI to download raw log files. Constrained to the admin port
-        /// and guarded by the AdminOnly-equivalent auth requirement so the
-        /// endpoint can never serve a file to an unauthenticated caller.
+        /// Registers the /admin/logs/download/{fileName} endpoint.
         /// </summary>
         private static void MapAdminLogDownload(WebApplication app, int adminPort)
         {
@@ -209,14 +150,7 @@ namespace KnockBox
         }
 
         /// <summary>
-        /// Writes the addresses Kestrel actually bound to once the host has started,
-        /// so the operator immediately sees the URL (e.g. <c>http://+:5276</c>)
-        /// at which the web UI is reachable. Written twice: once via
-        /// <see cref="Console.WriteLine(string)"/> so it is always visible on stdout
-        /// regardless of configured Serilog minimum level / sink filters (this is
-        /// vital startup information, not diagnostics), and once via
-        /// <see cref="ILogger"/> so the rolling log file preserves a record of every
-        /// bound address for post-hoc inspection.
+        /// Writes the addresses Kestrel actually bound to once the host has started.
         /// </summary>
         private static void LogBoundAddresses(WebApplication app)
         {
@@ -249,12 +183,8 @@ namespace KnockBox
         }
 
         /// <summary>
-        /// Applies the console + rolling-file sinks and formatting shared between
-        /// the bootstrap Serilog logger (used during plugin discovery, before DI
-        /// is built) and the host's <c>UseSerilog</c> configuration. Keeping both
-        /// pipelines in a single helper guarantees they stay in sync -- notably
-        /// <c>shared: true</c> on the file sink, which both writers need in order
-        /// to coexist without file-lock errors.
+        /// Applies the console + rolling-file sinks shared between the bootstrap
+        /// Serilog logger and the host's <c>UseSerilog</c> configuration.
         /// </summary>
         private static LoggerConfiguration ApplySharedLoggerConfiguration(
             LoggerConfiguration loggerConfig,
@@ -274,72 +204,6 @@ namespace KnockBox
                     retainedFileCountLimit: 31,
                     shared: true,
                     outputTemplate: outputTemplate);
-        }
-
-        /// <summary>
-        /// Mounts each discovered plugin's <c>wwwroot</c> folder under <c>/_content/{PluginName}</c>
-        /// so that static assets (scoped CSS bundles, images, scripts) referenced by
-        /// the plugin's Razor components resolve at runtime. Each mount is isolated
-        /// by try/catch so a single misconfigured plugin doesn't prevent the host
-        /// from starting. Duplicate plugin folder names are skipped with a warning.
-        /// </summary>
-        [System.Diagnostics.CodeAnalysis.SuppressMessage(
-            "Performance",
-            "CA1873:Avoid potentially expensive logging",
-            Justification = "Startup-only path. Log volume is bounded by the number of plugins in games/; readability of structured mount/error messages is more valuable than LoggerMessage cache wins.")]
-        private static void MapPluginStaticAssets(WebApplication app, string pluginsPath)
-        {
-            var logger = app.Services.GetRequiredService<ILogger<Program>>();
-
-            if (!Directory.Exists(pluginsPath))
-            {
-                logger.LogInformation(
-                    "Plugins directory [{PluginsPath}] does not exist; no plugin static assets will be mounted.",
-                    pluginsPath);
-                return;
-            }
-
-            var mountedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-            foreach (var dir in Directory.GetDirectories(pluginsPath))
-            {
-                var pluginName = Path.GetFileName(dir);
-                var wwwrootPath = Path.Combine(dir, "wwwroot");
-                if (!Directory.Exists(wwwrootPath))
-                    continue;
-
-                var requestPath = $"/_content/{pluginName}";
-
-                if (!mountedPaths.Add(requestPath))
-                {
-                    logger.LogWarning(
-                        "Duplicate plugin folder name [{PluginName}] detected at [{Dir}]; skipping to avoid route collision.",
-                        pluginName,
-                        dir);
-                    continue;
-                }
-
-                try
-                {
-                    app.UseStaticFiles(new StaticFileOptions
-                    {
-                        FileProvider = new PhysicalFileProvider(wwwrootPath),
-                        RequestPath = requestPath,
-                    });
-                    logger.LogInformation(
-                        "Mounted plugin static assets for [{PluginName}] at [{RequestPath}].",
-                        pluginName,
-                        requestPath);
-                }
-                catch (Exception ex)
-                {
-                    logger.LogError(
-                        ex,
-                        "Failed to mount plugin static assets for [{PluginName}] from [{WwwRootPath}].",
-                        pluginName,
-                        wwwrootPath);
-                }
-            }
         }
     }
 }
