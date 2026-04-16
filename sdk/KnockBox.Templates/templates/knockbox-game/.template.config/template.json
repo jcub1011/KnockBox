@@ -16,7 +16,7 @@
     "routeIdentifier": {
       "type": "parameter",
       "datatype": "string",
-      "description": "URL-safe route identifier for the game (e.g., 'trivia-blitz')",
+      "description": "URL-safe route identifier for the game (e.g., 'trivia-blitz'). NOTE for template maintainers: 'replaces' substitutes EVERY literal occurrence of 'my-game' across the template tree (including XML-doc examples). Do not introduce illustrative 'my-game' strings that should remain literal after scaffolding.",
       "defaultValue": "my-game",
       "replaces": "my-game"
     }

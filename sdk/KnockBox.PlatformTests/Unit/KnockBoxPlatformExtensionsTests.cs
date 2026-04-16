@@ -9,7 +9,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace KnockBox.Tests.Unit.Platform;
+namespace KnockBox.PlatformTests.Unit;
 
 [TestClass]
 public sealed class KnockBoxPlatformExtensionsTests
@@ -53,6 +53,46 @@ public sealed class KnockBoxPlatformExtensionsTests
         var resolved = app.Services.GetRequiredService<IGameAvailabilityService>();
         Assert.AreSame(stub, resolved);
     }
+
+    [TestMethod]
+    public void AddKnockBoxPlatform_ThrowsWhenDirectoryModeConflictsWithExplicitModules()
+    {
+        var builder = WebApplication.CreateBuilder();
+
+        // AddGameModule<T> flips PluginDiscovery to Explicit and adds the
+        // module. Reassigning PluginDiscovery back to Directory afterwards is
+        // exactly the footgun the guard catches.
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            builder.AddKnockBoxPlatform(o =>
+            {
+                o.AddGameModule<FakeModule>();
+                o.PluginDiscovery = PluginDiscoveryMode.Directory;
+            }));
+
+        StringAssert.Contains(ex.Message, "Directory");
+        StringAssert.Contains(ex.Message, "AddGameModule");
+    }
+
+    [TestMethod]
+    public void AddKnockBoxPlatform_DefaultAvailabilityService_GetAll_ReturnsSameReference()
+    {
+        var builder = WebApplication.CreateBuilder();
+        builder.AddKnockBoxPlatform(o => o.PluginDiscovery = PluginDiscoveryMode.Explicit);
+        using var app = builder.Build();
+
+        var availability = app.Services.GetRequiredService<IGameAvailabilityService>();
+
+        // GetAll is called from the home page's module enumeration; make sure
+        // the default impl isn't allocating a fresh dictionary per call.
+        Assert.AreSame(availability.GetAll(), availability.GetAll());
+    }
+
+    // Note: the duplicate-plugin-folder guard in MapPluginStaticAssets is not
+    // covered by an automated test because it can only trigger on a
+    // case-sensitive filesystem (two sibling dirs "Foo" and "foo"). Windows
+    // developer machines can't simulate that scenario. The guard itself is
+    // straightforward (HashSet.Add returning false => throw) and is covered by
+    // code inspection.
 
     private sealed class FakeModule : IGameModule
     {

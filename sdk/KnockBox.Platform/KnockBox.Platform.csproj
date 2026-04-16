@@ -65,7 +65,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Grants the in-repo test project access to internal types. -->
+    <!-- Grants the in-repo test projects access to internal types. -->
+    <InternalsVisibleTo Include="KnockBox.PlatformTests" />
     <InternalsVisibleTo Include="KnockBoxTests" />
   </ItemGroup>
 

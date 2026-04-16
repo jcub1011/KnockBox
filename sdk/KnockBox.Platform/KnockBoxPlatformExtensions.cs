@@ -35,16 +35,29 @@ public static class KnockBoxPlatformExtensions
         var options = new KnockBoxPlatformOptions();
         configure?.Invoke(options);
 
-        builder.Services.Configure<KnockBoxPlatformOptions>(o =>
+        // Guard against a silent misconfiguration: AddGameModule<T>() populates
+        // ExplicitModules AND flips PluginDiscovery to Explicit. If the caller
+        // then writes PluginDiscovery = Directory afterwards, the explicit
+        // modules would be silently dropped. Fail fast instead -- the caller
+        // either meant to use directory scanning (remove the AddGameModule
+        // calls) or explicit registration (drop the Directory assignment).
+        if (options.PluginDiscovery == PluginDiscoveryMode.Directory
+            && options.ExplicitModules.Count > 0)
         {
-            o.AppTitle = options.AppTitle;
-            o.HomeHeroTitle = options.HomeHeroTitle;
-            o.HomePageTitle = options.HomePageTitle;
-            o.PluginDiscovery = options.PluginDiscovery;
-            o.PluginsPath = options.PluginsPath;
-            o.ExplicitModules.AddRange(options.ExplicitModules);
-            o.ExplicitAssemblies.AddRange(options.ExplicitAssemblies);
-        });
+            throw new InvalidOperationException(
+                $"KnockBoxPlatformOptions has {options.ExplicitModules.Count} explicit " +
+                "module(s) registered but PluginDiscovery is set to Directory. " +
+                "Either remove the AddGameModule<T>() call(s) or remove the " +
+                "PluginDiscovery = Directory assignment.");
+        }
+
+        // Register the fully-populated options instance directly. Using
+        // OptionsWrapper preserves IOptions<T> resolvability for downstream
+        // consumers (e.g. MapKnockBoxPlatformEndpoints) without the
+        // field-by-field copy that risked double-adding ExplicitModules.
+        builder.Services.AddSingleton(options);
+        builder.Services.AddSingleton<IOptions<KnockBoxPlatformOptions>>(
+            new OptionsWrapper<KnockBoxPlatformOptions>(options));
 
         builder.Services.AddRazorComponents()
             .AddInteractiveServerComponents();
@@ -78,11 +91,7 @@ public static class KnockBoxPlatformExtensions
         }
         else
         {
-            var configuredPath = options.PluginsPath;
-            var pluginsPath = Path.IsPathRooted(configuredPath)
-                ? configuredPath
-                : Path.Combine(AppContext.BaseDirectory, configuredPath);
-
+            var pluginsPath = ResolvePluginsPath(options);
             var pluginLogger = bootstrapLoggerFactory.CreateLogger<PluginLoader>();
             pluginLoadResult = new PluginLoader(pluginLogger).LoadModules(pluginsPath);
         }
@@ -158,10 +167,7 @@ public static class KnockBoxPlatformExtensions
 
         if (platformOptions.PluginDiscovery == PluginDiscoveryMode.Directory)
         {
-            var pluginsPath = Path.IsPathRooted(platformOptions.PluginsPath)
-                ? platformOptions.PluginsPath
-                : Path.Combine(AppContext.BaseDirectory, platformOptions.PluginsPath);
-            MapPluginStaticAssets(app, pluginsPath);
+            MapPluginStaticAssets(app, ResolvePluginsPath(platformOptions));
         }
 
         // The Platform assembly contains routable pages (Home, Error, NotFound).
@@ -178,6 +184,15 @@ public static class KnockBoxPlatformExtensions
 
         return app;
     }
+
+    /// <summary>
+    /// Resolves <see cref="KnockBoxPlatformOptions.PluginsPath"/> to an absolute
+    /// path. Relative paths are anchored at <see cref="AppContext.BaseDirectory"/>.
+    /// </summary>
+    private static string ResolvePluginsPath(KnockBoxPlatformOptions options)
+        => Path.IsPathRooted(options.PluginsPath)
+            ? options.PluginsPath
+            : Path.Combine(AppContext.BaseDirectory, options.PluginsPath);
 
     /// <summary>
     /// Mounts each discovered plugin's <c>wwwroot</c> folder under <c>/_content/{PluginName}</c>
@@ -213,11 +228,14 @@ public static class KnockBoxPlatformExtensions
 
             if (!mountedPaths.Add(requestPath))
             {
-                logger.LogWarning(
-                    "Duplicate plugin folder name [{PluginName}] detected at [{Dir}]; skipping to avoid route collision.",
-                    pluginName,
-                    dir);
-                continue;
+                // Two plugin folders sharing a name means both would claim the
+                // same /_content/{Name} route. That's a deployment error: the
+                // second plugin's static assets would never resolve. Fail fast
+                // instead of limping along with broken CSS.
+                throw new InvalidOperationException(
+                    $"Duplicate plugin folder name [{pluginName}] detected at [{dir}]. " +
+                    $"Two plugins cannot share the request path [{requestPath}]; " +
+                    "rename one of the plugin folders or remove the duplicate.");
             }
 
             try

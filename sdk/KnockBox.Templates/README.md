@@ -81,6 +81,10 @@ https://github.com/jcub1011/KnockBox/blob/main/docs/making-a-game-plugin.md
 dotnet new uninstall KnockBox.Templates
 ```
 
+## Notes for template maintainers
+
+The `routeIdentifier` symbol in `.template.config/template.json` uses `"replaces": "my-game"`, which substitutes **every literal occurrence** of `my-game` across the scaffold — including comments and XML-doc examples. Do not introduce illustrative `my-game` strings anywhere in the template that are meant to remain literal after scaffolding (they won't). Same caution applies to `MyGame`, which is substituted by the `-n` name parameter.
+
 ## License
 
 MIT. See `LICENSE.txt` in the repository.

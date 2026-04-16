@@ -8,6 +8,9 @@ on:
         required: true
         type: string
 
+permissions:
+  contents: read
+
 jobs:
   validate:
     name: Validate version input
@@ -41,13 +44,11 @@ jobs:
 
       - name: NuGet Login
         id: oidc
-        if: github.event_name == 'workflow_dispatch'
         uses: NuGet/login@v1
         with:
           user: ${{ vars.NUGET_USERNAME }}
 
       - name: Publish to NuGet.org
-        if: github.event_name == 'workflow_dispatch'
         run: |
           # Note: This step uses NuGet.org Trusted Publishing (OIDC).
           # The repository must be configured as a Trusted Publisher on NuGet.org.
@@ -83,13 +84,11 @@ jobs:
 
       - name: NuGet Login
         id: oidc
-        if: github.event_name == 'workflow_dispatch'
         uses: NuGet/login@v1
         with:
           user: ${{ vars.NUGET_USERNAME }}
 
       - name: Publish to NuGet.org
-        if: github.event_name == 'workflow_dispatch'
         run: |
           dotnet nuget push nupkg/*.nupkg --source https://api.nuget.org/v3/index.json --skip-duplicate --api-key ${{ steps.oidc.outputs.NUGET_API_KEY }}
 
@@ -120,13 +119,11 @@ jobs:
 
       - name: NuGet Login
         id: oidc
-        if: github.event_name == 'workflow_dispatch'
         uses: NuGet/login@v1
         with:
           user: ${{ vars.NUGET_USERNAME }}
 
       - name: Publish to NuGet.org
-        if: github.event_name == 'workflow_dispatch'
         run: |
           dotnet nuget push nupkg/*.nupkg --source https://api.nuget.org/v3/index.json --skip-duplicate --api-key ${{ steps.oidc.outputs.NUGET_API_KEY }}
 
