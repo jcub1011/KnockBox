@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="src/KnockBox.Plugin/KnockBox.Plugin.csproj" />
+  <Project Path="tests/KnockBox.Plugin.Tests/KnockBox.Plugin.Tests.csproj" />
+</Solution>

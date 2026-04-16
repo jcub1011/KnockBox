@@ -1,0 +1,26 @@
+@page "/room/my-new-game/{ObfuscatedRoomCode}"
+@using KnockBox.Plugin.Services.State
+@using KnockBox.Core.Services.State.Games.Shared
+@using Microsoft.AspNetCore.Components
+
+<PageTitle>My New Game</PageTitle>
+
+@if (GameState == null)
+{
+    <div>Loading game...</div>
+}
+else
+{
+    <div>
+        <h1>Welcome to My New Game</h1>
+        <p>Lobby is @(GameState.IsJoinable ? "Open" : "Closed")</p>
+        <p>Players: @GameState.Players.Count</p>
+    </div>
+}
+
+@code {
+    [Parameter] public string? ObfuscatedRoomCode { get; set; }
+    [Inject] public IGameSessionService GameSessionService { get; set; } = default!;
+
+    private GameState? GameState => GameSessionService.GetState<GameState>(ObfuscatedRoomCode);
+}

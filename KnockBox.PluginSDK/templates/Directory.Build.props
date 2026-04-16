@@ -1,0 +1,8 @@
+<Project>
+  <PropertyGroup>
+    <!-- Disable building for projects inside the templates directory -->
+    <IsBuildEnabled>false</IsBuildEnabled>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>false</IsTestProject>
+  </PropertyGroup>
+</Project>

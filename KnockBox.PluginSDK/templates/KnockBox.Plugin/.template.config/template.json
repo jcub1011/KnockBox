@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "jcub1011",
+  "classifications": [ "KnockBox", "Web", "Blazor", "Plugin" ],
+  "name": "KnockBox Game Plugin",
+  "identity": "KnockBox.Plugin.Template",
+  "shortName": "knockbox-plugin",
+  "tags": {
+    "language": "C#",
+    "type": "project"
+  },
+  "sourceName": "KnockBox.Plugin",
+  "preferNameDirectory": true
+}

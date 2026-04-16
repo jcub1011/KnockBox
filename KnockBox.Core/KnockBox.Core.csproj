@@ -5,6 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <PackageId>KnockBox.Core</PackageId>
+    <Version>1.0.0</Version>
     <Authors>jcub1011</Authors>
     <Description>Core abstractions and plugin system for KnockBox party game host.</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
