@@ -32,5 +32,13 @@ namespace KnockBox.Services.Logic.Games.Shared
         /// <param name="ct"></param>
         /// <returns></returns>
         Task<ValueResult<UserRegistration>> JoinLobbyAsync(User user, string lobbyCode, CancellationToken ct = default);
+
+        /// <summary>
+        /// Returns the number of currently-active lobbies keyed by game route
+        /// identifier. Used by the admin dashboard to surface "games running
+        /// per type". Games with zero active lobbies are not included; callers
+        /// should union with the full plugin list if they want a complete table.
+        /// </summary>
+        IReadOnlyDictionary<string, int> GetLobbyCountsByRoute();
     }
 }

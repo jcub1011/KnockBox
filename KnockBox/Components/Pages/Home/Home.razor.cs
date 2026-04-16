@@ -8,6 +8,8 @@ using KnockBox.Core.Services.State.Users;
 using KnockBox.Services.Logic.Games.Shared;
 using Microsoft.AspNetCore.Components;
 using KnockBox.Core.Plugins;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace KnockBox.Components.Pages.Home
 {
@@ -20,6 +22,18 @@ namespace KnockBox.Components.Pages.Home
         [Inject] IRandomNumberService RandomNumberService { get; set; } = default!;
         [Inject] ILogger<Home> Logger { get; set; } = default!;
         [Inject] IEnumerable<IGameModule> GameModules { get; set; } = default!;
+        [Inject] IGameAvailabilityService GameAvailability { get; set; } = default!;
+
+        /// <summary>
+        /// Filtered + sorted game list for the tile grid. Disabled games are
+        /// hidden here; <see cref="LobbyService.CreateLobbyAsync"/> also
+        /// rejects them server-side, so this filter is presentational only
+        /// (an attacker cannot bypass the gate by keeping a stale tile open).
+        /// </summary>
+        private IEnumerable<IGameModule> VisibleGameModules =>
+            GameModules
+                .Where(m => GameAvailability.IsEnabled(m.RouteIdentifier))
+                .OrderBy(m => m.Name);
 
         [Parameter]
         [SupplyParameterFromQuery(Name = "join")]
@@ -62,6 +76,8 @@ namespace KnockBox.Components.Pages.Home
         {
             try
             {
+                GameAvailability.Changed += OnAvailabilityChanged;
+
                 if (Fresh == 1)
                 {
                     await UserService.ResetIdentityAsync(ComponentDetached);
@@ -70,7 +86,7 @@ namespace KnockBox.Components.Pages.Home
                 {
                     await UserService.InitializeCurrentUserAsync(ComponentDetached);
                 }
-                
+
                 await base.OnInitializedAsync();
 
                 if (!string.IsNullOrWhiteSpace(JoinCode))
@@ -185,6 +201,20 @@ namespace KnockBox.Components.Pages.Home
         private void OnReturnAnimationEnd()
         {
             _isReturning = false;
+        }
+
+        private void OnAvailabilityChanged()
+        {
+            // Availability changes can arrive from a different circuit (the
+            // admin's). Marshal to the Home page's sync context before
+            // touching component state.
+            _ = InvokeAsync(StateHasChanged);
+        }
+
+        public override void Dispose()
+        {
+            GameAvailability.Changed -= OnAvailabilityChanged;
+            base.Dispose();
         }
     }
 }

@@ -49,7 +49,7 @@
             Pick a Game
         </h2>
         <div class="game-grid">
-            @foreach (var module in GameModules.OrderBy(m => m.Name))
+            @foreach (var module in VisibleGameModules)
             {
                 <button class="game-tile" aria-label="@module.Name" disabled="@(!CanJoinOrCreate)" @onclick="() => CreateLobby(module.RouteIdentifier)">
                     @module.GetButtonContent()

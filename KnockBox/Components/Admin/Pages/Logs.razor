@@ -1,0 +1,54 @@
+@page "/admin/logs"
+@layout AdminLayout
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@using KnockBox.Services.Logic.Admin
+@inject IAdminLogService LogService
+
+<PageTitle>Admin - Logs</PageTitle>
+
+<h1 class="admin-h1">Logs</h1>
+
+@{
+    var files = LogService.ListFiles();
+}
+
+@if (files.Count == 0)
+{
+    <p style="color:var(--admin-text-dim)">No log files found in <code>logs/</code>.</p>
+}
+else
+{
+    <table class="admin-table">
+        <thead>
+            <tr>
+                <th>File</th>
+                <th style="text-align:right">Size</th>
+                <th>Last modified (UTC)</th>
+                <th style="text-align:right">Download</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var file in files)
+            {
+                <tr>
+                    <td><a href="/admin/logs/@file.Name">@file.Name</a></td>
+                    <td style="text-align:right">@FormatSize(file.SizeBytes)</td>
+                    <td>@file.LastModifiedUtc.ToString("u")</td>
+                    <td style="text-align:right">
+                        <a href="/admin/logs/download/@file.Name">Download</a>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private static string FormatSize(long bytes)
+    {
+        if (bytes < 1024) return $"{bytes} B";
+        if (bytes < 1024 * 1024) return $"{bytes / 1024.0:F1} KB";
+        if (bytes < 1024L * 1024 * 1024) return $"{bytes / (1024.0 * 1024):F1} MB";
+        return $"{bytes / (1024.0 * 1024 * 1024):F2} GB";
+    }
+}

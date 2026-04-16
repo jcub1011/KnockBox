@@ -1,0 +1,323 @@
+/* KnockBox admin interface. Intentionally utilitarian: this surface is
+   private to operators, so we optimise for density and legibility rather
+   than the branded look of the player-facing home page. */
+
+:root {
+    --admin-bg: #0f1115;
+    --admin-surface: #161a22;
+    --admin-surface-2: #1e2430;
+    --admin-border: #2a3142;
+    --admin-text: #e6e9ef;
+    --admin-text-dim: #95a0b3;
+    --admin-accent: #4f8df7;
+    --admin-accent-dim: #2c5aa8;
+    --admin-danger: #f06070;
+    --admin-good: #4cc38a;
+    --admin-warn: #f7b955;
+}
+
+body.admin-login-body,
+.admin-shell {
+    margin: 0;
+    background: var(--admin-bg);
+    color: var(--admin-text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    min-height: 100vh;
+}
+
+/* ── Login ────────────────────────────────────────────────────────── */
+
+body.admin-login-body {
+    display: grid;
+    place-items: center;
+}
+
+.admin-login-card {
+    background: var(--admin-surface);
+    border: 1px solid var(--admin-border);
+    border-radius: 10px;
+    padding: 2rem 2.25rem;
+    width: min(360px, 90vw);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+}
+
+.admin-login-title {
+    margin: 0;
+    font-size: 1.35rem;
+    letter-spacing: 0.5px;
+}
+
+.admin-login-subtitle {
+    margin: 0.25rem 0 1.5rem;
+    color: var(--admin-text-dim);
+    font-size: 0.9rem;
+}
+
+.admin-login-label {
+    display: block;
+    margin: 0.75rem 0 0.35rem;
+    font-size: 0.85rem;
+    color: var(--admin-text-dim);
+}
+
+.admin-login-card input[type="text"],
+.admin-login-card input[type="password"] {
+    width: 100%;
+    box-sizing: border-box;
+    background: var(--admin-surface-2);
+    color: var(--admin-text);
+    border: 1px solid var(--admin-border);
+    border-radius: 6px;
+    padding: 0.55rem 0.75rem;
+    font-size: 0.95rem;
+}
+
+.admin-login-card input:focus {
+    outline: none;
+    border-color: var(--admin-accent);
+}
+
+.admin-login-submit {
+    margin-top: 1.25rem;
+    width: 100%;
+    background: var(--admin-accent);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 0.65rem 1rem;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.admin-login-submit:hover { background: var(--admin-accent-dim); }
+
+.admin-login-error {
+    margin: 0 0 1rem;
+    padding: 0.65rem 0.85rem;
+    background: rgba(240, 96, 112, 0.12);
+    border: 1px solid rgba(240, 96, 112, 0.4);
+    color: var(--admin-danger);
+    border-radius: 6px;
+    font-size: 0.9rem;
+}
+
+/* ── Layout ───────────────────────────────────────────────────────── */
+
+.admin-shell {
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    min-height: 100vh;
+}
+
+.admin-sidebar {
+    background: var(--admin-surface);
+    border-right: 1px solid var(--admin-border);
+    padding: 1.25rem 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.admin-brand {
+    font-weight: 700;
+    letter-spacing: 1px;
+    padding: 0 1.25rem 1.25rem;
+    border-bottom: 1px solid var(--admin-border);
+    margin-bottom: 1rem;
+}
+
+.admin-nav a {
+    display: block;
+    color: var(--admin-text-dim);
+    text-decoration: none;
+    padding: 0.55rem 1.25rem;
+    font-size: 0.95rem;
+}
+
+.admin-nav a:hover { background: var(--admin-surface-2); color: var(--admin-text); }
+
+.admin-nav a.active {
+    background: var(--admin-surface-2);
+    color: var(--admin-text);
+    border-left: 3px solid var(--admin-accent);
+    padding-left: calc(1.25rem - 3px);
+}
+
+.admin-sidebar-spacer { flex: 1; }
+
+.admin-nav-logout {
+    color: var(--admin-text-dim);
+    padding: 0.55rem 1.25rem;
+    text-decoration: none;
+    font-size: 0.9rem;
+    border-top: 1px solid var(--admin-border);
+}
+
+.admin-nav-logout:hover { color: var(--admin-danger); }
+
+.admin-main {
+    padding: 1.75rem 2rem;
+    overflow-x: auto;
+}
+
+.admin-h1 {
+    margin: 0 0 1.5rem;
+    font-size: 1.5rem;
+    letter-spacing: 0.3px;
+}
+
+.admin-h2 {
+    margin: 1.5rem 0 0.75rem;
+    font-size: 1.1rem;
+    color: var(--admin-text-dim);
+}
+
+/* ── Cards & tables ───────────────────────────────────────────────── */
+
+.admin-card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.admin-card {
+    background: var(--admin-surface);
+    border: 1px solid var(--admin-border);
+    border-radius: 8px;
+    padding: 1rem 1.25rem;
+}
+
+.admin-card-label {
+    color: var(--admin-text-dim);
+    font-size: 0.8rem;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+
+.admin-card-value {
+    font-size: 1.6rem;
+    font-weight: 600;
+    margin-top: 0.25rem;
+}
+
+.admin-card-sub {
+    color: var(--admin-text-dim);
+    font-size: 0.85rem;
+    margin-top: 0.35rem;
+}
+
+.admin-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--admin-surface);
+    border: 1px solid var(--admin-border);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.admin-table th,
+.admin-table td {
+    text-align: left;
+    padding: 0.6rem 0.9rem;
+    border-bottom: 1px solid var(--admin-border);
+    font-size: 0.92rem;
+}
+
+.admin-table th {
+    background: var(--admin-surface-2);
+    color: var(--admin-text-dim);
+    font-weight: 500;
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    letter-spacing: 0.5px;
+}
+
+.admin-table tr:last-child td { border-bottom: none; }
+
+.admin-table a {
+    color: var(--admin-accent);
+    text-decoration: none;
+}
+.admin-table a:hover { text-decoration: underline; }
+
+/* ── Toggle switch ────────────────────────────────────────────────── */
+
+.admin-switch {
+    position: relative;
+    display: inline-block;
+    width: 44px;
+    height: 24px;
+}
+
+.admin-switch input { display: none; }
+
+.admin-switch-slider {
+    position: absolute;
+    inset: 0;
+    background: #353b48;
+    border-radius: 12px;
+    transition: background 0.18s ease;
+    cursor: pointer;
+}
+
+.admin-switch-slider::before {
+    content: "";
+    position: absolute;
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    top: 3px;
+    background: white;
+    border-radius: 50%;
+    transition: transform 0.18s ease;
+}
+
+.admin-switch input:checked + .admin-switch-slider { background: var(--admin-good); }
+.admin-switch input:checked + .admin-switch-slider::before { transform: translateX(20px); }
+
+.admin-status-enabled { color: var(--admin-good); font-weight: 600; }
+.admin-status-disabled { color: var(--admin-danger); font-weight: 600; }
+
+/* ── Log viewer ───────────────────────────────────────────────────── */
+
+.admin-log-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.admin-log-toolbar button,
+.admin-log-toolbar a.btn {
+    background: var(--admin-surface-2);
+    color: var(--admin-text);
+    border: 1px solid var(--admin-border);
+    border-radius: 6px;
+    padding: 0.35rem 0.75rem;
+    cursor: pointer;
+    font-size: 0.88rem;
+    text-decoration: none;
+}
+
+.admin-log-toolbar button:disabled { opacity: 0.45; cursor: not-allowed; }
+.admin-log-toolbar button:hover:not(:disabled) { background: var(--admin-border); }
+.admin-log-toolbar .spacer { flex: 1; }
+
+.admin-log-pane {
+    background: #0a0c11;
+    border: 1px solid var(--admin-border);
+    border-radius: 8px;
+    padding: 0.9rem 1rem;
+    max-height: 70vh;
+    overflow: auto;
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+    font-size: 0.82rem;
+    line-height: 1.35;
+    white-space: pre;
+}
+
+.admin-log-pane .line { display: block; }
+.admin-log-pane .line-err { color: var(--admin-danger); }
+.admin-log-pane .line-wrn { color: var(--admin-warn); }
