@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageType>Template</PackageType>
+    <TargetFramework>net10.0</TargetFramework>
+    <PackageId>KnockBox.Templates</PackageId>
+    <Title>KnockBox Game Plugin Templates</Title>
+    <Authors>jcub1011</Authors>
+    <Description>Project templates for creating KnockBox party game plugins.</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <RepositoryUrl>https://github.com/jcub1011/KnockBox</RepositoryUrl>
+    <PackageTags>knockbox partygame plugin template dotnet-new</PackageTags>
+    <IncludeContentInPack>true</IncludeContentInPack>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <ContentTargetFolders>content</ContentTargetFolders>
+    <NoDefaultExcludes>true</NoDefaultExcludes>
+    <NoWarn>$(NoWarn);NU5128</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Content Include="templates\**\*" Exclude="templates\**\bin\**;templates\**\obj\**" />
+    <Compile Remove="templates\**\*" />
+    <EmbeddedResource Remove="templates\**\*" />
+    <None Remove="templates\**\*" />
+  </ItemGroup>
+</Project>

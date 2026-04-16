@@ -1,0 +1,33 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "KnockBox",
+  "classifications": ["Game", "Blazor", "KnockBox", "Plugin"],
+  "identity": "KnockBox.GamePlugin",
+  "name": "KnockBox Game Plugin",
+  "shortName": "knockbox-game",
+  "description": "A project template for creating KnockBox party game plugins with a dev host and tests.",
+  "tags": {
+    "language": "C#",
+    "type": "solution"
+  },
+  "sourceName": "MyGame",
+  "preferNameDirectory": true,
+  "symbols": {
+    "routeIdentifier": {
+      "type": "parameter",
+      "datatype": "string",
+      "description": "URL-safe route identifier for the game (e.g., 'trivia-blitz')",
+      "defaultValue": "my-game",
+      "replaces": "my-game"
+    }
+  },
+  "sources": [
+    {
+      "modifiers": [
+        {
+          "exclude": ["**/bin/**", "**/obj/**"]
+        }
+      ]
+    }
+  ]
+}

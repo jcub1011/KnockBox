@@ -1,0 +1,104 @@
+@page "/room/my-game/{ObfuscatedRoomCode}"
+
+@using KnockBox.Core.Components.Shared
+@using KnockBox.Core.Services.State.Games.Shared
+@using KnockBox.Core.Services.State.Users
+@using KnockBox.Core.Services.Navigation
+
+@inherits DisposableComponent
+
+<HeadContent>
+    <link href="_content/MyGame/MyGame.styles.css" rel="stylesheet" />
+</HeadContent>
+
+@if (GameState is null)
+{
+    <div>Loading...</div>
+}
+else if (GameState.IsJoinable)
+{
+    <div class="lobby">
+        <h2>Waiting for players...</h2>
+        <ul>
+            <li><strong>@GameState.Host.Name</strong> (Host)</li>
+            @foreach (var player in GameState.Players)
+            {
+                <li>@player.Name</li>
+            }
+        </ul>
+        @if (IsHost)
+        {
+            <button @onclick="StartGame" disabled="@(!CanStart)">Start Game</button>
+        }
+    </div>
+}
+else
+{
+    <div class="game">
+        <h2>Game in progress!</h2>
+        <p>Players: @GameState.Players.Count</p>
+        @* TODO: Add your game UI here *@
+    </div>
+}
+
+@code {
+    [Inject] MyGameGameEngine GameEngine { get; set; } = default!;
+    [Inject] IGameSessionService GameSessionService { get; set; } = default!;
+    [Inject] INavigationService NavigationService { get; set; } = default!;
+    [Inject] IUserService UserService { get; set; } = default!;
+    [Inject] ILogger<MyGameLobby> Logger { get; set; } = default!;
+
+    [Parameter] public string ObfuscatedRoomCode { get; set; } = default!;
+
+    private MyGameGameState? GameState { get; set; }
+    private IDisposable? _stateSubscription;
+
+    private bool IsHost => GameState?.Host.Id == UserService.CurrentUser?.Id;
+    private bool CanStart => GameState is not null && GameState.Players.Count > 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (UserService.CurrentUser is null)
+            await UserService.InitializeCurrentUserAsync(ComponentDetached);
+
+        if (!GameSessionService.TryGetCurrentSession(out var session))
+        {
+            NavigationService.ToHome();
+            return;
+        }
+
+        if (session.LobbyRegistration.State is not MyGameGameState gameState)
+        {
+            Logger.LogError("Game state is not the expected type.");
+            NavigationService.ToHome();
+            return;
+        }
+
+        GameState = gameState;
+        GameState.OnStateDisposed += HandleStateDisposed;
+        _stateSubscription = GameState.StateChangedEventManager.Subscribe(
+            () => InvokeAsync(StateHasChanged));
+
+        await base.OnInitializedAsync();
+    }
+
+    private async Task StartGame()
+    {
+        if (GameState is null || UserService.CurrentUser is null) return;
+        await GameEngine.StartAsync(UserService.CurrentUser, GameState, ComponentDetached);
+    }
+
+    private void HandleStateDisposed()
+    {
+        GameSessionService.LeaveCurrentSession(navigateHome: false);
+        NavigationService.ToHome();
+    }
+
+    public override void Dispose()
+    {
+        if (GameState is not null)
+            GameState.OnStateDisposed -= HandleStateDisposed;
+        _stateSubscription?.Dispose();
+        base.Dispose();
+    }
+}
