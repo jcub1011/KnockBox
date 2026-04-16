@@ -21,7 +21,11 @@ namespace KnockBox.Services.Registrations.Logic
             // dashboard can see up-to-date metrics / log files.
             services.AddSingleton<IGameAvailabilityService, GameAvailabilityService>();
             services.AddSingleton<IAdminLogService, AdminLogService>();
-            services.AddSingleton<IAdminMetricsService, AdminMetricsService>();
+            
+            services.AddSingleton<AdminMetricsService>();
+            services.AddSingleton<IAdminMetricsService>(sp => sp.GetRequiredService<AdminMetricsService>());
+            services.AddHostedService(sp => sp.GetRequiredService<AdminMetricsService>());
+
             services.AddScoped<CircuitHandler, AdminCircuitTracker>();
 
             foreach (var module in pluginLoadResult.Modules)

@@ -60,6 +60,9 @@ namespace KnockBox.Services.Logic.Games.Shared
             if (string.IsNullOrWhiteSpace(routeIdentifier))
                 throw new ArgumentException("Route identifier must be non-empty.", nameof(routeIdentifier));
 
+            if (_state.TryGetValue(routeIdentifier, out var current) && current == enabled)
+                return;
+
             _state[routeIdentifier] = enabled;
             await PersistToDiskAsync();
             Changed?.Invoke();

@@ -1,15 +1,14 @@
+using Microsoft.Extensions.Hosting;
 using System.Diagnostics;
 
 namespace KnockBox.Services.Logic.Admin
 {
-    internal sealed class AdminMetricsService : IAdminMetricsService, IDisposable
+    internal sealed class AdminMetricsService : BackgroundService, IAdminMetricsService
     {
         private readonly Lock _lock = new();
         private IReadOnlyList<string> _boundAddresses = [];
         private int _activeCircuits;
 
-        private readonly PeriodicTimer _metricsTimer;
-        private readonly CancellationTokenSource _metricsCts;
         private double _cpuUtilization;
         private long _memoryUsageBytes;
 
@@ -31,15 +30,9 @@ namespace KnockBox.Services.Logic.Admin
 
         public long MemoryUsageBytes => Volatile.Read(ref _memoryUsageBytes);
 
-        public AdminMetricsService()
+        protected override async Task ExecuteAsync(CancellationToken ct)
         {
-            _metricsCts = new CancellationTokenSource();
-            _metricsTimer = new PeriodicTimer(TimeSpan.FromSeconds(2));
-            _ = MetricsLoop(_metricsCts.Token);
-        }
-
-        private async Task MetricsLoop(CancellationToken ct)
-        {
+            using var metricsTimer = new PeriodicTimer(TimeSpan.FromSeconds(2));
             try
             {
                 var process = Process.GetCurrentProcess();
@@ -47,7 +40,7 @@ namespace KnockBox.Services.Logic.Admin
                 var lastTime = DateTime.UtcNow;
                 var lastTotalProcessorTime = process.TotalProcessorTime;
 
-                while (await _metricsTimer.WaitForNextTickAsync(ct))
+                while (await metricsTimer.WaitForNextTickAsync(ct))
                 {
                     // Update Memory
                     process.Refresh();
@@ -67,7 +60,7 @@ namespace KnockBox.Services.Logic.Admin
                     lastTotalProcessorTime = currentTotalProcessorTime;
                 }
             }
-            catch (OperationCanceledException) { /* expected on dispose */ }
+            catch (OperationCanceledException) { /* expected on stop */ }
             catch { /* Ignore process errors in sampling loop */ }
         }
 
@@ -94,13 +87,6 @@ namespace KnockBox.Services.Logic.Admin
                 if (current <= 0) return;
                 next = current - 1;
             } while (Interlocked.CompareExchange(ref _activeCircuits, next, current) != current);
-        }
-
-        public void Dispose()
-        {
-            _metricsCts.Cancel();
-            _metricsCts.Dispose();
-            _metricsTimer.Dispose();
         }
     }
 }

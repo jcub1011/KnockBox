@@ -1,3 +1,5 @@
+using KnockBox.Admin;
+using Microsoft.Extensions.Options;
 using System.Text.RegularExpressions;
 
 namespace KnockBox.Services.Logic.Admin
@@ -19,10 +21,13 @@ namespace KnockBox.Services.Logic.Admin
         private readonly string _logsDirectory;
         private readonly ILogger<AdminLogService> _logger;
 
-        public AdminLogService(ILogger<AdminLogService> logger)
+        public AdminLogService(IOptions<AdminOptions> options, ILogger<AdminLogService> logger)
         {
             _logger = logger;
-            _logsDirectory = Path.Combine(AppContext.BaseDirectory, "logs");
+            var configuredPath = options.Value.LogDirectory;
+            _logsDirectory = Path.IsPathRooted(configuredPath)
+                ? configuredPath
+                : Path.Combine(AppContext.BaseDirectory, configuredPath);
         }
 
         public IReadOnlyList<LogFileInfo> ListFiles()
@@ -71,18 +76,10 @@ namespace KnockBox.Services.Logic.Admin
 
                 using var reader = new StreamReader(stream);
                 
-                // Fast-forward to start line without allocating strings
-                while (totalLines < startLine && !reader.EndOfStream)
+                // Fast-forward to start line
+                while (totalLines < startLine && reader.ReadLine() is not null)
                 {
-                    int c;
-                    while ((c = reader.Read()) != -1)
-                    {
-                        if (c == '\n')
-                        {
-                            totalLines++;
-                            break;
-                        }
-                    }
+                    totalLines++;
                 }
 
                 // Read actual page
@@ -93,29 +90,10 @@ namespace KnockBox.Services.Logic.Admin
                     totalLines++;
                 }
 
-                // Fast-forward the rest to count total
-                while (!reader.EndOfStream)
+                // Count the rest of the file
+                while (reader.ReadLine() is not null)
                 {
-                    int c;
-                    while ((c = reader.Read()) != -1)
-                    {
-                        if (c == '\n')
-                        {
-                            totalLines++;
-                            break;
-                        }
-                    }
-                }
-                
-                // Account for potential last line without newline if we didn't end exactly on one
-                if (stream.Position > 0 && stream.Position == stream.Length)
-                {
-                    stream.Position--;
-                    var lastChar = stream.ReadByte();
-                    if (lastChar != '\n')
-                    {
-                         totalLines++;
-                    }
+                    totalLines++;
                 }
 
                 return new LogPage(

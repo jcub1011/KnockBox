@@ -19,17 +19,23 @@ namespace KnockBox.Admin
         /// <summary>
         /// Admin username. Stored plaintext per project requirement.
         /// </summary>
-        public string Username { get; init; } = "admin";
+        public string Username { get; init; } = string.Empty;
 
         /// <summary>
         /// Admin password. Stored plaintext per project requirement.
         /// </summary>
-        public string Password { get; init; } = "changeme";
+        public string Password { get; init; } = string.Empty;
 
         /// <summary>
         /// Relative (to <c>AppContext.BaseDirectory</c>) or absolute path at
         /// which the persisted list of disabled game route identifiers lives.
         /// </summary>
         public string GameStatePath { get; init; } = "admin/games-state.json";
+
+        /// <summary>
+        /// Relative (to <c>AppContext.BaseDirectory</c>) or absolute path to
+        /// the directory where log files are stored.
+        /// </summary>
+        public string LogDirectory { get; init; } = "logs";
     }
 }

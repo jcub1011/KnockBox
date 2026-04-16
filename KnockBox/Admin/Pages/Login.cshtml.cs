@@ -54,8 +54,7 @@ namespace KnockBox.Admin.Pages
             if (!usernameMatches || !passwordMatches)
             {
                 _logger.LogWarning(
-                    "Admin login failed for supplied username [{Username}] from {RemoteIp}.",
-                    Username,
+                    "Admin login failed for an account attempt from {RemoteIp}.",
                     HttpContext.Connection.RemoteIpAddress);
                 Error = "Invalid username or password.";
                 Password = string.Empty;

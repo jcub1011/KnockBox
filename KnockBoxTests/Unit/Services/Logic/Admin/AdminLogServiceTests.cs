@@ -31,7 +31,7 @@ public sealed class AdminLogServiceTests
     [TestMethod]
     public void GetValidatedAbsolutePath_RejectsPathTraversal()
     {
-        var svc = new AdminLogService(NullLogger<AdminLogService>.Instance);
+        var svc = CreateService();
 
         Assert.IsNull(svc.GetValidatedAbsolutePath("../appsettings.json"));
         Assert.IsNull(svc.GetValidatedAbsolutePath("..\\appsettings.json"));
@@ -46,7 +46,7 @@ public sealed class AdminLogServiceTests
     [TestMethod]
     public void ReadPage_UnknownFile_ReturnsNull()
     {
-        var svc = new AdminLogService(NullLogger<AdminLogService>.Instance);
+        var svc = CreateService();
         var result = svc.ReadPage("knockbox-19990101.log", 0, 100);
         Assert.IsNull(result);
     }
@@ -56,7 +56,7 @@ public sealed class AdminLogServiceTests
     {
         var (fileName, _) = SeedLog(lineCount: 250);
 
-        var svc = new AdminLogService(NullLogger<AdminLogService>.Instance);
+        var svc = CreateService();
 
         var page0 = svc.ReadPage(fileName, 0, 100);
         var page1 = svc.ReadPage(fileName, 1, 100);
@@ -80,7 +80,7 @@ public sealed class AdminLogServiceTests
     {
         var (fileName, path) = SeedLog(lineCount: 10);
 
-        var svc = new AdminLogService(NullLogger<AdminLogService>.Instance);
+        var svc = CreateService();
         var initial = svc.TailSince(fileName, 0);
         Assert.IsNotNull(initial);
         Assert.AreEqual(10, initial.Lines.Count);
@@ -104,12 +104,21 @@ public sealed class AdminLogServiceTests
         File.WriteAllText(stray, "should be ignored");
         _createdFiles.Add(stray);
 
-        var svc = new AdminLogService(NullLogger<AdminLogService>.Instance);
+        var svc = CreateService();
         var files = svc.ListFiles();
 
         Assert.IsTrue(files.Any(f => f.Name == knockbox),
             $"Expected {knockbox} in listing, got: {string.Join(",", files.Select(f => f.Name))}");
         Assert.IsFalse(files.Any(f => f.Name == "audit.log"));
+    }
+
+    private IAdminLogService CreateService()
+    {
+        var options = Microsoft.Extensions.Options.Options.Create(new KnockBox.Admin.AdminOptions
+        {
+            LogDirectory = LogsDir
+        });
+        return new AdminLogService(options, NullLogger<AdminLogService>.Instance);
     }
 
     private (string fileName, string path) SeedLog(int lineCount)

@@ -45,7 +45,13 @@ namespace KnockBox.Admin
         {
             var isAdminPort = context.Connection.LocalPort == _adminPort;
             var path = context.Request.Path;
-            var isAdminPath = path.Value?.Contains("/admin", StringComparison.OrdinalIgnoreCase) == true;
+            
+            // Normalize path by trimming extra leading slashes for the check,
+            // so //admin still matches. StartsWithSegments handles /admin/
+            // and /admin precisely.
+            var isAdminPath = path.StartsWithSegments("/admin", StringComparison.OrdinalIgnoreCase)
+                || (path.Value?.TrimStart('/').StartsWith("admin/", StringComparison.OrdinalIgnoreCase) == true)
+                || (path.Value?.TrimStart('/').Equals("admin", StringComparison.OrdinalIgnoreCase) == true);
 
             if (isAdminPort)
             {

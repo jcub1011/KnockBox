@@ -26,12 +26,6 @@ namespace KnockBox
         {
             var builder = WebApplication.CreateBuilder(args);
 
-            var logPath = Path.Combine(AppContext.BaseDirectory, "logs", "knockbox-.log");
-
-            builder.Host.UseSerilog((context, services, loggerConfig) =>
-                ApplySharedLoggerConfiguration(loggerConfig, context.Configuration, logPath)
-                    .ReadFrom.Services(services));
-
             // Bind Admin config early -- we need the port to extend the Urls string
             // before Kestrel reads it (Kestrel resolves Urls during builder.Build()).
             builder.Services.Configure<AdminOptions>(
@@ -39,6 +33,20 @@ namespace KnockBox
             var adminOptions = builder.Configuration
                 .GetSection(AdminOptions.SectionName)
                 .Get<AdminOptions>() ?? new AdminOptions();
+
+            if (string.IsNullOrWhiteSpace(adminOptions.Username) || string.IsNullOrWhiteSpace(adminOptions.Password))
+            {
+                throw new InvalidOperationException("Admin Username and Password must be explicitly configured in appsettings.json.");
+            }
+
+            var logDirectory = Path.IsPathRooted(adminOptions.LogDirectory)
+                ? adminOptions.LogDirectory
+                : Path.Combine(AppContext.BaseDirectory, adminOptions.LogDirectory);
+            var logPath = Path.Combine(logDirectory, "knockbox-.log");
+
+            builder.Host.UseSerilog((context, services, loggerConfig) =>
+                ApplySharedLoggerConfiguration(loggerConfig, context.Configuration, logPath)
+                    .ReadFrom.Services(services));
 
             ConfigureAdminPort(builder, adminOptions.Port);
 
