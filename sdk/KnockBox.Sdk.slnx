@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="KnockBox.Core/KnockBox.Core.csproj" />
+  <Project Path="KnockBox.CoreTests/KnockBox.CoreTests.csproj" />
+  <Project Path="KnockBox.Platform/KnockBox.Platform.csproj" />
+  <Project Path="KnockBox.Templates/KnockBox.Templates.csproj" />
+</Solution>

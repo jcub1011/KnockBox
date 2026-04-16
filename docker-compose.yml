@@ -3,4 +3,4 @@ services:
     image: ${DOCKER_REGISTRY-}knockbox
     build:
       context: .
-      dockerfile: KnockBox/Dockerfile
+      dockerfile: host/KnockBox/Dockerfile

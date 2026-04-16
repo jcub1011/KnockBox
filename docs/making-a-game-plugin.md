@@ -407,5 +407,5 @@ Fail any of these and something breaks at load, runtime, or in production:
 - [`KnockBox.Core` on NuGet](https://www.nuget.org/packages/KnockBox.Core) — contract package API surface.
 - [`KnockBox.Platform` on NuGet](https://www.nuget.org/packages/KnockBox.Platform) — hosting SDK.
 - [`KnockBox.Templates` on NuGet](https://www.nuget.org/packages/KnockBox.Templates) — `dotnet new` scaffolding.
-- [`KnockBox/Specs/knockbox-platform-architecture.md`](../KnockBox/Specs/knockbox-platform-architecture.md) — canonical architecture reference (ALC isolation, session lifecycle, DI order, lobby routing). Read this if you need to understand *why* the invariants above exist.
+- [`host/KnockBox/Specs/knockbox-platform-architecture.md`](../host/KnockBox/Specs/knockbox-platform-architecture.md) — canonical architecture reference (ALC isolation, session lifecycle, DI order, lobby routing). Read this if you need to understand *why* the invariants above exist.
 - [Repository root README](../README.md) — in-repo contributor workflow (plugins as in-solution projects).

@@ -375,10 +375,10 @@ Release workflow (`release.yml`) needs updated to pack and push both new NuGet p
 
 ## Verification Plan
 
-1. **Build**: `dotnet build KnockBox.slnx` — all projects compile
-2. **Tests**: `dotnet test KnockBox.slnx` — all existing tests pass
-3. **Production host**: `dotnet run --project KnockBox/KnockBox.csproj` — full app works as before (lobby, join, play games, admin dashboard)
-4. **Template install**: `dotnet new install ./KnockBox.Templates` — template appears in `dotnet new list`
+1. **Build**: `dotnet build sdk/KnockBox.Sdk.slnx` and `dotnet build host/KnockBox.Host.slnx` — all projects compile
+2. **Tests**: `dotnet test sdk/KnockBox.Sdk.slnx` and `dotnet test host/KnockBox.Host.slnx` — all existing tests pass
+3. **Production host**: `dotnet run --project host/KnockBox/KnockBox.csproj` — full app works as before (lobby, join, play games, admin dashboard)
+4. **Template install**: `dotnet new install ./sdk/KnockBox.Templates` — template appears in `dotnet new list`
 5. **Template scaffold**: `dotnet new knockbox-game -n TestGame --routeIdentifier test-game` — creates three-project solution
 6. **Dev host run**: `cd TestGame && dotnet run --project TestGame.DevHost` — lightweight host starts, home page shows TestGame tile, can create lobby and join from multiple tabs
 7. **Template tests**: `cd TestGame && dotnet test` — starter test passes

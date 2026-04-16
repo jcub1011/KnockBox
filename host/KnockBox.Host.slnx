@@ -1,0 +1,23 @@
+<Solution>
+  <Project Path="../docker-compose.dcproj">
+    <BuildDependency Project="KnockBox.CardCounter/KnockBox.CardCounter.csproj" />
+    <BuildDependency Project="KnockBox.DiceSimulator/KnockBox.DiceSimulator.csproj" />
+    <Build />
+  </Project>
+  <Project Path="KnockBox/KnockBox.csproj" />
+  <Project Path="KnockBoxTests/KnockBoxTests.csproj" />
+  <Project Path="KnockBox.CardCounter/KnockBox.CardCounter.csproj" />
+  <Project Path="KnockBox.CardCounterTests/KnockBox.CardCounterTests.csproj" />
+  <Project Path="KnockBox.Codeword/KnockBox.Codeword.csproj" />
+  <Project Path="KnockBox.CodewordTests/KnockBox.CodewordTests.csproj" />
+  <Project Path="KnockBox.DiceSimulator/KnockBox.DiceSimulator.csproj" />
+  <Project Path="KnockBox.DiceSimulatorTests/KnockBox.DiceSimulatorTests.csproj" />
+  <Project Path="KnockBox.DrawnToDress/KnockBox.DrawnToDress.csproj" />
+  <Project Path="KnockBox.DrawnToDressTests/KnockBox.DrawnToDressTests.csproj" />
+  <Project Path="KnockBox.HiddenAgenda/KnockBox.HiddenAgenda.csproj" />
+  <Project Path="KnockBox.HiddenAgendaTests/KnockBox.HiddenAgendaTests.csproj" />
+  <Project Path="KnockBox.Operator/KnockBox.Operator.csproj" />
+  <Project Path="KnockBox.OperatorTests/KnockBox.OperatorTests.csproj" />
+  <Project Path="KnockBox.TaskMaster/KnockBox.TaskMaster.csproj" />
+  <Project Path="KnockBox.TaskMasterTests/KnockBox.TaskMasterTests.csproj" />
+</Solution>

@@ -1,0 +1,177 @@
+name: Release SDK
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'SDK NuGet version (no v prefix, e.g. 1.4.0 or 1.4.0-rc.1)'
+        required: true
+        type: string
+
+jobs:
+  validate:
+    name: Validate version input
+    runs-on: ubuntu-latest
+    steps:
+      - name: Reject leading v prefix
+        run: |
+          if [[ "${{ inputs.version }}" =~ ^v ]]; then
+            echo "ERROR: SDK version must not include a 'v' prefix. Use '1.4.0', not 'v1.4.0'."
+            exit 1
+          fi
+
+  pack-core:
+    name: Pack & Publish KnockBox.Core
+    needs: [validate]
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Pack
+        run: dotnet pack sdk/KnockBox.Core/KnockBox.Core.csproj -c Release -p:Version=${{ inputs.version }} -o nupkg
+
+      - name: NuGet Login
+        id: oidc
+        if: github.event_name == 'workflow_dispatch'
+        uses: NuGet/login@v1
+        with:
+          user: ${{ vars.NUGET_USERNAME }}
+
+      - name: Publish to NuGet.org
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          # Note: This step uses NuGet.org Trusted Publishing (OIDC).
+          # The repository must be configured as a Trusted Publisher on NuGet.org.
+          dotnet nuget push nupkg/*.nupkg --source https://api.nuget.org/v3/index.json --skip-duplicate --api-key ${{ steps.oidc.outputs.NUGET_API_KEY }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: knockbox-core-nupkg
+          path: nupkg/*.nupkg
+
+  pack-platform:
+    name: Pack & Publish KnockBox.Platform
+    needs: [validate]
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Pack
+        # -p:Version drives both AssemblyVersion and PackageVersion, and feeds
+        # the ProjectReference -> PackageReference transform at pack time so the
+        # Platform nupkg's KnockBox.Core dependency is pinned to the same version.
+        run: dotnet pack sdk/KnockBox.Platform/KnockBox.Platform.csproj -c Release -p:Version=${{ inputs.version }} -o nupkg
+
+      - name: NuGet Login
+        id: oidc
+        if: github.event_name == 'workflow_dispatch'
+        uses: NuGet/login@v1
+        with:
+          user: ${{ vars.NUGET_USERNAME }}
+
+      - name: Publish to NuGet.org
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          dotnet nuget push nupkg/*.nupkg --source https://api.nuget.org/v3/index.json --skip-duplicate --api-key ${{ steps.oidc.outputs.NUGET_API_KEY }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: knockbox-platform-nupkg
+          path: nupkg/*.nupkg
+
+  pack-templates:
+    name: Pack & Publish KnockBox.Templates
+    needs: [validate]
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Pack
+        run: dotnet pack sdk/KnockBox.Templates/KnockBox.Templates.csproj -c Release -p:Version=${{ inputs.version }} -o nupkg
+
+      - name: NuGet Login
+        id: oidc
+        if: github.event_name == 'workflow_dispatch'
+        uses: NuGet/login@v1
+        with:
+          user: ${{ vars.NUGET_USERNAME }}
+
+      - name: Publish to NuGet.org
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          dotnet nuget push nupkg/*.nupkg --source https://api.nuget.org/v3/index.json --skip-duplicate --api-key ${{ steps.oidc.outputs.NUGET_API_KEY }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: knockbox-templates-nupkg
+          path: nupkg/*.nupkg
+
+  release-sdk:
+    name: Publish GitHub Release (SDK)
+    needs: [pack-core, pack-platform, pack-templates]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout (full history for tag lookup)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Find previous SDK tag
+        id: prev
+        run: |
+          PREV=$(git tag --list 'sdk-*' --sort=-v:refname | grep -v "sdk-${{ inputs.version }}" | head -n1)
+          echo "tag=$PREV" >> "$GITHUB_OUTPUT"
+
+      - name: Download all SDK artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: knockbox-*-nupkg
+          merge-multiple: true
+
+      - name: List artifacts
+        run: ls -la artifacts
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: sdk-${{ inputs.version }}
+          tag_name: sdk-${{ inputs.version }}
+          previous_tag: ${{ steps.prev.outputs.tag }}
+          files: |
+            artifacts/*.nupkg
+          generate_release_notes: true
+          draft: false
+          prerelease: ${{ contains(inputs.version, '-') }}

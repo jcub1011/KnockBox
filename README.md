@@ -4,28 +4,29 @@ KnockBox is a Blazor Server host that ships party games as **runtime-loaded plug
 
 This README is the **in-repo contributor** onboarding guide for adding a new game plugin alongside the host in this solution. If you're building a plugin **externally** against the published NuGet packages (`KnockBox.Core`, `KnockBox.Platform`, `KnockBox.Templates`), use [`docs/making-a-game-plugin.md`](docs/making-a-game-plugin.md) instead — it covers the `dotnet new knockbox-game` scaffold, the DevHost workflow, and shipping plugins into a host's `games/` folder.
 
-The authoritative architecture reference (for both workflows) is [`KnockBox/Specs/knockbox-platform-architecture.md`](KnockBox/Specs/knockbox-platform-architecture.md) — consult it for the full rationale behind the patterns described here.
+The authoritative architecture reference (for both workflows) is [`host/KnockBox/Specs/knockbox-platform-architecture.md`](host/KnockBox/Specs/knockbox-platform-architecture.md) — consult it for the full rationale behind the patterns described here.
 
 ## Prerequisites
 
 - .NET 10 SDK
-- The solution file is `KnockBox.slnx` (new SLNX format)
+- The repo uses two solution files (new SLNX format): `sdk/KnockBox.Sdk.slnx` for the SDK NuGets, and `host/KnockBox.Host.slnx` for the host app + first-party game plugins.
 
 ### Common commands
 
 | Task | Command |
 | --- | --- |
-| Build the solution | `dotnet build KnockBox.slnx` |
-| Build the host (transitively builds every plugin and stages it to `games/`) | `dotnet build KnockBox/KnockBox.csproj` |
-| Run the host locally | `dotnet run --project KnockBox/KnockBox.csproj` |
-| Publish the host | `dotnet publish KnockBox/KnockBox.csproj -c Release` |
-| Run all tests | `dotnet test KnockBox.slnx` |
+| Build the SDK | `dotnet build sdk/KnockBox.Sdk.slnx` |
+| Build the host + plugins (transitively builds every plugin and stages it to `games/`) | `dotnet build host/KnockBox.Host.slnx` |
+| Run the host locally | `dotnet run --project host/KnockBox/KnockBox.csproj` |
+| Publish the host | `dotnet publish host/KnockBox/KnockBox.csproj -c Release` |
+| Run SDK tests | `dotnet test sdk/KnockBox.Sdk.slnx` |
+| Run host tests | `dotnet test host/KnockBox.Host.slnx` |
 | Docker (repo root) | `docker compose up --build` |
 
 ## How the plugin system works (1-minute mental model)
 
 - The host `KnockBox.csproj` references plugins with `ReferenceOutputAssembly="false" Private="false"`. Those references exist **only** to make the plugins build transitively — the host takes no compile-time dependency on plugin types.
-- Each plugin `.csproj` imports [`Directory.Plugin.targets`](Directory.Plugin.targets) (a shared MSBuild target at the repo root). After every plugin build, that target copies the plugin DLL, `.deps.json`, scoped-CSS bundle, and `wwwroot/` into `KnockBox/bin/{Config}/{TFM}/games/{PluginName}/`.
+- Each plugin `.csproj` imports [`Directory.Plugin.targets`](host/Directory.Plugin.targets) (a shared MSBuild target at `host/Directory.Plugin.targets`). After every plugin build, that target copies the plugin DLL, `.deps.json`, scoped-CSS bundle, and `wwwroot/` into `host/KnockBox/bin/{Config}/{TFM}/games/{PluginName}/`.
 - At startup, `Program.cs` calls `PluginLoader.LoadModules(AppContext.BaseDirectory/games)`. Each plugin is loaded into its own `PluginLoadContext` (AssemblyLoadContext) rooted at `games/{PluginName}/`. `KnockBox.Core`, the BCL, and logging/DI abstractions are deferred to the default ALC so type identity is preserved across the host/plugin boundary.
 - Each plugin exposes **exactly one** `IGameModule` (public parameterless constructor). Its `RegisterServices(IServiceCollection)` wires the game's engine into DI. `Program.cs` then maps each plugin's `wwwroot/` folder to `/_content/{PluginName}` and registers each plugin's assembly with Blazor routing so its `@page` components are reachable.
 
@@ -75,8 +76,8 @@ Non-negotiables:
 
 ### Step 2 — Wire the project into the solution and host
 
-1. Add the project to `KnockBox.slnx`.
-2. Add a build-only reference to `KnockBox/KnockBox.csproj`, alongside the existing plugins:
+1. Place the new project directory under `host/` and add it to `host/KnockBox.Host.slnx`.
+2. Add a build-only reference to `host/KnockBox/KnockBox.csproj`, alongside the existing plugins:
 
    ```xml
    <ProjectReference Include="..\KnockBox.CoinFlip\KnockBox.CoinFlip.csproj"
@@ -90,7 +91,7 @@ Non-negotiables:
 
 ### Step 3 — Subclass `AbstractGameState`
 
-Per-room state lives on a subclass of `AbstractGameState` ([`KnockBox.Core/Services/State/Games/Shared/AbstractGameState.cs`](KnockBox.Core/Services/State/Games/Shared/AbstractGameState.cs)). The base class provides the host, the player list, a `SemaphoreSlim(1,1)` lock, the `StateChangedEventManager`, kick/register hooks, and scheduled-callback support.
+Per-room state lives on a subclass of `AbstractGameState` ([`sdk/KnockBox.Core/Services/State/Games/Shared/AbstractGameState.cs`](sdk/KnockBox.Core/Services/State/Games/Shared/AbstractGameState.cs)). The base class provides the host, the player list, a `SemaphoreSlim(1,1)` lock, the `StateChangedEventManager`, kick/register hooks, and scheduled-callback support.
 
 ```csharp
 using KnockBox.Core.Services.State.Games.Shared;
@@ -112,7 +113,7 @@ Rules of the road:
 
 ### Step 4 — Subclass `AbstractGameEngine`
 
-The engine is a **singleton**. It holds no per-room state — it simply operates on the state instance it is given. Every fallible operation returns a `Result` / `ValueResult<T>` ([`KnockBox.Core/Extensions/Returns/Result.cs`](KnockBox.Core/Extensions/Returns/Result.cs)).
+The engine is a **singleton**. It holds no per-room state — it simply operates on the state instance it is given. Every fallible operation returns a `Result` / `ValueResult<T>` ([`sdk/KnockBox.Core/Extensions/Returns/Result.cs`](sdk/KnockBox.Core/Extensions/Returns/Result.cs)).
 
 ```csharp
 using KnockBox.CoinFlip.Services.State.Games;
@@ -171,7 +172,7 @@ Things to internalize:
 
 ### Step 5 — Build the Razor page(s)
 
-Game pages live at `room/{route-identifier}/{ObfuscatedRoomCode}`. They must inherit `DisposableComponent` ([`KnockBox.Core/Components/Shared/DisposableComponent.cs`](KnockBox.Core/Components/Shared/DisposableComponent.cs)), which provides a `ComponentDetached` cancellation token and a `Dispose()` lifecycle hook.
+Game pages live at `room/{route-identifier}/{ObfuscatedRoomCode}`. They must inherit `DisposableComponent` ([`sdk/KnockBox.Core/Components/Shared/DisposableComponent.cs`](sdk/KnockBox.Core/Components/Shared/DisposableComponent.cs)), which provides a `ComponentDetached` cancellation token and a `Dispose()` lifecycle hook.
 
 `Pages/CoinFlipLobby.razor`:
 
@@ -295,7 +296,7 @@ Key points:
 
 ### Step 6 — Implement `IGameModule`
 
-The host finds your plugin by reflecting for `IGameModule` ([`KnockBox.Core/Plugins/IGameModule.cs`](KnockBox.Core/Plugins/IGameModule.cs)). Exactly one implementation per plugin.
+The host finds your plugin by reflecting for `IGameModule` ([`sdk/KnockBox.Core/Plugins/IGameModule.cs`](sdk/KnockBox.Core/Plugins/IGameModule.cs)). Exactly one implementation per plugin.
 
 ```csharp
 using KnockBox.CoinFlip.Components;
@@ -326,7 +327,7 @@ public class CoinFlipModule : IGameModule
 ```
 
 - **Public parameterless constructor is required.** `PluginLoader` activates it via reflection.
-- `services.AddGameEngine<TEngine>(routeIdentifier)` (see [`KnockBox.Core/Plugins/GameModuleServiceCollectionExtensions.cs`](KnockBox.Core/Plugins/GameModuleServiceCollectionExtensions.cs)) registers `TEngine` as a singleton **and** re-exposes the same instance as a keyed `AbstractGameEngine` under `routeIdentifier`. Razor pages inject the concrete engine; `LobbyService.CreateLobbyAsync` resolves `GetKeyedService<AbstractGameEngine>(routeIdentifier)` when spinning up a room.
+- `services.AddGameEngine<TEngine>(routeIdentifier)` (see [`sdk/KnockBox.Core/Plugins/GameModuleServiceCollectionExtensions.cs`](sdk/KnockBox.Core/Plugins/GameModuleServiceCollectionExtensions.cs)) registers `TEngine` as a singleton **and** re-exposes the same instance as a keyed `AbstractGameEngine` under `routeIdentifier`. Razor pages inject the concrete engine; `LobbyService.CreateLobbyAsync` resolves `GetKeyedService<AbstractGameEngine>(routeIdentifier)` when spinning up a room.
 - **`RouteIdentifier` must match your page's `@page` route segment verbatim** — e.g., `"coin-flip"` ↔ `@page "/room/coin-flip/{ObfuscatedRoomCode}"`.
 - `GetButtonContent()` is the inner fragment of the game's tile on the home screen. The host wraps it in a `<button>` that owns click handling, disabled state, aria-label, and layout sizing — your fragment just owns the visual design. It is typical to point this at a small Razor component under `Components/`.
 
@@ -389,29 +390,29 @@ public class CoinFlipGameEngineTests
 }
 ```
 
-Add the test project to `KnockBox.slnx` as well.
+Add the test project under `host/` and to `host/KnockBox.Host.slnx` as well.
 
 ### Step 8 — Run it
 
 ```bash
-dotnet build KnockBox/KnockBox.csproj
-dotnet run --project KnockBox/KnockBox.csproj
+dotnet build host/KnockBox/KnockBox.csproj
+dotnet run --project host/KnockBox/KnockBox.csproj
 ```
 
-Building the host transitively builds your plugin and stages it into `KnockBox/bin/{Config}/net10.0/games/KnockBox.CoinFlip/`. On startup, `PluginLoader` picks it up, the home page's tile list discovers `CoinFlipModule`, and `/room/coin-flip/{code}` routes to your page.
+Building the host transitively builds your plugin and stages it into `host/KnockBox/bin/{Config}/net10.0/games/KnockBox.CoinFlip/`. On startup, `PluginLoader` picks it up, the home page's tile list discovers `CoinFlipModule`, and `/room/coin-flip/{code}` routes to your page.
 
 ## Key APIs at a glance
 
 | Type / file | Purpose |
 | --- | --- |
-| [`IGameModule`](KnockBox.Core/Plugins/IGameModule.cs) | The plugin entry-point interface. One public parameterless implementation per plugin. |
-| [`GameModuleServiceCollectionExtensions.AddGameEngine<TEngine>`](KnockBox.Core/Plugins/GameModuleServiceCollectionExtensions.cs) | Registers an engine as both a concrete singleton and a keyed `AbstractGameEngine`. |
-| [`AbstractGameState`](KnockBox.Core/Services/State/Games/Shared/AbstractGameState.cs) | Base for per-room state. Provides `Execute`/`ExecuteAsync`, `WithExclusiveRead`, `StateChangedEventManager`, `RegisterPlayer`/`KickPlayer`, `ScheduleCallback`, `PlayerUnregistered`, `OnStateDisposed`. |
-| [`AbstractGameEngine`](KnockBox.Core/Services/Logic/Games/Engines/Shared/AbstractGameEngine.cs) | Base for game engines. Override `CreateStateAsync`, `StartAsync`, optionally `CanStartAsync`. Singletons — never store per-room data here. |
-| [`DisposableComponent`](KnockBox.Core/Components/Shared/DisposableComponent.cs) | Base for game Razor pages. Exposes `ComponentDetached` cancellation token; subclasses override `Dispose()` to clean up state subscriptions. |
-| [`Result`, `ValueResult<T>`, `ValueResult<T, TError>`](KnockBox.Core/Extensions/Returns/Result.cs) | Return types for fallible operations. Use `TryGetSuccess`, `TryGetFailure`, `IsCanceled`. |
-| [`Directory.Plugin.targets`](Directory.Plugin.targets) | Shared MSBuild target each plugin imports. Copies DLL + `wwwroot/` into `KnockBox/bin/.../games/{PluginName}/`. |
-| [`KnockBox/Program.cs`](KnockBox/Program.cs) | Host composition root — look here for `PluginLoader.LoadModules`, `RegisterLogic`, and `MapPluginStaticAssets`. |
+| [`IGameModule`](sdk/KnockBox.Core/Plugins/IGameModule.cs) | The plugin entry-point interface. One public parameterless implementation per plugin. |
+| [`GameModuleServiceCollectionExtensions.AddGameEngine<TEngine>`](sdk/KnockBox.Core/Plugins/GameModuleServiceCollectionExtensions.cs) | Registers an engine as both a concrete singleton and a keyed `AbstractGameEngine`. |
+| [`AbstractGameState`](sdk/KnockBox.Core/Services/State/Games/Shared/AbstractGameState.cs) | Base for per-room state. Provides `Execute`/`ExecuteAsync`, `WithExclusiveRead`, `StateChangedEventManager`, `RegisterPlayer`/`KickPlayer`, `ScheduleCallback`, `PlayerUnregistered`, `OnStateDisposed`. |
+| [`AbstractGameEngine`](sdk/KnockBox.Core/Services/Logic/Games/Engines/Shared/AbstractGameEngine.cs) | Base for game engines. Override `CreateStateAsync`, `StartAsync`, optionally `CanStartAsync`. Singletons — never store per-room data here. |
+| [`DisposableComponent`](sdk/KnockBox.Core/Components/Shared/DisposableComponent.cs) | Base for game Razor pages. Exposes `ComponentDetached` cancellation token; subclasses override `Dispose()` to clean up state subscriptions. |
+| [`Result`, `ValueResult<T>`, `ValueResult<T, TError>`](sdk/KnockBox.Core/Extensions/Returns/Result.cs) | Return types for fallible operations. Use `TryGetSuccess`, `TryGetFailure`, `IsCanceled`. |
+| [`Directory.Plugin.targets`](host/Directory.Plugin.targets) | Shared MSBuild target each plugin imports. Copies DLL + `wwwroot/` into `host/KnockBox/bin/.../games/{PluginName}/`. |
+| [`host/KnockBox/Program.cs`](host/KnockBox/Program.cs) | Host composition root — look here for `PluginLoader.LoadModules`, `RegisterLogic`, and `MapPluginStaticAssets`. |
 
 ## Critical invariants (do not violate)
 
@@ -424,6 +425,6 @@ Building the host transitively builds your plugin and stages it into `KnockBox/b
 
 ## Further reading
 
-- [`KnockBox/Specs/knockbox-platform-architecture.md`](KnockBox/Specs/knockbox-platform-architecture.md) — the authoritative architecture reference (ALC isolation, session lifecycle, DI order, lobby routing).
+- [`host/KnockBox/Specs/knockbox-platform-architecture.md`](host/KnockBox/Specs/knockbox-platform-architecture.md) — the authoritative architecture reference (ALC isolation, session lifecycle, DI order, lobby routing).
 - [`CLAUDE.md`](CLAUDE.md) — build/test commands and additional contributor notes.
-- Existing plugins (`KnockBox.CardCounter`, `KnockBox.Codeword`, `KnockBox.DiceSimulator`, `KnockBox.DrawnToDress`, `KnockBox.Operator`) — concrete examples of the patterns above at varying complexity. `KnockBox.DiceSimulator` is the simplest starting reference.
+- Existing plugins under `host/` (`KnockBox.CardCounter`, `KnockBox.Codeword`, `KnockBox.DiceSimulator`, `KnockBox.DrawnToDress`, `KnockBox.Operator`) — concrete examples of the patterns above at varying complexity. `host/KnockBox.DiceSimulator` is the simplest starting reference.
