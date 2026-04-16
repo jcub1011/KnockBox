@@ -1,12 +1,12 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 
-namespace KnockBox.Core.Services.State.Shared
+namespace KnockBox.Services.State.Shared
 {
     /// <summary>
     /// Invokes a callback on intervals that corrects against time drift.
     /// </summary>
     /// <param name="tickInterval"></param>
-    public class FixedTickLoop(TimeSpan tickInterval)
+    internal class FixedTickLoop(TimeSpan tickInterval)
     {
         private const int MAX_QUEUED_TICKS = 3;
         private readonly long _tickIntervalTicks = (long)(tickInterval.TotalSeconds * Stopwatch.Frequency);

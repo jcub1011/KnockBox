@@ -1,7 +1,8 @@
-﻿using KnockBox.Core.Extensions.RandomGeneration;
+using KnockBox.Core.Extensions.RandomGeneration;
+using KnockBox.Core.Services.Logic.RandomGeneration;
 using System.Security.Cryptography;
 
-namespace KnockBox.Core.Services.Logic.RandomGeneration
+namespace KnockBox.Services.Logic.RandomGeneration
 {
     /// <summary>
     /// Default <see cref="IRandomNumberService"/> implementation. Routes calls

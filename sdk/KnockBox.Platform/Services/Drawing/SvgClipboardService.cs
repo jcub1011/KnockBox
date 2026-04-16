@@ -1,7 +1,8 @@
+using KnockBox.Core.Services.Drawing;
 using System.Collections.Concurrent;
 using System.Security.Cryptography;
 
-namespace KnockBox.Core.Services.Drawing
+namespace KnockBox.Services.Drawing
 {
     /// <summary>
     /// Thread-safe singleton that stores SVG drawing content under a randomly generated share

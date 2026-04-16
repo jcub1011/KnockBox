@@ -1,7 +1,8 @@
 using KnockBox.Core.Services.Logic.Games.Shared;
+using KnockBox.Core.Services.Navigation;
 using Microsoft.AspNetCore.Components;
 
-namespace KnockBox.Core.Services.Navigation
+namespace KnockBox.Services.Navigation
 {
     /// <summary>
     /// Default <see cref="INavigationService"/>. Wraps ASP.NET Core's

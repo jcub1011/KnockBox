@@ -1,7 +1,9 @@
 using KnockBox.Core.Services.Logic.Games.Shared;
+using KnockBox.Core.Services.State.Games.Shared;
+using KnockBox.Core.Services.State.Shared;
 using System.Diagnostics.CodeAnalysis;
 
-namespace KnockBox.Core.Services.State.Games.Shared
+namespace KnockBox.Services.State.Games.Shared
 {
     /// <summary>
     /// Transient, user-ID-backed state holder for a single user's active game session.

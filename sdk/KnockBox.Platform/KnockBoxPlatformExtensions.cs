@@ -1,7 +1,9 @@
 using KnockBox.Core.Plugins;
 using KnockBox.Core.Services.Drawing;
 using KnockBox.Core.Services.Navigation;
+using KnockBox.Services.Drawing;
 using KnockBox.Services.Logic.Games.Shared;
+using KnockBox.Services.Navigation;
 using KnockBox.Services.Registrations.Logic;
 using KnockBox.Services.Registrations.Repositories;
 using KnockBox.Services.Registrations.States;
