@@ -22,7 +22,7 @@ namespace KnockBox.Services.State.Games.Shared
     /// must not be captured inside the long-lived <see cref="GameSessionState"/>.
     /// </para>
     /// </summary>
-    public class GameSessionService(
+    internal sealed class GameSessionService(
         ISessionServiceProvider sessionServiceProvider,
         INavigationService navigationService,
         IUserService userService,

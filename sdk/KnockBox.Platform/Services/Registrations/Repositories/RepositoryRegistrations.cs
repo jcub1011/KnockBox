@@ -1,4 +1,5 @@
 using KnockBox.Data.Services.ClientStorage;
+using KnockBox.Platform.ClientStorage;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace KnockBox.Services.Registrations.Repositories

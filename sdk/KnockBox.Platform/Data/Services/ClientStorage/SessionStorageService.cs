@@ -1,9 +1,8 @@
+using KnockBox.Platform.ClientStorage;
 using Microsoft.JSInterop;
 
 namespace KnockBox.Data.Services.ClientStorage
 {
-    public interface ISessionStorageService : IClientStorageService { }
-
-    public class SessionStorageService(IJSRuntime jsRuntime)
+    internal sealed class SessionStorageService(IJSRuntime jsRuntime)
         : BrowserStorageService(jsRuntime, "sessionStorage"), ISessionStorageService { }
 }

@@ -5,7 +5,7 @@ using KnockBox.Core.Services.Logic.Games.Shared;
 using KnockBox.Core.Services.Logic.RandomGeneration;
 using KnockBox.Core.Services.State.Games.Shared;
 using KnockBox.Core.Services.State.Users;
-using KnockBox.Services.Logic.Games.Shared;
+using KnockBox.Platform.Games;
 using Microsoft.AspNetCore.Components;
 using KnockBox.Core.Plugins;
 using KnockBox.Platform;
@@ -13,7 +13,7 @@ using Microsoft.Extensions.Options;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace KnockBox.Components.Pages.Home
+namespace KnockBox.Platform.Components.Pages.Home
 {
     public partial class Home : DisposableComponent
     {

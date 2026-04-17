@@ -30,9 +30,12 @@ var builder = WebApplication.CreateBuilder(args);
 builder.AddKnockBoxPlatform(options =>
 {
     // Explicit-mode registration: the platform skips directory scanning and
-    // uses the modules registered here. Calling AddGameModule<T>() also flips
-    // PluginDiscovery to Explicit under the hood, so you never need to set it
-    // yourself in a DevHost.
+    // uses only the modules registered here. Both lines are required — the
+    // mode flag tells the platform to skip the games/ directory scan, and
+    // AddGameModule<T>() appends the module to the explicit list. If the two
+    // get out of sync, AddKnockBoxPlatform throws at startup with a clear
+    // message telling you which of the two is missing.
+    options.PluginDiscovery = PluginDiscoveryMode.Explicit;
     options.AddGameModule<MyGameModule>();
 });
 

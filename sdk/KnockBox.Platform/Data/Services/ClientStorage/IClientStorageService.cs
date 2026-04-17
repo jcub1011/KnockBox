@@ -1,4 +1,4 @@
-namespace KnockBox.Data.Services.ClientStorage
+namespace KnockBox.Platform.ClientStorage
 {
     public readonly record struct StorageResult<TValue>(TValue Value, bool Exists);
 
@@ -64,4 +64,10 @@ namespace KnockBox.Data.Services.ClientStorage
         /// <returns></returns>
         ValueTask ClearAsync();
     }
+
+    /// <summary>Marker interface for browser <c>sessionStorage</c>-backed client storage.</summary>
+    public interface ISessionStorageService : IClientStorageService { }
+
+    /// <summary>Marker interface for browser <c>localStorage</c>-backed client storage.</summary>
+    public interface ILocalStorageService : IClientStorageService { }
 }

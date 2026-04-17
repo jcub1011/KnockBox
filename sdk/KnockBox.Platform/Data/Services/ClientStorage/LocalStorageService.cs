@@ -1,9 +1,8 @@
+using KnockBox.Platform.ClientStorage;
 using Microsoft.JSInterop;
 
 namespace KnockBox.Data.Services.ClientStorage
 {
-    public interface ILocalStorageService : IClientStorageService { }
-
-    public class LocalStorageService(IJSRuntime jsRuntime)
+    internal sealed class LocalStorageService(IJSRuntime jsRuntime)
         : BrowserStorageService(jsRuntime, "localStorage"), ILocalStorageService { }
 }

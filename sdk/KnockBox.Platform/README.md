@@ -17,6 +17,7 @@ var builder = WebApplication.CreateBuilder(args);
 // Explicit-mode: register each game module directly. Ideal for DevHosts.
 builder.AddKnockBoxPlatform(options =>
 {
+    options.PluginDiscovery = PluginDiscoveryMode.Explicit;
     options.AddGameModule<MyGameModule>();
     // options.AddGameModule<AnotherGameModule>();
 });
@@ -31,31 +32,44 @@ For a production host that loads plugins from a directory:
 ```csharp
 builder.AddKnockBoxPlatform(options =>
 {
-    options.PluginDiscovery = PluginDiscoveryMode.Directory;
-    options.PluginsPath = "games";            // relative to AppContext.BaseDirectory
-    options.AppTitle = "My KnockBox Party";
-    options.HomeHeroTitle = "My KnockBox Party";
+    options.PluginDiscovery = PluginDiscoveryMode.Directory; // default
+    options.PluginsPaths.Clear();
+    options.PluginsPaths.Add("games");                  // relative to AppContext.BaseDirectory
+    options.PluginsPaths.Add("/var/lib/knockbox/games");  // or an absolute path
+    options.Branding.AppTitle = "My KnockBox Party";
+    options.Branding.HomeHeroTitle = "My KnockBox Party";
 });
 ```
 
-Each plugin subfolder under `PluginsPath` (`games/MyGame/`, `games/AnotherGame/`, …) is loaded into its own `AssemblyLoadContext`. The loader reflects each assembly for `IGameModule` implementations, activates them, and calls `RegisterServices`.
+Each plugin subfolder under the configured `PluginsPaths` (`games/MyGame/`, `games/AnotherGame/`, …) is loaded into its own `AssemblyLoadContext`. The loader reflects each assembly for `IGameModule` implementations, activates them, and calls `RegisterServices`.
+
+### Host override hook: `IGameAvailabilityService`
+
+The Platform ships a default `AllGamesEnabledService` that reports every game as enabled. Hosts that want per-game gating (disable cards, admin toggles, etc.) should register their own implementation on the service collection **before** calling `AddKnockBoxPlatform`:
+
+```csharp
+builder.Services.AddSingleton<IGameAvailabilityService, MyFileBackedAvailabilityService>();
+builder.AddKnockBoxPlatform(options => { ... });
+```
+
+The order matters: `AddKnockBoxPlatform` uses `TryAddSingleton` so a pre-existing registration wins. If the default fallback was installed (because the host registered after `AddKnockBoxPlatform` or forgot to register at all), the Platform logs an Information-level message at startup so misorders are diagnosable.
 
 ## Plugin discovery modes
 
 | Mode | When to use | Behaviour |
 | --- | --- | --- |
-| `PluginDiscoveryMode.Directory` *(default)* | Production hosts, or any scenario where plugins ship as loose DLL folders. | Scans `PluginsPath` for subfolders and loads each into its own ALC. |
-| `PluginDiscoveryMode.Explicit` | Dev hosts, tests, and any scenario with direct `ProjectReference`s to the plugin. | Uses modules registered via `options.AddGameModule<T>()`. No directory scan, no ALC isolation. `AddGameModule<T>()` flips the mode automatically. |
+| `PluginDiscoveryMode.Directory` *(default)* | Production hosts, or any scenario where plugins ship as loose DLL folders. | Scans every path in `PluginsPaths` for plugin subfolders and loads each into its own ALC. |
+| `PluginDiscoveryMode.Explicit` | Dev hosts, tests, and any scenario with direct `ProjectReference`s to the plugin. | Uses modules registered via `options.AddGameModule<T>()`. No directory scan, no ALC isolation. The caller must set this mode explicitly; `AddKnockBoxPlatform` throws if you leave it on `Directory` with explicit modules registered. |
 
 ## Configuration options
 
 | Option | Purpose |
 | --- | --- |
-| `AppTitle` | Header title shown once a game session is active. |
-| `HomeHeroTitle` | Large hero title on the home page. |
-| `HomePageTitle` | Browser tab / `<title>` on the home page. |
+| `Branding.AppTitle` | Header title shown once a game session is active. |
+| `Branding.HomeHeroTitle` | Large hero title on the home page. |
+| `Branding.HomePageTitle` | Browser tab / `<title>` on the home page. |
 | `PluginDiscovery` | `Directory` (default) or `Explicit`. |
-| `PluginsPath` | Relative or absolute path to the plugin folder root. Default: `games`. |
+| `PluginsPaths` | Ordered list of relative or absolute paths to plugin folder roots. Default: single entry `"games"`. |
 
 ## Extension points
 

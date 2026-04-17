@@ -1,5 +1,6 @@
 ﻿using System.Reflection;
 using System.Text;
+using KnockBox.Platform.Filtering;
 using KnockBox.Services.Logic.Filtering;
 
 namespace KnockBox.Tests.Unit.Logic.Filtering;

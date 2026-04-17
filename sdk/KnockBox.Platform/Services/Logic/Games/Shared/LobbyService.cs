@@ -6,10 +6,11 @@ using KnockBox.Core.Services.State.Users;
 using System.Collections.Concurrent;
 using Microsoft.Extensions.DependencyInjection;
 using KnockBox.Core.Plugins;
+using KnockBox.Platform.Games;
 
 namespace KnockBox.Services.Logic.Games.Shared
 {
-    public class LobbyService : ILobbyService
+    internal sealed class LobbyService : ILobbyService
     {
         private readonly ILobbyCodeService _lobbyCodeService;
         private readonly IGameAvailabilityService _gameAvailability;

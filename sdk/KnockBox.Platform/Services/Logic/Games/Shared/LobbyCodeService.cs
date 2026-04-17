@@ -1,10 +1,11 @@
 using System.Security.Cryptography;
 using KnockBox.Core.Extensions.Returns;
-using KnockBox.Services.Logic.Filtering;
+using KnockBox.Platform.Filtering;
+using KnockBox.Platform.Games;
 
 namespace KnockBox.Services.Logic.Games.Shared
 {
-    public class LobbyCodeService(IProfanityFilter profanityFilter) : ILobbyCodeService
+    internal sealed class LobbyCodeService(IProfanityFilter profanityFilter) : ILobbyCodeService
     {
         private const int CodeLength = 6;
         private const int MaxAttempts = 1024;

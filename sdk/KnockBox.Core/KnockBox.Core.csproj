@@ -41,4 +41,11 @@
     <None Include="README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Grants the in-repo test project access to internal APIs (the
+         PluginLoader forbidden-dependency helper, etc.). External consumers
+         remain bound by the public surface. -->
+    <InternalsVisibleTo Include="KnockBox.CoreTests" />
+  </ItemGroup>
+
 </Project>

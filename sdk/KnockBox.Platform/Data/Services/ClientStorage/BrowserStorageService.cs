@@ -1,15 +1,16 @@
+using KnockBox.Platform.ClientStorage;
 using Microsoft.JSInterop;
 using System.Text.Json;
 
 namespace KnockBox.Data.Services.ClientStorage
 {
-    public class BrowserStorageService : IClientStorageService
+    internal abstract class BrowserStorageService : IClientStorageService
     {
         private readonly string _storageName;
         private static readonly JsonSerializerOptions _serializerOptions = new(JsonSerializerDefaults.Web);
         private readonly Lazy<Task<IJSObjectReference>> _moduleTask;
 
-        public BrowserStorageService(IJSRuntime jsRuntime, string storageName)
+        protected BrowserStorageService(IJSRuntime jsRuntime, string storageName)
         {
             ArgumentNullException.ThrowIfNull(jsRuntime);
             _storageName = storageName;

@@ -1,10 +1,10 @@
-using KnockBox.Data.Services.ClientStorage;
+using KnockBox.Platform.ClientStorage;
 using KnockBox.Core.Extensions.Returns;
 using KnockBox.Core.Services.State.Shared;
 
 namespace KnockBox.Services.State.Shared;
 
-public class SessionTokenProvider(ISessionStorageService sessionStorageService, ILogger<SessionTokenProvider> logger) : ISessionTokenProvider
+public sealed class SessionTokenProvider(ISessionStorageService sessionStorageService, ILogger<SessionTokenProvider> logger) : ISessionTokenProvider
 {
     // Technically does not need to be disposed if "AvailableWaitHandle" is never accessed.
     readonly SemaphoreSlim _semaphore = new(1, 1);

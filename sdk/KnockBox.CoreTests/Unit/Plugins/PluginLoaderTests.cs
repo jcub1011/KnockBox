@@ -352,4 +352,90 @@ public sealed class PluginLoaderTests
             It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
             Times.AtLeastOnce());
     }
+
+    // ─── FindForbiddenDependency ───────────────────────────────────────────
+
+    [TestMethod]
+    public void FindForbiddenDependency_ReturnsPackageId_WhenDepsJsonListsKnockBoxPlatform()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), "knockbox-pluginloader-tests-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempDir);
+        try
+        {
+            var dllPath = Path.Combine(tempDir, "Sample.Plugin.dll");
+            File.WriteAllText(dllPath, string.Empty); // guard requires the .deps.json, not the DLL contents
+            var depsJsonPath = Path.ChangeExtension(dllPath, ".deps.json");
+            File.WriteAllText(depsJsonPath, """
+                {
+                    "runtimeTarget": { "name": ".NETCoreApp,Version=v10.0", "signature": "" },
+                    "libraries": {
+                        "Sample.Plugin/1.0.0": { "type": "project", "serviceable": false, "sha512": "" },
+                        "KnockBox.Core/1.0.0": { "type": "package", "serviceable": true, "sha512": "" },
+                        "KnockBox.Platform/1.0.0": { "type": "package", "serviceable": true, "sha512": "" }
+                    }
+                }
+                """);
+
+            var result = PluginLoader.FindForbiddenDependency(dllPath);
+
+            Assert.AreEqual("KnockBox.Platform", result);
+        }
+        finally
+        {
+            Directory.Delete(tempDir, recursive: true);
+        }
+    }
+
+    [TestMethod]
+    public void FindForbiddenDependency_ReturnsNull_WhenDepsJsonListsOnlyCoreAndBcl()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), "knockbox-pluginloader-tests-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempDir);
+        try
+        {
+            var dllPath = Path.Combine(tempDir, "Clean.Plugin.dll");
+            File.WriteAllText(dllPath, string.Empty);
+            var depsJsonPath = Path.ChangeExtension(dllPath, ".deps.json");
+            File.WriteAllText(depsJsonPath, """
+                {
+                    "runtimeTarget": { "name": ".NETCoreApp,Version=v10.0", "signature": "" },
+                    "libraries": {
+                        "Clean.Plugin/1.0.0": { "type": "project", "serviceable": false, "sha512": "" },
+                        "KnockBox.Core/1.0.0": { "type": "package", "serviceable": true, "sha512": "" }
+                    }
+                }
+                """);
+
+            var result = PluginLoader.FindForbiddenDependency(dllPath);
+
+            Assert.IsNull(result);
+        }
+        finally
+        {
+            Directory.Delete(tempDir, recursive: true);
+        }
+    }
+
+    [TestMethod]
+    public void FindForbiddenDependency_ReturnsNull_WhenDepsJsonIsMissing()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), "knockbox-pluginloader-tests-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempDir);
+        try
+        {
+            var dllPath = Path.Combine(tempDir, "NoDeps.Plugin.dll");
+            File.WriteAllText(dllPath, string.Empty);
+            // Intentionally do not create the .deps.json sidecar — framework-
+            // dependent plugins published without deps.json should not cause
+            // the guard to fail; it simply can't enforce the invariant there.
+
+            var result = PluginLoader.FindForbiddenDependency(dllPath);
+
+            Assert.IsNull(result);
+        }
+        finally
+        {
+            Directory.Delete(tempDir, recursive: true);
+        }
+    }
 }

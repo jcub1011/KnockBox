@@ -1,4 +1,4 @@
-namespace KnockBox.Services.Logic.Storage;
+namespace KnockBox.Platform.Storage;
 
 public interface IStoragePathService
 {

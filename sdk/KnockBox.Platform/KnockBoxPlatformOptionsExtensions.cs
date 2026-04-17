@@ -8,15 +8,20 @@ namespace KnockBox.Platform;
 public static class KnockBoxPlatformOptionsExtensions
 {
     /// <summary>
-    /// Registers a game module explicitly (sets discovery mode to
-    /// <see cref="PluginDiscoveryMode.Explicit"/> automatically).
+    /// Appends a game module to <see cref="KnockBoxPlatformOptions.ExplicitModules"/>.
     /// </summary>
+    /// <remarks>
+    /// Callers must also set <see cref="KnockBoxPlatformOptions.PluginDiscovery"/>
+    /// to <see cref="PluginDiscoveryMode.Explicit"/>; this method does not flip
+    /// the mode implicitly. <c>AddKnockBoxPlatform</c> throws if explicit modules
+    /// are registered while <c>PluginDiscovery</c> is set to
+    /// <see cref="PluginDiscoveryMode.Directory"/>, so the footgun is loud
+    /// either way.
+    /// </remarks>
     public static KnockBoxPlatformOptions AddGameModule<TModule>(
         this KnockBoxPlatformOptions options)
         where TModule : IGameModule, new()
     {
-        options.PluginDiscovery = PluginDiscoveryMode.Explicit;
-
         var module = new TModule();
         options.ExplicitModules.Add(module);
 
