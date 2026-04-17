@@ -2,7 +2,7 @@ using KnockBox.HiddenAgenda.Services.State.Games;
 using KnockBox.HiddenAgenda.Services.State.Games.Data;
 using KnockBox.HiddenAgenda.Services.Logic.Games;
 using KnockBox.Core.Services.State.Users;
-using KnockBox.Core.Extensions.Returns;
+using KnockBox.Core.Primitives.Returns;
 using Microsoft.AspNetCore.Components;
 
 namespace KnockBox.HiddenAgenda.Pages

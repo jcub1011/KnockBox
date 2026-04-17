@@ -1,6 +1,6 @@
-using KnockBox.Core.Extensions.Disposable;
-using KnockBox.Core.Extensions.Events;
-using KnockBox.Core.Extensions.Returns;
+using KnockBox.Core.Primitives.Disposable;
+using KnockBox.Core.Primitives.Events;
+using KnockBox.Core.Primitives.Returns;
 using KnockBox.Core.Services.State.Users;
 using System.Diagnostics.CodeAnalysis;
 

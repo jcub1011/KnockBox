@@ -1,4 +1,4 @@
-using KnockBox.Core.Extensions.Collections;
+using KnockBox.Tooling.Collections;
 using KnockBox.Core.Services.Logic.RandomGeneration;
 using Moq;
 

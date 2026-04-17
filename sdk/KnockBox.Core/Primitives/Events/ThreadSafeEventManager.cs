@@ -1,6 +1,6 @@
-using KnockBox.Core.Extensions.Disposable;
+using KnockBox.Core.Primitives.Disposable;
 
-namespace KnockBox.Core.Extensions.Events
+namespace KnockBox.Core.Primitives.Events
 {
     /// <summary>
     /// Default <see cref="IThreadSafeEventManager"/> implementation. Subscribers

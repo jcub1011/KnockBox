@@ -1,6 +1,6 @@
 namespace KnockBox.Services.State.Users
 {
-    using KnockBox.Core.Extensions.Returns;
+    using KnockBox.Core.Primitives.Returns;
     using KnockBox.Core.Services.State.Shared;
     using KnockBox.Core.Services.State.Users;
     using KnockBox.Platform.ClientStorage;

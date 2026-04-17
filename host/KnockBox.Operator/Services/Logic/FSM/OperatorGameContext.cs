@@ -1,4 +1,4 @@
-using KnockBox.Core.Extensions.Collections;
+using KnockBox.Tooling.Collections;
 using KnockBox.Operator.Models;
 using KnockBox.Operator.Services.State;
 using KnockBox.Core.Services.State.Games.Shared;

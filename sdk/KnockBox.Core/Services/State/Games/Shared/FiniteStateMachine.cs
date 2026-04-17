@@ -1,5 +1,5 @@
-﻿using KnockBox.Core.Extensions.Events;
-using KnockBox.Core.Extensions.Returns;
+using KnockBox.Core.Primitives.Events;
+using KnockBox.Core.Primitives.Returns;
 
 namespace KnockBox.Core.Services.State.Games.Shared
 {
@@ -91,7 +91,7 @@ namespace KnockBox.Core.Services.State.Games.Shared
                 if (chainedState is null)
                     return Result.Success;
 
-                // OnEnter requested a chained transition — exit the current state and enter the next
+                // OnEnter requested a chained transition � exit the current state and enter the next
                 if (state.OnExit(context).TryGetFailure(out var exitError))
                     return exitError;
 

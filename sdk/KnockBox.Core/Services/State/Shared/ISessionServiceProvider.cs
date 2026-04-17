@@ -1,4 +1,4 @@
-using KnockBox.Core.Extensions.Returns;
+using KnockBox.Core.Primitives.Returns;
 using System.Diagnostics.CodeAnalysis;
 
 namespace KnockBox.Core.Services.State.Shared;

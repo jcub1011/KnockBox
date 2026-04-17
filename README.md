@@ -113,11 +113,11 @@ Rules of the road:
 
 ### Step 4 — Subclass `AbstractGameEngine`
 
-The engine is a **singleton**. It holds no per-room state — it simply operates on the state instance it is given. Every fallible operation returns a `Result` / `ValueResult<T>` ([`sdk/KnockBox.Core/Extensions/Returns/Result.cs`](sdk/KnockBox.Core/Extensions/Returns/Result.cs)).
+The engine is a **singleton**. It holds no per-room state — it simply operates on the state instance it is given. Every fallible operation returns a `Result` / `ValueResult<T>` ([`sdk/KnockBox.Core/Primitives/Returns/Result.cs`](sdk/KnockBox.Core/Primitives/Returns/Result.cs)).
 
 ```csharp
 using KnockBox.CoinFlip.Services.State.Games;
-using KnockBox.Core.Extensions.Returns;
+using KnockBox.Core.Primitives.Returns;
 using KnockBox.Core.Services.Logic.Games.Engines.Shared;
 using KnockBox.Core.Services.Logic.Games.Utilities;
 using KnockBox.Core.Services.State.Games.Shared;
@@ -410,7 +410,7 @@ Building the host transitively builds your plugin and stages it into `host/Knock
 | [`AbstractGameState`](sdk/KnockBox.Core/Services/State/Games/Shared/AbstractGameState.cs) | Base for per-room state. Provides `Execute`/`ExecuteAsync`, `WithExclusiveRead`, `StateChangedEventManager`, `RegisterPlayer`/`KickPlayer`, `ScheduleCallback`, `PlayerUnregistered`, `OnStateDisposed`. |
 | [`AbstractGameEngine`](sdk/KnockBox.Core/Services/Logic/Games/Engines/Shared/AbstractGameEngine.cs) | Base for game engines. Override `CreateStateAsync`, `StartAsync`, optionally `CanStartAsync`. Singletons — never store per-room data here. |
 | [`DisposableComponent`](sdk/KnockBox.Core/Components/Shared/DisposableComponent.cs) | Base for game Razor pages. Exposes `ComponentDetached` cancellation token; subclasses override `Dispose()` to clean up state subscriptions. |
-| [`Result`, `ValueResult<T>`, `ValueResult<T, TError>`](sdk/KnockBox.Core/Extensions/Returns/Result.cs) | Return types for fallible operations. Use `TryGetSuccess`, `TryGetFailure`, `IsCanceled`. |
+| [`Result`, `ValueResult<T>`, `ValueResult<T, TError>`](sdk/KnockBox.Core/Primitives/Returns/Result.cs) | Return types for fallible operations. Use `TryGetSuccess`, `TryGetFailure`, `IsCanceled`. |
 | [`Directory.Plugin.targets`](host/Directory.Plugin.targets) | Shared MSBuild target each plugin imports. Copies DLL + `wwwroot/` into `host/KnockBox/bin/.../games/{PluginName}/`. |
 | [`host/KnockBox/Program.cs`](host/KnockBox/Program.cs) | Host composition root — look here for `PluginLoader.LoadModules`, `RegisterLogic`, and `MapPluginStaticAssets`. |
 

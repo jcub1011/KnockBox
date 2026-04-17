@@ -10,6 +10,7 @@
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <ProjectReference Include="..\..\sdk\KnockBox.Core\KnockBox.Core.csproj" />
+    <ProjectReference Include="../../sdk/KnockBox.Tooling/KnockBox.Tooling.csproj" />
   </ItemGroup>
 
   <ItemGroup>

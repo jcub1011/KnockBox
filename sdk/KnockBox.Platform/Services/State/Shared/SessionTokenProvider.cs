@@ -1,5 +1,5 @@
 using KnockBox.Platform.ClientStorage;
-using KnockBox.Core.Extensions.Returns;
+using KnockBox.Core.Primitives.Returns;
 using KnockBox.Core.Services.State.Shared;
 
 namespace KnockBox.Services.State.Shared;

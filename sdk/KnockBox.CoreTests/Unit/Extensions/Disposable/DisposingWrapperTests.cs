@@ -1,4 +1,4 @@
-using KnockBox.Core.Extensions.Disposable;
+using KnockBox.Core.Primitives.Disposable;
 
 namespace KnockBox.Tests.Unit.Extensions.Disposable;
 

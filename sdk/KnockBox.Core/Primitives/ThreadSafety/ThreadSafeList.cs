@@ -1,7 +1,7 @@
-﻿using KnockBox.Core.Extensions.ThreadSafety;
+using KnockBox.Core.Primitives.ThreadSafety;
 using System.Collections;
 
-namespace KnockBox.Core.Extensions.Collections
+namespace KnockBox.Core.Primitives.ThreadSafety
 {
     /// <summary>
     /// A <see cref="List{T}"/> guarded by a <see cref="ReaderWriterLockSlim"/>.

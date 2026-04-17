@@ -1,4 +1,4 @@
-using KnockBox.Core.Extensions.Returns;
+using KnockBox.Core.Primitives.Returns;
 
 namespace KnockBox.Platform.Games
 {

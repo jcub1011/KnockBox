@@ -1,4 +1,4 @@
-using KnockBox.Core.Extensions.Returns;
+using KnockBox.Core.Primitives.Returns;
 using KnockBox.Core.Services.Logic.Games.Engines.Shared;
 using KnockBox.Core.Services.Logic.RandomGeneration;
 using KnockBox.DiceSimulator.Services.State.Games;

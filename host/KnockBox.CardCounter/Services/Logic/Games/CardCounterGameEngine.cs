@@ -1,6 +1,6 @@
 using KnockBox.Core.Services.State.Games.Shared;
-using KnockBox.Core.Extensions.Collections;
-using KnockBox.Core.Extensions.Returns;
+using KnockBox.Tooling.Collections;
+using KnockBox.Core.Primitives.Returns;
 using KnockBox.CardCounter.Services.Logic.Games.FSM;
 using KnockBox.CardCounter.Services.Logic.Games.FSM.States;
 using KnockBox.Core.Services.Logic.Games.Engines.Shared;

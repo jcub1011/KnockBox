@@ -1,5 +1,5 @@
-using KnockBox.Core.Extensions.Disposable;
-using KnockBox.Core.Extensions.Returns;
+using KnockBox.Core.Primitives.Disposable;
+using KnockBox.Core.Primitives.Returns;
 using KnockBox.Core.Services.State.Shared;
 using Microsoft.Extensions.DependencyInjection;
 using System.Collections.Concurrent;

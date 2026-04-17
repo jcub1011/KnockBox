@@ -1,4 +1,4 @@
-﻿namespace KnockBox.Core.Extensions.ThreadSafety
+namespace KnockBox.Core.Primitives.ThreadSafety
 {
     /// <summary>
     /// Permissions granted by an <see cref="IRWLockScope"/>.

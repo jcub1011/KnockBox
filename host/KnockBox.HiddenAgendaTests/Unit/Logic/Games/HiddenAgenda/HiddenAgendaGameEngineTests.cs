@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using KnockBox.Core.Extensions.Returns;
+using KnockBox.Core.Primitives.Returns;
 using KnockBox.Core.Services.Logic.RandomGeneration;
 using KnockBox.HiddenAgenda.Services.Logic.Games;
 using KnockBox.HiddenAgenda.Services.State.Games;

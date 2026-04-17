@@ -1,5 +1,5 @@
 using KnockBox.Core.Services.State.Games.Shared;
-using KnockBox.Core.Extensions.Collections;
+using KnockBox.Tooling.Collections;
 using KnockBox.Core.Services.Logic.RandomGeneration;
 using KnockBox.CardCounter.Services.State.Games;
 using KnockBox.CardCounter.Services.State.Games.Data;

@@ -19,6 +19,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\KnockBox.Core\KnockBox.Core.csproj" />
+    <ProjectReference Include="..\KnockBox.Tooling\KnockBox.Tooling.csproj" />
   </ItemGroup>
 
 </Project>

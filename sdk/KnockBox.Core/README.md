@@ -21,7 +21,7 @@ The template generates three projects (`MyGame`, `MyGame.DevHost`, `MyGame.Tests
 If you'd rather wire up by hand, a minimal plugin is three types:
 
 ```csharp
-using KnockBox.Core.Extensions.Returns;
+using KnockBox.Core.Primitives.Returns;
 using KnockBox.Core.Plugins;
 using KnockBox.Core.Services.Logic.Games.Engines.Shared;
 using KnockBox.Core.Services.State.Games.Shared;

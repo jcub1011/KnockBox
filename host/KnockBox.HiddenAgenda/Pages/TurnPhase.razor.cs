@@ -4,7 +4,7 @@ using KnockBox.HiddenAgenda.Services.Logic.Games;
 using KnockBox.HiddenAgenda.Services.Logic.Games.Data;
 using KnockBox.Core.Services.State.Users;
 using KnockBox.Core.Services.State.Games.Shared;
-using KnockBox.Core.Extensions.Returns;
+using KnockBox.Core.Primitives.Returns;
 using Microsoft.AspNetCore.Components;
 
 namespace KnockBox.HiddenAgenda.Pages

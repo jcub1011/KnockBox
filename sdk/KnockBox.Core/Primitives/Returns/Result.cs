@@ -1,6 +1,6 @@
-﻿using System.Diagnostics.CodeAnalysis;
+using System.Diagnostics.CodeAnalysis;
 
-namespace KnockBox.Core.Extensions.Returns
+namespace KnockBox.Core.Primitives.Returns
 {
     /// <summary>
     /// A wrapper used to discern between failures and cancellations.

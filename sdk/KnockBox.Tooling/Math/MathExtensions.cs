@@ -1,4 +1,4 @@
-﻿namespace KnockBox.Core.Extensions.Math
+namespace KnockBox.Tooling.Math
 {
     public static class MathExtensions
     {

@@ -1,4 +1,4 @@
-using KnockBox.Core.Extensions.Collections;
+using KnockBox.Tooling.Collections;
 using KnockBox.Operator.Services.Logic.Games;
 using KnockBox.Operator.Services.State;
 using KnockBox.Core.Services.State.Users;

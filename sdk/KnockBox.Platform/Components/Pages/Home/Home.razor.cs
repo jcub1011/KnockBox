@@ -1,6 +1,6 @@
 using KnockBox.Core.Components.Shared;
-using KnockBox.Core.Extensions.Disposable;
-using KnockBox.Core.Extensions.Exceptions;
+using KnockBox.Core.Primitives.Disposable;
+using KnockBox.Core.Primitives.Exceptions;
 using KnockBox.Core.Services.Logic.Games.Shared;
 using KnockBox.Core.Services.Logic.RandomGeneration;
 using KnockBox.Core.Services.State.Games.Shared;

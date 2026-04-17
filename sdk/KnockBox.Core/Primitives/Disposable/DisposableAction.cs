@@ -1,4 +1,4 @@
-﻿namespace KnockBox.Core.Extensions.Disposable
+namespace KnockBox.Core.Primitives.Disposable
 {
     /// <summary>
     /// Invokes the provided action when disposed. Safe to invoke dispose multiple times as the action will only ever be called once.

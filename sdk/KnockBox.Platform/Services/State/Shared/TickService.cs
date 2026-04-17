@@ -1,6 +1,6 @@
 using KnockBox.Core.Services.State.Shared;
-using KnockBox.Core.Extensions.Disposable;
-using KnockBox.Core.Extensions.Returns;
+using KnockBox.Core.Primitives.Disposable;
+using KnockBox.Core.Primitives.Returns;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.ObjectPool;
 

@@ -1,5 +1,5 @@
 using System.Security.Cryptography;
-using KnockBox.Core.Extensions.Returns;
+using KnockBox.Core.Primitives.Returns;
 using KnockBox.Platform.Filtering;
 using KnockBox.Platform.Games;
 

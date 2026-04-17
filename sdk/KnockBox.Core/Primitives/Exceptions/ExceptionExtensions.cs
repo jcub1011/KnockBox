@@ -1,7 +1,8 @@
-﻿using System.Diagnostics.CodeAnalysis;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
+using KnockBox.Core.Primitives.Exceptions;
 
-namespace KnockBox.Core.Extensions.Exceptions
+namespace KnockBox.Core.Primitives.Exceptions
 {
     public static class ExceptionExtensions
     {

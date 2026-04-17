@@ -1,4 +1,3 @@
-using KnockBox.Core.Extensions.RandomGeneration;
 using KnockBox.Core.Services.Logic.RandomGeneration;
 using System.Security.Cryptography;
 
@@ -37,8 +36,15 @@ namespace KnockBox.Services.Logic.RandomGeneration
             return type switch
             {
                 RandomType.Secure => RandomNumberGenerator.GetBytes(length),
-                _ => Random.Shared.GetBytes(length)
+                _ => GetFastBytes(length)
             };
+        }
+
+        private static byte[] GetFastBytes(int length)
+        {
+            byte[] bytes = new byte[length];
+            Random.Shared.NextBytes(bytes);
+            return bytes;
         }
     }
 }

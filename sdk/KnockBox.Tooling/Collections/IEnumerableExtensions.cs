@@ -1,6 +1,6 @@
 using KnockBox.Core.Services.Logic.RandomGeneration;
 
-namespace KnockBox.Core.Extensions.Collections
+namespace KnockBox.Tooling.Collections
 {
     public static class IEnumerableExtensions
     {

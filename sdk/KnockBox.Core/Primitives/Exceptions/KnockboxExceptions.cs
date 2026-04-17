@@ -1,4 +1,4 @@
-﻿namespace KnockBox.Core.Extensions.Exceptions
+namespace KnockBox.Core.Primitives.Exceptions
 {
     /// <summary>
     /// The base class of knockbox exceptions.

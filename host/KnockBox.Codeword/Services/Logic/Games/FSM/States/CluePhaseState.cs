@@ -1,5 +1,5 @@
 using KnockBox.Core.Services.State.Games.Shared;
-using KnockBox.Core.Extensions.Returns;
+using KnockBox.Core.Primitives.Returns;
 using KnockBox.Codeword.Services.State.Games;
 using KnockBox.Codeword.Services.State.Games.Data;
 
