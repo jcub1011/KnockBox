@@ -1,4 +1,4 @@
-using KnockBox.Data.Services.ClientStorage;
+using KnockBox.Platform.ClientStorage;
 using KnockBox.Services.State.Shared;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;

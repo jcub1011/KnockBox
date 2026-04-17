@@ -10,7 +10,7 @@ namespace KnockBox.Services.Navigation
     /// platform routes (<c>home</c>, game URIs, join URIs) without stitching
     /// URL strings together themselves. Registered as scoped.
     /// </summary>
-    public class NavigationService(NavigationManager navigationManager)
+    internal sealed class NavigationService(NavigationManager navigationManager)
         : INavigationService
     {
         public string GameBaseRoute => "games";

@@ -12,9 +12,10 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <!-- Types live under the short `KnockBox.*` namespace root rather than
-         `KnockBox.Platform.*` for backward compat with the in-repo host layout. -->
-    <RootNamespace>KnockBox</RootNamespace>
+    <!-- RootNamespace defaults to KnockBox.Platform (matches the package id).
+         Public API surface lives under KnockBox.Platform.*; internal legacy
+         folders keep explicit KnockBox.Services.* namespace declarations until
+         they're renamed or made internal. -->
     <PackageId>KnockBox.Platform</PackageId>
     <Authors>jcub1011</Authors>
     <Description>Runtime host for KnockBox party game plugins.</Description>

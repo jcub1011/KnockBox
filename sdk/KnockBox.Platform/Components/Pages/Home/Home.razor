@@ -3,16 +3,16 @@
 
 @inherits DisposableComponent
 
-<PageTitle>@PlatformOptions.Value.HomePageTitle</PageTitle>
+<PageTitle>@PlatformOptions.Value.Branding.HomePageTitle</PageTitle>
 
 <div class="home-container @(_isTransitioning ? "transitioning" : "") @(_isReturning ? "returning" : "")">
     <div class="hero">
         <h1 class="title">
-            @foreach (var letter in PlatformOptions.Value.HomeHeroTitle)
+            @foreach (var letter in PlatformOptions.Value.Branding.HomeHeroTitle)
             {
                 <span class="title-letter" aria-hidden="true">@letter</span>
             }
-            <span class="sr-only">@PlatformOptions.Value.HomeHeroTitle</span>
+            <span class="sr-only">@PlatformOptions.Value.Branding.HomeHeroTitle</span>
         </h1>
     </div>
 

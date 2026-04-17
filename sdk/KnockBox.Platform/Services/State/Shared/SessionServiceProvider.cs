@@ -29,7 +29,7 @@ internal class CacheRegistration(IServiceScope scope, object service) : IDisposa
     }
 }
 
-public class SessionServiceProvider(
+public sealed class SessionServiceProvider(
     IServiceProvider serviceProvider,
     ILogger<SessionServiceProvider> logger)
     : ISessionServiceProvider, IDisposable

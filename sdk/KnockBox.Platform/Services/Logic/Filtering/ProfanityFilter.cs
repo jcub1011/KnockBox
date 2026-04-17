@@ -1,8 +1,10 @@
 namespace KnockBox.Services.Logic.Filtering
 {
-    public class ProfanityFilter : IProfanityFilter
+    using KnockBox.Platform.Filtering;
+
+    internal sealed class ProfanityFilter : IProfanityFilter
     {
-        private const string ProfanityResourceName = "KnockBox.Data.Statics.Profanities.English.txt";
+        private const string ProfanityResourceName = "KnockBox.Platform.Data.Statics.Profanities.English.txt";
         private static readonly Lazy<Automaton> AutomatonLazy = new(Automaton.Build, LazyThreadSafetyMode.ExecutionAndPublication);
 
         public ValueTask<List<ProfanityMatch>?> ExtractProfanitiesAsync(string text, CancellationToken ct = default)

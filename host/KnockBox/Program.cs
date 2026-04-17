@@ -1,13 +1,16 @@
 using KnockBox.Services.Logic.Admin;
+using KnockBox.Services.Logic.Games.Shared;
+using KnockBox.Services.Logic.Storage;
 using KnockBox.Admin;
 using KnockBox.Components;
 using KnockBox.Core.Plugins;
 using KnockBox.Platform;
-using KnockBox.Services.Logic.Games.Shared;
-using KnockBox.Services.Logic.Storage;
+using KnockBox.Platform.Games;
+using KnockBox.Platform.Storage;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Hosting.Server.Features;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Microsoft.AspNetCore.Components.Server.Circuits;
 using Serilog;
@@ -49,23 +52,31 @@ namespace KnockBox
             ConfigureAdminPort(builder, adminOptions.Port);
 
             // ── Admin-specific services (Host-side implementations) ──────────
-            // We register these BEFORE AddKnockBoxPlatform so the platform's 
+            // We register these BEFORE AddKnockBoxPlatform so the platform's
             // TryAddSingleton yields to these explicit overrides.
+            //
+            // A throwaway AdminSettingsService is built here purely to read the
+            // third-party-plugins toggle synchronously while deciding which
+            // directories to scan — no BuildServiceProvider() detour. It is
+            // NOT registered; the DI container constructs its own singleton
+            // below with the real ILogger<T>, so runtime mutations (e.g. the
+            // admin toggle at /admin/games) surface persistence failures in
+            // the Serilog pipeline. LoadFromDisk is idempotent, so the extra
+            // read at DI-resolution time is harmless.
+            var adminSettingsBootstrap = new AdminSettingsService(
+                storagePath,
+                Options.Create(adminOptions),
+                NullLogger<AdminSettingsService>.Instance);
             builder.Services.AddSingleton<IAdminSettingsService, AdminSettingsService>();
             builder.Services.AddSingleton<IGameAvailabilityService, GameAvailabilityService>();
 
             // ── Platform services ────────────────────────────────────────────
             builder.AddKnockBoxPlatform(options =>
             {
-                // We resolve the settings service from the builder's transient provider
-                // to decide which paths to register.
-                using var provider = builder.Services.BuildServiceProvider();
-                var settings = provider.GetRequiredService<IAdminSettingsService>();
-
                 options.PluginsPaths.Clear();
                 options.PluginsPaths.Add(storagePath.GetFirstPartyPluginsDirectory());
-                
-                if (settings.GetEnableThirdPartyPlugins())
+
+                if (adminSettingsBootstrap.GetEnableThirdPartyPlugins())
                 {
                     options.PluginsPaths.Add(storagePath.GetExternalPluginsDirectory());
                 }

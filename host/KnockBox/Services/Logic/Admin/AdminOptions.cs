@@ -5,6 +5,11 @@ namespace KnockBox.Services.Logic.Admin
     /// The admin interface is hidden behind a dedicated port and guarded by a
     /// single shared login pulled from this section.
     /// </summary>
+    /// <remarks>
+    /// Lives in the host assembly (not the Platform SDK package) so credentials
+    /// and admin paths never reach the plugin-facing surface. Marked public so
+    /// Razor Pages (e.g. the login page model) can accept it through DI.
+    /// </remarks>
     public sealed class AdminOptions
     {
         public const string SectionName = "Admin";

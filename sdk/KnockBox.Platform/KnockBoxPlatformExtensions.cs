@@ -2,9 +2,8 @@ using System.Reflection;
 using KnockBox.Core.Plugins;
 using KnockBox.Core.Services.Drawing;
 using KnockBox.Core.Services.Navigation;
+using KnockBox.Platform.Games;
 using KnockBox.Services.Drawing;
-using KnockBox.Services.Logic.Admin;
-using KnockBox.Services.Logic.Games.Shared;
 using KnockBox.Services.Navigation;
 using KnockBox.Services.Registrations.Logic;
 using KnockBox.Services.Registrations.Repositories;
@@ -32,6 +31,25 @@ public static class KnockBoxPlatformExtensions
     /// Registers all KnockBox Platform services, performs plugin discovery, and
     /// configures the Blazor component pipeline.
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Registration order matters for host overrides.</b> The Platform
+    /// registers default implementations of extensible services (currently
+    /// <c>IGameAvailabilityService</c>) via <c>TryAddSingleton</c>. A host that
+    /// wants to replace a default MUST call <c>builder.Services.AddSingleton&lt;...&gt;</c>
+    /// BEFORE calling <c>AddKnockBoxPlatform</c>; registrations made afterwards
+    /// will not win over the default instance Platform already installed.
+    /// </para>
+    /// <para>
+    /// If the default <c>AllGamesEnabledService</c> ends up in DI (no prior
+    /// registration was found), this method emits an Information log line so a
+    /// misordered override surfaces at startup instead of appearing as silent
+    /// "every game is enabled" behavior in production. The log is gated on
+    /// <see cref="PluginDiscoveryMode.Directory"/> — DevHosts run in
+    /// <see cref="PluginDiscoveryMode.Explicit"/> and are expected to rely on
+    /// the default, so they stay quiet.
+    /// </para>
+    /// </remarks>
     public static WebApplicationBuilder AddKnockBoxPlatform(
         this WebApplicationBuilder builder,
         Action<KnockBoxPlatformOptions>? configure = null)
@@ -39,20 +57,19 @@ public static class KnockBoxPlatformExtensions
         var options = new KnockBoxPlatformOptions();
         configure?.Invoke(options);
 
-        // Guard against a silent misconfiguration: AddGameModule<T>() populates
-        // ExplicitModules AND flips PluginDiscovery to Explicit. If the caller
-        // then writes PluginDiscovery = Directory afterwards, the explicit
-        // modules would be silently dropped. Fail fast instead -- the caller
-        // either meant to use directory scanning (remove the AddGameModule
-        // calls) or explicit registration (drop the Directory assignment).
+        // Guard against a silent misconfiguration: AddGameModule<T>() appends
+        // to ExplicitModules, but callers must also opt into Explicit mode
+        // themselves. Leaving PluginDiscovery at its default (Directory) while
+        // registering explicit modules is the footgun this guard catches.
         if (options.PluginDiscovery == PluginDiscoveryMode.Directory
             && options.ExplicitModules.Count > 0)
         {
             throw new InvalidOperationException(
                 $"KnockBoxPlatformOptions has {options.ExplicitModules.Count} explicit " +
                 "module(s) registered but PluginDiscovery is set to Directory. " +
-                "Either remove the AddGameModule<T>() call(s) or remove the " +
-                "PluginDiscovery = Directory assignment.");
+                "Either set PluginDiscovery = PluginDiscoveryMode.Explicit (to " +
+                "use the registered modules) or remove the AddGameModule<T>() " +
+                "call(s) so directory scanning is used.");
         }
 
         // Register the fully-populated options instance directly. Using
@@ -73,11 +90,12 @@ public static class KnockBoxPlatformExtensions
 
         // Default IGameAvailabilityService — yields to an explicit registration
         // made by the host (e.g. the production host's file-backed service).
+        // Hosts that need to override MUST register their implementation on
+        // the service collection BEFORE calling AddKnockBoxPlatform; TryAdd
+        // is order-sensitive.
+        var hostAlreadyRegisteredAvailability = builder.Services.Any(
+            d => d.ServiceType == typeof(IGameAvailabilityService));
         builder.Services.TryAddSingleton<IGameAvailabilityService, AllGamesEnabledService>();
-
-        // Default IAdminSettingsService — yields to an explicit registration
-        // made by the host (e.g. the production host's file-backed service).
-        builder.Services.TryAddSingleton<IAdminSettingsService, AllPluginsDisabledSettingsService>();
 
         // Single bootstrap logger factory used for both plugin discovery and
         // registration-time logging. Console-only here; the host's configured
@@ -87,6 +105,20 @@ public static class KnockBoxPlatformExtensions
             .WriteTo.Console()
             .CreateLogger();
         using var bootstrapLoggerFactory = new SerilogLoggerFactory(bootstrapSerilog, dispose: true);
+
+        if (!hostAlreadyRegisteredAvailability
+            && options.PluginDiscovery == PluginDiscoveryMode.Directory)
+        {
+            // Visible signal so a production host that meant to override but
+            // registered after AddKnockBoxPlatform sees at startup that the
+            // default won. Explicit-mode (DevHost) callers are expected to
+            // rely on the default, so we stay silent for them.
+            bootstrapLoggerFactory
+                .CreateLogger(typeof(KnockBoxPlatformExtensions).FullName!)
+                .LogInformation(
+                    "No IGameAvailabilityService registered before AddKnockBoxPlatform; " +
+                    "using the default AllGamesEnabledService (every game enabled).");
+        }
 
         // Plugin discovery
         PluginLoadResult pluginLoadResult;
@@ -105,23 +137,10 @@ public static class KnockBoxPlatformExtensions
             var modules = new List<IGameModule>();
             var assemblies = new List<Assembly>();
 
-            // We need to resolve the IStoragePathService and IAdminSettingsService
-            // from a temporary provider to decide which paths to scan.
-            using var tempProvider = builder.Services.BuildServiceProvider();
-            var storagePath = tempProvider.GetRequiredService<KnockBox.Services.Logic.Storage.IStoragePathService>();
-            var settingsService = tempProvider.GetRequiredService<IAdminSettingsService>();
-
-            // If the caller didn't explicitly set paths, we'll apply our 
-            // third-party gating logic to the default directories.
-            if (options.PluginsPaths.Count == 0)
-            {
-                options.PluginsPaths.Add(storagePath.GetFirstPartyPluginsDirectory());
-                if (settingsService.GetEnableThirdPartyPlugins())
-                {
-                    options.PluginsPaths.Add(storagePath.GetExternalPluginsDirectory());
-                }
-            }
-
+            // The caller (or the default `["games"]`) owns path selection. The
+            // platform no longer resolves host services via a throwaway
+            // BuildServiceProvider — hosts with admin-style gating should
+            // populate PluginsPaths directly inside their configure callback.
             foreach (var rawPath in options.PluginsPaths)
             {
                 var pluginsPath = ResolvePluginsPath(rawPath);

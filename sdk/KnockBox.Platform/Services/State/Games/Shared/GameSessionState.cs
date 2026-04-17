@@ -15,7 +15,7 @@ namespace KnockBox.Services.State.Games.Shared
     /// from the game state so the lobby slot is freed without requiring an active circuit.
     /// </para>
     /// </summary>
-    public sealed class GameSessionState : IDisposable
+    internal sealed class GameSessionState : IDisposable
     {
         private UserRegistration? _currentSession;
 

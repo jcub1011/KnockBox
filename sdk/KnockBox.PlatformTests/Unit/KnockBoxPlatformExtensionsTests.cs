@@ -4,7 +4,7 @@ using KnockBox.Core.Services.Logic.Games.Engines.Shared;
 using KnockBox.Core.Services.State.Games.Shared;
 using KnockBox.Core.Services.State.Users;
 using KnockBox.Platform;
-using KnockBox.Services.Logic.Games.Shared;
+using KnockBox.Platform.Games;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
@@ -18,7 +18,11 @@ public sealed class KnockBoxPlatformExtensionsTests
     public void AddKnockBoxPlatform_ExplicitMode_RegistersEngineKeyedByRouteIdentifier()
     {
         var builder = WebApplication.CreateBuilder();
-        builder.AddKnockBoxPlatform(o => o.AddGameModule<FakeModule>());
+        builder.AddKnockBoxPlatform(o =>
+        {
+            o.PluginDiscovery = PluginDiscoveryMode.Explicit;
+            o.AddGameModule<FakeModule>();
+        });
 
         using var app = builder.Build();
 
@@ -28,10 +32,27 @@ public sealed class KnockBoxPlatformExtensionsTests
     }
 
     [TestMethod]
+    public void AddGameModule_DoesNotFlipPluginDiscoveryMode()
+    {
+        // Regression guard for the old silent-flip behavior. The caller is now
+        // solely responsible for setting PluginDiscovery; AddGameModule only
+        // appends to ExplicitModules.
+        var options = new KnockBoxPlatformOptions();
+
+        options.AddGameModule<FakeModule>();
+
+        Assert.AreEqual(PluginDiscoveryMode.Directory, options.PluginDiscovery);
+        Assert.AreEqual(1, options.ExplicitModules.Count);
+    }
+
+    [TestMethod]
     public void AddKnockBoxPlatform_RegistersDefaultGameAvailabilityService()
     {
         var builder = WebApplication.CreateBuilder();
-        builder.AddKnockBoxPlatform(o => o.PluginDiscovery = PluginDiscoveryMode.Explicit);
+        builder.AddKnockBoxPlatform(o =>
+        {
+            o.PluginDiscovery = PluginDiscoveryMode.Explicit;
+        });
 
         using var app = builder.Build();
 
@@ -46,7 +67,10 @@ public sealed class KnockBoxPlatformExtensionsTests
         var stub = new StubAvailabilityService();
         builder.Services.AddSingleton<IGameAvailabilityService>(stub);
 
-        builder.AddKnockBoxPlatform(o => o.PluginDiscovery = PluginDiscoveryMode.Explicit);
+        builder.AddKnockBoxPlatform(o =>
+        {
+            o.PluginDiscovery = PluginDiscoveryMode.Explicit;
+        });
 
         using var app = builder.Build();
 
@@ -59,14 +83,14 @@ public sealed class KnockBoxPlatformExtensionsTests
     {
         var builder = WebApplication.CreateBuilder();
 
-        // AddGameModule<T> flips PluginDiscovery to Explicit and adds the
-        // module. Reassigning PluginDiscovery back to Directory afterwards is
-        // exactly the footgun the guard catches.
+        // AddGameModule<T> appends to ExplicitModules but no longer flips
+        // PluginDiscovery. Leaving PluginDiscovery at its default (Directory)
+        // while registering explicit modules is the footgun the guard catches.
         var ex = Assert.Throws<InvalidOperationException>(() =>
             builder.AddKnockBoxPlatform(o =>
             {
                 o.AddGameModule<FakeModule>();
-                o.PluginDiscovery = PluginDiscoveryMode.Directory;
+                // PluginDiscovery intentionally left at default (Directory).
             }));
 
         StringAssert.Contains(ex.Message, "Directory");
@@ -77,7 +101,10 @@ public sealed class KnockBoxPlatformExtensionsTests
     public void AddKnockBoxPlatform_DefaultAvailabilityService_GetAll_ReturnsSameReference()
     {
         var builder = WebApplication.CreateBuilder();
-        builder.AddKnockBoxPlatform(o => o.PluginDiscovery = PluginDiscoveryMode.Explicit);
+        builder.AddKnockBoxPlatform(o =>
+        {
+            o.PluginDiscovery = PluginDiscoveryMode.Explicit;
+        });
         using var app = builder.Build();
 
         var availability = app.Services.GetRequiredService<IGameAvailabilityService>();

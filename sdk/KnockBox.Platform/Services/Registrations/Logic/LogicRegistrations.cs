@@ -1,3 +1,5 @@
+using KnockBox.Platform.Filtering;
+using KnockBox.Platform.Games;
 using KnockBox.Services.Logic.Filtering;
 using KnockBox.Services.Logic.Games.Shared;
 using KnockBox.Core.Services.Logic.RandomGeneration;

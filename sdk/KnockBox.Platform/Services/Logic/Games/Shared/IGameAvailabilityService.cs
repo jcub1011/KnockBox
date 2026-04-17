@@ -1,4 +1,4 @@
-namespace KnockBox.Services.Logic.Games.Shared
+namespace KnockBox.Platform.Games
 {
     /// <summary>
     /// Tracks per-game enabled/disabled state so the home page can hide

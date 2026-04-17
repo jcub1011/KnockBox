@@ -17,8 +17,11 @@
          (lobby, session, navigation, profanity filter, tick loop), and the
          AddKnockBoxPlatform / UseKnockBoxPlatform extension methods used in
          Program.cs. Hosts (including this DevHost) reference Platform;
-         plugins NEVER do. -->
-    <PackageReference Include="KnockBox.Platform" Version="1.*" />
+         plugins NEVER do.
+         Pinned to 1.0.* — scaffolded projects float within the patch range
+         of the SDK version that scaffolded them, for reproducible DevHost
+         builds. Bump the floor manually when you upgrade to a new minor. -->
+    <PackageReference Include="KnockBox.Platform" Version="1.0.*" />
 
     <!-- Direct ProjectReference to the plugin — dev-only. This is what lets
          Visual Studio hot-reload Razor edits and rebuild the plugin DLL on

@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Text.Json;
 
 namespace KnockBox.Core.Plugins
 {
@@ -28,6 +29,16 @@ namespace KnockBox.Core.Plugins
         Justification = "Startup-only discovery path. Log volume is bounded by the number of plugins in games/; readability of structured discovery/error messages is more valuable than LoggerMessage cache wins.")]
     public sealed class PluginLoader(ILogger<PluginLoader> logger)
     {
+        /// <summary>
+        /// Package ids a plugin's <c>.deps.json</c> must NOT reference. Right now
+        /// only <c>KnockBox.Platform</c> is forbidden: referencing it from a
+        /// plugin drags the Platform's types into the plugin's ALC and breaks
+        /// the type-identity invariant that keeps host-shared contracts working
+        /// across the host/plugin boundary.
+        /// </summary>
+        internal static readonly IReadOnlyList<string> ForbiddenPluginDependencies =
+            new[] { "KnockBox.Platform" };
+
         /// <summary>
         /// Scans <paramref name="pluginsDirectory"/> for plugin folders, loads
         /// each into its own <see cref="PluginLoadContext"/>, reflects for
@@ -147,6 +158,19 @@ namespace KnockBox.Core.Plugins
                         continue;
                     }
 
+                    var forbidden = FindForbiddenDependency(dllPath);
+                    if (forbidden is not null)
+                    {
+                        logger.LogError(
+                            "Plugin [{Assembly}] declares a dependency on [{ForbiddenPackage}] in its .deps.json. " +
+                            "Plugins MUST reference only KnockBox.Core — referencing the Platform package breaks " +
+                            "AssemblyLoadContext isolation and causes type-identity drift at runtime. " +
+                            "Skipping this plugin.",
+                            primaryAssemblyName,
+                            forbidden);
+                        continue;
+                    }
+
                     bool IsSharedContract(AssemblyName name)
                     {
                         if (string.IsNullOrEmpty(name.Name))
@@ -218,6 +242,58 @@ namespace KnockBox.Core.Plugins
                     continue;
 
                 yield return type;
+            }
+        }
+
+        /// <summary>
+        /// Scans the plugin's co-located <c>.deps.json</c> for any package id in
+        /// <see cref="ForbiddenPluginDependencies"/>. Returns the offending id or
+        /// <c>null</c> if nothing is found. A missing, unreadable, or malformed
+        /// <c>.deps.json</c> all skip the check (return <c>null</c>) — the guard
+        /// cannot inspect what it cannot parse, and the subsequent assembly load
+        /// will surface any real IO problems with a clearer per-plugin error.
+        /// </summary>
+        internal static string? FindForbiddenDependency(string pluginDllPath)
+        {
+            var depsJsonPath = Path.ChangeExtension(pluginDllPath, ".deps.json");
+            if (!File.Exists(depsJsonPath))
+                return null;
+
+            try
+            {
+                using var stream = File.OpenRead(depsJsonPath);
+                using var doc = JsonDocument.Parse(stream);
+
+                // The shape of deps.json is `{ "libraries": { "Name/Version": { ... } }, ... }`.
+                // Walking `libraries` gives us every transitive package id; that's the
+                // simplest surface to match ForbiddenPluginDependencies against.
+                if (!doc.RootElement.TryGetProperty("libraries", out var libraries) ||
+                    libraries.ValueKind != JsonValueKind.Object)
+                    return null;
+
+                foreach (var library in libraries.EnumerateObject())
+                {
+                    // Entries are keyed "{Id}/{Version}"; take the id half.
+                    var slashIndex = library.Name.IndexOf('/');
+                    var id = slashIndex > 0 ? library.Name[..slashIndex] : library.Name;
+
+                    foreach (var forbidden in ForbiddenPluginDependencies)
+                    {
+                        if (string.Equals(id, forbidden, StringComparison.OrdinalIgnoreCase))
+                            return forbidden;
+                    }
+                }
+
+                return null;
+            }
+            catch (Exception)
+            {
+                // IO failure (racy delete, permissions) or malformed JSON: we
+                // can't enforce the guard here. The assembly load that follows
+                // will fail with its own clearer error if the plugin is truly
+                // broken; a well-formed plugin with a quirky deps.json simply
+                // skips the forbidden-dep check.
+                return null;
             }
         }
 

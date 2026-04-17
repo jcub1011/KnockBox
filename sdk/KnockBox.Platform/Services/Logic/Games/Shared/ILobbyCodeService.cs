@@ -1,6 +1,6 @@
 using KnockBox.Core.Extensions.Returns;
 
-namespace KnockBox.Services.Logic.Games.Shared
+namespace KnockBox.Platform.Games
 {
     /// <summary>
     /// A service used to create unique lobby codes.

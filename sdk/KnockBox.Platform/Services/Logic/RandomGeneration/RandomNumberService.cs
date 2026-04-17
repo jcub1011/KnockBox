@@ -10,7 +10,7 @@ namespace KnockBox.Services.Logic.RandomGeneration
     /// or <see cref="RandomNumberGenerator"/> for <see cref="RandomType.Secure"/>.
     /// Registered as a singleton by the platform.
     /// </summary>
-    public class RandomNumberService : IRandomNumberService
+    public sealed class RandomNumberService : IRandomNumberService
     {
         public int GetRandomInt(int exclusiveMax, RandomType type = RandomType.Fast)
         {

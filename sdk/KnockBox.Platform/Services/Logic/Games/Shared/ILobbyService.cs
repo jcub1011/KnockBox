@@ -2,7 +2,7 @@ using KnockBox.Core.Extensions.Returns;
 using KnockBox.Core.Services.Logic.Games.Shared;
 using KnockBox.Core.Services.State.Users;
 
-namespace KnockBox.Services.Logic.Games.Shared
+namespace KnockBox.Platform.Games
 {
     public interface ILobbyService
     {

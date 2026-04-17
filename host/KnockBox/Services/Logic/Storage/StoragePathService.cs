@@ -1,4 +1,4 @@
-using KnockBox.Services.Logic.Storage;
+using KnockBox.Platform.Storage;
 
 namespace KnockBox.Services.Logic.Storage
 {
