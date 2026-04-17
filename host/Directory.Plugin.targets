@@ -48,6 +48,8 @@
                      Condition="Exists('$(TargetDir)$(TargetName).staticwebassets.endpoints.json')" />
       <PluginPrimary Include="$(TargetDir)$(TargetName).staticwebassets.runtime.json"
                      Condition="Exists('$(TargetDir)$(TargetName).staticwebassets.runtime.json')" />
+      <PluginPrimary Include="$(TargetDir)KnockBox.Tooling.dll" Condition="Exists('$(TargetDir)KnockBox.Tooling.dll')" />
+      <PluginPrimary Include="$(TargetDir)KnockBox.Tooling.pdb" Condition="Exists('$(TargetDir)KnockBox.Tooling.pdb')" />
       <ScopedCss Include="$(IntermediateOutputPath)scopedcss\projectbundle\$(TargetName).bundle.scp.css" />
       <WwwRootFiles Include="wwwroot\**\*.*" />
       <PluginContentFiles Include="$(TargetDir)**\*.csv" />
