@@ -105,10 +105,13 @@ public partial class MyGameLobby : DisposableComponent
 
     private void HandleStateDisposed()
     {
-        // The state has already torn itself down; don't ask the session
-        // service to navigate — we handle the redirect ourselves.
-        GameSessionService.LeaveCurrentSession(navigateHome: false);
-        NavigationService.ToHome();
+        _ = InvokeAsync(() =>
+        {
+            // The state has already torn itself down.
+            // LeaveCurrentSession(navigateHome: true) performs the redirect natively,
+            // but we must marshal it to the UI thread to avoid an InvalidOperationException.
+            GameSessionService.LeaveCurrentSession(navigateHome: true);
+        });
     }
 
     public override void Dispose()

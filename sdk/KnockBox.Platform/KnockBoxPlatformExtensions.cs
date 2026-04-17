@@ -3,6 +3,7 @@ using KnockBox.Core.Plugins;
 using KnockBox.Core.Services.Drawing;
 using KnockBox.Core.Services.Navigation;
 using KnockBox.Services.Drawing;
+using KnockBox.Services.Logic.Admin;
 using KnockBox.Services.Logic.Games.Shared;
 using KnockBox.Services.Navigation;
 using KnockBox.Services.Registrations.Logic;
@@ -74,6 +75,10 @@ public static class KnockBoxPlatformExtensions
         // made by the host (e.g. the production host's file-backed service).
         builder.Services.TryAddSingleton<IGameAvailabilityService, AllGamesEnabledService>();
 
+        // Default IAdminSettingsService — yields to an explicit registration
+        // made by the host (e.g. the production host's file-backed service).
+        builder.Services.TryAddSingleton<IAdminSettingsService, AllPluginsDisabledSettingsService>();
+
         // Single bootstrap logger factory used for both plugin discovery and
         // registration-time logging. Console-only here; the host's configured
         // Serilog pipeline takes over once DI is built.
@@ -99,6 +104,23 @@ public static class KnockBoxPlatformExtensions
 
             var modules = new List<IGameModule>();
             var assemblies = new List<Assembly>();
+
+            // We need to resolve the IStoragePathService and IAdminSettingsService
+            // from a temporary provider to decide which paths to scan.
+            using var tempProvider = builder.Services.BuildServiceProvider();
+            var storagePath = tempProvider.GetRequiredService<KnockBox.Services.Logic.Storage.IStoragePathService>();
+            var settingsService = tempProvider.GetRequiredService<IAdminSettingsService>();
+
+            // If the caller didn't explicitly set paths, we'll apply our 
+            // third-party gating logic to the default directories.
+            if (options.PluginsPaths.Count == 0)
+            {
+                options.PluginsPaths.Add(storagePath.GetFirstPartyPluginsDirectory());
+                if (settingsService.GetEnableThirdPartyPlugins())
+                {
+                    options.PluginsPaths.Add(storagePath.GetExternalPluginsDirectory());
+                }
+            }
 
             foreach (var rawPath in options.PluginsPaths)
             {

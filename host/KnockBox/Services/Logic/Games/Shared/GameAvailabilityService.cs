@@ -1,4 +1,4 @@
-using KnockBox.Admin;
+using KnockBox.Services.Logic.Admin;
 using KnockBox.Services.Logic.Storage;
 using Microsoft.Extensions.Options;
 using System.Collections.Concurrent;

@@ -1,4 +1,4 @@
-namespace KnockBox.Admin
+namespace KnockBox.Services.Logic.Admin
 {
     /// <summary>
     /// Strongly-typed binding for the <c>Admin</c> section of appsettings.json.
@@ -31,6 +31,12 @@ namespace KnockBox.Admin
         /// Resolved relative to <c>IStoragePathService.GetAdminDirectory()</c>.
         /// </summary>
         public string GameStatePath { get; init; } = "games-state.json";
+
+        /// <summary>
+        /// Filename of the persisted admin settings.
+        /// Resolved relative to <c>IStoragePathService.GetAdminDirectory()</c>.
+        /// </summary>
+        public string SettingsPath { get; init; } = "settings.json";
 
         /// <summary>
         /// Directory where log files are stored. Resolved relative to

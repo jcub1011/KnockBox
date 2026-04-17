@@ -1,8 +1,8 @@
+using KnockBox.Services.Logic.Admin;
 using KnockBox.Admin;
 using KnockBox.Components;
 using KnockBox.Core.Plugins;
 using KnockBox.Platform;
-using KnockBox.Services.Logic.Admin;
 using KnockBox.Services.Logic.Games.Shared;
 using KnockBox.Services.Logic.Storage;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -48,16 +48,27 @@ namespace KnockBox
 
             ConfigureAdminPort(builder, adminOptions.Port);
 
-            // ── Platform services ────────────────────────────────────────────
-            // Register the file-backed GameAvailabilityService BEFORE Platform
-            // so Platform's TryAddSingleton yields to it.
+            // ── Admin-specific services (Host-side implementations) ──────────
+            // We register these BEFORE AddKnockBoxPlatform so the platform's 
+            // TryAddSingleton yields to these explicit overrides.
+            builder.Services.AddSingleton<IAdminSettingsService, AdminSettingsService>();
             builder.Services.AddSingleton<IGameAvailabilityService, GameAvailabilityService>();
 
+            // ── Platform services ────────────────────────────────────────────
             builder.AddKnockBoxPlatform(options =>
             {
+                // We resolve the settings service from the builder's transient provider
+                // to decide which paths to register.
+                using var provider = builder.Services.BuildServiceProvider();
+                var settings = provider.GetRequiredService<IAdminSettingsService>();
+
                 options.PluginsPaths.Clear();
                 options.PluginsPaths.Add(storagePath.GetFirstPartyPluginsDirectory());
-                options.PluginsPaths.Add(storagePath.GetExternalPluginsDirectory());
+                
+                if (settings.GetEnableThirdPartyPlugins())
+                {
+                    options.PluginsPaths.Add(storagePath.GetExternalPluginsDirectory());
+                }
             });
 
             // ── Admin-specific services ──────────────────────────────────────
