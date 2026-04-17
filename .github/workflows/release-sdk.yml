@@ -16,10 +16,20 @@ jobs:
     name: Validate version input
     runs-on: ubuntu-latest
     steps:
-      - name: Reject leading v prefix
+      - name: Validate version format
+        env:
+          VERSION: ${{ inputs.version }}
         run: |
-          if [[ "${{ inputs.version }}" =~ ^v ]]; then
+          # Reject a leading 'v' so nupkg filenames match the NuGet convention.
+          if [[ "$VERSION" =~ ^v ]]; then
             echo "ERROR: SDK version must not include a 'v' prefix. Use '1.4.0', not 'v1.4.0'."
+            exit 1
+          fi
+          # Reject anything outside of SemVer-safe characters. Defends downstream
+          # shell commands (dotnet pack -p:Version=…, gh release) against
+          # accidental or malicious metacharacter injection.
+          if [[ ! "$VERSION" =~ ^[A-Za-z0-9._+-]+$ ]]; then
+            echo "ERROR: Version '$VERSION' contains characters outside [A-Za-z0-9._+-]."
             exit 1
           fi
 
@@ -40,7 +50,9 @@ jobs:
           dotnet-version: '10.0.x'
 
       - name: Pack
-        run: dotnet pack sdk/KnockBox.Core/KnockBox.Core.csproj -c Release -p:Version=${{ inputs.version }} -o nupkg
+        env:
+          VERSION: ${{ inputs.version }}
+        run: dotnet pack sdk/KnockBox.Core/KnockBox.Core.csproj -c Release -p:Version="$VERSION" -o nupkg
 
       - name: NuGet Login
         id: oidc
@@ -80,7 +92,9 @@ jobs:
         # -p:Version drives both AssemblyVersion and PackageVersion, and feeds
         # the ProjectReference -> PackageReference transform at pack time so the
         # Platform nupkg's KnockBox.Core dependency is pinned to the same version.
-        run: dotnet pack sdk/KnockBox.Platform/KnockBox.Platform.csproj -c Release -p:Version=${{ inputs.version }} -o nupkg
+        env:
+          VERSION: ${{ inputs.version }}
+        run: dotnet pack sdk/KnockBox.Platform/KnockBox.Platform.csproj -c Release -p:Version="$VERSION" -o nupkg
 
       - name: NuGet Login
         id: oidc
@@ -115,7 +129,9 @@ jobs:
           dotnet-version: '10.0.x'
 
       - name: Pack
-        run: dotnet pack sdk/KnockBox.Templates/KnockBox.Templates.csproj -c Release -p:Version=${{ inputs.version }} -o nupkg
+        env:
+          VERSION: ${{ inputs.version }}
+        run: dotnet pack sdk/KnockBox.Templates/KnockBox.Templates.csproj -c Release -p:Version="$VERSION" -o nupkg
 
       - name: NuGet Login
         id: oidc
@@ -147,8 +163,10 @@ jobs:
 
       - name: Find previous SDK tag
         id: prev
+        env:
+          VERSION: ${{ inputs.version }}
         run: |
-          PREV=$(git tag --list 'sdk-*' --sort=-v:refname | grep -v "sdk-${{ inputs.version }}" | head -n1)
+          PREV=$(git tag --list 'sdk-*' --sort=-v:refname | grep -v "sdk-$VERSION" | head -n1)
           echo "tag=$PREV" >> "$GITHUB_OUTPUT"
 
       - name: Download all SDK artifacts

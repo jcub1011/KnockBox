@@ -12,8 +12,25 @@ permissions:
   contents: read
 
 jobs:
+  validate:
+    name: Validate tag input
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate tag format
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          # Host tags are conventionally vMAJOR.MINOR.PATCH[-suffix]. Reject
+          # anything outside the SemVer-safe character set so we never pipe
+          # metacharacter-bearing inputs into downstream shells or gh release.
+          if [[ ! "$TAG" =~ ^[A-Za-z0-9._+-]+$ ]]; then
+            echo "ERROR: Tag '$TAG' contains characters outside [A-Za-z0-9._+-]."
+            exit 1
+          fi
+
   publish:
     name: Publish ${{ matrix.rid }} (${{ matrix.mode }})
+    needs: [validate]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -29,32 +46,34 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      - name: Resolve version label
-        id: version
-        run: echo "label=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
-
       - name: Restore
         run: dotnet restore host/KnockBox/KnockBox.csproj -r ${{ matrix.rid }}
 
       - name: Publish host
+        env:
+          RID: ${{ matrix.rid }}
+          MODE: ${{ matrix.mode }}
         run: |
-          if [ "${{ matrix.mode }}" = "self-contained" ]; then
+          if [ "$MODE" = "self-contained" ]; then
             SELF_CONTAINED=true
           else
             SELF_CONTAINED=false
           fi
           dotnet publish host/KnockBox/KnockBox.csproj \
             -c Release \
-            -r ${{ matrix.rid }} \
+            -r "$RID" \
             --no-restore \
             --self-contained $SELF_CONTAINED \
             -p:PublishSingleFile=false \
             -p:UseAppHost=true \
-            -o publish/${{ matrix.rid }}-${{ matrix.mode }}
+            -o "publish/${RID}-${MODE}"
 
       - name: Verify plugins in publish output
+        env:
+          RID: ${{ matrix.rid }}
+          MODE: ${{ matrix.mode }}
         run: |
-          PUBLISH_DIR="publish/${{ matrix.rid }}-${{ matrix.mode }}"
+          PUBLISH_DIR="publish/${RID}-${MODE}"
           if [ ! -d "$PUBLISH_DIR/games" ]; then
             echo "ERROR: games/ folder missing from publish output"
             exit 1
@@ -69,9 +88,13 @@ jobs:
 
       - name: Create archive
         id: archive
+        env:
+          TAG: ${{ inputs.tag }}
+          RID: ${{ matrix.rid }}
+          MODE: ${{ matrix.mode }}
         run: |
-          ARCHIVE_NAME="knockbox-${{ steps.version.outputs.label }}-${{ matrix.rid }}-${{ matrix.mode }}.zip"
-          cd publish/${{ matrix.rid }}-${{ matrix.mode }}
+          ARCHIVE_NAME="knockbox-${TAG}-${RID}-${MODE}.zip"
+          cd "publish/${RID}-${MODE}"
           zip -r "../../$ARCHIVE_NAME" .
           cd ../..
           echo "name=$ARCHIVE_NAME" >> "$GITHUB_OUTPUT"
@@ -98,8 +121,10 @@ jobs:
 
       - name: Find previous host tag
         id: prev
+        env:
+          TAG: ${{ inputs.tag }}
         run: |
-          PREV=$(git tag --list 'v*' --sort=-v:refname | grep -v "${{ inputs.tag }}" | head -n1)
+          PREV=$(git tag --list 'v*' --sort=-v:refname | grep -v "$TAG" | head -n1)
           echo "tag=$PREV" >> "$GITHUB_OUTPUT"
 
       - name: Download all publish artifacts
