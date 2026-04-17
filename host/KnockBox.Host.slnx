@@ -4,6 +4,8 @@
     <BuildDependency Project="KnockBox.DiceSimulator/KnockBox.DiceSimulator.csproj" />
     <Build />
   </Project>
+  <Project Path="../sdk/KnockBox.Core/KnockBox.Core.csproj" />
+  <Project Path="../sdk/KnockBox.Platform/KnockBox.Platform.csproj" />
   <Project Path="KnockBox/KnockBox.csproj" />
   <Project Path="KnockBoxTests/KnockBoxTests.csproj" />
   <Project Path="KnockBox.CardCounter/KnockBox.CardCounter.csproj" />
