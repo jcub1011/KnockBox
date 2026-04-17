@@ -1,7 +1,9 @@
 using KnockBox.Admin;
 using KnockBox.Services.Logic.Games.Shared;
+using KnockBox.Services.Logic.Storage;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Moq;
 using System.Text.Json;
 
 namespace KnockBox.Tests.Unit.Services.Logic.Admin;
@@ -10,13 +12,17 @@ namespace KnockBox.Tests.Unit.Services.Logic.Admin;
 public sealed class GameAvailabilityServiceTests
 {
     private string _tempRoot = null!;
-    private string _statePath = null!;
+    private string _stateFileName = "games-state.json";
+    private Mock<IStoragePathService> _storagePathMock = null!;
 
     [TestInitialize]
     public void Setup()
     {
         _tempRoot = Path.Combine(Path.GetTempPath(), "knockbox-availability-" + Guid.NewGuid().ToString("N"));
-        _statePath = Path.Combine(_tempRoot, "games-state.json");
+        Directory.CreateDirectory(_tempRoot);
+        
+        _storagePathMock = new Mock<IStoragePathService>();
+        _storagePathMock.Setup(x => x.GetAdminDirectory()).Returns(_tempRoot);
     }
 
     [TestCleanup]
@@ -58,7 +64,8 @@ public sealed class GameAvailabilityServiceTests
         Assert.IsTrue(svc.IsEnabled("card-counter"));
 
         // And on disk, the disabled list should no longer contain it.
-        var json = File.ReadAllText(_statePath);
+        var statePath = Path.Combine(_tempRoot, _stateFileName);
+        var json = File.ReadAllText(statePath);
         Assert.IsFalse(json.Contains("card-counter", StringComparison.OrdinalIgnoreCase));
     }
 
@@ -87,8 +94,8 @@ public sealed class GameAvailabilityServiceTests
     [TestMethod]
     public void CorruptedFile_IsTolerated()
     {
-        Directory.CreateDirectory(_tempRoot);
-        File.WriteAllText(_statePath, "{ not valid json");
+        var statePath = Path.Combine(_tempRoot, _stateFileName);
+        File.WriteAllText(statePath, "{ not valid json");
 
         // Should not throw; should load as if nothing is disabled.
         var svc = CreateService();
@@ -98,8 +105,8 @@ public sealed class GameAvailabilityServiceTests
     [TestMethod]
     public void EmptyDisabledArray_IsTolerated()
     {
-        Directory.CreateDirectory(_tempRoot);
-        File.WriteAllText(_statePath, JsonSerializer.Serialize(new { disabled = Array.Empty<string>() }));
+        var statePath = Path.Combine(_tempRoot, _stateFileName);
+        File.WriteAllText(statePath, JsonSerializer.Serialize(new { disabled = Array.Empty<string>() }));
 
         var svc = CreateService();
         Assert.IsTrue(svc.IsEnabled("card-counter"));
@@ -116,7 +123,8 @@ public sealed class GameAvailabilityServiceTests
 
     private IGameAvailabilityService CreateService()
     {
-        var options = Options.Create(new AdminOptions { GameStatePath = _statePath });
-        return new GameAvailabilityService(options, NullLogger<GameAvailabilityService>.Instance);
+        var options = Options.Create(new AdminOptions { GameStatePath = _stateFileName });
+        return new GameAvailabilityService(_storagePathMock.Object, options, NullLogger<GameAvailabilityService>.Instance);
     }
 }
+

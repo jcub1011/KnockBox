@@ -1,17 +1,19 @@
 using KnockBox.Services.Logic.Admin;
+using KnockBox.Services.Logic.Storage;
 using Microsoft.Extensions.Logging.Abstractions;
+using Moq;
 
 namespace KnockBox.Tests.Unit.Services.Logic.Admin;
 
 [TestClass]
-// AdminLogService reads from a hardcoded AppContext.BaseDirectory/logs
-// directory, so each test seeds files there. We run sequentially inside
+// AdminLogService reads from a directory provided by IStoragePathService,
+// so each test seeds files there. We run sequentially inside
 // the class to avoid cross-test filename collisions (MSTestSettings.cs
 // parallelizes at method level assembly-wide).
 [DoNotParallelize]
 public sealed class AdminLogServiceTests
 {
-    private static readonly string LogsDir = Path.Combine(AppContext.BaseDirectory, "logs");
+    private static readonly string LogsDir = Path.Combine(AppContext.BaseDirectory, "logs-test");
 
     // Class-wide monotonic counter, folded into the 8-digit log-file date
     // slot so each test gets a unique, regex-valid filename.
@@ -114,11 +116,10 @@ public sealed class AdminLogServiceTests
 
     private IAdminLogService CreateService()
     {
-        var options = Microsoft.Extensions.Options.Options.Create(new KnockBox.Admin.AdminOptions
-        {
-            LogDirectory = LogsDir
-        });
-        return new AdminLogService(options, NullLogger<AdminLogService>.Instance);
+        var storageMock = new Mock<IStoragePathService>();
+        storageMock.Setup(s => s.GetLogDirectory()).Returns(LogsDir);
+
+        return new AdminLogService(storageMock.Object, NullLogger<AdminLogService>.Instance);
     }
 
     private (string fileName, string path) SeedLog(int lineCount)

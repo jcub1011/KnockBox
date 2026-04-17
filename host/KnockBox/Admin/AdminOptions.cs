@@ -27,14 +27,16 @@ namespace KnockBox.Admin
         public string Password { get; init; } = string.Empty;
 
         /// <summary>
-        /// Relative (to <c>AppContext.BaseDirectory</c>) or absolute path at
-        /// which the persisted list of disabled game route identifiers lives.
+        /// Filename of the persisted list of disabled game route identifiers.
+        /// Resolved relative to <c>IStoragePathService.GetAdminDirectory()</c>.
         /// </summary>
-        public string GameStatePath { get; init; } = "admin/games-state.json";
+        public string GameStatePath { get; init; } = "games-state.json";
 
         /// <summary>
-        /// Relative (to <c>AppContext.BaseDirectory</c>) or absolute path to
-        /// the directory where log files are stored.
+        /// Directory where log files are stored. Resolved relative to
+        /// <c>IStoragePathService.GetLogDirectory()</c>. In the default
+        /// implementation, this option is ignored in favour of the service's
+        /// hardcoded path.
         /// </summary>
         public string LogDirectory { get; init; } = "logs";
     }

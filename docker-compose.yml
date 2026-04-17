@@ -4,3 +4,8 @@ services:
     build:
       context: .
       dockerfile: host/KnockBox/Dockerfile
+    volumes:
+      - knockbox-data:/app/data
+
+volumes:
+  knockbox-data:

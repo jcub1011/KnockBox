@@ -4,6 +4,7 @@ using KnockBox.Core.Plugins;
 using KnockBox.Platform;
 using KnockBox.Services.Logic.Admin;
 using KnockBox.Services.Logic.Games.Shared;
+using KnockBox.Services.Logic.Storage;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Hosting.Server.Features;
@@ -34,9 +35,11 @@ namespace KnockBox
                 throw new InvalidOperationException("Admin Username and Password must be explicitly configured in appsettings.json.");
             }
 
-            var logDirectory = Path.IsPathRooted(adminOptions.LogDirectory)
-                ? adminOptions.LogDirectory
-                : Path.Combine(AppContext.BaseDirectory, adminOptions.LogDirectory);
+            // Register IStoragePathService early so we can use it for logging and plugin discovery.
+            var storagePath = new StoragePathService();
+            builder.Services.AddSingleton<IStoragePathService>(storagePath);
+
+            var logDirectory = storagePath.GetLogDirectory();
             var logPath = Path.Combine(logDirectory, "knockbox-.log");
 
             builder.Host.UseSerilog((context, services, loggerConfig) =>
@@ -52,7 +55,9 @@ namespace KnockBox
 
             builder.AddKnockBoxPlatform(options =>
             {
-                options.PluginsPath = builder.Configuration["Plugins:Path"] ?? "games";
+                options.PluginsPaths.Clear();
+                options.PluginsPaths.Add(storagePath.GetFirstPartyPluginsDirectory());
+                options.PluginsPaths.Add(storagePath.GetExternalPluginsDirectory());
             });
 
             // ── Admin-specific services ──────────────────────────────────────

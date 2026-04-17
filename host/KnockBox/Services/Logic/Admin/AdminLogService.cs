@@ -1,11 +1,12 @@
 using KnockBox.Admin;
+using KnockBox.Services.Logic.Storage;
 using Microsoft.Extensions.Options;
 using System.Text.RegularExpressions;
 
 namespace KnockBox.Services.Logic.Admin
 {
     /// <summary>
-    /// Reads files from <c>{AppContext.BaseDirectory}/logs/</c> for the
+    /// Reads files from <c>IStoragePathService.GetLogDirectory()</c> for the
     /// admin UI. Opens each file with <see cref="FileShare.ReadWrite"/> so
     /// we don't collide with Serilog's live writer (which uses
     /// <c>shared: true</c> in <c>Program.ApplySharedLoggerConfiguration</c>).
@@ -21,13 +22,10 @@ namespace KnockBox.Services.Logic.Admin
         private readonly string _logsDirectory;
         private readonly ILogger<AdminLogService> _logger;
 
-        public AdminLogService(IOptions<AdminOptions> options, ILogger<AdminLogService> logger)
+        public AdminLogService(IStoragePathService storagePath, ILogger<AdminLogService> logger)
         {
             _logger = logger;
-            var configuredPath = options.Value.LogDirectory;
-            _logsDirectory = Path.IsPathRooted(configuredPath)
-                ? configuredPath
-                : Path.Combine(AppContext.BaseDirectory, configuredPath);
+            _logsDirectory = storagePath.GetLogDirectory();
         }
 
         public IReadOnlyList<LogFileInfo> ListFiles()

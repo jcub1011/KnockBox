@@ -20,12 +20,30 @@ public sealed class KnockBoxPlatformOptions
     /// <summary>How game plugins are discovered. Defaults to directory scanning.</summary>
     public PluginDiscoveryMode PluginDiscovery { get; set; } = PluginDiscoveryMode.Directory;
 
+    private readonly List<string> _pluginsPaths = ["games"];
+
+    /// <summary>
+    /// Relative (to <c>AppContext.BaseDirectory</c>) or absolute paths to the
+    /// directories that contain game plugin folders. Only used in
+    /// <see cref="PluginDiscoveryMode.Directory"/> mode.
+    /// </summary>
+    public IList<string> PluginsPaths => _pluginsPaths;
+
     /// <summary>
     /// Relative (to <c>AppContext.BaseDirectory</c>) or absolute path to the
     /// directory that contains game plugin folders. Only used in
     /// <see cref="PluginDiscoveryMode.Directory"/> mode.
+    /// Backward-compatible wrapper around the first entry in <see cref="PluginsPaths"/>.
     /// </summary>
-    public string PluginsPath { get; set; } = "games";
+    public string PluginsPath
+    {
+        get => _pluginsPaths.Count > 0 ? _pluginsPaths[0] : string.Empty;
+        set
+        {
+            if (_pluginsPaths.Count > 0) _pluginsPaths[0] = value;
+            else _pluginsPaths.Add(value);
+        }
+    }
 
     /// <summary>Modules registered via <see cref="KnockBoxPlatformOptionsExtensions.AddGameModule{T}"/>.</summary>
     internal List<IGameModule> ExplicitModules { get; } = [];

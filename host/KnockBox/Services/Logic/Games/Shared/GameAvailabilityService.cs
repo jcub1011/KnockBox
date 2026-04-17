@@ -1,4 +1,5 @@
 using KnockBox.Admin;
+using KnockBox.Services.Logic.Storage;
 using Microsoft.Extensions.Options;
 using System.Collections.Concurrent;
 using System.Text.Json;
@@ -36,15 +37,13 @@ namespace KnockBox.Services.Logic.Games.Shared
         public event Action? Changed;
 
         public GameAvailabilityService(
+            IStoragePathService storagePath,
             IOptions<AdminOptions> options,
             ILogger<GameAvailabilityService> logger)
         {
             _logger = logger;
 
-            var configuredPath = options.Value.GameStatePath;
-            _statePath = Path.IsPathRooted(configuredPath)
-                ? configuredPath
-                : Path.Combine(AppContext.BaseDirectory, configuredPath);
+            _statePath = Path.Combine(storagePath.GetAdminDirectory(), options.Value.GameStatePath);
 
             LoadFromDisk();
         }

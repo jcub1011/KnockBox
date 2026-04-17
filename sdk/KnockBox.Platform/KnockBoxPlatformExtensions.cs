@@ -1,3 +1,4 @@
+using System.Reflection;
 using KnockBox.Core.Plugins;
 using KnockBox.Core.Services.Drawing;
 using KnockBox.Core.Services.Navigation;
@@ -93,9 +94,21 @@ public static class KnockBoxPlatformExtensions
         }
         else
         {
-            var pluginsPath = ResolvePluginsPath(options);
             var pluginLogger = bootstrapLoggerFactory.CreateLogger<PluginLoader>();
-            pluginLoadResult = new PluginLoader(pluginLogger).LoadModules(pluginsPath);
+            var loader = new PluginLoader(pluginLogger);
+
+            var modules = new List<IGameModule>();
+            var assemblies = new List<Assembly>();
+
+            foreach (var rawPath in options.PluginsPaths)
+            {
+                var pluginsPath = ResolvePluginsPath(rawPath);
+                var result = loader.LoadModules(pluginsPath);
+                modules.AddRange(result.Modules);
+                assemblies.AddRange(result.Assemblies);
+            }
+
+            pluginLoadResult = new PluginLoadResult(modules, assemblies.Distinct().ToList());
         }
 
         // Logic registrations (platform version — no admin services)
@@ -169,7 +182,10 @@ public static class KnockBoxPlatformExtensions
 
         if (platformOptions.PluginDiscovery == PluginDiscoveryMode.Directory)
         {
-            MapPluginStaticAssets(app, ResolvePluginsPath(platformOptions));
+            foreach (var rawPath in platformOptions.PluginsPaths)
+            {
+                MapPluginStaticAssets(app, ResolvePluginsPath(rawPath));
+            }
         }
 
         // The Platform assembly contains routable pages (Home, Error, NotFound).
@@ -188,13 +204,13 @@ public static class KnockBoxPlatformExtensions
     }
 
     /// <summary>
-    /// Resolves <see cref="KnockBoxPlatformOptions.PluginsPath"/> to an absolute
-    /// path. Relative paths are anchored at <see cref="AppContext.BaseDirectory"/>.
+    /// Resolves a plugin path to an absolute path. Relative paths are
+    /// anchored at <see cref="AppContext.BaseDirectory"/>.
     /// </summary>
-    private static string ResolvePluginsPath(KnockBoxPlatformOptions options)
-        => Path.IsPathRooted(options.PluginsPath)
-            ? options.PluginsPath
-            : Path.Combine(AppContext.BaseDirectory, options.PluginsPath);
+    private static string ResolvePluginsPath(string path)
+        => Path.IsPathRooted(path)
+            ? path
+            : Path.Combine(AppContext.BaseDirectory, path);
 
     /// <summary>
     /// Mounts each discovered plugin's <c>wwwroot</c> folder under <c>/_content/{PluginName}</c>
