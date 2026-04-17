@@ -248,9 +248,10 @@ namespace KnockBox.Core.Plugins
         /// <summary>
         /// Scans the plugin's co-located <c>.deps.json</c> for any package id in
         /// <see cref="ForbiddenPluginDependencies"/>. Returns the offending id or
-        /// <c>null</c> if nothing is found. A missing <c>.deps.json</c> skips the
-        /// check (returns <c>null</c>) — framework-dependent plugins published
-        /// without one simply can't be inspected.
+        /// <c>null</c> if nothing is found. A missing, unreadable, or malformed
+        /// <c>.deps.json</c> all skip the check (return <c>null</c>) — the guard
+        /// cannot inspect what it cannot parse, and the subsequent assembly load
+        /// will surface any real IO problems with a clearer per-plugin error.
         /// </summary>
         internal static string? FindForbiddenDependency(string pluginDllPath)
         {
@@ -258,30 +259,42 @@ namespace KnockBox.Core.Plugins
             if (!File.Exists(depsJsonPath))
                 return null;
 
-            using var stream = File.OpenRead(depsJsonPath);
-            using var doc = JsonDocument.Parse(stream);
-
-            // The shape of deps.json is `{ "libraries": { "Name/Version": { ... } }, ... }`.
-            // Walking `libraries` gives us every transitive package id; that's the
-            // simplest surface to match ForbiddenPluginDependencies against.
-            if (!doc.RootElement.TryGetProperty("libraries", out var libraries) ||
-                libraries.ValueKind != JsonValueKind.Object)
-                return null;
-
-            foreach (var library in libraries.EnumerateObject())
+            try
             {
-                // Entries are keyed "{Id}/{Version}"; take the id half.
-                var slashIndex = library.Name.IndexOf('/');
-                var id = slashIndex > 0 ? library.Name[..slashIndex] : library.Name;
+                using var stream = File.OpenRead(depsJsonPath);
+                using var doc = JsonDocument.Parse(stream);
 
-                foreach (var forbidden in ForbiddenPluginDependencies)
+                // The shape of deps.json is `{ "libraries": { "Name/Version": { ... } }, ... }`.
+                // Walking `libraries` gives us every transitive package id; that's the
+                // simplest surface to match ForbiddenPluginDependencies against.
+                if (!doc.RootElement.TryGetProperty("libraries", out var libraries) ||
+                    libraries.ValueKind != JsonValueKind.Object)
+                    return null;
+
+                foreach (var library in libraries.EnumerateObject())
                 {
-                    if (string.Equals(id, forbidden, StringComparison.OrdinalIgnoreCase))
-                        return forbidden;
-                }
-            }
+                    // Entries are keyed "{Id}/{Version}"; take the id half.
+                    var slashIndex = library.Name.IndexOf('/');
+                    var id = slashIndex > 0 ? library.Name[..slashIndex] : library.Name;
 
-            return null;
+                    foreach (var forbidden in ForbiddenPluginDependencies)
+                    {
+                        if (string.Equals(id, forbidden, StringComparison.OrdinalIgnoreCase))
+                            return forbidden;
+                    }
+                }
+
+                return null;
+            }
+            catch (Exception)
+            {
+                // IO failure (racy delete, permissions) or malformed JSON: we
+                // can't enforce the guard here. The assembly load that follows
+                // will fail with its own clearer error if the plugin is truly
+                // broken; a well-formed plugin with a quirky deps.json simply
+                // skips the forbidden-dep check.
+                return null;
+            }
         }
 
         private IGameModule? TryActivate(Type moduleType)

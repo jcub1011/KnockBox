@@ -44,7 +44,10 @@ public static class KnockBoxPlatformExtensions
     /// If the default <c>AllGamesEnabledService</c> ends up in DI (no prior
     /// registration was found), this method emits an Information log line so a
     /// misordered override surfaces at startup instead of appearing as silent
-    /// "every game is enabled" behavior in production.
+    /// "every game is enabled" behavior in production. The log is gated on
+    /// <see cref="PluginDiscoveryMode.Directory"/> — DevHosts run in
+    /// <see cref="PluginDiscoveryMode.Explicit"/> and are expected to rely on
+    /// the default, so they stay quiet.
     /// </para>
     /// </remarks>
     public static WebApplicationBuilder AddKnockBoxPlatform(
@@ -103,10 +106,13 @@ public static class KnockBoxPlatformExtensions
             .CreateLogger();
         using var bootstrapLoggerFactory = new SerilogLoggerFactory(bootstrapSerilog, dispose: true);
 
-        if (!hostAlreadyRegisteredAvailability)
+        if (!hostAlreadyRegisteredAvailability
+            && options.PluginDiscovery == PluginDiscoveryMode.Directory)
         {
-            // Visible signal so a host that meant to override but registered
-            // after AddKnockBoxPlatform sees at startup that the default won.
+            // Visible signal so a production host that meant to override but
+            // registered after AddKnockBoxPlatform sees at startup that the
+            // default won. Explicit-mode (DevHost) callers are expected to
+            // rely on the default, so we stay silent for them.
             bootstrapLoggerFactory
                 .CreateLogger(typeof(KnockBoxPlatformExtensions).FullName!)
                 .LogInformation(

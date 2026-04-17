@@ -438,4 +438,29 @@ public sealed class PluginLoaderTests
             Directory.Delete(tempDir, recursive: true);
         }
     }
+
+    [TestMethod]
+    public void FindForbiddenDependency_ReturnsNull_WhenDepsJsonIsMalformed()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), "knockbox-pluginloader-tests-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempDir);
+        try
+        {
+            var dllPath = Path.Combine(tempDir, "Broken.Plugin.dll");
+            File.WriteAllText(dllPath, string.Empty);
+            var depsJsonPath = Path.ChangeExtension(dllPath, ".deps.json");
+            // Truncated/invalid JSON — the guard can't parse it, so it should
+            // skip (return null) rather than throw and bubble up as a generic
+            // "failed to load plugin assembly" error from the outer catch.
+            File.WriteAllText(depsJsonPath, "{ this is not valid json");
+
+            var result = PluginLoader.FindForbiddenDependency(dllPath);
+
+            Assert.IsNull(result);
+        }
+        finally
+        {
+            Directory.Delete(tempDir, recursive: true);
+        }
+    }
 }
