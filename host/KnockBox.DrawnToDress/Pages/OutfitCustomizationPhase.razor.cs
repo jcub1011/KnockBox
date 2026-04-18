@@ -34,6 +34,7 @@ namespace KnockBox.DrawnToDress.Pages
         private string _outfitName = string.Empty;
         private bool _submitting;
         private string? _errorMessage;
+        private bool _sheetExpanded = true;
 
         private InteractionMode _mode = InteractionMode.Draw;
         private bool _showMannequin;
