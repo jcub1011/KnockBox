@@ -11,11 +11,16 @@ namespace KnockBox.Admin.Pages
     public sealed class LoginModel : PageModel
     {
         private readonly AdminOptions _options;
+        private readonly IAdminSettingsService _settingsService;
         private readonly ILogger<LoginModel> _logger;
 
-        public LoginModel(IOptions<AdminOptions> options, ILogger<LoginModel> logger)
+        public LoginModel(
+            IOptions<AdminOptions> options,
+            IAdminSettingsService settingsService,
+            ILogger<LoginModel> logger)
         {
             _options = options.Value;
+            _settingsService = settingsService;
             _logger = logger;
         }
 
@@ -48,9 +53,7 @@ namespace KnockBox.Admin.Pages
             var usernameMatches = FixedTimeEquals(
                 (Username ?? string.Empty).Trim(),
                 _options.Username);
-            var passwordMatches = FixedTimeEquals(
-                Password ?? string.Empty,
-                _options.Password);
+            var passwordMatches = _settingsService.VerifyPassword(Password ?? string.Empty);
 
             if (!usernameMatches || !passwordMatches)
             {
@@ -83,6 +86,11 @@ namespace KnockBox.Admin.Pages
                 "Admin login succeeded for user [{Username}] from {RemoteIp}.",
                 _options.Username,
                 HttpContext.Connection.RemoteIpAddress);
+
+            if (_settingsService.IsPasswordDefault())
+            {
+                return Redirect("/admin/changepassword");
+            }
 
             return Redirect(ResolveReturnUrl());
         }
