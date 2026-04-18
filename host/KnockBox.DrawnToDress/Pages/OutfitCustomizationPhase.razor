@@ -201,19 +201,14 @@
                     {
                         <div class="dtd-customization-field">
                             <label class="dtd-customization-label">Select Item</label>
-                            <div class="dtd-customization-item-selector">
+                            <select class="dtd-customization-select" @onchange="OnClothingTypeChanged">
                                 @foreach (var ct in GameState.Config.ClothingTypes)
                                 {
-                                    var typeId = ct.Id;
-                                    bool isSelected = _selectedTypeId == typeId;
-                                    <button class="dtd-item-select-btn @(isSelected ? "dtd-item-select-btn-active" : "")"
-                                            aria-pressed="@(isSelected ? "true" : "false")"
-                                            @onclick="() => SelectItemAsync(typeId)">
-                                        <span class="dtd-item-select-icon" aria-hidden="true">@GetClothingTypeIcon(ct.Id)</span>
-                                        <span class="dtd-item-select-name">@ct.DisplayName</span>
-                                    </button>
+                                    <option value="@ct.Id" selected="@(_selectedTypeId == ct.Id)">
+                                        @GetClothingTypeIcon(ct.Id) @ct.DisplayName
+                                    </option>
                                 }
-                            </div>
+                            </select>
                         </div>
                     }
 
@@ -234,16 +229,12 @@
                         {
                             <div class="dtd-customization-field">
                                 <label class="dtd-customization-label">Mannequin Face</label>
-                                <div class="dtd-customization-face-selector">
+                                <select class="dtd-customization-select" @bind="_selectedFace">
                                     @foreach (var face in Enum.GetValues<FaceType>())
                                     {
-                                        <button class="dtd-face-btn @(_selectedFace == face ? "dtd-face-btn-active" : "")"
-                                                @onclick="() => _selectedFace = face"
-                                                title="@face">
-                                            @face
-                                        </button>
+                                        <option value="@face">@face</option>
                                     }
-                                </div>
+                                </select>
                             </div>
 
                             <div class="dtd-customization-field">

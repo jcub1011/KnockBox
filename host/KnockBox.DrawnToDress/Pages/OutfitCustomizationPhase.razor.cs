@@ -172,6 +172,14 @@ namespace KnockBox.DrawnToDress.Pages
             }
         }
 
+        private async Task OnClothingTypeChanged(ChangeEventArgs e)
+        {
+            if (Enum.TryParse<ClothingType>(e.Value?.ToString(), out var typeId))
+            {
+                await SelectItemAsync(typeId);
+            }
+        }
+
         /// <summary>
         /// Returns a representative emoji for a clothing type id.
         /// </summary>

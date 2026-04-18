@@ -217,7 +217,8 @@
     color: var(--dtd-color-lavender-deep);
 }
 
-.dtd-customization-input {
+.dtd-customization-input,
+.dtd-customization-select {
     padding: 12px 16px;
     border: 3px solid var(--dtd-color-bg-soft);
     border-radius: 16px;
@@ -225,12 +226,25 @@
     font-size: 1rem;
     font-weight: 700;
     transition: all 0.2s;
+    background-color: #fff;
+    width: 100%;
 }
 
-.dtd-customization-input:focus {
+.dtd-customization-select {
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23B19CD9' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    background-size: 16px;
+    padding-right: 40px;
+}
+
+.dtd-customization-input:focus,
+.dtd-customization-select:focus {
     outline: none;
     border-color: var(--dtd-color-lavender);
-    background: #fff;
+    background-color: #fff;
 }
 
 .dtd-customization-mode-toggle {
@@ -274,52 +288,6 @@
     width: 20px;
     height: 20px;
     accent-color: var(--dtd-color-lavender);
-}
-
-/* ── Item Selector (Move mode) ─────────────────────────────────────────── */
-
-.dtd-customization-item-selector {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-}
-
-.dtd-item-select-btn {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 8px 14px;
-    border: 3px solid var(--dtd-color-bg-soft);
-    border-radius: 14px;
-    background: #fff;
-    font-family: var(--font-primary);
-    font-size: 0.85rem;
-    font-weight: 800;
-    color: var(--dtd-color-dark);
-    cursor: pointer;
-    transition: all 0.15s;
-}
-
-.dtd-item-select-btn:hover {
-    border-color: var(--dtd-color-lavender);
-    background: var(--dtd-color-bg-soft);
-}
-
-.dtd-item-select-btn-active {
-    border-color: var(--dtd-color-lavender);
-    background: var(--dtd-color-lavender);
-    color: #fff;
-    box-shadow: 0 3px 0 var(--dtd-color-lavender-deep);
-    transform: translateY(-1px);
-}
-
-.dtd-item-select-icon {
-    font-size: 1.1rem;
-    line-height: 1;
-}
-
-.dtd-item-select-name {
-    line-height: 1;
 }
 
 .dtd-customization-spacer {
@@ -415,41 +383,6 @@
     width: 100%;
 }
 
-.dtd-customization-face-selector {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    padding: 8px;
-    background: var(--dtd-color-bg-soft);
-    border-radius: 16px;
-}
-
-.dtd-face-btn {
-    padding: 6px 12px;
-    border: 3px solid transparent;
-    border-radius: 12px;
-    background: #fff;
-    font-family: var(--font-primary);
-    font-size: 0.8rem;
-    font-weight: 800;
-    color: var(--dtd-color-dark);
-    cursor: pointer;
-    transition: all 0.15s;
-    text-transform: capitalize;
-}
-
-.dtd-face-btn:hover {
-    background: var(--dtd-color-lavender-soft);
-}
-
-.dtd-face-btn-active {
-    border-color: var(--dtd-color-lavender);
-    background: var(--dtd-color-lavender);
-    color: #fff;
-    box-shadow: 0 3px 0 var(--dtd-color-lavender-deep);
-    transform: translateY(-1px);
-}
-
 /* ── Responsive ────────────────────────────────────────────────────────────── */
 
 @media (max-width: 900px) {
@@ -477,11 +410,6 @@
     .dtd-customization-actions {
         flex-direction: row;
         width: 100%;
-    }
-
-    .dtd-customization-item-selector {
-        flex-wrap: nowrap;
-        overflow: auto;
     }
 }
 
