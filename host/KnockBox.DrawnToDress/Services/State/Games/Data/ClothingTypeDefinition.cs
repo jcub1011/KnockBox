@@ -38,5 +38,10 @@ namespace KnockBox.DrawnToDress.Services.State.Games.Data
         /// Used by the drawing phase to position the mannequin reference for each clothing type.
         /// </summary>
         public int MannequinAnchorY { get; set; }
+
+        /// <summary>
+        /// Optional path to a version of the mannequin reference image that focuses on this specific body part.
+        /// </summary>
+        public string? MannequinFocusImagePath { get; set; }
     }
 }

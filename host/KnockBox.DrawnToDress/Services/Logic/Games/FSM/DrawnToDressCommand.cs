@@ -91,7 +91,9 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM
         string PlayerId,
         string? OutfitName,
         string? SketchSvgContent = null,
-        Dictionary<ClothingType, ItemPositionOverride>? ItemPositionOverrides = null) : DrawnToDressCommand(PlayerId);
+        Dictionary<ClothingType, ItemPositionOverride>? ItemPositionOverrides = null,
+        FaceType SelectedFace = FaceType.Default,
+        bool ShowMannequin = false) : DrawnToDressCommand(PlayerId);
 
     /// <summary>Updates the draft outfit name for the player while they are typing.</summary>
     public record UpdateDraftOutfitNameCommand(

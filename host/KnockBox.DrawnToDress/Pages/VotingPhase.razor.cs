@@ -141,6 +141,9 @@ namespace KnockBox.DrawnToDress.Pages
         protected int TotalOutfitHeight =>
             CompositeCanvasLayout.ComputeCompositeHeight(GameState.Config);
 
+        protected double MannequinDisplaySize =>
+            CompositeCanvasLayout.MannequinDisplaySize(GameState.Config);
+
         protected static string? SafeSvgContent(string? raw)
             => SvgContentSanitizer.Sanitize(raw);
     }

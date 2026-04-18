@@ -59,7 +59,8 @@
         if (_showMannequin && GameState.Config.ShowMannequin)
         {
             mannequinSvg = MannequinSvgHelper.Build(canvasWidth, totalOutfitHeight, GameState.Config.MannequinDimensions.Y / 2,
-                GameState.Config.MannequinDimensions.X, GameState.Config.MannequinScaleFactor, overrideDisplaySize: mannequinSize);
+                GameState.Config.MannequinDimensions.X, GameState.Config.MannequinScaleFactor, GameState.Config.MannequinImagePath, overrideDisplaySize: mannequinSize,
+                faceType: _selectedFace);
         }
 
         if (bgParts.Length > 0)
@@ -232,9 +233,23 @@
                         @if (GameState.Config.ShowMannequin)
                         {
                             <div class="dtd-customization-field">
+                                <label class="dtd-customization-label">Mannequin Face</label>
+                                <div class="dtd-customization-face-selector">
+                                    @foreach (var face in Enum.GetValues<FaceType>())
+                                    {
+                                        <button class="dtd-face-btn @(_selectedFace == face ? "dtd-face-btn-active" : "")"
+                                                @onclick="() => _selectedFace = face"
+                                                title="@face">
+                                            @face
+                                        </button>
+                                    }
+                                </div>
+                            </div>
+
+                            <div class="dtd-customization-field">
                                 <label class="dtd-customization-checkbox-label">
                                     <input type="checkbox" @bind="_showMannequin" />
-                                    Show Mannequin Reference
+                                    Show Mannequin (will be visible in voting)
                                 </label>
                             </div>
                         }

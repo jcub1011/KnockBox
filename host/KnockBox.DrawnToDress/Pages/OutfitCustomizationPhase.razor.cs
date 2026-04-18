@@ -37,6 +37,7 @@ namespace KnockBox.DrawnToDress.Pages
 
         private InteractionMode _mode = InteractionMode.Draw;
         private bool _showMannequin;
+        private FaceType _selectedFace = FaceType.Default;
         private ClothingType? _selectedTypeId;
         private Dictionary<ClothingType, ItemPositionOverride> _itemPositions = new();
         private IJSObjectReference? _dragModule;
@@ -257,7 +258,9 @@ namespace KnockBox.DrawnToDress.Pages
                     UserService.CurrentUser.Id,
                     _outfitName.Trim(),
                     sketchSvg,
-                    positionOverrides);
+                    positionOverrides,
+                    _selectedFace,
+                    _showMannequin);
 
                 var result = GameEngine.ProcessCommand(GameState.Context, cmd);
                 if (result.TryGetFailure(out var err))

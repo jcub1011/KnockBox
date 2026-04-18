@@ -39,16 +39,18 @@ namespace KnockBox.DrawnToDress.Services.State.Games.Data
 
         // ── Clothing types ────────────────────────────────────────────────────
 
+        private const string AssetBase = "_content/KnockBox.DrawnToDress/content/drawn-to-dress-assets";
+
         /// <summary>
         /// The canonical set of clothing types with correct dimensions and mannequin anchors.
         /// Used as the source of truth when toggling types on in the lobby config panel.
         /// </summary>
         public static IReadOnlyList<ClothingTypeDefinition> DefaultClothingTypes { get; } =
         [
-            new() { Id = ClothingType.Hat,    DisplayName = "Hat",    AllowMultiple = false, CanvasWidth = 600, CanvasHeight = 450, MannequinAnchorY = 160 },
-            new() { Id = ClothingType.Top,    DisplayName = "Top",    AllowMultiple = false, CanvasWidth = 600, CanvasHeight = 450, MannequinAnchorY = 700 },
-            new() { Id = ClothingType.Bottom, DisplayName = "Bottom", AllowMultiple = false, CanvasWidth = 600, CanvasHeight = 450, MannequinAnchorY = 1080 },
-            new() { Id = ClothingType.Shoes,  DisplayName = "Shoes",  AllowMultiple = false, CanvasWidth = 600, CanvasHeight = 350, MannequinAnchorY = 1270 },
+            new() { Id = ClothingType.Hat,    DisplayName = "Hat",    AllowMultiple = false, CanvasWidth = 600, CanvasHeight = 450, MannequinAnchorY = 160, MannequinFocusImagePath = $"{AssetBase}/mannequin-blank-head-focus.webp" },
+            new() { Id = ClothingType.Top,    DisplayName = "Top",    AllowMultiple = false, CanvasWidth = 600, CanvasHeight = 450, MannequinAnchorY = 700, MannequinFocusImagePath = $"{AssetBase}/mannequin-blank-top-focus.webp" },
+            new() { Id = ClothingType.Bottom, DisplayName = "Bottom", AllowMultiple = false, CanvasWidth = 600, CanvasHeight = 450, MannequinAnchorY = 1080, MannequinFocusImagePath = $"{AssetBase}/mannequin-blank-pants-focus.webp" },
+            new() { Id = ClothingType.Shoes,  DisplayName = "Shoes",  AllowMultiple = false, CanvasWidth = 600, CanvasHeight = 350, MannequinAnchorY = 1270, MannequinFocusImagePath = $"{AssetBase}/mannequin-blank-shoes-focus.webp" },
         ];
 
         /// <summary>
@@ -66,7 +68,13 @@ namespace KnockBox.DrawnToDress.Services.State.Games.Data
                 CanvasWidth = t.CanvasWidth,
                 CanvasHeight = t.CanvasHeight,
                 MannequinAnchorY = t.MannequinAnchorY,
+                MannequinFocusImagePath = t.MannequinFocusImagePath,
             })];
+
+        /// <summary>
+        /// The path to the default reference mannequin image.
+        /// </summary>
+        public string MannequinImagePath { get; set; } = $"{AssetBase}/mannequin-blank.webp";
 
         /// <summary>
         /// The native pixel dimensions of the reference mannequin image.
@@ -317,7 +325,8 @@ namespace KnockBox.DrawnToDress.Services.State.Games.Data
                 [
                     new() { Id = fallback.Id, DisplayName = fallback.DisplayName, AllowMultiple = fallback.AllowMultiple,
                             MaxItemsPerRound = fallback.MaxItemsPerRound, CanvasWidth = fallback.CanvasWidth,
-                            CanvasHeight = fallback.CanvasHeight, MannequinAnchorY = fallback.MannequinAnchorY },
+                            CanvasHeight = fallback.CanvasHeight, MannequinAnchorY = fallback.MannequinAnchorY,
+                            MannequinFocusImagePath = fallback.MannequinFocusImagePath },
                 ];
             }
 
