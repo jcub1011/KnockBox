@@ -112,8 +112,8 @@
                                                 if (KnockBox.Core.Services.Drawing.SvgContentSanitizer.Sanitize(item.SvgContent) is string safeSvg)
                                                 {
                                                     var (itemX, itemY) = CompositeCanvasLayout.GetItemPosition(
-                                                        ct.CanvasWidth, ct.CanvasHeight, ct.MannequinAnchorY, canvasWidth, totalOutfitHeight,
-                                                        GameState.Config.MannequinDimensions.X);
+                                                        ct, canvasWidth, totalOutfitHeight,
+                                                        GameState.Config.MannequinDimensions.X, outfit);
                                                     <g transform="translate(@itemX,@itemY)">
                                                         @((MarkupString)safeSvg)
                                                     </g>
