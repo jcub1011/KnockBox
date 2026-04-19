@@ -1,6 +1,7 @@
 using KnockBox.Platform.Storage;
 using KnockBox.Services.Logic.Admin;
 using Microsoft.Extensions.Options;
+using System.Globalization;
 using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -68,7 +69,7 @@ namespace KnockBox.Services.Logic.Admin
                 var parts = _passwordHash.Split(':');
                 if (parts.Length != 4 || parts[0] != "v1") return false;
 
-                var iterations = int.Parse(parts[1]);
+                var iterations = int.Parse(parts[1], CultureInfo.InvariantCulture);
                 var salt = Convert.FromBase64String(parts[2]);
                 var hash = Convert.FromBase64String(parts[3]);
 
@@ -190,10 +191,23 @@ namespace KnockBox.Services.Logic.Admin
                     await JsonSerializer.SerializeAsync(stream, payload, JsonOptions);
                 }
 
-                var backupPath = _statePath + ".bak";
-                File.Copy(tempPath, backupPath, overwrite: true);
-
                 File.Move(tempPath, _statePath, overwrite: true);
+
+                // Backup is best-effort: if this copy fails the main file already
+                // holds the new data, and the backup simply lags one revision.
+                var backupPath = _statePath + ".bak";
+                try
+                {
+                    File.Copy(_statePath, backupPath, overwrite: true);
+                }
+                catch (Exception backupEx)
+                {
+                    _logger.LogWarning(
+                        backupEx,
+                        "Persisted admin settings to [{Path}] but failed to refresh backup at [{BackupPath}].",
+                        _statePath,
+                        backupPath);
+                }
             }
             catch (Exception ex)
             {

@@ -215,8 +215,8 @@
                             {
                                 double mannequinSize = CompositeCanvasLayout.MannequinDisplaySize(GameState.Config);
                                 @((MarkupString)MannequinSvgHelper.Build(ComposedOutfitWidth, ComposedOutfitHeight, GameState.Config.MannequinDimensions.Y / 2,
-                                    GameState.Config.MannequinDimensions.X, GameState.Config.MannequinScaleFactor, GameState.Config.MannequinImagePath, 
-                                    overrideDisplaySize: mannequinSize))
+                                    GameState.Config.MannequinDimensions.X, GameState.Config.MannequinScaleFactor,
+                                    new MannequinDisplayOptions(GameState.Config.MannequinImagePath, OverrideDisplaySize: mannequinSize)))
                             }
 
                             @foreach (var clothingType in GameState.Config.ClothingTypes)
@@ -236,6 +236,7 @@
                                         @((MarkupString)safeSvgSlot)
                                     </g>
                                 }
+                                @* When the mannequin is shown it acts as the visual reference; empty-slot placeholders would clutter the figure, so we suppress them. *@
                                 else if (!_showMannequin)
                                 {
                                     <g transform="translate(@defX,@defY)">
@@ -286,7 +287,7 @@
                             {
                                 <button class="dtd-category-tab @(ct.Id == _selectedTypeId ? "dtd-category-tab-active" : "")"
                                         @onclick="() => _selectedTypeId = ct.Id">
-                                    <span class="dtd-category-icon">@GetClothingTypeIcon(ct.Id)</span>
+                                    <span class="dtd-category-icon" aria-hidden="true">@GetClothingTypeIcon(ct.Id)</span>
                                     <span class="dtd-category-label">@ct.DisplayName</span>
                                 </button>
                             }

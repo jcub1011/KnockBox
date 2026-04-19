@@ -53,7 +53,7 @@ namespace KnockBox.DrawnToDress.Pages
                 yOffset,
                 config.MannequinDimensions.X,
                 config.MannequinScaleFactor,
-                imagePath);
+                new MannequinDisplayOptions(imagePath));
         }
 
         /// <summary>Display name for the clothing type of the current round.</summary>

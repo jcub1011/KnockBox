@@ -1,8 +1,5 @@
 @inherits LayoutComponentBase
 @using Microsoft.AspNetCore.Components.Routing
-@using KnockBox.Services.Logic.Admin
-@inject IAdminSettingsService Settings
-@inject NavigationManager Nav
 
 <HeadContent>
     <link rel="stylesheet" href="/admin/admin.css" />
@@ -23,16 +20,3 @@
         @Body
     </main>
 </div>
-
-@code {
-    protected override void OnInitialized()
-    {
-        // Enforce password change if using default password.
-        // We only redirect if not already on the change password page.
-        var isChangePasswordPage = Nav.Uri.Contains("/admin/changepassword", StringComparison.OrdinalIgnoreCase);
-        if (Settings.IsPasswordDefault() && !isChangePasswordPage)
-        {
-            Nav.NavigateTo("/admin/changepassword");
-        }
-    }
-}

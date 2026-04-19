@@ -186,8 +186,8 @@
                     @if (outfit.Customization.ShowMannequin)
                     {
                         @((MarkupString)MannequinSvgHelper.Build(TotalOutfitWidth, TotalOutfitHeight, GameState.Config.MannequinDimensions.Y / 2,
-                            GameState.Config.MannequinDimensions.X, GameState.Config.MannequinScaleFactor, GameState.Config.MannequinImagePath, 
-                            overrideDisplaySize: MannequinDisplaySize, opacity: 1.0, faceType: outfit.Customization.SelectedFace))
+                            GameState.Config.MannequinDimensions.X, GameState.Config.MannequinScaleFactor,
+                            new MannequinDisplayOptions(GameState.Config.MannequinImagePath, OverrideDisplaySize: MannequinDisplaySize, Opacity: 1.0, FaceType: outfit.Customization.SelectedFace)))
                     }
                     @foreach (var ct in GameState.Config.ClothingTypes)
                     {

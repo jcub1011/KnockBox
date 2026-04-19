@@ -59,8 +59,8 @@
         if (_showMannequin && GameState.Config.ShowMannequin)
         {
             mannequinSvg = MannequinSvgHelper.Build(canvasWidth, totalOutfitHeight, GameState.Config.MannequinDimensions.Y / 2,
-                GameState.Config.MannequinDimensions.X, GameState.Config.MannequinScaleFactor, GameState.Config.MannequinImagePath, overrideDisplaySize: mannequinSize,
-                faceType: _selectedFace);
+                GameState.Config.MannequinDimensions.X, GameState.Config.MannequinScaleFactor,
+                new MannequinDisplayOptions(GameState.Config.MannequinImagePath, OverrideDisplaySize: mannequinSize, FaceType: _selectedFace));
         }
 
         if (bgParts.Length > 0)
@@ -172,12 +172,12 @@
                     <button class="dtd-btn-mode @(_mode == InteractionMode.Draw ? "dtd-btn-mode-active" : "")"
                             aria-pressed="@(_mode == InteractionMode.Draw ? "true" : "false")"
                             @onclick="() => SwitchModeAsync(InteractionMode.Draw)">
-                        🖌️ Draw
+                        <span aria-hidden="true">🖌️</span> Draw
                     </button>
                     <button class="dtd-btn-mode @(_mode == InteractionMode.MoveItems ? "dtd-btn-mode-active" : "")"
                             aria-pressed="@(_mode == InteractionMode.MoveItems ? "true" : "false")"
                             @onclick="() => SwitchModeAsync(InteractionMode.MoveItems)">
-                        🖐️ Move
+                        <span aria-hidden="true">🖐️</span> Move
                     </button>
                 </div>
 
@@ -209,12 +209,12 @@
                                 <button class="dtd-btn-mode @(_mode == InteractionMode.Draw ? "dtd-btn-mode-active" : "")"
                                         aria-pressed="@(_mode == InteractionMode.Draw ? "true" : "false")"
                                         @onclick="() => SwitchModeAsync(InteractionMode.Draw)">
-                                    🖌️ Draw
+                                    <span aria-hidden="true">🖌️</span> Draw
                                 </button>
                                 <button class="dtd-btn-mode @(_mode == InteractionMode.MoveItems ? "dtd-btn-mode-active" : "")"
                                         aria-pressed="@(_mode == InteractionMode.MoveItems ? "true" : "false")"
                                         @onclick="() => SwitchModeAsync(InteractionMode.MoveItems)">
-                                    🖐️ Move
+                                    <span aria-hidden="true">🖐️</span> Move
                                 </button>
                             </div>
                         </div>
@@ -228,7 +228,7 @@
                                     {
                                         <button class="dtd-item-tab @(ct.Id == _selectedTypeId ? "dtd-item-tab-active" : "")"
                                                 @onclick="() => SelectItemAsync(ct.Id)">
-                                            <span class="dtd-item-icon">@GetClothingTypeIcon(ct.Id)</span>
+                                            <span class="dtd-item-icon" aria-hidden="true">@GetClothingTypeIcon(ct.Id)</span>
                                             <span class="dtd-item-label">@ct.DisplayName</span>
                                         </button>
                                     }

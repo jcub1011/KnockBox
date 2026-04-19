@@ -123,6 +123,31 @@ namespace KnockBox
             app.UseAuthentication();
             app.UseAuthorization();
 
+            // If the admin is still using the default bootstrap password, force a
+            // password change before any other admin page renders.
+            app.Use(async (ctx, next) =>
+            {
+                var path = ctx.Request.Path.Value ?? string.Empty;
+                var isAdminPath = path.StartsWith("/admin", StringComparison.OrdinalIgnoreCase);
+                var isExempt =
+                    path.StartsWith("/admin/changepassword", StringComparison.OrdinalIgnoreCase)
+                    || path.StartsWith("/admin/login", StringComparison.OrdinalIgnoreCase)
+                    || path.StartsWith("/admin/logout", StringComparison.OrdinalIgnoreCase)
+                    || path.StartsWith("/admin/admin.css", StringComparison.OrdinalIgnoreCase);
+
+                if (isAdminPath && !isExempt && ctx.User?.Identity?.IsAuthenticated == true)
+                {
+                    var settings = ctx.RequestServices.GetRequiredService<IAdminSettingsService>();
+                    if (settings.IsPasswordDefault())
+                    {
+                        ctx.Response.Redirect("/admin/changepassword");
+                        return;
+                    }
+                }
+
+                await next();
+            });
+
             // ── Endpoints ────────────────────────────────────────────────────
             app.MapKnockBoxPlatformEndpoints<App>();
 

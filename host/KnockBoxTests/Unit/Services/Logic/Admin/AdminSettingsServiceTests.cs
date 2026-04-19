@@ -98,6 +98,26 @@ namespace KnockBox.Tests.Unit.Services.Logic.Admin
         }
 
         [TestMethod]
+        public async Task SetToSameValue_DoesNotWriteToDisk()
+        {
+            var service = CreateService();
+            var path = Path.Combine(_tempRoot, _settingsFileName);
+
+            await service.SetEnableThirdPartyPluginsAsync(false);
+            Assert.IsFalse(File.Exists(path), "Default value should not create a file.");
+
+            await service.SetEnableThirdPartyPluginsAsync(true);
+            var firstWriteTime = File.GetLastWriteTimeUtc(path);
+
+            await Task.Delay(10);
+            await service.SetEnableThirdPartyPluginsAsync(true);
+            var secondWriteTime = File.GetLastWriteTimeUtc(path);
+
+            Assert.AreEqual(firstWriteTime, secondWriteTime,
+                "Identical value must not rewrite file.");
+        }
+
+        [TestMethod]
         public async Task CorruptedFile_AndNoBackup_ThrowsException()
         {
             var service1 = CreateService();
