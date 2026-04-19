@@ -210,6 +210,15 @@
                              preserveAspectRatio="xMidYMid meet"
                              xmlns="http://www.w3.org/2000/svg"
                              role="img" aria-label="Your outfit preview">
+                            
+                            @if (_showMannequin && GameState.Config.ShowMannequin)
+                            {
+                                double mannequinSize = CompositeCanvasLayout.MannequinDisplaySize(GameState.Config);
+                                @((MarkupString)MannequinSvgHelper.Build(ComposedOutfitWidth, ComposedOutfitHeight, GameState.Config.MannequinDimensions.Y / 2,
+                                    GameState.Config.MannequinDimensions.X, GameState.Config.MannequinScaleFactor,
+                                    new MannequinDisplayOptions(GameState.Config.MannequinImagePath, OverrideDisplaySize: mannequinSize)))
+                            }
+
                             @foreach (var clothingType in GameState.Config.ClothingTypes)
                             {
                                 var (defX, defY) = CompositeCanvasLayout.GetItemPosition(
@@ -227,7 +236,8 @@
                                         @((MarkupString)safeSvgSlot)
                                     </g>
                                 }
-                                else
+                                @* When the mannequin is shown it acts as the visual reference; empty-slot placeholders would clutter the figure, so we suppress them. *@
+                                else if (!_showMannequin)
                                 {
                                     <g transform="translate(@defX,@defY)">
                                         <rect x="50" y="50"
@@ -249,6 +259,14 @@
                     </div>
 
                     <div class="dtd-outfit-actions-panel">
+                        @if (GameState.Config.ShowMannequin)
+                        {
+                            <label class="dtd-customization-checkbox-label dtd-mannequin-toggle-simple">
+                                <input type="checkbox" @bind="_showMannequin" />
+                                Show Mannequin
+                            </label>
+                        }
+
                         @if (_errorMessage is not null)
                         {
                             <p class="dtd-outfit-error" role="alert">@_errorMessage</p>
@@ -260,19 +278,34 @@
                 </section>
 
                 <section class="dtd-outfit-right-panel">
-                    <h3 class="dtd-outfit-section-title">@poolTitle</h3>
+                    <header class="dtd-outfit-right-header">
+                        <h3 class="dtd-outfit-section-title">@poolTitle</h3>
+                        
+                        <!-- Mobile Category Ribbon -->
+                        <div class="dtd-category-ribbon">
+                            @foreach (var ct in GameState.Config.ClothingTypes)
+                            {
+                                <button class="dtd-category-tab @(ct.Id == _selectedTypeId ? "dtd-category-tab-active" : "")"
+                                        @onclick="() => _selectedTypeId = ct.Id">
+                                    <span class="dtd-category-icon" aria-hidden="true">@GetClothingTypeIcon(ct.Id)</span>
+                                    <span class="dtd-category-label">@ct.DisplayName</span>
+                                </button>
+                            }
+                        </div>
+                    </header>
+
                     <div class="dtd-pool-scroll-area">
                         @{
-                            var poolByType = GameState.Config.ClothingTypes
-                                .ToDictionary(
-                                    ct => ct,
-                                    ct => GameState.ClothingPool.Values
-                                        .Where(item => item.ClothingTypeId == ct.Id && item.IsInPool)
-                                        .ToList());
+                            // On mobile, we only show the selected type. On desktop, we show all (css handles hidden)
+                            var activeTypes = GameState.Config.ClothingTypes.ToList();
                         }
-                        @foreach (var (clothingType, items) in poolByType)
+                        @foreach (var clothingType in activeTypes)
                         {
-                            <div @key="clothingType.Id" class="dtd-pool-type-group">
+                            var items = GameState.ClothingPool.Values
+                                .Where(item => item.ClothingTypeId == clothingType.Id && item.IsInPool)
+                                .ToList();
+
+                            <div @key="clothingType.Id" class="dtd-pool-type-group @(clothingType.Id != _selectedTypeId ? "dtd-pool-type-hidden-mobile" : "")">
                                 <h4 class="dtd-pool-type-label">@clothingType.DisplayName</h4>
                                 @if (items.Count == 0)
                                 {

@@ -1,6 +1,8 @@
 using KnockBox.Platform.Storage;
 using KnockBox.Services.Logic.Admin;
 using Microsoft.Extensions.Options;
+using System.Globalization;
+using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -11,9 +13,15 @@ namespace KnockBox.Services.Logic.Admin
     /// </summary>
     internal sealed class AdminSettingsService : IAdminSettingsService
     {
+        private const int Iterations = 100_000;
+        private const int SaltSize = 16; // 128 bits
+        private const int KeySize = 32;  // 256 bits
+        private static readonly HashAlgorithmName HashAlgorithm = HashAlgorithmName.SHA256;
+
         private readonly SemaphoreSlim _fileLock = new(1, 1);
         private readonly string _statePath;
         private readonly ILogger _logger;
+        private readonly AdminOptions _options;
 
         private static readonly JsonSerializerOptions JsonOptions = new()
         {
@@ -22,6 +30,7 @@ namespace KnockBox.Services.Logic.Admin
         };
 
         private bool _enableThirdPartyPlugins;
+        private string? _passwordHash;
 
         public AdminSettingsService(
             IStoragePathService storagePath,
@@ -29,6 +38,7 @@ namespace KnockBox.Services.Logic.Admin
             ILogger<AdminSettingsService> logger)
         {
             _logger = logger;
+            _options = options.Value;
             _statePath = Path.Combine(storagePath.GetAdminDirectory(), options.Value.SettingsPath);
 
             LoadFromDisk();
@@ -44,31 +54,91 @@ namespace KnockBox.Services.Logic.Admin
             await PersistToDiskAsync();
         }
 
+        public bool IsPasswordDefault() => string.IsNullOrWhiteSpace(_passwordHash);
+
+        public bool VerifyPassword(string password)
+        {
+            if (string.IsNullOrWhiteSpace(_passwordHash))
+            {
+                // Fallback to bootstrap password in appsettings.json
+                return FixedTimeEquals(password, _options.Password);
+            }
+
+            try
+            {
+                var parts = _passwordHash.Split(':');
+                if (parts.Length != 4 || parts[0] != "v1") return false;
+
+                var iterations = int.Parse(parts[1], CultureInfo.InvariantCulture);
+                var salt = Convert.FromBase64String(parts[2]);
+                var hash = Convert.FromBase64String(parts[3]);
+
+                var inputHash = Rfc2898DeriveBytes.Pbkdf2(
+                    password,
+                    salt,
+                    iterations,
+                    HashAlgorithm,
+                    hash.Length);
+
+                return CryptographicOperations.FixedTimeEquals(inputHash, hash);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to verify admin password hash format.");
+                return false;
+            }
+        }
+
+        public async ValueTask UpdatePasswordAsync(string newPassword)
+        {
+            var salt = RandomNumberGenerator.GetBytes(SaltSize);
+            var hash = Rfc2898DeriveBytes.Pbkdf2(
+                newPassword,
+                salt,
+                Iterations,
+                HashAlgorithm,
+                KeySize);
+
+            _passwordHash = $"v1:{Iterations}:{Convert.ToBase64String(salt)}:{Convert.ToBase64String(hash)}";
+            await PersistToDiskAsync();
+        }
+
         private void LoadFromDisk()
         {
             if (!File.Exists(_statePath))
             {
                 _logger.LogInformation(
-                    "No admin settings file at [{Path}]; using defaults (Third-party plugins disabled).",
+                    "No admin settings file at [{Path}]; using defaults.",
                     _statePath);
                 return;
             }
 
             try
             {
-                using var stream = new FileStream(
-                    _statePath,
-                    FileMode.Open,
-                    FileAccess.Read,
-                    FileShare.Read);
-                var doc = JsonSerializer.Deserialize<PersistedSettings>(stream, JsonOptions);
+                ReadSettingsFile(_statePath);
+            }
+            catch (JsonException ex)
+            {
+                _logger.LogWarning(ex, "Admin settings file at [{Path}] is corrupted. Attempting to load from backup.", _statePath);
                 
-                _enableThirdPartyPlugins = doc?.EnableThirdPartyPlugins ?? false;
-
-                _logger.LogInformation(
-                    "Loaded admin settings from [{Path}]: EnableThirdPartyPlugins={Value}.",
-                    _statePath,
-                    _enableThirdPartyPlugins);
+                var backupPath = _statePath + ".bak";
+                if (File.Exists(backupPath))
+                {
+                    try
+                    {
+                        ReadSettingsFile(backupPath);
+                        _logger.LogInformation("Successfully recovered admin settings from backup at [{BackupPath}].", backupPath);
+                        return;
+                    }
+                    catch (Exception backupEx)
+                    {
+                        _logger.LogError(backupEx, "Failed to read admin settings from backup at [{BackupPath}]. Both settings and backup are corrupted.", backupPath);
+                        throw;
+                    }
+                }
+                
+                _logger.LogError("No backup file found at [{BackupPath}]. Admin settings are corrupted and unrecoverable.", backupPath);
+                throw;
             }
             catch (Exception ex)
             {
@@ -77,6 +147,25 @@ namespace KnockBox.Services.Logic.Admin
                     "Failed to read admin settings from [{Path}]; using defaults.",
                     _statePath);
             }
+        }
+
+        private void ReadSettingsFile(string path)
+        {
+            using var stream = new FileStream(
+                path,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.Read);
+            var doc = JsonSerializer.Deserialize<PersistedSettings>(stream, JsonOptions);
+            
+            _enableThirdPartyPlugins = doc?.EnableThirdPartyPlugins ?? false;
+            _passwordHash = doc?.PasswordHash;
+
+            _logger.LogInformation(
+                "Loaded admin settings from [{Path}]: EnableThirdPartyPlugins={Value}, CustomPassword={HasPassword}.",
+                path,
+                _enableThirdPartyPlugins,
+                !string.IsNullOrWhiteSpace(_passwordHash));
         }
 
         private async Task PersistToDiskAsync()
@@ -88,7 +177,7 @@ namespace KnockBox.Services.Logic.Admin
                 if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
                     Directory.CreateDirectory(directory);
 
-                var payload = new PersistedSettings(_enableThirdPartyPlugins);
+                var payload = new PersistedSettings(_enableThirdPartyPlugins, _passwordHash);
 
                 var tempPath = _statePath + ".tmp";
                 using (var stream = new FileStream(
@@ -103,6 +192,22 @@ namespace KnockBox.Services.Logic.Admin
                 }
 
                 File.Move(tempPath, _statePath, overwrite: true);
+
+                // Backup is best-effort: if this copy fails the main file already
+                // holds the new data, and the backup simply lags one revision.
+                var backupPath = _statePath + ".bak";
+                try
+                {
+                    File.Copy(_statePath, backupPath, overwrite: true);
+                }
+                catch (Exception backupEx)
+                {
+                    _logger.LogWarning(
+                        backupEx,
+                        "Persisted admin settings to [{Path}] but failed to refresh backup at [{BackupPath}].",
+                        _statePath,
+                        backupPath);
+                }
             }
             catch (Exception ex)
             {
@@ -117,7 +222,15 @@ namespace KnockBox.Services.Logic.Admin
             }
         }
 
+        private static bool FixedTimeEquals(string? left, string? right)
+        {
+            var l = SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(left ?? string.Empty));
+            var r = SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(right ?? string.Empty));
+            return CryptographicOperations.FixedTimeEquals(l, r);
+        }
+
         private sealed record PersistedSettings(
-            [property: JsonPropertyName("enableThirdPartyPlugins")] bool EnableThirdPartyPlugins);
+            [property: JsonPropertyName("enableThirdPartyPlugins")] bool EnableThirdPartyPlugins,
+            [property: JsonPropertyName("passwordHash")] string? PasswordHash = null);
     }
 }

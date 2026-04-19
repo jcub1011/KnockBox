@@ -18,5 +18,22 @@ namespace KnockBox.Services.Logic.Admin
         /// Sets whether third-party plugins should be allowed.
         /// </summary>
         ValueTask SetEnableThirdPartyPluginsAsync(bool enabled);
+
+        /// <summary>
+        /// Returns true if the admin is still using the default bootstrap
+        /// password from configuration.
+        /// </summary>
+        bool IsPasswordDefault();
+
+        /// <summary>
+        /// Verifies the provided password against the persisted hash or the
+        /// default configuration password.
+        /// </summary>
+        bool VerifyPassword(string password);
+
+        /// <summary>
+        /// Hashes and persists a new admin password.
+        /// </summary>
+        ValueTask UpdatePasswordAsync(string newPassword);
     }
 }

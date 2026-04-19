@@ -5,7 +5,7 @@ namespace KnockBox.DrawnToDress.Services.State.Games.Data
     /// These definitions are part of <see cref="DrawnToDressConfig"/> and drive which
     /// drawing slots are available and how outfits are assembled.
     /// </summary>
-    public class ClothingTypeDefinition
+    public record ClothingTypeDefinition
     {
         /// <summary>Identifies which clothing category this definition represents.</summary>
         public ClothingType Id { get; set; }
@@ -38,5 +38,10 @@ namespace KnockBox.DrawnToDress.Services.State.Games.Data
         /// Used by the drawing phase to position the mannequin reference for each clothing type.
         /// </summary>
         public int MannequinAnchorY { get; set; }
+
+        /// <summary>
+        /// Optional path to a version of the mannequin reference image that focuses on this specific body part.
+        /// </summary>
+        public string? MannequinFocusImagePath { get; set; }
     }
 }

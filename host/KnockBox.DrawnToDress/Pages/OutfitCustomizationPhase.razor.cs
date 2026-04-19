@@ -34,9 +34,11 @@ namespace KnockBox.DrawnToDress.Pages
         private string _outfitName = string.Empty;
         private bool _submitting;
         private string? _errorMessage;
+        private bool _sheetExpanded = true;
 
         private InteractionMode _mode = InteractionMode.Draw;
         private bool _showMannequin;
+        private FaceType _selectedFace = FaceType.Default;
         private ClothingType? _selectedTypeId;
         private Dictionary<ClothingType, ItemPositionOverride> _itemPositions = new();
         private IJSObjectReference? _dragModule;
@@ -53,14 +55,29 @@ namespace KnockBox.DrawnToDress.Pages
             var myPlayer = GameState.GamePlayers.GetValueOrDefault(CurrentPlayerId);
             _outfitName = myPlayer?.DraftOutfitName ?? string.Empty;
 
+            var myOutfit = myPlayer?.GetOutfit(OutfitRound);
+            if (myOutfit is not null && !string.IsNullOrWhiteSpace(myOutfit.Customization.OutfitName))
+            {
+                _outfitName = myOutfit.Customization.OutfitName;
+            }
+            _selectedFace = myOutfit?.Customization.SelectedFace ?? FaceType.Default;
+            _showMannequin = myOutfit?.Customization.ShowMannequin ?? GameState.Config.ShowMannequin;
+
             // Compute default positions so each item's center aligns with the
             // corresponding mannequin body-part center in the composite canvas.
             int cw = ComputeCompositeWidth(GameState.Config);
             int ch = ComputeCompositeHeight(GameState.Config);
             foreach (var ct in GameState.Config.ClothingTypes)
             {
-                var (x, y) = GetItemPosition(ct.CanvasWidth, ct.CanvasHeight, ct.MannequinAnchorY, cw, ch, GameState.Config.MannequinDimensions.X);
-                _itemPositions[ct.Id] = new ItemPositionOverride { X = x, Y = y };
+                if (myOutfit?.Customization.ItemPositionOverrides.TryGetValue(ct.Id, out var ovr) == true)
+                {
+                    _itemPositions[ct.Id] = new ItemPositionOverride { X = ovr.X, Y = ovr.Y };
+                }
+                else
+                {
+                    var (x, y) = GetItemPosition(ct.CanvasWidth, ct.CanvasHeight, ct.MannequinAnchorY, cw, ch, GameState.Config.MannequinDimensions.X);
+                    _itemPositions[ct.Id] = new ItemPositionOverride { X = x, Y = y };
+                }
             }
 
             _selectedTypeId = GameState.Config.ClothingTypes.FirstOrDefault()?.Id;
@@ -171,6 +188,14 @@ namespace KnockBox.DrawnToDress.Pages
             }
         }
 
+        private async Task OnClothingTypeChanged(ChangeEventArgs e)
+        {
+            if (Enum.TryParse<ClothingType>(e.Value?.ToString(), out var typeId))
+            {
+                await SelectItemAsync(typeId);
+            }
+        }
+
         /// <summary>
         /// Returns a representative emoji for a clothing type id.
         /// </summary>
@@ -257,7 +282,9 @@ namespace KnockBox.DrawnToDress.Pages
                     UserService.CurrentUser.Id,
                     _outfitName.Trim(),
                     sketchSvg,
-                    positionOverrides);
+                    positionOverrides,
+                    _selectedFace,
+                    _showMannequin);
 
                 var result = GameEngine.ProcessCommand(GameState.Context, cmd);
                 if (result.TryGetFailure(out var err))

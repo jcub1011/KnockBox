@@ -31,22 +31,70 @@ namespace KnockBox.Tests.Unit.Services.Logic.Admin
         }
 
         [TestMethod]
-        public void DefaultState_IsDisabled()
+        public void DefaultState_IsDisabled_And_PasswordIsDefault()
         {
             var service = CreateService();
             Assert.IsFalse(service.GetEnableThirdPartyPlugins());
+            Assert.IsTrue(service.IsPasswordDefault());
+            Assert.IsTrue(service.VerifyPassword("changeme"));
+            Assert.IsFalse(service.VerifyPassword("wrong"));
         }
 
         [TestMethod]
-        public async Task PersistsToDisk_AndReloads()
+        public async Task PersistsToDisk_AndReloads_IncludingPassword()
         {
             var service1 = CreateService();
             await service1.SetEnableThirdPartyPluginsAsync(true);
+            await service1.UpdatePasswordAsync("new-password");
+
             Assert.IsTrue(service1.GetEnableThirdPartyPlugins());
+            Assert.IsFalse(service1.IsPasswordDefault());
+            Assert.IsTrue(service1.VerifyPassword("new-password"));
 
             // Create new instance to verify reload
             var service2 = CreateService();
             Assert.IsTrue(service2.GetEnableThirdPartyPlugins());
+            Assert.IsFalse(service2.IsPasswordDefault());
+            Assert.IsTrue(service2.VerifyPassword("new-password"));
+            Assert.IsFalse(service2.VerifyPassword("changeme"), "Old bootstrap password should no longer work.");
+        }
+
+        [TestMethod]
+        public async Task EmergencyReset_ByDeletingFile_RevertsToDefault()
+        {
+            var service1 = CreateService();
+            await service1.UpdatePasswordAsync("secret");
+            Assert.IsFalse(service1.IsPasswordDefault());
+
+            // Simulate emergency reset by deleting the settings file
+            var path = Path.Combine(_tempRoot, _settingsFileName);
+            File.Delete(path);
+
+            var service2 = CreateService();
+            Assert.IsTrue(service2.IsPasswordDefault(), "Should revert to default after file deletion.");
+            Assert.IsTrue(service2.VerifyPassword("changeme"));
+        }
+
+        [TestMethod]
+        public async Task CorruptedFile_RestoresFromBackup()
+        {
+            var service1 = CreateService();
+            await service1.SetEnableThirdPartyPluginsAsync(true);
+            await service1.UpdatePasswordAsync("secret");
+
+            var path = Path.Combine(_tempRoot, _settingsFileName);
+            var backupPath = path + ".bak";
+
+            Assert.IsTrue(File.Exists(backupPath), "Backup file should have been created during persist.");
+
+            // Corrupt the main settings file
+            await File.WriteAllTextAsync(path, "{ invalid_json: ");
+
+            // Create a new instance, which should recover from the backup
+            var service2 = CreateService();
+
+            Assert.IsTrue(service2.GetEnableThirdPartyPlugins(), "Should have recovered 'true' from backup.");
+            Assert.IsTrue(service2.VerifyPassword("secret"), "Should have recovered password from backup.");
         }
 
         [TestMethod]
@@ -56,21 +104,49 @@ namespace KnockBox.Tests.Unit.Services.Logic.Admin
             var path = Path.Combine(_tempRoot, _settingsFileName);
 
             await service.SetEnableThirdPartyPluginsAsync(false);
-            Assert.IsFalse(File.Exists(path), "Should not create file for default value if not changed.");
+            Assert.IsFalse(File.Exists(path), "Default value should not create a file.");
 
             await service.SetEnableThirdPartyPluginsAsync(true);
             var firstWriteTime = File.GetLastWriteTimeUtc(path);
 
-            await Task.Delay(10); // Ensure timestamp can change
+            await Task.Delay(10);
             await service.SetEnableThirdPartyPluginsAsync(true);
             var secondWriteTime = File.GetLastWriteTimeUtc(path);
 
-            Assert.AreEqual(firstWriteTime, secondWriteTime, "Should not rewrite file if value is identical.");
+            Assert.AreEqual(firstWriteTime, secondWriteTime,
+                "Identical value must not rewrite file.");
         }
 
+        [TestMethod]
+        public async Task CorruptedFile_AndNoBackup_ThrowsException()
+        {
+            var service1 = CreateService();
+            await service1.SetEnableThirdPartyPluginsAsync(true);
+
+            var path = Path.Combine(_tempRoot, _settingsFileName);
+            var backupPath = path + ".bak";
+
+            // Corrupt the main settings file and delete the backup
+            await File.WriteAllTextAsync(path, "{ invalid_json: ");
+            File.Delete(backupPath);
+
+            try
+            {
+                CreateService();
+                Assert.Fail("Should fail hard if settings are corrupted and no backup exists.");
+            }
+            catch (System.Text.Json.JsonException)
+            {
+                // Expected
+            }
+        }
         private IAdminSettingsService CreateService()
         {
-            var options = Options.Create(new AdminOptions { SettingsPath = _settingsFileName });
+            var options = Options.Create(new AdminOptions 
+            { 
+                SettingsPath = _settingsFileName,
+                Password = "changeme" 
+            });
             return new AdminSettingsService(
                 _storagePathMock.Object,
                 options,

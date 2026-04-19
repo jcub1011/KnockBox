@@ -33,6 +33,16 @@ namespace KnockBox.DrawnToDress.Services.State.Games.Data
         /// coordinates. An empty dictionary means the default stacked layout is used.
         /// </summary>
         public Dictionary<ClothingType, ItemPositionOverride> ItemPositionOverrides { get; set; } = new();
+
+        /// <summary>The selected face expression for the mannequin.</summary>
+        public FaceType SelectedFace { get; set; } = FaceType.Default;
+
+        /// <summary>
+        /// When <see langword="true"/>, the mannequin (and its selected face) is displayed
+        /// in the final presentation during voting. Defaults to <see langword="true"/> so
+        /// the customization phase reveals the mannequin reference unless the player opts out.
+        /// </summary>
+        public bool ShowMannequin { get; set; } = true;
     }
 
     /// <summary>

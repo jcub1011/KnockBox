@@ -364,3 +364,4 @@ MigrationBackup/
 FodyWeavers.xsd
 /publish-win-x64
 /.claude
+/host/.idea/.idea.KnockBox.Host/.idea
