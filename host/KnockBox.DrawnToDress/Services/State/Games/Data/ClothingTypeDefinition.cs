@@ -5,7 +5,7 @@ namespace KnockBox.DrawnToDress.Services.State.Games.Data
     /// These definitions are part of <see cref="DrawnToDressConfig"/> and drive which
     /// drawing slots are available and how outfits are assembled.
     /// </summary>
-    public class ClothingTypeDefinition
+    public record ClothingTypeDefinition
     {
         /// <summary>Identifies which clothing category this definition represents.</summary>
         public ClothingType Id { get; set; }

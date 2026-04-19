@@ -59,17 +59,7 @@ namespace KnockBox.DrawnToDress.Services.State.Games.Data
         /// GDD default: Hat, Top, Bottom, Shoes.
         /// </summary>
         public List<ClothingTypeDefinition> ClothingTypes { get; set; } =
-            [.. DefaultClothingTypes.Select(t => new ClothingTypeDefinition
-            {
-                Id = t.Id,
-                DisplayName = t.DisplayName,
-                AllowMultiple = t.AllowMultiple,
-                MaxItemsPerRound = t.MaxItemsPerRound,
-                CanvasWidth = t.CanvasWidth,
-                CanvasHeight = t.CanvasHeight,
-                MannequinAnchorY = t.MannequinAnchorY,
-                MannequinFocusImagePath = t.MannequinFocusImagePath,
-            })];
+            [.. DefaultClothingTypes.Select(t => t with { })];
 
         /// <summary>
         /// The path to the default reference mannequin image.
@@ -321,13 +311,7 @@ namespace KnockBox.DrawnToDress.Services.State.Games.Data
             if (ClothingTypes.Count == 0)
             {
                 var fallback = DefaultClothingTypes.First(t => t.Id == ClothingType.Top);
-                ClothingTypes =
-                [
-                    new() { Id = fallback.Id, DisplayName = fallback.DisplayName, AllowMultiple = fallback.AllowMultiple,
-                            MaxItemsPerRound = fallback.MaxItemsPerRound, CanvasWidth = fallback.CanvasWidth,
-                            CanvasHeight = fallback.CanvasHeight, MannequinAnchorY = fallback.MannequinAnchorY,
-                            MannequinFocusImagePath = fallback.MannequinFocusImagePath },
-                ];
+                ClothingTypes = [fallback with { }];
             }
 
             // ── Voting ─────────────────────────────────────────────────────────
