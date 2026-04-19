@@ -46,7 +46,7 @@ namespace KnockBox.Tests.Unit.Services.Logic.Admin
             var service1 = CreateService();
             await service1.SetEnableThirdPartyPluginsAsync(true);
             await service1.UpdatePasswordAsync("new-password");
-            
+
             Assert.IsTrue(service1.GetEnableThirdPartyPlugins());
             Assert.IsFalse(service1.IsPasswordDefault());
             Assert.IsTrue(service1.VerifyPassword("new-password"));
@@ -75,6 +75,51 @@ namespace KnockBox.Tests.Unit.Services.Logic.Admin
             Assert.IsTrue(service2.VerifyPassword("changeme"));
         }
 
+        [TestMethod]
+        public async Task CorruptedFile_RestoresFromBackup()
+        {
+            var service1 = CreateService();
+            await service1.SetEnableThirdPartyPluginsAsync(true);
+            await service1.UpdatePasswordAsync("secret");
+
+            var path = Path.Combine(_tempRoot, _settingsFileName);
+            var backupPath = path + ".bak";
+
+            Assert.IsTrue(File.Exists(backupPath), "Backup file should have been created during persist.");
+
+            // Corrupt the main settings file
+            await File.WriteAllTextAsync(path, "{ invalid_json: ");
+
+            // Create a new instance, which should recover from the backup
+            var service2 = CreateService();
+
+            Assert.IsTrue(service2.GetEnableThirdPartyPlugins(), "Should have recovered 'true' from backup.");
+            Assert.IsTrue(service2.VerifyPassword("secret"), "Should have recovered password from backup.");
+        }
+
+        [TestMethod]
+        public async Task CorruptedFile_AndNoBackup_ThrowsException()
+        {
+            var service1 = CreateService();
+            await service1.SetEnableThirdPartyPluginsAsync(true);
+
+            var path = Path.Combine(_tempRoot, _settingsFileName);
+            var backupPath = path + ".bak";
+
+            // Corrupt the main settings file and delete the backup
+            await File.WriteAllTextAsync(path, "{ invalid_json: ");
+            File.Delete(backupPath);
+
+            try
+            {
+                CreateService();
+                Assert.Fail("Should fail hard if settings are corrupted and no backup exists.");
+            }
+            catch (System.Text.Json.JsonException)
+            {
+                // Expected
+            }
+        }
         private IAdminSettingsService CreateService()
         {
             var options = Options.Create(new AdminOptions 

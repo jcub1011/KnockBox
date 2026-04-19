@@ -114,21 +114,30 @@ namespace KnockBox.Services.Logic.Admin
 
             try
             {
-                using var stream = new FileStream(
-                    _statePath,
-                    FileMode.Open,
-                    FileAccess.Read,
-                    FileShare.Read);
-                var doc = JsonSerializer.Deserialize<PersistedSettings>(stream, JsonOptions);
+                ReadSettingsFile(_statePath);
+            }
+            catch (JsonException ex)
+            {
+                _logger.LogWarning(ex, "Admin settings file at [{Path}] is corrupted. Attempting to load from backup.", _statePath);
                 
-                _enableThirdPartyPlugins = doc?.EnableThirdPartyPlugins ?? false;
-                _passwordHash = doc?.PasswordHash;
-
-                _logger.LogInformation(
-                    "Loaded admin settings from [{Path}]: EnableThirdPartyPlugins={Value}, CustomPassword={HasPassword}.",
-                    _statePath,
-                    _enableThirdPartyPlugins,
-                    !string.IsNullOrWhiteSpace(_passwordHash));
+                var backupPath = _statePath + ".bak";
+                if (File.Exists(backupPath))
+                {
+                    try
+                    {
+                        ReadSettingsFile(backupPath);
+                        _logger.LogInformation("Successfully recovered admin settings from backup at [{BackupPath}].", backupPath);
+                        return;
+                    }
+                    catch (Exception backupEx)
+                    {
+                        _logger.LogError(backupEx, "Failed to read admin settings from backup at [{BackupPath}]. Both settings and backup are corrupted.", backupPath);
+                        throw;
+                    }
+                }
+                
+                _logger.LogError("No backup file found at [{BackupPath}]. Admin settings are corrupted and unrecoverable.", backupPath);
+                throw;
             }
             catch (Exception ex)
             {
@@ -137,6 +146,25 @@ namespace KnockBox.Services.Logic.Admin
                     "Failed to read admin settings from [{Path}]; using defaults.",
                     _statePath);
             }
+        }
+
+        private void ReadSettingsFile(string path)
+        {
+            using var stream = new FileStream(
+                path,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.Read);
+            var doc = JsonSerializer.Deserialize<PersistedSettings>(stream, JsonOptions);
+            
+            _enableThirdPartyPlugins = doc?.EnableThirdPartyPlugins ?? false;
+            _passwordHash = doc?.PasswordHash;
+
+            _logger.LogInformation(
+                "Loaded admin settings from [{Path}]: EnableThirdPartyPlugins={Value}, CustomPassword={HasPassword}.",
+                path,
+                _enableThirdPartyPlugins,
+                !string.IsNullOrWhiteSpace(_passwordHash));
         }
 
         private async Task PersistToDiskAsync()
@@ -162,6 +190,9 @@ namespace KnockBox.Services.Logic.Admin
                     await JsonSerializer.SerializeAsync(stream, payload, JsonOptions);
                 }
 
+                var backupPath = _statePath + ".bak";
+                File.Copy(tempPath, backupPath, overwrite: true);
+
                 File.Move(tempPath, _statePath, overwrite: true);
             }
             catch (Exception ex)
@@ -177,10 +208,10 @@ namespace KnockBox.Services.Logic.Admin
             }
         }
 
-        private static bool FixedTimeEquals(string left, string right)
+        private static bool FixedTimeEquals(string? left, string? right)
         {
-            var l = SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(left));
-            var r = SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(right));
+            var l = SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(left ?? string.Empty));
+            var r = SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(right ?? string.Empty));
             return CryptographicOperations.FixedTimeEquals(l, r);
         }
 
