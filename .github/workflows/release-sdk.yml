@@ -1,0 +1,134 @@
+name: Release SDK
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'SDK NuGet version (no v prefix, e.g. 1.4.0 or 1.4.0-rc.1)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate version input
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate version format
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          # Reject a leading 'v' so nupkg filenames match the NuGet convention.
+          if [[ "$VERSION" =~ ^v ]]; then
+            echo "ERROR: SDK version must not include a 'v' prefix. Use '1.4.0', not 'v1.4.0'."
+            exit 1
+          fi
+          # Reject anything outside of SemVer-safe characters. Defends downstream
+          # shell commands (dotnet pack -p:Version=…, gh release) against
+          # accidental or malicious metacharacter injection.
+          if [[ ! "$VERSION" =~ ^[A-Za-z0-9._+-]+$ ]]; then
+            echo "ERROR: Version '$VERSION' contains characters outside [A-Za-z0-9._+-]."
+            exit 1
+          fi
+
+  pack:
+    name: Pack & Publish ${{ matrix.project }}
+    needs: [validate]
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    strategy:
+      # fail-fast:false so a transient failure on one package doesn't cancel
+      # in-flight pushes for the others.
+      fail-fast: false
+      matrix:
+        # `project` is the PascalCased folder name (sdk/KnockBox.<project>/);
+        # `id` is the lowercased tag used for the artifact name so the release
+        # step's `knockbox-*-nupkg` download pattern matches on case-sensitive
+        # Linux runners.
+        include:
+          - project: Core
+            id: core
+          - project: Platform
+            id: platform
+          - project: Templates
+            id: templates
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Pack
+        # -p:Version drives both AssemblyVersion and PackageVersion, and feeds
+        # the ProjectReference -> PackageReference transform at pack time so the
+        # Platform nupkg's KnockBox.Core dependency is pinned to the same version.
+        env:
+          VERSION: ${{ inputs.version }}
+        run: dotnet pack sdk/KnockBox.${{ matrix.project }}/KnockBox.${{ matrix.project }}.csproj -c Release -p:Version="$VERSION" -o nupkg
+
+      - name: NuGet Login
+        id: oidc
+        uses: NuGet/login@v1
+        with:
+          user: ${{ vars.NUGET_USERNAME }}
+
+      - name: Publish to NuGet.org
+        run: |
+          # Note: This step uses NuGet.org Trusted Publishing (OIDC).
+          # The repository must be configured as a Trusted Publisher on NuGet.org.
+          dotnet nuget push nupkg/*.nupkg --source https://api.nuget.org/v3/index.json --skip-duplicate --api-key ${{ steps.oidc.outputs.NUGET_API_KEY }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: knockbox-${{ matrix.id }}-nupkg
+          path: nupkg/*.nupkg
+
+  release-sdk:
+    name: Publish GitHub Release (SDK)
+    needs: [pack]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout (full history for tag lookup)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Find previous SDK tag
+        id: prev
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          PREV=$(git tag --list 'sdk-*' --sort=-v:refname | grep -v "sdk-$VERSION" | head -n1)
+          echo "tag=$PREV" >> "$GITHUB_OUTPUT"
+
+      - name: Download all SDK artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: knockbox-*-nupkg
+          merge-multiple: true
+
+      - name: List artifacts
+        run: ls -la artifacts
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: sdk-${{ inputs.version }}
+          tag_name: sdk-${{ inputs.version }}
+          previous_tag: ${{ steps.prev.outputs.tag }}
+          files: |
+            artifacts/*.nupkg
+          generate_release_notes: true
+          draft: false
+          prerelease: ${{ contains(inputs.version, '-') }}

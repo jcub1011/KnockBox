@@ -1,0 +1,74 @@
+<!--
+  KnockBox.Platform — hosting SDK for KnockBox game plugins.
+
+  Hosts (dev or production) reference this package. Plugins NEVER do — a plugin
+  referencing KnockBox.Platform breaks the runtime AssemblyLoadContext
+  isolation because assembly identity for the platform's types would drift
+  between the host and plugin sides.
+-->
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <!-- RootNamespace defaults to KnockBox.Platform (matches the package id).
+         Public API surface lives under KnockBox.Platform.*; internal legacy
+         folders keep explicit KnockBox.Services.* namespace declarations until
+         they're renamed or made internal. -->
+    <PackageId>KnockBox.Platform</PackageId>
+    <Authors>jcub1011</Authors>
+    <Description>Runtime host for KnockBox party game plugins.</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <RepositoryUrl>https://github.com/jcub1011/KnockBox</RepositoryUrl>
+    <PackageTags>knockbox partygame plugin-system platform</PackageTags>
+    <!-- Ships README.md on NuGet.org. The file is packed below via <None Include>. -->
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Keep the embedded profanity list out of the default `content` bucket
+         so it doesn't get copied to consumers; it is re-included as an
+         EmbeddedResource further down. -->
+    <None Remove="Data\Statics\Profanities\English.txt" />
+    <!-- Packed into the NuGet at the package root so NuGet.org renders it. -->
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- ASP.NET Core shared framework — required for hosting Blazor Server. -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <!-- In-repo project reference; at pack time this is transformed into a
+         `KnockBox.Core` package dependency. External consumers get the NuGet. -->
+    <ProjectReference Include="..\KnockBox.Core\KnockBox.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- FluentValidation — used by the platform's validators. -->
+    <PackageReference Include="FluentValidation" Version="12.1.1" />
+    <!-- Serilog stack — the platform ships a default request-logging pipeline
+         and a bootstrap logger used during plugin discovery (before the host's
+         logging is fully wired up). -->
+    <PackageReference Include="Serilog" Version="4.3.1" />
+    <PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
+    <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Profanity word list embedded into the assembly and loaded by
+         ProfanityFilter at startup. Keep the path stable; the filter reads
+         it via GetManifestResourceStream. -->
+    <EmbeddedResource Include="Data\Statics\Profanities\English.txt" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Microsoft.Extensions.Logging" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Grants the in-repo test projects access to internal types. -->
+    <InternalsVisibleTo Include="KnockBox.PlatformTests" />
+    <InternalsVisibleTo Include="KnockBoxTests" />
+  </ItemGroup>
+
+</Project>

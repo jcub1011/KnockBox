@@ -1,0 +1,314 @@
+@using KnockBox.Core.Components.Shared
+@using KnockBox.DrawnToDress.Services.Logic.Games
+@using KnockBox.DrawnToDress.Services.State.Games
+@using KnockBox.DrawnToDress.Services.State.Games.Data
+@using KnockBox.Core.Services.State.Users
+
+@{
+    bool isHost = UserService.CurrentUser?.Id == GameState.Host.Id;
+
+    string? myId = UserService.CurrentUser?.Id;
+    var myPlayer = myId is not null && GameState.GamePlayers.TryGetValue(myId, out var pOut) ? pOut : null;
+    bool hasSubmitted = myPlayer?.IsReady ?? false;
+
+    int submittedCount = GameState.GamePlayers.Values.Count(p => p.IsReady);
+    int totalPlayers = GameState.GamePlayers.Count;
+
+    string phaseName = OutfitRound == 1 ? "Customize Outfit" : $"Customize Outfit {OutfitRound}";
+    string nameLabel = OutfitRound == 1 ? "Outfit Name" : $"Outfit {OutfitRound} Name";
+    string finalizeLabel = OutfitRound == 1 ? "Finalize Outfit" : $"Finalize Outfit {OutfitRound}";
+    string finalizedMessage = OutfitRound == 1 ? "Outfit finalized! Waiting for the others\u2026" : $"Outfit {OutfitRound} finalized! Waiting for the others\u2026";
+
+    var myOutfit = myPlayer?.GetOutfit(OutfitRound);
+
+    int canvasWidth = CompositeCanvasLayout.ComputeCompositeWidth(GameState.Config);
+    int totalOutfitHeight = CompositeCanvasLayout.ComputeCompositeHeight(GameState.Config);
+    double mannequinSize = CompositeCanvasLayout.MannequinDisplaySize(GameState.Config);
+
+    // Build a composite background SVG from the player's selected outfit items, applying
+    // any position overrides set via the drag/manual-input layer.
+    string? outfitBackground = null;
+    string? mannequinSvg = null;
+    if (!isHost && !hasSubmitted && myOutfit is not null)
+    {
+        var bgParts = new System.Text.StringBuilder();
+
+        if (_mode == InteractionMode.Draw)
+        {
+            foreach (var ct in GameState.Config.ClothingTypes)
+            {
+                if (myOutfit.SelectedItemsByType.TryGetValue(ct.Id, out var itemId)
+                    && GameState.ClothingPool.TryGetValue(itemId, out var bgItem)
+                    && bgItem.SvgContent is not null)
+                {
+                    double itemX = 0;
+                    double itemY = 0;
+                    if (_itemPositions.TryGetValue(ct.Id, out var posOverride))
+                    {
+                        itemX = posOverride.X;
+                        itemY = posOverride.Y;
+                    }
+
+                    bgParts.Append($"<g transform=\"translate({itemX},{itemY})\">");
+                    bgParts.Append(bgItem.SvgContent);
+                    bgParts.Append("</g>");
+                }
+            }
+        }
+
+        if (_showMannequin && GameState.Config.ShowMannequin)
+        {
+            mannequinSvg = MannequinSvgHelper.Build(canvasWidth, totalOutfitHeight, GameState.Config.MannequinDimensions.Y / 2,
+                GameState.Config.MannequinDimensions.X, GameState.Config.MannequinScaleFactor,
+                new MannequinDisplayOptions(GameState.Config.MannequinImagePath, OverrideDisplaySize: mannequinSize, FaceType: _selectedFace));
+        }
+
+        if (bgParts.Length > 0)
+            outfitBackground = bgParts.ToString();
+    }
+}
+
+<div class="dtd-customization">
+
+    <!-- ── Header ────────────────────────────────────────────────────────── -->
+    <header class="dtd-customization-header">
+        <div class="dtd-customization-phase-badge">
+            <span class="dtd-customization-phase-icon" aria-hidden="true">✏️</span>
+            <h2 class="dtd-customization-phase-name">@phaseName</h2>
+        </div>
+
+        @* <div class="dtd-customization-progress-pill" aria-label="Player progress">
+            @submittedCount / @totalPlayers finalized
+        </div> *@
+
+        <TimerDisplay GameState="GameState" />
+    </header>
+
+    <main class="dtd-customization-main">
+        <!-- ── Host view ─────────────────────────────────────────────────────── -->
+        @if (isHost)
+        {
+            <div class="dtd-customization-host-panel">
+                <h3 class="dtd-customization-section-title">Outfit Runway</h3>
+                <div class="dtd-customization-player-grid">
+                    @foreach (var kv in GameState.GamePlayers)
+                    {
+                        var ps = kv.Value;
+                        string statusIcon = ps.IsReady ? "✅" : "⏳";
+                        var outfit = ps.GetOutfit(OutfitRound);
+                        string? outfitName = outfit?.Customization.OutfitName;
+                        if (string.IsNullOrWhiteSpace(outfitName)) outfitName = "Naming outfit…";
+                        <div class="dtd-customization-player-card @(ps.IsReady ? "dtd-customization-player-ready" : "")">
+                            <span class="dtd-customization-player-name">@ps.DisplayName</span>
+                            <div class="dtd-customization-runway-preview">
+                                @if (outfit != null)
+                                {
+                                    <svg viewBox="0 0 @canvasWidth @totalOutfitHeight" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
+                                        @foreach (var ct in GameState.Config.ClothingTypes)
+                                        {
+                                            if (outfit.SelectedItemsByType.TryGetValue(ct.Id, out var itemId)
+                                                && GameState.ClothingPool.TryGetValue(itemId, out var item))
+                                            {
+                                                if (KnockBox.Core.Services.Drawing.SvgContentSanitizer.Sanitize(item.SvgContent) is string safeSvg)
+                                                {
+                                                    var (itemX, itemY) = CompositeCanvasLayout.GetItemPosition(
+                                                        ct, canvasWidth, totalOutfitHeight,
+                                                        GameState.Config.MannequinDimensions.X, outfit);
+                                                    <g transform="translate(@itemX,@itemY)">
+                                                        @((MarkupString)safeSvg)
+                                                    </g>
+                                                }
+                                            }
+                                        }
+                                        @if (outfit.Customization.SketchSvgContent is not null && KnockBox.Core.Services.Drawing.SvgContentSanitizer.Sanitize(outfit.Customization.SketchSvgContent) is string sketchSvg)
+                                        {
+                                            @((MarkupString)sketchSvg)
+                                        }
+                                    </svg>
+                                }
+                            </div>
+                            <span class="dtd-customization-player-detail">
+                                @if (ps.IsReady)
+                                {
+                                    <span>"@outfitName"</span>
+                                }
+                                else
+                                {
+                                    <span>@outfitName</span>
+                                }
+                            </span>
+                            <span class="dtd-customization-player-status-badge">
+                                @(ps.IsReady ? "Finalized" : "Customizing...")
+                            </span>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+        else if (hasSubmitted)
+        {
+            <div class="dtd-customization-waiting-card">
+                <div class="dtd-customization-waiting-header">
+                    <span class="dtd-customization-waiting-icon">🌟</span>
+                    <p class="dtd-customization-waiting-text">@finalizedMessage</p>
+                </div>
+                
+                <div class="dtd-customization-submitted-preview">
+                    <p class="dtd-customization-submitted-name">
+                        "@myOutfit!.Customization.OutfitName"
+                    </p>
+                    @if (myOutfit.Customization.SketchSvgContent is not null)
+                    {
+                        <span class="dtd-customization-submitted-badge">Sketch Overlay Added ✏️</span>
+                    }
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="dtd-customization-editor-layout">
+                <!-- Floating Mode Switcher (Mobile) -->
+                <div class="dtd-customization-floating-toolbar">
+                    <button class="dtd-btn-mode @(_mode == InteractionMode.Draw ? "dtd-btn-mode-active" : "")"
+                            aria-pressed="@(_mode == InteractionMode.Draw ? "true" : "false")"
+                            @onclick="() => SwitchModeAsync(InteractionMode.Draw)">
+                        <span aria-hidden="true">🖌️</span> Draw
+                    </button>
+                    <button class="dtd-btn-mode @(_mode == InteractionMode.MoveItems ? "dtd-btn-mode-active" : "")"
+                            aria-pressed="@(_mode == InteractionMode.MoveItems ? "true" : "false")"
+                            @onclick="() => SwitchModeAsync(InteractionMode.MoveItems)">
+                        <span aria-hidden="true">🖐️</span> Move
+                    </button>
+                </div>
+
+                <section class="dtd-customization-controls-panel @(_sheetExpanded ? "dtd-sheet-expanded" : "dtd-sheet-collapsed")">
+                    <!-- Sheet Handle (Mobile) -->
+                    <div class="dtd-sheet-handle" @onclick="() => _sheetExpanded = !_sheetExpanded">
+                        <div class="dtd-sheet-handle-bar"></div>
+                        <span class="dtd-sheet-handle-label">@( _sheetExpanded ? "Hide Controls" : "Show Controls" )</span>
+                    </div>
+
+                    <div class="dtd-sheet-content">
+                        <div class="dtd-customization-field">
+                            <label class="dtd-customization-label" for="outfit-name-input">
+                                @nameLabel <span class="dtd-customization-required">*</span>
+                            </label>
+                            <input id="outfit-name-input"
+                                   class="dtd-customization-input"
+                                   type="text"
+                                   placeholder="Name your creation..."
+                                   maxlength="60"
+                                   value="@_outfitName"
+                                   @oninput="(e) => OnOutfitNameChangedAsync(e.Value?.ToString() ?? string.Empty)" />
+                        </div>
+
+                        <!-- Mode selector (Desktop only, hidden on mobile via CSS as we have the floating one) -->
+                        <div class="dtd-customization-field dtd-desktop-only">
+                            <label class="dtd-customization-label">Edit Mode</label>
+                            <div class="dtd-customization-mode-toggle">
+                                <button class="dtd-btn-mode @(_mode == InteractionMode.Draw ? "dtd-btn-mode-active" : "")"
+                                        aria-pressed="@(_mode == InteractionMode.Draw ? "true" : "false")"
+                                        @onclick="() => SwitchModeAsync(InteractionMode.Draw)">
+                                    <span aria-hidden="true">🖌️</span> Draw
+                                </button>
+                                <button class="dtd-btn-mode @(_mode == InteractionMode.MoveItems ? "dtd-btn-mode-active" : "")"
+                                        aria-pressed="@(_mode == InteractionMode.MoveItems ? "true" : "false")"
+                                        @onclick="() => SwitchModeAsync(InteractionMode.MoveItems)">
+                                    <span aria-hidden="true">🖐️</span> Move
+                                </button>
+                            </div>
+                        </div>
+
+                        @if (_mode == InteractionMode.MoveItems)
+                        {
+                            <div class="dtd-customization-field">
+                                <label class="dtd-customization-label">Select Item</label>
+                                <div class="dtd-item-ribbon">
+                                    @foreach (var ct in GameState.Config.ClothingTypes)
+                                    {
+                                        <button class="dtd-item-tab @(ct.Id == _selectedTypeId ? "dtd-item-tab-active" : "")"
+                                                @onclick="() => SelectItemAsync(ct.Id)">
+                                            <span class="dtd-item-icon" aria-hidden="true">@GetClothingTypeIcon(ct.Id)</span>
+                                            <span class="dtd-item-label">@ct.DisplayName</span>
+                                        </button>
+                                    }
+                                </div>
+                            </div>
+                        }
+
+                        <div class="dtd-customization-spacer"></div>
+
+                        <div class="dtd-customization-settings-group">
+                            @if (GameState.Config.ShowMannequin)
+                            {
+                                <div class="dtd-customization-field">
+                                    <label class="dtd-customization-label">Mannequin Face</label>
+                                    <select class="dtd-customization-select" @bind="_selectedFace">
+                                        @foreach (var face in Enum.GetValues<FaceType>())
+                                        {
+                                            <option value="@face">@face</option>
+                                        }
+                                    </select>
+                                </div>
+
+                                <div class="dtd-customization-field">
+                                    <label class="dtd-customization-checkbox-label">
+                                        <input type="checkbox" @bind="_showMannequin" />
+                                        Show Mannequin (will be visible in voting)
+                                    </label>
+                                </div>
+                            }
+                        </div>
+
+                        <div class="dtd-customization-actions">
+                            @if (_errorMessage is not null)
+                            {
+                                <p class="dtd-customization-error" role="alert">@_errorMessage</p>
+                            }
+                            <button class="dtd-btn dtd-btn-primary dtd-btn-lg"
+                                    @onclick="SubmitCustomizationAsync"
+                                    disabled="@_submitting">
+                                @(_submitting ? "Finalizing..." : "Finalize")
+                            </button>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="dtd-customization-canvas-panel">
+                    <div class="dtd-customization-canvas-container @(_mode == InteractionMode.MoveItems ? "dtd-canvas-move-mode" : "")">
+                        <SvgDrawingCanvas @ref="_sketchCanvas"
+                                          Width="100%"
+                                          Height="100%"
+                                          ViewBoxWidth="@canvasWidth"
+                                          ViewBoxHeight="@totalOutfitHeight"
+                                          BackgroundColor="#ffffff"
+                                          TrustedBackgroundSvgContent="@mannequinSvg"
+                                          BackgroundSvgContent="@outfitBackground"
+                                          ShowToolbar="@(_mode == InteractionMode.Draw)">
+                            <OverlayContent>
+                                @if (_mode == InteractionMode.MoveItems)
+                                {
+                                    <svg id="@_dragSvgId"
+                                         class="dtd-customization-drag-layer"
+                                         style="z-index: 3;"
+                                         width="@canvasWidth" height="@totalOutfitHeight"
+                                         viewBox="0 0 @canvasWidth @totalOutfitHeight"
+                                         preserveAspectRatio="xMidYMid meet"
+                                         xmlns="http://www.w3.org/2000/svg">
+                                        @if (mannequinSvg is not null)
+                                        {
+                                            @((MarkupString)mannequinSvg)
+                                        }
+                                    </svg>
+                                }
+                            </OverlayContent>
+                        </SvgDrawingCanvas>
+                    </div>
+
+                </section>
+            </div>
+        }
+    </main>
+</div>
+
+

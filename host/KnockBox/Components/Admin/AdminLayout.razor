@@ -1,0 +1,22 @@
+@inherits LayoutComponentBase
+@using Microsoft.AspNetCore.Components.Routing
+
+<HeadContent>
+    <link rel="stylesheet" href="/admin/admin.css" />
+</HeadContent>
+
+<div class="admin-shell">
+    <aside class="admin-sidebar">
+        <div class="admin-brand">KnockBox Admin</div>
+        <nav class="admin-nav">
+            <NavLink href="/admin" Match="NavLinkMatch.All">Dashboard</NavLink>
+            <NavLink href="/admin/games">Games</NavLink>
+            <NavLink href="/admin/logs">Logs</NavLink>
+        </nav>
+        <div class="admin-sidebar-spacer"></div>
+        <a class="admin-nav-logout" href="/admin/logout">Sign out</a>
+    </aside>
+    <main class="admin-main">
+        @Body
+    </main>
+</div>

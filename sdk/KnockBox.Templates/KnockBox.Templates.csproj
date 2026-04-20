@@ -1,0 +1,42 @@
+<!--
+  KnockBox.Templates — dotnet new template pack for KnockBox game plugins.
+
+  Users install this package with `dotnet new install KnockBox.Templates` and
+  then scaffold a plugin with `dotnet new knockbox-game -n MyGame`. The
+  template content lives under templates/knockbox-game/; everything in that
+  folder is packed verbatim (minus bin/obj).
+-->
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageType>Template</PackageType>
+    <TargetFramework>net10.0</TargetFramework>
+    <PackageId>KnockBox.Templates</PackageId>
+    <Title>KnockBox Game Plugin Templates</Title>
+    <Authors>jcub1011</Authors>
+    <Description>Project templates for creating KnockBox party game plugins.</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <RepositoryUrl>https://github.com/jcub1011/KnockBox</RepositoryUrl>
+    <PackageTags>knockbox partygame plugin template dotnet-new</PackageTags>
+    <!-- Template-pack conventions: include the template tree as content, ship
+         no compiled output, and suppress the "package has no lib/ or ref/"
+         warning NuGet emits for template packages. -->
+    <IncludeContentInPack>true</IncludeContentInPack>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <ContentTargetFolders>content</ContentTargetFolders>
+    <NoDefaultExcludes>true</NoDefaultExcludes>
+    <NoWarn>$(NoWarn);NU5128</NoWarn>
+    <!-- Ships README.md on NuGet.org. -->
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Packs the entire templates/ tree as package content; excludes
+         build artifacts from child projects that might be built locally. -->
+    <Content Include="templates\**\*" Exclude="templates\**\bin\**;templates\**\obj\**" />
+    <Compile Remove="templates\**\*" />
+    <EmbeddedResource Remove="templates\**\*" />
+    <None Remove="templates\**\*" />
+    <!-- Packs README.md into the root of the NuGet so NuGet.org renders it. -->
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+</Project>

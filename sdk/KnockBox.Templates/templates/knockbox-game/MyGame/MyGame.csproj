@@ -1,0 +1,50 @@
+<!--
+  Plugin assembly project.
+
+  This is the Razor Class Library (RCL) that ships as a KnockBox game plugin.
+  At runtime the host loads it into its own AssemblyLoadContext rooted at
+  games/{PluginName}/; only KnockBox.Core, the BCL, and logging/DI abstractions
+  are shared with the host, which is why this project MUST reference nothing
+  from KnockBox except KnockBox.Core.
+-->
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+
+    <!-- Required so @page directives (MVC-style routing) work inside this
+         class library. Without it, your lobby pages won't be routable. -->
+    <AddRazorSupportForMvc>true</AddRazorSupportForMvc>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- ASP.NET Core shared framework — needed by the Razor SDK. -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+
+    <!-- THE ONLY KnockBox reference this project may have.
+         Do NOT add KnockBox.Platform or any other game plugin here:
+           - KnockBox.Platform is the host SDK; pulling it in breaks the
+             runtime ALC isolation (assembly identity drift).
+           - Referencing another plugin couples you to its internals and
+             bypasses the discovery mechanism.
+         Use the 1.* floating version so you automatically pick up patch /
+         minor releases of the contracts. -->
+    <PackageReference Include="KnockBox.Core" Version="1.*" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Makes Microsoft.Extensions.Logging available in every .cs file without
+         an explicit using. The Razor SDK already brings in most ASP.NET Core
+         namespaces; this fills in the logging abstractions. -->
+    <Using Include="Microsoft.Extensions.Logging" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Lets the tests project reach internal types in this assembly. Keep the
+         assembly name in sync with MyGame.Tests.csproj. -->
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>MyGame.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+</Project>

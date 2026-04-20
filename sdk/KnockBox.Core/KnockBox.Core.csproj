@@ -1,0 +1,51 @@
+<!--
+  KnockBox.Core — contract package for KnockBox game plugins.
+
+  This is the only KnockBox package a plugin project should reference. It
+  contains the IGameModule / AbstractGameEngine / AbstractGameState contracts,
+  Razor component bases, result types, and other primitives shared across
+  every plugin and the host.
+-->
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <PackageId>KnockBox.Core</PackageId>
+    <Authors>jcub1011</Authors>
+    <Description>Core abstractions and plugin system for KnockBox party game host.</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <RepositoryUrl>https://github.com/jcub1011/KnockBox</RepositoryUrl>
+    <PackageTags>knockbox partygame plugin-system core</PackageTags>
+    <!-- Ships README.md on NuGet.org. The file is packed below via <None Include>. -->
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Contracts-only dependencies. Nothing in KnockBox.Core ties it to
+         a specific host implementation, logger, or DI container; the
+         abstractions packages above are enough for plugins to compile
+         against in isolation. -->
+    <PackageReference Include="Microsoft.AspNetCore.Components.Web" Version="10.0.5" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.5" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.5" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Microsoft.Extensions.Logging" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Packs README.md into the root of the NuGet so NuGet.org renders it. -->
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Grants the in-repo test project access to internal APIs (the
+         PluginLoader forbidden-dependency helper, etc.). External consumers
+         remain bound by the public surface. -->
+    <InternalsVisibleTo Include="KnockBox.CoreTests" />
+  </ItemGroup>
+
+</Project>

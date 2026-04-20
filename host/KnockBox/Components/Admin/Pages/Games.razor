@@ -1,0 +1,152 @@
+@page "/admin/games"
+@layout AdminLayout
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@using KnockBox.Core.Plugins
+@using KnockBox.Platform.Games
+@using KnockBox.Services.Logic.Admin
+@inject IEnumerable<IGameModule> GameModules
+@inject IGameAvailabilityService Availability
+@inject IAdminSettingsService Settings
+
+<PageTitle>Admin - Games</PageTitle>
+
+<h1 class="admin-h1">Games</h1>
+
+<div class="admin-card" style="margin-bottom: 2rem;">
+    <div style="display: flex; align-items: center; justify-content: space-between;">
+        <div>
+            <h2 class="admin-h2" style="margin: 0;">Global Settings</h2>
+            <p style="color:var(--admin-text-dim); margin: 0.25rem 0 0; font-size: 0.9rem;">
+                Configure system-wide game and plugin behavior.
+            </p>
+        </div>
+        <div style="display: flex; align-items: center;">
+            <span style="font-size: 0.95rem; margin-right: 1rem;">Enable Third-Party Plugins</span>
+            <label class="admin-switch">
+                <input type="checkbox"
+                       checked="@_enableThirdPartyPlugins"
+                       @onchange="OnToggleThirdParty" />
+                <span class="admin-switch-slider"></span>
+            </label>
+            @if (_showRestartHint)
+            {
+                <span class="admin-restart-hint">Restart Required</span>
+            }
+        </div>
+    </div>
+</div>
+
+<p style="color:var(--admin-text-dim); margin-top:-0.75rem;">
+    Toggle a game off to hide its tile on the home page and reject new lobby
+    creation for that route. Existing lobbies continue until their hosts leave.
+</p>
+
+@if (_showModal)
+{
+    <div class="admin-modal-overlay">
+        <div class="admin-modal">
+            <h3 class="admin-modal-title">Security Warning</h3>
+            <div class="admin-modal-body">
+                <p>Only install third-party plugins from sources you trust. Plugins can potentially cause harm to your system and connected users.</p>
+                <div class="admin-modal-warning">
+                    By enabling this setting, you are accepting these risks and understand that the developers of KnockBox are not responsible for damages caused by third-party plugins. Third-party plugins will not appear until restart.
+                </div>
+            </div>
+            <div class="admin-modal-footer">
+                <button class="admin-btn admin-btn-secondary" @onclick="CancelToggle">Cancel</button>
+                <button class="admin-btn admin-btn-danger" @onclick="ConfirmToggle">Enable & Understand Risks</button>
+            </div>
+        </div>
+    </div>
+}
+
+<table class="admin-table">
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Route</th>
+            <th>Description</th>
+            <th>Status</th>
+            <th style="text-align:right">Enabled</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var module in GameModules.OrderBy(m => m.Name))
+        {
+            var enabled = Availability.IsEnabled(module.RouteIdentifier);
+            <tr>
+                <td>@module.Name</td>
+                <td><code>@module.RouteIdentifier</code></td>
+                <td style="color:var(--admin-text-dim)">@module.Description</td>
+                <td>
+                    @if (enabled)
+                    {
+                        <span class="admin-status-enabled">Enabled</span>
+                    }
+                    else
+                    {
+                        <span class="admin-status-disabled">Disabled</span>
+                    }
+                </td>
+                <td style="text-align:right">
+                    <label class="admin-switch">
+                        <input type="checkbox"
+                               checked="@enabled"
+                               @onchange="e => OnToggle(module.RouteIdentifier, e)" />
+                        <span class="admin-switch-slider"></span>
+                    </label>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@code {
+    private bool _enableThirdPartyPlugins;
+    private bool _showModal;
+    private bool _showRestartHint;
+
+    protected override void OnInitialized()
+    {
+        _enableThirdPartyPlugins = Settings.GetEnableThirdPartyPlugins();
+    }
+
+    private async Task OnToggleThirdParty(ChangeEventArgs e)
+    {
+        var enabled = e.Value is bool b && b;
+        
+        if (enabled)
+        {
+            // Reset to current state until confirmed
+            _enableThirdPartyPlugins = false;
+            _showModal = true;
+        }
+        else
+        {
+            _enableThirdPartyPlugins = false;
+            await Settings.SetEnableThirdPartyPluginsAsync(false);
+            _showRestartHint = true;
+        }
+    }
+
+    private void CancelToggle()
+    {
+        _showModal = false;
+        _enableThirdPartyPlugins = false;
+    }
+
+    private async Task ConfirmToggle()
+    {
+        _showModal = false;
+        _enableThirdPartyPlugins = true;
+        await Settings.SetEnableThirdPartyPluginsAsync(true);
+        _showRestartHint = true;
+    }
+
+    private async Task OnToggle(string routeIdentifier, ChangeEventArgs e)
+    {
+        var enabled = e.Value is bool b && b;
+        await Availability.SetEnabledAsync(routeIdentifier, enabled);
+        StateHasChanged();
+    }
+}

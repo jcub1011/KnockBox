@@ -1,0 +1,70 @@
+@*
+    Lobby + game page.
+
+    This is the page players land on after creating or joining a lobby for this
+    game. The @page route's middle segment MUST match MyGameModule.RouteIdentifier
+    — the two are paired and the platform will 404 if they drift apart.
+
+    The ObfuscatedRoomCode is populated from the URL by Blazor routing. The
+    platform generates it inside LobbyService and embeds it into the lobby URI.
+
+    This component inherits DisposableComponent (from KnockBox.Core) which gives
+    us:
+      - a ComponentDetached CancellationToken you can pass to async operations,
+      - a base Dispose() override chain.
+
+    Remember: the KnockBox.Platform package owns the '/', '/not-found', and
+    '/error' routes. Your plugin owns pages under '/room/{route-identifier}/...'.
+
+    Code-behind + scoped CSS live in:
+      - MyGameLobby.razor.cs   (partial class, injected services, lifecycle)
+      - MyGameLobby.razor.css  (component-scoped styles, bundled as
+                                wwwroot/MyGame.styles.css by the Razor SDK)
+*@
+@page "/room/my-game/{ObfuscatedRoomCode}"
+
+@inherits DisposableComponent
+
+<HeadContent>
+    @* Scoped-CSS bundle for this plugin. The path follows Blazor's RCL
+       convention: _content/{AssemblyName}/{AssemblyName}.styles.css, served by
+       the platform from this plugin's wwwroot/ folder. *@
+    <link href="_content/MyGame/MyGame.styles.css" rel="stylesheet" />
+</HeadContent>
+
+@if (GameState is null)
+{
+    @* Rendered briefly while OnInitializedAsync resolves the session. *@
+    <div class="mg-loading">Loading...</div>
+}
+else if (GameState.IsJoinable)
+{
+    @* Lobby UI: shown before the host starts the game. *@
+    <div class="mg-lobby">
+        <h2>Waiting for players...</h2>
+        <ul>
+            <li><strong>@GameState.Host.Name</strong> (Host)</li>
+            @foreach (var player in GameState.Players)
+            {
+                <li>@player.Name</li>
+            }
+        </ul>
+        @if (IsHost)
+        {
+            <button @onclick="StartGame" disabled="@(!CanStart)">Start Game</button>
+        }
+    </div>
+}
+else
+{
+    @* In-progress UI: shown after StartAsync flips IsJoinable to false.
+       Branch on your own game-specific state (phase enums, FSM nodes, etc.)
+       to render the right screen for the current moment. *@
+    <div class="mg-game">
+        <h2>Game in progress!</h2>
+        <p>Players: @GameState.Players.Count</p>
+        @* TODO: Add your game UI here. A common pattern is to dispatch on a
+           phase enum stored on your GameState (IPhasedGameState&lt;TPhase&gt;)
+           and render a dedicated Razor component per phase. *@
+    </div>
+}
