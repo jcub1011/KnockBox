@@ -1,3 +1,4 @@
+using System.Collections.Frozen;
 using System.Reflection;
 using System.Text.Json;
 
@@ -36,8 +37,8 @@ namespace KnockBox.Core.Plugins
         /// the type-identity invariant that keeps host-shared contracts working
         /// across the host/plugin boundary.
         /// </summary>
-        internal static readonly IReadOnlyList<string> ForbiddenPluginDependencies =
-            new[] { "KnockBox.Platform" };
+        internal static readonly FrozenSet<string> ForbiddenPluginDependencies =
+            FrozenSet.ToFrozenSet(["KnockBox.Platform"], StringComparer.OrdinalIgnoreCase);
 
         /// <summary>
         /// Scans <paramref name="pluginsDirectory"/> for plugin folders, loads
@@ -277,11 +278,8 @@ namespace KnockBox.Core.Plugins
                     var slashIndex = library.Name.IndexOf('/');
                     var id = slashIndex > 0 ? library.Name[..slashIndex] : library.Name;
 
-                    foreach (var forbidden in ForbiddenPluginDependencies)
-                    {
-                        if (string.Equals(id, forbidden, StringComparison.OrdinalIgnoreCase))
-                            return forbidden;
-                    }
+                    if (ForbiddenPluginDependencies.TryGetValue(id, out var forbidden))
+                        return forbidden;
                 }
 
                 return null;

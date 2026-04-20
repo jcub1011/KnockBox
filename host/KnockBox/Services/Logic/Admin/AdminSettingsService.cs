@@ -29,8 +29,15 @@ namespace KnockBox.Services.Logic.Admin
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         };
 
-        private bool _enableThirdPartyPlugins;
-        private string? _passwordHash;
+        // volatile: readers (GetEnableThirdPartyPlugins, IsPasswordDefault,
+        // VerifyPassword) run unlocked for low-latency admin traffic. Writers
+        // mutate these fields inside _fileLock (see SetEnableThirdPartyPluginsAsync
+        // / UpdatePasswordAsync), so the volatile modifier is what gives unlocked
+        // readers memory-visibility of completed writes. Stale reads are tolerable
+        // here — two consecutive reads may cross a write boundary, which is fine
+        // for the admin UI's eventual-consistency semantics.
+        private volatile bool _enableThirdPartyPlugins;
+        private volatile string? _passwordHash;
 
         public AdminSettingsService(
             IStoragePathService storagePath,
@@ -46,12 +53,50 @@ namespace KnockBox.Services.Logic.Admin
 
         public bool GetEnableThirdPartyPlugins() => _enableThirdPartyPlugins;
 
+        /// <summary>
+        /// Reads only the <c>EnableThirdPartyPlugins</c> toggle from the persisted
+        /// settings file (falling back to <c>.bak</c> if the primary file is
+        /// missing or malformed). Used during host startup to decide which plugin
+        /// directories to scan before the DI container — and therefore the
+        /// <see cref="IAdminSettingsService"/> singleton — is built. Returns
+        /// <see langword="false"/> when no settings file or backup is readable.
+        /// </summary>
+        public static bool ReadThirdPartyToggleFromDisk(
+            IStoragePathService storagePath, AdminOptions options)
+        {
+            var path = Path.Combine(storagePath.GetAdminDirectory(), options.SettingsPath);
+            return TryRead(path) ?? TryRead(path + ".bak") ?? false;
+
+            static bool? TryRead(string filePath)
+            {
+                if (!File.Exists(filePath)) return null;
+                try
+                {
+                    using var stream = File.OpenRead(filePath);
+                    var doc = JsonSerializer.Deserialize<PersistedSettings>(stream, JsonOptions);
+                    return doc?.EnableThirdPartyPlugins ?? false;
+                }
+                catch
+                {
+                    return null;
+                }
+            }
+        }
+
         public async ValueTask SetEnableThirdPartyPluginsAsync(bool enabled)
         {
-            if (_enableThirdPartyPlugins == enabled) return;
+            await _fileLock.WaitAsync();
+            try
+            {
+                if (_enableThirdPartyPlugins == enabled) return;
 
-            _enableThirdPartyPlugins = enabled;
-            await PersistToDiskAsync();
+                _enableThirdPartyPlugins = enabled;
+                await PersistLockedAsync();
+            }
+            finally
+            {
+                _fileLock.Release();
+            }
         }
 
         public bool IsPasswordDefault() => string.IsNullOrWhiteSpace(_passwordHash);
@@ -99,8 +144,18 @@ namespace KnockBox.Services.Logic.Admin
                 HashAlgorithm,
                 KeySize);
 
-            _passwordHash = $"v1:{Iterations}:{Convert.ToBase64String(salt)}:{Convert.ToBase64String(hash)}";
-            await PersistToDiskAsync();
+            var newHash = $"v1:{Iterations}:{Convert.ToBase64String(salt)}:{Convert.ToBase64String(hash)}";
+
+            await _fileLock.WaitAsync();
+            try
+            {
+                _passwordHash = newHash;
+                await PersistLockedAsync();
+            }
+            finally
+            {
+                _fileLock.Release();
+            }
         }
 
         private void LoadFromDisk()
@@ -168,9 +223,14 @@ namespace KnockBox.Services.Logic.Admin
                 !string.IsNullOrWhiteSpace(_passwordHash));
         }
 
-        private async Task PersistToDiskAsync()
+        /// <summary>
+        /// Persists the current in-memory field snapshot to disk. Assumes
+        /// <see cref="_fileLock"/> is already held by the caller, so the field
+        /// write that preceded this call is serialized with the file IO that
+        /// commits it.
+        /// </summary>
+        private async Task PersistLockedAsync()
         {
-            await _fileLock.WaitAsync();
             try
             {
                 var directory = Path.GetDirectoryName(_statePath);
@@ -215,10 +275,6 @@ namespace KnockBox.Services.Logic.Admin
                     ex,
                     "Failed to persist admin settings to [{Path}]. Changes will be lost on restart.",
                     _statePath);
-            }
-            finally
-            {
-                _fileLock.Release();
             }
         }
 

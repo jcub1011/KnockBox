@@ -2,20 +2,14 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
-COPY host/KnockBox/KnockBox.csproj host/KnockBox/
-COPY sdk/KnockBox.Core/KnockBox.Core.csproj sdk/KnockBox.Core/
-COPY sdk/KnockBox.Platform/KnockBox.Platform.csproj sdk/KnockBox.Platform/
-COPY host/KnockBox.CardCounter/KnockBox.CardCounter.csproj host/KnockBox.CardCounter/
-COPY host/KnockBox.Codeword/KnockBox.Codeword.csproj host/KnockBox.Codeword/
-COPY host/KnockBox.DiceSimulator/KnockBox.DiceSimulator.csproj host/KnockBox.DiceSimulator/
-COPY host/KnockBox.DrawnToDress/KnockBox.DrawnToDress.csproj host/KnockBox.DrawnToDress/
-COPY host/KnockBox.HiddenAgenda/KnockBox.HiddenAgenda.csproj host/KnockBox.HiddenAgenda/
-COPY host/KnockBox.Operator/KnockBox.Operator.csproj host/KnockBox.Operator/
-COPY host/KnockBox.TaskMaster/KnockBox.TaskMaster.csproj host/KnockBox.TaskMaster/
-COPY host/Directory.Plugin.targets host/
+# Single-source copy so adding a new plugin does not require a Dockerfile edit.
+# Trades off the "restore-before-source-copy" layer-cache trick (which required
+# listing every csproj explicitly) for fewer maintenance touchpoints; plugin
+# additions are rare and the cost of a full restore on source-only changes is
+# small at our scale.
+COPY . .
 RUN dotnet restore host/KnockBox/KnockBox.csproj
 
-COPY . .
 WORKDIR /src/host/KnockBox
 RUN dotnet publish -c Release -o /app/publish /p:UseAppHost=false
 

@@ -305,28 +305,6 @@
                         </SvgDrawingCanvas>
                     </div>
 
-                    @if (_mode == InteractionMode.MoveItems && false) // Keep hidden
-                    {
-                        <div class="dtd-customization-manual-pos">
-                            <details class="dtd-card">
-                                <summary>Manual Position Controls</summary>
-                                <div class="dtd-manual-pos-grid">
-                                    @foreach (var ct in GameState.Config.ClothingTypes)
-                                    {
-                                        var typeId = ct.Id;
-                                        _itemPositions.TryGetValue(typeId, out var pos);
-                                        <div class="dtd-manual-pos-row">
-                                            <span class="dtd-manual-pos-label">@ct.DisplayName</span>
-                                            <input type="number" class="dtd-customization-input-sm" value="@((int)(pos?.X ?? 0))" 
-                                                   @onchange="(e) => OnManualPositionChanged(typeId, true, e)" title="X Position" />
-                                            <input type="number" class="dtd-customization-input-sm" value="@((int)(pos?.Y ?? 0))" 
-                                                   @onchange="(e) => OnManualPositionChanged(typeId, false, e)" title="Y Position" />
-                                        </div>
-                                    }
-                                </div>
-                            </details>
-                        </div>
-                    }
                 </section>
             </div>
         }

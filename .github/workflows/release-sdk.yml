@@ -33,13 +33,29 @@ jobs:
             exit 1
           fi
 
-  pack-core:
-    name: Pack & Publish KnockBox.Core
+  pack:
+    name: Pack & Publish ${{ matrix.project }}
     needs: [validate]
     runs-on: ubuntu-latest
     permissions:
       id-token: write
       contents: read
+    strategy:
+      # fail-fast:false so a transient failure on one package doesn't cancel
+      # in-flight pushes for the others.
+      fail-fast: false
+      matrix:
+        # `project` is the PascalCased folder name (sdk/KnockBox.<project>/);
+        # `id` is the lowercased tag used for the artifact name so the release
+        # step's `knockbox-*-nupkg` download pattern matches on case-sensitive
+        # Linux runners.
+        include:
+          - project: Core
+            id: core
+          - project: Platform
+            id: platform
+          - project: Templates
+            id: templates
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -50,9 +66,12 @@ jobs:
           dotnet-version: '10.0.x'
 
       - name: Pack
+        # -p:Version drives both AssemblyVersion and PackageVersion, and feeds
+        # the ProjectReference -> PackageReference transform at pack time so the
+        # Platform nupkg's KnockBox.Core dependency is pinned to the same version.
         env:
           VERSION: ${{ inputs.version }}
-        run: dotnet pack sdk/KnockBox.Core/KnockBox.Core.csproj -c Release -p:Version="$VERSION" -o nupkg
+        run: dotnet pack sdk/KnockBox.${{ matrix.project }}/KnockBox.${{ matrix.project }}.csproj -c Release -p:Version="$VERSION" -o nupkg
 
       - name: NuGet Login
         id: oidc
@@ -69,89 +88,12 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: knockbox-core-nupkg
-          path: nupkg/*.nupkg
-
-  pack-platform:
-    name: Pack & Publish KnockBox.Platform
-    needs: [validate]
-    runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-      contents: read
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup .NET 10
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '10.0.x'
-
-      - name: Pack
-        # -p:Version drives both AssemblyVersion and PackageVersion, and feeds
-        # the ProjectReference -> PackageReference transform at pack time so the
-        # Platform nupkg's KnockBox.Core dependency is pinned to the same version.
-        env:
-          VERSION: ${{ inputs.version }}
-        run: dotnet pack sdk/KnockBox.Platform/KnockBox.Platform.csproj -c Release -p:Version="$VERSION" -o nupkg
-
-      - name: NuGet Login
-        id: oidc
-        uses: NuGet/login@v1
-        with:
-          user: ${{ vars.NUGET_USERNAME }}
-
-      - name: Publish to NuGet.org
-        run: |
-          dotnet nuget push nupkg/*.nupkg --source https://api.nuget.org/v3/index.json --skip-duplicate --api-key ${{ steps.oidc.outputs.NUGET_API_KEY }}
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: knockbox-platform-nupkg
-          path: nupkg/*.nupkg
-
-  pack-templates:
-    name: Pack & Publish KnockBox.Templates
-    needs: [validate]
-    runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-      contents: read
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup .NET 10
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '10.0.x'
-
-      - name: Pack
-        env:
-          VERSION: ${{ inputs.version }}
-        run: dotnet pack sdk/KnockBox.Templates/KnockBox.Templates.csproj -c Release -p:Version="$VERSION" -o nupkg
-
-      - name: NuGet Login
-        id: oidc
-        uses: NuGet/login@v1
-        with:
-          user: ${{ vars.NUGET_USERNAME }}
-
-      - name: Publish to NuGet.org
-        run: |
-          dotnet nuget push nupkg/*.nupkg --source https://api.nuget.org/v3/index.json --skip-duplicate --api-key ${{ steps.oidc.outputs.NUGET_API_KEY }}
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: knockbox-templates-nupkg
+          name: knockbox-${{ matrix.id }}-nupkg
           path: nupkg/*.nupkg
 
   release-sdk:
     name: Publish GitHub Release (SDK)
-    needs: [pack-core, pack-platform, pack-templates]
+    needs: [pack]
     runs-on: ubuntu-latest
     permissions:
       contents: write

@@ -295,11 +295,8 @@
                     </header>
 
                     <div class="dtd-pool-scroll-area">
-                        @{
-                            // On mobile, we only show the selected type. On desktop, we show all (css handles hidden)
-                            var activeTypes = GameState.Config.ClothingTypes.ToList();
-                        }
-                        @foreach (var clothingType in activeTypes)
+                        @* On mobile, we only show the selected type. On desktop, we show all (css handles hidden). *@
+                        @foreach (var clothingType in GameState.Config.ClothingTypes)
                         {
                             var items = GameState.ClothingPool.Values
                                 .Where(item => item.ClothingTypeId == clothingType.Id && item.IsInPool)

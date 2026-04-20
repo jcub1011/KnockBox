@@ -27,8 +27,17 @@ namespace KnockBox.Services.Logic.Admin
         public string Username { get; init; } = string.Empty;
 
         /// <summary>
-        /// Admin password. Stored plaintext per project requirement.
+        /// Bootstrap admin password. Stored plaintext per project requirement.
         /// </summary>
+        /// <remarks>
+        /// This value is the fallback used by <c>AdminSettingsService.VerifyPassword</c>
+        /// only while no hashed password has been persisted. Once the admin changes
+        /// the password via <c>/admin/changepassword</c>, a PBKDF2 hash is written
+        /// to the settings file and this appsettings value is no longer consulted
+        /// — it may be rotated or cleared on the next restart without locking
+        /// anyone out. It is still used again only if the settings file (and its
+        /// <c>.bak</c> sibling) is manually deleted as an emergency reset.
+        /// </remarks>
         public string Password { get; init; } = string.Empty;
 
         /// <summary>

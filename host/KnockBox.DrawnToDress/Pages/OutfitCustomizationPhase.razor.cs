@@ -209,31 +209,6 @@ namespace KnockBox.DrawnToDress.Pages
         };
 
         /// <summary>
-        /// Called when a manual X or Y input changes.
-        /// </summary>
-        protected async Task OnManualPositionChanged(ClothingType typeId, bool isX, ChangeEventArgs e)
-        {
-            if (!double.TryParse(e.Value?.ToString(), out var val)) return;
-
-            if (!_itemPositions.TryGetValue(typeId, out var pos))
-            {
-                pos = new ItemPositionOverride();
-                _itemPositions[typeId] = pos;
-            }
-
-            if (isX) pos.X = val;
-            else pos.Y = val;
-
-            // Sync to drag layer if it's active
-            if (_dragModule is not null && _dragInitialized)
-            {
-                await _dragModule.InvokeVoidAsync("updateItemPosition", _dragSvgId, typeId.ToString(), pos.X, pos.Y);
-            }
-
-            StateHasChanged();
-        }
-
-        /// <summary>
         /// Retrieves the current sketch SVG (if any) and sends a
         /// <see cref="SubmitCustomizationCommand"/> to the engine.
         /// </summary>
