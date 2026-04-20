@@ -18,5 +18,26 @@ namespace KnockBox.Services.Logic.Admin
         /// Sets whether third-party plugins should be allowed.
         /// </summary>
         ValueTask SetEnableThirdPartyPluginsAsync(bool enabled);
+
+        /// <summary>
+        /// True when an active admin password is available — either persisted
+        /// in the writable admin folder or supplied as a non-empty
+        /// <c>Admin:Password</c> default in configuration.
+        /// </summary>
+        bool IsAdminPasswordSet();
+
+        /// <summary>
+        /// Constant-time check of a plaintext submission against the
+        /// currently active password. Returns false when no password is set.
+        /// </summary>
+        bool VerifyAdminPassword(string plaintext);
+
+        /// <summary>
+        /// Persists a new admin password to the admin folder, overriding any
+        /// default. The caller is responsible for authorizing the change —
+        /// initial set is unauthenticated; rotations must come from an
+        /// authenticated admin session.
+        /// </summary>
+        ValueTask SetAdminPasswordAsync(string plaintext);
     }
 }

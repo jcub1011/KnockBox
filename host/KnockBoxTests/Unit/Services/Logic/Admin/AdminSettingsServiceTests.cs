@@ -68,9 +68,72 @@ namespace KnockBox.Tests.Unit.Services.Logic.Admin
             Assert.AreEqual(firstWriteTime, secondWriteTime, "Should not rewrite file if value is identical.");
         }
 
-        private IAdminSettingsService CreateService()
+        [TestMethod]
+        public void IsAdminPasswordSet_False_WhenNoPersistedOrDefault()
         {
-            var options = Options.Create(new AdminOptions { SettingsPath = _settingsFileName });
+            var service = CreateService();
+            Assert.IsFalse(service.IsAdminPasswordSet());
+            Assert.IsFalse(service.VerifyAdminPassword("anything"));
+        }
+
+        [TestMethod]
+        public void IsAdminPasswordSet_True_WhenDefaultProvided()
+        {
+            var service = CreateService(defaultPassword: "dev-default");
+            Assert.IsTrue(service.IsAdminPasswordSet());
+            Assert.IsTrue(service.VerifyAdminPassword("dev-default"));
+            Assert.IsFalse(service.VerifyAdminPassword("wrong"));
+        }
+
+        [TestMethod]
+        public async Task SetAdminPassword_PersistsAndVerifies()
+        {
+            var service1 = CreateService();
+            await service1.SetAdminPasswordAsync("operator-secret");
+
+            Assert.IsTrue(service1.IsAdminPasswordSet());
+            Assert.IsTrue(service1.VerifyAdminPassword("operator-secret"));
+            Assert.IsFalse(service1.VerifyAdminPassword("bad"));
+
+            var service2 = CreateService();
+            Assert.IsTrue(service2.IsAdminPasswordSet());
+            Assert.IsTrue(service2.VerifyAdminPassword("operator-secret"));
+        }
+
+        [TestMethod]
+        public async Task PersistedPassword_OverridesDefault()
+        {
+            var service1 = CreateService(defaultPassword: "dev-default");
+            await service1.SetAdminPasswordAsync("real-secret");
+
+            // Same disk state, but a fresh default is still present.
+            var service2 = CreateService(defaultPassword: "dev-default");
+
+            Assert.IsTrue(service2.VerifyAdminPassword("real-secret"));
+            Assert.IsFalse(service2.VerifyAdminPassword("dev-default"),
+                "Persisted password must shadow the configuration default.");
+        }
+
+        [TestMethod]
+        public async Task SetAdminPassword_Rejects_NullEmptyOrWhitespace()
+        {
+            var service = CreateService();
+
+            await Assert.ThrowsExactlyAsync<ArgumentNullException>(async () =>
+                await service.SetAdminPasswordAsync(null!));
+            await Assert.ThrowsExactlyAsync<ArgumentException>(async () =>
+                await service.SetAdminPasswordAsync(""));
+            await Assert.ThrowsExactlyAsync<ArgumentException>(async () =>
+                await service.SetAdminPasswordAsync("   "));
+        }
+
+        private IAdminSettingsService CreateService(string defaultPassword = "")
+        {
+            var options = Options.Create(new AdminOptions
+            {
+                SettingsPath = _settingsFileName,
+                Password = defaultPassword,
+            });
             return new AdminSettingsService(
                 _storagePathMock.Object,
                 options,

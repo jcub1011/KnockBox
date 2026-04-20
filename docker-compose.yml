@@ -4,6 +4,9 @@ services:
     build:
       context: .
       dockerfile: host/KnockBox/Dockerfile
+    ports:
+      - "8080:8080"
+      - "5277:5277"
     volumes:
       - knockbox-data:/app/data
 

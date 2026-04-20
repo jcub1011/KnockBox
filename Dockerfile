@@ -5,6 +5,7 @@ WORKDIR /src
 COPY host/KnockBox/KnockBox.csproj host/KnockBox/
 COPY sdk/KnockBox.Core/KnockBox.Core.csproj sdk/KnockBox.Core/
 COPY sdk/KnockBox.Platform/KnockBox.Platform.csproj sdk/KnockBox.Platform/
+COPY sdk/KnockBox.Tooling/KnockBox.Tooling.csproj sdk/KnockBox.Tooling/
 COPY host/KnockBox.CardCounter/KnockBox.CardCounter.csproj host/KnockBox.CardCounter/
 COPY host/KnockBox.Codeword/KnockBox.Codeword.csproj host/KnockBox.Codeword/
 COPY host/KnockBox.DiceSimulator/KnockBox.DiceSimulator.csproj host/KnockBox.DiceSimulator/
@@ -23,6 +24,9 @@ FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 ENV ASPNETCORE_URLS=http://+:8080
 EXPOSE 8080
+EXPOSE 5277
 
 COPY --from=build /app/publish .
+RUN mkdir -p /app/data && chown -R $APP_UID:$APP_UID /app
+USER $APP_UID
 ENTRYPOINT ["dotnet", "KnockBox.dll"]

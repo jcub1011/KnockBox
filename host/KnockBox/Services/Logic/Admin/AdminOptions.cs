@@ -22,12 +22,19 @@ namespace KnockBox.Services.Logic.Admin
         public int Port { get; init; } = 5277;
 
         /// <summary>
-        /// Admin username. Stored plaintext per project requirement.
+        /// Admin username. Stored plaintext per project requirement. There is
+        /// no UI to change this at runtime, so the default of <c>admin</c> is
+        /// the effective identity unless an operator overrides it via
+        /// configuration.
         /// </summary>
-        public string Username { get; init; } = string.Empty;
+        public string Username { get; init; } = "admin";
 
         /// <summary>
-        /// Admin password. Stored plaintext per project requirement.
+        /// Default admin password supplied via configuration (appsettings or
+        /// the <c>Admin__Password</c> env var). The <em>active</em> password
+        /// is resolved by <see cref="IAdminSettingsService"/> — the persisted
+        /// value in the admin folder wins over this default. Empty means no
+        /// default, which triggers the first-run initialization flow.
         /// </summary>
         public string Password { get; init; } = string.Empty;
 

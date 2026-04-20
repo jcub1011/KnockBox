@@ -11,6 +11,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: release-sdk-${{ inputs.version }}
+  cancel-in-progress: false
+
 jobs:
   validate:
     name: Validate version input
@@ -74,7 +78,7 @@ jobs:
 
   pack-platform:
     name: Pack & Publish KnockBox.Platform
-    needs: [validate]
+    needs: [validate, pack-core]
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -114,7 +118,7 @@ jobs:
 
   pack-templates:
     name: Pack & Publish KnockBox.Templates
-    needs: [validate]
+    needs: [validate, pack-core]
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -166,7 +170,7 @@ jobs:
         env:
           VERSION: ${{ inputs.version }}
         run: |
-          PREV=$(git tag --list 'sdk-*' --sort=-v:refname | grep -v "sdk-$VERSION" | head -n1)
+          PREV=$(git tag --list 'sdk-*' --sort=-v:refname | grep -Fv -- "sdk-$VERSION" | head -n1)
           echo "tag=$PREV" >> "$GITHUB_OUTPUT"
 
       - name: Download all SDK artifacts

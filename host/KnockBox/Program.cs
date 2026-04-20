@@ -33,11 +33,6 @@ namespace KnockBox
                 .GetSection(AdminOptions.SectionName)
                 .Get<AdminOptions>() ?? new AdminOptions();
 
-            if (string.IsNullOrWhiteSpace(adminOptions.Username) || string.IsNullOrWhiteSpace(adminOptions.Password))
-            {
-                throw new InvalidOperationException("Admin Username and Password must be explicitly configured in appsettings.json.");
-            }
-
             // Register IStoragePathService early so we can use it for logging and plugin discovery.
             var storagePath = new StoragePathService();
             builder.Services.AddSingleton<IStoragePathService>(storagePath);
@@ -120,6 +115,10 @@ namespace KnockBox
 
             // Port split: admin paths only on admin port.
             app.UseMiddleware<AdminPortMiddleware>(adminOptions.Port);
+
+            // On the public port, short-circuit everything with an "Admin Not
+            // Initialized" 503 interstitial until an operator sets a password.
+            app.UseMiddleware<AdminNotInitializedMiddleware>(adminOptions.Port);
 
             app.UseAuthentication();
             app.UseAuthorization();
