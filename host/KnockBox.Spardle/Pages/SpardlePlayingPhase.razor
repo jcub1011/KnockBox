@@ -4,7 +4,11 @@
 @using KnockBox.Spardle.Models
 @inject IUserService UserService
 
-<div class="spd-play">
+<div class="spd-play" @key="@State.CurrentRound">
+    <div class="spd-play-curtain" aria-hidden="true">
+        <span class="spd-display spd-play-curtain-text">SPAR!</span>
+    </div>
+
     <header class="spd-play-top">
         <div class="spd-play-round">
             <span class="spd-play-round-label">ROUND</span>

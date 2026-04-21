@@ -21,4 +21,8 @@
     <ProjectReference Include="..\..\sdk\KnockBox.Core\KnockBox.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Data\" />
+  </ItemGroup>
+
 </Project>
