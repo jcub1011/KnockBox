@@ -30,6 +30,14 @@ namespace KnockBox.DrawnToDress.Pages
 
         private bool _submitting;
         private string? _errorMessage;
+        private bool _showMannequin;
+        private ClothingType _selectedTypeId;
+
+        protected override void OnInitialized()
+        {
+            _showMannequin = GameState.Config.ShowMannequin;
+            _selectedTypeId = GameState.Config.ClothingTypes.FirstOrDefault()?.Id ?? ClothingType.Top;
+        }
 
         /// <summary>
         /// Finds which item from the player's owned items is currently "selected" for a
@@ -199,6 +207,18 @@ namespace KnockBox.DrawnToDress.Pages
             if (e.Key is "Enter" or " ")
                 UnclaimItem(itemId);
         }
+
+        /// <summary>
+        /// Returns a representative emoji for a clothing type id.
+        /// </summary>
+        protected static string GetClothingTypeIcon(ClothingType typeId) => typeId switch
+        {
+            ClothingType.Hat => "\U0001F3A9",       // 🎩
+            ClothingType.Top => "\U0001F455",       // 👕
+            ClothingType.Bottom => "\U0001F456",    // 👖
+            ClothingType.Shoes => "\U0001F45F",     // 👟
+            _ => "\U0001F457",                      // 👗
+        };
 
         private void SendCommand(DrawnToDressCommand cmd, string action)
         {

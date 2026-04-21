@@ -128,6 +128,11 @@ namespace KnockBox.Admin.Pages
                 _options.Username,
                 HttpContext.Connection.RemoteIpAddress);
 
+            if (_settings.IsPasswordDefault())
+            {
+                return Redirect("/admin/changepassword");
+            }
+
             return Redirect(ResolveReturnUrl());
         }
 

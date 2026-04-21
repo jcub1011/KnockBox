@@ -1,5 +1,4 @@
 ﻿using System.ComponentModel;
-using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 
 namespace KnockBox.Services.Navigation.Games
@@ -37,26 +36,6 @@ namespace KnockBox.Services.Navigation.Games
             var field = value.GetType().GetField(value.ToString());
             var attribute = field?.GetCustomAttribute<NavigationString>();
             return attribute?.Uri;
-        }
-    }
-
-    public static class NavigationStringExtensions 
-    {
-        public static bool TryGetNavigationString(this GameType gameType, [NotNullWhen(true)] out string? navigationString)
-        {
-            navigationString = NavigationString.GetNavigationStringAttribute(gameType);
-            return navigationString is not null;
-        }
-    }
-
-    public static class DescriptionExtensions 
-    {
-        public static bool TryGetDescription(this Enum value, [NotNullWhen(true)] out string? description)
-        {
-            var field = value.GetType().GetField(value.ToString());
-            var attribute = field?.GetCustomAttribute<DescriptionAttribute>();
-            description = attribute?.Description;
-            return description is not null;
         }
     }
 }

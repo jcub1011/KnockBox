@@ -3,15 +3,12 @@ using KnockBox.Services.Logic.Games.Shared;
 using KnockBox.Services.Logic.Storage;
 using KnockBox.Admin;
 using KnockBox.Components;
-using KnockBox.Core.Plugins;
 using KnockBox.Platform;
 using KnockBox.Platform.Games;
 using KnockBox.Platform.Storage;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Hosting.Server.Features;
-using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
 using Microsoft.AspNetCore.Components.Server.Circuits;
 using Serilog;
 
@@ -49,21 +46,15 @@ namespace KnockBox
             // ── Admin-specific services (Host-side implementations) ──────────
             // We register these BEFORE AddKnockBoxPlatform so the platform's
             // TryAddSingleton yields to these explicit overrides.
-            //
-            // A throwaway AdminSettingsService is built here purely to read the
-            // third-party-plugins toggle synchronously while deciding which
-            // directories to scan — no BuildServiceProvider() detour. It is
-            // NOT registered; the DI container constructs its own singleton
-            // below with the real ILogger<T>, so runtime mutations (e.g. the
-            // admin toggle at /admin/games) surface persistence failures in
-            // the Serilog pipeline. LoadFromDisk is idempotent, so the extra
-            // read at DI-resolution time is harmless.
-            var adminSettingsBootstrap = new AdminSettingsService(
-                storagePath,
-                Options.Create(adminOptions),
-                NullLogger<AdminSettingsService>.Instance);
             builder.Services.AddSingleton<IAdminSettingsService, AdminSettingsService>();
             builder.Services.AddSingleton<IGameAvailabilityService, GameAvailabilityService>();
+
+            // Read the third-party-plugins toggle directly from disk so we can
+            // decide which directories to scan without constructing (and later
+            // discarding) a full AdminSettingsService instance. The DI singleton
+            // above is still the sole live instance at runtime.
+            var enableThirdPartyPlugins = AdminSettingsService.ReadThirdPartyToggleFromDisk(
+                storagePath, adminOptions);
 
             // ── Platform services ────────────────────────────────────────────
             builder.AddKnockBoxPlatform(options =>
@@ -71,7 +62,7 @@ namespace KnockBox
                 options.PluginsPaths.Clear();
                 options.PluginsPaths.Add(storagePath.GetFirstPartyPluginsDirectory());
 
-                if (adminSettingsBootstrap.GetEnableThirdPartyPlugins())
+                if (enableThirdPartyPlugins)
                 {
                     options.PluginsPaths.Add(storagePath.GetExternalPluginsDirectory());
                 }
@@ -124,6 +115,31 @@ namespace KnockBox
             // On the public port, short-circuit everything with an "Admin Not
             // Initialized" 503 interstitial until an operator sets a password.
             app.UseMiddleware<AdminNotInitializedMiddleware>(adminOptions.Port);
+
+            // If the admin is still using the default bootstrap password, force a
+            // password change before any other admin page renders.
+            app.Use(async (ctx, next) =>
+            {
+                var path = ctx.Request.Path.Value ?? string.Empty;
+                var isAdminPath = path.StartsWith("/admin", StringComparison.OrdinalIgnoreCase);
+                var isExempt =
+                    path.StartsWith("/admin/changepassword", StringComparison.OrdinalIgnoreCase)
+                    || path.StartsWith("/admin/login", StringComparison.OrdinalIgnoreCase)
+                    || path.StartsWith("/admin/logout", StringComparison.OrdinalIgnoreCase)
+                    || path.StartsWith("/admin/admin.css", StringComparison.OrdinalIgnoreCase);
+
+                if (isAdminPath && !isExempt && ctx.User?.Identity?.IsAuthenticated == true)
+                {
+                    var settings = ctx.RequestServices.GetRequiredService<IAdminSettingsService>();
+                    if (settings.IsPasswordDefault())
+                    {
+                        ctx.Response.Redirect("/admin/changepassword");
+                        return;
+                    }
+                }
+
+                await next();
+            });
 
             // ── Endpoints ────────────────────────────────────────────────────
             app.MapKnockBoxPlatformEndpoints<App>();

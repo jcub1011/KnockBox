@@ -42,13 +42,18 @@ namespace KnockBox.DrawnToDress.Pages
 
         private string GetMannequinSvg(ClothingType currentTypeId)
         {
-            int yOffset = (GameState.Config.ClothingTypes.FirstOrDefault((def) => def.Id == currentTypeId)?.MannequinAnchorY) ?? 0;
+            var config = GameState.Config;
+            var typeDef = config.ClothingTypes.FirstOrDefault(t => t.Id == currentTypeId);
+            int yOffset = typeDef?.MannequinAnchorY ?? 0;
+            string imagePath = typeDef?.MannequinFocusImagePath ?? config.MannequinImagePath;
+
             return MannequinSvgHelper.Build(
                 CurrentTypeCanvasWidth,
                 CurrentTypeCanvasHeight,
                 yOffset,
-                GameState.Config.MannequinDimensions.X,
-                GameState.Config.MannequinScaleFactor);
+                config.MannequinDimensions.X,
+                config.MannequinScaleFactor,
+                new MannequinDisplayOptions(imagePath));
         }
 
         /// <summary>Display name for the clothing type of the current round.</summary>

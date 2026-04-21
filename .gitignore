@@ -364,6 +364,6 @@ MigrationBackup/
 FodyWeavers.xsd
 /publish-win-x64
 /.claude
-
 # docker-compose local overrides
 /.env
+/host/.idea/.idea.KnockBox.Host/.idea

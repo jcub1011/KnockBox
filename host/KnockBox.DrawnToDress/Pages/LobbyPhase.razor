@@ -107,11 +107,6 @@
                         <input type="number" min="30" max="600" step="10" class="dtd-setting-input"
                                @bind="EditConfig.DrawingTimeSec" @bind:after="ApplyConfig" />
                     </label>
-                    <label class="dtd-setting-label dtd-setting-label-row" title="Display a mannequin outline as a drawing reference">
-                        <span>Show Mannequin Reference:</span>
-                        <input type="checkbox" class="dtd-setting-checkbox"
-                               @bind="EditConfig.ShowMannequin" @bind:after="ApplyConfig" />
-                    </label>
                     <label class="dtd-setting-label dtd-setting-label-row" title="Automatically advance phases when the timer expires">
                         <span>Enable Game Timers:</span>
                         <input type="checkbox" class="dtd-setting-checkbox"

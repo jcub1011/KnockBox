@@ -60,5 +60,31 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games
                 Y: bodyPartCenterY - itemCanvasHeight / 2.0
             );
         }
+
+        /// <summary>
+        /// Returns the (X, Y) translation for a clothing item in the composite
+        /// canvas, respecting any user-provided position overrides in the
+        /// <see cref="OutfitSubmission"/>.
+        /// </summary>
+        public static (double X, double Y) GetItemPosition(
+            ClothingTypeDefinition ct,
+            int compositeWidth,
+            int compositeHeight,
+            double nativeMannequinSize,
+            OutfitSubmission? outfit = null)
+        {
+            if (outfit?.Customization.ItemPositionOverrides.TryGetValue(ct.Id, out var ovr) == true)
+            {
+                return (ovr.X, ovr.Y);
+            }
+
+            return GetItemPosition(
+                ct.CanvasWidth,
+                ct.CanvasHeight,
+                ct.MannequinAnchorY,
+                compositeWidth,
+                compositeHeight,
+                nativeMannequinSize);
+        }
     }
 }

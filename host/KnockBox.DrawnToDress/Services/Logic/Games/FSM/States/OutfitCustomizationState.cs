@@ -117,6 +117,8 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
             outfit.Customization.SketchSvgContent = string.IsNullOrWhiteSpace(cmd.SketchSvgContent)
                 ? null
                 : cmd.SketchSvgContent;
+            outfit.Customization.SelectedFace = cmd.SelectedFace;
+            outfit.Customization.ShowMannequin = cmd.ShowMannequin;
 
             if (cmd.ItemPositionOverrides is { Count: > 0 })
             {

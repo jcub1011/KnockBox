@@ -6,6 +6,14 @@ namespace KnockBox.Services.Logic.Admin
     /// implement it; the host's Razor Pages and components that consume it
     /// are compiled against this host-local definition.
     /// </summary>
+    /// <remarks>
+    /// Reader methods (<see cref="GetEnableThirdPartyPlugins"/>,
+    /// <see cref="IsPasswordDefault"/>, <see cref="VerifyAdminPassword"/>) are
+    /// eventually consistent: they do not block on the persistence lock and may
+    /// observe a value up to one in-flight write stale. Admin traffic is
+    /// low-rate and single-operator, so this is intentional — do not rely on
+    /// strict read-your-writes ordering from concurrent call sites.
+    /// </remarks>
     public interface IAdminSettingsService
     {
         /// <summary>
@@ -25,6 +33,12 @@ namespace KnockBox.Services.Logic.Admin
         /// <c>Admin:Password</c> default in configuration.
         /// </summary>
         bool IsAdminPasswordSet();
+
+        /// <summary>
+        /// Returns true if the admin is still using the default bootstrap
+        /// password from configuration.
+        /// </summary>
+        bool IsPasswordDefault();
 
         /// <summary>
         /// Constant-time check of a plaintext submission against the

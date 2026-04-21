@@ -41,16 +41,7 @@ namespace KnockBox.DrawnToDress.Pages
                 ShowMannequin = src.ShowMannequin,
                 EnableTimer = src.EnableTimer,
                 AllowSketchingDuringOutfitBuilding = src.AllowSketchingDuringOutfitBuilding,
-                ClothingTypes = [.. src.ClothingTypes.Select(t => new ClothingTypeDefinition
-                {
-                    Id = t.Id,
-                    DisplayName = t.DisplayName,
-                    AllowMultiple = t.AllowMultiple,
-                    MaxItemsPerRound = t.MaxItemsPerRound,
-                    CanvasWidth = t.CanvasWidth,
-                    CanvasHeight = t.CanvasHeight,
-                    MannequinAnchorY = t.MannequinAnchorY,
-                })],
+                ClothingTypes = [.. src.ClothingTypes.Select(t => t with { })],
                 ThemeSource = src.ThemeSource,
                 ThemeAnnouncement = src.ThemeAnnouncement,
                 ThemeAnnouncementTimeSec = src.ThemeAnnouncementTimeSec,
@@ -94,16 +85,7 @@ namespace KnockBox.DrawnToDress.Pages
             {
                 // Clone from the static defaults so dimensions and anchors are always correct.
                 var template = DrawnToDressConfig.DefaultClothingTypes.First(t => t.Id == id);
-                var entry = new ClothingTypeDefinition
-                {
-                    Id = template.Id,
-                    DisplayName = template.DisplayName,
-                    AllowMultiple = template.AllowMultiple,
-                    MaxItemsPerRound = template.MaxItemsPerRound,
-                    CanvasWidth = template.CanvasWidth,
-                    CanvasHeight = template.CanvasHeight,
-                    MannequinAnchorY = template.MannequinAnchorY,
-                };
+                var entry = template with { };
 
                 // Insert at the correct position to preserve canonical order.
                 int targetIndex = DrawnToDressConfig.DefaultClothingTypes.ToList().FindIndex(t => t.Id == id);

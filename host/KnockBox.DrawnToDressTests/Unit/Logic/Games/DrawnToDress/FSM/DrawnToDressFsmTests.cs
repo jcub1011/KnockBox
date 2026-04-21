@@ -2024,6 +2024,56 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
         }
 
         [TestMethod]
+        public async Task OutfitCustomizationState_SubmitWithFaceAndMannequin_PersistsFields()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+            _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
+
+            state.GamePlayers["p1"] = new()
+            {
+                PlayerId = "p1",
+                SubmittedOutfit = new() { PlayerId = "p1" },
+            };
+
+            context.Fsm.TransitionTo(context, new OutfitCustomizationState());
+
+            _engine.ProcessCommand(context,
+                new SubmitCustomizationCommand("p1", "Fashion Forward", null, null, FaceType.Devious, true));
+
+            var customization = state.GamePlayers["p1"].SubmittedOutfit!.Customization;
+            Assert.AreEqual(FaceType.Devious, customization.SelectedFace);
+            Assert.IsTrue(customization.ShowMannequin);
+        }
+
+        [TestMethod]
+        public async Task OutfitCustomizationState_SubmitWithoutFaceAndMannequin_UsesDefaults()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DrawnToDressGameState)stateResult.Value!;
+            await _engine.StartAsync(_host, state);
+            var context = state.Context!;
+            _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
+
+            state.GamePlayers["p1"] = new()
+            {
+                PlayerId = "p1",
+                SubmittedOutfit = new() { PlayerId = "p1" },
+            };
+
+            context.Fsm.TransitionTo(context, new OutfitCustomizationState());
+
+            _engine.ProcessCommand(context,
+                new SubmitCustomizationCommand("p1", "Plain Jane"));
+
+            var customization = state.GamePlayers["p1"].SubmittedOutfit!.Customization;
+            Assert.AreEqual(FaceType.Default, customization.SelectedFace);
+            Assert.IsFalse(customization.ShowMannequin);
+        }
+
+        [TestMethod]
         public async Task OutfitCustomizationState_SubmitWithoutSketch_SketchIsNull()
         {
             var stateResult = await _engine.CreateStateAsync(_host);

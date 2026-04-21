@@ -36,6 +36,15 @@ namespace KnockBox.Services.Logic.Admin
         /// value in the admin folder wins over this default. Empty means no
         /// default, which triggers the first-run initialization flow.
         /// </summary>
+        /// <remarks>
+        /// This value is the fallback used by <c>AdminSettingsService.VerifyAdminPassword</c>
+        /// only while no hashed password has been persisted. Once the admin initializes
+        /// or changes the password via the UI, a PBKDF2 hash is written
+        /// to the settings file and this appsettings value is no longer consulted
+        /// — it may be rotated or cleared on the next restart without locking
+        /// anyone out. It is still used again only if the settings file (and its
+        /// <c>.bak</c> sibling) is manually deleted as an emergency reset.
+        /// </remarks>
         public string Password { get; init; } = string.Empty;
 
         /// <summary>
