@@ -1,0 +1,138 @@
+.spardle-tile {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.55rem;
+    padding: 1.75rem 1.25rem 1.5rem;
+    min-height: 200px;
+    overflow: hidden;
+    background:
+        radial-gradient(120% 90% at 50% 0%, #1a1f3b 0%, #0f1426 55%, #070912 100%);
+    color: #f4f6ff;
+    isolation: isolate;
+}
+
+.spardle-tile::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image:
+        linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+    background-size: 22px 22px;
+    background-position: -1px -1px;
+    pointer-events: none;
+    z-index: 0;
+}
+
+.spardle-tile-glow {
+    position: absolute;
+    inset: -10%;
+    background:
+        radial-gradient(60% 40% at 25% 15%, rgba(0, 209, 255, 0.18), transparent 70%),
+        radial-gradient(55% 40% at 80% 90%, rgba(255, 46, 99, 0.14), transparent 70%);
+    mix-blend-mode: screen;
+    pointer-events: none;
+    z-index: 0;
+}
+
+.spardle-tile-grid {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+    width: clamp(180px, 78%, 240px);
+    margin-bottom: 0.25rem;
+    perspective: 600px;
+}
+
+.spardle-tile-letter {
+    aspect-ratio: 1 / 1;
+    display: grid;
+    place-items: center;
+    font-family: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+    font-weight: 700;
+    font-size: clamp(0.85rem, 2.1vw, 1.15rem);
+    line-height: 1;
+    background: #161b33;
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    color: #f4f6ff;
+    box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.7);
+    transform-style: preserve-3d;
+    transition: transform 0.2s ease;
+}
+
+.spardle-tile-letter-correct {
+    background: #14f195;
+    color: #042418;
+    border-color: #000;
+    box-shadow:
+        3px 3px 0 rgba(0, 0, 0, 0.85),
+        0 0 14px rgba(20, 241, 149, 0.55);
+}
+
+.spardle-tile-letter-present {
+    background: #ffae00;
+    color: #2a1900;
+    border-color: #000;
+    box-shadow:
+        3px 3px 0 rgba(0, 0, 0, 0.85),
+        0 0 12px rgba(255, 174, 0, 0.5);
+}
+
+.spardle-tile-letter-absent {
+    background: #2a2f4a;
+    color: rgba(244, 246, 255, 0.55);
+    border-color: transparent;
+    box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.6);
+}
+
+::deep .game-tile-surface:hover .spardle-tile-letter {
+    animation: spardle-tile-flip 0.55s ease-in-out both;
+    animation-delay: calc(var(--col, 0) * 110ms);
+}
+
+@keyframes spardle-tile-flip {
+    0%   { transform: rotateX(0deg); }
+    50%  { transform: rotateX(90deg); }
+    100% { transform: rotateX(0deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    ::deep .game-tile-surface:hover .spardle-tile-letter {
+        animation: none;
+    }
+}
+
+.spardle-tile-name {
+    position: relative;
+    z-index: 1;
+    font-family: "Bowlby One SC", "Bowlby One", ui-serif, Georgia, serif;
+    font-size: clamp(1.5rem, 3.4vw, 2rem);
+    letter-spacing: 0.02em;
+    line-height: 1;
+    margin: 0.25rem 0 0.15rem;
+    text-shadow:
+        3px 3px 0 #000,
+        0 0 28px rgba(0, 209, 255, 0.25);
+}
+
+.spardle-tile-name-spar { color: #00d1ff; }
+.spardle-tile-name-dash { color: #f4f6ff; margin: 0 0.12em; }
+.spardle-tile-name-dle  { color: #ff2e63; }
+
+.spardle-tile-tag {
+    position: relative;
+    z-index: 1;
+    font-family: "Manrope", system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: rgba(244, 246, 255, 0.72);
+    text-align: center;
+}

@@ -1,4 +1,5 @@
 using KnockBox.Core.Plugins;
+using KnockBox.Spardle.Components;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -18,9 +19,7 @@ public class SpardleModule : IGameModule
 
     public RenderFragment GetButtonContent() => builder =>
     {
-        builder.OpenElement(0, "div");
-        builder.AddAttribute(1, "class", "game-tile");
-        builder.AddContent(2, "Spar-dle");
-        builder.CloseElement();
+        builder.OpenComponent<SpardleTile>(0);
+        builder.CloseComponent();
     };
 }
