@@ -3,7 +3,7 @@
 
 <div class="spd-grid-wrap">
     <div class="spd-grid @(HighContrast ? "spd-hc" : "")" style="--spd-cols:@WordLen;--spd-rows:@MaxGuesses;">
-        @foreach (var guess in PlayerState.Guesses)
+        @foreach (var guess in (PlayerState?.Guesses ?? Enumerable.Empty<GuessResult>()))
         {
             <div class="spd-row @(guess.IsCorrect ? "spd-row-won" : "")">
                 @for (int i = 0; i < guess.Word.Length; i++)
@@ -21,7 +21,12 @@
             </div>
         }
 
-        @if (!PlayerState.HasFinishedRound && State.IsRoundActive)
+        @{
+            int guessCount = PlayerState?.Guesses.Count ?? 0;
+            bool hasFinished = PlayerState?.HasFinishedRound ?? false;
+        }
+
+        @if (!hasFinished && State.IsRoundActive)
         {
             <div class="spd-row spd-row-current @(InvalidGuess ? "spd-row-shake" : "")">
                 @for (int i = 0; i < WordLen; i++)
@@ -37,7 +42,7 @@
             </div>
 
             @* Placeholder rows for remaining guesses *@
-            @for (int row = PlayerState.Guesses.Count + 1; row < MaxGuesses; row++)
+            @for (int row = guessCount + 1; row < MaxGuesses; row++)
             {
                 <div class="spd-row spd-row-placeholder">
                     @for (int i = 0; i < WordLen; i++)
@@ -47,10 +52,10 @@
                 </div>
             }
         }
-        else if (PlayerState.HasFinishedRound)
+        else if (hasFinished)
         {
             @* Finished — show remaining guesses as muted placeholders for layout stability *@
-            @for (int row = PlayerState.Guesses.Count; row < MaxGuesses; row++)
+            @for (int row = guessCount; row < MaxGuesses; row++)
             {
                 <div class="spd-row spd-row-placeholder">
                     @for (int i = 0; i < WordLen; i++)
@@ -63,7 +68,7 @@
     </div>
 </div>
 
-@if (State.TargetWord.Length > 5 && State.IsRoundActive)
+@if (State.TargetWord.Length > 5 && State.IsRoundActive && PlayerState is not null)
 {
     <div class="spd-legacy-bar" aria-label="Confirmed letter positions">
         @for (int i = 0; i < State.TargetWord.Length; i++)
@@ -91,7 +96,7 @@
     [Parameter] public bool InvalidGuess { get; set; }
     [Parameter] public bool HighContrast { get; set; }
 
-    private PlayerState PlayerState => State.GetOrCreatePlayerState(CurrentUserId);
+    private PlayerState? PlayerState => State.TryGetPlayerState(CurrentUserId, out var p) ? p : null;
     private int MaxGuesses => SpardleEngine.CalculateMaxGuesses(State.TargetWord.Length, State.DifficultyMultiplier);
     private int WordLen => State.TargetWord.Length;
 }

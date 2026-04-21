@@ -20,6 +20,10 @@
     <Using Include="Microsoft.Extensions.Logging" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="KnockBox.SpardleTests" />
+  </ItemGroup>
+
   <Import Project="..\Directory.Plugin.targets" />
 
 </Project>

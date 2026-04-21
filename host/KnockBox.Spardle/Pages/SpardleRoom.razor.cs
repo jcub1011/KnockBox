@@ -30,6 +30,7 @@ public partial class SpardleRoom : DisposableComponent
     private CancellationTokenSource? _toastCts;
     private CancellationTokenSource? _shakeCts;
     private GamePhase _previousPhase = GamePhase.Lobby;
+    private bool _hasLeft;
 
     protected SpardleState GameState { get; set; } = default!;
     protected string RoomCode { get; set; } = string.Empty;
@@ -76,6 +77,12 @@ public partial class SpardleRoom : DisposableComponent
         _previousPhase = GameState.Phase;
         _stateSubscription = GameState.StateChangedEventManager.Subscribe(async () =>
         {
+            if (!_hasLeft && UserService.CurrentUser is { } current && GameState.IsKicked(current))
+            {
+                _hasLeft = true;
+                await InvokeAsync(() => GameSessionService.LeaveCurrentSession(navigateHome: true));
+                return;
+            }
             if (GameState.Phase != _previousPhase)
             {
                 _previousPhase = GameState.Phase;
@@ -109,11 +116,6 @@ public partial class SpardleRoom : DisposableComponent
             }
         }
 
-        if (GameState?.IsKicked(UserService.CurrentUser!) == true)
-        {
-            GameSessionService.LeaveCurrentSession(navigateHome: true);
-        }
-
         await base.OnAfterRenderAsync(firstRender);
     }
 
@@ -129,7 +131,7 @@ public partial class SpardleRoom : DisposableComponent
         if (IsHostObserver) return;
         if (GameState.Phase != GamePhase.Playing) return;
 
-        var playerState = GameState.GetOrCreatePlayerState(UserService.CurrentUser.Id);
+        if (!GameState.TryGetPlayerState(UserService.CurrentUser.Id, out var playerState)) return;
         if (playerState.HasFinishedRound) return;
 
         int wordLen = GameState.TargetWord.Length;

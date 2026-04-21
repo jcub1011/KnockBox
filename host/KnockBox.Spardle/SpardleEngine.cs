@@ -27,8 +27,11 @@ public class SpardleEngine(
     {
         if (state is not SpardleState s) return Task.FromResult(Result.FromError("Invalid state"));
 
-        return Task.FromResult(s.Execute(() =>
+        var execResult = s.Execute(() =>
         {
+            if (host.Id != s.Host.Id)
+                return Result.FromError("Only the host may start the game.");
+
             // UpdateJoinableStatus(false) closes the join race before we read Players.Count;
             // once the lobby is non-joinable, RegisterPlayer rejects new joins.
             s.UpdateJoinableStatus(false);
@@ -42,14 +45,19 @@ public class SpardleEngine(
             var roster = s.HostIsParticipant ? s.Players.Prepend(s.Host) : s.Players;
             foreach (var user in roster)
             {
-                var ps = s.GetOrCreatePlayerState(user.Id);
+                var ps = s.CreatePlayerState(user.Id);
                 ps.TotalScore = 0;
                 ps.LastRoundPoints = 0;
                 ps.ResetRound();
             }
 
             EnterRoundIntro(s);
-        }));
+            return Result.Success;
+        });
+
+        if (execResult.TryGetSuccess(out var inner)) return Task.FromResult(inner);
+        if (execResult.TryGetFailure(out var err)) return Task.FromResult(Result.FromError(err));
+        return Task.FromResult(Result.FromCancellation());
     }
 
     private void GenerateRoundQueue(SpardleState state)
@@ -129,10 +137,7 @@ public class SpardleEngine(
         switch (mode)
         {
             case WordOrderMode.RandomNoRepeats:
-                var picked = new HashSet<int>(take);
-                while (picked.Count < take)
-                    picked.Add(rng.GetRandomInt(total));
-                return picked;
+                return SampleUniqueIndices(total, take);
 
             case WordOrderMode.RandomWithRepeats:
                 var withRepeats = new int[take];
@@ -152,15 +157,54 @@ public class SpardleEngine(
         }
     }
 
-    private static void OrderInPlace(List<string> pool, WordOrderMode mode)
+    // Fisher–Yates when the sampling ratio is high (or the universe is small); rejection
+    // sampling when we pick a small fraction of a large universe. The threshold caps the
+    // worst-case rejection churn at ~2× the number of draws while avoiding a 10k-int
+    // allocation when we only need a handful.
+    private const int ShuffleThresholdTotal = 2048;
+    private static bool ShouldShuffle(int total, int take)
+        => total <= ShuffleThresholdTotal || take * 2 >= total;
+
+    private int[] SampleUniqueIndices(int total, int take)
+    {
+        if (take <= 0 || total <= 0) return Array.Empty<int>();
+
+        if (ShouldShuffle(total, take))
+        {
+            var pool = new int[total];
+            for (int i = 0; i < total; i++) pool[i] = i;
+            FisherYates(pool);
+            if (take == total) return pool;
+            var result = new int[take];
+            Array.Copy(pool, result, take);
+            return result;
+        }
+
+        var picked = new HashSet<int>(take);
+        var order = new int[take];
+        int filled = 0;
+        while (filled < take)
+        {
+            int candidate = rng.GetRandomInt(total);
+            if (picked.Add(candidate)) order[filled++] = candidate;
+        }
+        return order;
+    }
+
+    private void FisherYates<T>(IList<T> items)
+    {
+        for (int n = items.Count - 1; n > 0; n--)
+        {
+            int k = rng.GetRandomInt(n + 1);
+            (items[n], items[k]) = (items[k], items[n]);
+        }
+    }
+
+    private void OrderInPlace(List<string> pool, WordOrderMode mode)
     {
         if (mode is WordOrderMode.RandomNoRepeats or WordOrderMode.RandomWithRepeats)
         {
-            for (int n = pool.Count - 1; n > 0; n--)
-            {
-                int k = Random.Shared.Next(n + 1);
-                (pool[n], pool[k]) = (pool[k], pool[n]);
-            }
+            FisherYates(pool);
         }
         else if (mode == WordOrderMode.ReverseListOrder)
         {
@@ -245,7 +289,7 @@ public class SpardleEngine(
         var roster = state.HostIsParticipant ? state.Players.Prepend(state.Host) : state.Players;
         foreach (var user in roster)
         {
-            var ps = state.GetOrCreatePlayerState(user.Id);
+            var ps = state.CreatePlayerState(user.Id);
             ps.ResetRound();
         }
     }
@@ -407,23 +451,25 @@ public class SpardleEngine(
 
     public Result SubmitGuess(SpardleState state, User player, string guess)
     {
-        Result errorResult = Result.Success;
-        var executeResult = state.Execute(() =>
+        var executeResult = state.Execute<Result>(() =>
         {
             if (player.Id == state.Host.Id && !state.HostIsParticipant)
-            { errorResult = Result.FromError("Host is observing and cannot submit guesses."); return; }
+                return Result.FromError("Host is observing and cannot submit guesses.");
 
             if (state.Phase != GamePhase.Playing || !state.IsRoundActive)
-            { errorResult = Result.FromError("Round is not active."); return; }
+                return Result.FromError("Round is not active.");
 
-            var pState = state.GetOrCreatePlayerState(player.Id);
+            // Reject strangers before materializing a PlayerState entry for them.
+            if (!state.TryGetPlayerState(player.Id, out var pState))
+                return Result.FromError("You are not a participant in this round.");
+
             if (pState.HasFinishedRound)
-            { errorResult = Result.FromError("You have already finished this round."); return; }
+                return Result.FromError("You have already finished this round.");
 
             guess = (guess ?? string.Empty).ToLowerInvariant().Trim();
 
             var valResult = ValidateGuess(state, pState, guess);
-            if (!valResult.IsSuccess) { errorResult = valResult; return; }
+            if (!valResult.IsSuccess) return valResult;
 
             var result = EvaluateGuess(state.TargetWord, guess);
             pState.Guesses.Add(result);
@@ -443,10 +489,12 @@ public class SpardleEngine(
             }
 
             CheckRoundEnd(state);
+            return Result.Success;
         });
 
-        if (!executeResult.IsSuccess) return executeResult;
-        return errorResult;
+        if (executeResult.TryGetSuccess(out var inner)) return inner;
+        if (executeResult.TryGetFailure(out var err)) return Result.FromError(err);
+        return Result.FromCancellation();
     }
 
     private Result ValidateGuess(SpardleState state, PlayerState pState, string guess)
@@ -488,18 +536,24 @@ public class SpardleEngine(
         return Result.Success;
     }
 
+    // Minimum fragment length that may participate in a compound decomposition. Without
+    // this, any string of 1-char English words ("a", "i") composes — so "aia" would pass.
+    private const int MinCompoundFragmentLength = 3;
+
     private static bool IsValidCompoundWord(string word, IWordListService service)
     {
         int n = word.Length;
         if (n == 0) return true;
+        if (n < MinCompoundFragmentLength) return false;
 
         var span = word.AsSpan();
         bool[] dp = new bool[n + 1];
         dp[0] = true;
 
-        for (int i = 1; i <= n; i++)
+        for (int i = MinCompoundFragmentLength; i <= n; i++)
         {
-            for (int j = 0; j < i; j++)
+            int maxStart = i - MinCompoundFragmentLength;
+            for (int j = 0; j <= maxStart; j++)
             {
                 if (dp[j] && service.IsValidWord(span.Slice(j, i - j)))
                 {
@@ -511,7 +565,7 @@ public class SpardleEngine(
         return dp[n];
     }
 
-    private GuessResult EvaluateGuess(string target, string guess)
+    internal static GuessResult EvaluateGuess(string target, string guess)
     {
         var statuses = new LetterStatus[target.Length];
         var targetChars = target.ToList();

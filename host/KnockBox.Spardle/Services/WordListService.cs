@@ -5,21 +5,31 @@ namespace KnockBox.Spardle.Services;
 
 public sealed class WordListService : IWordListService
 {
-    private static readonly string DataDir = Path.Combine(
-        Path.GetDirectoryName(typeof(WordListService).Assembly.Location)!,
-        "Data");
-
     private readonly IReadOnlyDictionary<int, WordPool> _nytStandardByLength;
     private readonly IReadOnlyDictionary<int, WordPool> _fullDictionaryByLength;
 
     public WordListService(ILogger<WordListService> logger)
     {
-        var nyWords = LoadCsv(Path.Combine(DataDir, "ny-dictionary.csv"), logger);
-        var fullWords = LoadCsv(Path.Combine(DataDir, "full-dictionary.csv"), logger);
+        var dataDir = ResolveDataDir();
+        var nyWords = LoadCsv(Path.Combine(dataDir, "ny-dictionary.csv"), logger);
+        var fullWords = LoadCsv(Path.Combine(dataDir, "full-dictionary.csv"), logger);
 
         _nytStandardByLength = BuildByLength(nyWords);
         // Full pool must include every NY word too — preserves prior UnionWith semantics.
         _fullDictionaryByLength = BuildByLength(fullWords.Concat(nyWords));
+    }
+
+    // Assembly.Location returns the on-disk path for plugins loaded via
+    // PluginLoadContext.LoadFromAssemblyPath; falls back to the host's
+    // games/KnockBox.Spardle/Data layout for single-file publishes where
+    // Location is empty.
+    private static string ResolveDataDir()
+    {
+        var asmLocation = typeof(WordListService).Assembly.Location;
+        var asmDir = string.IsNullOrEmpty(asmLocation) ? null : Path.GetDirectoryName(asmLocation);
+        if (!string.IsNullOrEmpty(asmDir))
+            return Path.Combine(asmDir, "Data");
+        return Path.Combine(AppContext.BaseDirectory, "games", "KnockBox.Spardle", "Data");
     }
 
     public bool IsValidWord(ReadOnlySpan<char> word)

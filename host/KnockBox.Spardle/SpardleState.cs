@@ -68,8 +68,11 @@ public class SpardleState(User host, ILogger logger) : AbstractGameState(host, l
     public List<string> CustomWordPool { get; set; } = [];
     public List<string> RoundQueue { get; set; } = [];
 
-    // Player tracking
-    public Dictionary<string, PlayerState> PlayerStates { get; } = [];
+    // Player tracking. Writes are owned by SpardleEngine and only ever happen inside
+    // Execute/ExecuteAsync. Render-thread callers read via TryGetPlayerState — they must
+    // never invoke CreatePlayerState, which would mutate the dictionary unlocked.
+    private readonly Dictionary<string, PlayerState> _playerStates = [];
+    public IReadOnlyDictionary<string, PlayerState> PlayerStates => _playerStates;
 
     // True when the host is playing alongside everyone else; false when the host is a
     // display-only observer (set at StartAsync time based on whether any other players
@@ -78,13 +81,24 @@ public class SpardleState(User host, ILogger logger) : AbstractGameState(host, l
 
     internal void SetHostIsParticipant(bool value) => HostIsParticipant = value;
 
-    public PlayerState GetOrCreatePlayerState(string userId)
+    /// <summary>
+    /// Creates (or returns the existing) <see cref="PlayerState"/> for <paramref name="userId"/>.
+    /// Mutates <see cref="PlayerStates"/>; callers MUST be inside <c>Execute</c>/<c>ExecuteAsync</c>.
+    /// </summary>
+    internal PlayerState CreatePlayerState(string userId)
     {
-        if (!PlayerStates.TryGetValue(userId, out var state))
+        if (!_playerStates.TryGetValue(userId, out var state))
         {
             state = new PlayerState();
-            PlayerStates[userId] = state;
+            _playerStates[userId] = state;
         }
         return state;
     }
+
+    /// <summary>
+    /// Read-only lookup for render-thread callers. Returns false when no entry exists
+    /// (e.g., an observing host, or a spectator who joined mid-round).
+    /// </summary>
+    public bool TryGetPlayerState(string userId, out PlayerState state)
+        => _playerStates.TryGetValue(userId, out state!);
 }

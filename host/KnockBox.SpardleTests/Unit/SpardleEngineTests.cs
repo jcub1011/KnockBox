@@ -468,4 +468,266 @@ public class SpardleEngineTests
             await Task.Delay(20);
         }
     }
+
+    // ───────────────────────────────────────────────────────────────────────
+    // Host identity (StartAsync guard)
+    // ───────────────────────────────────────────────────────────────────────
+
+    [TestMethod]
+    public async Task StartAsync_NonHostCaller_Rejected()
+    {
+        var (state, _) = await CreateStateAsync();
+        state.CustomWordPool = new List<string> { "apple" };
+        var impostor = new User("Imp", Guid.NewGuid().ToString());
+
+        var result = await _engine.StartAsync(impostor, state);
+
+        Assert.IsFalse(result.IsSuccess);
+        Assert.IsTrue(result.TryGetFailure(out var failure));
+        StringAssert.Contains(failure.PublicMessage, "host");
+        Assert.AreEqual(GamePhase.Lobby, state.Phase);
+    }
+
+    // ───────────────────────────────────────────────────────────────────────
+    // Hard mode
+    // ───────────────────────────────────────────────────────────────────────
+
+    [TestMethod]
+    public async Task SubmitGuess_HardMode_FirstGuessHasNoConstraint()
+    {
+        var (state, host) = await CreateStateAsync();
+        state.TotalRounds = 1;
+        state.TransitionDuration = TimeSpan.FromMilliseconds(80);
+        state.HardModeEnabled = true;
+        state.AllowDictionaryFallback = true;
+        state.RoundTimer = TimeSpan.FromSeconds(30);
+        state.CustomWordPool = new List<string> { "apple" };
+        state.WordOrderMode = WordOrderMode.ListOrder;
+
+        await _engine.StartAsync(host, state);
+        await WaitForPhaseAsync(state, GamePhase.Playing, timeoutMs: 1500);
+
+        var result = _engine.SubmitGuess(state, host, "crane");
+
+        Assert.IsTrue(result.IsSuccess, $"First guess should be unconstrained in hard mode: {result}");
+    }
+
+    [TestMethod]
+    public async Task SubmitGuess_HardMode_RequiresConfirmedLettersInPlace()
+    {
+        var (state, host) = await CreateStateAsync();
+        state.TotalRounds = 1;
+        state.TransitionDuration = TimeSpan.FromMilliseconds(80);
+        state.HardModeEnabled = true;
+        state.AllowDictionaryFallback = true;
+        state.RoundTimer = TimeSpan.FromSeconds(30);
+        state.CustomWordPool = new List<string> { "apple" };
+        state.WordOrderMode = WordOrderMode.ListOrder;
+
+        await _engine.StartAsync(host, state);
+        await WaitForPhaseAsync(state, GamePhase.Playing, timeoutMs: 1500);
+
+        // "amply" locks 'a' at index 0 (correct); 'p' at index 2 (correct).
+        var first = _engine.SubmitGuess(state, host, "amply");
+        Assert.IsTrue(first.IsSuccess, $"first guess should succeed: {first}");
+
+        // "bland" drops both locked letters — must be rejected.
+        var second = _engine.SubmitGuess(state, host, "bland");
+        Assert.IsFalse(second.IsSuccess);
+        Assert.IsTrue(second.TryGetFailure(out var failure));
+        StringAssert.Contains(failure.PublicMessage, "Hard Mode");
+    }
+
+    // ───────────────────────────────────────────────────────────────────────
+    // Compound word decomposition
+    // ───────────────────────────────────────────────────────────────────────
+
+    [TestMethod]
+    public async Task SubmitGuess_CompoundWordsAllowed_AcceptsConcatenationOfThreePlusLetterWords()
+    {
+        var (state, host) = await CreateStateAsync();
+        state.TotalRounds = 1;
+        state.TransitionDuration = TimeSpan.FromMilliseconds(80);
+        state.RoundTimer = TimeSpan.FromSeconds(30);
+        state.AllowDictionaryFallback = true;
+        state.AllowCompoundWords = true;
+        state.CustomWordPool = new List<string> { "aaaaaa" };
+        state.WordOrderMode = WordOrderMode.ListOrder;
+
+        await _engine.StartAsync(host, state);
+        await WaitForPhaseAsync(state, GamePhase.Playing, timeoutMs: 1500);
+
+        // "cathat" = "cat" + "hat"; both are 3-letter dictionary words. "cathat" itself is
+        // not in the dictionary, so the compound DP actually has to run.
+        var result = _engine.SubmitGuess(state, host, "cathat");
+        Assert.IsTrue(result.IsSuccess, $"valid compound should be accepted: {result}");
+    }
+
+    [TestMethod]
+    public async Task SubmitGuess_CompoundWordsAllowed_RejectsShortFragmentDecomposition()
+    {
+        var (state, host) = await CreateStateAsync();
+        state.TotalRounds = 1;
+        state.TransitionDuration = TimeSpan.FromMilliseconds(80);
+        state.RoundTimer = TimeSpan.FromSeconds(30);
+        state.AllowDictionaryFallback = true;
+        state.AllowCompoundWords = true;
+        state.CustomWordPool = new List<string> { "aaa" };
+        state.WordOrderMode = WordOrderMode.ListOrder;
+
+        await _engine.StartAsync(host, state);
+        await WaitForPhaseAsync(state, GamePhase.Playing, timeoutMs: 1500);
+
+        // "aia" would decompose as "a"+"i"+"a" only if 1-char fragments were allowed.
+        var result = _engine.SubmitGuess(state, host, "aia");
+        Assert.IsFalse(result.IsSuccess);
+        Assert.IsTrue(result.TryGetFailure(out var failure));
+        StringAssert.Contains(failure.PublicMessage, "Not a valid");
+    }
+
+    [TestMethod]
+    public async Task SubmitGuess_CompoundWordsAllowed_RejectsGarbage()
+    {
+        var (state, host) = await CreateStateAsync();
+        state.TotalRounds = 1;
+        state.TransitionDuration = TimeSpan.FromMilliseconds(80);
+        state.RoundTimer = TimeSpan.FromSeconds(30);
+        state.AllowDictionaryFallback = true;
+        state.AllowCompoundWords = true;
+        state.CustomWordPool = new List<string> { "xzqwplm" };
+        state.WordOrderMode = WordOrderMode.ListOrder;
+
+        await _engine.StartAsync(host, state);
+        await WaitForPhaseAsync(state, GamePhase.Playing, timeoutMs: 1500);
+
+        var result = _engine.SubmitGuess(state, host, "xzqwplm");
+        Assert.IsFalse(result.IsSuccess);
+    }
+
+    // ───────────────────────────────────────────────────────────────────────
+    // Round-end conditions
+    // ───────────────────────────────────────────────────────────────────────
+
+    [TestMethod]
+    public async Task CheckRoundEnd_WaitForAll_HoldsRoundUntilAllFinish()
+    {
+        var (state, host, players) = await CreateStateWithPlayersAsync(2);
+        state.TotalRounds = 1;
+        state.TransitionDuration = TimeSpan.FromMilliseconds(80);
+        state.RoundTimer = TimeSpan.FromSeconds(30);
+        state.WaitForAll = true;
+        state.WinCondition = WinConditionMode.Sprinter;
+        state.CustomWordPool = new List<string> { "apple" };
+        state.WordOrderMode = WordOrderMode.ListOrder;
+
+        await _engine.StartAsync(host, state);
+        await WaitForPhaseAsync(state, GamePhase.Playing, timeoutMs: 1500);
+
+        var first = _engine.SubmitGuess(state, players[0], "apple");
+        Assert.IsTrue(first.IsSuccess);
+        // With WaitForAll=true, the round must NOT advance even though a sprinter has solved.
+        Assert.AreEqual(GamePhase.Playing, state.Phase);
+
+        // Second player DNFs by exhausting their guesses (max guesses for length 5, k=2 → 6).
+        for (int i = 0; i < 6; i++)
+        {
+            _ = _engine.SubmitGuess(state, players[1], "crane");
+        }
+
+        Assert.AreEqual(GamePhase.RoundResults, state.Phase);
+    }
+
+    [TestMethod]
+    public async Task BuildOutcomes_Tactician_RanksByFewestGuesses()
+    {
+        var (state, host, players) = await CreateStateWithPlayersAsync(2);
+        state.TotalRounds = 1;
+        state.TransitionDuration = TimeSpan.FromMilliseconds(80);
+        state.RoundTimer = TimeSpan.FromSeconds(30);
+        state.WinCondition = WinConditionMode.Tactician;
+        state.WaitForAll = true;
+        state.AllowDictionaryFallback = true;
+        state.CustomWordPool = new List<string> { "apple" };
+        state.WordOrderMode = WordOrderMode.ListOrder;
+
+        await _engine.StartAsync(host, state);
+        await WaitForPhaseAsync(state, GamePhase.Playing, timeoutMs: 1500);
+
+        // P1 needs two guesses; P2 solves on the first.
+        Assert.IsTrue(_engine.SubmitGuess(state, players[0], "crane").IsSuccess);
+        Assert.IsTrue(_engine.SubmitGuess(state, players[1], "apple").IsSuccess);
+        Assert.IsTrue(_engine.SubmitGuess(state, players[0], "apple").IsSuccess);
+
+        await WaitForPhaseAsync(state, GamePhase.RoundResults, timeoutMs: 1500);
+
+        var p1Outcome = state.RoundHistory[0].Outcomes.Single(o => o.UserId == players[0].Id);
+        var p2Outcome = state.RoundHistory[0].Outcomes.Single(o => o.UserId == players[1].Id);
+
+        Assert.AreEqual(1, p2Outcome.Placement, "Tactician should rank fewest-guesses first");
+        Assert.AreEqual(10, p2Outcome.PointsAwarded);
+        Assert.AreEqual(2, p1Outcome.Placement);
+        Assert.AreEqual(5, p1Outcome.PointsAwarded);
+    }
+
+    // ───────────────────────────────────────────────────────────────────────
+    // Duplicate-letter evaluation
+    // ───────────────────────────────────────────────────────────────────────
+
+    [TestMethod]
+    [DataRow("lilac", "llama", "CPPAA")] // second 'l' matches target's still-unconsumed 'l' at index 2; first 'a' matches target's 'a'; second 'a' absent
+    [DataRow("apple", "paper", "PPCPA")] // p (pos 0) present; a present; p (pos 2) correct; e present; r absent
+    [DataRow("apple", "aaaaa", "CAAAA")] // only one 'a' in target
+    public void EvaluateGuess_DuplicateLetters_MatchWordleRules(string target, string guess, string expectedStatuses)
+    {
+        var result = SpardleEngine.EvaluateGuess(target, guess);
+        var actual = string.Concat(result.Statuses.Select(StatusCode));
+        Assert.AreEqual(expectedStatuses, actual, $"target={target}, guess={guess}");
+    }
+
+    private static char StatusCode(LetterStatus s) => s switch
+    {
+        LetterStatus.Correct => 'C',
+        LetterStatus.Present => 'P',
+        LetterStatus.Absent => 'A',
+        _ => '?'
+    };
+
+    // ───────────────────────────────────────────────────────────────────────
+    // Unique-index sampler (hybrid Fisher–Yates / rejection sampling)
+    // ───────────────────────────────────────────────────────────────────────
+
+    [TestMethod]
+    public async Task StartAsync_LargePoolSmallTake_ProducesUniqueIndicesViaRejectionPath()
+    {
+        // Full dictionary length 5 has ~10k entries — take=10 triggers rejection sampling.
+        var (state, host) = await CreateStateAsync();
+        state.WordPoolMode = WordPoolMode.FullDictionary;
+        state.ConstantWordLength = true;
+        state.TargetWordLength = 5;
+        state.WordOrderMode = WordOrderMode.RandomNoRepeats;
+        state.TotalRounds = 10;
+
+        await _engine.StartAsync(host, state);
+
+        Assert.HasCount(10, state.RoundQueue);
+        Assert.AreEqual(10, state.RoundQueue.Distinct().Count(), "all sampled words must be unique");
+    }
+
+    [TestMethod]
+    public async Task StartAsync_SmallPoolExhaustiveTake_UsesShufflePath()
+    {
+        // NYT-standard length 5 is several thousand words. We request all of them — the
+        // take/total ratio forces the Fisher–Yates branch and must terminate (the old
+        // rejection-sampling implementation would stall near-completion).
+        var (state, host) = await CreateStateAsync();
+        state.WordPoolMode = WordPoolMode.NytStandard;
+        state.WordOrderMode = WordOrderMode.RandomNoRepeats;
+        state.TotalRounds = int.MaxValue; // engine clamps to total available
+
+        await _engine.StartAsync(host, state);
+
+        int total = new WordListService(NullLogger<WordListService>.Instance).GetWordCount(WordPoolMode.NytStandard, 5);
+        Assert.HasCount(total, state.RoundQueue);
+        Assert.AreEqual(total, state.RoundQueue.Distinct().Count());
+    }
 }

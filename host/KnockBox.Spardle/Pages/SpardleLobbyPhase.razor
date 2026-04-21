@@ -46,6 +46,10 @@
             {
                 <p class="spd-lobby-hint">Configure at least one word in the pool.</p>
             }
+            @if (!string.IsNullOrEmpty(_startError))
+            {
+                <p class="spd-lobby-hint spd-lobby-hint-error">@_startError</p>
+            }
             <button class="spd-lobby-settings-gear" @onclick="ToggleSettings" title="Match Rules">
                 ⚙
             </button>
@@ -74,7 +78,7 @@
                     <div class="spd-lobby-field-grid">
                         <label class="spd-lobby-field">
                             <span>Source</span>
-                            <select @bind="State.WordPoolMode" @bind:after="NotifyChanged">
+                            <select @bind:get="State.WordPoolMode" @bind:set="SetWordPoolMode">
                                 <option value="@WordPoolMode.NytStandard">NYT Standard</option>
                                 <option value="@WordPoolMode.FullDictionary">Full Dictionary</option>
                                 <option value="@WordPoolMode.HostDefined">Host Defined</option>
@@ -83,7 +87,7 @@
                         </label>
                         <label class="spd-lobby-field">
                             <span>Order</span>
-                            <select @bind="State.WordOrderMode" @bind:after="NotifyChanged">
+                            <select @bind:get="State.WordOrderMode" @bind:set="SetWordOrderMode">
                                 <option value="@WordOrderMode.RandomNoRepeats">Random (No Repeats)</option>
                                 <option value="@WordOrderMode.RandomWithRepeats">Random (With Repeats)</option>
                                 <option value="@WordOrderMode.ListOrder">List Order</option>
@@ -94,14 +98,14 @@
                         {
                             <label class="spd-lobby-field spd-lobby-field-row">
                                 <span>Constant Word Length</span>
-                                <input type="checkbox" @bind="State.ConstantWordLength" @bind:after="NotifyChanged" />
+                                <input type="checkbox" @bind:get="State.ConstantWordLength" @bind:set="SetConstantWordLength" />
                             </label>
 
                             @if (State.ConstantWordLength)
                             {
                                 <label class="spd-lobby-field">
                                     <span>Word Length</span>
-                                    <select @bind="State.TargetWordLength" @bind:after="NotifyChanged">
+                                    <select @bind:get="State.TargetWordLength" @bind:set="SetTargetWordLength">
                                         @foreach (var len in WordList.GetAvailableLengths(WordPoolMode.FullDictionary))
                                         {
                                             <option value="@len">@len</option>
@@ -113,7 +117,7 @@
                             {
                                 <label class="spd-lobby-field">
                                     <span>Min Length</span>
-                                    <select @bind="State.MinWordLength" @bind:after="NotifyChanged">
+                                    <select @bind:get="State.MinWordLength" @bind:set="SetMinWordLength">
                                         @foreach (var len in WordList.GetAvailableLengths(WordPoolMode.FullDictionary))
                                         {
                                             <option value="@len">@len</option>
@@ -122,7 +126,7 @@
                                 </label>
                                 <label class="spd-lobby-field">
                                     <span>Max Length</span>
-                                    <select @bind="State.MaxWordLength" @bind:after="NotifyChanged">
+                                    <select @bind:get="State.MaxWordLength" @bind:set="SetMaxWordLength">
                                         @foreach (var len in WordList.GetAvailableLengths(WordPoolMode.FullDictionary))
                                         {
                                             <option value="@len">@len</option>
@@ -146,7 +150,7 @@
                     <div class="spd-lobby-field-grid">
                         <label class="spd-lobby-field">
                             <span>Total Rounds</span>
-                            <input type="number" min="1" max="50" @bind="State.TotalRounds" @bind:after="NotifyChanged" />
+                            <input type="number" min="1" max="50" @bind:get="State.TotalRounds" @bind:set="SetTotalRounds" />
                         </label>
                         <label class="spd-lobby-field">
                             <span>Round Timer (seconds)</span>
@@ -173,14 +177,14 @@
                     <div class="spd-lobby-field-grid">
                         <label class="spd-lobby-field">
                             <span>Mode</span>
-                            <select @bind="State.WinCondition" @bind:after="NotifyChanged">
+                            <select @bind:get="State.WinCondition" @bind:set="SetWinCondition">
                                 <option value="@WinConditionMode.Sprinter">Sprinter (first to solve)</option>
                                 <option value="@WinConditionMode.Tactician">Tactician (fewest guesses)</option>
                             </select>
                         </label>
                         <label class="spd-lobby-field">
                             <span>Difficulty Multiplier (k)</span>
-                            <select @bind="State.DifficultyMultiplier" @bind:after="NotifyChanged">
+                            <select @bind:get="State.DifficultyMultiplier" @bind:set="SetDifficultyMultiplier">
                                 <option value="1.0">Gentle (k = 1)</option>
                                 <option value="2.0">Standard (k = 2)</option>
                                 <option value="3.0">Brutal (k = 3)</option>
@@ -188,23 +192,23 @@
                         </label>
                         <label class="spd-lobby-field spd-lobby-field-row">
                             <span>Hard Mode</span>
-                            <input type="checkbox" @bind="State.HardModeEnabled" @bind:after="NotifyChanged" />
+                            <input type="checkbox" @bind:get="State.HardModeEnabled" @bind:set="SetHardModeEnabled" />
                         </label>
                         <label class="spd-lobby-field spd-lobby-field-row">
                             <span>Wait For All Players</span>
-                            <input type="checkbox" @bind="State.WaitForAll" @bind:after="NotifyChanged" />
+                            <input type="checkbox" @bind:get="State.WaitForAll" @bind:set="SetWaitForAll" />
                         </label>
                         <label class="spd-lobby-field spd-lobby-field-row">
                             <span>Reveal Answer</span>
-                            <input type="checkbox" @bind="State.RevealAnswer" @bind:after="NotifyChanged" />
+                            <input type="checkbox" @bind:get="State.RevealAnswer" @bind:set="SetRevealAnswer" />
                         </label>
                         <label class="spd-lobby-field spd-lobby-field-row">
                             <span>Dictionary Fallback</span>
-                            <input type="checkbox" @bind="State.AllowDictionaryFallback" @bind:after="NotifyChanged" />
+                            <input type="checkbox" @bind:get="State.AllowDictionaryFallback" @bind:set="SetAllowDictionaryFallback" />
                         </label>
                         <label class="spd-lobby-field spd-lobby-field-row">
                             <span>Allow Compound Words</span>
-                            <input type="checkbox" @bind="State.AllowCompoundWords" @bind:after="NotifyChanged" />
+                            <input type="checkbox" @bind:get="State.AllowCompoundWords" @bind:set="SetAllowCompoundWords" />
                         </label>
                     </div>
                 </section>
@@ -220,6 +224,8 @@
     private bool SettingsOpen { get; set; }
     private bool _unlimitedTimer;
     private string _customPoolText = string.Empty;
+    private string? _startError;
+    private CancellationTokenSource? _startErrorCts;
 
     private bool IsHost => UserService.CurrentUser?.Id == State.Host.Id;
     private bool CanStart => State.CustomWordPool.Count > 0
@@ -234,10 +240,34 @@
 
     private void ToggleSettings() => SettingsOpen = !SettingsOpen;
 
-    private void NotifyChanged()
+    // Every setter below mutates shared server state; each wraps the assignment in
+    // State.Execute so readers on other circuits never see a torn value, and so the
+    // notification fires after the lock is released.
+    private void SetWordPoolMode(WordPoolMode value) => State.Execute(() => State.WordPoolMode = value);
+    private void SetWordOrderMode(WordOrderMode value) => State.Execute(() => State.WordOrderMode = value);
+    private void SetConstantWordLength(bool value) => State.Execute(() => State.ConstantWordLength = value);
+    private void SetTargetWordLength(int value) => State.Execute(() => State.TargetWordLength = value);
+    private void SetWinCondition(WinConditionMode value) => State.Execute(() => State.WinCondition = value);
+    private void SetDifficultyMultiplier(double value) => State.Execute(() => State.DifficultyMultiplier = value);
+    private void SetHardModeEnabled(bool value) => State.Execute(() => State.HardModeEnabled = value);
+    private void SetWaitForAll(bool value) => State.Execute(() => State.WaitForAll = value);
+    private void SetRevealAnswer(bool value) => State.Execute(() => State.RevealAnswer = value);
+    private void SetAllowDictionaryFallback(bool value) => State.Execute(() => State.AllowDictionaryFallback = value);
+    private void SetAllowCompoundWords(bool value) => State.Execute(() => State.AllowCompoundWords = value);
+    private void SetTotalRounds(int value) => State.Execute(() => State.TotalRounds = value);
+
+    // Min/max clamping keeps min ≤ max by pushing the other bound along with the edit.
+    // Both ends of the clamp are committed inside the same Execute so the pair is atomic.
+    private void SetMinWordLength(int value) => State.Execute(() =>
     {
-        State.Execute(() => { });
-    }
+        State.MinWordLength = value;
+        if (State.MaxWordLength < value) State.MaxWordLength = value;
+    });
+    private void SetMaxWordLength(int value) => State.Execute(() =>
+    {
+        State.MaxWordLength = value;
+        if (State.MinWordLength > value) State.MinWordLength = value;
+    });
 
     private void OnCustomPoolChanged(ChangeEventArgs e)
     {
@@ -247,38 +277,60 @@
             .Select(w => w.Trim().ToLowerInvariant())
             .Where(w => w.Length is > 0 and <= 64)
             .ToList();
-        State.CustomWordPool = words;
-        NotifyChanged();
+        State.Execute(() => State.CustomWordPool = words);
     }
 
     private void OnRoundTimerChanged(ChangeEventArgs e)
     {
         if (int.TryParse(e.Value?.ToString(), out int seconds))
         {
-            State.RoundTimer = TimeSpan.FromSeconds(Math.Clamp(seconds, 30, 600));
-            NotifyChanged();
+            var timer = TimeSpan.FromSeconds(Math.Clamp(seconds, 30, 600));
+            State.Execute(() => State.RoundTimer = timer);
         }
     }
 
     private void OnUnlimitedToggled()
     {
-        State.RoundTimer = _unlimitedTimer ? TimeSpan.Zero : TimeSpan.FromMinutes(3);
-        NotifyChanged();
+        var timer = _unlimitedTimer ? TimeSpan.Zero : TimeSpan.FromMinutes(3);
+        State.Execute(() => State.RoundTimer = timer);
     }
 
     private void OnTransitionChanged(ChangeEventArgs e)
     {
         if (int.TryParse(e.Value?.ToString(), out int seconds))
         {
-            State.TransitionDuration = TimeSpan.FromSeconds(Math.Clamp(seconds, 2, 15));
-            NotifyChanged();
+            var span = TimeSpan.FromSeconds(Math.Clamp(seconds, 2, 15));
+            State.Execute(() => State.TransitionDuration = span);
         }
     }
 
     private async Task StartGame()
     {
         if (UserService.CurrentUser is null) return;
-        await GameEngine.StartAsync(UserService.CurrentUser, State);
+        var result = await GameEngine.StartAsync(UserService.CurrentUser, State);
+        if (result.TryGetFailure(out var failure))
+        {
+            await ShowStartError(failure.PublicMessage);
+        }
+    }
+
+    private async Task ShowStartError(string message)
+    {
+        _startErrorCts?.Cancel();
+        _startErrorCts = new CancellationTokenSource();
+        var token = _startErrorCts.Token;
+        _startError = message;
+        StateHasChanged();
+        try
+        {
+            await Task.Delay(3000, token);
+            if (!token.IsCancellationRequested)
+            {
+                _startError = null;
+                StateHasChanged();
+            }
+        }
+        catch (OperationCanceledException) { /* superseded */ }
     }
 
     private static string Initials(string name)

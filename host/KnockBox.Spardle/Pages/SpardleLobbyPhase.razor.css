@@ -167,6 +167,11 @@
     margin: -4px 0 0;
 }
 
+.spd-lobby-hint-error {
+    color: var(--spd-danger, #f14);
+    font-weight: 600;
+}
+
 .spd-lobby-waiting {
     color: var(--spd-ink-dim);
     font-style: italic;

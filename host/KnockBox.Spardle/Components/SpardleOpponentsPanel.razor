@@ -51,7 +51,9 @@
             : (IEnumerable<User>)State.Players;
 
         var sorted = roster
-            .Select(u => (User: u, Ps: State.GetOrCreatePlayerState(u.Id)))
+            .Select(u => (User: u, Ps: State.TryGetPlayerState(u.Id, out var p) ? p : null))
+            .Where(p => p.Ps is not null)
+            .Select(p => (p.User, Ps: p.Ps!))
             // Primary sort — "closest to finishing" in the current round:
             //   solved > still guessing > DNF, then most-correct-letters, then fewest guesses
             .OrderBy(p => RoundStateSortKey(p.Ps))
