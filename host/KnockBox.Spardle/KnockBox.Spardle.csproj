@@ -2,19 +2,14 @@
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
-    <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AddRazorSupportForMvc>true</AddRazorSupportForMvc>
   </PropertyGroup>
 
-
-  <Import Project="..\Directory.Plugin.targets" />
-
   <ItemGroup>
-    <SupportedPlatform Include="browser" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <PackageReference Include="Microsoft.AspNetCore.Components.Web" Version="10.0.6" />
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <Content Include="Data\*.csv" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
@@ -22,7 +17,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="Data\*.csv" CopyToOutputDirectory="PreserveNewest" />
+    <Using Include="Microsoft.Extensions.Logging" />
   </ItemGroup>
+
+  <Import Project="..\Directory.Plugin.targets" />
 
 </Project>

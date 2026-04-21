@@ -11,11 +11,6 @@
         </div>
         <div class="spd-lobby-tagline">HEAD-TO-HEAD WORD COMBAT</div>
 
-        <div class="spd-lobby-room">
-            <span class="spd-lobby-room-label">ROOM</span>
-            <span class="spd-lobby-room-code spd-mono">@RoomCode</span>
-        </div>
-
         @{
             var roster = State.Players.Prepend(State.Host).ToList();
             int idx = 0;

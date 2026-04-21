@@ -91,7 +91,7 @@
     box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.6);
 }
 
-::deep .game-tile-surface:hover .spardle-tile-letter {
+.spardle-tile:hover .spardle-tile-letter {
     animation: spardle-tile-flip 0.55s ease-in-out both;
     animation-delay: calc(var(--col, 0) * 110ms);
 }
@@ -103,7 +103,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-    ::deep .game-tile-surface:hover .spardle-tile-letter {
+    .spardle-tile:hover .spardle-tile-letter {
         animation: none;
     }
 }
