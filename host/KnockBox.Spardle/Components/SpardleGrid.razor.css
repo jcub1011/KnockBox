@@ -39,8 +39,10 @@
 }
 
 .spd-row-current {
-    animation: spd-row-current 2.4s ease-in-out infinite;
-    border-radius: 6px;
+    position: relative;
+    z-index: 2;
+    border-radius: calc(var(--spd-tile-size) * 0.14);
+    animation: spd-row-current 2.2s ease-in-out infinite;
 }
 
 .spd-row-shake {
