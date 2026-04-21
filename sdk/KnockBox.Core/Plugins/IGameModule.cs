@@ -36,5 +36,14 @@ namespace KnockBox.Core.Plugins
         /// game from other tiles.
         /// </summary>
         RenderFragment GetButtonContent();
+
+        /// <summary>
+        /// Optionally returns a custom header fragment rendered inside the host's <c>&lt;header&gt;</c>
+        /// element while the user is inside this game's room. Return <c>null</c> (the default) to
+        /// inherit the host's built-in header (game name link, room code button, leave button).
+        /// The host owns the <c>&lt;header&gt;</c> wrapper (animation classes, layout, shadow);
+        /// this fragment owns everything rendered inside it.
+        /// </summary>
+        RenderFragment? GetCustomHeader() => null;
     }
 }
