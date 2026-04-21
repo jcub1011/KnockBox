@@ -1,19 +1,25 @@
 @using KnockBox.Spardle.Models
 @using KnockBox.Spardle
 
-<div class="spardle-grid" style="display: flex; flex-direction: column; gap: 5px;">
+<div class="spd-grid @(HighContrast ? "spd-hc" : "")" style="--spd-cols:@State.TargetWord.Length;">
+    @{
+        int maxGuesses = SpardleEngine.CalculateMaxGuesses(State.TargetWord.Length, State.DifficultyMultiplier);
+        int wordLen = State.TargetWord.Length;
+    }
+
     @foreach (var guess in PlayerState.Guesses)
     {
-        <div style="display: flex; gap: 5px;">
+        <div class="spd-row @(guess.IsCorrect ? "spd-row-won" : "")">
             @for (int i = 0; i < guess.Word.Length; i++)
             {
-                var statusClass = guess.Statuses[i] switch {
-                    LetterStatus.Correct => "bg-green-500",
-                    LetterStatus.Present => "bg-yellow-500",
-                    _ => "bg-gray-500"
+                var statusClass = guess.Statuses[i] switch
+                {
+                    LetterStatus.Correct => "spd-tile-correct",
+                    LetterStatus.Present => "spd-tile-present",
+                    _ => "spd-tile-absent"
                 };
-                <div class="tile @statusClass" style="width: 40px; height: 40px; border: 1px solid black; display: flex; align-items: center; justify-content: center; font-weight: bold; text-transform: uppercase;">
-                    @guess.Word[i]
+                <div class="spd-tile spd-tile-flipped @statusClass" style="--col:@i;">
+                    <span class="spd-tile-face">@guess.Word[i].ToString().ToUpperInvariant()</span>
                 </div>
             }
         </div>
@@ -21,33 +27,72 @@
 
     @if (!PlayerState.HasFinishedRound && State.IsRoundActive)
     {
-        <div style="display: flex; gap: 5px;">
-            @for (int i = 0; i < State.TargetWord.Length; i++)
+        <div class="spd-row spd-row-current @(InvalidGuess ? "spd-row-shake" : "")">
+            @for (int i = 0; i < wordLen; i++)
             {
-                <div class="tile" style="width: 40px; height: 40px; border: 1px solid black; display: flex; align-items: center; justify-content: center; font-weight: bold; text-transform: uppercase;">
-                    @(i < CurrentGuess.Length ? CurrentGuess[i] : ' ')
+                bool filled = i < CurrentGuess.Length;
+                <div class="spd-tile @(filled ? "spd-tile-filled" : "spd-tile-empty")" style="--col:@i;">
+                    @if (filled)
+                    {
+                        <span class="spd-tile-face">@CurrentGuess[i].ToString().ToUpperInvariant()</span>
+                    }
                 </div>
             }
         </div>
-        
-        // Empty rows up to max guesses
-        @for (int row = PlayerState.Guesses.Count + 1; row < KnockBox.Spardle.SpardleEngine.CalculateMaxGuesses(State.TargetWord.Length, State.DifficultyMultiplier); row++)
+
+        @* Placeholder rows for remaining guesses *@
+        @for (int row = PlayerState.Guesses.Count + 1; row < maxGuesses; row++)
         {
-            <div style="display: flex; gap: 5px;">
-                @for (int i = 0; i < State.TargetWord.Length; i++)
+            <div class="spd-row spd-row-placeholder">
+                @for (int i = 0; i < wordLen; i++)
                 {
-                    <div class="tile" style="width: 40px; height: 40px; border: 1px solid gray; display: flex; align-items: center; justify-content: center;">
-                    </div>
+                    <div class="spd-tile spd-tile-empty" style="--col:@i;"></div>
+                }
+            </div>
+        }
+    }
+    else if (PlayerState.HasFinishedRound)
+    {
+        @* Finished — show remaining guesses as muted placeholders for layout stability *@
+        @for (int row = PlayerState.Guesses.Count; row < maxGuesses; row++)
+        {
+            <div class="spd-row spd-row-placeholder">
+                @for (int i = 0; i < wordLen; i++)
+                {
+                    <div class="spd-tile spd-tile-empty" style="--col:@i;"></div>
                 }
             </div>
         }
     }
 </div>
 
+@if (State.TargetWord.Length > 5 && State.IsRoundActive)
+{
+    <div class="spd-legacy-bar" aria-label="Confirmed letter positions">
+        @for (int i = 0; i < State.TargetWord.Length; i++)
+        {
+            char? confirmed = null;
+            foreach (var g in PlayerState.Guesses)
+            {
+                if (i < g.Statuses.Length && g.Statuses[i] == LetterStatus.Correct)
+                {
+                    confirmed = char.ToUpperInvariant(g.Word[i]);
+                    break;
+                }
+            }
+            <span class="spd-legacy-slot @(confirmed.HasValue ? "spd-legacy-filled" : "")">
+                @(confirmed?.ToString() ?? "_")
+            </span>
+        }
+    </div>
+}
+
 @code {
-    [Parameter] public SpardleState State { get; set; } = default!;
-    [Parameter] public string CurrentUserId { get; set; } = default!;
-    [Parameter] public string CurrentGuess { get; set; } = "";
+    [Parameter, EditorRequired] public SpardleState State { get; set; } = default!;
+    [Parameter, EditorRequired] public string CurrentUserId { get; set; } = default!;
+    [Parameter] public string CurrentGuess { get; set; } = string.Empty;
+    [Parameter] public bool InvalidGuess { get; set; }
+    [Parameter] public bool HighContrast { get; set; }
 
     private PlayerState PlayerState => State.GetOrCreatePlayerState(CurrentUserId);
 }

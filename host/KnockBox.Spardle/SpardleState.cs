@@ -29,6 +29,13 @@ public class SpardleState(User host, ILogger logger) : AbstractGameState(host, l
     public bool IsRoundActive { get; set; } = false;
     public bool IsGameOver { get; set; } = false;
 
+    // Phase / transition
+    public GamePhase Phase { get; set; } = GamePhase.Lobby;
+    public DateTimeOffset? PhaseExpiresAtUtc { get; set; }
+    public TimeSpan TransitionDuration { get; set; } = TimeSpan.FromSeconds(5);
+    public List<RoundResult> RoundHistory { get; } = [];
+    public string? LastCompletedAnswer { get; set; }
+
     // Word lists
     public List<string> CustomWordPool { get; set; } = [];
     public List<string> RoundQueue { get; set; } = [];

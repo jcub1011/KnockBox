@@ -1,0 +1,179 @@
+.spd-intro {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    overflow: hidden;
+    background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.1) 0%, rgba(0, 0, 0, 0.75) 75%);
+}
+
+.spd-intro-scanlines {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-image: repeating-linear-gradient(
+        0deg,
+        rgba(255, 255, 255, 0.025) 0,
+        rgba(255, 255, 255, 0.025) 1px,
+        transparent 1px,
+        transparent 4px
+    );
+    mix-blend-mode: screen;
+}
+
+.spd-intro-rail {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 6px;
+    background: linear-gradient(90deg, transparent, var(--spd-player-a), var(--spd-player-b), transparent);
+    overflow: hidden;
+    opacity: 0.9;
+}
+
+.spd-intro-rail::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.8), transparent);
+    transform: translateX(-100%);
+    animation: spd-scan 2.4s linear infinite;
+}
+
+.spd-intro-rail-top { top: 0; }
+.spd-intro-rail-bot { bottom: 0; }
+
+.spd-intro-stack {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    padding: 32px 40px;
+    text-align: center;
+}
+
+.spd-intro-label {
+    font-size: 1.8rem;
+    letter-spacing: 0.45em;
+    color: var(--spd-warn);
+    text-shadow: 3px 3px 0 #000;
+    animation: spd-slam 0.55s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.spd-intro-number {
+    font-size: clamp(7rem, 22vw, 16rem);
+    line-height: 0.85;
+    color: var(--spd-ink);
+    -webkit-text-stroke: 4px #000;
+    text-shadow:
+        0 0 0 #000,
+        10px 10px 0 #000,
+        0 0 60px var(--spd-player-a),
+        0 0 120px rgba(0, 209, 255, 0.4);
+    animation: spd-slam 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.12s both;
+}
+
+.spd-intro-of {
+    font-size: 1rem;
+    letter-spacing: 0.35em;
+    color: var(--spd-ink-dim);
+    margin-top: -10px;
+    animation: spd-slam 0.55s cubic-bezier(0.16, 1, 0.3, 1) 0.24s both;
+}
+
+.spd-intro-stats {
+    display: flex;
+    gap: 18px;
+    margin-top: 12px;
+    animation: spd-slam-subtle 0.45s ease-out 0.36s both;
+}
+
+.spd-intro-stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 10px 18px;
+    background: rgba(0, 0, 0, 0.55);
+    border: 1px solid var(--spd-border-strong);
+    border-radius: 4px;
+    min-width: 92px;
+}
+
+.spd-intro-stat-label {
+    font-family: var(--spd-font-display);
+    font-size: 0.7rem;
+    letter-spacing: 0.2em;
+    color: var(--spd-ink-dim);
+}
+
+.spd-intro-stat-value {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--spd-ink);
+}
+
+/* ── Countdown ring ────────────────────────────────────────────────── */
+
+.spd-intro-countdown {
+    position: relative;
+    width: 120px;
+    height: 120px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 18px;
+    animation: spd-slam-subtle 0.5s ease-out 0.48s both;
+}
+
+.spd-intro-ring {
+    position: absolute;
+    inset: 0;
+    transform: rotate(-90deg);
+}
+
+.spd-intro-ring-track {
+    fill: none;
+    stroke: rgba(255, 255, 255, 0.1);
+    stroke-width: 6;
+}
+
+.spd-intro-ring-fill {
+    fill: none;
+    stroke: var(--spd-warn);
+    stroke-width: 6;
+    stroke-linecap: round;
+    filter: drop-shadow(0 0 8px var(--spd-present-glow));
+    transition: stroke-dashoffset 0.2s linear;
+}
+
+.spd-intro-digit {
+    position: relative;
+    z-index: 2;
+    font-size: 3.5rem;
+    color: var(--spd-ink);
+    animation: spd-count-pop 0.4s ease-out both;
+}
+
+.spd-intro-getready {
+    margin-top: 8px;
+    font-size: 1.1rem;
+    letter-spacing: 0.5em;
+    color: var(--spd-danger);
+    text-shadow: 2px 2px 0 #000;
+    animation: spd-slam-subtle 0.4s ease-out 0.6s both, spd-pulse-danger 1.4s ease-in-out infinite 0.6s;
+}
+
+@media (max-width: 520px) {
+    .spd-intro-stats {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+    .spd-intro-stat {
+        min-width: 80px;
+        padding: 8px 12px;
+    }
+}

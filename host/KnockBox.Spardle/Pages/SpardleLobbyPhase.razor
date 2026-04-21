@@ -1,0 +1,253 @@
+@using KnockBox.Core.Services.State.Users
+@using KnockBox.Spardle.Models
+@using KnockBox.Spardle
+@inject IUserService UserService
+@inject SpardleEngine GameEngine
+
+<div class="spd-lobby">
+    <div class="spd-lobby-stage">
+        <div class="spd-lobby-brand">
+            <span class="spd-lobby-brand-spar">SPAR</span><span class="spd-lobby-brand-dash">–</span><span class="spd-lobby-brand-dle">DLE</span>
+        </div>
+        <div class="spd-lobby-tagline">HEAD-TO-HEAD WORD COMBAT</div>
+
+        <div class="spd-lobby-room">
+            <span class="spd-lobby-room-label">ROOM</span>
+            <span class="spd-lobby-room-code spd-mono">@RoomCode</span>
+        </div>
+
+        @{
+            var roster = State.Players.Prepend(State.Host).ToList();
+            int idx = 0;
+        }
+        <div class="spd-lobby-challengers">
+            <div class="spd-lobby-challengers-label">CHALLENGERS (@roster.Count)</div>
+            <div class="spd-lobby-challengers-list">
+                @foreach (var user in roster)
+                {
+                    bool isHost = user.Id == State.Host.Id;
+                    bool isMe = user.Id == UserService.CurrentUser?.Id;
+                    string accent = $"spd-opp-{(idx++ % 4) switch { 0 => "a", 1 => "b", 2 => "c", _ => "d" }}";
+                    <div class="spd-lobby-chip @accent @(isMe ? "spd-lobby-chip-me" : "")">
+                        <span class="spd-lobby-chip-avatar">@Initials(user.Name)</span>
+                        <span class="spd-lobby-chip-name">@user.Name</span>
+                        @if (isHost)
+                        {
+                            <span class="spd-lobby-chip-badge">HOST</span>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+
+        @if (IsHost)
+        {
+            <button class="spd-btn spd-btn-primary spd-btn-lg spd-lobby-start" @onclick="StartGame" disabled="@(!CanStart)">
+                ⚔ ENTER THE ARENA
+            </button>
+            @if (!CanStart)
+            {
+                <p class="spd-lobby-hint">Configure at least one word in the pool.</p>
+            }
+            <button class="spd-lobby-settings-gear" @onclick="ToggleSettings" title="Match Rules">
+                ⚙
+            </button>
+        }
+        else
+        {
+            <p class="spd-lobby-waiting">Waiting for <span class="spd-mono">@State.Host.Name</span> to open the arena…</p>
+        }
+    </div>
+
+    @if (IsHost)
+    {
+        @if (SettingsOpen)
+        {
+            <div class="spd-lobby-backdrop" @onclick="ToggleSettings"></div>
+        }
+        <aside class="spd-lobby-drawer @(SettingsOpen ? "spd-lobby-drawer-open" : "")">
+            <div class="spd-lobby-drawer-head">
+                <h3 class="spd-display spd-lobby-drawer-title">Match Rules</h3>
+                <button class="spd-lobby-drawer-close" @onclick="ToggleSettings" title="Close">✕</button>
+            </div>
+
+            <div class="spd-lobby-drawer-body">
+                <section>
+                    <h4 class="spd-lobby-section-title">Word Pool</h4>
+                    <div class="spd-lobby-field-grid">
+                        <label class="spd-lobby-field">
+                            <span>Source</span>
+                            <select @bind="State.WordPoolMode" @bind:after="NotifyChanged">
+                                <option value="@WordPoolMode.NytStandard">NYT Standard</option>
+                                <option value="@WordPoolMode.FullDictionary">Full Dictionary</option>
+                                <option value="@WordPoolMode.HostDefined">Host Defined</option>
+                                <option value="@WordPoolMode.CsvUpload">CSV Upload</option>
+                            </select>
+                        </label>
+                        <label class="spd-lobby-field">
+                            <span>Order</span>
+                            <select @bind="State.WordOrderMode" @bind:after="NotifyChanged">
+                                <option value="@WordOrderMode.RandomNoRepeats">Random (No Repeats)</option>
+                                <option value="@WordOrderMode.RandomWithRepeats">Random (With Repeats)</option>
+                                <option value="@WordOrderMode.ListOrder">List Order</option>
+                                <option value="@WordOrderMode.ReverseListOrder">Reverse List Order</option>
+                            </select>
+                        </label>
+                        <label class="spd-lobby-field spd-lobby-field-full">
+                            <span>Custom Words (one per line)</span>
+                            <textarea class="spd-lobby-textarea spd-mono"
+                                      rows="5"
+                                      value="@_customPoolText"
+                                      @oninput="OnCustomPoolChanged"></textarea>
+                        </label>
+                    </div>
+                </section>
+
+                <section>
+                    <h4 class="spd-lobby-section-title">Rounds &amp; Timing</h4>
+                    <div class="spd-lobby-field-grid">
+                        <label class="spd-lobby-field">
+                            <span>Total Rounds</span>
+                            <input type="number" min="1" max="50" @bind="State.TotalRounds" @bind:after="NotifyChanged" />
+                        </label>
+                        <label class="spd-lobby-field">
+                            <span>Round Timer (seconds)</span>
+                            <input type="number" min="30" max="600" step="5"
+                                   value="@((int)State.RoundTimer.TotalSeconds)"
+                                   @oninput="OnRoundTimerChanged"
+                                   disabled="@_unlimitedTimer" />
+                        </label>
+                        <label class="spd-lobby-field spd-lobby-field-row">
+                            <span>Unlimited Timer</span>
+                            <input type="checkbox" @bind="_unlimitedTimer" @bind:after="OnUnlimitedToggled" />
+                        </label>
+                        <label class="spd-lobby-field">
+                            <span>Transition Between Rounds</span>
+                            <input type="number" min="2" max="15" step="1"
+                                   value="@((int)State.TransitionDuration.TotalSeconds)"
+                                   @oninput="OnTransitionChanged" />
+                        </label>
+                    </div>
+                </section>
+
+                <section>
+                    <h4 class="spd-lobby-section-title">Win Condition</h4>
+                    <div class="spd-lobby-field-grid">
+                        <label class="spd-lobby-field">
+                            <span>Mode</span>
+                            <select @bind="State.WinCondition" @bind:after="NotifyChanged">
+                                <option value="@WinConditionMode.Sprinter">Sprinter (first to solve)</option>
+                                <option value="@WinConditionMode.Tactician">Tactician (fewest guesses)</option>
+                            </select>
+                        </label>
+                        <label class="spd-lobby-field">
+                            <span>Difficulty Multiplier (k)</span>
+                            <select @bind="State.DifficultyMultiplier" @bind:after="NotifyChanged">
+                                <option value="1.0">Gentle (k = 1)</option>
+                                <option value="2.0">Standard (k = 2)</option>
+                                <option value="3.0">Brutal (k = 3)</option>
+                            </select>
+                        </label>
+                        <label class="spd-lobby-field spd-lobby-field-row">
+                            <span>Hard Mode</span>
+                            <input type="checkbox" @bind="State.HardModeEnabled" @bind:after="NotifyChanged" />
+                        </label>
+                        <label class="spd-lobby-field spd-lobby-field-row">
+                            <span>Wait For All Players</span>
+                            <input type="checkbox" @bind="State.WaitForAll" @bind:after="NotifyChanged" />
+                        </label>
+                        <label class="spd-lobby-field spd-lobby-field-row">
+                            <span>Reveal Answer</span>
+                            <input type="checkbox" @bind="State.RevealAnswer" @bind:after="NotifyChanged" />
+                        </label>
+                        <label class="spd-lobby-field spd-lobby-field-row">
+                            <span>Dictionary Fallback</span>
+                            <input type="checkbox" @bind="State.AllowDictionaryFallback" @bind:after="NotifyChanged" />
+                        </label>
+                        <label class="spd-lobby-field spd-lobby-field-row">
+                            <span>Allow Compound Words</span>
+                            <input type="checkbox" @bind="State.AllowCompoundWords" @bind:after="NotifyChanged" />
+                        </label>
+                    </div>
+                </section>
+            </div>
+        </aside>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public SpardleState State { get; set; } = default!;
+    [Parameter] public string RoomCode { get; set; } = string.Empty;
+
+    private bool SettingsOpen { get; set; }
+    private bool _unlimitedTimer;
+    private string _customPoolText = string.Empty;
+
+    private bool IsHost => UserService.CurrentUser?.Id == State.Host.Id;
+    private bool CanStart => State.CustomWordPool.Count > 0
+        || State.WordPoolMode == WordPoolMode.NytStandard
+        || State.WordPoolMode == WordPoolMode.FullDictionary;
+
+    protected override void OnInitialized()
+    {
+        _customPoolText = string.Join('\n', State.CustomWordPool);
+        _unlimitedTimer = State.RoundTimer <= TimeSpan.Zero;
+    }
+
+    private void ToggleSettings() => SettingsOpen = !SettingsOpen;
+
+    private void NotifyChanged()
+    {
+        State.Execute(() => { });
+    }
+
+    private void OnCustomPoolChanged(ChangeEventArgs e)
+    {
+        _customPoolText = e.Value?.ToString() ?? string.Empty;
+        var words = _customPoolText
+            .Split(new[] { '\n', '\r', ',' }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(w => w.Trim().ToLowerInvariant())
+            .Where(w => w.Length is > 0 and <= 64)
+            .ToList();
+        State.CustomWordPool = words;
+        NotifyChanged();
+    }
+
+    private void OnRoundTimerChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out int seconds))
+        {
+            State.RoundTimer = TimeSpan.FromSeconds(Math.Clamp(seconds, 30, 600));
+            NotifyChanged();
+        }
+    }
+
+    private void OnUnlimitedToggled()
+    {
+        State.RoundTimer = _unlimitedTimer ? TimeSpan.Zero : TimeSpan.FromMinutes(3);
+        NotifyChanged();
+    }
+
+    private void OnTransitionChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out int seconds))
+        {
+            State.TransitionDuration = TimeSpan.FromSeconds(Math.Clamp(seconds, 2, 15));
+            NotifyChanged();
+        }
+    }
+
+    private async Task StartGame()
+    {
+        if (UserService.CurrentUser is null) return;
+        await GameEngine.StartAsync(UserService.CurrentUser, State);
+    }
+
+    private static string Initials(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return "?";
+        var parts = name.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length == 1) return char.ToUpperInvariant(parts[0][0]).ToString();
+        return $"{char.ToUpperInvariant(parts[0][0])}{char.ToUpperInvariant(parts[1][0])}";
+    }
+}

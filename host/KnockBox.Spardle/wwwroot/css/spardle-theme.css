@@ -1,0 +1,273 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   SPARDLE — "The Arena" theme
+   Bold. Competitive. Wordle with the gloves off.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:root {
+    /* ── Surfaces ──────────────────────────────────────────────────── */
+    --spd-bg-0: #070912;
+    --spd-bg-1: #0f1426;
+    --spd-bg-2: #1a1f3b;
+    --spd-bg-panel: rgba(22, 27, 51, 0.72);
+    --spd-bg-panel-solid: #161b33;
+    --spd-border: rgba(255, 255, 255, 0.08);
+    --spd-border-strong: rgba(255, 255, 255, 0.18);
+
+    /* ── Tile states ───────────────────────────────────────────────── */
+    --spd-correct: #14f195;
+    --spd-correct-ink: #042418;
+    --spd-correct-glow: rgba(20, 241, 149, 0.55);
+    --spd-present: #ffae00;
+    --spd-present-ink: #2a1900;
+    --spd-present-glow: rgba(255, 174, 0, 0.5);
+    --spd-absent: #2a2f4a;
+    --spd-absent-ink: rgba(244, 246, 255, 0.55);
+    --spd-empty: #161b33;
+    --spd-empty-border: rgba(255, 255, 255, 0.1);
+
+    /* ── Competitive accents ───────────────────────────────────────── */
+    --spd-player-a: #00d1ff;
+    --spd-player-b: #ff2e63;
+    --spd-player-c: #b97bff;
+    --spd-player-d: #ffde3a;
+    --spd-danger: #ff2e63;
+    --spd-warn: #ffae00;
+    --spd-gold: #ffd447;
+    --spd-silver: #cfd4e8;
+    --spd-bronze: #e08a4a;
+
+    /* ── Text ──────────────────────────────────────────────────────── */
+    --spd-ink: #f4f6ff;
+    --spd-ink-dim: rgba(244, 246, 255, 0.64);
+    --spd-ink-mute: rgba(244, 246, 255, 0.36);
+
+    /* ── Accessibility (high-contrast) ─────────────────────────────── */
+    --spd-hc-correct: #3b82f6;
+    --spd-hc-correct-glow: rgba(59, 130, 246, 0.55);
+    --spd-hc-present: #ef4444;
+    --spd-hc-present-glow: rgba(239, 68, 68, 0.55);
+
+    /* ── Typography ────────────────────────────────────────────────── */
+    --spd-font-display: "Bowlby One SC", "Bowlby One", "Anton", Impact, sans-serif;
+    --spd-font-tile: "JetBrains Mono", "IBM Plex Mono", "Courier New", monospace;
+    --spd-font-body: "Manrope", "Be Vietnam Pro", system-ui, sans-serif;
+}
+
+/* High-contrast mode swaps tile/key colors */
+.spd-hc {
+    --spd-correct: var(--spd-hc-correct);
+    --spd-correct-ink: #fff;
+    --spd-correct-glow: var(--spd-hc-correct-glow);
+    --spd-present: var(--spd-hc-present);
+    --spd-present-ink: #fff;
+    --spd-present-glow: var(--spd-hc-present-glow);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Global animations
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@keyframes spd-flip {
+    0%   { transform: rotateX(0);    filter: brightness(1); }
+    49%  { transform: rotateX(-90deg); filter: brightness(0.35); }
+    50%  { transform: rotateX(-90deg); filter: brightness(0.35); }
+    100% { transform: rotateX(0);    filter: brightness(1); }
+}
+
+@keyframes spd-shake {
+    0%, 100% { transform: translateX(0); }
+    15%      { transform: translateX(-7px); }
+    30%      { transform: translateX(6px); }
+    45%      { transform: translateX(-5px); }
+    60%      { transform: translateX(4px); }
+    75%      { transform: translateX(-2px); }
+    90%      { transform: translateX(1px); }
+}
+
+@keyframes spd-pulse-correct {
+    0%, 100% {
+        box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.8),
+                    0 0 0 0 var(--spd-correct-glow);
+    }
+    50% {
+        box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.8),
+                    0 0 24px 6px var(--spd-correct-glow);
+    }
+}
+
+@keyframes spd-pulse-danger {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(255, 46, 99, 0.6); }
+    50%      { box-shadow: 0 0 20px 6px rgba(255, 46, 99, 0.6); }
+}
+
+@keyframes spd-slam {
+    0%   { transform: scale(2.4) skewX(-12deg); opacity: 0; filter: blur(8px); letter-spacing: 0.4em; }
+    70%  { transform: scale(0.92) skewX(0);     opacity: 1; filter: blur(0);   letter-spacing: -0.01em; }
+    100% { transform: scale(1)    skewX(0);     opacity: 1; filter: blur(0);   letter-spacing: 0; }
+}
+
+@keyframes spd-slam-subtle {
+    0%   { transform: scale(1.6); opacity: 0; }
+    70%  { transform: scale(0.95); opacity: 1; }
+    100% { transform: scale(1);    opacity: 1; }
+}
+
+@keyframes spd-count-pop {
+    0%   { transform: scale(0.6); opacity: 0;  color: var(--spd-warn); }
+    40%  { transform: scale(1.2); opacity: 1;  color: var(--spd-ink); }
+    100% { transform: scale(1);   opacity: 1;  color: var(--spd-ink); }
+}
+
+@keyframes spd-row-current {
+    0%, 100% { box-shadow: inset 0 0 0 2px rgba(0, 209, 255, 0.35); }
+    50%      { box-shadow: inset 0 0 0 2px rgba(0, 209, 255, 0.9),
+                           0 0 18px rgba(0, 209, 255, 0.25); }
+}
+
+@keyframes spd-key-press {
+    0%   { transform: translate(0, 0); box-shadow: 3px 3px 0 #000; }
+    50%  { transform: translate(2px, 2px); box-shadow: 1px 1px 0 #000; }
+    100% { transform: translate(0, 0); box-shadow: 3px 3px 0 #000; }
+}
+
+@keyframes spd-bounce-in {
+    0%   { transform: scale(0.6); opacity: 0; }
+    60%  { transform: scale(1.1); opacity: 1; }
+    100% { transform: scale(1);   opacity: 1; }
+}
+
+@keyframes spd-drift {
+    0%   { background-position: 0 0; }
+    100% { background-position: 200px 200px; }
+}
+
+@keyframes spd-scan {
+    0%   { transform: translateX(-100%); opacity: 0; }
+    50%  { opacity: 0.7; }
+    100% { transform: translateX(100%);  opacity: 0; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Shared buttons (3D hard-shadow arcade)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.spd-btn {
+    font-family: var(--spd-font-display);
+    font-size: 0.95rem;
+    font-weight: 400;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    border: 3px solid #000;
+    border-radius: 4px;
+    box-shadow: 5px 5px 0 #000;
+    transition: transform 0.08s, box-shadow 0.08s, background-color 0.15s;
+    cursor: pointer;
+    padding: 12px 22px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    white-space: nowrap;
+    background: #fff;
+    color: #000;
+    user-select: none;
+}
+
+.spd-btn:hover:not(:disabled) {
+    transform: translate(-2px, -2px);
+    box-shadow: 7px 7px 0 #000;
+}
+
+.spd-btn:active:not(:disabled) {
+    transform: translate(3px, 3px);
+    box-shadow: 2px 2px 0 #000;
+}
+
+.spd-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    box-shadow: 2px 2px 0 #000;
+    transform: none;
+    filter: grayscale(40%);
+}
+
+.spd-btn-primary {
+    background: var(--spd-correct);
+    color: var(--spd-correct-ink);
+}
+
+.spd-btn-danger {
+    background: var(--spd-danger);
+    color: #fff;
+}
+
+.spd-btn-warn {
+    background: var(--spd-warn);
+    color: var(--spd-present-ink);
+}
+
+.spd-btn-ghost {
+    background: transparent;
+    color: var(--spd-ink);
+    border-color: var(--spd-border-strong);
+    box-shadow: none;
+}
+
+.spd-btn-ghost:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.06);
+    transform: none;
+    box-shadow: none;
+}
+
+.spd-btn-lg {
+    font-size: 1.3rem;
+    padding: 18px 36px;
+    box-shadow: 7px 7px 0 #000;
+}
+
+.spd-btn-lg:hover:not(:disabled) {
+    box-shadow: 9px 9px 0 #000;
+}
+
+.spd-btn-sm {
+    font-size: 0.75rem;
+    padding: 6px 12px;
+    box-shadow: 3px 3px 0 #000;
+    border-width: 2px;
+}
+
+.spd-btn-sm:hover:not(:disabled) {
+    box-shadow: 5px 5px 0 #000;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Shared chips / pills
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.spd-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 12px;
+    font-family: var(--spd-font-body);
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--spd-ink);
+    background: var(--spd-bg-panel);
+    border: 1px solid var(--spd-border-strong);
+    border-radius: 999px;
+}
+
+.spd-chip-correct { background: var(--spd-correct); color: var(--spd-correct-ink); border-color: transparent; }
+.spd-chip-warn    { background: var(--spd-warn);    color: var(--spd-present-ink); border-color: transparent; }
+.spd-chip-danger  { background: var(--spd-danger);  color: #fff; border-color: transparent; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Typography utility classes
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.spd-display { font-family: var(--spd-font-display); letter-spacing: 0.02em; }
+.spd-mono    { font-family: var(--spd-font-tile); }
+.spd-body    { font-family: var(--spd-font-body); }

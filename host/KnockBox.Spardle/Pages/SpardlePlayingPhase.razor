@@ -1,0 +1,59 @@
+@using KnockBox.Core.Services.State.Users
+@using KnockBox.Spardle
+@using KnockBox.Spardle.Components
+@using KnockBox.Spardle.Models
+@inject IUserService UserService
+
+<div class="spd-play">
+    <header class="spd-play-top">
+        <div class="spd-play-round">
+            <span class="spd-play-round-label">ROUND</span>
+            <span class="spd-play-round-value spd-display">@State.CurrentRound</span>
+            <span class="spd-play-round-total">/ @State.RoundQueue.Count</span>
+        </div>
+
+        <SpardleRoundTimer State="State" />
+
+        <button type="button"
+                class="spd-play-hc-toggle @(HighContrast ? "spd-play-hc-on" : "")"
+                @onclick="OnToggleContrast"
+                title="Toggle high-contrast colours">
+            <span class="spd-play-hc-dot"></span>
+            <span>HC</span>
+        </button>
+    </header>
+
+    <main class="spd-play-main">
+        <section class="spd-play-board">
+            <SpardleGrid State="State"
+                         CurrentUserId="@(UserService.CurrentUser?.Id ?? string.Empty)"
+                         CurrentGuess="@CurrentGuess"
+                         InvalidGuess="InvalidGuess"
+                         HighContrast="HighContrast" />
+
+            <SpardleKeyboard OnKeyPressed="OnKey"
+                             PlayerState="PlayerState"
+                             HighContrast="HighContrast" />
+        </section>
+
+        <aside class="spd-play-side">
+            <SpardleOpponentsPanel State="State" CurrentUserId="@(UserService.CurrentUser?.Id ?? string.Empty)" />
+        </aside>
+    </main>
+
+    <SpardleToast Message="@ToastMessage" Tone="ToastTone" />
+</div>
+
+@code {
+    [Parameter, EditorRequired] public SpardleState State { get; set; } = default!;
+    [Parameter] public string CurrentGuess { get; set; } = string.Empty;
+    [Parameter] public EventCallback<string> OnKey { get; set; }
+    [Parameter] public string? ToastMessage { get; set; }
+    [Parameter] public SpardleToast.ToastTone ToastTone { get; set; } = SpardleToast.ToastTone.Danger;
+    [Parameter] public bool InvalidGuess { get; set; }
+    [Parameter] public bool HighContrast { get; set; }
+    [Parameter] public EventCallback OnToggleContrast { get; set; }
+
+    private PlayerState? PlayerState =>
+        UserService.CurrentUser is { Id: var id } ? State.GetOrCreatePlayerState(id) : null;
+}
