@@ -1,0 +1,65 @@
+@page "/room/spardle/{ObfuscatedRoomCode}"
+@using KnockBox.Core.Components.Shared
+@using KnockBox.Spardle.Components
+@inherits DisposableComponent
+
+@if (GameState == null || UserService.CurrentUser == null)
+{
+    <p>Loading...</p>
+}
+else if (GameState.IsJoinable)
+{
+    <div class="lobby">
+        <h2>Spar-dle Lobby</h2>
+        <p>Room Code: @RoomCode</p>
+        @if (UserService.CurrentUser.Id == GameState.Host.Id)
+        {
+            <button @onclick="StartGame">Start Game</button>
+        }
+    </div>
+}
+else
+{
+    <div class="game-board">
+        <h3>Round @GameState.CurrentRound</h3>
+        @if (GameState.IsGameOver)
+        {
+            <h2>Game Over!</h2>
+        }
+        else
+        {
+            <SpardleGrid State="GameState" CurrentUserId="UserService.CurrentUser.Id" CurrentGuess="@_currentGuess" />
+            <SpardleKeyboard OnKeyPressed="HandleKeyPress" />
+        }
+    </div>
+}
+
+@code {
+    private async Task StartGame()
+    {
+        await GameEngine.StartAsync(UserService.CurrentUser!, GameState);
+    }
+
+    private string _currentGuess = "";
+
+    private void HandleKeyPress(string key)
+    {
+        if (key == "ENTER")
+        {
+            if (_currentGuess.Length == GameState.TargetWord.Length)
+            {
+                GameEngine.SubmitGuess(GameState, UserService.CurrentUser!, _currentGuess);
+                _currentGuess = "";
+            }
+        }
+        else if (key == "BACKSPACE" && _currentGuess.Length > 0)
+        {
+            _currentGuess = _currentGuess[..^1];
+        }
+        else if (key.Length == 1 && _currentGuess.Length < GameState.TargetWord.Length)
+        {
+            _currentGuess += key;
+        }
+        StateHasChanged();
+    }
+}

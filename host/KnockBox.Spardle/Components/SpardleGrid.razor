@@ -1,0 +1,53 @@
+@using KnockBox.Spardle.Models
+@using KnockBox.Spardle
+
+<div class="spardle-grid" style="display: flex; flex-direction: column; gap: 5px;">
+    @foreach (var guess in PlayerState.Guesses)
+    {
+        <div style="display: flex; gap: 5px;">
+            @for (int i = 0; i < guess.Word.Length; i++)
+            {
+                var statusClass = guess.Statuses[i] switch {
+                    LetterStatus.Correct => "bg-green-500",
+                    LetterStatus.Present => "bg-yellow-500",
+                    _ => "bg-gray-500"
+                };
+                <div class="tile @statusClass" style="width: 40px; height: 40px; border: 1px solid black; display: flex; align-items: center; justify-content: center; font-weight: bold; text-transform: uppercase;">
+                    @guess.Word[i]
+                </div>
+            }
+        </div>
+    }
+
+    @if (!PlayerState.HasFinishedRound && State.IsRoundActive)
+    {
+        <div style="display: flex; gap: 5px;">
+            @for (int i = 0; i < State.TargetWord.Length; i++)
+            {
+                <div class="tile" style="width: 40px; height: 40px; border: 1px solid black; display: flex; align-items: center; justify-content: center; font-weight: bold; text-transform: uppercase;">
+                    @(i < CurrentGuess.Length ? CurrentGuess[i] : ' ')
+                </div>
+            }
+        </div>
+        
+        // Empty rows up to max guesses
+        @for (int row = PlayerState.Guesses.Count + 1; row < KnockBox.Spardle.SpardleEngine.CalculateMaxGuesses(State.TargetWord.Length, State.DifficultyMultiplier); row++)
+        {
+            <div style="display: flex; gap: 5px;">
+                @for (int i = 0; i < State.TargetWord.Length; i++)
+                {
+                    <div class="tile" style="width: 40px; height: 40px; border: 1px solid gray; display: flex; align-items: center; justify-content: center;">
+                    </div>
+                }
+            </div>
+        }
+    }
+</div>
+
+@code {
+    [Parameter] public SpardleState State { get; set; } = default!;
+    [Parameter] public string CurrentUserId { get; set; } = default!;
+    [Parameter] public string CurrentGuess { get; set; } = "";
+
+    private PlayerState PlayerState => State.GetOrCreatePlayerState(CurrentUserId);
+}

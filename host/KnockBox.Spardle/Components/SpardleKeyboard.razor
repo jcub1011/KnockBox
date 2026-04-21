@@ -1,0 +1,32 @@
+<div class="spardle-keyboard" style="display: flex; flex-direction: column; gap: 5px; margin-top: 20px;">
+    @foreach (var row in _keys)
+    {
+        <div style="display: flex; gap: 5px; justify-content: center;">
+            @foreach (var key in row)
+            {
+                <button @onclick="() => HandleClick(key)" style="padding: 10px; min-width: 30px; font-weight: bold; text-transform: uppercase; cursor: pointer;">
+                    @key
+                </button>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public EventCallback<string> OnKeyPressed { get; set; }
+
+    private readonly string[][] _keys = new[]
+    {
+        new[] { "q", "w", "e", "r", "t", "y", "u", "i", "o", "p" },
+        new[] { "a", "s", "d", "f", "g", "h", "j", "k", "l" },
+        new[] { "ENTER", "z", "x", "c", "v", "b", "n", "m", "BACKSPACE" }
+    };
+
+    private async Task HandleClick(string key)
+    {
+        if (OnKeyPressed.HasDelegate)
+        {
+            await OnKeyPressed.InvokeAsync(key);
+        }
+    }
+}
