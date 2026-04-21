@@ -2,13 +2,14 @@
     display: flex;
     flex-direction: column;
     gap: 4px;
-    min-width: 220px;
-    padding: 8px 12px;
+    min-width: clamp(150px, 18vw, 220px);
+    padding: clamp(6px, 0.8vw, 8px) clamp(10px, 1.2vw, 12px);
     background: var(--spd-bg-panel);
     border: 1px solid var(--spd-border-strong);
     border-radius: 6px;
     font-family: var(--spd-font-tile);
     transition: border-color 0.2s, box-shadow 0.2s;
+    flex-shrink: 1;
 }
 
 .spd-timer-unlimited {
@@ -22,13 +23,13 @@
 }
 
 .spd-timer-unlimited .spd-timer-icon {
-    font-size: 1.4rem;
+    font-size: clamp(1.1rem, 1.4vw, 1.4rem);
     color: var(--spd-correct);
 }
 
 .spd-timer-bar {
     position: relative;
-    height: 10px;
+    height: clamp(6px, 1vh, 10px);
     background: rgba(0, 0, 0, 0.45);
     border-radius: 999px;
     overflow: hidden;
@@ -48,13 +49,13 @@
     justify-content: space-between;
     gap: 6px;
     font-weight: 700;
-    font-size: 1rem;
+    font-size: clamp(0.85rem, 1.2vw, 1rem);
     letter-spacing: 0.08em;
     color: var(--spd-ink);
 }
 
 .spd-timer-icon {
-    font-size: 1.1rem;
+    font-size: clamp(0.95rem, 1.2vw, 1.1rem);
 }
 
 .spd-timer-value {
@@ -69,4 +70,14 @@
 
 .spd-timer-urgent .spd-timer-value {
     color: var(--spd-danger);
+}
+
+@media (max-width: 480px) {
+    .spd-timer {
+        min-width: 0;
+        flex: 1;
+    }
+    .spd-timer-digits {
+        font-size: 0.8rem;
+    }
 }

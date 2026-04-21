@@ -1,33 +1,39 @@
 .spd-toast-holder {
     position: fixed;
-    bottom: 28px;
+    bottom: max(clamp(16px, 3vh, 28px), calc(env(safe-area-inset-bottom) + 16px));
     left: 50%;
     transform: translateX(-50%);
     z-index: 40;
     pointer-events: none;
+    width: min(92vw, 520px);
+    display: flex;
+    justify-content: center;
 }
 
 .spd-toast {
     display: inline-flex;
     align-items: center;
     gap: 10px;
-    padding: 12px 22px;
+    padding: clamp(8px, 1.2vw, 12px) clamp(14px, 2vw, 22px);
     background: var(--spd-bg-panel-solid);
     border: 2px solid var(--spd-danger);
     border-radius: 6px;
     font-family: var(--spd-font-display);
-    font-size: 0.95rem;
+    font-size: clamp(0.8rem, 1.2vw, 0.95rem);
     letter-spacing: 0.08em;
     text-transform: uppercase;
     color: var(--spd-ink);
     box-shadow: 5px 5px 0 rgba(0, 0, 0, 0.8);
     animation: spd-slam-subtle 0.3s ease-out both;
+    max-width: 100%;
+    text-align: center;
 }
 
 .spd-toast-icon {
     font-family: var(--spd-font-tile);
     font-size: 1.1rem;
     font-weight: 900;
+    flex-shrink: 0;
 }
 
 .spd-toast-danger {

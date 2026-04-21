@@ -1,12 +1,12 @@
 .spd-opp-panel {
     display: flex;
     flex-direction: column;
-    gap: 12px;
-    padding: 14px;
+    gap: clamp(8px, 1vw, 12px);
+    padding: clamp(10px, 1.2vw, 14px);
     background: var(--spd-bg-panel);
     border: 1px solid var(--spd-border);
     border-radius: 8px;
-    min-width: 240px;
+    min-width: 0;
 }
 
 .spd-opp-heading {
@@ -14,7 +14,7 @@
     align-items: center;
     gap: 8px;
     font-family: var(--spd-font-display);
-    font-size: 0.85rem;
+    font-size: clamp(0.75rem, 1vw, 0.85rem);
     letter-spacing: 0.22em;
     color: var(--spd-ink-dim);
     padding-bottom: 6px;
@@ -36,13 +36,14 @@
     display: flex;
     flex-direction: column;
     gap: 8px;
-    padding: 12px 14px;
+    padding: clamp(8px, 1vw, 12px) clamp(10px, 1.2vw, 14px);
     background: var(--spd-bg-panel-solid);
     border: 1px solid var(--spd-border);
     border-left-width: 4px;
     border-radius: 6px;
     transition: transform 0.15s, border-color 0.2s;
     animation: spd-slam-subtle 0.25s ease-out both;
+    min-width: 0;
 }
 
 .spd-opp-a { border-left-color: var(--spd-player-a); }
@@ -53,28 +54,31 @@
 .spd-opp-top {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: clamp(6px, 1vw, 10px);
+    min-width: 0;
 }
 
 .spd-opp-avatar {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 30px;
-    height: 30px;
+    width: clamp(26px, 3.2vw, 34px);
+    height: clamp(26px, 3.2vw, 34px);
+    flex-shrink: 0;
     background: rgba(0, 0, 0, 0.4);
     border: 2px solid #000;
     border-radius: 50%;
     font-family: var(--spd-font-display);
-    font-size: 0.85rem;
+    font-size: clamp(0.75rem, 1vw, 0.85rem);
     color: var(--spd-ink);
 }
 
 .spd-opp-name {
     flex: 1;
+    min-width: 0;
     font-family: var(--spd-font-body);
     font-weight: 700;
-    font-size: 0.95rem;
+    font-size: clamp(0.85rem, 1.1vw, 0.95rem);
     color: var(--spd-ink);
     white-space: nowrap;
     overflow: hidden;
@@ -82,23 +86,25 @@
 }
 
 .spd-opp-count {
-    font-size: 0.85rem;
+    font-size: clamp(0.75rem, 1vw, 0.85rem);
     font-weight: 700;
     color: var(--spd-ink-dim);
+    flex-shrink: 0;
 }
 
 .spd-opp-pips {
     display: flex;
-    gap: 4px;
+    gap: clamp(3px, 0.4vw, 4px);
     flex-wrap: wrap;
 }
 
 .spd-opp-pip {
-    width: 10px;
-    height: 10px;
+    width: clamp(7px, 0.9vw, 11px);
+    height: clamp(7px, 0.9vw, 11px);
     border-radius: 2px;
     background: var(--spd-empty);
     border: 1px solid var(--spd-empty-border);
+    flex-shrink: 0;
 }
 
 .spd-opp-pip-correct { background: var(--spd-correct); border-color: transparent; box-shadow: 0 0 6px var(--spd-correct-glow); }
@@ -109,7 +115,7 @@
 
 .spd-opp-status {
     font-family: var(--spd-font-display);
-    font-size: 0.75rem;
+    font-size: clamp(0.65rem, 0.9vw, 0.75rem);
     letter-spacing: 0.15em;
     padding: 3px 10px;
     border-radius: 3px;
@@ -136,7 +142,7 @@
     display: flex;
     flex-direction: column;
     gap: 2px;
-    padding: 10px 12px;
+    padding: clamp(8px, 1vw, 10px) clamp(10px, 1.2vw, 12px);
     margin-top: 4px;
     background: linear-gradient(135deg, rgba(0, 209, 255, 0.18), rgba(255, 46, 99, 0.12));
     border: 1px solid var(--spd-border-strong);
@@ -145,13 +151,68 @@
 
 .spd-opp-score-label {
     font-family: var(--spd-font-display);
-    font-size: 0.7rem;
+    font-size: clamp(0.6rem, 0.8vw, 0.7rem);
     letter-spacing: 0.2em;
     color: var(--spd-ink-dim);
 }
 
 .spd-opp-score-value {
-    font-size: 2rem;
+    font-size: clamp(1.4rem, 2.4vw, 2rem);
     line-height: 1;
     color: var(--spd-ink);
+}
+
+/* ── Horizontal-strip mode for narrow viewports ─────────────────────
+   When the sidebar collapses into a top strip above the board, cards
+   flow horizontally and can be scrolled. The score card docks to the
+   left so "YOUR SCORE" stays visible.
+*/
+
+@media (max-width: 1024px) {
+    .spd-opp-panel {
+        flex-direction: row;
+        align-items: stretch;
+        gap: 10px;
+        padding: 8px 10px;
+        overflow-x: auto;
+        scrollbar-width: thin;
+    }
+    .spd-opp-heading {
+        display: none;
+    }
+    .spd-opp-empty {
+        align-self: center;
+        padding: 0 10px;
+        white-space: nowrap;
+    }
+    .spd-opp-card {
+        flex: 0 0 auto;
+        min-width: 180px;
+        max-width: 220px;
+    }
+    .spd-opp-score {
+        flex: 0 0 auto;
+        min-width: 120px;
+        margin-top: 0;
+        order: -1;
+    }
+    .spd-opp-score-value {
+        font-size: 1.4rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .spd-opp-panel {
+        padding: 6px 8px;
+    }
+    .spd-opp-card {
+        min-width: 160px;
+        padding: 8px 10px;
+    }
+    .spd-opp-score {
+        min-width: 100px;
+    }
+    .spd-opp-score-value {
+        font-size: 1.2rem;
+    }
 }

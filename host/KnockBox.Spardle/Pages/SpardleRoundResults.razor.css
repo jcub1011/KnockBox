@@ -1,11 +1,13 @@
 .spd-results {
     position: relative;
-    min-height: 100vh;
+    height: 100%;
+    min-height: 0;
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: center;
-    padding: 24px 16px;
+    padding: clamp(12px, 2vh, 24px) clamp(10px, 2vw, 16px);
     font-family: var(--spd-font-body);
+    overflow-y: auto;
 }
 
 .spd-results-scrim {
@@ -13,6 +15,7 @@
     inset: 0;
     background: radial-gradient(ellipse at center, rgba(7, 9, 18, 0.4), rgba(7, 9, 18, 0.92));
     z-index: 0;
+    pointer-events: none;
 }
 
 .spd-results-card {
@@ -20,7 +23,8 @@
     z-index: 1;
     width: 100%;
     max-width: 760px;
-    padding: 28px 28px 20px;
+    padding: clamp(16px, 2.5vw, 28px) clamp(16px, 2.5vw, 28px) clamp(14px, 2vw, 20px);
+    margin: auto 0;
     background: var(--spd-bg-1);
     border: 2px solid var(--spd-border-strong);
     border-radius: 14px;
@@ -28,26 +32,28 @@
     animation: spd-slam 0.55s cubic-bezier(0.16, 1, 0.3, 1) both;
     display: flex;
     flex-direction: column;
-    gap: 22px;
+    gap: clamp(14px, 2vw, 22px);
 }
 
 .spd-results-head {
     display: flex;
     justify-content: space-between;
     align-items: baseline;
+    gap: 12px;
+    flex-wrap: wrap;
     border-bottom: 2px solid var(--spd-border-strong);
     padding-bottom: 12px;
 }
 
 .spd-results-head-label {
-    font-size: 1.5rem;
+    font-size: clamp(1.1rem, 2vw, 1.5rem);
     letter-spacing: 0.16em;
     color: var(--spd-warn);
     text-shadow: 2px 2px 0 #000;
 }
 
 .spd-results-head-status {
-    font-size: 0.9rem;
+    font-size: clamp(0.75rem, 1vw, 0.9rem);
     letter-spacing: 0.35em;
     color: var(--spd-ink-dim);
 }
@@ -62,7 +68,7 @@
 }
 
 .spd-results-answer-label {
-    font-size: 0.75rem;
+    font-size: clamp(0.65rem, 0.9vw, 0.75rem);
     letter-spacing: 0.3em;
     color: var(--spd-ink-dim);
 }
@@ -71,19 +77,20 @@
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
-    gap: 8px;
+    gap: clamp(4px, 1vw, 8px);
+    max-width: 100%;
 }
 
 .spd-results-tile {
-    width: 56px;
-    height: 56px;
+    width: clamp(34px, 5vw, 56px);
+    height: clamp(34px, 5vw, 56px);
     display: flex;
     align-items: center;
     justify-content: center;
     background: var(--spd-correct);
     color: var(--spd-correct-ink);
     font-family: var(--spd-font-tile);
-    font-size: 1.8rem;
+    font-size: clamp(1rem, 2vw, 1.8rem);
     font-weight: 700;
     border: 2px solid #000;
     border-radius: 4px;
@@ -98,23 +105,24 @@
     gap: 6px;
 }
 
-.spd-results-board-head {
+.spd-results-board-head,
+.spd-results-row {
     display: grid;
-    grid-template-columns: 60px 1fr 80px 80px 90px;
-    gap: 10px;
-    padding: 4px 12px;
+    grid-template-columns: auto minmax(0, 1fr) auto auto auto;
+    gap: clamp(6px, 1vw, 10px);
+    padding: 10px clamp(8px, 1.5vw, 12px);
+    align-items: center;
+}
+
+.spd-results-board-head {
+    padding-block: 4px;
     font-family: var(--spd-font-display);
-    font-size: 0.7rem;
+    font-size: clamp(0.62rem, 0.85vw, 0.7rem);
     letter-spacing: 0.2em;
     color: var(--spd-ink-mute);
 }
 
 .spd-results-row {
-    display: grid;
-    grid-template-columns: 60px 1fr 80px 80px 90px;
-    gap: 10px;
-    align-items: center;
-    padding: 10px 12px;
     background: var(--spd-bg-panel-solid);
     border: 1px solid var(--spd-border);
     border-radius: 6px;
@@ -131,14 +139,15 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 40px;
-    height: 40px;
+    width: clamp(32px, 4vw, 40px);
+    height: clamp(32px, 4vw, 40px);
     font-family: var(--spd-font-display);
-    font-size: 1.3rem;
+    font-size: clamp(1rem, 1.4vw, 1.3rem);
     border: 2px solid #000;
     border-radius: 50%;
     background: var(--spd-bg-2);
     color: var(--spd-ink);
+    flex-shrink: 0;
 }
 
 .spd-results-rank-gold   { background: var(--spd-gold);   color: #2a2000; box-shadow: 0 0 16px rgba(255, 212, 71, 0.55); }
@@ -149,15 +158,18 @@
 .spd-results-name {
     font-family: var(--spd-font-body);
     font-weight: 700;
+    font-size: clamp(0.85rem, 1.2vw, 1rem);
     color: var(--spd-ink);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    min-width: 0;
 }
 
 .spd-results-guesses {
     color: var(--spd-ink-dim);
-    font-size: 0.95rem;
+    font-size: clamp(0.8rem, 1vw, 0.95rem);
+    font-variant-numeric: tabular-nums;
 }
 
 .spd-results-points {
@@ -165,9 +177,9 @@
 }
 
 .spd-results-points-chip {
-    padding: 4px 10px;
+    padding: 4px clamp(6px, 1vw, 10px);
     font-family: var(--spd-font-display);
-    font-size: 0.85rem;
+    font-size: clamp(0.72rem, 1vw, 0.85rem);
     background: var(--spd-correct);
     color: var(--spd-correct-ink);
     border: 2px solid #000;
@@ -175,6 +187,7 @@
     box-shadow: 2px 2px 0 #000;
     animation: spd-bounce-in 0.45s ease-out both;
     animation-delay: calc(var(--row-idx, 0) * 80ms + 0.4s);
+    white-space: nowrap;
 }
 
 .spd-results-points-zero {
@@ -185,9 +198,10 @@
 }
 
 .spd-results-total {
-    font-size: 1.4rem;
+    font-size: clamp(1.05rem, 1.6vw, 1.4rem);
     color: var(--spd-ink);
     text-align: right;
+    font-variant-numeric: tabular-nums;
 }
 
 /* ── Next-round countdown ──────────────────────────────────────────── */
@@ -196,35 +210,34 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 14px;
-    padding: 12px;
+    gap: clamp(10px, 1.5vw, 14px);
+    padding: clamp(10px, 1.2vw, 12px);
     background: rgba(0, 0, 0, 0.35);
     border: 1px dashed var(--spd-border-strong);
     border-radius: 6px;
+    flex-wrap: wrap;
 }
 
 .spd-results-next-label {
-    font-size: 0.8rem;
+    font-size: clamp(0.7rem, 0.9vw, 0.8rem);
     letter-spacing: 0.28em;
     color: var(--spd-ink-dim);
 }
 
 .spd-results-next-digit {
-    font-size: 2rem;
+    font-size: clamp(1.4rem, 2.4vw, 2rem);
     color: var(--spd-correct);
     text-shadow: 2px 2px 0 #000;
     animation: spd-count-pop 0.4s ease-out both;
 }
 
-@media (max-width: 600px) {
+@media (max-width: 480px) {
     .spd-results-board-head,
     .spd-results-row {
-        grid-template-columns: 44px 1fr 60px 70px 70px;
         gap: 6px;
+        padding: 8px;
     }
-    .spd-results-tile {
-        width: 42px;
-        height: 42px;
-        font-size: 1.3rem;
+    .spd-results-answer {
+        gap: 4px;
     }
 }
