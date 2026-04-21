@@ -7,7 +7,7 @@ namespace KnockBox.SpardleTests.Unit;
 [TestClass]
 public class WordListServiceTests
 {
-    private static WordListService _service = default!;
+    private static IWordListService _service = default!;
 
     [ClassInitialize]
     public static void ClassInit(TestContext _)
@@ -16,35 +16,14 @@ public class WordListServiceTests
     }
 
     [TestMethod]
-    public void Ctor_LoadsBothFiles_FromDeployedDataDir()
-    {
-        Assert.IsGreaterThan(9000, _service.GetFullDictionary().Count);
-        Assert.IsGreaterThan(2000, _service.GetTargetWordPool(WordPoolMode.NytStandard).Count);
-    }
-
-    [TestMethod]
-    public void FullDictionary_ContainsAllNytWords()
-    {
-        var full = _service.GetFullDictionary();
-        var ny = _service.GetTargetWordPool(WordPoolMode.NytStandard);
-
-        foreach (var word in ny)
-        {
-            Assert.Contains(word, full, $"NY word '{word}' missing from merged full dictionary.");
-        }
-    }
-
-    [TestMethod]
     public void IsValidWord_ReturnsTrue_ForGoogleCommonWord()
     {
-        // "the" is in google-10000 but almost certainly not a NY 5-letter answer.
         Assert.IsTrue(_service.IsValidWord("the"));
     }
 
     [TestMethod]
     public void IsValidWord_ReturnsTrue_ForNyWord()
     {
-        // "aback" is the first NY entry; verifies NY words are included after merge.
         Assert.IsTrue(_service.IsValidWord("aback"));
     }
 
@@ -64,24 +43,114 @@ public class WordListServiceTests
     }
 
     [TestMethod]
-    public void GetTargetWordPool_NytStandard_ExcludesGoogleOnlyWords()
+    public void IsValidWord_AcceptsSpanFromSubstringRange()
     {
-        var ny = _service.GetTargetWordPool(WordPoolMode.NytStandard);
-        // "the" is not a valid 5-letter NYT answer.
-        Assert.DoesNotContain("the", ny);
+        ReadOnlySpan<char> span = "thesun".AsSpan(0, 3);
+        Assert.IsTrue(_service.IsValidWord(span));
     }
 
     [TestMethod]
-    public void GetTargetWordPool_FullDictionary_ReturnsMergedSet()
+    public void IsInPool_NytStandard_ContainsAback()
     {
-        Assert.AreSame(_service.GetFullDictionary(), _service.GetTargetWordPool(WordPoolMode.FullDictionary));
+        Assert.IsTrue(_service.IsInPool(WordPoolMode.NytStandard, "aback"));
+    }
+
+    [TestMethod]
+    public void IsInPool_NytStandard_ExcludesGoogleOnlyWords()
+    {
+        Assert.IsFalse(_service.IsInPool(WordPoolMode.NytStandard, "the"));
+    }
+
+    [TestMethod]
+    public void IsInPool_FullDictionary_ContainsNytAndGoogleWords()
+    {
+        Assert.IsTrue(_service.IsInPool(WordPoolMode.FullDictionary, "aback"));
+        Assert.IsTrue(_service.IsInPool(WordPoolMode.FullDictionary, "the"));
     }
 
     [TestMethod]
     [DataRow(WordPoolMode.HostDefined)]
     [DataRow(WordPoolMode.CsvUpload)]
-    public void GetTargetWordPool_UnscopedModes_ReturnEmpty(WordPoolMode mode)
+    public void IsInPool_UnbackedModes_ReturnFalse(WordPoolMode mode)
     {
-        Assert.IsEmpty(_service.GetTargetWordPool(mode));
+        Assert.IsFalse(_service.IsInPool(mode, "apple"));
+    }
+
+    [TestMethod]
+    public void GetWordCount_NytStandard_HasAllFiveLetterAnswers()
+    {
+        Assert.IsGreaterThan(2000, _service.GetWordCount(WordPoolMode.NytStandard, 5));
+    }
+
+    [TestMethod]
+    public void GetWordCount_FullDictionary_HasMultipleLengths()
+    {
+        Assert.IsGreaterThan(0, _service.GetWordCount(WordPoolMode.FullDictionary, 3));
+        Assert.IsGreaterThan(0, _service.GetWordCount(WordPoolMode.FullDictionary, 5));
+        Assert.IsGreaterThan(0, _service.GetWordCount(WordPoolMode.FullDictionary, 7));
+    }
+
+    [TestMethod]
+    public void GetWordCount_LengthWithNoWords_ReturnsZero()
+    {
+        Assert.AreEqual(0, _service.GetWordCount(WordPoolMode.NytStandard, 100));
+    }
+
+    [TestMethod]
+    public void GetWordCount_UnbackedMode_ReturnsZero()
+    {
+        Assert.AreEqual(0, _service.GetWordCount(WordPoolMode.HostDefined, 5));
+    }
+
+    [TestMethod]
+    public void GetWord_ReturnsValidWordOfRequestedLength()
+    {
+        int count = _service.GetWordCount(WordPoolMode.NytStandard, 5);
+        var firstBytes = _service.GetWord(WordPoolMode.NytStandard, 5, 0);
+        Assert.AreEqual(5, firstBytes.Length);
+        var first = System.Text.Encoding.ASCII.GetString(firstBytes);
+        Assert.IsTrue(_service.IsInPool(WordPoolMode.NytStandard, first));
+
+        var lastBytes = _service.GetWord(WordPoolMode.NytStandard, 5, count - 1);
+        Assert.AreEqual(5, lastBytes.Length);
+        var last = System.Text.Encoding.ASCII.GetString(lastBytes);
+        Assert.IsTrue(_service.IsInPool(WordPoolMode.NytStandard, last));
+    }
+
+    [TestMethod]
+    public void GetWord_FirstNytEntryIsAback()
+    {
+        var bytes = _service.GetWord(WordPoolMode.NytStandard, 5, 0);
+        Assert.AreEqual("aback", System.Text.Encoding.ASCII.GetString(bytes));
+    }
+
+    [TestMethod]
+    public void GetWordAsString_DecodesSpanToString()
+    {
+        var word = _service.GetWordAsString(WordPoolMode.NytStandard, 5, 0);
+        Assert.AreEqual("aback", word);
+    }
+
+    [TestMethod]
+    public void GetWord_OutOfRangeIndex_Throws()
+    {
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(
+            () => { _ = _service.GetWord(WordPoolMode.NytStandard, 5, -1); });
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(
+            () => { _ = _service.GetWord(WordPoolMode.NytStandard, 5, int.MaxValue); });
+    }
+
+    [TestMethod]
+    public void GetWord_UnbackedMode_Throws()
+    {
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(
+            () => { _ = _service.GetWord(WordPoolMode.HostDefined, 5, 0); });
+    }
+
+    [TestMethod]
+    public void GetWord_LengthWithNoWords_Throws()
+    {
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(
+            () => { _ = _service.GetWord(WordPoolMode.NytStandard, 100, 0); });
     }
 }

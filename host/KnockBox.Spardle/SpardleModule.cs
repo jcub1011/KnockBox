@@ -13,7 +13,7 @@ public class SpardleModule : IGameModule
 
     public void RegisterServices(IServiceCollection services)
     {
-        services.AddSingleton<Services.WordListService>();
+        services.AddSingleton<Services.IWordListService, Services.WordListService>();
         services.AddGameEngine<SpardleEngine>(RouteIdentifier);
     }
 

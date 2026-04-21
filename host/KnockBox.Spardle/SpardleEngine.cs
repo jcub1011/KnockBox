@@ -8,7 +8,7 @@ using Microsoft.Extensions.Logging;
 
 namespace KnockBox.Spardle;
 
-public class SpardleEngine(WordListService wordListService, ILoggerFactory loggerFactory) : AbstractGameEngine(1, 20)
+public class SpardleEngine(IWordListService wordListService, ILoggerFactory loggerFactory) : AbstractGameEngine(1, 20)
 {
     private readonly ILogger _logger = loggerFactory.CreateLogger<SpardleEngine>();
 
@@ -350,8 +350,7 @@ public class SpardleEngine(WordListService wordListService, ILoggerFactory logge
 
         if (!state.AllowDictionaryFallback)
         {
-            var pool = wordListService.GetTargetWordPool(state.WordPoolMode);
-            if (!state.CustomWordPool.Contains(guess) && !pool.Contains(guess))
+            if (!state.CustomWordPool.Contains(guess) && !wordListService.IsInPool(state.WordPoolMode, guess))
                 return Result.FromError("Word not in list.");
         }
         else
@@ -360,7 +359,7 @@ public class SpardleEngine(WordListService wordListService, ILoggerFactory logge
             {
                 if (state.AllowCompoundWords)
                 {
-                    if (!IsValidCompoundWord(guess, wordListService.GetFullDictionary()))
+                    if (!IsValidCompoundWord(guess, wordListService))
                         return Result.FromError("Not a valid word or compound word.");
                 }
                 else
@@ -373,11 +372,12 @@ public class SpardleEngine(WordListService wordListService, ILoggerFactory logge
         return Result.Success;
     }
 
-    private bool IsValidCompoundWord(string word, IReadOnlySet<string> dictionary)
+    private static bool IsValidCompoundWord(string word, IWordListService service)
     {
         int n = word.Length;
         if (n == 0) return true;
 
+        var span = word.AsSpan();
         bool[] dp = new bool[n + 1];
         dp[0] = true;
 
@@ -385,7 +385,7 @@ public class SpardleEngine(WordListService wordListService, ILoggerFactory logge
         {
             for (int j = 0; j < i; j++)
             {
-                if (dp[j] && dictionary.Contains(word.Substring(j, i - j)))
+                if (dp[j] && service.IsValidWord(span.Slice(j, i - j)))
                 {
                     dp[i] = true;
                     break;
