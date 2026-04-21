@@ -74,10 +74,29 @@
     box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.7);
 }
 
-/* Submitted — flip + color */
+/* Submitted — flip + color (color animation is synchronized with the flip
+   midpoint so the final color is hidden until the tile is edge-on) */
 .spd-tile-flipped {
-    animation: spd-flip 0.55s ease-in-out both;
+    animation-name: spd-flip;
+    animation-duration: 0.55s;
+    animation-timing-function: ease-in-out;
+    animation-fill-mode: both;
     animation-delay: calc(var(--col, 0) * 110ms);
+}
+
+.spd-tile-flipped.spd-tile-correct {
+    animation-name: spd-flip, spd-reveal-correct;
+    animation-duration: 0.55s, 0.55s;
+}
+
+.spd-tile-flipped.spd-tile-present {
+    animation-name: spd-flip, spd-reveal-present;
+    animation-duration: 0.55s, 0.55s;
+}
+
+.spd-tile-flipped.spd-tile-absent {
+    animation-name: spd-flip, spd-reveal-absent;
+    animation-duration: 0.55s, 0.55s;
 }
 
 .spd-tile-correct {
