@@ -43,6 +43,13 @@ public class SpardleState(User host, ILogger logger) : AbstractGameState(host, l
     // Player tracking
     public Dictionary<string, PlayerState> PlayerStates { get; } = [];
 
+    // True when the host is playing alongside everyone else; false when the host is a
+    // display-only observer (set at StartAsync time based on whether any other players
+    // joined, then locked for the duration of the game).
+    public bool HostIsParticipant { get; private set; } = true;
+
+    internal void SetHostIsParticipant(bool value) => HostIsParticipant = value;
+
     public PlayerState GetOrCreatePlayerState(string userId)
     {
         if (!PlayerStates.TryGetValue(userId, out var state))

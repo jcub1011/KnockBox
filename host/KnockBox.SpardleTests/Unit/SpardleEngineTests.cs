@@ -169,6 +169,140 @@ public class SpardleEngineTests
     }
 
     // ───────────────────────────────────────────────────────────────────────
+    // Host-as-observer mode
+    // ───────────────────────────────────────────────────────────────────────
+
+    [TestMethod]
+    public async Task StartAsync_HostSolo_CreatesHostPlayerState()
+    {
+        var (state, host) = await CreateStateAsync();
+        state.TotalRounds = 1;
+        state.CustomWordPool = new List<string> { "apple" };
+
+        await _engine.StartAsync(host, state);
+
+        Assert.IsTrue(state.HostIsParticipant);
+        Assert.IsTrue(state.PlayerStates.ContainsKey(host.Id));
+    }
+
+    [TestMethod]
+    public async Task StartAsync_WithOtherPlayers_HostBecomesObserver()
+    {
+        var (state, host, players) = await CreateStateWithPlayersAsync(1);
+        state.TotalRounds = 1;
+        state.CustomWordPool = new List<string> { "apple" };
+
+        await _engine.StartAsync(host, state);
+
+        Assert.IsFalse(state.HostIsParticipant);
+        Assert.IsFalse(state.PlayerStates.ContainsKey(host.Id));
+        Assert.IsTrue(state.PlayerStates.ContainsKey(players[0].Id));
+    }
+
+    [TestMethod]
+    public async Task SubmitGuess_ObserverHost_ReturnsError()
+    {
+        var (state, host, _) = await CreateStateWithPlayersAsync(1);
+        state.TotalRounds = 1;
+        state.TransitionDuration = TimeSpan.FromMilliseconds(80);
+        state.RoundTimer = TimeSpan.FromSeconds(30);
+        state.CustomWordPool = new List<string> { "apple" };
+        state.WordOrderMode = WordOrderMode.ListOrder;
+
+        await _engine.StartAsync(host, state);
+        await WaitForPhaseAsync(state, GamePhase.Playing, timeoutMs: 1500);
+
+        var result = _engine.SubmitGuess(state, host, "apple");
+
+        Assert.IsFalse(result.IsSuccess);
+        Assert.IsTrue(result.TryGetFailure(out var failure));
+        StringAssert.Contains(failure.PublicMessage, "observing");
+        Assert.IsFalse(state.PlayerStates.ContainsKey(host.Id), "host PlayerState must not be materialized by a rejected guess");
+    }
+
+    [TestMethod]
+    public async Task SubmitGuess_SoloHost_PlaysNormally()
+    {
+        var (state, host) = await CreateStateAsync();
+        state.TotalRounds = 1;
+        state.TransitionDuration = TimeSpan.FromMilliseconds(80);
+        state.RoundTimer = TimeSpan.FromSeconds(30);
+        state.WinCondition = WinConditionMode.Sprinter;
+        state.CustomWordPool = new List<string> { "apple" };
+        state.WordOrderMode = WordOrderMode.ListOrder;
+
+        await _engine.StartAsync(host, state);
+        await WaitForPhaseAsync(state, GamePhase.Playing, timeoutMs: 1500);
+
+        var result = _engine.SubmitGuess(state, host, "apple");
+
+        Assert.IsTrue(result.IsSuccess);
+        Assert.AreEqual(GamePhase.RoundResults, state.Phase);
+        var outcome = state.RoundHistory[0].Outcomes.Single(o => o.UserId == host.Id);
+        Assert.AreEqual(1, outcome.Placement);
+        Assert.AreEqual(10, outcome.PointsAwarded);
+    }
+
+    [TestMethod]
+    public async Task BuildOutcomes_ObserverMode_ExcludesHost()
+    {
+        var (state, host, players) = await CreateStateWithPlayersAsync(1);
+        state.TotalRounds = 1;
+        state.TransitionDuration = TimeSpan.FromMilliseconds(80);
+        state.RoundTimer = TimeSpan.FromSeconds(30);
+        state.WinCondition = WinConditionMode.Sprinter;
+        state.CustomWordPool = new List<string> { "apple" };
+        state.WordOrderMode = WordOrderMode.ListOrder;
+
+        await _engine.StartAsync(host, state);
+        await WaitForPhaseAsync(state, GamePhase.Playing, timeoutMs: 1500);
+
+        var submitResult = _engine.SubmitGuess(state, players[0], "apple");
+        Assert.IsTrue(submitResult.IsSuccess);
+
+        Assert.AreEqual(1, state.RoundHistory[0].Outcomes.Count);
+        Assert.AreEqual(players[0].Id, state.RoundHistory[0].Outcomes[0].UserId);
+        Assert.IsFalse(state.RoundHistory[0].Outcomes.Any(o => o.UserId == host.Id));
+    }
+
+    [TestMethod]
+    public async Task CheckRoundEnd_ObserverMode_EndsOnParticipantCompletion()
+    {
+        var (state, host, players) = await CreateStateWithPlayersAsync(1);
+        state.TotalRounds = 2;
+        state.TransitionDuration = TimeSpan.FromMilliseconds(80);
+        state.RoundTimer = TimeSpan.FromSeconds(30);
+        state.WinCondition = WinConditionMode.Sprinter;
+        state.CustomWordPool = new List<string> { "apple", "brave" };
+        state.WordOrderMode = WordOrderMode.ListOrder;
+
+        await _engine.StartAsync(host, state);
+        await WaitForPhaseAsync(state, GamePhase.Playing, timeoutMs: 1500);
+
+        _engine.SubmitGuess(state, players[0], "apple");
+
+        Assert.AreEqual(GamePhase.RoundResults, state.Phase);
+    }
+
+    [TestMethod]
+    public async Task RoundTimerExpiry_ObserverMode_DoesNotDnfHost()
+    {
+        var (state, host, players) = await CreateStateWithPlayersAsync(1);
+        state.TotalRounds = 1;
+        state.TransitionDuration = TimeSpan.FromMilliseconds(60);
+        state.RoundTimer = TimeSpan.FromMilliseconds(150);
+        state.CustomWordPool = new List<string> { "apple" };
+
+        await _engine.StartAsync(host, state);
+        await WaitForPhaseAsync(state, GamePhase.Playing, timeoutMs: 1500);
+        await WaitForPhaseAsync(state, GamePhase.RoundResults, timeoutMs: 2000);
+
+        Assert.AreEqual(1, state.RoundHistory[0].Outcomes.Count);
+        Assert.AreEqual(players[0].Id, state.RoundHistory[0].Outcomes[0].UserId);
+        Assert.IsFalse(state.RoundHistory[0].Outcomes.Any(o => o.UserId == host.Id));
+    }
+
+    // ───────────────────────────────────────────────────────────────────────
     // Helpers
     // ───────────────────────────────────────────────────────────────────────
 
@@ -178,6 +312,20 @@ public class SpardleEngineTests
         var abstractResult = await _engine.CreateStateAsync(host);
         Assert.IsTrue(abstractResult.TryGetSuccess(out var abstractState));
         return ((SpardleState)abstractState, host);
+    }
+
+    private async Task<(SpardleState state, User host, List<User> players)> CreateStateWithPlayersAsync(int playerCount)
+    {
+        var (state, host) = await CreateStateAsync();
+        var players = new List<User>();
+        for (int i = 0; i < playerCount; i++)
+        {
+            var player = new User($"P{i + 1}", Guid.NewGuid().ToString());
+            var reg = state.RegisterPlayer(player);
+            Assert.IsTrue(reg.IsSuccess, $"RegisterPlayer failed: {reg}");
+            players.Add(player);
+        }
+        return (state, host, players);
     }
 
     private static async Task WaitForPhaseAsync(SpardleState state, GamePhase target, int timeoutMs)

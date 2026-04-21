@@ -25,15 +25,18 @@ public class SpardleEngine(WordListService wordListService, ILoggerFactory logge
 
         return Task.FromResult(s.Execute(() =>
         {
+            // UpdateJoinableStatus(false) closes the join race before we read Players.Count;
+            // once the lobby is non-joinable, RegisterPlayer rejects new joins.
             s.UpdateJoinableStatus(false);
+            s.SetHostIsParticipant(s.Players.Count == 0);
             s.CurrentRound = 0;
             s.IsGameOver = false;
             s.RoundHistory.Clear();
             s.LastCompletedAnswer = null;
             GenerateRoundQueue(s);
 
-            // Seed PlayerState for every joined user (host + players).
-            foreach (var user in s.Players.Prepend(s.Host))
+            var roster = s.HostIsParticipant ? s.Players.Prepend(s.Host) : s.Players;
+            foreach (var user in roster)
             {
                 var ps = s.GetOrCreatePlayerState(user.Id);
                 ps.TotalScore = 0;
@@ -123,8 +126,8 @@ public class SpardleEngine(WordListService wordListService, ILoggerFactory logge
         state.IsRoundActive = true;
         state.CurrentRound++;
 
-        // Make sure every joined player has a PlayerState and reset per-round data.
-        foreach (var user in state.Players.Prepend(state.Host))
+        var roster = state.HostIsParticipant ? state.Players.Prepend(state.Host) : state.Players;
+        foreach (var user in roster)
         {
             var ps = state.GetOrCreatePlayerState(user.Id);
             ps.ResetRound();
@@ -203,7 +206,8 @@ public class SpardleEngine(WordListService wordListService, ILoggerFactory logge
     private List<PlayerRoundOutcome> BuildOutcomes(SpardleState s)
     {
         var participants = new List<(User User, PlayerState Ps)>();
-        foreach (var user in s.Players.Prepend(s.Host))
+        var roster = s.HostIsParticipant ? s.Players.Prepend(s.Host) : s.Players;
+        foreach (var user in roster)
         {
             if (s.PlayerStates.TryGetValue(user.Id, out var ps))
                 participants.Add((user, ps));
@@ -290,6 +294,9 @@ public class SpardleEngine(WordListService wordListService, ILoggerFactory logge
         Result errorResult = Result.Success;
         var executeResult = state.Execute(() =>
         {
+            if (player.Id == state.Host.Id && !state.HostIsParticipant)
+            { errorResult = Result.FromError("Host is observing and cannot submit guesses."); return; }
+
             if (state.Phase != GamePhase.Playing || !state.IsRoundActive)
             { errorResult = Result.FromError("Round is not active."); return; }
 

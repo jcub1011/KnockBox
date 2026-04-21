@@ -1,6 +1,6 @@
 .spd-page {
     position: relative;
-    min-height: 100vh;
+    min-height: 100%;
     background:
         radial-gradient(ellipse at 50% -20%, rgba(0, 209, 255, 0.12), transparent 55%),
         radial-gradient(ellipse at 20% 100%, rgba(255, 46, 99, 0.08), transparent 60%),

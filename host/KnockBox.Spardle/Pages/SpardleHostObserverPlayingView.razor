@@ -1,0 +1,105 @@
+@using KnockBox.Spardle
+@using KnockBox.Spardle.Components
+@using KnockBox.Spardle.Models
+
+<div class="spd-obs" @key="@State.CurrentRound">
+    <header class="spd-obs-top">
+        <div class="spd-obs-round">
+            <span class="spd-obs-round-label">ROUND</span>
+            <span class="spd-obs-round-value spd-display">@State.CurrentRound</span>
+            <span class="spd-obs-round-total">/ @State.RoundQueue.Count</span>
+        </div>
+
+        <SpardleRoundTimer State="State" />
+
+        <button type="button"
+                class="spd-obs-hc-toggle @(HighContrast ? "spd-obs-hc-on" : "")"
+                @onclick="OnToggleContrast"
+                title="Toggle high-contrast colours">
+            <span class="spd-obs-hc-dot"></span>
+            <span>HC</span>
+        </button>
+    </header>
+
+    @{
+        int wordLen = State.TargetWord.Length;
+        int maxGuesses = wordLen > 0
+            ? SpardleEngine.CalculateMaxGuesses(wordLen, State.DifficultyMultiplier)
+            : 6;
+        var accents = new[] { "spd-obs-a", "spd-obs-b", "spd-obs-c", "spd-obs-d" };
+        int accentIdx = 0;
+    }
+
+    <main class="spd-obs-gallery @(HighContrast ? "spd-hc" : "")" style="--spd-cols:@wordLen;">
+        @foreach (var user in State.Players)
+        {
+            var accent = accents[accentIdx++ % accents.Length];
+            if (!State.PlayerStates.TryGetValue(user.Id, out var ps)) { continue; }
+
+            string statusTag;
+            string statusClass;
+            if (ps.Dnf) { statusTag = "DNF"; statusClass = "spd-obs-dnf"; }
+            else if (ps.HasFinishedRound) { statusTag = FormatSolvedTag(ps, State.RoundStartTime); statusClass = "spd-obs-solved"; }
+            else { statusTag = "GUESSING…"; statusClass = "spd-obs-active"; }
+
+            <section class="spd-obs-card @accent">
+                <div class="spd-obs-card-top">
+                    <span class="spd-obs-avatar">@Initials(user.Name)</span>
+                    <span class="spd-obs-name">@user.Name</span>
+                    <span class="spd-obs-count spd-mono">@ps.Guesses.Count/@maxGuesses</span>
+                </div>
+
+                <div class="spd-obs-mini" style="--spd-cols:@wordLen; --spd-rows:@maxGuesses;">
+                    @foreach (var guess in ps.Guesses)
+                    {
+                        <div class="spd-obs-row">
+                            @for (int i = 0; i < guess.Statuses.Length; i++)
+                            {
+                                var statusClassName = guess.Statuses[i] switch
+                                {
+                                    LetterStatus.Correct => "spd-obs-tile-correct",
+                                    LetterStatus.Present => "spd-obs-tile-present",
+                                    _ => "spd-obs-tile-absent"
+                                };
+                                <div class="spd-obs-tile @statusClassName"></div>
+                            }
+                        </div>
+                    }
+                    @for (int row = ps.Guesses.Count; row < maxGuesses; row++)
+                    {
+                        <div class="spd-obs-row">
+                            @for (int i = 0; i < wordLen; i++)
+                            {
+                                <div class="spd-obs-tile spd-obs-tile-empty"></div>
+                            }
+                        </div>
+                    }
+                </div>
+
+                <div class="spd-obs-status @statusClass">@statusTag</div>
+            </section>
+        }
+    </main>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public SpardleState State { get; set; } = default!;
+    [Parameter] public bool HighContrast { get; set; }
+    [Parameter] public EventCallback OnToggleContrast { get; set; }
+
+    private static string Initials(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return "?";
+        var parts = name.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length == 1) return char.ToUpperInvariant(parts[0][0]).ToString();
+        return $"{char.ToUpperInvariant(parts[0][0])}{char.ToUpperInvariant(parts[1][0])}";
+    }
+
+    private static string FormatSolvedTag(PlayerState ps, DateTime? roundStart)
+    {
+        if (roundStart is null || ps.FinishedAt is null) return "SOLVED";
+        var elapsed = ps.FinishedAt.Value - roundStart.Value;
+        if (elapsed < TimeSpan.Zero) elapsed = TimeSpan.Zero;
+        return $"SOLVED {(int)elapsed.TotalMinutes}:{elapsed.Seconds:D2}";
+    }
+}

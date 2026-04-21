@@ -33,14 +33,23 @@ else
                 <SpardleRoundIntro State="GameState" />
                 break;
             case GamePhase.Playing:
-                <SpardlePlayingPhase State="GameState"
-                                     CurrentGuess="@_currentGuess"
-                                     OnKey="HandleKeyPress"
-                                     ToastMessage="@_toastMessage"
-                                     ToastTone="_toastTone"
-                                     InvalidGuess="_invalidGuess"
-                                     HighContrast="HighContrast"
-                                     OnToggleContrast="ToggleContrast" />
+                @if (IsHostObserver)
+                {
+                    <SpardleHostObserverPlayingView State="GameState"
+                                                    HighContrast="HighContrast"
+                                                    OnToggleContrast="ToggleContrast" />
+                }
+                else
+                {
+                    <SpardlePlayingPhase State="GameState"
+                                         CurrentGuess="@_currentGuess"
+                                         OnKey="HandleKeyPress"
+                                         ToastMessage="@_toastMessage"
+                                         ToastTone="_toastTone"
+                                         InvalidGuess="_invalidGuess"
+                                         HighContrast="HighContrast"
+                                         OnToggleContrast="ToggleContrast" />
+                }
                 break;
             case GamePhase.RoundResults:
                 <SpardleRoundResults State="GameState" />

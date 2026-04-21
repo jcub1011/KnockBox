@@ -35,6 +35,11 @@ public partial class SpardleRoom : DisposableComponent
     protected string RoomCode { get; set; } = string.Empty;
     protected bool HighContrast { get; set; }
 
+    protected bool IsHostObserver =>
+        GameState is not null
+        && !GameState.HostIsParticipant
+        && UserService.CurrentUser?.Id == GameState.Host.Id;
+
     private string _currentGuess = string.Empty;
     private string? _toastMessage;
     private SpardleToast.ToastTone _toastTone = SpardleToast.ToastTone.Danger;
@@ -121,6 +126,7 @@ public partial class SpardleRoom : DisposableComponent
     private async Task HandleKeyPress(string key)
     {
         if (GameState is null || UserService.CurrentUser is null) return;
+        if (IsHostObserver) return;
         if (GameState.Phase != GamePhase.Playing) return;
 
         var playerState = GameState.GetOrCreatePlayerState(UserService.CurrentUser.Id);

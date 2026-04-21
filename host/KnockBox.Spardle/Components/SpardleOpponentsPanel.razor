@@ -14,7 +14,11 @@
             : 6;
         var accents = new[] { "spd-opp-a", "spd-opp-b", "spd-opp-c", "spd-opp-d" };
         int accentIdx = 0;
-        var roster = State.Players.Prepend(State.Host).Where(u => u.Id != CurrentUserId).ToList();
+        var roster = (State.HostIsParticipant
+                ? State.Players.Prepend(State.Host)
+                : (IEnumerable<User>)State.Players)
+            .Where(u => u.Id != CurrentUserId)
+            .ToList();
     }
 
     @if (roster.Count == 0)
