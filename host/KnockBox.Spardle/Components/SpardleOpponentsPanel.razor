@@ -5,79 +5,120 @@
 <div class="spd-opp-panel">
     <div class="spd-opp-heading">
         <span class="spd-opp-heading-glyph">⚔</span>
-        OPPONENTS
+        LEADERS
     </div>
 
     @{
-        int maxGuesses = State.TargetWord.Length > 0
-            ? SpardleEngine.CalculateMaxGuesses(State.TargetWord.Length, State.DifficultyMultiplier)
-            : 6;
-        var accents = new[] { "spd-opp-a", "spd-opp-b", "spd-opp-c", "spd-opp-d" };
-        int accentIdx = 0;
-        var roster = (State.HostIsParticipant
-                ? State.Players.Prepend(State.Host)
-                : (IEnumerable<User>)State.Players)
-            .Where(u => u.Id != CurrentUserId)
-            .ToList();
+        var ranked = GetRanked();
+        var top = ranked.Take(TopCount).ToList();
+        var me = ranked.FirstOrDefault(r => r.User.Id == CurrentUserId);
+        var showSelfOverflow = me is not null && me.Rank > TopCount;
     }
 
-    @if (roster.Count == 0)
+    @if (ranked.Count == 0)
     {
-        <div class="spd-opp-empty">No opponents yet.</div>
+        <div class="spd-opp-empty">No players yet.</div>
     }
-
-    @foreach (var user in roster)
+    else
     {
-        var ps = State.GetOrCreatePlayerState(user.Id);
-        var accent = accents[accentIdx++ % accents.Length];
-        string statusTag;
-        string statusClass;
-        if (ps.Dnf) { statusTag = "DNF"; statusClass = "spd-opp-dnf"; }
-        else if (ps.HasFinishedRound) { statusTag = "SOLVED"; statusClass = "spd-opp-solved"; }
-        else { statusTag = "GUESSING…"; statusClass = "spd-opp-active"; }
+        <div class="spd-opp-list">
+            @foreach (var entry in top)
+            {
+                @RenderRow(entry)
+            }
 
-        <div class="spd-opp-card @accent">
-            <div class="spd-opp-top">
-                <span class="spd-opp-avatar">@Initials(user.Name)</span>
-                <span class="spd-opp-name">@user.Name</span>
-                <span class="spd-opp-count spd-mono">@ps.Guesses.Count/@maxGuesses</span>
-            </div>
-            <div class="spd-opp-pips">
-                @for (int i = 0; i < maxGuesses; i++)
-                {
-                    string pipClass = "spd-opp-pip-empty";
-                    if (i < ps.Guesses.Count)
-                    {
-                        var g = ps.Guesses[i];
-                        if (g.IsCorrect) pipClass = "spd-opp-pip-correct";
-                        else if (g.Statuses.Any(st => st == LetterStatus.Correct)) pipClass = "spd-opp-pip-hit";
-                        else if (g.Statuses.Any(st => st == LetterStatus.Present)) pipClass = "spd-opp-pip-present";
-                        else pipClass = "spd-opp-pip-miss";
-                    }
-                    <span class="spd-opp-pip @pipClass"></span>
-                }
-            </div>
-            <div class="spd-opp-status @statusClass">@statusTag</div>
+            @if (showSelfOverflow)
+            {
+                <div class="spd-opp-divider" aria-hidden="true">⋯</div>
+                @RenderRow(me!)
+            }
         </div>
     }
-
-    <div class="spd-opp-score">
-        <span class="spd-opp-score-label">YOUR SCORE</span>
-        <span class="spd-opp-score-value spd-display">@MyScore</span>
-    </div>
 </div>
 
 @code {
+    private const int TopCount = 5;
+
     [Parameter, EditorRequired] public SpardleState State { get; set; } = default!;
     [Parameter, EditorRequired] public string CurrentUserId { get; set; } = default!;
 
-    private int MyScore => State.PlayerStates.TryGetValue(CurrentUserId, out var ps) ? ps.TotalScore : 0;
+    private sealed record RankedEntry(User User, PlayerState PlayerState, int Rank);
 
-    private static string Initials(string name)
+    private List<RankedEntry> GetRanked()
     {
-        if (string.IsNullOrWhiteSpace(name)) return "?";
-        var parts = name.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
-        if (parts.Length == 1) return char.ToUpperInvariant(parts[0][0]).ToString();
-        return $"{char.ToUpperInvariant(parts[0][0])}{char.ToUpperInvariant(parts[1][0])}";
+        var roster = State.HostIsParticipant
+            ? State.Players.Prepend(State.Host)
+            : (IEnumerable<User>)State.Players;
+
+        var sorted = roster
+            .Select(u => (User: u, Ps: State.GetOrCreatePlayerState(u.Id)))
+            // Primary sort — "closest to finishing" in the current round:
+            //   solved > still guessing > DNF, then most-correct-letters, then fewest guesses
+            .OrderBy(p => RoundStateSortKey(p.Ps))
+            .ThenByDescending(p => CorrectLetterProgress(p.Ps, State.TargetWord.Length))
+            .ThenBy(p => p.Ps.Guesses.Count)
+            // Secondary — match standing, so absolute leaders surface on ties
+            .ThenByDescending(p => p.Ps.TotalScore)
+            .ThenBy(p => p.User.Name, StringComparer.OrdinalIgnoreCase)
+            .Select((e, i) => new RankedEntry(e.User, e.Ps, i + 1))
+            .ToList();
+
+        return sorted;
     }
+
+    private static int RoundStateSortKey(PlayerState ps)
+    {
+        if (ps.HasFinishedRound && !ps.Dnf) return 0;
+        if (ps.Dnf) return 2;
+        return 1;
+    }
+
+    private static int CorrectLetterProgress(PlayerState ps, int wordLength)
+    {
+        if (ps.Guesses.Count == 0 || wordLength <= 0) return 0;
+        Span<bool> confirmed = wordLength <= 64 ? stackalloc bool[wordLength] : new bool[wordLength];
+        int count = 0;
+        foreach (var g in ps.Guesses)
+        {
+            for (int i = 0; i < g.Statuses.Length && i < wordLength; i++)
+            {
+                if (g.Statuses[i] == LetterStatus.Correct && !confirmed[i])
+                {
+                    confirmed[i] = true;
+                    count++;
+                }
+            }
+        }
+        return count;
+    }
+
+    private RenderFragment RenderRow(RankedEntry entry) => __builder =>
+    {
+        var ps = entry.PlayerState;
+        var isMe = entry.User.Id == CurrentUserId;
+        var stateClass = ps.Dnf
+            ? "spd-opp-row-dnf"
+            : ps.HasFinishedRound
+                ? "spd-opp-row-solved"
+                : "spd-opp-row-live";
+        var badge = ps.Dnf
+            ? "DNF"
+            : ps.HasFinishedRound
+                ? "✓"
+                : ps.Guesses.Count.ToString();
+        var rankTierClass = entry.Rank switch
+        {
+            1 => "spd-opp-rank-gold",
+            2 => "spd-opp-rank-silver",
+            3 => "spd-opp-rank-bronze",
+            _ => ""
+        };
+
+        <div class="spd-opp-row @stateClass @(isMe ? "spd-opp-row-me" : "")">
+            <span class="spd-opp-rank @rankTierClass">@entry.Rank</span>
+            <span class="spd-opp-name">@entry.User.Name</span>
+            <span class="spd-opp-badge">@badge</span>
+            <span class="spd-opp-score spd-mono">@ps.TotalScore</span>
+        </div>
+    };
 }
