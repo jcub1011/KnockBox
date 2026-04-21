@@ -108,7 +108,7 @@ public sealed class AdminPortMiddlewareTests
     [TestMethod]
     [DataRow("/app.fnvs1zlphx.css")]
     [DataRow("/KnockBox.styles.css")]
-    [DataRow("/Components/Layout/ReconnectModal.razor.js")]
+    [DataRow("/_content/KnockBox.Platform/Components/Layout/ReconnectModal.razor.js")]
     [DataRow("/admin/admin.css")]
     [DataRow("/favicon.ico")]
     public async Task AdminPort_StaticAssets_Pass(string path)
