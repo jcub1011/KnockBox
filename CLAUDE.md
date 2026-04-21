@@ -18,7 +18,7 @@ Target framework is `net10.0`.
 - Run host tests: `dotnet test host/KnockBox.Host.slnx`
 - Run tests for one project: `dotnet test sdk/KnockBox.CoreTests/KnockBox.CoreTests.csproj`
 - Run a single test: `dotnet test --filter "FullyQualifiedName~LobbyServiceTests.CreateLobbyAsync_ReturnsFailure_WhenRouteUnknown"`
-- Docker (compose from repo root): `docker compose up --build`
+- Docker (compose from repo root): `docker compose up --build` — the override file references `${KNOCKBOX_USER_SECRETS_DIR}` and `${KNOCKBOX_HTTPS_DIR}`, so first-time dev setup is `cp .env.example .env` and uncomment the block matching your OS.
 
 ## Architecture
 

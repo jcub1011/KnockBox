@@ -7,8 +7,7 @@ namespace KnockBox.Tests.Unit.Admin;
 [TestClass]
 public sealed class AdminPortMiddlewareTests
 {
-    private const int AdminPort = 5277;
-    private const int MainPort = 5276;
+    private const int AdminPort = 8081;    private const int MainPort = 8080;
 
     [TestMethod]
     public async Task AdminPort_AdminPath_Passes()

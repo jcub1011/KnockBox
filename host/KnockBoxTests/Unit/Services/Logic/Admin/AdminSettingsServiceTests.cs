@@ -36,8 +36,8 @@ namespace KnockBox.Tests.Unit.Services.Logic.Admin
             var service = CreateService();
             Assert.IsFalse(service.GetEnableThirdPartyPlugins());
             Assert.IsTrue(service.IsPasswordDefault());
-            Assert.IsTrue(service.VerifyPassword("changeme"));
-            Assert.IsFalse(service.VerifyPassword("wrong"));
+            Assert.IsTrue(service.VerifyAdminPassword("changeme"));
+            Assert.IsFalse(service.VerifyAdminPassword("wrong"));
         }
 
         [TestMethod]
@@ -45,25 +45,25 @@ namespace KnockBox.Tests.Unit.Services.Logic.Admin
         {
             var service1 = CreateService();
             await service1.SetEnableThirdPartyPluginsAsync(true);
-            await service1.UpdatePasswordAsync("new-password");
+            await service1.SetAdminPasswordAsync("new-password");
 
             Assert.IsTrue(service1.GetEnableThirdPartyPlugins());
             Assert.IsFalse(service1.IsPasswordDefault());
-            Assert.IsTrue(service1.VerifyPassword("new-password"));
+            Assert.IsTrue(service1.VerifyAdminPassword("new-password"));
 
             // Create new instance to verify reload
             var service2 = CreateService();
             Assert.IsTrue(service2.GetEnableThirdPartyPlugins());
             Assert.IsFalse(service2.IsPasswordDefault());
-            Assert.IsTrue(service2.VerifyPassword("new-password"));
-            Assert.IsFalse(service2.VerifyPassword("changeme"), "Old bootstrap password should no longer work.");
+            Assert.IsTrue(service2.VerifyAdminPassword("new-password"));
+            Assert.IsFalse(service2.VerifyAdminPassword("changeme"), "Old bootstrap password should no longer work.");
         }
 
         [TestMethod]
         public async Task EmergencyReset_ByDeletingFile_RevertsToDefault()
         {
             var service1 = CreateService();
-            await service1.UpdatePasswordAsync("secret");
+            await service1.SetAdminPasswordAsync("secret");
             Assert.IsFalse(service1.IsPasswordDefault());
 
             // Simulate emergency reset by deleting the settings file
@@ -72,7 +72,7 @@ namespace KnockBox.Tests.Unit.Services.Logic.Admin
 
             var service2 = CreateService();
             Assert.IsTrue(service2.IsPasswordDefault(), "Should revert to default after file deletion.");
-            Assert.IsTrue(service2.VerifyPassword("changeme"));
+            Assert.IsTrue(service2.VerifyAdminPassword("changeme"));
         }
 
         [TestMethod]
@@ -80,7 +80,7 @@ namespace KnockBox.Tests.Unit.Services.Logic.Admin
         {
             var service1 = CreateService();
             await service1.SetEnableThirdPartyPluginsAsync(true);
-            await service1.UpdatePasswordAsync("secret");
+            await service1.SetAdminPasswordAsync("secret");
 
             var path = Path.Combine(_tempRoot, _settingsFileName);
             var backupPath = path + ".bak";
@@ -94,7 +94,7 @@ namespace KnockBox.Tests.Unit.Services.Logic.Admin
             var service2 = CreateService();
 
             Assert.IsTrue(service2.GetEnableThirdPartyPlugins(), "Should have recovered 'true' from backup.");
-            Assert.IsTrue(service2.VerifyPassword("secret"), "Should have recovered password from backup.");
+            Assert.IsTrue(service2.VerifyAdminPassword("secret"), "Should have recovered password from backup.");
         }
 
         [TestMethod]
@@ -115,6 +115,65 @@ namespace KnockBox.Tests.Unit.Services.Logic.Admin
 
             Assert.AreEqual(firstWriteTime, secondWriteTime,
                 "Identical value must not rewrite file.");
+        }
+
+        [TestMethod]
+        public void IsAdminPasswordSet_False_WhenNoPersistedOrDefault()
+        {
+            var service = CreateService(defaultPassword: "");
+            Assert.IsFalse(service.IsAdminPasswordSet());
+            Assert.IsFalse(service.VerifyAdminPassword("anything"));
+        }
+
+        [TestMethod]
+        public void IsAdminPasswordSet_True_WhenDefaultProvided()
+        {
+            var service = CreateService(defaultPassword: "dev-default");
+            Assert.IsTrue(service.IsAdminPasswordSet());
+            Assert.IsTrue(service.VerifyAdminPassword("dev-default"));
+            Assert.IsFalse(service.VerifyAdminPassword("wrong"));
+        }
+
+        [TestMethod]
+        public async Task SetAdminPassword_PersistsAndVerifies()
+        {
+            var service1 = CreateService();
+            await service1.SetAdminPasswordAsync("operator-secret");
+
+            Assert.IsTrue(service1.IsAdminPasswordSet());
+            Assert.IsTrue(service1.VerifyAdminPassword("operator-secret"));
+            Assert.IsFalse(service1.VerifyAdminPassword("bad"));
+
+            var service2 = CreateService();
+            Assert.IsTrue(service2.IsAdminPasswordSet());
+            Assert.IsTrue(service2.VerifyAdminPassword("operator-secret"));
+        }
+
+        [TestMethod]
+        public async Task PersistedPassword_OverridesDefault()
+        {
+            var service1 = CreateService(defaultPassword: "dev-default");
+            await service1.SetAdminPasswordAsync("real-secret");
+
+            // Same disk state, but a fresh default is still present.
+            var service2 = CreateService(defaultPassword: "dev-default");
+
+            Assert.IsTrue(service2.VerifyAdminPassword("real-secret"));
+            Assert.IsFalse(service2.VerifyAdminPassword("dev-default"),
+                "Persisted password must shadow the configuration default.");
+        }
+
+        [TestMethod]
+        public async Task SetAdminPassword_Rejects_NullEmptyOrWhitespace()
+        {
+            var service = CreateService();
+
+            await Assert.ThrowsExactlyAsync<ArgumentNullException>(async () =>
+                await service.SetAdminPasswordAsync(null!));
+            await Assert.ThrowsExactlyAsync<ArgumentException>(async () =>
+                await service.SetAdminPasswordAsync(""));
+            await Assert.ThrowsExactlyAsync<ArgumentException>(async () =>
+                await service.SetAdminPasswordAsync("   "));
         }
 
         [TestMethod]
@@ -140,12 +199,13 @@ namespace KnockBox.Tests.Unit.Services.Logic.Admin
                 // Expected
             }
         }
-        private IAdminSettingsService CreateService()
+
+        private IAdminSettingsService CreateService(string defaultPassword = "changeme")
         {
-            var options = Options.Create(new AdminOptions 
-            { 
+            var options = Options.Create(new AdminOptions
+            {
                 SettingsPath = _settingsFileName,
-                Password = "changeme" 
+                Password = defaultPassword,
             });
             return new AdminSettingsService(
                 _storagePathMock.Object,

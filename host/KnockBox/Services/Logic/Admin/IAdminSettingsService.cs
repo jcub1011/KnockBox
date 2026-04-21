@@ -8,7 +8,7 @@ namespace KnockBox.Services.Logic.Admin
     /// </summary>
     /// <remarks>
     /// Reader methods (<see cref="GetEnableThirdPartyPlugins"/>,
-    /// <see cref="IsPasswordDefault"/>, <see cref="VerifyPassword"/>) are
+    /// <see cref="IsPasswordDefault"/>, <see cref="VerifyAdminPassword"/>) are
     /// eventually consistent: they do not block on the persistence lock and may
     /// observe a value up to one in-flight write stale. Admin traffic is
     /// low-rate and single-operator, so this is intentional — do not rely on
@@ -28,20 +28,30 @@ namespace KnockBox.Services.Logic.Admin
         ValueTask SetEnableThirdPartyPluginsAsync(bool enabled);
 
         /// <summary>
+        /// True when an active admin password is available — either persisted
+        /// in the writable admin folder or supplied as a non-empty
+        /// <c>Admin:Password</c> default in configuration.
+        /// </summary>
+        bool IsAdminPasswordSet();
+
+        /// <summary>
         /// Returns true if the admin is still using the default bootstrap
         /// password from configuration.
         /// </summary>
         bool IsPasswordDefault();
 
         /// <summary>
-        /// Verifies the provided password against the persisted hash or the
-        /// default configuration password.
+        /// Constant-time check of a plaintext submission against the
+        /// currently active password. Returns false when no password is set.
         /// </summary>
-        bool VerifyPassword(string password);
+        bool VerifyAdminPassword(string plaintext);
 
         /// <summary>
-        /// Hashes and persists a new admin password.
+        /// Persists a new admin password to the admin folder, overriding any
+        /// default. The caller is responsible for authorizing the change —
+        /// initial set is unauthenticated; rotations must come from an
+        /// authenticated admin session.
         /// </summary>
-        ValueTask UpdatePasswordAsync(string newPassword);
+        ValueTask SetAdminPasswordAsync(string plaintext);
     }
 }

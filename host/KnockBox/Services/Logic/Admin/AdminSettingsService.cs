@@ -3,6 +3,7 @@ using KnockBox.Services.Logic.Admin;
 using Microsoft.Extensions.Options;
 using System.Globalization;
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -10,6 +11,13 @@ namespace KnockBox.Services.Logic.Admin
 {
     /// <summary>
     /// File-backed implementation of <see cref="IAdminSettingsService"/>.
+    ///
+    /// Admin password resolution order:
+    ///   1. The persisted value in the admin settings file (operator-set via
+    ///      the admin UI).
+    ///   2. The <c>Admin:Password</c> default from configuration (appsettings
+    ///      or <c>Admin__Password</c> env var) — empty string when unset.
+    /// If neither is populated the deployment is considered uninitialized.
     /// </summary>
     internal sealed class AdminSettingsService : IAdminSettingsService
     {
@@ -21,7 +29,7 @@ namespace KnockBox.Services.Logic.Admin
         private readonly SemaphoreSlim _fileLock = new(1, 1);
         private readonly string _statePath;
         private readonly ILogger _logger;
-        private readonly AdminOptions _options;
+        private readonly string _defaultPassword;
 
         private static readonly JsonSerializerOptions JsonOptions = new()
         {
@@ -30,9 +38,9 @@ namespace KnockBox.Services.Logic.Admin
         };
 
         // volatile: readers (GetEnableThirdPartyPlugins, IsPasswordDefault,
-        // VerifyPassword) run unlocked for low-latency admin traffic. Writers
+        // VerifyAdminPassword) run unlocked for low-latency admin traffic. Writers
         // mutate these fields inside _fileLock (see SetEnableThirdPartyPluginsAsync
-        // / UpdatePasswordAsync), so the volatile modifier is what gives unlocked
+        // / SetAdminPasswordAsync), so the volatile modifier is what gives unlocked
         // readers memory-visibility of completed writes. Stale reads are tolerable
         // here — two consecutive reads may cross a write boundary, which is fine
         // for the admin UI's eventual-consistency semantics.
@@ -45,8 +53,8 @@ namespace KnockBox.Services.Logic.Admin
             ILogger<AdminSettingsService> logger)
         {
             _logger = logger;
-            _options = options.Value;
             _statePath = Path.Combine(storagePath.GetAdminDirectory(), options.Value.SettingsPath);
+            _defaultPassword = options.Value.Password ?? string.Empty;
 
             LoadFromDisk();
         }
@@ -99,18 +107,30 @@ namespace KnockBox.Services.Logic.Admin
             }
         }
 
+        public bool IsAdminPasswordSet() => !string.IsNullOrWhiteSpace(_passwordHash) || !string.IsNullOrWhiteSpace(_defaultPassword);
+
         public bool IsPasswordDefault() => string.IsNullOrWhiteSpace(_passwordHash);
 
-        public bool VerifyPassword(string password)
+        public bool VerifyAdminPassword(string plaintext)
         {
+            if (string.IsNullOrWhiteSpace(plaintext)) return false;
+
             if (string.IsNullOrWhiteSpace(_passwordHash))
             {
                 // Fallback to bootstrap password in appsettings.json
-                return FixedTimeEquals(password, _options.Password);
+                if (string.IsNullOrWhiteSpace(_defaultPassword)) return false;
+                return PasswordHash.FixedTimeEquals(plaintext, _defaultPassword);
             }
 
             try
             {
+                // Is this a legacy plaintext password or a hash?
+                if (!_passwordHash.StartsWith("v1:"))
+                {
+                    // For migrating plaintext password from HEAD to hashing.
+                    return PasswordHash.FixedTimeEquals(plaintext, _passwordHash);
+                }
+
                 var parts = _passwordHash.Split(':');
                 if (parts.Length != 4 || parts[0] != "v1") return false;
 
@@ -119,7 +139,7 @@ namespace KnockBox.Services.Logic.Admin
                 var hash = Convert.FromBase64String(parts[3]);
 
                 var inputHash = Rfc2898DeriveBytes.Pbkdf2(
-                    password,
+                    plaintext,
                     salt,
                     iterations,
                     HashAlgorithm,
@@ -134,11 +154,13 @@ namespace KnockBox.Services.Logic.Admin
             }
         }
 
-        public async ValueTask UpdatePasswordAsync(string newPassword)
+        public async ValueTask SetAdminPasswordAsync(string plaintext)
         {
+            ArgumentException.ThrowIfNullOrWhiteSpace(plaintext);
+
             var salt = RandomNumberGenerator.GetBytes(SaltSize);
             var hash = Rfc2898DeriveBytes.Pbkdf2(
-                newPassword,
+                plaintext,
                 salt,
                 Iterations,
                 HashAlgorithm,
@@ -214,7 +236,7 @@ namespace KnockBox.Services.Logic.Admin
             var doc = JsonSerializer.Deserialize<PersistedSettings>(stream, JsonOptions);
             
             _enableThirdPartyPlugins = doc?.EnableThirdPartyPlugins ?? false;
-            _passwordHash = doc?.PasswordHash;
+            _passwordHash = doc?.PasswordHash ?? doc?.Password;
 
             _logger.LogInformation(
                 "Loaded admin settings from [{Path}]: EnableThirdPartyPlugins={Value}, CustomPassword={HasPassword}.",
@@ -278,15 +300,24 @@ namespace KnockBox.Services.Logic.Admin
             }
         }
 
-        private static bool FixedTimeEquals(string? left, string? right)
-        {
-            var l = SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(left ?? string.Empty));
-            var r = SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(right ?? string.Empty));
-            return CryptographicOperations.FixedTimeEquals(l, r);
-        }
-
         private sealed record PersistedSettings(
             [property: JsonPropertyName("enableThirdPartyPlugins")] bool EnableThirdPartyPlugins,
-            [property: JsonPropertyName("passwordHash")] string? PasswordHash = null);
+            [property: JsonPropertyName("passwordHash")] string? PasswordHash = null,
+            [property: JsonPropertyName("password")] string? Password = null);
+    }
+
+    /// <summary>
+    /// Shared password-comparison helper. Uses SHA-256 + <see cref="CryptographicOperations.FixedTimeEquals"/>
+    /// so failing attempts don't leak length or prefix information via
+    /// response timing.
+    /// </summary>
+    internal static class PasswordHash
+    {
+        public static bool FixedTimeEquals(string left, string right)
+        {
+            var l = SHA256.HashData(Encoding.UTF8.GetBytes(left));
+            var r = SHA256.HashData(Encoding.UTF8.GetBytes(right));
+            return CryptographicOperations.FixedTimeEquals(l, r);
+        }
     }
 }

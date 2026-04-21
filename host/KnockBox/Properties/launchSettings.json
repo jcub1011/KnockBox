@@ -7,7 +7,7 @@
         "ASPNETCORE_ENVIRONMENT": "Development"
       },
       "dotnetRunMessages": true,
-      "applicationUrl": "http://knockbox.dev.localhost:5276"
+      "applicationUrl": "http://knockbox.dev.localhost:8080"
     },
     "https": {
       "commandName": "Project",
@@ -16,7 +16,7 @@
         "ASPNETCORE_ENVIRONMENT": "Development"
       },
       "dotnetRunMessages": true,
-      "applicationUrl": "https://knockbox.dev.localhost:7106;http://knockbox.dev.localhost:5276"
+      "applicationUrl": "https://knockbox.dev.localhost:7106;http://knockbox.dev.localhost:8080"
     },
     "Container (.NET SDK)": {
       "commandName": "SdkContainer",

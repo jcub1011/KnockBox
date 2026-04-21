@@ -194,7 +194,14 @@ public static class KnockBoxPlatformExtensions
         }
 
         app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
-        app.UseHttpsRedirection();
+
+        // Docker deployments without SSL termination or specific reverse-proxy
+        // setups may need to skip the HTTPS redirect to avoid infinite loops.
+        if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("KNOCKBOX_SKIP_HTTPS_REDIRECT")))
+        {
+            app.UseHttpsRedirection();
+        }
+
         app.UseAntiforgery();
 
         return app;
