@@ -22,5 +22,11 @@ namespace KnockBox.HiddenAgenda
             builder.OpenComponent<HiddenAgendaTile>(0);
             builder.CloseComponent();
         };
+
+        public RenderFragment? GetCustomHeader() => builder =>
+        {
+            builder.OpenComponent<HiddenAgendaHeader>(0);
+            builder.CloseComponent();
+        };
     }
 }

@@ -22,5 +22,11 @@ namespace KnockBox.TaskMaster
             builder.OpenComponent<TaskMasterTile>(0);
             builder.CloseComponent();
         };
+
+        public RenderFragment? GetCustomHeader() => builder =>
+        {
+            builder.OpenComponent<TaskMasterHeader>(0);
+            builder.CloseComponent();
+        };
     }
 }

@@ -1,0 +1,71 @@
+@using KnockBox.Core.Services.Navigation
+@using KnockBox.Core.Services.State.Games.Shared
+@using Microsoft.JSInterop
+
+<div class="ctc-header-container">
+    <div class="ctc-header-scanlines"></div>
+    <div class="ctc-header-vignette"></div>
+    
+    <a class="ctc-header-brand" href="@NavigationService.GetHomeUri()" title="Click to return home">
+        <span class="ctc-header-prompt">&gt;</span>
+        <span class="ctc-header-text">CODEWORD</span>
+        <span class="ctc-header-caret"></span>
+    </a>
+
+    <div class="ctc-header-actions">
+        <button class="ctc-header-code @(_isRevealed ? "revealed" : "")"
+                @onclick="Toggle"
+                @onmouseup="OnMouseUp"
+                @oncontextmenu="CopyCodeAsync"
+                @oncontextmenu:preventDefault="true"
+                title="Click to reveal. Right-click/long-press to copy. Middle-click to join in a new tab.">
+            <span class="ctc-header-code-cover">[ SECURE LINK ]</span>
+            <span class="ctc-header-code-value">@Code</span>
+        </button>
+        <button class="ctc-header-leave" @onclick="Leave" title="ABORT MISSION" aria-label="Abort Mission">
+            <span class="ctc-header-leave-text">ABORT</span>
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        </button>
+    </div>
+</div>
+
+@code {
+    [Inject] INavigationService NavigationService { get; set; } = default!;
+    [Inject] IGameSessionService GameSessionService { get; set; } = default!;
+    [Inject] IJSRuntime JSRuntime { get; set; } = default!;
+    [Inject] ILogger<CodewordHeader> Logger { get; set; } = default!;
+
+    private bool _isRevealed;
+
+    private string Code =>
+        GameSessionService.TryGetCurrentSession(out var session)
+            ? session.LobbyRegistration.Code
+            : string.Empty;
+
+    private void Toggle() => _isRevealed = !_isRevealed;
+
+    private void Leave() => GameSessionService.LeaveCurrentSession(navigateHome: true);
+
+    private async Task OnMouseUp(MouseEventArgs e)
+    {
+        if (e.Button == 1 && GameSessionService.TryGetCurrentSession(out var session))
+        {
+            var url = NavigationService.GetJoinUri(session.LobbyRegistration.Code, fresh: true);
+            await JSRuntime.InvokeVoidAsync("window.open", url, "_blank");
+        }
+    }
+
+    private async Task CopyCodeAsync()
+    {
+        if (!GameSessionService.TryGetCurrentSession(out var session)) return;
+
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", session.LobbyRegistration.Code);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error copying lobby code.");
+        }
+    }
+}
