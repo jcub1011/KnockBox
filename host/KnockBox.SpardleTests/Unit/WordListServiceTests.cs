@@ -153,4 +153,27 @@ public class WordListServiceTests
         Assert.ThrowsExactly<ArgumentOutOfRangeException>(
             () => { _ = _service.GetWord(WordPoolMode.NytStandard, 100, 0); });
     }
+
+    [TestMethod]
+    public void GetAvailableLengths_NytStandard_ContainsOnlyFive()
+    {
+        var lengths = _service.GetAvailableLengths(WordPoolMode.NytStandard).ToList();
+        CollectionAssert.AreEqual(new[] { 5 }, lengths);
+    }
+
+    [TestMethod]
+    public void GetAvailableLengths_FullDictionary_IsSortedAscending()
+    {
+        var lengths = _service.GetAvailableLengths(WordPoolMode.FullDictionary).ToList();
+        Assert.IsGreaterThan(1, lengths.Count);
+        CollectionAssert.AreEqual(lengths.OrderBy(x => x).ToList(), lengths);
+        Assert.Contains(5, lengths);
+    }
+
+    [TestMethod]
+    public void GetAvailableLengths_UnbackedMode_ReturnsEmpty()
+    {
+        Assert.IsEmpty(_service.GetAvailableLengths(WordPoolMode.HostDefined));
+        Assert.IsEmpty(_service.GetAvailableLengths(WordPoolMode.CsvUpload));
+    }
 }

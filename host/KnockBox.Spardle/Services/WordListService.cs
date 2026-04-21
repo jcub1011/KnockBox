@@ -49,6 +49,13 @@ public sealed class WordListService : IWordListService
         return pool.GetWord(index);
     }
 
+    public IEnumerable<int> GetAvailableLengths(WordPoolMode mode)
+    {
+        var byLength = GetPool(mode);
+        if (byLength is null) return Array.Empty<int>();
+        return byLength.Keys.OrderBy(x => x);
+    }
+
     private IReadOnlyDictionary<int, WordPool>? GetPool(WordPoolMode mode) => mode switch
     {
         WordPoolMode.NytStandard => _nytStandardByLength,

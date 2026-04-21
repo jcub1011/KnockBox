@@ -11,6 +11,34 @@ public class SpardleState(User host, ILogger logger) : AbstractGameState(host, l
     public WordPoolMode WordPoolMode { get; set; } = WordPoolMode.NytStandard;
     public WordOrderMode WordOrderMode { get; set; } = WordOrderMode.RandomNoRepeats;
     public WinConditionMode WinCondition { get; set; } = WinConditionMode.Sprinter;
+
+    /// <summary>
+    /// When true, the engine picks all round words at a single fixed
+    /// <see cref="TargetWordLength"/>. When false, words are sampled across
+    /// <see cref="MinWordLength"/>–<see cref="MaxWordLength"/> inclusive.
+    /// Only consulted when <see cref="WordPoolMode"/> is
+    /// <see cref="Models.WordPoolMode.FullDictionary"/>.
+    /// </summary>
+    public bool ConstantWordLength { get; set; } = true;
+
+    /// <summary>
+    /// Target word length when <see cref="ConstantWordLength"/> is true.
+    /// Forced to 5 by the engine when <see cref="WordPoolMode"/> is
+    /// <see cref="Models.WordPoolMode.NytStandard"/>. Ignored when
+    /// <see cref="CustomWordPool"/> is non-empty.
+    /// </summary>
+    public int TargetWordLength { get; set; } = 5;
+
+    /// <summary>
+    /// Minimum word length (inclusive) when <see cref="ConstantWordLength"/> is false.
+    /// </summary>
+    public int MinWordLength { get; set; } = 3;
+
+    /// <summary>
+    /// Maximum word length (inclusive) when <see cref="ConstantWordLength"/> is false.
+    /// </summary>
+    public int MaxWordLength { get; set; } = 8;
+
     public bool HardModeEnabled { get; set; } = false;
     public TimeSpan RoundTimer { get; set; } = TimeSpan.FromMinutes(3);
     public bool AllowDictionaryFallback { get; set; } = true;

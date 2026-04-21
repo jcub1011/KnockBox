@@ -1,3 +1,4 @@
+using KnockBox.Core.Services.Logic.RandomGeneration;
 using KnockBox.Core.Services.State.Users;
 using KnockBox.Spardle;
 using KnockBox.Spardle.Models;
@@ -11,13 +12,35 @@ namespace KnockBox.SpardleTests.Unit;
 public class SpardleEngineTests
 {
     private SpardleEngine _engine = default!;
+    private SequentialRng _rng = default!;
 
     [TestInitialize]
     public void Setup()
     {
+        _rng = new SequentialRng();
         _engine = new SpardleEngine(
             new WordListService(NullLogger<WordListService>.Instance),
+            _rng,
             new NullLoggerFactory());
+    }
+
+    /// <summary>
+    /// Deterministic RNG: returns the call counter modulo the requested range.
+    /// For RandomNoRepeats (HashSet rejection-sample loop) this produces 0, 1, 2, ...
+    /// guaranteeing distinct picks until the counter wraps.
+    /// </summary>
+    private sealed class SequentialRng : IRandomNumberService
+    {
+        private int _counter;
+        public int GetRandomInt(int exclusiveMax, RandomType type = RandomType.Fast)
+            => exclusiveMax <= 0 ? 0 : _counter++ % exclusiveMax;
+        public int GetRandomInt(int inclusiveMin, int exclusiveMax, RandomType type = RandomType.Fast)
+        {
+            int range = exclusiveMax - inclusiveMin;
+            return range <= 0 ? inclusiveMin : inclusiveMin + (_counter++ % range);
+        }
+        public byte[] GetRandomBytes(int length, RandomType type = RandomType.Fast)
+            => new byte[length];
     }
 
     // ───────────────────────────────────────────────────────────────────────
@@ -300,6 +323,114 @@ public class SpardleEngineTests
         Assert.AreEqual(1, state.RoundHistory[0].Outcomes.Count);
         Assert.AreEqual(players[0].Id, state.RoundHistory[0].Outcomes[0].UserId);
         Assert.IsFalse(state.RoundHistory[0].Outcomes.Any(o => o.UserId == host.Id));
+    }
+
+    // ───────────────────────────────────────────────────────────────────────
+    // Round queue generation (real WordListService)
+    // ───────────────────────────────────────────────────────────────────────
+
+    [TestMethod]
+    public async Task StartAsync_NytStandard_FillsQueueWithFiveLetterWordsFromService()
+    {
+        var (state, host) = await CreateStateAsync();
+        state.WordPoolMode = WordPoolMode.NytStandard;
+        state.WordOrderMode = WordOrderMode.ListOrder;
+        state.TotalRounds = 3;
+
+        await _engine.StartAsync(host, state);
+
+        Assert.HasCount(3, state.RoundQueue);
+        foreach (var w in state.RoundQueue)
+            Assert.AreEqual(5, w.Length);
+        Assert.AreEqual("aback", state.RoundQueue[0]);
+    }
+
+    [TestMethod]
+    public async Task StartAsync_FullDictionaryConstantLength_UsesTargetLength()
+    {
+        var (state, host) = await CreateStateAsync();
+        state.WordPoolMode = WordPoolMode.FullDictionary;
+        state.ConstantWordLength = true;
+        state.TargetWordLength = 7;
+        state.WordOrderMode = WordOrderMode.ListOrder;
+        state.TotalRounds = 5;
+
+        await _engine.StartAsync(host, state);
+
+        Assert.HasCount(5, state.RoundQueue);
+        foreach (var w in state.RoundQueue)
+            Assert.AreEqual(7, w.Length);
+    }
+
+    [TestMethod]
+    public async Task StartAsync_FullDictionaryRange_AllWordsWithinBounds()
+    {
+        var (state, host) = await CreateStateAsync();
+        state.WordPoolMode = WordPoolMode.FullDictionary;
+        state.ConstantWordLength = false;
+        state.MinWordLength = 5;
+        state.MaxWordLength = 7;
+        state.WordOrderMode = WordOrderMode.RandomNoRepeats;
+        state.TotalRounds = 20;
+
+        await _engine.StartAsync(host, state);
+
+        Assert.HasCount(20, state.RoundQueue);
+        foreach (var w in state.RoundQueue)
+            Assert.IsTrue(w.Length >= 5 && w.Length <= 7, $"'{w}' length {w.Length} outside [5,7]");
+    }
+
+    [TestMethod]
+    public async Task StartAsync_FullDictionaryRange_ExcludesLengthsOutsideBounds()
+    {
+        var (state, host) = await CreateStateAsync();
+        state.WordPoolMode = WordPoolMode.FullDictionary;
+        state.ConstantWordLength = false;
+        state.MinWordLength = 4;
+        state.MaxWordLength = 4;
+        state.WordOrderMode = WordOrderMode.ListOrder;
+        state.TotalRounds = 10;
+
+        await _engine.StartAsync(host, state);
+
+        Assert.HasCount(10, state.RoundQueue);
+        foreach (var w in state.RoundQueue)
+            Assert.AreEqual(4, w.Length);
+    }
+
+    [TestMethod]
+    public async Task StartAsync_FullDictionaryRange_InvertedBounds_ProducesEmptyQueue()
+    {
+        var (state, host) = await CreateStateAsync();
+        state.WordPoolMode = WordPoolMode.FullDictionary;
+        state.ConstantWordLength = false;
+        state.MinWordLength = 10;
+        state.MaxWordLength = 5;
+        state.WordOrderMode = WordOrderMode.ListOrder;
+        state.TotalRounds = 3;
+
+        await _engine.StartAsync(host, state);
+
+        Assert.IsEmpty(state.RoundQueue);
+    }
+
+    [TestMethod]
+    public async Task StartAsync_CustomPool_OverridesPoolModeAndIgnoresLength()
+    {
+        var (state, host) = await CreateStateAsync();
+        state.WordPoolMode = WordPoolMode.FullDictionary;
+        state.ConstantWordLength = true;
+        state.TargetWordLength = 7;
+        state.CustomWordPool = new List<string> { "alpha", "betas", "gamma" };
+        state.TotalRounds = 3;
+        state.WordOrderMode = WordOrderMode.ListOrder;
+
+        await _engine.StartAsync(host, state);
+
+        Assert.HasCount(3, state.RoundQueue);
+        Assert.AreEqual("alpha", state.RoundQueue[0]);
+        Assert.AreEqual("betas", state.RoundQueue[1]);
+        Assert.AreEqual("gamma", state.RoundQueue[2]);
     }
 
     // ───────────────────────────────────────────────────────────────────────

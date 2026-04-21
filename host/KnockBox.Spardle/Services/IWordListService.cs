@@ -40,4 +40,11 @@ public interface IWordListService
     /// or <paramref name="index"/> is outside <c>[0, GetWordCount(mode, length))</c>.
     /// </exception>
     ReadOnlySpan<byte> GetWord(WordPoolMode mode, int length, int index);
+
+    /// <summary>
+    /// Returns the sorted distinct word lengths present in the pool.
+    /// Empty for unbacked modes (HostDefined, CsvUpload). Useful for
+    /// populating UI controls that need to know what lengths are available.
+    /// </summary>
+    IEnumerable<int> GetAvailableLengths(WordPoolMode mode);
 }

@@ -1,8 +1,10 @@
 @using KnockBox.Core.Services.State.Users
 @using KnockBox.Spardle.Models
 @using KnockBox.Spardle
+@using KnockBox.Spardle.Services
 @inject IUserService UserService
 @inject SpardleEngine GameEngine
+@inject IWordListService WordList
 
 <div class="spd-lobby">
     <div class="spd-lobby-stage">
@@ -88,6 +90,47 @@
                                 <option value="@WordOrderMode.ReverseListOrder">Reverse List Order</option>
                             </select>
                         </label>
+                        @if (State.WordPoolMode == WordPoolMode.FullDictionary)
+                        {
+                            <label class="spd-lobby-field spd-lobby-field-row">
+                                <span>Constant Word Length</span>
+                                <input type="checkbox" @bind="State.ConstantWordLength" @bind:after="NotifyChanged" />
+                            </label>
+
+                            @if (State.ConstantWordLength)
+                            {
+                                <label class="spd-lobby-field">
+                                    <span>Word Length</span>
+                                    <select @bind="State.TargetWordLength" @bind:after="NotifyChanged">
+                                        @foreach (var len in WordList.GetAvailableLengths(WordPoolMode.FullDictionary))
+                                        {
+                                            <option value="@len">@len</option>
+                                        }
+                                    </select>
+                                </label>
+                            }
+                            else
+                            {
+                                <label class="spd-lobby-field">
+                                    <span>Min Length</span>
+                                    <select @bind="State.MinWordLength" @bind:after="NotifyChanged">
+                                        @foreach (var len in WordList.GetAvailableLengths(WordPoolMode.FullDictionary))
+                                        {
+                                            <option value="@len">@len</option>
+                                        }
+                                    </select>
+                                </label>
+                                <label class="spd-lobby-field">
+                                    <span>Max Length</span>
+                                    <select @bind="State.MaxWordLength" @bind:after="NotifyChanged">
+                                        @foreach (var len in WordList.GetAvailableLengths(WordPoolMode.FullDictionary))
+                                        {
+                                            <option value="@len">@len</option>
+                                        }
+                                    </select>
+                                </label>
+                            }
+                        }
                         <label class="spd-lobby-field spd-lobby-field-full">
                             <span>Custom Words (one per line)</span>
                             <textarea class="spd-lobby-textarea spd-mono"

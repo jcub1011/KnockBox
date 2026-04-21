@@ -1,5 +1,6 @@
 using KnockBox.Core.Primitives.Returns;
 using KnockBox.Core.Services.Logic.Games.Engines.Shared;
+using KnockBox.Core.Services.Logic.RandomGeneration;
 using KnockBox.Core.Services.State.Games.Shared;
 using KnockBox.Core.Services.State.Users;
 using KnockBox.Spardle.Models;
@@ -8,7 +9,10 @@ using Microsoft.Extensions.Logging;
 
 namespace KnockBox.Spardle;
 
-public class SpardleEngine(IWordListService wordListService, ILoggerFactory loggerFactory) : AbstractGameEngine(1, 20)
+public class SpardleEngine(
+    IWordListService wordListService,
+    IRandomNumberService rng,
+    ILoggerFactory loggerFactory) : AbstractGameEngine(1, 20)
 {
     private readonly ILogger _logger = loggerFactory.CreateLogger<SpardleEngine>();
 
@@ -51,17 +55,129 @@ public class SpardleEngine(IWordListService wordListService, ILoggerFactory logg
     private void GenerateRoundQueue(SpardleState state)
     {
         state.RoundQueue.Clear();
-        var pool = state.CustomWordPool.Count > 0
-            ? new List<string>(state.CustomWordPool)
-            : new List<string> { "apple", "brave", "crane", "flint", "ghost", "ivory", "jolly", "knack" };
 
-        if (state.WordOrderMode is WordOrderMode.RandomNoRepeats or WordOrderMode.RandomWithRepeats)
-            pool = pool.OrderBy(_ => Guid.NewGuid()).ToList();
-        else if (state.WordOrderMode == WordOrderMode.ReverseListOrder)
+        int requested = state.TotalRounds > 0 ? state.TotalRounds : int.MaxValue;
+
+        if (state.CustomWordPool.Count > 0)
+        {
+            var pool = new List<string>(state.CustomWordPool);
+            OrderInPlace(pool, state.WordOrderMode);
+            state.RoundQueue.AddRange(pool.Take(Math.Min(requested, pool.Count)));
+            return;
+        }
+
+        if (state.WordPoolMode == WordPoolMode.NytStandard)
+        {
+            FillFromSingleLength(state, length: 5, requested);
+            return;
+        }
+
+        if (state.WordPoolMode == WordPoolMode.FullDictionary)
+        {
+            if (state.ConstantWordLength)
+                FillFromSingleLength(state, state.TargetWordLength, requested);
+            else
+                FillFromLengthRange(state, state.MinWordLength, state.MaxWordLength, requested);
+            return;
+        }
+
+        // HostDefined / CsvUpload with empty CustomWordPool — CanStart prevents this in the lobby.
+    }
+
+    private void FillFromSingleLength(SpardleState state, int length, int requested)
+    {
+        int total = wordListService.GetWordCount(state.WordPoolMode, length);
+        if (total == 0) return;
+
+        int take = Math.Min(requested, total);
+        var indices = PickIndices(state.WordOrderMode, total, take);
+        foreach (var idx in indices)
+            state.RoundQueue.Add(wordListService.GetWordAsString(state.WordPoolMode, length, idx));
+    }
+
+    private void FillFromLengthRange(SpardleState state, int min, int max, int requested)
+    {
+        if (min > max) return;
+
+        var lengths = wordListService.GetAvailableLengths(state.WordPoolMode)
+            .Where(L => L >= min && L <= max)
+            .ToArray();
+        if (lengths.Length == 0) return;
+
+        var cumulative = new int[lengths.Length];
+        int total = 0;
+        for (int i = 0; i < lengths.Length; i++)
+        {
+            total += wordListService.GetWordCount(state.WordPoolMode, lengths[i]);
+            cumulative[i] = total;
+        }
+        if (total == 0) return;
+
+        int take = Math.Min(requested, total);
+        var flatIndices = PickIndices(state.WordOrderMode, total, take);
+        foreach (var flat in flatIndices)
+        {
+            int bucket = LowerBound(cumulative, flat);
+            int prev = bucket == 0 ? 0 : cumulative[bucket - 1];
+            int idxInBucket = flat - prev;
+            state.RoundQueue.Add(wordListService.GetWordAsString(state.WordPoolMode, lengths[bucket], idxInBucket));
+        }
+    }
+
+    private IEnumerable<int> PickIndices(WordOrderMode mode, int total, int take)
+    {
+        switch (mode)
+        {
+            case WordOrderMode.RandomNoRepeats:
+                var picked = new HashSet<int>(take);
+                while (picked.Count < take)
+                    picked.Add(rng.GetRandomInt(total));
+                return picked;
+
+            case WordOrderMode.RandomWithRepeats:
+                var withRepeats = new int[take];
+                for (int i = 0; i < take; i++) withRepeats[i] = rng.GetRandomInt(total);
+                return withRepeats;
+
+            case WordOrderMode.ReverseListOrder:
+                var rev = new int[take];
+                for (int i = 0; i < take; i++) rev[i] = total - 1 - i;
+                return rev;
+
+            case WordOrderMode.ListOrder:
+            default:
+                var asc = new int[take];
+                for (int i = 0; i < take; i++) asc[i] = i;
+                return asc;
+        }
+    }
+
+    private static void OrderInPlace(List<string> pool, WordOrderMode mode)
+    {
+        if (mode is WordOrderMode.RandomNoRepeats or WordOrderMode.RandomWithRepeats)
+        {
+            for (int n = pool.Count - 1; n > 0; n--)
+            {
+                int k = Random.Shared.Next(n + 1);
+                (pool[n], pool[k]) = (pool[k], pool[n]);
+            }
+        }
+        else if (mode == WordOrderMode.ReverseListOrder)
+        {
             pool.Reverse();
+        }
+    }
 
-        int limit = state.TotalRounds > 0 ? state.TotalRounds : pool.Count;
-        state.RoundQueue.AddRange(pool.Take(Math.Min(limit, pool.Count)));
+    private static int LowerBound(int[] cumulative, int target)
+    {
+        int lo = 0, hi = cumulative.Length - 1;
+        while (lo < hi)
+        {
+            int mid = (lo + hi) >> 1;
+            if (cumulative[mid] <= target) lo = mid + 1;
+            else hi = mid;
+        }
+        return lo;
     }
 
     // ═══════════════════════════════════════════════════════════════════════
