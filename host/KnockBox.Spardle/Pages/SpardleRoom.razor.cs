@@ -132,8 +132,9 @@ public partial class SpardleRoom : DisposableComponent
         {
             if (_currentGuess.Length != wordLen)
             {
-                await ShowToast($"NEEDS {wordLen} LETTERS", SpardleToast.ToastTone.Warn);
-                await TriggerInvalidShake();
+                await Task.WhenAll(
+                    ShowToast($"NEEDS {wordLen} LETTERS", SpardleToast.ToastTone.Warn),
+                    TriggerInvalidShake());
                 return;
             }
             var result = GameEngine.SubmitGuess(GameState, UserService.CurrentUser, _currentGuess);
@@ -143,8 +144,9 @@ public partial class SpardleRoom : DisposableComponent
             }
             else if (result.TryGetFailure(out var failure))
             {
-                await ShowToast(failure.PublicMessage.ToUpperInvariant(), SpardleToast.ToastTone.Danger);
-                await TriggerInvalidShake();
+                await Task.WhenAll(
+                    ShowToast(failure.PublicMessage.ToUpperInvariant(), SpardleToast.ToastTone.Danger),
+                    TriggerInvalidShake());
             }
             StateHasChanged();
         }
