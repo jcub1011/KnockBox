@@ -15,7 +15,9 @@ public class SpardleEngineTests
     [TestInitialize]
     public void Setup()
     {
-        _engine = new SpardleEngine(new WordListService(), new NullLoggerFactory());
+        _engine = new SpardleEngine(
+            new WordListService(NullLogger<WordListService>.Instance),
+            new NullLoggerFactory());
     }
 
     // ───────────────────────────────────────────────────────────────────────

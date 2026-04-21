@@ -67,7 +67,7 @@ public class SpardleEngine(WordListService wordListService, ILoggerFactory logge
     // ScheduleCallback which wraps its action in ExecuteAsync).
     // ═══════════════════════════════════════════════════════════════════════
 
-    private void EnterRoundIntro(SpardleState s)
+    private void EnterRoundIntro(SpardleState s, TimeSpan? duration = null)
     {
         if (s.CurrentRound >= s.RoundQueue.Count)
         {
@@ -75,11 +75,13 @@ public class SpardleEngine(WordListService wordListService, ILoggerFactory logge
             return;
         }
 
+        var introDuration = duration ?? s.TransitionDuration;
+
         s.Phase = GamePhase.RoundIntro;
-        s.PhaseExpiresAtUtc = DateTimeOffset.UtcNow + s.TransitionDuration;
+        s.PhaseExpiresAtUtc = DateTimeOffset.UtcNow + introDuration;
         s.IsRoundActive = false;
 
-        s.ScheduleCallback(s.TransitionDuration, () =>
+        s.ScheduleCallback(introDuration, () =>
         {
             EnterPlaying(s);
             return Task.CompletedTask;
@@ -186,7 +188,7 @@ public class SpardleEngine(WordListService wordListService, ILoggerFactory logge
         }
         else
         {
-            EnterRoundIntro(s);
+            EnterRoundIntro(s, TimeSpan.FromSeconds(2));
         }
     }
 
@@ -341,12 +343,13 @@ public class SpardleEngine(WordListService wordListService, ILoggerFactory logge
 
         if (!state.AllowDictionaryFallback)
         {
-            if (!state.CustomWordPool.Contains(guess) && !wordListService.IsValidWord(guess, state.WordPoolMode))
+            var pool = wordListService.GetTargetWordPool(state.WordPoolMode);
+            if (!state.CustomWordPool.Contains(guess) && !pool.Contains(guess))
                 return Result.FromError("Word not in list.");
         }
         else
         {
-            if (!wordListService.IsValidWord(guess, WordPoolMode.FullDictionary))
+            if (!wordListService.IsValidWord(guess))
             {
                 if (state.AllowCompoundWords)
                 {
