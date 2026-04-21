@@ -19,7 +19,7 @@ namespace KnockBox.Services.Logic.Admin
         /// addition to the main URL, and port-filtering middleware confines
         /// <c>/admin/*</c> routes to it (and bars them everywhere else).
         /// </summary>
-        public int Port { get; init; } = 5277;
+        public int Port { get; init; } = 8081;
 
         /// <summary>
         /// Admin username. Stored plaintext per project requirement. There is

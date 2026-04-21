@@ -111,6 +111,11 @@ namespace KnockBox
             var app = builder.Build();
 
             // ── Middleware pipeline ───────────────────────────────────────────
+            app.UseForwardedHeaders();
+
+            app.UseAuthentication();
+            app.UseAuthorization();
+
             app.UseKnockBoxPlatformMiddleware();
 
             // Port split: admin paths only on admin port.
@@ -119,9 +124,6 @@ namespace KnockBox
             // On the public port, short-circuit everything with an "Admin Not
             // Initialized" 503 interstitial until an operator sets a password.
             app.UseMiddleware<AdminNotInitializedMiddleware>(adminOptions.Port);
-
-            app.UseAuthentication();
-            app.UseAuthorization();
 
             // ── Endpoints ────────────────────────────────────────────────────
             app.MapKnockBoxPlatformEndpoints<App>();
@@ -145,7 +147,7 @@ namespace KnockBox
         {
             if (adminPort <= 0) return;
 
-            var existing = builder.Configuration["Urls"] ?? "http://+:5276";
+            var existing = builder.Configuration["Urls"] ?? "http://+:8080";
             var adminUrl = $"http://+:{adminPort}";
 
             if (!existing.Split(';', StringSplitOptions.RemoveEmptyEntries)
