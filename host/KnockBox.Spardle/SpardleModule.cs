@@ -22,4 +22,10 @@ public class SpardleModule : IGameModule
         builder.OpenComponent<SpardleTile>(0);
         builder.CloseComponent();
     };
+
+    public RenderFragment? GetCustomHeader() => builder =>
+    {
+        builder.OpenComponent<SpardleHeader>(0);
+        builder.CloseComponent();
+    };
 }
