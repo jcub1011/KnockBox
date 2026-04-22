@@ -368,3 +368,5 @@ FodyWeavers.xsd
 /.env
 /host/.idea/.idea.KnockBox.Host/.idea
 /.playwright-mcp
+
+.gemini/settings.json
