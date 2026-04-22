@@ -37,6 +37,8 @@ namespace KnockBox.Services.State.Users
                     tokenResult.TryGetFailure(out var failure);
                     logger.LogError("Error getting session token (attempt {attempt}/{max}): {error}. Reattempting.",
                         attempt + 1, MAX_SESSION_TOKEN_RETRIEVALS, failure);
+                    if (attempt < MAX_SESSION_TOKEN_RETRIEVALS - 1)
+                        await Task.Delay(100, ct);
                 }
 
                 if (tokenResult.TryGetSuccess(out var token))

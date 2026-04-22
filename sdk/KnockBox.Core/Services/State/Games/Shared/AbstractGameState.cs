@@ -38,7 +38,7 @@ namespace KnockBox.Core.Services.State.Games.Shared
         private readonly List<CancellationTokenSource> _scheduledCallbacks = [];
         private readonly Lock _playerLock = new();
         private readonly Dictionary<string, (User User, IDisposable Token)> _players = [];
-        private readonly HashSet<string> _kickedPlayers = [];
+        private readonly Dictionary<string, User> _kickedPlayers = [];
         private readonly CancellationTokenSource _disposeCts = new();
         private int _disposed;
 
@@ -114,12 +114,10 @@ namespace KnockBox.Core.Services.State.Games.Shared
             {
                 using var scope = _playerLock.EnterScope();
                 if (_kickedPlayers.Count == 0) return [];
-                var result = new List<User>(_kickedPlayers.Count);
-                foreach (var entry in _players.Values)
-                {
-                    if (_kickedPlayers.Contains(entry.User.Id))
-                        result.Add(entry.User);
-                }
+                var result = new User[_kickedPlayers.Count];
+                int i = 0;
+                foreach (var user in _kickedPlayers.Values)
+                    result[i++] = user;
                 return result;
             }
         }
@@ -133,7 +131,7 @@ namespace KnockBox.Core.Services.State.Games.Shared
         {
             if (user is null) return false;
             using var scope = _playerLock.EnterScope();
-            return _kickedPlayers.Contains(user.Id);
+            return _kickedPlayers.ContainsKey(user.Id);
         }
 
         /// <summary>
@@ -153,7 +151,7 @@ namespace KnockBox.Core.Services.State.Games.Shared
                 return ValueResult<IDisposable>.FromError("Host cannot be a player in the game.");
 
             using var scope = _playerLock.EnterScope();
-            if (_kickedPlayers.Contains(player.Id))
+            if (_kickedPlayers.ContainsKey(player.Id))
             {
                 return ValueResult<IDisposable>.FromError("You have been kicked from this lobby and cannot rejoin.", $"Player [{player.Name}] was kicked and cannot rejoin.");
             }
@@ -248,7 +246,8 @@ namespace KnockBox.Core.Services.State.Games.Shared
                 using var scope = _playerLock.EnterScope();
                 if (_players.TryGetValue(player.Id, out var registration))
                 {
-                    _kickedPlayers.Add(player.Id);
+                    _kickedPlayers[player.Id] = player;
+                    _players.Remove(player.Id);
                     token = registration.Token;
                 }
             });
@@ -256,7 +255,7 @@ namespace KnockBox.Core.Services.State.Games.Shared
             if (!result.IsSuccess) return result;
             if (token is null) return Result.FromError("User is not in this game.");
 
-            token.Dispose();
+            PlayerUnregistered?.Invoke(player);
             return Result.Success;
         }
 
