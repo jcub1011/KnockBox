@@ -71,7 +71,7 @@
     flex-shrink: 0;
 }
 
-.spd-header-code {
+.spd-header-actions ::deep .spd-header-code {
     display: inline-grid;
     overflow: hidden;
     font-family: "Bowlby One SC", "Bowlby One", Impact, sans-serif;
@@ -92,30 +92,30 @@
     mask-image: linear-gradient(to right, transparent, black 10px, black calc(100% - 10px), transparent);
 }
 
-    .spd-header-code:hover {
-        transform: translate(-1px, -1px);
-        box-shadow: 4px 4px 0 #000;
-    }
+.spd-header-actions ::deep .spd-header-code:hover {
+    transform: translate(-1px, -1px);
+    box-shadow: 4px 4px 0 #000;
+}
 
-    .spd-header-code:active {
-        transform: translate(1px, 1px);
-        box-shadow: 1px 1px 0 #000;
-    }
+.spd-header-actions ::deep .spd-header-code:active {
+    transform: translate(1px, 1px);
+    box-shadow: 1px 1px 0 #000;
+}
 
-.spd-header-code-cover,
-.spd-header-code-value {
+.spd-header-actions ::deep .spd-header-code-cover,
+.spd-header-actions ::deep .spd-header-code-value {
     grid-area: 1 / 1;
     padding: 8px 14px;
     transition: transform 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-.spd-header-code-cover {
+.spd-header-actions ::deep .spd-header-code-cover {
     background: var(--spd-bg-panel-solid, #161b33);
     z-index: 1;
     transform: translateX(0);
 }
 
-.spd-header-code-value {
+.spd-header-actions ::deep .spd-header-code-value {
     font-family: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
     font-weight: 700;
     letter-spacing: 0.22em;
@@ -124,11 +124,11 @@
     transform: translateX(100%);
 }
 
-.spd-header-code.revealed .spd-header-code-cover {
+.spd-header-actions ::deep .spd-header-code.revealed .spd-header-code-cover {
     transform: translateX(-100%);
 }
 
-.spd-header-code.revealed .spd-header-code-value {
+.spd-header-actions ::deep .spd-header-code.revealed .spd-header-code-value {
     transform: translateX(0);
 }
 
@@ -169,13 +169,13 @@
         font-size: clamp(1rem, 4.5vw, 1.25rem);
     }
 
-    .spd-header-code {
+    .spd-header-actions ::deep .spd-header-code {
         font-size: 0.72rem;
         letter-spacing: 0.1em;
     }
 
-    .spd-header-code-cover,
-    .spd-header-code-value {
+    .spd-header-actions ::deep .spd-header-code-cover,
+    .spd-header-actions ::deep .spd-header-code-value {
         padding: 6px 10px;
     }
 
@@ -187,22 +187,28 @@
 
 @media (prefers-reduced-motion: reduce) {
     .spd-header-brand,
-    .spd-header-code,
     .spd-header-leave {
+        transition: none;
+    }
+
+    .spd-header-actions ::deep .spd-header-code {
         transition: none;
     }
 
     .spd-header-brand:hover,
     .spd-header-brand:active,
-    .spd-header-code:hover,
-    .spd-header-code:active,
     .spd-header-leave:hover,
     .spd-header-leave:active {
         transform: none;
     }
 
-    .spd-header-code-cover,
-    .spd-header-code-value {
+    .spd-header-actions ::deep .spd-header-code:hover,
+    .spd-header-actions ::deep .spd-header-code:active {
+        transform: none;
+    }
+
+    .spd-header-actions ::deep .spd-header-code-cover,
+    .spd-header-actions ::deep .spd-header-code-value {
         transition: none;
     }
 }

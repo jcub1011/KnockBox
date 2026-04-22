@@ -51,7 +51,7 @@
     transform: rotate(-2deg);
 }
 
-.ha-header-code {
+.ha-header-stamp-container ::deep .ha-header-code {
     background: transparent;
     border: 3px solid var(--ha-stamp);
     border-radius: 4px;
@@ -66,7 +66,7 @@
     position: relative;
 }
 
-.ha-header-code::after {
+.ha-header-stamp-container ::deep .ha-header-code::after {
     content: '';
     position: absolute;
     inset: -4px;
@@ -75,27 +75,27 @@
     pointer-events: none;
 }
 
-.ha-header-code:hover {
+.ha-header-stamp-container ::deep .ha-header-code:hover {
     background: rgba(183, 28, 28, 0.05);
     transform: scale(1.05) rotate(0deg);
 }
 
-.ha-header-code-cover {
+.ha-header-stamp-container ::deep .ha-header-code-cover {
     font-size: 0.85rem;
     letter-spacing: 2px;
 }
 
-.ha-header-code-value {
+.ha-header-stamp-container ::deep .ha-header-code-value {
     display: none;
     font-size: 1.2rem;
     letter-spacing: 4px;
 }
 
-.ha-header-code.revealed .ha-header-code-cover {
+.ha-header-stamp-container ::deep .ha-header-code.revealed .ha-header-code-cover {
     display: none;
 }
 
-.ha-header-code.revealed .ha-header-code-value {
+.ha-header-stamp-container ::deep .ha-header-code.revealed .ha-header-code-value {
     display: block;
 }
 

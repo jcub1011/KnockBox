@@ -1,0 +1,102 @@
+@namespace KnockBox.Core.Components.Shared
+@using KnockBox.Core.Services.Navigation
+@using KnockBox.Core.Services.State.Games.Shared
+@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.JSInterop
+@implements IDisposable
+
+<button class="@ClassName @(_isRevealed ? "revealed" : "")"
+        @onclick="Toggle"
+        @onauxclick="OnAuxClick"
+        @onauxclick:preventDefault="true"
+        @oncontextmenu="CopyCodeAsync"
+        @oncontextmenu:preventDefault="true"
+        @onpointerdown="OnPointerDown"
+        @onpointerup="OnPointerUp"
+        @onpointercancel="OnPointerCancel"
+        @onpointerleave="OnPointerCancel"
+        title="Click to reveal. Right-click/long-press to copy. Middle-click to join in a new tab.">
+    <span class="@CoverClassName">@CoverText</span>
+    <span class="@ValueClassName">@Code</span>
+</button>
+
+@code {
+    [Inject] INavigationService NavigationService { get; set; } = default!;
+    [Inject] IGameSessionService GameSessionService { get; set; } = default!;
+    [Inject] IJSRuntime JSRuntime { get; set; } = default!;
+    [Inject] ILogger<RoomCodeButton> Logger { get; set; } = default!;
+
+    [Parameter, EditorRequired] public string ClassName { get; set; } = "";
+    [Parameter, EditorRequired] public string CoverClassName { get; set; } = "";
+    [Parameter, EditorRequired] public string ValueClassName { get; set; } = "";
+    [Parameter] public string CoverText { get; set; } = "Join Code";
+
+    private bool _isRevealed;
+    private CancellationTokenSource? _longPressCts;
+
+    private string Code =>
+        GameSessionService.TryGetCurrentSession(out var session)
+            ? session.LobbyRegistration.Code
+            : string.Empty;
+
+    private void Toggle() => _isRevealed = !_isRevealed;
+
+    private async Task OnAuxClick(MouseEventArgs e)
+    {
+        if (e.Button != 1) return;
+        if (!GameSessionService.TryGetCurrentSession(out var session)) return;
+
+        var url = NavigationService.GetJoinUri(session.LobbyRegistration.Code, fresh: true);
+        await JSRuntime.InvokeVoidAsync("window.open", url, "_blank");
+    }
+
+    private async Task CopyCodeAsync()
+    {
+        if (!GameSessionService.TryGetCurrentSession(out var session)) return;
+
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", session.LobbyRegistration.Code);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error copying lobby code.");
+        }
+    }
+
+    private void OnPointerDown(PointerEventArgs e)
+    {
+        if (e.PointerType != "touch") return;
+
+        CancelLongPress();
+        var cts = new CancellationTokenSource();
+        _longPressCts = cts;
+        var token = cts.Token;
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(500, token);
+                await InvokeAsync(CopyCodeAsync);
+            }
+            catch (OperationCanceledException) { }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Long-press copy failed.");
+            }
+        }, token);
+    }
+
+    private void OnPointerUp(PointerEventArgs e) => CancelLongPress();
+    private void OnPointerCancel(PointerEventArgs e) => CancelLongPress();
+
+    private void CancelLongPress()
+    {
+        _longPressCts?.Cancel();
+        _longPressCts?.Dispose();
+        _longPressCts = null;
+    }
+
+    public void Dispose() => CancelLongPress();
+}

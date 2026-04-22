@@ -1,21 +1,15 @@
 @using KnockBox.Core.Services.Navigation
 @using KnockBox.Core.Services.State.Games.Shared
-@using Microsoft.JSInterop
 
 <div class="op-header">
     <a class="op-header-brand" href="@NavigationService.GetHomeUri()" title="Click to return home">
         <span class="op-header-brand-glyph">÷</span><span class="op-header-brand-text">OPERATOR</span><span class="op-header-brand-cursor">_</span>
     </a>
     <div class="op-header-actions">
-        <button class="op-header-code @(_isRevealed ? "revealed" : "")"
-                @onclick="Toggle"
-                @onmouseup="OnMouseUp"
-                @oncontextmenu="CopyCodeAsync"
-                @oncontextmenu:preventDefault="true"
-                title="Click to reveal. Right-click/long-press to copy. Middle-click to join in a new tab.">
-            <span class="op-header-code-cover">Join Code</span>
-            <span class="op-header-code-value">@Code</span>
-        </button>
+        <RoomCodeButton ClassName="op-header-code"
+                        CoverClassName="op-header-code-cover"
+                        ValueClassName="op-header-code-value"
+                        CoverText="Join Code" />
         <button class="op-header-leave" @onclick="Leave" title="Leave Session" aria-label="Leave Session">
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
         </button>
@@ -25,40 +19,6 @@
 @code {
     [Inject] INavigationService NavigationService { get; set; } = default!;
     [Inject] IGameSessionService GameSessionService { get; set; } = default!;
-    [Inject] IJSRuntime JSRuntime { get; set; } = default!;
-    [Inject] ILogger<OperatorHeader> Logger { get; set; } = default!;
-
-    private bool _isRevealed;
-
-    private string Code =>
-        GameSessionService.TryGetCurrentSession(out var session)
-            ? session.LobbyRegistration.Code
-            : string.Empty;
-
-    private void Toggle() => _isRevealed = !_isRevealed;
 
     private void Leave() => GameSessionService.LeaveCurrentSession(navigateHome: true);
-
-    private async Task OnMouseUp(MouseEventArgs e)
-    {
-        if (e.Button == 1 && GameSessionService.TryGetCurrentSession(out var session))
-        {
-            var url = NavigationService.GetJoinUri(session.LobbyRegistration.Code, fresh: true);
-            await JSRuntime.InvokeVoidAsync("window.open", url, "_blank");
-        }
-    }
-
-    private async Task CopyCodeAsync()
-    {
-        if (!GameSessionService.TryGetCurrentSession(out var session)) return;
-
-        try
-        {
-            await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", session.LobbyRegistration.Code);
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "Error copying lobby code.");
-        }
-    }
 }
