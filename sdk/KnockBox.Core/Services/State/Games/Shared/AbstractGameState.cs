@@ -96,7 +96,7 @@ namespace KnockBox.Core.Services.State.Games.Shared
             get
             {
                 using var scope = _playerLock.EnterScope();
-                if (_players.Count == 0) return Array.Empty<User>();
+                if (_players.Count == 0) return [];
                 var result = new User[_players.Count];
                 int i = 0;
                 foreach (var entry in _players.Values)
@@ -113,7 +113,7 @@ namespace KnockBox.Core.Services.State.Games.Shared
             get
             {
                 using var scope = _playerLock.EnterScope();
-                if (_kickedPlayers.Count == 0) return Array.Empty<User>();
+                if (_kickedPlayers.Count == 0) return [];
                 var result = new List<User>(_kickedPlayers.Count);
                 foreach (var entry in _players.Values)
                 {

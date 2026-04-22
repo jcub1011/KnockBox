@@ -76,9 +76,9 @@ namespace KnockBox.HiddenAgendaTests.Unit.Logic.Games.HiddenAgenda.States
             p0.HeldEventCard = EventCardDefinitions.Catalog;
             
             var drawn = new List<CurationCard> { 
-                new CurationCard(CurationCardType.Acquire, "C1", []),
-                new CurationCard(CurationCardType.Acquire, "C2", []),
-                new CurationCard(CurationCardType.Acquire, "C3", [])
+                new(CurationCardType.Acquire, "C1", []),
+                new(CurationCardType.Acquire, "C2", []),
+                new(CurationCardType.Acquire, "C3", [])
             };
             p1.CardDrawHistory.Add(new CardDrawRecord(1, drawn));
 

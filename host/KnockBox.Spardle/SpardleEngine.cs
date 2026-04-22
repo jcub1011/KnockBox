@@ -580,7 +580,7 @@ public class SpardleEngine(
             int maxStart = i - MinCompoundFragmentLength;
             for (int j = 0; j <= maxStart; j++)
             {
-                if (dp[j] && service.IsValidWord(span.Slice(j, i - j)))
+                if (dp[j] && service.IsValidWord(span[j..i]))
                 {
                     dp[i] = true;
                     break;

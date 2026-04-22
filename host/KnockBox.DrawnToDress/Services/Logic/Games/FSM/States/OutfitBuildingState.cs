@@ -235,7 +235,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
                     var candidate = new OutfitSubmission
                     {
                         PlayerId = cmd.PlayerId,
-                        SelectedItemsByType = [with(cmd.SelectedItemsByType)],
+                        SelectedItemsByType = new(cmd.SelectedItemsByType),
                     };
 
                     var allPreviousOutfits = context.GamePlayers.Values
@@ -264,7 +264,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
             player.SetOutfit(_outfitRound, new OutfitSubmission
             {
                 PlayerId = cmd.PlayerId,
-                SelectedItemsByType = [with(cmd.SelectedItemsByType)],
+                SelectedItemsByType = new(cmd.SelectedItemsByType),
                 SubmittedAt = DateTimeOffset.UtcNow,
             });
 

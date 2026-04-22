@@ -48,22 +48,30 @@
     private SpardleState? _subscribedState;
     private IDisposable? _stateSubscription;
     private IReadOnlyList<RankedEntry>? _rankedCache;
-
+    
     protected override void OnParametersSet()
     {
-        if (!ReferenceEquals(_subscribedState, State))
+        if (ReferenceEquals(_subscribedState, State)) return;
+
+        _stateSubscription?.Dispose();
+        _stateSubscription = null;
+
+        if (State is null)
         {
-            _stateSubscription?.Dispose();
-            _subscribedState = State;
-            _stateSubscription = State.StateChangedEventManager.Subscribe(InvalidateCacheAsync);
+            _subscribedState = null;
             _rankedCache = null;
+            return;
         }
+
+        _subscribedState = State;
+        _rankedCache = null;
+        _stateSubscription = State.StateChangedEventManager.Subscribe(OnStateChangedAsync);
     }
 
-    private ValueTask InvalidateCacheAsync()
+    private async ValueTask OnStateChangedAsync()
     {
         _rankedCache = null;
-        return ValueTask.CompletedTask;
+        await InvokeAsync(StateHasChanged);
     }
 
     public void Dispose()

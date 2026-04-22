@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 
 namespace KnockBox.Core.Primitives.Returns
@@ -28,10 +29,12 @@ namespace KnockBox.Core.Primitives.Returns
             _kind = ErrorKind.Failure;
         }
 
-        private ErrorWrapper(ErrorKind kind)
+        private ErrorWrapper(ErrorKind cancellationKind)
         {
+            Debug.Assert(cancellationKind == ErrorKind.Cancellation,
+                "This constructor only builds cancellation wrappers. Use the TError ctor for failures.");
             Error = default!;
-            _kind = kind;
+            _kind = cancellationKind;
         }
 
         /// <summary>

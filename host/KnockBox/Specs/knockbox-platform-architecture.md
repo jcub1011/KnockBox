@@ -484,6 +484,8 @@ Each game controls its full user experience: the lobby layout, gameplay phases, 
 
 **Security check on navigation:** When a user lands on a game page, the page validates in `OnInitializedAsync` that (1) the user has an active session in `IGameSessionService` and (2) the URI in the URL matches the session's registered lobby URI. If either check fails, the user is redirected home.
 
+All first-party lobby pages share this validation through `LobbyPageBase<TGameState>` (in `KnockBox.Core`), which extracts the trailing obfuscated room code from `session.LobbyRegistration.Uri` via `LobbyUriHelper.TryExtractObfuscatedRoomCode` and compares it to the incoming `{ObfuscatedRoomCode}` route parameter. The base also validates that `session.LobbyRegistration.State` matches the plugin's expected state type and that the state is not disposed — any mismatch redirects home. New lobby pages should inherit `LobbyPageBase<TGameState>` so the validation stays uniform.
+
 ---
 
 ## Join-to-Start Flow

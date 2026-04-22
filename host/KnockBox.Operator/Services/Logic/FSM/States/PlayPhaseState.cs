@@ -19,7 +19,7 @@ public class PlayPhaseState : IOperatorGameState, ITimedGameState<OperatorGameCo
         var playerId = context.State.TurnManager.CurrentPlayer;
         if (playerId != null && context.GamePlayers.TryGetValue(playerId, out var currentPlayer))
         {
-            currentPlayer.PreDrawCardIds = [with(currentPlayer.Hand.Select(c => c.Id))];
+            currentPlayer.PreDrawCardIds = [.. currentPlayer.Hand.Select(c => c.Id)];
         }
 
         // Clear transient UI states
@@ -151,7 +151,7 @@ public class PlayPhaseState : IOperatorGameState, ITimedGameState<OperatorGameCo
             {
                 actionCommand.SetupPendingState();
                 context.State.PendingGameActionCommand = actionCommand;
-                context.State.ReactionTargetPlayerIds = [with(actionCommand.GetReactionTargetIds())];
+                context.State.ReactionTargetPlayerIds = [.. actionCommand.GetReactionTargetIds()];
                 context.State.PlayerReactions.Clear();
                 context.State.Phase = OperatorGamePhase.Reaction;
                 return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromValue(new ReactionState());

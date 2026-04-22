@@ -19,6 +19,14 @@ namespace KnockBox.Core.Primitives.Events
             return newListeners;
         }
 
+        /// <summary>
+        /// Removes the first matching listener and returns a fresh snapshot.
+        /// </summary>
+        /// <remarks>
+        /// O(n) in the subscriber count: both the <see cref="Array.IndexOf{T}(T[], T)"/> scan
+        /// and the <see cref="Array.Copy(Array, int, Array, int, int)"/> traverse the list.
+        /// Callers with hot subscribe/unsubscribe churn on large subscriber counts should batch.
+        /// </remarks>
         public static T[] RemoveListener<T>(T[] listeners, T callback) where T : Delegate
         {
             int index = Array.IndexOf(listeners, callback);

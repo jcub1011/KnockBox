@@ -34,9 +34,9 @@ namespace KnockBox.Services.State.Users
                     tokenResult = await sessionTokenProvider.GetSessionTokenAsync(ct);
                     if (tokenResult.IsSuccess) break;
 
-                    logger.LogError("Error getting session token (attempt {attempt}/{max}). Reattempting.", attempt + 1, MAX_SESSION_TOKEN_RETRIEVALS);
-                    if (attempt < MAX_SESSION_TOKEN_RETRIEVALS - 1)
-                        await Task.Delay(100, ct);
+                    tokenResult.TryGetFailure(out var failure);
+                    logger.LogError("Error getting session token (attempt {attempt}/{max}): {error}. Reattempting.",
+                        attempt + 1, MAX_SESSION_TOKEN_RETRIEVALS, failure);
                 }
 
                 if (tokenResult.TryGetSuccess(out var token))
@@ -78,8 +78,18 @@ namespace KnockBox.Services.State.Users
 
         private void OnNameChanged(UserNameChangedArgs args)
         {
-            // Schedule the persist as a tracked task so a post-dispose fire is cancelled cleanly.
-            _ = SaveNameAsync(args.NewName, _disposeCts.Token);
+            // Guard against a late event fire racing with Dispose — Dispose unsubscribes,
+            // but an invocation that already started before unsubscribe will keep going.
+            if (Volatile.Read(ref _disposed) == 1) return;
+
+            try
+            {
+                _ = SaveNameAsync(args.NewName, _disposeCts.Token);
+            }
+            catch (ObjectDisposedException)
+            {
+                // Service disposed — drop silently.
+            }
         }
 
         private async Task SaveNameAsync(string name, CancellationToken ct)
@@ -89,6 +99,7 @@ namespace KnockBox.Services.State.Users
                 await localStorageService.SetAsync("user", "name", name, ct);
             }
             catch (OperationCanceledException) { /* Service disposed — drop silently. */ }
+            catch (ObjectDisposedException) { /* Service disposed — drop silently. */ }
             catch (Exception ex)
             {
                 logger.LogError(ex, "Error saving user name.");
@@ -100,6 +111,7 @@ namespace KnockBox.Services.State.Users
             if (Interlocked.Exchange(ref _disposed, 1) == 1) return;
 
             CurrentUser?.NameChanged -= OnNameChanged;
+
             _disposeCts.Cancel();
             _disposeCts.Dispose();
         }

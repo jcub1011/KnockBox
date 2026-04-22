@@ -329,6 +329,93 @@ public sealed class AbstractGameStateTests
         Assert.IsTrue(result.IsFailure);
     }
 
+    [TestMethod]
+    public async Task KickPlayer_FiresPlayerUnregisteredExactlyOnce()
+    {
+        using var state = MakeState();
+        state.UpdateJoinableStatus(true);
+        var player = MakeUser();
+        state.RegisterPlayer(player);
+
+        var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        int fired = 0;
+        state.PlayerUnregistered += _ =>
+        {
+            Interlocked.Increment(ref fired);
+            tcs.TrySetResult();
+        };
+
+        state.KickPlayer(player);
+
+        // Deterministically await the first notification.
+        var completed = await Task.WhenAny(tcs.Task, Task.Delay(1000));
+        Assert.AreSame(tcs.Task, completed, "PlayerUnregistered should have fired within timeout.");
+
+        // Brief delay to ensure no trailing duplicate notifications arrive.
+        await Task.Delay(50);
+        Assert.AreEqual(1, fired, "PlayerUnregistered should fire exactly once per kick.");
+    }
+
+    [TestMethod]
+    public async Task KickPlayer_FiresStateChangedExactlyOnce()
+    {
+        using var state = MakeState();
+        state.UpdateJoinableStatus(true);
+        var player = MakeUser();
+        state.RegisterPlayer(player);
+
+        // ThreadSafeEventManager.Notify dispatches on Task.Run. Drain any pending
+        // notifications from UpdateJoinableStatus before subscribing.
+        await Task.Delay(50);
+
+        var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        int notifications = 0;
+        using var subscription = state.StateChangedEventManager.Subscribe(() =>
+        {
+            Interlocked.Increment(ref notifications);
+            tcs.TrySetResult();
+            return ValueTask.CompletedTask;
+        });
+
+        state.KickPlayer(player);
+
+        // Deterministically await the first notification.
+        var completed = await Task.WhenAny(tcs.Task, Task.Delay(1000));
+        Assert.AreSame(tcs.Task, completed, "StateChanged should have fired within timeout.");
+
+        // Brief delay to ensure no trailing duplicate notifications arrive.
+        await Task.Delay(50);
+        Assert.AreEqual(1, notifications, "KickPlayer should produce exactly one StateChanged notification.");
+    }
+
+    [TestMethod]
+    public void KickPlayer_RemovesFromPlayersAndMarksKicked()
+    {
+        using var state = MakeState();
+        state.UpdateJoinableStatus(true);
+        var player = MakeUser();
+        state.RegisterPlayer(player);
+
+        state.KickPlayer(player);
+
+        Assert.DoesNotContain(player, state.Players);
+        Assert.IsTrue(state.IsKicked(player),
+            "Kicked player should appear in KickedPlayers after KickPlayer completes.");
+    }
+
+    [TestMethod]
+    public void KickedPlayers_ContainsKickedUser()
+    {
+        using var state = MakeState();
+        state.UpdateJoinableStatus(true);
+        var player = MakeUser();
+        state.RegisterPlayer(player);
+
+        state.KickPlayer(player);
+
+        Assert.Contains(player, state.KickedPlayers);
+    }
+
     // ── Execute ──────────────────────────────────────────────────────────────
 
     [TestMethod]

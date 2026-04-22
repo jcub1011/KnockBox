@@ -137,8 +137,7 @@ namespace KnockBox.Core.Components.Shared
         {
             OnLobbyDisposing();
             _tickSubscription?.Dispose();
-            if (GameState is not null)
-                GameState.OnStateDisposed -= HandleStateDisposed;
+            GameState?.OnStateDisposed -= HandleStateDisposed;
             _stateSubscription?.Dispose();
             base.Dispose();
         }
@@ -150,17 +149,7 @@ namespace KnockBox.Core.Components.Shared
 
         protected void ReturnToHome() => NavigationService.ToHome();
 
-        private void HandleStateDisposed()
-        {
-            try
-            {
-                _ = HandleStateDisposedAsync();
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError(ex, "Error handling game state disposal in lobby.");
-            }
-        }
+        private void HandleStateDisposed() => _ = HandleStateDisposedAsync();
 
         private async Task HandleStateDisposedAsync()
         {

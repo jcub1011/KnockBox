@@ -6,6 +6,15 @@ namespace KnockBox.Core.Plugins
     /// <summary>
     /// Represents a game module that can be dynamically loaded into the KnockBox platform.
     /// </summary>
+    /// <remarks>
+    /// The set of <see cref="IGameModule"/> instances resolved from the DI container is fixed
+    /// at host startup (populated by <c>PluginLoader.LoadModules</c> during
+    /// <c>RegisterLogic</c>) and is not mutated afterward. Callers that cache a projection
+    /// of the module list — for example, the home page's alphabetically-sorted tile list and
+    /// the admin dashboard's per-game row list — rely on this invariant to skip re-sorting on
+    /// every render. If plugin hot-reload is ever introduced, those caches will need explicit
+    /// invalidation.
+    /// </remarks>
     public interface IGameModule
     {
         /// <summary>
