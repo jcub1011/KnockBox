@@ -137,6 +137,7 @@
 .spd-intro-ring {
     position: absolute;
     inset: 0;
+    overflow: visible;
     transform: rotate(-90deg);
 }
 

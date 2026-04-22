@@ -1,4 +1,5 @@
 .spd-keyboard {
+    --spd-key-w: clamp(30px, 8vw, 56px);
     display: flex;
     flex-direction: column;
     gap: clamp(4px, 0.8vw, 8px);
@@ -16,11 +17,12 @@
 }
 
 .spd-key {
-    flex: 1 1 auto;
+    box-sizing: border-box;
+    flex: 0 1 var(--spd-key-w);
     min-width: 0;
     height: clamp(36px, 5.5vh, 52px);
-    padding: 0 clamp(4px, 1vw, 10px);
-    font-family: var(--spd-font-display);
+    padding: 0;
+    font-family: var(--spd-font-tile);
     font-size: clamp(0.8rem, 1.6vw, 1.05rem);
     letter-spacing: 0.06em;
     text-transform: uppercase;
@@ -47,7 +49,7 @@
 }
 
 .spd-key-wide {
-    flex: 1.6 1 auto;
+    flex: 0 1 calc(var(--spd-key-w) * 1.6);
     font-size: clamp(0.65rem, 1.2vw, 0.85rem);
 }
 
@@ -109,7 +111,6 @@
     .spd-key {
         height: 40px;
         font-size: 0.85rem;
-        padding: 0 3px;
         border-width: 1.5px;
     }
     .spd-key-wide {
