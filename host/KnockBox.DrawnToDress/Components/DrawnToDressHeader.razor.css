@@ -31,6 +31,7 @@
     background-image: radial-gradient(circle at 6px 0, transparent 6px, white 6px);
     background-size: 12px 12px;
     z-index: 1;
+    display: none;
 }
 
 .dtd-header-brand {
