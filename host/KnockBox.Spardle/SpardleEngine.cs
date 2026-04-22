@@ -351,7 +351,7 @@ public class SpardleEngine(
         }
         else
         {
-            EnterRoundIntro(s, TimeSpan.FromSeconds(2));
+            EnterPlaying(s);
         }
     }
 

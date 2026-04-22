@@ -118,7 +118,7 @@ public class SpardleEngineTests
     }
 
     [TestMethod]
-    public async Task SprinterWin_EntersRoundResultsThenNextIntro()
+    public async Task SprinterWin_EntersRoundResultsThenNextRoundPlaying()
     {
         var (state, host) = await CreateStateAsync();
         state.TotalRounds = 2;
@@ -141,9 +141,11 @@ public class SpardleEngineTests
         Assert.AreEqual(10, outcome.PointsAwarded);
         Assert.AreEqual(10, state.PlayerStates[host.Id].TotalScore);
 
-        // After the transition delay, next round's intro begins.
-        await WaitForPhaseAsync(state, GamePhase.RoundIntro, timeoutMs: 1500);
-        Assert.AreEqual(GamePhase.RoundIntro, state.Phase);
+        // After the results delay, skip the round-intro countdown and start the next round directly.
+        await WaitForPhaseAsync(state, GamePhase.Playing, timeoutMs: 1500);
+        Assert.AreEqual(GamePhase.Playing, state.Phase);
+        Assert.AreEqual(2, state.CurrentRound);
+        Assert.AreEqual("brave", state.TargetWord);
     }
 
     [TestMethod]

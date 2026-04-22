@@ -2,9 +2,12 @@
 @using KnockBox.Spardle.Models
 @using KnockBox.Spardle
 @using KnockBox.Spardle.Services
+@using Microsoft.JSInterop
 @inject IUserService UserService
 @inject SpardleEngine GameEngine
 @inject IWordListService WordList
+@inject IJSRuntime JSRuntime
+@implements IAsyncDisposable
 
 <div class="spd-lobby">
     <div class="spd-lobby-stage">
@@ -85,6 +88,28 @@
                                 <option value="@WordPoolMode.CsvUpload">CSV Upload</option>
                             </select>
                         </label>
+                        @if (State.WordPoolMode == WordPoolMode.CsvUpload)
+                        {
+                            <label class="spd-lobby-field spd-lobby-field-full">
+                                <span>CSV File (max 1MB)</span>
+                                <div class="spd-csv-picker">
+                                    <input @ref="_csvFileInput"
+                                           type="file"
+                                           accept=".csv,text/csv,text/plain"
+                                           class="spd-csv-picker-input" />
+                                    <span class="spd-csv-picker-button">Choose File</span>
+                                    <span class="spd-csv-picker-name">@(string.IsNullOrEmpty(_csvFileName) ? "No file chosen" : _csvFileName)</span>
+                                </div>
+                                @if (_csvWordCount > 0 && string.IsNullOrEmpty(_csvUploadError))
+                                {
+                                    <p class="spd-lobby-hint spd-csv-count">@_csvWordCount word@(_csvWordCount == 1 ? "" : "s") uploaded</p>
+                                }
+                                @if (!string.IsNullOrEmpty(_csvUploadError))
+                                {
+                                    <p class="spd-lobby-hint spd-lobby-hint-error">@_csvUploadError</p>
+                                }
+                            </label>
+                        }
                         <label class="spd-lobby-field">
                             <span>Order</span>
                             <select @bind:get="State.WordOrderMode" @bind:set="SetWordOrderMode">
@@ -135,13 +160,16 @@
                                 </label>
                             }
                         }
-                        <label class="spd-lobby-field spd-lobby-field-full">
-                            <span>Custom Words (one per line)</span>
-                            <textarea class="spd-lobby-textarea spd-mono"
-                                      rows="5"
-                                      value="@_customPoolText"
-                                      @oninput="OnCustomPoolChanged"></textarea>
-                        </label>
+                        @if (State.WordPoolMode == WordPoolMode.HostDefined)
+                        {
+                            <label class="spd-lobby-field spd-lobby-field-full">
+                                <span>Custom Words (one per line)</span>
+                                <textarea class="spd-lobby-textarea spd-mono"
+                                          rows="5"
+                                          value="@_customPoolText"
+                                          @oninput="OnCustomPoolChanged"></textarea>
+                            </label>
+                        }
                     </div>
                 </section>
 
@@ -227,6 +255,14 @@
     private string? _startError;
     private CancellationTokenSource? _startErrorCts;
 
+    private ElementReference _csvFileInput;
+    private IJSObjectReference? _csvUploadModule;
+    private DotNetObjectReference<SpardleLobbyPhase>? _csvSelfRef;
+    private string? _csvUploadError;
+    private bool _csvModuleAttached;
+    private string? _csvFileName;
+    private int _csvWordCount;
+
     private bool IsHost => UserService.CurrentUser?.Id == State.Host.Id;
     private bool CanStart => State.CustomWordPool.Count > 0
         || State.WordPoolMode == WordPoolMode.NytStandard
@@ -243,7 +279,28 @@
     // Every setter below mutates shared server state; each wraps the assignment in
     // State.Execute so readers on other circuits never see a torn value, and so the
     // notification fires after the lock is released.
-    private void SetWordPoolMode(WordPoolMode value) => State.Execute(() => State.WordPoolMode = value);
+    private void SetWordPoolMode(WordPoolMode value)
+    {
+        // NYT and Full Dictionary have no visible custom-words editor, so any leftover
+        // CustomWordPool entries would silently override the built-in source. Clear them
+        // on transition so the mode the user selects is the one the engine actually uses.
+        bool clearCustom = value is WordPoolMode.NytStandard or WordPoolMode.FullDictionary;
+        State.Execute(() =>
+        {
+            State.WordPoolMode = value;
+            if (clearCustom)
+            {
+                State.CustomWordPool = [];
+            }
+        });
+        if (clearCustom)
+        {
+            _customPoolText = string.Empty;
+            _csvFileName = null;
+            _csvWordCount = 0;
+            _csvUploadError = null;
+        }
+    }
     private void SetWordOrderMode(WordOrderMode value) => State.Execute(() => State.WordOrderMode = value);
     private void SetConstantWordLength(bool value) => State.Execute(() => State.ConstantWordLength = value);
     private void SetTargetWordLength(int value) => State.Execute(() => State.TargetWordLength = value);
@@ -278,6 +335,60 @@
             .Where(w => w.Length is > 0 and <= 64)
             .ToList();
         State.Execute(() => State.CustomWordPool = words);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        bool shouldBeAttached = State.WordPoolMode == WordPoolMode.CsvUpload;
+
+        if (shouldBeAttached && !_csvModuleAttached)
+        {
+            _csvUploadModule ??= await JSRuntime.InvokeAsync<IJSObjectReference>(
+                "import", "./_content/KnockBox.Spardle/js/spardle-csv-upload.js");
+            _csvSelfRef ??= DotNetObjectReference.Create(this);
+            await _csvUploadModule.InvokeVoidAsync("register", _csvFileInput, _csvSelfRef);
+            _csvModuleAttached = true;
+        }
+        else if (!shouldBeAttached && _csvModuleAttached)
+        {
+            _csvModuleAttached = false;
+        }
+    }
+
+    [JSInvokable]
+    public void OnCsvUploaded(string fileName, string joinedText)
+    {
+        _customPoolText = joinedText ?? string.Empty;
+        var words = _customPoolText
+            .Split(new[] { '\n', '\r', ',' }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(w => w.Trim().ToLowerInvariant())
+            .Where(w => w.Length is > 0 and <= 64)
+            .ToList();
+        State.Execute(() => State.CustomWordPool = words);
+        _csvFileName = fileName;
+        _csvWordCount = words.Count;
+        _csvUploadError = null;
+        StateHasChanged();
+    }
+
+    [JSInvokable]
+    public void OnCsvUploadError(string message)
+    {
+        _csvUploadError = message;
+        StateHasChanged();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            if (_csvUploadModule is not null)
+            {
+                await _csvUploadModule.DisposeAsync();
+            }
+        }
+        catch (JSDisconnectedException) { /* circuit already torn down */ }
+        _csvSelfRef?.Dispose();
     }
 
     private void OnRoundTimerChanged(ChangeEventArgs e)
