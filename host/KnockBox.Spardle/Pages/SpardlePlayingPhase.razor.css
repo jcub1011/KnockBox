@@ -40,17 +40,28 @@
 /* ── Top bar ───────────────────────────────────────────────────────── */
 
 .spd-play-top {
+    position: relative;
+    isolation: isolate;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: clamp(8px, 1.5vw, 14px);
     padding: clamp(6px, 1vw, 10px) clamp(10px, 1.5vw, 14px);
-    background: var(--spd-bg-panel);
     border: 1px solid var(--spd-border);
     border-radius: 8px;
-    backdrop-filter: blur(4px);
     flex-shrink: 0;
     animation: spd-mount-top 450ms cubic-bezier(0.16, 1, 0.3, 1) 120ms both;
+}
+
+.spd-play-top::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: var(--spd-bg-panel);
+    backdrop-filter: blur(4px);
+    border-radius: inherit;
+    z-index: -1;
+    pointer-events: none;
 }
 
 .spd-play-round {

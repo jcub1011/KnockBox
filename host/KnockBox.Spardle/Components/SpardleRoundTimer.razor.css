@@ -32,13 +32,13 @@
     height: clamp(6px, 1vh, 10px);
     background: rgba(0, 0, 0, 0.45);
     border-radius: 999px;
-    overflow: hidden;
 }
 
 .spd-timer-fill {
     height: 100%;
     background: linear-gradient(90deg, var(--spd-correct) 0%, var(--spd-warn) 55%, var(--spd-danger) 100%);
     background-size: 100% 100%;
+    border-radius: 999px;
     transition: width 0.15s linear;
     box-shadow: 0 0 12px rgba(20, 241, 149, 0.35);
 }

@@ -155,6 +155,7 @@ article {
 
 article.entering-from-home {
     animation: content-enter 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    overflow: hidden;
 }
 
 @keyframes content-enter {
@@ -187,6 +188,7 @@ header.entering-from-home {
 
 article.exiting-to-home {
     animation: content-exit 0.4s ease-in both;
+    overflow: hidden;
 }
 
 @keyframes content-exit {

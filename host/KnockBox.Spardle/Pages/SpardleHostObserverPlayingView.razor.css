@@ -11,16 +11,27 @@
 }
 
 .spd-obs-top {
+    position: relative;
+    isolation: isolate;
     flex: 0 0 auto;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 1rem;
     padding: 0.5rem 1rem;
-    background: var(--spd-bg-panel);
     border: 1px solid var(--spd-border-strong);
     border-radius: 1rem;
+}
+
+.spd-obs-top::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: var(--spd-bg-panel);
     backdrop-filter: blur(8px);
+    border-radius: inherit;
+    z-index: -1;
+    pointer-events: none;
 }
 
 .spd-obs-round {
