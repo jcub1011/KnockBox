@@ -79,7 +79,7 @@ public static class BoardDefinitions
     {
         if (!adj.TryGetValue(u, out var list))
         {
-            list = [];
+            list = new List<int>();
             adj[u] = list;
         }
         ((List<int>)list).Add(v);
