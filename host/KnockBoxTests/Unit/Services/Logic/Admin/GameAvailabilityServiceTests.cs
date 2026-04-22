@@ -111,7 +111,7 @@ public sealed class GameAvailabilityServiceTests
 
         var svc = CreateService();
         Assert.IsTrue(svc.IsEnabled("card-counter"));
-        Assert.AreEqual(0, svc.GetAll().Count);
+        Assert.IsEmpty(svc.GetAll());
     }
 
     [TestMethod]

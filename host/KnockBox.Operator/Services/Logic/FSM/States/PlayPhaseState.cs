@@ -19,7 +19,7 @@ public class PlayPhaseState : IOperatorGameState, ITimedGameState<OperatorGameCo
         var playerId = context.State.TurnManager.CurrentPlayer;
         if (playerId != null && context.GamePlayers.TryGetValue(playerId, out var currentPlayer))
         {
-            currentPlayer.PreDrawCardIds = new System.Collections.Generic.HashSet<Guid>(currentPlayer.Hand.Select(c => c.Id));
+            currentPlayer.PreDrawCardIds = [with(currentPlayer.Hand.Select(c => c.Id))];
         }
 
         // Clear transient UI states
@@ -151,7 +151,7 @@ public class PlayPhaseState : IOperatorGameState, ITimedGameState<OperatorGameCo
             {
                 actionCommand.SetupPendingState();
                 context.State.PendingGameActionCommand = actionCommand;
-                context.State.ReactionTargetPlayerIds = new HashSet<string>(actionCommand.GetReactionTargetIds());
+                context.State.ReactionTargetPlayerIds = [with(actionCommand.GetReactionTargetIds())];
                 context.State.PlayerReactions.Clear();
                 context.State.Phase = OperatorGamePhase.Reaction;
                 return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromValue(new ReactionState());
@@ -227,16 +227,16 @@ public class PlayPhaseState : IOperatorGameState, ITimedGameState<OperatorGameCo
             pState.Hand.Remove(numberCard);
             context.State.DiscardPile.Add(numberCard);
 
-            var playCommand = new PlayCardsCommand(playerId, new List<Guid> { numberCard.Id }, null);
-            new StandardPlayCommand(context, playCommand, new List<Card> { numberCard }).Execute();
+            var playCommand = new PlayCardsCommand(playerId, [numberCard.Id], null);
+            new StandardPlayCommand(context, playCommand, [numberCard]).Execute();
         }
         else if (operatorCard != null)
         {
             pState.Hand.Remove(operatorCard);
             context.State.DiscardPile.Add(operatorCard);
 
-            var playCommand = new PlayCardsCommand(playerId, new List<Guid> { operatorCard.Id }, null);
-            new StandardPlayCommand(context, playCommand, new List<Card> { operatorCard }).Execute();
+            var playCommand = new PlayCardsCommand(playerId, [operatorCard.Id], null);
+            new StandardPlayCommand(context, playCommand, [operatorCard]).Execute();
         }
         else
         {

@@ -19,7 +19,7 @@ public class TaskDefinitionTests
     [TestMethod]
     public void AllTasks_CorrectCountAndUniqueIds()
     {
-        Assert.AreEqual(31, TaskPool.AllTasks.Count);
+        Assert.HasCount(31, TaskPool.AllTasks);
         
         var ids = TaskPool.AllTasks.Select(t => t.Id).ToList();
         CollectionAssert.AllItemsAreUnique(ids);
@@ -68,7 +68,7 @@ public class TaskDefinitionTests
     public void GetPoolForPlayerCount_ThreePlayers_ExcludesRivalry()
     {
         var pool = TaskPool.GetPoolForPlayerCount(3);
-        Assert.AreEqual(25, pool.Count);
+        Assert.HasCount(25, pool);
         Assert.IsTrue(pool.All(t => t.Category != TaskCategory.Rivalry));
     }
 
@@ -76,7 +76,7 @@ public class TaskDefinitionTests
     public void GetPoolForPlayerCount_FourPlayers_HasThirtyTasks()
     {
         var pool = TaskPool.GetPoolForPlayerCount(4);
-        Assert.AreEqual(30, pool.Count);
+        Assert.HasCount(30, pool);
     }
 
     [TestMethod]
@@ -88,7 +88,7 @@ public class TaskDefinitionTests
         
         var drawn = TaskPool.DrawTasks(rng, pool, count);
         
-        Assert.AreEqual(count, drawn.Count);
+        Assert.HasCount(count, drawn);
         CollectionAssert.AllItemsAreUnique(drawn.Select(t => t.Id).ToList());
     }
 }

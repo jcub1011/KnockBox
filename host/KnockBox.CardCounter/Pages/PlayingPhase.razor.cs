@@ -46,10 +46,10 @@ namespace KnockBox.CardCounter.Pages
         private int _opChangeToastKey;
 
         // ── Reorder state ─────────────────────────────────────────────────────
-        protected List<int> SelectedReorderIndices = new();
+        protected List<int> SelectedReorderIndices = [];
 
         // ── Discard state ─────────────────────────────────────────────────────
-        private HashSet<int> _selectedDiscardIndices = new();
+        private HashSet<int> _selectedDiscardIndices = [];
 
         // ── Mobile opponent popover state ─────────────────────────────────────
         private string? _expandedOpponentId;

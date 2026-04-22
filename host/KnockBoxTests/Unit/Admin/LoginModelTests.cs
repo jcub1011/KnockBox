@@ -42,7 +42,7 @@ public sealed class LoginModelTests
         var result = await model.OnPostAsync();
 
         Assert.IsInstanceOfType<PageResult>(result);
-        StringAssert.Contains(model.Error ?? "", "at least");
+        Assert.Contains("at least", model.Error ?? "");
         _settingsMock.Verify(x => x.SetAdminPasswordAsync(It.IsAny<string>()), Times.Never);
     }
 
@@ -57,7 +57,7 @@ public sealed class LoginModelTests
         var result = await model.OnPostAsync();
 
         Assert.IsInstanceOfType<PageResult>(result);
-        StringAssert.Contains(model.Error ?? "", "do not match");
+        Assert.Contains("do not match", model.Error ?? "");
         _settingsMock.Verify(x => x.SetAdminPasswordAsync(It.IsAny<string>()), Times.Never);
     }
 
@@ -98,7 +98,7 @@ public sealed class LoginModelTests
         var result = await model.OnPostAsync();
 
         Assert.IsInstanceOfType<PageResult>(result);
-        StringAssert.Contains(model.Error ?? "", "Invalid");
+        Assert.Contains("Invalid", model.Error ?? "");
         _authMock.Verify(
             x => x.SignInAsync(It.IsAny<HttpContext>(), It.IsAny<string>(), It.IsAny<ClaimsPrincipal>(), It.IsAny<AuthenticationProperties>()),
             Times.Never);

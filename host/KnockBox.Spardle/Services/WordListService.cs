@@ -83,7 +83,7 @@ public sealed class WordListService : IWordListService
             if (trimmed.Length == 0) continue;
             if (!byLength.TryGetValue(trimmed.Length, out var bucket))
             {
-                bucket = new List<string>();
+                bucket = [];
                 byLength[trimmed.Length] = bucket;
             }
             bucket.Add(trimmed);
@@ -102,7 +102,7 @@ public sealed class WordListService : IWordListService
         if (!File.Exists(path))
         {
             logger.LogWarning("WordListService: CSV file not found at [{path}].", path);
-            return new List<string>();
+            return [];
         }
 
         var result = new List<string>();

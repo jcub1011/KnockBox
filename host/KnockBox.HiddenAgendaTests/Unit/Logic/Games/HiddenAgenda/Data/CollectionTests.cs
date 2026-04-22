@@ -10,7 +10,7 @@ public class CollectionTests
     [TestMethod]
     public void VerifyCollectionDefinitions()
     {
-        Assert.AreEqual(5, CollectionDefinitions.All.Count);
+        Assert.HasCount(5, CollectionDefinitions.All);
         
         var rm = CollectionDefinitions.Get(CollectionType.RenaissanceMasters);
         Assert.AreEqual("Renaissance Masters", rm.Name);

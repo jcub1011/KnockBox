@@ -12,7 +12,7 @@ namespace KnockBox.DiceSimulator.Services.State.Games
         : AbstractGameState(host, logger),
           IPlayerTrackedGameState<PlayerStats>
     {
-        private readonly List<DiceRollEntry> _rollHistory = new();
+        private readonly List<DiceRollEntry> _rollHistory = [];
         public ConcurrentDictionary<string, PlayerStats> GamePlayers { get; } = new();
 
         public IReadOnlyList<DiceRollEntry> RollHistory 

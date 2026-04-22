@@ -15,7 +15,7 @@ namespace KnockBox.DiceSimulator.Pages
         protected DiceRollAction RollAction { get; set; } = new();
         protected bool IsRoomCodeVisible { get; set; } = false;
 
-        private readonly HashSet<string> _expandedPlayerIds = new();
+        private readonly HashSet<string> _expandedPlayerIds = [];
 
         protected void TogglePlayerHistory(string playerId)
         {

@@ -12,7 +12,7 @@ namespace KnockBox.Services.Logic.Games.Shared
         private static readonly char[] AllowedChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789".ToCharArray();
 
         private readonly Lock _lock = new();
-        private readonly HashSet<string> _issuedCodes = new(StringComparer.Ordinal);
+        private readonly HashSet<string> _issuedCodes = [with(StringComparer.Ordinal)];
 
         public int LobbyCodeLength => CodeLength;
 

@@ -23,7 +23,7 @@ namespace KnockBox.Operator.Pages
 
         private Card? _pendingAction;
         private Guid? _selectedOperatorId;
-        private readonly List<Guid> _selectedNumberIds = new();
+        private readonly List<Guid> _selectedNumberIds = [];
         private string? _targetPlayerId;
         private bool _waitingForTarget;
         private bool _showDiscardHistory;
@@ -89,7 +89,7 @@ namespace KnockBox.Operator.Pages
             get
             {
                 var ps = CurrentPlayerState;
-                if (ps?.PreDrawCardIds == null || ps.PreDrawCardIds.Count == 0) return new();
+                if (ps?.PreDrawCardIds == null || ps.PreDrawCardIds.Count == 0) return [];
                 return [.. ps.Hand
                     .Where(c => !ps.PreDrawCardIds.Contains(c.Id))
                     .Select(c => c.Id)];
@@ -123,7 +123,7 @@ namespace KnockBox.Operator.Pages
             get
             {
                 if (CurrentPlayerState == null || !IsMyTurn || GameState.Context == null)
-                    return CurrentPlayerState?.Hand.Select(c => c.Id).ToHashSet() ?? new();
+                    return CurrentPlayerState?.Hand.Select(c => c.Id).ToHashSet() ?? [];
 
                 var hand = CurrentPlayerState.Hand;
                 var disabled = new HashSet<Guid>();

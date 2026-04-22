@@ -36,7 +36,7 @@ public class ActionCardTests
         _state.GamePlayers.TryAdd("p1", new OperatorPlayerState { UserId = "p1", CurrentPoints = 10m, ActiveOperator = CardOperator.Add });
         _state.GamePlayers.TryAdd("p2", new OperatorPlayerState { UserId = "p2", CurrentPoints = 10m, ActiveOperator = CardOperator.Add });
 
-        _state.TurnManager.SetTurnOrder(new List<string> { "p1", "p2" });
+        _state.TurnManager.SetTurnOrder(["p1", "p2"]);
 
         _playPhase = new PlayPhaseState();
         _reactionPhase = new ReactionState();
@@ -52,7 +52,7 @@ public class ActionCardTests
         _state.GamePlayers["p1"].Hand.Add(stealCard);
         _state.GamePlayers["p2"].Hand.Add(targetCard);
 
-        var playCmd = new PlayCardsCommand("p1", new List<Guid> { stealCard.Id }, "p2");
+        var playCmd = new PlayCardsCommand("p1", [stealCard.Id], "p2");
         _playPhase.HandleCommand(_context, playCmd);
 
         var passCmd = new PassReactionCommand("p2");
@@ -73,7 +73,7 @@ public class ActionCardTests
         _state.GamePlayers["p2"].Hand.Add(shieldCard);
         _state.GamePlayers["p2"].Hand.Add(targetCard);
 
-        var playCmd = new PlayCardsCommand("p1", new List<Guid> { stealCard.Id }, "p2");
+        var playCmd = new PlayCardsCommand("p1", [stealCard.Id], "p2");
         _playPhase.HandleCommand(_context, playCmd);
 
         var reactCmd = new PlayReactionCommand("p2", shieldCard.Id);
@@ -92,7 +92,7 @@ public class ActionCardTests
         var auditCard = new AuditCard();
         _state.GamePlayers["p1"].Hand.Add(auditCard);
 
-        var playCmd = new PlayCardsCommand("p1", new List<Guid> { auditCard.Id }, "p2");
+        var playCmd = new PlayCardsCommand("p1", [auditCard.Id], "p2");
         _playPhase.HandleCommand(_context, playCmd);
 
         var passCmd = new PassReactionCommand("p2");
@@ -110,7 +110,7 @@ public class ActionCardTests
         _state.GamePlayers["p1"].Hand.Add(auditCard);
         _state.GamePlayers["p2"].Hand.Add(shieldCard);
 
-        var playCmd = new PlayCardsCommand("p1", new List<Guid> { auditCard.Id }, "p2");
+        var playCmd = new PlayCardsCommand("p1", [auditCard.Id], "p2");
         _playPhase.HandleCommand(_context, playCmd);
 
         var reactCmd = new PlayReactionCommand("p2", shieldCard.Id);
@@ -129,7 +129,7 @@ public class ActionCardTests
         var htCard = new HostileTakeoverCard();
         _state.GamePlayers["p1"].Hand.Add(htCard);
 
-        var playCmd = new PlayCardsCommand("p1", new List<Guid> { htCard.Id }, "p2");
+        var playCmd = new PlayCardsCommand("p1", [htCard.Id], "p2");
         _playPhase.HandleCommand(_context, playCmd);
 
         var passCmd = new PassReactionCommand("p2");
@@ -149,7 +149,7 @@ public class ActionCardTests
         _state.GamePlayers["p1"].Hand.Add(htCard);
         _state.GamePlayers["p2"].Hand.Add(shieldCard);
 
-        var playCmd = new PlayCardsCommand("p1", new List<Guid> { htCard.Id }, "p2");
+        var playCmd = new PlayCardsCommand("p1", [htCard.Id], "p2");
         _playPhase.HandleCommand(_context, playCmd);
 
         var reactCmd = new PlayReactionCommand("p2", shieldCard.Id);
@@ -169,7 +169,7 @@ public class ActionCardTests
         _state.GamePlayers["p1"].Hand.Add(hpCard);
         _state.GamePlayers["p1"].Hand.Add(numCard);
 
-        var playCmd = new PlayCardsCommand("p1", new List<Guid> { hpCard.Id, numCard.Id }, "p2");
+        var playCmd = new PlayCardsCommand("p1", [hpCard.Id, numCard.Id], "p2");
         _playPhase.HandleCommand(_context, playCmd);
 
         var passCmd = new PassReactionCommand("p2");
@@ -192,7 +192,7 @@ public class ActionCardTests
         var hpCard2 = new HotPotatoCard();
         _state.GamePlayers["p2"].Hand.Add(hpCard2);
 
-        var playCmd = new PlayCardsCommand("p1", new List<Guid> { hpCard.Id, numCard.Id }, "p2");
+        var playCmd = new PlayCardsCommand("p1", [hpCard.Id, numCard.Id], "p2");
         _playPhase.HandleCommand(_context, playCmd);
 
         var redirectCmd = new RedirectHotPotatoCommand("p2", hpCard2.Id, "p3");
@@ -219,7 +219,7 @@ public class ActionCardTests
         for (int i = 0; i < 6; i++)
             _state.Deck.Add(new NumberCard(i));
 
-        var playCmd = new PlayCardsCommand("p1", new List<Guid> { floodCard.Id });
+        var playCmd = new PlayCardsCommand("p1", [floodCard.Id]);
         _playPhase.HandleCommand(_context, playCmd);
 
         // Transition to ReactionState for global actions
@@ -247,7 +247,7 @@ public class ActionCardTests
         _state.Deck.Add(new NumberCard(4m));
 
         // Play without a target
-        var playCmd = new PlayCardsCommand("p1", new List<Guid> { floodCard.Id });
+        var playCmd = new PlayCardsCommand("p1", [floodCard.Id]);
         var result = _playPhase.HandleCommand(_context, playCmd);
 
         // Flash Flood is a global action and SHOULD transition to reaction state
@@ -265,7 +265,7 @@ public class ActionCardTests
         _state.GamePlayers["p1"].Hand.Add(cookCard);
         _state.GamePlayers["p1"].Hand.Add(numCard);
 
-        var playCmd = new PlayCardsCommand("p1", new List<Guid> { cookCard.Id, numCard.Id });
+        var playCmd = new PlayCardsCommand("p1", [cookCard.Id, numCard.Id]);
         _playPhase.HandleCommand(_context, playCmd);
 
         Assert.AreEqual(10m, _state.GamePlayers["p1"].CurrentPoints);
@@ -281,7 +281,7 @@ public class ActionCardTests
         var compCard = new CompCard();
         _state.GamePlayers["p1"].Hand.Add(compCard);
 
-        var playCmd = new PlayCardsCommand("p1", new List<Guid> { compCard.Id });
+        var playCmd = new PlayCardsCommand("p1", [compCard.Id]);
         _playPhase.HandleCommand(_context, playCmd);
 
         Assert.AreEqual(CardOperator.Subtract, _state.GamePlayers["p1"].ActiveOperator);
@@ -295,7 +295,7 @@ public class ActionCardTests
         var compCard = new CompCard();
         _state.GamePlayers["p1"].Hand.Add(compCard);
 
-        var playCmd = new PlayCardsCommand("p1", new List<Guid> { compCard.Id });
+        var playCmd = new PlayCardsCommand("p1", [compCard.Id]);
         _playPhase.HandleCommand(_context, playCmd);
 
         Assert.AreEqual(CardOperator.Add, _state.GamePlayers["p1"].ActiveOperator);
@@ -321,7 +321,7 @@ public class ActionCardTests
         var crashCard = new MarketCrashCard();
         _state.GamePlayers["p1"].Hand.Add(crashCard);
 
-        var playCmd = new PlayCardsCommand("p1", new List<Guid> { crashCard.Id });
+        var playCmd = new PlayCardsCommand("p1", [crashCard.Id]);
         _playPhase.HandleCommand(_context, playCmd);
 
         // Transition to ReactionState
@@ -345,7 +345,7 @@ public class ActionCardTests
         var crashCard = new MarketCrashCard();
         _state.GamePlayers["p1"].Hand.Add(crashCard);
 
-        var playCmd = new PlayCardsCommand("p1", new List<Guid> { crashCard.Id });
+        var playCmd = new PlayCardsCommand("p1", [crashCard.Id]);
         _playPhase.HandleCommand(_context, playCmd);
 
         // Should resolve immediately because only target (p2) is audited
@@ -363,7 +363,7 @@ public class ActionCardTests
         var stealCard = new StealCard();
         _state.GamePlayers["p1"].Hand.Add(stealCard);
 
-        var playCmd = new PlayCardsCommand("p1", new List<Guid> { stealCard.Id }, "nonexistent");
+        var playCmd = new PlayCardsCommand("p1", [stealCard.Id], "nonexistent");
         var result = _playPhase.HandleCommand(_context, playCmd);
 
         Assert.IsTrue(result.TryGetFailure(out _));
@@ -375,7 +375,7 @@ public class ActionCardTests
         var card = new NumberCard(5m);
         _state.GamePlayers["p2"].Hand.Add(card);
 
-        var playCmd = new PlayCardsCommand("p2", new List<Guid> { card.Id });
+        var playCmd = new PlayCardsCommand("p2", [card.Id]);
         var result = _playPhase.HandleCommand(_context, playCmd);
 
         Assert.IsTrue(result.TryGetFailure(out _));
@@ -387,7 +387,7 @@ public class ActionCardTests
         var card = new NumberCard(5m);
         // Don't add card to hand
 
-        var playCmd = new PlayCardsCommand("p1", new List<Guid> { card.Id });
+        var playCmd = new PlayCardsCommand("p1", [card.Id]);
         var result = _playPhase.HandleCommand(_context, playCmd);
 
         Assert.IsTrue(result.TryGetFailure(out _));
@@ -396,7 +396,7 @@ public class ActionCardTests
     [TestMethod]
     public void PlayCards_EmptyCardList_ReturnsError()
     {
-        var playCmd = new PlayCardsCommand("p1", new List<Guid>());
+        var playCmd = new PlayCardsCommand("p1", []);
         var result = _playPhase.HandleCommand(_context, playCmd);
 
         Assert.IsTrue(result.TryGetFailure(out _));
@@ -455,7 +455,7 @@ public class ActionCardTests
         var blueShell = new BlueShellCard();
         _state.GamePlayers["p1"].Hand.Add(blueShell);
 
-        var playCmd = new PlayCardsCommand("p1", new List<Guid> { blueShell.Id }, null);
+        var playCmd = new PlayCardsCommand("p1", [blueShell.Id], null);
         var result = _playPhase.HandleCommand(_context, playCmd);
 
         Assert.IsInstanceOfType(result.Value, typeof(ReactionState));
@@ -478,7 +478,7 @@ public class ActionCardTests
         _state.GamePlayers["p1"].Hand.Add(blueShell);
         _state.GamePlayers["p2"].Hand.Add(shield);
 
-        var playCmd = new PlayCardsCommand("p1", new List<Guid> { blueShell.Id }, null);
+        var playCmd = new PlayCardsCommand("p1", [blueShell.Id], null);
         _playPhase.HandleCommand(_context, playCmd);
 
         var reactCmd = new PlayReactionCommand("p2", shield.Id);
@@ -497,7 +497,7 @@ public class ActionCardTests
         var blueShell = new BlueShellCard();
         _state.GamePlayers["p1"].Hand.Add(blueShell);
 
-        var playCmd = new PlayCardsCommand("p1", new List<Guid> { blueShell.Id }, null);
+        var playCmd = new PlayCardsCommand("p1", [blueShell.Id], null);
         _playPhase.HandleCommand(_context, playCmd);
 
         Assert.HasCount(2, _state.ReactionTargetPlayerIds);
@@ -526,7 +526,7 @@ public class ActionCardTests
         _state.GamePlayers["p1"].Hand.Add(blueShell);
         _state.GamePlayers["p2"].Hand.Add(shield);
 
-        var playCmd = new PlayCardsCommand("p1", new List<Guid> { blueShell.Id }, null);
+        var playCmd = new PlayCardsCommand("p1", [blueShell.Id], null);
         _playPhase.HandleCommand(_context, playCmd);
 
         // p2 shields, p3 passes
@@ -555,7 +555,7 @@ public class ActionCardTests
         _state.GamePlayers["p2"].Hand.Add(shield1);
         _state.GamePlayers["p3"].Hand.Add(shield2);
 
-        var playCmd = new PlayCardsCommand("p1", new List<Guid> { blueShell.Id }, null);
+        var playCmd = new PlayCardsCommand("p1", [blueShell.Id], null);
         _playPhase.HandleCommand(_context, playCmd);
 
         _reactionPhase.HandleCommand(_context, new PlayReactionCommand("p2", shield1.Id));
@@ -575,7 +575,7 @@ public class ActionCardTests
         var blueShell = new BlueShellCard();
         _state.GamePlayers["p1"].Hand.Add(blueShell);
 
-        var playCmd = new PlayCardsCommand("p1", new List<Guid> { blueShell.Id }, null);
+        var playCmd = new PlayCardsCommand("p1", [blueShell.Id], null);
         _playPhase.HandleCommand(_context, playCmd);
 
         // p3 reacts first (before p2) — order shouldn't matter
@@ -595,7 +595,7 @@ public class ActionCardTests
         var blueShell = new BlueShellCard();
         _state.GamePlayers["p1"].Hand.Add(blueShell);
 
-        var playCmd = new PlayCardsCommand("p1", new List<Guid> { blueShell.Id }, null);
+        var playCmd = new PlayCardsCommand("p1", [blueShell.Id], null);
         _playPhase.HandleCommand(_context, playCmd);
 
         _reactionPhase.HandleCommand(_context, new PassReactionCommand("p2"));
@@ -613,7 +613,7 @@ public class ActionCardTests
         var blueShell = new BlueShellCard();
         _state.GamePlayers["p1"].Hand.Add(blueShell);
 
-        var playCmd = new PlayCardsCommand("p1", new List<Guid> { blueShell.Id }, null);
+        var playCmd = new PlayCardsCommand("p1", [blueShell.Id], null);
         _playPhase.HandleCommand(_context, playCmd);
 
         // p1 is not targeted (not at 0)
@@ -633,7 +633,7 @@ public class ActionCardTests
         _state.GamePlayers["p1"].Hand.Add(surchargeCard);
         _state.GamePlayers["p1"].Hand.Add(numCard);
 
-        var playCmd = new PlayCardsCommand("p1", new List<Guid> { surchargeCard.Id, numCard.Id }, "p2");
+        var playCmd = new PlayCardsCommand("p1", [surchargeCard.Id, numCard.Id], "p2");
         _playPhase.HandleCommand(_context, playCmd);
 
         var passCmd = new PassReactionCommand("p2");
@@ -655,7 +655,7 @@ public class ActionCardTests
         _state.GamePlayers["p1"].Hand.Add(numCard);
         _state.GamePlayers["p2"].Hand.Add(shieldCard);
 
-        var playCmd = new PlayCardsCommand("p1", new List<Guid> { surchargeCard.Id, numCard.Id }, "p2");
+        var playCmd = new PlayCardsCommand("p1", [surchargeCard.Id, numCard.Id], "p2");
         _playPhase.HandleCommand(_context, playCmd);
 
         var reactCmd = new PlayReactionCommand("p2", shieldCard.Id);

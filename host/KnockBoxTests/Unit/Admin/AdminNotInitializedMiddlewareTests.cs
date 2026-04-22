@@ -62,8 +62,8 @@ public sealed class AdminNotInitializedMiddlewareTests
 
         buffer.Position = 0;
         var body = new StreamReader(buffer).ReadToEnd();
-        StringAssert.Contains(body, "Admin Not Initialized");
-        StringAssert.Contains(body, "open the admin page to initialize the admin account");
+        Assert.Contains("Admin Not Initialized", body);
+        Assert.Contains("open the admin page to initialize the admin account", body);
     }
 
     [TestMethod]

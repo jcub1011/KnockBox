@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using KnockBox.Core.Primitives.Returns;
 using KnockBox.Core.Services.Logic.Games.Engines.Shared;
 using KnockBox.Core.Services.Logic.RandomGeneration;
@@ -38,7 +39,7 @@ public class SpardleEngine(
             s.SetHostIsParticipant(s.Players.Count == 0);
             s.CurrentRound = 0;
             s.IsGameOver = false;
-            s.RoundHistory.Clear();
+            s.RoundHistory = s.RoundHistory.Clear();
             s.LastCompletedAnswer = null;
             GenerateRoundQueue(s);
 
@@ -62,7 +63,7 @@ public class SpardleEngine(
 
     private void GenerateRoundQueue(SpardleState state)
     {
-        state.RoundQueue.Clear();
+        var queue = new List<string>();
 
         int requested = state.TotalRounds > 0 ? state.TotalRounds : int.MaxValue;
 
@@ -70,44 +71,48 @@ public class SpardleEngine(
         {
             var pool = new List<string>(state.CustomWordPool);
             OrderInPlace(pool, state.WordOrderMode);
-            state.RoundQueue.AddRange(pool.Take(Math.Min(requested, pool.Count)));
+            queue.AddRange(pool.Take(Math.Min(requested, pool.Count)));
+            state.RoundQueue = queue.ToImmutableList();
             return;
         }
 
         if (state.WordPoolMode == WordPoolMode.NytStandard)
         {
-            FillFromSingleLength(state, length: 5, requested);
+            FillFromSingleLength(queue, state.WordPoolMode, state.WordOrderMode, length: 5, requested);
+            state.RoundQueue = queue.ToImmutableList();
             return;
         }
 
         if (state.WordPoolMode == WordPoolMode.FullDictionary)
         {
             if (state.ConstantWordLength)
-                FillFromSingleLength(state, state.TargetWordLength, requested);
+                FillFromSingleLength(queue, state.WordPoolMode, state.WordOrderMode, state.TargetWordLength, requested);
             else
-                FillFromLengthRange(state, state.MinWordLength, state.MaxWordLength, requested);
+                FillFromLengthRange(queue, state.WordPoolMode, state.WordOrderMode, state.MinWordLength, state.MaxWordLength, requested);
+            
+            state.RoundQueue = queue.ToImmutableList();
             return;
         }
 
-        // HostDefined / CsvUpload with empty CustomWordPool — CanStart prevents this in the lobby.
+        state.RoundQueue = queue.ToImmutableList();
     }
 
-    private void FillFromSingleLength(SpardleState state, int length, int requested)
+    private void FillFromSingleLength(List<string> queue, WordPoolMode poolMode, WordOrderMode orderMode, int length, int requested)
     {
-        int total = wordListService.GetWordCount(state.WordPoolMode, length);
+        int total = wordListService.GetWordCount(poolMode, length);
         if (total == 0) return;
 
         int take = Math.Min(requested, total);
-        var indices = PickIndices(state.WordOrderMode, total, take);
+        var indices = PickIndices(orderMode, total, take);
         foreach (var idx in indices)
-            state.RoundQueue.Add(wordListService.GetWordAsString(state.WordPoolMode, length, idx));
+            queue.Add(wordListService.GetWordAsString(poolMode, length, idx));
     }
 
-    private void FillFromLengthRange(SpardleState state, int min, int max, int requested)
+    private void FillFromLengthRange(List<string> queue, WordPoolMode poolMode, WordOrderMode orderMode, int min, int max, int requested)
     {
         if (min > max) return;
 
-        var lengths = wordListService.GetAvailableLengths(state.WordPoolMode)
+        var lengths = wordListService.GetAvailableLengths(poolMode)
             .Where(L => L >= min && L <= max)
             .ToArray();
         if (lengths.Length == 0) return;
@@ -116,19 +121,19 @@ public class SpardleEngine(
         int total = 0;
         for (int i = 0; i < lengths.Length; i++)
         {
-            total += wordListService.GetWordCount(state.WordPoolMode, lengths[i]);
+            total += wordListService.GetWordCount(poolMode, lengths[i]);
             cumulative[i] = total;
         }
         if (total == 0) return;
 
         int take = Math.Min(requested, total);
-        var flatIndices = PickIndices(state.WordOrderMode, total, take);
+        var flatIndices = PickIndices(orderMode, total, take);
         foreach (var flat in flatIndices)
         {
             int bucket = LowerBound(cumulative, flat);
             int prev = bucket == 0 ? 0 : cumulative[bucket - 1];
             int idxInBucket = flat - prev;
-            state.RoundQueue.Add(wordListService.GetWordAsString(state.WordPoolMode, lengths[bucket], idxInBucket));
+            queue.Add(wordListService.GetWordAsString(poolMode, lengths[bucket], idxInBucket));
         }
     }
 
@@ -167,7 +172,7 @@ public class SpardleEngine(
 
     private int[] SampleUniqueIndices(int total, int take)
     {
-        if (take <= 0 || total <= 0) return Array.Empty<int>();
+        if (take <= 0 || total <= 0) return [];
 
         if (ShouldShuffle(total, take))
         {
@@ -317,7 +322,7 @@ public class SpardleEngine(
         s.LastCompletedAnswer = s.TargetWord;
 
         var outcomes = BuildOutcomes(s);
-        s.RoundHistory.Add(new RoundResult
+        s.RoundHistory = s.RoundHistory.Add(new RoundResult
         {
             RoundNumber = s.CurrentRound,
             Answer = s.TargetWord,
@@ -472,7 +477,7 @@ public class SpardleEngine(
             if (!valResult.IsSuccess) return valResult;
 
             var result = EvaluateGuess(state.TargetWord, guess);
-            pState.Guesses.Add(result);
+            pState.Guesses = pState.Guesses.Add(result);
 
             int maxGuesses = CalculateMaxGuesses(state.TargetWord.Length, state.DifficultyMultiplier);
 
@@ -505,10 +510,30 @@ public class SpardleEngine(
         if (state.HardModeEnabled && pState.Guesses.Count > 0)
         {
             var lastGuess = pState.Guesses.Last();
+            
+            // 1. Enforce Correct positions
             for (int i = 0; i < lastGuess.Word.Length; i++)
             {
                 if (lastGuess.Statuses[i] == LetterStatus.Correct && guess[i] != lastGuess.Word[i])
-                    return Result.FromError("Hard Mode: Must use correct letters in the correct spot.");
+                    return Result.FromError($"Hard Mode: {lastGuess.Word[i].ToString().ToUpper()} must be at position {i + 1}.");
+            }
+
+            // 2. Enforce Presence (yellow) letters
+            var requiredCounts = new Dictionary<char, int>();
+            for (int i = 0; i < lastGuess.Word.Length; i++)
+            {
+                if (lastGuess.Statuses[i] is LetterStatus.Correct or LetterStatus.Present)
+                {
+                    char c = lastGuess.Word[i];
+                    requiredCounts[c] = requiredCounts.GetValueOrDefault(c) + 1;
+                }
+            }
+
+            foreach (var (c, count) in requiredCounts)
+            {
+                int inGuess = guess.Count(x => x == c);
+                if (inGuess < count)
+                    return Result.FromError($"Hard Mode: Guess must contain at least {count} '{c.ToString().ToUpper()}'.");
             }
         }
 
@@ -607,8 +632,8 @@ public class SpardleEngine(
     public static int CalculateMaxGuesses(int length, double multiplier)
     {
         if (length <= 0) return 6;
-        double g = 6.0 + multiplier * Math.Log((double)length / 5.0);
-        return (int)Math.Round(g, MidpointRounding.AwayFromZero);
+        double g = 6.0 + multiplier * Math.Log2((double)length / 5.0);
+        return Math.Max(1, (int)Math.Round(g, MidpointRounding.AwayFromZero));
     }
 
     private void CheckRoundEnd(SpardleState state)

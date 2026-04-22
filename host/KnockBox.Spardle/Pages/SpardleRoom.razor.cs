@@ -1,8 +1,4 @@
 using KnockBox.Core.Components.Shared;
-using KnockBox.Core.Primitives.Returns;
-using KnockBox.Core.Services.Navigation;
-using KnockBox.Core.Services.State.Games.Shared;
-using KnockBox.Core.Services.State.Users;
 using KnockBox.Spardle.Components;
 using KnockBox.Spardle.Models;
 using Microsoft.AspNetCore.Components;
@@ -11,28 +7,18 @@ using Microsoft.JSInterop;
 
 namespace KnockBox.Spardle.Pages;
 
-public partial class SpardleRoom : DisposableComponent
+public partial class SpardleRoom : LobbyPageBase<SpardleState>
 {
     [Inject] protected SpardleEngine GameEngine { get; set; } = default!;
-    [Inject] protected IGameSessionService GameSessionService { get; set; } = default!;
-    [Inject] protected INavigationService NavigationService { get; set; } = default!;
-    [Inject] protected IUserService UserService { get; set; } = default!;
     [Inject] protected IJSRuntime JSRuntime { get; set; } = default!;
-    [Inject] protected ILogger<SpardleRoom> Logger { get; set; } = default!;
 
-    [Parameter] public string ObfuscatedRoomCode { get; set; } = default!;
-
-    private IDisposable? _stateSubscription;
     private IJSObjectReference? _keyboardModule;
     private IJSObjectReference? _storageModule;
     private DotNetObjectReference<SpardleRoom>? _dotNetRef;
     private CancellationTokenSource? _toastCts;
     private CancellationTokenSource? _shakeCts;
     private GamePhase _previousPhase = GamePhase.Lobby;
-    private bool _hasLeft;
 
-    protected SpardleState GameState { get; set; } = default!;
-    protected string RoomCode { get; set; } = string.Empty;
     protected bool HighContrast { get; set; }
 
     protected bool IsHostObserver =>
@@ -45,52 +31,10 @@ public partial class SpardleRoom : DisposableComponent
     private SpardleToast.ToastTone _toastTone = SpardleToast.ToastTone.Danger;
     private bool _invalidGuess;
 
-    protected override async Task OnInitializedAsync()
+    protected override Task OnLobbyInitializedAsync()
     {
-        if (UserService.CurrentUser is null)
-            await UserService.InitializeCurrentUserAsync(ComponentDetached);
-
-        if (!GameSessionService.TryGetCurrentSession(out var session))
-        {
-            NavigationService.ToHome();
-            return;
-        }
-
-        if (!LobbyUriHelper.TryExtractObfuscatedRoomCode(session.LobbyRegistration.Uri, out var roomCode)
-            || roomCode.Trim() != ObfuscatedRoomCode)
-        {
-            NavigationService.ToHome();
-            return;
-        }
-
-        GameState = (SpardleState)session.LobbyRegistration.State;
-
-        if (GameState.IsDisposed)
-        {
-            NavigationService.ToHome();
-            return;
-        }
-
-        GameState.OnStateDisposed += HandleStateDisposed;
-        RoomCode = session.LobbyRegistration.Code;
         _previousPhase = GameState.Phase;
-        _stateSubscription = GameState.StateChangedEventManager.Subscribe(async () =>
-        {
-            if (!_hasLeft && UserService.CurrentUser is { } current && GameState.IsKicked(current))
-            {
-                _hasLeft = true;
-                await InvokeAsync(() => GameSessionService.LeaveCurrentSession(navigateHome: true));
-                return;
-            }
-            if (GameState.Phase != _previousPhase)
-            {
-                _previousPhase = GameState.Phase;
-                _currentGuess = string.Empty;
-            }
-            await InvokeAsync(StateHasChanged);
-        });
-
-        await base.OnInitializedAsync();
+        return Task.CompletedTask;
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -116,6 +60,16 @@ public partial class SpardleRoom : DisposableComponent
         }
 
         await base.OnAfterRenderAsync(firstRender);
+    }
+
+    protected override async ValueTask OnStateChangedAsync()
+    {
+        if (GameState.Phase != _previousPhase)
+        {
+            _previousPhase = GameState.Phase;
+            _currentGuess = string.Empty;
+        }
+        await base.OnStateChangedAsync();
     }
 
     [JSInvokable]
@@ -222,21 +176,10 @@ public partial class SpardleRoom : DisposableComponent
         StateHasChanged();
     }
 
-    private void HandleStateDisposed()
-    {
-        InvokeAsync(() =>
-        {
-            GameSessionService.LeaveCurrentSession(navigateHome: false);
-            NavigationService.ToHome();
-        });
-    }
-
-    public override void Dispose()
+    protected override void OnLobbyDisposing()
     {
         _toastCts?.Cancel();
         _shakeCts?.Cancel();
-        if (GameState is not null) GameState.OnStateDisposed -= HandleStateDisposed;
-        _stateSubscription?.Dispose();
 
         if (_keyboardModule is not null)
         {
@@ -255,7 +198,5 @@ public partial class SpardleRoom : DisposableComponent
             _ = _storageModule.DisposeAsync();
         }
         _dotNetRef?.Dispose();
-        base.Dispose();
     }
-
 }

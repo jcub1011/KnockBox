@@ -2466,7 +2466,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
                 SubmittedOutfit = new()
                 {
                     PlayerId = "p1",
-                    SelectedItemsByType = new Dictionary<ClothingType, Guid>(), // different item selected
+                    SelectedItemsByType = [], // different item selected
                 },
                 OwnedClothingItemIds = [itemId],
             };
@@ -2506,7 +2506,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
                 SubmittedOutfit = new()
                 {
                     PlayerId = "p1",
-                    SelectedItemsByType = new Dictionary<ClothingType, Guid>(), // selfHat not selected
+                    SelectedItemsByType = [], // selfHat not selected
                 },
                 OwnedClothingItemIds = [selfHat],
             };
@@ -2836,7 +2836,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             state.GamePlayers["p1"] = new()
             {
                 PlayerId = "p1",
-                SubmittedOutfit = new() { PlayerId = "p1", SelectedItemsByType = new() },
+                SubmittedOutfit = new() { PlayerId = "p1", SelectedItemsByType = [] },
             };
             state.GamePlayers["p2"] = new()
             {
@@ -3006,13 +3006,13 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             state.GamePlayers["p1"] = new()
             {
                 PlayerId = "p1",
-                SubmittedOutfit = new() { PlayerId = "p1", SelectedItemsByType = new() },
+                SubmittedOutfit = new() { PlayerId = "p1", SelectedItemsByType = [] },
                 OwnedClothingItemIds = [hatB],
             };
             state.GamePlayers["p2"] = new()
             {
                 PlayerId = "p2",
-                SubmittedOutfit = new() { PlayerId = "p2", SelectedItemsByType = new() },
+                SubmittedOutfit = new() { PlayerId = "p2", SelectedItemsByType = [] },
                 OwnedClothingItemIds = [hatA],
             };
 
@@ -3175,7 +3175,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             state.GamePlayers["p1"] = new()
             {
                 PlayerId = "p1",
-                SubmittedOutfit = new() { PlayerId = "p1", SelectedItemsByType = new() }, // empty Outfit 1
+                SubmittedOutfit = new() { PlayerId = "p1", SelectedItemsByType = [] }, // empty Outfit 1
             };
 
             context.Fsm.TransitionTo(context, new OutfitBuildingState(outfitRound: 2));
@@ -3610,7 +3610,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             state.GamePlayers["p1"] = new()
             {
                 PlayerId = "p1",
-                SubmittedOutfit = new() { PlayerId = "p1", SelectedItemsByType = new() },
+                SubmittedOutfit = new() { PlayerId = "p1", SelectedItemsByType = [] },
             };
 
             context.Fsm.TransitionTo(context, new OutfitDistinctnessResolutionState());

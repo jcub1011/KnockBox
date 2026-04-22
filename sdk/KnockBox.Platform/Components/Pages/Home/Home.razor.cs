@@ -38,7 +38,7 @@ namespace KnockBox.Platform.Components.Pages.Home
         /// <see cref="_sortedModules"/>; the visible subset is recomputed only
         /// when <see cref="IGameAvailabilityService.Changed"/> fires.
         /// </remarks>
-        private IGameModule[] _sortedModules = Array.Empty<IGameModule>();
+        private IGameModule[] _sortedModules = [];
         private IReadOnlyList<IGameModule> _visibleModules = Array.Empty<IGameModule>();
         private IReadOnlyList<IGameModule> VisibleGameModules => _visibleModules;
 

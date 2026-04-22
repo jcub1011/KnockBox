@@ -23,7 +23,7 @@ namespace KnockBox.Core.Primitives.Events
         {
             int index = Array.IndexOf(listeners, callback);
             if (index < 0) return listeners;
-            if (listeners.Length == 1) return Array.Empty<T>();
+            if (listeners.Length == 1) return [];
 
             var newListeners = new T[listeners.Length - 1];
             if (index > 0)

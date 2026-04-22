@@ -17,7 +17,7 @@ public class SessionTokenProviderTests : ISessionTokenProviderContractTests<Sess
     [TestInitialize]
     public void Setup()
     {
-        _inMemoryStorage = new Dictionary<string, string>();
+        _inMemoryStorage = [];
         _sessionStorageMock = new Mock<ISessionStorageService>();
 
         _sessionStorageMock

@@ -328,7 +328,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress
         [TestMethod]
         public void GenerateRound_EmptyEntrantList_ProducesEmptyRound()
         {
-            var round = SwissTournamentService.GenerateRound(1, new List<EntrantId>(), [], null);
+            var round = SwissTournamentService.GenerateRound(1, [], [], null);
             Assert.IsEmpty(round.Matchups);
         }
 

@@ -67,9 +67,9 @@ namespace KnockBox.HiddenAgenda.Tests.Unit.Logic
             Assert.IsNotNull(state.Context);
             Assert.IsNotNull(state.Context.Fsm);
             Assert.IsNotNull(state.BoardGraph);
-            Assert.AreEqual(3, state.GamePlayers.Count);
-            Assert.AreEqual(3, state.TurnManager.TurnOrder.Count);
-            Assert.IsTrue(state.CollectionProgress.Count > 0);
+            Assert.HasCount(3, state.GamePlayers);
+            Assert.HasCount(3, state.TurnManager.TurnOrder);
+            Assert.IsNotEmpty(state.CollectionProgress);
         }
 
         [TestMethod]

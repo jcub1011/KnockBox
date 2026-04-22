@@ -10,6 +10,6 @@ namespace KnockBox.DiceSimulator.Services.State.Games.Data
         public int HighestResult { get; set; }
         public string? HighestResultExpression { get; set; }
         public int CumulativeTotal { get; set; }
-        public Dictionary<DiceType, int> RollCountByDie { get; set; } = new();
+        public Dictionary<DiceType, int> RollCountByDie { get; set; } = [];
     }
 }

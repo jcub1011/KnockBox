@@ -1,3 +1,5 @@
+using System.Collections.Concurrent;
+using System.Collections.Immutable;
 using KnockBox.Core.Services.State.Games.Shared;
 using KnockBox.Core.Services.State.Users;
 using KnockBox.Spardle.Models;
@@ -61,17 +63,17 @@ public class SpardleState(User host, ILogger logger) : AbstractGameState(host, l
     public GamePhase Phase { get; set; } = GamePhase.Lobby;
     public DateTimeOffset? PhaseExpiresAtUtc { get; set; }
     public TimeSpan TransitionDuration { get; set; } = TimeSpan.FromSeconds(5);
-    public List<RoundResult> RoundHistory { get; } = [];
+    public ImmutableList<RoundResult> RoundHistory { get; set; } = [];
     public string? LastCompletedAnswer { get; set; }
 
     // Word lists
-    public List<string> CustomWordPool { get; set; } = [];
-    public List<string> RoundQueue { get; set; } = [];
+    public ImmutableList<string> CustomWordPool { get; set; } = [];
+    public ImmutableList<string> RoundQueue { get; set; } = [];
 
     // Player tracking. Writes are owned by SpardleEngine and only ever happen inside
     // Execute/ExecuteAsync. Render-thread callers read via TryGetPlayerState — they must
     // never invoke CreatePlayerState, which would mutate the dictionary unlocked.
-    private readonly Dictionary<string, PlayerState> _playerStates = [];
+    private readonly ConcurrentDictionary<string, PlayerState> _playerStates = new();
     public IReadOnlyDictionary<string, PlayerState> PlayerStates => _playerStates;
 
     // True when the host is playing alongside everyone else; false when the host is a

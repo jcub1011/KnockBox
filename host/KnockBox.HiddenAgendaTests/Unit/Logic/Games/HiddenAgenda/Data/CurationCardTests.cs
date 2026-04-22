@@ -22,7 +22,7 @@ public class CurationCardTests
         foreach (Wing wing in new[] { Wing.GrandHall, Wing.ModernWing, Wing.SculptureGarden, Wing.RestorationRoom })
         {
             var pool = CurationCardPool.GetPool(wing);
-            Assert.IsTrue(pool.Count > 0, $"Pool for {wing} should not be empty");
+            Assert.IsNotEmpty(pool, $"Pool for {wing} should not be empty");
             
             // Verify distributions (roughly)
             int acquireCount = pool.Count(c => c.Type == CurationCardType.Acquire);
@@ -30,7 +30,7 @@ public class CurationCardTests
             int tradeCount = pool.Count(c => c.Type == CurationCardType.Trade);
 
             double acquirePct = (double)acquireCount / pool.Count;
-            Assert.IsTrue(acquirePct >= 0.4, $"Acquire percentage too low for {wing}: {acquirePct}");
+            Assert.IsGreaterThanOrEqualTo(0.4, acquirePct, $"Acquire percentage too low for {wing}: {acquirePct}");
             
             foreach (var card in pool)
             {
@@ -57,6 +57,6 @@ public class CurationCardTests
     {
         var rng = new FakeRng();
         var drawn = CurationCardPool.DrawThree(rng, Wing.GrandHall);
-        Assert.AreEqual(3, drawn.Count);
+        Assert.HasCount(3, drawn);
     }
 }

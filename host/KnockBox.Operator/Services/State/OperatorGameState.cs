@@ -21,9 +21,9 @@ public class OperatorGameState(
 
     public ConcurrentDictionary<string, OperatorPlayerState> GamePlayers { get; } = new();
     
-    public List<Card> Deck { get; set; } = new();
-    public List<Card> DiscardPile { get; set; } = new();
-    public List<ActionLogEntry> ActionLog { get; set; } = new();
+    public List<Card> Deck { get; set; } = [];
+    public List<Card> DiscardPile { get; set; } = [];
+    public List<ActionLogEntry> ActionLog { get; set; } = [];
     public string? LastBlockedActionMessage { get; set; }
     public string? BlockedAttackerId { get; set; }
     
@@ -35,8 +35,8 @@ public class OperatorGameState(
     public TurnManager TurnManager { get; } = new();
 
     public IGameActionCommand? PendingGameActionCommand { get; set; }
-    public HashSet<string> ReactionTargetPlayerIds { get; set; } = new();
-    public List<PlayerReaction> PlayerReactions { get; set; } = new();
+    public HashSet<string> ReactionTargetPlayerIds { get; set; } = [];
+    public List<PlayerReaction> PlayerReactions { get; set; } = [];
 
     public int TurnCount { get; set; }
 

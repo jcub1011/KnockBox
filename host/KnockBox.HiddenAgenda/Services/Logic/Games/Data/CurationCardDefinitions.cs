@@ -26,7 +26,7 @@ public static class CurationCardPool
             Wing.ModernWing => GetModernWingPool(),
             Wing.SculptureGarden => GetSculptureGardenPool(),
             Wing.RestorationRoom => GetRestorationRoomPool(),
-            _ => new List<CurationCard>()
+            _ => []
         };
     }
 
@@ -44,8 +44,8 @@ public static class CurationCardPool
 
     private static List<CurationCard> GetGrandHallPool()
     {
-        return new List<CurationCard>
-        {
+        return
+        [
             // Acquire (50-60%)
             new(CurationCardType.Acquire, "+2 Renaissance Masters", [new(CollectionType.RenaissanceMasters, 2)]),
             new(CurationCardType.Acquire, "+2 Contemporary Showcase", [new(CollectionType.ContemporaryShowcase, 2)]),
@@ -76,13 +76,13 @@ public static class CurationCardPool
             new(CurationCardType.Trade, "+2 Renaissance Masters OR -1 Contemporary Showcase and +3 Renaissance Masters", 
                 [new(CollectionType.RenaissanceMasters, 2)], 
                 [new(CollectionType.ContemporaryShowcase, -1), new(CollectionType.RenaissanceMasters, 3)])
-        };
+        ];
     }
 
     private static List<CurationCard> GetModernWingPool()
     {
-        return new List<CurationCard>
-        {
+        return
+        [
             // Acquire
             new(CurationCardType.Acquire, "+2 Impressionist Gallery", [new(CollectionType.ImpressionistGallery, 2)]),
             new(CurationCardType.Acquire, "+3 Impressionist Gallery", [new(CollectionType.ImpressionistGallery, 3)]),
@@ -107,13 +107,13 @@ public static class CurationCardPool
             new(CurationCardType.Trade, "+2 Impressionist Gallery OR -1 Impressionist Gallery and +4 Renaissance Masters", 
                 [new(CollectionType.ImpressionistGallery, 2)], 
                 [new(CollectionType.ImpressionistGallery, -1), new(CollectionType.RenaissanceMasters, 4)])
-        };
+        ];
     }
 
     private static List<CurationCard> GetSculptureGardenPool()
     {
-        return new List<CurationCard>
-        {
+        return
+        [
             // Acquire
             new(CurationCardType.Acquire, "+2 Marble & Bronze", [new(CollectionType.MarbleAndBronze, 2)]),
             new(CurationCardType.Acquire, "+2 Emerging Artists", [new(CollectionType.EmergingArtists, 2)]),
@@ -139,13 +139,13 @@ public static class CurationCardPool
             new(CurationCardType.Trade, "+1 Marble & Bronze, +1 Emerging Artists OR +2 Renaissance Masters", 
                 [new(CollectionType.MarbleAndBronze, 1), new(CollectionType.EmergingArtists, 1)], 
                 [new(CollectionType.RenaissanceMasters, 2)])
-        };
+        ];
     }
 
     private static List<CurationCard> GetRestorationRoomPool()
     {
-        return new List<CurationCard>
-        {
+        return
+        [
             // Acquire (More flexible, lower values)
             new(CurationCardType.Acquire, "+1 to any collection", [new(CollectionType.RenaissanceMasters, 1)]),
             new(CurationCardType.Acquire, "+1 Renaissance Masters, +1 Marble & Bronze", [new(CollectionType.RenaissanceMasters, 1), new(CollectionType.MarbleAndBronze, 1)]),
@@ -167,6 +167,6 @@ public static class CurationCardPool
             new(CurationCardType.Trade, "+1 Impressionist Gallery OR +1 Marble & Bronze", 
                 [new(CollectionType.ImpressionistGallery, 1)], 
                 [new(CollectionType.MarbleAndBronze, 1)])
-        };
+        ];
     }
 }

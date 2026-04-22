@@ -55,7 +55,7 @@ public class WordPoolTests
     public void Contains_ReturnsFalse_ForEmptyQuery()
     {
         var pool = WordPool.Build(5, new[] { "apple" });
-        Assert.IsFalse(pool.Contains(ReadOnlySpan<char>.Empty));
+        Assert.IsFalse(pool.Contains([]));
     }
 
     [TestMethod]

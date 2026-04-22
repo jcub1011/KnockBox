@@ -1,3 +1,4 @@
+@using System.Collections.Immutable
 @using KnockBox.Core.Services.State.Users
 @using KnockBox.Spardle.Models
 @using KnockBox.Spardle
@@ -290,7 +291,7 @@
             State.WordPoolMode = value;
             if (clearCustom)
             {
-                State.CustomWordPool = [];
+                State.CustomWordPool = ImmutableList<string>.Empty;
             }
         });
         if (clearCustom)
@@ -334,7 +335,7 @@
             .Select(w => w.Trim().ToLowerInvariant())
             .Where(w => w.Length is > 0 and <= 64)
             .ToList();
-        State.Execute(() => State.CustomWordPool = words);
+        State.Execute(() => State.CustomWordPool = words.ToImmutableList());
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -364,7 +365,7 @@
             .Select(w => w.Trim().ToLowerInvariant())
             .Where(w => w.Length is > 0 and <= 64)
             .ToList();
-        State.Execute(() => State.CustomWordPool = words);
+        State.Execute(() => State.CustomWordPool = words.ToImmutableList());
         _csvFileName = fileName;
         _csvWordCount = words.Count;
         _csvUploadError = null;

@@ -372,7 +372,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword
 
             // Set up majority vote: 3 out of 4 voted to end (required = 3).
             _state.EndGameVoteStatus = new EndGameVoteStatus(
-                new HashSet<string> { "p1", "p2", "p3" }, 3);
+                ["p1", "p2", "p3"], 3);
 
             var result = _context.CheckWinConditions();
             Assert.IsTrue(result.GameOver);

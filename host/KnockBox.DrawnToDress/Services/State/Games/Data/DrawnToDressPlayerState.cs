@@ -26,7 +26,7 @@ namespace KnockBox.DrawnToDress.Services.State.Games.Data
         /// <summary>
         /// All outfits submitted by this player, keyed by 1-based outfit round number.
         /// </summary>
-        public Dictionary<int, OutfitSubmission> SubmittedOutfits { get; set; } = new();
+        public Dictionary<int, OutfitSubmission> SubmittedOutfits { get; set; } = [];
 
         /// <summary>Returns the outfit for the given round, or null.</summary>
         public OutfitSubmission? GetOutfit(int outfitRound) => SubmittedOutfits.GetValueOrDefault(outfitRound);

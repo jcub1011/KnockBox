@@ -46,7 +46,7 @@ namespace KnockBox.HiddenAgendaTests.Unit.Logic.Games.HiddenAgenda.States
                     LastSpinResult = 3
                 };
             }
-            _state.TurnManager.SetTurnOrder(new List<string> { "p0", "p1", "p2", "p3" });
+            _state.TurnManager.SetTurnOrder(["p0", "p1", "p2", "p3"]);
         }
 
         [TestMethod]
@@ -58,8 +58,8 @@ namespace KnockBox.HiddenAgendaTests.Unit.Logic.Games.HiddenAgenda.States
             Assert.IsNotNull(_state.ReachableSpaces);
             // From space 0 with spin 3, can reach space 3 (0-1-2-3) or others if shortcuts?
             // Space 2 has shortcut to 20, so 0-1-2-20 is also 3 steps.
-            Assert.IsTrue(_state.ReachableSpaces.Any(s => s.Id == 3));
-            Assert.IsTrue(_state.ReachableSpaces.Any(s => s.Id == 20));
+            Assert.Contains(s => s.Id == 3, _state.ReachableSpaces);
+            Assert.Contains(s => s.Id == 20, _state.ReachableSpaces);
         }
 
         [TestMethod]
@@ -73,7 +73,7 @@ namespace KnockBox.HiddenAgendaTests.Unit.Logic.Games.HiddenAgenda.States
             Assert.IsTrue(result.IsSuccess);
             Assert.IsInstanceOfType<DrawPhaseState>(result.Value);
             Assert.AreEqual(3, _state.GamePlayers["p0"].CurrentSpaceId);
-            Assert.AreEqual(1, _state.GamePlayers["p0"].MovementHistory.Count);
+            Assert.HasCount(1, _state.GamePlayers["p0"].MovementHistory);
         }
 
         [TestMethod]

@@ -33,7 +33,7 @@ public class ActionReactionTests
         _state.GamePlayers.TryAdd("p1", new OperatorPlayerState { UserId = "p1", CurrentPoints = 10m, ActiveOperator = CardOperator.Add });
         _state.GamePlayers.TryAdd("p2", new OperatorPlayerState { UserId = "p2", CurrentPoints = 10m, ActiveOperator = CardOperator.Add });
         
-        _state.TurnManager.SetTurnOrder(new List<string> { "p1", "p2" });
+        _state.TurnManager.SetTurnOrder(["p1", "p2"]);
 
         _playPhase = new PlayPhaseState();
         _reactionPhase = new ReactionState();
@@ -46,7 +46,7 @@ public class ActionReactionTests
         _state.GamePlayers["p1"].Hand.Add(stealCard);
         _state.GamePlayers["p2"].Hand.Add(new NumberCard(5m)); // P2 needs a card for Steal to be playable
 
-        var playCmd = new PlayCardsCommand("p1", new List<Guid> { stealCard.Id }, "p2");
+        var playCmd = new PlayCardsCommand("p1", [stealCard.Id], "p2");
         var result = _playPhase.HandleCommand(_context, playCmd);
 
         Assert.IsInstanceOfType(result.Value, typeof(ReactionState));
@@ -63,7 +63,7 @@ public class ActionReactionTests
         _state.GamePlayers["p1"].Hand.Add(hpCard);
         _state.GamePlayers["p1"].Hand.Add(numberCard);
 
-        var playCmd = new PlayCardsCommand("p1", new List<Guid> { hpCard.Id, numberCard.Id }, "p2");
+        var playCmd = new PlayCardsCommand("p1", [hpCard.Id, numberCard.Id], "p2");
         _playPhase.HandleCommand(_context, playCmd);
 
         var passCmd = new PassReactionCommand("p2");
@@ -87,7 +87,7 @@ public class ActionReactionTests
         var cardToSteal = new NumberCard(9m);
         _state.GamePlayers["p2"].Hand.Add(cardToSteal);
 
-        var playCmd = new PlayCardsCommand("p1", new List<Guid> { stealCard.Id }, "p2");
+        var playCmd = new PlayCardsCommand("p1", [stealCard.Id], "p2");
         _playPhase.HandleCommand(_context, playCmd);
 
         var reactCmd = new PlayReactionCommand("p2", shieldCard.Id);

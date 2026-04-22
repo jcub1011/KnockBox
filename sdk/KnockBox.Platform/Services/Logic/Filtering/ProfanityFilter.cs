@@ -193,9 +193,9 @@ namespace KnockBox.Services.Logic.Filtering
 
             private sealed class Node
             {
-                public Dictionary<char, int> Next { get; } = new();
+                public Dictionary<char, int> Next { get; } = [];
                 public int Fail { get; set; }
-                public List<int> Outputs { get; } = new();
+                public List<int> Outputs { get; } = [];
 
                 public static Node Create() => new();
                 public static Node CreateRoot() => new();
