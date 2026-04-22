@@ -92,8 +92,6 @@
 
         _isExitingGame = true;
         await InvokeAsync(StateHasChanged);
-        await Task.Delay(400);
-        _isExitingGame = false;
 
         // Ensure the session is cleaned up when navigating to the home page (via link or back button).
         GameSessionService.LeaveCurrentSession(navigateHome: false);
