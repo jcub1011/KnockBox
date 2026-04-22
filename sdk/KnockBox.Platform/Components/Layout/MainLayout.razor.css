@@ -41,6 +41,12 @@ header {
     z-index: 99;
 }
 
+.custom-header {
+    display: flex;
+    padding: 0;
+    box-shadow: none;
+}
+
 header a {
     text-decoration: none;
     color: inherit;

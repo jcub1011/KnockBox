@@ -19,6 +19,7 @@
     position: relative;
     z-index: 1000;
     box-shadow: 0 6px 0 var(--dtd-color-lavender-deep);
+    flex: 1;
 }
 
 .dtd-header-paper-edge {

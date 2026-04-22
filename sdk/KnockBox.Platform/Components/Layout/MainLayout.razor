@@ -9,21 +9,31 @@
 @implements IDisposable
 
 <div class="main">
-    <header class="@(_isOnHomePage ? "home-header" : "") @(_isEnteringGame ? "entering-from-home" : "") @(_isExitingGame ? "exiting-to-home" : "")">
-        @if (!_isOnHomePage && GameSessionService.TryGetCurrentSession(out var currentSession))
+    @{
+        GameSessionService.TryGetCurrentSession(out var currentSession);
+        RenderFragment? customHeader = null;
+        string gameName = string.Empty;
+
+        if (currentSession is not null)
         {
-            var customHeader = GameModules
+            gameName = currentSession.LobbyRegistration.GameName;
+            customHeader = GameModules
                 .FirstOrDefault(m => m.RouteIdentifier == currentSession.LobbyRegistration.RouteIdentifier)
                 ?.GetCustomHeader();
+        }
 
+        var isUsingCustomHeader = customHeader is not null;
+    }
+    <header class="@(_isOnHomePage ? "home-header" : "") @(_isEnteringGame ? "entering-from-home" : "") @(_isExitingGame ? "exiting-to-home" : "") @(isUsingCustomHeader ? "custom-header" : "")">
+        @if (!_isOnHomePage && currentSession is not null)
+        {
             if (customHeader is not null)
             {
                 @customHeader
             }
             else
             {
-                <a href="@NavigationService.GetHomeUri()" title="Click to return home">
-                    @currentSession.LobbyRegistration.GameName</a>
+                <a href="@NavigationService.GetHomeUri()" title="Click to return home">@gameName</a>
                 <div class="header-actions">
                     <button class="room-code-btn @(_isRoomCodeRevealed ? "revealed" : "")"
                             @onclick="ToggleRoomCode"

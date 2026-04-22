@@ -15,6 +15,7 @@
     position: relative;
     overflow: hidden;
     z-index: 1000;
+    flex: 1;
 }
 
 .ctc-header-scanlines {

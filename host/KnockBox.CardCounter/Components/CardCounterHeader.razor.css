@@ -8,6 +8,8 @@
     border-bottom: 3px solid #5c3411; /* Wood trim */
     box-shadow: 0 4px 10px rgba(0,0,0,0.5);
     z-index: 1000;
+    flex: 1;
+    gap: 8px;
 }
 
 .cc-header-brand {
@@ -21,6 +23,12 @@
     letter-spacing: 2px;
     text-shadow: 2px 2px 0 #000;
     transition: transform 0.2s, filter 0.2s;
+    flex-shrink: 1;
+}
+
+.cc-header-brand-text {
+    text-overflow: ellipsis;
+    flex-shrink: 1;
 }
 
 .cc-header-brand:hover {
@@ -106,10 +114,4 @@
 .cc-header-leave:hover {
     background: #e74c3c;
     transform: rotate(90deg);
-}
-
-@media (max-width: 600px) {
-    .cc-header-brand-text {
-        display: none;
-    }
 }
