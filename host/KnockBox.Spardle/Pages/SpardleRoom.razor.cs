@@ -8,7 +8,6 @@ using KnockBox.Spardle.Models;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Logging;
 using Microsoft.JSInterop;
-using System.Diagnostics.CodeAnalysis;
 
 namespace KnockBox.Spardle.Pages;
 
@@ -57,7 +56,7 @@ public partial class SpardleRoom : DisposableComponent
             return;
         }
 
-        if (!TryExtractObfuscatedRoomCode(session.LobbyRegistration.Uri, out var roomCode)
+        if (!LobbyUriHelper.TryExtractObfuscatedRoomCode(session.LobbyRegistration.Uri, out var roomCode)
             || roomCode.Trim() != ObfuscatedRoomCode)
         {
             NavigationService.ToHome();
@@ -259,12 +258,4 @@ public partial class SpardleRoom : DisposableComponent
         base.Dispose();
     }
 
-    private static bool TryExtractObfuscatedRoomCode(string uri, [NotNullWhen(true)] out string? obfuscatedRoomCode)
-    {
-        obfuscatedRoomCode = null;
-        var split = uri.Trim().Trim('/').Split('/');
-        if (split.Length <= 0) return false;
-        obfuscatedRoomCode = split[^1];
-        return true;
-    }
 }

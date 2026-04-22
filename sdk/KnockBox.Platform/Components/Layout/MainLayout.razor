@@ -114,24 +114,39 @@
         if (wasHome && !_isOnHomePage)
         {
             _isEnteringGame = true;
-            var token = _cts.Token;
-            _ = Task.Delay(600, token).ContinueWith(_ => InvokeAsync(() =>
-            {
-                _isEnteringGame = false;
-                StateHasChanged();
-            }), token, TaskContinuationOptions.OnlyOnRanToCompletion, TaskScheduler.Current);
+            _ = AnimateEnteringGameAsync(_cts.Token);
         }
 
-        _ = InvokeAsync(StateHasChanged).ContinueWith(
-            t => Logger.LogError(t.Exception, "Error refreshing layout after navigation."),
-            TaskContinuationOptions.OnlyOnFaulted);
+        _ = SafeStateHasChangedAsync("Error refreshing layout after navigation.");
     }
 
     private void OnUserInitialized()
     {
-        _ = InvokeAsync(StateHasChanged).ContinueWith(
-            t => Logger.LogError(t.Exception, "Error refreshing layout after user initialization."),
-            TaskContinuationOptions.OnlyOnFaulted);
+        _ = SafeStateHasChangedAsync("Error refreshing layout after user initialization.");
+    }
+
+    private async Task AnimateEnteringGameAsync(CancellationToken token)
+    {
+        try
+        {
+            await Task.Delay(600, token);
+            await InvokeAsync(() =>
+            {
+                _isEnteringGame = false;
+                StateHasChanged();
+            });
+        }
+        catch (OperationCanceledException) { /* Layout disposed mid-animation. */ }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error completing enter-game animation.");
+        }
+    }
+
+    private async Task SafeStateHasChangedAsync(string errorMessage)
+    {
+        try { await InvokeAsync(StateHasChanged); }
+        catch (Exception ex) { Logger.LogError(ex, errorMessage); }
     }
 
     public void Dispose()

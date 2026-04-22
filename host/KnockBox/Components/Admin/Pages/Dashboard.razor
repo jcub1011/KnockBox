@@ -91,10 +91,12 @@
     private readonly PeriodicTimer _timer = new(TimeSpan.FromSeconds(3));
     private CancellationTokenSource? _cts;
     private int _totalLobbies;
+    private IGameModule[] _sortedModules = Array.Empty<IGameModule>();
 
     protected override void OnInitialized()
     {
         _cts = new CancellationTokenSource();
+        _sortedModules = GameModules.OrderBy(m => m.Name).ToArray();
         _ = RunRefreshLoop(_cts.Token);
     }
 
@@ -117,14 +119,16 @@
 
         // Union all loaded modules with the live counts so games with zero
         // active lobbies still appear -- an operator scanning the page
-        // should see every game, not just the busy ones.
-        return GameModules
-            .OrderBy(m => m.Name)
-            .Select(m =>
-            {
-                counts.TryGetValue(m.RouteIdentifier, out var c);
-                return new GameRow(m.Name, m.RouteIdentifier, c);
-            });
+        // should see every game, not just the busy ones. The module list is
+        // fixed at startup so the sort is cached.
+        var rows = new GameRow[_sortedModules.Length];
+        for (int i = 0; i < _sortedModules.Length; i++)
+        {
+            var m = _sortedModules[i];
+            counts.TryGetValue(m.RouteIdentifier, out var c);
+            rows[i] = new GameRow(m.Name, m.RouteIdentifier, c);
+        }
+        return rows;
     }
 
     private static string FormatUptime(TimeSpan uptime)

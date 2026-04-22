@@ -1,6 +1,7 @@
 @page "/room/task-master/{ObfuscatedRoomCode}"
 
-@inherits DisposableComponent
+@inherits LobbyPageBase<TaskMasterGameState>
+@using KnockBox.TaskMaster.Services.State.Games
 
 <PageTitle>Task Master</PageTitle>
 

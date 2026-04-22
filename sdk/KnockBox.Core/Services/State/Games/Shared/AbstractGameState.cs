@@ -96,7 +96,12 @@ namespace KnockBox.Core.Services.State.Games.Shared
             get
             {
                 using var scope = _playerLock.EnterScope();
-                return [.. _players.Values.Select(p => p.User)];
+                if (_players.Count == 0) return Array.Empty<User>();
+                var result = new User[_players.Count];
+                int i = 0;
+                foreach (var entry in _players.Values)
+                    result[i++] = entry.User;
+                return result;
             }
         }
 
@@ -108,7 +113,14 @@ namespace KnockBox.Core.Services.State.Games.Shared
             get
             {
                 using var scope = _playerLock.EnterScope();
-                return [.. _players.Values.Where(p => _kickedPlayers.Contains(p.User.Id)).Select(p => p.User)];
+                if (_kickedPlayers.Count == 0) return Array.Empty<User>();
+                var result = new List<User>(_kickedPlayers.Count);
+                foreach (var entry in _players.Values)
+                {
+                    if (_kickedPlayers.Contains(entry.User.Id))
+                        result.Add(entry.User);
+                }
+                return result;
             }
         }
 
@@ -117,7 +129,7 @@ namespace KnockBox.Core.Services.State.Games.Shared
         /// </summary>
         /// <param name="user"></param>
         /// <returns></returns>
-        public bool IsKicked(User user)
+        public bool IsKicked(User? user)
         {
             if (user is null) return false;
             using var scope = _playerLock.EnterScope();
@@ -149,40 +161,37 @@ namespace KnockBox.Core.Services.State.Games.Shared
             // Check for re-join to avoid renaming if the player is already in the lobby (by ID).
             bool isRejoin = _players.ContainsKey(player.Id);
 
-            if (!isRejoin)
+            if (!isRejoin && IsNameTaken(player.Name))
             {
-                var takenNames = _players.Values.Select(p => p.User)
-                    .Concat([Host])
-                    .Select(u => u.Name)
-                    .ToHashSet();
-
-                if (takenNames.Contains(player.Name))
+                string originalName = player.Name;
+                int counter = 1;
+                while (true)
                 {
-                    string originalName = player.Name;
-                    int counter = 1;
-                    while (true)
+                    string suffix = $" ({counter})";
+                    int maxBaseLength = 12 - suffix.Length;
+                    string baseName = originalName.Length > maxBaseLength
+                        ? originalName[..maxBaseLength]
+                        : originalName;
+                    string candidate = baseName + suffix;
+
+                    if (!IsNameTaken(candidate))
                     {
-                        // Generate suffix: (#) where # is an incrementing counter.
-                        string suffix = $" ({counter})";
-
-                        // Truncate original name to fit suffix within 12 chars.
-                        int maxBaseLength = 12 - suffix.Length;
-                        string baseName = originalName;
-                        if (baseName.Length > maxBaseLength)
-                        {
-                            baseName = baseName[..maxBaseLength];
-                        }
-
-                        string candidate = baseName + suffix;
-
-                        if (!takenNames.Contains(candidate))
-                        {
-                            player.Name = candidate;
-                            break;
-                        }
-                        counter++;
+                        player.Name = candidate;
+                        break;
                     }
+                    counter++;
                 }
+            }
+
+            bool IsNameTaken(string name)
+            {
+                if (string.Equals(Host.Name, name, StringComparison.Ordinal)) return true;
+                foreach (var entry in _players.Values)
+                {
+                    if (string.Equals(entry.User.Name, name, StringComparison.Ordinal))
+                        return true;
+                }
+                return false;
             }
 
             // Self-reference allows the dispose closure to verify that this is still the
@@ -224,19 +233,31 @@ namespace KnockBox.Core.Services.State.Games.Shared
         /// <summary>
         /// Kicks the player.
         /// </summary>
-        /// <param name="player"></param>
-        /// <returns></returns>
+        /// <remarks>
+        /// The kicked-set mutation is routed through <see cref="Execute(Action)"/> so subscribers
+        /// observe the change. The token is disposed *after* <see cref="Execute"/> returns to avoid
+        /// re-entering the non-reentrant <see cref="_executeLock"/> — the dispose action itself
+        /// re-enters <see cref="Execute"/> to remove the player from <see cref="_players"/>.
+        /// </remarks>
         public Result KickPlayer(User player)
         {
-            using var scope = _playerLock.EnterScope();
-            if (_players.TryGetValue(player.Id, out var registration))
-            {
-                _kickedPlayers.Add(player.Id);
-                registration.Token.Dispose();
-                return Result.Success;
-            }
+            IDisposable? token = null;
 
-            return Result.FromError("User is not in this game.");
+            var result = Execute(() =>
+            {
+                using var scope = _playerLock.EnterScope();
+                if (_players.TryGetValue(player.Id, out var registration))
+                {
+                    _kickedPlayers.Add(player.Id);
+                    token = registration.Token;
+                }
+            });
+
+            if (!result.IsSuccess) return result;
+            if (token is null) return Result.FromError("User is not in this game.");
+
+            token.Dispose();
+            return Result.Success;
         }
 
         /// <summary>
@@ -463,7 +484,7 @@ namespace KnockBox.Core.Services.State.Games.Shared
                     if (_disposeCts.IsCancellationRequested)
                         return;
 
-                    await ExecuteAsync(async () => await action(), cts.Token);
+                    await ExecuteAsync(() => new ValueTask(action()), cts.Token);
                 }
                 catch (OperationCanceledException)
                 {

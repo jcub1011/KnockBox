@@ -1,6 +1,6 @@
 @page "/room/card-counter/{ObfuscatedRoomCode}"
 
-@inherits DisposableComponent
+@inherits LobbyPageBase<CardCounterGameState>
 @using KnockBox.CardCounter.Services.State.Games
 @using KnockBox.CardCounter.Services.Logic.Games.FSM
 @using KnockBox.Core.Services.State.Games.Shared

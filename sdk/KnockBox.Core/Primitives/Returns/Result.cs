@@ -3,33 +3,40 @@ using System.Diagnostics.CodeAnalysis;
 namespace KnockBox.Core.Primitives.Returns
 {
     /// <summary>
+    /// Discriminator for <see cref="ErrorWrapper{TError}"/>.
+    /// </summary>
+    internal enum ErrorKind : byte
+    {
+        Failure = 0,
+        Cancellation = 1,
+    }
+
+    /// <summary>
     /// A wrapper used to discern between failures and cancellations.
     /// </summary>
     /// <typeparam name="TError"></typeparam>
-    /// <param name="Error"></param>
-    /// <param name="IsCancellationError"></param>
     public readonly struct ErrorWrapper<TError>
     {
-        public readonly bool IsCancellationError;
+        private readonly ErrorKind _kind;
         public readonly TError Error;
+
+        public bool IsCancellationError => _kind == ErrorKind.Cancellation;
 
         private ErrorWrapper(TError error)
         {
             Error = error;
-            IsCancellationError = false;
+            _kind = ErrorKind.Failure;
         }
 
-        private ErrorWrapper(int _)
+        private ErrorWrapper(ErrorKind kind)
         {
             Error = default!;
-            IsCancellationError = true;
+            _kind = kind;
         }
 
         /// <summary>
-        /// Attempts to get the cancellation error, failing if it is a cancellation error.
+        /// Attempts to get the error, failing if it is a cancellation.
         /// </summary>
-        /// <param name="error"></param>
-        /// <returns></returns>
         public bool TryGetError([MaybeNullWhen(true)] out TError error)
         {
             if (IsCancellationError)
@@ -45,10 +52,10 @@ namespace KnockBox.Core.Primitives.Returns
         }
 
         public static ErrorWrapper<TError> FromError(TError error) => new(error);
-        public static ErrorWrapper<TError> FromCancellation() => new(0);
+        public static ErrorWrapper<TError> FromCancellation() => new(ErrorKind.Cancellation);
 
         public static implicit operator ErrorWrapper<TError>(TError error) => new(error);
-        public static implicit operator ErrorWrapper<TError>(OperationCanceledException _) => new(0);
+        public static implicit operator ErrorWrapper<TError>(OperationCanceledException _) => new(ErrorKind.Cancellation);
     }
 
     /// <summary>
