@@ -5,20 +5,21 @@
 @using Microsoft.JSInterop
 @implements IDisposable
 
-<button class="@ClassName @(_isRevealed ? "revealed" : "")"
-        @onclick="Toggle"
-        @onauxclick="OnAuxClick"
-        @onauxclick:preventDefault="true"
-        @oncontextmenu="CopyCodeAsync"
-        @oncontextmenu:preventDefault="true"
-        @onpointerdown="OnPointerDown"
-        @onpointerup="OnPointerUp"
-        @onpointercancel="OnPointerCancel"
-        @onpointerleave="OnPointerCancel"
-        title="Click to reveal. Right-click/long-press to copy. Middle-click to join in a new tab.">
+<a href="@JoinUrl"
+   target="_blank"
+   class="@ClassName @(_isRevealed ? "revealed" : "")"
+   @onclick="Toggle"
+   @onclick:preventDefault="true"
+   @oncontextmenu="CopyCodeAsync"
+   @oncontextmenu:preventDefault="true"
+   @onpointerdown="OnPointerDown"
+   @onpointerup="OnPointerUp"
+   @onpointercancel="OnPointerCancel"
+   @onpointerleave="OnPointerCancel"
+   title="Click to reveal. Right-click/long-press to copy. Middle-click to join in a new tab.">
     <span class="@CoverClassName">@CoverText</span>
     <span class="@ValueClassName">@Code</span>
-</button>
+</a>
 
 @code {
     [Inject] INavigationService NavigationService { get; set; } = default!;
@@ -34,21 +35,16 @@
     private bool _isRevealed;
     private CancellationTokenSource? _longPressCts;
 
+    private string JoinUrl => GameSessionService.TryGetCurrentSession(out var session)
+        ? NavigationService.GetJoinUri(session.LobbyRegistration.Code, fresh: true)
+        : "#";
+
     private string Code =>
         GameSessionService.TryGetCurrentSession(out var session)
             ? session.LobbyRegistration.Code
             : string.Empty;
 
     private void Toggle() => _isRevealed = !_isRevealed;
-
-    private async Task OnAuxClick(MouseEventArgs e)
-    {
-        if (e.Button != 1) return;
-        if (!GameSessionService.TryGetCurrentSession(out var session)) return;
-
-        var url = NavigationService.GetJoinUri(session.LobbyRegistration.Code, fresh: true);
-        await JSRuntime.InvokeVoidAsync("window.open", url, "_blank");
-    }
 
     private async Task CopyCodeAsync()
     {

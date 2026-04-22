@@ -105,6 +105,12 @@
     box-shadow: 0 0 15px rgba(168, 85, 247, 0.2);
 }
 
+.ds-header-actions ::deep .ds-header-code-cover,
+.ds-header-actions ::deep .ds-header-code-value {
+    grid-area: 1 / 1;
+    transition: opacity 0.2s ease;
+}
+
 .ds-header-actions ::deep .ds-header-code-cover {
     font-size: 0.65rem;
     font-weight: 700;
@@ -114,7 +120,8 @@
 }
 
 .ds-header-actions ::deep .ds-header-code-value {
-    display: none;
+    opacity: 0;
+    pointer-events: none;
     font-size: 1rem;
     font-weight: 800;
     letter-spacing: 2px;
@@ -123,11 +130,13 @@
 }
 
 .ds-header-actions ::deep .ds-header-code.revealed .ds-header-code-cover {
-    display: none;
+    opacity: 0;
+    pointer-events: none;
 }
 
 .ds-header-actions ::deep .ds-header-code.revealed .ds-header-code-value {
-    display: block;
+    opacity: 1;
+    pointer-events: auto;
 }
 
 .ds-header-leave {

@@ -80,23 +80,32 @@
     transform: scale(1.05) rotate(0deg);
 }
 
+.ha-header-stamp-container ::deep .ha-header-code-cover,
+.ha-header-stamp-container ::deep .ha-header-code-value {
+    grid-area: 1 / 1;
+    transition: opacity 0.2s ease;
+}
+
 .ha-header-stamp-container ::deep .ha-header-code-cover {
     font-size: 0.85rem;
     letter-spacing: 2px;
 }
 
 .ha-header-stamp-container ::deep .ha-header-code-value {
-    display: none;
+    opacity: 0;
+    pointer-events: none;
     font-size: 1.2rem;
     letter-spacing: 4px;
 }
 
 .ha-header-stamp-container ::deep .ha-header-code.revealed .ha-header-code-cover {
-    display: none;
+    opacity: 0;
+    pointer-events: none;
 }
 
 .ha-header-stamp-container ::deep .ha-header-code.revealed .ha-header-code-value {
-    display: block;
+    opacity: 1;
+    pointer-events: auto;
 }
 
 .ha-header-leave {

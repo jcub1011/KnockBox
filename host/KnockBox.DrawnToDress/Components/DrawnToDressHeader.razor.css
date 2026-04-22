@@ -93,6 +93,12 @@
     box-shadow: 0 2px 0 var(--dtd-color-yellow-deep);
 }
 
+.dtd-header-actions ::deep .dtd-header-code-cover,
+.dtd-header-actions ::deep .dtd-header-code-value {
+    grid-area: 1 / 1;
+    transition: opacity 0.2s ease;
+}
+
 .dtd-header-actions ::deep .dtd-header-code-cover {
     font-size: 0.8rem;
     text-transform: uppercase;
@@ -100,18 +106,21 @@
 }
 
 .dtd-header-actions ::deep .dtd-header-code-value {
-    display: none;
+    opacity: 0;
+    pointer-events: none;
     font-size: 1.2rem;
     font-family: var(--font-mono);
     color: var(--dtd-color-dark);
 }
 
 .dtd-header-actions ::deep .dtd-header-code.revealed .dtd-header-code-cover {
-    display: none;
+    opacity: 0;
+    pointer-events: none;
 }
 
 .dtd-header-actions ::deep .dtd-header-code.revealed .dtd-header-code-value {
-    display: block;
+    opacity: 1;
+    pointer-events: auto;
 }
 
 .dtd-header-leave {

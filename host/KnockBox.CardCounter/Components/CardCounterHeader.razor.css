@@ -76,6 +76,12 @@
     background: #222;
 }
 
+.cc-header-actions ::deep .cc-header-code-cover,
+.cc-header-actions ::deep .cc-header-code-value {
+    grid-area: 1 / 1;
+    transition: opacity 0.2s ease;
+}
+
 .cc-header-actions ::deep .cc-header-code-cover {
     display: block;
     font-size: 0.8rem;
@@ -84,17 +90,20 @@
 }
 
 .cc-header-actions ::deep .cc-header-code-value {
-    display: none;
+    opacity: 0;
+    pointer-events: none;
     font-size: 1.1rem;
     letter-spacing: 3px;
 }
 
 .cc-header-actions ::deep .cc-header-code.revealed .cc-header-code-cover {
-    display: none;
+    opacity: 0;
+    pointer-events: none;
 }
 
 .cc-header-actions ::deep .cc-header-code.revealed .cc-header-code-value {
-    display: block;
+    opacity: 1;
+    pointer-events: auto;
 }
 
 .cc-header-leave {

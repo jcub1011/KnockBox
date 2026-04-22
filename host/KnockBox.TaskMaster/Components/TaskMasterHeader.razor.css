@@ -85,24 +85,33 @@
     box-shadow: 4px 4px 0 rgba(0,0,0,0.4);
 }
 
+.tm-header-actions ::deep .tm-header-code-cover,
+.tm-header-actions ::deep .tm-header-code-value {
+    grid-area: 1 / 1;
+    transition: opacity 0.2s ease;
+}
+
 .tm-header-actions ::deep .tm-header-code-cover {
     font-size: 0.8rem;
     letter-spacing: 1px;
 }
 
 .tm-header-actions ::deep .tm-header-code-value {
-    display: none;
+    opacity: 0;
+    pointer-events: none;
     font-size: 1.1rem;
     font-family: var(--font-mono);
     letter-spacing: 2px;
 }
 
 .tm-header-actions ::deep .tm-header-code.revealed .tm-header-code-cover {
-    display: none;
+    opacity: 0;
+    pointer-events: none;
 }
 
 .tm-header-actions ::deep .tm-header-code.revealed .tm-header-code-value {
-    display: block;
+    opacity: 1;
+    pointer-events: auto;
 }
 
 .tm-header-leave {

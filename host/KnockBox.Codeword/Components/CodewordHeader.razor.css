@@ -102,8 +102,15 @@
     box-shadow: 0 0 10px var(--ctc-lavender-dim);
 }
 
+.ctc-header-actions ::deep .ctc-header-code-cover,
 .ctc-header-actions ::deep .ctc-header-code-value {
-    display: none;
+    grid-area: 1 / 1;
+    transition: opacity 0.2s ease;
+}
+
+.ctc-header-actions ::deep .ctc-header-code-value {
+    opacity: 0;
+    pointer-events: none;
     letter-spacing: 2px;
     font-weight: 700;
     color: #fff;
@@ -111,11 +118,13 @@
 }
 
 .ctc-header-actions ::deep .ctc-header-code.revealed .ctc-header-code-cover {
-    display: none;
+    opacity: 0;
+    pointer-events: none;
 }
 
 .ctc-header-actions ::deep .ctc-header-code.revealed .ctc-header-code-value {
-    display: block;
+    opacity: 1;
+    pointer-events: auto;
 }
 
 .ctc-header-leave {
