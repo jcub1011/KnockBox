@@ -21,6 +21,14 @@ namespace KnockBox.Services.Registrations.Logic
             services.AddSingleton<ILobbyCodeService, LobbyCodeService>();
             services.AddSingleton<IRandomNumberService, RandomNumberService>();
 
+            // Snapshot every service the platform has registered up to this point —
+            // this is the denylist that plugins can't shadow. Captured BEFORE the
+            // plugin loop so one plugin's registrations don't block another's.
+            // Any service the platform starts registering later (e.g. after a
+            // careless refactor) would silently leave the denylist, so keep
+            // platform registrations above this line.
+            var hostOwnedSnapshot = DefaultPluginRegistration.CaptureHostOwnedServiceTypes(services);
+
             foreach (var plugin in pluginLoadResult.Plugins)
             {
                 var manifest = plugin.Manifest;
@@ -43,7 +51,7 @@ namespace KnockBox.Services.Registrations.Logic
                     return new DefaultPluginContext(manifest, pluginLogger, pluginConfig, pluginStorage);
                 });
 
-                var registration = new DefaultPluginRegistration(services, manifest);
+                var registration = new DefaultPluginRegistration(services, manifest, logger, hostOwnedSnapshot);
 
                 try
                 {

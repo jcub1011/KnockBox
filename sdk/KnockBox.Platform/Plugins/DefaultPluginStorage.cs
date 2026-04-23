@@ -12,37 +12,7 @@ namespace KnockBox.Platform.Plugins;
 /// </summary>
 internal sealed class DefaultPluginStorage(string rootDirectory) : IPluginStorage
 {
-    private readonly string _root = NormalizeRoot(rootDirectory);
-
-    /// <summary>
-    /// Resolves the root to its final on-disk target: runs <see cref="Path.GetFullPath(string)"/>,
-    /// then — if the directory itself is a reparse point — follows it to its
-    /// ultimate target. This keeps the lexical containment check in
-    /// <c>IsInsideRoot</c> meaningful on macOS (<c>/var</c> → <c>/private/var</c>),
-    /// Docker bind mounts, and other setups where an operator hands in a
-    /// symlinked path. Broken links or resolve failures fall back to the
-    /// lexical form.
-    /// </summary>
-    private static string NormalizeRoot(string rootDirectory)
-    {
-        var full = Path.GetFullPath(rootDirectory);
-        if (!Directory.Exists(full))
-            return full;
-
-        try
-        {
-            var info = new DirectoryInfo(full);
-            if ((info.Attributes & FileAttributes.ReparsePoint) == 0)
-                return full;
-
-            var resolved = info.ResolveLinkTarget(returnFinalTarget: true);
-            return resolved?.FullName ?? full;
-        }
-        catch (IOException)
-        {
-            return full;
-        }
-    }
+    private readonly string _root = PluginPathGuard.NormalizeDirectory(rootDirectory);
 
     public Stream OpenRead(string relativePath)
     {
@@ -123,99 +93,20 @@ internal sealed class DefaultPluginStorage(string rootDirectory) : IPluginStorag
 
         var candidate = Path.GetFullPath(Path.Combine(_root, relativePath));
 
-        if (!IsInsideRoot(candidate))
+        if (!PluginPathGuard.IsInsideRoot(_root, candidate))
         {
             throw new ArgumentException(
                 $"Plugin storage path [{relativePath}] resolves outside the plugin's root directory.",
                 nameof(relativePath));
         }
 
-        EnsureNoReparsePointEscape(candidate, relativePath);
+        if (!PluginPathGuard.HasNoReparsePointEscape(_root, candidate, out var reason))
+        {
+            throw new ArgumentException(
+                $"Plugin storage path [{relativePath}]: {reason}",
+                nameof(relativePath));
+        }
 
         return candidate;
-    }
-
-    /// <summary>
-    /// Walks the lexical path from the root down to <paramref name="candidate"/>,
-    /// checking each existing segment. Any segment that is a reparse point
-    /// whose final target lives outside <c>_root</c> causes an
-    /// <see cref="ArgumentException"/>. Non-existent segments terminate the
-    /// walk — a file that doesn't exist yet (common for <c>OpenWrite</c>)
-    /// cannot be a reparse point.
-    /// </summary>
-    private void EnsureNoReparsePointEscape(string candidate, string relativePath)
-    {
-        System.Diagnostics.Debug.Assert(
-            IsInsideRoot(candidate),
-            "EnsureNoReparsePointEscape precondition: candidate must already be lexically inside _root.");
-
-        var relativeFromRoot = Path.GetRelativePath(_root, candidate);
-        var segments = relativeFromRoot.Split(
-            [Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar],
-            StringSplitOptions.RemoveEmptyEntries);
-
-        var currentPath = _root;
-        foreach (var segment in segments)
-        {
-            currentPath = Path.Combine(currentPath, segment);
-
-            FileAttributes attrs;
-            try
-            {
-                attrs = File.GetAttributes(currentPath);
-            }
-            catch (FileNotFoundException)
-            {
-                // Segment doesn't exist yet — nothing further to check.
-                return;
-            }
-            catch (DirectoryNotFoundException)
-            {
-                return;
-            }
-
-            if ((attrs & FileAttributes.ReparsePoint) == 0)
-                continue;
-
-            FileSystemInfo? resolved;
-            try
-            {
-                resolved = (attrs & FileAttributes.Directory) != 0
-                    ? new DirectoryInfo(currentPath).ResolveLinkTarget(returnFinalTarget: true)
-                    : new FileInfo(currentPath).ResolveLinkTarget(returnFinalTarget: true);
-            }
-            catch (IOException ex)
-            {
-                // Some runtime/platform combinations throw instead of returning
-                // null for broken or unresolvable link chains; normalize to
-                // ArgumentException so callers see one rejection shape.
-                throw new ArgumentException(
-                    $"Plugin storage path [{relativePath}] traverses reparse-point segment [{currentPath}] whose target could not be resolved: {ex.Message}",
-                    nameof(relativePath));
-            }
-
-            if (resolved is null)
-            {
-                throw new ArgumentException(
-                    $"Plugin storage path [{relativePath}] traverses reparse-point segment [{currentPath}] whose target could not be resolved.",
-                    nameof(relativePath));
-            }
-
-            if (!IsInsideRoot(resolved.FullName))
-            {
-                throw new ArgumentException(
-                    $"Plugin storage path [{relativePath}] traverses reparse-point segment [{currentPath}] whose final target [{resolved.FullName}] is outside the plugin's root directory.",
-                    nameof(relativePath));
-            }
-        }
-    }
-
-    private bool IsInsideRoot(string absolutePath)
-    {
-        var rootWithSep = _root.EndsWith(Path.DirectorySeparatorChar)
-            ? _root
-            : _root + Path.DirectorySeparatorChar;
-        return string.Equals(absolutePath, _root, StringComparison.Ordinal)
-            || absolutePath.StartsWith(rootWithSep, StringComparison.Ordinal);
     }
 }

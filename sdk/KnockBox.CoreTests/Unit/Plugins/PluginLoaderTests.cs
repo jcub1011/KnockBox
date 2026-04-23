@@ -271,6 +271,87 @@ public sealed class PluginLoaderTests
         finally { SafeDelete(tempDir); }
     }
 
+    [TestMethod]
+    public void LoadModules_PluginCompiledAgainstNewerCore_Rejected()
+    {
+        AssertFixtureIsolation();
+
+        var logger = MakeLogger();
+        var loader = new PluginLoader(logger.Object);
+        var tempDir = MakeTempDir();
+
+        try
+        {
+            var testAssemblyPath = typeof(PluginLoaderTests).Assembly.Location;
+            var assemblyFileName = Path.GetFileNameWithoutExtension(testAssemblyPath);
+            var pluginSubdir = Path.Combine(tempDir, assemblyFileName);
+            Directory.CreateDirectory(pluginSubdir);
+            var dllPath = Path.Combine(pluginSubdir, assemblyFileName + ".dll");
+            File.Copy(testAssemblyPath, dllPath, overwrite: true);
+            WriteManifest(pluginSubdir, TestPluginModuleA.FixtureManifest);
+
+            // Plant a deps.json claiming a KnockBox.Core version far newer than the host ships.
+            var hostCoreVersion = typeof(IGameModule).Assembly.GetName().Version!;
+            var impossiblyNew = new Version(hostCoreVersion.Major + 10, 0, 0, 0);
+            var depsJsonPath = Path.ChangeExtension(dllPath, ".deps.json");
+            File.WriteAllText(depsJsonPath, $$"""
+                {
+                    "runtimeTarget": { "name": ".NETCoreApp,Version=v10.0", "signature": "" },
+                    "libraries": {
+                        "{{assemblyFileName}}/1.0.0": { "type": "project", "serviceable": false, "sha512": "" },
+                        "KnockBox.Core/{{impossiblyNew}}": { "type": "package", "serviceable": true, "sha512": "" }
+                    }
+                }
+                """);
+
+            var result = loader.LoadModules(tempDir);
+
+            Assert.IsEmpty(result.Plugins);
+            VerifyLogged(logger, LogLevel.Error, Times.AtLeastOnce());
+        }
+        finally { SafeDelete(tempDir); }
+    }
+
+    [TestMethod]
+    public void LoadModules_PluginCompiledAgainstOlderCore_StillLoads()
+    {
+        AssertFixtureIsolation();
+
+        var logger = MakeLogger();
+        var loader = new PluginLoader(logger.Object);
+        var tempDir = MakeTempDir();
+
+        try
+        {
+            var testAssemblyPath = typeof(PluginLoaderTests).Assembly.Location;
+            var assemblyFileName = Path.GetFileNameWithoutExtension(testAssemblyPath);
+            var pluginSubdir = Path.Combine(tempDir, assemblyFileName);
+            Directory.CreateDirectory(pluginSubdir);
+            var dllPath = Path.Combine(pluginSubdir, assemblyFileName + ".dll");
+            File.Copy(testAssemblyPath, dllPath, overwrite: true);
+            WriteManifest(pluginSubdir, TestPluginModuleA.FixtureManifest);
+
+            // deps.json declaring a version older than the host's — should still load.
+            var depsJsonPath = Path.ChangeExtension(dllPath, ".deps.json");
+            File.WriteAllText(depsJsonPath, $$"""
+                {
+                    "runtimeTarget": { "name": ".NETCoreApp,Version=v10.0", "signature": "" },
+                    "libraries": {
+                        "{{assemblyFileName}}/1.0.0": { "type": "project", "serviceable": false, "sha512": "" },
+                        "KnockBox.Core/0.0.1": { "type": "package", "serviceable": true, "sha512": "" }
+                    }
+                }
+                """);
+
+            var result = loader.LoadModules(tempDir);
+
+            Assert.Contains(
+                p => p.Manifest.RouteIdentifier == "pluginloader-tests-route-a",
+                result.Plugins);
+        }
+        finally { SafeDelete(tempDir); }
+    }
+
     /// <summary>
     /// Guard: if a future change adds another IGameModule to this assembly,
     /// these tests' fixture is no longer isolated and assertions about counts
@@ -310,11 +391,13 @@ public sealed class PluginLoaderTests
             times);
     }
 
-    // ─── FindForbiddenDependency ───────────────────────────────────────────
+    // ─── InspectDepsJson ───────────────────────────────────────────────────
 
     [TestMethod]
-    public void FindForbiddenDependency_ReturnsPackageId_WhenDepsJsonListsKnockBoxPlatform()
+    public void InspectDepsJson_ReturnsPackageId_WhenDepsJsonListsKnockBoxPlatform()
     {
+        var logger = new Mock<ILogger<PluginLoader>>();
+        var loader = new PluginLoader(logger.Object);
         var tempDir = Path.Combine(Path.GetTempPath(), "knockbox-pluginloader-tests-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(tempDir);
         try
@@ -333,16 +416,18 @@ public sealed class PluginLoaderTests
                 }
                 """);
 
-            var result = PluginLoader.FindForbiddenDependency(dllPath);
+            var result = loader.InspectDepsJson(dllPath);
 
-            Assert.AreEqual("KnockBox.Platform", result);
+            Assert.AreEqual("KnockBox.Platform", result.ForbiddenDependency);
         }
         finally { Directory.Delete(tempDir, recursive: true); }
     }
 
     [TestMethod]
-    public void FindForbiddenDependency_ReturnsNull_WhenDepsJsonListsOnlyCoreAndBcl()
+    public void InspectDepsJson_ForbiddenDependencyIsNull_WhenDepsJsonListsOnlyCoreAndBcl()
     {
+        var logger = new Mock<ILogger<PluginLoader>>();
+        var loader = new PluginLoader(logger.Object);
         var tempDir = Path.Combine(Path.GetTempPath(), "knockbox-pluginloader-tests-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(tempDir);
         try
@@ -360,16 +445,18 @@ public sealed class PluginLoaderTests
                 }
                 """);
 
-            var result = PluginLoader.FindForbiddenDependency(dllPath);
+            var result = loader.InspectDepsJson(dllPath);
 
-            Assert.IsNull(result);
+            Assert.IsNull(result.ForbiddenDependency);
         }
         finally { Directory.Delete(tempDir, recursive: true); }
     }
 
     [TestMethod]
-    public void FindForbiddenDependency_ReturnsNull_WhenDepsJsonIsMissing()
+    public void InspectDepsJson_ReturnsDefault_WhenDepsJsonIsMissing()
     {
+        var logger = new Mock<ILogger<PluginLoader>>();
+        var loader = new PluginLoader(logger.Object);
         var tempDir = Path.Combine(Path.GetTempPath(), "knockbox-pluginloader-tests-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(tempDir);
         try
@@ -377,16 +464,19 @@ public sealed class PluginLoaderTests
             var dllPath = Path.Combine(tempDir, "NoDeps.Plugin.dll");
             File.WriteAllText(dllPath, string.Empty);
 
-            var result = PluginLoader.FindForbiddenDependency(dllPath);
+            var result = loader.InspectDepsJson(dllPath);
 
-            Assert.IsNull(result);
+            Assert.IsNull(result.ForbiddenDependency);
+            Assert.IsNull(result.CoreVersion);
         }
         finally { Directory.Delete(tempDir, recursive: true); }
     }
 
     [TestMethod]
-    public void FindForbiddenDependency_ReturnsNull_WhenDepsJsonIsMalformed()
+    public void InspectDepsJson_ReturnsDefaultAndLogsWarning_WhenDepsJsonIsMalformed()
     {
+        var logger = new Mock<ILogger<PluginLoader>>();
+        var loader = new PluginLoader(logger.Object);
         var tempDir = Path.Combine(Path.GetTempPath(), "knockbox-pluginloader-tests-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(tempDir);
         try
@@ -396,9 +486,11 @@ public sealed class PluginLoaderTests
             var depsJsonPath = Path.ChangeExtension(dllPath, ".deps.json");
             File.WriteAllText(depsJsonPath, "{ this is not valid json");
 
-            var result = PluginLoader.FindForbiddenDependency(dllPath);
+            var result = loader.InspectDepsJson(dllPath);
 
-            Assert.IsNull(result);
+            Assert.IsNull(result.ForbiddenDependency);
+            Assert.IsNull(result.CoreVersion);
+            VerifyLogged(logger, LogLevel.Warning, Times.Once());
         }
         finally { Directory.Delete(tempDir, recursive: true); }
     }

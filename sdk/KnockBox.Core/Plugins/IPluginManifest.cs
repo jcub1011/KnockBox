@@ -28,7 +28,12 @@ public interface IPluginManifest
     /// </summary>
     string RouteIdentifier { get; }
 
-    /// <summary>Plugin version. Informational only; not used for compatibility gating.</summary>
+    /// <summary>
+    /// Plugin's own version. Informational only (shown in logs and the admin
+    /// dashboard). It does <b>not</b> gate compatibility — that check uses the
+    /// <c>KnockBox.Core</c> version the plugin was compiled against, which the
+    /// loader reads from the plugin's <c>.deps.json</c>.
+    /// </summary>
     Version Version { get; }
 
     /// <summary>

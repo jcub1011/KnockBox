@@ -145,15 +145,29 @@ namespace KnockBox.Core.Plugins
                 return null;
             }
 
-            var forbidden = FindForbiddenDependency(dllPath);
-            if (forbidden is not null)
+            var depsInspection = InspectDepsJson(dllPath);
+            if (depsInspection.ForbiddenDependency is not null)
             {
                 logger.LogError(
                     "Plugin [{Assembly}] declares a dependency on [{ForbiddenPackage}] in its .deps.json. " +
                     "Plugins MUST reference only KnockBox.Core — referencing the Platform package breaks " +
                     "AssemblyLoadContext isolation and causes type-identity drift at runtime. Skipping.",
                     manifest.EntryAssembly,
-                    forbidden);
+                    depsInspection.ForbiddenDependency);
+                return null;
+            }
+
+            var hostCoreVersion = typeof(IGameModule).Assembly.GetName().Version;
+            if (depsInspection.CoreVersion is { } pluginCoreVersion
+                && hostCoreVersion is not null
+                && pluginCoreVersion > hostCoreVersion)
+            {
+                logger.LogError(
+                    "Plugin [{Assembly}] was compiled against KnockBox.Core v{PluginCore} but the host ships v{HostCore}; " +
+                    "plugin would crash on unknown API calls at runtime. Skipping.",
+                    manifest.EntryAssembly,
+                    pluginCoreVersion,
+                    hostCoreVersion);
                 return null;
             }
 
@@ -275,18 +289,34 @@ namespace KnockBox.Core.Plugins
         }
 
         /// <summary>
-        /// Scans the plugin's co-located <c>.deps.json</c> for any package id in
-        /// <see cref="ForbiddenPluginDependencies"/>. Returns the offending id or
-        /// <c>null</c> if nothing is found. A missing, unreadable, or malformed
-        /// <c>.deps.json</c> all skip the check (return <c>null</c>) — the guard
-        /// cannot inspect what it cannot parse, and the subsequent assembly load
-        /// will surface any real IO problems with a clearer per-plugin error.
+        /// Result of scanning a plugin's co-located <c>.deps.json</c>.
         /// </summary>
-        internal static string? FindForbiddenDependency(string pluginDllPath)
+        /// <param name="ForbiddenDependency">
+        /// The first package id matching <see cref="ForbiddenPluginDependencies"/>, or <c>null</c> if none.
+        /// </param>
+        /// <param name="CoreVersion">
+        /// Version the plugin declared against <c>KnockBox.Core</c>, or <c>null</c> if the
+        /// deps.json was missing, unparsable, or did not reference <c>KnockBox.Core</c>.
+        /// Used by the loader to reject plugins compiled against a newer Core than the
+        /// host ships.
+        /// </param>
+        internal readonly record struct DepsInspection(string? ForbiddenDependency, Version? CoreVersion);
+
+        /// <summary>
+        /// Scans the plugin's co-located <c>.deps.json</c> for any package id in
+        /// <see cref="ForbiddenPluginDependencies"/> and extracts the version the plugin
+        /// declared against <c>KnockBox.Core</c>. A missing, unreadable, or malformed
+        /// <c>.deps.json</c> returns an empty inspection — the guards cannot inspect
+        /// what they cannot parse, and the subsequent assembly load will surface any
+        /// real IO problems with a clearer per-plugin error. Parse failures are logged
+        /// at warning level so a broken <c>.deps.json</c> doesn't silently bypass the
+        /// forbidden-dependency check.
+        /// </summary>
+        internal DepsInspection InspectDepsJson(string pluginDllPath)
         {
             var depsJsonPath = Path.ChangeExtension(pluginDllPath, ".deps.json");
             if (!File.Exists(depsJsonPath))
-                return null;
+                return default;
 
             try
             {
@@ -295,35 +325,107 @@ namespace KnockBox.Core.Plugins
 
                 if (!doc.RootElement.TryGetProperty("libraries", out var libraries) ||
                     libraries.ValueKind != JsonValueKind.Object)
-                    return null;
+                    return default;
+
+                string? forbidden = null;
+                Version? coreVersion = null;
 
                 foreach (var library in libraries.EnumerateObject())
                 {
                     var slashIndex = library.Name.IndexOf('/');
                     var id = slashIndex > 0 ? library.Name[..slashIndex] : library.Name;
+                    var versionText = slashIndex > 0 && slashIndex + 1 < library.Name.Length
+                        ? library.Name[(slashIndex + 1)..]
+                        : null;
 
-                    if (ForbiddenPluginDependencies.TryGetValue(id, out var forbidden))
-                        return forbidden;
+                    if (forbidden is null && ForbiddenPluginDependencies.TryGetValue(id, out var match))
+                        forbidden = match;
+
+                    if (coreVersion is null
+                        && string.Equals(id, "KnockBox.Core", StringComparison.OrdinalIgnoreCase)
+                        && versionText is not null
+                        && Version.TryParse(StripPrereleaseSuffix(versionText), out var parsed))
+                    {
+                        coreVersion = parsed;
+                    }
+
+                    if (forbidden is not null && coreVersion is not null)
+                        break;
                 }
 
-                return null;
+                return new DepsInspection(forbidden, coreVersion);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                return null;
+                logger.LogWarning(
+                    ex,
+                    "Failed to parse .deps.json for plugin [{Dll}]; forbidden-dependency and Core-version checks will be skipped.",
+                    pluginDllPath);
+                return default;
             }
         }
+
+        /// <summary>
+        /// Drops an optional SemVer prerelease/build suffix (<c>-alpha</c>, <c>-rc.1</c>,
+        /// <c>+abc123</c>) before handing the core numeric component to
+        /// <see cref="Version.TryParse(string?, out Version?)"/>, which doesn't
+        /// accept SemVer-style suffixes.
+        /// </summary>
+        private static string StripPrereleaseSuffix(string versionText)
+        {
+            int dash = versionText.IndexOf('-');
+            int plus = versionText.IndexOf('+');
+            int cut = (dash, plus) switch
+            {
+                (< 0, < 0) => -1,
+                (< 0, var p) => p,
+                (var d, < 0) => d,
+                var (d, p) => Math.Min(d, p),
+            };
+            return cut < 0 ? versionText : versionText[..cut];
+        }
+
+        /// <summary>
+        /// Max time a plugin's <see cref="IGameModule"/> constructor is allowed to run
+        /// before the loader gives up and skips the module. A deadlocking ctor would
+        /// otherwise hang host startup indefinitely.
+        /// </summary>
+        internal static readonly TimeSpan ModuleActivationTimeout = TimeSpan.FromSeconds(5);
 
         private IGameModule? TryActivate(Type moduleType)
         {
             try
             {
-                if (Activator.CreateInstance(moduleType) is IGameModule module)
+                // Module constructors run on the startup thread — a misbehaving plugin
+                // can hang host boot by blocking in its ctor. Isolate the construction
+                // on the thread pool with a hard timeout.
+                var activation = Task.Run(() => Activator.CreateInstance(moduleType));
+                if (!activation.Wait(ModuleActivationTimeout))
+                {
+                    logger.LogError(
+                        "Game module [{Type}] from [{Assembly}] exceeded the {Timeout:g} activation timeout; skipping.",
+                        moduleType.FullName,
+                        moduleType.Assembly.GetName().Name,
+                        ModuleActivationTimeout);
+                    return null;
+                }
+
+                if (activation.Result is IGameModule module)
                     return module;
 
                 logger.LogError(
                     "Type [{Type}] implements IGameModule but could not be activated as one.",
                     moduleType.FullName);
+                return null;
+            }
+            catch (AggregateException agg) when (agg.InnerException is not null)
+            {
+                logger.LogError(
+                    agg.InnerException,
+                    "Failed to activate game module [{Type}] from [{Assembly}]. " +
+                    "Ensure it has a public parameterless constructor.",
+                    moduleType.FullName,
+                    moduleType.Assembly.GetName().Name);
                 return null;
             }
             catch (Exception ex)
