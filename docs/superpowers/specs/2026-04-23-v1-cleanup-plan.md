@@ -8,10 +8,10 @@
 | **Phase 2** | Plugin-loader & sandbox hardening | ✅ Complete |
 | **Phase 3** | Operational hygiene (shutdown, eviction, TimeProvider) | ✅ Complete |
 | **Phase 4** | `User` API tightening | ✅ Complete |
-| **Phase 5** | Packaging & release metadata | ⬜ Pending |
+| **Phase 5** | Packaging & release metadata | ✅ Complete |
 | **Phase 6** | Docs & release notes | ⬜ Pending |
 
-Totals after Phase 4: **1565 tests passing** (426 SDK + 1139 host), 0 failures, 7 skipped (pre-existing Windows symlink tests).
+Totals after Phase 5: **1565 tests passing** (426 SDK + 1139 host), 0 failures, 7 skipped (pre-existing Windows symlink tests). Phase 5 is metadata-only — same test count as end of Phase 4.
 
 ---
 
@@ -99,42 +99,17 @@ Work is split into six phases, ordered by blast radius. Phase 1 ripples into eve
 
 ---
 
-## Phase 5 — Packaging & release metadata — ⬜ Pending
+## Phase 5 — Packaging & release metadata — ✅ Complete
 
-Sticky post-publish. Land before tagging `1.0.0`.
+- [x] **5.1** Added Microsoft-recommended NuGet metadata to `KnockBox.Core.csproj`, `KnockBox.Platform.csproj`, `KnockBox.Templates.csproj`. Properties: `Deterministic`, `ContinuousIntegrationBuild` (conditional on `CI=true`), `PublishRepositoryUrl`, `EmbedUntrackedSources`, `IncludeSymbols`, `SymbolPackageFormat=snupkg`, `RepositoryType=git`. Templates has no compiled output so only got the repro/CI/repo flags (no `IncludeSymbols` block — would be a no-op). `Microsoft.SourceLink.GitHub 8.0.0` added to Core and Platform with `PrivateAssets="all"`. Verified locally: `dotnet pack -c Release` emits `.nupkg` + `.snupkg` for Core and Platform; Core's PDB contains a SourceLink JSON document that maps `C:\Users\...\KnockBox\*` → `https://raw.githubusercontent.com/jcub1011/KnockBox/{HEAD}/*`, and the nuspec embeds `<repository type="git" url="https://github.com/jcub1011/KnockBox" commit="..."/>`.
+- [x] **5.2** Updated `.github/workflows/release-sdk.yml` to push both `*.nupkg` and `*.snupkg` to nuget.org. Uses `shopt -s nullglob` so the Templates job (which emits no `.snupkg`) doesn't try to push a literal glob. Artifact-upload step now captures both file types, and the GitHub Release step attaches both. GitHub Actions sets `CI=true` automatically, so the `ContinuousIntegrationBuild` conditional activates without workflow-level changes; added a comment on the Pack step explaining this.
+- [x] **5.3** SemVer policy documented in the `release-sdk.yml` file header and in `docs/making-a-game-plugin.md` under a new "SemVer + version coupling" section placed between Prerequisites and Step 1. Plugin authors pin `KnockBox.Core [1.0.0, 2.0.0)`; host and SDK share a major; breaking contracts bumps both to `2.0.0`.
 
-### 5.1 Add Microsoft-recommended NuGet metadata
+### Phase 5 notes
 
-**Files:** `sdk/KnockBox.Core/KnockBox.Core.csproj`, `sdk/KnockBox.Platform/KnockBox.Platform.csproj`, `sdk/KnockBox.Templates/KnockBox.Templates.csproj`
-
-- [ ] Add to each `<PropertyGroup>`:
-  ```xml
-  <Deterministic>true</Deterministic>
-  <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
-  <PublishRepositoryUrl>true</PublishRepositoryUrl>
-  <EmbedUntrackedSources>true</EmbedUntrackedSources>
-  <IncludeSymbols>true</IncludeSymbols>
-  <SymbolPackageFormat>snupkg</SymbolPackageFormat>
-  <RepositoryType>git</RepositoryType>
-  ```
-- [ ] Add SourceLink package reference:
-  ```xml
-  <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="all" />
-  ```
-
-### 5.2 Push `.snupkg` in the release workflow
-
-**File:** `.github/workflows/release-sdk.yml`
-
-- [ ] `dotnet pack` will already emit `.snupkg` via the `.csproj` properties from 5.1.
-- [ ] Update the push step to push both `*.nupkg` and `*.snupkg` to nuget.org.
-- [ ] Confirm `CI=true` is set in the workflow env so `ContinuousIntegrationBuild` activates.
-
-### 5.3 Document SDK↔host version coupling
-
-**Files:** release workflow comments, `docs/making-a-game-plugin.md`
-
-- [ ] Explicit SemVer policy: "SDK `1.x.x` — plugin authors pin `KnockBox.Core >=1.0.0 <2.0.0`. Host `1.x.x` tracks SDK `1.x.x` major version. Breaking plugin API changes bump SDK major." Not a code change; it gates future releases.
+- `KnockBox.Plugins.Analyzer` is packable but is not in the release workflow's matrix and not in the plan's file list, so was left untouched. If it starts shipping, the same metadata block should be added there (minus `IncludeSymbols` — analyzer is `IncludeBuildOutput=false`, so symbols would go unpacked).
+- Deterministic-build flag requires the packing runner to set `CI=true`. Local `dotnet pack` does NOT set it, so local builds still have absolute paths in PDBs (SourceLink maps them anyway). Production releases on GitHub Actions get full reproducibility.
+- No test count change — Phase 5 is csproj/yaml/docs only.
 
 ---
 

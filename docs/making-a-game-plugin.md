@@ -65,6 +65,20 @@ See the [host README's "Installing third-party plugins"](../README.md#installing
 
 ---
 
+## SemVer + version coupling
+
+KnockBox.Core follows SemVer. The plugin-facing contract — `IGameModule`, `IPluginManifest`, `IPluginContext`, `IPluginRegistration`, `AbstractGameEngine`, `AbstractGameState` — is stable inside a major. Pin accordingly:
+
+```xml
+<PackageReference Include="KnockBox.Core" Version="[1.0.0,2.0.0)" />
+```
+
+- **Plugin authors:** pin `KnockBox.Core >=1.0.0 <2.0.0`. A host on SDK `1.x.x` will refuse to load a plugin compiled against a newer Core (`PluginLoader.InspectDepsJson` checks the plugin's `.deps.json` against the host's Core version), so locking your floor at `1.0.0` and ceiling at `2.0.0` keeps you forward-compatible across all `1.x` hosts.
+- **Hosts:** the `KnockBox` host app and the SDK share a major. Host `1.x.x` runs plugins built against SDK `1.x.x`. Breaking any contract above bumps both to `2.0.0` together — don't mix majors.
+- Non-breaking additions (new optional members, new helper extension methods) ship as minor bumps; bug fixes as patch bumps.
+
+---
+
 ## Step 1 — Scaffold
 
 ```bash

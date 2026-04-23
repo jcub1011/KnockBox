@@ -20,6 +20,17 @@
     <PackageTags>knockbox partygame plugin-system core</PackageTags>
     <!-- Ships README.md on NuGet.org. The file is packed below via <None Include>. -->
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <!-- Reproducible-build + SourceLink. CI-only flag (honored when the GitHub
+         Actions runner sets CI=true) makes the PDB mappings use relative paths
+         so they resolve against the committed source rather than the runner's
+         workspace. Emits a companion .snupkg under IncludeSymbols=true. -->
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <RepositoryType>git</RepositoryType>
   </PropertyGroup>
 
   <ItemGroup>
@@ -30,6 +41,10 @@
     <PackageReference Include="Microsoft.AspNetCore.Components.Web" Version="10.0.5" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.5" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.5" />
+    <!-- SourceLink embeds commit + repo URL into the PDB so NuGet consumers
+         can step-into KnockBox.Core sources directly from GitHub. PrivateAssets
+         keeps the package out of transitive dependency lists. -->
+    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="all" />
   </ItemGroup>
 
   <ItemGroup>

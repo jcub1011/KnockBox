@@ -24,6 +24,14 @@
     <PackageTags>knockbox partygame plugin-system platform</PackageTags>
     <!-- Ships README.md on NuGet.org. The file is packed below via <None Include>. -->
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <!-- Reproducible-build + SourceLink — same rationale as KnockBox.Core.csproj. -->
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <RepositoryType>git</RepositoryType>
   </PropertyGroup>
 
   <ItemGroup>
@@ -52,6 +60,8 @@
     <PackageReference Include="Serilog" Version="4.3.1" />
     <PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
     <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
+    <!-- SourceLink — same rationale as KnockBox.Core.csproj. -->
+    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="all" />
   </ItemGroup>
 
   <ItemGroup>
