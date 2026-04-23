@@ -20,6 +20,7 @@
   <ItemGroup>
     <ProjectReference Include="..\KnockBox.Core\KnockBox.Core.csproj" />
     <ProjectReference Include="..\KnockBox.Tooling\KnockBox.Tooling.csproj" />
+    <ProjectReference Include="..\KnockBox.CoreTests.EmbeddedManifestFixture\KnockBox.CoreTests.EmbeddedManifestFixture.csproj" />
   </ItemGroup>
 
 </Project>
