@@ -19,15 +19,15 @@ on:
         required: true
         type: string
       core_version:
-        description: 'KnockBox.Core NuGet version'
+        description: 'KnockBox.Core NuGet version (no v prefix, e.g. 1.4.0)'
         required: true
         type: string
       platform_version:
-        description: 'KnockBox.Platform NuGet version'
+        description: 'KnockBox.Platform NuGet version (no v prefix, e.g. 1.4.0)'
         required: true
         type: string
       templates_version:
-        description: 'KnockBox.Templates NuGet version'
+        description: 'KnockBox.Templates NuGet version (no v prefix, e.g. 1.4.0)'
         required: true
         type: string
 
