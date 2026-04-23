@@ -22,10 +22,10 @@ else
             <div class="joinable-state">
                 <h4>Players</h4>
                 <div class="player-list">
-                    @foreach (var player in GameState.Players)
+                    @foreach (var entry in GameState.Players)
                     {
                         <button class="btn" title="Click to kick player."
-                                @onclick="() => GameState.KickPlayer(player)">@player.Name @(player.Id == GameState.Host.Id ? "(Host)" : "")</button>
+                                @onclick="() => GameState.KickPlayer(entry.User)">@entry.DisplayName @(entry.User.Id == GameState.Host.Id ? "(Host)" : "")</button>
                     }
                 </div>
                 @if (UserService.CurrentUser?.Id == GameState.Host.Id)

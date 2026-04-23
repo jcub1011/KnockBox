@@ -38,7 +38,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games
             return gameState;
         }
 
-        public override async Task<Result> StartAsync(
+        protected override async Task<Result> StartAsyncCore(
             AbstractGameState state, CancellationToken ct = default)
         {
             if (state is not CardCounterGameState gameState)
@@ -371,19 +371,19 @@ namespace KnockBox.CardCounter.Services.Logic.Games
 
             // Register every non-host player
             var playerIds = new List<string>();
-            foreach (var user in state.Players)
+            foreach (var entry in state.Players)
             {
                 var ps = new PlayerState
                 {
-                    PlayerId = user.Id,
-                    DisplayName = user.Name,
+                    PlayerId = entry.User.Id,
+                    DisplayName = entry.DisplayName,
                     PassesRemaining = state.Config.TotalPassesPerPlayer,
                     BuyInRoll = randomNumberService.GetRandomInt(1, 7, RandomType.Fast),
                     ActiveOperator = state.Config.ActiveOperatorMode ? Operator.Add : null
                 };
 
-                state.GamePlayers[user.Id] = ps;
-                playerIds.Add(user.Id);
+                state.GamePlayers[entry.User.Id] = ps;
+                playerIds.Add(entry.User.Id);
             }
             state.TurnManager.SetTurnOrder(playerIds);
 

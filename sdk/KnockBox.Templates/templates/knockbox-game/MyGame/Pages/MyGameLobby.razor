@@ -44,9 +44,9 @@ else if (GameState.IsJoinable)
         <h2>Waiting for players...</h2>
         <ul>
             <li><strong>@GameState.Host.Name</strong> (Host)</li>
-            @foreach (var player in GameState.Players)
+            @foreach (var entry in GameState.Players)
             {
-                <li>@player.Name</li>
+                <li>@entry.DisplayName</li>
             }
         </ul>
         @if (IsHost)

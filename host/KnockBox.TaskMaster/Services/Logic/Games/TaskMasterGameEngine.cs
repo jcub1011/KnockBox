@@ -22,10 +22,10 @@ namespace KnockBox.TaskMaster.Services.Logic.Games
             return gameState;
         }
 
-        public override async Task<Result> StartAsync(AbstractGameState state, CancellationToken ct = default)
+        protected override Task<Result> StartAsyncCore(AbstractGameState state, CancellationToken ct = default)
         {
             if (state is not TaskMasterGameState gameState)
-                return Result.FromError("Error starting game.", $"Game state of type [{(state?.GetType().Name ?? "null")}] couldn't be cast to type [{nameof(TaskMasterGameState)}].");
+                return Task.FromResult(Result.FromError("Error starting game.", $"Game state of type [{(state?.GetType().Name ?? "null")}] couldn't be cast to type [{nameof(TaskMasterGameState)}]."));
 
             var executeResult = state.Execute(() =>
             {
@@ -33,8 +33,8 @@ namespace KnockBox.TaskMaster.Services.Logic.Games
                 gameState.SetPhase(GamePhase.Playing);
             });
 
-            if (executeResult.IsFailure) return executeResult;
-            return Result.Success;
+            if (executeResult.IsFailure) return Task.FromResult(executeResult);
+            return Task.FromResult(Result.Success);
         }
 
         internal void HandlePlayerLeft(User player, TaskMasterGameState state)

@@ -39,6 +39,22 @@ public sealed class LobbyServiceShutdownTests
             "Open-lobby dictionary must be empty after shutdown.");
     }
 
+    [TestMethod]
+    public async Task CreateLobbyAsync_AfterStopAsync_ReturnsError()
+    {
+        // A lobby created after StopAsync starts would leak — its state would
+        // never hit the snapshot-and-dispose loop. The shutdown flag rejects
+        // the request before we spin up an engine state.
+        var (service, _) = BuildServiceWithStubEngine();
+
+        await service.StopAsync(CancellationToken.None);
+
+        var host = UserFactory.Create("Host", Guid.NewGuid().ToString());
+        var result = await service.CreateLobbyAsync(host, "shutdown-test-route");
+
+        Assert.IsTrue(result.IsFailure, "CreateLobbyAsync must reject requests after shutdown begins.");
+    }
+
     private static (LobbyService service, Mock<ILobbyCodeService> codeService) BuildServiceWithStubEngine()
     {
         var module = new StubModule();
@@ -92,7 +108,7 @@ public sealed class LobbyServiceShutdownTests
             return Task.FromResult<ValueResult<AbstractGameState>>(state);
         }
 
-        public override Task<Result> StartAsync(AbstractGameState state, CancellationToken ct = default)
+        protected override Task<Result> StartAsyncCore(AbstractGameState state, CancellationToken ct = default)
             => Task.FromResult(Result.Success);
     }
 

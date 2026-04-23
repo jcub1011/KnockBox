@@ -18,20 +18,22 @@
         <div class="spd-lobby-tagline">HEAD-TO-HEAD WORD COMBAT</div>
 
         @{
-            var roster = State.Players.Prepend(State.Host).ToList();
+            var roster = new[] { (State.Host.Id, State.Host.Name) }
+                .Concat(State.Players.Select(p => (p.User.Id, p.DisplayName)))
+                .ToList();
             int idx = 0;
         }
         <div class="spd-lobby-challengers">
             <div class="spd-lobby-challengers-label">CHALLENGERS (@roster.Count)</div>
             <div class="spd-lobby-challengers-list">
-                @foreach (var user in roster)
+                @foreach (var (id, name) in roster)
                 {
-                    bool isHost = user.Id == State.Host.Id;
-                    bool isMe = user.Id == UserService.CurrentUser?.Id;
+                    bool isHost = id == State.Host.Id;
+                    bool isMe = id == UserService.CurrentUser?.Id;
                     string accent = $"spd-opp-{(idx++ % 4) switch { 0 => "a", 1 => "b", 2 => "c", _ => "d" }}";
                     <div class="spd-lobby-chip @accent @(isMe ? "spd-lobby-chip-me" : "")">
-                        <span class="spd-lobby-chip-avatar">@Initials(user.Name)</span>
-                        <span class="spd-lobby-chip-name">@user.Name</span>
+                        <span class="spd-lobby-chip-avatar">@Initials(name)</span>
+                        <span class="spd-lobby-chip-name">@name</span>
                         @if (isHost)
                         {
                             <span class="spd-lobby-chip-badge">HOST</span>
@@ -419,12 +421,7 @@
     private async Task StartGame()
     {
         if (UserService.CurrentUser is null) return;
-        if (UserService.CurrentUser.Id != State.Host.Id)
-        {
-            await ShowStartError("Only the host may start the game.");
-            return;
-        }
-        var result = await GameEngine.StartAsync(State);
+        var result = await GameEngine.StartAsync(UserService.CurrentUser, State);
         if (result.TryGetFailure(out var failure))
         {
             await ShowStartError(failure.PublicMessage);

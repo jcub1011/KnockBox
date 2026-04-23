@@ -3,7 +3,7 @@
 
 @{
     var sortedPlayers = GameState.Players
-        .Select(p => new { Player = p, State = GameState.Context?.GamePlayers.GetValueOrDefault(p.Id) })
+        .Select(p => new { Player = p, State = GameState.Context?.GamePlayers.GetValueOrDefault(p.User.Id) })
         .Where(x => x.State != null)
         .OrderBy(x => Math.Abs(x.State!.CurrentPoints))
         .ThenBy(x => x.State!.ScoreTimestamp)
@@ -26,7 +26,7 @@
 
             <div class="op-winner-pedestal holo-effect">
                 <span class="op-winner-label">WINNER</span>
-                <span class="op-winner-name">@winner.Player.Name</span>
+                <span class="op-winner-name">@winner.Player.DisplayName</span>
                 <span class="op-winner-score">@winner.State!.CurrentPoints.ToString("F1")</span>
                 <span class="op-winner-turns">@GameState.TurnCount turns played</span>
             </div>
@@ -39,7 +39,7 @@
                         var entry = sortedPlayers[i];
                         <div class="op-runner-up" style="--ri: @(i - 1)">
                             <span class="op-runner-rank">#@(i + 1)</span>
-                            <span class="op-runner-name">@entry.Player.Name</span>
+                            <span class="op-runner-name">@entry.Player.DisplayName</span>
                             <span class="op-runner-score">@entry.State!.CurrentPoints.ToString("F1")</span>
                         </div>
                     }
@@ -68,7 +68,7 @@ else
 
                 <div class="op-leaderboard-entry @(isWinner ? "winner" : "")">
                     <span class="op-entry-rank">#@(i + 1)</span>
-                    <span class="op-entry-name">@entry.Player.Name</span>
+                    <span class="op-entry-name">@entry.Player.DisplayName</span>
                     <div class="op-entry-score-col">
                         <span class="op-entry-score">@entry.State!.CurrentPoints.ToString("F1")</span>
                         @if (isWinner) { <span class="op-host-badge">WINNER</span> }

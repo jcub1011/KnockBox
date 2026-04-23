@@ -66,15 +66,17 @@ public class MyGameGameEngine(
     }
 
     /// <summary>
-    /// Called from the lobby page when the host clicks "Start Game". Flips the
-    /// lobby out of joinable mode and initializes the first game-specific state.
+    /// Game-specific start logic. Invoked by the base-class
+    /// <see cref="AbstractGameEngine.StartAsync"/> after host-identity
+    /// authorization has succeeded. Flips the lobby out of joinable mode and
+    /// initializes the first game-specific state.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Caller-identity verification (e.g. "only the host may start the game") is
-    /// the <b>invoker's</b> responsibility. The lobby page should check the
-    /// current user against <c>state.Host</c> before calling this. Engines are
-    /// free to assume the caller is authorized.
+    /// Host-identity verification ("only the host may start the game") lives in
+    /// the base class, so overrides are free to assume the caller is authorized.
+    /// If your game needs additional authorization (co-host, party role, etc.),
+    /// add it here.
     /// </para>
     /// <para>
     /// Callers consume the returned <see cref="Result"/> via
@@ -83,7 +85,7 @@ public class MyGameGameEngine(
     /// pattern is the engine's control-flow vocabulary.
     /// </para>
     /// </remarks>
-    public override Task<Result> StartAsync(
+    protected override Task<Result> StartAsyncCore(
         AbstractGameState state, CancellationToken ct = default)
     {
         // Defensive type-check: the platform plumbs a base-typed state back to

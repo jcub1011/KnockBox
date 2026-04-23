@@ -45,7 +45,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games
             return Task.FromResult<ValueResult<AbstractGameState>>(gameState);
         }
 
-        public override Task<Result> StartAsync(
+        protected override Task<Result> StartAsyncCore(
             AbstractGameState state, CancellationToken ct = default)
         {
             if (state is not DrawnToDressGameState gameState)
@@ -63,12 +63,12 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games
 
                 // Snapshot all registered players into GamePlayers so FSM states can look
                 // them up by ID.
-                foreach (var player in gameState.Players)
+                foreach (var entry in gameState.Players)
                 {
-                    gameState.GamePlayers[player.Id] = new DrawnToDressPlayerState
+                    gameState.GamePlayers[entry.User.Id] = new DrawnToDressPlayerState
                     {
-                        PlayerId = player.Id,
-                        DisplayName = player.Name,
+                        PlayerId = entry.User.Id,
+                        DisplayName = entry.DisplayName,
                     };
                 }
 

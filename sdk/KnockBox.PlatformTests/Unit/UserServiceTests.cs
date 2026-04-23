@@ -59,6 +59,25 @@ public sealed class UserServiceTests
     }
 
     [TestMethod]
+    public void UserFactory_Create_TrimsAndCapsName()
+    {
+        // Mirrors SetCurrentUserName: trim whitespace, cap at 12 chars.
+        var trimmed = UserFactory.Create("   Bob   ", "id1");
+        Assert.AreEqual("Bob", trimmed.Name);
+
+        var capped = UserFactory.Create("ThisNameIsWayTooLong", "id2");
+        Assert.AreEqual("ThisNameIsWa", capped.Name);
+        Assert.AreEqual(12, capped.Name.Length);
+    }
+
+    [TestMethod]
+    public void UserFactory_CreateUnchecked_LeavesNameAsIs()
+    {
+        var user = UserFactory.CreateUnchecked("   ThisNameIsWayTooLong   ", "id");
+        Assert.AreEqual("   ThisNameIsWayTooLong   ", user.Name);
+    }
+
+    [TestMethod]
     public async Task SetCurrentUserName_TrimsWhitespace()
     {
         var (service, _) = await NewInitializedServiceAsync();

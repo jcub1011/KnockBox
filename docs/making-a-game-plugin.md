@@ -75,9 +75,10 @@ KnockBox.Core follows SemVer. The plugin-facing contract — `IGameModule`, `IPl
 <PackageReference Include="KnockBox.Core" Version="[1.0.0,2.0.0)" />
 ```
 
-- **Plugin authors:** pin `KnockBox.Core >=1.0.0 <2.0.0`. A host on SDK `1.x.x` will refuse to load a plugin compiled against a newer Core (`PluginLoader.InspectDepsJson` checks the plugin's `.deps.json` against the host's Core version), so locking your floor at `1.0.0` and ceiling at `2.0.0` keeps you forward-compatible across all `1.x` hosts.
+- **Plugin authors:** pin `KnockBox.Core >=1.0.0 <2.0.0`. A host on SDK `1.x.x` will refuse to load a plugin compiled against a newer Core (`PluginLoader.InspectDepsJson` reads the plugin's `.deps.json` and compares it against the host's Core version), so locking your floor at `1.0.0` and ceiling at `2.0.0` keeps you forward-compatible across all `1.x` hosts.
 - **Hosts:** the `KnockBox` host app and the SDK share a major. Host `1.x.x` runs plugins built against SDK `1.x.x`. Breaking any contract above bumps both to `2.0.0` together — don't mix majors.
 - Non-breaking additions (new optional members, new helper extension methods) ship as minor bumps; bug fixes as patch bumps.
+- **`AssemblyVersion` is pinned at `1.0.0.0` for the entire v1.x line** so consumers pinned at `[1.0.0, 2.0.0)` never need binding redirects when we ship a minor/patch. The compat gate therefore reads the `AssemblyInformationalVersion` (which carries the full SemVer driven by `-p:Version=…` at pack time) rather than the frozen `AssemblyVersion`. If you're building against a locally-built Core (no `-p:Version` passed), both resolve to `1.0.0.0` and the gate is effectively a no-op.
 
 ---
 
@@ -131,17 +132,22 @@ Three abstract/virtual hooks with fixed signatures in v1:
 public abstract Task<ValueResult<AbstractGameState>> CreateStateAsync(
     User host, CancellationToken ct = default);
 
-public abstract Task<Result> StartAsync(
+// Base class — plugins override StartAsyncCore, not this.
+public Task<Result> StartAsync(
+    User caller, AbstractGameState state, CancellationToken ct = default);
+
+// Plugin override point. Host-identity authorization already happened upstream.
+protected abstract Task<Result> StartAsyncCore(
     AbstractGameState state, CancellationToken ct = default);
 
 public virtual Task<bool> CanStartAsync(
     AbstractGameState state, CancellationToken ct = default);
 ```
 
-`StartAsync` does **not** take a `User` parameter — caller-identity checks ("only the host may start") live in the lobby page, same pattern as `KickPlayer`. The engine assumes the caller is authorized. `CanStartAsync` defaults to `HasValidPlayerCount(state)` — a protected helper that checks the player-count range and that the lobby is still joinable. Override `CanStartAsync` and compose with the helper when you need game-specific readiness rules.
+`StartAsync(caller, state)` is the public entry point — the base class verifies `caller.Id == state.Host.Id` before delegating to your `StartAsyncCore(state, ct)` override. Plugins never re-check the host identity; that invariant is enforced once, in the platform. If your game needs additional authorization (co-host, party role, etc.), add it at the top of `StartAsyncCore`. `CanStartAsync` composes two protected helpers, `HasValidPlayerCount(state)` and `IsLobbyOpen(state)` — override it and combine them with any game-specific readiness rules.
 
-**Edit:** override `CreateStateAsync` / `StartAsync`, and add your game's commands (`PlaceBid`, `DrawCard`, `Guess`, etc.).
-**Leave alone:** the inheritance from `AbstractGameEngine`.
+**Edit:** override `CreateStateAsync` / `StartAsyncCore`, and add your game's commands (`PlaceBid`, `DrawCard`, `Guess`, etc.).
+**Leave alone:** the inheritance from `AbstractGameEngine` and the public `StartAsync`.
 
 ### `MyGame/Pages/MyGameLobby.razor`
 

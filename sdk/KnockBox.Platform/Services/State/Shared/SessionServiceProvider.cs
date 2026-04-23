@@ -40,10 +40,12 @@ public sealed class SessionServiceProvider : ISessionServiceProvider, IDisposabl
     internal TimeSpan EvictionDelay { get; set; } = TimeSpan.FromMinutes(1);
 
     /// <summary>
-    /// Production constructor. DI supplies <see cref="TimeProvider.System"/> when a
-    /// <see cref="TimeProvider"/> isn't registered, so hosts don't need to register one
-    /// explicitly. Tests construct via <see cref="SessionServiceProvider(IServiceProvider, ILogger{SessionServiceProvider}, TimeProvider)"/>
-    /// to pass a <c>FakeTimeProvider</c>.
+    /// Production constructor. When no <see cref="TimeProvider"/> is registered
+    /// in DI, the container picks this shorter ctor (longest-viable constructor
+    /// selection); it delegates to the full overload with
+    /// <see cref="TimeProvider.System"/>. Register a <c>TimeProvider</c> at the
+    /// container level if you want DI to pick the longer ctor instead. Tests
+    /// construct the longer overload directly with a <c>FakeTimeProvider</c>.
     /// </summary>
     public SessionServiceProvider(
         IServiceProvider serviceProvider,

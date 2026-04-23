@@ -43,7 +43,7 @@
     [Parameter, EditorRequired] public SpardleState State { get; set; } = default!;
     [Parameter, EditorRequired] public string CurrentUserId { get; set; } = default!;
 
-    private sealed record RankedEntry(User User, PlayerState PlayerState, int Rank);
+    private sealed record RankedEntry(User User, string DisplayName, PlayerState PlayerState, int Rank);
 
     private SpardleState? _subscribedState;
     private IDisposable? _stateSubscription;
@@ -92,14 +92,15 @@
 
     private List<RankedEntry> ComputeRanked()
     {
-        var roster = State.HostIsParticipant
-            ? State.Players.Prepend(State.Host)
-            : (IEnumerable<User>)State.Players;
+        IEnumerable<(User User, string DisplayName)> roster =
+            State.HostIsParticipant
+                ? State.Players.Select(p => (p.User, p.DisplayName)).Prepend((State.Host, State.Host.Name))
+                : State.Players.Select(p => (p.User, p.DisplayName));
 
         var sorted = roster
-            .Select(u => (User: u, Ps: State.TryGetPlayerState(u.Id, out var p) ? p : null))
+            .Select(u => (u.User, u.DisplayName, Ps: State.TryGetPlayerState(u.User.Id, out var p) ? p : null))
             .Where(p => p.Ps is not null)
-            .Select(p => (p.User, Ps: p.Ps!))
+            .Select(p => (p.User, p.DisplayName, Ps: p.Ps!))
             // Primary sort — "closest to finishing" in the current round:
             //   solved > still guessing > DNF, then most-correct-letters, then fewest guesses
             .OrderBy(p => RoundStateSortKey(p.Ps))
@@ -107,8 +108,8 @@
             .ThenBy(p => p.Ps.Guesses.Count)
             // Secondary — match standing, so absolute leaders surface on ties
             .ThenByDescending(p => p.Ps.TotalScore)
-            .ThenBy(p => p.User.Name, StringComparer.OrdinalIgnoreCase)
-            .Select((e, i) => new RankedEntry(e.User, e.Ps, i + 1))
+            .ThenBy(p => p.DisplayName, StringComparer.OrdinalIgnoreCase)
+            .Select((e, i) => new RankedEntry(e.User, e.DisplayName, e.Ps, i + 1))
             .ToList();
 
         return sorted;
@@ -164,7 +165,7 @@
 
         <div class="spd-opp-row @stateClass @(isMe ? "spd-opp-row-me" : "")">
             <span class="spd-opp-rank @rankTierClass">@entry.Rank</span>
-            <span class="spd-opp-name">@entry.User.Name</span>
+            <span class="spd-opp-name">@entry.DisplayName</span>
             <span class="spd-opp-badge">@badge</span>
             <span class="spd-opp-score spd-mono">@ps.TotalScore</span>
         </div>

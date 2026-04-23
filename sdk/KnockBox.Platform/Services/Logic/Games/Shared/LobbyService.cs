@@ -18,6 +18,7 @@ namespace KnockBox.Services.Logic.Games.Shared
         private readonly ILogger<LobbyService> _logger;
         private readonly ConcurrentDictionary<string, LobbyRegistration> _lobbies = [];
         private readonly Dictionary<string, GameRegistration> _gamesByRoute;
+        private int _shuttingDown;
 
         public LobbyService(
             IServiceProvider serviceProvider,
@@ -75,6 +76,9 @@ namespace KnockBox.Services.Logic.Games.Shared
             string routeIdentifier,
             CancellationToken ct = default)
         {
+            if (Volatile.Read(ref _shuttingDown) == 1)
+                return ValueResult<LobbyRegistration>.FromError("Host is shutting down; no new lobbies can be created.");
+
             if (string.IsNullOrWhiteSpace(routeIdentifier) || !_gamesByRoute.TryGetValue(routeIdentifier, out var game))
                 return ValueResult<LobbyRegistration>.FromError($"No game registered for route identifier [{routeIdentifier}].");
 
@@ -198,6 +202,11 @@ namespace KnockBox.Services.Logic.Games.Shared
 
         public Task StopAsync(CancellationToken cancellationToken)
         {
+            // Flag set *before* the snapshot so any CreateLobbyAsync racing
+            // against shutdown rejects rather than leaking a lobby whose state
+            // never gets disposed.
+            Interlocked.Exchange(ref _shuttingDown, 1);
+
             // Snapshot first so we don't mutate the collection while enumerating.
             var snapshot = _lobbies.ToArray();
             _lobbies.Clear();

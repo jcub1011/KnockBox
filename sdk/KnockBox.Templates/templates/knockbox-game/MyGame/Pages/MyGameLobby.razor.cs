@@ -98,17 +98,11 @@ public partial class MyGameLobby : DisposableComponent
     {
         if (GameState is null || UserService.CurrentUser is null) return;
 
-        // Caller-identity check lives with the invoker, not the engine. Non-host
-        // players clicking Start would be a client-side bug; we reject it here.
-        if (UserService.CurrentUser.Id != GameState.Host.Id)
-        {
-            Logger.LogWarning("Non-host user [{id}] cannot start the game.", UserService.CurrentUser.Id);
-            return;
-        }
-
-        // The engine returns a Result — in a real game you'd branch on
-        // result.TryGetFailure(...) to surface a toast or inline error.
-        await GameEngine.StartAsync(GameState, ComponentDetached);
+        // The base AbstractGameEngine.StartAsync verifies that the caller is the
+        // lobby's host before invoking the engine's game-specific start logic;
+        // overrides assume the caller is authorized. Branch on the returned
+        // Result to surface a toast or inline error in a real game.
+        await GameEngine.StartAsync(UserService.CurrentUser, GameState, ComponentDetached);
     }
 
     private void HandleStateDisposed()

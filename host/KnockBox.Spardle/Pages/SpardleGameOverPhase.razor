@@ -7,15 +7,17 @@
 @inject INavigationService NavigationService
 
 @{
-    var rosterSource = State.HostIsParticipant
-        ? State.Players.Prepend(State.Host)
-        : (IEnumerable<User>)State.Players;
+    IEnumerable<(User User, string DisplayName)> rosterSource =
+        State.HostIsParticipant
+            ? State.Players.Select(p => (p.User, p.DisplayName)).Prepend((State.Host, State.Host.Name))
+            : State.Players.Select(p => (p.User, p.DisplayName));
     var roster = rosterSource
         .Select(u => new
         {
-            User = u,
-            Score = State.PlayerStates.TryGetValue(u.Id, out var ps) ? ps.TotalScore : 0,
-            RoundsWon = State.RoundHistory.Count(r => r.Outcomes.Any(o => o.UserId == u.Id && o.Placement == 1))
+            User = u.User,
+            DisplayName = u.DisplayName,
+            Score = State.PlayerStates.TryGetValue(u.User.Id, out var ps) ? ps.TotalScore : 0,
+            RoundsWon = State.RoundHistory.Count(r => r.Outcomes.Any(o => o.UserId == u.User.Id && o.Placement == 1))
         })
         .OrderByDescending(x => x.Score)
         .ThenByDescending(x => x.RoundsWon)
@@ -37,7 +39,7 @@
         {
             <div class="spd-over-podium-block spd-over-second">
                 <div class="spd-over-podium-crown">🥈</div>
-                <div class="spd-over-podium-name">@second.User.Name</div>
+                <div class="spd-over-podium-name">@second.DisplayName</div>
                 <div class="spd-over-podium-score spd-display">@second.Score</div>
                 <div class="spd-over-podium-bar"></div>
             </div>
@@ -46,7 +48,7 @@
         {
             <div class="spd-over-podium-block spd-over-first">
                 <div class="spd-over-podium-crown spd-over-podium-crown-first">👑</div>
-                <div class="spd-over-podium-name">@first.User.Name</div>
+                <div class="spd-over-podium-name">@first.DisplayName</div>
                 <div class="spd-over-podium-score spd-display">@first.Score</div>
                 <div class="spd-over-podium-bar"></div>
             </div>
@@ -55,7 +57,7 @@
         {
             <div class="spd-over-podium-block spd-over-third">
                 <div class="spd-over-podium-crown">🥉</div>
-                <div class="spd-over-podium-name">@third.User.Name</div>
+                <div class="spd-over-podium-name">@third.DisplayName</div>
                 <div class="spd-over-podium-score spd-display">@third.Score</div>
                 <div class="spd-over-podium-bar"></div>
             </div>
@@ -76,7 +78,7 @@
                 bool isMe = row.User.Id == UserService.CurrentUser?.Id;
                 <div class="spd-over-board-row @(isMe ? "spd-over-board-me" : "")" style="--row-idx:@rank;">
                     <span class="spd-over-board-rank spd-display">@rank</span>
-                    <span class="spd-over-board-name">@row.User.Name</span>
+                    <span class="spd-over-board-name">@row.DisplayName</span>
                     <span class="spd-over-board-won spd-mono">@row.RoundsWon</span>
                     <span class="spd-over-board-total spd-display">@row.Score</span>
                 </div>

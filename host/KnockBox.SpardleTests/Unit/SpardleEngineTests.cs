@@ -88,7 +88,7 @@ public class SpardleEngineTests
         state.CustomWordPool = ImmutableList.Create("apple", "brave");
 
         var start = DateTimeOffset.UtcNow;
-        var result = await _engine.StartAsync(state);
+        var result = await _engine.StartAsync(host, state);
 
         Assert.IsTrue(result.IsSuccess);
         Assert.AreEqual(GamePhase.RoundIntro, state.Phase);
@@ -96,6 +96,18 @@ public class SpardleEngineTests
         Assert.IsNotNull(state.PhaseExpiresAtUtc);
         var actualDelay = state.PhaseExpiresAtUtc!.Value - start;
         Assert.IsTrue(actualDelay.TotalMilliseconds > 4500 && actualDelay.TotalMilliseconds < 6000);
+    }
+
+    [TestMethod]
+    public async Task StartAsync_NonHost_ReturnsError()
+    {
+        var (state, _) = await CreateStateAsync();
+        state.CustomWordPool = ImmutableList.Create("apple");
+        var nonHost = UserFactory.Create("NotHost", "nothost-id");
+
+        var result = await _engine.StartAsync(nonHost, state);
+
+        Assert.IsFalse(result.IsSuccess);
     }
 
     [TestMethod]
@@ -107,7 +119,7 @@ public class SpardleEngineTests
         state.RoundTimer = TimeSpan.FromSeconds(30);
         state.CustomWordPool = ["apple"];
 
-        await _engine.StartAsync(state);
+        await _engine.StartAsync(host, state);
 
         Assert.AreEqual(GamePhase.RoundIntro, state.Phase);
 
@@ -129,7 +141,7 @@ public class SpardleEngineTests
         state.CustomWordPool = ImmutableList.Create("apple", "brave");
         state.WordOrderMode = WordOrderMode.ListOrder;
 
-        await _engine.StartAsync(state);
+        await _engine.StartAsync(host, state);
         await WaitForPhaseAsync(state, GamePhase.Playing, timeoutMs: 1500);
 
         var submitResult = _engine.SubmitGuess(state, host, "apple");
@@ -158,7 +170,7 @@ public class SpardleEngineTests
         state.RoundTimer = TimeSpan.FromMilliseconds(150);
         state.CustomWordPool = ["apple"];
 
-        await _engine.StartAsync(state);
+        await _engine.StartAsync(host, state);
         await WaitForPhaseAsync(state, GamePhase.Playing, timeoutMs: 1500);
         // Don't submit anything — wait for timer to expire and push us into results.
         await WaitForPhaseAsync(state, GamePhase.RoundResults, timeoutMs: 2000);
@@ -184,7 +196,7 @@ public class SpardleEngineTests
         state.CustomWordPool = ["apple"];
         state.WordOrderMode = WordOrderMode.ListOrder;
 
-        await _engine.StartAsync(state);
+        await _engine.StartAsync(host, state);
         await WaitForPhaseAsync(state, GamePhase.Playing, timeoutMs: 1500);
 
         _engine.SubmitGuess(state, host, "apple");
@@ -205,7 +217,7 @@ public class SpardleEngineTests
         state.TotalRounds = 1;
         state.CustomWordPool = ["apple"];
 
-        await _engine.StartAsync(state);
+        await _engine.StartAsync(host, state);
 
         Assert.IsTrue(state.HostIsParticipant);
         Assert.IsTrue(state.PlayerStates.ContainsKey(host.Id));
@@ -218,7 +230,7 @@ public class SpardleEngineTests
         state.TotalRounds = 1;
         state.CustomWordPool = ["apple"];
 
-        await _engine.StartAsync(state);
+        await _engine.StartAsync(host, state);
 
         Assert.IsFalse(state.HostIsParticipant);
         Assert.IsFalse(state.PlayerStates.ContainsKey(host.Id));
@@ -235,7 +247,7 @@ public class SpardleEngineTests
         state.CustomWordPool = ["apple"];
         state.WordOrderMode = WordOrderMode.ListOrder;
 
-        await _engine.StartAsync(state);
+        await _engine.StartAsync(host, state);
         await WaitForPhaseAsync(state, GamePhase.Playing, timeoutMs: 1500);
 
         var result = _engine.SubmitGuess(state, host, "apple");
@@ -257,7 +269,7 @@ public class SpardleEngineTests
         state.CustomWordPool = ["apple"];
         state.WordOrderMode = WordOrderMode.ListOrder;
 
-        await _engine.StartAsync(state);
+        await _engine.StartAsync(host, state);
         await WaitForPhaseAsync(state, GamePhase.Playing, timeoutMs: 1500);
 
         var result = _engine.SubmitGuess(state, host, "apple");
@@ -280,7 +292,7 @@ public class SpardleEngineTests
         state.CustomWordPool = ["apple"];
         state.WordOrderMode = WordOrderMode.ListOrder;
 
-        await _engine.StartAsync(state);
+        await _engine.StartAsync(host, state);
         await WaitForPhaseAsync(state, GamePhase.Playing, timeoutMs: 1500);
 
         var submitResult = _engine.SubmitGuess(state, players[0], "apple");
@@ -302,7 +314,7 @@ public class SpardleEngineTests
         state.CustomWordPool = ImmutableList.Create("apple", "brave");
         state.WordOrderMode = WordOrderMode.ListOrder;
 
-        await _engine.StartAsync(state);
+        await _engine.StartAsync(host, state);
         await WaitForPhaseAsync(state, GamePhase.Playing, timeoutMs: 1500);
 
         _engine.SubmitGuess(state, players[0], "apple");
@@ -319,7 +331,7 @@ public class SpardleEngineTests
         state.RoundTimer = TimeSpan.FromMilliseconds(150);
         state.CustomWordPool = ["apple"];
 
-        await _engine.StartAsync(state);
+        await _engine.StartAsync(host, state);
         await WaitForPhaseAsync(state, GamePhase.Playing, timeoutMs: 1500);
         await WaitForPhaseAsync(state, GamePhase.RoundResults, timeoutMs: 2000);
 
@@ -340,7 +352,7 @@ public class SpardleEngineTests
         state.WordOrderMode = WordOrderMode.ListOrder;
         state.TotalRounds = 3;
 
-        await _engine.StartAsync(state);
+        await _engine.StartAsync(host, state);
 
         Assert.HasCount(3, state.RoundQueue);
         foreach (var w in state.RoundQueue)
@@ -358,7 +370,7 @@ public class SpardleEngineTests
         state.WordOrderMode = WordOrderMode.ListOrder;
         state.TotalRounds = 5;
 
-        await _engine.StartAsync(state);
+        await _engine.StartAsync(host, state);
 
         Assert.HasCount(5, state.RoundQueue);
         foreach (var w in state.RoundQueue)
@@ -376,7 +388,7 @@ public class SpardleEngineTests
         state.WordOrderMode = WordOrderMode.RandomNoRepeats;
         state.TotalRounds = 20;
 
-        await _engine.StartAsync(state);
+        await _engine.StartAsync(host, state);
 
         Assert.HasCount(20, state.RoundQueue);
         foreach (var w in state.RoundQueue)
@@ -394,7 +406,7 @@ public class SpardleEngineTests
         state.WordOrderMode = WordOrderMode.ListOrder;
         state.TotalRounds = 10;
 
-        await _engine.StartAsync(state);
+        await _engine.StartAsync(host, state);
 
         Assert.HasCount(10, state.RoundQueue);
         foreach (var w in state.RoundQueue)
@@ -412,7 +424,7 @@ public class SpardleEngineTests
         state.WordOrderMode = WordOrderMode.ListOrder;
         state.TotalRounds = 3;
 
-        await _engine.StartAsync(state);
+        await _engine.StartAsync(host, state);
 
         Assert.IsEmpty(state.RoundQueue);
     }
@@ -428,7 +440,7 @@ public class SpardleEngineTests
         state.TotalRounds = 3;
         state.WordOrderMode = WordOrderMode.ListOrder;
 
-        await _engine.StartAsync(state);
+        await _engine.StartAsync(host, state);
 
         Assert.HasCount(3, state.RoundQueue);
         Assert.AreEqual("alpha", state.RoundQueue[0]);
@@ -488,7 +500,7 @@ public class SpardleEngineTests
         state.CustomWordPool = ["apple"];
         state.WordOrderMode = WordOrderMode.ListOrder;
 
-        await _engine.StartAsync(state);
+        await _engine.StartAsync(host, state);
         await WaitForPhaseAsync(state, GamePhase.Playing, timeoutMs: 1500);
 
         var result = _engine.SubmitGuess(state, host, "crane");
@@ -508,7 +520,7 @@ public class SpardleEngineTests
         state.CustomWordPool = ["apple"];
         state.WordOrderMode = WordOrderMode.ListOrder;
 
-        await _engine.StartAsync(state);
+        await _engine.StartAsync(host, state);
         await WaitForPhaseAsync(state, GamePhase.Playing, timeoutMs: 1500);
 
         // "amply" locks 'a' at index 0 (correct); 'p' at index 2 (correct).
@@ -538,7 +550,7 @@ public class SpardleEngineTests
         state.CustomWordPool = ["aaaaaa"];
         state.WordOrderMode = WordOrderMode.ListOrder;
 
-        await _engine.StartAsync(state);
+        await _engine.StartAsync(host, state);
         await WaitForPhaseAsync(state, GamePhase.Playing, timeoutMs: 1500);
 
         // "cathat" = "cat" + "hat"; both are 3-letter dictionary words. "cathat" itself is
@@ -559,7 +571,7 @@ public class SpardleEngineTests
         state.CustomWordPool = ["aaa"];
         state.WordOrderMode = WordOrderMode.ListOrder;
 
-        await _engine.StartAsync(state);
+        await _engine.StartAsync(host, state);
         await WaitForPhaseAsync(state, GamePhase.Playing, timeoutMs: 1500);
 
         // "aia" would decompose as "a"+"i"+"a" only if 1-char fragments were allowed.
@@ -581,7 +593,7 @@ public class SpardleEngineTests
         state.CustomWordPool = ["xzqwplm"];
         state.WordOrderMode = WordOrderMode.ListOrder;
 
-        await _engine.StartAsync(state);
+        await _engine.StartAsync(host, state);
         await WaitForPhaseAsync(state, GamePhase.Playing, timeoutMs: 1500);
 
         var result = _engine.SubmitGuess(state, host, "xzqwplm");
@@ -604,7 +616,7 @@ public class SpardleEngineTests
         state.CustomWordPool = ["apple"];
         state.WordOrderMode = WordOrderMode.ListOrder;
 
-        await _engine.StartAsync(state);
+        await _engine.StartAsync(host, state);
         await WaitForPhaseAsync(state, GamePhase.Playing, timeoutMs: 1500);
 
         var first = _engine.SubmitGuess(state, players[0], "apple");
@@ -634,7 +646,7 @@ public class SpardleEngineTests
         state.CustomWordPool = ["apple"];
         state.WordOrderMode = WordOrderMode.ListOrder;
 
-        await _engine.StartAsync(state);
+        await _engine.StartAsync(host, state);
         await WaitForPhaseAsync(state, GamePhase.Playing, timeoutMs: 1500);
 
         // P1 needs two guesses; P2 solves on the first.
@@ -691,7 +703,7 @@ public class SpardleEngineTests
         state.WordOrderMode = WordOrderMode.RandomNoRepeats;
         state.TotalRounds = 10;
 
-        await _engine.StartAsync(state);
+        await _engine.StartAsync(host, state);
 
         Assert.HasCount(10, state.RoundQueue);
         Assert.AreEqual(10, state.RoundQueue.Distinct().Count(), "all sampled words must be unique");
@@ -708,7 +720,7 @@ public class SpardleEngineTests
         state.WordOrderMode = WordOrderMode.RandomNoRepeats;
         state.TotalRounds = int.MaxValue; // engine clamps to total available
 
-        await _engine.StartAsync(state);
+        await _engine.StartAsync(host, state);
 
         int total = new WordListService(NullLogger<WordListService>.Instance).GetWordCount(WordPoolMode.NytStandard, 5);
         Assert.HasCount(total, state.RoundQueue);

@@ -28,7 +28,7 @@ public class OperatorGameEngine(ILogger<OperatorGameState> stateLogger, IRandomN
         return Task.FromResult(ValueResult<AbstractGameState>.FromValue(state));
     }
 
-    public override async Task<Result> StartAsync(AbstractGameState state, CancellationToken ct = default)
+    protected override async Task<Result> StartAsyncCore(AbstractGameState state, CancellationToken ct = default)
     {
         if (state is not OperatorGameState operatorState)
         {
@@ -44,10 +44,10 @@ public class OperatorGameEngine(ILogger<OperatorGameState> stateLogger, IRandomN
             var allParticipants = operatorState.Players.ToList();
 
             // Initialize GamePlayers (deck generation and dealing happen in SetupState after choices)
-            foreach (var user in allParticipants)
+            foreach (var entry in allParticipants)
             {
-                var playerState = new OperatorPlayerState { UserId = user.Id };
-                operatorState.GamePlayers[user.Id] = playerState;
+                var playerState = new OperatorPlayerState { UserId = entry.User.Id };
+                operatorState.GamePlayers[entry.User.Id] = playerState;
             }
 
             // 3. Set Phase to Setup
@@ -56,7 +56,7 @@ public class OperatorGameEngine(ILogger<OperatorGameState> stateLogger, IRandomN
             fsm.TransitionTo(context, new KnockBox.Operator.Services.Logic.FSM.States.SetupState());
 
             // 4. Initialize Turn Manager
-            operatorState.TurnManager.SetTurnOrder(allParticipants.Select(p => p.Id));
+            operatorState.TurnManager.SetTurnOrder(allParticipants.Select(p => p.User.Id));
 
             // 5. Update Joinable Status
             operatorState.SetJoinable(false);

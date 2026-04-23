@@ -60,7 +60,7 @@ namespace KnockBox.HiddenAgenda.Tests.Unit.Logic
             state.RegisterPlayer(UserFactory.Create("Player 2", "p2"));
             state.RegisterPlayer(UserFactory.Create("Player 3", "p3"));
 
-            var result = await _engine.StartAsync(state);
+            var result = await _engine.StartAsync(_host, state);
 
             Assert.IsTrue((bool)result.IsSuccess);
             Assert.IsFalse(state.IsJoinable);
@@ -70,6 +70,21 @@ namespace KnockBox.HiddenAgenda.Tests.Unit.Logic
             Assert.HasCount(3, state.GamePlayers);
             Assert.HasCount(3, state.TurnManager.TurnOrder);
             Assert.IsNotEmpty(state.CollectionProgress);
+        }
+
+        [TestMethod]
+        public async Task StartAsync_NonHost_ReturnsError()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (HiddenAgendaGameState)stateResult.Value!;
+            state.RegisterPlayer(UserFactory.Create("Player 1", "p1"));
+            state.RegisterPlayer(UserFactory.Create("Player 2", "p2"));
+            state.RegisterPlayer(UserFactory.Create("Player 3", "p3"));
+            var nonHost = UserFactory.Create("NotHost", "nothost-id");
+
+            var result = await _engine.StartAsync(nonHost, state);
+
+            Assert.IsTrue((bool)result.IsFailure);
         }
 
         [TestMethod]

@@ -83,6 +83,40 @@ public sealed class AbstractGameStateTests
         Assert.AreSame(tcs.Task, completed, "StateChanged was not fired.");
     }
 
+    [TestMethod]
+    public void Execute_ActionThrows_DoesNotFireStateChanged()
+    {
+        using var state = MakeState();
+        int notifyCount = 0;
+        state.StateChangedEventManager.Subscribe(() =>
+        {
+            Interlocked.Increment(ref notifyCount);
+            return ValueTask.CompletedTask;
+        });
+
+        var result = state.Execute(() => throw new InvalidOperationException("boom"));
+
+        Assert.IsTrue(result.IsFailure, "Execute should fail when the action throws.");
+        Assert.AreEqual(0, Volatile.Read(ref notifyCount), "StateChanged must not fire when the action threw.");
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ActionThrows_DoesNotFireStateChanged()
+    {
+        using var state = MakeState();
+        int notifyCount = 0;
+        state.StateChangedEventManager.Subscribe(() =>
+        {
+            Interlocked.Increment(ref notifyCount);
+            return ValueTask.CompletedTask;
+        });
+
+        var result = await state.ExecuteAsync(() => throw new InvalidOperationException("boom"));
+
+        Assert.IsTrue(result.IsFailure, "ExecuteAsync should fail when the action throws.");
+        Assert.AreEqual(0, Volatile.Read(ref notifyCount), "StateChanged must not fire when the action threw.");
+    }
+
     // ── Players ──────────────────────────────────────────────────────────────
 
     [TestMethod]
@@ -107,7 +141,7 @@ public sealed class AbstractGameStateTests
         Assert.IsTrue(result.IsSuccess);
         Assert.IsTrue(result.TryGetSuccess(out _));
         Assert.HasCount(1, state.Players);
-        Assert.Contains(player, state.Players);
+        Assert.IsTrue(state.Players.Any(p => ReferenceEquals(p.User, player)));
     }
 
     [TestMethod]
@@ -281,7 +315,7 @@ public sealed class AbstractGameStateTests
         var result = state.KickPlayer(player);
 
         Assert.IsTrue(result.IsSuccess);
-        Assert.DoesNotContain(player, state.Players);
+        Assert.IsFalse(state.Players.Any(p => ReferenceEquals(p.User, player)));
         Assert.IsTrue(state.IsKicked(player));
     }
 
@@ -385,7 +419,7 @@ public sealed class AbstractGameStateTests
 
         state.KickPlayer(player);
 
-        Assert.DoesNotContain(player, state.Players);
+        Assert.IsFalse(state.Players.Any(p => ReferenceEquals(p.User, player)));
         Assert.IsTrue(state.IsKicked(player),
             "Kicked player should appear in KickedPlayers after KickPlayer completes.");
     }

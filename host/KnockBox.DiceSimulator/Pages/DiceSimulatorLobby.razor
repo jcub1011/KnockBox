@@ -24,10 +24,10 @@ else
             <div class="joinable-state">
                 <h4>Players</h4>
                 <div class="player-list">
-                    @foreach (var player in GameState.Players)
+                    @foreach (var entry in GameState.Players)
                     {
                         <button class="btn" title="Click to kick player."
-                                @onclick="() => GameState.KickPlayer(player)">@player.Name @(player.Id == GameState.Host.Id ? "(Host)" : "")</button>
+                                @onclick="() => GameState.KickPlayer(entry.User)">@entry.DisplayName @(entry.User.Id == GameState.Host.Id ? "(Host)" : "")</button>
                     }
                 </div>
                 @if (UserService.CurrentUser?.Id == GameState.Host.Id)
@@ -129,7 +129,12 @@ else
                     <button class="btn btn-sm btn-outline-secondary export-btn" @onclick="ExportCsv">Export CSV ?</button>
                 </div>
                 <div class="player-rolls-list">
-                    @foreach (var player in Enumerable.Repeat(GameState.Host, 1).Concat(GameState.Players))
+                    @{
+                        IEnumerable<(string Id, string DisplayName)> roster =
+                            new[] { (GameState.Host.Id, GameState.Host.Name) }
+                                .Concat(GameState.Players.Select(p => (p.User.Id, p.DisplayName)));
+                    }
+                    @foreach (var player in roster)
                     {
                         var playerLastRoll = GameState.RollHistory.LastOrDefault(r => r.PlayerId == player.Id);
                         var playerRollCount = GameState.RollHistory.Count(r => r.PlayerId == player.Id);
@@ -139,7 +144,7 @@ else
 
                         <div class="player-roll-row" @onclick="() => TogglePlayerHistory(player.Id)">
                             <div class="player-roll-summary">
-                                <span class="player-roll-name">@player.Name</span>
+                                <span class="player-roll-name">@player.DisplayName</span>
                                 @if (playerLastRoll is not null)
                                 {
                                     <span class="player-roll-result">#@playerRollCount &mdash; @playerLastRoll.Expression = <strong>@playerLastRoll.Result</strong></span>

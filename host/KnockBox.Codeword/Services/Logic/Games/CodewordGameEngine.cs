@@ -37,7 +37,7 @@ namespace KnockBox.Codeword.Services.Logic.Games
             return Task.FromResult<ValueResult<AbstractGameState>>(gameState);
         }
 
-        public override Task<Result> StartAsync(
+        protected override Task<Result> StartAsyncCore(
             AbstractGameState state, CancellationToken ct = default)
         {
             if (state is not CodewordGameState gameState)
@@ -55,14 +55,14 @@ namespace KnockBox.Codeword.Services.Logic.Games
                 gameState.Context = context;
 
                 // Snapshot all registered players into GamePlayers.
-                foreach (var user in gameState.Players)
+                foreach (var entry in gameState.Players)
                 {
-                    gameState.GamePlayers[user.Id] = new CodewordPlayerState
+                    gameState.GamePlayers[entry.User.Id] = new CodewordPlayerState
                     {
-                        PlayerId = user.Id,
-                        DisplayName = user.Name
+                        PlayerId = entry.User.Id,
+                        DisplayName = entry.DisplayName
                     };
-                    gameState.TurnManager.TurnOrder.Add(user.Id);
+                    gameState.TurnManager.TurnOrder.Add(entry.User.Id);
                 }
 
                 fsm.TransitionTo(context, new SetupState());
@@ -241,14 +241,14 @@ namespace KnockBox.Codeword.Services.Logic.Games
                 state.EndGameVoteStatus = new EndGameVoteStatus([], 0);
 
                 // Re-snapshot players.
-                foreach (var user in state.Players)
+                foreach (var entry in state.Players)
                 {
-                    state.GamePlayers[user.Id] = new CodewordPlayerState
+                    state.GamePlayers[entry.User.Id] = new CodewordPlayerState
                     {
-                        PlayerId = user.Id,
-                        DisplayName = user.Name
+                        PlayerId = entry.User.Id,
+                        DisplayName = entry.DisplayName
                     };
-                    state.TurnManager.TurnOrder.Add(user.Id);
+                    state.TurnManager.TurnOrder.Add(entry.User.Id);
                 }
 
                 fsm.TransitionTo(context, new SetupState());

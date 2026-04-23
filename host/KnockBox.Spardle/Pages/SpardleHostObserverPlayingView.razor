@@ -31,10 +31,10 @@
     }
 
     <main class="spd-obs-gallery @(HighContrast ? "spd-hc" : "")" style="--spd-cols:@wordLen;">
-        @foreach (var user in State.Players)
+        @foreach (var entry in State.Players)
         {
             var accent = accents[accentIdx++ % accents.Length];
-            if (!State.PlayerStates.TryGetValue(user.Id, out var ps)) { continue; }
+            if (!State.PlayerStates.TryGetValue(entry.User.Id, out var ps)) { continue; }
 
             string statusTag;
             string statusClass;
@@ -44,8 +44,8 @@
 
             <section class="spd-obs-card @accent">
                 <div class="spd-obs-card-top">
-                    <span class="spd-obs-avatar">@Initials(user.Name)</span>
-                    <span class="spd-obs-name">@user.Name</span>
+                    <span class="spd-obs-avatar">@Initials(entry.DisplayName)</span>
+                    <span class="spd-obs-name">@entry.DisplayName</span>
                     <span class="spd-obs-count spd-mono">@ps.Guesses.Count/@maxGuesses</span>
                 </div>
 

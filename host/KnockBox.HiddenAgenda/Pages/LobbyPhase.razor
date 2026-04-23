@@ -14,17 +14,17 @@
     <div class="ha-lobby-players">
         <h4 class="ha-subheading">Curators (@GameState.Players.Count / 6)</h4>
         <div class="ha-lobby-player-grid">
-            @foreach (var player in GameState.Players)
+            @foreach (var entry in GameState.Players)
             {
                 <div class="ha-lobby-player">
-                    <span class="ha-lobby-player-name">@player.Name</span>
-                    @if (player.Id == GameState.Host.Id)
+                    <span class="ha-lobby-player-name">@entry.DisplayName</span>
+                    @if (entry.User.Id == GameState.Host.Id)
                     {
                         <span class="ha-badge ha-badge-gold">Host</span>
                     }
-                    @if (IsHost && player.Id != GameState.Host.Id)
+                    @if (IsHost && entry.User.Id != GameState.Host.Id)
                     {
-                        <button class="ha-btn ha-btn-danger ha-btn-sm" @onclick="() => KickPlayer(player)">Kick</button>
+                        <button class="ha-btn ha-btn-danger ha-btn-sm" @onclick="() => KickPlayer(entry.User)">Kick</button>
                     }
                 </div>
             }

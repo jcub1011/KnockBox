@@ -82,14 +82,14 @@ namespace KnockBox.Operator.Pages
                 return;
             }
 
-            int index = GameState.Players.IndexOf(user => user.Id == userId);
+            int index = GameState.Players.IndexOf(entry => entry.User.Id == userId);
             if (index < 0)
             {
                 Logger.LogWarning("Unable to kick player [{id}] as they aren't in the lobby.", userId);
                 return;
             }
 
-            var result = GameState.KickPlayer(GameState.Players[index]);
+            var result = GameState.KickPlayer(GameState.Players[index].User);
             if (result.TryGetFailure(out var error))
             {
                 Logger.LogWarning("Error kicking player [{error}].", error.PublicMessage);
@@ -99,12 +99,7 @@ namespace KnockBox.Operator.Pages
         protected async Task StartGame()
         {
             if (UserService.CurrentUser is null) return;
-            if (UserService.CurrentUser.Id != GameState.Host.Id)
-            {
-                Logger.LogWarning("User [{id}] cannot start the game as they are not the host.", UserService.CurrentUser.Id);
-                return;
-            }
-            var result = await GameEngine.StartAsync(GameState);
+            var result = await GameEngine.StartAsync(UserService.CurrentUser, GameState);
             if (result.TryGetFailure(out var error))
                 Logger.LogError("Failed to start game: {Error}", error);
         }

@@ -157,7 +157,7 @@ namespace KnockBox.Core.Plugins
                 return null;
             }
 
-            var hostCoreVersion = typeof(IGameModule).Assembly.GetName().Version;
+            var hostCoreVersion = ResolveHostCoreVersion();
             if (depsInspection.CoreVersion is { } pluginCoreVersion
                 && hostCoreVersion is not null
                 && pluginCoreVersion > hostCoreVersion)
@@ -383,6 +383,32 @@ namespace KnockBox.Core.Plugins
                 var (d, p) => Math.Min(d, p),
             };
             return cut < 0 ? versionText : versionText[..cut];
+        }
+
+        /// <summary>
+        /// Resolves the host's <c>KnockBox.Core</c> version for plugin-compat
+        /// gating. Prefers <see cref="AssemblyInformationalVersionAttribute"/>
+        /// (carries the full SemVer driven by <c>-p:Version=…</c> at pack time)
+        /// and falls back to <see cref="AssemblyName.Version"/>. Reading from
+        /// InformationalVersion matters because the assembly's <c>Version</c>
+        /// is pinned at the major for binary compatibility across v1.x, so
+        /// using it would falsely reject any plugin built against a later
+        /// minor.
+        /// </summary>
+        internal static Version? ResolveHostCoreVersion()
+        {
+            var assembly = typeof(IGameModule).Assembly;
+            var infoVersion = assembly
+                .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
+                .InformationalVersion;
+
+            if (!string.IsNullOrWhiteSpace(infoVersion)
+                && Version.TryParse(StripPrereleaseSuffix(infoVersion), out var parsed))
+            {
+                return parsed;
+            }
+
+            return assembly.GetName().Version;
         }
 
         /// <summary>

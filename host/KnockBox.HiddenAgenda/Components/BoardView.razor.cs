@@ -32,7 +32,7 @@ namespace KnockBox.HiddenAgenda.Components
         private string GetPlayerColor(string playerId)
         {
             var players = GameState.Players.ToList();
-            var index = players.FindIndex(p => p.Id == playerId);
+            var index = players.FindIndex(p => p.User.Id == playerId);
             return index switch
             {
                 0 => "red",

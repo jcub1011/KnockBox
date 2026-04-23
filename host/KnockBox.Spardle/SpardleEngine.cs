@@ -24,7 +24,7 @@ public class SpardleEngine(
         return Task.FromResult<ValueResult<AbstractGameState>>(state);
     }
 
-    public override Task<Result> StartAsync(AbstractGameState state, CancellationToken ct = default)
+    protected override Task<Result> StartAsyncCore(AbstractGameState state, CancellationToken ct = default)
     {
         if (state is not SpardleState s) return Task.FromResult(Result.FromError("Invalid state"));
 
@@ -40,7 +40,8 @@ public class SpardleEngine(
             s.LastCompletedAnswer = null;
             GenerateRoundQueue(s);
 
-            var roster = s.HostIsParticipant ? s.Players.Prepend(s.Host) : s.Players;
+            var playerUsers = s.Players.Select(p => p.User);
+            var roster = s.HostIsParticipant ? playerUsers.Prepend(s.Host) : playerUsers;
             foreach (var user in roster)
             {
                 var ps = s.CreatePlayerState(user.Id);
@@ -288,7 +289,8 @@ public class SpardleEngine(
         state.IsRoundActive = true;
         state.CurrentRound++;
 
-        var roster = state.HostIsParticipant ? state.Players.Prepend(state.Host) : state.Players;
+        var playerUsers = state.Players.Select(p => p.User);
+        var roster = state.HostIsParticipant ? playerUsers.Prepend(state.Host) : playerUsers;
         foreach (var user in roster)
         {
             var ps = state.CreatePlayerState(user.Id);
@@ -367,12 +369,15 @@ public class SpardleEngine(
 
     private List<PlayerRoundOutcome> BuildOutcomes(SpardleState s)
     {
-        var participants = new List<(User User, PlayerState Ps)>();
-        var roster = s.HostIsParticipant ? s.Players.Prepend(s.Host) : s.Players;
-        foreach (var user in roster)
+        var participants = new List<(User User, string DisplayName, PlayerState Ps)>();
+        var playerEntries = s.Players.Select(p => (p.User, p.DisplayName));
+        var roster = s.HostIsParticipant
+            ? playerEntries.Prepend((s.Host, s.Host.Name))
+            : playerEntries;
+        foreach (var (user, displayName) in roster)
         {
             if (s.PlayerStates.TryGetValue(user.Id, out var ps))
-                participants.Add((user, ps));
+                participants.Add((user, displayName, ps));
         }
 
         var solvers = participants
@@ -382,7 +387,7 @@ public class SpardleEngine(
             .Where(p => p.Ps.Dnf || !p.Ps.HasFinishedRound)
             .ToList();
 
-        IEnumerable<IGrouping<(int, long), (User User, PlayerState Ps)>> solverGroups;
+        IEnumerable<IGrouping<(int, long), (User User, string DisplayName, PlayerState Ps)>> solverGroups;
         if (s.WinCondition == WinConditionMode.Tactician)
         {
             solverGroups = solvers
@@ -407,7 +412,7 @@ public class SpardleEngine(
                 outcomes.Add(new PlayerRoundOutcome
                 {
                     UserId = member.User.Id,
-                    DisplayName = member.User.Name,
+                    DisplayName = member.DisplayName,
                     GuessCount = member.Ps.Guesses.Count,
                     FinishedAt = member.Ps.FinishedAt,
                     Dnf = false,
@@ -418,12 +423,12 @@ public class SpardleEngine(
             placement += group.Count();
         }
 
-        foreach (var (user, ps) in dnfs)
+        foreach (var (user, displayName, ps) in dnfs)
         {
             outcomes.Add(new PlayerRoundOutcome
             {
                 UserId = user.Id,
-                DisplayName = user.Name,
+                DisplayName = displayName,
                 GuessCount = ps.Guesses.Count,
                 FinishedAt = ps.FinishedAt,
                 Dnf = true,

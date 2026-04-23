@@ -45,7 +45,7 @@
                 {
                     <div class="ha-history-entry">
                         <span class="ha-history-turn">Turn @entry.TurnNumber</span>
-                        <span>@(GameState.Players.FirstOrDefault(p => p.Id == entry.PlayerId)?.Name) moved to @entry.SpaceId</span>
+                        <span>@(GameState.Players.FirstOrDefault(p => p.User.Id == entry.PlayerId).DisplayName) moved to @entry.SpaceId</span>
                     </div>
                 }
             </div>
@@ -78,9 +78,9 @@
                                             <label class="ha-text-bold">Select Target Curator:</label>
                                             <select class="ha-select" @bind="_selectedTargetPlayerId">
                                                 <option value="">-- Select --</option>
-                                                @foreach (var player in GameState.Players.Where(p => p.Id != UserService.CurrentUser?.Id))
+                                                @foreach (var entry in GameState.Players.Where(p => p.User.Id != UserService.CurrentUser?.Id))
                                                 {
-                                                    <option value="@player.Id">@player.Name</option>
+                                                    <option value="@entry.User.Id">@entry.DisplayName</option>
                                                 }
                                             </select>
                                         </div>

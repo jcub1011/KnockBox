@@ -131,8 +131,8 @@ namespace KnockBox.DrawnToDress.Pages
                 return;
             }
 
-            var player = GameState.Players.FirstOrDefault(p => p.Id == userId);
-            if (player is null)
+            var entry = GameState.Players.FirstOrDefault(p => p.User.Id == userId);
+            if (entry.User is null)
             {
                 Logger.LogWarning("Cannot kick player [{id}]: not found.", userId);
                 return;
@@ -141,7 +141,7 @@ namespace KnockBox.DrawnToDress.Pages
             // Kicking is a lobby-level state operation (same pattern as CardCounter).
             // It does not need to go through the FSM because it has no game-logic side-effects
             // while still in the lobby phase.
-            var result = GameState.KickPlayer(player);
+            var result = GameState.KickPlayer(entry.User);
             if (result.TryGetFailure(out var err))
             {
                 Logger.LogWarning("Error kicking player: {msg}", err.PublicMessage);
@@ -151,12 +151,7 @@ namespace KnockBox.DrawnToDress.Pages
         protected async Task StartGame()
         {
             if (UserService.CurrentUser is null) return;
-            if (UserService.CurrentUser.Id != GameState.Host.Id)
-            {
-                Logger.LogWarning("User [{id}] cannot start the game as they are not the host.", UserService.CurrentUser.Id);
-                return;
-            }
-            var result = await GameEngine.StartAsync(GameState);
+            var result = await GameEngine.StartAsync(UserService.CurrentUser, GameState);
             if (result.TryGetFailure(out var err))
                 Logger.LogError("Failed to start game: {msg}", err.PublicMessage);
         }

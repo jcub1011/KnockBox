@@ -41,12 +41,31 @@ namespace KnockBox.Core.Services.State.Users
     /// </summary>
     public static class UserFactory
     {
+        internal const int MaxNameLength = 12;
+
         /// <summary>
-        /// Constructs a <see cref="User"/> with the supplied name and id. Does
-        /// not trim or cap the name — callers reproducing production behavior
-        /// must do so themselves.
+        /// Constructs a <see cref="User"/> with the supplied name and id,
+        /// applying the same normalization as
+        /// <see cref="IUserService.SetCurrentUserName"/>: trim leading/trailing
+        /// whitespace and cap at 12 characters. Test fixtures should prefer
+        /// this overload so their <see cref="User"/> instances match production
+        /// shape; reach for <see cref="CreateUnchecked"/> only when the test
+        /// explicitly needs an un-normalized value.
         /// </summary>
-        public static User Create(string name, string id) => new(name, id);
+        public static User Create(string name, string id)
+        {
+            name = (name ?? string.Empty).Trim();
+            if (name.Length > MaxNameLength) name = name[..MaxNameLength];
+            return new User(name, id);
+        }
+
+        /// <summary>
+        /// Constructs a <see cref="User"/> without trimming or capping the
+        /// name. Intended for tests that intentionally exercise pre-normalization
+        /// paths (e.g. verifying that upstream layers do reject a 13-character
+        /// input). Production code should never call this.
+        /// </summary>
+        public static User CreateUnchecked(string name, string id) => new(name, id);
     }
 
     public interface IUserService

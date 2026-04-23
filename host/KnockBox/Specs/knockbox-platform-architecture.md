@@ -357,23 +357,29 @@ public abstract class AbstractGameEngine
     public abstract Task<ValueResult<AbstractGameState>> CreateStateAsync(
         User host, CancellationToken ct = default);
 
-    public abstract Task<Result> StartAsync(
+    // Public entry point — sealed in the base class. Verifies
+    // caller.Id == state.Host.Id before delegating to StartAsyncCore.
+    public Task<Result> StartAsync(
+        User caller, AbstractGameState state, CancellationToken ct = default);
+
+    // Plugin override point. Host-identity authorization has already happened.
+    protected abstract Task<Result> StartAsyncCore(
         AbstractGameState state, CancellationToken ct = default);
 
     public virtual Task<bool> CanStartAsync(
         AbstractGameState state, CancellationToken ct = default)
-        => Task.FromResult(HasValidPlayerCount(state));
+        => Task.FromResult(HasValidPlayerCount(state) && IsLobbyOpen(state));
 
     protected bool HasValidPlayerCount(AbstractGameState state)
-        => MinPlayerCount <= state.Players.Count
-        && state.Players.Count <= MaxPlayerCount
-        && state.IsJoinable;
+        => MinPlayerCount <= state.Players.Count && state.Players.Count <= MaxPlayerCount;
+
+    protected bool IsLobbyOpen(AbstractGameState state) => state.IsJoinable;
 }
 ```
 
-`StartAsync` does **not** take a `User` parameter. The caller-identity check ("only the host may start the game") lives in each plugin's lobby page, same pattern as `KickPlayer` — the engine assumes the caller is authorized. The host is reachable via `state.Host` if the engine needs it.
+`StartAsync(caller, state)` is sealed in the base class and verifies that `caller.Id == state.Host.Id` before calling the plugin's `StartAsyncCore` override. Host-identity authorization is enforced once by the platform — plugins never re-check it. The same pattern is used by `KickPlayer`, so plugins get a consistent auth story across command paths.
 
-`HasValidPlayerCount` is a `protected` helper extracted from the default `CanStartAsync` so plugins can override `CanStartAsync` with game-specific readiness rules and still compose with the baseline check.
+`HasValidPlayerCount` and `IsLobbyOpen` are `protected` helpers that `CanStartAsync` composes; plugins override `CanStartAsync` with game-specific readiness rules and combine them with the baseline checks.
 
 `AbstractGameEngine` is purely server-side, concerned only with game logic and state transitions. It has no knowledge of UI components.
 
@@ -641,8 +647,8 @@ Players cannot join a lobby once the game state's `IsJoinable` is set to `false`
 ### Start Game
 
 1. Host clicks start in the game's lobby view.
-2. The lobby page verifies that `UserService.CurrentUser.Id == state.Host.Id` — the caller-identity check lives at the page layer, not in the engine.
-3. The game engine's `StartAsync(state)` is called. It calls `state.Execute(...)` to initialize game data and close the lobby (`state.SetJoinable(false)` inside the Execute lambda).
+2. The lobby page calls `engine.StartAsync(UserService.CurrentUser, state)`. The base-class `StartAsync` verifies `caller.Id == state.Host.Id` and returns a failure Result for non-host callers.
+3. On authorized calls, the base delegates to the plugin's `StartAsyncCore(state)` override, which calls `state.Execute(...)` to initialize game data and close the lobby (`state.SetJoinable(false)` inside the Execute lambda).
 4. The state notifies all subscribers, causing all circuits to re-render.
 
 ### Gameplay

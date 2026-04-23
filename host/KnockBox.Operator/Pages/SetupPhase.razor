@@ -12,16 +12,16 @@
         <div class="op-setup-host-grid">
             @for (int i = 0; i < GameState.Players.Count; i++)
             {
-                var player = GameState.Players[i];
-                var playerState = GameState.GamePlayers.GetValueOrDefault(player.Id);
+                var entry = GameState.Players[i];
+                var playerState = GameState.GamePlayers.GetValueOrDefault(entry.User.Id);
                 var hasSubmitted = playerState != null && playerState.CurrentPoints != 0m;
                 var isPositive = playerState?.CurrentPoints > 0;
 
                 <div class="op-setup-slot @(hasSubmitted ? "ready" : "")" style="--i: @i">
                     <div class="op-setup-slot-avatar @(hasSubmitted ? (isPositive ? "avatar-positive" : "avatar-negative") : "")">
-                        @player.Name[0].ToString().ToUpper()
+                        @entry.DisplayName[0].ToString().ToUpper()
                     </div>
-                    <span class="op-setup-slot-name">@player.Name</span>
+                    <span class="op-setup-slot-name">@entry.DisplayName</span>
                     @if (hasSubmitted)
                     {
                         <span class="op-setup-slot-score @(isPositive ? "score-positive" : "score-negative")">

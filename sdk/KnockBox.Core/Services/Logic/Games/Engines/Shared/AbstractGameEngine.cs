@@ -36,28 +36,52 @@ namespace KnockBox.Core.Services.Logic.Games.Engines.Shared
         public abstract Task<ValueResult<AbstractGameState>> CreateStateAsync(User host, CancellationToken ct = default);
 
         /// <summary>
-        /// Starts the game state. Caller-identity verification (e.g. "only the host may start")
-        /// is the responsibility of the invoker — engines should assume the caller is authorized.
-        /// The host is available via <see cref="AbstractGameState.Host"/> if the engine needs it.
+        /// Starts the game. The base implementation validates that <paramref name="caller"/>
+        /// is the lobby's host (<see cref="AbstractGameState.Host"/>), then delegates to
+        /// <see cref="StartAsyncCore"/>. Plugins implement the game-specific start logic by
+        /// overriding <see cref="StartAsyncCore"/>; host-identity authorization lives in the
+        /// platform so every plugin inherits it automatically.
         /// </summary>
-        public abstract Task<Result> StartAsync(AbstractGameState state, CancellationToken ct = default);
-
-        /// <summary>
-        /// Checks if the game state is good to start.
-        /// </summary>
-        public virtual Task<bool> CanStartAsync(AbstractGameState state, CancellationToken ct = default)
+        public async Task<Result> StartAsync(User caller, AbstractGameState state, CancellationToken ct = default)
         {
-            return Task.FromResult(HasValidPlayerCount(state));
+            if (caller is null) return Result.FromError("Caller is required.");
+            if (state is null) return Result.FromError("State is required.");
+            if (caller.Id != state.Host.Id)
+                return Result.FromError("Only the host can start the game.");
+            return await StartAsyncCore(state, ct);
         }
 
         /// <summary>
-        /// Returns true when the state has a player count inside
-        /// [<see cref="MinPlayerCount"/>, <see cref="MaxPlayerCount"/>] and the lobby is still joinable.
-        /// Override <see cref="CanStartAsync"/> and compose with this helper to add game-specific rules.
+        /// Game-specific start logic. Invoked by <see cref="StartAsync"/> after host-identity
+        /// authorization has succeeded. Engines should assume the caller is authorized;
+        /// <see cref="AbstractGameState.Host"/> remains available for any additional per-game
+        /// checks.
+        /// </summary>
+        protected abstract Task<Result> StartAsyncCore(AbstractGameState state, CancellationToken ct = default);
+
+        /// <summary>
+        /// Checks if the game state is good to start. Default composition is
+        /// <see cref="HasValidPlayerCount"/> AND <see cref="IsLobbyOpen"/>; override
+        /// and add game-specific readiness rules as needed.
+        /// </summary>
+        public virtual Task<bool> CanStartAsync(AbstractGameState state, CancellationToken ct = default)
+        {
+            return Task.FromResult(HasValidPlayerCount(state) && IsLobbyOpen(state));
+        }
+
+        /// <summary>
+        /// Returns true when the player count is within
+        /// [<see cref="MinPlayerCount"/>, <see cref="MaxPlayerCount"/>]. Does <b>not</b>
+        /// check <see cref="AbstractGameState.IsJoinable"/>; compose with
+        /// <see cref="IsLobbyOpen"/> when you need both.
         /// </summary>
         protected bool HasValidPlayerCount(AbstractGameState state)
-            => MinPlayerCount <= state.Players.Count
-            && state.Players.Count <= MaxPlayerCount
-            && state.IsJoinable;
+            => MinPlayerCount <= state.Players.Count && state.Players.Count <= MaxPlayerCount;
+
+        /// <summary>
+        /// Returns true when the lobby is currently accepting joins
+        /// (<see cref="AbstractGameState.IsJoinable"/>).
+        /// </summary>
+        protected bool IsLobbyOpen(AbstractGameState state) => state.IsJoinable;
     }
 }

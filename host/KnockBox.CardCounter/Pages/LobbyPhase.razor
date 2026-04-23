@@ -17,7 +17,12 @@
                     bool isUserHost = GameState.Host.Id == UserService.CurrentUser?.Id;
                 }
 
-                @foreach (var player in GameState.Players.Prepend(GameState.Host))
+                @{
+                    IEnumerable<(string Id, string DisplayName)> roster =
+                        new[] { (GameState.Host.Id, GameState.Host.Name) }
+                            .Concat(GameState.Players.Select(p => (p.User.Id, p.DisplayName)));
+                }
+                @foreach (var player in roster)
                 {
                     bool isHost = player.Id == GameState.Host.Id;
                     bool isMe = player.Id == UserService.CurrentUser?.Id;
@@ -25,23 +30,23 @@
                     {
                         <div class="cc-lobby-player @(isMe ? "cc-lobby-player-me" : "")">
                             <span class="cc-player-avatar">👑</span>
-                            <span class="cc-player-lobbyname">@player.Name</span>
+                            <span class="cc-player-lobbyname">@player.DisplayName</span>
                             <span class="cc-host-badge">HOST</span>
                         </div>
                     }
                     else if (isUserHost)
                     {
-                        <button class="cc-lobby-player @(isMe ? "cc-lobby-player-me" : "")" 
+                        <button class="cc-lobby-player @(isMe ? "cc-lobby-player-me" : "")"
                                 @onclick="() => KickPlayer(player.Id)" title="Click to kick player">
                             <span class="cc-player-avatar">🃏</span>
-                            <span class="cc-player-lobbyname">@player.Name</span>
+                            <span class="cc-player-lobbyname">@player.DisplayName</span>
                         </button>
                     }
                     else
                     {
                         <div class="cc-lobby-player @(isMe ? "cc-lobby-player-me" : "")">
                             <span class="cc-player-avatar">🃏</span>
-                            <span class="cc-player-lobbyname">@player.Name</span>
+                            <span class="cc-player-lobbyname">@player.DisplayName</span>
                         </div>
                     }
                 }

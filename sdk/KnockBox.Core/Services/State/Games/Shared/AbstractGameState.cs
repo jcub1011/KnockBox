@@ -7,6 +7,25 @@ using System.Diagnostics.CodeAnalysis;
 namespace KnockBox.Core.Services.State.Games.Shared
 {
     /// <summary>
+    /// A registered player's seat in a specific lobby: the underlying
+    /// <see cref="User"/> (authoritative identity, owned by
+    /// <c>IUserService</c>), the <see cref="DisplayName"/> used for this lobby
+    /// only (may differ from <c>User.Name</c> after disambiguation of
+    /// colliding names), and the <see cref="Token"/> that unregisters the
+    /// player when disposed.
+    /// </summary>
+    /// <remarks>
+    /// <para><b>Why a separate <see cref="DisplayName"/>:</b> two players in
+    /// the same lobby with the same <c>User.Name</c> would otherwise render
+    /// identically. The state appends " (1)", " (2)", … to the second and
+    /// subsequent occurrences. That rename applies <i>only</i> to this lobby;
+    /// the underlying <c>User</c> is not mutated, so other lobbies and the
+    /// user's global identity (<c>IUserService.CurrentUser</c>) are
+    /// unaffected.</para>
+    /// </remarks>
+    public readonly record struct PlayerEntry(User User, string DisplayName, IDisposable Token);
+
+    /// <summary>
     /// Base class for per-room game state. One instance is created per lobby by
     /// the owning <c>AbstractGameEngine.CreateStateAsync</c>, stashed on the
     /// lobby's <c>LobbyRegistration</c>, and consumed by Razor pages and the
@@ -37,7 +56,7 @@ namespace KnockBox.Core.Services.State.Games.Shared
         private readonly Lock _scheduledLock = new();
         private readonly List<CancellationTokenSource> _scheduledCallbacks = [];
         private readonly Lock _playerLock = new();
-        private readonly Dictionary<string, (User User, IDisposable Token)> _players = [];
+        private readonly Dictionary<string, PlayerEntry> _players = [];
         private readonly Dictionary<string, User> _kickedPlayers = [];
         private readonly CancellationTokenSource _disposeCts = new();
         private int _disposed;
@@ -89,18 +108,20 @@ namespace KnockBox.Core.Services.State.Games.Shared
         public User Host => host;
 
         /// <summary>
-        /// The players in this game.
+        /// The players in this game. Each entry carries both the authoritative
+        /// <see cref="User"/> and the per-lobby <see cref="PlayerEntry.DisplayName"/>
+        /// (which may differ from <c>User.Name</c> after disambiguation).
         /// </summary>
-        public IReadOnlyList<User> Players
+        public IReadOnlyList<PlayerEntry> Players
         {
             get
             {
                 using var scope = _playerLock.EnterScope();
                 if (_players.Count == 0) return [];
-                var result = new User[_players.Count];
+                var result = new PlayerEntry[_players.Count];
                 int i = 0;
                 foreach (var entry in _players.Values)
-                    result[i++] = entry.User;
+                    result[i++] = entry;
                 return result;
             }
         }
@@ -176,11 +197,15 @@ namespace KnockBox.Core.Services.State.Games.Shared
                 }
 
                 // Check for re-join to avoid renaming if the player is already in the lobby (by ID).
-                bool isRejoin = _players.ContainsKey(player.Id);
+                bool isRejoin = _players.TryGetValue(player.Id, out var existingEntry);
 
-                if (!isRejoin && IsNameTaken(player.Name))
+                // Compute the per-lobby display name locally. Never mutate
+                // player.Name — that reference is shared with IUserService.
+                string displayName = isRejoin ? existingEntry.DisplayName : player.Name;
+
+                if (!isRejoin && IsNameTaken(displayName))
                 {
-                    string originalName = player.Name;
+                    string originalName = displayName;
                     int counter = 1;
                     while (true)
                     {
@@ -193,7 +218,7 @@ namespace KnockBox.Core.Services.State.Games.Shared
 
                         if (!IsNameTaken(candidate))
                         {
-                            player.Name = candidate;
+                            displayName = candidate;
                             break;
                         }
                         counter++;
@@ -205,7 +230,7 @@ namespace KnockBox.Core.Services.State.Games.Shared
                     if (string.Equals(Host.Name, name, StringComparison.Ordinal)) return true;
                     foreach (var entry in _players.Values)
                     {
-                        if (string.Equals(entry.User.Name, name, StringComparison.Ordinal))
+                        if (string.Equals(entry.DisplayName, name, StringComparison.Ordinal))
                             return true;
                     }
                     return false;
@@ -237,7 +262,7 @@ namespace KnockBox.Core.Services.State.Games.Shared
                     if (shouldFire) SafeInvoke(PlayerUnregistered, player, nameof(PlayerUnregistered));
                 });
 
-                _players[player.Id] = (player, unsubscriber);
+                _players[player.Id] = new PlayerEntry(player, displayName, unsubscriber);
 
                 if (!isRejoin)
                     logger.LogInformation("User [{userId}] entered game [{type}] hosted by user [{hostId}].", player.Id, GetType().Name, Host.Id);
@@ -297,6 +322,14 @@ namespace KnockBox.Core.Services.State.Games.Shared
         /// </remarks>
         public void SetJoinable(bool isJoinable)
         {
+            // Dev-time sanity check: if the execute lock isn't held, the caller
+            // forgot to wrap SetJoinable inside Execute, and any reader gating
+            // on IsJoinable (RegisterPlayer, etc.) can race with this write.
+            // CurrentCount == 0 means *some* thread holds the semaphore; in the
+            // single-threaded Blazor-server model that's the current thread.
+            System.Diagnostics.Debug.Assert(
+                _executeLock.CurrentCount == 0,
+                "SetJoinable must be called from inside an Execute / ExecuteAsync block.");
             IsJoinable = isJoinable;
         }
 
@@ -311,6 +344,7 @@ namespace KnockBox.Core.Services.State.Games.Shared
             if (TryGetDisposeError(out var ode))
                 return Result.FromError("State was disposed.", ode.ToString());
 
+            bool notify = false;
             try
             {
                 ct.ThrowIfCancellationRequested();
@@ -319,12 +353,12 @@ namespace KnockBox.Core.Services.State.Games.Shared
                 try
                 {
                     await action();
+                    notify = true;
                     return Result.Success;
                 }
                 finally
                 {
                     _executeLock.Release();
-                    StateChangedEventManager.Notify();
                 }
             }
             catch (OperationCanceledException)
@@ -338,6 +372,10 @@ namespace KnockBox.Core.Services.State.Games.Shared
             catch (Exception ex)
             {
                 return Result.FromError("Error executing action.", ex.ToString());
+            }
+            finally
+            {
+                if (notify) StateChangedEventManager.Notify();
             }
         }
 
@@ -350,6 +388,7 @@ namespace KnockBox.Core.Services.State.Games.Shared
         {
             if (TryGetDisposeError(out var ode)) return Result.FromError("State was disposed.", ode.ToString());
 
+            bool notify = false;
             try
             {
                 _executeLock.Wait();
@@ -357,12 +396,12 @@ namespace KnockBox.Core.Services.State.Games.Shared
                 try
                 {
                     action();
+                    notify = true;
                     return Result.Success;
                 }
                 finally
                 {
                     _executeLock.Release();
-                    StateChangedEventManager.Notify();
                 }
             }
             catch (OperationCanceledException)
@@ -376,6 +415,10 @@ namespace KnockBox.Core.Services.State.Games.Shared
             catch (Exception ex)
             {
                 return Result.FromError("Error executing action.", ex.ToString());
+            }
+            finally
+            {
+                if (notify) StateChangedEventManager.Notify();
             }
         }
 
@@ -389,18 +432,20 @@ namespace KnockBox.Core.Services.State.Games.Shared
         {
             if (TryGetDisposeError(out var ode)) return ValueResult<TReturn>.FromError("State was disposed.", ode.ToString());
 
+            bool notify = false;
             try
             {
                 _executeLock.Wait();
 
                 try
                 {
-                    return action();
+                    var result = action();
+                    notify = true;
+                    return result;
                 }
                 finally
                 {
                     _executeLock.Release();
-                    StateChangedEventManager.Notify();
                 }
             }
             catch (OperationCanceledException)
@@ -414,6 +459,10 @@ namespace KnockBox.Core.Services.State.Games.Shared
             catch (Exception ex)
             {
                 return ValueResult<TReturn>.FromError("Error executing action.", ex.ToString());
+            }
+            finally
+            {
+                if (notify) StateChangedEventManager.Notify();
             }
         }
 

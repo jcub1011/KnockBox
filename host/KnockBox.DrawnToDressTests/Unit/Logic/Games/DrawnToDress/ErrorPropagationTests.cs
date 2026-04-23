@@ -43,7 +43,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress
             [
                 new() { Id = ClothingType.Hat, DisplayName = "Hat", MaxItemsPerRound = 3 },
             ];
-            await _engine.StartAsync(state);
+            await _engine.StartAsync(_host, state);
             var context = state.Context!;
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
 
@@ -97,7 +97,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress
             [
                 new() { Id = ClothingType.Hat, DisplayName = "Hat", MaxItemsPerRound = 10 },
             ];
-            await _engine.StartAsync(state);
+            await _engine.StartAsync(_host, state);
             var context = state.Context!;
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
 
@@ -145,7 +145,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress
             [
                 new() { Id = ClothingType.Hat, DisplayName = "Hat", MaxItemsPerRound = 10 },
             ];
-            await _engine.StartAsync(state);
+            await _engine.StartAsync(_host, state);
             var context = state.Context!;
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
 
@@ -170,7 +170,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress
             [
                 new() { Id = ClothingType.Hat, DisplayName = "Hat", MaxItemsPerRound = 10 },
             ];
-            await _engine.StartAsync(state);
+            await _engine.StartAsync(_host, state);
             var context = state.Context!;
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
 

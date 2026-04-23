@@ -185,7 +185,7 @@ public sealed class LogicRegistrationsTests
             User host, CancellationToken ct = default)
             => throw new NotImplementedException();
 
-        public override Task<Result> StartAsync(
+        protected override Task<Result> StartAsyncCore(
             AbstractGameState state, CancellationToken ct = default)
             => throw new NotImplementedException();
     }

@@ -61,7 +61,7 @@ namespace KnockBox.DiceSimulator.Tests.Unit.Logic
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DiceSimulatorGameState)stateResult.Value!;
 
-            var result = await _engine.StartAsync(state);
+            var result = await _engine.StartAsync(_host, state);
 
             Assert.IsTrue((bool)result.IsSuccess);
             Assert.IsFalse(state.IsJoinable);
@@ -70,8 +70,30 @@ namespace KnockBox.DiceSimulator.Tests.Unit.Logic
         [TestMethod]
         public async Task StartAsync_InvalidStateType_ReturnsError()
         {
-            // We use a mock or null as invalid cast
-            var result = await _engine.StartAsync(null!);
+            var result = await _engine.StartAsync(_host, null!);
+            Assert.IsTrue((bool)result.IsFailure);
+        }
+
+        [TestMethod]
+        public async Task StartAsync_NonHost_ReturnsError()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DiceSimulatorGameState)stateResult.Value!;
+            var nonHost = UserFactory.Create("NotHost", "nothost-id");
+
+            var result = await _engine.StartAsync(nonHost, state);
+
+            Assert.IsTrue((bool)result.IsFailure);
+        }
+
+        [TestMethod]
+        public async Task StartAsync_NullCaller_ReturnsError()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DiceSimulatorGameState)stateResult.Value!;
+
+            var result = await _engine.StartAsync(null!, state);
+
             Assert.IsTrue((bool)result.IsFailure);
         }
 

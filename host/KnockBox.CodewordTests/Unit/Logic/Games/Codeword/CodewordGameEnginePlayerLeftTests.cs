@@ -52,7 +52,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword
             var state = (CodewordGameState)result.Value!;
             for (int i = 0; i < playerCount; i++)
                 state.RegisterPlayer(MakePlayer(i));
-            await _engine.StartAsync(state);
+            await _engine.StartAsync(_host, state);
             return state;
         }
 

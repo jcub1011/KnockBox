@@ -36,7 +36,7 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games
             return Task.FromResult<ValueResult<AbstractGameState>>(gameState);
         }
 
-        public override Task<Result> StartAsync(AbstractGameState state, CancellationToken ct = default)
+        protected override Task<Result> StartAsyncCore(AbstractGameState state, CancellationToken ct = default)
         {
             if (state is not HiddenAgendaGameState gameState)
                 return Task.FromResult(Result.FromError("Error starting game.", $"Game state of type [{(state?.GetType().Name ?? "null")}] couldn't be cast to type [{nameof(HiddenAgendaGameState)}]."));
@@ -54,16 +54,16 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games
                 gameState.BoardGraph = BoardDefinitions.CreateGrandCircuit();
                 
                 // Initialize players
-                foreach (var user in gameState.Players)
+                foreach (var entry in gameState.Players)
                 {
-                    var playerState = new HiddenAgendaPlayerState 
-                    { 
-                        PlayerId = user.Id, 
-                        DisplayName = user.Name,
+                    var playerState = new HiddenAgendaPlayerState
+                    {
+                        PlayerId = entry.User.Id,
+                        DisplayName = entry.DisplayName,
                         CurrentSpaceId = 0 // Start at Grand Hall Foyer
                     };
-                    gameState.GamePlayers[user.Id] = playerState;
-                    gameState.TurnManager.TurnOrder.Add(user.Id);
+                    gameState.GamePlayers[entry.User.Id] = playerState;
+                    gameState.TurnManager.TurnOrder.Add(entry.User.Id);
                 }
 
                 fsm.TransitionTo(context, new RoundSetupState());

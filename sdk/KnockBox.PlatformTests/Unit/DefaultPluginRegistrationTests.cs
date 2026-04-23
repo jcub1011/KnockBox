@@ -219,7 +219,7 @@ public sealed class DefaultPluginRegistrationTests
         public override Task<ValueResult<AbstractGameState>> CreateStateAsync(User host, CancellationToken ct = default)
             => throw new NotImplementedException();
 
-        public override Task<Result> StartAsync(AbstractGameState state, CancellationToken ct = default)
+        protected override Task<Result> StartAsyncCore(AbstractGameState state, CancellationToken ct = default)
             => throw new NotImplementedException();
     }
 

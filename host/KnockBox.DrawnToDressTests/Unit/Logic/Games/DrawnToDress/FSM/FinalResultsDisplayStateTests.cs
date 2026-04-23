@@ -38,7 +38,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
-            await _engine.StartAsync(state);
+            await _engine.StartAsync(_host, state);
             state.GamePlayers["pA"] = new() { PlayerId = "pA", DisplayName = "Player A" };
             state.GamePlayers["pB"] = new() { PlayerId = "pB", DisplayName = "Player B" };
             return (state, state.Context!);
