@@ -18,7 +18,7 @@
 
 .spd-grid {
     --spd-gap: clamp(3px, 0.5cqw, 8px);
-    --spd-tile-cap: clamp(34px, 6vmin, 70px);
+    --spd-tile-cap: 70px;
     --spd-tile-size: min(
         calc((100cqw - (var(--spd-cols) - 1) * var(--spd-gap)) / var(--spd-cols)),
         calc((100cqh - (var(--spd-rows) - 1) * var(--spd-gap)) / var(--spd-rows)),
