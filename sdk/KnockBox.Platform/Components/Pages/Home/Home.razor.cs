@@ -192,10 +192,13 @@ namespace KnockBox.Platform.Components.Pages.Home
 
             await animationDelay;
 
+            // When the host leaves — either by navigation (LeaveCurrentSession) or by
+            // letting the post-disconnect grace period lapse (GameSessionState.Dispose →
+            // TakeCurrentSession().Dispose()) — this closure runs. CloseLobbyAsync
+            // itself disposes the state; don't call State.Dispose() here or we
+            // double-dispose.
             var disposeAction = new DisposableAction(() =>
             {
-                // Close the lobby when the host leaves
-                lobby.State.Dispose();
                 _ = LobbyService.CloseLobbyAsync(user, lobby, CancellationToken.None);
             });
 

@@ -29,14 +29,40 @@ internal class CacheRegistration(IServiceScope scope, object service) : IDisposa
     }
 }
 
-public sealed class SessionServiceProvider(
-    IServiceProvider serviceProvider,
-    ILogger<SessionServiceProvider> logger)
-    : ISessionServiceProvider, IDisposable
+public sealed class SessionServiceProvider : ISessionServiceProvider, IDisposable
 {
+    private readonly IServiceProvider _serviceProvider;
+    private readonly ILogger<SessionServiceProvider> _logger;
+    private readonly TimeProvider _timeProvider;
+
     private int _disposed = 0;
     private readonly ConcurrentDictionary<RegistrationKey, Lazy<CacheRegistration>> _services = [];
     internal TimeSpan EvictionDelay { get; set; } = TimeSpan.FromMinutes(1);
+
+    /// <summary>
+    /// Production constructor. DI supplies <see cref="TimeProvider.System"/> when a
+    /// <see cref="TimeProvider"/> isn't registered, so hosts don't need to register one
+    /// explicitly. Tests construct via <see cref="SessionServiceProvider(IServiceProvider, ILogger{SessionServiceProvider}, TimeProvider)"/>
+    /// to pass a <c>FakeTimeProvider</c>.
+    /// </summary>
+    public SessionServiceProvider(
+        IServiceProvider serviceProvider,
+        ILogger<SessionServiceProvider> logger)
+        : this(serviceProvider, logger, TimeProvider.System) { }
+
+    /// <summary>
+    /// Test-friendly constructor that accepts an explicit <see cref="TimeProvider"/> so
+    /// eviction delay can be driven by a <c>FakeTimeProvider</c> without real wall-clock waits.
+    /// </summary>
+    public SessionServiceProvider(
+        IServiceProvider serviceProvider,
+        ILogger<SessionServiceProvider> logger,
+        TimeProvider timeProvider)
+    {
+        _serviceProvider = serviceProvider;
+        _logger = logger;
+        _timeProvider = timeProvider;
+    }
 
     public ValueResult<ServiceRegistration<TService>> GetService<TService>(SessionToken sessionToken)
     {
@@ -58,7 +84,7 @@ public sealed class SessionServiceProvider(
             {
                 _services.TryRemove(new KeyValuePair<RegistrationKey, Lazy<CacheRegistration>>(key, lazyRegistration));
 
-                logger.LogError(ex, "Failed to resolve session-scoped service.");
+                _logger.LogError(ex, "Failed to resolve session-scoped service.");
                 return new ResultError("Unable to get service.");
             }
 
@@ -99,7 +125,9 @@ public sealed class SessionServiceProvider(
     {
         try
         {
-            await Task.Delay(EvictionDelay, token);
+            // TimeProvider-aware delay lets tests drive eviction via FakeTimeProvider
+            // without real wall-clock waits. Defaults to TimeProvider.System in prod.
+            await Task.Delay(EvictionDelay, _timeProvider, token);
 
             // Provider already disposing — leave eviction to Dispose() to avoid racing it.
             if (Volatile.Read(ref _disposed) == 1) return;
@@ -120,13 +148,13 @@ public sealed class SessionServiceProvider(
             if (shouldEvict)
             {
                 registrationToEvict.Dispose();
-                logger.LogDebug("Session service {Type} for {Token} expired and was disposed.", key.ServiceType.Name, key.SessionToken.Token);
+                _logger.LogDebug("Session service {Type} for {Token} expired and was disposed.", key.ServiceType.Name, key.SessionToken.Token);
             }
         }
         catch (OperationCanceledException) { }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Error handling eviction for session service {Type} with token {Token}.", key.ServiceType.Name, key.SessionToken.Token);
+            _logger.LogError(ex, "Error handling eviction for session service {Type} with token {Token}.", key.ServiceType.Name, key.SessionToken.Token);
         }
     }
 
@@ -136,7 +164,7 @@ public sealed class SessionServiceProvider(
         if (Volatile.Read(ref _disposed) == 1)
             throw new ObjectDisposedException(nameof(SessionServiceProvider));
 
-        var scope = serviceProvider.CreateScope();
+        var scope = _serviceProvider.CreateScope();
         try
         {
             var service = scope.ServiceProvider.GetRequiredService(key.ServiceType);

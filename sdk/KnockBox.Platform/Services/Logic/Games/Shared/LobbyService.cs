@@ -5,12 +5,13 @@ using KnockBox.Core.Services.State.Games.Shared;
 using KnockBox.Core.Services.State.Users;
 using System.Collections.Concurrent;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using KnockBox.Core.Plugins;
 using KnockBox.Platform.Games;
 
 namespace KnockBox.Services.Logic.Games.Shared
 {
-    internal sealed class LobbyService : ILobbyService
+    internal sealed class LobbyService : ILobbyService, IHostedService
     {
         private readonly ILobbyCodeService _lobbyCodeService;
         private readonly IGameAvailabilityService _gameAvailability;
@@ -185,5 +186,38 @@ namespace KnockBox.Services.Logic.Games.Shared
         }
 
         private readonly record struct GameRegistration(IGameModule Module, AbstractGameEngine Engine);
+
+        // ── IHostedService: graceful shutdown ────────────────────────────────
+        //
+        // Snapshots every open lobby on application stop and disposes its state so
+        // subscribers (engine background tasks, scheduled callbacks, Blazor circuit
+        // handlers) get a deterministic OnStateDisposed notification instead of being
+        // torn down mid-flight by the runtime.
+
+        public Task StartAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public Task StopAsync(CancellationToken cancellationToken)
+        {
+            // Snapshot first so we don't mutate the collection while enumerating.
+            var snapshot = _lobbies.ToArray();
+            _lobbies.Clear();
+
+            foreach (var kvp in snapshot)
+            {
+                try
+                {
+                    kvp.Value.State.Dispose();
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(
+                        ex,
+                        "Error disposing lobby [{Code}] during shutdown.",
+                        kvp.Key);
+                }
+            }
+
+            return Task.CompletedTask;
+        }
     }
 }
