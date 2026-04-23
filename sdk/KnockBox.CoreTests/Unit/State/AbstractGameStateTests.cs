@@ -14,7 +14,7 @@ public sealed class AbstractGameStateTests
     }
 
     private static User MakeUser(string name = "TestUser") =>
-        new User(name, Guid.NewGuid().ToString());
+        UserFactory.Create(name, Guid.NewGuid().ToString());
 
     private static ILogger MakeLogger() => Mock.Of<ILogger>();
 

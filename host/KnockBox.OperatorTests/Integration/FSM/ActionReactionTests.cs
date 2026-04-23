@@ -26,7 +26,7 @@ public class ActionReactionTests
     public void Setup()
     {
         _rngMock = new Mock<IRandomNumberService>();
-        var host = new User("Host", "host1");
+        var host = UserFactory.Create("Host", "host1");
         _state = new OperatorGameState(host, NullLogger<OperatorGameState>.Instance);
         _context = new OperatorGameContext(_state, _rngMock.Object);
         

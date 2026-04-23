@@ -21,7 +21,7 @@ namespace KnockBox.TaskMaster.Tests.Unit.Logic
         {
             _engineLoggerMock = new Mock<ILogger<TaskMasterGameEngine>>();
             _stateLoggerMock = new Mock<ILogger<TaskMasterGameState>>();
-            _host = new User("Host", "host1");
+            _host = UserFactory.Create("Host", "host1");
 
             _engine = new TaskMasterGameEngine(
                 _engineLoggerMock.Object,

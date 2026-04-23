@@ -23,8 +23,8 @@ namespace KnockBox.DiceSimulator.Tests.Integration
             var engineLogger = Mock.Of<ILogger<DiceSimulatorGameEngine>>();
             var stateLogger = Mock.Of<ILogger<DiceSimulatorGameState>>();
             var engine = new DiceSimulatorGameEngine(randomSvc, engineLogger, stateLogger);
-            var host = new User("Host", "host");
-            var player1 = new User("P1", "p1");
+            var host = UserFactory.Create("Host", "host");
+            var player1 = UserFactory.Create("P1", "p1");
 
             // Act: Create State
             var stateResult = await engine.CreateStateAsync(host);
@@ -83,7 +83,7 @@ namespace KnockBox.DiceSimulator.Tests.Integration
             var engineLogger = Mock.Of<ILogger<DiceSimulatorGameEngine>>();
             var stateLogger = Mock.Of<ILogger<DiceSimulatorGameState>>();
             var engine = new DiceSimulatorGameEngine(randomSvc, engineLogger, stateLogger);
-            var host = new User("Host", "host");
+            var host = UserFactory.Create("Host", "host");
 
             var stateResult = await engine.CreateStateAsync(host);
             var state = (DiceSimulatorGameState)stateResult.Value!;

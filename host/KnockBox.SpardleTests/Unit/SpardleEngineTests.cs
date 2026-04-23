@@ -442,7 +442,7 @@ public class SpardleEngineTests
 
     private async Task<(SpardleState state, User host)> CreateStateAsync()
     {
-        var host = new User("Host", Guid.NewGuid().ToString());
+        var host = UserFactory.Create("Host", Guid.NewGuid().ToString());
         var abstractResult = await _engine.CreateStateAsync(host);
         Assert.IsTrue(abstractResult.TryGetSuccess(out var abstractState));
         return ((SpardleState)abstractState, host);
@@ -454,7 +454,7 @@ public class SpardleEngineTests
         var players = new List<User>();
         for (int i = 0; i < playerCount; i++)
         {
-            var player = new User($"P{i + 1}", Guid.NewGuid().ToString());
+            var player = UserFactory.Create($"P{i + 1}", Guid.NewGuid().ToString());
             var reg = state.RegisterPlayer(player);
             Assert.IsTrue(reg.IsSuccess, $"RegisterPlayer failed: {reg}");
             players.Add(player);

@@ -36,7 +36,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword
             _engineLoggerMock = new Mock<ILogger<CodewordGameEngine>>();
             _stateLoggerMock = new Mock<ILogger<CodewordGameState>>();
 
-            _host = new User("Host", "host-id");
+            _host = UserFactory.Create("Host", "host-id");
 
             _engine = new CodewordGameEngine(
                 _randomMock.Object,
@@ -44,7 +44,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword
                 _stateLoggerMock.Object);
         }
 
-        private User MakePlayer(int index) => new($"Player{index}", $"p{index}-id");
+        private User MakePlayer(int index) => UserFactory.Create($"Player{index}", $"p{index}-id");
 
         private async Task<CodewordGameState> CreateStartedGameAsync(int playerCount = 5)
         {
@@ -70,7 +70,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword
             string currentClueGiverId = state.TurnManager.TurnOrder[state.TurnManager.CurrentPlayerIndex];
 
             // Remove the current clue giver.
-            _engine.HandlePlayerLeft(new User("dummy", currentClueGiverId), state);
+            _engine.HandlePlayerLeft(UserFactory.Create("dummy", currentClueGiverId), state);
 
             // Game should still be in CluePhase (re-entered) and the index should point to an alive player.
             Assert.AreEqual(CodewordGamePhase.CluePhase, state.Phase);
@@ -97,7 +97,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword
             for (int i = 0; i < alivePlayers.Count; i++)
             {
                 string currentPlayerId = state.TurnManager.TurnOrder[state.TurnManager.CurrentPlayerIndex];
-                _engine.SubmitClue(new User("dummy", currentPlayerId), state, clues[i]);
+                _engine.SubmitClue(UserFactory.Create("dummy", currentPlayerId), state, clues[i]);
             }
 
             // Should now be in Discussion (which includes inline voting).
@@ -109,13 +109,13 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword
             string voterId = alivePlayers[1].PlayerId;
 
             // Cast a vote for the player who will leave (select target, don't lock in).
-            _engine.CastVote(new User("dummy", voterId), state, leavingPlayerId);
+            _engine.CastVote(UserFactory.Create("dummy", voterId), state, leavingPlayerId);
 
             var voterState = context.GetPlayer(voterId)!;
             Assert.AreEqual(leavingPlayerId, voterState.VoteTargetId);
 
             // Player leaves.
-            _engine.HandlePlayerLeft(new User("dummy", leavingPlayerId), state);
+            _engine.HandlePlayerLeft(UserFactory.Create("dummy", leavingPlayerId), state);
 
             // Vote targeting the leaving player should be voided.
             Assert.IsFalse(voterState.HasVoted, "Vote should be voided when target leaves.");
@@ -138,8 +138,8 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword
 
             // With 4 players: 3 Agent, 1 Insider.
             // Remove 2 agents to get to 2 remaining (1 Agent + 1 Insider).
-            _engine.HandlePlayerLeft(new User("dummy", agents[0].PlayerId), state);
-            _engine.HandlePlayerLeft(new User("dummy", agents[1].PlayerId), state);
+            _engine.HandlePlayerLeft(UserFactory.Create("dummy", agents[0].PlayerId), state);
+            _engine.HandlePlayerLeft(UserFactory.Create("dummy", agents[1].PlayerId), state);
 
             // Should transition to GameOver with ≤2 remaining.
             Assert.AreEqual(CodewordGamePhase.GameOver, state.Phase);
@@ -175,7 +175,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword
             int aliveCountBefore = context.GetAlivePlayerCount();
             string leavingPlayerId = state.TurnManager.TurnOrder[0];
 
-            _engine.HandlePlayerLeft(new User("dummy", leavingPlayerId), state);
+            _engine.HandlePlayerLeft(UserFactory.Create("dummy", leavingPlayerId), state);
 
             int aliveCountAfter = context.GetAlivePlayerCount();
             Assert.AreEqual(aliveCountBefore - 1, aliveCountAfter);

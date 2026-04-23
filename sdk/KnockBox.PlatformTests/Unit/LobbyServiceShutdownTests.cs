@@ -25,7 +25,7 @@ public sealed class LobbyServiceShutdownTests
     {
         var (service, codeService) = BuildServiceWithStubEngine();
 
-        var host = new User("Host", Guid.NewGuid().ToString());
+        var host = UserFactory.Create("Host", Guid.NewGuid().ToString());
         var result = await service.CreateLobbyAsync(host, "shutdown-test-route");
         Assert.IsTrue(result.TryGetSuccess(out var registration));
 

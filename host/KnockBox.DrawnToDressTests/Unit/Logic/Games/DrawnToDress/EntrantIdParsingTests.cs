@@ -168,7 +168,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress
             randomMock.Setup(r => r.GetRandomInt(It.IsAny<int>(), It.IsAny<RandomType>())).Returns(0);
             randomMock.Setup(r => r.GetRandomInt(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<RandomType>())).Returns(0);
 
-            var host = new User("Host", "host1");
+            var host = UserFactory.Create("Host", "host1");
             var engine = new DrawnToDressGameEngine(
                 engineLoggerMock.Object,
                 stateLoggerMock.Object,

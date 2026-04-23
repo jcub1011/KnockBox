@@ -30,7 +30,7 @@ namespace KnockBox.HiddenAgenda.Tests.Unit.Logic
             _loggerMock = new Mock<ILogger>();
             _stateLoggerMock = new Mock<ILogger<HiddenAgendaGameState>>();
             
-            var host = new User("Host", "host1");
+            var host = UserFactory.Create("Host", "host1");
             _state = new HiddenAgendaGameState(host, _stateLoggerMock.Object);
             _state.BoardGraph = BoardDefinitions.CreateGrandCircuit();
             

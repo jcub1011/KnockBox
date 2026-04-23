@@ -17,7 +17,7 @@ namespace KnockBox.DiceSimulator.Tests.Unit.State
         public void Setup()
         {
             _loggerMock = new Mock<ILogger<DiceSimulatorGameState>>();
-            _host = new User("HostUser", "host-id");
+            _host = UserFactory.Create("HostUser", "host-id");
         }
 
         private DiceRollEntry CreateValidEntry()

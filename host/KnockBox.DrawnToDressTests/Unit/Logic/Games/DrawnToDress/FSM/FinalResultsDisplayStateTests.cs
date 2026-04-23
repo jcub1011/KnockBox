@@ -27,7 +27,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             _randomMock = new Mock<IRandomNumberService>();
             _randomMock.Setup(r => r.GetRandomInt(It.IsAny<int>(), It.IsAny<RandomType>())).Returns(0);
             _randomMock.Setup(r => r.GetRandomInt(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<RandomType>())).Returns(0);
-            _host = new User("Host", "host1");
+            _host = UserFactory.Create("Host", "host1");
             _engine = new DrawnToDressGameEngine(
                 _engineLoggerMock.Object,
                 _stateLoggerMock.Object,

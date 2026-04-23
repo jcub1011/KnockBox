@@ -21,7 +21,7 @@ public class ActionCardTests
     public void Setup()
     {
         _loggerMock = new Mock<ILogger<OperatorGameState>>();
-        var host = new KnockBox.Core.Services.State.Users.User("host", "Host");
+        var host = KnockBox.Core.Services.State.Users.UserFactory.Create("host", "Host");
         _state = new OperatorGameState(host, _loggerMock.Object);
         _rngMock = new Mock<IRandomNumberService>();
         _context = new OperatorGameContext(_state, _rngMock.Object);

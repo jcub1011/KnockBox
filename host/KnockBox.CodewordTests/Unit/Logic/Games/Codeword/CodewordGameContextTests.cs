@@ -32,7 +32,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword
             _loggerMock = new Mock<ILogger>();
             _stateLoggerMock = new Mock<ILogger<CodewordGameState>>();
 
-            var host = new User("Host", "host-id");
+            var host = UserFactory.Create("Host", "host-id");
             _state = new CodewordGameState(host, _stateLoggerMock.Object);
             _context = new CodewordGameContext(_state, _randomMock.Object, _loggerMock.Object);
         }

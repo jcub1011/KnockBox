@@ -8,6 +8,7 @@ namespace KnockBox.Services.State.Users
     public class UserService(ILocalStorageService localStorageService, ISessionTokenProvider sessionTokenProvider, ILogger<UserService> logger) : IUserService, IDisposable
     {
         const int MAX_SESSION_TOKEN_RETRIEVALS = 5;
+        const int MAX_NAME_LENGTH = 12;
 
         private readonly CancellationTokenSource _disposeCts = new();
         private int _disposed;
@@ -15,6 +16,7 @@ namespace KnockBox.Services.State.Users
         public User? CurrentUser { get; private set; }
 
         public event Action? UserInitialized;
+        public event Action<UserNameChangedArgs>? UserNameChanged;
 
         public async Task InitializeCurrentUserAsync(CancellationToken ct = default)
         {
@@ -56,11 +58,7 @@ namespace KnockBox.Services.State.Users
                 logger.LogError(ex, "Error initializing current user service.");
             }
 
-            // Unsubscribe from the previous user (if re-initializing) before replacing it.
-            CurrentUser?.NameChanged -= OnNameChanged;
-
-            CurrentUser = new(name, id);
-            CurrentUser.NameChanged += OnNameChanged;
+            CurrentUser = new User(name, id);
             UserInitialized?.Invoke();
         }
 
@@ -78,19 +76,48 @@ namespace KnockBox.Services.State.Users
             await InitializeCurrentUserAsync(ct);
         }
 
-        private void OnNameChanged(UserNameChangedArgs args)
+        public void SetCurrentUserName(string name)
         {
-            // Guard against a late event fire racing with Dispose — Dispose unsubscribes,
-            // but an invocation that already started before unsubscribe will keep going.
             if (Volatile.Read(ref _disposed) == 1) return;
+
+            var user = CurrentUser;
+            if (user is null) return;
+
+            name = name?.Trim() ?? string.Empty;
+            if (name.Length > MAX_NAME_LENGTH) name = name[..MAX_NAME_LENGTH];
+
+            var previous = user.Name;
+            if (string.Equals(previous, name, StringComparison.Ordinal)) return;
+
+            user.Name = name;
+
+            RaiseUserNameChanged(previous, name);
 
             try
             {
-                _ = SaveNameAsync(args.NewName, _disposeCts.Token);
+                _ = SaveNameAsync(name, _disposeCts.Token);
             }
             catch (ObjectDisposedException)
             {
-                // Service disposed — drop silently.
+                // Service disposed between the check above and here — drop silently.
+            }
+        }
+
+        private void RaiseUserNameChanged(string previous, string current)
+        {
+            var handlers = UserNameChanged;
+            if (handlers is null) return;
+
+            var args = new UserNameChangedArgs(previous, current);
+            // Mirror the Phase 1.4 pattern — one throwing subscriber must not
+            // short-circuit the rest of the invocation list.
+            foreach (Action<UserNameChangedArgs> handler in handlers.GetInvocationList())
+            {
+                try { handler(args); }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "A UserNameChanged subscriber threw.");
+                }
             }
         }
 
@@ -111,8 +138,6 @@ namespace KnockBox.Services.State.Users
         public void Dispose()
         {
             if (Interlocked.Exchange(ref _disposed, 1) == 1) return;
-
-            CurrentUser?.NameChanged -= OnNameChanged;
 
             _disposeCts.Cancel();
             _disposeCts.Dispose();

@@ -7,11 +7,11 @@
 | **Phase 1** | `AbstractGameState` / `AbstractGameEngine` API breaking changes | ✅ Complete |
 | **Phase 2** | Plugin-loader & sandbox hardening | ✅ Complete |
 | **Phase 3** | Operational hygiene (shutdown, eviction, TimeProvider) | ✅ Complete |
-| **Phase 4** | `User` API tightening | ⏳ In progress |
+| **Phase 4** | `User` API tightening | ✅ Complete |
 | **Phase 5** | Packaging & release metadata | ⬜ Pending |
 | **Phase 6** | Docs & release notes | ⬜ Pending |
 
-Totals after Phase 3: **1553 tests passing** (414 SDK + 1139 host), 0 failures, 7 skipped (pre-existing Windows symlink tests).
+Totals after Phase 4: **1565 tests passing** (426 SDK + 1139 host), 0 failures, 7 skipped (pre-existing Windows symlink tests).
 
 ---
 
@@ -80,31 +80,22 @@ Work is split into six phases, ordered by blast radius. Phase 1 ripples into eve
 
 ---
 
-## Phase 4 — `User` API tightening — ⏳ In progress
+## Phase 4 — `User` API tightening — ✅ Complete
 
-### 4.1 Lock down `User` construction and mutation
+- [x] **4.1** Lock down `User` construction and mutation — ctor now `internal`; `Name` is `{ get; internal set; }`; the public `NameChanged` event on `User` is gone. Notification moved to `IUserService.UserNameChanged` (new event) with per-handler isolation. Trim + 12-char cap moved into new `IUserService.SetCurrentUserName(string)`; `Home.razor.cs` now calls that instead of assigning `CurrentUser.Name` directly. The internal setter on `Name` is still used by `AbstractGameState.RegisterPlayer`'s name-disambiguation pass (same assembly, so `internal` access works).
+- [x] **4.2** Added `UserFactory.Create(name, id)` in `KnockBox.Core.Services.State.Users` as the public escape hatch. Plugin-author test code constructs `User` via the factory; in-repo tests migrated off `new User(...)` across ~60 files (the only remaining in-repo `new User(...)` is the single production site in `UserService.InitializeCurrentUserAsync`).
+- [x] **Phase 4 tests** — new `sdk/KnockBox.PlatformTests/Unit/UserServiceTests.cs` with 12 tests. Covers:
+  - reflection pins on `User` ctor + `Name` setter being `internal` and `Id` having no setter;
+  - `UserFactory.Create` basic construction;
+  - `SetCurrentUserName` trim, 12-char cap, event fire with correct previous/new args, idempotence when trimmed value equals current;
+  - persistence to local storage via the fire-and-forget `SaveNameAsync`;
+  - one-bad-handler-doesn't-short-circuit fan-out (mirrors Phase 1.4 pattern);
+  - null-`CurrentUser` and post-dispose no-ops.
 
-**Files:** `sdk/KnockBox.Core/Services/State/Users/IUserService.cs` (currently contains the `User` class), `sdk/KnockBox.Platform/Services/State/Users/UserService.cs`
+### Phase 4 audit corrections worked during execution
 
-Currently `User` has a public primary-ctor, a public-settable `Name` setter with side effects (12-char trim, event fire), and a public `NameChanged` event. The only in-repo production `new User(` site is `UserService.cs:62`.
-
-Changes:
-- [ ] Make `User`'s constructor `internal`. Grant `InternalsVisibleTo` to test projects that construct `User` directly. For external plugin authors who need to construct `User` for testing, provide a factory on `IUserService` or a dedicated `UserFactory` in `KnockBox.Core`.
-- [ ] Make `Name` init-only (`{ get; internal set; }`). Move the 12-char trim + event-firing logic to `IUserService` / `UserService`.
-- [ ] Remove the public `NameChanged` event from `User`. Move the notification to `IUserService` (new event signature: `event Action<UserNameChangedArgs>? UserNameChanged`).
-
-**Ripple:** grep `NameChanged` and `new User(` across the repo; update each site. Known sites:
-- `sdk/KnockBox.Platform/Services/State/Users/UserService.cs:62` (single production `new User(`)
-- `host/KnockBox.DrawnToDress/Pages/OutfitCustomizationPhase.razor` + `.razor.cs` (`NameChanged` subscription — needs to move to `IUserService.UserNameChanged`)
-- Test projects with direct `new User(...)` calls (add `InternalsVisibleTo` or a factory helper)
-
-### Phase 4 verification
-
-- [ ] `User` cannot be constructed from outside `KnockBox.Core` (compile check on an external-style test that tries).
-- [ ] `Name` mutation from outside the Platform is rejected at compile time.
-- [ ] Name truncation still caps at 12 characters when set through `IUserService`.
-- [ ] `UserNameChanged` on `IUserService` fires on name change; throwing subscribers don't short-circuit the invocation list (mirror the Phase 1.4 pattern).
-- [ ] `DrawnToDress/OutfitCustomizationPhase` still receives name-change notifications via the new hook.
+- Plan-draft ripple list flagged `host/KnockBox.DrawnToDress/Pages/OutfitCustomizationPhase.razor[.cs]` as a `NameChanged` subscriber. It isn't — the `OnOutfitNameChangedAsync` method there is the **outfit** name's handler (a draft-name-for-a-drawing), unrelated to `User.NameChanged`. Ripple was limited to `UserService` itself.
+- The plan's "compile check on an external-style test that tries to construct `User`" is not expressible as a runtime test. Replaced with reflection-based pins: `User_Constructor_IsInternal`, `User_NameSetter_IsInternal`, `User_IdSetter_DoesNotExist`. These fail the moment the accessibility weakens, which is the practical guarantee we wanted.
 
 ---
 

@@ -27,7 +27,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
             _loggerMock = new Mock<ILogger>();
             _stateLoggerMock = new Mock<ILogger<CardCounterGameState>>();
 
-            var host = new User("Host", "host-id");
+            var host = UserFactory.Create("Host", "host-id");
             _state = new CardCounterGameState(host, _stateLoggerMock.Object);
             _context = new CardCounterGameContext(_state, _randomMock.Object, _loggerMock.Object);
         }

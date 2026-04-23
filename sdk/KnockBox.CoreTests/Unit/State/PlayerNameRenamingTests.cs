@@ -14,7 +14,7 @@ public sealed class PlayerNameRenamingTests
     }
 
     private static User MakeUser(string name, string id = "") =>
-        new User(name, string.IsNullOrEmpty(id) ? Guid.NewGuid().ToString() : id);
+        UserFactory.Create(name, string.IsNullOrEmpty(id) ? Guid.NewGuid().ToString() : id);
 
     private static ILogger MakeLogger() => Mock.Of<ILogger>();
 

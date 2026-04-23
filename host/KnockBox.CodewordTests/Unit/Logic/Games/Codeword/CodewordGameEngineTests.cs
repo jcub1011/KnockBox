@@ -37,7 +37,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword
             _engineLoggerMock = new Mock<ILogger<CodewordGameEngine>>();
             _stateLoggerMock = new Mock<ILogger<CodewordGameState>>();
 
-            _host = new User("Host", "host-id");
+            _host = UserFactory.Create("Host", "host-id");
 
             _engine = new CodewordGameEngine(
                 _randomMock.Object,
@@ -45,7 +45,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword
                 _stateLoggerMock.Object);
         }
 
-        private User MakePlayer(int index) => new($"Player{index}", $"p{index}-id");
+        private User MakePlayer(int index) => UserFactory.Create($"Player{index}", $"p{index}-id");
 
         private async Task<CodewordGameState> CreateStateWithPlayersAsync(int count)
         {
@@ -242,7 +242,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword
         public async Task ReturnToLobby_NonHost_ReturnsError()
         {
             using var state = await CreateStartedGameAsync(4);
-            var nonHost = new User("NotHost", "nothost-id");
+            var nonHost = UserFactory.Create("NotHost", "nothost-id");
 
             var result = _engine.ReturnToLobby(nonHost, state);
 
@@ -279,7 +279,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword
         public async Task ResetGame_NonHost_ReturnsError()
         {
             using var state = await CreateStartedGameAsync(4);
-            var nonHost = new User("NotHost", "nothost-id");
+            var nonHost = UserFactory.Create("NotHost", "nothost-id");
 
             var result = _engine.ResetGame(nonHost, state);
 
@@ -372,7 +372,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword
             // Remove player at index 1 (before current)
             string leavingPlayerId = state.TurnManager.TurnOrder[1];
 
-            _engine.HandlePlayerLeft(new User(leavingPlayerId, leavingPlayerId), state);
+            _engine.HandlePlayerLeft(UserFactory.Create(leavingPlayerId, leavingPlayerId), state);
 
             Assert.AreEqual(2, state.TurnManager.CurrentPlayerIndex);
         }
@@ -393,7 +393,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword
             voterState.HasVoted = true;
             voterState.VoteTargetId = leavingPlayerId;
 
-            _engine.HandlePlayerLeft(new User("dummy", leavingPlayerId), state);
+            _engine.HandlePlayerLeft(UserFactory.Create("dummy", leavingPlayerId), state);
 
             // Voter's vote should be voided
             Assert.IsFalse(voterState.HasVoted);
@@ -406,8 +406,8 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword
             using var state = await CreateStartedGameAsync(4);
 
             // Remove players until <= 2 remain (4 players, remove 2)
-            var player0 = new User("dummy", state.TurnManager.TurnOrder[0]);
-            var player1 = new User("dummy", state.TurnManager.TurnOrder[1]);
+            var player0 = UserFactory.Create("dummy", state.TurnManager.TurnOrder[0]);
+            var player1 = UserFactory.Create("dummy", state.TurnManager.TurnOrder[1]);
 
             _engine.HandlePlayerLeft(player0, state);
             _engine.HandlePlayerLeft(player1, state);
