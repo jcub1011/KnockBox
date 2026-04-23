@@ -14,8 +14,20 @@ name: Release SDK
 on:
   workflow_dispatch:
     inputs:
-      version:
-        description: 'SDK NuGet version (no v prefix, e.g. 1.4.0 or 1.4.0-rc.1)'
+      release_tag:
+        description: 'GitHub Release tag (e.g. sdk-1.4.0)'
+        required: true
+        type: string
+      core_version:
+        description: 'KnockBox.Core NuGet version'
+        required: true
+        type: string
+      platform_version:
+        description: 'KnockBox.Platform NuGet version'
+        required: true
+        type: string
+      templates_version:
+        description: 'KnockBox.Templates NuGet version'
         required: true
         type: string
 
@@ -23,47 +35,43 @@ permissions:
   contents: read
 
 concurrency:
-  group: release-sdk-${{ inputs.version }}
+  group: release-sdk-${{ inputs.release_tag }}
   cancel-in-progress: false
 
 jobs:
   validate:
-    name: Validate version input
+    name: Validate version inputs
     runs-on: ubuntu-latest
     steps:
-      - name: Validate version format
+      - name: Validate version formats
         env:
-          VERSION: ${{ inputs.version }}
+          CORE_V: ${{ inputs.core_version }}
+          PLATFORM_V: ${{ inputs.platform_version }}
+          TEMPLATES_V: ${{ inputs.templates_version }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
         run: |
-          # Reject a leading 'v' so nupkg filenames match the NuGet convention.
-          if [[ "$VERSION" =~ ^v ]]; then
-            echo "ERROR: SDK version must not include a 'v' prefix. Use '1.4.0', not 'v1.4.0'."
-            exit 1
-          fi
-          # Reject anything outside of SemVer-safe characters. Defends downstream
-          # shell commands (dotnet pack -p:Version=…, gh release) against
-          # accidental or malicious metacharacter injection.
-          if [[ ! "$VERSION" =~ ^[A-Za-z0-9._+-]+$ ]]; then
-            echo "ERROR: Version '$VERSION' contains characters outside [A-Za-z0-9._+-]."
+          for V in "$CORE_V" "$PLATFORM_V" "$TEMPLATES_V"; do
+            if [[ "$V" =~ ^v ]]; then
+              echo "ERROR: NuGet version '$V' must not include a 'v' prefix."
+              exit 1
+            fi
+            if [[ ! "$V" =~ ^[A-Za-z0-9._+-]+$ ]]; then
+              echo "ERROR: Version '$V' contains invalid characters."
+              exit 1
+            fi
+          done
+          if [[ ! "$RELEASE_TAG" =~ ^[A-Za-z0-9._+-]+$ ]]; then
+            echo "ERROR: Release tag '$RELEASE_TAG' contains invalid characters."
             exit 1
           fi
 
   pack:
-    name: Pack & Publish ${{ matrix.project }}
+    name: Pack ${{ matrix.project }}
     needs: [validate]
     runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-      contents: read
     strategy:
-      # fail-fast:false so a transient failure on one package doesn't cancel
-      # in-flight pushes for the others.
       fail-fast: false
       matrix:
-        # `project` is the PascalCased folder name (sdk/KnockBox.<project>/);
-        # `id` is the lowercased tag used for the artifact name so the release
-        # step's `knockbox-*-nupkg` download pattern matches on case-sensitive
-        # Linux runners.
         include:
           - project: Core
             id: core
@@ -81,39 +89,17 @@ jobs:
           dotnet-version: '10.0.x'
 
       - name: Pack
-        # -p:Version drives both AssemblyVersion and PackageVersion, and feeds
-        # the ProjectReference -> PackageReference transform at pack time so the
-        # Platform nupkg's KnockBox.Core dependency is pinned to the same version.
-        #
-        # GitHub Actions sets CI=true automatically — the SDK csproj files read
-        # that and flip <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>,
-        # which makes the compiled PDB use repo-relative paths so SourceLink
-        # resolves against the committed source instead of the runner's workspace.
         env:
-          VERSION: ${{ inputs.version }}
-        run: dotnet pack sdk/KnockBox.${{ matrix.project }}/KnockBox.${{ matrix.project }}.csproj -c Release -p:Version="$VERSION" -o nupkg
-
-      - name: NuGet Login
-        id: oidc
-        uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841  # v1
-        with:
-          user: ${{ vars.NUGET_USERNAME }}
-
-      - name: Publish to NuGet.org
-        # Pushes both the primary .nupkg and the companion .snupkg (symbol
-        # package emitted under IncludeSymbols + SymbolPackageFormat=snupkg).
-        # --skip-duplicate keeps the step idempotent across re-runs; Templates
-        # has no compiled output so produces no .snupkg — `shopt -s nullglob`
-        # prevents the glob from being pushed literally when it matches nothing.
+          CORE_V: ${{ inputs.core_version }}
+          PLATFORM_V: ${{ inputs.platform_version }}
+          TEMPLATES_V: ${{ inputs.templates_version }}
         run: |
-          # Note: This step uses NuGet.org Trusted Publishing (OIDC).
-          # The repository must be configured as a Trusted Publisher on NuGet.org.
-          shopt -s nullglob
-          dotnet nuget push nupkg/*.nupkg --source https://api.nuget.org/v3/index.json --skip-duplicate --api-key ${{ steps.oidc.outputs.NUGET_API_KEY }}
-          snupkgs=(nupkg/*.snupkg)
-          if (( ${#snupkgs[@]} > 0 )); then
-            dotnet nuget push "${snupkgs[@]}" --source https://api.nuget.org/v3/index.json --skip-duplicate --api-key ${{ steps.oidc.outputs.NUGET_API_KEY }}
-          fi
+          case "${{ matrix.project }}" in
+            Core) VERSION="$CORE_V" ;;
+            Platform) VERSION="$PLATFORM_V" ;;
+            Templates) VERSION="$TEMPLATES_V" ;;
+          esac
+          dotnet pack sdk/KnockBox.${{ matrix.project }}/KnockBox.${{ matrix.project }}.csproj -c Release -p:Version="$VERSION" -o nupkg
 
       - name: Upload artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
@@ -123,9 +109,38 @@ jobs:
             nupkg/*.nupkg
             nupkg/*.snupkg
 
+  publish-nuget:
+    name: Push to NuGet.org
+    needs: [pack]
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+    steps:
+      - name: Download all SDK artifacts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4
+        with:
+          path: nupkg
+          pattern: knockbox-*-nupkg
+          merge-multiple: true
+
+      - name: NuGet Login
+        id: oidc
+        uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841  # v1
+        with:
+          user: ${{ vars.NUGET_USERNAME }}
+
+      - name: Publish all packages
+        run: |
+          shopt -s nullglob
+          dotnet nuget push nupkg/*.nupkg --source https://api.nuget.org/v3/index.json --skip-duplicate --api-key ${{ steps.oidc.outputs.NUGET_API_KEY }}
+          snupkgs=(nupkg/*.snupkg)
+          if (( ${#snupkgs[@]} > 0 )); then
+            dotnet nuget push "${snupkgs[@]}" --source https://api.nuget.org/v3/index.json --skip-duplicate --api-key ${{ steps.oidc.outputs.NUGET_API_KEY }}
+          fi
+
   release-sdk:
     name: Publish GitHub Release (SDK)
-    needs: [pack]
+    needs: [publish-nuget]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -138,9 +153,9 @@ jobs:
       - name: Find previous SDK tag
         id: prev
         env:
-          VERSION: ${{ inputs.version }}
+          TAG: ${{ inputs.release_tag }}
         run: |
-          PREV=$(git tag --list 'sdk-*' --sort=-v:refname | grep -Fv -- "sdk-$VERSION" | head -n1)
+          PREV=$(git tag --list 'sdk-*' --sort=-v:refname | grep -Fv -- "$TAG" | head -n1)
           echo "tag=$PREV" >> "$GITHUB_OUTPUT"
 
       - name: Download all SDK artifacts
@@ -150,18 +165,15 @@ jobs:
           pattern: knockbox-*-nupkg
           merge-multiple: true
 
-      - name: List artifacts
-        run: ls -la artifacts
-
       - name: Create release
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65  # v2
         with:
-          name: sdk-${{ inputs.version }}
-          tag_name: sdk-${{ inputs.version }}
+          name: ${{ inputs.release_tag }}
+          tag_name: ${{ inputs.release_tag }}
           previous_tag: ${{ steps.prev.outputs.tag }}
           files: |
             artifacts/*.nupkg
             artifacts/*.snupkg
           generate_release_notes: true
           draft: false
-          prerelease: ${{ contains(inputs.version, '-') }}
+          prerelease: ${{ contains(inputs.release_tag, '-') }}

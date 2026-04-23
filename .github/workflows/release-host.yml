@@ -138,6 +138,7 @@ jobs:
           push: true
           tags: |
             jabobb/knockbox:${{ inputs.tag }}
+            jabobb/knockbox:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
