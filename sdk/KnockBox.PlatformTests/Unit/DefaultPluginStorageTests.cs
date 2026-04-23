@@ -257,4 +257,236 @@ public sealed class DefaultPluginStorageTests
         }
         finally { SafeDelete(root); }
     }
+
+    // ─── Symlink escape hardening (Phase 2) ─────────────────────────────────
+    //
+    // These tests create real symlinks on disk, which requires privileged
+    // access on Windows (admin terminal or Developer Mode enabled). When link
+    // creation fails with the expected denial exceptions, the test is marked
+    // Inconclusive rather than failed — CI runners without elevated privileges
+    // still get a clean signal without pretending the hardening works.
+
+    private static bool TryCreateSymlink(string linkPath, string targetPath, bool linkTargetIsDirectory)
+    {
+        try
+        {
+            if (linkTargetIsDirectory)
+                Directory.CreateSymbolicLink(linkPath, targetPath);
+            else
+                File.CreateSymbolicLink(linkPath, targetPath);
+            return true;
+        }
+        catch (UnauthorizedAccessException) { return false; }
+        catch (IOException) { return false; }
+        catch (PlatformNotSupportedException) { return false; }
+    }
+
+    [TestMethod]
+    public void OpenRead_ThroughDirectorySymlinkEscapingRoot_Throws()
+    {
+        var workspace = MakeRoot();
+        var root = Path.Combine(workspace, "root");
+        Directory.CreateDirectory(root);
+
+        var outside = Path.Combine(workspace, "outside");
+        Directory.CreateDirectory(outside);
+        File.WriteAllText(Path.Combine(outside, "secret.txt"), "leak");
+
+        var link = Path.Combine(root, "link");
+        try
+        {
+            if (!TryCreateSymlink(link, outside, linkTargetIsDirectory: true))
+            {
+                Assert.Inconclusive("Creating symlinks is not permitted on this platform/session.");
+                return;
+            }
+
+            var storage = new DefaultPluginStorage(root);
+
+            Assert.Throws<ArgumentException>(() => storage.OpenRead("link/secret.txt"));
+        }
+        finally { SafeDelete(workspace); }
+    }
+
+    [TestMethod]
+    public void OpenRead_FileSymlinkEscapingRoot_Throws()
+    {
+        var workspace = MakeRoot();
+        var root = Path.Combine(workspace, "root");
+        Directory.CreateDirectory(root);
+
+        var outside = Path.Combine(workspace, "outside");
+        Directory.CreateDirectory(outside);
+        var targetFile = Path.Combine(outside, "secret.txt");
+        File.WriteAllText(targetFile, "leak");
+
+        var link = Path.Combine(root, "secret.txt");
+        try
+        {
+            if (!TryCreateSymlink(link, targetFile, linkTargetIsDirectory: false))
+            {
+                Assert.Inconclusive("Creating symlinks is not permitted on this platform/session.");
+                return;
+            }
+
+            var storage = new DefaultPluginStorage(root);
+
+            Assert.Throws<ArgumentException>(() => storage.OpenRead("secret.txt"));
+        }
+        finally { SafeDelete(workspace); }
+    }
+
+    [TestMethod]
+    public void OpenWrite_ThroughDirectorySymlinkEscapingRoot_ThrowsEvenWhenTerminalFileDoesNotExist()
+    {
+        var workspace = MakeRoot();
+        var root = Path.Combine(workspace, "root");
+        Directory.CreateDirectory(root);
+
+        var outside = Path.Combine(workspace, "outside");
+        Directory.CreateDirectory(outside);
+
+        var link = Path.Combine(root, "link");
+        try
+        {
+            if (!TryCreateSymlink(link, outside, linkTargetIsDirectory: true))
+            {
+                Assert.Inconclusive("Creating symlinks is not permitted on this platform/session.");
+                return;
+            }
+
+            var storage = new DefaultPluginStorage(root);
+
+            // newfile.txt doesn't exist yet; the escape is via the intermediate
+            // symlink, which does exist and MUST be caught before the write.
+            Assert.Throws<ArgumentException>(() => storage.OpenWrite("link/newfile.txt"));
+            Assert.IsFalse(File.Exists(Path.Combine(outside, "newfile.txt")),
+                "Write was not rejected before it hit the symlink target.");
+        }
+        finally { SafeDelete(workspace); }
+    }
+
+    [TestMethod]
+    public void OpenRead_SymlinkStayingInsideRoot_IsAccepted()
+    {
+        var workspace = MakeRoot();
+        var root = Path.Combine(workspace, "root");
+        Directory.CreateDirectory(root);
+
+        var realDir = Path.Combine(root, "real");
+        Directory.CreateDirectory(realDir);
+        File.WriteAllText(Path.Combine(realDir, "ok.txt"), "inside");
+
+        var link = Path.Combine(root, "link");
+        try
+        {
+            if (!TryCreateSymlink(link, realDir, linkTargetIsDirectory: true))
+            {
+                Assert.Inconclusive("Creating symlinks is not permitted on this platform/session.");
+                return;
+            }
+
+            var storage = new DefaultPluginStorage(root);
+
+            using var stream = storage.OpenRead("link/ok.txt");
+            using var sr = new StreamReader(stream);
+            Assert.AreEqual("inside", sr.ReadToEnd());
+        }
+        finally { SafeDelete(workspace); }
+    }
+
+    /// <summary>
+    /// Creates an NTFS directory junction via <c>mklink /J</c>. Junctions are
+    /// reparse points on Windows and do NOT require administrator privileges,
+    /// so this exercises the same reparse-point-resolution code path as a
+    /// symlink test without relying on elevated rights or Developer Mode.
+    /// </summary>
+    private static bool TryCreateJunction(string linkPath, string targetPath)
+    {
+        if (!OperatingSystem.IsWindows())
+            return false;
+
+        try
+        {
+            var psi = new System.Diagnostics.ProcessStartInfo("cmd.exe", $"/c mklink /J \"{linkPath}\" \"{targetPath}\"")
+            {
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+            };
+            using var proc = System.Diagnostics.Process.Start(psi);
+            if (proc is null) return false;
+            proc.WaitForExit();
+            return proc.ExitCode == 0 && Directory.Exists(linkPath);
+        }
+        catch { return false; }
+    }
+
+    [TestMethod]
+    public void OpenRead_ThroughDirectoryJunctionEscapingRoot_Throws()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            Assert.Inconclusive("Junctions are Windows-only.");
+            return;
+        }
+
+        var workspace = MakeRoot();
+        var root = Path.Combine(workspace, "root");
+        Directory.CreateDirectory(root);
+
+        var outside = Path.Combine(workspace, "outside");
+        Directory.CreateDirectory(outside);
+        File.WriteAllText(Path.Combine(outside, "secret.txt"), "leak");
+
+        var junction = Path.Combine(root, "junction");
+        try
+        {
+            if (!TryCreateJunction(junction, outside))
+            {
+                Assert.Inconclusive("Creating a junction via mklink /J failed on this machine.");
+                return;
+            }
+
+            var storage = new DefaultPluginStorage(root);
+
+            Assert.Throws<ArgumentException>(() => storage.OpenRead("junction/secret.txt"));
+        }
+        finally { SafeDelete(workspace); }
+    }
+
+    [TestMethod]
+    public void OpenRead_NestedSymlinkChainEscapingRoot_Throws()
+    {
+        var workspace = MakeRoot();
+        var root = Path.Combine(workspace, "root");
+        Directory.CreateDirectory(root);
+
+        var outside = Path.Combine(workspace, "outside");
+        Directory.CreateDirectory(outside);
+        File.WriteAllText(Path.Combine(outside, "leak.txt"), "leak");
+
+        // link1 -> link2 -> outside
+        var link2 = Path.Combine(workspace, "link2");
+        var link1 = Path.Combine(root, "link1");
+        try
+        {
+            if (!TryCreateSymlink(link2, outside, linkTargetIsDirectory: true))
+            {
+                Assert.Inconclusive("Creating symlinks is not permitted on this platform/session.");
+                return;
+            }
+            if (!TryCreateSymlink(link1, link2, linkTargetIsDirectory: true))
+            {
+                Assert.Inconclusive("Creating symlinks is not permitted on this platform/session.");
+                return;
+            }
+
+            var storage = new DefaultPluginStorage(root);
+
+            Assert.Throws<ArgumentException>(() => storage.OpenRead("link1/leak.txt"));
+        }
+        finally { SafeDelete(workspace); }
+    }
 }
