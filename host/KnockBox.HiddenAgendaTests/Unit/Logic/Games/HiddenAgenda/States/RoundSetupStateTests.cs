@@ -67,7 +67,7 @@ namespace KnockBox.HiddenAgendaTests.Unit.Logic.Games.HiddenAgenda.States
             var state = new RoundSetupState();
             state.OnEnter(_context);
             Assert.IsNotNull(_state.CurrentTaskPool);
-            Assert.IsTrue(_state.CurrentTaskPool.Count > 0);
+            Assert.IsNotEmpty(_state.CurrentTaskPool);
         }
 
         [TestMethod]
@@ -77,7 +77,7 @@ namespace KnockBox.HiddenAgendaTests.Unit.Logic.Games.HiddenAgenda.States
             state.OnEnter(_context);
             foreach (var player in _state.GamePlayers.Values)
             {
-                Assert.AreEqual(3, player.SecretTasks.Count);
+                Assert.HasCount(3, player.SecretTasks);
             }
         }
 
@@ -87,7 +87,7 @@ namespace KnockBox.HiddenAgendaTests.Unit.Logic.Games.HiddenAgenda.States
             _state.CurrentRound = 0;
             var state = new RoundSetupState();
             state.OnEnter(_context);
-            Assert.AreEqual(4, _state.TurnManager.TurnOrder.Count);
+            Assert.HasCount(4, _state.TurnManager.TurnOrder);
         }
 
         [TestMethod]

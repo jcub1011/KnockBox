@@ -268,7 +268,7 @@ public class ActionCardTests
     public void StealCard_Play_DoesNothing_WhenBlocked()
     {
         var player = new OperatorPlayerState { UserId = "p1" };
-        var target = new OperatorPlayerState { UserId = "p2", Hand = new() { new NumberCard(1m) } };
+        var target = new OperatorPlayerState { UserId = "p2", Hand = [new NumberCard(1m)] };
         _state.GamePlayers["p1"] = player;
         _state.GamePlayers["p2"] = target;
         var card = new StealCard();
@@ -284,7 +284,7 @@ public class ActionCardTests
     public void StealCard_Play_StealsRandomCard_WhenNotBlocked()
     {
         var player = new OperatorPlayerState { UserId = "p1" };
-        var target = new OperatorPlayerState { UserId = "p2", Hand = new() { new NumberCard(1m), new NumberCard(2m) } };
+        var target = new OperatorPlayerState { UserId = "p2", Hand = [new NumberCard(1m), new NumberCard(2m)] };
         _state.GamePlayers["p1"] = player;
         _state.GamePlayers["p2"] = target;
         _rngMock.Setup(r => r.GetRandomInt(2)).Returns(0);

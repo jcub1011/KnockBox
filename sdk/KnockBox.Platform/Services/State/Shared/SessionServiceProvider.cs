@@ -56,8 +56,7 @@ public sealed class SessionServiceProvider(
             }
             catch (Exception ex)
             {
-                var kvp = new KeyValuePair<RegistrationKey, Lazy<CacheRegistration>>(key, lazyRegistration);
-                ((ICollection<KeyValuePair<RegistrationKey, Lazy<CacheRegistration>>>)_services).Remove(kvp);
+                _services.TryRemove(new KeyValuePair<RegistrationKey, Lazy<CacheRegistration>>(key, lazyRegistration));
 
                 logger.LogError(ex, "Failed to resolve session-scoped service.");
                 return new ResultError("Unable to get service.");
@@ -102,6 +101,9 @@ public sealed class SessionServiceProvider(
         {
             await Task.Delay(EvictionDelay, token);
 
+            // Provider already disposing — leave eviction to Dispose() to avoid racing it.
+            if (Volatile.Read(ref _disposed) == 1) return;
+
             bool shouldEvict = false;
 
             lock (registrationToEvict.StateLock)
@@ -111,9 +113,8 @@ public sealed class SessionServiceProvider(
                 registrationToEvict.IsEvicted = true;
                 shouldEvict = true;
 
-                // Atomically remove the exact instance from the dictionary while still under the state lock
-                var entry = new KeyValuePair<RegistrationKey, Lazy<CacheRegistration>>(key, lazyRegistration);
-                ((ICollection<KeyValuePair<RegistrationKey, Lazy<CacheRegistration>>>)_services).Remove(entry);
+                // Atomically remove the exact instance from the dictionary while still under the state lock.
+                _services.TryRemove(new KeyValuePair<RegistrationKey, Lazy<CacheRegistration>>(key, lazyRegistration));
             }
 
             if (shouldEvict)

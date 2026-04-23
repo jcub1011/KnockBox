@@ -1,0 +1,100 @@
+@using KnockBox.Core.Services.Navigation
+@using KnockBox.Core.Services.State.Games.Shared
+@using KnockBox.Core.Services.State.Users
+@using KnockBox.Spardle.Models
+@inject IGameSessionService GameSessionService
+@inject IUserService UserService
+@inject INavigationService NavigationService
+
+@{
+    var rosterSource = State.HostIsParticipant
+        ? State.Players.Prepend(State.Host)
+        : (IEnumerable<User>)State.Players;
+    var roster = rosterSource
+        .Select(u => new
+        {
+            User = u,
+            Score = State.PlayerStates.TryGetValue(u.Id, out var ps) ? ps.TotalScore : 0,
+            RoundsWon = State.RoundHistory.Count(r => r.Outcomes.Any(o => o.UserId == u.Id && o.Placement == 1))
+        })
+        .OrderByDescending(x => x.Score)
+        .ThenByDescending(x => x.RoundsWon)
+        .ToList();
+
+    var first = roster.ElementAtOrDefault(0);
+    var second = roster.ElementAtOrDefault(1);
+    var third = roster.ElementAtOrDefault(2);
+}
+
+<div class="spd-over">
+    <div class="spd-over-banner">
+        <span class="spd-display spd-over-banner-main">MATCH OVER</span>
+        <span class="spd-display spd-over-banner-sub">FINAL STANDINGS</span>
+    </div>
+
+    <div class="spd-over-podium">
+        @if (second is not null)
+        {
+            <div class="spd-over-podium-block spd-over-second">
+                <div class="spd-over-podium-crown">🥈</div>
+                <div class="spd-over-podium-name">@second.User.Name</div>
+                <div class="spd-over-podium-score spd-display">@second.Score</div>
+                <div class="spd-over-podium-bar"></div>
+            </div>
+        }
+        @if (first is not null)
+        {
+            <div class="spd-over-podium-block spd-over-first">
+                <div class="spd-over-podium-crown spd-over-podium-crown-first">👑</div>
+                <div class="spd-over-podium-name">@first.User.Name</div>
+                <div class="spd-over-podium-score spd-display">@first.Score</div>
+                <div class="spd-over-podium-bar"></div>
+            </div>
+        }
+        @if (third is not null)
+        {
+            <div class="spd-over-podium-block spd-over-third">
+                <div class="spd-over-podium-crown">🥉</div>
+                <div class="spd-over-podium-name">@third.User.Name</div>
+                <div class="spd-over-podium-score spd-display">@third.Score</div>
+                <div class="spd-over-podium-bar"></div>
+            </div>
+        }
+    </div>
+
+    <div class="spd-over-board">
+        <div class="spd-over-board-head">
+            <span>#</span>
+            <span>PLAYER</span>
+            <span>ROUNDS WON</span>
+            <span>TOTAL</span>
+        </div>
+        @{
+            int rank = 1;
+            foreach (var row in roster)
+            {
+                bool isMe = row.User.Id == UserService.CurrentUser?.Id;
+                <div class="spd-over-board-row @(isMe ? "spd-over-board-me" : "")" style="--row-idx:@rank;">
+                    <span class="spd-over-board-rank spd-display">@rank</span>
+                    <span class="spd-over-board-name">@row.User.Name</span>
+                    <span class="spd-over-board-won spd-mono">@row.RoundsWon</span>
+                    <span class="spd-over-board-total spd-display">@row.Score</span>
+                </div>
+                rank++;
+            }
+        }
+    </div>
+
+    <button class="spd-btn spd-btn-primary spd-btn-lg spd-over-exit" @onclick="ReturnHome">
+        RETURN HOME
+    </button>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public SpardleState State { get; set; } = default!;
+
+    private void ReturnHome()
+    {
+        GameSessionService.LeaveCurrentSession(navigateHome: true);
+    }
+}

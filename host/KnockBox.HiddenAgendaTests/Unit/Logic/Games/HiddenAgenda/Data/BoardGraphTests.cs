@@ -19,7 +19,7 @@ public class BoardGraphTests
     [TestMethod]
     public void CreateGrandCircuit_VerifySpaceCounts()
     {
-        Assert.AreEqual(24, _graph.Spaces.Count);
+        Assert.HasCount(24, _graph.Spaces);
         
         var wings = _graph.Spaces.Values.GroupBy(s => s.Wing).ToDictionary(g => g.Key, g => g.Count());
         
@@ -49,9 +49,9 @@ public class BoardGraphTests
         var reachable = _graph.GetReachableSpaces(0, 1);
         
         // Space 0 is connected to 1 and 19 in the main loop
-        Assert.AreEqual(2, reachable.Count);
-        Assert.IsTrue(reachable.Any(s => s.Id == 1));
-        Assert.IsTrue(reachable.Any(s => s.Id == 19));
+        Assert.HasCount(2, reachable);
+        Assert.Contains(s => s.Id == 1, reachable);
+        Assert.Contains(s => s.Id == 19, reachable);
     }
 
     [TestMethod]
@@ -60,10 +60,10 @@ public class BoardGraphTests
         // Space 2 is connected to 1, 3, and 20 (shortcut)
         var reachable = _graph.GetReachableSpaces(2, 1);
         
-        Assert.AreEqual(3, reachable.Count);
-        Assert.IsTrue(reachable.Any(s => s.Id == 1));
-        Assert.IsTrue(reachable.Any(s => s.Id == 3));
-        Assert.IsTrue(reachable.Any(s => s.Id == 20));
+        Assert.HasCount(3, reachable);
+        Assert.Contains(s => s.Id == 1, reachable);
+        Assert.Contains(s => s.Id == 3, reachable);
+        Assert.Contains(s => s.Id == 20, reachable);
     }
 
     [TestMethod]
@@ -76,15 +76,15 @@ public class BoardGraphTests
         // Distance 3: 3, 20 (from 2), 17 (from 18)
         // Note: 20 is distance 3 from 0 (0->1->2->20)
         
-        Assert.IsTrue(reachable.Any(s => s.Id == 1));
-        Assert.IsTrue(reachable.Any(s => s.Id == 19));
-        Assert.IsTrue(reachable.Any(s => s.Id == 2));
-        Assert.IsTrue(reachable.Any(s => s.Id == 18));
-        Assert.IsTrue(reachable.Any(s => s.Id == 3));
-        Assert.IsTrue(reachable.Any(s => s.Id == 20));
-        Assert.IsTrue(reachable.Any(s => s.Id == 17));
+        Assert.Contains(s => s.Id == 1, reachable);
+        Assert.Contains(s => s.Id == 19, reachable);
+        Assert.Contains(s => s.Id == 2, reachable);
+        Assert.Contains(s => s.Id == 18, reachable);
+        Assert.Contains(s => s.Id == 3, reachable);
+        Assert.Contains(s => s.Id == 20, reachable);
+        Assert.Contains(s => s.Id == 17, reachable);
         
-        Assert.IsFalse(reachable.Any(s => s.Id == 0), "Should not include starting space");
+        Assert.DoesNotContain(s => s.Id == 0, reachable, "Should not include starting space");
     }
 
     [TestMethod]

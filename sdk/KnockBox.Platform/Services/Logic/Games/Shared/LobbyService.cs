@@ -28,7 +28,7 @@ namespace KnockBox.Services.Logic.Games.Shared
             _lobbyCodeService = lobbyCodeService;
             _gameAvailability = gameAvailability;
             _logger = logger;
-            _gamesByRoute = new Dictionary<string, GameRegistration>(StringComparer.OrdinalIgnoreCase);
+            _gamesByRoute = new(StringComparer.OrdinalIgnoreCase);
 
             foreach (var module in gameModules)
             {

@@ -1,0 +1,28 @@
+<div class="spd-toast-holder">
+    @if (!string.IsNullOrEmpty(Message))
+    {
+        <div class="spd-toast @(Tone switch
+        {
+            ToastTone.Warn => "spd-toast-warn",
+            ToastTone.Success => "spd-toast-success",
+            _ => "spd-toast-danger"
+        })">
+            <span class="spd-toast-icon">
+                @(Tone switch
+                {
+                    ToastTone.Warn => "⚠",
+                    ToastTone.Success => "✓",
+                    _ => "✕"
+                })
+            </span>
+            <span class="spd-toast-msg">@Message</span>
+        </div>
+    }
+</div>
+
+@code {
+    public enum ToastTone { Danger, Warn, Success }
+
+    [Parameter] public string? Message { get; set; }
+    [Parameter] public ToastTone Tone { get; set; } = ToastTone.Danger;
+}

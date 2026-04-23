@@ -1,6 +1,7 @@
 @page "/room/dice-simulator/{ObfuscatedRoomCode}"
 
-@inherits DisposableComponent
+@inherits LobbyPageBase<DiceSimulatorGameState>
+@using KnockBox.DiceSimulator.Services.State.Games
 @using KnockBox.DiceSimulator.Services.State.Games.Data
 
 <PageTitle>Dice Simulator</PageTitle>

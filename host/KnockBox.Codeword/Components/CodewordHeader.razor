@@ -1,0 +1,31 @@
+@using KnockBox.Core.Services.Navigation
+@using KnockBox.Core.Services.State.Games.Shared
+
+<div class="ctc-header-container">
+    <div class="ctc-header-scanlines"></div>
+    <div class="ctc-header-vignette"></div>
+
+    <a class="ctc-header-brand" href="@NavigationService.GetHomeUri()" title="Click to return home">
+        <span class="ctc-header-prompt">&gt;</span>
+        <span class="ctc-header-text">CODEWORD</span>
+        <span class="ctc-header-caret"></span>
+    </a>
+
+    <div class="ctc-header-actions">
+        <RoomCodeButton ClassName="ctc-header-code"
+                        CoverClassName="ctc-header-code-cover"
+                        ValueClassName="ctc-header-code-value"
+                        CoverText="[ SECURE LINK ]" />
+        <button class="ctc-header-leave" @onclick="Leave" title="ABORT MISSION" aria-label="Abort Mission">
+            <span class="ctc-header-leave-text">ABORT</span>
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        </button>
+    </div>
+</div>
+
+@code {
+    [Inject] INavigationService NavigationService { get; set; } = default!;
+    [Inject] IGameSessionService GameSessionService { get; set; } = default!;
+
+    private void Leave() => GameSessionService.LeaveCurrentSession(navigateHome: true);
+}

@@ -48,7 +48,7 @@ namespace KnockBox.HiddenAgenda.Tests.Unit.Logic.States
             
             Assert.IsNull(result.Value);
             Assert.AreEqual(GamePhase.Reveal, _state.Phase);
-            Assert.AreEqual(1, _state.RoundResults.Count);
+            Assert.HasCount(1, _state.RoundResults);
         }
 
         [TestMethod]

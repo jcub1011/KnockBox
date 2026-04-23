@@ -22,5 +22,11 @@ namespace KnockBox.Operator
             builder.OpenComponent<OperatorTile>(0);
             builder.CloseComponent();
         };
+
+        public RenderFragment? GetCustomHeader() => builder =>
+        {
+            builder.OpenComponent<OperatorHeader>(0);
+            builder.CloseComponent();
+        };
     }
 }

@@ -22,5 +22,11 @@ namespace KnockBox.CardCounter
             builder.OpenComponent<CardCounterTile>(0);
             builder.CloseComponent();
         };
+
+        public RenderFragment? GetCustomHeader() => builder =>
+        {
+            builder.OpenComponent<CardCounterHeader>(0);
+            builder.CloseComponent();
+        };
     }
 }

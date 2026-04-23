@@ -22,5 +22,11 @@ namespace KnockBox.Codeword
             builder.OpenComponent<CodewordTile>(0);
             builder.CloseComponent();
         };
+
+        public RenderFragment? GetCustomHeader() => builder =>
+        {
+            builder.OpenComponent<CodewordHeader>(0);
+            builder.CloseComponent();
+        };
     }
 }

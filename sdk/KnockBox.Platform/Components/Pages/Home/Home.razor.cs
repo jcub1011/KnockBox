@@ -33,10 +33,25 @@ namespace KnockBox.Platform.Components.Pages.Home
         /// rejects them server-side, so this filter is presentational only
         /// (an attacker cannot bypass the gate by keeping a stale tile open).
         /// </summary>
-        private IEnumerable<IGameModule> VisibleGameModules =>
-            GameModules
-                .Where(m => GameAvailability.IsEnabled(m.RouteIdentifier))
-                .OrderBy(m => m.Name);
+        /// <remarks>
+        /// The full module list is fixed at startup so it's sorted once into
+        /// <see cref="_sortedModules"/>; the visible subset is recomputed only
+        /// when <see cref="IGameAvailabilityService.Changed"/> fires.
+        /// </remarks>
+        private IGameModule[] _sortedModules = [];
+        private IReadOnlyList<IGameModule> _visibleModules = Array.Empty<IGameModule>();
+        private IReadOnlyList<IGameModule> VisibleGameModules => _visibleModules;
+
+        private void RebuildVisibleModules()
+        {
+            var visible = new List<IGameModule>(_sortedModules.Length);
+            foreach (var m in _sortedModules)
+            {
+                if (GameAvailability.IsEnabled(m.RouteIdentifier))
+                    visible.Add(m);
+            }
+            _visibleModules = visible;
+        }
 
         [Parameter]
         [SupplyParameterFromQuery(Name = "join")]
@@ -79,6 +94,8 @@ namespace KnockBox.Platform.Components.Pages.Home
         {
             try
             {
+                _sortedModules = GameModules.OrderBy(m => m.Name).ToArray();
+                RebuildVisibleModules();
                 GameAvailability.Changed += OnAvailabilityChanged;
 
                 if (Fresh == 1)
@@ -208,6 +225,7 @@ namespace KnockBox.Platform.Components.Pages.Home
 
         private void OnAvailabilityChanged()
         {
+            RebuildVisibleModules();
             // Availability changes can arrive from a different circuit (the
             // admin's). Marshal to the Home page's sync context before
             // touching component state.

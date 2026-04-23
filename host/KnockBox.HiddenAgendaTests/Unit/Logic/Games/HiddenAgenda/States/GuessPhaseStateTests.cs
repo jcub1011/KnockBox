@@ -48,7 +48,7 @@ namespace KnockBox.HiddenAgendaTests.Unit.Logic.Games.HiddenAgenda.States
                     CurrentSpaceId = 0
                 };
             }
-            _state.TurnManager.SetTurnOrder(new List<string> { "p0", "p1", "p2", "p3" });
+            _state.TurnManager.SetTurnOrder(["p0", "p1", "p2", "p3"]);
             
             // Set up a basic task pool
             _state.CurrentTaskPool = TaskPool.AllTasks.Take(10).ToList();

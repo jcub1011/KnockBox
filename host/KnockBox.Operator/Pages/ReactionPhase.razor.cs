@@ -37,7 +37,7 @@ namespace KnockBox.Operator.Pages
 
         protected List<NumberCard> GetPendingLiabilityTransferCards()
         {
-            return GameState.PendingGameActionCommand?.PlayedCards.OfType<NumberCard>().ToList() ?? new();
+            return GameState.PendingGameActionCommand?.PlayedCards.OfType<NumberCard>().ToList() ?? [];
         }
 
         protected async Task PlayShield(Guid cardId)
@@ -98,14 +98,14 @@ namespace KnockBox.Operator.Pages
 
         protected List<Card> GetPotentialReactionCards()
         {
-            if (GameState.Context == null || CurrentPlayerState == null) return new();
+            if (GameState.Context == null || CurrentPlayerState == null) return [];
 
             var pendingCard = GetPendingActionCard();
             if (pendingCard is IBlockableCard blockable)
             {
                 return [.. blockable.GetPotentialReactionCards(GameState.Context, CurrentPlayerState)];
             }
-            return new();
+            return [];
         }
 
         protected string GetAttackerName()

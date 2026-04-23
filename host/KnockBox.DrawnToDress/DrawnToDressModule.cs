@@ -22,5 +22,11 @@ namespace KnockBox.DrawnToDress
             builder.OpenComponent<DrawnToDressTile>(0);
             builder.CloseComponent();
         };
+
+        public RenderFragment? GetCustomHeader() => builder =>
+        {
+            builder.OpenComponent<DrawnToDressHeader>(0);
+            builder.CloseComponent();
+        };
     }
 }

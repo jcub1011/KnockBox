@@ -146,7 +146,7 @@ namespace KnockBox.HiddenAgenda.Tests.Unit.Logic
             Assert.AreEqual(0, _state.CollectionProgress[CollectionType.RenaissanceMasters]);
             Assert.AreEqual(0, player.RoundScore);
             Assert.AreEqual(0, player.TurnsTakenThisRound);
-            Assert.AreEqual(0, player.SecretTasks.Count); // ResetForNewRound clears tasks, SetupState re-draws them
+            Assert.IsEmpty(player.SecretTasks); // ResetForNewRound clears tasks, SetupState re-draws them
         }
 
         [TestMethod]
@@ -226,7 +226,7 @@ namespace KnockBox.HiddenAgenda.Tests.Unit.Logic
 
             var result = _context.ValidateGuessSubmission("p1", invalidGuesses);
             Assert.IsNotNull(result);
-            Assert.IsTrue(result.Contains("Invalid opponent ID"));
+            Assert.Contains("Invalid opponent ID", result);
         }
 
         [TestMethod]
@@ -242,7 +242,7 @@ namespace KnockBox.HiddenAgenda.Tests.Unit.Logic
 
             var result = _context.ValidateGuessSubmission("p1", invalidGuesses);
             Assert.IsNotNull(result);
-            Assert.IsTrue(result.Contains("exactly 3 tasks"));
+            Assert.Contains("exactly 3 tasks", result);
         }
     }
 }

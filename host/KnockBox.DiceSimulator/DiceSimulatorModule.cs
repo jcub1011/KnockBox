@@ -22,5 +22,11 @@ namespace KnockBox.DiceSimulator
             builder.OpenComponent<DiceSimulatorTile>(0);
             builder.CloseComponent();
         };
+
+        public RenderFragment? GetCustomHeader() => builder =>
+        {
+            builder.OpenComponent<DiceSimulatorHeader>(0);
+            builder.CloseComponent();
+        };
     }
 }

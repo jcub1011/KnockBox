@@ -25,6 +25,7 @@
     private DotNetObjectReference<CountdownClock>? _dotNetRef;
     private DateTimeOffset _lastEndTimeUtc;
     private bool _needsRestart;
+    private bool _disposed;
 
     private float Fraction { get; set; } = 1f;
     private float RemainingSeconds { get; set; }
@@ -80,6 +81,8 @@
     [JSInvokable]
     public void OnCountdownTick(float fraction, float remainingSeconds, float durationSeconds)
     {
+        if (_disposed) return;
+
         Fraction = fraction;
         RemainingSeconds = remainingSeconds;
         DurationSeconds = durationSeconds;
@@ -88,6 +91,8 @@
 
     public async ValueTask DisposeAsync()
     {
+        _disposed = true;
+
         if (_jsModule is not null)
         {
             try

@@ -9,6 +9,9 @@ namespace KnockBox.Services.State.Users
     {
         const int MAX_SESSION_TOKEN_RETRIEVALS = 5;
 
+        private readonly CancellationTokenSource _disposeCts = new();
+        private int _disposed;
+
         public User? CurrentUser { get; private set; }
 
         public event Action? UserInitialized;
@@ -25,18 +28,18 @@ namespace KnockBox.Services.State.Users
                     name = storedName;
                 }
 
-                int remainingAttempts = MAX_SESSION_TOKEN_RETRIEVALS;
-                ValueResult<SessionToken> tokenResult;
-                do
+                ValueResult<SessionToken> tokenResult = default;
+                for (int attempt = 0; attempt < MAX_SESSION_TOKEN_RETRIEVALS; attempt++)
                 {
                     tokenResult = await sessionTokenProvider.GetSessionTokenAsync(ct);
-                    if (tokenResult.TryGetFailure(out var error))
-                    {
-                        logger.LogError("{error}\nError getting session token. Reattempting token retrieval.", error);
-                        await Task.Delay(100, ct); // Space attempts apart
-                    }
+                    if (tokenResult.IsSuccess) break;
+
+                    tokenResult.TryGetFailure(out var failure);
+                    logger.LogError("Error getting session token (attempt {attempt}/{max}): {error}. Reattempting.",
+                        attempt + 1, MAX_SESSION_TOKEN_RETRIEVALS, failure);
+                    if (attempt < MAX_SESSION_TOKEN_RETRIEVALS - 1)
+                        await Task.Delay(100, ct);
                 }
-                while (--remainingAttempts > 0);
 
                 if (tokenResult.TryGetSuccess(out var token))
                 {
@@ -75,12 +78,30 @@ namespace KnockBox.Services.State.Users
             await InitializeCurrentUserAsync(ct);
         }
 
-        private async void OnNameChanged(UserNameChangedArgs args)
+        private void OnNameChanged(UserNameChangedArgs args)
+        {
+            // Guard against a late event fire racing with Dispose — Dispose unsubscribes,
+            // but an invocation that already started before unsubscribe will keep going.
+            if (Volatile.Read(ref _disposed) == 1) return;
+
+            try
+            {
+                _ = SaveNameAsync(args.NewName, _disposeCts.Token);
+            }
+            catch (ObjectDisposedException)
+            {
+                // Service disposed — drop silently.
+            }
+        }
+
+        private async Task SaveNameAsync(string name, CancellationToken ct)
         {
             try
             {
-                await localStorageService.SetAsync("user", "name", args.NewName);
+                await localStorageService.SetAsync("user", "name", name, ct);
             }
+            catch (OperationCanceledException) { /* Service disposed — drop silently. */ }
+            catch (ObjectDisposedException) { /* Service disposed — drop silently. */ }
             catch (Exception ex)
             {
                 logger.LogError(ex, "Error saving user name.");
@@ -89,7 +110,12 @@ namespace KnockBox.Services.State.Users
 
         public void Dispose()
         {
+            if (Interlocked.Exchange(ref _disposed, 1) == 1) return;
+
             CurrentUser?.NameChanged -= OnNameChanged;
+
+            _disposeCts.Cancel();
+            _disposeCts.Dispose();
         }
     }
 }

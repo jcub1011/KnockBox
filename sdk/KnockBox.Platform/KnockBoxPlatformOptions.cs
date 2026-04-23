@@ -31,7 +31,7 @@ public sealed class KnockBoxPlatformOptions
     /// the list and add the absolute paths they want, based on whatever
     /// host-local settings they own.
     /// </summary>
-    public IList<string> PluginsPaths { get; } = new List<string> { "games" };
+    public IList<string> PluginsPaths { get; } = ["games"];
 
     /// <summary>Modules registered via <see cref="KnockBoxPlatformOptionsExtensions.AddGameModule{T}"/>.</summary>
     internal List<IGameModule> ExplicitModules { get; } = [];

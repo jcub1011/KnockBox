@@ -1,0 +1,455 @@
+@using System.Collections.Immutable
+@using KnockBox.Core.Services.State.Users
+@using KnockBox.Spardle.Models
+@using KnockBox.Spardle
+@using KnockBox.Spardle.Services
+@using Microsoft.JSInterop
+@inject IUserService UserService
+@inject SpardleEngine GameEngine
+@inject IWordListService WordList
+@inject IJSRuntime JSRuntime
+@implements IAsyncDisposable
+
+<div class="spd-lobby">
+    <div class="spd-lobby-stage">
+        <div class="spd-lobby-brand">
+            <span class="spd-lobby-brand-spar">SPAR</span><span class="spd-lobby-brand-dash">–</span><span class="spd-lobby-brand-dle">DLE</span>
+        </div>
+        <div class="spd-lobby-tagline">HEAD-TO-HEAD WORD COMBAT</div>
+
+        @{
+            var roster = State.Players.Prepend(State.Host).ToList();
+            int idx = 0;
+        }
+        <div class="spd-lobby-challengers">
+            <div class="spd-lobby-challengers-label">CHALLENGERS (@roster.Count)</div>
+            <div class="spd-lobby-challengers-list">
+                @foreach (var user in roster)
+                {
+                    bool isHost = user.Id == State.Host.Id;
+                    bool isMe = user.Id == UserService.CurrentUser?.Id;
+                    string accent = $"spd-opp-{(idx++ % 4) switch { 0 => "a", 1 => "b", 2 => "c", _ => "d" }}";
+                    <div class="spd-lobby-chip @accent @(isMe ? "spd-lobby-chip-me" : "")">
+                        <span class="spd-lobby-chip-avatar">@Initials(user.Name)</span>
+                        <span class="spd-lobby-chip-name">@user.Name</span>
+                        @if (isHost)
+                        {
+                            <span class="spd-lobby-chip-badge">HOST</span>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+
+        @if (IsHost)
+        {
+            <button class="spd-btn spd-btn-primary spd-btn-lg spd-lobby-start" @onclick="StartGame" disabled="@(!CanStart)">
+                ⚔ ENTER THE ARENA
+            </button>
+            @if (!CanStart)
+            {
+                <p class="spd-lobby-hint">Configure at least one word in the pool.</p>
+            }
+            @if (!string.IsNullOrEmpty(_startError))
+            {
+                <p class="spd-lobby-hint spd-lobby-hint-error">@_startError</p>
+            }
+            <button class="spd-lobby-settings-gear" @onclick="ToggleSettings" title="Match Rules">
+                ⚙
+            </button>
+        }
+        else
+        {
+            <p class="spd-lobby-waiting">Waiting for <span class="spd-mono">@State.Host.Name</span> to open the arena…</p>
+        }
+    </div>
+
+    @if (IsHost)
+    {
+        @if (SettingsOpen)
+        {
+            <div class="spd-lobby-backdrop" @onclick="ToggleSettings"></div>
+        }
+        <aside class="spd-lobby-drawer @(SettingsOpen ? "spd-lobby-drawer-open" : "")">
+            <div class="spd-lobby-drawer-head">
+                <h3 class="spd-display spd-lobby-drawer-title">Match Rules</h3>
+                <button class="spd-lobby-drawer-close" @onclick="ToggleSettings" title="Close">✕</button>
+            </div>
+
+            <div class="spd-lobby-drawer-body">
+                <section>
+                    <h4 class="spd-lobby-section-title">Word Pool</h4>
+                    <div class="spd-lobby-field-grid">
+                        <label class="spd-lobby-field">
+                            <span>Source</span>
+                            <select @bind:get="State.WordPoolMode" @bind:set="SetWordPoolMode">
+                                <option value="@WordPoolMode.NytStandard">NYT Standard</option>
+                                <option value="@WordPoolMode.FullDictionary">Full Dictionary</option>
+                                <option value="@WordPoolMode.HostDefined">Host Defined</option>
+                                <option value="@WordPoolMode.CsvUpload">CSV Upload</option>
+                            </select>
+                        </label>
+                        @if (State.WordPoolMode == WordPoolMode.CsvUpload)
+                        {
+                            <label class="spd-lobby-field spd-lobby-field-full">
+                                <span>CSV File (max 1MB)</span>
+                                <div class="spd-csv-picker">
+                                    <input @ref="_csvFileInput"
+                                           type="file"
+                                           accept=".csv,text/csv,text/plain"
+                                           class="spd-csv-picker-input" />
+                                    <span class="spd-csv-picker-button">Choose File</span>
+                                    <span class="spd-csv-picker-name">@(string.IsNullOrEmpty(_csvFileName) ? "No file chosen" : _csvFileName)</span>
+                                </div>
+                                @if (_csvWordCount > 0 && string.IsNullOrEmpty(_csvUploadError))
+                                {
+                                    <p class="spd-lobby-hint spd-csv-count">@_csvWordCount word@(_csvWordCount == 1 ? "" : "s") uploaded</p>
+                                }
+                                @if (!string.IsNullOrEmpty(_csvUploadError))
+                                {
+                                    <p class="spd-lobby-hint spd-lobby-hint-error">@_csvUploadError</p>
+                                }
+                            </label>
+                        }
+                        <label class="spd-lobby-field">
+                            <span>Order</span>
+                            <select @bind:get="State.WordOrderMode" @bind:set="SetWordOrderMode">
+                                <option value="@WordOrderMode.RandomNoRepeats">Random (No Repeats)</option>
+                                <option value="@WordOrderMode.RandomWithRepeats">Random (With Repeats)</option>
+                                <option value="@WordOrderMode.ListOrder">List Order</option>
+                                <option value="@WordOrderMode.ReverseListOrder">Reverse List Order</option>
+                            </select>
+                        </label>
+                        @if (State.WordPoolMode == WordPoolMode.FullDictionary)
+                        {
+                            <label class="spd-lobby-field spd-lobby-field-row">
+                                <span>Constant Word Length</span>
+                                <input type="checkbox" @bind:get="State.ConstantWordLength" @bind:set="SetConstantWordLength" />
+                            </label>
+
+                            @if (State.ConstantWordLength)
+                            {
+                                <label class="spd-lobby-field">
+                                    <span>Word Length</span>
+                                    <select @bind:get="State.TargetWordLength" @bind:set="SetTargetWordLength">
+                                        @foreach (var len in WordList.GetAvailableLengths(WordPoolMode.FullDictionary))
+                                        {
+                                            <option value="@len">@len</option>
+                                        }
+                                    </select>
+                                </label>
+                            }
+                            else
+                            {
+                                <label class="spd-lobby-field">
+                                    <span>Min Length</span>
+                                    <select @bind:get="State.MinWordLength" @bind:set="SetMinWordLength">
+                                        @foreach (var len in WordList.GetAvailableLengths(WordPoolMode.FullDictionary))
+                                        {
+                                            <option value="@len">@len</option>
+                                        }
+                                    </select>
+                                </label>
+                                <label class="spd-lobby-field">
+                                    <span>Max Length</span>
+                                    <select @bind:get="State.MaxWordLength" @bind:set="SetMaxWordLength">
+                                        @foreach (var len in WordList.GetAvailableLengths(WordPoolMode.FullDictionary))
+                                        {
+                                            <option value="@len">@len</option>
+                                        }
+                                    </select>
+                                </label>
+                            }
+                        }
+                        @if (State.WordPoolMode == WordPoolMode.HostDefined)
+                        {
+                            <label class="spd-lobby-field spd-lobby-field-full">
+                                <span>Custom Words (one per line)</span>
+                                <textarea class="spd-lobby-textarea spd-mono"
+                                          rows="5"
+                                          value="@_customPoolText"
+                                          @oninput="OnCustomPoolChanged"></textarea>
+                            </label>
+                        }
+                    </div>
+                </section>
+
+                <section>
+                    <h4 class="spd-lobby-section-title">Rounds &amp; Timing</h4>
+                    <div class="spd-lobby-field-grid">
+                        <label class="spd-lobby-field">
+                            <span>Total Rounds</span>
+                            <input type="number" min="1" max="50" @bind:get="State.TotalRounds" @bind:set="SetTotalRounds" />
+                        </label>
+                        <label class="spd-lobby-field">
+                            <span>Round Timer (seconds)</span>
+                            <input type="number" min="30" max="600" step="5"
+                                   value="@((int)State.RoundTimer.TotalSeconds)"
+                                   @oninput="OnRoundTimerChanged"
+                                   disabled="@_unlimitedTimer" />
+                        </label>
+                        <label class="spd-lobby-field spd-lobby-field-row">
+                            <span>Unlimited Timer</span>
+                            <input type="checkbox" @bind="_unlimitedTimer" @bind:after="OnUnlimitedToggled" />
+                        </label>
+                        <label class="spd-lobby-field">
+                            <span>Transition Between Rounds</span>
+                            <input type="number" min="2" max="15" step="1"
+                                   value="@((int)State.TransitionDuration.TotalSeconds)"
+                                   @oninput="OnTransitionChanged" />
+                        </label>
+                    </div>
+                </section>
+
+                <section>
+                    <h4 class="spd-lobby-section-title">Win Condition</h4>
+                    <div class="spd-lobby-field-grid">
+                        <label class="spd-lobby-field">
+                            <span>Mode</span>
+                            <select @bind:get="State.WinCondition" @bind:set="SetWinCondition">
+                                <option value="@WinConditionMode.Sprinter">Sprinter (first to solve)</option>
+                                <option value="@WinConditionMode.Tactician">Tactician (fewest guesses)</option>
+                            </select>
+                        </label>
+                        <label class="spd-lobby-field">
+                            <span>Difficulty Multiplier (k)</span>
+                            <select @bind:get="State.DifficultyMultiplier" @bind:set="SetDifficultyMultiplier">
+                                <option value="1.0">Gentle (k = 1)</option>
+                                <option value="2.0">Standard (k = 2)</option>
+                                <option value="3.0">Brutal (k = 3)</option>
+                            </select>
+                        </label>
+                        <label class="spd-lobby-field spd-lobby-field-row">
+                            <span>Hard Mode</span>
+                            <input type="checkbox" @bind:get="State.HardModeEnabled" @bind:set="SetHardModeEnabled" />
+                        </label>
+                        <label class="spd-lobby-field spd-lobby-field-row">
+                            <span>Wait For All Players</span>
+                            <input type="checkbox" @bind:get="State.WaitForAll" @bind:set="SetWaitForAll" />
+                        </label>
+                        <label class="spd-lobby-field spd-lobby-field-row">
+                            <span>Reveal Answer</span>
+                            <input type="checkbox" @bind:get="State.RevealAnswer" @bind:set="SetRevealAnswer" />
+                        </label>
+                        <label class="spd-lobby-field spd-lobby-field-row">
+                            <span>Dictionary Fallback</span>
+                            <input type="checkbox" @bind:get="State.AllowDictionaryFallback" @bind:set="SetAllowDictionaryFallback" />
+                        </label>
+                        <label class="spd-lobby-field spd-lobby-field-row">
+                            <span>Allow Compound Words</span>
+                            <input type="checkbox" @bind:get="State.AllowCompoundWords" @bind:set="SetAllowCompoundWords" />
+                        </label>
+                    </div>
+                </section>
+            </div>
+        </aside>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public SpardleState State { get; set; } = default!;
+    [Parameter] public string RoomCode { get; set; } = string.Empty;
+
+    private bool SettingsOpen { get; set; }
+    private bool _unlimitedTimer;
+    private string _customPoolText = string.Empty;
+    private string? _startError;
+    private CancellationTokenSource? _startErrorCts;
+
+    private ElementReference _csvFileInput;
+    private IJSObjectReference? _csvUploadModule;
+    private DotNetObjectReference<SpardleLobbyPhase>? _csvSelfRef;
+    private string? _csvUploadError;
+    private bool _csvModuleAttached;
+    private string? _csvFileName;
+    private int _csvWordCount;
+
+    private bool IsHost => UserService.CurrentUser?.Id == State.Host.Id;
+    private bool CanStart => State.CustomWordPool.Count > 0
+        || State.WordPoolMode == WordPoolMode.NytStandard
+        || State.WordPoolMode == WordPoolMode.FullDictionary;
+
+    protected override void OnInitialized()
+    {
+        _customPoolText = string.Join('\n', State.CustomWordPool);
+        _unlimitedTimer = State.RoundTimer <= TimeSpan.Zero;
+    }
+
+    private void ToggleSettings() => SettingsOpen = !SettingsOpen;
+
+    // Every setter below mutates shared server state; each wraps the assignment in
+    // State.Execute so readers on other circuits never see a torn value, and so the
+    // notification fires after the lock is released.
+    private void SetWordPoolMode(WordPoolMode value)
+    {
+        // NYT and Full Dictionary have no visible custom-words editor, so any leftover
+        // CustomWordPool entries would silently override the built-in source. Clear them
+        // on transition so the mode the user selects is the one the engine actually uses.
+        bool clearCustom = value is WordPoolMode.NytStandard or WordPoolMode.FullDictionary;
+        State.Execute(() =>
+        {
+            State.WordPoolMode = value;
+            if (clearCustom)
+            {
+                State.CustomWordPool = ImmutableList<string>.Empty;
+            }
+        });
+        if (clearCustom)
+        {
+            _customPoolText = string.Empty;
+            _csvFileName = null;
+            _csvWordCount = 0;
+            _csvUploadError = null;
+        }
+    }
+    private void SetWordOrderMode(WordOrderMode value) => State.Execute(() => State.WordOrderMode = value);
+    private void SetConstantWordLength(bool value) => State.Execute(() => State.ConstantWordLength = value);
+    private void SetTargetWordLength(int value) => State.Execute(() => State.TargetWordLength = value);
+    private void SetWinCondition(WinConditionMode value) => State.Execute(() => State.WinCondition = value);
+    private void SetDifficultyMultiplier(double value) => State.Execute(() => State.DifficultyMultiplier = value);
+    private void SetHardModeEnabled(bool value) => State.Execute(() => State.HardModeEnabled = value);
+    private void SetWaitForAll(bool value) => State.Execute(() => State.WaitForAll = value);
+    private void SetRevealAnswer(bool value) => State.Execute(() => State.RevealAnswer = value);
+    private void SetAllowDictionaryFallback(bool value) => State.Execute(() => State.AllowDictionaryFallback = value);
+    private void SetAllowCompoundWords(bool value) => State.Execute(() => State.AllowCompoundWords = value);
+    private void SetTotalRounds(int value) => State.Execute(() => State.TotalRounds = value);
+
+    // Min/max clamping keeps min ≤ max by pushing the other bound along with the edit.
+    // Both ends of the clamp are committed inside the same Execute so the pair is atomic.
+    private void SetMinWordLength(int value) => State.Execute(() =>
+    {
+        State.MinWordLength = value;
+        if (State.MaxWordLength < value) State.MaxWordLength = value;
+    });
+    private void SetMaxWordLength(int value) => State.Execute(() =>
+    {
+        State.MaxWordLength = value;
+        if (State.MinWordLength > value) State.MinWordLength = value;
+    });
+
+    private void OnCustomPoolChanged(ChangeEventArgs e)
+    {
+        _customPoolText = e.Value?.ToString() ?? string.Empty;
+        var words = _customPoolText
+            .Split(new[] { '\n', '\r', ',' }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(w => w.Trim().ToLowerInvariant())
+            .Where(w => w.Length is > 0 and <= 64)
+            .ToList();
+        State.Execute(() => State.CustomWordPool = words.ToImmutableList());
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        bool shouldBeAttached = State.WordPoolMode == WordPoolMode.CsvUpload;
+
+        if (shouldBeAttached && !_csvModuleAttached)
+        {
+            _csvUploadModule ??= await JSRuntime.InvokeAsync<IJSObjectReference>(
+                "import", "./_content/KnockBox.Spardle/js/spardle-csv-upload.js");
+            _csvSelfRef ??= DotNetObjectReference.Create(this);
+            await _csvUploadModule.InvokeVoidAsync("register", _csvFileInput, _csvSelfRef);
+            _csvModuleAttached = true;
+        }
+        else if (!shouldBeAttached && _csvModuleAttached)
+        {
+            _csvModuleAttached = false;
+        }
+    }
+
+    [JSInvokable]
+    public void OnCsvUploaded(string fileName, string joinedText)
+    {
+        _customPoolText = joinedText ?? string.Empty;
+        var words = _customPoolText
+            .Split(new[] { '\n', '\r', ',' }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(w => w.Trim().ToLowerInvariant())
+            .Where(w => w.Length is > 0 and <= 64)
+            .ToList();
+        State.Execute(() => State.CustomWordPool = words.ToImmutableList());
+        _csvFileName = fileName;
+        _csvWordCount = words.Count;
+        _csvUploadError = null;
+        StateHasChanged();
+    }
+
+    [JSInvokable]
+    public void OnCsvUploadError(string message)
+    {
+        _csvUploadError = message;
+        StateHasChanged();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            if (_csvUploadModule is not null)
+            {
+                await _csvUploadModule.DisposeAsync();
+            }
+        }
+        catch (JSDisconnectedException) { /* circuit already torn down */ }
+        _csvSelfRef?.Dispose();
+    }
+
+    private void OnRoundTimerChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out int seconds))
+        {
+            var timer = TimeSpan.FromSeconds(Math.Clamp(seconds, 30, 600));
+            State.Execute(() => State.RoundTimer = timer);
+        }
+    }
+
+    private void OnUnlimitedToggled()
+    {
+        var timer = _unlimitedTimer ? TimeSpan.Zero : TimeSpan.FromMinutes(3);
+        State.Execute(() => State.RoundTimer = timer);
+    }
+
+    private void OnTransitionChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out int seconds))
+        {
+            var span = TimeSpan.FromSeconds(Math.Clamp(seconds, 2, 15));
+            State.Execute(() => State.TransitionDuration = span);
+        }
+    }
+
+    private async Task StartGame()
+    {
+        if (UserService.CurrentUser is null) return;
+        var result = await GameEngine.StartAsync(UserService.CurrentUser, State);
+        if (result.TryGetFailure(out var failure))
+        {
+            await ShowStartError(failure.PublicMessage);
+        }
+    }
+
+    private async Task ShowStartError(string message)
+    {
+        _startErrorCts?.Cancel();
+        _startErrorCts = new CancellationTokenSource();
+        var token = _startErrorCts.Token;
+        _startError = message;
+        StateHasChanged();
+        try
+        {
+            await Task.Delay(3000, token);
+            if (!token.IsCancellationRequested)
+            {
+                _startError = null;
+                StateHasChanged();
+            }
+        }
+        catch (OperationCanceledException) { /* superseded */ }
+    }
+
+    private static string Initials(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return "?";
+        var parts = name.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length == 1) return char.ToUpperInvariant(parts[0][0]).ToString();
+        return $"{char.ToUpperInvariant(parts[0][0])}{char.ToUpperInvariant(parts[1][0])}";
+    }
+}

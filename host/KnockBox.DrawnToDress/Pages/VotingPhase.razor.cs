@@ -18,7 +18,7 @@ namespace KnockBox.DrawnToDress.Pages
 
         [Parameter] public DrawnToDressGameState GameState { get; set; } = default!;
 
-        private readonly Dictionary<(Guid matchupId, string criterionId), EntrantId> _selectedVotes = new();
+        private readonly Dictionary<(Guid matchupId, string criterionId), EntrantId> _selectedVotes = [];
         private bool _submitting;
         private string? _errorMessage;
 

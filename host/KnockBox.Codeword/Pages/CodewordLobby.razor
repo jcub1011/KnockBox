@@ -1,6 +1,6 @@
 @page "/room/codeword/{ObfuscatedRoomCode}"
 
-@inherits DisposableComponent
+@inherits LobbyPageBase<CodewordGameState>
 @using KnockBox.Codeword.Services.State.Games
 @using KnockBox.Codeword.Services.Logic.Games.FSM
 @using KnockBox.Core.Services.State.Games.Shared

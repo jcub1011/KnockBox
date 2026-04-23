@@ -32,7 +32,7 @@ namespace KnockBox.DrawnToDress.Services.State.Games.Data
         /// Per-item position overrides keyed by clothing type. Stores absolute viewBox
         /// coordinates. An empty dictionary means the default stacked layout is used.
         /// </summary>
-        public Dictionary<ClothingType, ItemPositionOverride> ItemPositionOverrides { get; set; } = new();
+        public Dictionary<ClothingType, ItemPositionOverride> ItemPositionOverrides { get; set; } = [];
 
         /// <summary>The selected face expression for the mannequin.</summary>
         public FaceType SelectedFace { get; set; } = FaceType.Default;

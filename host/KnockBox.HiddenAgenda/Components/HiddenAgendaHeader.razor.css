@@ -1,0 +1,136 @@
+.ha-header-container {
+    --ha-manila: #e6d5b8;
+    --ha-manila-dark: #d1bc9e;
+    --ha-burgundy: #4a0404;
+    --ha-ink: #1a1a1a;
+    --ha-stamp: #b71c1c;
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px;
+    height: 60px;
+    background: var(--ha-manila);
+    border-bottom: 2px solid var(--ha-manila-dark);
+    position: relative;
+    z-index: 1000;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.ha-header-folder-tab {
+    position: relative;
+    padding: 8px 24px;
+    background: var(--ha-manila);
+    border: 2px solid var(--ha-manila-dark);
+    border-bottom: none;
+    border-radius: 12px 12px 0 0;
+    margin-bottom: -4px;
+    box-shadow: 0 -4px 8px rgba(0,0,0,0.05);
+}
+
+.ha-header-brand {
+    text-decoration: none;
+}
+
+.ha-header-brand-text {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 1.2rem;
+    font-weight: 900;
+    color: var(--ha-burgundy);
+    letter-spacing: 2px;
+}
+
+.ha-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+}
+
+.ha-header-stamp-container {
+    position: relative;
+    transform: rotate(-2deg);
+}
+
+.ha-header-stamp-container ::deep .ha-header-code {
+    background: transparent;
+    border: 3px solid var(--ha-stamp);
+    border-radius: 4px;
+    padding: 4px 16px;
+    color: var(--ha-stamp);
+    font-family: 'Courier New', Courier, monospace;
+    font-weight: 900;
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: all 0.2s;
+    min-width: 140px;
+    position: relative;
+}
+
+.ha-header-stamp-container ::deep .ha-header-code::after {
+    content: '';
+    position: absolute;
+    inset: -4px;
+    border: 1px solid var(--ha-stamp);
+    opacity: 0.3;
+    pointer-events: none;
+}
+
+.ha-header-stamp-container ::deep .ha-header-code:hover {
+    background: rgba(183, 28, 28, 0.05);
+    transform: scale(1.05) rotate(0deg);
+}
+
+.ha-header-stamp-container ::deep .ha-header-code-cover,
+.ha-header-stamp-container ::deep .ha-header-code-value {
+    grid-area: 1 / 1;
+    transition: opacity 0.2s ease;
+}
+
+.ha-header-stamp-container ::deep .ha-header-code-cover {
+    font-size: 0.85rem;
+    letter-spacing: 2px;
+}
+
+.ha-header-stamp-container ::deep .ha-header-code-value {
+    opacity: 0;
+    pointer-events: none;
+    font-size: 1.2rem;
+    letter-spacing: 4px;
+}
+
+.ha-header-stamp-container ::deep .ha-header-code.revealed .ha-header-code-cover {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.ha-header-stamp-container ::deep .ha-header-code.revealed .ha-header-code-value {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.ha-header-leave {
+    background: var(--ha-ink);
+    border: none;
+    border-radius: 4px;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--ha-manila);
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+}
+
+.ha-header-leave:hover {
+    background: var(--ha-burgundy);
+    transform: scale(1.1);
+}
+
+@media (max-width: 600px) {
+    .ha-header-brand-text {
+        font-size: 0.9rem;
+        letter-spacing: 1px;
+    }
+}

@@ -35,7 +35,7 @@ public class SetupStateTests
         _state.GamePlayers.TryAdd("p1", new OperatorPlayerState { UserId = "p1", CurrentPoints = 0m });
         _state.GamePlayers.TryAdd("p2", new OperatorPlayerState { UserId = "p2", CurrentPoints = 0m });
 
-        _state.TurnManager.SetTurnOrder(new List<string> { "p1", "p2" });
+        _state.TurnManager.SetTurnOrder(["p1", "p2"]);
         _setupState = new SetupState();
         _setupState.OnEnter(_context);
     }
@@ -145,7 +145,7 @@ public class DrawPhaseStateTests
         _state.GamePlayers.TryAdd("p1", new OperatorPlayerState { UserId = "p1", CurrentPoints = 10m, ActiveOperator = CardOperator.Add });
         _state.GamePlayers.TryAdd("p2", new OperatorPlayerState { UserId = "p2", CurrentPoints = -10m, ActiveOperator = CardOperator.Subtract });
 
-        _state.TurnManager.SetTurnOrder(new List<string> { "p1", "p2" });
+        _state.TurnManager.SetTurnOrder(["p1", "p2"]);
     }
 
     [TestMethod]
@@ -236,8 +236,8 @@ public class ReactionStateTests
         _state.GamePlayers.TryAdd("p1", new OperatorPlayerState { UserId = "p1", CurrentPoints = 10m, ActiveOperator = CardOperator.Add });
         _state.GamePlayers.TryAdd("p2", new OperatorPlayerState { UserId = "p2", CurrentPoints = 10m, ActiveOperator = CardOperator.Add });
 
-        _state.TurnManager.SetTurnOrder(new List<string> { "p1", "p2" });
-        _state.ReactionTargetPlayerIds = new HashSet<string> { "p2" };
+        _state.TurnManager.SetTurnOrder(["p1", "p2"]);
+        _state.ReactionTargetPlayerIds = ["p2"];
 
         _reactionState = new ReactionState();
     }
@@ -264,8 +264,8 @@ public class ReactionStateTests
     {
         // Set up pending action with no blockable cards for target
         var stealCard = new StealCard();
-        var playCmd = new PlayCardsCommand("p1", new List<Guid> { stealCard.Id }, "p2");
-        _state.PendingGameActionCommand = stealCard.CreateCommand(_context, playCmd, new List<Card> { stealCard });
+        var playCmd = new PlayCardsCommand("p1", [stealCard.Id], "p2");
+        _state.PendingGameActionCommand = stealCard.CreateCommand(_context, playCmd, [stealCard]);
         _state.DiscardPile.Add(stealCard);
         // p2 has no shield — cannot react
 
@@ -281,8 +281,8 @@ public class ReactionStateTests
     public void Tick_CanReact_UsesFullTimeout()
     {
         var stealCard = new StealCard();
-        var playCmd = new PlayCardsCommand("p1", new List<Guid> { stealCard.Id }, "p2");
-        _state.PendingGameActionCommand = stealCard.CreateCommand(_context, playCmd, new List<Card> { stealCard });
+        var playCmd = new PlayCardsCommand("p1", [stealCard.Id], "p2");
+        _state.PendingGameActionCommand = stealCard.CreateCommand(_context, playCmd, [stealCard]);
         _state.DiscardPile.Add(stealCard);
         _state.GamePlayers["p2"].Hand.Add(new ShieldCard());
 
@@ -300,8 +300,8 @@ public class ReactionStateTests
         var hpCard = new HotPotatoCard();
         _state.GamePlayers["p2"].Hand.Add(hpCard);
         var numCard = new NumberCard(5m);
-        var playCmd = new PlayCardsCommand("p1", new List<Guid> { hpCard.Id, numCard.Id }, "p2");
-        _state.PendingGameActionCommand = new HotPotatoCommand(_context, playCmd, new List<Card> { hpCard, numCard });
+        var playCmd = new PlayCardsCommand("p1", [hpCard.Id, numCard.Id], "p2");
+        _state.PendingGameActionCommand = new HotPotatoCommand(_context, playCmd, [hpCard, numCard]);
 
         var cmd = new RedirectHotPotatoCommand("p2", hpCard.Id, "p2");
         var result = _reactionState.HandleCommand(_context, cmd);
@@ -314,8 +314,8 @@ public class ReactionStateTests
         var hpCard = new HotPotatoCard();
         _state.GamePlayers["p2"].Hand.Add(hpCard);
         var numCard = new NumberCard(5m);
-        var playCmd = new PlayCardsCommand("p1", new List<Guid> { hpCard.Id, numCard.Id }, "p2");
-        _state.PendingGameActionCommand = new HotPotatoCommand(_context, playCmd, new List<Card> { hpCard, numCard });
+        var playCmd = new PlayCardsCommand("p1", [hpCard.Id, numCard.Id], "p2");
+        _state.PendingGameActionCommand = new HotPotatoCommand(_context, playCmd, [hpCard, numCard]);
 
         var cmd = new RedirectHotPotatoCommand("p2", hpCard.Id, "nonexistent");
         var result = _reactionState.HandleCommand(_context, cmd);
@@ -344,7 +344,7 @@ public class PlayPhaseTimeoutTests
         _state.GamePlayers.TryAdd("p1", new OperatorPlayerState { UserId = "p1", CurrentPoints = 10m, ActiveOperator = CardOperator.Add });
         _state.GamePlayers.TryAdd("p2", new OperatorPlayerState { UserId = "p2", CurrentPoints = 10m, ActiveOperator = CardOperator.Add });
 
-        _state.TurnManager.SetTurnOrder(new List<string> { "p1", "p2" });
+        _state.TurnManager.SetTurnOrder(["p1", "p2"]);
         _playPhase = new PlayPhaseState();
         _playPhase.OnEnter(_context);
     }

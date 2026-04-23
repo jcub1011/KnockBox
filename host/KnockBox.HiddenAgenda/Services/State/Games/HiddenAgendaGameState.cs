@@ -43,7 +43,7 @@ public class HiddenAgendaGameState(User host, ILogger<HiddenAgendaGameState> log
     public BoardGraph BoardGraph { get; set; } = null!;
 
     // Collection progress (mutable, reset each round)
-    public Dictionary<CollectionType, int> CollectionProgress { get; } = new();
+    public Dictionary<CollectionType, int> CollectionProgress { get; } = [];
 
     // Round tracking
     public int CurrentRound { get; set; }

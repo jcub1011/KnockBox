@@ -263,6 +263,9 @@ export function dispose(svgId) {
     if (state) {
         state.abortController?.abort();
         state.dotNetRef = null;
+        if (state.svg) {
+            state.svg.innerHTML = '';
+        }
         state.svg = null;
         state.items.clear();
     }

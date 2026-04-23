@@ -62,7 +62,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
                     context.Config.VotingCriteria,
                     context.State.Votes.Values,
                     context.State.CriterionCoinFlipResults)
-                : new Dictionary<EntrantId, double>();
+                : [];
 
             return SwissTournamentService.GenerateRound(
                 roundNumber,

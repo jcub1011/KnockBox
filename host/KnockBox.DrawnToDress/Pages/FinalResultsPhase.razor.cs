@@ -24,7 +24,7 @@ namespace KnockBox.DrawnToDress.Pages
 
         private bool _submitting;
         private string? _errorMessage;
-        private readonly HashSet<string> _expandedPlayers = new();
+        private readonly HashSet<string> _expandedPlayers = [];
 
         private string CurrentPlayerId => UserService.CurrentUser?.Id ?? string.Empty;
 

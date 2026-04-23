@@ -3,6 +3,74 @@ using KnockBox.Core.Primitives.Disposable;
 namespace KnockBox.Core.Primitives.Events
 {
     /// <summary>
+    /// Shared dispatch helpers for <see cref="ThreadSafeEventManager"/> /
+    /// <see cref="ThreadSafeEventManager{TEventArgs}"/>. Snapshot reads are lock-free;
+    /// subscribe/unsubscribe build the new snapshot via <see cref="Array.Copy"/> to
+    /// avoid intermediate List/enumerator allocations from spread expressions.
+    /// </summary>
+    internal static class ThreadSafeEventManagerHelper
+    {
+        public static T[] AddListener<T>(T[] listeners, T callback) where T : Delegate
+        {
+            var newListeners = new T[listeners.Length + 1];
+            if (listeners.Length > 0)
+                Array.Copy(listeners, newListeners, listeners.Length);
+            newListeners[listeners.Length] = callback;
+            return newListeners;
+        }
+
+        /// <summary>
+        /// Removes the first matching listener and returns a fresh snapshot.
+        /// </summary>
+        /// <remarks>
+        /// O(n) in the subscriber count: both the <see cref="Array.IndexOf{T}(T[], T)"/> scan
+        /// and the <see cref="Array.Copy(Array, int, Array, int, int)"/> traverse the list.
+        /// Callers with hot subscribe/unsubscribe churn on large subscriber counts should batch.
+        /// </remarks>
+        public static T[] RemoveListener<T>(T[] listeners, T callback) where T : Delegate
+        {
+            int index = Array.IndexOf(listeners, callback);
+            if (index < 0) return listeners;
+            if (listeners.Length == 1) return [];
+
+            var newListeners = new T[listeners.Length - 1];
+            if (index > 0)
+                Array.Copy(listeners, 0, newListeners, 0, index);
+            if (index < listeners.Length - 1)
+                Array.Copy(listeners, index + 1, newListeners, index, listeners.Length - index - 1);
+            return newListeners;
+        }
+
+        public static Task DispatchAsync<TListener>(
+            TListener[] snapshot,
+            Func<TListener, Task> invoker)
+        {
+            if (snapshot.Length == 0) return Task.CompletedTask;
+
+            Task[]? tasks = null;
+            var taskCount = 0;
+
+            for (var i = 0; i < snapshot.Length; i++)
+            {
+                var task = invoker(snapshot[i]);
+                if (!task.IsCompletedSuccessfully)
+                {
+                    tasks ??= new Task[snapshot.Length];
+                    tasks[taskCount++] = task;
+                }
+            }
+
+            if (taskCount == 0) return Task.CompletedTask;
+            if (taskCount == 1) return tasks![0];
+
+            if (taskCount != tasks!.Length)
+                Array.Resize(ref tasks, taskCount);
+
+            return Task.WhenAll(tasks);
+        }
+    }
+
+    /// <summary>
     /// Default <see cref="IThreadSafeEventManager"/> implementation. Subscribers
     /// are held in an immutable snapshot array swapped under a lock; notifications
     /// read the snapshot without holding the lock, so handlers can safely
@@ -25,21 +93,14 @@ namespace KnockBox.Core.Primitives.Events
 
             lock (_lock)
             {
-                _listeners = [.. _listeners, callback];
+                _listeners = ThreadSafeEventManagerHelper.AddListener(_listeners, callback);
             }
 
             return new DisposableAction(() =>
             {
                 lock (_lock)
                 {
-                    var index = Array.IndexOf(_listeners, callback);
-                    if (index >= 0)
-                    {
-                        var newListeners = new Func<ValueTask>[_listeners.Length - 1];
-                        Array.Copy(_listeners, 0, newListeners, 0, index);
-                        Array.Copy(_listeners, index + 1, newListeners, index, _listeners.Length - index - 1);
-                        _listeners = newListeners;
-                    }
+                    _listeners = ThreadSafeEventManagerHelper.RemoveListener(_listeners, callback);
                 }
             });
         }
@@ -47,53 +108,17 @@ namespace KnockBox.Core.Primitives.Events
         public Task NotifyAsync()
         {
             Func<ValueTask>[] snapshot;
-
-            lock (_lock)
-            {
-                snapshot = _listeners;
-            }
-
-            if (snapshot.Length == 0) return Task.CompletedTask;
-
-            Task[]? tasks = null;
-            var taskCount = 0;
-
-            for (var i = 0; i < snapshot.Length; i++)
-            {
-                var task = SafeInvokeAsync(snapshot[i]);
-                if (!task.IsCompletedSuccessfully)
-                {
-                    tasks ??= new Task[snapshot.Length];
-                    tasks[taskCount++] = task;
-                }
-            }
-
-            if (taskCount == 0) return Task.CompletedTask;
-            if (taskCount == 1) return tasks![0];
-
-            if (taskCount != tasks!.Length)
-            {
-                Array.Resize(ref tasks, taskCount);
-            }
-
-            return Task.WhenAll(tasks);
+            lock (_lock) { snapshot = _listeners; }
+            return ThreadSafeEventManagerHelper.DispatchAsync(snapshot, SafeInvokeAsync);
         }
 
         public void Notify()
         {
-            async Task ExecuteNotifyAsync()
+            _ = Task.Run(async () =>
             {
-                try
-                {
-                    await NotifyAsync();
-                }
-                catch (Exception ex)
-                {
-                    logger?.LogError(ex, "Error notifying subscribers.");
-                }
-            }
-
-            _ = Task.Run(() => ExecuteNotifyAsync());
+                try { await NotifyAsync(); }
+                catch (Exception ex) { logger?.LogError(ex, "Error notifying subscribers."); }
+            });
         }
 
         private Task SafeInvokeAsync(Func<ValueTask> callback)
@@ -101,11 +126,7 @@ namespace KnockBox.Core.Primitives.Events
             try
             {
                 var valueTask = callback();
-                if (valueTask.IsCompletedSuccessfully)
-                {
-                    return Task.CompletedTask;
-                }
-
+                if (valueTask.IsCompletedSuccessfully) return Task.CompletedTask;
                 return AwaitValueTaskAsync(valueTask);
             }
             catch (Exception ex)
@@ -117,14 +138,8 @@ namespace KnockBox.Core.Primitives.Events
 
         private async Task AwaitValueTaskAsync(ValueTask valueTask)
         {
-            try
-            {
-                await valueTask.ConfigureAwait(false);
-            }
-            catch (Exception ex)
-            {
-                logger?.LogError(ex, "Error notifying subscriber.");
-            }
+            try { await valueTask.ConfigureAwait(false); }
+            catch (Exception ex) { logger?.LogError(ex, "Error notifying subscriber."); }
         }
     }
 
@@ -145,21 +160,14 @@ namespace KnockBox.Core.Primitives.Events
 
             lock (_lock)
             {
-                _listeners = [.. _listeners, callback];
+                _listeners = ThreadSafeEventManagerHelper.AddListener(_listeners, callback);
             }
 
             return new DisposableAction(() =>
             {
                 lock (_lock)
                 {
-                    var index = Array.IndexOf(_listeners, callback);
-                    if (index >= 0)
-                    {
-                        var newListeners = new Func<TEventArgs, ValueTask>[_listeners.Length - 1];
-                        Array.Copy(_listeners, 0, newListeners, 0, index);
-                        Array.Copy(_listeners, index + 1, newListeners, index, _listeners.Length - index - 1);
-                        _listeners = newListeners;
-                    }
+                    _listeners = ThreadSafeEventManagerHelper.RemoveListener(_listeners, callback);
                 }
             });
         }
@@ -167,53 +175,17 @@ namespace KnockBox.Core.Primitives.Events
         public Task NotifyAsync(TEventArgs args)
         {
             Func<TEventArgs, ValueTask>[] snapshot;
-
-            lock (_lock)
-            {
-                snapshot = _listeners;
-            }
-
-            if (snapshot.Length == 0) return Task.CompletedTask;
-
-            Task[]? tasks = null;
-            var taskCount = 0;
-
-            for (var i = 0; i < snapshot.Length; i++)
-            {
-                var task = SafeInvokeAsync(snapshot[i], args);
-                if (!task.IsCompletedSuccessfully)
-                {
-                    tasks ??= new Task[snapshot.Length];
-                    tasks[taskCount++] = task;
-                }
-            }
-
-            if (taskCount == 0) return Task.CompletedTask;
-            if (taskCount == 1) return tasks![0];
-
-            if (taskCount != tasks!.Length)
-            {
-                Array.Resize(ref tasks, taskCount);
-            }
-
-            return Task.WhenAll(tasks);
+            lock (_lock) { snapshot = _listeners; }
+            return ThreadSafeEventManagerHelper.DispatchAsync(snapshot, cb => SafeInvokeAsync(cb, args));
         }
 
         public void Notify(TEventArgs args)
         {
-            async Task ExecuteNotifyAsync(TEventArgs args)
+            _ = Task.Run(async () =>
             {
-                try
-                {
-                    await NotifyAsync(args);
-                }
-                catch (Exception ex)
-                {
-                    logger?.LogError(ex, "Error notifying subscribers with args [{args}].", args);
-                }
-            }
-
-            _ = Task.Run(() => ExecuteNotifyAsync(args));
+                try { await NotifyAsync(args); }
+                catch (Exception ex) { logger?.LogError(ex, "Error notifying subscribers with args [{args}].", args); }
+            });
         }
 
         private Task SafeInvokeAsync(Func<TEventArgs, ValueTask> callback, TEventArgs args)
@@ -221,11 +193,7 @@ namespace KnockBox.Core.Primitives.Events
             try
             {
                 var valueTask = callback(args);
-                if (valueTask.IsCompletedSuccessfully)
-                {
-                    return Task.CompletedTask;
-                }
-
+                if (valueTask.IsCompletedSuccessfully) return Task.CompletedTask;
                 return AwaitValueTaskAsync(valueTask);
             }
             catch (Exception ex)
@@ -237,14 +205,8 @@ namespace KnockBox.Core.Primitives.Events
 
         private async Task AwaitValueTaskAsync(ValueTask valueTask)
         {
-            try
-            {
-                await valueTask.ConfigureAwait(false);
-            }
-            catch (Exception ex)
-            {
-                logger?.LogError(ex, "Error notifying subscriber.");
-            }
+            try { await valueTask.ConfigureAwait(false); }
+            catch (Exception ex) { logger?.LogError(ex, "Error notifying subscriber."); }
         }
     }
 }

@@ -44,7 +44,7 @@ namespace KnockBox.HiddenAgendaTests.Unit.Logic.Games.HiddenAgenda.States
                     DisplayName = $"Player {i}"
                 };
             }
-            _state.TurnManager.SetTurnOrder(new List<string> { "p0", "p1", "p2", "p3" });
+            _state.TurnManager.SetTurnOrder(["p0", "p1", "p2", "p3"]);
         }
 
         [TestMethod]
@@ -76,9 +76,9 @@ namespace KnockBox.HiddenAgendaTests.Unit.Logic.Games.HiddenAgenda.States
             p0.HeldEventCard = EventCardDefinitions.Catalog;
             
             var drawn = new List<CurationCard> { 
-                new CurationCard(CurationCardType.Acquire, "C1", []),
-                new CurationCard(CurationCardType.Acquire, "C2", []),
-                new CurationCard(CurationCardType.Acquire, "C3", [])
+                new(CurationCardType.Acquire, "C1", []),
+                new(CurationCardType.Acquire, "C2", []),
+                new(CurationCardType.Acquire, "C3", [])
             };
             p1.CardDrawHistory.Add(new CardDrawRecord(1, drawn));
 
@@ -89,7 +89,7 @@ namespace KnockBox.HiddenAgendaTests.Unit.Logic.Games.HiddenAgenda.States
             
             Assert.IsTrue(result.IsSuccess);
             Assert.IsNotNull(_state.CatalogRevealedCards);
-            Assert.AreEqual(3, _state.CatalogRevealedCards.Count);
+            Assert.HasCount(3, _state.CatalogRevealedCards);
             Assert.IsNull(p0.HeldEventCard);
             
             // AdvanceToNextPlayer returns EventCardPhaseState for next player

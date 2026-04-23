@@ -11,13 +11,13 @@ namespace KnockBox.HiddenAgenda.Components
         [Parameter, EditorRequired] public IReadOnlyList<HiddenAgendaPlayerState> Opponents { get; set; } = default!;
         [Parameter] public Action<Dictionary<string, List<string>>>? OnSubmit { get; set; }
 
-        protected Dictionary<string, List<string>> Guesses { get; set; } = new();
+        protected Dictionary<string, List<string>> Guesses { get; set; } = [];
 
         protected override void OnInitialized()
         {
             foreach (var opponent in Opponents)
             {
-                Guesses[opponent.PlayerId] = new List<string> { "", "", "" };
+                Guesses[opponent.PlayerId] = ["", "", ""];
             }
         }
 

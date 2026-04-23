@@ -40,7 +40,7 @@ namespace KnockBox.DrawnToDress.Pages
         private bool _showMannequin;
         private FaceType _selectedFace = FaceType.Default;
         private ClothingType? _selectedTypeId;
-        private Dictionary<ClothingType, ItemPositionOverride> _itemPositions = new();
+        private Dictionary<ClothingType, ItemPositionOverride> _itemPositions = [];
         private IJSObjectReference? _dragModule;
         private DotNetObjectReference<OutfitCustomizationPhase>? _dotNetRef;
         private readonly string _dragSvgId = $"drag-layer-{Guid.NewGuid():N}";
@@ -244,7 +244,7 @@ namespace KnockBox.DrawnToDress.Pages
                 }
 
                 // Always submit position overrides so VotingPhase properly reconstructs the mapped outfit.
-                Dictionary<ClothingType, ItemPositionOverride>? positionOverrides = new();
+                Dictionary<ClothingType, ItemPositionOverride>? positionOverrides = [];
                 foreach (var ct in GameState.Config.ClothingTypes)
                 {
                     if (_itemPositions.TryGetValue(ct.Id, out var pos))

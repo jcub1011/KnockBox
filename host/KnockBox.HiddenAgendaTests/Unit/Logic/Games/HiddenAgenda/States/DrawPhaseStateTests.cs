@@ -48,7 +48,7 @@ namespace KnockBox.HiddenAgendaTests.Unit.Logic.Games.HiddenAgenda.States
                     CurrentSpaceId = 0
                 };
             }
-            _state.TurnManager.SetTurnOrder(new List<string> { "p0", "p1", "p2", "p3" });
+            _state.TurnManager.SetTurnOrder(["p0", "p1", "p2", "p3"]);
         }
 
         [TestMethod]
@@ -59,8 +59,8 @@ namespace KnockBox.HiddenAgendaTests.Unit.Logic.Games.HiddenAgenda.States
             state.OnEnter(_context);
 
             Assert.IsNotNull(_state.DrawnCards);
-            Assert.AreEqual(3, _state.DrawnCards.Count);
-            Assert.AreEqual(1, _state.GamePlayers["p0"].CardDrawHistory.Count);
+            Assert.HasCount(3, _state.DrawnCards);
+            Assert.HasCount(1, _state.GamePlayers["p0"].CardDrawHistory);
         }
 
         [TestMethod]
@@ -94,8 +94,8 @@ namespace KnockBox.HiddenAgendaTests.Unit.Logic.Games.HiddenAgenda.States
                 Assert.AreEqual(effect.Delta, _state.CollectionProgress[effect.Collection]);
             }
             
-            Assert.AreEqual(1, _state.GamePlayers["p0"].CardPlayHistory.Count);
-            Assert.AreEqual(1, _state.RoundPlayHistory.Count);
+            Assert.HasCount(1, _state.GamePlayers["p0"].CardPlayHistory);
+            Assert.HasCount(1, _state.RoundPlayHistory);
         }
 
         [TestMethod]
@@ -138,7 +138,7 @@ namespace KnockBox.HiddenAgendaTests.Unit.Logic.Games.HiddenAgenda.States
 
             Assert.IsTrue(result.IsSuccess);
             Assert.IsInstanceOfType<EventCardPhaseState>(result.Value);
-            Assert.AreEqual(1, _state.GamePlayers["p0"].CardPlayHistory.Count);
+            Assert.HasCount(1, _state.GamePlayers["p0"].CardPlayHistory);
         }
 
         [TestMethod]

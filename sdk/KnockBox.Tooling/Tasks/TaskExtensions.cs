@@ -1,5 +1,4 @@
 using KnockBox.Core.Primitives.Exceptions;
-using KnockBox.Core.Primitives.Exceptions;
 
 namespace KnockBox.Tooling.Tasks
 {

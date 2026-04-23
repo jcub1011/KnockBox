@@ -367,3 +367,6 @@ FodyWeavers.xsd
 # docker-compose local overrides
 /.env
 /host/.idea/.idea.KnockBox.Host/.idea
+/.playwright-mcp
+
+.gemini/settings.json

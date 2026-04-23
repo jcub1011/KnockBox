@@ -1,0 +1,91 @@
+@using KnockBox.Spardle.Models
+
+<div class="spd-keyboard @(HighContrast ? "spd-hc" : "")">
+    @foreach (var row in _keys)
+    {
+        <div class="spd-keyboard-row">
+            @foreach (var key in row)
+            {
+                string statusClass = GetStatusClass(key);
+                string wideClass = key is "ENTER" or "BACKSPACE" ? "spd-key-wide" : string.Empty;
+                string label = key switch
+                {
+                    "ENTER" => "Enter",
+                    "BACKSPACE" => "⌫",
+                    _ => key.ToUpperInvariant()
+                };
+                string extra = key switch
+                {
+                    "ENTER" => "spd-key-primary",
+                    "BACKSPACE" => "spd-key-ghost",
+                    _ => string.Empty
+                };
+                <button type="button"
+                        class="spd-key @statusClass @wideClass @extra"
+                        @onclick="() => HandleClick(key)"
+                        aria-label="@(key == "BACKSPACE" ? "Backspace" : label)">
+                    @label
+                </button>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public EventCallback<string> OnKeyPressed { get; set; }
+    [Parameter] public PlayerState? PlayerState { get; set; }
+    [Parameter] public bool HighContrast { get; set; }
+
+    private readonly string[][] _keys =
+    {
+        new[] { "q", "w", "e", "r", "t", "y", "u", "i", "o", "p" },
+        new[] { "a", "s", "d", "f", "g", "h", "j", "k", "l" },
+        new[] { "ENTER", "z", "x", "c", "v", "b", "n", "m", "BACKSPACE" }
+    };
+
+    private Dictionary<char, LetterStatus> BuildLetterStatuses()
+    {
+        var map = new Dictionary<char, LetterStatus>();
+        if (PlayerState is null) return map;
+
+        foreach (var guess in PlayerState.Guesses)
+        {
+            for (int i = 0; i < guess.Word.Length; i++)
+            {
+                char ch = guess.Word[i];
+                var next = guess.Statuses[i];
+                if (!map.TryGetValue(ch, out var existing) || Rank(next) > Rank(existing))
+                    map[ch] = next;
+            }
+        }
+        return map;
+    }
+
+    private static int Rank(LetterStatus s) => s switch
+    {
+        LetterStatus.Correct => 3,
+        LetterStatus.Present => 2,
+        LetterStatus.Absent  => 1,
+        _ => 0
+    };
+
+    private string GetStatusClass(string key)
+    {
+        if (key.Length != 1) return string.Empty;
+        var map = BuildLetterStatuses();
+        if (!map.TryGetValue(key[0], out var status)) return string.Empty;
+        return status switch
+        {
+            LetterStatus.Correct => "spd-key-correct",
+            LetterStatus.Present => "spd-key-present",
+            LetterStatus.Absent  => "spd-key-absent",
+            _ => string.Empty
+        };
+    }
+
+    private async Task HandleClick(string key)
+    {
+        if (OnKeyPressed.HasDelegate)
+            await OnKeyPressed.InvokeAsync(key);
+    }
+}

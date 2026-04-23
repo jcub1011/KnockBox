@@ -36,7 +36,7 @@ public class GameFlowTests
         _state.GamePlayers.TryAdd("p1", new OperatorPlayerState { UserId = "p1", CurrentPoints = 0m });
         _state.GamePlayers.TryAdd("p2", new OperatorPlayerState { UserId = "p2", CurrentPoints = 0m });
 
-        _state.TurnManager.SetTurnOrder(new List<string> { "p1", "p2" });
+        _state.TurnManager.SetTurnOrder(["p1", "p2"]);
         _state.Phase = OperatorGamePhase.Setup;
         _fsm.TransitionTo(_context, new SetupState());
     }
@@ -65,7 +65,7 @@ public class GameFlowTests
         // Add a card to deck so draw can give p1 a card
         _state.Deck.Add(new NumberCard(1m));
 
-        var playCmd = new PlayCardsCommand("p1", new List<Guid> { card.Id });
+        var playCmd = new PlayCardsCommand("p1", [card.Id]);
         _fsm.HandleCommand(_context, playCmd);
         
         var endCmd = new EndTurnCommand("p1");
@@ -88,7 +88,7 @@ public class GameFlowTests
         p2.Hand.Clear();
         p2.Hand.Add(winCard);
 
-        var winCmd = new PlayCardsCommand("p2", new List<Guid> { winCard.Id });
+        var winCmd = new PlayCardsCommand("p2", [winCard.Id]);
         _fsm.HandleCommand(_context, winCmd);
 
         // Deck is empty and all remaining cards are shields -> GameOver

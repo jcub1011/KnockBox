@@ -19,8 +19,8 @@ public record SecretTask(
 
 public static class TaskPool
 {
-    public static IReadOnlyList<SecretTask> AllTasks { get; } = new List<SecretTask>
-    {
+    public static IReadOnlyList<SecretTask> AllTasks { get; } =
+    [
         // Devotion (Easy, 1pt)
         new("D1", TaskCategory.Devotion, TaskDifficulty.Easy, "Play a card that adds progress to Renaissance Masters on at least 4 separate turns.", "Frequent progress on Renaissance Masters", 1),
         new("D2", TaskCategory.Devotion, TaskDifficulty.Easy, "Play a card that adds progress to Contemporary Showcase on at least 4 separate turns.", "Frequent progress on Contemporary Showcase", 1),
@@ -61,7 +61,7 @@ public static class TaskPool
         new("R4", TaskCategory.Rivalry, TaskDifficulty.Hard, "Play a Remove card on a collection that is currently the highest-progress collection, at least 3 times.", "Targeting leading collections", 3),
         new("R5", TaskCategory.Rivalry, TaskDifficulty.Hard, "Play an Acquire card on a collection that is currently the lowest-progress collection, at least 3 times.", "Supporting lagging collections", 3),
         new("R6", TaskCategory.Rivalry, TaskDifficulty.Hard, "Be in the same wing as a specific other player (assigned randomly at task draw) on at least 4 turns.", "Shadowing a specific player", 3)
-    };
+    ];
 
     public static IReadOnlyList<SecretTask> GetPoolForPlayerCount(int playerCount)
     {

@@ -19,7 +19,7 @@ public sealed class AdminLogServiceTests
     // slot so each test gets a unique, regex-valid filename.
     private static int _seedCounter;
 
-    private readonly List<string> _createdFiles = new();
+    private readonly List<string> _createdFiles = [];
 
     [TestCleanup]
     public void Cleanup()
@@ -67,9 +67,9 @@ public sealed class AdminLogServiceTests
         Assert.IsNotNull(page0);
         Assert.IsNotNull(page1);
         Assert.IsNotNull(page2);
-        Assert.AreEqual(100, page0.Lines.Count);
-        Assert.AreEqual(100, page1.Lines.Count);
-        Assert.AreEqual(50, page2.Lines.Count);
+        Assert.HasCount(100, page0.Lines);
+        Assert.HasCount(100, page1.Lines);
+        Assert.HasCount(50, page2.Lines);
         Assert.AreEqual(250, page0.TotalLines);
         Assert.AreEqual("line 0", page0.Lines[0]);
         Assert.AreEqual("line 99", page0.Lines[99]);
@@ -85,14 +85,14 @@ public sealed class AdminLogServiceTests
         var svc = CreateService();
         var initial = svc.TailSince(fileName, 0);
         Assert.IsNotNull(initial);
-        Assert.AreEqual(10, initial.Lines.Count);
+        Assert.HasCount(10, initial.Lines);
 
         // Append new lines.
         File.AppendAllLines(path, new[] { "line 10", "line 11" });
 
         var tail = svc.TailSince(fileName, initial.NewOffset);
         Assert.IsNotNull(tail);
-        Assert.AreEqual(2, tail.Lines.Count);
+        Assert.HasCount(2, tail.Lines);
         Assert.AreEqual("line 10", tail.Lines[0]);
         Assert.AreEqual("line 11", tail.Lines[1]);
     }
@@ -109,9 +109,9 @@ public sealed class AdminLogServiceTests
         var svc = CreateService();
         var files = svc.ListFiles();
 
-        Assert.IsTrue(files.Any(f => f.Name == knockbox),
-            $"Expected {knockbox} in listing, got: {string.Join(",", files.Select(f => f.Name))}");
-        Assert.IsFalse(files.Any(f => f.Name == "audit.log"));
+        Assert.Contains(f => f.Name == knockbox,
+files, $"Expected {knockbox} in listing, got: {string.Join(",", files.Select(f => f.Name))}");
+        Assert.DoesNotContain(f => f.Name == "audit.log", files);
     }
 
     private IAdminLogService CreateService()

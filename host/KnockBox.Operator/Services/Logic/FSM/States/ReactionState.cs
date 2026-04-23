@@ -144,7 +144,7 @@ public class ReactionState : IOperatorGameState, ITimedGameState<OperatorGameCon
 
         // Redirect to new target — update the command and re-enter reaction state
         context.State.PendingGameActionCommand.UpdateTarget(redirect.NewTargetPlayerId);
-        context.State.ReactionTargetPlayerIds = new HashSet<string> { redirect.NewTargetPlayerId };
+        context.State.ReactionTargetPlayerIds = [redirect.NewTargetPlayerId];
         context.State.StateStartTime = DateTimeOffset.UtcNow;
 
         return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromValue(new ReactionState());
