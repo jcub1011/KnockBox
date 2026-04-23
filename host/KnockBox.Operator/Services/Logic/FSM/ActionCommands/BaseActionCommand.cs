@@ -71,6 +71,6 @@ public abstract class BaseActionCommand(
 
     protected string GetPlayerName(string playerId)
     {
-        return Context.State.Players.FirstOrDefault(p => p.Id == playerId)?.Name ?? "Unknown";
+        return Context.State.Players.FirstOrDefault(p => p.User.Id == playerId).DisplayName ?? "Unknown";
     }
 }

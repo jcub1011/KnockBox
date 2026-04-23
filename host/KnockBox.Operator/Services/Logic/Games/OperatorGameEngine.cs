@@ -24,20 +24,15 @@ public class OperatorGameEngine(ILogger<OperatorGameState> stateLogger, IRandomN
 
         var state = new OperatorGameState(host, stateLogger);
         state.Context = new OperatorGameContext(state, randomNumberService);
-        state.UpdateJoinableStatus(true);
+        state.Execute(() => state.SetJoinable(true));
         return Task.FromResult(ValueResult<AbstractGameState>.FromValue(state));
     }
 
-    public override async Task<Result> StartAsync(User host, AbstractGameState state, CancellationToken ct = default)
+    protected override async Task<Result> StartAsyncCore(AbstractGameState state, CancellationToken ct = default)
     {
         if (state is not OperatorGameState operatorState)
         {
             return Result.FromError("Invalid game state type.");
-        }
-
-        if (host.Id != operatorState.Host.Id)
-        {
-            return Result.FromError("Only the host can start the game.");
         }
 
         var context = new OperatorGameContext(operatorState, randomNumberService);
@@ -49,23 +44,23 @@ public class OperatorGameEngine(ILogger<OperatorGameState> stateLogger, IRandomN
             var allParticipants = operatorState.Players.ToList();
 
             // Initialize GamePlayers (deck generation and dealing happen in SetupState after choices)
-            foreach (var user in allParticipants)
+            foreach (var entry in allParticipants)
             {
-                var playerState = new OperatorPlayerState { UserId = user.Id };
-                operatorState.GamePlayers[user.Id] = playerState;
+                var playerState = new OperatorPlayerState { UserId = entry.User.Id };
+                operatorState.GamePlayers[entry.User.Id] = playerState;
             }
 
             // 3. Set Phase to Setup
             operatorState.Phase = OperatorGamePhase.Setup;
             operatorState.Context = context;
             fsm.TransitionTo(context, new KnockBox.Operator.Services.Logic.FSM.States.SetupState());
-            
+
             // 4. Initialize Turn Manager
-            operatorState.TurnManager.SetTurnOrder(allParticipants.Select(p => p.Id));
-            
+            operatorState.TurnManager.SetTurnOrder(allParticipants.Select(p => p.User.Id));
+
             // 5. Update Joinable Status
-            operatorState.UpdateJoinableStatus(false);
-            
+            operatorState.SetJoinable(false);
+
             return ValueTask.CompletedTask;
         }, ct);
     }

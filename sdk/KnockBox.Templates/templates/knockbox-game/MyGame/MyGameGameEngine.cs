@@ -55,37 +55,43 @@ public class MyGameGameEngine(
     {
         var state = new MyGameGameState(host, stateLogger);
 
-        // IsJoinable = true opens the lobby to additional players. Flip it to
+        // SetJoinable(true) opens the lobby to additional players. Flip it to
         // false in StartAsync (or whenever the game's "locked in" phase begins).
-        state.UpdateJoinableStatus(true);
+        // SetJoinable must be invoked inside Execute so readers of IsJoinable
+        // are serialized against the transition.
+        state.Execute(() => state.SetJoinable(true));
 
         logger.LogInformation("Created game state for host [{HostId}].", host.Id);
         return Task.FromResult<ValueResult<AbstractGameState>>(state);
     }
 
     /// <summary>
-    /// Called from the lobby page when the host clicks "Start Game". Validates
-    /// the request, flips the lobby out of joinable mode, and initializes the
-    /// first game-specific state.
+    /// Game-specific start logic. Invoked by the base-class
+    /// <see cref="AbstractGameEngine.StartAsync"/> after host-identity
+    /// authorization has succeeded. Flips the lobby out of joinable mode and
+    /// initializes the first game-specific state.
     /// </summary>
     /// <remarks>
+    /// <para>
+    /// Host-identity verification ("only the host may start the game") lives in
+    /// the base class, so overrides are free to assume the caller is authorized.
+    /// If your game needs additional authorization (co-host, party role, etc.),
+    /// add it here.
+    /// </para>
+    /// <para>
     /// Callers consume the returned <see cref="Result"/> via
     /// <c>TryGetFailure(out var error)</c> / <c>IsSuccess</c>. Prefer returning
     /// failures over throwing — the <c>Result</c> / <c>ValueResult&lt;T&gt;</c>
     /// pattern is the engine's control-flow vocabulary.
+    /// </para>
     /// </remarks>
-    public override Task<Result> StartAsync(
-        User host, AbstractGameState state, CancellationToken ct = default)
+    protected override Task<Result> StartAsyncCore(
+        AbstractGameState state, CancellationToken ct = default)
     {
         // Defensive type-check: the platform plumbs a base-typed state back to
         // us; cast to our concrete type before touching game-specific fields.
         if (state is not MyGameGameState gameState)
             return Task.FromResult(Result.FromError("Invalid state type.", "Internal error."));
-
-        // Only the host can start the game. Non-host players clicking Start
-        // would be a client-side bug; we still reject it server-side.
-        if (host != gameState.Host)
-            return Task.FromResult(Result.FromError("Only the host can start the game."));
 
         // All mutation inside Execute. The base class:
         //   - acquires the state's SemaphoreSlim(1,1),
@@ -95,7 +101,7 @@ public class MyGameGameEngine(
         //     the lock — so re-entrant Execute calls from handlers are safe.
         var executeResult = gameState.Execute(() =>
         {
-            gameState.UpdateJoinableStatus(false);
+            gameState.SetJoinable(false);
             // TODO: Initialize your game state here (deal cards, pick first
             //       player, seed RNG, etc.).
         });

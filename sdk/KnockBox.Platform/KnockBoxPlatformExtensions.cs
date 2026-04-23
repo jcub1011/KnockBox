@@ -4,6 +4,7 @@ using KnockBox.Core.Plugins;
 using KnockBox.Core.Services.Drawing;
 using KnockBox.Core.Services.Navigation;
 using KnockBox.Platform.Games;
+using KnockBox.Platform.Plugins;
 using KnockBox.Platform.Storage;
 using KnockBox.Services.Drawing;
 using KnockBox.Services.Navigation;
@@ -170,6 +171,13 @@ public static class KnockBoxPlatformExtensions
             pluginLoadResult = new PluginLoadResult(plugins, assemblies.Distinct().ToList());
         }
 
+        // Navigation + drawing services. Registered BEFORE RegisterLogic so that
+        // the plugin-registration denylist snapshot (captured at the top of
+        // RegisterLogic) includes these — otherwise a plugin could shadow
+        // INavigationService or ISvgClipboardService.
+        builder.Services.AddScoped<INavigationService, NavigationService>();
+        builder.Services.AddSingleton<ISvgClipboardService, SvgClipboardService>();
+
         // Logic registrations (platform version — no admin services).
         // `LogicRegistrations` is static, so we can't use the generic overload —
         // typeof(...).FullName keeps the logger category in sync with renames
@@ -177,10 +185,6 @@ public static class KnockBoxPlatformExtensions
         var registrationLogger = bootstrapLoggerFactory
             .CreateLogger(typeof(LogicRegistrations).FullName!);
         builder.Services.RegisterLogic(pluginLoadResult, registrationLogger);
-
-        // Navigation + drawing services
-        builder.Services.AddScoped<INavigationService, NavigationService>();
-        builder.Services.AddSingleton<ISvgClipboardService, SvgClipboardService>();
 
         return builder;
     }
@@ -302,6 +306,7 @@ public static class KnockBoxPlatformExtensions
             return;
         }
 
+        var pluginsRoot = PluginPathGuard.NormalizeDirectory(pluginsPath);
         var mountedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var dir in Directory.GetDirectories(pluginsPath))
@@ -310,6 +315,29 @@ public static class KnockBoxPlatformExtensions
             var wwwrootPath = Path.Combine(dir, "wwwroot");
             if (!Directory.Exists(wwwrootPath))
                 continue;
+
+            // Reject plugin folders whose wwwroot escapes the plugins root via a
+            // symlink / NTFS junction. A malicious or misconfigured plugin could
+            // otherwise serve any file on disk under /_content/{PluginName}.
+            var fullWwwroot = Path.GetFullPath(wwwrootPath);
+            string? rejection = null;
+            if (!PluginPathGuard.IsInsideRoot(pluginsRoot, fullWwwroot))
+            {
+                rejection = "wwwroot resolves outside the plugins root.";
+            }
+            else if (!PluginPathGuard.HasNoReparsePointEscape(pluginsRoot, fullWwwroot, out var reason))
+            {
+                rejection = reason;
+            }
+            if (rejection is not null)
+            {
+                logger.LogError(
+                    "Refusing to mount plugin static assets for [{PluginName}] from [{WwwRootPath}]: {Reason}",
+                    pluginName,
+                    wwwrootPath,
+                    rejection);
+                continue;
+            }
 
             var requestPath = $"/_content/{pluginName}";
 

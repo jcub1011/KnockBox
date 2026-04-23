@@ -19,22 +19,22 @@
     
     @* Opponents *@
     <div class="op-opponents-grid">
-        @foreach (var player in GameState.Players.Where(p => p.Id != UserService.CurrentUser?.Id))
+        @foreach (var entry in GameState.Players.Where(p => p.User.Id != UserService.CurrentUser?.Id))
         {
-            var pState = GameState.Context?.GamePlayers.GetValueOrDefault(player.Id);
+            var pState = GameState.Context?.GamePlayers.GetValueOrDefault(entry.User.Id);
             if (pState != null)
             {
-                <OperatorPlayerInfo Name="@player.Name"
+                <OperatorPlayerInfo Name="@entry.DisplayName"
                                     Score="@pState.CurrentPoints"
                                     ActiveOperator="@pState.ActiveOperator"
                                     HandSize="@pState.Hand.Count"
-                                    IsActive="@(GameState.TurnManager.CurrentPlayer == player.Id)"
+                                    IsActive="@(GameState.TurnManager.CurrentPlayer == entry.User.Id)"
                                     IsAudited="@pState.IsAudited"
                                     IsDivideBroken="@pState.IsDivideBroken"
                                     IsBeingStolenFrom="@pState.IsBeingStolenFrom"
-                                    IsTargetable="@IsPlayerTargetable(player.Id, pState)"
-                                    IsTargeted="@(_targetPlayerId == player.Id)"
-                                    OnClick="@(() => SelectTarget(player.Id))" />
+                                    IsTargetable="@IsPlayerTargetable(entry.User.Id, pState)"
+                                    IsTargeted="@(_targetPlayerId == entry.User.Id)"
+                                    OnClick="@(() => SelectTarget(entry.User.Id))" />
             }
         }
     </div>
@@ -220,7 +220,7 @@
         else
         {
             <div class="op-waiting-text">
-                Waiting for @(GameState.Players.FirstOrDefault(p => p.Id == GameState.TurnManager.CurrentPlayer)?.Name ?? "another player")...
+                Waiting for @(GameState.Players.FirstOrDefault(p => p.User.Id == GameState.TurnManager.CurrentPlayer).DisplayName ?? "another player")...
             </div>
         }
     </div>

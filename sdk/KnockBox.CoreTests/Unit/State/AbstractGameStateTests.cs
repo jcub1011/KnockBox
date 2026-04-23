@@ -14,7 +14,7 @@ public sealed class AbstractGameStateTests
     }
 
     private static User MakeUser(string name = "TestUser") =>
-        new User(name, Guid.NewGuid().ToString());
+        UserFactory.Create(name, Guid.NewGuid().ToString());
 
     private static ILogger MakeLogger() => Mock.Of<ILogger>();
 
@@ -35,7 +35,7 @@ public sealed class AbstractGameStateTests
         Assert.AreSame(host, state.Host);
     }
 
-    // ── IsJoinable / UpdateJoinableStatus ────────────────────────────────────
+    // ── IsJoinable / SetJoinable ─────────────────────────────────────────────
 
     [TestMethod]
     public void IsJoinable_InitiallyFalse()
@@ -46,28 +46,36 @@ public sealed class AbstractGameStateTests
     }
 
     [TestMethod]
-    public void UpdateJoinableStatus_ToTrue_SetsIsJoinable()
+    public void SetJoinable_ToTrue_InsideExecute_SetsIsJoinable()
     {
         using var state = MakeState();
 
-        state.UpdateJoinableStatus(true);
+        state.Execute(() => state.SetJoinable(true));
 
         Assert.IsTrue(state.IsJoinable);
     }
 
     [TestMethod]
-    public void UpdateJoinableStatus_ToFalse_ClearsIsJoinable()
+    public void SetJoinable_ToFalse_InsideExecute_ClearsIsJoinable()
     {
         using var state = MakeState();
-        state.UpdateJoinableStatus(true);
+        state.Execute(() => state.SetJoinable(true));
 
-        state.UpdateJoinableStatus(false);
+        state.Execute(() => state.SetJoinable(false));
 
         Assert.IsFalse(state.IsJoinable);
     }
 
     [TestMethod]
-    public async Task UpdateJoinableStatus_Changed_FiresStateChanged()
+    public void SetJoinable_OutsideExecute_Throws()
+    {
+        using var state = MakeState();
+
+        Assert.Throws<InvalidOperationException>(() => state.SetJoinable(true));
+    }
+
+    [TestMethod]
+    public async Task SetJoinable_InsideExecute_FiresStateChanged()
     {
         using var state = MakeState();
         var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -77,29 +85,44 @@ public sealed class AbstractGameStateTests
             return ValueTask.CompletedTask;
         });
 
-        state.UpdateJoinableStatus(true);
+        state.Execute(() => state.SetJoinable(true));
 
         var completed = await Task.WhenAny(tcs.Task, Task.Delay(TimeSpan.FromSeconds(2)));
         Assert.AreSame(tcs.Task, completed, "StateChanged was not fired.");
     }
 
     [TestMethod]
-    public async Task UpdateJoinableStatus_SameValue_DoesNotFireStateChanged()
+    public void Execute_ActionThrows_DoesNotFireStateChanged()
     {
         using var state = MakeState();
-        state.UpdateJoinableStatus(false);
-
-        var changeCount = 0;
+        int notifyCount = 0;
         state.StateChangedEventManager.Subscribe(() =>
         {
-            Interlocked.Increment(ref changeCount);
+            Interlocked.Increment(ref notifyCount);
             return ValueTask.CompletedTask;
         });
 
-        state.UpdateJoinableStatus(false);
-        await Task.Delay(100);
+        var result = state.Execute(() => throw new InvalidOperationException("boom"));
 
-        Assert.AreEqual(0, changeCount);
+        Assert.IsTrue(result.IsFailure, "Execute should fail when the action throws.");
+        Assert.AreEqual(0, Volatile.Read(ref notifyCount), "StateChanged must not fire when the action threw.");
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ActionThrows_DoesNotFireStateChanged()
+    {
+        using var state = MakeState();
+        int notifyCount = 0;
+        state.StateChangedEventManager.Subscribe(() =>
+        {
+            Interlocked.Increment(ref notifyCount);
+            return ValueTask.CompletedTask;
+        });
+
+        var result = await state.ExecuteAsync(() => throw new InvalidOperationException("boom"));
+
+        Assert.IsTrue(result.IsFailure, "ExecuteAsync should fail when the action throws.");
+        Assert.AreEqual(0, Volatile.Read(ref notifyCount), "StateChanged must not fire when the action threw.");
     }
 
     // ── Players ──────────────────────────────────────────────────────────────
@@ -118,7 +141,7 @@ public sealed class AbstractGameStateTests
     public void RegisterPlayer_WhenJoinable_AddsPlayer()
     {
         using var state = MakeState();
-        state.UpdateJoinableStatus(true);
+        state.Execute(() => state.SetJoinable(true));
         var player = MakeUser("Player1");
 
         var result = state.RegisterPlayer(player);
@@ -126,7 +149,7 @@ public sealed class AbstractGameStateTests
         Assert.IsTrue(result.IsSuccess);
         Assert.IsTrue(result.TryGetSuccess(out _));
         Assert.HasCount(1, state.Players);
-        Assert.Contains(player, state.Players);
+        Assert.IsTrue(state.Players.Any(p => ReferenceEquals(p.User, player)));
     }
 
     [TestMethod]
@@ -146,7 +169,7 @@ public sealed class AbstractGameStateTests
     {
         var host = MakeUser("Host");
         using var state = MakeState(host);
-        state.UpdateJoinableStatus(true);
+        state.Execute(() => state.SetJoinable(true));
 
         var result = state.RegisterPlayer(host);
 
@@ -158,7 +181,7 @@ public sealed class AbstractGameStateTests
     public void RegisterPlayer_AlreadyRegistered_Succeeds_WithoutDuplicating()
     {
         using var state = MakeState();
-        state.UpdateJoinableStatus(true);
+        state.Execute(() => state.SetJoinable(true));
         var player = MakeUser();
 
         state.RegisterPlayer(player);
@@ -175,7 +198,7 @@ public sealed class AbstractGameStateTests
         // The old token held by GameSessionState should become a no-op on dispose so the
         // player is not accidentally removed from the lobby by the eviction of the stale session.
         using var state = MakeState();
-        state.UpdateJoinableStatus(true);
+        state.Execute(() => state.SetJoinable(true));
         var player = MakeUser();
 
         var firstReg = state.RegisterPlayer(player);
@@ -195,7 +218,7 @@ public sealed class AbstractGameStateTests
     public void RegisterPlayer_Rejoin_NewTokenRemovesPlayer()
     {
         using var state = MakeState();
-        state.UpdateJoinableStatus(true);
+        state.Execute(() => state.SetJoinable(true));
         var player = MakeUser();
 
         state.RegisterPlayer(player);
@@ -211,7 +234,7 @@ public sealed class AbstractGameStateTests
     public void RegisterPlayer_Rejoin_PlayerUnregisteredNotFiredForStaleToken()
     {
         using var state = MakeState();
-        state.UpdateJoinableStatus(true);
+        state.Execute(() => state.SetJoinable(true));
         var player = MakeUser();
         int eventCount = 0;
         state.PlayerUnregistered += _ => eventCount++;
@@ -229,7 +252,7 @@ public sealed class AbstractGameStateTests
     public void RegisterPlayer_Rejoin_PlayerUnregisteredFiredForNewToken()
     {
         using var state = MakeState();
-        state.UpdateJoinableStatus(true);
+        state.Execute(() => state.SetJoinable(true));
         var player = MakeUser();
         User? unregisteredPlayer = null;
         state.PlayerUnregistered += u => unregisteredPlayer = u;
@@ -247,7 +270,7 @@ public sealed class AbstractGameStateTests
     public void RegisterPlayer_Dispose_RemovesPlayer()
     {
         using var state = MakeState();
-        state.UpdateJoinableStatus(true);
+        state.Execute(() => state.SetJoinable(true));
         var player = MakeUser();
 
         var reg = state.RegisterPlayer(player);
@@ -262,7 +285,7 @@ public sealed class AbstractGameStateTests
     public void RegisterPlayer_Dispose_FiresPlayerUnregisteredEvent()
     {
         using var state = MakeState();
-        state.UpdateJoinableStatus(true);
+        state.Execute(() => state.SetJoinable(true));
         var player = MakeUser();
         User? unregisteredPlayer = null;
         state.PlayerUnregistered += u => unregisteredPlayer = u;
@@ -278,7 +301,7 @@ public sealed class AbstractGameStateTests
     public void RegisterPlayer_AfterDispose_ReturnsFailure()
     {
         using var state = MakeState();
-        state.UpdateJoinableStatus(true);
+        state.Execute(() => state.SetJoinable(true));
         state.Dispose();
         var player = MakeUser();
 
@@ -293,14 +316,14 @@ public sealed class AbstractGameStateTests
     public void KickPlayer_RegisteredPlayer_Succeeds()
     {
         using var state = MakeState();
-        state.UpdateJoinableStatus(true);
+        state.Execute(() => state.SetJoinable(true));
         var player = MakeUser();
         state.RegisterPlayer(player);
 
         var result = state.KickPlayer(player);
 
         Assert.IsTrue(result.IsSuccess);
-        Assert.DoesNotContain(player, state.Players);
+        Assert.IsFalse(state.Players.Any(p => ReferenceEquals(p.User, player)));
         Assert.IsTrue(state.IsKicked(player));
     }
 
@@ -319,7 +342,7 @@ public sealed class AbstractGameStateTests
     public void KickPlayer_KickedPlayer_CannotRejoin()
     {
         using var state = MakeState();
-        state.UpdateJoinableStatus(true);
+        state.Execute(() => state.SetJoinable(true));
         var player = MakeUser();
         state.RegisterPlayer(player);
         state.KickPlayer(player);
@@ -333,7 +356,7 @@ public sealed class AbstractGameStateTests
     public async Task KickPlayer_FiresPlayerUnregisteredExactlyOnce()
     {
         using var state = MakeState();
-        state.UpdateJoinableStatus(true);
+        state.Execute(() => state.SetJoinable(true));
         var player = MakeUser();
         state.RegisterPlayer(player);
 
@@ -368,7 +391,7 @@ public sealed class AbstractGameStateTests
             return ValueTask.CompletedTask;
         });
 
-        state.UpdateJoinableStatus(true);
+        state.Execute(() => state.SetJoinable(true));
         var player = MakeUser();
         state.RegisterPlayer(player);
 
@@ -398,13 +421,13 @@ public sealed class AbstractGameStateTests
     public void KickPlayer_RemovesFromPlayersAndMarksKicked()
     {
         using var state = MakeState();
-        state.UpdateJoinableStatus(true);
+        state.Execute(() => state.SetJoinable(true));
         var player = MakeUser();
         state.RegisterPlayer(player);
 
         state.KickPlayer(player);
 
-        Assert.DoesNotContain(player, state.Players);
+        Assert.IsFalse(state.Players.Any(p => ReferenceEquals(p.User, player)));
         Assert.IsTrue(state.IsKicked(player),
             "Kicked player should appear in KickedPlayers after KickPlayer completes.");
     }
@@ -413,7 +436,7 @@ public sealed class AbstractGameStateTests
     public void KickedPlayers_ContainsKickedUser()
     {
         using var state = MakeState();
-        state.UpdateJoinableStatus(true);
+        state.Execute(() => state.SetJoinable(true));
         var player = MakeUser();
         state.RegisterPlayer(player);
 

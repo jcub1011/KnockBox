@@ -25,7 +25,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress
             _randomMock = new Mock<IRandomNumberService>();
             _randomMock.Setup(r => r.GetRandomInt(It.IsAny<int>(), It.IsAny<RandomType>())).Returns(0);
             _randomMock.Setup(r => r.GetRandomInt(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<RandomType>())).Returns(0);
-            _host = new User("Host", "host1");
+            _host = UserFactory.Create("Host", "host1");
 
             _engine = new DrawnToDressGameEngine(
                 _engineLoggerMock.Object,
@@ -72,13 +72,13 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress
         }
 
         [TestMethod]
-        public async Task StartAsync_NonHostUser_ReturnsError()
+        public async Task StartAsync_NonHost_ReturnsError()
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
-            var otherUser = new User("Other", "other1");
+            var nonHost = UserFactory.Create("NotHost", "nothost-id");
 
-            var startResult = await _engine.StartAsync(otherUser, state);
+            var startResult = await _engine.StartAsync(nonHost, state);
 
             Assert.IsTrue((bool)startResult.IsFailure);
         }

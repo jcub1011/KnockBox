@@ -32,7 +32,8 @@ namespace KnockBox.DiceSimulator.Pages
 
         protected async Task StartGame()
         {
-            await GameEngine.StartAsync(UserService.CurrentUser!, GameState);
+            if (UserService.CurrentUser is null) return;
+            await GameEngine.StartAsync(UserService.CurrentUser, GameState);
         }
 
         protected void RollDice()

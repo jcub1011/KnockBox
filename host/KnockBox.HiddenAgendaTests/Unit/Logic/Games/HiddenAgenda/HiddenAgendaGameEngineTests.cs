@@ -28,7 +28,7 @@ namespace KnockBox.HiddenAgenda.Tests.Unit.Logic
             _rngMock = new Mock<IRandomNumberService>();
             _engineLoggerMock = new Mock<ILogger<HiddenAgendaGameEngine>>();
             _stateLoggerMock = new Mock<ILogger<HiddenAgendaGameState>>();
-            _host = new User("Host", "host1");
+            _host = UserFactory.Create("Host", "host1");
 
             _engine = new HiddenAgendaGameEngine(
                 _rngMock.Object,
@@ -56,9 +56,9 @@ namespace KnockBox.HiddenAgenda.Tests.Unit.Logic
             
             // Register minimum players (3)
             // Note: Host is NOT a player in the Players list for AbstractGameState
-            state.RegisterPlayer(new User("Player 1", "p1"));
-            state.RegisterPlayer(new User("Player 2", "p2"));
-            state.RegisterPlayer(new User("Player 3", "p3"));
+            state.RegisterPlayer(UserFactory.Create("Player 1", "p1"));
+            state.RegisterPlayer(UserFactory.Create("Player 2", "p2"));
+            state.RegisterPlayer(UserFactory.Create("Player 3", "p3"));
 
             var result = await _engine.StartAsync(_host, state);
 
@@ -73,11 +73,14 @@ namespace KnockBox.HiddenAgenda.Tests.Unit.Logic
         }
 
         [TestMethod]
-        public async Task StartAsync_InvalidHost_ReturnsError()
+        public async Task StartAsync_NonHost_ReturnsError()
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (HiddenAgendaGameState)stateResult.Value!;
-            var nonHost = new User("Not Host", "non-host");
+            state.RegisterPlayer(UserFactory.Create("Player 1", "p1"));
+            state.RegisterPlayer(UserFactory.Create("Player 2", "p2"));
+            state.RegisterPlayer(UserFactory.Create("Player 3", "p3"));
+            var nonHost = UserFactory.Create("NotHost", "nothost-id");
 
             var result = await _engine.StartAsync(nonHost, state);
 

@@ -31,7 +31,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             _randomMock = new Mock<IRandomNumberService>();
             _randomMock.Setup(r => r.GetRandomInt(It.IsAny<int>(), It.IsAny<RandomType>())).Returns(0);
             _randomMock.Setup(r => r.GetRandomInt(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<RandomType>())).Returns(0);
-            _host = new User("Host", "host1");
+            _host = UserFactory.Create("Host", "host1");
 
             _engine = new DrawnToDressGameEngine(
                 _engineLoggerMock.Object,
@@ -1825,7 +1825,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
 
-            var player = new User("Alice", "alice1");
+            var player = UserFactory.Create("Alice", "alice1");
             state.RegisterPlayer(player);
 
             // Act: start the game (default config → ThemeSource.Random → DrawingRoundState).
@@ -1846,7 +1846,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             var state = (DrawnToDressGameState)stateResult.Value!;
 
             // Register one non-host player.
-            var player = new User("Alice", "alice1");
+            var player = UserFactory.Create("Alice", "alice1");
             state.RegisterPlayer(player);
 
             // Act
@@ -1870,7 +1870,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
                 new() { Id = ClothingType.Hat, DisplayName = "Hat", MaxItemsPerRound = 3 },
             ];
 
-            var player = new User("Alice", "alice1");
+            var player = UserFactory.Create("Alice", "alice1");
             state.RegisterPlayer(player);
 
             await _engine.StartAsync(_host, state);
@@ -1902,7 +1902,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
                 new() { Id = ClothingType.Hat, DisplayName = "Hat", MaxItemsPerRound = 1 },
             ];
 
-            var player = new User("Alice", "alice1");
+            var player = UserFactory.Create("Alice", "alice1");
             state.RegisterPlayer(player);
             await _engine.StartAsync(_host, state);
             var context = state.Context!;

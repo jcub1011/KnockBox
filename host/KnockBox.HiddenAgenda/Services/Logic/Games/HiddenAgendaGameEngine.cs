@@ -30,19 +30,16 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games
                 return Task.FromResult(ValueResult<AbstractGameState>.FromError("Failed to create game state.", $"Parameter {nameof(host)} was null."));
 
             var gameState = new HiddenAgendaGameState(host, stateLogger);
-            gameState.UpdateJoinableStatus(true);
+            gameState.Execute(() => gameState.SetJoinable(true));
             gameState.PlayerUnregistered += player => HandlePlayerLeft(player, gameState);
             logger.LogInformation("Created gameState with user [{userId}] as host.", host.Id);
             return Task.FromResult<ValueResult<AbstractGameState>>(gameState);
         }
 
-        public override Task<Result> StartAsync(User host, AbstractGameState state, CancellationToken ct = default)
+        protected override Task<Result> StartAsyncCore(AbstractGameState state, CancellationToken ct = default)
         {
             if (state is not HiddenAgendaGameState gameState)
                 return Task.FromResult(Result.FromError("Error starting game.", $"Game state of type [{(state?.GetType().Name ?? "null")}] couldn't be cast to type [{nameof(HiddenAgendaGameState)}]."));
-
-            if (host != gameState.Host)
-                return Task.FromResult(Result.FromError("Only the host can start the game."));
 
             var context = new HiddenAgendaGameContext(gameState, randomNumberService, logger);
             var fsm = new FiniteStateMachine<HiddenAgendaGameContext, HiddenAgendaCommand>(logger);
@@ -50,23 +47,23 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games
 
             var executeResult = gameState.Execute(() =>
             {
-                gameState.UpdateJoinableStatus(false);
+                gameState.SetJoinable(false);
                 gameState.Context = context;
                 
                 // Initialize board
                 gameState.BoardGraph = BoardDefinitions.CreateGrandCircuit();
                 
                 // Initialize players
-                foreach (var user in gameState.Players)
+                foreach (var entry in gameState.Players)
                 {
-                    var playerState = new HiddenAgendaPlayerState 
-                    { 
-                        PlayerId = user.Id, 
-                        DisplayName = user.Name,
+                    var playerState = new HiddenAgendaPlayerState
+                    {
+                        PlayerId = entry.User.Id,
+                        DisplayName = entry.DisplayName,
                         CurrentSpaceId = 0 // Start at Grand Hall Foyer
                     };
-                    gameState.GamePlayers[user.Id] = playerState;
-                    gameState.TurnManager.TurnOrder.Add(user.Id);
+                    gameState.GamePlayers[entry.User.Id] = playerState;
+                    gameState.TurnManager.TurnOrder.Add(entry.User.Id);
                 }
 
                 fsm.TransitionTo(context, new RoundSetupState());

@@ -32,7 +32,7 @@ namespace KnockBox.HiddenAgenda.Tests.Unit.Logic.States
             _loggerMock = new Mock<ILogger>();
             _stateLoggerMock = new Mock<ILogger<HiddenAgendaGameState>>();
             
-            var host = new User("Host", "host1");
+            var host = UserFactory.Create("Host", "host1");
             _state = new HiddenAgendaGameState(host, _stateLoggerMock.Object);
             _state.BoardGraph = BoardDefinitions.CreateGrandCircuit();
             
@@ -60,9 +60,14 @@ public void ReturnToLobby_HostOnly_SetsLobbyPhase()
     var res1 = _stateLogic.HandleCommand(_context, new ReturnToLobbyCommand("other"));
     Assert.IsNotNull(res1.Error);
 
-    // Host
-    var res2 = _stateLogic.HandleCommand(_context, new ReturnToLobbyCommand("host1"));
-    Assert.IsNull(res2.Value);
+    // Host — HandleCommand calls SetJoinable, which debug-asserts the execute
+    // lock is held. In production the engine dispatches commands via
+    // state.Execute(() => fsm.HandleCommand(...)); mirror that here.
+    _state.Execute(() =>
+    {
+        var res2 = _stateLogic.HandleCommand(_context, new ReturnToLobbyCommand("host1"));
+        Assert.IsNull(res2.Value);
+    });
     Assert.AreEqual(GamePhase.Lobby, _state.Phase);
 }
 

@@ -72,8 +72,8 @@ public class ReactionState : IOperatorGameState, ITimedGameState<OperatorGameCon
             pState.Hand.RemoveAt(shieldIdx);
             context.State.DiscardPile.Add(shield);
 
-            string reactorName = context.State.Players.FirstOrDefault(p => p.Id == react.PlayerId)?.Name ?? "Unknown";
-            string attackerName = context.State.Players.FirstOrDefault(p => p.Id == context.State.TurnManager.CurrentPlayer)?.Name ?? "Unknown";
+            string reactorName = context.State.Players.FirstOrDefault(p => p.User.Id == react.PlayerId).DisplayName ?? "Unknown";
+            string attackerName = context.State.Players.FirstOrDefault(p => p.User.Id == context.State.TurnManager.CurrentPlayer).DisplayName ?? "Unknown";
 
             context.State.ActionLog.Add(new ActionLogEntry(
                 $"{reactorName} used a Shield to block {attackerName}'s action.",

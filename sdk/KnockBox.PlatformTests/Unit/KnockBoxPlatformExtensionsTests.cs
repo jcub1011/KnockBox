@@ -140,8 +140,8 @@ public sealed class KnockBoxPlatformExtensionsTests
             User host, CancellationToken ct = default)
             => throw new NotImplementedException();
 
-        public override Task<Result> StartAsync(
-            User host, AbstractGameState state, CancellationToken ct = default)
+        protected override Task<Result> StartAsyncCore(
+            AbstractGameState state, CancellationToken ct = default)
             => throw new NotImplementedException();
     }
 

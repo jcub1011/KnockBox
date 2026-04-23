@@ -2,6 +2,7 @@ using KnockBox.DrawnToDress.Services.Logic.Games;
 using KnockBox.DrawnToDress.Services.Logic.Games.FSM;
 using KnockBox.DrawnToDress.Services.State.Games;
 using KnockBox.DrawnToDress.Services.State.Games.Data;
+using KnockBox.Core.Services.State.Games.Shared;
 using KnockBox.Core.Services.State.Users;
 using Microsoft.AspNetCore.Components;
 
@@ -131,8 +132,12 @@ namespace KnockBox.DrawnToDress.Pages
                 return;
             }
 
-            var player = GameState.Players.FirstOrDefault(p => p.Id == userId);
-            if (player is null)
+            PlayerEntry? match = null;
+            foreach (var candidate in GameState.Players)
+            {
+                if (candidate.User.Id == userId) { match = candidate; break; }
+            }
+            if (match is null)
             {
                 Logger.LogWarning("Cannot kick player [{id}]: not found.", userId);
                 return;
@@ -141,7 +146,7 @@ namespace KnockBox.DrawnToDress.Pages
             // Kicking is a lobby-level state operation (same pattern as CardCounter).
             // It does not need to go through the FSM because it has no game-logic side-effects
             // while still in the lobby phase.
-            var result = GameState.KickPlayer(player);
+            var result = GameState.KickPlayer(match.Value.User);
             if (result.TryGetFailure(out var err))
             {
                 Logger.LogWarning("Error kicking player: {msg}", err.PublicMessage);

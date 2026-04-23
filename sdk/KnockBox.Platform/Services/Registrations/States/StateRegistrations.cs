@@ -8,6 +8,7 @@ using KnockBox.Services.State.Shared;
 using KnockBox.Core.Services.State.Users;
 using KnockBox.Services.State.Users;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 
 namespace KnockBox.Services.Registrations.States
 {
@@ -19,7 +20,14 @@ namespace KnockBox.Services.Registrations.States
             services.AddSingleton<TickService>();
             services.AddSingleton<ITickService>(sp => sp.GetRequiredService<TickService>());
             services.AddHostedService(sp => sp.GetRequiredService<TickService>());
-            services.AddSingleton<ILobbyService, LobbyService>();
+            // LobbyService is a singleton that also participates in the hosted-service
+            // lifecycle so it can dispose every open lobby on ApplicationStopping. Register
+            // the concrete type once and bridge both the ILobbyService and IHostedService
+            // identities to it — otherwise StopAsync would run against a *second* instance
+            // with an empty _lobbies.
+            services.AddSingleton<LobbyService>();
+            services.AddSingleton<ILobbyService>(sp => sp.GetRequiredService<LobbyService>());
+            services.AddHostedService(sp => sp.GetRequiredService<LobbyService>());
 
             // Session service registrations
             services.AddSingleton<ISessionServiceProvider, SessionServiceProvider>();

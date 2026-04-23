@@ -19,26 +19,23 @@ namespace KnockBox.DiceSimulator.Services.Logic.Games
                 return ValueResult<AbstractGameState>.FromError("Failed to create game state.", $"Parameter {nameof(host)} was null.");
 
             var gameState = new DiceSimulatorGameState(host, stateLogger);
-            gameState.UpdateJoinableStatus(true);
+            gameState.Execute(() => gameState.SetJoinable(true));
             logger.LogInformation("Created gameState with user [{userId}] as host.", host.Id);
             return gameState;
         }
 
-        public override async Task<Result> StartAsync(User host, AbstractGameState state, CancellationToken ct = default)
+        protected override Task<Result> StartAsyncCore(AbstractGameState state, CancellationToken ct = default)
         {
             if (state is not DiceSimulatorGameState gameState)
-                return Result.FromError("Error starting game.", $"Game state of type [{(state?.GetType().Name ?? "null")}] couldn't be cast to type [{nameof(DiceSimulatorGameState)}].");
-
-            if (host != gameState.Host)
-                return Result.FromError("Only the host can start the game.");
+                return Task.FromResult(Result.FromError("Error starting game.", $"Game state of type [{(state?.GetType().Name ?? "null")}] couldn't be cast to type [{nameof(DiceSimulatorGameState)}]."));
 
             var executeResult = state.Execute(() =>
             {
-                state.UpdateJoinableStatus(false);
+                state.SetJoinable(false);
             });
 
-            if (executeResult.IsFailure) return executeResult;
-            return Result.Success;
+            if (executeResult.IsFailure) return Task.FromResult(executeResult);
+            return Task.FromResult(Result.Success);
         }
 
         public Result RollDice(User player, DiceSimulatorGameState state, DiceRollAction action)

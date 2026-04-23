@@ -22,18 +22,18 @@
                 <span class="dtd-host-badge">HOST</span>
             </div>
 
-            @foreach (var player in GameState.Players)
+            @foreach (var entry in GameState.Players)
             {
-                bool isMe = player.Id == UserService.CurrentUser?.Id;
+                bool isMe = entry.User.Id == UserService.CurrentUser?.Id;
                 if (isHost)
                 {
                     <div role="listitem">
                         <button class="dtd-player dtd-player-kick @(isMe ? "dtd-player-me" : "")"
-                                @onclick="() => KickPlayer(player.Id)"
-                                aria-label="Kick @player.Name"
-                                title="Click to kick @player.Name">
+                                @onclick="() => KickPlayer(entry.User.Id)"
+                                aria-label="Kick @entry.DisplayName"
+                                title="Click to kick @entry.DisplayName">
                             <span class="dtd-player-avatar" aria-hidden="true">🎨</span>
-                            <span class="dtd-player-name">@player.Name</span>
+                            <span class="dtd-player-name">@entry.DisplayName</span>
                             <span class="dtd-kick-hint" aria-hidden="true">✕ Kick</span>
                         </button>
                     </div>
@@ -42,7 +42,7 @@
                 {
                     <div class="dtd-player @(isMe ? "dtd-player-me" : "")" role="listitem">
                         <span class="dtd-player-avatar" aria-hidden="true">🎨</span>
-                        <span class="dtd-player-name">@player.Name</span>
+                        <span class="dtd-player-name">@entry.DisplayName</span>
                     </div>
                 }
             }

@@ -27,7 +27,7 @@ namespace MyGame;
 /// <para><b>Inherited surface you will actually use:</b></para>
 /// <list type="bullet">
 ///   <item><c>Host</c>, <c>Players</c>, <c>KickedPlayers</c> — roster snapshot.</item>
-///   <item><c>IsJoinable</c> / <c>UpdateJoinableStatus(bool)</c> — controls whether the lobby accepts new joiners.</item>
+///   <item><c>IsJoinable</c> / <c>SetJoinable(bool)</c> — controls whether the lobby accepts new joiners. <c>SetJoinable</c> must be called inside <c>Execute</c>.</item>
 ///   <item><c>Execute(Action)</c> / <c>ExecuteAsync(Func&lt;Task&gt;)</c> — mutation gate.
 ///     Acquire the per-state <c>SemaphoreSlim(1,1)</c>, run your lambda, release,
 ///     then fire <c>StateChangedEventManager</c> after the lock is released.

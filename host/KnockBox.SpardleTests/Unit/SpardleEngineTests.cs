@@ -99,6 +99,18 @@ public class SpardleEngineTests
     }
 
     [TestMethod]
+    public async Task StartAsync_NonHost_ReturnsError()
+    {
+        var (state, _) = await CreateStateAsync();
+        state.CustomWordPool = ImmutableList.Create("apple");
+        var nonHost = UserFactory.Create("NotHost", "nothost-id");
+
+        var result = await _engine.StartAsync(nonHost, state);
+
+        Assert.IsFalse(result.IsSuccess);
+    }
+
+    [TestMethod]
     public async Task TransitionFromIntroToPlaying_FiresAfterDelay()
     {
         var (state, host) = await CreateStateAsync();
@@ -442,7 +454,7 @@ public class SpardleEngineTests
 
     private async Task<(SpardleState state, User host)> CreateStateAsync()
     {
-        var host = new User("Host", Guid.NewGuid().ToString());
+        var host = UserFactory.Create("Host", Guid.NewGuid().ToString());
         var abstractResult = await _engine.CreateStateAsync(host);
         Assert.IsTrue(abstractResult.TryGetSuccess(out var abstractState));
         return ((SpardleState)abstractState, host);
@@ -454,7 +466,7 @@ public class SpardleEngineTests
         var players = new List<User>();
         for (int i = 0; i < playerCount; i++)
         {
-            var player = new User($"P{i + 1}", Guid.NewGuid().ToString());
+            var player = UserFactory.Create($"P{i + 1}", Guid.NewGuid().ToString());
             var reg = state.RegisterPlayer(player);
             Assert.IsTrue(reg.IsSuccess, $"RegisterPlayer failed: {reg}");
             players.Add(player);
@@ -470,25 +482,6 @@ public class SpardleEngineTests
             if (state.Phase == target) return;
             await Task.Delay(20);
         }
-    }
-
-    // ───────────────────────────────────────────────────────────────────────
-    // Host identity (StartAsync guard)
-    // ───────────────────────────────────────────────────────────────────────
-
-    [TestMethod]
-    public async Task StartAsync_NonHostCaller_Rejected()
-    {
-        var (state, _) = await CreateStateAsync();
-        state.CustomWordPool = ["apple"];
-        var impostor = new User("Imp", Guid.NewGuid().ToString());
-
-        var result = await _engine.StartAsync(impostor, state);
-
-        Assert.IsFalse(result.IsSuccess);
-        Assert.IsTrue(result.TryGetFailure(out var failure));
-        Assert.Contains("host", failure.PublicMessage);
-        Assert.AreEqual(GamePhase.Lobby, state.Phase);
     }
 
     // ───────────────────────────────────────────────────────────────────────

@@ -32,22 +32,19 @@ namespace KnockBox.CardCounter.Services.Logic.Games
                     "Failed to create game state.", $"Parameter {nameof(host)} was null.");
 
             var gameState = new CardCounterGameState(host, stateLogger);
-            gameState.UpdateJoinableStatus(true);
+            gameState.Execute(() => gameState.SetJoinable(true));
             gameState.PlayerUnregistered += player => HandlePlayerLeft(player, gameState);
             logger.LogInformation("Created CardCounter state with host [{id}].", host.Id);
             return gameState;
         }
 
-        public override async Task<Result> StartAsync(
-            User host, AbstractGameState state, CancellationToken ct = default)
+        protected override async Task<Result> StartAsyncCore(
+            AbstractGameState state, CancellationToken ct = default)
         {
             if (state is not CardCounterGameState gameState)
                 return Result.FromError(
                     "Error starting game.",
                     $"State type [{state?.GetType().Name}] cannot be cast to [{nameof(CardCounterGameState)}].");
-
-            if (host != gameState.Host)
-                return Result.FromError("Only the host can start the game.");
 
             if (gameState.Players.Count == 0)
                 return Result.FromError("At least one other player must join before starting the game.");
@@ -58,7 +55,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games
 
             var executeResult = gameState.Execute(() =>
             {
-                gameState.UpdateJoinableStatus(false);
+                gameState.SetJoinable(false);
                 gameState.Context = context;
                 InitializeGame(context);
             });
@@ -239,7 +236,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games
                 state.ForceDrawStack.Clear();
                 state.IsNewShoe = false;
                 state.HedgeYourBetPlayerId = null;
-                state.UpdateJoinableStatus(true);
+                state.SetJoinable(true);
             });
         }
 
@@ -374,19 +371,19 @@ namespace KnockBox.CardCounter.Services.Logic.Games
 
             // Register every non-host player
             var playerIds = new List<string>();
-            foreach (var user in state.Players)
+            foreach (var entry in state.Players)
             {
                 var ps = new PlayerState
                 {
-                    PlayerId = user.Id,
-                    DisplayName = user.Name,
+                    PlayerId = entry.User.Id,
+                    DisplayName = entry.DisplayName,
                     PassesRemaining = state.Config.TotalPassesPerPlayer,
                     BuyInRoll = randomNumberService.GetRandomInt(1, 7, RandomType.Fast),
                     ActiveOperator = state.Config.ActiveOperatorMode ? Operator.Add : null
                 };
 
-                state.GamePlayers[user.Id] = ps;
-                playerIds.Add(user.Id);
+                state.GamePlayers[entry.User.Id] = ps;
+                playerIds.Add(entry.User.Id);
             }
             state.TurnManager.SetTurnOrder(playerIds);
 

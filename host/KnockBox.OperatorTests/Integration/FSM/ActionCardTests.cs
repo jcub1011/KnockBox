@@ -29,7 +29,7 @@ public class ActionCardTests
         _rngMock = new Mock<IRandomNumberService>();
         _rngMock.Setup(r => r.GetRandomInt(It.IsAny<int>())).Returns(0);
 
-        var host = new User("Host", "host1");
+        var host = UserFactory.Create("Host", "host1");
         _state = new OperatorGameState(host, NullLogger<OperatorGameState>.Instance);
         _context = new OperatorGameContext(_state, _rngMock.Object);
 

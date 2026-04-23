@@ -42,7 +42,7 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games.FSM.States
                     
                     // Signal to the engine that the match is done by setting phase to Lobby.
                     context.State.SetPhase(GamePhase.Lobby);
-                    context.State.UpdateJoinableStatus(false);
+                    context.State.SetJoinable(false);
                     return null;
                 }
 

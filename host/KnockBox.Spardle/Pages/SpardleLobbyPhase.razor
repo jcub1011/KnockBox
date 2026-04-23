@@ -18,20 +18,20 @@
         <div class="spd-lobby-tagline">HEAD-TO-HEAD WORD COMBAT</div>
 
         @{
-            var roster = State.Players.Prepend(State.Host).ToList();
+            var roster = State.RosterIncludingHost.ToList();
             int idx = 0;
         }
         <div class="spd-lobby-challengers">
             <div class="spd-lobby-challengers-label">CHALLENGERS (@roster.Count)</div>
             <div class="spd-lobby-challengers-list">
-                @foreach (var user in roster)
+                @foreach (var entry in roster)
                 {
-                    bool isHost = user.Id == State.Host.Id;
-                    bool isMe = user.Id == UserService.CurrentUser?.Id;
+                    bool isHost = entry.User.Id == State.Host.Id;
+                    bool isMe = entry.User.Id == UserService.CurrentUser?.Id;
                     string accent = $"spd-opp-{(idx++ % 4) switch { 0 => "a", 1 => "b", 2 => "c", _ => "d" }}";
                     <div class="spd-lobby-chip @accent @(isMe ? "spd-lobby-chip-me" : "")">
-                        <span class="spd-lobby-chip-avatar">@Initials(user.Name)</span>
-                        <span class="spd-lobby-chip-name">@user.Name</span>
+                        <span class="spd-lobby-chip-avatar">@Initials(entry.DisplayName)</span>
+                        <span class="spd-lobby-chip-name">@entry.DisplayName</span>
                         @if (isHost)
                         {
                             <span class="spd-lobby-chip-badge">HOST</span>

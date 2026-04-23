@@ -26,7 +26,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress
             _randomMock = new Mock<IRandomNumberService>();
             _randomMock.Setup(r => r.GetRandomInt(It.IsAny<int>(), It.IsAny<RandomType>())).Returns(0);
             _randomMock.Setup(r => r.GetRandomInt(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<RandomType>())).Returns(0);
-            _host = new User("Host", "host1");
+            _host = UserFactory.Create("Host", "host1");
 
             _engine = new DrawnToDressGameEngine(
                 _engineLoggerMock.Object,
@@ -42,7 +42,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress
             var state = (DrawnToDressGameState)stateResult.Value!;
             await _engine.StartAsync(_host, state);
 
-            var player = new User("Player1", "p1");
+            var player = UserFactory.Create("Player1", "p1");
             state.GamePlayers["p1"] = new DrawnToDressPlayerState { PlayerId = "p1" };
 
             // Act: simulate disconnect by calling HandlePlayerLeft directly.
@@ -60,7 +60,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress
             var state = (DrawnToDressGameState)stateResult.Value!;
             await _engine.StartAsync(_host, state);
 
-            var player = new User("Player1", "p1");
+            var player = UserFactory.Create("Player1", "p1");
             state.GamePlayers["p1"] = new DrawnToDressPlayerState { PlayerId = "p1", IsReady = false };
 
             // Act
@@ -79,7 +79,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
 
-            var disconnectedUser = new User("Player1", "p1");
+            var disconnectedUser = UserFactory.Create("Player1", "p1");
             state.GamePlayers["p1"] = new DrawnToDressPlayerState { PlayerId = "p1", IsReady = false };
             state.GamePlayers["p2"] = new DrawnToDressPlayerState { PlayerId = "p2", IsReady = true };
 
@@ -98,7 +98,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress
             var state = (DrawnToDressGameState)stateResult.Value!;
             await _engine.StartAsync(_host, state);
 
-            var unknownPlayer = new User("Ghost", "unknown-id");
+            var unknownPlayer = UserFactory.Create("Ghost", "unknown-id");
 
             // Act: should not throw — the guard clause returns early.
             _engine.HandlePlayerLeft(unknownPlayer, state);
@@ -115,7 +115,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress
             var state = (DrawnToDressGameState)stateResult.Value!;
             await _engine.StartAsync(_host, state);
 
-            var player = new User("Player1", "p1");
+            var player = UserFactory.Create("Player1", "p1");
             state.GamePlayers["p1"] = new DrawnToDressPlayerState { PlayerId = "p1" };
 
             // Act: disconnect twice.
@@ -140,7 +140,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress
             state.GamePlayers["p2"] = new DrawnToDressPlayerState { PlayerId = "p2", IsReady = false };
 
             // Act: disconnect p1, then p2 readies up.
-            _engine.HandlePlayerLeft(new User("Player1", "p1"), state);
+            _engine.HandlePlayerLeft(UserFactory.Create("Player1", "p1"), state);
 
             Assert.IsTrue(state.GamePlayers["p1"].IsReady);
             Assert.IsFalse(state.GamePlayers["p2"].IsReady);

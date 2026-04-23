@@ -31,22 +31,19 @@ namespace KnockBox.Codeword.Services.Logic.Games
                     "Failed to create game state.", $"Parameter {nameof(host)} was null."));
 
             var gameState = new CodewordGameState(host, stateLogger);
-            gameState.UpdateJoinableStatus(true);
+            gameState.Execute(() => gameState.SetJoinable(true));
             gameState.PlayerUnregistered += player => HandlePlayerLeft(player, gameState);
             logger.LogInformation("Created Codeword state with host [{id}].", host.Id);
             return Task.FromResult<ValueResult<AbstractGameState>>(gameState);
         }
 
-        public override Task<Result> StartAsync(
-            User host, AbstractGameState state, CancellationToken ct = default)
+        protected override Task<Result> StartAsyncCore(
+            AbstractGameState state, CancellationToken ct = default)
         {
             if (state is not CodewordGameState gameState)
                 return Task.FromResult(Result.FromError(
                     "Error starting game.",
                     $"State type [{state?.GetType().Name}] cannot be cast to [{nameof(CodewordGameState)}]."));
-
-            if (host != gameState.Host)
-                return Task.FromResult(Result.FromError("Only the host can start the game."));
 
             var context = new CodewordGameContext(gameState, randomNumberService, logger);
             var fsm = new FiniteStateMachine<CodewordGameContext, CodewordCommand>(logger);
@@ -54,18 +51,18 @@ namespace KnockBox.Codeword.Services.Logic.Games
 
             var executeResult = gameState.Execute(() =>
             {
-                gameState.UpdateJoinableStatus(false);
+                gameState.SetJoinable(false);
                 gameState.Context = context;
 
                 // Snapshot all registered players into GamePlayers.
-                foreach (var user in gameState.Players)
+                foreach (var entry in gameState.Players)
                 {
-                    gameState.GamePlayers[user.Id] = new CodewordPlayerState
+                    gameState.GamePlayers[entry.User.Id] = new CodewordPlayerState
                     {
-                        PlayerId = user.Id,
-                        DisplayName = user.Name
+                        PlayerId = entry.User.Id,
+                        DisplayName = entry.DisplayName
                     };
-                    gameState.TurnManager.TurnOrder.Add(user.Id);
+                    gameState.TurnManager.TurnOrder.Add(entry.User.Id);
                 }
 
                 fsm.TransitionTo(context, new SetupState());
@@ -207,7 +204,7 @@ namespace KnockBox.Codeword.Services.Logic.Games
                 state.CurrentGameNumber = 1;
                 state.EndGameVoteStatus = new EndGameVoteStatus([], 0);
                 state.GameScores.Clear();
-                state.UpdateJoinableStatus(true);
+                state.SetJoinable(true);
             });
         }
 
@@ -244,14 +241,14 @@ namespace KnockBox.Codeword.Services.Logic.Games
                 state.EndGameVoteStatus = new EndGameVoteStatus([], 0);
 
                 // Re-snapshot players.
-                foreach (var user in state.Players)
+                foreach (var entry in state.Players)
                 {
-                    state.GamePlayers[user.Id] = new CodewordPlayerState
+                    state.GamePlayers[entry.User.Id] = new CodewordPlayerState
                     {
-                        PlayerId = user.Id,
-                        DisplayName = user.Name
+                        PlayerId = entry.User.Id,
+                        DisplayName = entry.DisplayName
                     };
-                    state.TurnManager.TurnOrder.Add(user.Id);
+                    state.TurnManager.TurnOrder.Add(entry.User.Id);
                 }
 
                 fsm.TransitionTo(context, new SetupState());

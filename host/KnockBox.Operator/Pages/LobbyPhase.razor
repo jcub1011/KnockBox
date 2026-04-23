@@ -14,21 +14,21 @@
             <h2 class="op-lobby-title">Operator Lobby</h2>
                 
             <div class="op-lobby-players">
-                @foreach (var player in GameState.Players)
+                @foreach (var entry in GameState.Players)
                 {
-                    var isMe = player.Id == UserService.CurrentUser?.Id;
-                    var isHost = player.Id == GameState.Host.Id;
-                    
+                    var isMe = entry.User.Id == UserService.CurrentUser?.Id;
+                    var isHost = entry.User.Id == GameState.Host.Id;
+
                     <div class="op-lobby-player @(isMe ? "op-lobby-player-me" : "")">
-                        <span class="op-player-lobbyname">@player.Name</span>
+                        <span class="op-player-lobbyname">@entry.DisplayName</span>
                         @if (isHost)
                         {
                             <span class="op-host-badge">HOST</span>
                         }
-                        
+
                         @if (UserService.CurrentUser?.Id == GameState.Host.Id && !isHost)
                         {
-                            <button class="op-btn op-btn-danger op-btn-sm" @onclick="() => KickPlayer(player.Id)" title="Kick Player">
+                            <button class="op-btn op-btn-danger op-btn-sm" @onclick="() => KickPlayer(entry.User.Id)" title="Kick Player">
                                 ✕
                             </button>
                         }

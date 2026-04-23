@@ -5,18 +5,20 @@ using KnockBox.Core.Services.State.Games.Shared;
 using KnockBox.Core.Services.State.Users;
 using System.Collections.Concurrent;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using KnockBox.Core.Plugins;
 using KnockBox.Platform.Games;
 
 namespace KnockBox.Services.Logic.Games.Shared
 {
-    internal sealed class LobbyService : ILobbyService
+    internal sealed class LobbyService : ILobbyService, IHostedService
     {
         private readonly ILobbyCodeService _lobbyCodeService;
         private readonly IGameAvailabilityService _gameAvailability;
         private readonly ILogger<LobbyService> _logger;
         private readonly ConcurrentDictionary<string, LobbyRegistration> _lobbies = [];
         private readonly Dictionary<string, GameRegistration> _gamesByRoute;
+        private int _shuttingDown;
 
         public LobbyService(
             IServiceProvider serviceProvider,
@@ -74,6 +76,9 @@ namespace KnockBox.Services.Logic.Games.Shared
             string routeIdentifier,
             CancellationToken ct = default)
         {
+            if (Volatile.Read(ref _shuttingDown) == 1)
+                return ValueResult<LobbyRegistration>.FromError("Host is shutting down; no new lobbies can be created.");
+
             if (string.IsNullOrWhiteSpace(routeIdentifier) || !_gamesByRoute.TryGetValue(routeIdentifier, out var game))
                 return ValueResult<LobbyRegistration>.FromError($"No game registered for route identifier [{routeIdentifier}].");
 
@@ -140,27 +145,21 @@ namespace KnockBox.Services.Logic.Games.Shared
             }
         }
 
-        public async Task<ValueResult<UserRegistration>> JoinLobbyAsync(
+        public Task<ValueResult<UserRegistration>> JoinLobbyAsync(
             User user,
             string lobbyCode,
             CancellationToken ct = default)
         {
             if (!_lobbies.TryGetValue(NormalizeLobbyCode(lobbyCode), out var registration))
-                return ValueResult<UserRegistration>.FromError($"Lobby with code [{lobbyCode}] not found.");
+                return Task.FromResult(ValueResult<UserRegistration>.FromError($"Lobby with code [{lobbyCode}] not found."));
 
-            ValueResult<IDisposable> registrationResult = null!;
-            var executionResult = registration.State.Execute(() =>
-            {
-                registrationResult = registration.State.RegisterPlayer(user);
-            });
-
-            if (executionResult.TryGetFailure(out var error))
-                return ValueResult<UserRegistration>.FromError(error);
-
+            // RegisterPlayer wraps its own gate check + dictionary mutation in Execute;
+            // wrapping here would deadlock on the non-reentrant execute lock.
+            var registrationResult = registration.State.RegisterPlayer(user);
             if (!registrationResult.TryGetSuccess(out var unsubscriber))
-                return ValueResult<UserRegistration>.FromError(registrationResult.Error.Error);
+                return Task.FromResult(ValueResult<UserRegistration>.FromError(registrationResult.Error.Error));
 
-            return new UserRegistration(user, unsubscriber, registration);
+            return Task.FromResult<ValueResult<UserRegistration>>(new UserRegistration(user, unsubscriber, registration));
         }
 
         public IReadOnlyDictionary<string, int> GetLobbyCountsByRoute()
@@ -191,5 +190,43 @@ namespace KnockBox.Services.Logic.Games.Shared
         }
 
         private readonly record struct GameRegistration(IGameModule Module, AbstractGameEngine Engine);
+
+        // ── IHostedService: graceful shutdown ────────────────────────────────
+        //
+        // Snapshots every open lobby on application stop and disposes its state so
+        // subscribers (engine background tasks, scheduled callbacks, Blazor circuit
+        // handlers) get a deterministic OnStateDisposed notification instead of being
+        // torn down mid-flight by the runtime.
+
+        public Task StartAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public Task StopAsync(CancellationToken cancellationToken)
+        {
+            // Flag set *before* the snapshot so any CreateLobbyAsync racing
+            // against shutdown rejects rather than leaking a lobby whose state
+            // never gets disposed.
+            Interlocked.Exchange(ref _shuttingDown, 1);
+
+            // Snapshot first so we don't mutate the collection while enumerating.
+            var snapshot = _lobbies.ToArray();
+            _lobbies.Clear();
+
+            foreach (var kvp in snapshot)
+            {
+                try
+                {
+                    kvp.Value.State.Dispose();
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(
+                        ex,
+                        "Error disposing lobby [{Code}] during shutdown.",
+                        kvp.Key);
+                }
+            }
+
+            return Task.CompletedTask;
+        }
     }
 }

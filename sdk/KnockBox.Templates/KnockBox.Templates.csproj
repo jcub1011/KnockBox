@@ -27,6 +27,14 @@
     <NoWarn>$(NoWarn);NU5128</NoWarn>
     <!-- Ships README.md on NuGet.org. -->
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <!-- Reproducible-build metadata. Templates has no compiled output, so
+         IncludeSymbols/SymbolPackageFormat are no-ops here; keeping the
+         Deterministic + CI + repo flags for parity with the other SDK
+         packages and to normalize pack output across builds. -->
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <RepositoryType>git</RepositoryType>
   </PropertyGroup>
 
   <ItemGroup>

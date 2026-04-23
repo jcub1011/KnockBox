@@ -27,7 +27,7 @@ namespace KnockBox.DiceSimulator.Tests.Unit.Logic
             _randomMock = new Mock<IRandomNumberService>();
             _engineLoggerMock = new Mock<ILogger<DiceSimulatorGameEngine>>();
             _stateLoggerMock = new Mock<ILogger<DiceSimulatorGameState>>();
-            _host = new User("Host", "host1");
+            _host = UserFactory.Create("Host", "host1");
 
             _engine = new DiceSimulatorGameEngine(
                 _randomMock.Object,
@@ -68,11 +68,18 @@ namespace KnockBox.DiceSimulator.Tests.Unit.Logic
         }
 
         [TestMethod]
-        public async Task StartAsync_InvalidHost_ReturnsError()
+        public async Task StartAsync_InvalidStateType_ReturnsError()
+        {
+            var result = await _engine.StartAsync(_host, null!);
+            Assert.IsTrue((bool)result.IsFailure);
+        }
+
+        [TestMethod]
+        public async Task StartAsync_NonHost_ReturnsError()
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DiceSimulatorGameState)stateResult.Value!;
-            var nonHost = new User("Not Host", "non-host");
+            var nonHost = UserFactory.Create("NotHost", "nothost-id");
 
             var result = await _engine.StartAsync(nonHost, state);
 
@@ -80,10 +87,13 @@ namespace KnockBox.DiceSimulator.Tests.Unit.Logic
         }
 
         [TestMethod]
-        public async Task StartAsync_InvalidStateType_ReturnsError()
+        public async Task StartAsync_NullCaller_ReturnsError()
         {
-            // We use a mock or null as invalid cast
-            var result = await _engine.StartAsync(_host, null!);
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (DiceSimulatorGameState)stateResult.Value!;
+
+            var result = await _engine.StartAsync(null!, state);
+
             Assert.IsTrue((bool)result.IsFailure);
         }
 
@@ -104,7 +114,7 @@ namespace KnockBox.DiceSimulator.Tests.Unit.Logic
                 Mode = RollMode.Normal
             };
 
-            var user = new User("Player", "p1");
+            var user = UserFactory.Create("Player", "p1");
 
             var result = _engine.RollDice(user, state, action);
 
@@ -143,7 +153,7 @@ namespace KnockBox.DiceSimulator.Tests.Unit.Logic
                 Mode = RollMode.Advantage
             };
 
-            var user = new User("Player", "p1");
+            var user = UserFactory.Create("Player", "p1");
             var result = _engine.RollDice(user, state, action);
 
             Assert.IsTrue((bool)result.IsSuccess);
@@ -171,7 +181,7 @@ namespace KnockBox.DiceSimulator.Tests.Unit.Logic
                 Mode = RollMode.Disadvantage
             };
 
-            var user = new User("Player", "p1");
+            var user = UserFactory.Create("Player", "p1");
             var result = _engine.RollDice(user, state, action);
 
             Assert.IsTrue((bool)result.IsSuccess);
@@ -222,7 +232,7 @@ namespace KnockBox.DiceSimulator.Tests.Unit.Logic
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DiceSimulatorGameState)stateResult.Value!;
-            var user = new User("A", "B");
+            var user = UserFactory.Create("A", "B");
             
             var result = _engine.ClearHistory(user, state);
             Assert.IsTrue((bool)result.IsFailure);

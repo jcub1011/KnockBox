@@ -13,19 +13,25 @@ The solution is split into the host project, a shared core library, one class li
 | Project | Type | Purpose |
 |---|---|---|
 | `KnockBox` | ASP.NET Core Web App (Blazor Server) | Entry point: host-side routing, DI bootstrapping, database, middleware, plugin discovery |
-| `KnockBox.Core` | Class Library | Shared platform infrastructure: `IGameModule` / `PluginLoader`, `AbstractGameState`, `AbstractGameEngine`, session services, navigation, `IRandomNumberService`, result types, thread-safety utilities, `DisposableComponent` |
+| `KnockBox.Core` | Class Library (SDK NuGet) | Shared platform infrastructure: `IGameModule` / `IPluginManifest` / `IPluginContext` / `IPluginRegistration` / `PluginLoader`, `AbstractGameState`, `AbstractGameEngine`, session services, navigation, `IRandomNumberService`, result types, thread-safety utilities, `DisposableComponent` |
+| `KnockBox.Platform` | Class Library (SDK NuGet) | Hosting SDK: `AddKnockBoxPlatform` / `UseKnockBoxPlatform`, `LobbyService`, `SessionServiceProvider`, home/error pages, default plugin-context wiring, static-asset mounting |
+| `KnockBox.Plugins.Analyzer` | netstandard2.0 Roslyn analyzer (SDK NuGet) | Build-time lints KB1001-KB1004 flagging filesystem / network / process / env sandbox-escaping APIs in plugin projects |
+| `KnockBox.Templates` | `dotnet new` template pack (SDK NuGet) | `knockbox-game` template: scaffolds a plugin RCL + DevHost + tests with `plugin.json` and analyzer reference pre-wired |
 | `KnockBox.CardCounter` | Class Library (game plugin) | Card Counter game logic, state, Razor pages |
-| `KnockBox.DiceSimulator` | Class Library (game plugin) | Dice Simulator game logic, state, Razor pages |
 | `KnockBox.Codeword` | Class Library (game plugin) | Codeword game logic, state, Razor pages |
+| `KnockBox.DiceSimulator` | Class Library (game plugin) | Dice Simulator game logic, state, Razor pages |
 | `KnockBox.DrawnToDress` | Class Library (game plugin) | Drawn To Dress game logic, state, Razor pages |
+| `KnockBox.HiddenAgenda` | Class Library (game plugin) | Hidden Agenda game logic, state, Razor pages |
 | `KnockBox.Operator` | Class Library (game plugin) | Operator game logic, state, Razor pages |
+| `KnockBox.Spardle` | Class Library (game plugin) | Spardle game logic, state, Razor pages |
+| `KnockBox.TaskMaster` | Class Library (game plugin) | TaskMaster game logic, state, Razor pages |
 | `KnockBox.CoreTests` | MSTest | Unit tests for `KnockBox.Core` |
-| `KnockBox.CardCounterTests` | MSTest | Unit tests for `KnockBox.CardCounter` |
-| `KnockBox.DiceSimulatorTests` | MSTest | Unit and integration tests for `KnockBox.DiceSimulator` |
-| `KnockBox.CodewordTests` | MSTest | Unit tests for `KnockBox.Codeword` |
-| `KnockBox.DrawnToDressTests` | MSTest | Unit tests for `KnockBox.DrawnToDress` |
-| `KnockBox.OperatorTests` | MSTest | Unit tests for `KnockBox.Operator` |
+| `KnockBox.PlatformTests` | MSTest | Unit tests for `KnockBox.Platform` |
+| `KnockBox.Plugins.AnalyzerTests` | MSTest | Analyzer rule tests (custom Roslyn harness) |
+| `KnockBox.{Game}Tests` | MSTest | One per first-party plugin — unit and integration tests for that game |
 | `KnockBoxTests` | MSTest | Integration tests for the main `KnockBox` project (repository layer, etc.) |
+
+The repository ships **eight first-party game plugins**: CardCounter, Codeword, DiceSimulator, DrawnToDress, HiddenAgenda, Operator, Spardle, TaskMaster.
 
 **`KnockBox` references only `KnockBox.Core`.** Game projects are *not* referenced at compile time — they are loaded at runtime from the `games/` subdirectory alongside the host's binaries (see **Plugin System**). Every game project references `KnockBox.Core` only. Adding, removing, or renaming a game never requires a change to `KnockBox` or to any other game.
 
@@ -63,58 +69,91 @@ Each plugin exposes exactly one `IGameModule` implementation with a public param
 ```csharp
 public interface IGameModule
 {
-    string Name { get; }
-    string Description { get; }
-    string RouteIdentifier { get; }      // e.g. "card-counter"
-    void RegisterServices(IServiceCollection services);
+    IPluginManifest Manifest { get; }
+    void RegisterServices(IPluginRegistration registration);
+    RenderFragment GetButtonContent();
+    RenderFragment? GetCustomHeader() => null;
 }
 ```
 
-A typical implementation is trivial:
+Identity — name, description, `RouteIdentifier`, `Version`, `EntryAssembly`, declared capabilities — lives on the `IPluginManifest` returned by `Manifest`. The manifest is typically read from an embedded `plugin.json` resource so the in-code copy and the on-disk copy come from the same source file:
 
 ```csharp
 public class CardCounterModule : IGameModule
 {
-    public string Name => "Card Counter";
-    public string Description => "High stakes blackjack style counting.";
-    public string RouteIdentifier => "card-counter";
+    public IPluginManifest Manifest { get; } =
+        PluginManifest.FromEmbeddedResourceOrThrow(typeof(CardCounterModule).Assembly);
 
-    public void RegisterServices(IServiceCollection services)
-        => services.AddGameEngine<CardCounterGameEngine>(RouteIdentifier);
+    public void RegisterServices(IPluginRegistration registration)
+        => registration.AddGameEngine<CardCounterGameEngine>();
+
+    public RenderFragment GetButtonContent() => builder =>
+    {
+        builder.OpenComponent<CardCounterTile>(0);
+        builder.CloseComponent();
+    };
 }
 ```
+
+### `plugin.json` + `IPluginManifest`
+
+Every plugin folder contains a `plugin.json` that declares the plugin's identity and the host capabilities it wants access to (`PluginManifest` in `sdk/KnockBox.Core/Plugins/PluginManifest.cs`):
+
+```json
+{
+  "schemaVersion": 1,
+  "name": "Card Counter",
+  "description": "High stakes blackjack style counting.",
+  "routeIdentifier": "card-counter",
+  "version": "1.0.0",
+  "entryAssembly": "KnockBox.CardCounter",
+  "capabilities": []
+}
+```
+
+`schemaVersion` is pinned at 1. `routeIdentifier` must match `^[a-z0-9-]+$` and doubles as the URL segment (`/room/{routeIdentifier}/...`) and the DI key for the keyed `AbstractGameEngine`. `capabilities` is a list of zero or more of `config` / `storage`; each entry unlocks the matching `IPluginContext` surface at runtime (`IPluginContext.Configuration`, `IPluginContext.Storage`). Accessing an un-declared capability throws `PluginCapabilityNotGrantedException` on first read.
+
+The loader reads `plugin.json` before it loads the plugin DLL, then cross-checks the parsed manifest against the module's in-code `Manifest` property. Any disagreement (different name, mismatched route, different schema, etc.) rejects the plugin.
+
+### `IPluginContext` and `IPluginRegistration`
+
+`RegisterServices` does **not** receive a raw `IServiceCollection` — it receives an `IPluginRegistration` (`sdk/KnockBox.Core/Plugins/IPluginRegistration.cs`), the plugin's only handle on DI:
+
+- `AddGameEngine<TEngine>()` — exactly once per plugin. Registers `TEngine` as a singleton and the same instance as a keyed `AbstractGameEngine` under the plugin's own route identifier.
+- `AddSingleton<TService, TImplementation>()` / `AddScoped` / `AddTransient` — plugin-private registrations.
+- Factory overloads (`AddSingleton<T>(Func<IPluginContext, T>)` etc.) — lets plugin services close over their `IPluginContext` (per-plugin `ILogger`, `IConfiguration`, `IPluginStorage`) captured at registration time.
+
+Every registration goes through `DefaultPluginRegistration` (`sdk/KnockBox.Platform/Plugins/DefaultPluginRegistration.cs`), which silently drops registrations that target host-owned service types. See **Sandbox Surface / Host-service denylist** below.
 
 ### `PluginLoader`
 
-`PluginLoader` (`sdk/KnockBox.Core/Plugins/PluginLoader.cs`) is invoked from `Program.cs` before `RegisterLogic`. It:
+`PluginLoader` (`sdk/KnockBox.Core/Plugins/PluginLoader.cs`) is invoked from `AddKnockBoxPlatform` before `RegisterLogic`. It:
 
-1. Scans subdirectories of `games/` and loads each `{PluginName}.dll` into its own `PluginLoadContext` (`sdk/KnockBox.Core/Plugins/PluginLoadContext.cs`), which uses `AssemblyDependencyResolver` to satisfy transitive deps from the plugin folder while deferring shared-contract assemblies (anything already resolved by the host) to the default ALC.
-2. Reflects over each assembly for non-abstract, non-interface types assignable to `IGameModule`, handling `ReflectionTypeLoadException` gracefully.
-3. Activates each module via `Activator.CreateInstance` (parameterless constructor required).
-4. De-duplicates by `RouteIdentifier` (case-insensitive) — first wins, subsequent duplicates are logged as errors.
-5. Returns a `PluginLoadResult(IReadOnlyList<IGameModule> Modules, IReadOnlyList<Assembly> Assemblies)`.
+1. Scans subdirectories of `games/` and, for each subfolder, parses `plugin.json` into an `IPluginManifest`. Manifest shape failures (unknown capabilities, bad route identifier, missing fields, wrong schema version) reject the plugin before any DLL loads.
+2. Inspects the plugin's `{EntryAssembly}.deps.json` via `InspectDepsJson`. This surfaces two gates:
+   - **Forbidden dependencies** — plugins that list `KnockBox.Platform` (or any entry from the static forbidden-dependencies set) in their compile graph are rejected; they would drag platform types into the plugin ALC and break type identity. Adding or removing entries from the forbidden set requires an SDK release — it is not host-configurable.
+   - **`KnockBox.Core` version gate** — the loader reads the Core version the plugin was compiled against and rejects plugins compiled against a newer Core than the host. Prerelease / build-suffixes on the version string (`-alpha`, `+build`) are stripped before parsing.
+3. Loads each `{EntryAssembly}.dll` into its own `PluginLoadContext` (`sdk/KnockBox.Core/Plugins/PluginLoadContext.cs`), which uses `AssemblyDependencyResolver` to satisfy transitive deps from the plugin folder while deferring shared-contract assemblies (anything already resolved by the host) to the default ALC.
+4. Reflects over each assembly for non-abstract types assignable to `IGameModule`, handling `ReflectionTypeLoadException` gracefully.
+5. Activates the single matching module via `Activator.CreateInstance` **inside a 5-second timeout** (`Task.Run` + `Wait(timeout)`). Hanging ctors log an error and the plugin is skipped.
+6. Cross-checks the activated module's `Manifest` against the on-disk manifest; rejects mismatches.
+7. De-duplicates by `RouteIdentifier` (case-insensitive) — first wins, subsequent duplicates are logged as errors.
+8. Returns a `PluginLoadResult(IReadOnlyList<LoadedPlugin> Plugins, IReadOnlyList<Assembly> Assemblies)` where each `LoadedPlugin` carries the module, its manifest, and a pointer to its load context.
 
-A single misbehaving plugin (missing primary DLL, type load failure, ctor throw) is logged and skipped; it does not prevent the host from starting.
+A single misbehaving plugin (missing DLL, malformed `plugin.json`, type load failure, ctor throw, ctor timeout, manifest mismatch, forbidden dep, newer Core) is logged and skipped; it does not prevent the host from starting.
 
 ### `AddGameEngine<TEngine>` Helper
 
-Modules register their engine via a Core-provided extension (`sdk/KnockBox.Core/Plugins/GameModuleServiceCollectionExtensions.cs`):
+`IPluginRegistration.AddGameEngine<TEngine>()` does two registrations under the plugin's own route identifier:
 
 ```csharp
-public static IServiceCollection AddGameEngine<TEngine>(
-    this IServiceCollection services,
-    string routeIdentifier)
-    where TEngine : AbstractGameEngine
-{
-    services.AddSingleton<TEngine>();
-    services.AddKeyedSingleton<AbstractGameEngine>(
-        routeIdentifier,
-        (sp, _) => sp.GetRequiredService<TEngine>());
-    return services;
-}
+services.AddSingleton<TEngine>();
+services.AddKeyedSingleton<AbstractGameEngine>(
+    routeIdentifier,
+    (sp, _) => sp.GetRequiredService<TEngine>());
 ```
 
-The concrete engine is a singleton, and the same instance is exposed as a keyed `AbstractGameEngine`. This lets Razor pages inject the concrete engine directly (`@inject CardCounterGameEngine Engine`) while `LobbyService` resolves generically by route key via `IServiceProvider.GetKeyedService<AbstractGameEngine>(routeIdentifier)` — a single instance serves both paths.
+The concrete engine is a singleton, and the same instance is exposed as a keyed `AbstractGameEngine`. This lets Razor pages inject the concrete engine directly (`@inject CardCounterGameEngine Engine`) while `LobbyService` resolves generically by route key via `IServiceProvider.GetKeyedService<AbstractGameEngine>(routeIdentifier)` — a single instance serves both paths. `AddGameEngine` must be called **exactly once** per plugin; zero or multiple calls are flagged by the loader and the plugin is marked unreachable.
 
 ### `GamePluginAssemblies`
 
@@ -269,16 +308,25 @@ public class LobbyRegistration(string lobbyCode, string lobbyUri, string gameNam
 
 ### User
 
-Players are identified by a `User` class containing `Name` (max 12 characters, trimmed) and `Id` (a UUIDv7 string). The `Id` is unique per Blazor circuit and is used for all authorization checks, action routing, and player tracking. `Name` is the player's chosen display name, persisted to browser `localStorage` via JS interop. The `User` class fires a `NameChanged` event when the name is mutated.
+Players are identified by a `User` class containing `Name` (max 12 characters, trimmed) and `Id` (a UUIDv7 string). The `Id` is unique per Blazor circuit and is used for all authorization checks, action routing, and player tracking. `Name` is the player's chosen display name, persisted to browser `localStorage` via the `IUserService` when it changes.
+
+The `User` type is intentionally narrow in v1:
 
 ```csharp
-public class User(string name, string id)
+public class User
 {
-    public string Name { get; set; }  // Capped to 12 chars, trimmed, fires NameChanged
-    public string Id => id;
-    public event Action<UserNameChangedArgs>? NameChanged;
+    internal User(string name, string id);     // internal ctor
+    public string Name { get; internal set; }  // internal setter
+    public string Id { get; }
+}
+
+public static class UserFactory
+{
+    public static User Create(string name, string id);  // test fixture factory
 }
 ```
+
+The constructor is `internal` so external code cannot bypass `IUserService` to mint arbitrary users. Plugin test code constructs `User` fixtures via `UserFactory.Create(name, id)` in `KnockBox.Core.Services.State.Users`. In-repo callers that need the internal setter (the name-disambiguation pass in `AbstractGameState.RegisterPlayer` is the only one) live in `KnockBox.Core` and access it directly. Production mutation goes through `IUserService.SetCurrentUserName`.
 
 ### UserRegistration
 
@@ -306,18 +354,32 @@ public abstract class AbstractGameEngine
     public int MaxPlayerCount { get; }
     public int MinPlayerCount { get; }
 
-    public abstract Task<ValueResult<AbstractGameState>> CreateStateAsync(User host, CancellationToken ct = default);
-    public abstract Task<Result> StartAsync(User host, AbstractGameState state, CancellationToken ct = default);
+    public abstract Task<ValueResult<AbstractGameState>> CreateStateAsync(
+        User host, CancellationToken ct = default);
 
-    public virtual Task<bool> CanStartAsync(AbstractGameState state)
-    {
-        return Task.FromResult(
-            MinPlayerCount <= state.Players.Count
-            && state.Players.Count <= MaxPlayerCount
-            && state.IsJoinable);
-    }
+    // Public entry point — sealed in the base class. Verifies
+    // caller.Id == state.Host.Id before delegating to StartAsyncCore.
+    public Task<Result> StartAsync(
+        User caller, AbstractGameState state, CancellationToken ct = default);
+
+    // Plugin override point. Host-identity authorization has already happened.
+    protected abstract Task<Result> StartAsyncCore(
+        AbstractGameState state, CancellationToken ct = default);
+
+    public virtual Task<bool> CanStartAsync(
+        AbstractGameState state, CancellationToken ct = default)
+        => Task.FromResult(HasValidPlayerCount(state) && IsLobbyOpen(state));
+
+    protected bool HasValidPlayerCount(AbstractGameState state)
+        => MinPlayerCount <= state.Players.Count && state.Players.Count <= MaxPlayerCount;
+
+    protected bool IsLobbyOpen(AbstractGameState state) => state.IsJoinable;
 }
 ```
+
+`StartAsync(caller, state)` is sealed in the base class and verifies that `caller.Id == state.Host.Id` before calling the plugin's `StartAsyncCore` override. Host-identity authorization is enforced once by the platform — plugins never re-check it. The same pattern is used by `KickPlayer`, so plugins get a consistent auth story across command paths.
+
+`HasValidPlayerCount` and `IsLobbyOpen` are `protected` helpers that `CanStartAsync` composes; plugins override `CanStartAsync` with game-specific readiness rules and combine them with the baseline checks.
 
 `AbstractGameEngine` is purely server-side, concerned only with game logic and state transitions. It has no knowledge of UI components.
 
@@ -339,7 +401,7 @@ The state exposes `WithExclusiveRead` and `WithExclusiveReadAsync` for non-mutat
 
 #### Scheduled Callbacks
 
-The state exposes a `ScheduleCallback` method that allows game engines to schedule delayed state transitions. `ScheduleCallback` accepts a `TimeSpan` delay and a `Func<Task>` action, and returns a `ValueResult<CancellationTokenSource>` that the caller can use to cancel the scheduled callback before it fires. Internally, the scheduled action is executed via `ExecuteAsync` when the delay elapses, ensuring it follows the same locking and notification semantics as any player-driven mutation. All outstanding callbacks are automatically cancelled when the state is disposed.
+The state exposes a `ScheduleCallback` method that allows game engines to schedule delayed state transitions. It accepts a `TimeSpan` delay and a `Func<Task>` action, and returns a `ValueResult<IScheduledCallbackHandle>` (`sdk/KnockBox.Core/Primitives/Disposable/IScheduledCallbackHandle.cs`). The handle exposes `Cancel()` and `IDisposable.Dispose()` — both idempotent and safe to call after the owning state has been disposed; neither leaks the underlying `CancellationTokenSource`. Internally the scheduled action is invoked via `ExecuteAsync` when the delay elapses, so it follows the same locking and notification semantics as any player-driven mutation. All outstanding callbacks are automatically cancelled when the state is disposed.
 
 ```csharp
 public abstract class AbstractGameState(User host, ILogger logger) : IDisposable
@@ -355,26 +417,39 @@ public abstract class AbstractGameState(User host, ILogger logger) : IDisposable
 
     public ValueResult<IDisposable> RegisterPlayer(User player);
     public Result KickPlayer(User player);
-    public void UpdateJoinableStatus(bool isJoinable);
+
+    /// MUST be called from inside Execute / ExecuteAsync. The setter itself
+    /// does not take a lock; callers rely on the outer Execute to serialize
+    /// against the IsJoinable gate in RegisterPlayer.
+    public void SetJoinable(bool isJoinable);
 
     public ValueTask<Result> ExecuteAsync(Func<ValueTask> action, CancellationToken ct = default);
     public Result Execute(Action action);
     public ValueResult<TReturn> Execute<TReturn>(Func<TReturn> action);
     public ValueTask<Result> WithExclusiveReadAsync(Func<ValueTask> action, CancellationToken ct = default);
     public Result WithExclusiveRead(Action action);
-    public ValueResult<CancellationTokenSource> ScheduleCallback(TimeSpan delay, Func<Task> action);
+    public ValueResult<IScheduledCallbackHandle> ScheduleCallback(TimeSpan delay, Func<Task> action);
 }
 ```
 
+`Execute` always fires `StateChangedEventManager.Notify()` when it releases the lock, regardless of whether the inner mutation changed anything. The pre-v1 `UpdateJoinableStatus(bool)` suppressed the notify when the value was unchanged — `SetJoinable` does not. Callers that care about same-value idempotence must gate on the inside.
+
+Exceptions during `Execute` / `ExecuteAsync` are caught and the dispose race is reported as a specific `ObjectDisposedException`-class failure; the unified public error message is "State was disposed." across both already-disposed and in-flight-disposal paths. `PlayerUnregistered` and `OnStateDisposed` invocation lists are iterated with per-handler error isolation — one throwing subscriber does not short-circuit the rest.
+
 ### IUserService
 
-A scoped service (one per Blazor circuit) that manages the current user's identity. On `InitializeCurrentUserAsync`, loads the stored username from browser `localStorage` (falls back to "Not Set") and creates a `User` with a UUIDv7 ID. Persists name changes back to `localStorage` by subscribing to the `User.NameChanged` event.
+A scoped service (one per Blazor circuit) that manages the current user's identity. On `InitializeCurrentUserAsync`, loads the stored username from browser `localStorage` (falls back to "Not Set") and creates a `User` with a UUIDv7 ID. Name changes flow through `SetCurrentUserName`, which owns trimming, the 12-character cap, the `UserNameChanged` event fan-out (per-handler error isolation), and the fire-and-forget persistence back to `localStorage`.
 
 ```csharp
 public interface IUserService
 {
     User? CurrentUser { get; }
+    event Action? UserInitialized;
+    event Action<UserNameChangedArgs>? UserNameChanged;
+
     Task InitializeCurrentUserAsync(CancellationToken ct = default);
+    Task ResetIdentityAsync(CancellationToken ct = default);
+    void SetCurrentUserName(string name);
 }
 ```
 
@@ -535,12 +610,11 @@ The following diagram shows the complete lifecycle from a player joining an exis
         │                                                                  │ <─────────────────────│
         │                                                                  │                      │
         │                                                                  │  engine.StartAsync(  │
-        │                                                                  │    host, state)      │
+        │                                                                  │    state)            │
         │                                                        ┌─────────────────────────┐      │
         │                                                        │  Execute:                │      │
         │                                                        │    Acquire lock          │      │
-        │                                                        │    UpdateJoinableStatus  │      │
-        │                                                        │    (false)               │      │
+        │                                                        │    SetJoinable(false)    │      │
         │                                                        │    Release lock          │      │
         │                                                        │    NotifyChanged()       │      │
         │                                                        └─────────────────────────┘      │
@@ -573,8 +647,9 @@ Players cannot join a lobby once the game state's `IsJoinable` is set to `false`
 ### Start Game
 
 1. Host clicks start in the game's lobby view.
-2. The game engine's `StartAsync(host, state)` is called. It verifies the caller is the host, then calls `state.Execute(...)` to initialize game data and close the lobby (`UpdateJoinableStatus(false)`).
-3. The state notifies all subscribers, causing all circuits to re-render.
+2. The lobby page calls `engine.StartAsync(UserService.CurrentUser, state)`. The base-class `StartAsync` verifies `caller.Id == state.Host.Id` and returns a failure Result for non-host callers.
+3. On authorized calls, the base delegates to the plugin's `StartAsyncCore(state)` override, which calls `state.Execute(...)` to initialize game data and close the lobby (`state.SetJoinable(false)` inside the Execute lambda).
+4. The state notifies all subscribers, causing all circuits to re-render.
 
 ### Gameplay
 
@@ -608,17 +683,47 @@ Adding a game requires these steps:
 
 3. **Subclass `AbstractGameState`** — define a concrete state class with the strongly-typed properties your game needs. The host, player list, lock, subscription, notification, and scheduled callback infrastructure is inherited.
 
-4. **Subclass `AbstractGameEngine`** — implement `CreateStateAsync(User host)` to return the concrete state instance (wrapped in `ValueResult`), implement `StartAsync(User host, AbstractGameState state)` to begin gameplay, and add game-specific action methods. Each method calls `state.Execute`/`state.ExecuteAsync` — locking and notification are handled automatically.
+4. **Subclass `AbstractGameEngine`** — implement `CreateStateAsync(User host, CancellationToken)` to return the concrete state instance (wrapped in `ValueResult`), implement `StartAsync(AbstractGameState state, CancellationToken)` to begin gameplay (the engine does not receive a `User` — caller-identity checks live in the lobby page), and add game-specific action methods. Each method calls `state.Execute`/`state.ExecuteAsync` — locking and notification are handled automatically. Use `SetJoinable` from inside an `Execute` lambda to close the lobby. Optionally override `CanStartAsync(state, ct)` and compose with the protected `HasValidPlayerCount(state)` helper.
 
-5. **Create Razor page(s)** — add one or more pages inheriting `DisposableComponent` with `@page "/room/{route-identifier}/{ObfuscatedRoomCode}"`. Inject the concrete engine via DI, subscribe to `state.StateChangedEventManager`, validate the session in `OnInitializedAsync`, and dispose the subscription in `Dispose()`. Any `wwwroot/` assets are served automatically from `/_content/KnockBox.{GameName}`.
+5. **Create Razor page(s)** — add one or more pages inheriting `DisposableComponent` with `@page "/room/{route-identifier}/{ObfuscatedRoomCode}"`. Inject the concrete engine via DI, subscribe to `state.StateChangedEventManager`, validate the session in `OnInitializedAsync`, enforce host-only `StartAsync` at the page layer, and dispose the subscription in `Dispose()`. Any `wwwroot/` assets are served automatically from `/_content/KnockBox.{GameName}`.
 
-6. **Implement `IGameModule`** — add a class to the game project with a public parameterless constructor that implements `IGameModule`. Supply `Name`, `Description`, `RouteIdentifier`, and in `RegisterServices` call `services.AddGameEngine<YourEngine>(RouteIdentifier)` (plus any other game-specific DI). The `RouteIdentifier` must match the route segment used in the game's `@page` directives.
+6. **Author `plugin.json`** — create a `plugin.json` at the plugin project root with `schemaVersion`, `name`, `description`, `routeIdentifier`, `version`, `entryAssembly`, and `capabilities`. Mark it as an `<EmbeddedResource>` in the csproj so `PluginManifest.FromEmbeddedResourceOrThrow` can read it, and `Directory.Plugin.targets` will also copy it alongside the DLL into `games/`. The `routeIdentifier` must match the route segment used in the game's `@page` directives.
+
+7. **Implement `IGameModule`** — add a class to the game project with a public parameterless constructor (returning within 5 seconds). Expose the manifest via `PluginManifest.FromEmbeddedResourceOrThrow(typeof(MyModule).Assembly)`, implement `GetButtonContent()` to render the home-page tile, and in `RegisterServices(IPluginRegistration registration)` call `registration.AddGameEngine<YourEngine>()` (plus any other game-specific DI). Optionally override `GetCustomHeader()` to replace the host's default in-room header.
 
 No changes to `KnockBox`, `KnockBox.Core`, or any other game project are required. After a rebuild the platform discovers the new plugin, registers its engine, mounts its static assets, and the game appears on the home page automatically.
 
 ### Sandbox Surface
 
 Plugin projects are analyzed at build time by `KnockBox.Plugins.Analyzer` (rules KB1001–KB1004). The analyzer flags direct filesystem access (KB1001 — use `IPluginContext.Storage` instead; the path-accepting `StreamReader(string)` / `StreamWriter(string)` ctors are flagged, but stream-accepting overloads are exempt), outbound network traffic and name resolution (KB1002 — outbound network from plugins is not supported, covering `HttpClient`, raw sockets, `Dns`, `Ping`, `NetworkInterface`, `SmtpClient`), process launch or host shutdown (KB1003 — not permitted, including `Process.Start` and `Environment.Exit` / `Environment.FailFast`), and raw environment-variable reads (KB1004 — use `IPluginContext.Configuration`). Rules ship as warnings, not errors; use `#pragma warning disable KBxxxx` with a justification comment when you have a considered reason (e.g., reading a bundled read-only CSV via `<Content CopyToOutputDirectory>`). These are build-time lints and do not block reflection-based bypass (`Activator.CreateInstance`, `Type.GetType`) — the plugin trust model above still applies as the authoritative security boundary.
+
+### Host-service denylist
+
+`DefaultPluginRegistration` (`sdk/KnockBox.Platform/Plugins/DefaultPluginRegistration.cs`) is what a plugin's `IPluginRegistration` calls land on. Every `AddSingleton` / `AddScoped` / `AddTransient` / `AddGameEngine` is routed through an `IsHostOwned(Type)` check that consults two sets:
+
+1. **Static `AlwaysProtectedTypes`** — a `FrozenSet<Type>` of plugin-system primitives (`IPluginContext`, `IPluginRegistration`, `IPluginManifest`, `IPluginStorage`, `IGameModule`, `AbstractGameEngine`, `AbstractGameState`) and Microsoft.Extensions fundamentals (`IConfiguration`, `IHostedService`, `IHostApplicationLifetime`, `ILoggerFactory`, `ILogger`, `ILogger<>`). These are blocked regardless of what's in the `IServiceCollection` at plugin-registration time.
+2. **Dynamic snapshot** — `DefaultPluginRegistration.CaptureHostOwnedServiceTypes(IServiceCollection)` is called at the top of `LogicRegistrations.RegisterLogic`, before the plugin loop starts. It walks every descriptor and records each `ServiceType`, promoting closed generics to their open definition. The result is a `FrozenSet<Type>` passed to every `DefaultPluginRegistration` constructor. Any type the host registered *before* `RegisterLogic` (repositories, validators, state services, navigation, drawing, `LobbyService`, `SessionServiceProvider`, etc.) is automatically protected — the denylist is self-maintaining.
+
+Closed generics are reduced to their open definition before the check, so a plugin's `ILogger<MyPluginService>` registration is rejected because the host's `ILogger<>` is in `AlwaysProtectedTypes`. Rejected registrations are dropped silently and logged at error level — the plugin continues loading without the rogue registration.
+
+The denylist is not host-configurable. Adding or removing entries requires an SDK release because they affect the plugin contract.
+
+### Lobby lifecycle hooks
+
+`LobbyService` implements `IHostedService` (registered both as `ILobbyService` and as a hosted service, backed by a single concrete singleton registration). On `StopAsync` it snapshots the lobby dictionary, clears it, and disposes every open `AbstractGameState` — each in a try/catch so one bad state doesn't orphan the rest. This ensures a clean host shutdown releases state semaphores, cancels scheduled callbacks, and flushes any downstream subscriptions.
+
+The host-eviction-closes-lobby chain runs outside `StopAsync` and covers the "host's circuit dropped and the 1-minute grace period elapsed" case:
+
+1. `GameSessionService` is disposed with the host's circuit; its `LifecycleToken` on `GameSessionState` releases.
+2. `SessionServiceProvider`'s eviction timer fires after the grace period (driven by `TimeProvider.Delay`, so tests can advance a `FakeTimeProvider` synchronously).
+3. `GameSessionState.Dispose()` runs `TakeCurrentSession()?.Dispose()` → the `disposeAction` closure in `Home.razor.cs` → `LobbyService.CloseLobbyAsync(host, lobby)`.
+4. `CloseLobbyAsync` removes the lobby from the dictionary, releases the lobby code, disposes the state (which disposes the semaphore, cancels scheduled callbacks, fires `OnStateDisposed`, and propagates to every subscriber's re-render, which navigates non-host players home).
+
+### SDK versioning and compatibility
+
+`KnockBox.Core` follows SemVer. Inside a major the plugin-facing contract (`IGameModule`, `IPluginManifest`, `IPluginContext`, `IPluginRegistration`, `AbstractGameEngine`, `AbstractGameState`) is stable. The host, the SDK packages, and the template pack all share a major — host `1.x.x` runs plugins compiled against SDK `1.x.x`. Plugins pin `KnockBox.Core [1.0.0, 2.0.0)` and are rejected by a host on SDK `1.x.x` if their `.deps.json` reports a Core version newer than the host's.
+
+Breaking changes to any contract above bump the SDK and host to `2.0.0` in lock-step. Non-breaking additions ship as minor; bug fixes as patch. The SDK-side authorial guide is [`docs/making-a-game-plugin.md`](../../../docs/making-a-game-plugin.md).
 
 ---
 
@@ -634,8 +739,12 @@ DI is organized into registration extension methods called from `Program.cs` in 
 | `ILobbyCodeService` | `LobbyCodeService` | Lobby code generation and release |
 | `IRandomNumberService` | `RandomNumberService` | Fast and secure random number generation |
 
-After the core singletons, `RegisterLogic` iterates `pluginLoadResult.Modules` and for each module:
-- Invokes `module.RegisterServices(services)`, which typically calls `services.AddGameEngine<TEngine>(RouteIdentifier)` — registering the concrete engine as a singleton *and* exposing it as a keyed `AbstractGameEngine` under the module's `RouteIdentifier`.
+Before the plugin loop starts, `RegisterLogic` calls `DefaultPluginRegistration.CaptureHostOwnedServiceTypes(services)` and stores the resulting `FrozenSet<Type>` — this is the dynamic half of the denylist described in **Host-service denylist** above.
+
+After the core singletons, `RegisterLogic` iterates `pluginLoadResult.Plugins` and for each one:
+- Constructs a per-plugin `DefaultPluginRegistration` (with the plugin's manifest and the host-owned type snapshot) and invokes `module.RegisterServices(registration)`, which typically calls `registration.AddGameEngine<TEngine>()` — registering the concrete engine as a singleton *and* exposing it as a keyed `AbstractGameEngine` under the manifest's `RouteIdentifier`.
+- Asserts the plugin called `AddGameEngine` exactly once; zero or more-than-one calls flag the plugin as unreachable.
+- Registers a keyed `IPluginContext` under the plugin's `RouteIdentifier` so plugin-private services resolved with a factory receive the right per-plugin logger / configuration section / storage root.
 - Adds the module instance itself as an `IGameModule` singleton so the home page can enumerate available games.
 
 Finally, `RegisterLogic` adds a `GamePluginAssemblies` singleton wrapping `pluginLoadResult.Assemblies`.
@@ -731,8 +840,9 @@ _stateSubscription?.Dispose();
 | Frontend | Blazor Server (Interactive Server render mode, prerender disabled) |
 | Real-time updates | `IDisposable` event subscriptions via `ThreadSafeEventManager` |
 | State storage | In-memory (`ConcurrentDictionary`, per-state `SemaphoreSlim` locking) |
-| Scheduled transitions | `ScheduleCallback` on `AbstractGameState` (returns `CancellationTokenSource`) |
-| Game plugin system | `PluginLoader` + `AssemblyLoadContext.Default` loading `games/{PluginName}/{PluginName}.dll`; reflection-based `IGameModule` discovery; keyed `AbstractGameEngine` DI; per-plugin `wwwroot` mounted at `/_content/{PluginName}`; build glue in `Directory.Plugin.targets` |
+| Scheduled transitions | `ScheduleCallback` on `AbstractGameState` (returns `IScheduledCallbackHandle`) |
+| Game plugin system | `PluginLoader` reads `plugin.json` into `IPluginManifest`, inspects `.deps.json` for forbidden deps + Core-version gate, activates `IGameModule` inside a 5-second ctor budget, cross-checks the in-code manifest against on-disk, loads the DLL into a per-plugin `AssemblyLoadContext`; keyed `AbstractGameEngine` DI via `IPluginRegistration.AddGameEngine<T>()`; per-plugin `wwwroot` mounted at `/_content/{PluginName}`; build glue in `Directory.Plugin.targets` |
+| Plugin sandbox | Host-service denylist (`AlwaysProtectedTypes` static set + dynamic `IServiceCollection` snapshot captured before the plugin loop); `IPluginStorage` path guard rejects `..` / absolute paths / reparse-point escapes; `KnockBox.Plugins.Analyzer` Roslyn warnings KB1001-KB1004 at build time |
 | Game UI | Game-owned Razor pages at `/room/{route-identifier}/{obfuscated-code}` |
 | Database | PostgreSQL via EF Core (Npgsql) |
 | Logging | Serilog (structured, console sink) |

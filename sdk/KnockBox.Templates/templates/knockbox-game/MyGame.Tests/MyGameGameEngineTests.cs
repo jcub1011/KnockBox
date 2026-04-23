@@ -41,7 +41,7 @@ public class MyGameGameEngineTests
     [TestMethod]
     public async Task CreateStateAsync_ReturnsSuccessfulState()
     {
-        var host = new User("TestHost", Guid.CreateVersion7().ToString());
+        var host = UserFactory.Create("TestHost", Guid.CreateVersion7().ToString());
 
         var result = await _engine.CreateStateAsync(host);
 
@@ -52,7 +52,7 @@ public class MyGameGameEngineTests
     [TestMethod]
     public async Task CreateStateAsync_StateIsJoinable()
     {
-        var host = new User("TestHost", Guid.CreateVersion7().ToString());
+        var host = UserFactory.Create("TestHost", Guid.CreateVersion7().ToString());
 
         var result = await _engine.CreateStateAsync(host);
 
@@ -66,8 +66,8 @@ public class MyGameGameEngineTests
     [TestMethod]
     public async Task StartAsync_RejectsNonHost()
     {
-        var host = new User("Host", Guid.CreateVersion7().ToString());
-        var nonHost = new User("Player", Guid.CreateVersion7().ToString());
+        var host = UserFactory.Create("Host", Guid.CreateVersion7().ToString());
+        var nonHost = UserFactory.Create("Player", Guid.CreateVersion7().ToString());
         var createResult = await _engine.CreateStateAsync(host);
         Assert.IsTrue(createResult.TryGetSuccess(out var state));
 

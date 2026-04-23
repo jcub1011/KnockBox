@@ -94,12 +94,20 @@ public sealed class LobbyPageBaseTests
     {
         public User? CurrentUser { get; private set; } = user;
         public event Action? UserInitialized;
+        public event Action<UserNameChangedArgs>? UserNameChanged;
         public Task InitializeCurrentUserAsync(CancellationToken ct = default)
         {
             UserInitialized?.Invoke();
             return Task.CompletedTask;
         }
         public Task ResetIdentityAsync(CancellationToken ct = default) => Task.CompletedTask;
+        public void SetCurrentUserName(string name)
+        {
+            if (CurrentUser is null) return;
+            var previous = CurrentUser.Name;
+            CurrentUser.Name = name;
+            UserNameChanged?.Invoke(new UserNameChangedArgs(previous, name));
+        }
     }
 
     private sealed class StubTickService : ITickService
@@ -326,7 +334,7 @@ public sealed class LobbyPageBaseTests
         var host = MakeUser("Host");
         var player = MakeUser("Player");
         using var state = new TestGameState(host, NullLogger.Instance);
-        state.UpdateJoinableStatus(true);
+        state.Execute(() => state.SetJoinable(true));
         state.RegisterPlayer(player);
         state.KickPlayer(player);
 
@@ -347,7 +355,7 @@ public sealed class LobbyPageBaseTests
         var host = MakeUser("Host");
         var player = MakeUser("Player");
         using var state = new TestGameState(host, NullLogger.Instance);
-        state.UpdateJoinableStatus(true);
+        state.Execute(() => state.SetJoinable(true));
         state.RegisterPlayer(player);
 
         var nav = new StubNavigationService();

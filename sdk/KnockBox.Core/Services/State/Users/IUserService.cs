@@ -1,47 +1,71 @@
-﻿namespace KnockBox.Core.Services.State.Users
+namespace KnockBox.Core.Services.State.Users
 {
     public record class UserNameChangedArgs(string PreviousName, string NewName);
 
     /// <summary>
-    /// A user.
+    /// A player's public identity: a <see cref="Name"/> chosen by the user and a
+    /// stable <see cref="Id"/> assigned by the platform. Construction is
+    /// restricted to the platform — consumers resolve the current circuit's user
+    /// via <see cref="IUserService.CurrentUser"/>, and test code builds fixtures
+    /// via <see cref="UserFactory"/>. This keeps name-trimming, event firing,
+    /// and persistence in a single place (<see cref="IUserService"/>) rather
+    /// than leaking across every call site that could mutate <see cref="Name"/>.
     /// </summary>
-    /// <param name="UserName"></param>
-    /// <param name="UserId"></param>
-    public class User(string name, string id)
+    public class User
     {
-        /// <summary>
-        /// The name of the user. Capped to 12 characters.
-        /// </summary>
-        public string Name 
-        { 
-            get => field;
-            set
-            {
-                // Limit to 12 characters
-                value = value.Trim();
-                if (value.Length > 12) value = value[..12];
-                if (field == value) return;
-
-                string previousName = field;
-                field = value;
-                
-                try
-                {
-                    NameChanged?.Invoke(new(previousName, value));
-                }
-                catch { } // Ignore errors
-            }
-        } = name;
+        internal User(string name, string id)
+        {
+            Name = name;
+            Id = id;
+        }
 
         /// <summary>
-        /// The unique id of the user.
+        /// The user's display name. Capped to 12 characters by
+        /// <see cref="IUserService.SetCurrentUserName"/>. External code mutates
+        /// this through that method; the setter itself is reserved for the
+        /// platform (e.g. the name-disambiguation pass in
+        /// <c>AbstractGameState.RegisterPlayer</c>).
         /// </summary>
-        public string Id => id;
+        public string Name { get; internal set; }
 
         /// <summary>
-        /// Invoked when the user name has changed.
+        /// The unique id of the user. Immutable once the user is constructed.
         /// </summary>
-        public event Action<UserNameChangedArgs>? NameChanged;
+        public string Id { get; }
+    }
+
+    /// <summary>
+    /// Factory for building <see cref="User"/> instances outside the platform's
+    /// normal lifecycle. Intended for plugin test code; production consumers
+    /// should resolve <see cref="IUserService.CurrentUser"/>.
+    /// </summary>
+    public static class UserFactory
+    {
+        internal const int MaxNameLength = 12;
+
+        /// <summary>
+        /// Constructs a <see cref="User"/> with the supplied name and id,
+        /// applying the same normalization as
+        /// <see cref="IUserService.SetCurrentUserName"/>: trim leading/trailing
+        /// whitespace and cap at 12 characters. Test fixtures should prefer
+        /// this overload so their <see cref="User"/> instances match production
+        /// shape; reach for <see cref="CreateUnchecked"/> only when the test
+        /// explicitly needs an un-normalized value.
+        /// </summary>
+        public static User Create(string name, string id)
+        {
+            name = (name ?? string.Empty).Trim();
+            if (name.Length > MaxNameLength) name = name[..MaxNameLength];
+            return new User(name, id);
+        }
+
+        /// <summary>
+        /// Constructs a <see cref="User"/> without trimming or capping the
+        /// name. Intended for tests that intentionally exercise pre-normalization
+        /// paths (e.g. verifying that upstream layers do reject a 13-character
+        /// input). Production code should never call this.
+        /// </summary>
+        public static User CreateUnchecked(string name, string id) => new(name, id);
     }
 
     public interface IUserService
@@ -59,6 +83,13 @@
         event Action? UserInitialized;
 
         /// <summary>
+        /// Raised after <see cref="SetCurrentUserName"/> applies a name change to
+        /// <see cref="CurrentUser"/>. Subscribers that throw are isolated — one
+        /// bad handler does not short-circuit the invocation list.
+        /// </summary>
+        event Action<UserNameChangedArgs>? UserNameChanged;
+
+        /// <summary>
         /// Initializes the current user.
         /// </summary>
         /// <param name="ct"></param>
@@ -71,5 +102,13 @@
         /// <param name="ct"></param>
         /// <returns></returns>
         Task ResetIdentityAsync(CancellationToken ct = default);
+
+        /// <summary>
+        /// Updates <see cref="CurrentUser"/>'s name. Trims whitespace and caps at
+        /// 12 characters. No-op when <see cref="CurrentUser"/> is null or the
+        /// trimmed+capped value equals the current name. Persists the new name
+        /// asynchronously and raises <see cref="UserNameChanged"/>.
+        /// </summary>
+        void SetCurrentUserName(string name);
     }
 }

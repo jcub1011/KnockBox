@@ -21,7 +21,7 @@ namespace KnockBox.TaskMaster.Tests.Unit.Logic
         {
             _engineLoggerMock = new Mock<ILogger<TaskMasterGameEngine>>();
             _stateLoggerMock = new Mock<ILogger<TaskMasterGameState>>();
-            _host = new User("Host", "host1");
+            _host = UserFactory.Create("Host", "host1");
 
             _engine = new TaskMasterGameEngine(
                 _engineLoggerMock.Object,
@@ -62,21 +62,21 @@ namespace KnockBox.TaskMaster.Tests.Unit.Logic
         }
 
         [TestMethod]
-        public async Task StartAsync_InvalidHost_ReturnsError()
+        public async Task StartAsync_InvalidStateType_ReturnsError()
         {
-            var stateResult = await _engine.CreateStateAsync(_host);
-            var state = (TaskMasterGameState)stateResult.Value!;
-            var nonHost = new User("Not Host", "non-host");
-
-            var result = await _engine.StartAsync(nonHost, state);
-
+            var result = await _engine.StartAsync(_host, null!);
             Assert.IsTrue((bool)result.IsFailure);
         }
 
         [TestMethod]
-        public async Task StartAsync_InvalidStateType_ReturnsError()
+        public async Task StartAsync_NonHost_ReturnsError()
         {
-            var result = await _engine.StartAsync(_host, null!);
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (TaskMasterGameState)stateResult.Value!;
+            var nonHost = UserFactory.Create("NotHost", "nothost-id");
+
+            var result = await _engine.StartAsync(nonHost, state);
+
             Assert.IsTrue((bool)result.IsFailure);
         }
     }

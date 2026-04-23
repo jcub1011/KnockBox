@@ -98,8 +98,10 @@ public partial class MyGameLobby : DisposableComponent
     {
         if (GameState is null || UserService.CurrentUser is null) return;
 
-        // The engine returns a Result — in a real game you'd branch on
-        // result.TryGetFailure(...) to surface a toast or inline error.
+        // The base AbstractGameEngine.StartAsync verifies that the caller is the
+        // lobby's host before invoking the engine's game-specific start logic;
+        // overrides assume the caller is authorized. Branch on the returned
+        // Result to surface a toast or inline error in a real game.
         await GameEngine.StartAsync(UserService.CurrentUser, GameState, ComponentDetached);
     }
 

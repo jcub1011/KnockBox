@@ -22,7 +22,8 @@ namespace KnockBox.HiddenAgenda.Pages
 
         protected async Task StartGame()
         {
-            await GameEngine.StartAsync(UserService.CurrentUser!, GameState);
+            if (UserService.CurrentUser is null) return;
+            await GameEngine.StartAsync(UserService.CurrentUser, GameState);
         }
     }
 }

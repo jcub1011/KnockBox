@@ -3,16 +3,16 @@
 
 @{
     var sortedPlayers = GameState.Players
-        .Select(p => new { Player = p, State = GameState.Context?.GamePlayers.GetValueOrDefault(p.Id) })
+        .Select(p => new { Player = p, State = GameState.Context?.GamePlayers.GetValueOrDefault(p.User.Id) })
         .Where(x => x.State != null)
         .OrderBy(x => Math.Abs(x.State!.CurrentPoints))
         .ThenBy(x => x.State!.ScoreTimestamp)
         .ToList();
 
-    var currentPlayer = GameState.Players.FirstOrDefault(p => p.Id == GameState.TurnManager.CurrentPlayer);
-    var currentPlayerName = currentPlayer?.Name ?? "...";
-    var currentPlayerState = currentPlayer != null
-        ? GameState.GamePlayers.GetValueOrDefault(currentPlayer.Id)
+    var currentPlayer = GameState.Players.FirstOrDefault(p => p.User.Id == GameState.TurnManager.CurrentPlayer);
+    var currentPlayerName = currentPlayer.DisplayName ?? "...";
+    var currentPlayerState = currentPlayer.User is not null
+        ? GameState.GamePlayers.GetValueOrDefault(currentPlayer.User.Id)
         : null;
 
     var deckPercent = GetDeckPercentage();
@@ -120,16 +120,16 @@
                     @for (int i = 0; i < sortedPlayers.Count; i++)
                     {
                         var entry = sortedPlayers[i];
-                        var isCurrentTurn = entry.Player.Id == GameState.TurnManager.CurrentPlayer;
+                        var isCurrentTurn = entry.Player.User.Id == GameState.TurnManager.CurrentPlayer;
                         var isReactionTarget = GameState.Phase == OperatorGamePhase.Reaction
-                            && GameState.ReactionTargetPlayerIds.Contains(entry.Player.Id);
+                            && GameState.ReactionTargetPlayerIds.Contains(entry.Player.User.Id);
 
                         <div class="op-spectator-entry @(isCurrentTurn ? "active-turn" : "") @(isReactionTarget ? "targeted" : "")">
                             <span class="op-spectator-rank">#@(i + 1)</span>
                             <div class="op-spectator-player-info">
                                 <span class="op-spectator-player-name">
                                     @if (isReactionTarget) { <span class="op-target-icon"></span> }
-                                    @entry.Player.Name
+                                    @entry.Player.DisplayName
                                 </span>
                                 <div class="op-spectator-player-details">
                                     <span class="op-spectator-operator">@GetOperatorSymbol(entry.State!.ActiveOperator)</span>

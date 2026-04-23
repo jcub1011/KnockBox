@@ -40,7 +40,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
             var state = context.State;
 
             // Allow new players to join.
-            state.UpdateJoinableStatus(true);
+            state.SetJoinable(true);
 
             // Clear per-game player data (players stay registered via state.Players).
             state.GamePlayers.Clear();
