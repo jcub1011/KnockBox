@@ -98,6 +98,27 @@ public sealed class DefaultPasswordRedirectMiddlewareTests
     }
 
     [TestMethod]
+    [DataRow("/admin/admin.css")]
+    [DataRow("/admin/logo.svg")]
+    [DataRow("/admin/js/script.js")]
+    public async Task AuthenticatedStaticAsset_DefaultPassword_PassesThrough(string path)
+    {
+        // Regression: under MapStaticAssets the /admin/admin.css request
+        // matches an endpoint with no [AllowWithDefaultPassword], so without
+        // the static-asset short-circuit the stylesheet for the
+        // ChangePassword page itself gets redirected and the page renders
+        // unstyled.
+        var called = false;
+        var middleware = new DefaultPasswordRedirectMiddleware(_ => { called = true; return Task.CompletedTask; });
+        var ctx = BuildContext(path, authenticated: true);
+
+        await middleware.InvokeAsync(ctx, CreateSettings(isDefault: true));
+
+        Assert.IsTrue(called);
+        Assert.AreNotEqual(StatusCodes.Status302Found, ctx.Response.StatusCode);
+    }
+
+    [TestMethod]
     public async Task EndpointWithoutAllowAttribute_DefaultPassword_Redirects()
     {
         var called = false;

@@ -14,9 +14,11 @@ namespace KnockBox.Admin
     /// <remarks>
     /// Must run after <see cref="IApplicationBuilder"/>'s <c>UseRouting</c> so
     /// <see cref="HttpContext.GetEndpoint"/> has a value by the time we look
-    /// it up. Requests that never match an endpoint (e.g., static files served
-    /// by static-file middleware earlier in the pipeline) fall through
-    /// unchanged — those requests don't carry sensitive admin UI.
+    /// it up. Static-asset requests (identified by a file extension in the
+    /// last path segment) are exempted up front: under
+    /// <c>MapStaticAssets</c> they match an endpoint with no
+    /// <see cref="AllowWithDefaultPasswordAttribute"/>, so without this guard
+    /// the stylesheet for the ChangePassword page itself would be redirected.
     /// </remarks>
     internal sealed class DefaultPasswordRedirectMiddleware
     {
@@ -33,6 +35,9 @@ namespace KnockBox.Admin
             if (!path.StartsWith("/admin", StringComparison.OrdinalIgnoreCase))
                 return _next(context);
 
+            if (LooksLikeStaticAsset(context.Request.Path))
+                return _next(context);
+
             if (context.User?.Identity?.IsAuthenticated != true)
                 return _next(context);
 
@@ -45,6 +50,19 @@ namespace KnockBox.Admin
 
             context.Response.Redirect("/admin/changepassword");
             return Task.CompletedTask;
+        }
+
+        // Mirrors AdminPortMiddleware.LooksLikeStaticAsset — any request whose
+        // final path segment contains a '.' is treated as a static asset (e.g.
+        // /admin/admin.css, /admin/logo.svg). Admin UI routes don't have
+        // extensions, so this only catches asset requests.
+        private static bool LooksLikeStaticAsset(PathString path)
+        {
+            if (!path.HasValue) return false;
+            var value = path.Value!;
+            var lastSlash = value.LastIndexOf('/');
+            var lastSegment = lastSlash >= 0 ? value[(lastSlash + 1)..] : value;
+            return lastSegment.Contains('.');
         }
     }
 }
