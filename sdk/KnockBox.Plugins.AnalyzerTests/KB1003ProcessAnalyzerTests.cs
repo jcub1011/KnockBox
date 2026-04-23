@@ -30,6 +30,30 @@ public sealed class KB1003ProcessAnalyzerTests
     }
 
     [TestMethod]
+    public async Task EnvironmentExit_ProducesKB1003()
+    {
+        var source = """
+            using System;
+            public class C { public void M() => Environment.Exit(0); }
+            """;
+
+        await AnalyzerHarness.AssertSingleDiagnosticAsync<KB1003ProcessAnalyzer>(
+            source, "KB1003", "System.Environment.Exit");
+    }
+
+    [TestMethod]
+    public async Task EnvironmentFailFast_ProducesKB1003()
+    {
+        var source = """
+            using System;
+            public class C { public void M() => Environment.FailFast("bye"); }
+            """;
+
+        await AnalyzerHarness.AssertSingleDiagnosticAsync<KB1003ProcessAnalyzer>(
+            source, "KB1003", "System.Environment.FailFast");
+    }
+
+    [TestMethod]
     public async Task StopwatchStart_ProducesNoDiagnostic()
     {
         // Stopwatch lives in System.Diagnostics but isn't related to process

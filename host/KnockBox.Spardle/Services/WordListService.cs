@@ -99,6 +99,11 @@ public sealed class WordListService : IWordListService
 
     private static List<string> LoadCsv(string path, ILogger logger)
     {
+        // KB1001: reading a plugin-bundled asset staged alongside the DLL
+        // (Data/*.csv ships via <Content CopyToOutputDirectory>).
+        // IPluginContext.Storage is for writable user data, not read-only
+        // bundled content — it's the wrong destination for this.
+#pragma warning disable KB1001
         if (!File.Exists(path))
         {
             logger.LogWarning("WordListService: CSV file not found at [{path}].", path);
@@ -112,5 +117,6 @@ public sealed class WordListService : IWordListService
             if (trimmed.Length > 0) result.Add(trimmed);
         }
         return result;
+#pragma warning restore KB1001
     }
 }

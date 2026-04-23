@@ -30,6 +30,54 @@ public sealed class KB1002HttpAnalyzerTests
     }
 
     [TestMethod]
+    public async Task DnsGetHostEntry_ProducesKB1002()
+    {
+        var source = """
+            using System.Net;
+            public class C { public IPHostEntry M() => Dns.GetHostEntry("example.com"); }
+            """;
+
+        await AnalyzerHarness.AssertSingleDiagnosticAsync<KB1002HttpAnalyzer>(
+            source, "KB1002", "System.Net.Dns");
+    }
+
+    [TestMethod]
+    public async Task NewPing_ProducesKB1002()
+    {
+        var source = """
+            using System.Net.NetworkInformation;
+            public class C { public Ping M() => new Ping(); }
+            """;
+
+        await AnalyzerHarness.AssertSingleDiagnosticAsync<KB1002HttpAnalyzer>(
+            source, "KB1002", "System.Net.NetworkInformation.Ping");
+    }
+
+    [TestMethod]
+    public async Task NetworkInterfaceGetAll_ProducesKB1002()
+    {
+        var source = """
+            using System.Net.NetworkInformation;
+            public class C { public NetworkInterface[] M() => NetworkInterface.GetAllNetworkInterfaces(); }
+            """;
+
+        await AnalyzerHarness.AssertSingleDiagnosticAsync<KB1002HttpAnalyzer>(
+            source, "KB1002", "System.Net.NetworkInformation.NetworkInterface");
+    }
+
+    [TestMethod]
+    public async Task NewSmtpClient_ProducesKB1002()
+    {
+        var source = """
+            using System.Net.Mail;
+            public class C { public SmtpClient M() => new SmtpClient(); }
+            """;
+
+        await AnalyzerHarness.AssertSingleDiagnosticAsync<KB1002HttpAnalyzer>(
+            source, "KB1002", "System.Net.Mail.SmtpClient");
+    }
+
+    [TestMethod]
     public async Task NonNetworkCode_ProducesNoDiagnostic()
     {
         var source = """

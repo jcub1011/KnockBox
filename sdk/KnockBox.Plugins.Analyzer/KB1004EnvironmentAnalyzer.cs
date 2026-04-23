@@ -28,7 +28,8 @@ public sealed class KB1004EnvironmentAnalyzer : SandboxAnalyzerBase
         description:
             "Plugin projects must read configuration through IPluginContext.Configuration so the values come " +
             "from the plugin's own Plugins:{RouteIdentifier} section. Declare the 'config' capability in " +
-            "plugin.json to receive an IConfiguration instance.");
+            "plugin.json to receive an IConfiguration instance. This is a build-time lint and does not prevent " +
+            "reflection-based bypass (e.g., Activator.CreateInstance, Type.GetType).");
 
     protected override ImmutableHashSet<string> BannedTypes { get; } = ImmutableHashSet<string>.Empty;
 

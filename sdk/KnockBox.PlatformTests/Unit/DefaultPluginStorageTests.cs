@@ -133,25 +133,14 @@ public sealed class DefaultPluginStorageTests
     // ─── Edge: empty string, null ───────────────────────────────────────────
 
     [TestMethod]
-    public void Resolve_EmptyString_ResolvesToRoot_PinsCurrentBehavior()
+    public void Resolve_EmptyString_Throws()
     {
         var root = MakeRoot();
         try
         {
             var storage = new DefaultPluginStorage(root);
 
-            // Empty string currently passes the root-prefix check (equal to root).
-            // File.OpenRead on a directory throws UnauthorizedAccessException
-            // (Windows) or a related IOException — the point is it did NOT raise
-            // ArgumentException, pinning that the lexical resolver considers
-            // empty-relative-path inside root.
-            try
-            {
-                using var _ = storage.OpenRead("");
-                Assert.Fail("Expected an IO-related exception opening the root as a file.");
-            }
-            catch (UnauthorizedAccessException) { /* expected on Windows */ }
-            catch (IOException) { /* expected on other platforms or a directory-is-not-file */ }
+            Assert.Throws<ArgumentException>(() => storage.OpenRead(""));
         }
         finally { SafeDelete(root); }
     }
@@ -486,6 +475,84 @@ public sealed class DefaultPluginStorageTests
             var storage = new DefaultPluginStorage(root);
 
             Assert.Throws<ArgumentException>(() => storage.OpenRead("link1/leak.txt"));
+        }
+        finally { SafeDelete(workspace); }
+    }
+
+    [TestMethod]
+    public void Ctor_WhenRootIsSymlink_NormalizesToFinalTarget()
+    {
+        // Pins _root normalization: if an operator hands in a symlinked path
+        // (e.g. macOS /var → /private/var, Docker bind mounts), the storage
+        // service resolves it to the final target so downstream in-root checks
+        // are against the canonical form. Writes through the symlinked path
+        // must land in the final-target directory.
+        var workspace = MakeRoot();
+        var realRoot = Path.Combine(workspace, "real");
+        Directory.CreateDirectory(realRoot);
+
+        var linkedRoot = Path.Combine(workspace, "linked");
+        try
+        {
+            if (!TryCreateSymlink(linkedRoot, realRoot, linkTargetIsDirectory: true))
+            {
+                Assert.Inconclusive("Creating symlinks is not permitted on this platform/session.");
+                return;
+            }
+
+            var storage = new DefaultPluginStorage(linkedRoot);
+
+            using (var w = storage.OpenWrite("hello.txt"))
+            {
+                var bytes = System.Text.Encoding.UTF8.GetBytes("normalized");
+                w.Write(bytes, 0, bytes.Length);
+            }
+
+            // File must exist at the real target, not through the symlink alias.
+            Assert.IsTrue(File.Exists(Path.Combine(realRoot, "hello.txt")));
+
+            using var r = storage.OpenRead("hello.txt");
+            using var sr = new StreamReader(r);
+            Assert.AreEqual("normalized", sr.ReadToEnd());
+        }
+        finally { SafeDelete(workspace); }
+    }
+
+    [TestMethod]
+    public void OpenRead_SymlinkChainEndingInsideRoot_IsAccepted()
+    {
+        // Pins "only the FINAL target matters" behavior from
+        // ResolveLinkTarget(returnFinalTarget: true). A link that transits
+        // outside and comes back in is accepted — the resolver collapses the
+        // chain to its endpoint, which IS inside _root.
+        var workspace = MakeRoot();
+        var root = Path.Combine(workspace, "root");
+        Directory.CreateDirectory(root);
+        var realInside = Path.Combine(root, "real");
+        Directory.CreateDirectory(realInside);
+        File.WriteAllText(Path.Combine(realInside, "target.txt"), "reachable");
+
+        // link1 (inside root) -> link2 (outside root) -> realInside (inside root)
+        var link2 = Path.Combine(workspace, "link2");
+        var link1 = Path.Combine(root, "link1");
+        try
+        {
+            if (!TryCreateSymlink(link2, realInside, linkTargetIsDirectory: true))
+            {
+                Assert.Inconclusive("Creating symlinks is not permitted on this platform/session.");
+                return;
+            }
+            if (!TryCreateSymlink(link1, link2, linkTargetIsDirectory: true))
+            {
+                Assert.Inconclusive("Creating symlinks is not permitted on this platform/session.");
+                return;
+            }
+
+            var storage = new DefaultPluginStorage(root);
+
+            using var stream = storage.OpenRead("link1/target.txt");
+            using var sr = new StreamReader(stream);
+            Assert.AreEqual("reachable", sr.ReadToEnd());
         }
         finally { SafeDelete(workspace); }
     }

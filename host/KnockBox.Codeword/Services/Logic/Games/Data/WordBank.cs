@@ -19,6 +19,11 @@ namespace KnockBox.Codeword.Services.Logic.Games.Data
         /// </summary>
         public static IReadOnlyList<WordGroup> Load(ILogger logger)
         {
+            // KB1001: reading a plugin-bundled asset staged alongside the DLL
+            // (WordPairs.csv ships via <Content CopyToOutputDirectory>).
+            // IPluginContext.Storage is for writable user data, not read-only
+            // bundled content — it's the wrong destination for this.
+#pragma warning disable KB1001
             if (!File.Exists(CsvPath))
             {
                 logger.LogWarning("WordBank: CSV file not found at [{path}].", CsvPath);
@@ -26,6 +31,7 @@ namespace KnockBox.Codeword.Services.Logic.Games.Data
             }
 
             var lines = File.ReadAllLines(CsvPath);
+#pragma warning restore KB1001
             var groups = new List<WordGroup>();
 
             for (int i = 0; i < lines.Length; i++)

@@ -72,12 +72,22 @@ public sealed class KB1001FileSystemAccessAnalyzerTests
     [TestMethod]
     public async Task StreamReaderOverExistingStream_ProducesNoDiagnostic()
     {
-        // StreamReader/StreamWriter have string-path ctors too, but plugin code
-        // typically wraps them around a Stream the plugin received from
-        // IPluginStorage — flagging them would be noisy.
+        // The (Stream)-accepting ctor is the common "wrap the stream returned
+        // by IPluginStorage" pattern and is deliberately exempt.
         var source = """
             using System.IO;
             public class C { public string M(Stream s) { using var r = new StreamReader(s); return r.ReadToEnd(); } }
+            """;
+
+        await AnalyzerHarness.AssertNoDiagnosticAsync<KB1001FileSystemAccessAnalyzer>(source);
+    }
+
+    [TestMethod]
+    public async Task StreamWriterOverExistingStream_ProducesNoDiagnostic()
+    {
+        var source = """
+            using System.IO;
+            public class C { public void M(Stream s) { using var w = new StreamWriter(s); w.WriteLine("x"); } }
             """;
 
         await AnalyzerHarness.AssertNoDiagnosticAsync<KB1001FileSystemAccessAnalyzer>(source);
@@ -93,6 +103,33 @@ public sealed class KB1001FileSystemAccessAnalyzerTests
             """;
 
         await AnalyzerHarness.AssertNoDiagnosticAsync<KB1001FileSystemAccessAnalyzer>(source);
+    }
+
+    // ─── StreamReader/StreamWriter path-ctors ───────────────────────────────
+
+    [TestMethod]
+    public async Task NewStreamReaderOverPath_ProducesKB1001()
+    {
+        // The (string)-accepting ctor opens a file by path, same as File.Open*.
+        var source = """
+            using System.IO;
+            public class C { public string M() { using var r = new StreamReader("x"); return r.ReadToEnd(); } }
+            """;
+
+        await AnalyzerHarness.AssertSingleDiagnosticAsync<KB1001FileSystemAccessAnalyzer>(
+            source, "KB1001", "System.IO.StreamReader");
+    }
+
+    [TestMethod]
+    public async Task NewStreamWriterOverPath_ProducesKB1001()
+    {
+        var source = """
+            using System.IO;
+            public class C { public void M() { using var w = new StreamWriter("x"); w.WriteLine("y"); } }
+            """;
+
+        await AnalyzerHarness.AssertSingleDiagnosticAsync<KB1001FileSystemAccessAnalyzer>(
+            source, "KB1001", "System.IO.StreamWriter");
     }
 
     // ─── Suppression ────────────────────────────────────────────────────────
