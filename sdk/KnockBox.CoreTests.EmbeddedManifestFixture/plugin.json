@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "name": "Embedded Fixture",
+  "description": "Fixture plugin manifest embedded into KnockBox.CoreTests.EmbeddedManifestFixture for PluginManifest.FromEmbeddedResource tests.",
+  "routeIdentifier": "embedded-fixture",
+  "version": "1.2.3",
+  "entryAssembly": "KnockBox.CoreTests.EmbeddedManifestFixture",
+  "capabilities": ["config", "storage"]
+}

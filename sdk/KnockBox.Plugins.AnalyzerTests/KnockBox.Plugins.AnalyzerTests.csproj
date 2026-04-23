@@ -1,0 +1,35 @@
+<!--
+  Tests for KnockBox.Plugins.Analyzer. Uses a small in-process Roslyn harness
+  (AnalyzerHarness.cs) rather than Microsoft.CodeAnalysis.CSharp.Analyzer.Testing.MSTest
+  to avoid version entanglement between that package and the MSTest 4.x we
+  already ship elsewhere in the SDK solution.
+
+  Note the analyzer is referenced with OutputItemType="Analyzer" so the
+  compiler loads it as an analyzer for THIS project too — if an analyzer we
+  wrote has a bug that fires on this test project's own code, we want to see
+  it during the same build.
+-->
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.14.0" />
+    <PackageReference Include="MSTest" Version="4.2.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Microsoft.VisualStudio.TestTools.UnitTesting" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\KnockBox.Plugins.Analyzer\KnockBox.Plugins.Analyzer.csproj" />
+  </ItemGroup>
+
+</Project>

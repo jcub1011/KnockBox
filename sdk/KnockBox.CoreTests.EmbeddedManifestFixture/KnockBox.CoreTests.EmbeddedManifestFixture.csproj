@@ -1,0 +1,29 @@
+<!--
+  Fixture assembly for KnockBox.CoreTests. Its sole purpose is to embed a valid
+  plugin.json as a resource so tests can exercise
+  PluginManifest.FromEmbeddedResource / FromEmbeddedResourceOrThrow against a
+  real, external assembly (rather than emitting one at runtime or coupling
+  CoreTests to a host-side plugin).
+-->
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!--
+      No LogicalName override: MSBuild emits this as
+      KnockBox.CoreTests.EmbeddedManifestFixture.plugin.json, matching what
+      first-party plugin projects produce. The loader's EndsWith("plugin.json")
+      match handles the namespace prefix, so this exercises the realistic
+      "{Namespace}.plugin.json" branch.
+    -->
+    <EmbeddedResource Include="plugin.json" />
+  </ItemGroup>
+
+</Project>

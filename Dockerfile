@@ -2,23 +2,24 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
-COPY KnockBox/KnockBox.csproj KnockBox/
-COPY KnockBox.Core/KnockBox.Core.csproj KnockBox.Core/
-COPY KnockBox.CardCounter/KnockBox.CardCounter.csproj KnockBox.CardCounter/
-COPY KnockBox.Codeword/KnockBox.Codeword.csproj KnockBox.Codeword/
-COPY KnockBox.DiceSimulator/KnockBox.DiceSimulator.csproj KnockBox.DiceSimulator/
-COPY KnockBox.DrawnToDress/KnockBox.DrawnToDress.csproj KnockBox.DrawnToDress/
-COPY KnockBox.Operator/KnockBox.Operator.csproj KnockBox.Operator/
-RUN dotnet restore KnockBox/KnockBox.csproj
-
+# Single-source copy so adding a new plugin does not require a Dockerfile edit.
+# Trades off the "restore-before-source-copy" layer-cache trick (which required
+# listing every csproj explicitly) for fewer maintenance touchpoints; plugin
+# additions are rare and the cost of a full restore on source-only changes is
+# small at our scale.
 COPY . .
-WORKDIR /src/KnockBox
+RUN dotnet restore host/KnockBox/KnockBox.csproj
+
+WORKDIR /src/host/KnockBox
 RUN dotnet publish -c Release -o /app/publish /p:UseAppHost=false
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 ENV ASPNETCORE_URLS=http://+:8080
 EXPOSE 8080
+EXPOSE 8081
 
 COPY --from=build /app/publish .
+RUN mkdir -p /app/data && chown -R $APP_UID:$APP_UID /app
+USER $APP_UID
 ENTRYPOINT ["dotnet", "KnockBox.dll"]

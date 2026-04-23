@@ -3,4 +3,12 @@ services:
     image: ${DOCKER_REGISTRY-}knockbox
     build:
       context: .
-      dockerfile: KnockBox/Dockerfile
+      dockerfile: host/KnockBox/Dockerfile
+    ports:
+      - "8080:8080"
+      - "8081:8081"
+    volumes:
+      - knockbox-data:/app/data
+
+volumes:
+  knockbox-data:

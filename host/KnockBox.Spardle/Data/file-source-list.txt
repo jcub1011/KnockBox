@@ -1,0 +1,2 @@
+full-dictionary => https://github.com/first20hours/google-10000-english
+ny-dictionary => https://github.com/ericwindmill/legal_wordle_words/blob/main/lib/src/legal_words.dart

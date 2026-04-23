@@ -1,0 +1,48 @@
+<!--
+  KnockBox.Plugins.Analyzer — Roslyn analyzer that flags sandbox-escaping APIs
+  in plugin projects (direct filesystem access, HTTP, process launch, raw
+  environment reads). Ships as a NuGet package that consumers reference with
+  PrivateAssets="all" and IncludeAssets="analyzers".
+
+  MUST target netstandard2.0 — that's what Roslyn requires to load analyzers
+  consistently across all supported compiler versions.
+-->
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <!-- Pinned to Roslyn 4.14's default; avoids future contributors reaching
+         for C# 13/14-only APIs the analyzer's TFM can't resolve. -->
+    <LangVersion>11</LangVersion>
+    <Nullable>enable</Nullable>
+    <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+
+    <PackageId>KnockBox.Plugins.Analyzer</PackageId>
+    <Authors>jcub1011</Authors>
+    <Description>Roslyn analyzer that flags sandbox-escaping APIs in KnockBox game-plugin projects.</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <RepositoryUrl>https://github.com/jcub1011/KnockBox</RepositoryUrl>
+    <PackageTags>knockbox partygame plugin-system analyzer roslyn</PackageTags>
+
+    <!-- Analyzer package conventions: no lib, no runtime deps, no compiled
+         output (the DLL ships under analyzers/dotnet/cs explicitly). -->
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <DevelopmentDependency>true</DevelopmentDependency>
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+    <NoWarn>$(NoWarn);NU5128</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Pinned to a version available in the .NET 10 SDK's bundled Roslyn.
+         PrivateAssets=all so consumers don't transitively take a dep on the
+         Roslyn public API surface. -->
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.14.0" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Packs the analyzer DLL into the NuGet under analyzers/dotnet/cs,
+         which is where the .NET SDK picks up C# analyzers. -->
+    <None Include="$(OutputPath)\$(AssemblyName).dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
+  </ItemGroup>
+
+</Project>

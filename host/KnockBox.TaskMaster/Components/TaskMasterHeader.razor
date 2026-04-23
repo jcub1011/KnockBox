@@ -1,0 +1,28 @@
+@using KnockBox.Core.Services.Navigation
+@using KnockBox.Core.Services.State.Games.Shared
+
+<div class="tm-header-container">
+    <div class="tm-header-hazard-strip"></div>
+
+    <a class="tm-header-brand" href="@NavigationService.GetHomeUri()" title="Click to return home">
+        <div class="tm-header-clip"></div>
+        <span class="tm-header-brand-text">TASK MASTER</span>
+    </a>
+
+    <div class="tm-header-actions">
+        <RoomCodeButton ClassName="tm-header-code"
+                        CoverClassName="tm-header-code-cover"
+                        ValueClassName="tm-header-code-value"
+                        CoverText="SITE ID" />
+        <button class="tm-header-leave" @onclick="Leave" title="ABANDON SITE" aria-label="Leave Session">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>
+        </button>
+    </div>
+</div>
+
+@code {
+    [Inject] INavigationService NavigationService { get; set; } = default!;
+    [Inject] IGameSessionService GameSessionService { get; set; } = default!;
+
+    private void Leave() => GameSessionService.LeaveCurrentSession(navigateHome: true);
+}

@@ -1,0 +1,94 @@
+@using KnockBox.Core.Components.Shared
+@using KnockBox.Core.Services.State.Users
+@using KnockBox.Spardle
+@using KnockBox.Spardle.Models
+@inject IUserService UserService
+
+@{
+    var lastRound = State.RoundHistory.LastOrDefault();
+    bool isFinalRound = State.CurrentRound >= State.RoundQueue.Count;
+}
+
+<div class="spd-results" @key="State.CurrentRound">
+    <div class="spd-results-scrim"></div>
+
+    <div class="spd-results-card">
+        <header class="spd-results-head">
+            <span class="spd-results-head-label spd-display">ROUND @State.CurrentRound</span>
+            <span class="spd-results-head-status spd-display">COMPLETE</span>
+        </header>
+
+        @if (State.RevealAnswer && !string.IsNullOrEmpty(State.LastCompletedAnswer))
+        {
+            <div class="spd-results-answer-wrap">
+                <span class="spd-results-answer-label spd-display">THE WORD</span>
+                <div class="spd-results-answer">
+                    @for (int i = 0; i < State.LastCompletedAnswer!.Length; i++)
+                    {
+                        <div class="spd-results-tile spd-tile-flipped spd-tile-correct" style="--col:@i;">
+                            <span class="spd-tile-face">@char.ToUpperInvariant(State.LastCompletedAnswer[i])</span>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+
+        <div class="spd-results-board">
+            <div class="spd-results-board-head">
+                <span>RANK</span>
+                <span>PLAYER</span>
+                <span>GUESSES</span>
+                <span>ROUND</span>
+                <span>TOTAL</span>
+            </div>
+            @if (lastRound is not null)
+            {
+                int rowIdx = 0;
+                foreach (var outcome in lastRound.Outcomes.OrderBy(o => o.Dnf ? 999 : o.Placement))
+                {
+                    bool isMe = outcome.UserId == UserService.CurrentUser?.Id;
+                    int totalScore = State.PlayerStates.TryGetValue(outcome.UserId, out var ps) ? ps.TotalScore : 0;
+                    string rankClass = outcome.Dnf ? "spd-results-rank-dnf"
+                        : outcome.Placement == 1 ? "spd-results-rank-gold"
+                        : outcome.Placement == 2 ? "spd-results-rank-silver"
+                        : outcome.Placement == 3 ? "spd-results-rank-bronze"
+                        : "spd-results-rank-other";
+                    <div class="spd-results-row @(isMe ? "spd-results-row-me" : "")"
+                         style="--row-idx:@rowIdx;">
+                        <span class="spd-results-rank @rankClass">
+                            @(outcome.Dnf ? "—" : outcome.Placement.ToString())
+                        </span>
+                        <span class="spd-results-name">@outcome.DisplayName</span>
+                        <span class="spd-results-guesses spd-mono">@(outcome.Dnf ? "DNF" : outcome.GuessCount.ToString())</span>
+                        <span class="spd-results-points">
+                            <span class="spd-results-points-chip @(outcome.PointsAwarded > 0 ? "" : "spd-results-points-zero")">
+                                +@outcome.PointsAwarded
+                            </span>
+                        </span>
+                        <span class="spd-results-total spd-display">@totalScore</span>
+                    </div>
+                    rowIdx++;
+                }
+            }
+        </div>
+
+        @if (State.PhaseExpiresAtUtc is { } expires)
+        {
+            <CountdownClock EndTimeUtc="expires" Duration="State.TransitionDuration" Context="countdown">
+                @{
+                    int sec = Math.Max(0, (int)Math.Ceiling(countdown.RemainingSeconds));
+                }
+                <div class="spd-results-next">
+                    <span class="spd-results-next-label spd-display">
+                        @(isFinalRound ? "FINAL RESULTS IN" : "NEXT ROUND IN")
+                    </span>
+                    <span class="spd-results-next-digit spd-display" @key="sec">@sec</span>
+                </div>
+            </CountdownClock>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public SpardleState State { get; set; } = default!;
+}
