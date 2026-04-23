@@ -20,22 +20,19 @@ public class SpardleEngine(
     public override Task<ValueResult<AbstractGameState>> CreateStateAsync(User host, CancellationToken ct = default)
     {
         var state = new SpardleState(host, _logger);
-        state.UpdateJoinableStatus(true);
+        state.Execute(() => state.SetJoinable(true));
         return Task.FromResult<ValueResult<AbstractGameState>>(state);
     }
 
-    public override Task<Result> StartAsync(User host, AbstractGameState state, CancellationToken ct = default)
+    public override Task<Result> StartAsync(AbstractGameState state, CancellationToken ct = default)
     {
         if (state is not SpardleState s) return Task.FromResult(Result.FromError("Invalid state"));
 
         var execResult = s.Execute(() =>
         {
-            if (host.Id != s.Host.Id)
-                return Result.FromError("Only the host may start the game.");
-
-            // UpdateJoinableStatus(false) closes the join race before we read Players.Count;
+            // SetJoinable(false) closes the join race before we read Players.Count;
             // once the lobby is non-joinable, RegisterPlayer rejects new joins.
-            s.UpdateJoinableStatus(false);
+            s.SetJoinable(false);
             s.SetHostIsParticipant(s.Players.Count == 0);
             s.CurrentRound = 0;
             s.IsGameOver = false;

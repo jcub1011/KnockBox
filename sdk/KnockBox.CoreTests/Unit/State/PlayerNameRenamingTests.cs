@@ -29,7 +29,7 @@ public sealed class PlayerNameRenamingTests
     {
         var host = MakeUser("Alice");
         using var state = MakeState(host);
-        state.UpdateJoinableStatus(true);
+        state.Execute(() => state.SetJoinable(true));
         var player = MakeUser("Alice");
 
         state.RegisterPlayer(player);
@@ -42,7 +42,7 @@ public sealed class PlayerNameRenamingTests
     {
         var host = MakeUser("Host");
         using var state = MakeState(host);
-        state.UpdateJoinableStatus(true);
+        state.Execute(() => state.SetJoinable(true));
         
         var player1 = MakeUser("Alice");
         state.RegisterPlayer(player1);
@@ -59,7 +59,7 @@ public sealed class PlayerNameRenamingTests
     {
         var host = MakeUser("Alice");
         using var state = MakeState(host);
-        state.UpdateJoinableStatus(true);
+        state.Execute(() => state.SetJoinable(true));
 
         var player1 = MakeUser("Alice");
         state.RegisterPlayer(player1);
@@ -77,7 +77,7 @@ public sealed class PlayerNameRenamingTests
     {
         var host = MakeUser("VeryLongName"); // 12 chars
         using var state = MakeState(host);
-        state.UpdateJoinableStatus(true);
+        state.Execute(() => state.SetJoinable(true));
 
         var player = MakeUser("VeryLongName");
         state.RegisterPlayer(player);
@@ -93,7 +93,7 @@ public sealed class PlayerNameRenamingTests
     {
         var host = MakeUser("Host");
         using var state = MakeState(host);
-        state.UpdateJoinableStatus(true);
+        state.Execute(() => state.SetJoinable(true));
 
         var userId = Guid.NewGuid().ToString();
         var player1 = MakeUser("Alice", userId);
@@ -112,7 +112,7 @@ public sealed class PlayerNameRenamingTests
     {
         var host = MakeUser("VeryLongName"); // 12 chars
         using var state = MakeState(host);
-        state.UpdateJoinableStatus(true);
+        state.Execute(() => state.SetJoinable(true));
 
         var player1 = MakeUser("VeryLong (1)");
         state.RegisterPlayer(player1);

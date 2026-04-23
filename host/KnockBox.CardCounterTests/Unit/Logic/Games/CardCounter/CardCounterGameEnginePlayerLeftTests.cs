@@ -59,7 +59,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
             foreach (var p in players)
                 state.RegisterPlayer(p);
 
-            await _engine.StartAsync(_host, state);
+            await _engine.StartAsync(state);
             return state;
         }
 
@@ -193,7 +193,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
             Assert.IsTrue((bool)p2TokenResult.IsSuccess);
             var p2Token = p2TokenResult.Value!;
 
-            await _engine.StartAsync(_host, state);
+            await _engine.StartAsync(state);
 
             state.SetPhase(GamePhase.Playing);
             Assert.Contains(_player2.Id, state.TurnManager.TurnOrder);

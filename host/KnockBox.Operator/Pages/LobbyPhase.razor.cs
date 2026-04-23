@@ -98,8 +98,13 @@ namespace KnockBox.Operator.Pages
 
         protected async Task StartGame()
         {
-            if (UserService.CurrentUser == null) return;
-            var result = await GameEngine.StartAsync(UserService.CurrentUser, GameState);
+            if (UserService.CurrentUser is null) return;
+            if (UserService.CurrentUser.Id != GameState.Host.Id)
+            {
+                Logger.LogWarning("User [{id}] cannot start the game as they are not the host.", UserService.CurrentUser.Id);
+                return;
+            }
+            var result = await GameEngine.StartAsync(GameState);
             if (result.TryGetFailure(out var error))
                 Logger.LogError("Failed to start game: {Error}", error);
         }

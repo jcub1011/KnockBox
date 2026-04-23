@@ -31,7 +31,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games
                     "Failed to create game state.", $"Parameter {nameof(host)} was null."));
 
             var gameState = new DrawnToDressGameState(host, stateLogger);
-            gameState.UpdateJoinableStatus(true);
+            gameState.Execute(() => gameState.SetJoinable(true));
             gameState.PlayerUnregistered += player => HandlePlayerLeft(player, gameState);
 
             // Create the context and FSM so the lobby state is active from the start.
@@ -46,14 +46,11 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games
         }
 
         public override Task<Result> StartAsync(
-            User host, AbstractGameState state, CancellationToken ct = default)
+            AbstractGameState state, CancellationToken ct = default)
         {
             if (state is not DrawnToDressGameState gameState)
                 return Task.FromResult(Result.FromError("Error starting game.",
                     $"Game state of type [{state?.GetType().Name ?? "null"}] couldn't be cast to [{nameof(DrawnToDressGameState)}]."));
-
-            if (host != gameState.Host)
-                return Task.FromResult(Result.FromError("Only the host can start the game."));
 
             if (gameState.Context is null)
                 return Task.FromResult(Result.FromError("Game context is not initialized."));
@@ -62,7 +59,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games
 
             var executeResult = state.Execute(() =>
             {
-                state.UpdateJoinableStatus(false);
+                state.SetJoinable(false);
 
                 // Snapshot all registered players into GamePlayers so FSM states can look
                 // them up by ID.
@@ -76,7 +73,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games
                 }
 
                 // Process the start command through the FSM.
-                var fsmResult = context.Fsm.HandleCommand(context, new StartGameCommand(host.Id));
+                var fsmResult = context.Fsm.HandleCommand(context, new StartGameCommand(gameState.Host.Id));
                 if (fsmResult.TryGetFailure(out var err))
                 {
                     logger.LogError("StartAsync: FSM start command error: {msg}", err.PublicMessage);

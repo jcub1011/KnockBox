@@ -35,7 +35,7 @@ namespace KnockBox.DiceSimulator.Tests.Integration
             Assert.IsTrue(state.IsJoinable);
 
             // Start game
-            var startResult = await engine.StartAsync(host, state);
+            var startResult = await engine.StartAsync(state);
             Assert.IsTrue((bool)startResult.IsSuccess);
             Assert.IsFalse(state.IsJoinable);
 

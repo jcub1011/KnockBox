@@ -326,7 +326,7 @@ public sealed class LobbyPageBaseTests
         var host = MakeUser("Host");
         var player = MakeUser("Player");
         using var state = new TestGameState(host, NullLogger.Instance);
-        state.UpdateJoinableStatus(true);
+        state.Execute(() => state.SetJoinable(true));
         state.RegisterPlayer(player);
         state.KickPlayer(player);
 
@@ -347,7 +347,7 @@ public sealed class LobbyPageBaseTests
         var host = MakeUser("Host");
         var player = MakeUser("Player");
         using var state = new TestGameState(host, NullLogger.Instance);
-        state.UpdateJoinableStatus(true);
+        state.Execute(() => state.SetJoinable(true));
         state.RegisterPlayer(player);
 
         var nav = new StubNavigationService();

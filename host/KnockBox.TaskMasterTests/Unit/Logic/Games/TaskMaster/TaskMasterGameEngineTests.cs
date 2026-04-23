@@ -54,7 +54,7 @@ namespace KnockBox.TaskMaster.Tests.Unit.Logic
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (TaskMasterGameState)stateResult.Value!;
 
-            var result = await _engine.StartAsync(_host, state);
+            var result = await _engine.StartAsync(state);
 
             Assert.IsTrue((bool)result.IsSuccess);
             Assert.IsFalse(state.IsJoinable);
@@ -62,21 +62,9 @@ namespace KnockBox.TaskMaster.Tests.Unit.Logic
         }
 
         [TestMethod]
-        public async Task StartAsync_InvalidHost_ReturnsError()
-        {
-            var stateResult = await _engine.CreateStateAsync(_host);
-            var state = (TaskMasterGameState)stateResult.Value!;
-            var nonHost = new User("Not Host", "non-host");
-
-            var result = await _engine.StartAsync(nonHost, state);
-
-            Assert.IsTrue((bool)result.IsFailure);
-        }
-
-        [TestMethod]
         public async Task StartAsync_InvalidStateType_ReturnsError()
         {
-            var result = await _engine.StartAsync(_host, null!);
+            var result = await _engine.StartAsync(null!);
             Assert.IsTrue((bool)result.IsFailure);
         }
     }

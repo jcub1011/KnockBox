@@ -419,7 +419,12 @@
     private async Task StartGame()
     {
         if (UserService.CurrentUser is null) return;
-        var result = await GameEngine.StartAsync(UserService.CurrentUser, State);
+        if (UserService.CurrentUser.Id != State.Host.Id)
+        {
+            await ShowStartError("Only the host may start the game.");
+            return;
+        }
+        var result = await GameEngine.StartAsync(State);
         if (result.TryGetFailure(out var failure))
         {
             await ShowStartError(failure.PublicMessage);

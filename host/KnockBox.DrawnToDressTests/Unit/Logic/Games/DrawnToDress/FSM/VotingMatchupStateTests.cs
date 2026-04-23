@@ -51,7 +51,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             if (criteria is not null)
                 state.Config.VotingCriteria = criteria;
 
-            await _engine.StartAsync(_host, state);
+            await _engine.StartAsync(state);
             var context = state.Context!;
 
             state.GamePlayers["pA"] = new() { PlayerId = "pA", SubmittedOutfit = new() { PlayerId = "pA" } };
@@ -187,7 +187,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
             state.Config.VotingTimeSec = -10; // deadline will be 10 s in the past on entry
-            await _engine.StartAsync(_host, state);
+            await _engine.StartAsync(state);
             var context = state.Context!;
 
             state.GamePlayers["pA"] = new() { PlayerId = "pA", SubmittedOutfit = new() { PlayerId = "pA" } };
@@ -280,7 +280,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
             state.Config.VotingCriteria = criteria;
-            await _engine.StartAsync(_host, state);
+            await _engine.StartAsync(state);
             var context = state.Context!;
 
             state.GamePlayers["pA"] = new() { PlayerId = "pA", SubmittedOutfit = new() { PlayerId = "pA" } };

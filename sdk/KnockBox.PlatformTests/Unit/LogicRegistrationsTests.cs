@@ -186,7 +186,7 @@ public sealed class LogicRegistrationsTests
             => throw new NotImplementedException();
 
         public override Task<Result> StartAsync(
-            User host, AbstractGameState state, CancellationToken ct = default)
+            AbstractGameState state, CancellationToken ct = default)
             => throw new NotImplementedException();
     }
 

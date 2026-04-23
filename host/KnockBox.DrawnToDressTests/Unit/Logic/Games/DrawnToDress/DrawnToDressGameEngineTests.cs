@@ -60,7 +60,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
 
-            var startResult = await _engine.StartAsync(_host, state);
+            var startResult = await _engine.StartAsync(state);
 
             Assert.IsTrue((bool)startResult.IsSuccess);
             Assert.IsFalse(state.IsJoinable);
@@ -71,16 +71,5 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress
             Assert.AreEqual(GamePhase.Drawing, state.Phase);
         }
 
-        [TestMethod]
-        public async Task StartAsync_NonHostUser_ReturnsError()
-        {
-            var stateResult = await _engine.CreateStateAsync(_host);
-            var state = (DrawnToDressGameState)stateResult.Value!;
-            var otherUser = new User("Other", "other1");
-
-            var startResult = await _engine.StartAsync(otherUser, state);
-
-            Assert.IsTrue((bool)startResult.IsFailure);
-        }
     }
 }

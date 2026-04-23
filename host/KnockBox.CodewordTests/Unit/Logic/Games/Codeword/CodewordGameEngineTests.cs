@@ -59,7 +59,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword
         private async Task<CodewordGameState> CreateStartedGameAsync(int playerCount = 4)
         {
             var state = await CreateStateWithPlayersAsync(playerCount);
-            await _engine.StartAsync(_host, state);
+            await _engine.StartAsync(state);
             return state;
         }
 
@@ -113,18 +113,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword
             var mockState = new Mock<KnockBox.Core.Services.State.Games.Shared.AbstractGameState>(
                 _host, Mock.Of<ILogger>());
 
-            var result = await _engine.StartAsync(_host, mockState.Object);
-
-            Assert.IsTrue(result.IsFailure);
-        }
-
-        [TestMethod]
-        public async Task StartAsync_WithNonHost_ReturnsError()
-        {
-            using var state = await CreateStateWithPlayersAsync(4);
-            var nonHost = new User("NotHost", "nothost-id");
-
-            var result = await _engine.StartAsync(nonHost, state);
+            var result = await _engine.StartAsync(mockState.Object);
 
             Assert.IsTrue(result.IsFailure);
         }

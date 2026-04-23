@@ -140,27 +140,21 @@ namespace KnockBox.Services.Logic.Games.Shared
             }
         }
 
-        public async Task<ValueResult<UserRegistration>> JoinLobbyAsync(
+        public Task<ValueResult<UserRegistration>> JoinLobbyAsync(
             User user,
             string lobbyCode,
             CancellationToken ct = default)
         {
             if (!_lobbies.TryGetValue(NormalizeLobbyCode(lobbyCode), out var registration))
-                return ValueResult<UserRegistration>.FromError($"Lobby with code [{lobbyCode}] not found.");
+                return Task.FromResult(ValueResult<UserRegistration>.FromError($"Lobby with code [{lobbyCode}] not found."));
 
-            ValueResult<IDisposable> registrationResult = null!;
-            var executionResult = registration.State.Execute(() =>
-            {
-                registrationResult = registration.State.RegisterPlayer(user);
-            });
-
-            if (executionResult.TryGetFailure(out var error))
-                return ValueResult<UserRegistration>.FromError(error);
-
+            // RegisterPlayer wraps its own gate check + dictionary mutation in Execute;
+            // wrapping here would deadlock on the non-reentrant execute lock.
+            var registrationResult = registration.State.RegisterPlayer(user);
             if (!registrationResult.TryGetSuccess(out var unsubscriber))
-                return ValueResult<UserRegistration>.FromError(registrationResult.Error.Error);
+                return Task.FromResult(ValueResult<UserRegistration>.FromError(registrationResult.Error.Error));
 
-            return new UserRegistration(user, unsubscriber, registration);
+            return Task.FromResult<ValueResult<UserRegistration>>(new UserRegistration(user, unsubscriber, registration));
         }
 
         public IReadOnlyDictionary<string, int> GetLobbyCountsByRoute()

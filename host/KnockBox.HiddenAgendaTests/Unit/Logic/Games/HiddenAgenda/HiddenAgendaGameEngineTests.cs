@@ -60,7 +60,7 @@ namespace KnockBox.HiddenAgenda.Tests.Unit.Logic
             state.RegisterPlayer(new User("Player 2", "p2"));
             state.RegisterPlayer(new User("Player 3", "p3"));
 
-            var result = await _engine.StartAsync(_host, state);
+            var result = await _engine.StartAsync(state);
 
             Assert.IsTrue((bool)result.IsSuccess);
             Assert.IsFalse(state.IsJoinable);
@@ -70,18 +70,6 @@ namespace KnockBox.HiddenAgenda.Tests.Unit.Logic
             Assert.HasCount(3, state.GamePlayers);
             Assert.HasCount(3, state.TurnManager.TurnOrder);
             Assert.IsNotEmpty(state.CollectionProgress);
-        }
-
-        [TestMethod]
-        public async Task StartAsync_InvalidHost_ReturnsError()
-        {
-            var stateResult = await _engine.CreateStateAsync(_host);
-            var state = (HiddenAgendaGameState)stateResult.Value!;
-            var nonHost = new User("Not Host", "non-host");
-
-            var result = await _engine.StartAsync(nonHost, state);
-
-            Assert.IsTrue((bool)result.IsFailure);
         }
 
         [TestMethod]

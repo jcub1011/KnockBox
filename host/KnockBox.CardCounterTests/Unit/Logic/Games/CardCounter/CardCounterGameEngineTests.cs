@@ -49,7 +49,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
             var state = (CardCounterGameState)stateResult.Value!;
             foreach (var p in players)
                 state.RegisterPlayer(p);
-            await _engine.StartAsync(_host, state);
+            await _engine.StartAsync(state);
             return state;
         }
 
@@ -84,26 +84,13 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         // ── StartAsync ────────────────────────────────────────────────────────
 
         [TestMethod]
-        public async Task StartAsync_WithNonHost_ReturnsError()
-        {
-            var stateResult = await _engine.CreateStateAsync(_host);
-            using var state = (CardCounterGameState)stateResult.Value!;
-            state.RegisterPlayer(_player1);
-
-            var nonHost = new User("NotHost", "nothost-id");
-            var result = await _engine.StartAsync(nonHost, state);
-
-            Assert.IsTrue(result.IsFailure);
-        }
-
-        [TestMethod]
         public async Task StartAsync_WithNoPlayers_ReturnsError()
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             using var state = (CardCounterGameState)stateResult.Value!;
             // No players registered
 
-            var result = await _engine.StartAsync(_host, state);
+            var result = await _engine.StartAsync(state);
 
             Assert.IsTrue(result.IsFailure);
         }
@@ -134,7 +121,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
             state.Config.ActiveOperatorMode = true;
             foreach (var p in players)
                 state.RegisterPlayer(p);
-            await _engine.StartAsync(_host, state);
+            await _engine.StartAsync(state);
             return state;
         }
 
@@ -556,7 +543,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
             _engine.ReturnToLobby(_host, state);
 
             // After returning to lobby, the game should be startable again
-            var result = await _engine.StartAsync(_host, state);
+            var result = await _engine.StartAsync(state);
 
             Assert.IsTrue((bool)result.IsSuccess, "Should be able to start the game again after returning to the lobby.");
             Assert.IsFalse(state.IsJoinable, "State should not be joinable once the game has started.");

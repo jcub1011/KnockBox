@@ -24,20 +24,15 @@ public class OperatorGameEngine(ILogger<OperatorGameState> stateLogger, IRandomN
 
         var state = new OperatorGameState(host, stateLogger);
         state.Context = new OperatorGameContext(state, randomNumberService);
-        state.UpdateJoinableStatus(true);
+        state.Execute(() => state.SetJoinable(true));
         return Task.FromResult(ValueResult<AbstractGameState>.FromValue(state));
     }
 
-    public override async Task<Result> StartAsync(User host, AbstractGameState state, CancellationToken ct = default)
+    public override async Task<Result> StartAsync(AbstractGameState state, CancellationToken ct = default)
     {
         if (state is not OperatorGameState operatorState)
         {
             return Result.FromError("Invalid game state type.");
-        }
-
-        if (host.Id != operatorState.Host.Id)
-        {
-            return Result.FromError("Only the host can start the game.");
         }
 
         var context = new OperatorGameContext(operatorState, randomNumberService);
@@ -59,13 +54,13 @@ public class OperatorGameEngine(ILogger<OperatorGameState> stateLogger, IRandomN
             operatorState.Phase = OperatorGamePhase.Setup;
             operatorState.Context = context;
             fsm.TransitionTo(context, new KnockBox.Operator.Services.Logic.FSM.States.SetupState());
-            
+
             // 4. Initialize Turn Manager
             operatorState.TurnManager.SetTurnOrder(allParticipants.Select(p => p.Id));
-            
+
             // 5. Update Joinable Status
-            operatorState.UpdateJoinableStatus(false);
-            
+            operatorState.SetJoinable(false);
+
             return ValueTask.CompletedTask;
         }, ct);
     }

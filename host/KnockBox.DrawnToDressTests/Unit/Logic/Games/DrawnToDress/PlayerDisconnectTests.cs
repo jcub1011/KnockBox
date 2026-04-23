@@ -40,7 +40,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress
             // Arrange
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
-            await _engine.StartAsync(_host, state);
+            await _engine.StartAsync(state);
 
             var player = new User("Player1", "p1");
             state.GamePlayers["p1"] = new DrawnToDressPlayerState { PlayerId = "p1" };
@@ -58,7 +58,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress
             // Arrange
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
-            await _engine.StartAsync(_host, state);
+            await _engine.StartAsync(state);
 
             var player = new User("Player1", "p1");
             state.GamePlayers["p1"] = new DrawnToDressPlayerState { PlayerId = "p1", IsReady = false };
@@ -76,7 +76,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress
             // Arrange
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
-            await _engine.StartAsync(_host, state);
+            await _engine.StartAsync(state);
             var context = state.Context!;
 
             var disconnectedUser = new User("Player1", "p1");
@@ -96,7 +96,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress
             // Arrange
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
-            await _engine.StartAsync(_host, state);
+            await _engine.StartAsync(state);
 
             var unknownPlayer = new User("Ghost", "unknown-id");
 
@@ -113,7 +113,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress
             // Arrange
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
-            await _engine.StartAsync(_host, state);
+            await _engine.StartAsync(state);
 
             var player = new User("Player1", "p1");
             state.GamePlayers["p1"] = new DrawnToDressPlayerState { PlayerId = "p1" };
@@ -133,7 +133,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress
             // Arrange
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
-            await _engine.StartAsync(_host, state);
+            await _engine.StartAsync(state);
             var context = state.Context!;
 
             state.GamePlayers["p1"] = new DrawnToDressPlayerState { PlayerId = "p1", IsReady = false };

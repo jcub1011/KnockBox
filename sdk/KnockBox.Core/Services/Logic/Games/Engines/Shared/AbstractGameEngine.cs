@@ -33,29 +33,31 @@ namespace KnockBox.Core.Services.Logic.Games.Engines.Shared
         /// <summary>
         /// Creates a new initialized state ready for players to join.
         /// </summary>
-        /// <param name="host"></param>
-        /// <param name="ct"></param>
-        /// <returns></returns>
         public abstract Task<ValueResult<AbstractGameState>> CreateStateAsync(User host, CancellationToken ct = default);
 
         /// <summary>
-        /// Starts the game state. Only the host can start the game.
+        /// Starts the game state. Caller-identity verification (e.g. "only the host may start")
+        /// is the responsibility of the invoker — engines should assume the caller is authorized.
+        /// The host is available via <see cref="AbstractGameState.Host"/> if the engine needs it.
         /// </summary>
-        /// <param name="host"></param>
-        /// <param name="state"></param>
-        /// <returns></returns>
-        public abstract Task<Result> StartAsync(User host, AbstractGameState state, CancellationToken ct = default);
+        public abstract Task<Result> StartAsync(AbstractGameState state, CancellationToken ct = default);
 
         /// <summary>
         /// Checks if the game state is good to start.
         /// </summary>
-        /// <param name="state"></param>
-        /// <returns></returns>
-        public virtual Task<bool> CanStartAsync(AbstractGameState state)
+        public virtual Task<bool> CanStartAsync(AbstractGameState state, CancellationToken ct = default)
         {
-            return Task.FromResult(MinPlayerCount <= state.Players.Count
-                && state.Players.Count <= MaxPlayerCount
-                && state.IsJoinable);
+            return Task.FromResult(HasValidPlayerCount(state));
         }
+
+        /// <summary>
+        /// Returns true when the state has a player count inside
+        /// [<see cref="MinPlayerCount"/>, <see cref="MaxPlayerCount"/>] and the lobby is still joinable.
+        /// Override <see cref="CanStartAsync"/> and compose with this helper to add game-specific rules.
+        /// </summary>
+        protected bool HasValidPlayerCount(AbstractGameState state)
+            => MinPlayerCount <= state.Players.Count
+            && state.Players.Count <= MaxPlayerCount
+            && state.IsJoinable;
     }
 }
