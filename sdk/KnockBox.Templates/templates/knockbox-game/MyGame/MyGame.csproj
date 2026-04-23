@@ -22,7 +22,7 @@
     <!-- ASP.NET Core shared framework — needed by the Razor SDK. -->
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
 
-    <!-- THE ONLY KnockBox reference this project may have.
+    <!-- THE ONLY KnockBox runtime reference this project may have.
          Do NOT add KnockBox.Platform or any other game plugin here:
            - KnockBox.Platform is the host SDK; pulling it in breaks the
              runtime ALC isolation (assembly identity drift).
@@ -31,6 +31,17 @@
          Use the 1.* floating version so you automatically pick up patch /
          minor releases of the contracts. -->
     <PackageReference Include="KnockBox.Core" Version="1.*" />
+
+    <!-- Analyzer that flags sandbox-escaping APIs (direct filesystem access,
+         raw HTTP, process launch, environment variable reads). Ships only
+         as a build-time dependency — PrivateAssets="all" keeps it out of
+         your NuGet consumers' graphs, and IncludeAssets="analyzers" tells
+         NuGet to surface only the analyzer DLLs (not a runtime reference).
+         Suppress specific warnings with #pragma warning disable KB1xxx when
+         you have a considered reason. -->
+    <PackageReference Include="KnockBox.Plugins.Analyzer" Version="1.*"
+                      PrivateAssets="all"
+                      IncludeAssets="analyzers" />
   </ItemGroup>
 
   <ItemGroup>

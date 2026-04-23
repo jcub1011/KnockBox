@@ -56,6 +56,21 @@
     </None>
   </ItemGroup>
 
+  <!--
+    Wire the KnockBox sandbox-escape analyzer into every first-party plugin.
+    OutputItemType="Analyzer" routes the analyzer DLL to the compiler's
+    analyzer pipeline instead of the normal reference set;
+    ReferenceOutputAssembly="false" keeps the plugin's runtime output clean
+    (the analyzer only exists to produce warnings at build time). When the
+    analyzer is shipped as a NuGet package, third-party plugin authors get
+    the same behavior via a PackageReference with PrivateAssets="all".
+  -->
+  <ItemGroup>
+    <ProjectReference Include="$(MSBuildThisFileDirectory)..\sdk\KnockBox.Plugins.Analyzer\KnockBox.Plugins.Analyzer.csproj"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
   <Target Name="PublishPlugin" AfterTargets="Build">
     <Message Text="Publishing plugin $(TargetName) to KnockBox app..." Importance="high" />
     <PropertyGroup>
