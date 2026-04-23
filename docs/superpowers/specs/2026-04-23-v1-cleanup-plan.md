@@ -9,9 +9,9 @@
 | **Phase 3** | Operational hygiene (shutdown, eviction, TimeProvider) | ✅ Complete |
 | **Phase 4** | `User` API tightening | ✅ Complete |
 | **Phase 5** | Packaging & release metadata | ✅ Complete |
-| **Phase 6** | Docs & release notes | ⬜ Pending |
+| **Phase 6** | Docs & release notes | ✅ Complete |
 
-Totals after Phase 5: **1565 tests passing** (426 SDK + 1139 host), 0 failures, 7 skipped (pre-existing Windows symlink tests). Phase 5 is metadata-only — same test count as end of Phase 4.
+Totals after Phase 6: **1565 tests passing** (426 SDK + 1139 host), 0 failures, 7 skipped (pre-existing Windows symlink tests). Phase 6 is docs-only — same test count as end of Phase 4.
 
 ---
 
@@ -34,7 +34,7 @@ Work is split into six phases, ordered by blast radius. Phase 1 ripples into eve
 - [x] **1.5** Add `CancellationToken ct = default` to `CanStartAsync`
 - [x] **1.6** Drop `User host` from `StartAsync` — caller-identity check moved into each plugin's lobby page (lobby pages already had `UserService.CurrentUser` and `State.Host`; same pattern as existing `KickPlayer` check)
 - [x] **1.7** Factor `HasValidPlayerCount` helper out of default `CanStartAsync`
-- [x] **1.8** Propagate new signatures into **8** first-party plugins — CardCounter, Codeword, DiceSimulator, DrawnToDress, HiddenAgenda, Operator, Spardle, TaskMaster (not 9 — ConsultTheCard project exists but has no source; flag for CLAUDE.md correction)
+- [x] **1.8** Propagate new signatures into **8** first-party plugins — CardCounter, Codeword, DiceSimulator, DrawnToDress, HiddenAgenda, Operator, Spardle, TaskMaster
 - [x] **Phase 1 tests** — new `Phase1VerificationTests.cs` with 7 tests: dispose-race specific error (sync + async), `IScheduledCallbackHandle` idempotence + survival across state dispose, handler-chain non-short-circuit on both `PlayerUnregistered` and `OnStateDisposed`, concurrent-worker smoke test for `SetJoinable`/`RegisterPlayer` serialization
 
 ### Phase 1 audit corrections worked during execution
@@ -113,39 +113,17 @@ Work is split into six phases, ordered by blast radius. Phase 1 ripples into eve
 
 ---
 
-## Phase 6 — Docs & release notes — ⬜ Pending
+## Phase 6 — Docs & release notes — ✅ Complete
 
-### 6.1 Plugin-author guide refresh
+- [x] **6.1** Plugin-author guide (`docs/making-a-game-plugin.md`) refreshed — new top-level section "The manifest, capabilities, and `IPluginRegistration`" (covers `plugin.json` shape, capability gating via `IPluginContext`, the `IPluginRegistration` surface + host-service denylist including the static always-protected set, plugin-data directory layout, 5-second ctor budget, net10.0 only, no hot-reload, caller-identity-check-is-the-page's-job, and `ForbiddenPluginDependencies` is not configurable); Step 2 Module/Engine descriptions + Step 3 state prose updated with v1.0 signatures (`SetJoinable` inside `Execute`, `IScheduledCallbackHandle`, `StartAsync(state, ct)` and `CanStartAsync(state, ct)` with `HasValidPlayerCount` helper); Step 7 test snippet migrated to `StartAsync(state!)` + `UserFactory.Create`; Step 8 ship checklist gained `plugin.json` and `.deps.json` entries with their rejection paths; Invariants checklist extended with `plugin.json` both-copies-agree, `SetJoinable` inside `Execute`, `IScheduledCallbackHandle` disposal, 5s ctor budget, caller-identity, and capability-declaration rules; Troubleshooting table gained 5 new rows covering ctor timeout, manifest mismatch, capability-not-granted, denylist-dropped, newer-Core rejection.
+- [x] **6.2** Architecture doc (`host/KnockBox/Specs/knockbox-platform-architecture.md`) synced — Solution Structure table lists all 8 first-party plugins + SDK NuGets + analyzer + template pack; `IGameModule` contract replaced with manifest-based shape; new subsections on `plugin.json` + `IPluginManifest` and on `IPluginContext`/`IPluginRegistration`; `PluginLoader` description rewritten to reflect plugin.json parsing, deps.json inspection with forbidden-dep + Core-version gates, 5s ctor timeout, cross-check; `AddGameEngine` helper moved to `IPluginRegistration`; `AbstractGameEngine` code block updated (`StartAsync(state, ct)`, `CanStartAsync` with CT + `HasValidPlayerCount` helper); `AbstractGameState` code block updated (`SetJoinable`, `IScheduledCallbackHandle`), plus a paragraph on the always-fire-notify behavior change and `ObjectDisposedException` unified message; `User` section rewritten for internal ctor + `UserFactory.Create`; `IUserService` code block extended with `UserNameChanged` + `SetCurrentUserName` + `ResetIdentityAsync`; call-flow diagram and Start Game / Adding a New Game sections updated to match Phase 1 signatures; new sections on host-service denylist, lobby lifecycle hooks (`IHostedService` shutdown + eviction-closes-lobby chain), and SDK versioning / compatibility policy; Technology Stack table updated (ScheduleCallback → `IScheduledCallbackHandle`, plugin sandbox row added).
+- [x] **6.3** Created `CHANGELOG.md` at repo root with an unreleased `[1.0.0]` entry organized into Breaking changes (engine, state, module, sandbox, User/IUserService), Added (shutdown hook, TimeProvider, IScheduledCallbackHandle, UserFactory, NuGet packaging metadata + SourceLink, SemVer doc), Removed (7 obsolete plugin tests + 1 same-value-notify test), and Internal notes. Includes the explicit minor-behavior-change note on `Execute` always firing `Notify` regardless of whether the inner mutation changed anything.
+- [x] **6.4** Fixed `CLAUDE.md`'s plugin count: "seven first-party game plugins" → "eight first-party game plugins (CardCounter, Codeword, DiceSimulator, DrawnToDress, HiddenAgenda, Operator, Spardle, TaskMaster)". Also extended the `sdk/KnockBox.Sdk.slnx` line to include the analyzer and PlatformTests. The empty `KnockBox.ConsultTheCard` folders were removed by the user during Phase 6 — no leftover references in docs.
 
-**File:** `docs/making-a-game-plugin.md`
+### Phase 6 notes
 
-- [ ] Migration note: `IGameModule` no longer has `Name`/`Description`/`RouteIdentifier`; those now live on `IPluginManifest` and must match between `plugin.json` and `IGameModule.Manifest`.
-- [ ] `RegisterServices` now receives `IPluginRegistration`, not `IServiceCollection`. List of blocked service types (from Phase 2.1, refreshed for the snapshot-based denylist). No `IHostedService`. No cross-plugin keyed services.
-- [ ] Capability declarations in `plugin.json` (`config`, `storage`) — accessing an undeclared capability throws `PluginCapabilityNotGrantedException`.
-- [ ] Plugin-data directory layout: `{AppContext.BaseDirectory}/data/plugins/{routeIdentifier}/` (via `IPluginStorage`). Plugins can still bypass this by calling `System.IO` directly — that's an authoring violation, not runtime-enforced.
-- [ ] 5-second plugin-module constructor budget (Phase 2.4).
-- [ ] No plugin hot-reload; restart required.
-- [ ] Plugins must target `net10.0`. No multi-targeting.
-- [ ] Caller-identity check for `engine.StartAsync(state, ct)` is the invoker's responsibility (Phase 1.6).
-- [ ] Updated `AbstractGameEngine` / `AbstractGameState` snippets matching Phase 1 signatures — `StartAsync(AbstractGameState state, CancellationToken ct)`, `SetJoinable` inside `Execute`, `CanStartAsync` with `CancellationToken`, `IScheduledCallbackHandle`.
-- [ ] Document Phase 2.6: `ForbiddenPluginDependencies` is not configurable; adding entries requires an SDK release.
-
-### 6.2 Architecture doc sync
-
-**File:** `host/KnockBox/Specs/knockbox-platform-architecture.md`
-
-- [ ] Replace the pre-refactor `IGameModule` sketch with the manifest-based one.
-- [ ] Describe `IPluginRegistration` and the hybrid host-service denylist (static set + dynamic snapshot).
-- [ ] Describe the `plugin.json` agree-check and capability gating.
-- [ ] Update `ScheduleCallback`, `StartAsync`, `CanStartAsync`, `UpdateJoinableStatus` mentions (including line 358 and the call-flow diagram around 542/576) to match Phase 1.
-- [ ] Section on version policy (Phase 5.3).
-- [ ] **Fix plugin count:** CLAUDE.md and this doc say "seven first-party game plugins"; actual is **eight** (CardCounter, Codeword, DiceSimulator, DrawnToDress, HiddenAgenda, Operator, Spardle, TaskMaster). ConsultTheCard project exists but has no source.
-- [ ] Document the host-eviction-closes-lobby chain (Phase 3.2) and shutdown hook (Phase 3.1).
-
-### 6.3 CHANGELOG
-
-- [ ] Author `CHANGELOG.md` at repo root (does not currently exist) with an explicit v1.0.0 entry listing the breaking changes from Phases 1, 2.1, 2.2, 4.
-- [ ] Note the minor behavior change: `state.Execute(() => state.SetJoinable(x))` always fires `StateChangedEventManager.Notify()`, even when `x` equals the current value. The old `UpdateJoinableStatus` suppressed the notify when unchanged.
+- Phase 6 is docs-only. No csproj, code, or workflow changes; test count is unchanged at 1565.
+- `OutfitCustomizationPhase.razor[.cs]` did NOT subscribe to `User.NameChanged` — the `OnOutfitNameChangedAsync` handler is the outfit name, unrelated to the user's name. The Phase 4 ripple list in earlier plan drafts was wrong about that site; no migration needed there.
 
 ---
 
