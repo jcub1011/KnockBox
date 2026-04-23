@@ -106,7 +106,7 @@
 .spd-header-actions ::deep .spd-header-code-value {
     grid-area: 1 / 1;
     padding: 8px 14px;
-    transition: transform 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transition: transform 0.32s cubic-bezier(0.25, 1, 0.5, 1);
 }
 
 .spd-header-actions ::deep .spd-header-code-cover {
