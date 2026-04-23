@@ -32,7 +32,7 @@ Work is split into six phases, ordered by blast radius. Phase 1 ripples into eve
 - [x] **1.3** Give `Execute`/`Dispose` race a specific error — all four overloads catch `ObjectDisposedException` separately; unified public message "State was disposed." across both already-disposed and during-execute paths
 - [x] **1.4** Per-handler error isolation — added private `SafeInvoke` / `SafeInvoke<T>` helpers; applied to both `PlayerUnregistered` sites (line 218, 258) and `OnStateDisposed` (line 515)
 - [x] **1.5** Add `CancellationToken ct = default` to `CanStartAsync`
-- [x] **1.6** Drop `User host` from `StartAsync` — caller-identity check moved into each plugin's lobby page (lobby pages already had `UserService.CurrentUser` and `State.Host`; same pattern as existing `KickPlayer` check)
+- [x] **1.6** Seal caller-identity check in the base class — `AbstractGameEngine.StartAsync(User caller, state, ct)` is now the non-virtual public entry point that verifies `caller.Id == state.Host.Id` and delegates to a new abstract `StartAsyncCore(state, ct)` override point. Plugins override `StartAsyncCore`, never `StartAsync`; the per-plugin duplication of the host check is removed.
 - [x] **1.7** Factor `HasValidPlayerCount` helper out of default `CanStartAsync`
 - [x] **1.8** Propagate new signatures into **8** first-party plugins — CardCounter, Codeword, DiceSimulator, DrawnToDress, HiddenAgenda, Operator, Spardle, TaskMaster
 - [x] **Phase 1 tests** — new `Phase1VerificationTests.cs` with 7 tests: dispose-race specific error (sync + async), `IScheduledCallbackHandle` idempotence + survival across state dispose, handler-chain non-short-circuit on both `PlayerUnregistered` and `OnStateDisposed`, concurrent-worker smoke test for `SetJoinable`/`RegisterPlayer` serialization
@@ -41,7 +41,7 @@ Work is split into six phases, ordered by blast radius. Phase 1 ripples into eve
 
 - Plan-draft static `SetJoinable` wouldn't compile — engines aren't subclasses of `AbstractGameState`. Made public with strong XML doc ("must be called inside Execute") instead.
 - Plan-draft "gate under `WithExclusiveRead`, mutation outside" had a TOCTOU: another thread could flip `IsJoinable` between gate and add. Corrected by running the entire `RegisterPlayer` body inside a single `Execute`.
-- 7 obsolete engine-level "non-host caller rejected" tests deleted across plugin test projects. The behavior moved to the lobby page; those tests no longer represent a meaningful engine contract. Razor-page-level enforcement is now an untested gap — follow-up.
+- Initial Phase 1.6 draft dropped `User host` from `StartAsync` and deleted the engine-level "non-host caller rejected" tests per plugin. Reverted during execution: the auth check was restored to the base class as a sealed entry point (`StartAsync` non-virtual) delegating to a new `StartAsyncCore` override, and the non-host tests were reinstated across 7 plugin test projects (`CardCounter`, `Codeword`, `DiceSimulator`, `DrawnToDress`, `HiddenAgenda`, `Spardle`, `TaskMaster`).
 - Deleted `UpdateJoinableStatus_SameValue_DoesNotFireStateChanged`. With the new shape, `Execute` always fires `Notify` regardless of whether the inner mutation changed anything. Minor behavior change; CHANGELOG entry needed.
 
 ---
@@ -131,10 +131,9 @@ Work is split into six phases, ordered by blast radius. Phase 1 ripples into eve
 
 1. **`OnStateDisposed` handler contract:** `Dispose` fires `OnStateDisposed` before `_disposeCts.Cancel()` and well before `_executeLock.Dispose()`. A subscriber that calls `Execute` from inside `OnStateDisposed` will succeed but race with the rest of disposal. Document the contract explicitly in the v1.0 XML doc so plugin authors know what's legal.
 2. **`_kickedPlayers` is never cleared:** kicked-set grows unbounded for the lobby's lifetime. Probably intentional ("kicked stays kicked"), but should be an explicit behavior contract somewhere.
-3. **Razor-page-level host-check for `StartAsync` has no test coverage.** The engine no longer enforces it; each plugin's lobby page does. Follow-up integration test via `bUnit` or `WebApplicationFactory`.
-4. **Ctor-timeout has no end-to-end verification test** (Phase 2.4). Needs a separate slow-ctor fixture assembly.
-5. **`MapPluginStaticAssets` wwwroot-reject branch untested** (Phase 2.3).
-6. **End-to-end host-eviction-closes-lobby test** (Phase 3.2). Needs `bUnit`/`WebApplicationFactory`.
+3. **Ctor-timeout has no end-to-end verification test** (Phase 2.4). Needs a separate slow-ctor fixture assembly.
+4. **`MapPluginStaticAssets` wwwroot-reject branch untested** (Phase 2.3).
+5. **End-to-end host-eviction-closes-lobby test** (Phase 3.2). Needs `bUnit`/`WebApplicationFactory`.
 
 ---
 

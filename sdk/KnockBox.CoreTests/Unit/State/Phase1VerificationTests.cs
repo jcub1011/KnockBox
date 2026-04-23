@@ -22,7 +22,7 @@ public sealed class Phase1VerificationTests
     {
     }
 
-    private static User MakeUser(string name = "U") => new(name, Guid.NewGuid().ToString());
+    private static User MakeUser(string name = "U") => UserFactory.Create(name, Guid.NewGuid().ToString());
     private static TestGameState MakeState(User? host = null)
         => new(host ?? MakeUser("Host"), Mock.Of<ILogger>());
 

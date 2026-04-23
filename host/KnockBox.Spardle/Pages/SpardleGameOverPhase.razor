@@ -7,10 +7,8 @@
 @inject INavigationService NavigationService
 
 @{
-    IEnumerable<(User User, string DisplayName)> rosterSource =
-        State.HostIsParticipant
-            ? State.Players.Select(p => (p.User, p.DisplayName)).Prepend((State.Host, State.Host.Name))
-            : State.Players.Select(p => (p.User, p.DisplayName));
+    IEnumerable<PlayerEntry> rosterSource =
+        State.HostIsParticipant ? State.RosterIncludingHost : State.Players;
     var roster = rosterSource
         .Select(u => new
         {

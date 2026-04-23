@@ -370,14 +370,11 @@ public class SpardleEngine(
     private List<PlayerRoundOutcome> BuildOutcomes(SpardleState s)
     {
         var participants = new List<(User User, string DisplayName, PlayerState Ps)>();
-        var playerEntries = s.Players.Select(p => (p.User, p.DisplayName));
-        var roster = s.HostIsParticipant
-            ? playerEntries.Prepend((s.Host, s.Host.Name))
-            : playerEntries;
-        foreach (var (user, displayName) in roster)
+        var roster = s.HostIsParticipant ? s.RosterIncludingHost : s.Players;
+        foreach (var entry in roster)
         {
-            if (s.PlayerStates.TryGetValue(user.Id, out var ps))
-                participants.Add((user, displayName, ps));
+            if (s.PlayerStates.TryGetValue(entry.User.Id, out var ps))
+                participants.Add((entry.User, entry.DisplayName, ps));
         }
 
         var solvers = participants

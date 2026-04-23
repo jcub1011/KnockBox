@@ -231,7 +231,6 @@ When the `storage` capability is declared, `IPluginContext.Storage` reads and wr
 - Plugins target `net10.0`. No multi-targeting. The host is `net10.0` and the ALC isolation only works when runtime identity matches.
 - No plugin hot-reload; restarting the host is the only way to pick up new or changed plugins.
 - Module constructors must return within **5 seconds**. Hanging ctors log an error and the plugin is skipped.
-- Caller-identity checks for `engine.StartAsync(state, ct)` live in your lobby page. The engine assumes the caller is authorized — mirror the `KickPlayer` pattern in your page.
 
 ---
 
@@ -423,7 +422,7 @@ public class MyGameGameEngineTests
         var createResult = await _engine.CreateStateAsync(host);
         Assert.IsTrue(createResult.TryGetSuccess(out var state));
 
-        var startResult = await _engine.StartAsync(state!);
+        var startResult = await _engine.StartAsync(host, state!);
 
         Assert.IsTrue(startResult.IsSuccess);
         Assert.IsFalse(state!.IsJoinable);
@@ -436,7 +435,7 @@ Tips:
 - **Test against a real state**, not a mocked one. `AbstractGameState` is a regular class; its lock is in-process and costs nothing in tests.
 - **Use `TryGetSuccess(out var value)`** to unpack `ValueResult<T>` — that's the canonical success-path assertion.
 - **Use `UserFactory.Create(name, id)`** to build `User` fixtures. The `User` ctor is `internal` as of v1.0 — the factory is the supported escape hatch for test code. In production, consumers resolve `IUserService.CurrentUser` instead of constructing users directly.
-- **`StartAsync` takes the state only**, not the host. If your test needs to simulate a non-host trying to start, wire that at the lobby-page level; engines assume the caller is authorized.
+- **`StartAsync(caller, state)` enforces host-identity at the base class.** To test the non-host rejection path, pass a non-host `User` as the first argument and assert `IsFailure`. Plugins override `StartAsyncCore(state, ct)` and never re-check the caller identity.
 - **Don't test Razor pages here.** They need a full circuit; exercise them manually in the DevHost or with bUnit in a separate integration-test project.
 
 ---
@@ -524,7 +523,7 @@ Fail any of these and something breaks at load, runtime, or in production:
 - ✅ `IGameModule` implementation has a public parameterless constructor that returns within 5 seconds. The plugin loader uses `Activator.CreateInstance` with no arguments and enforces a timeout.
 - ✅ Exactly one `IGameModule` implementation per plugin assembly. Zero = plugin not registered; more than one = platform fails fast.
 - ✅ Engine is stateless. One instance, one process — never stash per-room data on the engine.
-- ✅ Caller-identity checks for `engine.StartAsync(state, ct)` live in the lobby page, not the engine.
+- ✅ Lobby pages call `engine.StartAsync(UserService.CurrentUser, GameState)`; the base class rejects non-host callers. Plugins override `StartAsyncCore(state, ct)`, never `StartAsync`.
 - ✅ Any use of `IPluginContext.Configuration` / `.Storage` is declared in `plugin.json`'s `capabilities`. Undeclared access throws at first read.
 
 ---

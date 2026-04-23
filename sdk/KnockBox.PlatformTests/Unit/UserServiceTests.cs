@@ -168,6 +168,23 @@ public sealed class UserServiceTests
     }
 
     [TestMethod]
+    public async Task InitializeCurrentUserAsync_StoredNameLongerThanCap_IsTruncated()
+    {
+        // A name persisted by an older version (or hand-edited localStorage)
+        // could exceed the 12-char cap. Construction must apply the same
+        // trim+cap normalization as UserFactory.Create / SetCurrentUserName
+        // so CurrentUser.Name honors the v1 invariant regardless of source.
+        var service = NewService(out var storage);
+        await storage.SetAsync("user", "name", "abcdefghijklmnop"); // 16 chars
+
+        await service.InitializeCurrentUserAsync();
+
+        Assert.IsNotNull(service.CurrentUser);
+        Assert.AreEqual(12, service.CurrentUser!.Name.Length);
+        Assert.AreEqual("abcdefghijkl", service.CurrentUser.Name);
+    }
+
+    [TestMethod]
     public async Task SetCurrentUserName_AfterDispose_IsNoOp()
     {
         var (service, storage) = await NewInitializedServiceAsync();

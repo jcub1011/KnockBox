@@ -1,5 +1,6 @@
 @using KnockBox.Spardle.Models
 @using KnockBox.Spardle
+@using KnockBox.Core.Services.State.Games.Shared
 @using KnockBox.Core.Services.State.Users
 @implements IDisposable
 
@@ -92,10 +93,8 @@
 
     private List<RankedEntry> ComputeRanked()
     {
-        IEnumerable<(User User, string DisplayName)> roster =
-            State.HostIsParticipant
-                ? State.Players.Select(p => (p.User, p.DisplayName)).Prepend((State.Host, State.Host.Name))
-                : State.Players.Select(p => (p.User, p.DisplayName));
+        IEnumerable<PlayerEntry> roster =
+            State.HostIsParticipant ? State.RosterIncludingHost : State.Players;
 
         var sorted = roster
             .Select(u => (u.User, u.DisplayName, Ps: State.TryGetPlayerState(u.User.Id, out var p) ? p : null))

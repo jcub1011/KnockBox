@@ -58,7 +58,7 @@ namespace KnockBox.Services.State.Users
                 logger.LogError(ex, "Error initializing current user service.");
             }
 
-            CurrentUser = new User(name, id);
+            CurrentUser = UserFactory.Create(name, id);
             UserInitialized?.Invoke();
         }
 
@@ -83,7 +83,7 @@ namespace KnockBox.Services.State.Users
             var user = CurrentUser;
             if (user is null) return;
 
-            name = name?.Trim() ?? string.Empty;
+            name = name.Trim();
             if (name.Length > MAX_NAME_LENGTH) name = name[..MAX_NAME_LENGTH];
 
             var previous = user.Name;

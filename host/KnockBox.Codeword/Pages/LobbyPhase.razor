@@ -18,36 +18,31 @@
                     int playerCount = GameState.Players.Count;
                 }
 
-                @{
-                    IEnumerable<(string Id, string DisplayName)> roster =
-                        new[] { (GameState.Host.Id, GameState.Host.Name) }
-                            .Concat(GameState.Players.Select(p => (p.User.Id, p.DisplayName)));
-                }
-                @foreach (var player in roster)
+                @foreach (var entry in GameState.RosterIncludingHost)
                 {
-                    bool isHost = player.Id == GameState.Host.Id;
-                    bool isMe = player.Id == UserService.CurrentUser?.Id;
+                    bool isHost = entry.User.Id == GameState.Host.Id;
+                    bool isMe = entry.User.Id == UserService.CurrentUser?.Id;
                     @if (isHost)
                     {
                         <div class="ctc-lobby-player @(isMe ? "ctc-lobby-player-me" : "")">
                             <span class="ctc-player-avatar">👑</span>
-                            <span class="ctc-player-lobbyname">@player.DisplayName</span>
+                            <span class="ctc-player-lobbyname">@entry.DisplayName</span>
                             <span class="ctc-host-badge">HOST</span>
                         </div>
                     }
                     else if (isUserHost)
                     {
                         <button class="ctc-lobby-player @(isMe ? "ctc-lobby-player-me" : "")"
-                                @onclick="() => KickPlayer(player.Id)" title="Click to kick player">
+                                @onclick="() => KickPlayer(entry.User.Id)" title="Click to kick player">
                             <span class="ctc-player-avatar">🕵️</span>
-                            <span class="ctc-player-lobbyname">@player.DisplayName</span>
+                            <span class="ctc-player-lobbyname">@entry.DisplayName</span>
                         </button>
                     }
                     else
                     {
                         <div class="ctc-lobby-player @(isMe ? "ctc-lobby-player-me" : "")">
                             <span class="ctc-player-avatar">🕵️</span>
-                            <span class="ctc-player-lobbyname">@player.DisplayName</span>
+                            <span class="ctc-player-lobbyname">@entry.DisplayName</span>
                         </div>
                     }
                 }

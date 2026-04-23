@@ -7,12 +7,11 @@ using System.Diagnostics.CodeAnalysis;
 namespace KnockBox.Core.Services.State.Games.Shared
 {
     /// <summary>
-    /// A registered player's seat in a specific lobby: the underlying
-    /// <see cref="User"/> (authoritative identity, owned by
-    /// <c>IUserService</c>), the <see cref="DisplayName"/> used for this lobby
-    /// only (may differ from <c>User.Name</c> after disambiguation of
-    /// colliding names), and the <see cref="Token"/> that unregisters the
-    /// player when disposed.
+    /// A seat in a lobby's roster: the underlying <see cref="User"/>
+    /// (authoritative identity, owned by <c>IUserService</c>), the
+    /// <see cref="DisplayName"/> used for this lobby only (may differ from
+    /// <c>User.Name</c> after disambiguation of colliding names), and an
+    /// optional <see cref="Token"/> that unregisters the player when disposed.
     /// </summary>
     /// <remarks>
     /// <para><b>Why a separate <see cref="DisplayName"/>:</b> two players in
@@ -22,8 +21,13 @@ namespace KnockBox.Core.Services.State.Games.Shared
     /// the underlying <c>User</c> is not mutated, so other lobbies and the
     /// user's global identity (<c>IUserService.CurrentUser</c>) are
     /// unaffected.</para>
+    /// <para><b>When is <see cref="Token"/> null:</b> registered players always
+    /// have a non-null token — the owner disposes it to leave the lobby.
+    /// Synthetic entries yielded by <see cref="AbstractGameState.RosterIncludingHost"/>
+    /// for the host carry a null token, since the host isn't a registered
+    /// player and has no unregistration handle.</para>
     /// </remarks>
-    public readonly record struct PlayerEntry(User User, string DisplayName, IDisposable Token);
+    public readonly record struct PlayerEntry(User User, string DisplayName, IDisposable? Token);
 
     /// <summary>
     /// Base class for per-room game state. One instance is created per lobby by
@@ -123,6 +127,23 @@ namespace KnockBox.Core.Services.State.Games.Shared
                 foreach (var entry in _players.Values)
                     result[i++] = entry;
                 return result;
+            }
+        }
+
+        /// <summary>
+        /// The full roster for the lobby — <see cref="Host"/> first, then every
+        /// registered player. The host's entry carries a null <c>Token</c>
+        /// (the host isn't a registered player) and a <c>DisplayName</c> equal
+        /// to <c>Host.Name</c>; player entries carry the per-lobby
+        /// disambiguated <c>DisplayName</c>. Use this instead of composing
+        /// a host-plus-players sequence at each call site.
+        /// </summary>
+        public IEnumerable<PlayerEntry> RosterIncludingHost
+        {
+            get
+            {
+                yield return new PlayerEntry(Host, Host.Name, Token: null);
+                foreach (var entry in Players) yield return entry;
             }
         }
 
@@ -318,18 +339,17 @@ namespace KnockBox.Core.Services.State.Games.Shared
         /// block</b> so that readers which gate on <see cref="IsJoinable"/> (e.g. <see cref="RegisterPlayer"/>)
         /// are serialized against the transition and so <see cref="StateChangedEventManager"/>
         /// subscribers see the new value once the lock is released. Calling this outside the
-        /// execute lock is a programmer error; the method itself does not take a lock.
+        /// execute lock throws <see cref="InvalidOperationException"/> in every build — the race
+        /// is a programmer error either way.
         /// </remarks>
         public void SetJoinable(bool isJoinable)
         {
-            // Dev-time sanity check: if the execute lock isn't held, the caller
-            // forgot to wrap SetJoinable inside Execute, and any reader gating
-            // on IsJoinable (RegisterPlayer, etc.) can race with this write.
-            // CurrentCount == 0 means *some* thread holds the semaphore; in the
-            // single-threaded Blazor-server model that's the current thread.
-            System.Diagnostics.Debug.Assert(
-                _executeLock.CurrentCount == 0,
-                "SetJoinable must be called from inside an Execute / ExecuteAsync block.");
+            // CurrentCount == 0 means some thread on this state holds the
+            // semaphore, which is what we need — we're not asserting which
+            // thread, only that the execute lock is held.
+            if (_executeLock.CurrentCount != 0)
+                throw new InvalidOperationException(
+                    "SetJoinable must be called from inside an Execute / ExecuteAsync block so that readers gating on IsJoinable are serialized against the transition.");
             IsJoinable = isJoinable;
         }
 
