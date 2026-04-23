@@ -76,7 +76,10 @@ namespace KnockBox.Core.Services.Logic.Games.Engines.Shared
         /// <see cref="IsLobbyOpen"/> when you need both.
         /// </summary>
         protected bool HasValidPlayerCount(AbstractGameState state)
-            => MinPlayerCount <= state.Players.Count && state.Players.Count <= MaxPlayerCount;
+        {
+            var count = state.Players.Count;
+            return MinPlayerCount <= count && count <= MaxPlayerCount;
+        }
 
         /// <summary>
         /// Returns true when the lobby is currently accepting joins

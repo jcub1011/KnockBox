@@ -3,6 +3,7 @@ using KnockBox.Core.Primitives.Events;
 using KnockBox.Core.Primitives.Returns;
 using KnockBox.Core.Services.State.Users;
 using System.Diagnostics.CodeAnalysis;
+using System.Runtime.CompilerServices;
 
 namespace KnockBox.Core.Services.State.Games.Shared
 {
@@ -56,10 +57,12 @@ namespace KnockBox.Core.Services.State.Games.Shared
     public abstract class AbstractGameState(User host, ILogger logger) : IDisposable
     {
         private readonly Lock _disposeLock = new();
+        private readonly AsyncLocal<bool> _isExecuting = new();
         private readonly SemaphoreSlim _executeLock = new(1, 1);
         private readonly Lock _scheduledLock = new();
         private readonly List<CancellationTokenSource> _scheduledCallbacks = [];
         private readonly Lock _playerLock = new();
+        private volatile PlayerEntry[] _cachedPlayerEntries = [];
         private readonly Dictionary<string, PlayerEntry> _players = [];
         private readonly Dictionary<string, User> _kickedPlayers = [];
         private readonly CancellationTokenSource _disposeCts = new();
@@ -71,6 +74,21 @@ namespace KnockBox.Core.Services.State.Games.Shared
         protected void NotifyStateChanged()
         {
             StateChangedEventManager.Notify();
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal void UpdatePlayerCacheUnsafe()
+        {
+            ThrowIfNotExecuting();
+            _cachedPlayerEntries = [.. _players.Values];
+        }
+
+        /// <summary>
+        /// Throws if the code was reached outside of an <see cref="Execute"/> or <see cref="ExecuteAsync"/> wrapper.
+        /// </summary>
+        protected void ThrowIfNotExecuting()
+        {
+            if (!_isExecuting.Value) throw new InvalidOperationException("Code was reached outside of an Execute or ExecuteAsync wrapper.");
         }
 
         /// <summary>
@@ -116,19 +134,7 @@ namespace KnockBox.Core.Services.State.Games.Shared
         /// <see cref="User"/> and the per-lobby <see cref="PlayerEntry.DisplayName"/>
         /// (which may differ from <c>User.Name</c> after disambiguation).
         /// </summary>
-        public IReadOnlyList<PlayerEntry> Players
-        {
-            get
-            {
-                using var scope = _playerLock.EnterScope();
-                if (_players.Count == 0) return [];
-                var result = new PlayerEntry[_players.Count];
-                int i = 0;
-                foreach (var entry in _players.Values)
-                    result[i++] = entry;
-                return result;
-            }
-        }
+        public IReadOnlyList<PlayerEntry> Players => _cachedPlayerEntries;
 
         /// <summary>
         /// The full roster for the lobby — <see cref="Host"/> first, then every
@@ -277,6 +283,7 @@ namespace KnockBox.Core.Services.State.Games.Shared
                         if (_players.TryGetValue(player.Id, out var current) && ReferenceEquals(current.Token, unsubscriber))
                         {
                             _players.Remove(player.Id);
+                            UpdatePlayerCacheUnsafe();
                             shouldFire = true;
                         }
                     });
@@ -284,6 +291,7 @@ namespace KnockBox.Core.Services.State.Games.Shared
                 });
 
                 _players[player.Id] = new PlayerEntry(player, displayName, unsubscriber);
+                UpdatePlayerCacheUnsafe();
 
                 if (!isRejoin)
                     logger.LogInformation("User [{userId}] entered game [{type}] hosted by user [{hostId}].", player.Id, GetType().Name, Host.Id);
@@ -320,6 +328,7 @@ namespace KnockBox.Core.Services.State.Games.Shared
                 {
                     _kickedPlayers[player.Id] = player;
                     _players.Remove(player.Id);
+                    UpdatePlayerCacheUnsafe();
                     token = registration.Token;
                 }
             });
@@ -344,12 +353,7 @@ namespace KnockBox.Core.Services.State.Games.Shared
         /// </remarks>
         public void SetJoinable(bool isJoinable)
         {
-            // CurrentCount == 0 means some thread on this state holds the
-            // semaphore, which is what we need — we're not asserting which
-            // thread, only that the execute lock is held.
-            if (_executeLock.CurrentCount != 0)
-                throw new InvalidOperationException(
-                    "SetJoinable must be called from inside an Execute / ExecuteAsync block so that readers gating on IsJoinable are serialized against the transition.");
+            ThrowIfNotExecuting();
             IsJoinable = isJoinable;
         }
 
@@ -369,6 +373,7 @@ namespace KnockBox.Core.Services.State.Games.Shared
             {
                 ct.ThrowIfCancellationRequested();
                 await _executeLock.WaitAsync(ct);
+                _isExecuting.Value = true;
 
                 try
                 {
@@ -378,6 +383,7 @@ namespace KnockBox.Core.Services.State.Games.Shared
                 }
                 finally
                 {
+                    _isExecuting.Value = false;
                     _executeLock.Release();
                 }
             }
@@ -412,6 +418,7 @@ namespace KnockBox.Core.Services.State.Games.Shared
             try
             {
                 _executeLock.Wait();
+                _isExecuting.Value = true;
 
                 try
                 {
@@ -421,6 +428,7 @@ namespace KnockBox.Core.Services.State.Games.Shared
                 }
                 finally
                 {
+                    _isExecuting.Value = false;
                     _executeLock.Release();
                 }
             }
@@ -456,6 +464,7 @@ namespace KnockBox.Core.Services.State.Games.Shared
             try
             {
                 _executeLock.Wait();
+                _isExecuting.Value = true;
 
                 try
                 {
@@ -465,6 +474,7 @@ namespace KnockBox.Core.Services.State.Games.Shared
                 }
                 finally
                 {
+                    _isExecuting.Value = false;
                     _executeLock.Release();
                 }
             }
@@ -499,6 +509,7 @@ namespace KnockBox.Core.Services.State.Games.Shared
             {
                 ct.ThrowIfCancellationRequested();
                 await _executeLock.WaitAsync(ct);
+                _isExecuting.Value = true;
 
                 try
                 {
@@ -507,6 +518,7 @@ namespace KnockBox.Core.Services.State.Games.Shared
                 }
                 finally
                 {
+                    _isExecuting.Value = false;
                     _executeLock.Release();
                 }
             }
@@ -536,6 +548,7 @@ namespace KnockBox.Core.Services.State.Games.Shared
             try
             {
                 _executeLock.Wait();
+                _isExecuting.Value = true;
 
                 try
                 {
@@ -544,6 +557,7 @@ namespace KnockBox.Core.Services.State.Games.Shared
                 }
                 finally
                 {
+                    _isExecuting.Value = false;
                     _executeLock.Release();
                 }
             }
