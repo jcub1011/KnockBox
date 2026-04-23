@@ -1,0 +1,38 @@
+a {
+    /* Critical: remove text decoration and browser default coloring */
+    text-decoration: none !important;
+    color: inherit;
+    
+    /* Crucial: behave like a button/container so padding, min-width, and transforms work */
+    display: inline-grid;
+    place-items: center;
+    vertical-align: middle;
+    box-sizing: border-box;
+    
+    /* Inherit style properties from parent components */
+    font-family: inherit;
+    font-size: inherit;
+    font-weight: inherit;
+    line-height: inherit;
+    text-align: center; /* Most buttons are centered */
+    
+    /* Functional resets */
+    cursor: pointer;
+    user-select: none;
+    -webkit-user-drag: none;
+    outline: none;
+    background: transparent;
+    border: none;
+    padding: 0;
+    margin: 0;
+}
+
+/* Ensure no state re-introduces browser link defaults */
+a:hover, 
+a:focus, 
+a:active, 
+a:visited {
+    text-decoration: none !important;
+    color: inherit;
+    outline: none;
+}

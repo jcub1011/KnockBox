@@ -1,0 +1,261 @@
+#blazor-error-ui {
+    color-scheme: light only;
+    background: lightyellow;
+    bottom: 0;
+    box-shadow: 0 -1px 2px rgba(0, 0, 0, 0.2);
+    box-sizing: border-box;
+    display: none;
+    left: 0;
+    padding: 0.6rem 1.25rem 0.7rem 1.25rem;
+    position: fixed;
+    width: 100%;
+    z-index: 1000;
+}
+
+    #blazor-error-ui .dismiss {
+        cursor: pointer;
+        position: absolute;
+        right: 0.75rem;
+        top: 0.5rem;
+    }
+
+header.home-header {
+    display: none;
+}
+
+header {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    background-color: white;
+    justify-content: space-between;
+    font-family: var(--font-primary);
+    padding: 8px 16px;
+    margin: 0px;
+    font-size: 1.75em;
+    font-weight: 900;
+    box-shadow: 
+        0px 6px 0px rgba(0, 0, 0, 0.6),
+        0px -12px 0px #fff;
+    width: 100%;
+    z-index: 99;
+}
+
+.custom-header {
+    display: flex;
+    padding: 0;
+    box-shadow: none;
+}
+
+header a {
+    text-decoration: none;
+    color: inherit;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
+
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
+.leave-session-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 44px;
+    padding: 0;
+    margin: 0;
+    border-radius: 8px;
+    background: white;
+    cursor: pointer;
+    color: #000;
+    border: none;
+}
+
+.leave-session-btn:hover {
+    background: #f0f0f0;
+}
+
+.main {
+    display: flex;
+    gap: 0px;
+    flex-direction: column;
+    padding: 0px;
+    margin: 0px;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+}
+
+/* ── Scrolling Diagonal Background ──────────────────────────────────────── */
+
+.main::before {
+    content: "";
+    position: fixed;
+    top: calc(50vh - 150vmax);
+    left: calc(50vw - 150vmax);
+    width: 300vmax;
+    height: 300vmax;
+    z-index: -1;
+    background-color: var(--bg-color);
+    background-image: linear-gradient(rgba(0, 0, 0, 0.05), rgba(0, 0, 0, 0.05)), url("/_content/KnockBox.Platform/content/backgrounds/yellow-vertical_loop_crop_lq.webp");
+    background-repeat: repeat;
+    filter: blur(2px);
+    background-size: auto, auto 400px;
+    transform: rotate(45deg);
+    animation: partyGradient 12s linear infinite;
+}
+
+@keyframes partyGradient {
+    0% {
+        background-position: 0 0, 0 0;
+    }
+
+    100% {
+        background-position: 0 0, 0 -400px;
+    }
+}
+
+article {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    overflow: auto;
+    padding: 0px;
+    margin: 0px;
+}
+
+.header-actions ::deep .room-code-btn {
+    display: inline-grid;
+    overflow: hidden;
+    font-family: var(--font-primary);
+    font-size: 1em;
+    font-weight: 500;
+    margin: 0px;
+    padding: 0px 8px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+    -webkit-mask-image: linear-gradient(to right, transparent, black 8px, black calc(100% - 8px), transparent);
+    mask-image: linear-gradient(to right, transparent, black 8px, black calc(100% - 8px), transparent);
+}
+
+/* ── Join Code Slide Animation ───────────────────────────────────────── */
+
+.header-actions ::deep .room-code-cover,
+.header-actions ::deep .room-code-value {
+    grid-area: 1 / 1;
+    transition: transform 0.3s ease-out;
+}
+
+.header-actions ::deep .room-code-cover {
+    background: white;
+    width: 100%;
+    padding: 0px 8px;
+    z-index: 1;
+    transform: translateX(0);
+}
+
+.header-actions ::deep .room-code-value {
+    font-family: var(--font-mono);
+    font-weight: 600;
+    padding: 0px 8px;
+    transform: translateX(100%);
+}
+
+.header-actions ::deep .room-code-btn.revealed .room-code-cover {
+    transform: translateX(-100%);
+}
+
+.header-actions ::deep .room-code-btn.revealed .room-code-value {
+    transform: translateX(0);
+}
+
+/* ── Game Entrance Animation ──────────────────────────────────────────── */
+
+article.entering-from-home {
+    animation: content-enter 0.5s cubic-bezier(0.25, 1, 0.5, 1) both;
+    overflow: hidden;
+}
+
+@keyframes content-enter {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+header.entering-from-home {
+    animation: header-enter 0.4s cubic-bezier(0.25, 1, 0.5, 1) both;
+}
+
+@keyframes header-enter {
+    from {
+        opacity: 0;
+        transform: translateY(-100%);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ── Game Exit Animation (back to home) ───────────────────────────────── */
+
+article.exiting-to-home {
+    animation: content-exit 0.4s ease-in both;
+    overflow: hidden;
+}
+
+@keyframes content-exit {
+    from {
+        opacity: 1;
+        transform: translateY(0);
+    }
+    to {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+}
+
+header.exiting-to-home {
+    animation: header-exit 0.35s ease-in both;
+}
+
+@keyframes header-exit {
+    from {
+        opacity: 1;
+        transform: translateY(0);
+    }
+    to {
+        opacity: 0;
+        transform: translateY(-100%);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    article.entering-from-home,
+    header.entering-from-home,
+    article.exiting-to-home,
+    header.exiting-to-home {
+        animation: none;
+    }
+
+    .header-actions ::deep .room-code-cover,
+    .header-actions ::deep .room-code-value {
+        transition: none;
+    }
+}

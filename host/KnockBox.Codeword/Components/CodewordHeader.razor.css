@@ -1,0 +1,157 @@
+.ctc-header-container {
+    --ctc-lavender: #a78bfa;
+    --ctc-lavender-soft: rgba(167, 139, 250, 0.55);
+    --ctc-lavender-dim: rgba(167, 139, 250, 0.3);
+    --ctc-lavender-faint: rgba(167, 139, 250, 0.15);
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    height: 54px;
+    background: #0f0f1a;
+    border-bottom: 1px solid var(--ctc-lavender-dim);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.6);
+    position: relative;
+    overflow: hidden;
+    z-index: 1000;
+    flex: 1;
+}
+
+.ctc-header-scanlines {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.15) 50%);
+    background-size: 100% 2px;
+    pointer-events: none;
+    z-index: 1;
+}
+
+.ctc-header-vignette {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at center, transparent 40%, rgba(0, 0, 0, 0.4) 100%);
+    pointer-events: none;
+    z-index: 2;
+}
+
+.ctc-header-brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    text-decoration: none;
+    position: relative;
+    z-index: 3;
+}
+
+.ctc-header-prompt {
+    color: var(--ctc-lavender);
+    font-weight: 900;
+    font-size: 1.2rem;
+    font-family: 'Share Tech Mono', monospace;
+}
+
+.ctc-header-text {
+    color: #fff;
+    font-weight: 700;
+    font-size: 1.1rem;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    text-shadow: 0 0 8px var(--ctc-lavender-soft);
+    font-family: 'Share Tech Mono', monospace;
+}
+
+.ctc-header-caret {
+    width: 8px;
+    height: 16px;
+    background: var(--ctc-lavender);
+    box-shadow: 0 0 6px var(--ctc-lavender-soft);
+    animation: ctc-blink 1s steps(1) infinite;
+}
+
+@keyframes ctc-blink {
+    0%, 49%   { opacity: 1; }
+    50%, 100% { opacity: 0; }
+}
+
+.ctc-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    position: relative;
+    z-index: 3;
+}
+
+.ctc-header-actions ::deep .ctc-header-code {
+    background: rgba(167, 139, 250, 0.05);
+    border: 1px solid var(--ctc-lavender-dim);
+    border-radius: 4px;
+    padding: 4px 12px;
+    color: var(--ctc-lavender);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    min-width: 140px;
+    text-align: center;
+}
+
+.ctc-header-actions ::deep .ctc-header-code:hover {
+    background: var(--ctc-lavender-faint);
+    border-color: var(--ctc-lavender-soft);
+    box-shadow: 0 0 10px var(--ctc-lavender-dim);
+}
+
+.ctc-header-actions ::deep .ctc-header-code-cover,
+.ctc-header-actions ::deep .ctc-header-code-value {
+    grid-area: 1 / 1;
+    transition: opacity 0.2s ease;
+}
+
+.ctc-header-actions ::deep .ctc-header-code-value {
+    opacity: 0;
+    pointer-events: none;
+    letter-spacing: 2px;
+    font-weight: 700;
+    color: #fff;
+    text-shadow: 0 0 5px var(--ctc-lavender-soft);
+}
+
+.ctc-header-actions ::deep .ctc-header-code.revealed .ctc-header-code-cover {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.ctc-header-actions ::deep .ctc-header-code.revealed .ctc-header-code-value {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.ctc-header-leave {
+    background: transparent;
+    border: 1px solid #ef4444;
+    border-radius: 4px;
+    padding: 4px 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #ef4444;
+    cursor: pointer;
+    font-family: 'Share Tech Mono', monospace;
+    font-weight: 700;
+    font-size: 0.8rem;
+    transition: all 0.2s;
+}
+
+.ctc-header-leave:hover {
+    background: rgba(239, 68, 68, 0.1);
+    box-shadow: 0 0 10px rgba(239, 68, 68, 0.3);
+    color: #f87171;
+    border-color: #f87171;
+}
+
+@media (max-width: 600px) {
+    .ctc-header-leave-text {
+        display: none;
+    }
+}

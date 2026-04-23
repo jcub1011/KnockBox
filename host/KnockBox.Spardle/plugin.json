@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "name": "Spar-dle",
+  "description": "A fast-paced competitive word guessing game.",
+  "routeIdentifier": "spardle",
+  "version": "1.0.0",
+  "entryAssembly": "KnockBox.Spardle",
+  "capabilities": []
+}

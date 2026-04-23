@@ -1,0 +1,24 @@
+@using KnockBox.Core.Services.Navigation
+@using KnockBox.Core.Services.State.Games.Shared
+
+<div class="cc-header-container">
+    <a class="cc-header-brand" href="@NavigationService.GetHomeUri()" title="Click to return home">
+        <span class="cc-header-brand-icon">♠</span><span class="cc-header-brand-text">CARD COUNTER</span><span class="cc-header-brand-icon-flipped">♣</span>
+    </a>
+    <div class="cc-header-actions">
+        <RoomCodeButton ClassName="cc-header-code"
+                        CoverClassName="cc-header-code-cover"
+                        ValueClassName="cc-header-code-value"
+                        CoverText="Lobby Code" />
+        <button class="cc-header-leave" @onclick="Leave" title="Leave Session" aria-label="Leave Session">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
+        </button>
+    </div>
+</div>
+
+@code {
+    [Inject] INavigationService NavigationService { get; set; } = default!;
+    [Inject] IGameSessionService GameSessionService { get; set; } = default!;
+
+    private void Leave() => GameSessionService.LeaveCurrentSession(navigateHome: true);
+}

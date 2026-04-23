@@ -1,0 +1,53 @@
+/*
+   Component-scoped CSS for MyGameLobby.razor.
+
+   The Razor SDK compiles this file into the plugin's scoped-CSS bundle at
+   wwwroot/MyGame.styles.css. The platform serves it from
+   /_content/MyGame/MyGame.styles.css, which the <link> tag in
+   MyGameLobby.razor's <HeadContent> references.
+
+   Rules here are auto-scoped: the SDK rewrites selectors with a generated
+   attribute (e.g. [b-xyz123]) so they only match elements rendered by THIS
+   component. You can use simple tag / class selectors without worrying about
+   collisions with other plugins or the host.
+*/
+
+.mg-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 50vh;
+    font-size: 1.1rem;
+    opacity: 0.7;
+}
+
+.mg-lobby,
+.mg-game {
+    max-width: 640px;
+    margin: 2rem auto;
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.mg-lobby ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.mg-lobby button {
+    align-self: flex-start;
+    padding: 0.5rem 1.25rem;
+    font: inherit;
+    cursor: pointer;
+}
+
+.mg-lobby button:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}

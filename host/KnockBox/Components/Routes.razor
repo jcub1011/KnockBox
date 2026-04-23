@@ -1,0 +1,20 @@
+@using KnockBox.Core.Plugins
+@using KnockBox.Components.Admin
+@using KnockBox.Platform
+@using Microsoft.AspNetCore.Components.Authorization
+@inject GamePluginAssemblies GamePlugins
+
+<CascadingAuthenticationState>
+    <Router AppAssembly="typeof(KnockBoxPlatformExtensions).Assembly"
+            AdditionalAssemblies="GamePlugins.Assemblies.Concat(new[] { typeof(Program).Assembly })"
+            NotFoundPage="typeof(KnockBox.Platform.Components.Pages.NotFound)">
+        <Found Context="routeData">
+            <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(KnockBox.Platform.Components.Layout.MainLayout)">
+                <NotAuthorized>
+                    <AdminLoginRedirect />
+                </NotAuthorized>
+            </AuthorizeRouteView>
+            <FocusOnNavigate RouteData="routeData" Selector="h1" />
+        </Found>
+    </Router>
+</CascadingAuthenticationState>

@@ -1,0 +1,82 @@
+<!--
+  Plugin assembly project.
+
+  This is the Razor Class Library (RCL) that ships as a KnockBox game plugin.
+  At runtime the host loads it into its own AssemblyLoadContext rooted at
+  games/{PluginName}/; only KnockBox.Core, the BCL, and logging/DI abstractions
+  are shared with the host, which is why this project MUST reference nothing
+  from KnockBox except KnockBox.Core.
+-->
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+
+    <!-- Required so @page directives (MVC-style routing) work inside this
+         class library. Without it, your lobby pages won't be routable. -->
+    <AddRazorSupportForMvc>true</AddRazorSupportForMvc>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- ASP.NET Core shared framework — needed by the Razor SDK. -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+
+    <!-- THE ONLY KnockBox runtime reference this project may have.
+         Do NOT add KnockBox.Platform or any other game plugin here:
+           - KnockBox.Platform is the host SDK; pulling it in breaks the
+             runtime ALC isolation (assembly identity drift).
+           - Referencing another plugin couples you to its internals and
+             bypasses the discovery mechanism.
+         Use the 1.* floating version so you automatically pick up patch /
+         minor releases of the contracts. -->
+    <PackageReference Include="KnockBox.Core" Version="1.*" />
+
+    <!-- Analyzer that flags sandbox-escaping APIs (direct filesystem access,
+         raw HTTP, process launch, environment variable reads). Ships only
+         as a build-time dependency — PrivateAssets="all" keeps it out of
+         your NuGet consumers' graphs, and IncludeAssets="analyzers" tells
+         NuGet to surface only the analyzer DLLs (not a runtime reference).
+         Suppress specific warnings with #pragma warning disable KB1xxx when
+         you have a considered reason. -->
+    <PackageReference Include="KnockBox.Plugins.Analyzer" Version="1.*"
+                      PrivateAssets="all"
+                      IncludeAssets="analyzers" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Makes Microsoft.Extensions.Logging available in every .cs file without
+         an explicit using. The Razor SDK already brings in most ASP.NET Core
+         namespaces; this fills in the logging abstractions. -->
+    <Using Include="Microsoft.Extensions.Logging" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Lets the tests project reach internal types in this assembly. Keep the
+         assembly name in sync with MyGame.Tests.csproj. -->
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>MyGame.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
+  <!-- Fail the build if plugin.json is missing. The host refuses to load
+       plugin folders without a manifest, so skipping this here would only
+       push the failure to runtime. -->
+  <Target Name="ValidatePluginManifest" BeforeTargets="BeforeBuild;PrepareForBuild">
+    <Error Condition="!Exists('$(MSBuildProjectDirectory)\plugin.json')"
+           Text="Plugin project '$(MSBuildProjectName)' is missing required [plugin.json] in its project root. Every plugin must declare its identity and capabilities in plugin.json; see the KnockBox.Core docs for the schema." />
+  </Target>
+
+  <!-- Embed plugin.json as an assembly resource so the plugin's IGameModule
+       can read it via PluginManifest.FromEmbeddedResourceOrThrow, AND stage
+       a disk copy next to the DLL so the host loader can validate the
+       manifest before loading the assembly. -->
+  <ItemGroup Condition="Exists('$(MSBuildProjectDirectory)\plugin.json')">
+    <EmbeddedResource Include="plugin.json">
+      <LogicalName>plugin.json</LogicalName>
+    </EmbeddedResource>
+    <None Include="plugin.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+</Project>

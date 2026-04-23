@@ -1,0 +1,102 @@
+@using KnockBox.Spardle.Models
+@using KnockBox.Spardle
+
+<div class="spd-grid-wrap">
+    <div class="spd-grid @(HighContrast ? "spd-hc" : "")" style="--spd-cols:@WordLen;--spd-rows:@MaxGuesses;">
+        @foreach (var guess in (PlayerState?.Guesses ?? Enumerable.Empty<GuessResult>()))
+        {
+            <div class="spd-row @(guess.IsCorrect ? "spd-row-won" : "")">
+                @for (int i = 0; i < guess.Word.Length; i++)
+                {
+                    var statusClass = guess.Statuses[i] switch
+                    {
+                        LetterStatus.Correct => "spd-tile-correct",
+                        LetterStatus.Present => "spd-tile-present",
+                        _ => "spd-tile-absent"
+                    };
+                    <div class="spd-tile spd-tile-flipped @statusClass" style="--col:@i;">
+                        <span class="spd-tile-face">@guess.Word[i].ToString().ToUpperInvariant()</span>
+                    </div>
+                }
+            </div>
+        }
+
+        @{
+            int guessCount = PlayerState?.Guesses.Count ?? 0;
+            bool hasFinished = PlayerState?.HasFinishedRound ?? false;
+        }
+
+        @if (!hasFinished && State.IsRoundActive)
+        {
+            <div class="spd-row spd-row-current @(InvalidGuess ? "spd-row-shake" : "")">
+                @for (int i = 0; i < WordLen; i++)
+                {
+                    bool filled = i < CurrentGuess.Length;
+                    <div class="spd-tile @(filled ? "spd-tile-filled" : "spd-tile-empty")" style="--col:@i;">
+                        @if (filled)
+                        {
+                            <span class="spd-tile-face">@CurrentGuess[i].ToString().ToUpperInvariant()</span>
+                        }
+                    </div>
+                }
+            </div>
+
+            @* Placeholder rows for remaining guesses *@
+            @for (int row = guessCount + 1; row < MaxGuesses; row++)
+            {
+                <div class="spd-row spd-row-placeholder">
+                    @for (int i = 0; i < WordLen; i++)
+                    {
+                        <div class="spd-tile spd-tile-empty" style="--col:@i;"></div>
+                    }
+                </div>
+            }
+        }
+        else if (hasFinished)
+        {
+            @* Finished — show remaining guesses as muted placeholders for layout stability *@
+            @for (int row = guessCount; row < MaxGuesses; row++)
+            {
+                <div class="spd-row spd-row-placeholder">
+                    @for (int i = 0; i < WordLen; i++)
+                    {
+                        <div class="spd-tile spd-tile-empty" style="--col:@i;"></div>
+                    }
+                </div>
+            }
+        }
+    </div>
+</div>
+
+@if (State.TargetWord.Length > 5 && State.IsRoundActive && PlayerState is not null)
+{
+    <div class="spd-legacy-bar" aria-label="Confirmed letter positions">
+        @for (int i = 0; i < State.TargetWord.Length; i++)
+        {
+            char? confirmed = null;
+            foreach (var g in PlayerState.Guesses)
+            {
+                if (i < g.Statuses.Length && g.Statuses[i] == LetterStatus.Correct)
+                {
+                    confirmed = char.ToUpperInvariant(g.Word[i]);
+                    break;
+                }
+            }
+            <span class="spd-legacy-slot @(confirmed.HasValue ? "spd-legacy-filled" : "")">
+                @(confirmed?.ToString() ?? "_")
+            </span>
+        }
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public SpardleState State { get; set; } = default!;
+    [Parameter, EditorRequired] public string CurrentUserId { get; set; } = default!;
+    [Parameter] public string CurrentGuess { get; set; } = string.Empty;
+    [Parameter] public bool InvalidGuess { get; set; }
+    [Parameter] public bool HighContrast { get; set; }
+
+    private PlayerState? PlayerState => State.TryGetPlayerState(CurrentUserId, out var p) ? p : null;
+    private int MaxGuesses => SpardleEngine.CalculateMaxGuesses(State.TargetWord.Length, State.DifficultyMultiplier);
+    private int WordLen => State.TargetWord.Length;
+}

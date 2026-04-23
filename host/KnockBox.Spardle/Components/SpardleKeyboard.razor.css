@@ -1,0 +1,119 @@
+.spd-keyboard {
+    --spd-key-w: clamp(30px, 8vw, 56px);
+    display: flex;
+    flex-direction: column;
+    gap: clamp(4px, 0.8vw, 8px);
+    width: 100%;
+    max-width: min(720px, 100%);
+    margin: 0 auto;
+    padding: clamp(4px, 0.8vw, 10px) clamp(2px, 0.6vw, 6px) clamp(2px, 0.4vw, 4px);
+    flex-shrink: 0;
+}
+
+.spd-keyboard-row {
+    display: flex;
+    justify-content: center;
+    gap: clamp(3px, 0.7vw, 6px);
+}
+
+.spd-key {
+    box-sizing: border-box;
+    flex: 0 1 var(--spd-key-w);
+    min-width: 0;
+    height: clamp(36px, 5.5vh, 52px);
+    padding: 0;
+    font-family: var(--spd-font-tile);
+    font-size: clamp(0.8rem, 1.6vw, 1.05rem);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--spd-ink);
+    background: var(--spd-bg-panel-solid);
+    border: 2px solid #000;
+    border-radius: 5px;
+    box-shadow: 3px 3px 0 #000;
+    cursor: pointer;
+    user-select: none;
+    transition: transform 0.08s, box-shadow 0.08s, background-color 0.2s;
+}
+
+.spd-key:hover:not(:disabled) {
+    background: var(--spd-bg-2);
+    transform: translate(-1px, -1px);
+    box-shadow: 4px 4px 0 #000;
+}
+
+.spd-key:active:not(:disabled) {
+    transform: translate(2px, 2px);
+    box-shadow: 1px 1px 0 #000;
+    animation: spd-key-press 0.12s ease-out;
+}
+
+.spd-key-wide {
+    flex: 0 1 calc(var(--spd-key-w) * 1.6);
+    font-size: clamp(0.65rem, 1.2vw, 0.85rem);
+}
+
+.spd-key-primary {
+    background: var(--spd-correct);
+    color: var(--spd-correct-ink);
+}
+
+.spd-key-ghost {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--spd-ink);
+}
+
+/* ── Letter status colours ─────────────────────────────────────────── */
+
+.spd-key-correct {
+    background: var(--spd-correct);
+    color: var(--spd-correct-ink);
+    box-shadow: 3px 3px 0 #000, 0 0 12px var(--spd-correct-glow);
+}
+
+.spd-key-present {
+    background: var(--spd-present);
+    color: var(--spd-present-ink);
+    box-shadow: 3px 3px 0 #000, 0 0 10px var(--spd-present-glow);
+}
+
+.spd-key-absent {
+    background: var(--spd-absent);
+    color: var(--spd-absent-ink);
+    box-shadow: 2px 2px 0 #000;
+    opacity: 0.85;
+}
+
+@media (max-width: 1024px) {
+    .spd-keyboard {
+        max-width: min(640px, 100%);
+    }
+}
+
+@media (max-width: 720px) {
+    .spd-key {
+        height: clamp(34px, 6vh, 48px);
+        box-shadow: 2px 2px 0 #000;
+    }
+    .spd-key:hover:not(:disabled) {
+        box-shadow: 3px 3px 0 #000;
+    }
+}
+
+@media (max-width: 480px) {
+    .spd-keyboard {
+        gap: 4px;
+        padding: 4px 2px 2px;
+    }
+    .spd-keyboard-row {
+        gap: 3px;
+    }
+    .spd-key {
+        height: 40px;
+        font-size: 0.85rem;
+        border-width: 1.5px;
+    }
+    .spd-key-wide {
+        font-size: 0.65rem;
+    }
+}

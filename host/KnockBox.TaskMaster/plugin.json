@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "name": "Task Master",
+  "description": "Complete tasks before time runs out.",
+  "routeIdentifier": "task-master",
+  "version": "1.0.0",
+  "entryAssembly": "KnockBox.TaskMaster",
+  "capabilities": []
+}

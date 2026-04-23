@@ -1,0 +1,11 @@
+@using KnockBox.Core.Plugins
+@inject GamePluginAssemblies GamePlugins
+
+<Router AppAssembly="typeof(KnockBoxPlatformExtensions).Assembly"
+        AdditionalAssemblies="GamePlugins.Assemblies"
+        NotFoundPage="typeof(Pages.NotFound)">
+    <Found Context="routeData">
+        <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)" />
+        <FocusOnNavigate RouteData="routeData" Selector="h1" />
+    </Found>
+</Router>

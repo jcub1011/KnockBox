@@ -1,0 +1,160 @@
+@using KnockBox.Core.Plugins
+@using KnockBox.Core.Services.Navigation
+@using KnockBox.Core.Services.State.Games.Shared
+@using KnockBox.Core.Services.State.Users
+@using Microsoft.AspNetCore.Components.Routing
+@using Microsoft.Extensions.Options
+
+@inherits LayoutComponentBase
+@implements IDisposable
+
+<div class="main">
+    @{
+        GameSessionService.TryGetCurrentSession(out var currentSession);
+        RenderFragment? customHeader = null;
+        string gameName = string.Empty;
+
+        if (currentSession is not null)
+        {
+            gameName = currentSession.LobbyRegistration.GameName;
+            customHeader = GameModules
+                .FirstOrDefault(m => m.Manifest.RouteIdentifier == currentSession.LobbyRegistration.RouteIdentifier)
+                ?.GetCustomHeader();
+        }
+
+        var isUsingCustomHeader = customHeader is not null;
+    }
+    <header class="@(_isOnHomePage ? "home-header" : "") @(_isEnteringGame ? "entering-from-home" : "") @(_isExitingGame ? "exiting-to-home" : "") @(isUsingCustomHeader ? "custom-header" : "")">
+        @if (!_isOnHomePage && currentSession is not null)
+        {
+            if (customHeader is not null)
+            {
+                @customHeader
+            }
+            else
+            {
+                <a href="@NavigationService.GetHomeUri()" title="Click to return home">@gameName</a>
+                <div class="header-actions">
+                    <RoomCodeButton ClassName="room-code-btn"
+                                    CoverClassName="room-code-cover"
+                                    ValueClassName="room-code-value"
+                                    CoverText="Join Code" />
+                    <button class="leave-session-btn" @onclick="LeaveSession" title="Leave Session">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
+                    </button>
+                </div>
+            }
+        }
+        else
+        {
+            <span>@PlatformOptions.Value.Branding.AppTitle</span>
+        }
+    </header>
+    <article class="@(_isEnteringGame ? "entering-from-home" : "") @(_isExitingGame ? "exiting-to-home" : "")">
+        @Body
+        <div id="blazor-error-ui" data-nosnippet>
+            An unhandled error has occurred.
+            <a href="." class="reload">Reload</a>
+            <span class="dismiss">🗙</span>
+        </div>
+    </article>
+</div>
+
+@code {
+    [Inject] IOptions<KnockBox.Platform.KnockBoxPlatformOptions> PlatformOptions { get; set; } = default!;
+    [Inject] INavigationService NavigationService { get; set; } = default!;
+    [Inject] IGameSessionService GameSessionService { get; set; } = default!;
+    [Inject] IUserService UserService { get; set; } = default!;
+    [Inject] NavigationManager NavigationManager { get; set; } = default!;
+    [Inject] ILogger<MainLayout> Logger { get; set; } = default!;
+    [Inject] IEnumerable<IGameModule> GameModules { get; set; } = default!;
+
+    private bool _isOnHomePage;
+    private bool _isEnteringGame;
+    private bool _isExitingGame;
+    private IDisposable? _locationChangingRegistration;
+    private CancellationTokenSource _cts = new();
+
+    protected override void OnInitialized()
+    {
+        _isOnHomePage = IsHomePage();
+        NavigationManager.LocationChanged += OnLocationChanged;
+        UserService.UserInitialized += OnUserInitialized;
+        _locationChangingRegistration = NavigationManager.RegisterLocationChangingHandler(OnLocationChanging);
+    }
+
+    private async ValueTask OnLocationChanging(LocationChangingContext context)
+    {
+        if (_isOnHomePage || _isExitingGame) return;
+
+        var targetRelPath = NavigationManager.ToBaseRelativePath(context.TargetLocation).TrimEnd('/');
+        if (targetRelPath is not ("" or "home")) return;
+
+        _isExitingGame = true;
+        await InvokeAsync(StateHasChanged);
+
+        // Ensure the session is cleaned up when navigating to the home page (via link or back button).
+        GameSessionService.LeaveCurrentSession(navigateHome: false);
+    }
+
+    private bool IsHomePage()
+    {
+        var relPath = NavigationManager.ToBaseRelativePath(NavigationManager.Uri).TrimEnd('/');
+        return relPath is "" or "home";
+    }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        var wasHome = _isOnHomePage;
+        _isOnHomePage = IsHomePage();
+        _isExitingGame = false;
+
+        if (wasHome && !_isOnHomePage)
+        {
+            _isEnteringGame = true;
+            _ = AnimateEnteringGameAsync(_cts.Token);
+        }
+
+        _ = SafeStateHasChangedAsync("Error refreshing layout after navigation.");
+    }
+
+    private void OnUserInitialized()
+    {
+        _ = SafeStateHasChangedAsync("Error refreshing layout after user initialization.");
+    }
+
+    private async Task AnimateEnteringGameAsync(CancellationToken token)
+    {
+        try
+        {
+            await Task.Delay(600, token);
+            await InvokeAsync(() =>
+            {
+                _isEnteringGame = false;
+                StateHasChanged();
+            });
+        }
+        catch (OperationCanceledException) { /* Layout disposed mid-animation. */ }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error completing enter-game animation.");
+        }
+    }
+
+    private async Task SafeStateHasChangedAsync(string errorMessage)
+    {
+        try { await InvokeAsync(StateHasChanged); }
+        catch (Exception ex) { Logger.LogError(ex, errorMessage); }
+    }
+
+    public void Dispose()
+    {
+        _cts.Cancel();
+        _cts.Dispose();
+        NavigationManager.LocationChanged -= OnLocationChanged;
+        UserService.UserInitialized -= OnUserInitialized;
+        _locationChangingRegistration?.Dispose();
+    }
+
+    private void LeaveSession() => GameSessionService.LeaveCurrentSession(navigateHome: true);
+}

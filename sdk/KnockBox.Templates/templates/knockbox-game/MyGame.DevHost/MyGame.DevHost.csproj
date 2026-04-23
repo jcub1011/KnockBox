@@ -1,0 +1,32 @@
+<!--
+  Local development host.
+
+  This is a throwaway ASP.NET Core app whose only job is to load your plugin
+  during development. Deploy the plugin DLLs into a production KnockBox host —
+  do not ship this DevHost itself.
+-->
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- The hosting SDK. Brings in Blazor Server, the platform's services
+         (lobby, session, navigation, profanity filter, tick loop), and the
+         AddKnockBoxPlatform / UseKnockBoxPlatform extension methods used in
+         Program.cs. Hosts (including this DevHost) reference Platform;
+         plugins NEVER do.
+         Pinned to 1.0.* — scaffolded projects float within the patch range
+         of the SDK version that scaffolded them, for reproducible DevHost
+         builds. Bump the floor manually when you upgrade to a new minor. -->
+    <PackageReference Include="KnockBox.Platform" Version="1.0.*" />
+
+    <!-- Direct ProjectReference to the plugin — dev-only. This is what lets
+         Visual Studio hot-reload Razor edits and rebuild the plugin DLL on
+         save. The production host never project-references a plugin; it only
+         discovers staged DLLs from its games/ folder at startup. -->
+    <ProjectReference Include="..\MyGame\MyGame.csproj" />
+  </ItemGroup>
+</Project>

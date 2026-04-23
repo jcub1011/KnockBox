@@ -1,0 +1,172 @@
+@using KnockBox.Spardle.Models
+@using KnockBox.Spardle
+@using KnockBox.Core.Services.State.Games.Shared
+@using KnockBox.Core.Services.State.Users
+@implements IDisposable
+
+<div class="spd-opp-panel">
+    <div class="spd-opp-heading">
+        <span class="spd-opp-heading-glyph">⚔</span>
+        LEADERS
+    </div>
+
+    @{
+        var ranked = GetRanked();
+        var me = FindCurrentUser(ranked);
+        var topCount = Math.Min(ranked.Count, TopCount);
+        var showSelfOverflow = me is not null && me.Rank > TopCount;
+    }
+
+    @if (ranked.Count == 0)
+    {
+        <div class="spd-opp-empty">No players yet.</div>
+    }
+    else
+    {
+        <div class="spd-opp-list">
+            @for (int i = 0; i < topCount; i++)
+            {
+                @RenderRow(ranked[i])
+            }
+
+            @if (showSelfOverflow)
+            {
+                <div class="spd-opp-divider" aria-hidden="true">⋯</div>
+                @RenderRow(me!)
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private const int TopCount = 5;
+
+    [Parameter, EditorRequired] public SpardleState State { get; set; } = default!;
+    [Parameter, EditorRequired] public string CurrentUserId { get; set; } = default!;
+
+    private sealed record RankedEntry(User User, string DisplayName, PlayerState PlayerState, int Rank);
+
+    private SpardleState? _subscribedState;
+    private IDisposable? _stateSubscription;
+    private IReadOnlyList<RankedEntry>? _rankedCache;
+    
+    protected override void OnParametersSet()
+    {
+        if (ReferenceEquals(_subscribedState, State)) return;
+
+        _stateSubscription?.Dispose();
+        _stateSubscription = null;
+
+        if (State is null)
+        {
+            _subscribedState = null;
+            _rankedCache = null;
+            return;
+        }
+
+        _subscribedState = State;
+        _rankedCache = null;
+        _stateSubscription = State.StateChangedEventManager.Subscribe(OnStateChangedAsync);
+    }
+
+    private async ValueTask OnStateChangedAsync()
+    {
+        _rankedCache = null;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        _stateSubscription?.Dispose();
+    }
+
+    private IReadOnlyList<RankedEntry> GetRanked() => _rankedCache ??= ComputeRanked();
+
+    private RankedEntry? FindCurrentUser(IReadOnlyList<RankedEntry> ranked)
+    {
+        for (int i = 0; i < ranked.Count; i++)
+        {
+            if (ranked[i].User.Id == CurrentUserId) return ranked[i];
+        }
+        return null;
+    }
+
+    private List<RankedEntry> ComputeRanked()
+    {
+        IEnumerable<PlayerEntry> roster =
+            State.HostIsParticipant ? State.RosterIncludingHost : State.Players;
+
+        var sorted = roster
+            .Select(u => (u.User, u.DisplayName, Ps: State.TryGetPlayerState(u.User.Id, out var p) ? p : null))
+            .Where(p => p.Ps is not null)
+            .Select(p => (p.User, p.DisplayName, Ps: p.Ps!))
+            // Primary sort — "closest to finishing" in the current round:
+            //   solved > still guessing > DNF, then most-correct-letters, then fewest guesses
+            .OrderBy(p => RoundStateSortKey(p.Ps))
+            .ThenByDescending(p => CorrectLetterProgress(p.Ps, State.TargetWord.Length))
+            .ThenBy(p => p.Ps.Guesses.Count)
+            // Secondary — match standing, so absolute leaders surface on ties
+            .ThenByDescending(p => p.Ps.TotalScore)
+            .ThenBy(p => p.DisplayName, StringComparer.OrdinalIgnoreCase)
+            .Select((e, i) => new RankedEntry(e.User, e.DisplayName, e.Ps, i + 1))
+            .ToList();
+
+        return sorted;
+    }
+
+    private static int RoundStateSortKey(PlayerState ps)
+    {
+        if (ps.HasFinishedRound && !ps.Dnf) return 0;
+        if (ps.Dnf) return 2;
+        return 1;
+    }
+
+    private static int CorrectLetterProgress(PlayerState ps, int wordLength)
+    {
+        if (ps.Guesses.Count == 0 || wordLength <= 0) return 0;
+        Span<bool> confirmed = wordLength <= 64 ? stackalloc bool[wordLength] : new bool[wordLength];
+        int count = 0;
+        foreach (var g in ps.Guesses)
+        {
+            for (int i = 0; i < g.Statuses.Length && i < wordLength; i++)
+            {
+                if (g.Statuses[i] == LetterStatus.Correct && !confirmed[i])
+                {
+                    confirmed[i] = true;
+                    count++;
+                }
+            }
+        }
+        return count;
+    }
+
+    private RenderFragment RenderRow(RankedEntry entry) => __builder =>
+    {
+        var ps = entry.PlayerState;
+        var isMe = entry.User.Id == CurrentUserId;
+        var stateClass = ps.Dnf
+            ? "spd-opp-row-dnf"
+            : ps.HasFinishedRound
+                ? "spd-opp-row-solved"
+                : "spd-opp-row-live";
+        var badge = ps.Dnf
+            ? "DNF"
+            : ps.HasFinishedRound
+                ? "✓"
+                : ps.Guesses.Count.ToString();
+        var rankTierClass = entry.Rank switch
+        {
+            1 => "spd-opp-rank-gold",
+            2 => "spd-opp-rank-silver",
+            3 => "spd-opp-rank-bronze",
+            _ => ""
+        };
+
+        <div class="spd-opp-row @stateClass @(isMe ? "spd-opp-row-me" : "")">
+            <span class="spd-opp-rank @rankTierClass">@entry.Rank</span>
+            <span class="spd-opp-name">@entry.DisplayName</span>
+            <span class="spd-opp-badge">@badge</span>
+            <span class="spd-opp-score spd-mono">@ps.TotalScore</span>
+        </div>
+    };
+}

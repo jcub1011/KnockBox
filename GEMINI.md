@@ -5,10 +5,10 @@ This file serves as the primary instructional context for Gemini CLI when workin
 ## Project Overview
 KnockBox is a Blazor Server application that hosts party games as **runtime-loaded plugins**. The architecture is designed for extreme decoupling: the host has no compile-time knowledge of specific games.
 
-- **Host (`KnockBox/`)**: Manages routing, DI bootstrapping, and plugin discovery.
-- **Core (`KnockBox.Core/`)**: Contains shared abstractions (`IGameModule`, `AbstractGameState`, `AbstractGameEngine`), session management, and thread-safety utilities.
-- **Plugins (`KnockBox.GameName/`)**: Standalone Razor Class Libraries (RCLs) that implement the game logic and UI.
-- **Tests**: MSTest projects for Core, Host, and each Plugin.
+- **Host (`host/KnockBox/`)**: Manages routing, DI bootstrapping, and plugin discovery.
+- **Core (`sdk/KnockBox.Core/`)**: Contains shared abstractions (`IGameModule`, `AbstractGameState`, `AbstractGameEngine`), session management, and thread-safety utilities.
+- **Plugins (`host/KnockBox.GameName/`)**: Standalone Razor Class Libraries (RCLs) that implement the game logic and UI.
+- **Tests**: MSTest projects for Core (under `sdk/`), Host, and each Plugin (all under `host/`).
 
 ## Technical Architecture
 - **Plugin System**: Games are discovered at runtime in the `games/` directory. Each plugin is loaded into its own `PluginLoadContext` (AssemblyLoadContext) to isolate dependencies.
@@ -20,13 +20,14 @@ KnockBox is a Blazor Server application that hosts party games as **runtime-load
 ## Building and Running
 | Task | Command |
 | --- | --- |
-| Build Solution | `dotnet build KnockBox.slnx` |
-| Build & Stage Plugins | `dotnet build KnockBox/KnockBox.csproj` |
-| Run Locally | `dotnet run --project KnockBox/KnockBox.csproj` |
-| Run Tests | `dotnet test KnockBox.slnx` |
+| Build SDK | `dotnet build sdk/KnockBox.Sdk.slnx` |
+| Build Host & Stage Plugins | `dotnet build host/KnockBox.Host.slnx` |
+| Run Locally | `dotnet run --project host/KnockBox/KnockBox.csproj` |
+| Run SDK Tests | `dotnet test sdk/KnockBox.Sdk.slnx` |
+| Run Host Tests | `dotnet test host/KnockBox.Host.slnx` |
 | Docker | `docker compose up --build` |
 
-> **Note**: Building the host project transitively builds all plugins and stages them to the `bin/.../games/` folder via `Directory.Plugin.targets`.
+> **Note**: Building the host project transitively builds all plugins and stages them to the `host/KnockBox/bin/.../games/` folder via `host/Directory.Plugin.targets`.
 
 ## Development Conventions
 
@@ -49,7 +50,7 @@ KnockBox is a Blazor Server application that hosts party games as **runtime-load
 - **C# Version**: C# 13.
 
 ## Key Files & Locations
-- `KnockBox/Specs/`: Detailed architectural and refactor specifications.
-- `KnockBox/Program.cs`: Composition root and plugin loading logic.
-- `KnockBox.Core/Plugins/`: `PluginLoader` and `IGameModule` definitions.
-- `Directory.Plugin.targets`: The build-time "glue" that stages plugins for discovery.
+- `host/KnockBox/Specs/`: Detailed architectural and refactor specifications.
+- `host/KnockBox/Program.cs`: Composition root and plugin loading logic.
+- `sdk/KnockBox.Core/Plugins/`: `PluginLoader` and `IGameModule` definitions.
+- `host/Directory.Plugin.targets`: The build-time "glue" that stages plugins for discovery.
