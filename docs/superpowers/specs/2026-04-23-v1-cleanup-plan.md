@@ -1,0 +1,222 @@
+# KnockBox Pre-v1.0 Cleanup — Implementation Plan
+
+## Status at a glance
+
+| Phase | Scope | Status |
+|---|---|---|
+| **Phase 1** | `AbstractGameState` / `AbstractGameEngine` API breaking changes | ✅ Complete |
+| **Phase 2** | Plugin-loader & sandbox hardening | ✅ Complete |
+| **Phase 3** | Operational hygiene (shutdown, eviction, TimeProvider) | ✅ Complete |
+| **Phase 4** | `User` API tightening | ⏳ In progress |
+| **Phase 5** | Packaging & release metadata | ⬜ Pending |
+| **Phase 6** | Docs & release notes | ⬜ Pending |
+
+Totals after Phase 3: **1553 tests passing** (414 SDK + 1139 host), 0 failures, 7 skipped (pre-existing Windows symlink tests).
+
+---
+
+## Context
+
+KnockBox ships the SDK (`KnockBox.Core`, `KnockBox.Platform`, `KnockBox.Templates`) as independently versioned NuGet packages; third-party plugins take a source dependency on `KnockBox.Core`. Once v1.0 tags the SDK, the public surface of `AbstractGameEngine`, `AbstractGameState`, `IGameModule`, `IPluginManifest`, `IPluginContext`, and `IPluginRegistration` is effectively frozen under semver. This plan absorbs the breaking changes and hygiene fixes that are cheap now and expensive later.
+
+SDK targeting stays `net10.0` only; this plan does not multi-target.
+
+Work is split into six phases, ordered by blast radius. Phase 1 ripples into every first-party plugin, so it goes first.
+
+---
+
+## Phase 1 — `AbstractGameState` / `AbstractGameEngine` API breaking changes — ✅ Complete
+
+- [x] **1.1** Replace `ScheduleCallback`'s leaked CTS with `IScheduledCallbackHandle` (`sdk/KnockBox.Core/Primitives/Disposable/IScheduledCallbackHandle.cs` new; private `ScheduledCallbackHandle` nested inside `AbstractGameState`)
+- [x] **1.2** Move joinable-status writes inside execute lock — `UpdateJoinableStatus` → `SetJoinable`, `RegisterPlayer` now wraps its entire body (gate + mutation) in `Execute`, `LobbyService.JoinLobbyAsync` drops its outer `Execute` wrap to avoid deadlocking the non-reentrant semaphore
+- [x] **1.3** Give `Execute`/`Dispose` race a specific error — all four overloads catch `ObjectDisposedException` separately; unified public message "State was disposed." across both already-disposed and during-execute paths
+- [x] **1.4** Per-handler error isolation — added private `SafeInvoke` / `SafeInvoke<T>` helpers; applied to both `PlayerUnregistered` sites (line 218, 258) and `OnStateDisposed` (line 515)
+- [x] **1.5** Add `CancellationToken ct = default` to `CanStartAsync`
+- [x] **1.6** Drop `User host` from `StartAsync` — caller-identity check moved into each plugin's lobby page (lobby pages already had `UserService.CurrentUser` and `State.Host`; same pattern as existing `KickPlayer` check)
+- [x] **1.7** Factor `HasValidPlayerCount` helper out of default `CanStartAsync`
+- [x] **1.8** Propagate new signatures into **8** first-party plugins — CardCounter, Codeword, DiceSimulator, DrawnToDress, HiddenAgenda, Operator, Spardle, TaskMaster (not 9 — ConsultTheCard project exists but has no source; flag for CLAUDE.md correction)
+- [x] **Phase 1 tests** — new `Phase1VerificationTests.cs` with 7 tests: dispose-race specific error (sync + async), `IScheduledCallbackHandle` idempotence + survival across state dispose, handler-chain non-short-circuit on both `PlayerUnregistered` and `OnStateDisposed`, concurrent-worker smoke test for `SetJoinable`/`RegisterPlayer` serialization
+
+### Phase 1 audit corrections worked during execution
+
+- Plan-draft static `SetJoinable` wouldn't compile — engines aren't subclasses of `AbstractGameState`. Made public with strong XML doc ("must be called inside Execute") instead.
+- Plan-draft "gate under `WithExclusiveRead`, mutation outside" had a TOCTOU: another thread could flip `IsJoinable` between gate and add. Corrected by running the entire `RegisterPlayer` body inside a single `Execute`.
+- 7 obsolete engine-level "non-host caller rejected" tests deleted across plugin test projects. The behavior moved to the lobby page; those tests no longer represent a meaningful engine contract. Razor-page-level enforcement is now an untested gap — follow-up.
+- Deleted `UpdateJoinableStatus_SameValue_DoesNotFireStateChanged`. With the new shape, `Execute` always fires `Notify` regardless of whether the inner mutation changed anything. Minor behavior change; CHANGELOG entry needed.
+
+---
+
+## Phase 2 — Plugin-loader & sandbox hardening — ✅ Complete
+
+- [x] **2.1** Host-service denylist — hybrid design: small static `AlwaysProtectedTypes` (plugin-system primitives + Microsoft.Extensions fundamentals) UNION dynamic `IServiceCollection` snapshot captured at the top of `LogicRegistrations.RegisterLogic`. Self-maintaining — any future platform service registered before the plugin loop is protected automatically. Reordered `AddKnockBoxPlatform` so `INavigationService` + `ISvgClipboardService` register before `RegisterLogic`.
+- [x] **2.2** Plugin version guard — `PluginLoader.InspectDepsJson` (replacing static `FindForbiddenDependency`) returns both the forbidden-dep hit and the plugin's compiled-against `KnockBox.Core` version. Plugins compiled against a Core version newer than the host's are rejected with a clear error. SemVer prerelease/build suffixes (`-alpha`, `+build`) stripped before `Version.TryParse`.
+- [x] **2.3** Path-traversal defense for wwwroot mounts — new `sdk/KnockBox.Platform/Plugins/PluginPathGuard.cs` factored from inline checks in `DefaultPluginStorage`. `MapPluginStaticAssets` now validates every plugin's wwwroot against the plugins root before mounting; symlink/junction escapes are logged and skipped.
+- [x] **2.4** Plugin module constructor timeout — 5-second timeout on `Activator.CreateInstance` via `Task.Run` + `Wait(timeout)`. Hanging ctor logs error and the module is skipped.
+- [x] **2.5** `.deps.json` parse failure now logs — `InspectDepsJson`'s `catch (Exception)` changed from silent-return to a warning log with the exception and DLL path.
+- [ ] **2.6** Document `ForbiddenPluginDependencies` is not configurable — deferred to Phase 6 (docs).
+- [x] **Phase 2 tests** — `DefaultPluginRegistrationTests` (9 tests, covering both deny-set sources + plugin-private success + `AddGameEngine` always works + `CaptureHostOwnedServiceTypes` closed-to-open-generic promotion); `PluginPathGuardTests` (7 tests); `InspectDepsJson` tests rewritten (4 tests including warning-log on malformed JSON); 2 new `LoadModules` tests for version rejection (newer-Core rejected, older-Core still loads).
+
+### Phase 2 open gaps
+
+- **Ctor-timeout has no end-to-end verification test.** A slow-ctor `IGameModule` fixture in `CoreTests` would slow every `LoadModules` test by 5 seconds because `FindMatchingModule` activates every discovered module type. The right home is a separate fixture assembly (extending `EmbeddedManifestFixture` or a new `SlowCtorFixture`). The `Task.Run` + `Wait(timeout)` code path itself is straightforward and exercised indirectly by every activation.
+- **`MapPluginStaticAssets` wwwroot-reject branch untested.** Full test requires a `WebApplication`; the guard's inputs are covered by `PluginPathGuardTests` but the branch in `MapPluginStaticAssets` is untested. Candidate once `bUnit`/`WebApplicationFactory` enters the test pipeline.
+
+---
+
+## Phase 3 — Operational hygiene — ✅ Complete
+
+- [x] **3.1** Graceful lobby cleanup on host shutdown — `LobbyService` now implements `IHostedService`. `StopAsync` snapshots `_lobbies`, clears the dictionary, disposes every state (each in a try/catch). Registered as concrete singleton with `ILobbyService` and `IHostedService` bridges so there's exactly one instance.
+- [x] **3.2** Host-eviction closes lobby — **already wired via the `disposeAction` closure in `Home.razor.cs`**. When `GameSessionState.Dispose()` fires after the eviction grace period, it runs `TakeCurrentSession()?.Dispose()` → the closure → `LobbyService.CloseLobbyAsync`. Fixed a pre-existing double-dispose bug (removed `lobby.State.Dispose()` from the closure — `CloseLobbyAsync` already disposes). Documented the eviction trigger in the closure's comment. No new event plumbing introduced.
+- [x] **3.3** Inject `TimeProvider` into `SessionServiceProvider` — added test-friendly constructor overload accepting `TimeProvider`; production ctor defaults to `TimeProvider.System`. `StartEvictionTimer` now uses the `Task.Delay(delay, timeProvider, token)` overload so `FakeTimeProvider.Advance(...)` drives eviction synchronously.
+- [x] **Phase 3 tests** — `SessionServiceProviderTests` (3 tests covering reconnect-before-grace, reconnect-after-grace with dispose verified, reconnect-exactly-before-deadline + cancellation of eviction timer); `LobbyServiceShutdownTests` (1 test: create lobby, `StopAsync`, assert state disposed + dict empty). Added `Microsoft.Extensions.TimeProvider.Testing` to `KnockBox.PlatformTests.csproj`.
+
+### Phase 3 open gaps
+
+- **No end-to-end test for the host-eviction-closes-lobby chain.** Chain crosses the Blazor scoped-service boundary (`GameSessionState.Dispose` → `TakeCurrentSession()` → `Home.razor.cs` closure → `LobbyService.CloseLobbyAsync`). Individual pieces are covered: `SessionServiceProviderTests` verifies eviction fires and disposes the scoped service; `LobbyServiceShutdownTests` verifies the lobby-cleanup side. Full chain needs `bUnit` or `WebApplicationFactory`.
+
+### Phase 3 answered question
+
+- "Does an empty lobby with no non-host players get auto-closed after N minutes, or only closed when the host evicts?" — **Only when the host evicts.** No timer for empty-lobby cleanup.
+
+---
+
+## Phase 4 — `User` API tightening — ⏳ In progress
+
+### 4.1 Lock down `User` construction and mutation
+
+**Files:** `sdk/KnockBox.Core/Services/State/Users/IUserService.cs` (currently contains the `User` class), `sdk/KnockBox.Platform/Services/State/Users/UserService.cs`
+
+Currently `User` has a public primary-ctor, a public-settable `Name` setter with side effects (12-char trim, event fire), and a public `NameChanged` event. The only in-repo production `new User(` site is `UserService.cs:62`.
+
+Changes:
+- [ ] Make `User`'s constructor `internal`. Grant `InternalsVisibleTo` to test projects that construct `User` directly. For external plugin authors who need to construct `User` for testing, provide a factory on `IUserService` or a dedicated `UserFactory` in `KnockBox.Core`.
+- [ ] Make `Name` init-only (`{ get; internal set; }`). Move the 12-char trim + event-firing logic to `IUserService` / `UserService`.
+- [ ] Remove the public `NameChanged` event from `User`. Move the notification to `IUserService` (new event signature: `event Action<UserNameChangedArgs>? UserNameChanged`).
+
+**Ripple:** grep `NameChanged` and `new User(` across the repo; update each site. Known sites:
+- `sdk/KnockBox.Platform/Services/State/Users/UserService.cs:62` (single production `new User(`)
+- `host/KnockBox.DrawnToDress/Pages/OutfitCustomizationPhase.razor` + `.razor.cs` (`NameChanged` subscription — needs to move to `IUserService.UserNameChanged`)
+- Test projects with direct `new User(...)` calls (add `InternalsVisibleTo` or a factory helper)
+
+### Phase 4 verification
+
+- [ ] `User` cannot be constructed from outside `KnockBox.Core` (compile check on an external-style test that tries).
+- [ ] `Name` mutation from outside the Platform is rejected at compile time.
+- [ ] Name truncation still caps at 12 characters when set through `IUserService`.
+- [ ] `UserNameChanged` on `IUserService` fires on name change; throwing subscribers don't short-circuit the invocation list (mirror the Phase 1.4 pattern).
+- [ ] `DrawnToDress/OutfitCustomizationPhase` still receives name-change notifications via the new hook.
+
+---
+
+## Phase 5 — Packaging & release metadata — ⬜ Pending
+
+Sticky post-publish. Land before tagging `1.0.0`.
+
+### 5.1 Add Microsoft-recommended NuGet metadata
+
+**Files:** `sdk/KnockBox.Core/KnockBox.Core.csproj`, `sdk/KnockBox.Platform/KnockBox.Platform.csproj`, `sdk/KnockBox.Templates/KnockBox.Templates.csproj`
+
+- [ ] Add to each `<PropertyGroup>`:
+  ```xml
+  <Deterministic>true</Deterministic>
+  <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
+  <PublishRepositoryUrl>true</PublishRepositoryUrl>
+  <EmbedUntrackedSources>true</EmbedUntrackedSources>
+  <IncludeSymbols>true</IncludeSymbols>
+  <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+  <RepositoryType>git</RepositoryType>
+  ```
+- [ ] Add SourceLink package reference:
+  ```xml
+  <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="all" />
+  ```
+
+### 5.2 Push `.snupkg` in the release workflow
+
+**File:** `.github/workflows/release-sdk.yml`
+
+- [ ] `dotnet pack` will already emit `.snupkg` via the `.csproj` properties from 5.1.
+- [ ] Update the push step to push both `*.nupkg` and `*.snupkg` to nuget.org.
+- [ ] Confirm `CI=true` is set in the workflow env so `ContinuousIntegrationBuild` activates.
+
+### 5.3 Document SDK↔host version coupling
+
+**Files:** release workflow comments, `docs/making-a-game-plugin.md`
+
+- [ ] Explicit SemVer policy: "SDK `1.x.x` — plugin authors pin `KnockBox.Core >=1.0.0 <2.0.0`. Host `1.x.x` tracks SDK `1.x.x` major version. Breaking plugin API changes bump SDK major." Not a code change; it gates future releases.
+
+---
+
+## Phase 6 — Docs & release notes — ⬜ Pending
+
+### 6.1 Plugin-author guide refresh
+
+**File:** `docs/making-a-game-plugin.md`
+
+- [ ] Migration note: `IGameModule` no longer has `Name`/`Description`/`RouteIdentifier`; those now live on `IPluginManifest` and must match between `plugin.json` and `IGameModule.Manifest`.
+- [ ] `RegisterServices` now receives `IPluginRegistration`, not `IServiceCollection`. List of blocked service types (from Phase 2.1, refreshed for the snapshot-based denylist). No `IHostedService`. No cross-plugin keyed services.
+- [ ] Capability declarations in `plugin.json` (`config`, `storage`) — accessing an undeclared capability throws `PluginCapabilityNotGrantedException`.
+- [ ] Plugin-data directory layout: `{AppContext.BaseDirectory}/data/plugins/{routeIdentifier}/` (via `IPluginStorage`). Plugins can still bypass this by calling `System.IO` directly — that's an authoring violation, not runtime-enforced.
+- [ ] 5-second plugin-module constructor budget (Phase 2.4).
+- [ ] No plugin hot-reload; restart required.
+- [ ] Plugins must target `net10.0`. No multi-targeting.
+- [ ] Caller-identity check for `engine.StartAsync(state, ct)` is the invoker's responsibility (Phase 1.6).
+- [ ] Updated `AbstractGameEngine` / `AbstractGameState` snippets matching Phase 1 signatures — `StartAsync(AbstractGameState state, CancellationToken ct)`, `SetJoinable` inside `Execute`, `CanStartAsync` with `CancellationToken`, `IScheduledCallbackHandle`.
+- [ ] Document Phase 2.6: `ForbiddenPluginDependencies` is not configurable; adding entries requires an SDK release.
+
+### 6.2 Architecture doc sync
+
+**File:** `host/KnockBox/Specs/knockbox-platform-architecture.md`
+
+- [ ] Replace the pre-refactor `IGameModule` sketch with the manifest-based one.
+- [ ] Describe `IPluginRegistration` and the hybrid host-service denylist (static set + dynamic snapshot).
+- [ ] Describe the `plugin.json` agree-check and capability gating.
+- [ ] Update `ScheduleCallback`, `StartAsync`, `CanStartAsync`, `UpdateJoinableStatus` mentions (including line 358 and the call-flow diagram around 542/576) to match Phase 1.
+- [ ] Section on version policy (Phase 5.3).
+- [ ] **Fix plugin count:** CLAUDE.md and this doc say "seven first-party game plugins"; actual is **eight** (CardCounter, Codeword, DiceSimulator, DrawnToDress, HiddenAgenda, Operator, Spardle, TaskMaster). ConsultTheCard project exists but has no source.
+- [ ] Document the host-eviction-closes-lobby chain (Phase 3.2) and shutdown hook (Phase 3.1).
+
+### 6.3 CHANGELOG
+
+- [ ] Author `CHANGELOG.md` at repo root (does not currently exist) with an explicit v1.0.0 entry listing the breaking changes from Phases 1, 2.1, 2.2, 4.
+- [ ] Note the minor behavior change: `state.Execute(() => state.SetJoinable(x))` always fires `StateChangedEventManager.Notify()`, even when `x` equals the current value. The old `UpdateJoinableStatus` suppressed the notify when unchanged.
+
+---
+
+## Out-of-scope but flagged for follow-up
+
+1. **`OnStateDisposed` handler contract:** `Dispose` fires `OnStateDisposed` before `_disposeCts.Cancel()` and well before `_executeLock.Dispose()`. A subscriber that calls `Execute` from inside `OnStateDisposed` will succeed but race with the rest of disposal. Document the contract explicitly in the v1.0 XML doc so plugin authors know what's legal.
+2. **`_kickedPlayers` is never cleared:** kicked-set grows unbounded for the lobby's lifetime. Probably intentional ("kicked stays kicked"), but should be an explicit behavior contract somewhere.
+3. **Razor-page-level host-check for `StartAsync` has no test coverage.** The engine no longer enforces it; each plugin's lobby page does. Follow-up integration test via `bUnit` or `WebApplicationFactory`.
+4. **Ctor-timeout has no end-to-end verification test** (Phase 2.4). Needs a separate slow-ctor fixture assembly.
+5. **`MapPluginStaticAssets` wwwroot-reject branch untested** (Phase 2.3).
+6. **End-to-end host-eviction-closes-lobby test** (Phase 3.2). Needs `bUnit`/`WebApplicationFactory`.
+
+---
+
+## Critical files
+
+| Area | Files |
+|---|---|
+| State/engine primitives | `sdk/KnockBox.Core/Services/State/Games/Shared/AbstractGameState.cs`, `sdk/KnockBox.Core/Services/Logic/Games/Engines/Shared/AbstractGameEngine.cs` |
+| Scheduled callback handle | `sdk/KnockBox.Core/Primitives/Disposable/IScheduledCallbackHandle.cs` |
+| Sandbox enforcement | `sdk/KnockBox.Platform/Plugins/DefaultPluginRegistration.cs`, `sdk/KnockBox.Core/Plugins/IPluginRegistration.cs`, `sdk/KnockBox.Platform/Services/Registrations/Logic/LogicRegistrations.cs` |
+| Plugin loader | `sdk/KnockBox.Core/Plugins/PluginLoader.cs`, `sdk/KnockBox.Core/Plugins/IPluginManifest.cs` |
+| Path guards | `sdk/KnockBox.Platform/Plugins/PluginPathGuard.cs`, `sdk/KnockBox.Platform/Plugins/DefaultPluginStorage.cs`, `sdk/KnockBox.Platform/KnockBoxPlatformExtensions.cs` |
+| Lobby / session lifetime | `sdk/KnockBox.Platform/Services/Logic/Games/Shared/LobbyService.cs`, `sdk/KnockBox.Platform/Services/State/Shared/SessionServiceProvider.cs`, `sdk/KnockBox.Platform/Components/Pages/Home/Home.razor.cs` |
+| User API (Phase 4) | `sdk/KnockBox.Core/Services/State/Users/IUserService.cs`, `sdk/KnockBox.Platform/Services/State/Users/UserService.cs` |
+| Plugin engines (Phase 1 ripple, 8 plugins) | `host/KnockBox.{CardCounter,Codeword,DiceSimulator,DrawnToDress,HiddenAgenda,Operator,Spardle,TaskMaster}/**/*Engine.cs` |
+| Packaging (Phase 5) | all three SDK `.csproj`, `.github/workflows/release-sdk.yml` |
+| Docs (Phase 6) | `docs/making-a-game-plugin.md`, `host/KnockBox/Specs/knockbox-platform-architecture.md`, `CHANGELOG.md` (new) |
+
+---
+
+## Verification
+
+Run after each phase; all must stay green.
+
+1. **SDK tests:** `dotnet test sdk/KnockBox.Sdk.slnx` — last run (end of Phase 3): 414 pass / 0 fail / 7 skipped.
+2. **Host tests:** `dotnet test host/KnockBox.Host.slnx` — last run (end of Phase 3): 1139 pass / 0 fail.
+3. **End-to-end smoke (Phase 6):** `dotnet run --project host/KnockBox/KnockBox.csproj`; create a lobby in browser A, join in browser B, start the game, close browser A, wait 90s, confirm the lobby is removed and no unhandled exceptions in logs.
+4. **Packaging (Phase 5):** `dotnet pack sdk/KnockBox.Sdk.slnx -c Release`; inspect both `.nupkg` and `.snupkg` with NuGet Package Explorer; confirm SourceLink metadata in the PDB and deterministic-build flag in the `.nuspec`.
+5. **Pre-tag rehearsal (Phase 5):** tag `0.9.0-rc.1`, run `release-sdk.yml`, confirm both `.nupkg` and `.snupkg` are published, before the real `1.0.0` tag.
