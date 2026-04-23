@@ -33,6 +33,24 @@ public sealed class ManifestsAgreeTests
     }
 
     [TestMethod]
+    public void ManifestsAgree_CapabilitiesSameSetDifferentOrder_ReturnsTrue()
+    {
+        var onDisk = Baseline() with
+        {
+            Capabilities = new HashSet<PluginCapability> { PluginCapability.Config, PluginCapability.Storage },
+        };
+        var fromModule = Baseline() with
+        {
+            Capabilities = new HashSet<PluginCapability> { PluginCapability.Storage, PluginCapability.Config },
+        };
+
+        var agree = PluginLoader.ManifestsAgree(onDisk, fromModule, out var disagreement);
+
+        Assert.IsTrue(agree);
+        Assert.AreEqual(string.Empty, disagreement);
+    }
+
+    [TestMethod]
     [DataRow("Name")]
     [DataRow("Description")]
     [DataRow("RouteIdentifier")]

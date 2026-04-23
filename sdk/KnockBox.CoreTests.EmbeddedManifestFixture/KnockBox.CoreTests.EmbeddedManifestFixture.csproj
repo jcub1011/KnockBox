@@ -16,9 +16,14 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <EmbeddedResource Include="plugin.json">
-      <LogicalName>plugin.json</LogicalName>
-    </EmbeddedResource>
+    <!--
+      No LogicalName override: MSBuild emits this as
+      KnockBox.CoreTests.EmbeddedManifestFixture.plugin.json, matching what
+      first-party plugin projects produce. The loader's EndsWith("plugin.json")
+      match handles the namespace prefix, so this exercises the realistic
+      "{Namespace}.plugin.json" branch.
+    -->
+    <EmbeddedResource Include="plugin.json" />
   </ItemGroup>
 
 </Project>

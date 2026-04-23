@@ -616,6 +616,10 @@ Adding a game requires these steps:
 
 No changes to `KnockBox`, `KnockBox.Core`, or any other game project are required. After a rebuild the platform discovers the new plugin, registers its engine, mounts its static assets, and the game appears on the home page automatically.
 
+### Sandbox Surface
+
+Plugin projects are analyzed at build time by `KnockBox.Plugins.Analyzer` (rules KB1001–KB1004). The analyzer flags direct filesystem access (KB1001 — use `IPluginContext.Storage` instead; the path-accepting `StreamReader(string)` / `StreamWriter(string)` ctors are flagged, but stream-accepting overloads are exempt), outbound network traffic and name resolution (KB1002 — outbound network from plugins is not supported, covering `HttpClient`, raw sockets, `Dns`, `Ping`, `NetworkInterface`, `SmtpClient`), process launch or host shutdown (KB1003 — not permitted, including `Process.Start` and `Environment.Exit` / `Environment.FailFast`), and raw environment-variable reads (KB1004 — use `IPluginContext.Configuration`). Rules ship as warnings, not errors; use `#pragma warning disable KBxxxx` with a justification comment when you have a considered reason (e.g., reading a bundled read-only CSV via `<Content CopyToOutputDirectory>`). These are build-time lints and do not block reflection-based bypass (`Activator.CreateInstance`, `Type.GetType`) — the plugin trust model above still applies as the authoritative security boundary.
+
 ---
 
 ## DI Registration

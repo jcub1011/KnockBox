@@ -150,16 +150,16 @@ public sealed partial record PluginManifest(
                     $"plugin.json schemaVersion [{schemaVersion}] is not supported (expected [{SupportedSchemaVersion}]).");
             }
 
-            if (!TryGetString(root, "name", out var name))
-                return ValueResult<PluginManifest>.FromError("plugin.json is missing required string 'name'.");
-            if (!TryGetString(root, "description", out var description))
-                return ValueResult<PluginManifest>.FromError("plugin.json is missing required string 'description'.");
-            if (!TryGetString(root, "routeIdentifier", out var routeIdentifier))
-                return ValueResult<PluginManifest>.FromError("plugin.json is missing required string 'routeIdentifier'.");
-            if (!TryGetString(root, "version", out var versionString))
-                return ValueResult<PluginManifest>.FromError("plugin.json is missing required string 'version'.");
-            if (!TryGetString(root, "entryAssembly", out var entryAssembly))
-                return ValueResult<PluginManifest>.FromError("plugin.json is missing required string 'entryAssembly'.");
+            if (!TryRequireString(root, "name", out var name, out var nameError))
+                return ValueResult<PluginManifest>.FromError(nameError);
+            if (!TryRequireString(root, "description", out var description, out var descError))
+                return ValueResult<PluginManifest>.FromError(descError);
+            if (!TryRequireString(root, "routeIdentifier", out var routeIdentifier, out var routeError))
+                return ValueResult<PluginManifest>.FromError(routeError);
+            if (!TryRequireString(root, "version", out var versionString, out var versionError))
+                return ValueResult<PluginManifest>.FromError(versionError);
+            if (!TryRequireString(root, "entryAssembly", out var entryAssembly, out var entryError))
+                return ValueResult<PluginManifest>.FromError(entryError);
 
             if (!RouteIdentifierPattern().IsMatch(routeIdentifier))
             {
@@ -214,20 +214,43 @@ public sealed partial record PluginManifest(
         }
     }
 
-    private static bool TryGetString(JsonElement root, string propertyName, out string value)
+    private enum StringFieldStatus
     {
-        if (root.TryGetProperty(propertyName, out var element)
-            && element.ValueKind == JsonValueKind.String)
+        Present,
+        Missing,
+        EmptyOrWhitespace,
+    }
+
+    private static StringFieldStatus ReadString(JsonElement root, string propertyName, out string value)
+    {
+        if (!root.TryGetProperty(propertyName, out var element)
+            || element.ValueKind != JsonValueKind.String)
         {
-            var s = element.GetString();
-            if (!string.IsNullOrWhiteSpace(s))
-            {
-                value = s;
-                return true;
-            }
+            value = string.Empty;
+            return StringFieldStatus.Missing;
         }
 
-        value = string.Empty;
-        return false;
+        var s = element.GetString();
+        if (string.IsNullOrWhiteSpace(s))
+        {
+            value = string.Empty;
+            return StringFieldStatus.EmptyOrWhitespace;
+        }
+
+        value = s;
+        return StringFieldStatus.Present;
+    }
+
+    private static bool TryRequireString(JsonElement root, string propertyName, out string value, out string error)
+    {
+        var status = ReadString(root, propertyName, out value);
+        error = status switch
+        {
+            StringFieldStatus.Present => string.Empty,
+            StringFieldStatus.Missing => $"plugin.json is missing required string '{propertyName}'.",
+            StringFieldStatus.EmptyOrWhitespace => $"plugin.json required string '{propertyName}' is empty or whitespace.",
+            _ => $"plugin.json required string '{propertyName}' could not be read.",
+        };
+        return status == StringFieldStatus.Present;
     }
 }

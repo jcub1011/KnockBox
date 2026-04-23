@@ -196,7 +196,7 @@ public sealed class PluginManifestTests
     [DataRow("routeIdentifier")]
     [DataRow("version")]
     [DataRow("entryAssembly")]
-    public void TryParse_WhitespaceRequiredString_Fails(string field)
+    public void TryParse_WhitespaceRequiredString_FailsAsEmpty(string field)
     {
         var json = ReplaceFieldValue(ValidManifest, field, "\"   \"");
         using var stream = StreamFor(json);
@@ -204,31 +204,51 @@ public sealed class PluginManifestTests
         var result = PluginManifest.TryParse(stream);
 
         AssertFailureContains(result, field);
+        Assert.IsTrue(result.TryGetFailure(out var error));
+        Assert.IsTrue(
+            error.PublicMessage.Contains("empty", StringComparison.OrdinalIgnoreCase)
+                || error.PublicMessage.Contains("whitespace", StringComparison.OrdinalIgnoreCase),
+            $"Expected whitespace-only field '{field}' to report 'empty' or 'whitespace', got: {error.PublicMessage}");
+        Assert.IsFalse(
+            error.PublicMessage.Contains("missing", StringComparison.OrdinalIgnoreCase),
+            $"Whitespace-only field '{field}' must not be reported as 'missing'. Got: {error.PublicMessage}");
+    }
+
+    [TestMethod]
+    [DataRow("name")]
+    [DataRow("description")]
+    [DataRow("routeIdentifier")]
+    [DataRow("version")]
+    [DataRow("entryAssembly")]
+    public void TryParse_EmptyRequiredString_FailsAsEmpty(string field)
+    {
+        var json = ReplaceFieldValue(ValidManifest, field, "\"\"");
+        using var stream = StreamFor(json);
+
+        var result = PluginManifest.TryParse(stream);
+
+        AssertFailureContains(result, field);
+        Assert.IsTrue(result.TryGetFailure(out var error));
+        Assert.IsTrue(
+            error.PublicMessage.Contains("empty", StringComparison.OrdinalIgnoreCase)
+                || error.PublicMessage.Contains("whitespace", StringComparison.OrdinalIgnoreCase),
+            $"Expected empty field '{field}' to report 'empty' or 'whitespace', got: {error.PublicMessage}");
     }
 
     // ─── TryParse — format errors ───────────────────────────────────────────
 
     [TestMethod]
-    [DataRow("Fixture")]       // uppercase
-    [DataRow("fix_ture")]      // underscore
-    [DataRow("fix ture")]      // space
-    [DataRow("")]              // empty-after-whitespace-trim still hits TryGetString first; empty is already failed separately
+    [DataRow("Fixture")]   // uppercase
+    [DataRow("fix_ture")]  // underscore
+    [DataRow("fix ture")]  // space
     public void TryParse_InvalidRouteIdentifierShape_Fails(string badRoute)
     {
-        if (string.IsNullOrEmpty(badRoute))
-        {
-            // Empty string fails the whitespace-check before the regex; still expect failure.
-            using var s = StreamFor(ReplaceFieldValue(ValidManifest, "routeIdentifier", "\"\""));
-            Assert.IsFalse(PluginManifest.TryParse(s).TryGetSuccess(out _));
-            return;
-        }
-
         var json = ReplaceFieldValue(ValidManifest, "routeIdentifier", $"\"{badRoute}\"");
         using var stream = StreamFor(json);
 
         var result = PluginManifest.TryParse(stream);
 
-        AssertFailureContains(result, "routeIdentifier");
+        AssertFailureContains(result, "routeIdentifier", "^[a-z0-9-]+$");
     }
 
     [TestMethod]
