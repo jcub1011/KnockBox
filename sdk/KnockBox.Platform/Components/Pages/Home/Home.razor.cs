@@ -47,7 +47,7 @@ namespace KnockBox.Platform.Components.Pages.Home
             var visible = new List<IGameModule>(_sortedModules.Length);
             foreach (var m in _sortedModules)
             {
-                if (GameAvailability.IsEnabled(m.RouteIdentifier))
+                if (GameAvailability.IsEnabled(m.Manifest.RouteIdentifier))
                     visible.Add(m);
             }
             _visibleModules = visible;
@@ -94,7 +94,7 @@ namespace KnockBox.Platform.Components.Pages.Home
         {
             try
             {
-                _sortedModules = GameModules.OrderBy(m => m.Name).ToArray();
+                _sortedModules = GameModules.OrderBy(m => m.Manifest.Name).ToArray();
                 RebuildVisibleModules();
                 GameAvailability.Changed += OnAvailabilityChanged;
 

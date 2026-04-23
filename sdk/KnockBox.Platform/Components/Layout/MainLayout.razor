@@ -18,7 +18,7 @@
         {
             gameName = currentSession.LobbyRegistration.GameName;
             customHeader = GameModules
-                .FirstOrDefault(m => m.RouteIdentifier == currentSession.LobbyRegistration.RouteIdentifier)
+                .FirstOrDefault(m => m.Manifest.RouteIdentifier == currentSession.LobbyRegistration.RouteIdentifier)
                 ?.GetCustomHeader();
         }
 

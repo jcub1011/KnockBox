@@ -47,7 +47,7 @@
         <div class="game-grid">
             @foreach (var module in VisibleGameModules)
             {
-                <button class="game-tile" aria-label="@module.Name" disabled="@(!CanJoinOrCreate)" @onclick="() => CreateLobby(module.RouteIdentifier)">
+                <button class="game-tile" aria-label="@module.Manifest.Name" disabled="@(!CanJoinOrCreate)" @onclick="() => CreateLobby(module.Manifest.RouteIdentifier)">
                     @module.GetButtonContent()
                 </button>
             }

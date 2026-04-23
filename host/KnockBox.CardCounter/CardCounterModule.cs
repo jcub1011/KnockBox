@@ -2,20 +2,16 @@ using KnockBox.CardCounter.Components;
 using KnockBox.CardCounter.Services.Logic.Games;
 using KnockBox.Core.Plugins;
 using Microsoft.AspNetCore.Components;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace KnockBox.CardCounter
 {
     public class CardCounterModule : IGameModule
     {
-        public string Name => "Card Counter";
-        public string Description => "High stakes blackjack style counting.";
-        public string RouteIdentifier => "card-counter";
+        public IPluginManifest Manifest { get; } =
+            PluginManifest.FromEmbeddedResourceOrThrow(typeof(CardCounterModule).Assembly);
 
-        public void RegisterServices(IServiceCollection services)
-        {
-            services.AddGameEngine<CardCounterGameEngine>(RouteIdentifier);
-        }
+        public void RegisterServices(IPluginRegistration registration)
+            => registration.AddGameEngine<CardCounterGameEngine>();
 
         public RenderFragment GetButtonContent() => builder =>
         {

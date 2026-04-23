@@ -32,17 +32,17 @@ namespace KnockBox.Services.Logic.Games.Shared
 
             foreach (var module in gameModules)
             {
-                var engine = serviceProvider.GetKeyedService<AbstractGameEngine>(module.RouteIdentifier);
+                var engine = serviceProvider.GetKeyedService<AbstractGameEngine>(module.Manifest.RouteIdentifier);
                 if (engine is null)
                 {
                     _logger.LogError(
                         "Game module [{Name}] with route identifier [{RouteIdentifier}] did not register an AbstractGameEngine; it will be unavailable.",
-                        module.Name,
-                        module.RouteIdentifier);
+                        module.Manifest.Name,
+                        module.Manifest.RouteIdentifier);
                     continue;
                 }
 
-                _gamesByRoute[module.RouteIdentifier] = new GameRegistration(module, engine);
+                _gamesByRoute[module.Manifest.RouteIdentifier] = new GameRegistration(module, engine);
             }
         }
 
@@ -106,7 +106,7 @@ namespace KnockBox.Services.Logic.Games.Shared
                     return ValueResult<LobbyRegistration>.FromError(lobbyCodeResult.Error.Error);
                 }
 
-                var lobbyRegistration = new LobbyRegistration(lobbyCode, lobbyUri, game.Module.Name, routeIdentifier, gameState);
+                var lobbyRegistration = new LobbyRegistration(lobbyCode, lobbyUri, game.Module.Manifest.Name, routeIdentifier, gameState);
                 if (!_lobbies.TryAdd(lobbyCode, lobbyRegistration))
                 {
                     // This branch means LobbyCodeService handed us a code that is

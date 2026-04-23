@@ -96,7 +96,7 @@
     protected override void OnInitialized()
     {
         _cts = new CancellationTokenSource();
-        _sortedModules = GameModules.OrderBy(m => m.Name).ToArray();
+        _sortedModules = GameModules.OrderBy(m => m.Manifest.Name).ToArray();
         _ = RunRefreshLoop(_cts.Token);
     }
 
@@ -125,8 +125,8 @@
         for (int i = 0; i < _sortedModules.Length; i++)
         {
             var m = _sortedModules[i];
-            counts.TryGetValue(m.RouteIdentifier, out var c);
-            rows[i] = new GameRow(m.Name, m.RouteIdentifier, c);
+            counts.TryGetValue(m.Manifest.RouteIdentifier, out var c);
+            rows[i] = new GameRow(m.Manifest.Name, m.Manifest.RouteIdentifier, c);
         }
         return rows;
     }

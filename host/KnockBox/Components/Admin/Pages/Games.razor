@@ -71,13 +71,13 @@
         </tr>
     </thead>
     <tbody>
-        @foreach (var module in GameModules.OrderBy(m => m.Name))
+        @foreach (var module in GameModules.OrderBy(m => m.Manifest.Name))
         {
-            var enabled = Availability.IsEnabled(module.RouteIdentifier);
+            var enabled = Availability.IsEnabled(module.Manifest.RouteIdentifier);
             <tr>
-                <td>@module.Name</td>
-                <td><code>@module.RouteIdentifier</code></td>
-                <td style="color:var(--admin-text-dim)">@module.Description</td>
+                <td>@module.Manifest.Name</td>
+                <td><code>@module.Manifest.RouteIdentifier</code></td>
+                <td style="color:var(--admin-text-dim)">@module.Manifest.Description</td>
                 <td>
                     @if (enabled)
                     {
@@ -92,7 +92,7 @@
                     <label class="admin-switch">
                         <input type="checkbox"
                                checked="@enabled"
-                               @onchange="e => OnToggle(module.RouteIdentifier, e)" />
+                               @onchange="e => OnToggle(module.Manifest.RouteIdentifier, e)" />
                         <span class="admin-switch-slider"></span>
                     </label>
                 </td>

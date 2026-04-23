@@ -1,24 +1,27 @@
-using System.Reflection;
-using KnockBox.Core.Primitives.Returns;
+using System.Runtime.Loader;
 using KnockBox.Core.Plugins;
+using KnockBox.Core.Primitives.Returns;
 using KnockBox.Core.Services.Logic.Games.Engines.Shared;
 using KnockBox.Core.Services.State.Games.Shared;
 using KnockBox.Core.Services.State.Users;
+using KnockBox.Platform.Storage;
 using KnockBox.Services.Registrations.Logic;
+using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
-using Moq;
 
 namespace KnockBox.PlatformTests.Unit;
 
 /// <summary>
-/// Focused coverage for the DI-key collision detection added to
-/// <see cref="LogicRegistrations.RegisterLogic"/>. A plugin's
-/// <c>RegisterServices</c> callback runs with full DI authority — the
-/// platform cannot prevent it from calling <c>AddKeyedSingleton&lt;AbstractGameEngine&gt;(...)</c>
-/// with any key. RegisterLogic's job is to detect misuse, drop the offending
-/// descriptor, and log at Error so the misbehaving plugin surfaces at startup.
+/// Coverage for <see cref="LogicRegistrations.RegisterLogic"/>. Under the soft
+/// sandbox the plugin sees only <see cref="IPluginRegistration"/> (never the
+/// raw <see cref="IServiceCollection"/>), so the malicious-key/duplicate-key
+/// attacks the previous safety net guarded against are no longer expressible.
+/// What's left is the shape of the call itself: exactly-one
+/// <c>AddGameEngine</c> per plugin, failure containment across plugins, and
+/// the plugin context wiring that replaces direct service-collection access.
 /// </summary>
 [TestClass]
 public sealed class LogicRegistrationsTests
@@ -26,11 +29,11 @@ public sealed class LogicRegistrationsTests
     [TestMethod]
     public void Preserves_LegitimateRegistrations_ViaHelper()
     {
-        var services = new ServiceCollection();
+        var services = CreateBaselineServices();
         var logger = NullLogger.Instance;
 
         var module = new GoodModule("good");
-        services.RegisterLogic(new PluginLoadResult([module], []), logger);
+        services.RegisterLogic(new PluginLoadResult([ToLoadedPlugin(module)], []), logger);
 
         var provider = services.BuildServiceProvider();
 
@@ -44,149 +47,136 @@ public sealed class LogicRegistrationsTests
     }
 
     [TestMethod]
-    public void Drops_KeyedEngine_RegisteredUnderWrongRoute()
-    {
-        var services = new ServiceCollection();
-        var logger = new CapturingLogger();
-
-        // The module claims route "a" but registers a keyed engine under "b".
-        var module = new MaliciousModule("a", wrongKey: "b");
-        services.RegisterLogic(new PluginLoadResult([module], []), logger);
-
-        var provider = services.BuildServiceProvider();
-
-        Assert.IsNull(
-            provider.GetKeyedService<AbstractGameEngine>("b"),
-            "The under-wrong-route registration must be dropped.");
-        Assert.IsTrue(
-            logger.Errors.Any(e => e.Contains("only its own RouteIdentifier", StringComparison.Ordinal)),
-            "An Error must be logged explaining the mismatch.");
-    }
-
-    [TestMethod]
-    public void Drops_KeyedEngine_WhenKeyAlreadyClaimed_ByEarlierPlugin()
-    {
-        var services = new ServiceCollection();
-        var logger = new CapturingLogger();
-
-        // Two plugins claiming the same RouteIdentifier. PluginLoader dedupes
-        // this up-stream, but the safety net in RegisterLogic still has to
-        // handle it in case a future caller bypasses the loader.
-        var first = new GoodModule("shared-route");
-        var second = new GoodModule("shared-route");
-
-        services.RegisterLogic(new PluginLoadResult([first, second], []), logger);
-
-        var provider = services.BuildServiceProvider();
-
-        // The first plugin's registration survives.
-        var keyed = provider.GetKeyedService<AbstractGameEngine>("shared-route");
-        Assert.IsNotNull(keyed);
-
-        Assert.IsTrue(
-            logger.Errors.Any(e => e.Contains("already claimed", StringComparison.Ordinal)),
-            "An Error must be logged explaining the prior-owner collision.");
-    }
-
-    [TestMethod]
-    public void Drops_KeyedEngine_WithNonStringKey()
-    {
-        var services = new ServiceCollection();
-        var logger = new CapturingLogger();
-
-        var module = new IntKeyModule();
-        services.RegisterLogic(new PluginLoadResult([module], []), logger);
-
-        var provider = services.BuildServiceProvider();
-
-        Assert.IsNull(
-            provider.GetKeyedService<AbstractGameEngine>(42),
-            "Non-string keys must be dropped.");
-        Assert.IsTrue(
-            logger.Errors.Any(e => e.Contains("non-string service key", StringComparison.Ordinal)),
-            "An Error must be logged explaining the non-string key.");
-    }
-
-    [TestMethod]
     public void ThrowingPlugin_DoesNotBlock_LaterPluginWithSameRoute()
     {
-        // If a plugin throws from RegisterServices, it aborts the loop iteration
-        // *before* its RouteIdentifier is added to ownedKeys. A later plugin
-        // with the same RouteIdentifier therefore registers successfully.
-        var services = new ServiceCollection();
+        var services = CreateBaselineServices();
         var logger = new CapturingLogger();
 
         var throwing = new ThrowingModule("shared-route");
         var good = new GoodModule("shared-route");
 
-        services.RegisterLogic(new PluginLoadResult([throwing, good], []), logger);
+        services.RegisterLogic(
+            new PluginLoadResult([ToLoadedPlugin(throwing), ToLoadedPlugin(good)], []),
+            logger);
 
         var provider = services.BuildServiceProvider();
 
         var keyed = provider.GetKeyedService<AbstractGameEngine>("shared-route");
         Assert.IsNotNull(keyed,
-            "A throwing plugin must not claim the route key; the next legitimate plugin registers normally.");
+            "A throwing plugin must not prevent the next plugin from registering its engine.");
         Assert.IsInstanceOfType<TestEngine>(keyed);
     }
+
+    [TestMethod]
+    public void Plugin_CallingAddGameEngine_MoreThanOnce_LogsError()
+    {
+        var services = CreateBaselineServices();
+        var logger = new CapturingLogger();
+
+        var module = new DoubleEngineModule("twice");
+        services.RegisterLogic(new PluginLoadResult([ToLoadedPlugin(module)], []), logger);
+
+        Assert.IsTrue(
+            logger.Errors.Any(e => e.Contains("AddGameEngine", StringComparison.Ordinal)
+                                 && e.Contains("2", StringComparison.Ordinal)),
+            "An Error must be logged explaining that AddGameEngine was called more than once.");
+    }
+
+    [TestMethod]
+    public void Plugin_NeverCallingAddGameEngine_LogsErrorAndStillExposesModule()
+    {
+        var services = CreateBaselineServices();
+        var logger = new CapturingLogger();
+
+        var module = new NoEngineModule("empty");
+        services.RegisterLogic(new PluginLoadResult([ToLoadedPlugin(module)], []), logger);
+
+        Assert.IsTrue(
+            logger.Errors.Any(e => e.Contains("AddGameEngine", StringComparison.Ordinal)
+                                 && e.Contains("0", StringComparison.Ordinal)),
+            "An Error must be logged explaining that AddGameEngine was never called.");
+
+        var provider = services.BuildServiceProvider();
+        var modules = provider.GetServices<IGameModule>().ToArray();
+        Assert.Contains(module, modules,
+            "Module must remain visible as IGameModule even when its engine registration was malformed, so the home page still lists it.");
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Minimal DI baseline needed by the default <see cref="IPluginContext"/>
+    /// factory inside <see cref="LogicRegistrations.RegisterLogic"/>.
+    /// </summary>
+    private static IServiceCollection CreateBaselineServices()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<ILoggerFactory>(NullLoggerFactory.Instance);
+        services.AddSingleton<IConfiguration>(new ConfigurationBuilder().Build());
+        services.AddSingleton<IStoragePathService>(new TempStoragePathService());
+        return services;
+    }
+
+    private static LoadedPlugin ToLoadedPlugin(IGameModule module) =>
+        new(
+            Module: module,
+            Manifest: module.Manifest,
+            Assembly: module.GetType().Assembly,
+            LoadContext: AssemblyLoadContext.GetLoadContext(module.GetType().Assembly) ?? AssemblyLoadContext.Default);
+
+    private static IPluginManifest MakeManifest(string route) => new PluginManifest(
+        Name: $"Module-{route}",
+        Description: "test",
+        RouteIdentifier: route,
+        Version: new Version(1, 0, 0),
+        EntryAssembly: "KnockBox.PlatformTests",
+        Capabilities: new HashSet<PluginCapability>());
 
     // ── Fake modules & engines ───────────────────────────────────────────
 
     private sealed class GoodModule(string route) : IGameModule
     {
-        public string Name => $"Good-{route}";
-        public string Description => "Well-behaved test module.";
-        public string RouteIdentifier => route;
+        public IPluginManifest Manifest { get; } = MakeManifest(route);
 
-        public void RegisterServices(IServiceCollection services)
-            => services.AddGameEngine<TestEngine>(RouteIdentifier);
+        public void RegisterServices(IPluginRegistration registration)
+            => registration.AddGameEngine<TestEngine>();
 
-        public Microsoft.AspNetCore.Components.RenderFragment GetButtonContent() => _ => { };
-    }
-
-    private sealed class MaliciousModule(string route, string wrongKey) : IGameModule
-    {
-        public string Name => $"Malicious-{route}";
-        public string Description => "Registers a keyed engine under a route it doesn't own.";
-        public string RouteIdentifier => route;
-
-        public void RegisterServices(IServiceCollection services)
-        {
-            services.AddSingleton<TestEngine>();
-            services.AddKeyedSingleton<AbstractGameEngine>(
-                wrongKey,
-                (sp, _) => sp.GetRequiredService<TestEngine>());
-        }
-
-        public Microsoft.AspNetCore.Components.RenderFragment GetButtonContent() => _ => { };
-    }
-
-    private sealed class IntKeyModule : IGameModule
-    {
-        public string Name => "IntKey";
-        public string Description => "Registers a keyed engine with a non-string key.";
-        public string RouteIdentifier => "int-key";
-
-        public void RegisterServices(IServiceCollection services)
-        {
-            services.AddSingleton<TestEngine>();
-            services.AddKeyedSingleton<AbstractGameEngine>(
-                42,
-                (sp, _) => sp.GetRequiredService<TestEngine>());
-        }
-
-        public Microsoft.AspNetCore.Components.RenderFragment GetButtonContent() => _ => { };
+        public RenderFragment GetButtonContent() => _ => { };
     }
 
     private sealed class ThrowingModule(string route) : IGameModule
     {
-        public string Name => $"Throwing-{route}";
-        public string Description => "Throws from RegisterServices.";
-        public string RouteIdentifier => route;
+        public IPluginManifest Manifest { get; } = MakeManifest(route);
 
-        public void RegisterServices(IServiceCollection services)
+        public void RegisterServices(IPluginRegistration registration)
             => throw new InvalidOperationException("intentional");
 
-        public Microsoft.AspNetCore.Components.RenderFragment GetButtonContent() => _ => { };
+        public RenderFragment GetButtonContent() => _ => { };
+    }
+
+    private sealed class DoubleEngineModule(string route) : IGameModule
+    {
+        public IPluginManifest Manifest { get; } = MakeManifest(route);
+
+        public void RegisterServices(IPluginRegistration registration)
+        {
+            registration.AddGameEngine<TestEngine>();
+            registration.AddGameEngine<TestEngine>();
+        }
+
+        public RenderFragment GetButtonContent() => _ => { };
+    }
+
+    private sealed class NoEngineModule(string route) : IGameModule
+    {
+        public IPluginManifest Manifest { get; } = MakeManifest(route);
+
+        public void RegisterServices(IPluginRegistration registration)
+        {
+            // Intentionally does NOT call AddGameEngine<T>.
+        }
+
+        public RenderFragment GetButtonContent() => _ => { };
     }
 
     private sealed class TestEngine : AbstractGameEngine
@@ -198,6 +188,16 @@ public sealed class LogicRegistrationsTests
         public override Task<Result> StartAsync(
             User host, AbstractGameState state, CancellationToken ct = default)
             => throw new NotImplementedException();
+    }
+
+    private sealed class TempStoragePathService : IStoragePathService
+    {
+        private readonly string _root = Path.Combine(Path.GetTempPath(), "knockbox-logicreg-tests", Guid.NewGuid().ToString("N"));
+        public string GetAdminDirectory() => Path.Combine(_root, "admin");
+        public string GetLogDirectory() => Path.Combine(_root, "logs");
+        public string GetFirstPartyPluginsDirectory() => Path.Combine(_root, "games");
+        public string GetExternalPluginsDirectory() => Path.Combine(_root, "external-games");
+        public string GetPluginDataDirectory(string routeIdentifier) => Path.Combine(_root, "plugins", routeIdentifier);
     }
 
     private sealed class CapturingLogger : ILogger

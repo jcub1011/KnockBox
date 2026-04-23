@@ -1,8 +1,10 @@
 using System.Reflection;
+using System.Runtime.Loader;
 using KnockBox.Core.Plugins;
 using KnockBox.Core.Services.Drawing;
 using KnockBox.Core.Services.Navigation;
 using KnockBox.Platform.Games;
+using KnockBox.Platform.Storage;
 using KnockBox.Services.Drawing;
 using KnockBox.Services.Navigation;
 using KnockBox.Services.Registrations.Logic;
@@ -97,6 +99,13 @@ public static class KnockBoxPlatformExtensions
             d => d.ServiceType == typeof(IGameAvailabilityService));
         builder.Services.TryAddSingleton<IGameAvailabilityService, AllGamesEnabledService>();
 
+        // Default IStoragePathService — yields to a host-registered impl the
+        // same way as IGameAvailabilityService. Required by the per-plugin
+        // IPluginContext factory (see LogicRegistrations) for
+        // GetPluginDataDirectory; a host that doesn't register its own must
+        // still have SOME default available.
+        builder.Services.TryAddSingleton<IStoragePathService, DefaultStoragePathService>();
+
         // Single bootstrap logger factory used for both plugin discovery and
         // registration-time logging. Console-only here; the host's configured
         // Serilog pipeline takes over once DI is built.
@@ -125,16 +134,25 @@ public static class KnockBoxPlatformExtensions
 
         if (options.PluginDiscovery == PluginDiscoveryMode.Explicit)
         {
-            pluginLoadResult = new PluginLoadResult(
-                options.ExplicitModules,
-                options.ExplicitAssemblies);
+            // Explicit mode (DevHost) has no on-disk plugin.json; the module's
+            // own Manifest property is authoritative and used directly.
+            var explicitPlugins = options.ExplicitModules
+                .Select(m => new LoadedPlugin(
+                    Module: m,
+                    Manifest: m.Manifest,
+                    Assembly: m.GetType().Assembly,
+                    LoadContext: AssemblyLoadContext.GetLoadContext(m.GetType().Assembly)
+                                 ?? AssemblyLoadContext.Default))
+                .ToList();
+
+            pluginLoadResult = new PluginLoadResult(explicitPlugins, options.ExplicitAssemblies);
         }
         else
         {
             var pluginLogger = bootstrapLoggerFactory.CreateLogger<PluginLoader>();
             var loader = new PluginLoader(pluginLogger);
 
-            var modules = new List<IGameModule>();
+            var plugins = new List<LoadedPlugin>();
             var assemblies = new List<Assembly>();
 
             // The caller (or the default `["games"]`) owns path selection. The
@@ -145,11 +163,11 @@ public static class KnockBoxPlatformExtensions
             {
                 var pluginsPath = ResolvePluginsPath(rawPath);
                 var result = loader.LoadModules(pluginsPath);
-                modules.AddRange(result.Modules);
+                plugins.AddRange(result.Plugins);
                 assemblies.AddRange(result.Assemblies);
             }
 
-            pluginLoadResult = new PluginLoadResult(modules, assemblies.Distinct().ToList());
+            pluginLoadResult = new PluginLoadResult(plugins, assemblies.Distinct().ToList());
         }
 
         // Logic registrations (platform version — no admin services).

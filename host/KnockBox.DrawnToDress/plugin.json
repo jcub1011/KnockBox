@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "name": "Drawn To Dress",
+  "description": "The drawing and dress-up game.",
+  "routeIdentifier": "drawn-to-dress",
+  "version": "1.0.0",
+  "entryAssembly": "KnockBox.DrawnToDress",
+  "capabilities": []
+}

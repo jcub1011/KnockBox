@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "name": "Codeword",
+  "description": "A social card-based fortune teller.",
+  "routeIdentifier": "codeword",
+  "version": "1.0.0",
+  "entryAssembly": "KnockBox.Codeword",
+  "capabilities": []
+}

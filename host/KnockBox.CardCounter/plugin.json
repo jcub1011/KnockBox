@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "name": "Card Counter",
+  "description": "High stakes blackjack style counting.",
+  "routeIdentifier": "card-counter",
+  "version": "1.0.0",
+  "entryAssembly": "KnockBox.CardCounter",
+  "capabilities": []
+}

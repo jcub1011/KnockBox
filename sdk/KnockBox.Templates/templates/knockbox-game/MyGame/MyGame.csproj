@@ -47,4 +47,25 @@
       <_Parameter1>MyGame.Tests</_Parameter1>
     </AssemblyAttribute>
   </ItemGroup>
+
+  <!-- Fail the build if plugin.json is missing. The host refuses to load
+       plugin folders without a manifest, so skipping this here would only
+       push the failure to runtime. -->
+  <Target Name="ValidatePluginManifest" BeforeTargets="BeforeBuild;PrepareForBuild">
+    <Error Condition="!Exists('$(MSBuildProjectDirectory)\plugin.json')"
+           Text="Plugin project '$(MSBuildProjectName)' is missing required [plugin.json] in its project root. Every plugin must declare its identity and capabilities in plugin.json; see the KnockBox.Core docs for the schema." />
+  </Target>
+
+  <!-- Embed plugin.json as an assembly resource so the plugin's IGameModule
+       can read it via PluginManifest.FromEmbeddedResourceOrThrow, AND stage
+       a disk copy next to the DLL so the host loader can validate the
+       manifest before loading the assembly. -->
+  <ItemGroup Condition="Exists('$(MSBuildProjectDirectory)\plugin.json')">
+    <EmbeddedResource Include="plugin.json">
+      <LogicalName>plugin.json</LogicalName>
+    </EmbeddedResource>
+    <None Include="plugin.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
 </Project>

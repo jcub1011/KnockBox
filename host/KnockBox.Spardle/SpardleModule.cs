@@ -1,20 +1,18 @@
 using KnockBox.Core.Plugins;
 using KnockBox.Spardle.Components;
 using Microsoft.AspNetCore.Components;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace KnockBox.Spardle;
 
 public class SpardleModule : IGameModule
 {
-    public string Name => "Spar-dle";
-    public string Description => "A fast-paced competitive word guessing game.";
-    public string RouteIdentifier => "spardle";
+    public IPluginManifest Manifest { get; } =
+        PluginManifest.FromEmbeddedResourceOrThrow(typeof(SpardleModule).Assembly);
 
-    public void RegisterServices(IServiceCollection services)
+    public void RegisterServices(IPluginRegistration registration)
     {
-        services.AddSingleton<Services.IWordListService, Services.WordListService>();
-        services.AddGameEngine<SpardleEngine>(RouteIdentifier);
+        registration.AddSingleton<Services.IWordListService, Services.WordListService>();
+        registration.AddGameEngine<SpardleEngine>();
     }
 
     public RenderFragment GetButtonContent() => builder =>

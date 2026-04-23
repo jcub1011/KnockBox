@@ -43,9 +43,12 @@
 
   <ItemGroup>
     <!-- Grants the in-repo test project access to internal APIs (the
-         PluginLoader forbidden-dependency helper, etc.). External consumers
-         remain bound by the public surface. -->
+         PluginLoader forbidden-dependency helper, etc.) and the Platform
+         package access to the AddGameEngine helper used by
+         DefaultPluginRegistration. External consumers remain bound by the
+         public surface. -->
     <InternalsVisibleTo Include="KnockBox.CoreTests" />
+    <InternalsVisibleTo Include="KnockBox.Platform" />
   </ItemGroup>
 
 </Project>

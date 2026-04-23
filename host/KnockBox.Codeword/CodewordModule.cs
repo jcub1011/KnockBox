@@ -2,20 +2,16 @@ using KnockBox.Codeword.Components;
 using KnockBox.Codeword.Services.Logic.Games;
 using KnockBox.Core.Plugins;
 using Microsoft.AspNetCore.Components;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace KnockBox.Codeword
 {
     public class CodewordModule : IGameModule
     {
-        public string Name => "Codeword";
-        public string Description => "A social card-based fortune teller.";
-        public string RouteIdentifier => "codeword";
+        public IPluginManifest Manifest { get; } =
+            PluginManifest.FromEmbeddedResourceOrThrow(typeof(CodewordModule).Assembly);
 
-        public void RegisterServices(IServiceCollection services)
-        {
-            services.AddGameEngine<CodewordGameEngine>(RouteIdentifier);
-        }
+        public void RegisterServices(IPluginRegistration registration)
+            => registration.AddGameEngine<CodewordGameEngine>();
 
         public RenderFragment GetButtonContent() => builder =>
         {

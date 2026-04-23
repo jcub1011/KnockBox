@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "name": "Operator",
+  "description": "Decode and transmit the right signal.",
+  "routeIdentifier": "operator",
+  "version": "1.0.0",
+  "entryAssembly": "KnockBox.Operator",
+  "capabilities": []
+}

@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "name": "My Game",
+  "description": "A KnockBox party game.",
+  "routeIdentifier": "my-game",
+  "version": "1.0.0",
+  "entryAssembly": "MyGame",
+  "capabilities": []
+}

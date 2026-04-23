@@ -28,7 +28,34 @@
       2. Static-web-assets manifests (if produced).
       3. The scoped-CSS bundle (if produced).
       4. The plugin's wwwroot assets (if present).
+      5. plugin.json (the soft-sandbox manifest).
   -->
+
+  <!--
+    plugin.json is mandatory for every plugin project. Fail fast at build time
+    if it's missing so the author sees the error before publish, not at host
+    startup. Runs BEFORE Build so it short-circuits the rest of the build.
+  -->
+  <Target Name="ValidatePluginManifest" BeforeTargets="BeforeBuild;PrepareForBuild">
+    <Error Condition="!Exists('$(MSBuildProjectDirectory)\plugin.json')"
+           Text="Plugin project '$(MSBuildProjectName)' is missing required [plugin.json] in its project root. Every plugin must declare its identity and capabilities in plugin.json; see docs for the schema." />
+  </Target>
+
+  <!--
+    Embed plugin.json into the assembly as a resource (so PluginManifest.FromEmbeddedResource
+    can find it at runtime for cross-check against the on-disk copy) and stage
+    a disk copy next to the DLL so the loader can read it before activating
+    the assembly.
+  -->
+  <ItemGroup Condition="Exists('$(MSBuildProjectDirectory)\plugin.json')">
+    <EmbeddedResource Include="plugin.json">
+      <LogicalName>plugin.json</LogicalName>
+    </EmbeddedResource>
+    <None Include="plugin.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
   <Target Name="PublishPlugin" AfterTargets="Build">
     <Message Text="Publishing plugin $(TargetName) to KnockBox app..." Importance="high" />
     <PropertyGroup>
@@ -44,6 +71,7 @@
       <PluginPrimary Include="$(TargetDir)$(TargetName).dll" />
       <PluginPrimary Include="$(TargetDir)$(TargetName).pdb" Condition="Exists('$(TargetDir)$(TargetName).pdb')" />
       <PluginPrimary Include="$(TargetDir)$(TargetName).deps.json" Condition="Exists('$(TargetDir)$(TargetName).deps.json')" />
+      <PluginPrimary Include="$(TargetDir)plugin.json" Condition="Exists('$(TargetDir)plugin.json')" />
       <PluginPrimary Include="$(TargetDir)$(TargetName).staticwebassets.endpoints.json"
                      Condition="Exists('$(TargetDir)$(TargetName).staticwebassets.endpoints.json')" />
       <PluginPrimary Include="$(TargetDir)$(TargetName).staticwebassets.runtime.json"

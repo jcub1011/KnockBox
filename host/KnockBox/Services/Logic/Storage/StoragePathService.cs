@@ -15,7 +15,10 @@ namespace KnockBox.Services.Logic.Storage
         public string GetFirstPartyPluginsDirectory() => 
             Path.Combine(AppContext.BaseDirectory, "games");
 
-        public string GetExternalPluginsDirectory() => 
+        public string GetExternalPluginsDirectory() =>
             Path.Combine(AppContext.BaseDirectory, DataRoot, "games");
+
+        public string GetPluginDataDirectory(string routeIdentifier) =>
+            Path.Combine(AppContext.BaseDirectory, DataRoot, "plugins", routeIdentifier);
     }
 }

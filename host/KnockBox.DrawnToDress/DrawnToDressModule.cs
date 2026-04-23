@@ -2,20 +2,16 @@ using KnockBox.Core.Plugins;
 using KnockBox.DrawnToDress.Components;
 using KnockBox.DrawnToDress.Services.Logic.Games;
 using Microsoft.AspNetCore.Components;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace KnockBox.DrawnToDress
 {
     public class DrawnToDressModule : IGameModule
     {
-        public string Name => "Drawn To Dress";
-        public string Description => "The drawing and dress-up game.";
-        public string RouteIdentifier => "drawn-to-dress";
+        public IPluginManifest Manifest { get; } =
+            PluginManifest.FromEmbeddedResourceOrThrow(typeof(DrawnToDressModule).Assembly);
 
-        public void RegisterServices(IServiceCollection services)
-        {
-            services.AddGameEngine<DrawnToDressGameEngine>(RouteIdentifier);
-        }
+        public void RegisterServices(IPluginRegistration registration)
+            => registration.AddGameEngine<DrawnToDressGameEngine>();
 
         public RenderFragment GetButtonContent() => builder =>
         {

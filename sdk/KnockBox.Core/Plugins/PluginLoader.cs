@@ -1,5 +1,6 @@
 using System.Collections.Frozen;
 using System.Reflection;
+using System.Runtime.Loader;
 using System.Text.Json;
 
 namespace KnockBox.Core.Plugins
@@ -10,19 +11,22 @@ namespace KnockBox.Core.Plugins
     /// platform's DI registration code to wire every plugin's services and to
     /// expose the set of plugin assemblies to Blazor's router.
     /// </summary>
-    /// <param name="Modules">Every discovered <see cref="IGameModule"/>, in discovery order.</param>
+    /// <param name="Plugins">Every discovered plugin, in discovery order.</param>
     /// <param name="Assemblies">The distinct plugin assemblies that contributed at least one module.</param>
     public sealed record PluginLoadResult(
-        IReadOnlyList<IGameModule> Modules,
+        IReadOnlyList<LoadedPlugin> Plugins,
         IReadOnlyList<Assembly> Assemblies)
     {
-        /// <summary>An empty result with no modules and no assemblies.</summary>
-        public static PluginLoadResult Empty { get; } =
-            new([], []);
+        /// <summary>An empty result with no plugins and no assemblies.</summary>
+        public static PluginLoadResult Empty { get; } = new([], []);
     }
 
     /// <summary>
-    /// Discovers <see cref="IGameModule"/> implementations from DLLs in a plugins directory.
+    /// Discovers plugin folders, validates each one's <c>plugin.json</c>,
+    /// loads the plugin assembly into its own
+    /// <see cref="AssemblyLoadContext"/>, activates the single
+    /// <see cref="IGameModule"/> implementation inside, and returns the
+    /// successfully loaded plugins.
     /// </summary>
     [System.Diagnostics.CodeAnalysis.SuppressMessage(
         "Performance",
@@ -41,94 +45,22 @@ namespace KnockBox.Core.Plugins
             FrozenSet.ToFrozenSet(["KnockBox.Platform"], StringComparer.OrdinalIgnoreCase);
 
         /// <summary>
-        /// Scans <paramref name="pluginsDirectory"/> for plugin folders, loads
-        /// each into its own <see cref="PluginLoadContext"/>, reflects for
-        /// <see cref="IGameModule"/> implementations, activates them, and
-        /// returns the aggregate result. Modules with duplicate route
-        /// identifiers are rejected (first wins); types that fail to activate
-        /// are skipped with an error log.
+        /// Scans <paramref name="pluginsDirectory"/> for plugin folders. For
+        /// each subdirectory, reads <c>plugin.json</c>, locates
+        /// <c>{EntryAssembly}.dll</c>, loads it into a per-plugin ALC, reflects
+        /// for an <see cref="IGameModule"/>, cross-checks the module's reported
+        /// manifest against the on-disk one, and accumulates the results.
+        /// Duplicate route identifiers (first wins) and any validation failure
+        /// skip the offending plugin with a logged error.
         /// </summary>
-        /// <param name="pluginsDirectory">
-        /// Directory containing one subfolder per plugin. Each subfolder's
-        /// primary DLL is expected to be named after the subfolder.
-        /// </param>
         public PluginLoadResult LoadModules(string pluginsDirectory)
         {
             if (!Directory.Exists(pluginsDirectory))
             {
                 logger.LogWarning(
-                    "Plugins directory [{PluginsDirectory}] does not exist; no game modules will be loaded.",
+                    "Plugins directory [{PluginsDirectory}] does not exist; no game plugins will be loaded.",
                     pluginsDirectory);
                 return PluginLoadResult.Empty;
-            }
-
-            var loadedAssemblies = LoadAssemblies(pluginsDirectory);
-            var modules = new List<IGameModule>();
-            var moduleAssemblies = new HashSet<Assembly>();
-            var routeIdentifiers = new Dictionary<string, IGameModule>(StringComparer.OrdinalIgnoreCase);
-
-            foreach (var assembly in loadedAssemblies)
-            {
-                foreach (var moduleType in GetModuleTypes(assembly))
-                {
-                    var module = TryActivate(moduleType);
-                    if (module is null)
-                        continue;
-
-                    if (routeIdentifiers.TryGetValue(module.RouteIdentifier, out var existing))
-                    {
-                        logger.LogError(
-                            "Duplicate game module route identifier [{RouteIdentifier}]. " +
-                            "Keeping [{ExistingType}] from [{ExistingAssembly}]; skipping [{SkippedType}] from [{SkippedAssembly}].",
-                            module.RouteIdentifier,
-                            existing.GetType().FullName,
-                            existing.GetType().Assembly.GetName().Name,
-                            moduleType.FullName,
-                            moduleType.Assembly.GetName().Name);
-                        continue;
-                    }
-
-                    routeIdentifiers.Add(module.RouteIdentifier, module);
-                    modules.Add(module);
-                    moduleAssemblies.Add(moduleType.Assembly);
-
-                    logger.LogInformation(
-                        "Loaded game module [{Name}] with route identifier [{RouteIdentifier}] from [{Assembly}].",
-                        module.Name,
-                        module.RouteIdentifier,
-                        moduleType.Assembly.GetName().Name);
-                }
-            }
-
-            return new PluginLoadResult(modules, [.. moduleAssemblies]);
-        }
-
-        private List<Assembly> LoadAssemblies(string pluginsDirectory)
-        {
-            // Each plugin lives in its own subfolder (games/{TargetName}/) and publishes
-            // its primary assembly as {TargetName}.dll alongside its transitive deps.
-            // Each plugin gets its own PluginLoadContext so its transitive deps resolve
-            // from its own folder via AssemblyDependencyResolver ({PluginName}.deps.json),
-            // isolating version conflicts between plugins. Assemblies already loaded by
-            // the host (shared contracts like KnockBox.Core, logging/DI abstractions,
-            // BCL) are deferred to the default ALC so type identity is preserved across
-            // the host/plugin boundary. Loose DLLs dropped directly under the plugins
-            // root are ignored; the per-subdirectory layout is the only supported shape.
-            var pluginDllPaths = new List<string>();
-            foreach (var subdir in Directory.GetDirectories(pluginsDirectory))
-            {
-                var expected = Path.Combine(subdir, Path.GetFileName(subdir) + ".dll");
-                if (File.Exists(expected))
-                {
-                    pluginDllPaths.Add(expected);
-                }
-                else
-                {
-                    logger.LogWarning(
-                        "Plugin subdirectory [{Subdirectory}] is missing expected primary assembly [{ExpectedDll}]; skipping.",
-                        subdir,
-                        Path.GetFileName(expected));
-                }
             }
 
             // Snapshot host-loaded assembly names ONCE, before any plugin loads. Using a
@@ -144,65 +76,136 @@ namespace KnockBox.Core.Plugins
                     .Where(n => n is not null)!,
                 StringComparer.OrdinalIgnoreCase);
 
-            var assemblies = new List<Assembly>(pluginDllPaths.Count);
+            var plugins = new List<LoadedPlugin>();
+            var assemblies = new HashSet<Assembly>();
+            var routeIdentifiers = new Dictionary<string, LoadedPlugin>(StringComparer.OrdinalIgnoreCase);
 
-            foreach (var dllPath in pluginDllPaths)
+            foreach (var subdir in Directory.GetDirectories(pluginsDirectory))
             {
-                try
-                {
-                    var primaryAssemblyName = AssemblyName.GetAssemblyName(dllPath).Name;
-                    if (string.IsNullOrEmpty(primaryAssemblyName))
-                    {
-                        logger.LogWarning(
-                            "Plugin assembly at [{DllPath}] has no readable AssemblyName; skipping.",
-                            dllPath);
-                        continue;
-                    }
+                var loaded = TryLoadPluginFolder(subdir, hostAssemblyNames);
+                if (loaded is null)
+                    continue;
 
-                    var forbidden = FindForbiddenDependency(dllPath);
-                    if (forbidden is not null)
-                    {
-                        logger.LogError(
-                            "Plugin [{Assembly}] declares a dependency on [{ForbiddenPackage}] in its .deps.json. " +
-                            "Plugins MUST reference only KnockBox.Core — referencing the Platform package breaks " +
-                            "AssemblyLoadContext isolation and causes type-identity drift at runtime. " +
-                            "Skipping this plugin.",
-                            primaryAssemblyName,
-                            forbidden);
-                        continue;
-                    }
-
-                    bool IsSharedContract(AssemblyName name)
-                    {
-                        if (string.IsNullOrEmpty(name.Name))
-                            return false;
-                        // Never share the plugin's own primary assembly -- each plugin
-                        // must load into its own ALC even if something with the same
-                        // name is already in the default ALC.
-                        if (string.Equals(name.Name, primaryAssemblyName, StringComparison.OrdinalIgnoreCase))
-                            return false;
-                        // Host-owned contracts (KnockBox.Core, logging/DI abstractions,
-                        // BCL) must share type identity across the host/plugin boundary.
-                        return hostAssemblyNames.Contains(name.Name);
-                    }
-
-                    var alc = new PluginLoadContext(dllPath, IsSharedContract);
-                    var assembly = alc.LoadFromAssemblyPath(dllPath);
-                    assemblies.Add(assembly);
-                }
-                catch (Exception ex)
+                if (routeIdentifiers.TryGetValue(loaded.Manifest.RouteIdentifier, out var existing))
                 {
                     logger.LogError(
-                        ex,
-                        "Failed to load plugin assembly [{DllPath}].",
-                        dllPath);
+                        "Duplicate plugin route identifier [{RouteIdentifier}]. " +
+                        "Keeping [{ExistingAssembly}]; skipping [{SkippedAssembly}].",
+                        loaded.Manifest.RouteIdentifier,
+                        existing.Assembly.GetName().Name,
+                        loaded.Assembly.GetName().Name);
+                    continue;
                 }
+
+                routeIdentifiers.Add(loaded.Manifest.RouteIdentifier, loaded);
+                plugins.Add(loaded);
+                assemblies.Add(loaded.Assembly);
+
+                logger.LogInformation(
+                    "Loaded game plugin [{Name}] with route identifier [{RouteIdentifier}] from [{Assembly}] v{Version}.",
+                    loaded.Manifest.Name,
+                    loaded.Manifest.RouteIdentifier,
+                    loaded.Assembly.GetName().Name,
+                    loaded.Manifest.Version);
             }
 
-            return assemblies;
+            return new PluginLoadResult(plugins, [.. assemblies]);
         }
 
-        private IEnumerable<Type> GetModuleTypes(Assembly assembly)
+        private LoadedPlugin? TryLoadPluginFolder(string subdir, HashSet<string> hostAssemblyNames)
+        {
+            var manifestPath = Path.Combine(subdir, "plugin.json");
+            if (!File.Exists(manifestPath))
+            {
+                logger.LogError(
+                    "Plugin folder [{Subdirectory}] is missing required [plugin.json]; skipping.",
+                    subdir);
+                return null;
+            }
+
+            var manifestResult = PluginManifest.TryReadFromFile(manifestPath);
+            if (!manifestResult.TryGetSuccess(out var manifest))
+            {
+                manifestResult.TryGetFailure(out var error);
+                logger.LogError(
+                    "Plugin folder [{Subdirectory}] has an invalid plugin.json: {Error}; skipping.",
+                    subdir,
+                    error.PublicMessage);
+                return null;
+            }
+
+            var dllPath = Path.Combine(subdir, manifest.EntryAssembly + ".dll");
+            if (!File.Exists(dllPath))
+            {
+                logger.LogError(
+                    "Plugin folder [{Subdirectory}] declares entryAssembly [{EntryAssembly}] but [{DllPath}] does not exist; skipping.",
+                    subdir,
+                    manifest.EntryAssembly,
+                    dllPath);
+                return null;
+            }
+
+            var forbidden = FindForbiddenDependency(dllPath);
+            if (forbidden is not null)
+            {
+                logger.LogError(
+                    "Plugin [{Assembly}] declares a dependency on [{ForbiddenPackage}] in its .deps.json. " +
+                    "Plugins MUST reference only KnockBox.Core — referencing the Platform package breaks " +
+                    "AssemblyLoadContext isolation and causes type-identity drift at runtime. Skipping.",
+                    manifest.EntryAssembly,
+                    forbidden);
+                return null;
+            }
+
+            Assembly assembly;
+            AssemblyLoadContext loadContext;
+            try
+            {
+                bool IsSharedContract(AssemblyName name)
+                {
+                    if (string.IsNullOrEmpty(name.Name))
+                        return false;
+                    if (string.Equals(name.Name, manifest.EntryAssembly, StringComparison.OrdinalIgnoreCase))
+                        return false;
+                    return hostAssemblyNames.Contains(name.Name);
+                }
+
+                loadContext = new PluginLoadContext(dllPath, IsSharedContract);
+                assembly = loadContext.LoadFromAssemblyPath(dllPath);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(
+                    ex,
+                    "Failed to load plugin assembly [{DllPath}]; skipping.",
+                    dllPath);
+                return null;
+            }
+
+            var module = FindMatchingModule(assembly, manifest);
+            if (module is null)
+                return null;
+
+            if (!ManifestsAgree(manifest, module.Manifest, out var disagreement))
+            {
+                logger.LogError(
+                    "Plugin [{Assembly}]: on-disk plugin.json disagrees with IGameModule.Manifest — {Disagreement}. Skipping.",
+                    assembly.GetName().Name,
+                    disagreement);
+                return null;
+            }
+
+            return new LoadedPlugin(module, manifest, assembly, loadContext);
+        }
+
+        /// <summary>
+        /// Activates every <see cref="IGameModule"/> in <paramref name="assembly"/>
+        /// and returns the single one whose
+        /// <see cref="IPluginManifest.RouteIdentifier"/> matches the on-disk
+        /// manifest. Modules whose ctors throw are logged and skipped; having a
+        /// broken sibling module does not prevent the matching one from loading.
+        /// </summary>
+        private IGameModule? FindMatchingModule(Assembly assembly, IPluginManifest manifest)
         {
             Type?[] types;
             try
@@ -211,10 +214,6 @@ namespace KnockBox.Core.Plugins
             }
             catch (ReflectionTypeLoadException ex)
             {
-                // Fail the whole assembly on partial-load failures. Partial activation
-                // of a broken plugin is worse than skipping it entirely: it leaves
-                // ops with a confusing mix of logged errors and seemingly-working
-                // modules that will blow up later when missing types are touched.
                 foreach (var loaderException in ex.LoaderExceptions.Where(e => e is not null))
                 {
                     logger.LogError(
@@ -222,7 +221,7 @@ namespace KnockBox.Core.Plugins
                         "Loader exception while scanning [{Assembly}] for game modules; skipping the entire assembly.",
                         assembly.GetName().Name);
                 }
-                yield break;
+                return null;
             }
             catch (Exception ex)
             {
@@ -230,9 +229,10 @@ namespace KnockBox.Core.Plugins
                     ex,
                     "Failed to scan [{Assembly}] for game modules.",
                     assembly.GetName().Name);
-                yield break;
+                return null;
             }
 
+            IGameModule? match = null;
             foreach (var type in types)
             {
                 if (type is null)
@@ -242,8 +242,36 @@ namespace KnockBox.Core.Plugins
                 if (!typeof(IGameModule).IsAssignableFrom(type))
                     continue;
 
-                yield return type;
+                var module = TryActivate(type);
+                if (module is null)
+                    continue;
+
+                if (!string.Equals(module.Manifest.RouteIdentifier, manifest.RouteIdentifier, StringComparison.Ordinal))
+                    continue;
+
+                if (match is not null)
+                {
+                    logger.LogError(
+                        "Plugin assembly [{Assembly}] has multiple IGameModule types claiming route [{Route}] ([{First}], [{Second}]); skipping.",
+                        assembly.GetName().Name,
+                        manifest.RouteIdentifier,
+                        match.GetType().FullName,
+                        type.FullName);
+                    return null;
+                }
+
+                match = module;
             }
+
+            if (match is null)
+            {
+                logger.LogError(
+                    "Plugin assembly [{Assembly}] has no IGameModule implementation whose Manifest.RouteIdentifier matches the on-disk plugin.json route [{Route}]; skipping.",
+                    assembly.GetName().Name,
+                    manifest.RouteIdentifier);
+            }
+
+            return match;
         }
 
         /// <summary>
@@ -265,16 +293,12 @@ namespace KnockBox.Core.Plugins
                 using var stream = File.OpenRead(depsJsonPath);
                 using var doc = JsonDocument.Parse(stream);
 
-                // The shape of deps.json is `{ "libraries": { "Name/Version": { ... } }, ... }`.
-                // Walking `libraries` gives us every transitive package id; that's the
-                // simplest surface to match ForbiddenPluginDependencies against.
                 if (!doc.RootElement.TryGetProperty("libraries", out var libraries) ||
                     libraries.ValueKind != JsonValueKind.Object)
                     return null;
 
                 foreach (var library in libraries.EnumerateObject())
                 {
-                    // Entries are keyed "{Id}/{Version}"; take the id half.
                     var slashIndex = library.Name.IndexOf('/');
                     var id = slashIndex > 0 ? library.Name[..slashIndex] : library.Name;
 
@@ -286,11 +310,6 @@ namespace KnockBox.Core.Plugins
             }
             catch (Exception)
             {
-                // IO failure (racy delete, permissions) or malformed JSON: we
-                // can't enforce the guard here. The assembly load that follows
-                // will fail with its own clearer error if the plugin is truly
-                // broken; a well-formed plugin with a quirky deps.json simply
-                // skips the forbidden-dep check.
                 return null;
             }
         }
@@ -317,6 +336,38 @@ namespace KnockBox.Core.Plugins
                     moduleType.Assembly.GetName().Name);
                 return null;
             }
+        }
+
+        /// <summary>
+        /// Returns <c>true</c> if the on-disk manifest and the module's reported
+        /// manifest agree on every identity and capability field. On mismatch
+        /// sets <paramref name="disagreement"/> to a short human-readable reason.
+        /// </summary>
+        internal static bool ManifestsAgree(
+            IPluginManifest onDisk,
+            IPluginManifest fromModule,
+            out string disagreement)
+        {
+            if (!string.Equals(onDisk.Name, fromModule.Name, StringComparison.Ordinal))
+            { disagreement = $"Name disk=[{onDisk.Name}] code=[{fromModule.Name}]"; return false; }
+            if (!string.Equals(onDisk.Description, fromModule.Description, StringComparison.Ordinal))
+            { disagreement = $"Description disk=[{onDisk.Description}] code=[{fromModule.Description}]"; return false; }
+            if (!string.Equals(onDisk.RouteIdentifier, fromModule.RouteIdentifier, StringComparison.Ordinal))
+            { disagreement = $"RouteIdentifier disk=[{onDisk.RouteIdentifier}] code=[{fromModule.RouteIdentifier}]"; return false; }
+            if (!string.Equals(onDisk.EntryAssembly, fromModule.EntryAssembly, StringComparison.Ordinal))
+            { disagreement = $"EntryAssembly disk=[{onDisk.EntryAssembly}] code=[{fromModule.EntryAssembly}]"; return false; }
+            if (onDisk.Version != fromModule.Version)
+            { disagreement = $"Version disk=[{onDisk.Version}] code=[{fromModule.Version}]"; return false; }
+            if (!onDisk.Capabilities.SetEquals(fromModule.Capabilities))
+            {
+                disagreement =
+                    $"Capabilities disk=[{string.Join(',', onDisk.Capabilities)}] " +
+                    $"code=[{string.Join(',', fromModule.Capabilities)}]";
+                return false;
+            }
+
+            disagreement = string.Empty;
+            return true;
         }
     }
 }
