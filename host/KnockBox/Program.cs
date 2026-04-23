@@ -104,6 +104,10 @@ namespace KnockBox
             // ── Middleware pipeline ───────────────────────────────────────────
             app.UseForwardedHeaders();
 
+            // Explicit UseRouting so DefaultPasswordRedirectMiddleware can read
+            // endpoint metadata via context.GetEndpoint().
+            app.UseRouting();
+
             app.UseAuthentication();
             app.UseAuthorization();
 
@@ -116,30 +120,13 @@ namespace KnockBox
             // Initialized" 503 interstitial until an operator sets a password.
             app.UseMiddleware<AdminNotInitializedMiddleware>(adminOptions.Port);
 
-            // If the admin is still using the default bootstrap password, force a
-            // password change before any other admin page renders.
-            app.Use(async (ctx, next) =>
-            {
-                var path = ctx.Request.Path.Value ?? string.Empty;
-                var isAdminPath = path.StartsWith("/admin", StringComparison.OrdinalIgnoreCase);
-                var isExempt =
-                    path.StartsWith("/admin/changepassword", StringComparison.OrdinalIgnoreCase)
-                    || path.StartsWith("/admin/login", StringComparison.OrdinalIgnoreCase)
-                    || path.StartsWith("/admin/logout", StringComparison.OrdinalIgnoreCase)
-                    || path.StartsWith("/admin/admin.css", StringComparison.OrdinalIgnoreCase);
-
-                if (isAdminPath && !isExempt && ctx.User?.Identity?.IsAuthenticated == true)
-                {
-                    var settings = ctx.RequestServices.GetRequiredService<IAdminSettingsService>();
-                    if (settings.IsPasswordDefault())
-                    {
-                        ctx.Response.Redirect("/admin/changepassword");
-                        return;
-                    }
-                }
-
-                await next();
-            });
+            // While the default bootstrap password is still in effect, force
+            // authenticated admins onto /admin/changepassword. Exempt endpoints
+            // opt in via [AllowWithDefaultPassword] (Login, Logout,
+            // ChangePassword) — endpoint metadata rather than path prefixes so
+            // a new admin page that needs bootstrap access is one attribute
+            // away instead of a middleware edit.
+            app.UseMiddleware<DefaultPasswordRedirectMiddleware>();
 
             // ── Endpoints ────────────────────────────────────────────────────
             app.MapKnockBoxPlatformEndpoints<App>();

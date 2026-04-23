@@ -142,7 +142,7 @@ Deployment consequences:
 
 - **Do not bind-mount `games/`** from a user-writable volume in Docker. Bake plugins into the image at build time so the running container's `games/` is read-only from the host's perspective.
 - Treat `games/` in the published artifact the same way you treat `KnockBox.dll` itself — changes require a full release review, not a hot-patch drop.
-- If third-party plugins ever become part of the story, this section must be revisited; the current model assumes every plugin is first-party and ships in the same release cycle as the host.
+- Third-party plugins are opt-in via the admin toggle (off by default) and are loaded from `data/games/` (volume-mounted). The trust model does **not** change for third-party plugins — they run with the same full-host privileges as first-party code. Operators enabling the toggle accept the same trust posture as shipping the plugin in the first-party release artifact. See [`../../../README.md#installing-third-party-plugins`](../../../README.md) for the operator-facing warnings and [`../../../docs/making-a-game-plugin.md#trust-model`](../../../docs/making-a-game-plugin.md) for the plugin-author guidance.
 
 ---
 

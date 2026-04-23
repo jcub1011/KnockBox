@@ -34,6 +34,29 @@ A plugin's lifecycle in one paragraph: the host's `PluginLoader` scans a directo
 
 ---
 
+## Trust model
+
+> [!WARNING]
+> **Your plugin runs inside the host process with no sandbox.** When an operator drops your DLL into their `data/games/` folder, your code gets the same privileges as the host binary: full filesystem access, full network access, the ability to read every Blazor circuit's traffic, and a non-collectible `AssemblyLoadContext` that survives for the life of the process. This isn't a constraint we can tighten in code — it's a property of runtime plugin loading. Plugin authors and plugin operators both take on responsibility.
+
+What this means for you as a **plugin author**:
+
+- **Do not bundle secrets.** Anything shipped in your DLL or `wwwroot/` is visible to anyone who runs your plugin.
+- **Sign your releases.** GitHub Releases with SHA-256 checksums at minimum; signed NuGet or signed artifacts preferred. Operators have no other way to verify they're running what you shipped.
+- **Pin your dependencies.** Transitive deps resolve from your plugin folder via `AssemblyDependencyResolver`. A compromised transitive package ships in your release.
+- **Document your trust posture.** Your README should tell operators what your plugin reads, writes, and sends on the network. The ALC isolation does not prevent any of that.
+- **Disclose security issues responsibly.** An exploitable bug in your plugin is an exploitable bug in every host that runs it.
+
+What this means for a **plugin operator** installing your plugin:
+
+- The admin third-party-plugins toggle is off by default. Enabling it is an explicit trust decision.
+- Only install plugins from sources the operator knows and can verify.
+- Protect `data/games/` with filesystem ACLs; anyone with write access can execute arbitrary code inside the host.
+
+See the [host README's "Installing third-party plugins"](../README.md#installing-third-party-plugins) section for the operator-facing checklist.
+
+---
+
 ## Prerequisites
 
 - **.NET 10 SDK**

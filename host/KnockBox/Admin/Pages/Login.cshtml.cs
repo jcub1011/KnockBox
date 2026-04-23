@@ -8,6 +8,7 @@ using System.Security.Claims;
 
 namespace KnockBox.Admin.Pages
 {
+    [AllowWithDefaultPassword]
     public sealed class LoginModel : PageModel
     {
         private const int MinimumPasswordLength = 8;

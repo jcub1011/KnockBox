@@ -124,11 +124,16 @@ namespace KnockBox.Services.Logic.Admin
 
             try
             {
-                // Is this a legacy plaintext password or a hash?
                 if (!_passwordHash.StartsWith("v1:"))
                 {
-                    // For migrating plaintext password from HEAD to hashing.
-                    return PasswordHash.FixedTimeEquals(plaintext, _passwordHash);
+                    // Pre-1.0 legacy shapes (plaintext in `password` or
+                    // `passwordHash`) are no longer accepted. A non-v1 value on
+                    // disk indicates either a corrupt file or a pre-v1 deployment;
+                    // the operator must reset the admin password.
+                    _logger.LogWarning(
+                        "Admin password hash has an unrecognized format (expected `v1:` prefix). " +
+                        "Delete the settings file to reset to the bootstrap password.");
+                    return false;
                 }
 
                 var parts = _passwordHash.Split(':');
@@ -236,7 +241,7 @@ namespace KnockBox.Services.Logic.Admin
             var doc = JsonSerializer.Deserialize<PersistedSettings>(stream, JsonOptions);
             
             _enableThirdPartyPlugins = doc?.EnableThirdPartyPlugins ?? false;
-            _passwordHash = doc?.PasswordHash ?? doc?.Password;
+            _passwordHash = doc?.PasswordHash;
 
             _logger.LogInformation(
                 "Loaded admin settings from [{Path}]: EnableThirdPartyPlugins={Value}, CustomPassword={HasPassword}.",
@@ -302,8 +307,7 @@ namespace KnockBox.Services.Logic.Admin
 
         private sealed record PersistedSettings(
             [property: JsonPropertyName("enableThirdPartyPlugins")] bool EnableThirdPartyPlugins,
-            [property: JsonPropertyName("passwordHash")] string? PasswordHash = null,
-            [property: JsonPropertyName("password")] string? Password = null);
+            [property: JsonPropertyName("passwordHash")] string? PasswordHash = null);
     }
 
     /// <summary>

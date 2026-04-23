@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace KnockBox.Admin.Pages
 {
+    [AllowWithDefaultPassword]
     public sealed class LogoutModel : PageModel
     {
         public async Task<IActionResult> OnGetAsync()

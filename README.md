@@ -23,6 +23,21 @@ The authoritative architecture reference (for both workflows) is [`host/KnockBox
 | Run host tests | `dotnet test host/KnockBox.Host.slnx` |
 | Docker (repo root) | `docker compose up --build` |
 
+## Installing third-party plugins
+
+> [!WARNING]
+> **Third-party plugins run with the full privileges of the host process.** There is no sandbox, no code-signing check, and no manifest allowlist. A plugin that implements `IGameModule` can execute arbitrary code at host startup, read and write any file the host can reach, and observe every Blazor circuit's traffic. Treat the contents of your `data/games/` directory as trusted as the host binary itself.
+
+Operator checklist before dropping a plugin into `data/games/`:
+
+- **Source.** Only install plugins from authors you trust. "Public on NuGet" is not the same as "safe to run in your process."
+- **Verify.** Compare checksums against the author's release notes. If the author provides signed artifacts, verify the signature.
+- **Isolate `data/games/`.** Restrict write access with filesystem ACLs; never bind-mount it from a user-writable volume. The host reads this directory at startup — anyone who can write here can execute arbitrary code inside the host.
+- **Third-party toggle is off by default.** The admin page's "enable third-party plugins" switch is off until you explicitly turn it on. That's a load-bearing default, not an inconvenience.
+- **Stay current.** Keep the host and plugins up to date; security fixes affect both sides of the ALC boundary.
+
+Plugin authors: see [`docs/making-a-game-plugin.md`](docs/making-a-game-plugin.md) for the packaging and trust-model obligations you owe your downstream operators.
+
 ## How the plugin system works (1-minute mental model)
 
 - The host `KnockBox.csproj` references plugins with `ReferenceOutputAssembly="false" Private="false"`. Those references exist **only** to make the plugins build transitively — the host takes no compile-time dependency on plugin types.

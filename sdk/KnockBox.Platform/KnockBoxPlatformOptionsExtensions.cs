@@ -22,13 +22,8 @@ public static class KnockBoxPlatformOptionsExtensions
         this KnockBoxPlatformOptions options)
         where TModule : IGameModule, new()
     {
-        var module = new TModule();
-        options.ExplicitModules.Add(module);
-
-        var assembly = typeof(TModule).Assembly;
-        if (!options.ExplicitAssemblies.Contains(assembly))
-            options.ExplicitAssemblies.Add(assembly);
-
+        options.AddExplicitModule(new TModule());
+        options.AddExplicitAssembly(typeof(TModule).Assembly);
         return options;
     }
 }

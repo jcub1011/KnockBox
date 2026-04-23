@@ -177,6 +177,81 @@ namespace KnockBox.Tests.Unit.Services.Logic.Admin
         }
 
         [TestMethod]
+        public void LegacyPlaintextPassword_InJsonPasswordField_IsIgnored()
+        {
+            // Pre-1.0 format: `password` field at the root. We no longer load it.
+            var path = Path.Combine(_tempRoot, _settingsFileName);
+            File.WriteAllText(path, """{"enableThirdPartyPlugins":false,"password":"plaintext"}""");
+
+            var service = CreateService(defaultPassword: "");
+
+            Assert.IsTrue(service.IsPasswordDefault(),
+                "A legacy `password` field must be ignored — the service must look uninitialized.");
+            Assert.IsFalse(service.VerifyAdminPassword("plaintext"),
+                "Legacy plaintext values must not authenticate.");
+            Assert.IsFalse(service.IsAdminPasswordSet(),
+                "No persisted hash and no default — IsAdminPasswordSet must be false.");
+        }
+
+        [TestMethod]
+        public void LegacyNonV1PasswordHash_IsIgnored_AndLogsWarning()
+        {
+            // Pre-1.0 interim format: plaintext stored in `passwordHash` as a
+            // migration bridge. The bridge has been removed — any non-`v1:` value
+            // must be rejected so the operator resets.
+            var path = Path.Combine(_tempRoot, _settingsFileName);
+            File.WriteAllText(path, """{"enableThirdPartyPlugins":false,"passwordHash":"plaintext"}""");
+
+            var service = CreateService(defaultPassword: "");
+
+            Assert.IsFalse(service.IsPasswordDefault(),
+                "A non-empty hash string flips IsPasswordDefault to false — the file is not 'uninitialized', it's unrecognized.");
+            Assert.IsFalse(service.VerifyAdminPassword("plaintext"),
+                "Non-v1 hash format must not authenticate.");
+        }
+
+        [TestMethod]
+        public async Task Backup_Mirrors_Main_AfterSetAdminPassword()
+        {
+            var service = CreateService();
+            await service.SetAdminPasswordAsync("operator-secret");
+
+            var path = Path.Combine(_tempRoot, _settingsFileName);
+            var backupPath = path + ".bak";
+
+            Assert.IsTrue(File.Exists(path));
+            Assert.IsTrue(File.Exists(backupPath));
+
+            var mainContents = await File.ReadAllTextAsync(path);
+            var backupContents = await File.ReadAllTextAsync(backupPath);
+
+            Assert.AreEqual(mainContents, backupContents,
+                "Backup is written *after* the atomic rename, so it must mirror the new state byte-for-byte.");
+            Assert.Contains("\"passwordHash\":", mainContents);
+            Assert.Contains("\"v1:", mainContents);
+        }
+
+        [TestMethod]
+        public async Task LoadFromBackup_VerifiesCurrentPassword_NotPrior()
+        {
+            var service1 = CreateService();
+            await service1.SetAdminPasswordAsync("first-secret");
+            await service1.SetAdminPasswordAsync("current-secret");
+
+            // Simulate a crash-time scenario: main file is gone, only the backup
+            // remains. The backup must hold the *current* password, not "first-secret".
+            var path = Path.Combine(_tempRoot, _settingsFileName);
+            File.WriteAllText(path, "{ not valid json");
+
+            var service2 = CreateService();
+
+            Assert.IsTrue(service2.VerifyAdminPassword("current-secret"),
+                "Backup must hold the most-recently-persisted password.");
+            Assert.IsFalse(service2.VerifyAdminPassword("first-secret"),
+                "An earlier password must not be recoverable from the backup.");
+        }
+
+        [TestMethod]
         public async Task CorruptedFile_AndNoBackup_ThrowsException()
         {
             var service1 = CreateService();

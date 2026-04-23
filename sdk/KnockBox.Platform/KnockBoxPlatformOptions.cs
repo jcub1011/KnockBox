@@ -33,11 +33,22 @@ public sealed class KnockBoxPlatformOptions
     /// </summary>
     public IList<string> PluginsPaths { get; } = ["games"];
 
+    private readonly List<IGameModule> _explicitModules = [];
+    private readonly List<Assembly> _explicitAssemblies = [];
+
     /// <summary>Modules registered via <see cref="KnockBoxPlatformOptionsExtensions.AddGameModule{T}"/>.</summary>
-    internal List<IGameModule> ExplicitModules { get; } = [];
+    internal IReadOnlyList<IGameModule> ExplicitModules => _explicitModules;
 
     /// <summary>Assemblies registered via explicit module registration.</summary>
-    internal List<Assembly> ExplicitAssemblies { get; } = [];
+    internal IReadOnlyList<Assembly> ExplicitAssemblies => _explicitAssemblies;
+
+    internal void AddExplicitModule(IGameModule module) => _explicitModules.Add(module);
+
+    internal void AddExplicitAssembly(Assembly assembly)
+    {
+        if (!_explicitAssemblies.Contains(assembly))
+            _explicitAssemblies.Add(assembly);
+    }
 }
 
 /// <summary>

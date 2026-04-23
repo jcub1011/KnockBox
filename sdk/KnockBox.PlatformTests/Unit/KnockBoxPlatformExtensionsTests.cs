@@ -114,6 +114,55 @@ public sealed class KnockBoxPlatformExtensionsTests
         Assert.AreSame(availability.GetAll(), availability.GetAll());
     }
 
+    [TestMethod]
+    public void AddKnockBoxPlatform_RegistersLogicSharedServices_BeforePluginRegisterServices()
+    {
+        // Contract guard: by the time a plugin's RegisterServices runs, the
+        // platform's core logic services must already be visible in the
+        // collection. Plugins may rely on those services (via the container
+        // they receive later); if the order ever flips, the dependency
+        // silently breaks at resolve time.
+        var capturingModule = new ServiceCollectionSnapshotModule();
+
+        var builder = WebApplication.CreateBuilder();
+        builder.AddKnockBoxPlatform(o =>
+        {
+            o.PluginDiscovery = PluginDiscoveryMode.Explicit;
+            o.AddExplicitModule(capturingModule);
+        });
+
+        using var _ = builder.Build();
+
+        Assert.IsNotNull(capturingModule.Snapshot,
+            "Expected the module's RegisterServices to run during AddKnockBoxPlatform.");
+        Assert.IsTrue(capturingModule.SawLogicSharedServices,
+            "IProfanityFilter / ILobbyCodeService / IRandomNumberService must be registered before plugins run.");
+    }
+
+    [TestMethod]
+    public void AddKnockBoxPlatform_PluginRegisterServices_RunsAfterRepositoriesAndStateServices()
+    {
+        // Smoke assertion for the RegisterRepositories -> RegisterValidators ->
+        // RegisterStateServices -> plugins ordering. We don't want to hardwire
+        // specific internal service types here; we just assert that *some*
+        // services were already in the collection before the plugin ran.
+        var capturingModule = new ServiceCollectionSnapshotModule();
+
+        var builder = WebApplication.CreateBuilder();
+        var beforeKnockboxCount = builder.Services.Count;
+        builder.AddKnockBoxPlatform(o =>
+        {
+            o.PluginDiscovery = PluginDiscoveryMode.Explicit;
+            o.AddExplicitModule(capturingModule);
+        });
+        using var _ = builder.Build();
+
+        Assert.IsNotNull(capturingModule.Snapshot);
+        Assert.IsTrue(
+            capturingModule.Snapshot!.Count > beforeKnockboxCount + 5,
+            "Plugin's RegisterServices should have run after repos/validators/state/logic-shared were registered.");
+    }
+
     // Note: the duplicate-plugin-folder guard in MapPluginStaticAssets is not
     // covered by an automated test because it can only trigger on a
     // case-sensitive filesystem (two sibling dirs "Foo" and "foo"). Windows
@@ -143,6 +192,30 @@ public sealed class KnockBoxPlatformExtensionsTests
         public override Task<Result> StartAsync(
             User host, AbstractGameState state, CancellationToken ct = default)
             => throw new NotImplementedException();
+    }
+
+    private sealed class ServiceCollectionSnapshotModule : IGameModule
+    {
+        public string Name => "Snapshot";
+        public string Description => "Test module that captures the IServiceCollection state at RegisterServices time.";
+        public string RouteIdentifier => "snapshot-test";
+
+        public List<ServiceDescriptor>? Snapshot { get; private set; }
+        public bool SawLogicSharedServices { get; private set; }
+
+        public void RegisterServices(IServiceCollection services)
+        {
+            Snapshot = [.. services];
+            SawLogicSharedServices =
+                services.Any(d => d.ServiceType == typeof(KnockBox.Platform.Filtering.IProfanityFilter))
+                && services.Any(d => d.ServiceType == typeof(KnockBox.Platform.Games.ILobbyCodeService))
+                && services.Any(d => d.ServiceType == typeof(KnockBox.Core.Services.Logic.RandomGeneration.IRandomNumberService));
+
+            // Also register our own engine so the pipeline completes normally.
+            services.AddGameEngine<FakeEngine>(RouteIdentifier);
+        }
+
+        public RenderFragment GetButtonContent() => _ => { };
     }
 
     private sealed class StubAvailabilityService : IGameAvailabilityService

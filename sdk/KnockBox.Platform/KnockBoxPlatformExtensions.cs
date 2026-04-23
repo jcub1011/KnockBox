@@ -152,9 +152,12 @@ public static class KnockBoxPlatformExtensions
             pluginLoadResult = new PluginLoadResult(modules, assemblies.Distinct().ToList());
         }
 
-        // Logic registrations (platform version — no admin services)
+        // Logic registrations (platform version — no admin services).
+        // `LogicRegistrations` is static, so we can't use the generic overload —
+        // typeof(...).FullName keeps the logger category in sync with renames
+        // without needing a hardcoded string literal.
         var registrationLogger = bootstrapLoggerFactory
-            .CreateLogger("KnockBox.Services.Registrations.Logic.LogicRegistrations");
+            .CreateLogger(typeof(LogicRegistrations).FullName!);
         builder.Services.RegisterLogic(pluginLoadResult, registrationLogger);
 
         // Navigation + drawing services
