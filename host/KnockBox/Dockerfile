@@ -13,7 +13,7 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 COPY ["host/KnockBox/KnockBox.csproj", "host/KnockBox/"]
-RUN dotnet restore "./host/KnockBox/KnockBox.csproj"
+RUN dotnet restore "./host/KnockBox/KnockBox.csproj" -r linux-x64
 COPY . .
 WORKDIR "/src/host/KnockBox"
 RUN dotnet build "./KnockBox.csproj" -c $BUILD_CONFIGURATION -o /app/build
@@ -21,7 +21,7 @@ RUN dotnet build "./KnockBox.csproj" -c $BUILD_CONFIGURATION -o /app/build
 # This stage is used to publish the service project to be copied to the final stage
 FROM build AS publish
 ARG BUILD_CONFIGURATION=Release
-RUN dotnet publish "./KnockBox.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
+RUN dotnet publish "./KnockBox.csproj" -c $BUILD_CONFIGURATION -r linux-x64 --no-self-contained -o /app/publish /p:UseAppHost=false
 
 # This stage is used in production or when running from VS in regular mode (Default when not using the Debug configuration)
 FROM base AS final
