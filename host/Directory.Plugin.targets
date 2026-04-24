@@ -32,6 +32,25 @@
   -->
 
   <!--
+    ReadyToRun (R2R) ahead-of-time compilation for every plugin. Activates
+    only on Release publishes that supply a RuntimeIdentifier (matches the
+    host's gating). Composite must stay false: a plugin loads into its own
+    PluginLoadContext but defers KnockBox.Core/Platform/BCL to the default
+    ALC. Composite-baking those into the plugin image would produce duplicate
+    types and break ALC type identity across the host/plugin boundary.
+
+    Plugins are not published as part of the host's normal publish chain
+    (ReferenceOutputAssembly="false" only triggers Build); the host csproj
+    has a PublishPluginProjects target that explicitly invokes Publish on
+    each plugin so these properties take effect.
+  -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Release' AND '$(RuntimeIdentifier)' != ''">
+    <PublishReadyToRun>true</PublishReadyToRun>
+    <PublishReadyToRunComposite>false</PublishReadyToRunComposite>
+    <PublishReadyToRunShowWarnings>false</PublishReadyToRunShowWarnings>
+  </PropertyGroup>
+
+  <!--
     plugin.json is mandatory for every plugin project. Fail fast at build time
     if it's missing so the author sees the error before publish, not at host
     startup. Runs BEFORE Build so it short-circuits the rest of the build.
@@ -108,6 +127,30 @@
     <Copy SourceFiles="@(WwwRootFiles)"
           DestinationFolder="$(PluginDestDir)wwwroot\%(RecursiveDir)"
           Condition="'@(WwwRootFiles)' != ''" />
+  </Target>
+
+  <!--
+    Re-stage the R2R-compiled DLL and (RID-qualified) deps.json over the IL
+    versions that PublishPlugin (AfterTargets="Build") wrote earlier. Only the
+    DLL and deps.json change between Build and Publish under R2R; the rest of
+    the staged artifacts (PDB, plugin.json, scoped CSS, staticwebassets,
+    wwwroot, KnockBox.Tooling.*) are identical and don't need re-copying.
+
+    This target only fires when the plugin is being published (the host's
+    PublishPluginProjects target invokes that during the host's Publish).
+  -->
+  <Target Name="PublishPluginAfterPublish" AfterTargets="Publish">
+    <PropertyGroup>
+      <PluginDestDir>$(MSBuildThisFileDirectory)KnockBox\bin\$(Configuration)\$(TargetFramework)\games\$(TargetName)\</PluginDestDir>
+    </PropertyGroup>
+    <ItemGroup>
+      <PluginPublishedPrimary Include="$(PublishDir)$(TargetName).dll" />
+      <PluginPublishedPrimary Include="$(PublishDir)$(TargetName).deps.json"
+                              Condition="Exists('$(PublishDir)$(TargetName).deps.json')" />
+    </ItemGroup>
+    <Copy SourceFiles="@(PluginPublishedPrimary)"
+          DestinationFolder="$(PluginDestDir)"
+          OverwriteReadOnlyFiles="true" />
   </Target>
 
 </Project>
