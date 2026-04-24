@@ -1,6 +1,6 @@
 .spd-toast-holder {
     position: fixed;
-    bottom: max(clamp(16px, 3vh, 28px), calc(env(safe-area-inset-bottom) + 16px));
+    top: max(clamp(64px, 9vh, 88px), calc(env(safe-area-inset-top) + 64px));
     left: 50%;
     transform: translateX(-50%);
     z-index: 40;

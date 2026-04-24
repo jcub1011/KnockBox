@@ -1,7 +1,5 @@
 <Solution>
   <Project Path="../docker-compose.dcproj">
-    <BuildDependency Project="KnockBox.CardCounter/KnockBox.CardCounter.csproj" />
-    <BuildDependency Project="KnockBox.DiceSimulator/KnockBox.DiceSimulator.csproj" />
     <Build />
   </Project>
   <Project Path="../sdk/KnockBox.Core/KnockBox.Core.csproj" />

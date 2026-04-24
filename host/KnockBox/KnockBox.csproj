@@ -6,7 +6,23 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
   </PropertyGroup>
-	
+
+  <!--
+    ReadyToRun (R2R) ahead-of-time compilation for the host. Only activates on
+    Release publishes that supply a RuntimeIdentifier (Dockerfile and the
+    release-host.yml matrix do; dev `dotnet build`/`dotnet run` do not).
+    Composite mode bundles the host's compile-time closure (KnockBox.Core,
+    KnockBox.Platform, ASP.NET/Blazor) into one native image. Plugins are
+    compile-time unreferenced (ReferenceOutputAssembly="false" below) and are
+    therefore excluded from the composite — they get their own per-assembly
+    R2R image via Directory.Plugin.targets.
+  -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Release' AND '$(RuntimeIdentifier)' != ''">
+    <PublishReadyToRun>true</PublishReadyToRun>
+    <PublishReadyToRunComposite>true</PublishReadyToRunComposite>
+    <PublishReadyToRunShowWarnings>false</PublishReadyToRunShowWarnings>
+  </PropertyGroup>
+
   <PropertyGroup>
 	<ContainerRegistry>registry.hub.docker.com</ContainerRegistry>
 	<ContainerRepository>jabobb/knockbox</ContainerRepository>
@@ -70,6 +86,44 @@
   <PropertyGroup>
     <PluginStagingDir>$(MSBuildProjectDirectory)\bin\$(Configuration)\$(TargetFramework)\games\</PluginStagingDir>
   </PropertyGroup>
+
+  <!--
+    Plugin projects are referenced with ReferenceOutputAssembly="false", which
+    means the host's `dotnet publish` only triggers `Build` on each plugin
+    (not `Publish`). That's fine for IL builds — Directory.Plugin.targets
+    stages the build output to bin/.../games/ via its AfterTargets="Build"
+    target. But R2R compilation is a publish-time operation, so plugins need
+    `Publish` invoked explicitly to get R2R'd.
+
+    This target runs after the host's Publish, before CopyPluginsToPublish,
+    and invokes Publish on every plugin ProjectReference. Each plugin's
+    AfterTargets="Publish" target (in Directory.Plugin.targets) then
+    overwrites its IL DLL/deps.json in the staging dir with the R2R-compiled
+    publish output, which CopyPluginsToPublish then mirrors into
+    $(PublishDir)games/.
+
+    Conditional on RuntimeIdentifier so non-RID publishes (which can't do
+    R2R anyway) skip this and continue using build-only plugin output.
+  -->
+  <Target Name="PublishPluginProjects"
+          AfterTargets="Publish"
+          BeforeTargets="CopyPluginsToPublish"
+          Condition="'$(RuntimeIdentifier)' != ''">
+    <ItemGroup>
+      <!--
+        Qualify the metadata as %(ProjectReference.ReferenceOutputAssembly).
+        Unqualified %(ReferenceOutputAssembly) batches across all items in the
+        list and errors if any item doesn't define the metadata — and the
+        KnockBox.Core / KnockBox.Platform references don't.
+      -->
+      <_PluginProjectsToPublish Include="@(ProjectReference)"
+                                Condition="'%(ProjectReference.ReferenceOutputAssembly)' == 'false'" />
+    </ItemGroup>
+    <MSBuild Projects="@(_PluginProjectsToPublish)"
+             Targets="Publish"
+             Properties="Configuration=$(Configuration);TargetFramework=$(TargetFramework);RuntimeIdentifier=$(RuntimeIdentifier);SelfContained=false" />
+  </Target>
+
   <Target Name="CopyPluginsToPublish" AfterTargets="Publish">
     <ItemGroup>
       <PluginPublishFiles Include="$(PluginStagingDir)**\*.*" />

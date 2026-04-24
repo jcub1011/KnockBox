@@ -180,6 +180,7 @@
     .spd-opp-panel {
         width: clamp(148px, 46vw, 200px);
         padding: 6px 8px;
+        background: rgba(15, 20, 38, 0.5);
     }
     .spd-opp-row {
         padding: 3px 6px;
