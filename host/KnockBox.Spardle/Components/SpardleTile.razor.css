@@ -6,7 +6,6 @@
     justify-content: center;
     gap: 0.55rem;
     padding: 1.75rem 1.25rem 1.5rem;
-    min-height: 200px;
     overflow: hidden;
     background:
         radial-gradient(120% 90% at 50% 0%, #1a1f3b 0%, #0f1426 55%, #070912 100%);

@@ -16,7 +16,7 @@
     --admin-warn: #f7b955;
 }
 
-body.admin-login-body,
+.admin-login-body,
 .admin-shell {
     margin: 0;
     background: var(--admin-bg);
@@ -27,7 +27,7 @@ body.admin-login-body,
 
 /* ── Login ────────────────────────────────────────────────────────── */
 
-body.admin-login-body {
+.admin-login-body {
     display: grid;
     place-items: center;
 }

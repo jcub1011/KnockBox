@@ -1,4 +1,5 @@
 @page "/room/task-master/{ObfuscatedRoomCode}"
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
 
 @inherits LobbyPageBase<TaskMasterGameState>
 @using KnockBox.TaskMaster.Services.State.Games
