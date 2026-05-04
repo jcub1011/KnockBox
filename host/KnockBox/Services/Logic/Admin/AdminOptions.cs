@@ -8,7 +8,7 @@ namespace KnockBox.Services.Logic.Admin
     /// <remarks>
     /// Lives in the host assembly (not the Platform SDK package) so credentials
     /// and admin paths never reach the plugin-facing surface. Marked public so
-    /// Razor Pages (e.g. the login page model) can accept it through DI.
+    /// the admin login component can accept it through DI.
     /// </remarks>
     public sealed class AdminOptions
     {

@@ -60,6 +60,10 @@
   <ItemGroup>
     <!-- FluentValidation — used by the platform's validators. -->
     <PackageReference Include="FluentValidation" Version="12.1.1" />
+    <!-- MessagePack hub protocol for SignalR. Smaller wire format and faster
+         serialization than the default JSON protocol; transparent to handlers
+         and to anything subscribing to StateChangedEventManager. -->
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Protocols.MessagePack" Version="10.0.0" />
     <!-- Serilog stack — the platform ships a default request-logging pipeline
          and a bootstrap logger used during plugin discovery (before the host's
          logging is fully wired up). -->

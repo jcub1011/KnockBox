@@ -1,0 +1,218 @@
+@page "/admin/login"
+@layout AdminLoginLayout
+@using System.Security.Claims
+@using KnockBox.Admin
+@using KnockBox.Components.Admin
+@using KnockBox.Services.Logic.Admin
+@using Microsoft.AspNetCore.Authentication
+@using Microsoft.AspNetCore.Authentication.Cookies
+@using Microsoft.Extensions.Options
+@attribute [AllowWithDefaultPassword]
+@inject IOptions<AdminOptions> Options
+@inject IAdminSettingsService Settings
+@inject ILogger<Login> Logger
+@inject NavigationManager Nav
+
+<PageTitle>KnockBox Admin @(IsInitMode ? "- Initialize" : "- Sign In")</PageTitle>
+
+<div class="admin-login-body">
+    <main class="admin-login-card">
+        @if (IsInitMode)
+        {
+            <h1 class="admin-login-title">Initialize Admin Account</h1>
+            <p class="admin-login-subtitle">
+                No admin account has been configured for this deployment.
+                Choose a password to activate the <code>@Options.Value.Username</code>
+                account. The public game interface is disabled until this step completes.
+            </p>
+
+            @if (!string.IsNullOrEmpty(_error))
+            {
+                <div class="admin-login-error" role="alert">@_error</div>
+            }
+
+            <form method="post" @formname="admin-auth" @onsubmit="OnPostAsync">
+                <AntiforgeryToken />
+                <label class="admin-login-label" for="password">New password (min @MinimumPasswordLength characters)</label>
+                <input id="password" name="Input.Password" type="password" autocomplete="new-password"
+                       minlength="@MinimumPasswordLength" required autofocus />
+
+                <label class="admin-login-label" for="confirmPassword">Confirm password</label>
+                <input id="confirmPassword" name="Input.ConfirmPassword" type="password" autocomplete="new-password"
+                       minlength="@MinimumPasswordLength" required />
+
+                <button class="admin-login-submit" type="submit">Initialize</button>
+            </form>
+        }
+        else
+        {
+            <h1 class="admin-login-title">KnockBox Admin</h1>
+            <p class="admin-login-subtitle">Sign in to manage the host.</p>
+
+            @if (!string.IsNullOrEmpty(_error))
+            {
+                <div class="admin-login-error" role="alert">@_error</div>
+            }
+
+            <form method="post" @formname="admin-auth" @onsubmit="OnPostAsync">
+                <AntiforgeryToken />
+                <label class="admin-login-label" for="username">Username</label>
+                <input id="username" name="Input.Username" type="text" autocomplete="username"
+                       value="@(Input?.Username)" required autofocus />
+
+                <label class="admin-login-label" for="password">Password</label>
+                <input id="password" name="Input.Password" type="password" autocomplete="current-password" required />
+
+                <button class="admin-login-submit" type="submit">Sign in</button>
+            </form>
+        }
+    </main>
+</div>
+
+@code {
+    private const int MinimumPasswordLength = 8;
+    private string? _error;
+
+    [CascadingParameter] public HttpContext HttpContext { get; set; } = default!;
+
+    [SupplyParameterFromForm] public LoginInputModel? Input { get; set; }
+
+    [SupplyParameterFromQuery] public string? ReturnUrl { get; set; }
+
+    private bool IsInitMode => !Settings.IsAdminPasswordSet();
+
+    protected override void OnInitialized()
+    {
+        // OnGet equivalent: bounce already-authenticated users on a fresh load.
+        // Skip on POST so the form handler still runs.
+        if (HttpContext.Request.Method == "GET"
+            && HttpContext.User.Identity?.IsAuthenticated == true)
+        {
+            Nav.NavigateTo(ResolveReturnUrl(), forceLoad: true);
+        }
+    }
+
+    private async Task OnPostAsync()
+    {
+        // Re-check at submit time so a race between two operators (both
+        // seeing the init form, both submitting) collapses deterministically:
+        // whoever persists first wins; the other falls through to login.
+        if (!Settings.IsAdminPasswordSet())
+        {
+            await HandleInitAsync();
+            return;
+        }
+
+        await HandleLoginAsync();
+    }
+
+    private async Task HandleInitAsync()
+    {
+        Input ??= new LoginInputModel();
+        var password = Input.Password ?? string.Empty;
+        var confirm = Input.ConfirmPassword ?? string.Empty;
+
+        if (password.Length < MinimumPasswordLength)
+        {
+            _error = $"Password must be at least {MinimumPasswordLength} characters.";
+            Input.Password = string.Empty;
+            Input.ConfirmPassword = string.Empty;
+            return;
+        }
+
+        if (!string.Equals(password, confirm, StringComparison.Ordinal))
+        {
+            _error = "Passwords do not match.";
+            Input.Password = string.Empty;
+            Input.ConfirmPassword = string.Empty;
+            return;
+        }
+
+        await Settings.SetAdminPasswordAsync(password);
+
+        Logger.LogInformation(
+            "Admin account initialized from {RemoteIp}.",
+            HttpContext.Connection.RemoteIpAddress);
+
+        await SignInAsync();
+        Nav.NavigateTo(ResolveReturnUrl(), forceLoad: true);
+    }
+
+    private async Task HandleLoginAsync()
+    {
+        Input ??= new LoginInputModel();
+        var usernameMatches = PasswordHash.FixedTimeEquals(
+            (Input.Username ?? string.Empty).Trim(),
+            Options.Value.Username);
+        var passwordMatches = Settings.VerifyAdminPassword(Input.Password ?? string.Empty);
+
+        if (!usernameMatches || !passwordMatches)
+        {
+            Logger.LogWarning(
+                "Admin login failed for an account attempt from {RemoteIp}.",
+                HttpContext.Connection.RemoteIpAddress);
+            _error = "Invalid username or password.";
+            Input.Password = string.Empty;
+            return;
+        }
+
+        await SignInAsync();
+
+        Logger.LogInformation(
+            "Admin login succeeded for user [{Username}] from {RemoteIp}.",
+            Options.Value.Username,
+            HttpContext.Connection.RemoteIpAddress);
+
+        if (Settings.IsPasswordDefault())
+        {
+            Nav.NavigateTo("/admin/changepassword", forceLoad: true);
+            return;
+        }
+
+        Nav.NavigateTo(ResolveReturnUrl(), forceLoad: true);
+    }
+
+    private async Task SignInAsync()
+    {
+        var claims = new[]
+        {
+            new Claim(ClaimTypes.Name, Options.Value.Username),
+            new Claim(ClaimTypes.Role, "Admin"),
+        };
+        var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+        var principal = new ClaimsPrincipal(identity);
+
+        await HttpContext.SignInAsync(
+            CookieAuthenticationDefaults.AuthenticationScheme,
+            principal,
+            new AuthenticationProperties
+            {
+                IsPersistent = false,
+                AllowRefresh = true,
+            });
+    }
+
+    private string ResolveReturnUrl()
+    {
+        if (!string.IsNullOrWhiteSpace(ReturnUrl) && IsLocalRedirect(ReturnUrl))
+            return ReturnUrl;
+        return "/admin";
+    }
+
+    // Replacement for IUrlHelper.IsLocalUrl — accept rooted paths only and
+    // reject scheme-relative URLs (//evil.example) to block open-redirect.
+    private static bool IsLocalRedirect(string url)
+    {
+        if (string.IsNullOrEmpty(url)) return false;
+        if (url[0] == '/' && (url.Length == 1 || (url[1] != '/' && url[1] != '\\'))) return true;
+        if (url.Length > 1 && url[0] == '~' && url[1] == '/') return true;
+        return false;
+    }
+
+    public sealed class LoginInputModel
+    {
+        public string Username { get; set; } = string.Empty;
+        public string Password { get; set; } = string.Empty;
+        public string ConfirmPassword { get; set; } = string.Empty;
+    }
+}
