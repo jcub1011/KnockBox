@@ -83,8 +83,27 @@ public static class KnockBoxPlatformExtensions
         builder.Services.AddSingleton<IOptions<KnockBoxPlatformOptions>>(
             new OptionsWrapper<KnockBoxPlatformOptions>(options));
 
+        // MessagePack hub protocol — smaller wire format than the default JSON
+        // protocol, faster to (de)serialize. Transparent to handlers and to
+        // StateChangedEventManager subscribers.
+        builder.Services.AddSignalR().AddMessagePackProtocol();
+
         builder.Services.AddRazorComponents()
-            .AddInteractiveServerComponents();
+            .AddInteractiveServerComponents(o =>
+            {
+                // KnockBox owns its own reconnect grace period via
+                // ISessionServiceProvider (1-minute eviction keyed on user-id).
+                // The default 100 retained disconnected circuits is mostly
+                // redundant on top of that and holds full render trees in
+                // memory; lower it and align the retention window with the
+                // session grace period.
+                o.DisconnectedCircuitMaxRetained = 10;
+                o.DisconnectedCircuitRetentionPeriod = TimeSpan.FromMinutes(1);
+                // Lossy under backpressure is fine for a turn-based game UI;
+                // 4 batches is enough headroom for normal tick-to-render lag
+                // without retaining 10 batches per circuit.
+                o.MaxBufferedUnacknowledgedRenderBatches = 4;
+            });
 
         // Core service registrations
         builder.Services.RegisterRepositories();
