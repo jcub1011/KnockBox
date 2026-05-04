@@ -77,12 +77,6 @@ namespace KnockBox
 
             builder.Services.AddScoped<CircuitHandler, AdminCircuitTracker>();
 
-            // Razor Pages is used only for the admin login/logout endpoints.
-            builder.Services.AddRazorPages(options =>
-            {
-                options.RootDirectory = "/Admin/Pages";
-            });
-
             // Cookie auth + AdminOnly policy.
             builder.Services
                 .AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
@@ -130,9 +124,6 @@ namespace KnockBox
 
             // ── Endpoints ────────────────────────────────────────────────────
             app.MapKnockBoxPlatformEndpoints<App>();
-
-            // Razor Pages host the admin login/logout endpoints.
-            app.MapRazorPages();
 
             // Admin log download endpoint.
             MapAdminLogDownload(app, adminOptions.Port);

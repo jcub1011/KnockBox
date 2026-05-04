@@ -1,3 +1,5 @@
+@inject NavigationManager Nav
+
 <!DOCTYPE html>
 <html lang="en">
 
@@ -8,6 +10,15 @@
     <ResourcePreloader />
     <link rel="stylesheet" href="@Assets["_content/KnockBox.Platform/app.css"]" />
     <link rel="stylesheet" href="@Assets["KnockBox.styles.css"]" />
+    @if (IsAdminRequest())
+    {
+        @* Admin styles live on a separate port and aren't reachable from the
+           public site; emit the link here so the prerendered HTML carries it
+           regardless of whether the page is static-SSR or interactive (with
+           prerender disabled, HeadContent from inside AdminLayout never makes
+           it into the initial response). *@
+        <link rel="stylesheet" href="/admin/admin.css" />
+    }
     <link href="https://fonts.googleapis.com/css2?family=Google+Sans+Code:ital,wght@0,300..800;1,300..800&family=Lexend:wght@100..900&display=swap" rel="stylesheet">
     <ImportMap />
     <HeadOutlet @rendermode="InteractiveServer" />
@@ -20,3 +31,13 @@
 </body>
 
 </html>
+
+@code {
+    private bool IsAdminRequest()
+    {
+        var rel = Nav.ToBaseRelativePath(Nav.Uri).TrimStart('/');
+        return rel.Equals("admin", StringComparison.OrdinalIgnoreCase)
+            || rel.StartsWith("admin/", StringComparison.OrdinalIgnoreCase)
+            || rel.StartsWith("admin?", StringComparison.OrdinalIgnoreCase);
+    }
+}
