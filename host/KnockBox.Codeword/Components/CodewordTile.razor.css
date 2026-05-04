@@ -8,8 +8,6 @@
     --ctc-lavender-dim: rgba(167, 139, 250, 0.3);
     --ctc-lavender-faint: rgba(167, 139, 250, 0.15);
 
-    width: 100%;
-    height: 100%;
     padding: 14px 18px;
     background: radial-gradient(ellipse at center, #1a1a2e 0%, #0f0f1a 100%);
     box-shadow:

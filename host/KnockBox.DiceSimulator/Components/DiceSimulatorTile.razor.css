@@ -10,8 +10,6 @@
     --ds-text-muted: #9b8ec4;
     --ds-shadow: #0b0816;
 
-    width: 100%;
-    min-height: 160px;
     padding: 16px 20px 14px 20px;
     background:
         radial-gradient(ellipse at 30% 20%, rgba(168, 85, 247, 0.08) 0%, transparent 60%),

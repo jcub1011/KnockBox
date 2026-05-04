@@ -1,8 +1,6 @@
 /* ── Card Counter Tile — Casino Felt ─────────────────────────────────────── */
 
 .cc-tile {
-    width: 100%;
-    min-height: 160px;
     padding: 18px 20px 16px 20px;
     background:
         radial-gradient(ellipse at 50% 35%, #128a55 0%, #0a5c3b 55%, #053a25 100%);
