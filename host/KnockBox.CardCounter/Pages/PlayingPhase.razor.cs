@@ -1,13 +1,14 @@
 using KnockBox.CardCounter.Services.Logic.Games;
 using KnockBox.CardCounter.Services.State.Games;
 using KnockBox.CardCounter.Services.State.Games.Data;
+using KnockBox.Core.Components.Shared;
 using KnockBox.Core.Services.State.Users;
 using Microsoft.AspNetCore.Components;
 using CardCounterOperator = KnockBox.CardCounter.Services.State.Games.Operator;
 
 namespace KnockBox.CardCounter.Pages
 {
-    public partial class PlayingPhase : ComponentBase
+    public partial class PlayingPhase : DisposableComponent
     {
         [Inject] protected CardCounterGameEngine GameEngine { get; set; } = default!;
 
@@ -69,6 +70,7 @@ namespace KnockBox.CardCounter.Pages
                 // Dismiss the operator-change toast when a new balance result arrives so the
                 // two toasts never overlap.
                 _operatorChangeDismissed = true;
+                ScheduleToastDismiss(_toastKey, isOpChange: false);
             }
 
             if (!ReferenceEquals(GameState?.LastOperatorChange, _cachedOperatorChange))
@@ -79,6 +81,7 @@ namespace KnockBox.CardCounter.Pages
                 // Dismiss the balance-change toast when the operator changes so the
                 // two toasts never overlap.
                 _operatorResultDismissed = true;
+                ScheduleToastDismiss(_opChangeToastKey, isOpChange: true);
             }
 
             // Only clear transient UI state (pending card, selected target, etc.) when the
@@ -309,6 +312,34 @@ namespace KnockBox.CardCounter.Pages
             if (GameState == null || UserService.CurrentUser == null) return;
             GameEngine.NotMyMoneyCancel(UserService.CurrentUser, GameState);
             _notMyMoneyTargetId = null;
+        }
+
+        // Mirror the CSS toast animation duration in PlayingPhase.razor.css
+        // (`balanceChangeFade 3s`).
+        private static readonly TimeSpan ToastDuration = TimeSpan.FromSeconds(3);
+
+        // Schedules the toast's auto-dismiss flag without using @onanimationend
+        // (which WebKit rejects with InvalidCharacterError on iPhone Safari and
+        // tears the circuit). The captured key guards against newer toasts
+        // dismissing the displayed one prematurely.
+        private void ScheduleToastDismiss(int capturedKey, bool isOpChange)
+        {
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await Task.Delay(ToastDuration, ComponentDetached);
+                    bool stale = isOpChange
+                        ? capturedKey != _opChangeToastKey
+                        : capturedKey != _toastKey;
+                    if (stale) return;
+
+                    if (isOpChange) _operatorChangeDismissed = true;
+                    else _operatorResultDismissed = true;
+                    await InvokeAsync(StateHasChanged);
+                }
+                catch (OperationCanceledException) { }
+            });
         }
 
         protected void DismissOperatorResult()

@@ -59,7 +59,7 @@ else
             @* ── Error toast ── *@
             @if (_errorMessage is not null)
             {
-                <div @key="_errorKey" class="ctc-error-toast" @onanimationend="DismissError">
+                <div @key="_errorKey" class="ctc-error-toast">
                     <span class="ctc-error-icon">⚠️</span>
                     <span>@_errorMessage</span>
                 </div>
@@ -87,6 +87,9 @@ else
                         break;
                     case CodewordGamePhase.Reveal:
                         <RevealPhase GameState="GameState" OnError="ShowError" />
+                        break;
+                    case CodewordGamePhase.ContinueOrEndRound:
+                        <ContinueOrEndRoundPhase GameState="GameState" OnError="ShowError" />
                         break;
                     case CodewordGamePhase.GameOver:
                         <GameOverPhase GameState="GameState" />

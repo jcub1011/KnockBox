@@ -295,6 +295,7 @@ namespace KnockBox.Codeword.Services.Logic.Games.FSM
                 ps.HasVoted = false;
                 ps.HasVotedToEndGame = false;
                 ps.HasVotedToSkipTime = false;
+                ps.ContinueOrEndVote = null;
             }
 
             State.CurrentRoundClues.Clear();

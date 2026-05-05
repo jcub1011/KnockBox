@@ -29,7 +29,7 @@ else
         @* ── Error toast ── *@
         @if (_errorMessage is not null)
         {
-            <div @key="_errorKey" class="op-error-toast" @onanimationend="DismissError">
+            <div @key="_errorKey" class="op-error-toast">
                 <span class="op-error-icon">⚠️</span>
                 <span>@_errorMessage</span>
             </div>

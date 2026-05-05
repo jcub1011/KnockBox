@@ -164,6 +164,79 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword
         }
 
         [TestMethod]
+        public async Task PlayerLeft_DuringCluePhase_PreservesOtherPlayersSubmittedClues()
+        {
+            // Regression: re-entering CluePhaseState after a leaver used to call
+            // ResetEliminationCycleState, wiping HasSubmittedClue across every alive
+            // player. Players who already submitted would be re-prompted forever.
+            using var state = await CreateStartedGameAsync(5);
+            var context = state.Context!;
+
+            // Advance to CluePhase.
+            _engine.Tick(context, DateTimeOffset.UtcNow.AddSeconds(10));
+            Assert.AreEqual(CodewordGamePhase.CluePhase, state.Phase);
+
+            // First two players submit clues.
+            string[] clues = ["wave", "splash"];
+            for (int i = 0; i < 2; i++)
+            {
+                string currentPlayerId = state.TurnManager.TurnOrder[state.TurnManager.CurrentPlayerIndex];
+                _engine.SubmitClue(UserFactory.Create("dummy", currentPlayerId), state, clues[i]);
+            }
+
+            // Capture the players who submitted.
+            var submittedIds = context.GetAlivePlayers()
+                .Where(p => p.HasSubmittedClue)
+                .Select(p => p.PlayerId)
+                .ToList();
+            Assert.HasCount(2, submittedIds, "Expected 2 players to have submitted.");
+
+            // The next player in the turn order (the active clue giver) leaves.
+            string activeClueGiverId = state.TurnManager.TurnOrder[state.TurnManager.CurrentPlayerIndex];
+            _engine.HandlePlayerLeft(UserFactory.Create("dummy", activeClueGiverId), state);
+
+            // Phase must still be CluePhase (not Setup, not Reveal).
+            Assert.AreEqual(CodewordGamePhase.CluePhase, state.Phase);
+
+            // The two players who already submitted must still be marked as submitted —
+            // before the fix, ResetEliminationCycleState would have wiped these flags.
+            foreach (var id in submittedIds)
+            {
+                var p = context.GetPlayer(id);
+                Assert.IsNotNull(p);
+                Assert.IsTrue(p.HasSubmittedClue, $"Player {id} lost their submitted-clue flag after a leaver.");
+            }
+        }
+
+        [TestMethod]
+        public async Task PlayerLeft_DuringCluePhase_AllOthersSubmitted_AdvancesToDiscussion()
+        {
+            // If the active clue-giver leaves while every other alive player has
+            // already submitted, fast-forward to DiscussionPhase rather than getting
+            // stuck on a non-existent index.
+            using var state = await CreateStartedGameAsync(5);
+            var context = state.Context!;
+
+            _engine.Tick(context, DateTimeOffset.UtcNow.AddSeconds(10));
+            Assert.AreEqual(CodewordGamePhase.CluePhase, state.Phase);
+
+            // Submit clues for the first 4 players in turn order.
+            string[] clues = ["wave", "splash", "tide", "fish"];
+            for (int i = 0; i < 4; i++)
+            {
+                string currentPlayerId = state.TurnManager.TurnOrder[state.TurnManager.CurrentPlayerIndex];
+                _engine.SubmitClue(UserFactory.Create("dummy", currentPlayerId), state, clues[i]);
+            }
+
+            // The 5th player is now the active clue-giver. They leave.
+            string activeClueGiverId = state.TurnManager.TurnOrder[state.TurnManager.CurrentPlayerIndex];
+            _engine.HandlePlayerLeft(UserFactory.Create("dummy", activeClueGiverId), state);
+
+            // No eligible un-submitted alive player remains → advance to Discussion.
+            Assert.AreEqual(CodewordGamePhase.Discussion, state.Phase);
+        }
+
+        [TestMethod]
         public async Task PlayerLeft_DuringDiscussion_AdjustsAliveCount()
         {
             using var state = await CreateStartedGameAsync(5);

@@ -146,7 +146,7 @@ namespace KnockBox.Platform.Components.Pages.Home
             if (!joinResult.TryGetSuccess(out var registration))
             {
                 _isTransitioning = false;
-                _isReturning = animate;
+                if (animate) StartReturnAnimation();
                 var errorMsg = joinResult.TryGetFailure(out var failure) ? failure.PublicMessage : "Failed to join lobby.";
                 ShowError(errorMsg);
                 return;
@@ -179,7 +179,7 @@ namespace KnockBox.Platform.Components.Pages.Home
             if (!createResult.TryGetSuccess(out var lobby))
             {
                 _isTransitioning = false;
-                _isReturning = true;
+                StartReturnAnimation();
                 var errorMsg = createResult.TryGetFailure(out var failure) ? failure.PublicMessage : "Failed to create lobby.";
                 ShowError(errorMsg);
                 return;
@@ -204,21 +204,52 @@ namespace KnockBox.Platform.Components.Pages.Home
 
         // ── Error toast ───────────────────────────────────────────────────────
 
+        // Mirror the CSS .home-error-toast animation duration in Home.razor.css.
+        private static readonly TimeSpan ErrorToastDuration = TimeSpan.FromSeconds(3);
+
+        // Mirror the longest .home-container.returning animation in Home.razor.css
+        // (`fade-in-up 0.7s ease-out 0.15s` ≈ 0.85s), padded so we clear after it ends.
+        private static readonly TimeSpan ReturnAnimationDuration = TimeSpan.FromMilliseconds(900);
+
         private void ShowError(string message)
         {
             _errorMessage = message;
             _errorKey++;
+            int capturedKey = _errorKey;
             StateHasChanged();
+
+            // WebKit rejects setAttribute('@onanimationend', ...) and tears the
+            // circuit on iPhone Safari, so we drive dismissal from a server-side
+            // timer instead. Guard against rapid successive errors: only clear
+            // if no later ShowError has bumped the key.
+            ScheduleClear(ErrorToastDuration, () =>
+            {
+                if (_errorKey == capturedKey) _errorMessage = null;
+            });
         }
 
-        private void DismissError()
+        private void StartReturnAnimation()
         {
-            _errorMessage = null;
+            _isReturning = true;
+            ScheduleClear(ReturnAnimationDuration, () => _isReturning = false);
         }
 
-        private void OnReturnAnimationEnd()
+        private void ScheduleClear(TimeSpan delay, Action clear)
         {
-            _isReturning = false;
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await Task.Delay(delay, ComponentDetached);
+                    clear();
+                    await InvokeAsync(StateHasChanged);
+                }
+                catch (OperationCanceledException) { }
+                catch (Exception ex)
+                {
+                    Logger.LogError(ex, "Error clearing scheduled UI state.");
+                }
+            });
         }
 
         private void OnAvailabilityChanged()

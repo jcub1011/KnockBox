@@ -55,6 +55,13 @@ namespace KnockBox.Codeword.Services.State.Games.Data
         /// </summary>
         public bool HasVotedToSkipTime { get; set; }
 
+        /// <summary>
+        /// The player's vote during the ContinueOrEndRound phase.
+        /// <see langword="null"/> = not yet voted, <c>false</c> = continue, <c>true</c> = end the game.
+        /// Reset on entry to the phase and on cycle reset.
+        /// </summary>
+        public bool? ContinueOrEndVote { get; set; }
+
         /// <summary>The player's score for the current game.</summary>
         public int Score { get; set; }
     }

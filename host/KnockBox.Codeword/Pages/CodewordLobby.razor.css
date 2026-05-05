@@ -513,6 +513,20 @@
 
 ::deep .ctc-btn-lg { font-size: 1.1rem; padding: 12px 28px; }
 
+/* Selected state mirrors the :active fill so a logged vote reads at a glance. */
+::deep .ctc-btn.ctc-btn-selected.ctc-btn-primary { background: #a78bfa; color: #000; }
+::deep .ctc-btn.ctc-btn-selected.ctc-btn-secondary { background: rgba(255, 255, 255, 0.6); color: #000; }
+::deep .ctc-btn.ctc-btn-selected.ctc-btn-danger { background: #e74c3c; color: #000; }
+::deep .ctc-btn.ctc-btn-selected.ctc-btn-warning { background: #e67e22; color: #000; }
+
+::deep .ctc-continue-end-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    justify-content: center;
+    margin-top: 8px;
+}
+
 /* ── Lobby ────────────────────────────────────────────────────────────────── */
 
 ::deep .ctc-lobby {

@@ -36,6 +36,12 @@ namespace KnockBox.Codeword.Services.Logic.Games.FSM
     /// <summary>Informant guesses the Agent word during the reveal phase.</summary>
     public record InformantGuessCommand(string PlayerId, string GuessedWord) : CodewordCommand(PlayerId);
 
+    // ── ContinueOrEndRound ────────────────────────────────────────────────────
+
+    /// <summary>Player votes whether to continue the game with another round
+    /// or end the game now (after a non-Informant elimination).</summary>
+    public record ContinueOrEndRoundVoteCommand(string PlayerId, bool VoteToEnd) : CodewordCommand(PlayerId);
+
     // ── GameOver ──────────────────────────────────────────────────────────────
 
     /// <summary>Host starts the next game in a multi-game session.</summary>

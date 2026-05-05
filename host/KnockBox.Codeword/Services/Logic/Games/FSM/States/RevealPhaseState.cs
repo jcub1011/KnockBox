@@ -148,7 +148,13 @@ namespace KnockBox.Codeword.Services.Logic.Games.FSM.States
                 return null;
             }
 
-            // Auto-advance to next clue phase.
+            // After an actual elimination, ask the remaining players whether
+            // to continue or end the game. On a tie no one was eliminated, so
+            // skip straight to the next clue round.
+            var lastElim = context.State.LastElimination;
+            if (lastElim is not null && !lastElim.WasTie)
+                return new ContinueOrEndRoundPhaseState();
+
             return new CluePhaseState();
         }
 

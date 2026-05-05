@@ -1,3 +1,4 @@
+@inherits KnockBox.Core.Components.Shared.DisposableComponent
 @using KnockBox.CardCounter.Services.Logic.Formatting
 @using KnockBox.Core.Services.State.Users
 @using KnockBox.CardCounter.Services.State.Games
@@ -440,8 +441,7 @@ else if (GameState.GamePlayers.Values.Any(p => p.ActionHand.Count > GameState.Co
     {
         @* Non-blocking balance-change animation that auto-dismisses *@
         <div @key="_toastKey"
-             class="cc-balance-change-toast @(opDelta > 0 ? "cc-balance-change-gain" : opDelta < 0 ? "cc-balance-change-loss" : "")"
-             @onanimationend="DismissOperatorResult">
+             class="cc-balance-change-toast @(opDelta > 0 ? "cc-balance-change-gain" : opDelta < 0 ? "cc-balance-change-loss" : "")">
             <div class="cc-balance-change-row">
                 <span class="cc-balance-change-before @(opResult.BalanceBefore >= 0 ? "cc-positive" : "cc-negative")">
                     @opResult.BalanceBefore.FormatBalance()
@@ -519,8 +519,7 @@ else if (GameState.GamePlayers.Values.Any(p => p.ActionHand.Count > GameState.Co
 {
     double hostOpDelta = hostOpResult.BalanceAfter - hostOpResult.BalanceBefore;
     <div @key="_toastKey"
-         class="cc-host-op-toast @(hostOpDelta > 0 ? "cc-balance-change-gain" : hostOpDelta < 0 ? "cc-balance-change-loss" : "")"
-         @onanimationend="DismissOperatorResult">
+         class="cc-host-op-toast @(hostOpDelta > 0 ? "cc-balance-change-gain" : hostOpDelta < 0 ? "cc-balance-change-loss" : "")">
         <span class="cc-host-op-toast-player">⚡ @hostOpResult.PlayerName</span>
         <div class="cc-host-op-toast-row">
             <span class="@(hostOpResult.BalanceBefore >= 0 ? "cc-positive" : "cc-negative")">@hostOpResult.BalanceBefore.FormatBalance()</span>
@@ -537,8 +536,7 @@ else if (GameState.GamePlayers.Values.Any(p => p.ActionHand.Count > GameState.Co
 @if (myPlayer != null && !_operatorChangeDismissed && GameState.LastOperatorChange is { } opChange && opChange.PlayerId == myId && GameState.Config.ActiveOperatorMode)
 {
     <div @key="_opChangeToastKey"
-         class="cc-op-change-toast"
-         @onanimationend="DismissOperatorChange">
+         class="cc-op-change-toast">
         <span class="cc-op-change-label">⚡ OPERATOR CHANGED</span>
         <div class="cc-op-change-row">
             @if (opChange.PreviousOperator.HasValue)
