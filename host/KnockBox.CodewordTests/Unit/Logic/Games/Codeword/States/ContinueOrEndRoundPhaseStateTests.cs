@@ -185,23 +185,5 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
             Assert.AreEqual(false, _state.GamePlayers["p3"].ContinueOrEndVote);
         }
 
-        [TestMethod]
-        public void Tick_Timeout_MajorityAlreadyEnd_TransitionsToGameOver()
-        {
-            var phase = new ContinueOrEndRoundPhaseState();
-            phase.OnEnter(_context);
-
-            phase.HandleCommand(_context, new ContinueOrEndRoundVoteCommand("p0", VoteToEnd: true));
-            phase.HandleCommand(_context, new ContinueOrEndRoundVoteCommand("p1", VoteToEnd: true));
-            // p0 + p1 = 2 of 3 needed; not yet majority. Third never votes; on timeout the
-            // remaining players default to continue, leaving 2 end votes < required 3 — so
-            // continue wins. We exercise the early-tally path by adding one more before
-            // ticking.
-            phase.HandleCommand(_context, new ContinueOrEndRoundVoteCommand("p2", VoteToEnd: true));
-
-            // Already transitioned via majority on third vote. Phase no longer applies,
-            // but verify Tick on a stale phase is harmless.
-            Assert.AreEqual(true, _state.GamePlayers["p2"].ContinueOrEndVote);
-        }
     }
 }

@@ -253,5 +253,84 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword
             int aliveCountAfter = context.GetAlivePlayerCount();
             Assert.AreEqual(aliveCountBefore - 1, aliveCountAfter);
         }
+
+        [TestMethod]
+        public async Task PlayerLeft_DuringContinueOrEndRound_RecomputesMajority()
+        {
+            using var state = await CreateStartedGameAsync(4);
+            var context = state.Context!;
+
+            _engine.Tick(context, DateTimeOffset.UtcNow.AddSeconds(10));
+            context.Fsm.TransitionTo(context, new ContinueOrEndRoundPhaseState());
+            Assert.AreEqual(CodewordGamePhase.ContinueOrEndRound, state.Phase);
+            Assert.AreEqual(3, state.EndGameVoteStatus.RequiredVotes);
+
+            // p0 votes end (1 of 3 — not majority).
+            string p0Id = state.TurnManager.TurnOrder[0];
+            _engine.VoteContinueOrEndRound(UserFactory.Create("dummy", p0Id), state, voteToEnd: true);
+            Assert.AreEqual(1, state.EndGameVoteStatus.VotedToEnd.Count);
+
+            // p1 leaves without voting.
+            string p1Id = state.TurnManager.TurnOrder[1];
+            _engine.HandlePlayerLeft(UserFactory.Create("dummy", p1Id), state);
+
+            // 3 alive remaining → required = (3/2)+1 = 2. VotedToEnd = {p0} (1) < 2,
+            // and p2/p3 still un-voted → stay in ContinueOrEndRound.
+            Assert.AreEqual(CodewordGamePhase.ContinueOrEndRound, state.Phase);
+            Assert.AreEqual(2, state.EndGameVoteStatus.RequiredVotes);
+            Assert.AreEqual(1, state.EndGameVoteStatus.VotedToEnd.Count);
+        }
+
+        [TestMethod]
+        public async Task PlayerLeft_DuringContinueOrEndRound_LeaverTipsMajority_TransitionsToGameOver()
+        {
+            using var state = await CreateStartedGameAsync(4);
+            var context = state.Context!;
+
+            _engine.Tick(context, DateTimeOffset.UtcNow.AddSeconds(10));
+            context.Fsm.TransitionTo(context, new ContinueOrEndRoundPhaseState());
+
+            string p0Id = state.TurnManager.TurnOrder[0];
+            string p1Id = state.TurnManager.TurnOrder[1];
+            string p2Id = state.TurnManager.TurnOrder[2];
+
+            // p0 + p1 vote end (2 of 3 — not majority yet).
+            _engine.VoteContinueOrEndRound(UserFactory.Create("dummy", p0Id), state, voteToEnd: true);
+            _engine.VoteContinueOrEndRound(UserFactory.Create("dummy", p1Id), state, voteToEnd: true);
+            Assert.AreEqual(CodewordGamePhase.ContinueOrEndRound, state.Phase);
+
+            // p2 leaves without voting. New required = (3/2)+1 = 2; VotedToEnd already 2 → GameOver.
+            _engine.HandlePlayerLeft(UserFactory.Create("dummy", p2Id), state);
+
+            Assert.AreEqual(CodewordGamePhase.GameOver, state.Phase);
+            Assert.IsNotNull(state.WinResult);
+            Assert.IsTrue(state.WinResult.GameOver);
+        }
+
+        [TestMethod]
+        public async Task PlayerLeft_DuringContinueOrEndRound_AllRemainingVoted_AdvancesToCluePhase()
+        {
+            using var state = await CreateStartedGameAsync(4);
+            var context = state.Context!;
+
+            _engine.Tick(context, DateTimeOffset.UtcNow.AddSeconds(10));
+            context.Fsm.TransitionTo(context, new ContinueOrEndRoundPhaseState());
+
+            string p0Id = state.TurnManager.TurnOrder[0];
+            string p1Id = state.TurnManager.TurnOrder[1];
+            string p2Id = state.TurnManager.TurnOrder[2];
+            string p3Id = state.TurnManager.TurnOrder[3];
+
+            // p0, p1, p2 vote continue. p3 hasn't voted.
+            _engine.VoteContinueOrEndRound(UserFactory.Create("dummy", p0Id), state, voteToEnd: false);
+            _engine.VoteContinueOrEndRound(UserFactory.Create("dummy", p1Id), state, voteToEnd: false);
+            _engine.VoteContinueOrEndRound(UserFactory.Create("dummy", p2Id), state, voteToEnd: false);
+            Assert.AreEqual(CodewordGamePhase.ContinueOrEndRound, state.Phase);
+
+            // p3 leaves. All 3 remaining alive have already voted → no majority for end → CluePhase.
+            _engine.HandlePlayerLeft(UserFactory.Create("dummy", p3Id), state);
+
+            Assert.AreEqual(CodewordGamePhase.CluePhase, state.Phase);
+        }
     }
 }

@@ -221,6 +221,22 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
         }
 
         [TestMethod]
+        public void Tick_NonTieElimination_AdvancesToContinueOrEndRound()
+        {
+            // Non-tie elimination of a non-Informant where the game continues (3 alive)
+            // routes through ContinueOrEndRound instead of straight back to CluePhase.
+            _state.GamePlayers["p2"].IsEliminated = true;
+            _state.LastElimination = new EliminationResult("p2", "Player 2", Role.Insider, WasTie: false);
+
+            var reveal = new RevealPhaseState();
+            reveal.OnEnter(_context);
+
+            var result = reveal.Tick(_context, DateTimeOffset.UtcNow.AddMinutes(5));
+            Assert.IsTrue(result.IsSuccess);
+            Assert.IsInstanceOfType<ContinueOrEndRoundPhaseState>(result.Value);
+        }
+
+        [TestMethod]
         public void Tick_BeforeTimeout_ReturnsNull()
         {
             _state.LastElimination = new EliminationResult("", "", default, WasTie: true);

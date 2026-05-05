@@ -137,21 +137,11 @@ namespace KnockBox.Operator.Pages
             int capturedKey = _errorKey;
             StateHasChanged();
 
-            // WebKit rejects setAttribute('@onanimationend', ...) and tears the
-            // circuit on iPhone Safari, so dismissal is driven by a server-side
-            // timer instead of the DOM animationend event.
-            _ = Task.Run(async () =>
+            // Server-side dismissal because WebKit (iPhone Safari) tears the
+            // circuit on `@onanimationend`.
+            ScheduleClear(ErrorToastDuration, () =>
             {
-                try
-                {
-                    await Task.Delay(ErrorToastDuration, ComponentDetached);
-                    if (_errorKey == capturedKey)
-                    {
-                        _errorMessage = null;
-                        await InvokeAsync(StateHasChanged);
-                    }
-                }
-                catch (OperationCanceledException) { }
+                if (_errorKey == capturedKey) _errorMessage = null;
             });
         }
     }

@@ -234,24 +234,6 @@ namespace KnockBox.Platform.Components.Pages.Home
             ScheduleClear(ReturnAnimationDuration, () => _isReturning = false);
         }
 
-        private void ScheduleClear(TimeSpan delay, Action clear)
-        {
-            _ = Task.Run(async () =>
-            {
-                try
-                {
-                    await Task.Delay(delay, ComponentDetached);
-                    clear();
-                    await InvokeAsync(StateHasChanged);
-                }
-                catch (OperationCanceledException) { }
-                catch (Exception ex)
-                {
-                    Logger.LogError(ex, "Error clearing scheduled UI state.");
-                }
-            });
-        }
-
         private void OnAvailabilityChanged()
         {
             RebuildVisibleModules();

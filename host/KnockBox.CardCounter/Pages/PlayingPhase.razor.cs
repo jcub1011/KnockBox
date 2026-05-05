@@ -318,27 +318,21 @@ namespace KnockBox.CardCounter.Pages
         // (`balanceChangeFade 3s`).
         private static readonly TimeSpan ToastDuration = TimeSpan.FromSeconds(3);
 
-        // Schedules the toast's auto-dismiss flag without using @onanimationend
-        // (which WebKit rejects with InvalidCharacterError on iPhone Safari and
-        // tears the circuit). The captured key guards against newer toasts
+        // Schedules the toast's auto-dismiss flag via the base ScheduleClear
+        // helper (server-side timer, since WebKit on iPhone Safari rejects
+        // `@onanimationend`). The captured key guards against newer toasts
         // dismissing the displayed one prematurely.
         private void ScheduleToastDismiss(int capturedKey, bool isOpChange)
         {
-            _ = Task.Run(async () =>
+            ScheduleClear(ToastDuration, () =>
             {
-                try
-                {
-                    await Task.Delay(ToastDuration, ComponentDetached);
-                    bool stale = isOpChange
-                        ? capturedKey != _opChangeToastKey
-                        : capturedKey != _toastKey;
-                    if (stale) return;
+                bool stale = isOpChange
+                    ? capturedKey != _opChangeToastKey
+                    : capturedKey != _toastKey;
+                if (stale) return;
 
-                    if (isOpChange) _operatorChangeDismissed = true;
-                    else _operatorResultDismissed = true;
-                    await InvokeAsync(StateHasChanged);
-                }
-                catch (OperationCanceledException) { }
+                if (isOpChange) _operatorChangeDismissed = true;
+                else _operatorResultDismissed = true;
             });
         }
 
