@@ -1,0 +1,71 @@
+@using KnockBox.Core.Services.State.Users
+@using KnockBox.Codeword.Services.State.Games
+
+@{
+    var myId = UserService.CurrentUser?.Id ?? "";
+    var isHost = GameState.Host.Id == myId;
+    int aliveCount = GameState.GamePlayers.Values.Count(p => !p.IsEliminated);
+    int endVotes = GameState.EndGameVoteStatus.VotedToEnd.Count;
+    int castCount = GameState.GamePlayers.Values.Count(p => !p.IsEliminated && p.ContinueOrEndVote.HasValue);
+    int continueVotes = castCount - endVotes;
+    int required = GameState.EndGameVoteStatus.RequiredVotes;
+    var lastElim = GameState.LastElimination;
+}
+
+<div class="ctc-vote-area">
+    <div class="ctc-vote-panel">
+        <h2 class="ctc-phase-title glitch" data-text="[ ROUND DECISION ]">[ ROUND DECISION ]</h2>
+
+        @if (lastElim is not null && !lastElim.WasTie)
+        {
+            <p class="ctc-waiting-text">
+                <strong>@lastElim.PlayerName</strong> was eliminated.
+                Continue with another round, or end the game now?
+            </p>
+        }
+        else
+        {
+            <p class="ctc-waiting-text">Continue with another round, or end the game now?</p>
+        }
+
+        <div class="ctc-vote-progress-bar">
+            END: @endVotes &nbsp;|&nbsp; CONTINUE: @continueVotes &nbsp;|&nbsp; PENDING: @(aliveCount - castCount)
+            &nbsp;(majority needs @required to end)
+        </div>
+
+        @if (isHost)
+        {
+            <p class="ctc-waiting-text">[ HOST: SPECTATING ]</p>
+        }
+        else
+        {
+            var myPlayer = GetMyPlayer();
+
+            @if (myPlayer is null || myPlayer.IsEliminated)
+            {
+                <p class="ctc-waiting-text">You have been terminated and cannot vote.</p>
+            }
+            else
+            {
+                <div class="ctc-continue-end-buttons">
+                    <button class="ctc-btn ctc-btn-primary @(myPlayer.ContinueOrEndVote == false ? "ctc-btn-selected" : "")"
+                            @onclick="() => Vote(false)">
+                        [ CONTINUE ]
+                    </button>
+                    <button class="ctc-btn ctc-btn-danger @(myPlayer.ContinueOrEndVote == true ? "ctc-btn-selected" : "")"
+                            @onclick="() => Vote(true)">
+                        [ END GAME ]
+                    </button>
+                </div>
+
+                @if (myPlayer.ContinueOrEndVote.HasValue)
+                {
+                    <p class="ctc-waiting-text">
+                        Vote logged: <strong>@(myPlayer.ContinueOrEndVote.Value ? "END" : "CONTINUE")</strong>.
+                        Click again to rescind.
+                    </p>
+                }
+            }
+        }
+    </div>
+</div>

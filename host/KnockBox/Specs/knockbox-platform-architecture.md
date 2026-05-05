@@ -391,6 +391,8 @@ The game state instance is created when the lobby is created via the engine's `C
 
 All state mutations go through `Execute` (sync) or `ExecuteAsync` (async), which acquire a per-state `SemaphoreSlim(1, 1)`, execute the mutation, release the lock, and then notify all subscribers. Notification happens *after* the lock is released to keep lock duration minimal and to prevent reentrant deadlocks from listener callbacks. Each listener is invoked with error isolation so that a failing subscriber does not prevent others from being notified.
 
+**Documented exception — per-keystroke pending-clue write.** `Codeword.Pages.CluePhase.OnClueInput` writes `CodewordPlayerState.PendingClue` directly without going through `Execute`. This is intentional: notifying subscribers on every keystroke would re-render every connected client and is exactly the storm the lock is meant to dampen. The write is safe because reference assignment of a `string` is atomic in .NET, and the timeout reader in `CluePhaseState.Tick` only ever observes a complete prior value (worst case: the timeout grabs the previous keystroke). New code should *not* rely on this exception — it exists solely for the per-frame UI-input hot path. Grep `Execute bypass` to find the call-site.
+
 Subscriptions are obtained via `state.StateChangedEventManager.Subscribe(Func<ValueTask>)`, which returns an `IDisposable`. Razor components store the subscription and dispose it when the component is detached, preventing dead callbacks from accumulating.
 
 The `PlayerUnregistered` event is fired after a player is successfully removed from the game (disconnected, left, or kicked). It is raised *outside* the execute lock so subscribers may safely call `Execute` in response.

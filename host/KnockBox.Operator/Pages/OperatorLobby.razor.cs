@@ -127,16 +127,22 @@ namespace KnockBox.Operator.Pages
 
         // ── Error toast ───────────────────────────────────────────────────────
 
+        // Mirror the CSS .op-error-toast animation duration in OperatorLobby.razor.css.
+        private static readonly TimeSpan ErrorToastDuration = TimeSpan.FromSeconds(3);
+
         private void ShowError(string message)
         {
             _errorMessage = message;
             _errorKey++;
+            int capturedKey = _errorKey;
             StateHasChanged();
-        }
 
-        private void DismissError()
-        {
-            _errorMessage = null;
+            // Server-side dismissal because WebKit (iPhone Safari) tears the
+            // circuit on `@onanimationend`.
+            ScheduleClear(ErrorToastDuration, () =>
+            {
+                if (_errorKey == capturedKey) _errorMessage = null;
+            });
         }
     }
 }

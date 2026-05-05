@@ -170,6 +170,17 @@ namespace KnockBox.Codeword.Services.Logic.Games
             return ProcessCommand(ctx, new VoteToEndGameCommand(player.Id));
         }
 
+        /// <summary>
+        /// During the ContinueOrEndRound phase, an alive player votes whether
+        /// to continue with another round (<paramref name="voteToEnd"/> = false)
+        /// or end the game now (<paramref name="voteToEnd"/> = true).
+        /// </summary>
+        public Result VoteContinueOrEndRound(User player, CodewordGameState state, bool voteToEnd)
+        {
+            if (!TryGetContext(state, out var ctx, out var err)) return err;
+            return ProcessCommand(ctx, new ContinueOrEndRoundVoteCommand(player.Id, voteToEnd));
+        }
+
         /// <summary>Host starts the next game in a multi-game session.</summary>
         public Result StartNextGame(User player, CodewordGameState state)
         {
@@ -339,13 +350,18 @@ namespace KnockBox.Codeword.Services.Logic.Games
                     return;
                 }
 
-                // Auto-advance if the leaving player was the current clue giver during CluePhase.
-                if (state.Phase == CodewordGamePhase.CluePhase
-                    && leftIndex >= 0)
+                // Mid-CluePhase disconnect: advance the turn in place rather than
+                // re-entering CluePhaseState. Re-entry would call ResetEliminationCycleState
+                // and wipe HasSubmittedClue on every alive player, forcing players who
+                // already submitted to submit again — the "endless clue entry" bug.
+                if (state.Phase == CodewordGamePhase.CluePhase && leftIndex >= 0)
                 {
-                    // The current clue giver index may now point to the next player;
-                    // re-enter CluePhaseState to skip to the next alive player.
-                    context.Fsm.TransitionTo(context, new CluePhaseState());
+                    if (!CluePhaseState.AdvanceToNextEligibleClueGiver(context))
+                    {
+                        // No eligible un-submitted alive player remains — fast-forward
+                        // to the discussion phase rather than getting stuck on a bad index.
+                        context.Fsm.TransitionTo(context, new DiscussionPhaseState());
+                    }
                     return;
                 }
 
@@ -359,6 +375,31 @@ namespace KnockBox.Codeword.Services.Logic.Games
                     else
                         context.Fsm.TransitionTo(context, new DiscussionPhaseState());
                     return;
+                }
+
+                // ContinueOrEndRound: void the leaver's vote, recompute the required
+                // threshold against the new alive count, and re-evaluate.
+                if (state.Phase == CodewordGamePhase.ContinueOrEndRound)
+                {
+                    state.EndGameVoteStatus.VotedToEnd.Remove(player.Id);
+                    int aliveCount = context.GetAlivePlayerCount();
+                    int required = (aliveCount / 2) + 1;
+                    state.EndGameVoteStatus = new EndGameVoteStatus(
+                        state.EndGameVoteStatus.VotedToEnd, required);
+
+                    if (state.EndGameVoteStatus.VotedToEnd.Count >= required)
+                    {
+                        state.WinResult = context.CheckWinConditions();
+                        context.Fsm.TransitionTo(context, new GameOverState());
+                        return;
+                    }
+
+                    if (context.GetAlivePlayers().All(p => p.ContinueOrEndVote.HasValue))
+                    {
+                        // All remaining alive have voted; "continue" won.
+                        context.Fsm.TransitionTo(context, new CluePhaseState());
+                        return;
+                    }
                 }
             });
         }

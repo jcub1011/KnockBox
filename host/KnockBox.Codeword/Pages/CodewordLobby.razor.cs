@@ -33,20 +33,28 @@ namespace KnockBox.Codeword.Pages
                 CodewordGamePhase.Discussion => config.DiscussionPhaseTimeoutMs,
                 CodewordGamePhase.Voting => config.VotePhaseTimeoutMs,
                 CodewordGamePhase.Reveal => config.RevealPhaseTimeoutMs,
+                CodewordGamePhase.ContinueOrEndRound => config.ContinueOrEndRoundPhaseTimeoutMs,
                 _ => 1
             };
         }
+
+        // Mirror the CSS .ctc-error-toast animation duration in CodewordLobby.razor.css.
+        private static readonly TimeSpan ErrorToastDuration = TimeSpan.FromSeconds(3);
 
         private void ShowError(string message)
         {
             _errorMessage = message;
             _errorKey++;
+            int capturedKey = _errorKey;
             StateHasChanged();
-        }
 
-        private void DismissError()
-        {
-            _errorMessage = null;
+            // Server-side dismissal because WebKit (iPhone Safari) tears the
+            // circuit on `@onanimationend`. Guard against rapid successive
+            // errors via the captured key.
+            ScheduleClear(ErrorToastDuration, () =>
+            {
+                if (_errorKey == capturedKey) _errorMessage = null;
+            });
         }
     }
 }

@@ -168,10 +168,13 @@ else
             @if (isMyTurn)
             {
                 <form class="ctc-clue-input-area" @onsubmit="SubmitClue" @onsubmit:preventDefault="true">
-                    <input type="text" class="ctc-clue-input" placeholder="Input sequence (max 50 chars)..."
-                           value="@_clueText" @oninput="OnClueInput" maxlength="50" />
-                    <button type="submit" class="ctc-btn ctc-btn-primary"
-                            disabled="@(string.IsNullOrWhiteSpace(_clueText))">
+                    @* No `value="@_clueText"`: parent re-renders on every state change, and a value
+                       rebind during a keystroke clobbers in-flight input. The DOM owns the value;
+                       `@key` bumps force a clean reset after a successful submit. *@
+                    <input @key="_inputKey" type="text" class="ctc-clue-input"
+                           placeholder="Input sequence (max 50 chars)..."
+                           @oninput="OnClueInput" maxlength="50" />
+                    <button type="submit" class="ctc-btn ctc-btn-primary">
                         [ TRANSMIT CLUE ]
                     </button>
                 </form>

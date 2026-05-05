@@ -19,11 +19,23 @@ namespace KnockBox.Codeword.Pages
 
         private string _clueText = string.Empty;
 
+        // Bumped after a successful submit to force Blazor to recreate the input
+        // element, clearing the DOM-owned value. The DOM owns its value (no
+        // `value="@_clueText"` binding) so that parent re-renders mid-keystroke
+        // don't clobber in-flight input.
+        private int _inputKey;
+
         protected void OnClueInput(ChangeEventArgs e)
         {
             _clueText = e.Value?.ToString() ?? string.Empty;
 
-            // Store pending clue on player state so the server can auto-submit on timeout.
+            // PERF: deliberate AbstractGameState.Execute bypass — see
+            // host/KnockBox/Specs/knockbox-platform-architecture.md ("Documented
+            // exception — per-keystroke pending-clue write"). Notifying on every
+            // keystroke would re-render every subscriber and is exactly the storm
+            // we're avoiding. The Tick reader and this writer race on a string
+            // reference, which is atomic, so the worst case is the timeout grabs
+            // the previous keystroke.
             var myId = UserService.CurrentUser?.Id;
             if (myId is not null && GameState.GamePlayers.TryGetValue(myId, out var player) && !player.HasSubmittedClue)
             {
@@ -44,6 +56,7 @@ namespace KnockBox.Codeword.Pages
             else
             {
                 _clueText = string.Empty;
+                _inputKey++;
             }
         }
     }

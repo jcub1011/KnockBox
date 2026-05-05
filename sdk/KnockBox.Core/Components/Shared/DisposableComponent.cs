@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Components;
+using System.Diagnostics;
 
 namespace KnockBox.Core.Components.Shared
 {
@@ -27,6 +28,50 @@ namespace KnockBox.Core.Components.Shared
         /// Cancels when the user leaves this page.
         /// </summary>
         protected CancellationToken ComponentDetached => CTS.Token;
+
+        /// <summary>
+        /// Schedules <paramref name="onClear"/> to run on the renderer's
+        /// SyncContext after <paramref name="delay"/>, then triggers a
+        /// re-render. Cancelled if the component is disposed before the delay
+        /// elapses.
+        /// </summary>
+        /// <remarks>
+        /// Used to drive UI-dismiss animations from the server when the DOM
+        /// <c>animationend</c> event isn't usable — notably, iPhone Safari
+        /// rejects <c>setAttribute('@onanimationend', ...)</c> and tears the
+        /// circuit.
+        /// </remarks>
+        protected void ScheduleClear(TimeSpan delay, Action onClear)
+        {
+            async Task ScheduleWithCatch(TimeSpan delay, Action onClear)
+            {
+                try
+                {
+                    await ScheduleClearAsync(delay, onClear);
+                }
+                catch (Exception ex)
+                {
+                    // TODO: Hook up to serilog file logging
+                    Debug.WriteLine($"Error while calling ScheduleWithCatch: {ex}");
+                }
+            }
+
+            _ = ScheduleWithCatch(delay, onClear);
+        }
+
+        private async Task ScheduleClearAsync(TimeSpan delay, Action onClear)
+        {
+            try
+            {
+                await Task.Delay(delay, ComponentDetached);
+                await InvokeAsync(() =>
+                {
+                    onClear();
+                    StateHasChanged();
+                });
+            }
+            catch (OperationCanceledException) { }
+        }
 
         public virtual void Dispose()
         {

@@ -259,7 +259,7 @@ else
                             <div class="ctc-action-item">
                                 <button class="ctc-btn ctc-btn-warning" @onclick="VoteToEndGame"
                                         title="@(hasVotedToEnd ? "Click to rescind your vote to end the game" : "Vote to end the game early")">
-                                    @(hasVotedToEnd ? "[ ABORT TERMINATION ]" : "[ INITIATE TERMINATION ]")
+                                    @(hasVotedToEnd ? "[ ABORT GAME END ]" : "[ END GAME ]")
                                 </button>
                                 <div class="ctc-vote-small-progress">
                                     @endVote.VotedToEnd.Count / @endVote.RequiredVotes required
@@ -269,7 +269,7 @@ else
                             <div class="ctc-action-item">
                                 <button class="ctc-btn ctc-btn-secondary" @onclick="SkipRemainingTime"
                                         title="@(hasVotedToSkip ? "Click to rescind your vote to skip time" : "Vote to skip the remaining discussion time")">
-                                    @(hasVotedToSkip ? "[ ABORT SKIP ]" : "[ FAST-FORWARD ]")
+                                    @(hasVotedToSkip ? "[ ABORT VOTE SKIP ]" : "[ SKIP VOTING ]")
                                 </button>
                                 <div class="ctc-vote-small-progress">
                                     @skipVote.VotedToEnd.Count / @skipVote.RequiredVotes required

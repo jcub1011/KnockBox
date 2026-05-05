@@ -39,7 +39,7 @@
         </div>
     </form>
 
-    <div class="games-section" @onanimationend="OnReturnAnimationEnd">
+    <div class="games-section">
         <h2 class="games-heading">
             <span class="games-heading-icon" aria-hidden="true">&#127922;</span>
             Pick a Game
@@ -56,7 +56,7 @@
 
     @if (_errorMessage is not null)
     {
-        <div @key="_errorKey" class="home-error-toast" @onanimationend="DismissError">
+        <div @key="_errorKey" class="home-error-toast">
             <span class="home-error-icon" aria-hidden="true">&#9888;&#65039;</span>
             <span>@_errorMessage</span>
         </div>

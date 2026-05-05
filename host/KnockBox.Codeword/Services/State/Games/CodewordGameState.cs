@@ -127,6 +127,7 @@ namespace KnockBox.Codeword.Services.State.Games
         Discussion,
         Voting,
         Reveal,
+        ContinueOrEndRound,
         GameOver
     }
 
@@ -173,6 +174,7 @@ namespace KnockBox.Codeword.Services.State.Games
         public int DiscussionPhaseTimeoutMs { get; set; } = 120000;
         public int VotePhaseTimeoutMs { get; set; } = 15000;
         public int RevealPhaseTimeoutMs { get; set; } = 10000;
+        public int ContinueOrEndRoundPhaseTimeoutMs { get; set; } = 30000;
         public int InformantGuessTimeoutMs { get; set; } = 30000;
         public bool EnableTimers { get; set; } = true;
         public int TotalGames { get; set; } = 5;

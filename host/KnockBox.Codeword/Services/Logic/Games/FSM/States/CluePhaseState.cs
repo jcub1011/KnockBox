@@ -20,11 +20,12 @@ namespace KnockBox.Codeword.Services.Logic.Games.FSM.States
             context.ResetEliminationCycleState();
             context.State.SetPhase(CodewordGamePhase.CluePhase);
 
-            // Advance past eliminated players to the next alive player.
-            if (!AdvanceToNextAlivePlayer(context))
+            // Advance past eliminated players to the next alive player. After
+            // ResetEliminationCycleState, every alive player is eligible, so a
+            // false return here means the alive count is zero.
+            if (!AdvanceToNextEligibleClueGiver(context))
             {
-                // No alive players — should not happen, but transition to GameOver as a safety net.
-                context.Logger.LogWarning("CluePhaseState.OnEnter: no alive players found.");
+                context.Logger.LogWarning("CluePhaseState.OnEnter: no eligible clue-giver found.");
                 return new GameOverState();
             }
 
@@ -90,9 +91,9 @@ namespace KnockBox.Codeword.Services.Logic.Games.FSM.States
             if (context.GetAlivePlayers().All(p => p.HasSubmittedClue))
                 return new DiscussionPhaseState();
 
-            // Advance to next alive player and reset timer.
+            // Advance to next eligible player and reset timer.
             context.State.TurnManager.NextTurn();
-            AdvanceToNextAlivePlayer(context);
+            AdvanceToNextEligibleClueGiver(context);
             _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.State.Config.CluePhaseTimeoutMs);
 
             return null;
@@ -127,9 +128,9 @@ namespace KnockBox.Codeword.Services.Logic.Games.FSM.States
             if (context.GetAlivePlayers().All(p => p.HasSubmittedClue))
                 return new DiscussionPhaseState();
 
-            // Advance to next alive player and reset timer.
+            // Advance to next eligible player and reset timer.
             context.State.TurnManager.NextTurn();
-            AdvanceToNextAlivePlayer(context);
+            AdvanceToNextEligibleClueGiver(context);
             _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.State.Config.CluePhaseTimeoutMs);
 
             return null;
@@ -160,14 +161,24 @@ namespace KnockBox.Codeword.Services.Logic.Games.FSM.States
         }
 
         /// <summary>
-        /// Advances <see cref="CodewordGameState.TurnManager.CurrentPlayerIndex"/> past eliminated players
-        /// to the next alive player. Returns <see langword="false"/> if no alive player is found
-        /// (full wrap without hitting an alive player).
+        /// Advances <see cref="CodewordGameState.TurnManager.CurrentPlayerIndex"/>
+        /// to the next eligible clue-giver — alive and not yet submitted this cycle.
+        /// Returns <see langword="false"/> if no eligible player exists after a full
+        /// wrap; in that case the index is restored to its starting value and the
+        /// caller should transition out of CluePhase.
         /// </summary>
-        private static bool AdvanceToNextAlivePlayer(CodewordGameContext context)
+        internal static bool AdvanceToNextEligibleClueGiver(CodewordGameContext context)
         {
             var turnOrder = context.State.TurnManager.TurnOrder;
+            if (turnOrder.Count == 0) return false;
+
+            // Guard against an out-of-range index (a leaver may have shrunk the list).
             int startIndex = context.State.TurnManager.CurrentPlayerIndex;
+            if (startIndex >= turnOrder.Count)
+            {
+                startIndex = 0;
+                context.State.TurnManager.SetCurrentPlayerIndex(0);
+            }
 
             for (int i = 0; i < turnOrder.Count; i++)
             {
@@ -179,9 +190,9 @@ namespace KnockBox.Codeword.Services.Logic.Games.FSM.States
                 context.State.TurnManager.NextTurn();
             }
 
-            // Wrapped fully — no alive un-submitted player found.
+            // Wrapped fully — no eligible un-submitted alive player found.
             context.State.TurnManager.SetCurrentPlayerIndex(startIndex);
-            return context.GetAlivePlayerCount() > 0;
+            return false;
         }
     }
 }

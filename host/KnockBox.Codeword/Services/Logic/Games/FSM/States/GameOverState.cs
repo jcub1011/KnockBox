@@ -67,6 +67,7 @@ namespace KnockBox.Codeword.Services.Logic.Games.FSM.States
                 ps.VoteTargetId = null;
                 ps.HasVoted = false;
                 ps.HasVotedToEndGame = false;
+                ps.ContinueOrEndVote = null;
                 ps.Score = 0;
             }
 
