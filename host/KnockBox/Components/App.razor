@@ -25,7 +25,7 @@
 </head>
 
 <body>
-    <Routes />
+    <Routes @rendermode="GetRenderMode()" />
     <ReconnectModal />
     <script src="@Assets["_framework/blazor.web.js"]"></script>
 </body>
@@ -39,5 +39,21 @@
         return rel.Equals("admin", StringComparison.OrdinalIgnoreCase)
             || rel.StartsWith("admin/", StringComparison.OrdinalIgnoreCase)
             || rel.StartsWith("admin?", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static readonly InteractiveServerRenderMode InteractiveServer = new(prerender: false);
+
+    // Login / logout require static SSR for cookie auth (HttpContext.SignInAsync,
+    // [SupplyParameterFromForm]); returning null here keeps Routes static for those
+    // requests so Blazor doesn't hand them to an interactive circuit.
+    private IComponentRenderMode? GetRenderMode()
+    {
+        var rel = Nav.ToBaseRelativePath(Nav.Uri).TrimStart('/');
+        if (rel.StartsWith("admin/login", StringComparison.OrdinalIgnoreCase)
+            || rel.StartsWith("admin/logout", StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+        return InteractiveServer;
     }
 }
