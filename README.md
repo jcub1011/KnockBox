@@ -38,6 +38,48 @@ Operator checklist before dropping a plugin into `data/games/`:
 
 Plugin authors: see [`docs/making-a-game-plugin.md`](docs/making-a-game-plugin.md) for the packaging and trust-model obligations you owe your downstream operators.
 
+## Persistence
+
+The host writes all operator-managed state into a single data root:
+
+| Subdirectory | Contents |
+| --- | --- |
+| `admin/settings.json` (+ `.bak`) | Admin password hash (PBKDF2) and the third-party-plugins toggle. |
+| `admin/games-state.json` | List of disabled game route identifiers. |
+| `logs/knockbox-YYYYMMDD.log` | Rolling Serilog files; 31-day retention. |
+| `plugins/{routeIdentifier}/` | Per-plugin storage written through `IPluginStorage`. |
+| `games/` | Operator-installed third-party plugins (only consulted when the admin toggle is on). |
+
+**Updates wipe the host install dir on most deployment workflows, so the data root must be persisted out-of-band.** Pick one of the two options below before you ship to production — otherwise every update resets every admin setting.
+
+### Docker
+
+The published image declares `VOLUME /app/data`, so even a `docker run` with no `-v` flag survives container recreation via an anonymous volume. For real deployments, mount a named volume or bind mount instead so backups and migrations are tractable:
+
+```bash
+docker volume create knockbox-data
+docker run -d --name knockbox \
+  -p 8080:8080 -p 8081:8081 \
+  -v knockbox-data:/app/data \
+  jabobb/knockbox:latest
+```
+
+To upgrade: `docker stop knockbox && docker rm knockbox && docker pull jabobb/knockbox:latest && docker run … -v knockbox-data:/app/data …`. The volume — and therefore every persisted file above — is reattached to the new container untouched.
+
+### Non-Docker (zip release / `dotnet publish`)
+
+The host honours `KNOCKBOX_DATA_ROOT`. Set it to a directory **outside** the install folder before the process starts; the host writes all state under that path instead of the default `{install}/data/`. The variable is read once during startup (Serilog captures the log path immediately), so it must be set in the service unit / shell environment rather than after launch.
+
+```bash
+# Linux systemd unit (Environment=...)
+KNOCKBOX_DATA_ROOT=/var/lib/knockbox
+
+# Windows service / PowerShell
+$env:KNOCKBOX_DATA_ROOT = "C:\ProgramData\KnockBox"
+```
+
+Updates that replace the install directory then leave the data root intact. First-party plugins that ship inside the release artifact are still loaded from `{install}/games/` and intentionally do **not** follow the override.
+
 ## How the plugin system works (1-minute mental model)
 
 - The host `KnockBox.csproj` references plugins with `ReferenceOutputAssembly="false" Private="false"`. Those references exist **only** to make the plugins build transitively — the host takes no compile-time dependency on plugin types.

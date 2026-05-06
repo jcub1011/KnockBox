@@ -21,5 +21,15 @@ EXPOSE 8081
 
 COPY --from=build /app/publish .
 RUN mkdir -p /app/data && chown -R $APP_UID:$APP_UID /app
+
+# Persisted state: admin settings, rolling Serilog logs, per-plugin storage,
+# and operator-installed third-party plugins all live under /app/data. The
+# VOLUME directive ensures Docker creates an anonymous volume by default if
+# the operator runs the image without `-v`, so data survives container
+# recreation. Production deployments should mount a named volume or bind
+# mount; see README.md.
+ENV KNOCKBOX_DATA_ROOT=/app/data
+VOLUME ["/app/data"]
+
 USER $APP_UID
 ENTRYPOINT ["dotnet", "KnockBox.dll"]

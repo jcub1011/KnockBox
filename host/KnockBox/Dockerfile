@@ -2,7 +2,6 @@
 
 # This stage is used when running from VS in fast mode (Default for Debug configuration)
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS base
-USER $APP_UID
 WORKDIR /app
 EXPOSE 8080
 EXPOSE 8081
@@ -27,4 +26,9 @@ RUN dotnet publish "./KnockBox.csproj" -c $BUILD_CONFIGURATION -r linux-x64 --no
 FROM base AS final
 WORKDIR /app
 COPY --from=publish /app/publish .
+# /app/data is the writable root for persisted state. The named volume from
+# docker-compose.yml mounts here; chown ensures the non-root runtime user can
+# write to it (named volumes inherit root ownership otherwise).
+RUN mkdir -p /app/data && chown -R $APP_UID:$APP_UID /app
+USER $APP_UID
 ENTRYPOINT ["dotnet", "KnockBox.dll"]
