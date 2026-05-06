@@ -52,6 +52,9 @@ public class SpardleEngineTests
     [DataRow(5, 2.0, 6)]
     [DataRow(10, 2.0, 8)]
     [DataRow(15, 2.0, 9)]
+    [DataRow(3, 2.0, 6)]   // would be 5 without the floor
+    [DataRow(3, 3.0, 6)]   // would be 4 without the floor
+    [DataRow(4, 3.0, 6)]   // would be 5 without the floor
     public void CalculateMaxGuesses_ReturnsExpected(int length, double multiplier, int expected)
     {
         int result = SpardleEngine.CalculateMaxGuesses(length, multiplier);
@@ -59,20 +62,72 @@ public class SpardleEngineTests
     }
 
     // ───────────────────────────────────────────────────────────────────────
-    // Scoring table
+    // Scoring formulas
     // ───────────────────────────────────────────────────────────────────────
 
     [TestMethod]
-    [DataRow(1, true, 10)]
-    [DataRow(2, true, 5)]
-    [DataRow(3, true, 2)]
-    [DataRow(4, true, 1)]
-    [DataRow(7, true, 1)]
-    [DataRow(0, false, 0)]
-    public void PointsForPlacement_MatchesGdd(int placement, bool solved, int expected)
+    [DataRow(5, 1, 11)]   // floor(11.99)
+    [DataRow(5, 2, 5)]    // floor(5.99)
+    [DataRow(5, 3, 3)]    // floor(3.99)
+    [DataRow(10, 1, 20)]  // floor(20.0)
+    [DataRow(10, 2, 10)]  // floor(10.0)
+    [DataRow(10, 4, 5)]   // floor(5.0)
+    [DataRow(15, 1, 26)]  // floor(26.76)
+    [DataRow(15, 2, 13)]  // floor(13.38)
+    [DataRow(5, 20, 0)]   // floor(0.59) — large place collapses to 0
+    [DataRow(0, 1, 0)]    // guard: invalid wordLength
+    [DataRow(5, 0, 0)]    // guard: invalid placement
+    [DataRow(-1, 1, 0)]   // guard: negative wordLength
+    public void PointsForSolver_MatchesFormula(int wordLength, int placement, int expected)
     {
-        Assert.AreEqual(expected, SpardleEngine.PointsForPlacement(placement, solved));
+        Assert.AreEqual(expected, SpardleEngine.PointsForSolver(wordLength, placement));
     }
+
+    [TestMethod]
+    [DataRow(5, 4, 11, 8)]    // floor(0.8 × 11) = 8
+    [DataRow(10, 7, 20, 14)]  // floor(0.7 × 20) = 14
+    [DataRow(10, 9, 20, 18)]  // max correct (n-1) still strictly < anchor
+    [DataRow(10, 0, 20, 0)]   // zero correct
+    [DataRow(5, 3, 0, 0)]     // zero anchor
+    [DataRow(10, 1, 2, 0)]    // floor(0.1 × 2) = 0 — small percent against small anchor
+    [DataRow(0, 1, 11, 0)]    // guard: invalid wordLength
+    [DataRow(5, -1, 11, 0)]   // guard: negative correctCount
+    [DataRow(5, 3, -1, 0)]    // guard: negative anchor
+    public void PointsForNonSolver_ScalesByPercent(int wordLength, int correctCount, int anchor, int expected)
+    {
+        Assert.AreEqual(expected, SpardleEngine.PointsForNonSolver(wordLength, correctCount, anchor));
+    }
+
+    [TestMethod]
+    public void BestCorrectCount_ReturnsMaxAcrossGuesses()
+    {
+        var guesses = new List<GuessResult>
+        {
+            MakeGuess("PPPPP"),  // 0 correct
+            MakeGuess("CCPAA"),  // 2 correct
+            MakeGuess("CCCAA"),  // 3 correct
+            MakeGuess("CACAC"),  // 3 correct (tie)
+        };
+        Assert.AreEqual(3, SpardleEngine.BestCorrectCount(guesses));
+    }
+
+    [TestMethod]
+    public void BestCorrectCount_EmptyList_ReturnsZero()
+    {
+        Assert.AreEqual(0, SpardleEngine.BestCorrectCount(new List<GuessResult>()));
+    }
+
+    private static GuessResult MakeGuess(string statusCode) => new()
+    {
+        Word = new string('a', statusCode.Length),
+        Statuses = statusCode.Select(c => c switch
+        {
+            'C' => LetterStatus.Correct,
+            'P' => LetterStatus.Present,
+            _ => LetterStatus.Absent
+        }).ToArray(),
+        IsCorrect = statusCode.All(c => c == 'C')
+    };
 
     // ───────────────────────────────────────────────────────────────────────
     // Phase transitions
@@ -151,8 +206,8 @@ public class SpardleEngineTests
 
         var outcome = state.RoundHistory[0].Outcomes.Single(o => o.UserId == host.Id);
         Assert.AreEqual(1, outcome.Placement);
-        Assert.AreEqual(10, outcome.PointsAwarded);
-        Assert.AreEqual(10, state.PlayerStates[host.Id].TotalScore);
+        Assert.AreEqual(11, outcome.PointsAwarded);  // floor(10·log10(5)+5) = 11
+        Assert.AreEqual(11, state.PlayerStates[host.Id].TotalScore);
 
         // After the results delay, skip the round-intro countdown and start the next round directly.
         await WaitForPhaseAsync(state, GamePhase.Playing, timeoutMs: 1500);
@@ -278,7 +333,7 @@ public class SpardleEngineTests
         Assert.AreEqual(GamePhase.RoundResults, state.Phase);
         var outcome = state.RoundHistory[0].Outcomes.Single(o => o.UserId == host.Id);
         Assert.AreEqual(1, outcome.Placement);
-        Assert.AreEqual(10, outcome.PointsAwarded);
+        Assert.AreEqual(11, outcome.PointsAwarded);  // floor(10·log10(5)+5) = 11
     }
 
     [TestMethod]
@@ -590,13 +645,16 @@ public class SpardleEngineTests
         state.RoundTimer = TimeSpan.FromSeconds(30);
         state.AllowDictionaryFallback = true;
         state.AllowCompoundWords = true;
+        // Pool word is the target. Submit a different 7-char garbage so the custom-pool
+        // shortcut in ValidateGuess can't accept it — the test has to actually reach the
+        // compound-word decomposition path.
         state.CustomWordPool = ["xzqwplm"];
         state.WordOrderMode = WordOrderMode.ListOrder;
 
         await _engine.StartAsync(host, state);
         await WaitForPhaseAsync(state, GamePhase.Playing, timeoutMs: 1500);
 
-        var result = _engine.SubmitGuess(state, host, "xzqwplm");
+        var result = _engine.SubmitGuess(state, host, "qkpvtxz");
         Assert.IsFalse(result.IsSuccess);
     }
 
@@ -660,9 +718,9 @@ public class SpardleEngineTests
         var p2Outcome = state.RoundHistory[0].Outcomes.Single(o => o.UserId == players[1].Id);
 
         Assert.AreEqual(1, p2Outcome.Placement, "Tactician should rank fewest-guesses first");
-        Assert.AreEqual(10, p2Outcome.PointsAwarded);
+        Assert.AreEqual(11, p2Outcome.PointsAwarded);  // floor(10·log10(5)+5) = 11
         Assert.AreEqual(2, p1Outcome.Placement);
-        Assert.AreEqual(5, p1Outcome.PointsAwarded);
+        Assert.AreEqual(5, p1Outcome.PointsAwarded);   // floor(11.99/2) = 5
     }
 
     // ───────────────────────────────────────────────────────────────────────
@@ -707,6 +765,204 @@ public class SpardleEngineTests
 
         Assert.HasCount(10, state.RoundQueue);
         Assert.AreEqual(10, state.RoundQueue.Distinct().Count(), "all sampled words must be unique");
+    }
+
+    // ───────────────────────────────────────────────────────────────────────
+    // Non-solver scoring (percent × lowest-solver anchor)
+    // ───────────────────────────────────────────────────────────────────────
+
+    [TestMethod]
+    public async Task BuildOutcomes_NonSolverPointsAnchorOnLowestSolver()
+    {
+        // Two solvers (A 1st, B 2nd) and two non-solvers on a 5-letter word.
+        // n=5, place=1 → 11; place=2 → 5. Non-solver anchor = 5 (lowest solver).
+        var (state, host, players) = await CreateStateWithPlayersAsync(4);
+        state.TotalRounds = 1;
+        state.TransitionDuration = TimeSpan.FromMilliseconds(80);
+        state.RoundTimer = TimeSpan.FromSeconds(30);
+        state.WinCondition = WinConditionMode.Tactician;
+        state.WaitForAll = true;
+        state.AllowDictionaryFallback = true;
+        state.CustomWordPool = ["apple"];
+        state.CustomWordPoolLookup = ImmutableHashSet.Create("apple");
+        state.WordOrderMode = WordOrderMode.ListOrder;
+
+        await _engine.StartAsync(host, state);
+        await WaitForPhaseAsync(state, GamePhase.Playing, timeoutMs: 1500);
+
+        // A solves on guess 1 → 1st place. B solves on guess 2 → 2nd place.
+        Assert.IsTrue(_engine.SubmitGuess(state, players[0], "apple").IsSuccess);
+        Assert.IsTrue(_engine.SubmitGuess(state, players[1], "crane").IsSuccess);
+        Assert.IsTrue(_engine.SubmitGuess(state, players[1], "apple").IsSuccess);
+
+        // C exhausts 6 guesses with 4 correct letters in best guess ("apply" → CCCCA).
+        for (int i = 0; i < 6; i++)
+            _ = _engine.SubmitGuess(state, players[2], "apply");
+
+        // D exhausts 6 guesses with 1 correct letter in best guess ("axxxx" → CAAAA).
+        for (int i = 0; i < 6; i++)
+            _ = _engine.SubmitGuess(state, players[3], "ample");
+
+        await WaitForPhaseAsync(state, GamePhase.RoundResults, timeoutMs: 1500);
+
+        var outcomes = state.RoundHistory[0].Outcomes;
+        var a = outcomes.Single(o => o.UserId == players[0].Id);
+        var b = outcomes.Single(o => o.UserId == players[1].Id);
+        var c = outcomes.Single(o => o.UserId == players[2].Id);
+        var d = outcomes.Single(o => o.UserId == players[3].Id);
+
+        Assert.AreEqual(11, a.PointsAwarded);
+        Assert.AreEqual(5, b.PointsAwarded);
+        // C: best guess "apply" has 4 correct positions out of 5 → floor(0.8 × 5) = 4.
+        Assert.AreEqual(4, c.PointsAwarded);
+        Assert.IsLessThan(b.PointsAwarded, c.PointsAwarded, "non-solver must score below lowest solver");
+        // D: "ample" → A:correct, m:absent, p:correct, l:correct, e:correct = 4 correct.
+        // floor(0.8 × 5) = 4. Same as C.
+        Assert.AreEqual(4, d.PointsAwarded);
+    }
+
+    [TestMethod]
+    public async Task BuildOutcomes_AllDnf_AnchorsAtFirstPlaceFormula()
+    {
+        // No one solves: anchor falls back to PointsForSolver(5, 1) = 11.
+        // Player has best-guess "apply" (4 correct out of 5) → floor(0.8 × 11) = 8.
+        var (state, host, players) = await CreateStateWithPlayersAsync(1);
+        state.TotalRounds = 1;
+        state.TransitionDuration = TimeSpan.FromMilliseconds(60);
+        state.RoundTimer = TimeSpan.FromSeconds(30);
+        state.AllowDictionaryFallback = true;
+        state.CustomWordPool = ["apple"];
+        state.CustomWordPoolLookup = ImmutableHashSet.Create("apple");
+        state.WordOrderMode = WordOrderMode.ListOrder;
+
+        await _engine.StartAsync(host, state);
+        await WaitForPhaseAsync(state, GamePhase.Playing, timeoutMs: 1500);
+
+        // Burn 6 guesses, none correct, best has 4 correct positions.
+        for (int i = 0; i < 6; i++)
+            _ = _engine.SubmitGuess(state, players[0], "apply");
+
+        await WaitForPhaseAsync(state, GamePhase.RoundResults, timeoutMs: 1500);
+
+        var outcome = state.RoundHistory[0].Outcomes.Single();
+        Assert.IsTrue(outcome.Dnf);
+        Assert.AreEqual(8, outcome.PointsAwarded);
+    }
+
+    // ───────────────────────────────────────────────────────────────────────
+    // Custom-pool validation under dictionary fallback
+    // ───────────────────────────────────────────────────────────────────────
+
+    [TestMethod]
+    public async Task ValidateGuess_AcceptsCustomPoolWord_WhenFallbackEnabled()
+    {
+        // "zorks" is not in the dictionary but is in the custom pool. With fallback
+        // enabled, the engine must still accept it as a valid guess.
+        var (state, host) = await CreateStateAsync();
+        state.TotalRounds = 1;
+        state.TransitionDuration = TimeSpan.FromMilliseconds(80);
+        state.RoundTimer = TimeSpan.FromSeconds(30);
+        state.AllowDictionaryFallback = true;
+        state.CustomWordPool = ["apple", "zorks"];
+        state.CustomWordPoolLookup = ImmutableHashSet.Create("apple", "zorks");
+        state.WordOrderMode = WordOrderMode.ListOrder;
+
+        await _engine.StartAsync(host, state);
+        await WaitForPhaseAsync(state, GamePhase.Playing, timeoutMs: 1500);
+
+        var result = _engine.SubmitGuess(state, host, "zorks");
+
+        Assert.IsTrue(result.IsSuccess, $"custom-pool word should be accepted with fallback on: {result}");
+    }
+
+    [TestMethod]
+    public async Task ValidateGuess_RejectsRandomGarbage_WhenFallbackEnabled()
+    {
+        // Sanity check: a non-dictionary, non-custom-pool word still fails.
+        var (state, host) = await CreateStateAsync();
+        state.TotalRounds = 1;
+        state.TransitionDuration = TimeSpan.FromMilliseconds(80);
+        state.RoundTimer = TimeSpan.FromSeconds(30);
+        state.AllowDictionaryFallback = true;
+        state.CustomWordPool = ["apple"];
+        state.CustomWordPoolLookup = ImmutableHashSet.Create("apple");
+        state.WordOrderMode = WordOrderMode.ListOrder;
+
+        await _engine.StartAsync(host, state);
+        await WaitForPhaseAsync(state, GamePhase.Playing, timeoutMs: 1500);
+
+        var result = _engine.SubmitGuess(state, host, "zxqwk");
+
+        Assert.IsFalse(result.IsSuccess);
+    }
+
+    [TestMethod]
+    public async Task ValidateGuess_AcceptsCustomPoolWord_WhenFallbackDisabled()
+    {
+        // No-fallback mode + custom pool: only words in the custom pool (and the built-in
+        // pool for the selected mode) are accepted. A coined word like "zorks" must still
+        // be accepted because it's in the custom pool.
+        var (state, host) = await CreateStateAsync();
+        state.TotalRounds = 1;
+        state.TransitionDuration = TimeSpan.FromMilliseconds(80);
+        state.RoundTimer = TimeSpan.FromSeconds(30);
+        state.AllowDictionaryFallback = false;
+        state.CustomWordPool = ["zorks", "apple"];
+        state.CustomWordPoolLookup = ImmutableHashSet.Create("zorks", "apple");
+        state.WordOrderMode = WordOrderMode.ListOrder;
+
+        await _engine.StartAsync(host, state);
+        await WaitForPhaseAsync(state, GamePhase.Playing, timeoutMs: 1500);
+
+        var result = _engine.SubmitGuess(state, host, "zorks");
+
+        Assert.IsTrue(result.IsSuccess, $"custom-pool word should be accepted with fallback off: {result}");
+    }
+
+    [TestMethod]
+    public async Task ValidateGuess_RejectsDictionaryWordNotInPool_WhenFallbackDisabled()
+    {
+        // No-fallback mode: a real word that ISN'T in the custom pool (and isn't in the
+        // built-in NYT pool either, since CustomWordPool overrides the round queue but
+        // WordPoolMode still drives IsInPool) should fail. We pick a guess of matching
+        // length that we know isn't in the NYT-standard 5-letter list.
+        var (state, host) = await CreateStateAsync();
+        state.TotalRounds = 1;
+        state.TransitionDuration = TimeSpan.FromMilliseconds(80);
+        state.RoundTimer = TimeSpan.FromSeconds(30);
+        state.AllowDictionaryFallback = false;
+        state.WordPoolMode = WordPoolMode.HostDefined;
+        state.CustomWordPool = ["zorks"];
+        state.CustomWordPoolLookup = ImmutableHashSet.Create("zorks");
+        state.WordOrderMode = WordOrderMode.ListOrder;
+
+        await _engine.StartAsync(host, state);
+        await WaitForPhaseAsync(state, GamePhase.Playing, timeoutMs: 1500);
+
+        // "crane" is a real word but not in the custom pool. HostDefined mode has no
+        // backing pool in IsInPool, so the check returns false → rejection.
+        var result = _engine.SubmitGuess(state, host, "crane");
+
+        Assert.IsFalse(result.IsSuccess);
+        Assert.IsTrue(result.TryGetFailure(out var failure));
+        Assert.Contains("not in list", failure.PublicMessage);
+    }
+
+    [TestMethod]
+    public async Task StartAsyncCore_RebuildsCustomWordPoolLookup_WhenOutOfSync()
+    {
+        // If state is initialized programmatically with CustomWordPool but no Lookup,
+        // StartAsyncCore's safety belt rebuilds the lookup.
+        var (state, host) = await CreateStateAsync();
+        state.TotalRounds = 1;
+        state.CustomWordPool = ["apple", "zorks"];
+        // Intentionally leave CustomWordPoolLookup empty.
+
+        await _engine.StartAsync(host, state);
+
+        Assert.HasCount(2, state.CustomWordPoolLookup);
+        Assert.Contains("apple", state.CustomWordPoolLookup);
+        Assert.Contains("zorks", state.CustomWordPoolLookup);
     }
 
     [TestMethod]

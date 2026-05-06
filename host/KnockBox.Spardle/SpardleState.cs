@@ -68,6 +68,9 @@ public class SpardleState(User host, ILogger logger) : AbstractGameState(host, l
 
     // Word lists
     public ImmutableList<string> CustomWordPool { get; set; } = [];
+    // O(1) membership check used by SpardleEngine.ValidateGuess. Kept in sync with
+    // CustomWordPool by every assignment path (lobby setters + StartAsyncCore safety belt).
+    public ImmutableHashSet<string> CustomWordPoolLookup { get; set; } = ImmutableHashSet<string>.Empty;
     public ImmutableList<string> RoundQueue { get; set; } = [];
 
     // Player tracking. Writes are owned by SpardleEngine and only ever happen inside
