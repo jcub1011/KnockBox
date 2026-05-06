@@ -44,21 +44,7 @@ public sealed class WakeLockServiceTests
     [TestMethod]
     public async Task AcquireAsync_ImportsModuleOnlyOnce_AcrossMultipleCalls()
     {
-        var module = new Mock<IJSObjectReference>();
-        module
-            .Setup(m => m.InvokeAsync<IJSVoidResult>(
-                "acquire",
-                It.IsAny<CancellationToken>(),
-                It.IsAny<object?[]?>()))
-            .Returns(new ValueTask<IJSVoidResult>(default(IJSVoidResult)!));
-
-        var jsRuntime = new Mock<IJSRuntime>();
-        jsRuntime
-            .Setup(r => r.InvokeAsync<IJSObjectReference>(
-                "import",
-                It.IsAny<object?[]?>()))
-            .Returns(new ValueTask<IJSObjectReference>(module.Object));
-
+        var (jsRuntime, module) = BuildJsMocks();
         var service = new WakeLockService(jsRuntime.Object, NullLogger<WakeLockService>.Instance);
 
         Assert.IsTrue(await service.AcquireAsync());
@@ -82,22 +68,9 @@ public sealed class WakeLockServiceTests
     [TestMethod]
     public async Task AcquireAsync_UsesPlatformContentImportPath()
     {
-        var module = new Mock<IJSObjectReference>();
-        module
-            .Setup(m => m.InvokeAsync<IJSVoidResult>(
-                It.IsAny<string>(),
-                It.IsAny<CancellationToken>(),
-                It.IsAny<object?[]?>()))
-            .Returns(new ValueTask<IJSVoidResult>(default(IJSVoidResult)!));
-
-        var jsRuntime = new Mock<IJSRuntime>();
-        jsRuntime
-            .Setup(r => r.InvokeAsync<IJSObjectReference>(
-                "import",
-                It.IsAny<object?[]?>()))
-            .Returns(new ValueTask<IJSObjectReference>(module.Object));
-
+        var (jsRuntime, _) = BuildJsMocks();
         var service = new WakeLockService(jsRuntime.Object, NullLogger<WakeLockService>.Instance);
+
         Assert.IsTrue(await service.AcquireAsync());
 
         // Guards the "JS lives in KnockBox.Platform RCL, not the host" invariant.
@@ -111,26 +84,7 @@ public sealed class WakeLockServiceTests
     [TestMethod]
     public async Task ReleaseAsync_AfterAcquire_InvokesReleaseOnModule()
     {
-        var module = new Mock<IJSObjectReference>();
-        module
-            .Setup(m => m.InvokeAsync<IJSVoidResult>(
-                It.IsAny<string>(),
-                It.IsAny<CancellationToken>(),
-                It.IsAny<object?[]?>()))
-            .Returns(new ValueTask<IJSVoidResult>(default(IJSVoidResult)!));
-        module
-            .Setup(m => m.InvokeAsync<IJSVoidResult>(
-                It.IsAny<string>(),
-                It.IsAny<object?[]?>()))
-            .Returns(new ValueTask<IJSVoidResult>(default(IJSVoidResult)!));
-
-        var jsRuntime = new Mock<IJSRuntime>();
-        jsRuntime
-            .Setup(r => r.InvokeAsync<IJSObjectReference>(
-                "import",
-                It.IsAny<object?[]?>()))
-            .Returns(new ValueTask<IJSObjectReference>(module.Object));
-
+        var (jsRuntime, module) = BuildJsMocks();
         var service = new WakeLockService(jsRuntime.Object, NullLogger<WakeLockService>.Instance);
 
         Assert.IsTrue(await service.AcquireAsync());
@@ -144,25 +98,9 @@ public sealed class WakeLockServiceTests
     [TestMethod]
     public async Task ReleaseAsync_SwallowsJSDisconnectedException()
     {
-        var module = new Mock<IJSObjectReference>();
-        module
-            .Setup(m => m.InvokeAsync<IJSVoidResult>(
-                "acquire",
-                It.IsAny<CancellationToken>(),
-                It.IsAny<object?[]?>()))
-            .Returns(new ValueTask<IJSVoidResult>(default(IJSVoidResult)!));
-        module
-            .Setup(m => m.InvokeAsync<IJSVoidResult>(
-                "release",
-                It.IsAny<object?[]?>()))
-            .ThrowsAsync(new JSDisconnectedException("circuit gone"));
-
-        var jsRuntime = new Mock<IJSRuntime>();
-        jsRuntime
-            .Setup(r => r.InvokeAsync<IJSObjectReference>(
-                "import",
-                It.IsAny<object?[]?>()))
-            .Returns(new ValueTask<IJSObjectReference>(module.Object));
+        var (jsRuntime, _) = BuildJsMocks(m => m
+            .Setup(x => x.InvokeAsync<IJSVoidResult>("release", It.IsAny<object?[]?>()))
+            .ThrowsAsync(new JSDisconnectedException("circuit gone")));
 
         var service = new WakeLockService(jsRuntime.Object, NullLogger<WakeLockService>.Instance);
         Assert.IsTrue(await service.AcquireAsync());
@@ -174,20 +112,9 @@ public sealed class WakeLockServiceTests
     [TestMethod]
     public async Task AcquireAsync_SwallowsUnexpectedException_AndLogsWarning()
     {
-        var module = new Mock<IJSObjectReference>();
-        module
-            .Setup(m => m.InvokeAsync<IJSVoidResult>(
-                "acquire",
-                It.IsAny<CancellationToken>(),
-                It.IsAny<object?[]?>()))
-            .ThrowsAsync(new InvalidOperationException("boom"));
-
-        var jsRuntime = new Mock<IJSRuntime>();
-        jsRuntime
-            .Setup(r => r.InvokeAsync<IJSObjectReference>(
-                "import",
-                It.IsAny<object?[]?>()))
-            .Returns(new ValueTask<IJSObjectReference>(module.Object));
+        var (jsRuntime, _) = BuildJsMocks(m => m
+            .Setup(x => x.InvokeAsync<IJSVoidResult>("acquire", It.IsAny<CancellationToken>(), It.IsAny<object?[]?>()))
+            .ThrowsAsync(new InvalidOperationException("boom")));
 
         var logger = new CountingLogger();
         var service = new WakeLockService(jsRuntime.Object, logger);
@@ -201,25 +128,9 @@ public sealed class WakeLockServiceTests
     [TestMethod]
     public async Task ReleaseAsync_SwallowsUnexpectedException_AndLogsWarning()
     {
-        var module = new Mock<IJSObjectReference>();
-        module
-            .Setup(m => m.InvokeAsync<IJSVoidResult>(
-                "acquire",
-                It.IsAny<CancellationToken>(),
-                It.IsAny<object?[]?>()))
-            .Returns(new ValueTask<IJSVoidResult>(default(IJSVoidResult)!));
-        module
-            .Setup(m => m.InvokeAsync<IJSVoidResult>(
-                "release",
-                It.IsAny<object?[]?>()))
-            .ThrowsAsync(new InvalidOperationException("boom"));
-
-        var jsRuntime = new Mock<IJSRuntime>();
-        jsRuntime
-            .Setup(r => r.InvokeAsync<IJSObjectReference>(
-                "import",
-                It.IsAny<object?[]?>()))
-            .Returns(new ValueTask<IJSObjectReference>(module.Object));
+        var (jsRuntime, _) = BuildJsMocks(m => m
+            .Setup(x => x.InvokeAsync<IJSVoidResult>("release", It.IsAny<object?[]?>()))
+            .ThrowsAsync(new InvalidOperationException("boom")));
 
         var logger = new CountingLogger();
         var service = new WakeLockService(jsRuntime.Object, logger);
@@ -228,6 +139,37 @@ public sealed class WakeLockServiceTests
         await service.ReleaseAsync();  // must not throw
 
         Assert.AreEqual(1, logger.WarningCount);
+    }
+
+    // Standard wiring: import returns the module, and module 'acquire'/'release' both
+    // succeed with a void result. configureModule layers per-test overrides on top
+    // (e.g., ThrowsAsync on a specific method) before the service is constructed.
+    private static (Mock<IJSRuntime> jsRuntime, Mock<IJSObjectReference> module) BuildJsMocks(
+        Action<Mock<IJSObjectReference>>? configureModule = null)
+    {
+        var module = new Mock<IJSObjectReference>();
+        module
+            .Setup(m => m.InvokeAsync<IJSVoidResult>(
+                It.IsAny<string>(),
+                It.IsAny<CancellationToken>(),
+                It.IsAny<object?[]?>()))
+            .Returns(new ValueTask<IJSVoidResult>(default(IJSVoidResult)!));
+        module
+            .Setup(m => m.InvokeAsync<IJSVoidResult>(
+                It.IsAny<string>(),
+                It.IsAny<object?[]?>()))
+            .Returns(new ValueTask<IJSVoidResult>(default(IJSVoidResult)!));
+
+        configureModule?.Invoke(module);
+
+        var jsRuntime = new Mock<IJSRuntime>();
+        jsRuntime
+            .Setup(r => r.InvokeAsync<IJSObjectReference>(
+                "import",
+                It.IsAny<object?[]?>()))
+            .Returns(new ValueTask<IJSObjectReference>(module.Object));
+
+        return (jsRuntime, module);
     }
 
     // Hand-rolled because Moq cannot generate a Castle proxy for ILogger<WakeLockService>:

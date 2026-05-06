@@ -15,11 +15,16 @@ let releaseGeneration = 0;
 // re-acquire) racing on the initial request both see sentinel === null and
 // would each create a sentinel, orphaning the loser.
 let pendingRequest = null;
+// iOS pre-18.4 PWAs expose navigator.wakeLock but reject every request() with
+// NotAllowedError. Cache that so we don't spam the console on every render or
+// visibilitychange. Cleared only by a page reload — version flips need one anyway.
+let permanentlyUnsupported = false;
 
 async function request() {
     if (sentinel !== null) return;
     if (pendingRequest !== null) { await pendingRequest; return; }
     if (typeof navigator === 'undefined' || !('wakeLock' in navigator)) return;
+    if (permanentlyUnsupported) return;
 
     const requestedGeneration = releaseGeneration;
     pendingRequest = (async () => {
@@ -27,7 +32,12 @@ async function request() {
         try {
             acquired = await navigator.wakeLock.request('screen');
         } catch (err) {
-            console.warn('[WakeLock] request failed:', err);
+            if (err?.name === 'NotAllowedError') {
+                permanentlyUnsupported = true;
+                console.warn('[WakeLock] not permitted on this platform; suppressing further attempts.');
+            } else {
+                console.warn('[WakeLock] request failed:', err);
+            }
             return;
         }
 

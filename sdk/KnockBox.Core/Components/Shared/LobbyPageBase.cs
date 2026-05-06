@@ -136,16 +136,17 @@ namespace KnockBox.Core.Components.Shared
             base.OnAfterRender(firstRender);
         }
 
+        /// <remarks>
+        /// Acquires the wake lock on the first render *after* <see cref="OnInitializedAsync"/>
+        /// completes — not necessarily <paramref name="firstRender"/>, since async init can
+        /// finish later. <c>_wakeLockAcquired</c> makes this idempotent across subsequent
+        /// renders; <c>_kickHandled</c> excludes pages that are about to redirect home.
+        /// The flag is set *before* the await to block re-entry from concurrent renders
+        /// while the JS round-trip is in flight, and cleared on failure so a transient
+        /// JSDisconnect/cancel doesn't permanently disable the lock for this page.
+        /// </remarks>
         protected override async Task OnAfterRenderAsync(bool firstRender)
         {
-            // Acquire on the first render *after* OnInitializedAsync completes —
-            // not necessarily firstRender, since async init can finish later.
-            // _wakeLockAcquired makes this idempotent across subsequent renders;
-            // _kickHandled excludes pages that are about to redirect home.
-            // Set the flag *before* the await to block re-entry from concurrent
-            // renders while the JS round-trip is in flight; clear it on failure
-            // so a transient JSDisconnect/cancel doesn't permanently disable
-            // the lock for this page.
             if (_initialized && !_kickHandled && !_wakeLockAcquired)
             {
                 _wakeLockAcquired = true;

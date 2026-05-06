@@ -19,10 +19,12 @@ namespace KnockBox.Services.Browser
 
         private readonly ILogger<WakeLockService> _logger;
         private readonly Lazy<Task<IJSObjectReference>> _moduleTask;
+        private bool _holdsLock;
 
         public WakeLockService(IJSRuntime jsRuntime, ILogger<WakeLockService> logger)
         {
             ArgumentNullException.ThrowIfNull(jsRuntime);
+            ArgumentNullException.ThrowIfNull(logger);
             _logger = logger;
             _moduleTask = new Lazy<Task<IJSObjectReference>>(() =>
                 jsRuntime.InvokeAsync<IJSObjectReference>("import", ModulePath).AsTask());
@@ -34,6 +36,7 @@ namespace KnockBox.Services.Browser
             {
                 var module = await _moduleTask.Value.ConfigureAwait(false);
                 await module.InvokeVoidAsync("acquire", ct).ConfigureAwait(false);
+                _holdsLock = true;
                 return true;
             }
             catch (JSDisconnectedException) { return false; }
@@ -54,6 +57,7 @@ namespace KnockBox.Services.Browser
             {
                 var module = await _moduleTask.Value.ConfigureAwait(false);
                 await module.InvokeVoidAsync("release").ConfigureAwait(false);
+                _holdsLock = false;
             }
             catch (JSDisconnectedException) { }
             catch (TaskCanceledException) { }
@@ -71,7 +75,8 @@ namespace KnockBox.Services.Browser
             try
             {
                 var module = await _moduleTask.Value.ConfigureAwait(false);
-                await module.InvokeVoidAsync("release").ConfigureAwait(false);
+                if (_holdsLock)
+                    await module.InvokeVoidAsync("release").ConfigureAwait(false);
                 await module.DisposeAsync().ConfigureAwait(false);
             }
             catch (JSDisconnectedException) { }
