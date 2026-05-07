@@ -691,6 +691,153 @@ public class SpardleEngineTests
         Assert.AreEqual(GamePhase.RoundResults, state.Phase);
     }
 
+    // ───────────────────────────────────────────────────────────────────────
+    // Give Up
+    // ───────────────────────────────────────────────────────────────────────
+
+    [TestMethod]
+    public async Task GiveUp_MarksPlayerAsDnfAndFinished()
+    {
+        var (state, host) = await CreateStateAsync();
+        state.TotalRounds = 1;
+        state.TransitionDuration = TimeSpan.FromMilliseconds(80);
+        state.RoundTimer = TimeSpan.FromSeconds(30);
+        state.CustomWordPool = ["apple"];
+        state.WordOrderMode = WordOrderMode.ListOrder;
+
+        await _engine.StartAsync(host, state);
+        await WaitForPhaseAsync(state, GamePhase.Playing, timeoutMs: 1500);
+
+        var before = DateTime.UtcNow;
+        var result = _engine.GiveUp(state, host);
+
+        Assert.IsTrue(result.IsSuccess, $"GiveUp should succeed: {result}");
+        var ps = state.PlayerStates[host.Id];
+        Assert.IsTrue(ps.HasFinishedRound);
+        Assert.IsTrue(ps.Dnf);
+        Assert.IsNotNull(ps.FinishedAt);
+        Assert.IsTrue(ps.FinishedAt >= before);
+    }
+
+    [TestMethod]
+    public async Task GiveUp_TriggersRoundEnd_WhenLastUnfinishedPlayer()
+    {
+        var (state, host, players) = await CreateStateWithPlayersAsync(2);
+        state.TotalRounds = 1;
+        state.TransitionDuration = TimeSpan.FromMilliseconds(80);
+        state.RoundTimer = TimeSpan.FromSeconds(30);
+        state.WaitForAll = true;
+        state.WinCondition = WinConditionMode.Sprinter;
+        state.CustomWordPool = ["apple"];
+        state.WordOrderMode = WordOrderMode.ListOrder;
+
+        await _engine.StartAsync(host, state);
+        await WaitForPhaseAsync(state, GamePhase.Playing, timeoutMs: 1500);
+
+        Assert.IsTrue(_engine.SubmitGuess(state, players[0], "apple").IsSuccess);
+        // WaitForAll holds the round open until everyone finishes.
+        Assert.AreEqual(GamePhase.Playing, state.Phase);
+
+        var giveUpResult = _engine.GiveUp(state, players[1]);
+
+        Assert.IsTrue(giveUpResult.IsSuccess);
+        Assert.AreEqual(GamePhase.RoundResults, state.Phase);
+    }
+
+    [TestMethod]
+    public async Task GiveUp_ReturnsFailure_WhenRoundNotActive()
+    {
+        var (state, host) = await CreateStateAsync();
+        state.CustomWordPool = ["apple"];
+
+        var result = _engine.GiveUp(state, host);
+
+        Assert.IsFalse(result.IsSuccess);
+        Assert.IsTrue(result.TryGetFailure(out var failure));
+        Assert.Contains("not active", failure.PublicMessage);
+    }
+
+    [TestMethod]
+    public async Task GiveUp_IsIdempotent_WhenPlayerAlreadyFinished()
+    {
+        var (state, host, players) = await CreateStateWithPlayersAsync(2);
+        state.TotalRounds = 1;
+        state.TransitionDuration = TimeSpan.FromMilliseconds(80);
+        state.RoundTimer = TimeSpan.FromSeconds(30);
+        state.WaitForAll = true;
+        state.CustomWordPool = ["apple"];
+        state.WordOrderMode = WordOrderMode.ListOrder;
+
+        await _engine.StartAsync(host, state);
+        await WaitForPhaseAsync(state, GamePhase.Playing, timeoutMs: 1500);
+
+        // First give-up. WaitForAll keeps the round Playing because players[1] is still going.
+        Assert.IsTrue(_engine.GiveUp(state, players[0]).IsSuccess);
+        Assert.AreEqual(GamePhase.Playing, state.Phase);
+
+        var ps = state.PlayerStates[players[0].Id];
+        var firstFinishedAt = ps.FinishedAt;
+
+        // Second call is a no-op success — does not change FinishedAt.
+        var second = _engine.GiveUp(state, players[0]);
+
+        Assert.IsTrue(second.IsSuccess);
+        Assert.AreEqual(firstFinishedAt, ps.FinishedAt);
+    }
+
+    [TestMethod]
+    public async Task GiveUp_ObserverHost_ReturnsError()
+    {
+        var (state, host, _) = await CreateStateWithPlayersAsync(1);
+        state.TotalRounds = 1;
+        state.TransitionDuration = TimeSpan.FromMilliseconds(80);
+        state.RoundTimer = TimeSpan.FromSeconds(30);
+        state.CustomWordPool = ["apple"];
+        state.WordOrderMode = WordOrderMode.ListOrder;
+
+        await _engine.StartAsync(host, state);
+        await WaitForPhaseAsync(state, GamePhase.Playing, timeoutMs: 1500);
+
+        var result = _engine.GiveUp(state, host);
+
+        Assert.IsFalse(result.IsSuccess);
+        Assert.IsTrue(result.TryGetFailure(out var failure));
+        Assert.Contains("observing", failure.PublicMessage);
+        Assert.IsFalse(state.PlayerStates.ContainsKey(host.Id));
+    }
+
+    [TestMethod]
+    public async Task GiveUp_ScoringTreatsPlayerAsNonSolver()
+    {
+        var (state, host, players) = await CreateStateWithPlayersAsync(2);
+        state.TotalRounds = 1;
+        state.TransitionDuration = TimeSpan.FromMilliseconds(80);
+        state.RoundTimer = TimeSpan.FromSeconds(30);
+        state.WaitForAll = true;
+        state.WinCondition = WinConditionMode.Sprinter;
+        state.AllowDictionaryFallback = true;
+        state.CustomWordPool = ["apple"];
+        state.CustomWordPoolLookup = ImmutableHashSet.Create("apple");
+        state.WordOrderMode = WordOrderMode.ListOrder;
+
+        await _engine.StartAsync(host, state);
+        await WaitForPhaseAsync(state, GamePhase.Playing, timeoutMs: 1500);
+
+        // p0 solves; p1 gives up without ever guessing → 0 correct letters → 0 points.
+        Assert.IsTrue(_engine.SubmitGuess(state, players[0], "apple").IsSuccess);
+        Assert.IsTrue(_engine.GiveUp(state, players[1]).IsSuccess);
+
+        await WaitForPhaseAsync(state, GamePhase.RoundResults, timeoutMs: 1500);
+
+        var solver = state.RoundHistory[0].Outcomes.Single(o => o.UserId == players[0].Id);
+        var giverUpper = state.RoundHistory[0].Outcomes.Single(o => o.UserId == players[1].Id);
+
+        Assert.IsFalse(solver.Dnf);
+        Assert.IsTrue(giverUpper.Dnf);
+        Assert.AreEqual(0, giverUpper.PointsAwarded);
+        Assert.AreEqual(0, giverUpper.Placement);
+    }
+
     [TestMethod]
     public async Task BuildOutcomes_Tactician_RanksByFewestGuesses()
     {

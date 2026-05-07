@@ -534,6 +534,34 @@ public class SpardleEngine(
         return Result.FromCancellation();
     }
 
+    public Result GiveUp(SpardleState state, User player)
+    {
+        var executeResult = state.Execute<Result>(() =>
+        {
+            if (player.Id == state.Host.Id && !state.HostIsParticipant)
+                return Result.FromError("Host is observing and cannot give up.");
+
+            if (state.Phase != GamePhase.Playing || !state.IsRoundActive)
+                return Result.FromError("Round is not active.");
+
+            if (!state.TryGetPlayerState(player.Id, out var pState))
+                return Result.FromError("You are not a participant in this round.");
+
+            if (pState.HasFinishedRound) return Result.Success;
+
+            pState.HasFinishedRound = true;
+            pState.Dnf = true;
+            pState.FinishedAt = DateTime.UtcNow;
+
+            CheckRoundEnd(state);
+            return Result.Success;
+        });
+
+        if (executeResult.TryGetSuccess(out var inner)) return inner;
+        if (executeResult.TryGetFailure(out var err)) return Result.FromError(err);
+        return Result.FromCancellation();
+    }
+
     private Result ValidateGuess(SpardleState state, PlayerState pState, string guess)
     {
         if (guess.Length != state.TargetWord.Length)

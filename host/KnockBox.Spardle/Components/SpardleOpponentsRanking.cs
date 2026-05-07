@@ -34,13 +34,17 @@ internal static class SpardleOpponentsRanking
 
         if (state.WinCondition == WinConditionMode.Sprinter)
         {
-            // Solved players surface first, ordered by solve time. The remaining
-            // group (still guessing or DNF) ranks by letter progress: greens
-            // first, then yellows, then name. Constant-within-group keys keep
-            // each ThenBy a no-op outside its target group.
+            // Three-state grouping: solved → still-guessing → DNF. DNF players (max-guess
+            // exhaustion or voluntary give-up) carry a FinishedAt timestamp; without the
+            // explicit DNF bucket they would tiebreak ahead of still-guessing players via
+            // the FinishedAt key, surfacing forfeits above active competitors.
+            // Within each group: solvers by finish time; non-solvers by letter progress.
+            // Constant-within-group keys keep each ThenBy a no-op outside its target group.
             sorted = entries
-                .OrderBy(p => p.Ps.HasFinishedRound && !p.Ps.Dnf ? 0 : 1)
-                .ThenBy(p => (p.Ps.FinishedAt ?? DateTime.MaxValue).Ticks)
+                .OrderBy(p => RoundStateSortKey(p.Ps))
+                .ThenBy(p => p.Ps.HasFinishedRound && !p.Ps.Dnf
+                    ? (p.Ps.FinishedAt ?? DateTime.MaxValue).Ticks
+                    : 0L)
                 .ThenByDescending(p => p.Ps.HasFinishedRound && !p.Ps.Dnf ? 0 : p.CorrectPos)
                 .ThenByDescending(p => p.Ps.HasFinishedRound && !p.Ps.Dnf ? 0 : p.WrongPos)
                 .ThenBy(p => p.DisplayName, StringComparer.OrdinalIgnoreCase);

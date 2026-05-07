@@ -48,11 +48,11 @@ public class SpardleState(User host, ILogger logger) : AbstractGameState(host, l
     public double DifficultyMultiplier { get; set; } = 2.0;
     
     // Dynamic defaults
-    public bool WaitForAll { get; set; } = false;
+    public bool WaitForAll { get; set; } = true;
     public bool RevealAnswer { get; set; } = true;
 
     // Game state
-    public int TotalRounds { get; set; } = 3;
+    public int TotalRounds { get; set; } = 5;
     public int CurrentRound { get; set; } = 0;
     public string TargetWord { get; set; } = string.Empty;
     public DateTime? RoundStartTime { get; set; }

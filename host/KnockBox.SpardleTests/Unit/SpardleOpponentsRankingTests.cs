@@ -234,7 +234,7 @@ public class SpardleOpponentsRankingTests
     }
 
     [TestMethod]
-    public void ComputeRanked_Sprinter_DnfRanksWithUnsolvedByLetterProgress()
+    public void ComputeRanked_Sprinter_DnfRanksBelowStillGuessing_RegardlessOfProgress()
     {
         var state = MakeState(WinConditionMode.Sprinter, "apple");
         state.RoundStartTime = DateTime.UtcNow;
@@ -242,21 +242,56 @@ public class SpardleOpponentsRankingTests
         var alice = AddPlayer(state, "Alice");
         var bob = AddPlayer(state, "Bob");
 
-        // Alice DNF with 3 greens.
+        // Alice DNF with 3 greens (good progress, but forfeited).
         var alicePs = state.CreatePlayerState(alice.Id);
+        alicePs.HasFinishedRound = true;
         alicePs.Dnf = true;
+        alicePs.FinishedAt = state.RoundStartTime.Value.AddSeconds(20);
         alicePs.Guesses = ImmutableList.Create(
             MakeGuess("apple", LetterStatus.Correct, LetterStatus.Correct, LetterStatus.Correct, LetterStatus.Absent, LetterStatus.Absent));
 
-        // Bob still guessing with 1 green.
+        // Bob still guessing with only 1 green.
         state.CreatePlayerState(bob.Id).Guesses = ImmutableList.Create(
             MakeGuess("apple", LetterStatus.Correct, LetterStatus.Absent, LetterStatus.Absent, LetterStatus.Absent, LetterStatus.Absent));
 
         var ranked = SpardleOpponentsRanking.ComputeRanked(state);
 
-        // Per spec, unsolved+DNF share a group; sort by greens (Alice 3 > Bob 1).
-        Assert.AreEqual("Alice", ranked[0].DisplayName);
+        // Bob still has a chance; Alice has forfeited — Alice must drop below regardless of greens.
+        Assert.AreEqual("Bob", ranked[0].DisplayName);
+        Assert.AreEqual("Alice", ranked[1].DisplayName);
+    }
+
+    [TestMethod]
+    public void ComputeRanked_Sprinter_GiveUpDoesNotSurfaceAboveStillGuessing()
+    {
+        // Regression: a give-up player has FinishedAt set. The previous Sprinter sort used
+        // FinishedAt as the universal tiebreak, which placed give-up forfeits at the top of
+        // the unsolved group instead of dropping them to DNF.
+        var state = MakeState(WinConditionMode.Sprinter, "apple");
+        state.RoundStartTime = new DateTime(2026, 1, 1, 10, 0, 0, DateTimeKind.Utc);
+
+        var alice = AddPlayer(state, "Alice");
+        var bob = AddPlayer(state, "Bob");
+        var carol = AddPlayer(state, "Carol");
+
+        // Alice gave up early — DNF with FinishedAt set.
+        var alicePs = state.CreatePlayerState(alice.Id);
+        alicePs.HasFinishedRound = true;
+        alicePs.Dnf = true;
+        alicePs.FinishedAt = state.RoundStartTime.Value.AddSeconds(10);
+
+        // Bob and Carol still guessing.
+        state.CreatePlayerState(bob.Id).Guesses = ImmutableList.Create(
+            MakeGuess("apple", LetterStatus.Correct, LetterStatus.Absent, LetterStatus.Absent, LetterStatus.Absent, LetterStatus.Absent));
+        state.CreatePlayerState(carol.Id).Guesses = ImmutableList.Create(
+            MakeGuess("apple", LetterStatus.Correct, LetterStatus.Correct, LetterStatus.Absent, LetterStatus.Absent, LetterStatus.Absent));
+
+        var ranked = SpardleOpponentsRanking.ComputeRanked(state);
+
+        // Carol (2g) > Bob (1g) > Alice (DNF, regardless of finish time).
+        Assert.AreEqual("Carol", ranked[0].DisplayName);
         Assert.AreEqual("Bob", ranked[1].DisplayName);
+        Assert.AreEqual("Alice", ranked[2].DisplayName);
     }
 
     [TestMethod]
