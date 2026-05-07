@@ -1,6 +1,9 @@
 @using KnockBox.Spardle
 @using KnockBox.Spardle.Components
 @using KnockBox.Spardle.Models
+@using Microsoft.JSInterop
+@implements IAsyncDisposable
+@inject IJSRuntime JSRuntime
 
 <div class="spd-obs" @key="@State.CurrentRound">
     <header class="spd-obs-top">
@@ -28,13 +31,18 @@
             : 6;
         var accents = new[] { "spd-obs-a", "spd-obs-b", "spd-obs-c", "spd-obs-d" };
         int accentIdx = 0;
+
+        var visiblePlayerIds = new HashSet<string>(State.Players.Select(p => p.User.Id));
+        var rankedEntries = SpardleOpponentsRanking.ComputeRanked(State)
+            .Where(r => visiblePlayerIds.Contains(r.User.Id))
+            .ToList();
     }
 
     <main class="spd-obs-gallery @(HighContrast ? "spd-hc" : "")" style="--spd-cols:@wordLen;">
-        @foreach (var entry in State.Players)
+        @foreach (var entry in rankedEntries)
         {
+            var ps = entry.PlayerState;
             var accent = accents[accentIdx++ % accents.Length];
-            if (!State.PlayerStates.TryGetValue(entry.User.Id, out var ps)) { continue; }
 
             string statusTag;
             string statusClass;
@@ -42,7 +50,13 @@
             else if (ps.HasFinishedRound) { statusTag = FormatSolvedTag(ps, State.RoundStartTime); statusClass = "spd-obs-solved"; }
             else { statusTag = "GUESSING…"; statusClass = "spd-obs-active"; }
 
-            <section class="spd-obs-card @accent">
+            var isSolved = ps.HasFinishedRound && !ps.Dnf;
+            var solvedRowIdx = isSolved && ps.Guesses.Count > 0 ? ps.Guesses.Count - 1 : -1;
+            var outcomeCls = isSolved ? "spd-obs-card-solved" : ps.Dnf ? "spd-obs-card-dnf" : "";
+
+            <section class="spd-obs-card @accent @outcomeCls"
+                     @key="entry.User.Id"
+                     data-spd-id="@entry.User.Id">
                 <div class="spd-obs-card-top">
                     <span class="spd-obs-avatar">@Initials(entry.DisplayName)</span>
                     <span class="spd-obs-name">@entry.DisplayName</span>
@@ -50,9 +64,11 @@
                 </div>
 
                 <div class="spd-obs-mini" style="--spd-cols:@wordLen; --spd-rows:@maxGuesses;">
-                    @foreach (var guess in ps.Guesses)
+                    @for (int gIdx = 0; gIdx < ps.Guesses.Count; gIdx++)
                     {
-                        <div class="spd-obs-row">
+                        var guess = ps.Guesses[gIdx];
+                        var winnerCls = gIdx == solvedRowIdx ? "spd-obs-row-winner" : "";
+                        <div class="spd-obs-row @winnerCls">
                             @for (int i = 0; i < guess.Statuses.Length; i++)
                             {
                                 var statusClassName = guess.Statuses[i] switch
@@ -86,6 +102,45 @@
     [Parameter, EditorRequired] public SpardleState State { get; set; } = default!;
     [Parameter] public bool HighContrast { get; set; }
     [Parameter] public EventCallback OnToggleContrast { get; set; }
+
+    private IJSObjectReference? _flipModule;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_flipModule is null)
+        {
+            try
+            {
+                _flipModule = await JSRuntime.InvokeAsync<IJSObjectReference>(
+                    "import", "./_content/KnockBox.Spardle/js/spardle-host-flip.js");
+            }
+            catch (JSDisconnectedException) { return; }
+            catch (TaskCanceledException) { return; }
+        }
+
+        try
+        {
+            await _flipModule.InvokeVoidAsync(
+                "reorder",
+                ".spd-obs-gallery",
+                ".spd-obs-card",
+                "data-spd-id",
+                450,
+                State.CurrentRound);
+        }
+        catch (JSDisconnectedException) { /* circuit torn down */ }
+        catch (TaskCanceledException) { /* superseded */ }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_flipModule is not null)
+        {
+            try { await _flipModule.DisposeAsync(); }
+            catch (JSDisconnectedException) { /* circuit torn down */ }
+            catch (TaskCanceledException) { /* superseded */ }
+        }
+    }
 
     private static string Initials(string name)
     {
