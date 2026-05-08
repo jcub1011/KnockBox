@@ -1,0 +1,43 @@
+@page "/room/dnd-mapper/{ObfuscatedRoomCode}"
+
+@inherits LobbyPageBase<DndMapperGameState>
+@using KnockBox.DndMapper.Services.State.Games
+
+<PageTitle>DnD Mapper</PageTitle>
+
+<HeadContent>
+    <link href="_content/KnockBox.DndMapper/KnockBox.DndMapper.styles.css" rel="stylesheet" />
+</HeadContent>
+
+<div class="dndm-content">
+    @if (GameState == null)
+    {
+        <div>Loading...</div>
+    }
+    else if (GameState.IsJoinable)
+    {
+        <div class="card">
+            <h4>Players</h4>
+            <div class="player-list">
+                @foreach (var entry in GameState.Players)
+                {
+                    <button class="btn" title="Click to kick player."
+                            @onclick="() => GameState.KickPlayer(entry.User)">
+                        @entry.DisplayName @(entry.User.Id == GameState.Host.Id ? "(Host)" : "")
+                    </button>
+                }
+            </div>
+            @if (UserService.CurrentUser?.Id == GameState.Host.Id)
+            {
+                <button class="btn btn-primary mt-3" @onclick="StartGame">Start Session</button>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="card">
+            <h3>DnD Mapper</h3>
+            <p>Game scaffold &mdash; gameplay coming soon.</p>
+        </div>
+    }
+</div>

@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "name": "DnD Mapper",
+  "description": "Collaborative tabletop map building.",
+  "routeIdentifier": "dnd-mapper",
+  "version": "1.0.0",
+  "entryAssembly": "KnockBox.DndMapper",
+  "capabilities": []
+}

@@ -23,4 +23,6 @@
   <Project Path="KnockBox.TaskMasterTests/KnockBox.TaskMasterTests.csproj" />
   <Project Path="KnockBox.Spardle/KnockBox.Spardle.csproj" />
   <Project Path="KnockBox.SpardleTests/KnockBox.SpardleTests.csproj" />
+  <Project Path="KnockBox.DndMapper/KnockBox.DndMapper.csproj" />
+  <Project Path="KnockBox.DndMapperTests/KnockBox.DndMapperTests.csproj" />
 </Solution>

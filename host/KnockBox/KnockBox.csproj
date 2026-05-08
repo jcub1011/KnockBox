@@ -74,6 +74,8 @@
                       ReferenceOutputAssembly="false" Private="false" />
     <ProjectReference Include="..\KnockBox.Spardle\KnockBox.Spardle.csproj"
                       ReferenceOutputAssembly="false" Private="false" />
+    <ProjectReference Include="..\KnockBox.DndMapper\KnockBox.DndMapper.csproj"
+                      ReferenceOutputAssembly="false" Private="false" />
   </ItemGroup>
 
   <!--
