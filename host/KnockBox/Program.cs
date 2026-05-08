@@ -1,6 +1,5 @@
 using KnockBox.Services.Logic.Admin;
 using KnockBox.Services.Logic.Games.Shared;
-using KnockBox.Services.Logic.Storage;
 using KnockBox.Admin;
 using KnockBox.Components;
 using KnockBox.Platform;
@@ -31,7 +30,7 @@ namespace KnockBox
                 .Get<AdminOptions>() ?? new AdminOptions();
 
             // Register IStoragePathService early so we can use it for logging and plugin discovery.
-            var storagePath = new StoragePathService();
+            var storagePath = new DefaultStoragePathService();
             builder.Services.AddSingleton<IStoragePathService>(storagePath);
 
             var logDirectory = storagePath.GetLogDirectory();

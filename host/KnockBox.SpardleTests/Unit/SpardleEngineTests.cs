@@ -817,7 +817,6 @@ public class SpardleEngineTests
         state.WinCondition = WinConditionMode.Sprinter;
         state.AllowDictionaryFallback = true;
         state.CustomWordPool = ["apple"];
-        state.CustomWordPoolLookup = ImmutableHashSet.Create("apple");
         state.WordOrderMode = WordOrderMode.ListOrder;
 
         await _engine.StartAsync(host, state);
@@ -931,7 +930,6 @@ public class SpardleEngineTests
         state.WaitForAll = true;
         state.AllowDictionaryFallback = true;
         state.CustomWordPool = ["apple"];
-        state.CustomWordPoolLookup = ImmutableHashSet.Create("apple");
         state.WordOrderMode = WordOrderMode.ListOrder;
 
         await _engine.StartAsync(host, state);
@@ -979,7 +977,6 @@ public class SpardleEngineTests
         state.RoundTimer = TimeSpan.FromSeconds(30);
         state.AllowDictionaryFallback = true;
         state.CustomWordPool = ["apple"];
-        state.CustomWordPoolLookup = ImmutableHashSet.Create("apple");
         state.WordOrderMode = WordOrderMode.ListOrder;
 
         await _engine.StartAsync(host, state);
@@ -1011,7 +1008,6 @@ public class SpardleEngineTests
         state.RoundTimer = TimeSpan.FromSeconds(30);
         state.AllowDictionaryFallback = true;
         state.CustomWordPool = ["apple", "zorks"];
-        state.CustomWordPoolLookup = ImmutableHashSet.Create("apple", "zorks");
         state.WordOrderMode = WordOrderMode.ListOrder;
 
         await _engine.StartAsync(host, state);
@@ -1032,7 +1028,6 @@ public class SpardleEngineTests
         state.RoundTimer = TimeSpan.FromSeconds(30);
         state.AllowDictionaryFallback = true;
         state.CustomWordPool = ["apple"];
-        state.CustomWordPoolLookup = ImmutableHashSet.Create("apple");
         state.WordOrderMode = WordOrderMode.ListOrder;
 
         await _engine.StartAsync(host, state);
@@ -1055,7 +1050,6 @@ public class SpardleEngineTests
         state.RoundTimer = TimeSpan.FromSeconds(30);
         state.AllowDictionaryFallback = false;
         state.CustomWordPool = ["zorks", "apple"];
-        state.CustomWordPoolLookup = ImmutableHashSet.Create("zorks", "apple");
         state.WordOrderMode = WordOrderMode.ListOrder;
 
         await _engine.StartAsync(host, state);
@@ -1080,7 +1074,6 @@ public class SpardleEngineTests
         state.AllowDictionaryFallback = false;
         state.WordPoolMode = WordPoolMode.HostDefined;
         state.CustomWordPool = ["zorks"];
-        state.CustomWordPoolLookup = ImmutableHashSet.Create("zorks");
         state.WordOrderMode = WordOrderMode.ListOrder;
 
         await _engine.StartAsync(host, state);
@@ -1096,20 +1089,21 @@ public class SpardleEngineTests
     }
 
     [TestMethod]
-    public async Task StartAsyncCore_RebuildsCustomWordPoolLookup_WhenOutOfSync()
+    public async Task SpardleState_AssigningCustomWordPool_KeepsLookupInSync()
     {
-        // If state is initialized programmatically with CustomWordPool but no Lookup,
-        // StartAsyncCore's safety belt rebuilds the lookup.
-        var (state, host) = await CreateStateAsync();
-        state.TotalRounds = 1;
-        state.CustomWordPool = ["apple", "zorks"];
-        // Intentionally leave CustomWordPoolLookup empty.
+        // The CustomWordPool setter auto-derives CustomWordPoolLookup, so callers
+        // cannot leave the two desynced.
+        var (state, _) = await CreateStateAsync();
 
-        await _engine.StartAsync(host, state);
+        state.CustomWordPool = ["apple", "zorks"];
 
         Assert.HasCount(2, state.CustomWordPoolLookup);
         Assert.Contains("apple", state.CustomWordPoolLookup);
         Assert.Contains("zorks", state.CustomWordPoolLookup);
+
+        state.CustomWordPool = ImmutableList<string>.Empty;
+
+        Assert.IsEmpty(state.CustomWordPoolLookup);
     }
 
     [TestMethod]

@@ -67,10 +67,19 @@ public class SpardleState(User host, ILogger logger) : AbstractGameState(host, l
     public string? LastCompletedAnswer { get; set; }
 
     // Word lists
-    public ImmutableList<string> CustomWordPool { get; set; } = [];
-    // O(1) membership check used by SpardleEngine.ValidateGuess. Kept in sync with
-    // CustomWordPool by every assignment path (lobby setters + StartAsyncCore safety belt).
-    public ImmutableHashSet<string> CustomWordPoolLookup { get; set; } = ImmutableHashSet<string>.Empty;
+    // CustomWordPool is the canonical ordered list (drives display + round-queue selection).
+    // CustomWordPoolLookup is the O(1) membership view consumed by SpardleEngine.ValidateGuess;
+    // it auto-derives from the setter so callers cannot desync the two.
+    public ImmutableList<string> CustomWordPool
+    {
+        get;
+        set
+        {
+            field = value;
+            CustomWordPoolLookup = value.ToImmutableHashSet(StringComparer.Ordinal);
+        }
+    } = [];
+    public ImmutableHashSet<string> CustomWordPoolLookup { get; private set; } = ImmutableHashSet<string>.Empty;
     public ImmutableList<string> RoundQueue { get; set; } = [];
 
     // Player tracking. Writes are owned by SpardleEngine and only ever happen inside

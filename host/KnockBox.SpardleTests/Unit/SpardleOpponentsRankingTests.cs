@@ -517,6 +517,61 @@ public class SpardleOpponentsRankingTests
     }
 
     // ───────────────────────────────────────────────────────────────────────
+    // Observer view: ComputeRanked composed with the razor's State.Players filter
+    // ───────────────────────────────────────────────────────────────────────
+
+    [TestMethod]
+    public void ObserverViewRankAndFilter_ExcludesHost_OrdersByRoundState()
+    {
+        // Mirrors SpardleHostObserverPlayingView's two-step pipeline:
+        //   1. SpardleOpponentsRanking.ComputeRanked(state)
+        //   2. .Where(r => state.Players.Select(p => p.User.Id).Contains(r.User.Id))
+        // With HostIsParticipant=true, the host IS in ComputeRanked's roster — the
+        // razor's State.Players filter is what drops them from the observer panel.
+        var host = UserFactory.Create("Host", Guid.NewGuid().ToString());
+        var state = new SpardleState(host, NullLogger.Instance);
+        state.Execute(() => state.SetJoinable(true));
+        state.WinCondition = WinConditionMode.Sprinter;
+        state.TargetWord = "apple";
+        state.RoundStartTime = new DateTime(2026, 1, 1, 10, 0, 0, DateTimeKind.Utc);
+        // Host plays alongside the registered players — exercises the observer filter.
+        state.SetHostIsParticipant(true);
+
+        var alice = AddPlayer(state, "Alice");
+        var bob = AddPlayer(state, "Bob");
+        var carol = AddPlayer(state, "Carol");
+
+        // Host: still-guessing (1 green). Filter should drop them.
+        state.CreatePlayerState(host.Id).Guesses = ImmutableList.Create(
+            MakeGuess("apple", LetterStatus.Correct, LetterStatus.Absent, LetterStatus.Absent, LetterStatus.Absent, LetterStatus.Absent));
+        // Alice: solved at +20s.
+        SetSolved(state, alice, state.RoundStartTime.Value.AddSeconds(20));
+        // Bob: still-guessing with 2 greens.
+        state.CreatePlayerState(bob.Id).Guesses = ImmutableList.Create(
+            MakeGuess("apple", LetterStatus.Correct, LetterStatus.Correct, LetterStatus.Absent, LetterStatus.Absent, LetterStatus.Absent));
+        // Carol: DNF.
+        var carolPs = state.CreatePlayerState(carol.Id);
+        carolPs.HasFinishedRound = true;
+        carolPs.Dnf = true;
+        carolPs.FinishedAt = state.RoundStartTime.Value.AddSeconds(15);
+
+        var ranked = SpardleOpponentsRanking.ComputeRanked(state);
+
+        // Pre-filter: host is present.
+        Assert.IsTrue(ranked.Any(r => r.User.Id == host.Id), "host should appear in raw ComputeRanked output when participating");
+
+        // Apply the razor's filter.
+        var visibleIds = state.Players.Select(p => p.User.Id).ToHashSet();
+        var filtered = ranked.Where(r => visibleIds.Contains(r.User.Id)).ToList();
+
+        Assert.IsFalse(filtered.Any(r => r.User.Id == host.Id), "host must be excluded by the observer filter");
+        Assert.HasCount(3, filtered);
+        Assert.AreEqual("Alice", filtered[0].DisplayName);
+        Assert.AreEqual("Bob", filtered[1].DisplayName);
+        Assert.AreEqual("Carol", filtered[2].DisplayName);
+    }
+
+    // ───────────────────────────────────────────────────────────────────────
     // Helpers
     // ───────────────────────────────────────────────────────────────────────
 

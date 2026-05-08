@@ -103,7 +103,11 @@
     [Parameter] public bool HighContrast { get; set; }
     [Parameter] public EventCallback OnToggleContrast { get; set; }
 
+    private const int FlipDurationMs = 450;
+    private const string FlipRootSelector = ".spd-obs-gallery";
+
     private IJSObjectReference? _flipModule;
+    private bool _flipInFlight;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -118,24 +122,36 @@
             catch (TaskCanceledException) { return; }
         }
 
+        // Skip if a previous reorder is still flushing — overlapping reads on the same
+        // root would just race on getBoundingClientRect with no benefit.
+        if (_flipInFlight) return;
+        _flipInFlight = true;
         try
         {
             await _flipModule.InvokeVoidAsync(
                 "reorder",
-                ".spd-obs-gallery",
+                FlipRootSelector,
                 ".spd-obs-card",
                 "data-spd-id",
-                450,
+                FlipDurationMs,
                 State.CurrentRound);
         }
         catch (JSDisconnectedException) { /* circuit torn down */ }
         catch (TaskCanceledException) { /* superseded */ }
+        finally
+        {
+            _flipInFlight = false;
+        }
     }
 
     public async ValueTask DisposeAsync()
     {
         if (_flipModule is not null)
         {
+            try { await _flipModule.InvokeVoidAsync("clear", FlipRootSelector); }
+            catch (JSDisconnectedException) { /* circuit torn down */ }
+            catch (TaskCanceledException) { /* superseded */ }
+
             try { await _flipModule.DisposeAsync(); }
             catch (JSDisconnectedException) { /* circuit torn down */ }
             catch (TaskCanceledException) { /* superseded */ }

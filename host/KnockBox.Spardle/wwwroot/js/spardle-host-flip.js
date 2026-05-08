@@ -35,3 +35,7 @@ export function reorder(rootSelector, itemSelector, keyAttr, durationMs, revisio
     for (const [k, p] of current) next.set(k, { x: p.x, y: p.y });
     cache.positions = next;
 }
+
+export function clear(rootSelector) {
+    caches.delete(rootSelector);
+}

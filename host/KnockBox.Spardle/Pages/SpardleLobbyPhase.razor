@@ -292,7 +292,6 @@
             if (clearCustom)
             {
                 State.CustomWordPool = ImmutableList<string>.Empty;
-                State.CustomWordPoolLookup = ImmutableHashSet<string>.Empty;
             }
         });
         if (clearCustom)
@@ -336,11 +335,7 @@
             .Select(w => w.Trim().ToLowerInvariant())
             .Where(w => w.Length is > 0 and <= 64)
             .ToList();
-        State.Execute(() =>
-        {
-            State.CustomWordPool = words.ToImmutableList();
-            State.CustomWordPoolLookup = words.ToImmutableHashSet(StringComparer.Ordinal);
-        });
+        State.Execute(() => State.CustomWordPool = words.ToImmutableList());
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -370,11 +365,7 @@
             .Select(w => w.Trim().ToLowerInvariant())
             .Where(w => w.Length is > 0 and <= 64)
             .ToList();
-        State.Execute(() =>
-        {
-            State.CustomWordPool = words.ToImmutableList();
-            State.CustomWordPoolLookup = words.ToImmutableHashSet(StringComparer.Ordinal);
-        });
+        State.Execute(() => State.CustomWordPool = words.ToImmutableList());
         _csvFileName = fileName;
         _csvWordCount = words.Count;
         _csvUploadError = null;

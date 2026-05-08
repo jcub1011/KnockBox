@@ -10,7 +10,7 @@ namespace KnockBox.Platform.Storage;
 /// <c>AddKnockBoxPlatform</c> so a host can override any path by registering
 /// its own implementation first.
 /// </summary>
-internal sealed class DefaultStoragePathService : IStoragePathService
+public sealed class DefaultStoragePathService : IStoragePathService
 {
     private readonly string _dataRoot;
 

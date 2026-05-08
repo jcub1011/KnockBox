@@ -53,6 +53,12 @@ First stable release. Freezes the public contract of `IGameModule`, `IPluginMani
 
 - `UpdateJoinableStatus_SameValue_DoesNotFireStateChanged` test. The new `Execute` shape fires `Notify` on every successful execute; same-value idempotence is not a contract. Callers that want it must gate inside the lambda.
 
+### First-party plugin behavior changes
+
+These do not affect the SDK contract but change defaults that hosts will see in the lobby UI:
+
+- **Spardle**: `WaitForAll` default flipped from `false` to `true` and `TotalRounds` default from `3` to `5`. Existing lobbies built from these defaults will now keep the round open until everyone finishes (previously the round ended on the first solver in Sprinter mode) and play 5 rounds instead of 3. Hosts can override either toggle in the lobby UI before starting the game.
+
 ### Internal notes (non-contract)
 
 These do not affect the public API but are relevant to anyone tracking the implementation:

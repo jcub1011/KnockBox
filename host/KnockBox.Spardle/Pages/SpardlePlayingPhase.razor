@@ -79,6 +79,7 @@
 
     private bool _giveUpArmed;
     private CancellationTokenSource? _giveUpResetCts;
+    private bool _disposed;
 
     private async Task OnGiveUpClicked()
     {
@@ -91,11 +92,9 @@
             try
             {
                 await Task.Delay(5000, token);
-                if (!token.IsCancellationRequested)
-                {
-                    _giveUpArmed = false;
-                    StateHasChanged();
-                }
+                if (_disposed || token.IsCancellationRequested) return;
+                _giveUpArmed = false;
+                StateHasChanged();
             }
             catch (OperationCanceledException) { /* superseded */ }
             return;
@@ -108,6 +107,7 @@
 
     public void Dispose()
     {
+        _disposed = true;
         _giveUpResetCts?.Cancel();
         _giveUpResetCts?.Dispose();
     }

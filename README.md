@@ -66,6 +66,8 @@ docker run -d --name knockbox \
 
 To upgrade: `docker stop knockbox && docker rm knockbox && docker pull jabobb/knockbox:latest && docker run … -v knockbox-data:/app/data …`. The volume — and therefore every persisted file above — is reattached to the new container untouched.
 
+> **Note:** `docker run --rm` removes anonymous volumes too, so the `VOLUME` declaration only protects operators using non-`--rm` runs. The named-volume example above is the recommended deployment shape; the `VOLUME` directive is a safety net for first-time runs without `-v`, not a substitute for explicit volume management.
+
 ### Non-Docker (zip release / `dotnet publish`)
 
 The host honours `KNOCKBOX_DATA_ROOT`. Set it to a directory **outside** the install folder before the process starts; the host writes all state under that path instead of the default `{install}/data/`. The variable is read once during startup (Serilog captures the log path immediately), so it must be set in the service unit / shell environment rather than after launch.

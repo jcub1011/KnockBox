@@ -38,11 +38,6 @@ public class SpardleEngine(
             s.IsGameOver = false;
             s.RoundHistory = s.RoundHistory.Clear();
             s.LastCompletedAnswer = null;
-            // Safety belt: if any state-init path bypassed the lobby setters and left the
-            // O(1) lookup desynced from the list, rebuild it. Cheap when already in sync
-            // (count comparison only).
-            if (s.CustomWordPoolLookup.Count != s.CustomWordPool.Count)
-                s.CustomWordPoolLookup = s.CustomWordPool.ToImmutableHashSet(StringComparer.Ordinal);
             GenerateRoundQueue(s);
 
             var playerUsers = s.Players.Select(p => p.User);
