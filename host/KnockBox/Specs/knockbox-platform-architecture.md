@@ -20,6 +20,7 @@ The solution is split into the host project, a shared core library, one class li
 | `KnockBox.CardCounter` | Class Library (game plugin) | Card Counter game logic, state, Razor pages |
 | `KnockBox.Codeword` | Class Library (game plugin) | Codeword game logic, state, Razor pages |
 | `KnockBox.DiceSimulator` | Class Library (game plugin) | Dice Simulator game logic, state, Razor pages |
+| `KnockBox.DndMapper` | Class Library (game plugin) | DnD Mapper game logic, state, Razor pages |
 | `KnockBox.DrawnToDress` | Class Library (game plugin) | Drawn To Dress game logic, state, Razor pages |
 | `KnockBox.HiddenAgenda` | Class Library (game plugin) | Hidden Agenda game logic, state, Razor pages |
 | `KnockBox.Operator` | Class Library (game plugin) | Operator game logic, state, Razor pages |
@@ -31,7 +32,7 @@ The solution is split into the host project, a shared core library, one class li
 | `KnockBox.{Game}Tests` | MSTest | One per first-party plugin — unit and integration tests for that game |
 | `KnockBoxTests` | MSTest | Integration tests for the main `KnockBox` project (repository layer, etc.) |
 
-The repository ships **eight first-party game plugins**: CardCounter, Codeword, DiceSimulator, DrawnToDress, HiddenAgenda, Operator, Spardle, TaskMaster.
+The repository ships **nine first-party game plugins**: CardCounter, Codeword, DiceSimulator, DndMapper, DrawnToDress, HiddenAgenda, Operator, Spardle, TaskMaster.
 
 **`KnockBox` references only `KnockBox.Core`.** Game projects are *not* referenced at compile time — they are loaded at runtime from the `games/` subdirectory alongside the host's binaries (see **Plugin System**). Every game project references `KnockBox.Core` only. Adding, removing, or renaming a game never requires a change to `KnockBox` or to any other game.
 
@@ -731,7 +732,7 @@ Breaking changes to any contract above bump the SDK and host to `2.0.0` in lock-
 
 ## DI Registration
 
-DI is organized into registration extension methods called from `Program.cs` in this order: `RegisterRepositories` → `RegisterValidators` → `RegisterStateServices` → *(`PluginLoader.LoadModules` runs)* → `RegisterLogic(pluginLoadResult)` → navigation and drawing services registered directly on `builder.Services`.
+DI is organized into registration extension methods called from `AddKnockBoxPlatform` (in `KnockBox.Platform`) in this order: `RegisterRepositories` → `RegisterValidators` → `RegisterStateServices` → *(`PluginLoader.LoadModules` runs)* → `RegisterLogic(pluginLoadResult)` → navigation and drawing services registered directly on `builder.Services`.
 
 ### RegisterLogic(PluginLoadResult) — Singletons
 
