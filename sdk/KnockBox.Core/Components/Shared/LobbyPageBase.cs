@@ -1,3 +1,4 @@
+using KnockBox.Core.Services.Browser;
 using KnockBox.Core.Services.Navigation;
 using KnockBox.Core.Services.State.Games.Shared;
 using KnockBox.Core.Services.State.Shared;
@@ -21,6 +22,7 @@ namespace KnockBox.Core.Components.Shared
         [Inject] protected INavigationService NavigationService { get; set; } = default!;
         [Inject] protected IUserService UserService { get; set; } = default!;
         [Inject] protected ITickService TickService { get; set; } = default!;
+        [Inject] protected IWakeLockService WakeLockService { get; set; } = default!;
         [Inject] protected ILoggerFactory LoggerFactory { get; set; } = default!;
 
         [Parameter] public string ObfuscatedRoomCode { get; set; } = default!;
@@ -33,6 +35,7 @@ namespace KnockBox.Core.Components.Shared
         private IDisposable? _tickSubscription;
         private bool _kickHandled;
         private bool _initialized;
+        private bool _wakeLockAcquired;
 
         protected override async Task OnInitializedAsync()
         {
@@ -133,12 +136,34 @@ namespace KnockBox.Core.Components.Shared
             base.OnAfterRender(firstRender);
         }
 
+        /// <remarks>
+        /// Acquires the wake lock on the first render *after* <see cref="OnInitializedAsync"/>
+        /// completes — not necessarily <paramref name="firstRender"/>, since async init can
+        /// finish later. <c>_wakeLockAcquired</c> makes this idempotent across subsequent
+        /// renders; <c>_kickHandled</c> excludes pages that are about to redirect home.
+        /// The flag is set *before* the await to block re-entry from concurrent renders
+        /// while the JS round-trip is in flight, and cleared on failure so a transient
+        /// JSDisconnect/cancel doesn't permanently disable the lock for this page.
+        /// </remarks>
+        protected override async Task OnAfterRenderAsync(bool firstRender)
+        {
+            if (_initialized && !_kickHandled && !_wakeLockAcquired)
+            {
+                _wakeLockAcquired = true;
+                var ok = await WakeLockService.AcquireAsync(ComponentDetached);
+                if (!ok) _wakeLockAcquired = false;
+            }
+            await base.OnAfterRenderAsync(firstRender);
+        }
+
         public override void Dispose()
         {
             OnLobbyDisposing();
             _tickSubscription?.Dispose();
             GameState?.OnStateDisposed -= HandleStateDisposed;
             _stateSubscription?.Dispose();
+            // Fire-and-forget is safe: ReleaseAsync logs and swallows all exceptions.
+            _ = WakeLockService.ReleaseAsync();
             base.Dispose();
         }
 
