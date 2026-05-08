@@ -24,7 +24,7 @@ The host is the user who created the room. They have all player affordances **pl
 
 - **Map management**: create, name, edit, delete maps; pick the *active map* shown to everyone; reorder maps; upload images into the active map; transform (move/scale/rotate/layer) any image; configure each map's grid.
 - **Token management**: place arbitrary NPC/monster tokens on any map; place additional player-style tokens with character sheets (e.g. to run an absent player's character or pilot a DMPC); move *any* token on the board (subject to the token-movement permission setting).
-- **GM rolls**: roll dice with modifiers and choose visibility (public to all, or private to host).
+- **GM rolls**: roll dice with modifiers; all results are visible to all participants.
 - **Session lifecycle**: start the session from the lobby; end the session at any time (everyone returns to the home page).
 - The host's own character token + sheet is **optional** — the host is not required to participate as a character.
 
@@ -36,7 +36,7 @@ A player is any non-host participant who has joined the lobby.
 - May edit their own sheet at any time during the session (subject to permission settings — see §11).
 - Sees the same active map the host has selected.
 - Can move their own token (default permission); cannot move other players' tokens or NPC tokens unless the host changes the permission setting.
-- Can roll dice publicly (all see the result) or privately (only host sees).
+- Can roll dice; all results are visible to all participants.
 
 ### 2.3 Disconnect handling
 
@@ -56,7 +56,7 @@ The session is **open-ended**: there is no auto-progression, round counter, or t
    │       (no transition back) │
 ```
 
-- **Lobby**: standard KnockBox lobby. Host configures session settings (default attribute preset, token-movement permission, dice-roll visibility default — see §11). Host can also pre-author maps before starting (so the session begins with a map already loaded).
+- **Lobby**: standard KnockBox lobby. Host configures session settings (attribute preset, token-movement permission — see §11). Host can also pre-author maps before starting (so the session begins with a map already loaded).
 - **Playing**: indefinite. Host can edit/add/switch maps, manage tokens, and toggle settings live. Players interact with the active map.
 - **End**: host clicks "End Session". State is disposed via existing `GameSessionState.Dispose()` lifecycle. Uploaded images are deleted from plugin storage (see §5.5).
 
@@ -82,8 +82,9 @@ Each `Map` contains:
 | `Images`        | `List<MapImage>` (see §5)  | Background/foreground images composing the map.                  |
 | `Tokens`        | `List<Token>` (see §7)     | All tokens currently on this map.                                |
 | `CreatedUtc`    | `DateTime`                 | For sort order in the switcher.                                  |
+| `DefaultSpawnPosition` | `(double X, double Y)?` | Cell coordinates where player tokens are placed when auto-spawned on this map. If null, the system uses the map center. |
 
-Tokens are **per-map**, not global — when the host switches maps, the tokens visible change. (This avoids the "where did everyone go?" UX problem of switching from a tavern interior to an outdoor wilderness map and dragging interior tokens along.) Each player's token has a "default position" that the host sets (or it auto-centers); when a map becomes active and the player has no token on it yet, one is auto-spawned at the default position.
+Tokens are **per-map**, not global — when the host switches maps, the tokens visible change. (This avoids the "where did everyone go?" UX problem of switching from a tavern interior to an outdoor wilderness map and dragging interior tokens along.) Each Map has an optional `DefaultSpawnPosition` (grid cell coordinates). When a player's token does not yet exist on a map that becomes active, `SpawnPlayerTokenAsync` places it at that position (or at the map center if unset). Token and sheet records are created for all lobby players when the session starts; players joining mid-session have their token spawned immediately on the active map.
 
 > *Open question O-1*: alternative model — tokens are session-global and persist through map switches at their last position. Cleaner for replay-style use; messier for dungeon-vs-overworld. **Default decision: per-map tokens.**
 
@@ -100,11 +101,11 @@ Host-only sidebar listing all maps with thumbnails. Single click on a map = make
 The host clicks "Upload Image" in the active map's editor. The browser opens a file picker. The selected file is sent via HTTP `POST` (multipart) to a new endpoint **`POST /api/dnd-mapper/{ObfuscatedRoomCode}/images`**, registered in `Program.cs` using the standard ASP.NET minimal-api pattern guarded by:
 
 - Authorization: caller's circuit user must equal the room's host.
-- Room must exist and be in `Playing` phase (or `Lobby` if we allow pre-session authoring — see O-2).
+- Room must exist and be in `Playing` or `Lobby` phase (lobby authoring is supported).
 - File size cap — proposal: **20 MB per file**, 200 MB per room total. Enforced via `FormOptions.MultipartBodyLengthLimit` plus a per-room running total tracked on state.
 - MIME/content sniff: only `image/png`, `image/jpeg`, `image/webp` accepted. Reject SVG (avoid embedded-script risk).
 
-The endpoint writes the file to plugin storage using the existing `IPluginStorage` (path-traversal-guarded). Path convention: `plugins/dnd-mapper/{room-id}/images/{guid}.{ext}`. Storage root resolved via existing `IStoragePathService.GetPluginDataDirectory("dnd-mapper")`.
+The endpoint writes the file to plugin storage using the existing `IPluginStorage` (path-traversal-guarded). Path convention: `{room-id}/images/{guid}.{ext}` (relative to the plugin storage root). Storage root resolved via existing `IStoragePathService.GetPluginDataDirectory("dnd-mapper")`.
 
 After write, the endpoint returns the new `MapImage` record. The host's circuit then calls `engine.AddImageAsync(state, hostUser, mapId, mapImage)` to attach it to the active map within `state.ExecuteAsync`, which fires the state-change notification to all players.
 
@@ -157,7 +158,7 @@ v1: **square grid only**. Hex support is out of scope.
 | `WidthCells`    | `int`       | 30      | Number of columns. 5 ≤ W ≤ 200.                                    |
 | `HeightCells`   | `int`       | 20      | Number of rows. 5 ≤ H ≤ 200.                                       |
 | `CellPixels`    | `int`       | 50      | Cell side in CSS pixels at 1× zoom.                                |
-| `ShowGridLines` | `bool`      | true    | Players can override locally (UI-only, not server state) — TBD O-3.|
+| `ShowGridLines` | `bool`      | true    | Players can override locally via a UI toggle (client-only state, not server state). |
 | `SnapToGrid`    | `bool`      | true    | If true, token drops snap to nearest cell center.                  |
 | `LineColor`     | `string`    | "#222"  | Hex; host-configurable.                                            |
 
@@ -178,7 +179,7 @@ Each client has its own pan (px offset) and zoom (scalar). These are **client-lo
 | Type            | Owned by                | Sheet            | Movable by (default)                        |
 | --------------- | ----------------------- | ---------------- | ------------------------------------------- |
 | `PlayerToken`   | A specific `userId`     | One required     | Owner + host                                 |
-| `NPCToken`      | Host (collective)       | None or simple   | Host only                                    |
+| `NPCToken`      | Host (collective) by default; if `PlayersCanCreateNPCs = true`, the creating player's `userId` is assigned as `OwnerUserId`. | None or simple | Host always; creating player if `PlayersCanCreateNPCs = true` (subject to `TokenMovement` setting). |
 | `HostExtraToken`| Host (collective), but flagged "represents player X" optionally | Optional | Host only                                    |
 
 Per the user's role decision (§2): players own exactly one `PlayerToken` and one sheet. The host can spawn any number of `NPCToken`s (no sheet) or `HostExtraToken`s (with optional sheet, useful for piloting absent players' characters or running DMPCs).
@@ -189,9 +190,10 @@ Per the user's role decision (§2): players own exactly one `PlayerToken` and on
 | ------------- | --------------- | -------------------------------------------------------------------------------------- |
 | `Id`          | `Guid`          |                                                                                        |
 | `Type`        | enum            | `PlayerToken` / `NPCToken` / `HostExtraToken`.                                          |
-| `OwnerUserId` | `string?`       | Set for `PlayerToken`; null otherwise. Used to enforce "move own" permission.           |
+| `OwnerUserId` | `string?`       | Set for `PlayerToken`; null otherwise (or creating player's userId for NPCs when `PlayersCanCreateNPCs = true`). Used to enforce "move own" permission. |
+| `RepresentsUserId` | `string?`  | Set on `HostExtraToken` when piloting an absent player's character; null otherwise. Display-only — does not affect permission checks. |
 | `Name`        | `string`        | Player display name by default for `PlayerToken`; host-chosen otherwise.                |
-| `Color`       | `string`        | Border/highlight color. Player picks for own token; host picks for NPC.                 |
+| `Color`       | `string`        | Border/highlight color. Defaults to a deterministic palette color assigned by player slot index (0-based, cycling through a fixed 8-color palette). Player can override for own token; host picks for NPC/extra tokens. |
 | `IconKind`    | `enum`          | v1: `Initial` (first letter of Name) or `Solid` colored disc. Image upload — see O-4.   |
 | `MapId`       | `Guid`          | The map this token currently lives on.                                                  |
 | `X`, `Y`      | `double`        | Cell coordinates.                                                                       |
@@ -224,7 +226,7 @@ The host's "Tokens" panel lists all NPC and host-extra tokens with a "+ Add" but
 
 ### 8.1 Schema selection
 
-The host picks one of the following at session start (lobby) and may re-pick during the session (with a confirmation, since changing the schema invalidates existing attribute values):
+The host picks one of the following at session start (lobby) and may re-pick during the session (with a confirmation). On schema change: attributes whose name exists in both the old and new schema retain their value (type mismatch resets to default); attributes absent from the new schema are silently removed from all sheets.
 
 | Preset           | Attributes                                                                                | Default? |
 | ---------------- | ----------------------------------------------------------------------------------------- | -------- |
@@ -244,13 +246,13 @@ The chosen schema lives on `DndMapperGameState.AttributeSchema` and is broadcast
 | `CharacterName` | `string`                            | Display name on the sheet (separate from KnockBox display name).                     |
 | `Values`      | `Dictionary<string, AttributeValue>`  | Keyed by attribute name from the schema. `AttributeValue` is a discriminated union (int score, int modifier, text). |
 | `Notes`       | `string`                              | Free-text notes the owner can edit.                                                  |
-| `Hp`, `MaxHp` | `int?`                                | Optional v1 hit-point tracking (independent of schema). Visible to host always; visibility to others — TBD O-7. |
+| `Hp`, `MaxHp` | `int?`                                | Optional v1 hit-point tracking (independent of schema). Visible to owner and host only; other players do not see HP values. Both are nullable — if unset, the HP row is hidden in the sheet panel. Edited via +/− stepper buttons (direct numeric entry also allowed). |
 
 ### 8.3 Editing & visibility
 
 - A player edits their **own** sheet via a panel in the side rail.
-- The host can edit **any** sheet (they're acting as GM).
-- Sheets are visible to all participants by default — character names + attributes are public to the table. (Notes and HP — see O-7.) This matches in-person tabletop convention; players who want secret stats are uncommon.
+- The host can edit **any** sheet (they're acting as GM). The host is always exempt from `SheetEditByOthers` — they can edit any sheet regardless of the setting.
+- Character names and attribute values are visible to all participants (matching in-person tabletop convention). Notes and HP are visible to the sheet owner and host only.
 
 ### 8.4 Where the sheet lives in state
 
@@ -272,7 +274,6 @@ RollRequest {
     AttributeRef: (sheetId, attrName)?,  // optional — adds the attribute's modifier
     FlatModifier: int,                    // additive; default 0
     Mode: enum { Normal, Advantage, Disadvantage },
-    Visibility: enum { Public, PrivateToHost, PrivateToSelf },
     Label: string                         // free text, e.g. "Stealth check"
 }
 ```
@@ -285,7 +286,7 @@ RollRequest {
 2. Calls existing `IRandomNumberService.GetRandomInt(1, sides+1, RandomType.Fast)` once per die. (Reuses the platform service the DiceSimulator plugin already uses.)
 3. Computes total: sum of dice (with adv/dis applied to a single d20 if Mode ≠ Normal), plus flat modifier, plus resolved attribute modifier.
 4. Records a `RollResult` in `DndMapperGameState.RollLog : List<RollResult>` (capped at 200 most recent).
-5. Visibility rules determine which clients render the result.
+5. `RollResult` is broadcast to all clients via the standard state-change notification; all rolls are visible to all participants.
 
 ### 9.4 UI
 
@@ -293,10 +294,7 @@ A bottom-right "Roll" button opens a modal with:
 - Quick buttons (`d20`, `2d6`, `Initiative`).
 - A dropdown to attach an attribute from the user's sheet (auto-fills the modifier).
 - Adv/Dis toggles.
-- Visibility selector (default = `Public`).
-- A history strip showing the last several rolls (chat-like log).
-
-Public rolls broadcast to all; private-to-host rolls render only on the host's screen and the rolling player's screen; private-to-self rolls render only on the rolling player's screen.
+- A history strip showing the last 20 rolls (chat-like log; all rolls are visible to all participants).
 
 ---
 
@@ -327,9 +325,12 @@ Configurable session settings, set in lobby and editable mid-session by the host
 | ----------------------------- | ------------------------------------------------------ | ---------------- |
 | `TokenMovement`               | `OwnerOrHost` / `Anyone` / `HostOnly`                  | `OwnerOrHost`    |
 | `SheetEditByOthers`           | `OwnersOnly` / `OwnersAndHost` / `Anyone`              | `OwnersAndHost`  |
-| `DefaultRollVisibility`       | `Public` / `PrivateToHost` / `PrivateToSelf`            | `Public`         |
 | `PlayersCanCreateNPCs`        | `bool`                                                 | `false`          |
 | `MapEditByPlayers`            | `bool`                                                 | `false` (host-only authoring in v1) |
+
+> **`SheetEditByOthers` note**: the host is always exempt — they can edit any sheet regardless of this setting.
+>
+> **`PlayersCanCreateNPCs` note**: when `true`, the creating player's `userId` is stored as `OwnerUserId` on the new `NPCToken`. Movement follows the `TokenMovement` setting (e.g. under `OwnerOrHost`, the creator and host can both move it).
 
 These live on `DndMapperGameState.Settings`.
 
@@ -358,10 +359,10 @@ public sealed class DndMapperGameState : AbstractGameState
 
 Engine methods (verbs):
 
-- **Maps**: `CreateMapAsync`, `RenameMapAsync`, `DeleteMapAsync`, `DuplicateMapAsync`, `SetActiveMapAsync`, `UpdateGridAsync`.
+- **Maps**: `CreateMapAsync`, `RenameMapAsync`, `DeleteMapAsync` (cascade: all tokens on the map are permanently removed; if it was the active map, `ActiveMapId` shifts to the next map in list order or `null` if none remain; clients show an empty canvas when `ActiveMapId` is null), `DuplicateMapAsync`, `SetActiveMapAsync` (triggers `SpawnPlayerTokenAsync` for any player not yet present on the newly active map), `UpdateGridAsync`.
 - **Images**: `AddImageAsync` (called by upload endpoint after disk write), `UpdateImageTransformAsync`, `ReorderImageLayerAsync`, `RemoveImageAsync`.
-- **Tokens**: `SpawnPlayerTokenAsync` (auto on first map activation), `SpawnNpcTokenAsync`, `SpawnHostExtraTokenAsync`, `MoveTokenAsync`, `UpdateTokenAsync` (rename/recolor/icon), `RemoveTokenAsync`, `SetTokenHiddenAsync`.
-- **Sheets**: `CreateSheetAsync`, `UpdateSheetAttributeAsync`, `UpdateSheetFreeFieldsAsync` (name/notes/hp), `DeleteSheetAsync`, `ChangeSchemaAsync`.
+- **Tokens**: `SpawnPlayerTokenAsync` (called at session start for all lobby players and immediately on mid-session join; places token at `Map.DefaultSpawnPosition` or map center), `SpawnNpcTokenAsync`, `SpawnHostExtraTokenAsync`, `MoveTokenAsync`, `UpdateTokenAsync` (rename/recolor/icon), `RemoveTokenAsync`, `SetTokenHiddenAsync`.
+- **Sheets**: `CreateSheetAsync`, `UpdateSheetAttributeAsync`, `UpdateSheetFreeFieldsAsync` (name/notes/hp — `Hp`/`MaxHp` are nullable; if unset the HP row is hidden in the sheet panel), `DeleteSheetAsync`, `ChangeSchemaAsync` (cascade: attributes whose name matches the new schema retain their value, type mismatch resets to default; attributes absent from the new schema are removed from all sheets).
 - **Dice**: `RollAsync`.
 - **Settings**: `UpdateSettingsAsync`.
 - **Lifecycle**: `EndSessionAsync`.
@@ -379,7 +380,7 @@ host/KnockBox.DndMapper/Pages/
     DndMapperPlayingPhase.razor           (NEW — main play canvas)
         Components/
             MapCanvas.razor               (SVG: images + grid + tokens)
-            TokenLayer.razor              (interactive, uses outfitItemDrag.js style interop)
+            TokenLayer.razor              (interactive, uses outfitItemDrag.js style interop; hidden tokens render as 50% opacity with an eye-slash overlay for the host only, and are not rendered at all for non-host players)
             HostMapSwitcher.razor         (host-only sidebar)
             HostImageInspector.razor      (host-only transform handles)
             CharacterSheetPanel.razor     (per-player; switches between own/others)
@@ -427,6 +428,7 @@ These are intentionally excluded from v1 to keep the design scoped. Any of them 
 - **Macros and rollable tables**.
 - **Import/export of campaigns** (no save format).
 - **Mobile-optimized layout** — desktop-first.
+- **Host "center viewport for everyone" broadcast** — the §6.4 affordance that nudges all clients' viewports to a specific cell. Deferred to v1.x.
 
 ---
 
@@ -442,7 +444,7 @@ These are intentionally excluded from v1 to keep the design scoped. Any of them 
 | O-6 | Token-move animation — server is final-position only; should clients tween to smooth the visual?                                                           | Yes, ~150 ms tween.            |
 | O-7 | Sheet HP and Notes visibility — public to all, host-only, or owner-and-host?                                                                              | Owner + host.                  |
 | O-8 | Per-room storage cap (proposed 200 MB) and per-image cap (20 MB) — too high, too low, configurable in `appsettings.json`?                                  | 20 MB / image, 200 MB / room.  |
-| O-9 | Should the dice roll log include all rolls in the session (even private ones, host-only) or only the rolls the viewer is permitted to see?                | Viewer-permission filtered.    |
+| O-9 | ~~Should the dice roll log include private rolls?~~ **Closed**: all rolls are public in v1. No private roll feature. | N/A — all rolls public.        |
 | O-10| Hidden NPC tokens — does the host also see them differently (e.g. ghosted) so they don't forget?                                                          | Yes, ghosted with eye-slash.   |
 
 ---
