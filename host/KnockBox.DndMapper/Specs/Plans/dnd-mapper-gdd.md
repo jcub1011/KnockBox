@@ -27,7 +27,7 @@ The host is the user who created the room. They have all player affordances **pl
 - **GM rolls**: roll dice with modifiers; the host always sees every roll result regardless of session settings.
 - **Session lifecycle**: start the session from the lobby; end the session at any time (everyone returns to the home page).
 - The host's own character token + sheet is **optional** — the host is not required to participate as a character.
-- **Two views**: the host's main tab is the **control view** (full GM interface — hidden tokens visible, all rolls visible, all management panels). A separate **display view** at `/room/dnd-mapper/{ObfuscatedRoomCode}/display` provides a screen-shareable player perspective with no GM overlays (see §13).
+- **View (v1)**: the host's main tab is the **control view** — full GM interface with hidden tokens visible, all rolls visible, all management panels. The screen-shareable **display view** at `/room/dnd-mapper/{ObfuscatedRoomCode}/display` is **deferred to v1.x** (see §13).
 
 ### 2.2 Player
 
@@ -109,7 +109,7 @@ Host-only sidebar listing all maps with thumbnails. Single click on a map = make
 
 ### 5.1 Upload flow
 
-The host clicks "Upload Image" in the active map's editor. The browser opens a file picker. The selected file is sent via HTTP `POST` (multipart) to a new endpoint **`POST /api/dnd-mapper/{ObfuscatedRoomCode}/images`**, registered in `Program.cs` using the standard ASP.NET minimal-api pattern guarded by:
+The host clicks "Upload Image" in the active map's editor. The browser opens a file picker. The selected file is sent via HTTP `POST` (multipart) to **`POST /api/plugins/dnd-mapper/{ObfuscatedRoomCode}/images`**, served by a generic plugin-route dispatcher in `KnockBox.Platform` (registered via `MapKnockBoxPlatformEndpoints`). The dispatcher resolves the plugin engine via keyed DI on `{routeIdentifier}` and delegates to a new SDK-level `IGameEngineHttpHandler` contract that `DndMapperGameEngine` opts into — `Program.cs` has no plugin-specific knowledge, preserving the host↔plugin compile-time isolation invariant. The dispatcher enforces:
 
 - Authorization: caller's circuit user must equal the room's host.
 - Room must exist and be in `Playing` or `Lobby` phase (lobby authoring is supported).
@@ -143,9 +143,9 @@ Images may be stacked freely (e.g. a parchment background, a dungeon floor on to
 
 ### 5.4 Serving uploaded images
 
-Add a controller / minimal-api endpoint **`GET /api/dnd-mapper/{ObfuscatedRoomCode}/images/{imageId}`** that:
+The same platform dispatcher serves **`GET /api/plugins/dnd-mapper/{ObfuscatedRoomCode}/images/{imageId}`** through `IGameEngineHttpHandler`:
 
-- Verifies the room exists. **No further auth check** — the obfuscated room code (two random GUIDs in the URL) is treated as the access token, matching the §13 display view's stance. This avoids the broken-image trap where the screen-shareable display view would otherwise be unable to load any map images.
+- Verifies the room exists. **No further auth check** — the obfuscated room code (two random GUIDs in the URL) is treated as the access token, matching the existing room-URL convention. Keeps the v1 player view simple and leaves the door open for the v1.x display view (§13) to load images without per-circuit auth.
 - Streams the file via `IPluginStorage.OpenRead`, with appropriate `Content-Type` and `Cache-Control: private, max-age=3600` headers.
 
 This avoids exposing the on-disk path and keeps images discoverable only to clients who know the room URL.
@@ -303,7 +303,7 @@ RollRequest {
 2. Validates the dice cap (§9.1) and the adv/dis precondition: when `Mode ≠ Normal`, `Dice` must contain exactly one entry of `(1, 20)` — otherwise the call is rejected. (Adv/dis is a d20-only mechanic; silently ignoring or coercing to the largest die would surprise users.)
 3. Calls existing `IRandomNumberService.GetRandomInt(1, sides+1, RandomType.Fast)` once per die. (Reuses the platform service the DiceSimulator plugin already uses.)
 4. Computes total: sum of dice (with adv/dis applied to the single d20 when Mode ≠ Normal), plus flat modifier, plus resolved attribute modifier.
-5. Records a `RollResult` in `DndMapperGameState.RollLog : List<RollResult>` (capped at 200 most recent). Each `RollResult` carries `RollerUserId : string` (the participant the roll is *attributed* to) and `ForcedByUserId : string?` (set to the host's userId when the host force-rolled on someone else's behalf — see §9.5.3 step 4; null otherwise).
+5. Records a `RollResult` in `DndMapperGameState.RollLog : List<RollResult>` (capped at 200 most recent). Each `RollResult` carries `RollerUserId : string` (the participant the roll is *attributed* to). The `ForcedByUserId : string?` field (set when the host force-rolled on someone else's behalf — see §9.5.3 step 4) is reserved for the v1.x initiative tracker; in v1 it is always `null`.
 6. The full `RollLog` is broadcast to all clients via the standard state-change notification. The host always renders all results. Non-host clients render a result if `Settings.RollsVisibleToPlayers = true` OR `roll.RollerUserId == currentUserId`. **Note: this filtering is client-side** — the full log is on the wire. Server-side per-user diffing was considered and judged not worth the complexity for v1; the threat model is "casual friends playing a tabletop," not "adversarial competitors with custom clients."
 
 ### 9.4 UI
@@ -317,6 +317,8 @@ A bottom-right "Roll" button opens a modal with:
 ---
 
 ## 9.5 Initiative Tracker
+
+> **Scope**: deferred to v1.x. The §9.5 design is preserved here for the v1.x increment; v1 ships without combat / turn order. References elsewhere in this doc — `ActiveCombat` state field, combat engine verbs (§12), `InitiativeBanner.razor`, `HostInitiativePanel.razor` (§13), and the `ForcedByUserId` field on `RollResult` (§9.3) — are likewise v1.x.
 
 ### 9.5.1 Overview
 
@@ -445,7 +447,7 @@ public sealed class DndMapperGameState : AbstractGameState
     public Dictionary<Guid, CharacterSheet> Sheets { get; }        // session-scoped
     public List<RollResult> RollLog { get; }                       // capped to 200
 
-    public CombatState? ActiveCombat { get; private set; }         // null when no combat
+    public CombatState? ActiveCombat { get; private set; }         // v1.x — always null in v1 (see §9.5)
 
     // Tokens live on Map.Tokens — not duplicated here.
 
@@ -460,7 +462,7 @@ Engine methods (verbs):
 - **Tokens**: `SpawnPlayerTokenAsync` (called at session start for all lobby players, on mid-session join, and on `SetActiveMapAsync` for any registered player who has no token on the newly active map; places token at `Map.DefaultSpawnPosition` or map center; reuses the player's existing session-scoped `CharacterSheet` if one already exists, otherwise creates one), `SpawnNpcTokenAsync`, `SpawnHostExtraTokenAsync`, `MoveTokenAsync`, `UpdateTokenAsync` (rename/recolor/icon), `RemoveTokenAsync`, `SetTokenHiddenAsync`, `ConvertAbandonedPlayerTokensAsync` (internal — invoked by the `PlayerUnregistered` handler per §2.3 to flip a departing player's `PlayerToken`s to `HostExtraToken` with `RepresentsUserId = oldUserId`).
 - **Sheets**: `CreateSheetAsync`, `UpdateSheetAttributeAsync`, `UpdateSheetFreeFieldsAsync` (name/notes/hp — `Hp`/`MaxHp` are nullable; if unset the HP row is hidden in the sheet panel), `DeleteSheetAsync`, `ChangeSchemaAsync` (cascade: attributes whose name matches the new schema retain their value, type mismatch resets to default; attributes absent from the new schema are removed from all sheets).
 - **Dice**: `RollAsync`.
-- **Combat**: `StartInitiativeAsync` (host; creates CombatState in WaitingForRolls with selected NPC + all player combatants), `SubmitInitiativeRollAsync` (player; rolls d20 + DEX modifier, stores in CombatantEntry), `SetNpcInitiativeAsync` (host; manual entry or auto-roll for an NPC combatant), `ForceInitiativeRollAsync` (host; force-rolls for a player who hasn't rolled), `AdvanceTurnAsync` (host; next turn, wraps + increments RoundNumber at end of order), `AddCombatantAsync` (host; insert NPC mid-combat at initiative position), `RemoveCombatantAsync` (host; delete combatant, auto-advance if it was their turn), `EndCombatAsync` (host; clears ActiveCombat).
+- **Combat (v1.x — deferred, see §9.5)**: `StartInitiativeAsync` (host; creates CombatState in WaitingForRolls with selected NPC + all player combatants), `SubmitInitiativeRollAsync` (player; rolls d20 + DEX modifier, stores in CombatantEntry), `SetNpcInitiativeAsync` (host; manual entry or auto-roll for an NPC combatant), `ForceInitiativeRollAsync` (host; force-rolls for a player who hasn't rolled), `AdvanceTurnAsync` (host; next turn, wraps + increments RoundNumber at end of order), `AddCombatantAsync` (host; insert NPC mid-combat at initiative position), `RemoveCombatantAsync` (host; delete combatant, auto-advance if it was their turn), `EndCombatAsync` (host; clears ActiveCombat).
 - **Settings**: `UpdateSettingsAsync`.
 - **Lifecycle**: `EndSessionAsync`.
 
@@ -484,14 +486,16 @@ host/KnockBox.DndMapper/Pages/
             DiceRollerModal.razor
             RollLogPanel.razor            (filters results per §9.3 visibility rules)
             PermissionsPanel.razor        (host-only; mirrors §11)
-            InitiativeBanner.razor        (all clients; visible whenever ActiveCombat != null; see §9.5.6)
-            HostInitiativePanel.razor     (host-only; start/manage combat; see §9.5.6)
-    DndMapperDisplay.razor                (NEW — screen-shareable display view)
+            InitiativeBanner.razor        (v1.x — see §9.5)
+            HostInitiativePanel.razor     (v1.x — see §9.5)
+    DndMapperDisplay.razor                (v1.x — screen-shareable display view; see deferral note below)
 ```
 
-`DndMapperDisplay.razor` is at `/room/dnd-mapper/{ObfuscatedRoomCode}/display`. No special authorization is required — the obfuscated room code's randomized GUIDs make external discovery infeasible, and the view has no interaction affordances so there is no harm in open access. Any user who navigates to the URL may view the display (useful for casting to a TV or projector without an active KnockBox session).
+> **Scope**: the display view is deferred to v1.x — the section below is the v1.x design. v1 ships with the host control view + player view only.
 
-> **Platform extension required.** The standard `IGameSessionService` is per-circuit and tied to a registered user via `ISessionServiceProvider`. The display view has no registered user, so it cannot resolve `DndMapperGameState` through the normal path. v1 will need a thin **read-only observer attach** — e.g. an `IGameSessionService.AttachObserverAsync(routeIdentifier, obfuscatedRoomCode)` extension that walks the existing room registry, returns the room's `AbstractGameState` directly, and records nothing in the per-user session cache. The observer subscribes to `state.StateChangedEventManager` and disposes the subscription on circuit close. Implementers: this is a small platform addition, not a DnD-Mapper-only concern; spec it in the platform architecture doc when implementation begins.
+`DndMapperDisplay.razor` will live at `/room/dnd-mapper/{ObfuscatedRoomCode}/display`. No special authorization is required — the obfuscated room code's randomized GUIDs make external discovery infeasible, and the view has no interaction affordances so there is no harm in open access. Any user who navigates to the URL may view the display (useful for casting to a TV or projector without an active KnockBox session).
+
+> **Platform extension required (v1.x).** The standard `IGameSessionService` is per-circuit and tied to a registered user via `ISessionServiceProvider`. The display view has no registered user, so it cannot resolve `DndMapperGameState` through the normal path. v1.x will need a thin **read-only observer attach** — e.g. an `IGameSessionService.AttachObserverAsync(routeIdentifier, obfuscatedRoomCode)` extension that walks the existing room registry, returns the room's `AbstractGameState` directly, and records nothing in the per-user session cache. The observer subscribes to `state.StateChangedEventManager` and disposes the subscription on circuit close. This is a small platform addition, not a DnD-Mapper-only concern; spec it in the platform architecture doc when v1.x implementation begins.
 
 The display view subscribes to that state and re-renders on every state change, but:
 - Renders the active map identically to `MapCanvas.razor` (images + grid + visible tokens).
@@ -520,7 +524,9 @@ The display view subscribes to that state and re-renders on every state change, 
 | Phase-switch razor pattern    | `host/KnockBox.Spardle/Pages/SpardleRoom.razor`.                                              |
 | Per-player attribute pattern  | `host/KnockBox.HiddenAgenda/Services/State/Games/Data/HiddenAgendaPlayerState.cs` (richer per-player records). |
 
-**Net new infrastructure**: image upload HTTP endpoint, image serving HTTP endpoint, square-grid SVG component, token drag interop (adapt `outfitItemDrag.js`), dice modal + roll log component, attribute-schema editor, map switcher.
+**Net new infrastructure (platform)**: `IGameEngineHttpHandler` contract in `KnockBox.Core` SDK + a generic plugin-route dispatcher (`/api/plugins/{routeIdentifier}/{**path}`) in `KnockBox.Platform`. Drives both the image upload (§5.1) and image serve (§5.4) endpoints without leaking plugin-specific names into `Program.cs`.
+
+**Net new infrastructure (plugin)**: square-grid SVG component, token drag interop (adapt `outfitItemDrag.js`), image transform handles, dice modal + roll log component, attribute-schema editor, map switcher.
 
 ---
 
@@ -541,6 +547,8 @@ These are intentionally excluded from v1 to keep the design scoped. Any of them 
 - **Import/export of campaigns** (no save format).
 - **Mobile-optimized layout** — desktop-first.
 - **Host "center viewport for everyone" broadcast** — the §6.4 affordance that nudges all clients' viewports to a specific cell. Deferred to v1.x.
+- **Initiative / turn-order tracker** — the full §9.5 design (combat state, banner, host panel, force-rolls, mid-combat add/remove). Deferred to v1.x.
+- **Screen-shareable display view** — the full §13 `DndMapperDisplay.razor` page plus the platform observer-attach extension. Deferred to v1.x.
 
 ---
 
@@ -567,7 +575,7 @@ When the implementation phase starts, the following validation matrix should be 
 
 1. **Build**: `dotnet build host/KnockBox.Host.slnx` succeeds; `KnockBox.DndMapper.dll` is staged into `host/KnockBox/bin/{Config}/{TFM}/games/KnockBox.DndMapper/`.
 2. **Unit tests**: `dotnet test host/KnockBox.DndMapperTests/KnockBox.DndMapperTests.csproj` passes for every engine verb — happy path + permission rejection + invalid-input path.
-3. **End-to-end**: with the host running, two browsers (host + one player) join the same room. Verify:
+3. **End-to-end (v1)**: with the host running, two browsers (host + one player) join the same room. Verify:
    - Host uploads an image; both clients see it on the active map.
    - Host transforms the image; both clients see the new position/scale.
    - Host creates a second map; switcher updates; switching active map propagates to player.
@@ -575,12 +583,11 @@ When the implementation phase starts, the following validation matrix should be 
    - Player tries to drag host's NPC token under default permissions — blocked.
    - Player rolls 1d20 + DEX modifier; result appears in shared log (all clients).
    - Host sets `RollsVisibleToPlayers = false`; player rolls again — result visible to roller and host only, not to other players.
-   - Any browser (including unauthenticated) opens the `/display` URL; confirms hidden token is absent, GM panels are absent, roll log is empty (while `RollsVisibleToPlayers = false`).
-   - Host sets `RollsVisibleToPlayers = true`; display tab now shows the roll log.
    - Host changes `TokenMovement` to `Anyone`; player can now move NPC.
    - Host clicks "End Session"; both clients return home; uploaded image files are removed from disk.
-4. **Initiative tracker**: host starts initiative, selects two NPC tokens. Both players and both NPC combatants appear in WaitingForRolls banner. One player rolls; the other doesn't. Host force-rolls for the second player. Host enters initiative for both NPCs. Banner automatically transitions to Active phase showing sorted turn order with round 1. Host clicks "Next Turn" through the full order; on the last combatant banner wraps to round 2. Host removes one NPC mid-combat; if it was their turn, next combatant is highlighted. Host ends combat; banner disappears on all clients.
-5. **Architecture invariant**: `KnockBox.csproj` still has zero `using` of `KnockBox.DndMapper` types; `ReferenceOutputAssembly="false"` on the project ref is preserved.
+4. **Initiative tracker (v1.x — deferred)**: out of scope for v1; see §9.5. The v1.x verification matrix will cover: host starts initiative and selects two NPC tokens; both players and both NPC combatants appear in WaitingForRolls banner; one player rolls, the other doesn't; host force-rolls for the second player; host enters initiative for both NPCs; banner automatically transitions to Active phase showing sorted turn order with round 1; host clicks "Next Turn" through the full order, with the banner wrapping to round 2 on the last combatant; host removes one NPC mid-combat (if it was their turn, next combatant is highlighted); host ends combat and the banner disappears on all clients.
+5. **Display view (v1.x — deferred)**: out of scope for v1; see §13. The v1.x verification matrix will cover: any browser (including unauthenticated) opens the `/display` URL and confirms hidden tokens are absent, GM panels are absent, and the roll log is empty while `RollsVisibleToPlayers = false`; host sets `RollsVisibleToPlayers = true` and the display tab now shows the roll log.
+6. **Architecture invariant**: `KnockBox.csproj` still has zero `using` of `KnockBox.DndMapper` types; `ReferenceOutputAssembly="false"` on the project ref is preserved. The new `IGameEngineHttpHandler` contract (§5.1) lives in `KnockBox.Core` SDK and is opted into by `DndMapperGameEngine`; no plugin-specific names appear in `Program.cs`.
 
 ---
 
