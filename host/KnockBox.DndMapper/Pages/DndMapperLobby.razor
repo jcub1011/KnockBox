@@ -11,17 +11,12 @@
         {
             @if (UserService.CurrentUser?.Id == State.Host.Id)
             {
-                <details class="card lobby-authoring" open>
-                    <summary>Pre-game authoring (optional)</summary>
-                    <div class="lobby-authoring-body">
-                        <SchemaPresetSelector State="@State" />
-                        <div class="authoring-grid">
-                            <HostMapSwitcher State="@State" />
-                            <ImageUploadButton State="@State" />
-                        </div>
-                        <PermissionsPanel State="@State" Embedded="true" />
-                    </div>
-                </details>
+                <div class="card">
+                    <SchemaPresetSelector State="@State" />
+                </div>
+                <div class="card">
+                    <PermissionsPanel State="@State" Embedded="true" />
+                </div>
             }
 
             <div class="card">

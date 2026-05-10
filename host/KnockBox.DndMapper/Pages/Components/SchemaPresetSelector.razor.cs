@@ -125,38 +125,41 @@ namespace KnockBox.DndMapper.Pages.Components
             _cascadeOpen = false;
         }
 
-        private void AddRow()
+        private async Task AddRow()
         {
             _customRows.Add(new CustomRowDraft());
-            _customError = null;
+            await TryAutoApplyAsync();
         }
 
-        private void RemoveRow(int idx)
+        private async Task RemoveRow(int idx)
         {
             if (idx >= 0 && idx < _customRows.Count) _customRows.RemoveAt(idx);
-            _customError = null;
+            await TryAutoApplyAsync();
         }
 
-        private void UpdateName(int idx, string name)
+        private async Task UpdateName(int idx, string name)
         {
             if (idx < 0 || idx >= _customRows.Count) return;
             _customRows[idx].Name = name;
+            await TryAutoApplyAsync();
         }
 
-        private void UpdateType(int idx, string? raw)
+        private async Task UpdateType(int idx, string? raw)
         {
             if (idx < 0 || idx >= _customRows.Count) return;
             if (Enum.TryParse<AttributeValueType>(raw, out var type))
                 _customRows[idx].Type = type;
+            await TryAutoApplyAsync();
         }
 
-        private void UpdateDefault(int idx, string value)
+        private async Task UpdateDefault(int idx, string value)
         {
             if (idx < 0 || idx >= _customRows.Count) return;
             _customRows[idx].Default = value;
+            await TryAutoApplyAsync();
         }
 
-        private async Task SaveCustom()
+        private async Task TryAutoApplyAsync()
         {
             var rows = BuildRowsFromDrafts(out var error);
             if (rows is null)

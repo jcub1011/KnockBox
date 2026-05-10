@@ -36,7 +36,7 @@
                                type="text"
                                placeholder="Name"
                                value="@row.Name"
-                               @oninput="@(e => UpdateName(idx, e.Value?.ToString() ?? string.Empty))" />
+                               @onchange="@(e => UpdateName(idx, e.Value?.ToString() ?? string.Empty))" />
                         <select class="dndm-custom-type"
                                 value="@row.Type"
                                 @onchange="@(e => UpdateType(idx, e.Value?.ToString()))">
@@ -48,7 +48,7 @@
                                type="text"
                                placeholder="Default"
                                value="@row.Default"
-                               @oninput="@(e => UpdateDefault(idx, e.Value?.ToString() ?? string.Empty))" />
+                               @onchange="@(e => UpdateDefault(idx, e.Value?.ToString() ?? string.Empty))" />
                         <button class="dndm-btn dndm-btn--small dndm-btn--ghost"
                                 type="button"
                                 title="Remove row"
@@ -57,7 +57,6 @@
                 }
                 <div class="dndm-custom-actions">
                     <button class="dndm-btn dndm-btn--small" type="button" @onclick="AddRow">+ Add row</button>
-                    <button class="dndm-btn dndm-btn--small dndm-btn--primary" type="button" @onclick="SaveCustom">Save schema</button>
                     @if (_customError is string err)
                     {
                         <span class="dndm-custom-error">@err</span>
