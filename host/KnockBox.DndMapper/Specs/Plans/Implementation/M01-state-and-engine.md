@@ -2,9 +2,9 @@
 
 > **Goal**: replace the empty DnD Mapper scaffold with the full v1 state model and every engine verb except image management. After M01, the engine layer can drive an entire session through unit tests; no UI changes yet.
 >
-> **Dependencies**: existing scaffold only. No prior milestones required. **Includes one platform addition** — adding a `PlayerRegistered` event to `AbstractGameState` (see §3.8) so mid-session-join auto-spawn (GDD §4.2) is possible.
+> **Dependencies**: existing scaffold only. No prior milestones required. **No SDK changes required** — the platform's `RegisterPlayer` already rejects new players once a session has started (`IsJoinable == false`), so mid-session join is structurally impossible and no `PlayerRegistered` event is needed. Initial player tokens are spawned in `StartAsyncCore`; the only post-Start auto-spawn path is `SetActiveMapAsync` for players already registered before Start.
 >
-> **GDD references**: §2.3 (disconnect handling), §3 (lifecycle), §4 (maps — including §4.2 mid-session join), §6 (grid), §7 (tokens), §8 (sheets), §9 (dice — excluding §9.5 initiative which is v1.x), §11 (permissions), §12 (state model sketch — engine verbs list, minus image and combat verbs).
+> **GDD references**: §2.3 (disconnect handling), §3 (lifecycle), §4 (maps), §6 (grid), §7 (tokens), §8 (sheets), §9 (dice — excluding §9.5 initiative which is v1.x), §11 (permissions), §12 (state model sketch — engine verbs list, minus image and combat verbs).
 >
 > **Out of scope** (do NOT implement here): `AddImageAsync`, `UpdateImageTransformAsync`, `ReorderImageLayerAsync`, `RemoveImageAsync` (M03). Plugin HTTP dispatcher (M02). Razor pages beyond the existing scaffold (M04, M05). Lobby authoring UI (M06). Combat / initiative tracker, display view, observer-attach (all v1.x — `ActiveCombat`, `CombatState`, `CombatantEntry`, `InitiativeBanner`, `HostInitiativePanel` MUST NOT appear in v1 code).
 
@@ -57,11 +57,8 @@ Services/Logic/Games/
 ### Files to modify
 
 - `host/KnockBox.DndMapper/Services/State/Games/DndMapperGameState.cs` — replace the 12-line scaffold with the full GDD §12 shape. Constructor seeds defaults.
-- `host/KnockBox.DndMapper/Services/Logic/Games/DndMapperGameEngine.cs` — extend the 43-line scaffold: inject `IRandomNumberService`, subscribe `state.PlayerUnregistered` AND `state.PlayerRegistered` in `CreateStateAsync`, override `StartAsyncCore` to flip phase + spawn player tokens, add every verb listed in §3.6.
+- `host/KnockBox.DndMapper/Services/Logic/Games/DndMapperGameEngine.cs` — extend the 43-line scaffold: inject `IRandomNumberService`, subscribe `state.PlayerUnregistered` in `CreateStateAsync`, override `StartAsyncCore` to flip phase + spawn player tokens, add every verb listed in §3.6.
 - `host/KnockBox.DndMapperTests/` — add the test classes listed in §7.
-- **SDK platform addition** (see §3.7):
-  - `sdk/KnockBox.Core/Services/State/Games/Shared/AbstractGameState.cs` — add `PlayerRegistered` event + invocation site + dispose clear.
-  - `sdk/KnockBox.PlatformTests/...` — add tests for the new event.
 
 ### Files NOT touched in M01
 
@@ -233,7 +230,6 @@ public sealed class DndMapperGameEngine : AbstractGameEngine
 
         var state = new DndMapperGameState(host, _stateLogger);
         state.PlayerUnregistered += player => HandlePlayerLeft(player, state);
-        state.PlayerRegistered += player => HandlePlayerJoined(player, state);
         return Task.FromResult<ValueResult<AbstractGameState>>(state);
     }
 
@@ -276,26 +272,6 @@ public sealed class DndMapperGameEngine : AbstractGameEngine
         // Convert all PlayerTokens owned by `player` into HostExtraTokens.
         state.Execute(() => ConvertAbandonedPlayerTokensInternal(state, player));
     }
-
-    private void HandlePlayerJoined(User player, DndMapperGameState state)
-    {
-        // PlayerRegistered fires OUTSIDE the lock (same convention as PlayerUnregistered),
-        // so re-entering Execute is safe. Spawn the player on the active map iff the
-        // session is in Playing phase AND there is an active map AND they don't already
-        // have a token there (e.g. host re-authored after Start). Lobby-phase joins are
-        // handled by StartAsyncCore's loop instead.
-        state.Execute(() =>
-        {
-            if (state.Phase != DndMapperPhase.Playing) return;
-            if (state.ActiveMapId is not Guid mapId) return;
-            if (state.Maps.FirstOrDefault(m => m.Id == mapId) is not Map activeMap) return;
-            if (activeMap.Tokens.Any(t => t.Type == TokenType.PlayerToken && t.OwnerUserId == player.Id))
-                return;
-
-            int slot = state.Players.Count - 1; // newest registered player; deterministic per join order
-            SpawnPlayerTokenInternal(state, activeMap, player, slot);
-        });
-    }
 }
 ```
 
@@ -304,7 +280,7 @@ public sealed class DndMapperGameEngine : AbstractGameEngine
 > - `MaxPlayerCount = 8` keeps slot-color cycling clean (palette is 8). The GDD says "up to ~6"; 8 leaves headroom without wrapping color slots.
 > - **Override return type matches `AbstractGameEngine`**: `Task<ValueResult<AbstractGameState>>` for `CreateStateAsync`, `Task<Result>` for `StartAsyncCore` (verified against the existing scaffold and `sdk/KnockBox.Core/.../AbstractGameEngine.cs`). Do not switch to `ValueTask<...>`.
 > - **`Execute(Action)` returns `Result` directly**; do not use `Execute<TReturn>(Func<TReturn>)` unless you actually want a `ValueResult<TReturn>` wrapper. All verb pseudocode in §3.6 follows the Action form: mutate inside the lambda, then return the outer `Result.Success` (or capture failure via local variable + return after `Execute` returns success).
-> - The engine subscribes to both `PlayerUnregistered` and `PlayerRegistered` once at state creation. Both events fire outside the execute lock — re-entering `Execute` from handlers is safe and required.
+> - The engine subscribes to `PlayerUnregistered` once at state creation. The event fires outside the execute lock — re-entering `Execute` from the handler is safe and required. (There is no symmetric `PlayerRegistered` subscription: the platform refuses new player registrations once `IsJoinable == false`, which `StartAsyncCore` flips, so post-Start joins cannot happen.)
 
 ### 3.6 Engine verbs
 
@@ -413,27 +389,7 @@ Where the verb returns a value (e.g. `CreateMapAsync` returns the new `Map.Id`),
 |------|------------------|---------|
 | `EndSessionAsync(state, caller) → Result` | host only | In M01: just calls `state.Dispose()` (which fires `OnStateDisposed`, propagates through the platform's session lifecycle, redirecting clients home). **M03 will extend this** to enumerate per-room image files and call `IPluginStorage.Delete` on each before disposing. |
 
-### 3.7 Platform extension — `AbstractGameState.PlayerRegistered`
-
-GDD §4.2 requires that "players joining mid-session have their token spawned immediately on the active map." The existing `AbstractGameState` exposes `PlayerUnregistered` but not its counterpart. M01 adds the missing event in the SDK so the DnD Mapper engine can hook the join the same way it hooks the leave.
-
-**Files modified (SDK):**
-
-- `sdk/KnockBox.Core/Services/State/Games/Shared/AbstractGameState.cs`:
-  - Add `public event Action<User>? PlayerRegistered;` near the existing `PlayerUnregistered` declaration.
-  - Inside `RegisterPlayer` — *after* the `Execute` block sets up the `PlayerEntry` — call `SafeInvoke(PlayerRegistered, player, nameof(PlayerRegistered));` (mirroring the pattern around line 290 for unregistration). The invocation must run **outside** the lock so handlers may re-enter `Execute` safely.
-  - In `Dispose()`, set `PlayerRegistered = null;` next to the existing `PlayerUnregistered = null;` clear.
-  - The XML doc on the new event must say: "Fires after a player has been registered into the lobby/state. Raised outside the execute lock — handlers may safely re-enter `Execute` / `ExecuteAsync`." Keep the wording symmetric with `PlayerUnregistered`'s doc.
-
-**Tests modified (SDK):**
-
-Add a test under `sdk/KnockBox.PlatformTests/Unit/AbstractGameStateTests.cs` (or wherever the existing `PlayerUnregistered` tests live):
-- `RegisterPlayer_FiresPlayerRegisteredOutsideLock` — subscribe a handler that itself calls `state.Execute(...)`; assert the inner Execute succeeds (would deadlock if event fired inside the lock).
-- `Dispose_ClearsPlayerRegisteredHandlers` — subscribe, dispose, assert the handler list is null/empty.
-
-**Why this is in M01, not M06:** without `PlayerRegistered`, the engine has no clean entry point to honor the GDD's mid-session-join contract — every other path (polling state changes from a Razor component, monkey-patching `RegisterPlayer`) is worse. The platform addition is small, well-isolated, mirrors an existing pattern, and is symmetric with `PlayerUnregistered`. A previous draft of these plans deferred this discovery to M06; the deferral was wrong.
-
-### 3.8 Wire `IRandomNumberService` into module DI
+### 3.7 Wire `IRandomNumberService` into module DI
 
 `DndMapperModule.cs` currently does:
 
@@ -453,7 +409,7 @@ public void RegisterServices(IPluginRegistration registration)
 - [ ] `dotnet build host/KnockBox.Host.slnx` succeeds with no warnings introduced by this milestone.
 - [ ] `KnockBox.DndMapper.dll` continues to stage into `host/KnockBox/bin/{Config}/{TFM}/games/KnockBox.DndMapper/`.
 - [ ] `dotnet test host/KnockBox.DndMapperTests/KnockBox.DndMapperTests.csproj` is green, with the test classes / methods listed in §7 present and passing.
-- [ ] `dotnet test sdk/KnockBox.Sdk.slnx` is green, **including the new `PlayerRegistered` tests in the platform layer** (§3.7).
+- [ ] `dotnet test sdk/KnockBox.Sdk.slnx` is green (no SDK changes in this milestone).
 - [ ] `KnockBox.csproj` still has zero `using KnockBox.DndMapper.*` and the `<ProjectReference>` to `KnockBox.DndMapper` retains `ReferenceOutputAssembly="false"` and `Private="false"`.
 - [ ] `plugin.json` is unchanged (M03 owns the `Storage` capability addition).
 - [ ] Lobby page (`DndMapperLobby.razor`) still renders unchanged; phase wiring lands in M04.
@@ -549,10 +505,7 @@ Each `[TestMethod]` is a single-assertion unit test. The list below is the **min
 - `SetTokenHiddenAsync_HostCaller_FlipsHidden`.
 - `SetTokenHiddenAsync_NonHostCaller_ReturnsError`.
 - `PlayerUnregistered_ConvertsAllPlayerTokensToHostExtraTokens` — register a player, spawn tokens on two maps, simulate `PlayerUnregistered` (dispose the registration unsubscriber), assert `Type == HostExtraToken`, `OwnerUserId == null`, `RepresentsUserId == oldUserId`, sheets remain in `state.Sheets`.
-- `PlayerRegistered_DuringPlaying_AutoSpawnsOnActiveMap` — start session with one map active, register a fresh player (mid-session join), assert a `PlayerToken` for that player now exists on the active map at the default-spawn position, with a fresh `CharacterSheet` seeded from the schema.
-- `PlayerRegistered_DuringLobby_DoesNotSpawnImmediately` — register a player while `Phase == Lobby`; assert no token is spawned. (Lobby joins are batched into the `StartAsyncCore` loop instead.)
-- `PlayerRegistered_PlayingButNoActiveMap_DoesNotSpawn` — `state.ActiveMapId == null`; assert no token is spawned and no exception is thrown.
-- `PlayerRegistered_PlayerAlreadyHasTokenOnActiveMap_DoesNotDuplicate` — pre-seed a player token on the active map, then fire the event; assert no extra token. (Defends against re-entry from any host-driven re-register flow.)
+- `RegisterPlayer_AfterStart_IsRejectedByPlatform` — call `state.RegisterPlayer(newUser)` after `StartAsyncCore` flips `IsJoinable` to false; assert the `ValueResult` is a failure (locks in the platform contract this milestone depends on).
 - `RemoveTokenAsync_PlayerToken_ReturnsErrorEvenForHost` — explicit assertion of the §3.6 rule that `PlayerToken`s are never removable by this verb.
 
 #### `SheetVerbsTests`
