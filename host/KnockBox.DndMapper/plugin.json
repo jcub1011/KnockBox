@@ -5,5 +5,5 @@
   "routeIdentifier": "dnd-mapper",
   "version": "1.0.0",
   "entryAssembly": "KnockBox.DndMapper",
-  "capabilities": []
+  "capabilities": ["Storage"]
 }

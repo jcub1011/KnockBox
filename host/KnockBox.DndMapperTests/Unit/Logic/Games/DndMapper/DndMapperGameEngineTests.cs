@@ -2,6 +2,7 @@ using KnockBox.Core.Services.Logic.RandomGeneration;
 using KnockBox.Core.Services.State.Users;
 using KnockBox.DndMapper.Services.Logic.Games;
 using KnockBox.DndMapper.Services.State.Games;
+using KnockBox.DndMapperTests.Helpers;
 using Microsoft.Extensions.Logging;
 using Moq;
 
@@ -25,6 +26,7 @@ namespace KnockBox.DndMapper.Tests.Unit.Logic
             _host = UserFactory.Create("Host", "host1");
 
             _engine = new DndMapperGameEngine(
+                new TestPluginContext(new InMemoryPluginStorage()),
                 _engineLoggerMock.Object,
                 _stateLoggerMock.Object,
                 _rngMock.Object);

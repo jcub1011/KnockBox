@@ -1,6 +1,7 @@
 using KnockBox.Core.Services.State.Users;
 using KnockBox.DndMapper.Services.Logic.Games;
 using KnockBox.DndMapper.Services.State.Games;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace KnockBox.DndMapperTests.Helpers
@@ -9,10 +10,23 @@ namespace KnockBox.DndMapperTests.Helpers
     {
         public static (DndMapperGameEngine engine, DndMapperGameState state, User host, SequentialRng rng) Build(
             params int[] rngValues)
+            => Build(storage: new InMemoryPluginStorage(), rngValues: rngValues);
+
+        public static (DndMapperGameEngine engine, DndMapperGameState state, User host, SequentialRng rng) Build(
+            InMemoryPluginStorage storage,
+            params int[] rngValues)
+            => Build(storage, engineLogger: null, rngValues: rngValues);
+
+        public static (DndMapperGameEngine engine, DndMapperGameState state, User host, SequentialRng rng) Build(
+            InMemoryPluginStorage storage,
+            ILogger<DndMapperGameEngine>? engineLogger,
+            params int[] rngValues)
         {
             var rng = new SequentialRng(rngValues);
+            var context = new TestPluginContext(storage);
             var engine = new DndMapperGameEngine(
-                NullLogger<DndMapperGameEngine>.Instance,
+                context,
+                engineLogger ?? NullLogger<DndMapperGameEngine>.Instance,
                 NullLogger<DndMapperGameState>.Instance,
                 rng);
             var host = UserFactory.Create("Host", Guid.NewGuid().ToString());
