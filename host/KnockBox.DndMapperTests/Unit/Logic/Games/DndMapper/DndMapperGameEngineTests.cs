@@ -1,3 +1,4 @@
+using KnockBox.Core.Services.Logic.RandomGeneration;
 using KnockBox.Core.Services.State.Users;
 using KnockBox.DndMapper.Services.Logic.Games;
 using KnockBox.DndMapper.Services.State.Games;
@@ -11,6 +12,7 @@ namespace KnockBox.DndMapper.Tests.Unit.Logic
     {
         private Mock<ILogger<DndMapperGameEngine>> _engineLoggerMock = default!;
         private Mock<ILogger<DndMapperGameState>> _stateLoggerMock = default!;
+        private Mock<IRandomNumberService> _rngMock = default!;
         private User _host = default!;
         private DndMapperGameEngine _engine = default!;
 
@@ -19,11 +21,13 @@ namespace KnockBox.DndMapper.Tests.Unit.Logic
         {
             _engineLoggerMock = new Mock<ILogger<DndMapperGameEngine>>();
             _stateLoggerMock = new Mock<ILogger<DndMapperGameState>>();
+            _rngMock = new Mock<IRandomNumberService>();
             _host = UserFactory.Create("Host", "host1");
 
             _engine = new DndMapperGameEngine(
                 _engineLoggerMock.Object,
-                _stateLoggerMock.Object);
+                _stateLoggerMock.Object,
+                _rngMock.Object);
         }
 
         [TestMethod]
