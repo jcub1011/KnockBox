@@ -6,8 +6,11 @@
 <section class="dndm-panel dndm-permp">
     <header class="dndm-panel-header">
         <span>Permissions</span>
-        <button class="dndm-btn dndm-btn--icon dndm-btn--small" type="button" title="Close"
-                @onclick="OnClose">×</button>
+        @if (!Embedded)
+        {
+            <button class="dndm-btn dndm-btn--icon dndm-btn--small" type="button" title="Close"
+                    @onclick="OnClose">×</button>
+        }
     </header>
     <div class="dndm-panel-body">
         <div class="dndm-panel-section">

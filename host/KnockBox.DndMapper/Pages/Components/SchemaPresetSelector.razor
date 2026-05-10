@@ -1,0 +1,73 @@
+@using KnockBox.Core.Components.Shared
+@using KnockBox.DndMapper.Models
+@using KnockBox.DndMapper.Services.State.Games
+@using KnockBox.DndMapper.Services.State.Games.Data
+@inherits DisposableComponent
+
+<section class="dndm-panel dndm-schema-selector">
+    <header class="dndm-panel-header">
+        <span>Attribute schema</span>
+    </header>
+    <div class="dndm-panel-body">
+        <div class="dndm-pillgroup">
+            <button class="@PillCls(AttributePreset.DnD5eCore)"
+                    type="button"
+                    @onclick="@(() => SelectPreset(AttributePreset.DnD5eCore))">D&amp;D 5e core</button>
+            <button class="@PillCls(AttributePreset.DnD5ePlusCommonSkills)"
+                    type="button"
+                    @onclick="@(() => SelectPreset(AttributePreset.DnD5ePlusCommonSkills))">D&amp;D 5e + skills</button>
+            <button class="@PillCls(AttributePreset.SimpleD20)"
+                    type="button"
+                    @onclick="@(() => SelectPreset(AttributePreset.SimpleD20))">Simple d20</button>
+            <button class="@PillCls(AttributePreset.Custom)"
+                    type="button"
+                    @onclick="@(() => SelectPreset(AttributePreset.Custom))">Custom</button>
+        </div>
+
+        @if (ShowCustomEditor)
+        {
+            <div class="dndm-custom-editor">
+                @for (int i = 0; i < _customRows.Count; i++)
+                {
+                    var idx = i;
+                    var row = _customRows[idx];
+                    <div class="dndm-custom-row">
+                        <input class="dndm-custom-name"
+                               type="text"
+                               placeholder="Name"
+                               value="@row.Name"
+                               @oninput="@(e => UpdateName(idx, e.Value?.ToString() ?? string.Empty))" />
+                        <select class="dndm-custom-type"
+                                value="@row.Type"
+                                @onchange="@(e => UpdateType(idx, e.Value?.ToString()))">
+                            <option value="@AttributeValueType.Score">Score</option>
+                            <option value="@AttributeValueType.Modifier">Modifier</option>
+                            <option value="@AttributeValueType.Text">Text</option>
+                        </select>
+                        <input class="dndm-custom-default"
+                               type="text"
+                               placeholder="Default"
+                               value="@row.Default"
+                               @oninput="@(e => UpdateDefault(idx, e.Value?.ToString() ?? string.Empty))" />
+                        <button class="dndm-btn dndm-btn--small dndm-btn--ghost"
+                                type="button"
+                                title="Remove row"
+                                @onclick="@(() => RemoveRow(idx))">×</button>
+                    </div>
+                }
+                <div class="dndm-custom-actions">
+                    <button class="dndm-btn dndm-btn--small" type="button" @onclick="AddRow">+ Add row</button>
+                    <button class="dndm-btn dndm-btn--small dndm-btn--primary" type="button" @onclick="SaveCustom">Save schema</button>
+                    @if (_customError is string err)
+                    {
+                        <span class="dndm-custom-error">@err</span>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+</section>
+
+<SchemaCascadeWarningModal IsOpen="_cascadeOpen"
+                           OnConfirm="ConfirmCascade"
+                           OnCancel="CancelCascade" />

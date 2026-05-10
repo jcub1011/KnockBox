@@ -24,3 +24,35 @@
     gap: 8px;
     margin-top: 12px;
 }
+
+.dndm-content .lobby-authoring {
+    margin-bottom: 16px;
+}
+
+.dndm-content .lobby-authoring > summary {
+    cursor: pointer;
+    color: #e8b849;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-weight: 600;
+    list-style: revert;
+}
+
+.dndm-content .lobby-authoring-body {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 12px;
+}
+
+.dndm-content .authoring-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+}
+
+@media (min-width: 720px) {
+    .dndm-content .authoring-grid {
+        grid-template-columns: 2fr 1fr;
+    }
+}

@@ -11,6 +11,7 @@ namespace KnockBox.DndMapper.Pages.Components
     {
         [Parameter, EditorRequired] public DndMapperGameState State { get; set; } = default!;
         [Parameter] public EventCallback OnClose { get; set; }
+        [Parameter] public bool Embedded { get; set; }
 
         [Inject] protected DndMapperGameEngine Engine { get; set; } = default!;
         [Inject] protected IUserService UserService { get; set; } = default!;
