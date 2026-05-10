@@ -1,0 +1,73 @@
+@using KnockBox.DndMapper.Services.State.Games
+@using KnockBox.DndMapper.Services.State.Games.Data
+@using KnockBox.Core.Components.Shared
+@inherits DisposableComponent
+
+<div class="dndm-canvas-frame">
+    <div class="dndm-canvas-toolbar">
+        <label class="dndm-grid-toggle">
+            <input type="checkbox" checked="@LocalShowGridLines" @onchange="OnToggleGrid" />
+            Grid
+        </label>
+        <button class="dndm-zoom-btn" type="button" @onclick="ZoomOut" title="Zoom out">−</button>
+        <span class="dndm-zoom-readout">@($"{_zoom * 100:0}%")</span>
+        <button class="dndm-zoom-btn" type="button" @onclick="ZoomIn" title="Zoom in">+</button>
+        <button class="dndm-zoom-btn" type="button" @onclick="ResetView" title="Reset view">⟲</button>
+    </div>
+
+    <svg id="@_svgId"
+         class="dndm-map-canvas"
+         viewBox="@ViewBoxString"
+         preserveAspectRatio="xMidYMid meet"
+         @onwheel="OnWheel"
+         @onwheel:preventDefault="true"
+         @onmousedown="OnSvgMouseDown"
+         @onmousemove="OnSvgMouseMove"
+         @onmouseup="OnSvgMouseUp"
+         @onmouseleave="OnSvgMouseUp"
+         xmlns="http://www.w3.org/2000/svg">
+
+        <rect x="0" y="0"
+              width="@Map.Grid.WidthCells" height="@Map.Grid.HeightCells"
+              fill="#0e1117" />
+
+        @if (Map.Images.Count > 0)
+        {
+            @foreach (var img in Map.Images.OrderBy(i => i.LayerOrder))
+            {
+                var cx = img.X + img.Width / 2;
+                var cy = img.Y + img.Height / 2;
+                <image @key="img.Id"
+                       href="@($"/api/plugins/dnd-mapper/{RoomCode}/images/{img.Id}")"
+                       x="@F(img.X)" y="@F(img.Y)"
+                       width="@F(img.Width)" height="@F(img.Height)"
+                       transform="@($"rotate({F(img.Rotation)} {F(cx)} {F(cy)})")"
+                       opacity="@F(img.Opacity)"
+                       preserveAspectRatio="none"
+                       pointer-events="none" />
+            }
+        }
+
+        @if (LocalShowGridLines)
+        {
+            <g class="dndm-grid-layer" pointer-events="none">
+                @for (int x = 0; x <= Map.Grid.WidthCells; x++)
+                {
+                    <line x1="@x" y1="0" x2="@x" y2="@Map.Grid.HeightCells"
+                          stroke="@Map.Grid.LineColor" stroke-width="0.02" />
+                }
+                @for (int y = 0; y <= Map.Grid.HeightCells; y++)
+                {
+                    <line x1="0" y1="@y" x2="@Map.Grid.WidthCells" y2="@y"
+                          stroke="@Map.Grid.LineColor" stroke-width="0.02" />
+                }
+            </g>
+        }
+
+        <TokenLayer State="State"
+                    Map="Map"
+                    IsHost="IsHost"
+                    CurrentUserId="@CurrentUserId"
+                    SvgId="@_svgId" />
+    </svg>
+</div>

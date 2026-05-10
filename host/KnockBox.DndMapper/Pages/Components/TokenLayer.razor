@@ -1,0 +1,43 @@
+@using System.Globalization
+@using KnockBox.Core.Components.Shared
+@using KnockBox.DndMapper.Helpers
+@using KnockBox.DndMapper.Models
+@using KnockBox.DndMapper.Services.State.Games
+@using KnockBox.DndMapper.Services.State.Games.Data
+@inherits DisposableComponent
+@implements IAsyncDisposable
+
+<g class="dndm-token-layer">
+    @if (Map is not null)
+    {
+        @foreach (var token in VisibleTokens)
+        {
+            <g @key="token.Id"
+               class="@TokenCssClass(token)"
+               data-token-id="@token.Id"
+               transform="@($"translate({Fmt(token.X)} {Fmt(token.Y)})")">
+                <circle r="0.45"
+                        fill="@FillFor(token)"
+                        stroke="@(string.IsNullOrEmpty(token.Color) ? "#888" : token.Color)"
+                        stroke-width="0.06" />
+                @if (token.IconKind == TokenIconKind.Initial && !string.IsNullOrEmpty(token.Name))
+                {
+                    <svg:text text-anchor="middle"
+                              dominant-baseline="central"
+                              font-size="0.5"
+                              font-weight="bold"
+                              fill="#ffffff"
+                              pointer-events="none">
+                        @token.Name.Substring(0, 1).ToUpperInvariant()
+                    </svg:text>
+                }
+                @if (IsHost && token.Hidden)
+                {
+                    <line x1="-0.4" y1="-0.4" x2="0.4" y2="0.4"
+                          stroke="#ff4444" stroke-width="0.08"
+                          pointer-events="none" />
+                }
+            </g>
+        }
+    }
+</g>

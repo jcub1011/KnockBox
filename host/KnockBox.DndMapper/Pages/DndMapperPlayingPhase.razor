@@ -1,0 +1,18 @@
+@using KnockBox.DndMapper.Pages.Components
+@using KnockBox.DndMapper.Services.State.Games
+@using KnockBox.DndMapper.Services.State.Games.Data
+
+<div class="dnd-mapper-playing">
+    @if (ActiveMap is null)
+    {
+        <div class="dndm-empty">No active map.</div>
+    }
+    else
+    {
+        <MapCanvas State="State"
+                   RoomCode="@RoomCode"
+                   Map="ActiveMap"
+                   IsHost="IsHost"
+                   CurrentUserId="@CurrentUserId" />
+    }
+</div>

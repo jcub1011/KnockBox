@@ -1,0 +1,12 @@
+.dndm-token {
+    transition: transform 150ms ease-out;
+    cursor: grab;
+}
+
+.dndm-token:active {
+    cursor: grabbing;
+}
+
+.dndm-token--hidden {
+    opacity: 0.5;
+}
