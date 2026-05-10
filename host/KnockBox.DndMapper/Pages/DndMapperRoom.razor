@@ -18,12 +18,12 @@ else
     @switch (GameState.Phase)
     {
         case DndMapperPhase.Lobby:
-            <DndMapperLobby State="GameState" RoomCode="@RoomCode" />
+            <DndMapperLobby State="GameState" RoomCode="@ObfuscatedRoomCode" />
             break;
 
         case DndMapperPhase.Playing:
             <DndMapperPlayingPhase State="GameState"
-                                   RoomCode="@RoomCode"
+                                   RoomCode="@ObfuscatedRoomCode"
                                    IsHost="IsHost()"
                                    CurrentUserId="@UserService.CurrentUser.Id" />
             break;

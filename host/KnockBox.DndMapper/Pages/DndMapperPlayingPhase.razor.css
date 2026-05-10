@@ -41,7 +41,6 @@
     border-right: 1px solid #2c2c44;
     display: flex;
     flex-direction: column;
-    overflow: hidden;
     min-width: 0;
 }
 

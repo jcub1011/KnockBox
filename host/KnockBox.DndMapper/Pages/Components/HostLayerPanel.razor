@@ -1,0 +1,26 @@
+﻿@inherits DisposableComponent
+
+<section class="dndm-panel">
+    <header class="dndm-panel-header">
+        <span>Map Layers</span>
+        <div class="dndm-tokenp-add">
+            <button class="dndm-btn dndm-btn--small"
+                    type="button"
+                    title="Add image layer"
+                    disabled="@(_activeMap is null)"
+                    @onclick="OnAddNpc">
+                + NPC
+            </button>
+            <button class="dndm-btn dndm-btn--small"
+                    type="button"
+                    title="Delete image layer"
+                    disabled="@(_activeMap is null)"
+                    @onclick="OnAddHostExtra">
+                + Extra
+            </button>
+        </div>
+    </header>
+    <div class="dndm-panel-body">
+        <p>This is a placeholder for host-only controls that don't fit in the token panel or image upload button.</p>
+    </div>
+</section>

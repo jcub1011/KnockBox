@@ -23,8 +23,8 @@ namespace KnockBox.DndMapper.Pages.Components
         [Inject] protected DndMapperGameEngine Engine { get; set; } = default!;
         [Inject] protected IUserService UserService { get; set; } = default!;
 
-        private const double MinZoom = 0.25;
-        private const double MaxZoom = 4.0;
+        private const double MinZoom = 0.10;
+        private const double MaxZoom = 10.0;
         private const int LeftMouseButton = 0;
         private const int MiddleMouseButton = 1;
 

@@ -3,6 +3,10 @@
     cursor: grab;
 }
 
+.unselectable {
+    pointer-events: none;
+}
+
 .dndm-token:active {
     cursor: grabbing;
 }
