@@ -1,0 +1,231 @@
+/* Shared styling for the DnD Mapper UI panels (M05).
+   Loaded once from DndMapperPlayingPhase. Class prefix: dndm-. */
+
+:root {
+    --dndm-bg-deep: #0e1117;
+    --dndm-bg-panel: #1a1a2e;
+    --dndm-bg-panel-2: #14141f;
+    --dndm-bg-elev: #262640;
+    --dndm-bg-elev-hover: #34345a;
+    --dndm-border: #2c2c44;
+    --dndm-border-strong: #3a3a5c;
+    --dndm-border-accent: rgba(168, 85, 247, 0.35);
+    --dndm-text: #ede4d3;
+    --dndm-text-dim: #b6ad99;
+    --dndm-text-muted: #7a7464;
+    --dndm-gold: #e8b849;
+    --dndm-parchment: #cdb98e;
+    --dndm-danger: #e26b6b;
+    --dndm-success: #6dd6a1;
+    --dndm-display: Georgia, "IM Fell English", "EB Garamond", serif;
+}
+
+/* ─── Panel shell ─────────────────────────────────────────────── */
+.dndm-panel {
+    background: var(--dndm-bg-panel);
+    border: 1px solid var(--dndm-border-accent);
+    border-radius: 6px;
+    color: var(--dndm-text);
+    font-family: var(--font-primary);
+}
+
+.dndm-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--dndm-border);
+    font-family: var(--dndm-display);
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--dndm-gold);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+}
+
+.dndm-panel-body {
+    padding: 0.5rem 0.75rem;
+}
+
+.dndm-panel-section {
+    padding: 0.5rem 0;
+    border-top: 1px solid var(--dndm-border);
+}
+.dndm-panel-section:first-child { border-top: 0; }
+
+.dndm-panel-empty {
+    padding: 1rem 0.5rem;
+    color: var(--dndm-text-muted);
+    font-style: italic;
+    font-size: 0.85rem;
+    text-align: center;
+}
+
+/* ─── Buttons ─────────────────────────────────────────────────── */
+.dndm-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    background: var(--dndm-bg-elev);
+    color: var(--dndm-text);
+    border: 1px solid var(--dndm-border-strong);
+    border-radius: 4px;
+    padding: 0.35rem 0.75rem;
+    font-family: var(--font-primary);
+    font-size: 0.85rem;
+    cursor: pointer;
+    line-height: 1;
+    transition: background 120ms ease, border-color 120ms ease;
+}
+
+.dndm-btn:hover {
+    background: var(--dndm-bg-elev-hover);
+    border-color: var(--dndm-parchment);
+}
+
+.dndm-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.dndm-btn--primary {
+    background: linear-gradient(180deg, #b48a2a, #8a6818);
+    border-color: var(--dndm-gold);
+    color: #1a1208;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+.dndm-btn--primary:hover { background: linear-gradient(180deg, #c79832, #9a7619); }
+
+.dndm-btn--ghost {
+    background: transparent;
+    border-color: var(--dndm-border);
+    color: var(--dndm-text-dim);
+}
+.dndm-btn--ghost:hover { color: var(--dndm-text); border-color: var(--dndm-border-strong); }
+
+.dndm-btn--danger {
+    background: #4a1f24;
+    border-color: var(--dndm-danger);
+    color: #f8d8d8;
+}
+.dndm-btn--danger:hover { background: #6a2b32; }
+
+.dndm-btn--icon {
+    padding: 0.25rem 0.5rem;
+    font-size: 1rem;
+}
+
+.dndm-btn--small {
+    padding: 0.2rem 0.5rem;
+    font-size: 0.75rem;
+}
+
+/* ─── Inputs ──────────────────────────────────────────────────── */
+.dndm-input,
+.dndm-select,
+.dndm-textarea {
+    background: var(--dndm-bg-deep);
+    color: var(--dndm-text);
+    border: 1px solid var(--dndm-border-strong);
+    border-radius: 3px;
+    padding: 0.3rem 0.45rem;
+    font-family: var(--font-primary);
+    font-size: 0.85rem;
+    width: 100%;
+    box-sizing: border-box;
+}
+.dndm-input:focus,
+.dndm-select:focus,
+.dndm-textarea:focus {
+    outline: none;
+    border-color: var(--dndm-gold);
+    box-shadow: 0 0 0 2px rgba(232, 184, 73, 0.15);
+}
+
+.dndm-textarea { resize: vertical; min-height: 60px; }
+
+.dndm-input--num { width: 5.5rem; text-align: right; font-variant-numeric: tabular-nums; }
+
+.dndm-label {
+    display: block;
+    font-size: 0.7rem;
+    color: var(--dndm-text-dim);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 0.2rem;
+}
+
+.dndm-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.dndm-row--wrap { flex-wrap: wrap; }
+
+.dndm-color-swatch {
+    width: 18px; height: 18px;
+    border-radius: 3px;
+    border: 1px solid var(--dndm-border-strong);
+    flex: 0 0 auto;
+}
+
+/* ─── Radio pill group ────────────────────────────────────────── */
+.dndm-pillgroup {
+    display: inline-flex;
+    border: 1px solid var(--dndm-border-strong);
+    border-radius: 4px;
+    overflow: hidden;
+}
+.dndm-pillgroup button {
+    background: transparent;
+    color: var(--dndm-text-dim);
+    border: 0;
+    padding: 0.3rem 0.6rem;
+    font-size: 0.75rem;
+    font-family: var(--font-primary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+}
+.dndm-pillgroup button + button { border-left: 1px solid var(--dndm-border); }
+.dndm-pillgroup button:hover { color: var(--dndm-text); }
+.dndm-pillgroup button.active {
+    background: var(--dndm-gold);
+    color: #1a1208;
+    font-weight: 600;
+}
+
+/* ─── Toggle switch ───────────────────────────────────────────── */
+.dndm-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    user-select: none;
+    font-size: 0.85rem;
+}
+.dndm-toggle input { position: absolute; opacity: 0; pointer-events: none; }
+.dndm-toggle-track {
+    position: relative;
+    width: 32px; height: 16px;
+    background: var(--dndm-bg-elev);
+    border: 1px solid var(--dndm-border-strong);
+    border-radius: 8px;
+    transition: background 120ms ease;
+}
+.dndm-toggle-track::after {
+    content: '';
+    position: absolute;
+    top: 1px; left: 1px;
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: var(--dndm-text-dim);
+    transition: transform 140ms ease, background 140ms ease;
+}
+.dndm-toggle input:checked + .dndm-toggle-track { background: rgba(232, 184, 73, 0.3); border-color: var(--dndm-gold); }
+.dndm-toggle input:checked + .dndm-toggle-track::after { transform: translateX(16px); background: var(--dndm-gold); }

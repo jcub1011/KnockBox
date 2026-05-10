@@ -2,17 +2,101 @@
 @using KnockBox.DndMapper.Services.State.Games
 @using KnockBox.DndMapper.Services.State.Games.Data
 
-<div class="dnd-mapper-playing">
-    @if (ActiveMap is null)
-    {
-        <div class="dndm-empty">No active map.</div>
-    }
-    else
-    {
-        <MapCanvas State="State"
-                   RoomCode="@RoomCode"
-                   Map="ActiveMap"
-                   IsHost="IsHost"
-                   CurrentUserId="@CurrentUserId" />
-    }
-</div>
+<HeadContent>
+    <link href="_content/KnockBox.DndMapper/css/panels.css" rel="stylesheet" />
+</HeadContent>
+
+<CascadingValue Value="_toasts" IsFixed="true">
+    <div class="dnd-mapper-playing @(IsHost ? "dnd-mapper-playing--host" : null)
+                @(_leftCollapsed ? "dnd-mapper-playing--left-collapsed" : null)
+                @(_rightCollapsed ? "dnd-mapper-playing--right-collapsed" : null)">
+
+        @if (IsHost)
+        {
+            <aside class="dndm-rail dndm-rail--left">
+                <button class="dndm-rail-toggle"
+                        type="button"
+                        title="@(_leftCollapsed ? "Expand" : "Collapse")"
+                        @onclick="ToggleLeftRail">@(_leftCollapsed ? "›" : "‹")</button>
+                <div class="dndm-rail-content">
+                    <HostMapSwitcher State="State" />
+                    <HostTokenPanel State="State" />
+                    <ImageUploadButton State="State" />
+                </div>
+            </aside>
+        }
+
+        <main class="dndm-canvas-area">
+            @if (ActiveMap is null)
+            {
+                <div class="dndm-empty">
+                    @if (IsHost)
+                    {
+                        <span>No active map. Create one from the <strong>Maps</strong> panel.</span>
+                    }
+                    else
+                    {
+                        <span>Waiting for the host to choose a map…</span>
+                    }
+                </div>
+            }
+            else
+            {
+                <MapCanvas State="State"
+                           Map="ActiveMap"
+                           RoomCode="@RoomCode"
+                           IsHost="IsHost"
+                           CurrentUserId="@CurrentUserId"
+                           SelectedImageId="_selectedImageId"
+                           SelectedImageIdChanged="OnSelectedImageIdChanged" />
+
+                @if (IsHost && _selectedImageId is Guid imgId && State.ActiveMapId is Guid mapId)
+                {
+                    <div class="dndm-canvas-inspector">
+                        <HostImageInspector State="State"
+                                            MapId="mapId"
+                                            ImageId="imgId"
+                                            OnClose="@(() => _selectedImageId = null)" />
+                    </div>
+                }
+            }
+        </main>
+
+        <aside class="dndm-rail dndm-rail--right">
+            <button class="dndm-rail-toggle"
+                    type="button"
+                    title="@(_rightCollapsed ? "Expand" : "Collapse")"
+                    @onclick="ToggleRightRail">@(_rightCollapsed ? "‹" : "›")</button>
+            <div class="dndm-rail-content">
+                <CharacterSheetPanel State="State" CurrentUserId="@CurrentUserId" IsHost="IsHost" />
+                <RollLogPanel State="State" CurrentUserId="@CurrentUserId" IsHost="IsHost" />
+            </div>
+        </aside>
+
+        <div class="dndm-floating-actions">
+            <button class="dndm-btn dndm-btn--primary" type="button" @onclick="ToggleDice">Roll</button>
+            @if (IsHost)
+            {
+                <button class="dndm-btn" type="button" @onclick="TogglePerms">Permissions</button>
+            }
+        </div>
+
+        @if (_diceOpen)
+        {
+            <DiceRollerModal State="State"
+                             CurrentUserId="@CurrentUserId"
+                             IsHost="IsHost"
+                             OnClose="@(() => _diceOpen = false)" />
+        }
+        @if (IsHost && _permsOpen)
+        {
+            <div class="dndm-modal-overlay" @onclick="@(() => _permsOpen = false)">
+                <div @onclick:stopPropagation="true">
+                    <PermissionsPanel State="State" OnClose="@(() => _permsOpen = false)" />
+                </div>
+            </div>
+        }
+
+        <DndMapperToast Service="_toasts" />
+    </div>
+</CascadingValue>

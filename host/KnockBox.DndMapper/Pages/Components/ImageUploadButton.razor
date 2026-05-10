@@ -1,0 +1,15 @@
+@using Microsoft.AspNetCore.Components.Forms
+@using KnockBox.Core.Components.Shared
+@using KnockBox.DndMapper.Services.State.Games
+@inherits DisposableComponent
+
+<label class="dndm-upload @(_disabled ? "dndm-upload--disabled" : null)">
+    <span class="dndm-upload-label">
+        @if (_uploading) { <span>Uploading…</span> } else { <span>+ Upload Image</span> }
+    </span>
+    <span class="dndm-upload-hint">PNG · JPEG · WebP · ≤ 5 MB</span>
+    <InputFile OnChange="OnFileSelected"
+               accept="image/png,image/jpeg,image/webp"
+               disabled="@_disabled"
+               class="dndm-upload-input" />
+</label>

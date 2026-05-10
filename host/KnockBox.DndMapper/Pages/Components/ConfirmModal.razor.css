@@ -1,0 +1,45 @@
+.dndm-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(7, 7, 14, 0.65);
+    backdrop-filter: blur(2px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
+}
+
+.dndm-modal-card {
+    min-width: 320px;
+    max-width: 480px;
+    background: #1a1a2e;
+    color: #ede4d3;
+    border: 1px solid rgba(168, 85, 247, 0.35);
+    border-radius: 8px;
+    padding: 1.25rem 1.5rem 1rem;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6);
+    font-family: var(--font-primary);
+}
+
+.dndm-modal-title {
+    margin: 0 0 0.5rem 0;
+    font-family: Georgia, "IM Fell English", "EB Garamond", serif;
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: #e8b849;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+
+.dndm-modal-message {
+    margin: 0 0 1rem 0;
+    font-size: 0.95rem;
+    line-height: 1.45;
+    color: #d8cfbe;
+}
+
+.dndm-modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.6rem;
+}

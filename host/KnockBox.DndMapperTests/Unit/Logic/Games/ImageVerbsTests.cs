@@ -276,5 +276,70 @@ namespace KnockBox.DndMapperTests.Unit.Logic.Games
             Assert.IsTrue(_storage.Exists("other-session/images/foo.png"),
                 "Cleanup should be scoped to the session prefix.");
         }
+
+        // ── SetImageLockedAsync ───────────────────────────────────────────────────
+
+        [TestMethod]
+        public void SetImageLockedAsync_HostCaller_TogglesLocked()
+        {
+            var img = SeedImage();
+            Assert.IsTrue(_engine.AddImageAsync(_state, _host, _mapId, img).IsSuccess);
+
+            var lockResult = _engine.SetImageLockedAsync(_state, _host, _mapId, img.Id, true);
+            Assert.IsTrue(lockResult.IsSuccess);
+            Assert.IsTrue(_state.Maps[0].Images.Single().Locked);
+
+            var unlockResult = _engine.SetImageLockedAsync(_state, _host, _mapId, img.Id, false);
+            Assert.IsTrue(unlockResult.IsSuccess);
+            Assert.IsFalse(_state.Maps[0].Images.Single().Locked);
+        }
+
+        [TestMethod]
+        public void SetImageLockedAsync_NonHost_ReturnsError()
+        {
+            var img = SeedImage();
+            _engine.AddImageAsync(_state, _host, _mapId, img);
+            var player = EngineTestFactory.RegisterPlayer(_state);
+
+            var result = _engine.SetImageLockedAsync(_state, player, _mapId, img.Id, true);
+            Assert.IsTrue(result.IsFailure);
+        }
+
+        [TestMethod]
+        public void SetImageLockedAsync_UnknownImage_ReturnsError()
+        {
+            var result = _engine.SetImageLockedAsync(_state, _host, _mapId, Guid.NewGuid(), true);
+            Assert.IsTrue(result.IsFailure);
+        }
+
+        [TestMethod]
+        public void UpdateImageTransformAsync_LockedImage_ReturnsError()
+        {
+            var img = SeedImage();
+            _engine.AddImageAsync(_state, _host, _mapId, img);
+            _engine.SetImageLockedAsync(_state, _host, _mapId, img.Id, true);
+
+            var result = _engine.UpdateImageTransformAsync(
+                _state, _host, _mapId, img.Id, 5, 5, 20, 20, 0, 1.0);
+            Assert.IsTrue(result.IsFailure);
+
+            // Unchanged
+            var fresh = _state.Maps[0].Images.Single();
+            Assert.AreEqual(0, fresh.X);
+            Assert.AreEqual(10, fresh.Width);
+        }
+
+        [TestMethod]
+        public void ReorderImageLayerAsync_LockedImage_ReturnsError()
+        {
+            var a = SeedImage(); _engine.AddImageAsync(_state, _host, _mapId, a);
+            var b = SeedImage(); _engine.AddImageAsync(_state, _host, _mapId, b);
+            _engine.SetImageLockedAsync(_state, _host, _mapId, a.Id, true);
+
+            var result = _engine.ReorderImageLayerAsync(_state, _host, _mapId, a.Id, 1);
+            Assert.IsTrue(result.IsFailure);
+            Assert.AreEqual(0, _state.Maps[0].Images[0].LayerOrder);
+            Assert.AreEqual(a.Id, _state.Maps[0].Images[0].Id);
+        }
     }
 }

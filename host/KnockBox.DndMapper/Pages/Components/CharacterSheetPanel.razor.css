@@ -1,0 +1,100 @@
+.dndm-sheet { display: flex; flex-direction: column; }
+
+.dndm-sheet-tabs {
+    display: flex;
+    gap: 0.2rem;
+    padding: 0.4rem 0.4rem 0;
+    flex-wrap: wrap;
+}
+
+.dndm-sheet-tab {
+    background: transparent;
+    color: #b6ad99;
+    border: 1px solid transparent;
+    border-bottom: 1px solid #2c2c44;
+    padding: 0.3rem 0.6rem;
+    font-family: var(--font-primary);
+    font-size: 0.8rem;
+    cursor: pointer;
+    border-radius: 4px 4px 0 0;
+}
+
+.dndm-sheet-tab:hover { color: #ede4d3; }
+
+.dndm-sheet-tab--active {
+    color: #e8b849;
+    border: 1px solid #2c2c44;
+    border-bottom-color: transparent;
+    background: #14141f;
+}
+
+.dndm-sheet-body {
+    padding: 0.5rem 0.75rem;
+    border-top: 0;
+}
+
+.dndm-sheet-namerow {
+    margin-bottom: 0.65rem;
+    border-bottom: 1px dashed #2c2c44;
+    padding-bottom: 0.5rem;
+}
+
+.dndm-sheet-name {
+    font-family: var(--dndm-display);
+    font-size: 1.1rem;
+    color: #ede4d3;
+    background: transparent;
+    border: 0;
+    border-bottom: 1px solid transparent;
+    padding: 0.25rem 0;
+    width: 100%;
+}
+
+.dndm-sheet-name:focus {
+    outline: none;
+    border-bottom-color: #e8b849;
+}
+
+.dndm-sheet-attrs {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.3rem;
+    margin-bottom: 0.6rem;
+}
+
+.dndm-sheet-attr {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.2rem 0;
+}
+
+.dndm-sheet-attr-name {
+    flex: 0 0 6.5rem;
+    color: #cdb98e;
+    font-family: var(--dndm-display);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-size: 0.75rem;
+}
+
+.dndm-sheet-attr-mod {
+    flex: 0 0 auto;
+    min-width: 2.5rem;
+    color: #e8b849;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    font-weight: 600;
+    font-size: 0.85rem;
+}
+
+.dndm-sheet-section { padding: 0.6rem 0; border-top: 1px solid #2c2c44; }
+.dndm-sheet-section .dndm-label { margin-bottom: 0.3rem; }
+
+.dndm-sheet-hp {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.dndm-sheet-hp-sep { color: #7a7464; padding: 0 0.2rem; }

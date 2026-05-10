@@ -55,17 +55,22 @@ RollLogVisibilityFilterTests.cs
 SheetVisibilityHelperTests.cs
 ```
 
+> **Scope correction (post-implementation):** an earlier draft of this plan claimed the engine wouldn't change. The §3.2 lock toggle and §3.4 sheet-attach / represents-player affordances actually require new engine verbs, and §3.2's canvas-side transform handles require a `MapCanvas` change. The lists below reflect what shipped.
+
 ### Files to modify
 
 - `host/KnockBox.DndMapper/Pages/DndMapperPlayingPhase.razor` — extend the layout from M04's minimal canvas-only version to the full panel composition (see §3.10).
 - `host/KnockBox.DndMapper/Pages/DndMapperPlayingPhase.razor.css` — full layout grid (CSS Grid or Flexbox).
 - (Optional) `host/KnockBox.DndMapper/wwwroot/css/...` — any shared styles.
+- `host/KnockBox.DndMapper/Pages/Components/MapCanvas.razor[.cs/.css]` — adds `SelectedImageId` two-way binding and the canvas-side transform handles overlay required by §3.2 (host-only). Selection state lives on `DndMapperPlayingPhase`.
+- `host/KnockBox.DndMapper/Services/Logic/Games/DndMapperGameEngine.cs` — three new host-only verbs needed by the panels: `SetImageLockedAsync` (§3.2 lock toggle), `SetTokenSheetAsync` (§3.4 sheet attach/detach), `SetTokenRepresentsAsync` (§3.4 represents-player dropdown). Also adds locked-image guards to `UpdateImageTransformAsync` and `ReorderImageLayerAsync`.
+- `host/KnockBox.DndMapperTests/Unit/Logic/Games/ImageVerbsTests.cs` — coverage for `SetImageLockedAsync` plus the locked-guard behavior on transform/reorder.
+- `host/KnockBox.DndMapperTests/Unit/TokenVerbsTests.cs` — coverage for `SetTokenSheetAsync` and `SetTokenRepresentsAsync`.
 
 ### Files NOT touched in M05
 
 - `Services/State/Games/*` — no state shape changes.
-- `Services/Logic/Games/DndMapperGameEngine.cs` — no new verbs.
-- `Services/Logic/Games/Http/*` — no HTTP changes; the upload button calls the existing M03 endpoint.
+- `Services/Logic/Games/Http/*` — no HTTP changes; the upload button calls the engine directly per §3.3.
 - `Pages/DndMapperLobby.razor` — M06 adds lobby authoring (which reuses M05 components). M05 leaves the lobby alone.
 - `plugin.json`, `KnockBox.DndMapper.csproj` — unchanged.
 

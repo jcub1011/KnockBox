@@ -435,5 +435,101 @@ namespace KnockBox.DndMapperTests.Unit
             var spawn = _engine.SpawnNpcTokenAsync(_state, stranger, mapId, "Goblin");
             Assert.IsTrue(spawn.IsFailure);
         }
+
+        // ── SetTokenSheetAsync ────────────────────────────────────────────────────
+
+        [TestMethod]
+        public void SetTokenSheetAsync_HostAttachesAndDetaches()
+        {
+            var mapId = CreateAndActivateMap();
+            Assert.IsTrue(_engine.SpawnNpcTokenAsync(_state, _host, mapId, "Goblin").TryGetSuccess(out var tokenId));
+            Assert.IsTrue(_engine.CreateSheetAsync(_state, _host, ownerUserId: null, "Goblin Sheet").TryGetSuccess(out var sheetId));
+
+            var attach = _engine.SetTokenSheetAsync(_state, _host, tokenId, sheetId);
+            Assert.IsTrue(attach.IsSuccess);
+            Assert.AreEqual(sheetId, _state.Maps[0].Tokens.Single(t => t.Id == tokenId).SheetId);
+
+            var detach = _engine.SetTokenSheetAsync(_state, _host, tokenId, null);
+            Assert.IsTrue(detach.IsSuccess);
+            Assert.IsNull(_state.Maps[0].Tokens.Single(t => t.Id == tokenId).SheetId);
+        }
+
+        [TestMethod]
+        public void SetTokenSheetAsync_NonHost_ReturnsError()
+        {
+            var mapId = CreateAndActivateMap();
+            Assert.IsTrue(_engine.SpawnNpcTokenAsync(_state, _host, mapId, "Goblin").TryGetSuccess(out var tokenId));
+            var player = EngineTestFactory.RegisterPlayer(_state);
+
+            var result = _engine.SetTokenSheetAsync(_state, player, tokenId, null);
+            Assert.IsTrue(result.IsFailure);
+        }
+
+        [TestMethod]
+        public void SetTokenSheetAsync_UnknownSheet_ReturnsError()
+        {
+            var mapId = CreateAndActivateMap();
+            Assert.IsTrue(_engine.SpawnNpcTokenAsync(_state, _host, mapId, "Goblin").TryGetSuccess(out var tokenId));
+
+            var result = _engine.SetTokenSheetAsync(_state, _host, tokenId, Guid.NewGuid());
+            Assert.IsTrue(result.IsFailure);
+        }
+
+        [TestMethod]
+        public void SetTokenSheetAsync_UnknownToken_ReturnsError()
+        {
+            var result = _engine.SetTokenSheetAsync(_state, _host, Guid.NewGuid(), null);
+            Assert.IsTrue(result.IsFailure);
+        }
+
+        // ── SetTokenRepresentsAsync ───────────────────────────────────────────────
+
+        [TestMethod]
+        public void SetTokenRepresentsAsync_HostExtraToken_SetAndClear()
+        {
+            var (mapId, players) = CreateMapWithPlayers("Alice");
+            Assert.IsTrue(_engine.SpawnHostExtraTokenAsync(_state, _host, mapId, "Doppel", representsUserId: null)
+                .TryGetSuccess(out var tokenId));
+
+            var set = _engine.SetTokenRepresentsAsync(_state, _host, tokenId, players[0].Id);
+            Assert.IsTrue(set.IsSuccess);
+            Assert.AreEqual(players[0].Id, _state.Maps[0].Tokens.Single(t => t.Id == tokenId).RepresentsUserId);
+
+            var clear = _engine.SetTokenRepresentsAsync(_state, _host, tokenId, null);
+            Assert.IsTrue(clear.IsSuccess);
+            Assert.IsNull(_state.Maps[0].Tokens.Single(t => t.Id == tokenId).RepresentsUserId);
+        }
+
+        [TestMethod]
+        public void SetTokenRepresentsAsync_NotHostExtra_ReturnsError()
+        {
+            var mapId = CreateAndActivateMap();
+            Assert.IsTrue(_engine.SpawnNpcTokenAsync(_state, _host, mapId, "Goblin").TryGetSuccess(out var npcId));
+
+            var result = _engine.SetTokenRepresentsAsync(_state, _host, npcId, null);
+            Assert.IsTrue(result.IsFailure);
+        }
+
+        [TestMethod]
+        public void SetTokenRepresentsAsync_UnknownPlayer_ReturnsError()
+        {
+            var mapId = CreateAndActivateMap();
+            Assert.IsTrue(_engine.SpawnHostExtraTokenAsync(_state, _host, mapId, "Doppel", null)
+                .TryGetSuccess(out var tokenId));
+
+            var result = _engine.SetTokenRepresentsAsync(_state, _host, tokenId, "not-a-real-player-id");
+            Assert.IsTrue(result.IsFailure);
+        }
+
+        [TestMethod]
+        public void SetTokenRepresentsAsync_NonHost_ReturnsError()
+        {
+            var (mapId, players) = CreateMapWithPlayers("Alice");
+            Assert.IsTrue(_engine.SpawnHostExtraTokenAsync(_state, _host, mapId, "Doppel", null)
+                .TryGetSuccess(out var tokenId));
+
+            var result = _engine.SetTokenRepresentsAsync(_state, players[0], tokenId, players[0].Id);
+            Assert.IsTrue(result.IsFailure);
+        }
     }
 }

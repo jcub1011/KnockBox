@@ -537,6 +537,68 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             return error is null ? Result.Success : Result.FromError(error);
         }
 
+        /// <summary>
+        /// Sets or clears the character sheet attached to a token. Host-only.
+        /// Pass <c>null</c> to detach. The sheet must exist if non-null.
+        /// </summary>
+        public Result SetTokenSheetAsync(DndMapperGameState state, User caller, Guid tokenId, Guid? sheetId)
+        {
+            if (state is null) return Result.FromError("State is required.");
+            if (caller is null) return Result.FromError("Caller is required.");
+            if (!IsHost(state, caller)) return Result.FromError("Only the host may attach character sheets to tokens.");
+
+            string? error = null;
+            var exec = state.Execute(() =>
+            {
+                var (token, _) = FindTokenAndMap(state, tokenId);
+                if (token is null) { error = "Unknown token id."; return; }
+                if (sheetId is Guid sid && !state.Sheets.ContainsKey(sid))
+                {
+                    error = "Unknown sheet id.";
+                    return;
+                }
+                token.SheetId = sheetId;
+            });
+
+            if (exec.IsCanceled) return Result.FromCancellation();
+            if (exec.TryGetFailure(out var execErr)) return Result.FromError(execErr);
+            return error is null ? Result.Success : Result.FromError(error);
+        }
+
+        /// <summary>
+        /// Sets or clears the player a host-extra token represents. Host-only.
+        /// Only valid on <see cref="TokenType.HostExtraToken"/>. Pass <c>null</c> to clear.
+        /// </summary>
+        public Result SetTokenRepresentsAsync(DndMapperGameState state, User caller, Guid tokenId, string? representsUserId)
+        {
+            if (state is null) return Result.FromError("State is required.");
+            if (caller is null) return Result.FromError("Caller is required.");
+            if (!IsHost(state, caller)) return Result.FromError("Only the host may change which player a token represents.");
+
+            string? error = null;
+            var exec = state.Execute(() =>
+            {
+                var (token, _) = FindTokenAndMap(state, tokenId);
+                if (token is null) { error = "Unknown token id."; return; }
+                if (token.Type != TokenType.HostExtraToken)
+                {
+                    error = "Only host-extra tokens may represent a player.";
+                    return;
+                }
+                if (representsUserId is not null
+                    && !state.Players.Any(p => p.User.Id == representsUserId))
+                {
+                    error = "Unknown player id.";
+                    return;
+                }
+                token.RepresentsUserId = representsUserId;
+            });
+
+            if (exec.IsCanceled) return Result.FromCancellation();
+            if (exec.TryGetFailure(out var execErr)) return Result.FromError(execErr);
+            return error is null ? Result.Success : Result.FromError(error);
+        }
+
         public Result SetTokenHiddenAsync(DndMapperGameState state, User caller, Guid tokenId, bool hidden)
         {
             if (state is null) return Result.FromError("State is required.");
@@ -846,6 +908,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             {
                 var (image, _) = FindImageAndMap(state, mapId, imageId);
                 if (image is null) { error = "Unknown map or image id."; return; }
+                if (image.Locked) { error = "Image is locked."; return; }
 
                 image.X = x;
                 image.Y = y;
@@ -874,6 +937,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
 
                 int currentIndex = map.Images.FindIndex(i => i.Id == imageId);
                 if (currentIndex < 0) { error = "Unknown image id."; return; }
+                if (map.Images[currentIndex].Locked) { error = "Image is locked."; return; }
                 if (newLayerOrder < 0 || newLayerOrder >= map.Images.Count)
                 {
                     error = "New layer order is out of range.";
@@ -886,6 +950,29 @@ namespace KnockBox.DndMapper.Services.Logic.Games
 
                 for (int i = 0; i < map.Images.Count; i++)
                     map.Images[i].LayerOrder = i;
+            });
+
+            if (exec.IsCanceled) return Result.FromCancellation();
+            if (exec.TryGetFailure(out var execErr)) return Result.FromError(execErr);
+            return error is null ? Result.Success : Result.FromError(error);
+        }
+
+        /// <summary>
+        /// Locks or unlocks an image. Host-only. Locked images cannot have their
+        /// transform changed or layer reordered until unlocked. Removal still works.
+        /// </summary>
+        public Result SetImageLockedAsync(DndMapperGameState state, User caller, Guid mapId, Guid imageId, bool locked)
+        {
+            if (state is null) return Result.FromError("State is required.");
+            if (caller is null) return Result.FromError("Caller is required.");
+            if (!IsHost(state, caller)) return Result.FromError("Only the host may lock or unlock images.");
+
+            string? error = null;
+            var exec = state.Execute(() =>
+            {
+                var (image, _) = FindImageAndMap(state, mapId, imageId);
+                if (image is null) { error = "Unknown map or image id."; return; }
+                image.Locked = locked;
             });
 
             if (exec.IsCanceled) return Result.FromCancellation();

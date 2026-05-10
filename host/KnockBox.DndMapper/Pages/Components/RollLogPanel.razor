@@ -1,0 +1,48 @@
+@using System.Text
+@using KnockBox.Core.Components.Shared
+@using KnockBox.DndMapper.Models
+@using KnockBox.DndMapper.Services.Logic.Visibility
+@using KnockBox.DndMapper.Services.State.Games
+@using KnockBox.DndMapper.Services.State.Games.Data
+@inherits DisposableComponent
+
+<section class="dndm-panel dndm-rolllog">
+    <header class="dndm-panel-header">
+        <span>Roll Log</span>
+    </header>
+    <div class="dndm-panel-body dndm-rolllog-body">
+        @if (Visible.Count == 0)
+        {
+            <div class="dndm-panel-empty">No rolls yet.</div>
+        }
+        else
+        {
+            @foreach (var r in Visible)
+            {
+                <article @key="r.Id" class="dndm-rolllog-entry">
+                    <header class="dndm-rolllog-meta">
+                        <span class="dndm-rolllog-roller">@RollerName(r.RollerUserId)</span>
+                        <span class="dndm-rolllog-label">@r.Label</span>
+                        @if (r.Mode != RollMode.Normal)
+                        {
+                            <span class="dndm-rolllog-mode">@(r.Mode == RollMode.Advantage ? "ADV" : "DIS")</span>
+                        }
+                    </header>
+                    <div class="dndm-rolllog-dice">
+                        @foreach (var d in r.Rolls)
+                        {
+                            <span class="@($"dndm-die{(d.Discarded ? " dndm-die--discarded" : "")}")"
+                                  title="@($"d{d.Sides}")">@d.Result</span>
+                        }
+                        @if (r.FlatModifier != 0 || r.AttributeModifier is not null)
+                        {
+                            var mods = (r.FlatModifier) + (r.AttributeModifier ?? 0);
+                            <span class="dndm-rolllog-mod">@(mods >= 0 ? "+" : "")@mods</span>
+                        }
+                        <span class="dndm-rolllog-total">= <strong>@r.Total</strong></span>
+                    </div>
+                </article>
+            }
+        }
+    </div>
+</section>

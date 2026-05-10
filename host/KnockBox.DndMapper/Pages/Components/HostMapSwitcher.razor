@@ -1,0 +1,87 @@
+@using KnockBox.Core.Components.Shared
+@using KnockBox.DndMapper.Services.State.Games
+@using KnockBox.DndMapper.Services.State.Games.Data
+@inherits DisposableComponent
+
+<section class="dndm-panel dndm-mapsw">
+    <header class="dndm-panel-header">
+        <span>Maps</span>
+        <button class="dndm-btn dndm-btn--icon dndm-btn--small"
+                type="button"
+                title="New map"
+                @onclick="OnNewMap">+</button>
+    </header>
+    <div class="dndm-panel-body dndm-mapsw-list">
+        @if (Maps.Count == 0)
+        {
+            <div class="dndm-panel-empty">No maps yet — click <strong>+</strong> to create one.</div>
+        }
+        else
+        {
+            @foreach (var (m, idx) in Maps.Select((m, i) => (m, i)))
+            {
+                var isActive = State.ActiveMapId == m.Id;
+                var rowClass = isActive ? "dndm-mapsw-row dndm-mapsw-row--active" : "dndm-mapsw-row";
+                <div @key="m.Id"
+                     class="@rowClass"
+                     draggable="true"
+                     @ondragstart="@(() => OnDragStart(idx))"
+                     @ondragover:preventDefault="true"
+                     @ondragover="@(() => OnDragOver(idx))"
+                     @ondrop="@(() => OnDrop(idx))"
+                     @onclick="@(() => OnRowClick(m.Id))">
+                    <div class="dndm-mapsw-thumb">
+                        @if (m.Images.Count > 0)
+                        {
+                            <span class="dndm-mapsw-thumb-tag">@m.Images.Count</span>
+                        }
+                        else
+                        {
+                            <span class="dndm-mapsw-thumb-blank">◇</span>
+                        }
+                    </div>
+                    <div class="dndm-mapsw-row-main">
+                        @if (_renamingId == m.Id)
+                        {
+                            <input class="dndm-input dndm-mapsw-rename"
+                                   value="@_renameDraft"
+                                   @oninput="@(e => _renameDraft = (string?)e.Value ?? string.Empty)"
+                                   @onkeydown="@(e => OnRenameKey(e, m.Id))"
+                                   @onblur="@(() => CommitRename(m.Id))"
+                                   @ref="_renameInputRef" />
+                        }
+                        else
+                        {
+                            <span class="dndm-mapsw-name">@m.Name</span>
+                        }
+                        <span class="dndm-mapsw-meta">@m.Grid.WidthCells×@m.Grid.HeightCells</span>
+                    </div>
+                    <div class="dndm-mapsw-actions">
+                        <button class="dndm-btn dndm-btn--icon dndm-btn--small"
+                                type="button"
+                                title="Rename"
+                                @onclick:stopPropagation="true"
+                                @onclick="@(() => StartRename(m))">✎</button>
+                        <button class="dndm-btn dndm-btn--icon dndm-btn--small"
+                                type="button"
+                                title="Duplicate"
+                                @onclick:stopPropagation="true"
+                                @onclick="@(() => OnDuplicate(m.Id))">⎘</button>
+                        <button class="dndm-btn dndm-btn--icon dndm-btn--small"
+                                type="button"
+                                title="Delete"
+                                @onclick:stopPropagation="true"
+                                @onclick="@(() => OnDeleteRequest(m))">×</button>
+                    </div>
+                </div>
+            }
+        }
+    </div>
+</section>
+
+<ConfirmModal IsOpen="_pendingDelete is not null"
+              Title="Delete map?"
+              Message="@($"This will permanently delete \"{_pendingDelete?.Name}\" and remove all of its images from disk.")"
+              ConfirmText="Delete"
+              OnConfirm="ConfirmDelete"
+              OnCancel="CancelDelete" />

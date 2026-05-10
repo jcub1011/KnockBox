@@ -1,0 +1,53 @@
+.dndm-toast-stack {
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    z-index: 80;
+    pointer-events: none;
+    max-width: min(420px, calc(100vw - 2rem));
+}
+
+.dndm-toast {
+    pointer-events: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.55rem 0.85rem;
+    background: #1a1a2e;
+    color: #ede4d3;
+    border: 1px solid rgba(168, 85, 247, 0.45);
+    border-left-width: 3px;
+    border-radius: 4px;
+    font-family: var(--font-primary);
+    font-size: 0.875rem;
+    box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.55);
+    animation: dndm-toast-in 220ms ease-out;
+}
+
+.dndm-toast-icon {
+    flex: 0 0 auto;
+    font-weight: 700;
+    color: #cdb98e;
+}
+
+.dndm-toast-message {
+    flex: 1 1 auto;
+    line-height: 1.35;
+}
+
+.dndm-toast--success { border-left-color: #6dd6a1; }
+.dndm-toast--success .dndm-toast-icon { color: #6dd6a1; }
+
+.dndm-toast--warn { border-left-color: #e8b849; }
+.dndm-toast--warn .dndm-toast-icon { color: #e8b849; }
+
+.dndm-toast--danger { border-left-color: #e26b6b; }
+.dndm-toast--danger .dndm-toast-icon { color: #e26b6b; }
+
+@keyframes dndm-toast-in {
+    from { transform: translateX(8px); opacity: 0; }
+    to   { transform: translateX(0);   opacity: 1; }
+}

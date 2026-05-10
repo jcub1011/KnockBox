@@ -1,0 +1,47 @@
+.dndm-upload {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.2rem;
+    padding: 0.6rem 0.5rem;
+    background: var(--dndm-bg-elev);
+    border: 1px dashed var(--dndm-border-strong);
+    border-radius: 4px;
+    color: var(--dndm-text);
+    cursor: pointer;
+    text-align: center;
+    transition: border-color 120ms, background 120ms;
+}
+
+.dndm-upload:hover {
+    border-color: var(--dndm-gold);
+    background: var(--dndm-bg-elev-hover);
+}
+
+.dndm-upload--disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.dndm-upload-label {
+    font-family: var(--dndm-display);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    font-size: 0.8rem;
+    color: var(--dndm-gold);
+}
+
+.dndm-upload-hint {
+    font-size: 0.7rem;
+    color: var(--dndm-text-muted);
+    letter-spacing: 0.5px;
+}
+
+.dndm-upload-input {
+    position: absolute;
+    width: 1px; height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+}

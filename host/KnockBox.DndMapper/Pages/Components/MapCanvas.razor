@@ -29,22 +29,49 @@
 
         <rect x="0" y="0"
               width="@Map.Grid.WidthCells" height="@Map.Grid.HeightCells"
-              fill="#0e1117" />
+              fill="#0e1117"
+              @onclick="OnBackgroundClick" />
 
         @if (Map.Images.Count > 0)
         {
             @foreach (var img in Map.Images.OrderBy(i => i.LayerOrder))
             {
-                var cx = img.X + img.Width / 2;
-                var cy = img.Y + img.Height / 2;
+                var draft = (IsHost && _drag is { ImageId: var dId } && dId == img.Id) ? _drag : null;
+                var x = draft?.X ?? img.X;
+                var y = draft?.Y ?? img.Y;
+                var w = draft?.W ?? img.Width;
+                var h = draft?.H ?? img.Height;
+                var rot = draft?.Rot ?? img.Rotation;
+                var cx = x + w / 2;
+                var cy = y + h / 2;
                 <image @key="img.Id"
                        href="@($"/api/plugins/dnd-mapper/{RoomCode}/images/{img.Id}")"
-                       x="@F(img.X)" y="@F(img.Y)"
-                       width="@F(img.Width)" height="@F(img.Height)"
-                       transform="@($"rotate({F(img.Rotation)} {F(cx)} {F(cy)})")"
+                       x="@F(x)" y="@F(y)"
+                       width="@F(w)" height="@F(h)"
+                       transform="@($"rotate({F(rot)} {F(cx)} {F(cy)})")"
                        opacity="@F(img.Opacity)"
                        preserveAspectRatio="none"
                        pointer-events="none" />
+            }
+
+            @if (IsHost)
+            {
+                <g class="dndm-image-pickers">
+                    @foreach (var img in Map.Images.OrderBy(i => i.LayerOrder))
+                    {
+                        var cx = img.X + img.Width / 2;
+                        var cy = img.Y + img.Height / 2;
+                        <rect @key="@($"pick-{img.Id}")"
+                              x="@F(img.X)" y="@F(img.Y)"
+                              width="@F(img.Width)" height="@F(img.Height)"
+                              transform="@($"rotate({F(img.Rotation)} {F(cx)} {F(cy)})")"
+                              fill="transparent"
+                              stroke="@(SelectedImageId == img.Id ? "#e8b849" : "transparent")"
+                              stroke-width="0.04"
+                              pointer-events="all"
+                              @onmousedown="@(e => OnImageMouseDown(e, img))" />
+                    }
+                </g>
             }
         }
 
@@ -69,5 +96,38 @@
                     IsHost="IsHost"
                     CurrentUserId="@CurrentUserId"
                     SvgId="@_svgId" />
+
+        @if (IsHost && SelectedImage is { } sel)
+        {
+            var s = (_drag is { ImageId: var did } && did == sel.Id) ? _drag : null;
+            var sx = s?.X ?? sel.X;
+            var sy = s?.Y ?? sel.Y;
+            var sw = s?.W ?? sel.Width;
+            var sh = s?.H ?? sel.Height;
+            var sr = s?.Rot ?? sel.Rotation;
+            var hSize = 0.25; // cells
+            <g class="dndm-image-handles" pointer-events="all">
+                <g transform="@($"rotate({F(sr)} {F(sx + sw / 2)} {F(sy + sh / 2)})")">
+                    <rect x="@F(sx - hSize / 2)" y="@F(sy - hSize / 2)"
+                          width="@F(hSize)" height="@F(hSize)" class="dndm-image-handle"
+                          @onmousedown="@(e => OnHandleMouseDown(e, sel, HandleKind.NW))" />
+                    <rect x="@F(sx + sw - hSize / 2)" y="@F(sy - hSize / 2)"
+                          width="@F(hSize)" height="@F(hSize)" class="dndm-image-handle"
+                          @onmousedown="@(e => OnHandleMouseDown(e, sel, HandleKind.NE))" />
+                    <rect x="@F(sx - hSize / 2)" y="@F(sy + sh - hSize / 2)"
+                          width="@F(hSize)" height="@F(hSize)" class="dndm-image-handle"
+                          @onmousedown="@(e => OnHandleMouseDown(e, sel, HandleKind.SW))" />
+                    <rect x="@F(sx + sw - hSize / 2)" y="@F(sy + sh - hSize / 2)"
+                          width="@F(hSize)" height="@F(hSize)" class="dndm-image-handle"
+                          @onmousedown="@(e => OnHandleMouseDown(e, sel, HandleKind.SE))" />
+                    <line x1="@F(sx + sw / 2)" y1="@F(sy)"
+                          x2="@F(sx + sw / 2)" y2="@F(sy - 0.6)"
+                          class="dndm-image-rotline" />
+                    <circle cx="@F(sx + sw / 2)" cy="@F(sy - 0.6)" r="@F(hSize / 1.5)"
+                            class="dndm-image-handle dndm-image-handle--rot"
+                            @onmousedown="@(e => OnHandleMouseDown(e, sel, HandleKind.Rotate))" />
+                </g>
+            </g>
+        }
     </svg>
 </div>

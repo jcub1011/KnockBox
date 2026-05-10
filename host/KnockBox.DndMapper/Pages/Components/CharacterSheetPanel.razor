@@ -1,0 +1,131 @@
+@using KnockBox.Core.Components.Shared
+@using KnockBox.DndMapper.Models
+@using KnockBox.DndMapper.Services.Logic.Visibility
+@using KnockBox.DndMapper.Services.State.Games
+@using KnockBox.DndMapper.Services.State.Games.Data
+@inherits DisposableComponent
+
+<section class="dndm-panel dndm-sheet">
+    <header class="dndm-panel-header">
+        <span>Character Sheet</span>
+    </header>
+
+    @if (VisibleSheets.Count == 0)
+    {
+        <div class="dndm-panel-empty">No character sheets yet.</div>
+    }
+    else
+    {
+        <div class="dndm-sheet-tabs" role="tablist">
+            @foreach (var s in VisibleSheets)
+            {
+                var active = s.Id == _activeSheetId;
+                <button @key="s.Id"
+                        class="@($"dndm-sheet-tab{(active ? " dndm-sheet-tab--active" : "")}")"
+                        type="button"
+                        role="tab"
+                        @onclick="@(() => SelectSheet(s.Id))">
+                    @(string.IsNullOrEmpty(s.CharacterName) ? "(unnamed)" : s.CharacterName)
+                </button>
+            }
+        </div>
+
+        @if (ActiveSheet is { } sheet)
+        {
+            var canEdit = SheetVisibilityHelper.CanEdit(sheet, CurrentUserId, IsHost, State.Settings.SheetEditByOthers);
+            var canSeePrivate = SheetVisibilityHelper.CanSeeNotesAndHp(sheet, CurrentUserId, IsHost);
+
+            <div class="dndm-panel-body dndm-sheet-body">
+                <div class="dndm-sheet-namerow">
+                    <input class="dndm-input dndm-sheet-name"
+                           value="@sheet.CharacterName"
+                           disabled="@(!canEdit)"
+                           @oninput="@(e => OnNameInput(sheet, (string?)e.Value))"
+                           @onblur="@(() => CommitFreeFields(sheet))" />
+                </div>
+
+                <div class="dndm-sheet-attrs">
+                    @foreach (var row in State.AttributeSchema.Rows)
+                    {
+                        var current = sheet.Values.TryGetValue(row.Name, out var v) ? v : row.Default;
+                        <div @key="row.Name" class="dndm-sheet-attr">
+                            <span class="dndm-sheet-attr-name">@row.Name</span>
+                            @switch (row.Type)
+                            {
+                                case AttributeValueType.Score:
+                                    <input type="number"
+                                           class="dndm-input dndm-input--num"
+                                           value="@(current.IntValue ?? 10)"
+                                           disabled="@(!canEdit)"
+                                           @onchange="@(e => CommitAttribute(sheet, row, AttributeValue.Score(ParseInt(e.Value, 10))))" />
+                                    <span class="dndm-sheet-attr-mod">@FormatMod(current.GetModifier())</span>
+                                    break;
+                                case AttributeValueType.Modifier:
+                                    <input type="number"
+                                           class="dndm-input dndm-input--num"
+                                           value="@(current.IntValue ?? 0)"
+                                           disabled="@(!canEdit)"
+                                           @onchange="@(e => CommitAttribute(sheet, row, AttributeValue.Modifier(ParseInt(e.Value, 0))))" />
+                                    break;
+                                case AttributeValueType.Text:
+                                    <input class="dndm-input"
+                                           value="@(current.StringValue ?? string.Empty)"
+                                           disabled="@(!canEdit)"
+                                           @onchange="@(e => CommitAttribute(sheet, row, AttributeValue.Text(((string?)e.Value) ?? string.Empty)))" />
+                                    break;
+                            }
+                        </div>
+                    }
+                </div>
+
+                @if (canSeePrivate)
+                {
+                    <div class="dndm-sheet-section">
+                        <span class="dndm-label">HP</span>
+                        @if (sheet.Hp is null || sheet.MaxHp is null)
+                        {
+                            <button class="dndm-btn dndm-btn--small"
+                                    type="button"
+                                    disabled="@(!canEdit)"
+                                    @onclick="@(() => InitializeHp(sheet))">+ Add HP tracking</button>
+                        }
+                        else
+                        {
+                            <div class="dndm-sheet-hp">
+                                <button class="dndm-btn dndm-btn--small dndm-btn--icon"
+                                        type="button"
+                                        disabled="@(!canEdit)"
+                                        @onclick="@(() => StepHp(sheet, -1))">−</button>
+                                <input type="number"
+                                       class="dndm-input dndm-input--num"
+                                       value="@sheet.Hp"
+                                       disabled="@(!canEdit)"
+                                       @onchange="@(e => OnHpDirect(sheet, (string?)e.Value))" />
+                                <span class="dndm-sheet-hp-sep">/</span>
+                                <input type="number"
+                                       class="dndm-input dndm-input--num"
+                                       value="@sheet.MaxHp"
+                                       disabled="@(!canEdit)"
+                                       @onchange="@(e => OnMaxHpDirect(sheet, (string?)e.Value))" />
+                                <button class="dndm-btn dndm-btn--small dndm-btn--icon"
+                                        type="button"
+                                        disabled="@(!canEdit)"
+                                        @onclick="@(() => StepHp(sheet, +1))">+</button>
+                            </div>
+                        }
+                    </div>
+
+                    <div class="dndm-sheet-section">
+                        <span class="dndm-label">Notes</span>
+                        <textarea class="dndm-textarea"
+                                  rows="4"
+                                  value="@_notesDraft"
+                                  disabled="@(!canEdit)"
+                                  @oninput="@(e => OnNotesInput((string?)e.Value))"
+                                  @onblur="@(() => CommitFreeFields(sheet))"></textarea>
+                    </div>
+                }
+            </div>
+        }
+    }
+</section>

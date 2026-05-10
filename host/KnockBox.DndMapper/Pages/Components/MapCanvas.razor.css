@@ -59,3 +59,24 @@
 .dndm-map-canvas:active {
     cursor: grabbing;
 }
+
+.dndm-image-pickers rect {
+    cursor: pointer;
+}
+
+.dndm-image-handle {
+    fill: #e8b849;
+    stroke: #1a1208;
+    stroke-width: 0.03;
+    cursor: nwse-resize;
+}
+
+.dndm-image-handle--rot {
+    cursor: grab;
+}
+
+.dndm-image-rotline {
+    stroke: #e8b849;
+    stroke-width: 0.04;
+    stroke-dasharray: 0.1 0.1;
+}

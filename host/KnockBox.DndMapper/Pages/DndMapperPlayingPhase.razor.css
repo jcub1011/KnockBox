@@ -1,0 +1,124 @@
+.dnd-mapper-playing {
+    --dndm-rail-w-left: 280px;
+    --dndm-rail-w-right: 320px;
+    --dndm-rail-collapsed: 28px;
+
+    position: relative;
+    display: grid;
+    grid-template-columns: var(--dndm-rail-w-right) 1fr;
+    grid-template-rows: 1fr;
+    width: 100%;
+    height: 100%;
+    background: #0e1117;
+    color: #ede4d3;
+    font-family: var(--font-primary);
+    overflow: hidden;
+}
+
+.dnd-mapper-playing--host {
+    grid-template-columns: var(--dndm-rail-w-left) 1fr var(--dndm-rail-w-right);
+}
+
+.dnd-mapper-playing--host.dnd-mapper-playing--left-collapsed {
+    grid-template-columns: var(--dndm-rail-collapsed) 1fr var(--dndm-rail-w-right);
+}
+
+.dnd-mapper-playing--right-collapsed {
+    grid-template-columns: var(--dndm-rail-collapsed) 1fr;
+}
+
+.dnd-mapper-playing--host.dnd-mapper-playing--right-collapsed {
+    grid-template-columns: var(--dndm-rail-w-left) 1fr var(--dndm-rail-collapsed);
+}
+
+.dnd-mapper-playing--host.dnd-mapper-playing--left-collapsed.dnd-mapper-playing--right-collapsed {
+    grid-template-columns: var(--dndm-rail-collapsed) 1fr var(--dndm-rail-collapsed);
+}
+
+.dndm-rail {
+    position: relative;
+    background: #14141f;
+    border-right: 1px solid #2c2c44;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-width: 0;
+}
+
+.dndm-rail--right {
+    border-right: 0;
+    border-left: 1px solid #2c2c44;
+}
+
+.dndm-rail-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    padding: 0.5rem;
+    overflow: auto;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+.dnd-mapper-playing--left-collapsed .dndm-rail--left .dndm-rail-content,
+.dnd-mapper-playing--right-collapsed .dndm-rail--right .dndm-rail-content {
+    display: none;
+}
+
+.dndm-rail-toggle {
+    position: absolute;
+    top: 50%;
+    width: 18px;
+    height: 36px;
+    transform: translateY(-50%);
+    background: #1a1a2e;
+    color: #cdb98e;
+    border: 1px solid #2c2c44;
+    border-radius: 3px;
+    cursor: pointer;
+    z-index: 5;
+    font-family: var(--dndm-display);
+    font-size: 0.95rem;
+    line-height: 1;
+    padding: 0;
+}
+
+.dndm-rail--left .dndm-rail-toggle { right: -10px; }
+.dndm-rail--right .dndm-rail-toggle { left: -10px; }
+
+.dndm-canvas-area {
+    position: relative;
+    display: flex;
+    overflow: hidden;
+    background: #0e1117;
+}
+
+.dndm-canvas-area > :global(.dndm-canvas-frame) { flex: 1 1 auto; }
+
+.dndm-canvas-inspector {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.75rem;
+    width: 260px;
+    z-index: 4;
+}
+
+.dndm-empty {
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #7a7464;
+    font-style: italic;
+    text-align: center;
+    padding: 2rem;
+}
+
+.dndm-floating-actions {
+    position: absolute;
+    bottom: 1rem;
+    right: 1rem;
+    display: flex;
+    gap: 0.5rem;
+    z-index: 6;
+}
