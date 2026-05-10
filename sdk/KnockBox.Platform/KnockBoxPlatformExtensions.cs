@@ -197,6 +197,11 @@ public static class KnockBoxPlatformExtensions
         builder.Services.AddScoped<INavigationService, NavigationService>();
         builder.Services.AddSingleton<ISvgClipboardService, SvgClipboardService>();
 
+        // Plugin HTTP dispatcher singleton — backs the `/api/plugins/...`
+        // endpoint mapped by MapKnockBoxPlatformEndpoints. Resolves engines
+        // via keyed DI and rooms via ILobbyService.TryGetByUri.
+        builder.Services.AddSingleton<PluginHttpDispatcher>();
+
         // Logic registrations (platform version — no admin services).
         // `LogicRegistrations` is static, so we can't use the generic overload —
         // typeof(...).FullName keeps the logger category in sync with renames
@@ -287,6 +292,11 @@ public static class KnockBoxPlatformExtensions
         var gamePluginAssemblies = app.Services.GetRequiredService<GamePluginAssemblies>();
         var additionalAssemblies = gamePluginAssemblies.Assemblies
             .Append(typeof(KnockBoxPlatformExtensions).Assembly);
+
+        // Plugin HTTP dispatcher — `/api/plugins/{routeIdentifier}/{**subPath}`.
+        // Inert until a plugin opts in by implementing IGameEngineHttpHandler;
+        // unknown route / missing handler / unknown room all 404.
+        app.MapPluginApi();
 
         app.MapRazorComponents<TRootComponent>()
             .AddInteractiveServerRenderMode()
