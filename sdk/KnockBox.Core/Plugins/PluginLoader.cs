@@ -76,11 +76,18 @@ namespace KnockBox.Core.Plugins
                     .Where(n => n is not null)!,
                 StringComparer.OrdinalIgnoreCase);
 
+            // Pre-scan every plugin's .deps.json to find dependencies that two-or-more
+            // plugins ship at semver-compatible (same Major.Minor) versions. Winners
+            // are promoted into the default ALC so each plugin's PluginLoadContext
+            // shares a single Assembly instance instead of loading its own copy.
+            var pluginSubdirs = Directory.GetDirectories(pluginsDirectory);
+            PromoteShareableDependencies(pluginSubdirs, hostAssemblyNames);
+
             var plugins = new List<LoadedPlugin>();
             var assemblies = new HashSet<Assembly>();
             var routeIdentifiers = new Dictionary<string, LoadedPlugin>(StringComparer.OrdinalIgnoreCase);
 
-            foreach (var subdir in Directory.GetDirectories(pluginsDirectory))
+            foreach (var subdir in pluginSubdirs)
             {
                 var loaded = TryLoadPluginFolder(subdir, hostAssemblyNames);
                 if (loaded is null)
@@ -300,7 +307,26 @@ namespace KnockBox.Core.Plugins
         /// Used by the loader to reject plugins compiled against a newer Core than the
         /// host ships.
         /// </param>
-        internal readonly record struct DepsInspection(string? ForbiddenDependency, Version? CoreVersion);
+        internal readonly record struct DepsInspection(
+            string? ForbiddenDependency,
+            Version? CoreVersion,
+            IReadOnlyList<PluginDependency> Dependencies)
+        {
+            public DepsInspection(string? ForbiddenDependency, Version? CoreVersion)
+                : this(ForbiddenDependency, CoreVersion, Array.Empty<PluginDependency>()) { }
+        }
+
+        /// <summary>
+        /// A single transitive dependency a plugin ships alongside its entry assembly,
+        /// as discovered by scanning the plugin's <c>.deps.json</c> and verifying that
+        /// a matching DLL exists in the plugin folder. Used by
+        /// <see cref="PromoteShareableDependencies"/> to deduplicate copies of the
+        /// same library across plugins that ship semver-compatible versions.
+        /// </summary>
+        /// <param name="SimpleName">Assembly simple name (no extension).</param>
+        /// <param name="Version">Parsed version, prerelease/build suffix stripped.</param>
+        /// <param name="DllPath">Absolute path to the dependency DLL in the plugin folder.</param>
+        internal readonly record struct PluginDependency(string SimpleName, Version Version, string DllPath);
 
         /// <summary>
         /// Scans the plugin's co-located <c>.deps.json</c> for any package id in
@@ -329,6 +355,8 @@ namespace KnockBox.Core.Plugins
 
                 string? forbidden = null;
                 Version? coreVersion = null;
+                var pluginDir = Path.GetDirectoryName(pluginDllPath) ?? string.Empty;
+                List<PluginDependency>? dependencies = null;
 
                 foreach (var library in libraries.EnumerateObject())
                 {
@@ -341,19 +369,32 @@ namespace KnockBox.Core.Plugins
                     if (forbidden is null && ForbiddenPluginDependencies.TryGetValue(id, out var match))
                         forbidden = match;
 
-                    if (coreVersion is null
-                        && string.Equals(id, "KnockBox.Core", StringComparison.OrdinalIgnoreCase)
-                        && versionText is not null
-                        && Version.TryParse(StripPrereleaseSuffix(versionText), out var parsed))
+                    if (versionText is not null
+                        && Version.TryParse(StripPrereleaseSuffix(versionText), out var parsedVersion))
                     {
-                        coreVersion = parsed;
-                    }
+                        if (coreVersion is null
+                            && string.Equals(id, "KnockBox.Core", StringComparison.OrdinalIgnoreCase))
+                        {
+                            coreVersion = parsedVersion;
+                        }
 
-                    if (forbidden is not null && coreVersion is not null)
-                        break;
+                        // Only consider entries that actually have a matching DLL on disk
+                        // in the plugin folder. Framework/runtime refs and project-only
+                        // entries without a co-located DLL are skipped silently — they're
+                        // not shareable across ALCs from a plugin folder anyway.
+                        var candidateDll = Path.Combine(pluginDir, id + ".dll");
+                        if (File.Exists(candidateDll))
+                        {
+                            (dependencies ??= new List<PluginDependency>())
+                                .Add(new PluginDependency(id, parsedVersion, candidateDll));
+                        }
+                    }
                 }
 
-                return new DepsInspection(forbidden, coreVersion);
+                return new DepsInspection(
+                    forbidden,
+                    coreVersion,
+                    (IReadOnlyList<PluginDependency>?)dependencies ?? Array.Empty<PluginDependency>());
             }
             catch (Exception ex)
             {
@@ -362,6 +403,193 @@ namespace KnockBox.Core.Plugins
                     "Failed to parse .deps.json for plugin [{Dll}]; forbidden-dependency and Core-version checks will be skipped.",
                     pluginDllPath);
                 return default;
+            }
+        }
+
+        /// <summary>
+        /// A dependency winner chosen by <see cref="SelectShareableWinners"/>: the
+        /// highest-patch version of a library multiple plugins requested at the same
+        /// <c>Major.Minor</c>. <see cref="RequesterCount"/> is the number of plugins
+        /// that asked for a compatible version (always &gt;= 2).
+        /// </summary>
+        internal readonly record struct SharedDependencyWinner(
+            string SimpleName,
+            Version Version,
+            string DllPath,
+            int RequesterCount);
+
+        /// <summary>
+        /// Pure grouping logic for the share decision. Given the per-plugin dependency
+        /// lists (and the strong-name token of each candidate DLL), groups by
+        /// <c>(SimpleName, Major, Minor, PublicKeyToken)</c> and returns one winner per
+        /// group that has at least two distinct plugins requesting it. The winner is
+        /// the highest version in the group (patch bumps are non-breaking under
+        /// semver). Names already in <paramref name="hostAssemblyNames"/> are skipped
+        /// — those are shared by the existing default-ALC fallback path.
+        /// </summary>
+        internal static IReadOnlyList<SharedDependencyWinner> SelectShareableWinners(
+            IReadOnlyList<IReadOnlyList<PluginDependency>> perPluginDependencies,
+            Func<string, byte[]?> getPublicKeyToken,
+            HashSet<string> hostAssemblyNames)
+        {
+            // Group key = (name, major, minor, publicKeyTokenHex). Strong-named
+            // assemblies with different tokens but the same simple name MUST NOT
+            // be considered the same library.
+            var groups = new Dictionary<(string Name, int Major, int Minor, string TokenHex),
+                (PluginDependency Best, HashSet<int> PluginIndexes)>(
+                comparer: new ShareGroupKeyComparer());
+
+            for (int i = 0; i < perPluginDependencies.Count; i++)
+            {
+                foreach (var dep in perPluginDependencies[i])
+                {
+                    if (hostAssemblyNames.Contains(dep.SimpleName))
+                        continue;
+                    if (ForbiddenPluginDependencies.Contains(dep.SimpleName))
+                        continue;
+
+                    var token = getPublicKeyToken(dep.DllPath);
+                    var tokenHex = token is null || token.Length == 0
+                        ? string.Empty
+                        : Convert.ToHexString(token);
+
+                    var key = (dep.SimpleName, dep.Version.Major, dep.Version.Minor, tokenHex);
+                    if (!groups.TryGetValue(key, out var entry))
+                    {
+                        entry = (dep, new HashSet<int> { i });
+                        groups[key] = entry;
+                        continue;
+                    }
+
+                    entry.PluginIndexes.Add(i);
+                    if (dep.Version > entry.Best.Version)
+                        entry.Best = dep;
+                    groups[key] = entry;
+                }
+            }
+
+            var winners = new List<SharedDependencyWinner>();
+            foreach (var (_, entry) in groups)
+            {
+                if (entry.PluginIndexes.Count < 2)
+                    continue;
+                winners.Add(new SharedDependencyWinner(
+                    entry.Best.SimpleName,
+                    entry.Best.Version,
+                    entry.Best.DllPath,
+                    entry.PluginIndexes.Count));
+            }
+            return winners;
+        }
+
+        private sealed class ShareGroupKeyComparer
+            : IEqualityComparer<(string Name, int Major, int Minor, string TokenHex)>
+        {
+            public bool Equals(
+                (string Name, int Major, int Minor, string TokenHex) x,
+                (string Name, int Major, int Minor, string TokenHex) y) =>
+                string.Equals(x.Name, y.Name, StringComparison.OrdinalIgnoreCase)
+                && x.Major == y.Major
+                && x.Minor == y.Minor
+                && string.Equals(x.TokenHex, y.TokenHex, StringComparison.Ordinal);
+
+            public int GetHashCode((string Name, int Major, int Minor, string TokenHex) obj) =>
+                HashCode.Combine(
+                    StringComparer.OrdinalIgnoreCase.GetHashCode(obj.Name),
+                    obj.Major,
+                    obj.Minor,
+                    obj.TokenHex);
+        }
+
+        /// <summary>
+        /// Discovers dependencies shipped by two or more plugins at semver-compatible
+        /// versions (same <c>Major.Minor</c>) and loads each winner into the default
+        /// <see cref="AssemblyLoadContext"/>. Adds promoted simple names to
+        /// <paramref name="hostAssemblyNames"/> so the existing
+        /// <c>IsSharedContract</c> predicate routes those names to the default ALC
+        /// when the per-plugin contexts are later asked to resolve them. Promotion
+        /// failures (bad image, file lock, etc.) are logged and skipped — the
+        /// dependency falls back to per-plugin private loading exactly as before.
+        /// </summary>
+        internal void PromoteShareableDependencies(
+            IReadOnlyList<string> pluginSubdirs,
+            HashSet<string> hostAssemblyNames)
+        {
+            if (pluginSubdirs.Count < 2)
+                return;
+
+            var perPluginDeps = new List<IReadOnlyList<PluginDependency>>(pluginSubdirs.Count);
+            foreach (var subdir in pluginSubdirs)
+            {
+                var manifestPath = Path.Combine(subdir, "plugin.json");
+                if (!File.Exists(manifestPath))
+                {
+                    perPluginDeps.Add(Array.Empty<PluginDependency>());
+                    continue;
+                }
+                var manifestResult = PluginManifest.TryReadFromFile(manifestPath);
+                if (!manifestResult.TryGetSuccess(out var manifest))
+                {
+                    perPluginDeps.Add(Array.Empty<PluginDependency>());
+                    continue;
+                }
+                var dllPath = Path.Combine(subdir, manifest.EntryAssembly + ".dll");
+                if (!File.Exists(dllPath))
+                {
+                    perPluginDeps.Add(Array.Empty<PluginDependency>());
+                    continue;
+                }
+                var inspection = InspectDepsJson(dllPath);
+                // Exclude the plugin's own entry assembly — it's never a shareable dep.
+                var filtered = inspection.Dependencies
+                    .Where(d => !string.Equals(d.SimpleName, manifest.EntryAssembly, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+                perPluginDeps.Add(filtered);
+            }
+
+            var winners = SelectShareableWinners(
+                perPluginDeps,
+                getPublicKeyToken: ReadPublicKeyTokenSafe,
+                hostAssemblyNames);
+
+            foreach (var winner in winners)
+            {
+                try
+                {
+                    AssemblyLoadContext.Default.LoadFromAssemblyPath(winner.DllPath);
+                    hostAssemblyNames.Add(winner.SimpleName);
+                    logger.LogInformation(
+                        "Promoted shared dependency [{Name}] v{Version} into default ALC (requested by {Count} plugins).",
+                        winner.SimpleName,
+                        winner.Version,
+                        winner.RequesterCount);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogWarning(
+                        ex,
+                        "Failed to promote shared dependency [{Name}] v{Version} from [{Path}]; " +
+                        "it will continue to load privately per plugin.",
+                        winner.SimpleName,
+                        winner.Version,
+                        winner.DllPath);
+                }
+            }
+        }
+
+        private byte[]? ReadPublicKeyTokenSafe(string dllPath)
+        {
+            try
+            {
+                return AssemblyName.GetAssemblyName(dllPath).GetPublicKeyToken();
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(
+                    ex,
+                    "Could not read AssemblyName for [{Path}]; treating as unsigned for share-grouping.",
+                    dllPath);
+                return null;
             }
         }
 
