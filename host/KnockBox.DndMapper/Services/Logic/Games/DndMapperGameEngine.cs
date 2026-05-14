@@ -4,6 +4,7 @@ using KnockBox.Core.Services.Logic.Games.Engines.Shared;
 using KnockBox.Core.Services.Logic.RandomGeneration;
 using KnockBox.Core.Services.State.Games.Shared;
 using KnockBox.Core.Services.State.Users;
+using KnockBox.DndMapper.Helpers;
 using KnockBox.DndMapper.Models;
 using KnockBox.DndMapper.Services.Logic.Games.Http;
 using KnockBox.DndMapper.Services.State.Games;
@@ -310,6 +311,17 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                 var map = state.Maps.FirstOrDefault(m => m.Id == mapId);
                 if (map is null) { error = "Unknown map id."; return; }
                 map.Grid = newGrid.Clone();
+
+                // Tokens are stored at cell-center coordinates; clamp any that fall
+                // outside the new bounds to the nearest in-bounds cell center.
+                // Images are intentionally left as-is so the host can reposition them.
+                double maxX = Math.Max(0.5, map.Grid.WidthCells - 0.5);
+                double maxY = Math.Max(0.5, map.Grid.HeightCells - 0.5);
+                foreach (var token in map.Tokens)
+                {
+                    token.X = Math.Clamp(token.X, 0.5, maxX);
+                    token.Y = Math.Clamp(token.Y, 0.5, maxY);
+                }
             });
 
             if (exec.IsCanceled) return Result.FromCancellation();
@@ -366,7 +378,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             return ValueResult<Guid>.FromValue(newTokenId);
         }
 
-        public ValueResult<Guid> SpawnNpcTokenAsync(DndMapperGameState state, User caller, Guid mapId, string name)
+        public ValueResult<Guid> SpawnNpcTokenAsync(DndMapperGameState state, User caller, Guid mapId, string name, double? atX = null, double? atY = null)
         {
             if (state is null) return ValueResult<Guid>.FromError("State is required.");
             if (caller is null) return ValueResult<Guid>.FromError("Caller is required.");
@@ -386,7 +398,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                 if (map is null) { error = "Unknown map id."; return; }
 
                 newId = Guid.NewGuid();
-                var (cx, cy) = MapCenter(map);
+                var (cx, cy) = ResolveSpawn(map, atX, atY);
                 map.Tokens.Add(new Token
                 {
                     Id = newId,
@@ -407,7 +419,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             return ValueResult<Guid>.FromValue(newId);
         }
 
-        public ValueResult<Guid> SpawnHostExtraTokenAsync(DndMapperGameState state, User caller, Guid mapId, string name, string? representsUserId)
+        public ValueResult<Guid> SpawnHostExtraTokenAsync(DndMapperGameState state, User caller, Guid mapId, string name, string? representsUserId, double? atX = null, double? atY = null)
         {
             if (state is null) return ValueResult<Guid>.FromError("State is required.");
             if (caller is null) return ValueResult<Guid>.FromError("Caller is required.");
@@ -429,7 +441,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                 }
 
                 newId = Guid.NewGuid();
-                var (cx, cy) = MapCenter(map);
+                var (cx, cy) = ResolveSpawn(map, atX, atY);
                 map.Tokens.Add(new Token
                 {
                     Id = newId,
@@ -629,7 +641,18 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             if (state is null) return ValueResult<Guid>.FromError("State is required.");
             if (caller is null) return ValueResult<Guid>.FromError("Caller is required.");
             if (string.IsNullOrWhiteSpace(characterName)) return ValueResult<Guid>.FromError("Character name cannot be empty.");
-            if (!IsHost(state, caller)) return ValueResult<Guid>.FromError("Only the host may create sheets directly.");
+
+            // Host can create any sheet (NPC or owned). A non-host player may only
+            // create a single sheet for themselves; once they have one they must use
+            // the existing sheet rather than spawn duplicates.
+            bool isHost = IsHost(state, caller);
+            if (!isHost)
+            {
+                if (ownerUserId != caller.Id)
+                    return ValueResult<Guid>.FromError("Players may only create a sheet they own.");
+                if (state.Sheets.Values.Any(s => s.OwnerUserId == caller.Id))
+                    return ValueResult<Guid>.FromError("You already have a character sheet.");
+            }
 
             Guid newId = Guid.NewGuid();
             var exec = state.Execute(() =>
@@ -1361,9 +1384,25 @@ namespace KnockBox.DndMapper.Services.Logic.Games
         }
 
         private static (double X, double Y) MapCenter(Map map) =>
-            (map.Grid.WidthCells / 2.0, map.Grid.HeightCells / 2.0);
+            // Floor-then-center keeps spawns on a cell center regardless of even/odd
+            // grid dimensions (W/2.0 lands on a corner for even widths).
+            (Math.Floor(map.Grid.WidthCells / 2.0) + 0.5,
+             Math.Floor(map.Grid.HeightCells / 2.0) + 0.5);
 
-        private static (double X, double Y) SpawnPosition(Map map) =>
-            map.DefaultSpawnPosition ?? MapCenter(map);
+        private static (double X, double Y) SpawnPosition(Map map)
+        {
+            var (rawX, rawY) = map.DefaultSpawnPosition ?? MapCenter(map);
+            // Snap any caller-supplied or default position to the nearest in-bounds
+            // cell center so freshly spawned tokens never sit on a grid intersection.
+            return SnapToGridHelper.Snap(rawX, rawY, map.Grid);
+        }
+
+        // If the caller (e.g. the host's UI) supplied an explicit spawn anchor —
+        // typically the center of the current viewport — snap+clamp it onto a
+        // cell. Otherwise fall back to the map's default spawn position.
+        private static (double X, double Y) ResolveSpawn(Map map, double? atX, double? atY) =>
+            atX is double x && atY is double y
+                ? SnapToGridHelper.Snap(x, y, map.Grid)
+                : SpawnPosition(map);
     }
 }

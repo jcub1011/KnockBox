@@ -29,6 +29,9 @@ namespace KnockBox.DndMapper.Pages.Components
         private bool _npcModalOpen;
         private string _npcNameDraft = string.Empty;
 
+        private bool HasOwnSheet =>
+            State.Sheets.Values.Any(s => s.OwnerUserId == CurrentUserId);
+
         private List<CharacterSheet> VisibleSheets =>
             [.. State.Sheets.Values
                 .Where(s => SheetVisibilityHelper.CanSeeSheet(s, IsHost))
@@ -178,6 +181,29 @@ namespace KnockBox.DndMapper.Pages.Components
         }
 
         private void CloseNpcModal() => _npcModalOpen = false;
+
+        private async Task CreateMySheet()
+        {
+            if (UserService.CurrentUser is null) return;
+            var name = string.IsNullOrWhiteSpace(UserService.CurrentUser.Name)
+                ? "My character"
+                : UserService.CurrentUser.Name;
+
+            var result = Engine.CreateSheetAsync(
+                State,
+                UserService.CurrentUser,
+                ownerUserId: UserService.CurrentUser.Id,
+                characterName: name);
+            if (result.TryGetFailure(out var err))
+            {
+                if (Toasts is not null) await Toasts.Push(err.PublicMessage, DndMapperToastTone.Danger);
+                return;
+            }
+            if (result.TryGetSuccess(out var newId))
+            {
+                _activeSheetId = newId;
+            }
+        }
 
         private async Task ConfirmCreateNpcSheet()
         {

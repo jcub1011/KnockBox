@@ -64,6 +64,11 @@
                                 @onclick="@(() => StartRename(m))">✎</button>
                         <button class="dndm-btn dndm-btn--icon dndm-btn--small"
                                 type="button"
+                                title="Map settings"
+                                @onclick:stopPropagation="true"
+                                @onclick="@(() => OpenSettings(m))">⚙</button>
+                        <button class="dndm-btn dndm-btn--icon dndm-btn--small"
+                                type="button"
                                 title="Duplicate"
                                 @onclick:stopPropagation="true"
                                 @onclick="@(() => OnDuplicate(m.Id))">⎘</button>
@@ -85,3 +90,8 @@
               ConfirmText="Delete"
               OnConfirm="ConfirmDelete"
               OnCancel="CancelDelete" />
+
+<MapSettingsModal IsOpen="_settingsTarget is not null"
+                  Map="_settingsTarget"
+                  OnSave="OnSettingsSaved"
+                  OnCancel="CloseSettings" />

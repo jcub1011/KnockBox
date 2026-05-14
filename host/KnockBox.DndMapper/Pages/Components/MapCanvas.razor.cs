@@ -2,6 +2,7 @@ using System.Globalization;
 using KnockBox.Core.Components.Shared;
 using KnockBox.Core.Services.State.Users;
 using KnockBox.DndMapper.Helpers;
+using KnockBox.DndMapper.Models;
 using KnockBox.DndMapper.Services.Logic.Games;
 using KnockBox.DndMapper.Services.State.Games;
 using KnockBox.DndMapper.Services.State.Games.Data;
@@ -26,6 +27,8 @@ namespace KnockBox.DndMapper.Pages.Components
         [Inject] protected IUserService UserService { get; set; } = default!;
         [Inject] protected IJSRuntime JSRuntime { get; set; } = default!;
         [Inject] protected ILogger<MapCanvas> Logger { get; set; } = default!;
+
+        [CascadingParameter] public DndMapperViewport? Viewport { get; set; }
 
         private const double MinZoom = 0.10;
         private const double MaxZoom = 10.0;
@@ -97,7 +100,16 @@ namespace KnockBox.DndMapper.Pages.Components
                 LocalShowGridLines = Map.Grid.ShowGridLines;
                 _gridInitialized = true;
             }
+            PublishViewport();
             base.OnParametersSet();
+        }
+
+        private void PublishViewport()
+        {
+            if (Viewport is null || Map is null) return;
+            double viewW = Map.Grid.WidthCells / _zoom;
+            double viewH = Map.Grid.HeightCells / _zoom;
+            Viewport.Set(Map.Id, _panX + viewW / 2.0, _panY + viewH / 2.0);
         }
 
         protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -162,6 +174,7 @@ namespace KnockBox.DndMapper.Pages.Components
             _panX = 0;
             _panY = 0;
             _zoom = 1.0;
+            PublishViewport();
         }
 
         private void SetZoom(double next)
@@ -175,6 +188,7 @@ namespace KnockBox.DndMapper.Pages.Components
             _panY += (oldH - newH) / 2.0;
             _zoom = next;
             ClampPan();
+            PublishViewport();
         }
 
         private void ClampPan()
@@ -248,6 +262,7 @@ namespace KnockBox.DndMapper.Pages.Components
                 _panX -= dx / pxPerCell;
                 _panY -= dy / pxPerCell;
                 ClampPan();
+                PublishViewport();
                 return;
             }
 

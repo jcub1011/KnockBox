@@ -73,14 +73,23 @@ export function initialize(svgId, dotNetRef, tokens, widthCells, heightCells) {
         const info = state.tokens.get(tokenId);
         if (!info || !info.movable) return false;
 
+        // Anchor the drag on the GROUP'S actual rendered position rather than the
+        // canonical token X/Y. For regular tokens these match. For stack-popover
+        // chips they don't — using the chip's real position keeps the cursor
+        // glued to the chip throughout the drag.
+        const transform = group.getAttribute('transform') || '';
+        const m = /translate\(\s*([-\d.]+)\s+([-\d.]+)\s*\)/.exec(transform);
+        const startX = m ? parseFloat(m[1]) : info.x;
+        const startY = m ? parseFloat(m[2]) : info.y;
+
         const pt = getSvgCoords(svg, state.svgPoint, clientX, clientY);
         state.dragging = {
             tokenId,
             group,
-            offsetX: pt.x - info.x,
-            offsetY: pt.y - info.y,
-            startX: info.x,
-            startY: info.y,
+            offsetX: pt.x - startX,
+            offsetY: pt.y - startY,
+            startX,
+            startY,
             moved: false,
         };
         // Suppress the CSS transition for the duration of the drag so the
@@ -88,6 +97,11 @@ export function initialize(svgId, dotNetRef, tokens, widthCells, heightCells) {
         group.style.transition = 'none';
         return true;
     }
+
+    // Squared distance (in SVG/cell units) below which a drag is treated as a
+    // click — avoids snapping a token into a neighbouring cell when the user
+    // taps a chip without intending to move it.
+    const DRAG_THRESHOLD_SQ = 0.09; // 0.3 cells
 
     function moveDrag(clientX, clientY) {
         if (!state.dragging) return;
@@ -99,7 +113,9 @@ export function initialize(svgId, dotNetRef, tokens, widthCells, heightCells) {
         applyTransform(state.dragging.group, nx, ny);
         state.dragging.lastX = nx;
         state.dragging.lastY = ny;
-        state.dragging.moved = true;
+        const dx = nx - state.dragging.startX;
+        const dy = ny - state.dragging.startY;
+        if (dx * dx + dy * dy >= DRAG_THRESHOLD_SQ) state.dragging.moved = true;
     }
 
     function endDrag() {
@@ -108,7 +124,12 @@ export function initialize(svgId, dotNetRef, tokens, widthCells, heightCells) {
         // Restore the transition so subsequent remote moves animate.
         group.style.transition = '';
         state.dragging = null;
-        if (!moved) return;
+        if (!moved) {
+            // Restore the group's transform to its pre-drag position so a
+            // sub-threshold drag doesn't leave the visual stranded mid-cell.
+            applyTransform(group, startX, startY);
+            return;
+        }
 
         const finalX = lastX ?? startX;
         const finalY = lastY ?? startY;
@@ -162,6 +183,20 @@ export function setMovableTokens(svgId, tokens) {
     for (const t of tokens || []) {
         state.tokens.set(t.tokenId, { x: t.x, y: t.y, movable: !!t.movable });
     }
+}
+
+/**
+ * Updates the clamp bounds applied during drag (needed after a map swap whose
+ * new grid has different dimensions). No-op if the instance is gone.
+ * @param {string} svgId
+ * @param {number} widthCells
+ * @param {number} heightCells
+ */
+export function setBounds(svgId, widthCells, heightCells) {
+    const state = instances.get(svgId);
+    if (!state) return;
+    state.widthCells = widthCells;
+    state.heightCells = heightCells;
 }
 
 /**

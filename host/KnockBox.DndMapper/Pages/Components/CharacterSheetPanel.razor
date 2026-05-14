@@ -15,6 +15,13 @@
                     title="Create a host-only NPC/monster sheet"
                     @onclick="OpenNpcModal">+ NPC Sheet</button>
         }
+        else if (!HasOwnSheet)
+        {
+            <button class="dndm-btn dndm-btn--small"
+                    type="button"
+                    title="Create your character sheet"
+                    @onclick="CreateMySheet">+ My Sheet</button>
+        }
     </header>
 
     @if (VisibleSheets.Count == 0)

@@ -27,6 +27,7 @@ namespace KnockBox.DndMapper.Pages.Components
         private int? _dragOverIndex;
 
         private Map? _pendingDelete;
+        private Map? _settingsTarget;
 
         private List<Map> Maps =>
             [.. State.Maps.OrderBy(m => m.ListOrder).ThenBy(m => m.CreatedUtc)];
@@ -111,6 +112,23 @@ namespace KnockBox.DndMapper.Pages.Components
         }
 
         private void OnDeleteRequest(Map m) => _pendingDelete = m;
+
+        private void OpenSettings(Map m) => _settingsTarget = m;
+
+        private void CloseSettings() => _settingsTarget = null;
+
+        private async Task OnSettingsSaved(GridConfig grid)
+        {
+            var target = _settingsTarget;
+            _settingsTarget = null;
+            if (target is null || UserService.CurrentUser is null) return;
+
+            var result = Engine.UpdateGridAsync(State, UserService.CurrentUser, target.Id, grid);
+            if (result.TryGetFailure(out var err))
+            {
+                await PushToast(err.PublicMessage, DndMapperToastTone.Danger);
+            }
+        }
 
         private void CancelDelete() => _pendingDelete = null;
 

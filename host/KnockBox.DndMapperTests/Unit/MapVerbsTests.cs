@@ -323,5 +323,29 @@ namespace KnockBox.DndMapperTests.Unit
             var update = _engine.UpdateGridAsync(_state, player, mapId, new GridConfig());
             Assert.IsTrue(update.IsFailure);
         }
+
+        [TestMethod]
+        public void UpdateGridAsync_ShrinkGrid_ClampsTokenPositionsToNewBounds()
+        {
+            var c = _engine.CreateMapAsync(_state, _host, "A");
+            Assert.IsTrue(c.TryGetSuccess(out var mapId));
+            Assert.IsTrue(_engine.SetActiveMapAsync(_state, _host, mapId).IsSuccess);
+
+            var spawn = _engine.SpawnNpcTokenAsync(_state, _host, mapId, "Goblin");
+            Assert.IsTrue(spawn.TryGetSuccess(out var tokenId));
+
+            var move = _engine.MoveTokenAsync(_state, _host, tokenId, 25.5, 15.5);
+            Assert.IsTrue(move.IsSuccess);
+
+            var newGrid = new GridConfig { WidthCells = 10, HeightCells = 8 };
+            var update = _engine.UpdateGridAsync(_state, _host, mapId, newGrid);
+            Assert.IsTrue(update.IsSuccess);
+
+            var token = _state.Maps.Single(m => m.Id == mapId).Tokens.Single(t => t.Id == tokenId);
+            Assert.IsTrue(token.X <= 10 - 0.5 + 1e-6, $"Token X {token.X} should be clamped within new width.");
+            Assert.IsTrue(token.Y <= 8 - 0.5 + 1e-6, $"Token Y {token.Y} should be clamped within new height.");
+            Assert.IsTrue(token.X >= 0.5 - 1e-6);
+            Assert.IsTrue(token.Y >= 0.5 - 1e-6);
+        }
     }
 }

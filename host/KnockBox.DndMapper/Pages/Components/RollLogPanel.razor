@@ -9,6 +9,16 @@
 <section class="dndm-panel dndm-rolllog">
     <header class="dndm-panel-header">
         <span>Roll Log</span>
+        <span class="dndm-rolllog-actions">
+            <button class="dndm-btn dndm-btn--small dndm-btn--primary"
+                    type="button"
+                    title="@QuickRollTitle"
+                    @onclick="QuickRoll">🎲 Roll</button>
+            <button class="dndm-btn dndm-btn--small dndm-btn--icon"
+                    type="button"
+                    title="Dice settings"
+                    @onclick="OpenSettings">⚙</button>
+        </span>
     </header>
     <div class="dndm-panel-body dndm-rolllog-body">
         @if (Visible.Count == 0)

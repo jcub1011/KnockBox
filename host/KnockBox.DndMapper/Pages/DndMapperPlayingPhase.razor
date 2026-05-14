@@ -1,3 +1,4 @@
+@using KnockBox.DndMapper.Models
 @using KnockBox.DndMapper.Pages.Components
 @using KnockBox.DndMapper.Services.State.Games
 @using KnockBox.DndMapper.Services.State.Games.Data
@@ -6,10 +7,12 @@
     <link href="_content/KnockBox.DndMapper/css/panels.css" rel="stylesheet" />
 </HeadContent>
 
+<CascadingValue Value="_viewport" IsFixed="true">
 <CascadingValue Value="_toasts" IsFixed="true">
     <div class="dnd-mapper-playing @(IsHost ? "dnd-mapper-playing--host" : null)
                 @(_leftCollapsed ? "dnd-mapper-playing--left-collapsed" : null)
-                @(_rightCollapsed ? "dnd-mapper-playing--right-collapsed" : null)">
+                @(_rightCollapsed ? "dnd-mapper-playing--right-collapsed" : null)"
+         style="@RootStyle">
 
         @if (IsHost)
         {
@@ -26,6 +29,12 @@
                                     SelectedImageId="_selectedImageId"
                                     SelectedImageIdChanged="OnSelectedImageIdChanged" />
                 </div>
+                @if (!_leftCollapsed)
+                {
+                    <div class="dndm-rail-resize dndm-rail-resize--left"
+                         @ref="_leftHandleRef"
+                         title="Drag to resize"></div>
+                }
             </aside>
         }
 
@@ -70,24 +79,34 @@
                     type="button"
                     title="@(_rightCollapsed ? "Expand" : "Collapse")"
                     @onclick="ToggleRightRail">@(_rightCollapsed ? "‹" : "›")</button>
+            @if (!_rightCollapsed)
+            {
+                <div class="dndm-rail-resize dndm-rail-resize--right"
+                     @ref="_rightHandleRef"
+                     title="Drag to resize"></div>
+            }
             <div class="dndm-rail-content">
                 <CharacterSheetPanel State="State" CurrentUserId="@CurrentUserId" IsHost="IsHost" />
-                <RollLogPanel State="State" CurrentUserId="@CurrentUserId" IsHost="IsHost" />
+                <RollLogPanel State="State"
+                              Config="_diceConfig"
+                              CurrentUserId="@CurrentUserId"
+                              IsHost="IsHost"
+                              OnOpenSettings="@(() => _diceOpen = true)" />
             </div>
         </aside>
 
-        <div class="dndm-floating-actions">
-            <button class="dndm-btn dndm-btn--primary" type="button" @onclick="ToggleDice">Roll</button>
-            @if (IsHost)
-            {
+        @if (IsHost)
+        {
+            <div class="dndm-floating-actions">
                 <button class="dndm-btn" type="button" @onclick="TogglePerms">Permissions</button>
                 <EndSessionButton State="State" />
-            }
-        </div>
+            </div>
+        }
 
         @if (_diceOpen)
         {
             <DiceRollerModal State="State"
+                             Config="_diceConfig"
                              CurrentUserId="@CurrentUserId"
                              IsHost="IsHost"
                              OnClose="@(() => _diceOpen = false)" />
@@ -103,4 +122,5 @@
 
         <DndMapperToast Service="_toasts" />
     </div>
+</CascadingValue>
 </CascadingValue>

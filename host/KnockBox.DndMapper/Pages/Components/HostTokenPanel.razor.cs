@@ -15,6 +15,7 @@ namespace KnockBox.DndMapper.Pages.Components
         [Inject] protected DndMapperGameEngine Engine { get; set; } = default!;
         [Inject] protected IUserService UserService { get; set; } = default!;
         [CascadingParameter] public DndMapperToastService? Toasts { get; set; }
+        [CascadingParameter] public DndMapperViewport? Viewport { get; set; }
 
         private IDisposable? _stateSub;
         private Token? _pendingDelete;
@@ -40,11 +41,17 @@ namespace KnockBox.DndMapper.Pages.Components
             _ => "",
         };
 
+        private (double? X, double? Y) SpawnAnchor() =>
+            _activeMap is not null && Viewport?.GetCenterFor(_activeMap.Id) is { } center
+                ? (center.X, center.Y)
+                : (null, null);
+
         private async Task OnAddNpc()
         {
             if (UserService.CurrentUser is null || _activeMap is null) return;
             var name = $"NPC {_activeMap.Tokens.Count(t => t.Type == TokenType.NPCToken) + 1}";
-            var result = Engine.SpawnNpcTokenAsync(State, UserService.CurrentUser, _activeMap.Id, name);
+            var (ax, ay) = SpawnAnchor();
+            var result = Engine.SpawnNpcTokenAsync(State, UserService.CurrentUser, _activeMap.Id, name, ax, ay);
             if (result.TryGetFailure(out var err))
             {
                 await PushToast(err.PublicMessage, DndMapperToastTone.Danger);
@@ -55,7 +62,8 @@ namespace KnockBox.DndMapper.Pages.Components
         {
             if (UserService.CurrentUser is null || _activeMap is null) return;
             var name = $"Extra {_activeMap.Tokens.Count(t => t.Type == TokenType.HostExtraToken) + 1}";
-            var result = Engine.SpawnHostExtraTokenAsync(State, UserService.CurrentUser, _activeMap.Id, name, representsUserId: null);
+            var (ax, ay) = SpawnAnchor();
+            var result = Engine.SpawnHostExtraTokenAsync(State, UserService.CurrentUser, _activeMap.Id, name, representsUserId: null, ax, ay);
             if (result.TryGetFailure(out var err))
             {
                 await PushToast(err.PublicMessage, DndMapperToastTone.Danger);

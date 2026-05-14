@@ -1,5 +1,10 @@
 .dndm-rolllog { display: flex; flex-direction: column; min-height: 0; }
 
+.dndm-rolllog-actions {
+    display: inline-flex;
+    gap: 0.35rem;
+}
+
 .dndm-rolllog-body {
     display: flex;
     flex-direction: column;

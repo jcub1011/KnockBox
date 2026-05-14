@@ -27,11 +27,16 @@ namespace KnockBox.DndMapper.Pages.Components
         private DotNetObjectReference<TokenLayer>? _dotNetRef;
         private IDisposable? _stateSub;
         private bool _initialized;
+        private int _lastBoundsWidth;
+        private int _lastBoundsHeight;
+        private TokenCellKey? _expandedCell;
 
         private IEnumerable<Token> VisibleTokens =>
             Map is null
                 ? []
                 : TokenVisibilityFilter.VisibleTokensFor(Map.Tokens, IsHost);
+
+        private List<TokenStack> Stacks => TokenStackGrouper.Group(VisibleTokens);
 
         protected override void OnInitialized()
         {
@@ -41,18 +46,8 @@ namespace KnockBox.DndMapper.Pages.Components
 
         private async ValueTask OnStateChangedAsync()
         {
-            if (_jsModule is not null && _initialized)
-            {
-                try
-                {
-                    await _jsModule.InvokeVoidAsync("setMovableTokens", SvgId, BuildTokenJsList());
-                }
-                catch (JSDisconnectedException) { /* circuit teardown */ }
-                catch (Exception ex)
-                {
-                    Logger.LogWarning(ex, "Failed to push token movability to JS for svg [{SvgId}].", SvgId);
-                }
-            }
+            // Re-sync happens in OnAfterRenderAsync once Blazor has rebound parameters
+            // (the Map may have just been swapped). We only request a re-render here.
             await InvokeAsync(StateHasChanged);
         }
 
@@ -66,16 +61,36 @@ namespace KnockBox.DndMapper.Pages.Components
                     _jsModule = await JSRuntime.InvokeAsync<IJSObjectReference>(
                         "import", "./_content/KnockBox.DndMapper/js/dndMapperTokenDrag.js");
 
-                    int w = Map?.Grid.WidthCells ?? 0;
-                    int h = Map?.Grid.HeightCells ?? 0;
+                    _lastBoundsWidth = Map?.Grid.WidthCells ?? 0;
+                    _lastBoundsHeight = Map?.Grid.HeightCells ?? 0;
                     await _jsModule.InvokeVoidAsync(
-                        "initialize", SvgId, _dotNetRef, BuildTokenJsList(), w, h);
+                        "initialize", SvgId, _dotNetRef, BuildTokenJsList(), _lastBoundsWidth, _lastBoundsHeight);
                     _initialized = true;
                 }
                 catch (JSDisconnectedException) { /* circuit teardown */ }
                 catch (Exception ex)
                 {
                     Logger.LogWarning(ex, "Failed to initialize token drag JS for svg [{SvgId}].", SvgId);
+                }
+            }
+            else if (_jsModule is not null && _initialized)
+            {
+                try
+                {
+                    int w = Map?.Grid.WidthCells ?? 0;
+                    int h = Map?.Grid.HeightCells ?? 0;
+                    if (w != _lastBoundsWidth || h != _lastBoundsHeight)
+                    {
+                        _lastBoundsWidth = w;
+                        _lastBoundsHeight = h;
+                        await _jsModule.InvokeVoidAsync("setBounds", SvgId, w, h);
+                    }
+                    await _jsModule.InvokeVoidAsync("setMovableTokens", SvgId, BuildTokenJsList());
+                }
+                catch (JSDisconnectedException) { /* circuit teardown */ }
+                catch (Exception ex)
+                {
+                    Logger.LogWarning(ex, "Failed to re-sync token JS state for svg [{SvgId}].", SvgId);
                 }
             }
             await base.OnAfterRenderAsync(firstRender);
@@ -103,6 +118,10 @@ namespace KnockBox.DndMapper.Pages.Components
             return list.ToArray();
         }
 
+        private void OpenStack(TokenCellKey cell) => _expandedCell = cell;
+
+        private void CloseStack() => _expandedCell = null;
+
         [JSInvokable]
         public async Task OnTokenDragEnd(string tokenIdStr, double x, double y)
         {
@@ -112,6 +131,9 @@ namespace KnockBox.DndMapper.Pages.Components
             var (sx, sy) = SnapToGridHelper.Snap(x, y, Map.Grid);
 
             var result = GameEngine.MoveTokenAsync(State, UserService.CurrentUser, tokenId, sx, sy);
+            // Close any open stack popover so the user isn't stuck looking at chips
+            // that no longer reflect the underlying stack composition.
+            _expandedCell = null;
             if (!result.IsSuccess && _jsModule is not null)
             {
                 try

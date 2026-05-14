@@ -26,7 +26,7 @@
 
             <section class="dndm-dice-custom">
                 <span class="dndm-label">Custom</span>
-                @foreach (var (term, idx) in _terms.Select((t, i) => (t, i)))
+                @foreach (var (term, idx) in Config.Terms.Select((t, i) => (t, i)))
                 {
                     <div @key="idx" class="dndm-dice-term">
                         <input type="number" min="0" max="20"
@@ -41,7 +41,7 @@
                                 <option value="@s" selected="@(s == term.Sides)">@s</option>
                             }
                         </select>
-                        @if (_terms.Count > 1)
+                        @if (Config.Terms.Count > 1)
                         {
                             <button class="dndm-btn dndm-btn--small dndm-btn--icon"
                                     type="button"
@@ -58,13 +58,13 @@
                 <span class="dndm-label">Attribute mod</span>
                 <select class="dndm-select" @onchange="@(e => OnAttributeChange((string?)e.Value))">
                     <option value="">— none —</option>
-                    @if (_pickerSheet is not null)
+                    @if (PickerSheet is not null)
                     {
                         @foreach (var row in State.AttributeSchema.Rows)
                         {
                             if (row.Type == AttributeValueType.Score || row.Type == AttributeValueType.Modifier)
                             {
-                                <option value="@row.Name" selected="@(_attributeName == row.Name)">@row.Name</option>
+                                <option value="@row.Name" selected="@(Config.AttributeName == row.Name)">@row.Name</option>
                             }
                         }
                     }
@@ -75,7 +75,7 @@
                     <select class="dndm-select" @onchange="@(e => OnSheetChange((string?)e.Value))">
                         @foreach (var s in _pickableSheets)
                         {
-                            <option value="@s.Id" selected="@(_pickerSheet?.Id == s.Id)">@(string.IsNullOrEmpty(s.CharacterName) ? "(unnamed)" : s.CharacterName)</option>
+                            <option value="@s.Id" selected="@(Config.PickerSheetId == s.Id)">@(string.IsNullOrEmpty(s.CharacterName) ? "(unnamed)" : s.CharacterName)</option>
                         }
                     </select>
                 }
@@ -85,21 +85,21 @@
                 <span class="dndm-label">Flat modifier</span>
                 <input type="number"
                        class="dndm-input dndm-input--num"
-                       value="@_flatMod"
-                       @onchange="@(e => _flatMod = ParseInt(e.Value, _flatMod))" />
+                       value="@Config.FlatModifier"
+                       @onchange="@(e => OnFlatModChange(e.Value))" />
             </section>
 
             <section>
                 <span class="dndm-label">Mode</span>
                 <div class="dndm-pillgroup">
-                    <button class="@PillCls(_mode == RollMode.Normal)" type="button"
-                            @onclick="@(() => _mode = RollMode.Normal)">Normal</button>
-                    <button class="@PillCls(_mode == RollMode.Advantage)" type="button"
+                    <button class="@PillCls(Config.Mode == RollMode.Normal)" type="button"
+                            @onclick="@(() => SetMode(RollMode.Normal))">Normal</button>
+                    <button class="@PillCls(Config.Mode == RollMode.Advantage)" type="button"
                             disabled="@(!CanAdvDis)"
-                            @onclick="@(() => _mode = RollMode.Advantage)">Adv</button>
-                    <button class="@PillCls(_mode == RollMode.Disadvantage)" type="button"
+                            @onclick="@(() => SetMode(RollMode.Advantage))">Adv</button>
+                    <button class="@PillCls(Config.Mode == RollMode.Disadvantage)" type="button"
                             disabled="@(!CanAdvDis)"
-                            @onclick="@(() => _mode = RollMode.Disadvantage)">Dis</button>
+                            @onclick="@(() => SetMode(RollMode.Disadvantage))">Dis</button>
                 </div>
                 @if (!CanAdvDis)
                 {
@@ -110,8 +110,8 @@
             <section>
                 <span class="dndm-label">Label</span>
                 <input class="dndm-input"
-                       value="@_label"
-                       @onchange="@(e => _label = ((string?)e.Value) ?? string.Empty)"
+                       value="@Config.Label"
+                       @onchange="@(e => OnLabelChange((string?)e.Value))"
                        placeholder="Attack roll, save vs fear…" />
             </section>
         </div>

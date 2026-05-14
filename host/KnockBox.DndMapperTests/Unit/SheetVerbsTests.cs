@@ -36,10 +36,39 @@ namespace KnockBox.DndMapperTests.Unit
         }
 
         [TestMethod]
-        public void CreateSheetAsync_NonHostCaller_ReturnsError()
+        public void CreateSheetAsync_NonHostCreatingNpcSheet_ReturnsError()
         {
             var player = EngineTestFactory.RegisterPlayer(_state);
+            // Non-host caller passing ownerUserId=null (NPC sheet) is still rejected.
             var result = _engine.CreateSheetAsync(_state, player, null, "X");
+            Assert.IsTrue(result.IsFailure);
+        }
+
+        [TestMethod]
+        public void CreateSheetAsync_PlayerCreatesOwnSheet_Succeeds()
+        {
+            var player = EngineTestFactory.RegisterPlayer(_state);
+            var result = _engine.CreateSheetAsync(_state, player, ownerUserId: player.Id, "Sir Robin");
+            Assert.IsTrue(result.TryGetSuccess(out var newId));
+            Assert.AreEqual(player.Id, _state.Sheets[newId].OwnerUserId);
+        }
+
+        [TestMethod]
+        public void CreateSheetAsync_PlayerCreatesSecondOwnSheet_Fails()
+        {
+            var player = EngineTestFactory.RegisterPlayer(_state);
+            Assert.IsTrue(_engine.CreateSheetAsync(_state, player, player.Id, "First").IsSuccess);
+
+            var second = _engine.CreateSheetAsync(_state, player, player.Id, "Second");
+            Assert.IsTrue(second.IsFailure);
+        }
+
+        [TestMethod]
+        public void CreateSheetAsync_PlayerCreatesSheetForOtherPlayer_Fails()
+        {
+            var p1 = EngineTestFactory.RegisterPlayer(_state);
+            var p2 = EngineTestFactory.RegisterPlayer(_state);
+            var result = _engine.CreateSheetAsync(_state, p1, ownerUserId: p2.Id, "Stolen identity");
             Assert.IsTrue(result.IsFailure);
         }
 

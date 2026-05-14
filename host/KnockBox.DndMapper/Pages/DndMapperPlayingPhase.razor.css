@@ -5,7 +5,7 @@
 
     position: relative;
     display: grid;
-    grid-template-columns: var(--dndm-rail-w-right) 1fr;
+    grid-template-columns: 1fr var(--dndm-rail-w-right);
     grid-template-rows: 1fr;
     width: 100%;
     height: 100%;
@@ -24,7 +24,7 @@
 }
 
 .dnd-mapper-playing--right-collapsed {
-    grid-template-columns: var(--dndm-rail-collapsed) 1fr;
+    grid-template-columns: 1fr var(--dndm-rail-collapsed);
 }
 
 .dnd-mapper-playing--host.dnd-mapper-playing--right-collapsed {
@@ -84,6 +84,25 @@
 
 .dndm-rail--left .dndm-rail-toggle { right: -10px; }
 .dndm-rail--right .dndm-rail-toggle { left: -10px; }
+
+.dndm-rail-resize {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 6px;
+    background: transparent;
+    cursor: col-resize;
+    z-index: 4;
+    touch-action: none;
+}
+
+.dndm-rail-resize:hover,
+.dndm-rail-resize:active {
+    background: rgba(232, 184, 73, 0.25);
+}
+
+.dndm-rail-resize--left { right: 0; }
+.dndm-rail-resize--right { left: 0; }
 
 .dndm-canvas-area {
     position: relative;
