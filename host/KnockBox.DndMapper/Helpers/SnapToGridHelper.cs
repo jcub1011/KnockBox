@@ -26,5 +26,29 @@ namespace KnockBox.DndMapper.Helpers
                 Math.Clamp(sx, 0.5, Math.Max(0.5, grid.WidthCells - 0.5)),
                 Math.Clamp(sy, 0.5, Math.Max(0.5, grid.HeightCells - 0.5)));
         }
+
+        /// <summary>
+        /// Snaps a corner-anchored (x, y) position to whole-cell coordinates when
+        /// <see cref="GridConfig.SnapToGrid"/> is true, then clamps to the grid bounds.
+        /// Used for image positions and resize-corner anchors. When snapping is off
+        /// the values are returned clamped but otherwise unchanged.
+        /// </summary>
+        public static (double X, double Y) SnapCorner(double x, double y, GridConfig grid)
+        {
+            ArgumentNullException.ThrowIfNull(grid);
+
+            if (!grid.SnapToGrid)
+            {
+                return (
+                    Math.Clamp(x, 0, grid.WidthCells),
+                    Math.Clamp(y, 0, grid.HeightCells));
+            }
+
+            double sx = Math.Round(x);
+            double sy = Math.Round(y);
+            return (
+                Math.Clamp(sx, 0, grid.WidthCells),
+                Math.Clamp(sy, 0, grid.HeightCells));
+        }
     }
 }

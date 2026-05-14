@@ -78,5 +78,22 @@ namespace KnockBox.DndMapperTests.Unit.Logic.Visibility
             Assert.IsTrue(SheetVisibilityHelper.CanEdit(s, "u-other", false, SheetEditPolicy.Anyone));
             Assert.IsTrue(SheetVisibilityHelper.CanEdit(s, "u-other", true, SheetEditPolicy.Anyone));
         }
+
+        [TestMethod]
+        public void CanSeeSheet_OwnedSheet_VisibleToEveryone()
+        {
+            var s = Sheet("u1");
+            Assert.IsTrue(SheetVisibilityHelper.CanSeeSheet(s, viewerIsHost: false));
+            Assert.IsTrue(SheetVisibilityHelper.CanSeeSheet(s, viewerIsHost: true));
+        }
+
+        [TestMethod]
+        public void CanSeeSheet_NpcSheet_HostOnly()
+        {
+            // Null owner = host-created NPC/monster sheet — players must not see it.
+            var npc = Sheet(null);
+            Assert.IsTrue(SheetVisibilityHelper.CanSeeSheet(npc, viewerIsHost: true));
+            Assert.IsFalse(SheetVisibilityHelper.CanSeeSheet(npc, viewerIsHost: false));
+        }
     }
 }

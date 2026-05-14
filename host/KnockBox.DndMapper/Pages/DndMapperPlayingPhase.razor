@@ -21,7 +21,10 @@
                 <div class="dndm-rail-content">
                     <HostMapSwitcher State="State" />
                     <HostTokenPanel State="State" />
-                    <HostLayerPanel State="State" />
+                    <HostLayerPanel State="State"
+                                    RoomCode="@RoomCode"
+                                    SelectedImageId="_selectedImageId"
+                                    SelectedImageIdChanged="OnSelectedImageIdChanged" />
                     <ImageUploadButton State="State" />
                 </div>
             </aside>

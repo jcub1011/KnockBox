@@ -1,6 +1,7 @@
 using System.Globalization;
 using KnockBox.Core.Components.Shared;
 using KnockBox.Core.Services.State.Users;
+using KnockBox.DndMapper.Helpers;
 using KnockBox.DndMapper.Services.Logic.Games;
 using KnockBox.DndMapper.Services.State.Games;
 using KnockBox.DndMapper.Services.State.Games.Data;
@@ -27,15 +28,25 @@ namespace KnockBox.DndMapper.Pages.Components
         private const double MaxZoom = 10.0;
         private const int LeftMouseButton = 0;
         private const int MiddleMouseButton = 1;
+        // Pixel distance below which a left-button "pan" is treated as a click (= deselect).
+        private const double ClickDeadZonePixels = 3.0;
 
         private readonly string _svgId = $"dndm-svg-{Guid.NewGuid():N}";
+        private ElementReference _frameRef;
 
         private double _panX;
         private double _panY;
         private double _zoom = 1.0;
         private bool _panning;
+        private bool _panMoved;
+        private long _panButton;
         private double _panLastClientX;
         private double _panLastClientY;
+        private double _panStartClientX;
+        private double _panStartClientY;
+
+        private bool _spaceHeld;
+        private bool _shiftHeld;
 
         private bool LocalShowGridLines { get; set; } = true;
         private bool _gridInitialized;
@@ -77,6 +88,17 @@ namespace KnockBox.DndMapper.Pages.Components
                 _gridInitialized = true;
             }
             base.OnParametersSet();
+        }
+
+        protected override async Task OnAfterRenderAsync(bool firstRender)
+        {
+            // Focus the frame on first render so Space/Shift work without the user clicking first.
+            if (firstRender)
+            {
+                try { await _frameRef.FocusAsync(preventScroll: true); }
+                catch { /* element not focusable yet — ignore */ }
+            }
+            await base.OnAfterRenderAsync(firstRender);
         }
 
         private static string F(double value) =>
@@ -124,12 +146,33 @@ namespace KnockBox.DndMapper.Pages.Components
             SetZoom(_zoom * factor);
         }
 
+        private void OnKeyDown(KeyboardEventArgs e)
+        {
+            if (e.Key == " " || e.Code == "Space") _spaceHeld = true;
+            if (e.Key == "Shift") _shiftHeld = true;
+        }
+
+        private void OnKeyUp(KeyboardEventArgs e)
+        {
+            if (e.Key == " " || e.Code == "Space") _spaceHeld = false;
+            if (e.Key == "Shift") _shiftHeld = false;
+        }
+
         private void OnSvgMouseDown(MouseEventArgs e)
         {
-            if (e.Button != MiddleMouseButton) return;
+            // Middle-button always pans. Any left-button event reaching the SVG (background
+            // rect, or a locked-image picker whose pointer-events are off) starts a "pan"
+            // that turns into a deselect on mouse-up if the cursor never moved beyond
+            // ClickDeadZonePixels (see OnSvgMouseUp). Picker/handle rects stopPropagation,
+            // so legitimate image interactions don't reach here.
+            if (e.Button != MiddleMouseButton && e.Button != LeftMouseButton) return;
             _panning = true;
+            _panButton = e.Button;
+            _panMoved = false;
             _panLastClientX = e.ClientX;
             _panLastClientY = e.ClientY;
+            _panStartClientX = e.ClientX;
+            _panStartClientY = e.ClientY;
         }
 
         private async Task OnSvgMouseMove(MouseEventArgs e)
@@ -140,6 +183,12 @@ namespace KnockBox.DndMapper.Pages.Components
                 double dy = e.ClientY - _panLastClientY;
                 _panLastClientX = e.ClientX;
                 _panLastClientY = e.ClientY;
+
+                double totalDx = e.ClientX - _panStartClientX;
+                double totalDy = e.ClientY - _panStartClientY;
+                if (Math.Abs(totalDx) > ClickDeadZonePixels || Math.Abs(totalDy) > ClickDeadZonePixels)
+                    _panMoved = true;
+
                 double pixelsPerCell = Math.Max(1, Map.Grid.CellPixels);
                 _panX -= dx / (pixelsPerCell * _zoom);
                 _panY -= dy / (pixelsPerCell * _zoom);
@@ -150,7 +199,7 @@ namespace KnockBox.DndMapper.Pages.Components
             if (_drag is { } d)
             {
                 var (cdx, cdy) = ClientDeltaToCells(e.ClientX - d.StartClientX, e.ClientY - d.StartClientY);
-                ApplyDragDelta(d, cdx, cdy);
+                ApplyDragDelta(d, cdx, cdy, _shiftHeld);
                 StateHasChanged();
             }
 
@@ -159,11 +208,25 @@ namespace KnockBox.DndMapper.Pages.Components
 
         private async Task OnSvgMouseUp(MouseEventArgs e)
         {
-            _panning = false;
+            // Pan finalize: if the left-button "pan" never moved, treat it as a background
+            // click → deselect any selected image.
+            if (_panning)
+            {
+                bool wasLeftClickWithoutDrag =
+                    _panButton == LeftMouseButton && !_panMoved && !_spaceHeld;
+                _panning = false;
+                _panMoved = false;
+                if (wasLeftClickWithoutDrag && IsHost && SelectedImageId is not null)
+                {
+                    await SelectedImageIdChanged.InvokeAsync(null);
+                }
+            }
+
             if (_drag is { } d)
             {
                 if (UserService.CurrentUser is not null)
                 {
+                    SnapDragToGrid(d);
                     var w = Math.Max(0.1, d.W);
                     var h = Math.Max(0.1, d.H);
                     var op = SelectedImage?.Opacity ?? 1.0;
@@ -186,6 +249,11 @@ namespace KnockBox.DndMapper.Pages.Components
         private async Task OnImageMouseDown(MouseEventArgs e, MapImage img)
         {
             if (!IsHost || e.Button != LeftMouseButton) return;
+            // Space-held pan takes precedence — let the SVG handler pan instead.
+            if (_spaceHeld) return;
+            // Locked images do not select or drag; the event bubbles to the SVG which
+            // will start a pan in OnSvgMouseDown.
+            if (img.Locked) return;
             if (SelectedImageId != img.Id)
             {
                 await SelectedImageIdChanged.InvokeAsync(img.Id);
@@ -196,16 +264,8 @@ namespace KnockBox.DndMapper.Pages.Components
         private void OnHandleMouseDown(MouseEventArgs e, MapImage img, HandleKind kind)
         {
             if (!IsHost || e.Button != LeftMouseButton) return;
+            if (img.Locked) return;
             _drag = NewDrag(e, img, kind);
-        }
-
-        private async Task OnBackgroundClick(MouseEventArgs e)
-        {
-            if (!IsHost) return;
-            if (SelectedImageId is not null)
-            {
-                await SelectedImageIdChanged.InvokeAsync(null);
-            }
         }
 
         private static DragState NewDrag(MouseEventArgs e, MapImage img, HandleKind kind) => new()
@@ -226,7 +286,7 @@ namespace KnockBox.DndMapper.Pages.Components
             Rot = img.Rotation,
         };
 
-        private static void ApplyDragDelta(DragState d, double dx, double dy)
+        private static void ApplyDragDelta(DragState d, double dx, double dy, bool freeAspect)
         {
             switch (d.Kind)
             {
@@ -235,24 +295,10 @@ namespace KnockBox.DndMapper.Pages.Components
                     d.Y = d.OrigY + dy;
                     break;
                 case HandleKind.NW:
-                    d.X = d.OrigX + dx;
-                    d.Y = d.OrigY + dy;
-                    d.W = Math.Max(0.1, d.OrigW - dx);
-                    d.H = Math.Max(0.1, d.OrigH - dy);
-                    break;
                 case HandleKind.NE:
-                    d.Y = d.OrigY + dy;
-                    d.W = Math.Max(0.1, d.OrigW + dx);
-                    d.H = Math.Max(0.1, d.OrigH - dy);
-                    break;
                 case HandleKind.SW:
-                    d.X = d.OrigX + dx;
-                    d.W = Math.Max(0.1, d.OrigW - dx);
-                    d.H = Math.Max(0.1, d.OrigH + dy);
-                    break;
                 case HandleKind.SE:
-                    d.W = Math.Max(0.1, d.OrigW + dx);
-                    d.H = Math.Max(0.1, d.OrigH + dy);
+                    ApplyResize(d, dx, dy, freeAspect);
                     break;
                 case HandleKind.Rotate:
                     // Rotate handle starts above the image center; treat the start
@@ -263,6 +309,79 @@ namespace KnockBox.DndMapper.Pages.Components
                     d.Rot = (d.OrigRot + deg) % 360.0;
                     break;
             }
+        }
+
+        internal static void ApplyResize(DragState d, double dx, double dy, bool freeAspect)
+        {
+            // Direction signs: which corner is being dragged relative to the image origin (NW).
+            // east = true for NE/SE (drag column = right edge); south = true for SW/SE.
+            bool east = d.Kind is HandleKind.NE or HandleKind.SE;
+            bool south = d.Kind is HandleKind.SW or HandleKind.SE;
+
+            // Raw new dimensions, free-form.
+            double rawW = east ? d.OrigW + dx : d.OrigW - dx;
+            double rawH = south ? d.OrigH + dy : d.OrigH - dy;
+
+            double minDim = 0.1;
+            rawW = Math.Max(minDim, rawW);
+            rawH = Math.Max(minDim, rawH);
+
+            double newW = rawW;
+            double newH = rawH;
+
+            if (!freeAspect && d.OrigW > 0 && d.OrigH > 0)
+            {
+                // Aspect-locked: drive both axes from whichever scale moved further from 1.0.
+                // Using Math.Max would bias toward growth — if the user shrinks one axis while
+                // the other is near-unchanged, the unchanged axis (scale ≈ 1) would win and
+                // the image would grow instead of shrink.
+                double scaleW = rawW / d.OrigW;
+                double scaleH = rawH / d.OrigH;
+                double scale = Math.Abs(scaleW - 1.0) >= Math.Abs(scaleH - 1.0) ? scaleW : scaleH;
+                newW = Math.Max(minDim, d.OrigW * scale);
+                newH = Math.Max(minDim, d.OrigH * scale);
+            }
+
+            d.W = newW;
+            d.H = newH;
+            // Reposition anchored corner so the opposite corner (the fixed one) stays put.
+            d.X = east ? d.OrigX : d.OrigX + (d.OrigW - newW);
+            d.Y = south ? d.OrigY : d.OrigY + (d.OrigH - newH);
+        }
+
+        private void SnapDragToGrid(DragState d)
+        {
+            if (!Map.Grid.SnapToGrid) return;
+            if (d.Kind == HandleKind.Rotate) return;
+
+            if (d.Kind == HandleKind.Body)
+            {
+                var (sx, sy) = SnapToGridHelper.SnapCorner(d.X, d.Y, Map.Grid);
+                d.X = sx;
+                d.Y = sy;
+                return;
+            }
+
+            // Resize handles: snap both corners (anchor + drag corner), then recompute W/H
+            // from the difference. Width/height stay positive because of the min-clamp in
+            // ApplyResize.
+            double anchorX = d.Kind is HandleKind.NE or HandleKind.SE ? d.OrigX : d.OrigX + d.OrigW;
+            double anchorY = d.Kind is HandleKind.SW or HandleKind.SE ? d.OrigY : d.OrigY + d.OrigH;
+            double dragCornerX = d.Kind is HandleKind.NE or HandleKind.SE ? d.X + d.W : d.X;
+            double dragCornerY = d.Kind is HandleKind.SW or HandleKind.SE ? d.Y + d.H : d.Y;
+
+            var (sAnchorX, sAnchorY) = SnapToGridHelper.SnapCorner(anchorX, anchorY, Map.Grid);
+            var (sDragX, sDragY) = SnapToGridHelper.SnapCorner(dragCornerX, dragCornerY, Map.Grid);
+
+            double newX = Math.Min(sAnchorX, sDragX);
+            double newY = Math.Min(sAnchorY, sDragY);
+            double newW = Math.Max(0.1, Math.Abs(sDragX - sAnchorX));
+            double newH = Math.Max(0.1, Math.Abs(sDragY - sAnchorY));
+
+            d.X = newX;
+            d.Y = newY;
+            d.W = newW;
+            d.H = newH;
         }
     }
 }

@@ -3,7 +3,11 @@
 @using KnockBox.Core.Components.Shared
 @inherits DisposableComponent
 
-<div class="dndm-canvas-frame">
+<div class="dndm-canvas-frame"
+     tabindex="0"
+     @ref="_frameRef"
+     @onkeydown="OnKeyDown"
+     @onkeyup="OnKeyUp">
     <div class="dndm-canvas-toolbar">
         <label class="dndm-grid-toggle">
             <input type="checkbox" checked="@LocalShowGridLines" @onchange="OnToggleGrid" />
@@ -29,8 +33,7 @@
 
         <rect x="0" y="0"
               width="@Map.Grid.WidthCells" height="@Map.Grid.HeightCells"
-              fill="#0e1117"
-              @onclick="OnBackgroundClick" />
+              fill="#0e1117" />
 
         @if (Map.Images.Count > 0)
         {
@@ -59,6 +62,9 @@
                 <g class="dndm-image-pickers">
                     @foreach (var img in Map.Images.OrderBy(i => i.LayerOrder))
                     {
+                        // Locked images and Space-pan mode disable the picker so the click
+                        // falls through to the SVG and starts a pan.
+                        var pickerEvents = (img.Locked || _spaceHeld) ? "none" : "all";
                         var cx = img.X + img.Width / 2;
                         var cy = img.Y + img.Height / 2;
                         <rect @key="@($"pick-{img.Id}")"
@@ -68,8 +74,9 @@
                               fill="transparent"
                               stroke="@(SelectedImageId == img.Id ? "#e8b849" : "transparent")"
                               stroke-width="0.04"
-                              pointer-events="all"
-                              @onmousedown="@(e => OnImageMouseDown(e, img))" />
+                              pointer-events="@pickerEvents"
+                              @onmousedown="@(e => OnImageMouseDown(e, img))"
+                              @onmousedown:stopPropagation="true" />
                     }
                 </g>
             }
@@ -97,7 +104,7 @@
                     CurrentUserId="@CurrentUserId"
                     SvgId="@_svgId" />
 
-        @if (IsHost && SelectedImage is { } sel)
+        @if (IsHost && SelectedImage is { Locked: false } sel)
         {
             var s = (_drag is { ImageId: var did } && did == sel.Id) ? _drag : null;
             var sx = s?.X ?? sel.X;
@@ -110,22 +117,27 @@
                 <g transform="@($"rotate({F(sr)} {F(sx + sw / 2)} {F(sy + sh / 2)})")">
                     <rect x="@F(sx - hSize / 2)" y="@F(sy - hSize / 2)"
                           width="@F(hSize)" height="@F(hSize)" class="dndm-image-handle"
-                          @onmousedown="@(e => OnHandleMouseDown(e, sel, HandleKind.NW))" />
+                          @onmousedown="@(e => OnHandleMouseDown(e, sel, HandleKind.NW))"
+                          @onmousedown:stopPropagation="true" />
                     <rect x="@F(sx + sw - hSize / 2)" y="@F(sy - hSize / 2)"
                           width="@F(hSize)" height="@F(hSize)" class="dndm-image-handle"
-                          @onmousedown="@(e => OnHandleMouseDown(e, sel, HandleKind.NE))" />
+                          @onmousedown="@(e => OnHandleMouseDown(e, sel, HandleKind.NE))"
+                          @onmousedown:stopPropagation="true" />
                     <rect x="@F(sx - hSize / 2)" y="@F(sy + sh - hSize / 2)"
                           width="@F(hSize)" height="@F(hSize)" class="dndm-image-handle"
-                          @onmousedown="@(e => OnHandleMouseDown(e, sel, HandleKind.SW))" />
+                          @onmousedown="@(e => OnHandleMouseDown(e, sel, HandleKind.SW))"
+                          @onmousedown:stopPropagation="true" />
                     <rect x="@F(sx + sw - hSize / 2)" y="@F(sy + sh - hSize / 2)"
                           width="@F(hSize)" height="@F(hSize)" class="dndm-image-handle"
-                          @onmousedown="@(e => OnHandleMouseDown(e, sel, HandleKind.SE))" />
+                          @onmousedown="@(e => OnHandleMouseDown(e, sel, HandleKind.SE))"
+                          @onmousedown:stopPropagation="true" />
                     <line x1="@F(sx + sw / 2)" y1="@F(sy)"
                           x2="@F(sx + sw / 2)" y2="@F(sy - 0.6)"
                           class="dndm-image-rotline" />
                     <circle cx="@F(sx + sw / 2)" cy="@F(sy - 0.6)" r="@F(hSize / 1.5)"
                             class="dndm-image-handle dndm-image-handle--rot"
-                            @onmousedown="@(e => OnHandleMouseDown(e, sel, HandleKind.Rotate))" />
+                            @onmousedown="@(e => OnHandleMouseDown(e, sel, HandleKind.Rotate))"
+                            @onmousedown:stopPropagation="true" />
                 </g>
             </g>
         }

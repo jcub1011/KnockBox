@@ -24,7 +24,9 @@ namespace KnockBox.DndMapper.Services.Logic.Games
         // M03 image caps — see GDD §5 and the M03 milestone doc.
         private const long PerFileCapBytes = 5L * 1024 * 1024;
         private const long PerRoomCapBytes = 10L * 1024 * 1024;
-        private const int SniffHeadLength = 16;
+        // Large enough to (a) MIME-sniff the magic bytes and (b) locate JPEG SOF markers
+        // past EXIF/JFIF metadata for intrinsic dimension extraction.
+        private const int SniffHeadLength = 4096;
 
         private readonly ILogger<DndMapperGameEngine> _logger;
         private readonly ILogger<DndMapperGameState> _stateLogger;
@@ -1044,11 +1046,14 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             if (declaredLength > PerFileCapBytes)
                 return ValueResult<MapImage>.FromError("Image exceeds 5 MB per-file cap.");
 
-            // Pre-flight: map exists + room cap.
+            // Pre-flight: map exists + room cap. Also capture CellPixels so we can convert
+            // intrinsic pixel dimensions to cell units after the upload completes.
             string? prefError = null;
+            int cellPixels = 1;
             state.WithExclusiveRead(() =>
             {
-                if (state.Maps.All(m => m.Id != mapId))
+                var map = state.Maps.FirstOrDefault(m => m.Id == mapId);
+                if (map is null)
                 {
                     prefError = "Unknown map id.";
                     return;
@@ -1058,6 +1063,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                     prefError = "Room exceeds 10 MB total image cap.";
                     return;
                 }
+                cellPixels = Math.Max(1, map.Grid.CellPixels);
             });
             if (prefError is not null) return ValueResult<MapImage>.FromError(prefError);
 
@@ -1108,14 +1114,28 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                 return ValueResult<MapImage>.FromError("Storage write failed.");
             }
 
+            double defaultW = 10;
+            double defaultH = 10;
+            double originalW = 0;
+            double originalH = 0;
+            if (ImageDimensionSniffer.TryDetect(head.AsSpan(0, read), sniffedMime, out int pxW, out int pxH))
+            {
+                defaultW = pxW / (double)cellPixels;
+                defaultH = pxH / (double)cellPixels;
+                originalW = defaultW;
+                originalH = defaultH;
+            }
+
             var image = new MapImage
             {
                 Id = Guid.NewGuid(),
                 RelativePath = relativePath,
                 X = 0,
                 Y = 0,
-                Width = 10,
-                Height = 10,
+                Width = defaultW,
+                Height = defaultH,
+                OriginalWidth = originalW,
+                OriginalHeight = originalH,
                 Rotation = 0,
                 Opacity = 1.0,
                 LayerOrder = 0, // overwritten by AddImageAsync to map.Images.Count

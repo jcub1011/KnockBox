@@ -8,6 +8,13 @@
 <section class="dndm-panel dndm-sheet">
     <header class="dndm-panel-header">
         <span>Character Sheet</span>
+        @if (IsHost)
+        {
+            <button class="dndm-btn dndm-btn--small"
+                    type="button"
+                    title="Create a host-only NPC/monster sheet"
+                    @onclick="OpenNpcModal">+ NPC Sheet</button>
+        }
     </header>
 
     @if (VisibleSheets.Count == 0)
@@ -129,3 +136,28 @@
         }
     }
 </section>
+
+@if (_npcModalOpen)
+{
+    <div class="dndm-modal-overlay" @onclick="CloseNpcModal">
+        <div class="dndm-modal" @onclick:stopPropagation="true">
+            <header class="dndm-modal-header">New NPC sheet</header>
+            <div class="dndm-modal-body">
+                <label class="dndm-label">
+                    Name
+                    <input class="dndm-input"
+                           autofocus
+                           value="@_npcNameDraft"
+                           @oninput="@(e => _npcNameDraft = (string?)e.Value ?? string.Empty)" />
+                </label>
+            </div>
+            <footer class="dndm-modal-footer">
+                <button class="dndm-btn" type="button" @onclick="CloseNpcModal">Cancel</button>
+                <button class="dndm-btn dndm-btn--primary"
+                        type="button"
+                        disabled="@string.IsNullOrWhiteSpace(_npcNameDraft)"
+                        @onclick="ConfirmCreateNpcSheet">Create</button>
+            </footer>
+        </div>
+    </div>
+}

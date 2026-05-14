@@ -1,26 +1,40 @@
-﻿@inherits DisposableComponent
+@inherits DisposableComponent
 
 <section class="dndm-panel">
     <header class="dndm-panel-header">
         <span>Map Layers</span>
-        <div class="dndm-tokenp-add">
-            <button class="dndm-btn dndm-btn--small"
-                    type="button"
-                    title="Add image layer"
-                    disabled="@(_activeMap is null)"
-                    @onclick="OnAddNpc">
-                + NPC
-            </button>
-            <button class="dndm-btn dndm-btn--small"
-                    type="button"
-                    title="Delete image layer"
-                    disabled="@(_activeMap is null)"
-                    @onclick="OnAddHostExtra">
-                + Extra
-            </button>
-        </div>
     </header>
-    <div class="dndm-panel-body">
-        <p>This is a placeholder for host-only controls that don't fit in the token panel or image upload button.</p>
+    <div class="dndm-panel-body dndm-layers-body">
+        @if (ActiveMap is null)
+        {
+            <div class="dndm-panel-empty">No active map.</div>
+        }
+        else if (ActiveMap.Images.Count == 0)
+        {
+            <div class="dndm-panel-empty">No image layers yet. Upload one below.</div>
+        }
+        else
+        {
+            <ul class="dndm-layers-list">
+                @foreach (var img in ActiveMap.Images.OrderByDescending(i => i.LayerOrder))
+                {
+                    var selected = img.Id == SelectedImageId;
+                    <li @key="img.Id"
+                        class="@($"dndm-layer-row{(selected ? " dndm-layer-row--selected" : string.Empty)}")"
+                        @onclick="@(() => SelectImage(img.Id))">
+                        <img class="dndm-layer-thumb"
+                             src="@($"/api/plugins/dnd-mapper/{RoomCode}/images/{img.Id}")"
+                             alt="layer @img.LayerOrder" />
+                        <span class="dndm-layer-meta">
+                            <span class="dndm-layer-order">#@img.LayerOrder</span>
+                            @if (img.Locked)
+                            {
+                                <span class="dndm-layer-lock" title="Locked">🔒</span>
+                            }
+                        </span>
+                    </li>
+                }
+            </ul>
+        }
     </div>
 </section>

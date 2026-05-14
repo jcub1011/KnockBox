@@ -6,6 +6,11 @@
     flex-direction: column;
     background: #14141f;
     color: #ede4d3;
+    outline: none;
+}
+
+.dndm-canvas-frame:focus {
+    outline: none;
 }
 
 .dndm-canvas-toolbar {

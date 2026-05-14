@@ -34,6 +34,30 @@ namespace KnockBox.DndMapperTests.Unit.Logic.Games
             return new MemoryStream(bytes, writable: false);
         }
 
+        // Builds a PNG-prefixed buffer with a real IHDR chunk so ImageDimensionSniffer
+        // can extract width/height.
+        private static MemoryStream MakePngWithDimensions(int pxWidth, int pxHeight, int totalBytes = 2048)
+        {
+            if (totalBytes < 24) totalBytes = 24;
+            var bytes = new byte[totalBytes];
+            Array.Copy(PngMagic, bytes, PngMagic.Length);
+            // IHDR chunk length = 13 (big-endian uint32) at offset 8..11.
+            bytes[8] = 0; bytes[9] = 0; bytes[10] = 0; bytes[11] = 13;
+            // "IHDR" at offset 12..15.
+            bytes[12] = (byte)'I'; bytes[13] = (byte)'H'; bytes[14] = (byte)'D'; bytes[15] = (byte)'R';
+            // Width (big-endian uint32) at offset 16..19.
+            bytes[16] = (byte)((pxWidth >> 24) & 0xFF);
+            bytes[17] = (byte)((pxWidth >> 16) & 0xFF);
+            bytes[18] = (byte)((pxWidth >> 8) & 0xFF);
+            bytes[19] = (byte)(pxWidth & 0xFF);
+            // Height at offset 20..23.
+            bytes[20] = (byte)((pxHeight >> 24) & 0xFF);
+            bytes[21] = (byte)((pxHeight >> 16) & 0xFF);
+            bytes[22] = (byte)((pxHeight >> 8) & 0xFF);
+            bytes[23] = (byte)(pxHeight & 0xFF);
+            return new MemoryStream(bytes, writable: false);
+        }
+
         [TestMethod]
         public async Task SaveImageAsync_HostHappyPath_PersistsAndReturnsMapImage()
         {
@@ -212,6 +236,36 @@ namespace KnockBox.DndMapperTests.Unit.Logic.Games
                 }
                 return n;
             }
+        }
+
+        [TestMethod]
+        public async Task SaveImageAsync_WithPngHeader_SetsIntrinsicAndOriginalDimensions()
+        {
+            // Map's default Grid.CellPixels is 50 → an 800×600 image becomes 16×12 cells.
+            using var stream = MakePngWithDimensions(800, 600, totalBytes: 4096);
+
+            var result = await _engine.SaveImageAsync(_state, _host, _mapId, stream, declaredLength: 4096);
+
+            Assert.IsTrue(result.TryGetSuccess(out var img));
+            Assert.AreEqual(16.0, img.Width, 1e-9);
+            Assert.AreEqual(12.0, img.Height, 1e-9);
+            Assert.AreEqual(16.0, img.OriginalWidth, 1e-9);
+            Assert.AreEqual(12.0, img.OriginalHeight, 1e-9);
+        }
+
+        [TestMethod]
+        public async Task SaveImageAsync_PngWithoutDimensions_FallsBackToTenByTen()
+        {
+            // PNG magic only — no IHDR — sniffer returns false and engine uses the 10×10 default.
+            using var stream = MakePng(64);
+
+            var result = await _engine.SaveImageAsync(_state, _host, _mapId, stream, declaredLength: 64);
+
+            Assert.IsTrue(result.TryGetSuccess(out var img));
+            Assert.AreEqual(10.0, img.Width, 1e-9);
+            Assert.AreEqual(10.0, img.Height, 1e-9);
+            Assert.AreEqual(0.0, img.OriginalWidth, 1e-9);
+            Assert.AreEqual(0.0, img.OriginalHeight, 1e-9);
         }
 
         [TestMethod]

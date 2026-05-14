@@ -10,6 +10,7 @@
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <ProjectReference Include="..\..\sdk\KnockBox.Core\KnockBox.Core.csproj" />
+    <InternalsVisibleTo Include="KnockBox.DndMapperTests" />
   </ItemGroup>
 
   <ItemGroup>

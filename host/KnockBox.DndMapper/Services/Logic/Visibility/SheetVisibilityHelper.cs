@@ -18,6 +18,18 @@ namespace KnockBox.DndMapper.Services.Logic.Visibility
             return viewerIsHost || sheet.OwnerUserId == viewerUserId;
         }
 
+        /// <summary>
+        /// Whether the viewer should see this sheet at all (e.g. in a tab list).
+        /// Host sees every sheet. Players see player-owned sheets but never host-only
+        /// NPC sheets (those have a null owner).
+        /// </summary>
+        public static bool CanSeeSheet(CharacterSheet sheet, bool viewerIsHost)
+        {
+            ArgumentNullException.ThrowIfNull(sheet);
+            if (viewerIsHost) return true;
+            return sheet.OwnerUserId is not null;
+        }
+
         public static bool CanEdit(
             CharacterSheet sheet,
             string viewerUserId,

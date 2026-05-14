@@ -26,8 +26,12 @@ namespace KnockBox.DndMapper.Pages.Components
         private string _notesDraft = string.Empty;
         private Guid? _draftFor;
 
+        private bool _npcModalOpen;
+        private string _npcNameDraft = string.Empty;
+
         private List<CharacterSheet> VisibleSheets =>
             [.. State.Sheets.Values
+                .Where(s => SheetVisibilityHelper.CanSeeSheet(s, IsHost))
                 .OrderBy(s => s.OwnerUserId == CurrentUserId ? 0 : 1)
                 .ThenBy(s => s.CharacterName)];
 
@@ -165,6 +169,33 @@ namespace KnockBox.DndMapper.Pages.Components
             {
                 await Toasts.Push(err.PublicMessage, DndMapperToastTone.Danger);
             }
+        }
+
+        private void OpenNpcModal()
+        {
+            _npcNameDraft = string.Empty;
+            _npcModalOpen = true;
+        }
+
+        private void CloseNpcModal() => _npcModalOpen = false;
+
+        private async Task ConfirmCreateNpcSheet()
+        {
+            if (UserService.CurrentUser is null) return;
+            var name = _npcNameDraft.Trim();
+            if (string.IsNullOrWhiteSpace(name)) return;
+
+            var result = Engine.CreateSheetAsync(State, UserService.CurrentUser, ownerUserId: null, characterName: name);
+            if (result.TryGetFailure(out var err))
+            {
+                if (Toasts is not null) await Toasts.Push(err.PublicMessage, DndMapperToastTone.Danger);
+                return;
+            }
+            if (result.TryGetSuccess(out var newId))
+            {
+                _activeSheetId = newId;
+            }
+            _npcModalOpen = false;
         }
 
         public override void Dispose()

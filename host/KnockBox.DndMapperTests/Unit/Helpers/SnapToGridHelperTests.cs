@@ -48,5 +48,42 @@ namespace KnockBox.DndMapperTests.Unit.Helpers
             Assert.AreEqual(0, cx, 1e-9);
             Assert.AreEqual(10, cy, 1e-9);
         }
+
+        [TestMethod]
+        public void SnapCorner_OnIntegerCells_NoChange()
+        {
+            var (x, y) = SnapToGridHelper.SnapCorner(3, 7, Grid(true));
+            Assert.AreEqual(3, x, 1e-9);
+            Assert.AreEqual(7, y, 1e-9);
+        }
+
+        [TestMethod]
+        public void SnapCorner_FractionalRoundsToNearestWholeCell()
+        {
+            var (x, y) = SnapToGridHelper.SnapCorner(3.3, 7.7, Grid(true));
+            Assert.AreEqual(3, x, 1e-9);
+            Assert.AreEqual(8, y, 1e-9);
+        }
+
+        [TestMethod]
+        public void SnapCorner_OutOfBounds_Clamps()
+        {
+            var grid = Grid(true, w: 10, h: 10);
+            var (lowX, lowY) = SnapToGridHelper.SnapCorner(-5, -2, grid);
+            var (highX, highY) = SnapToGridHelper.SnapCorner(99, 99, grid);
+            Assert.AreEqual(0, lowX, 1e-9);
+            Assert.AreEqual(0, lowY, 1e-9);
+            Assert.AreEqual(10, highX, 1e-9);
+            Assert.AreEqual(10, highY, 1e-9);
+        }
+
+        [TestMethod]
+        public void SnapCorner_NoSnap_ReturnsClampedRaw()
+        {
+            var grid = Grid(false, w: 10, h: 10);
+            var (x, y) = SnapToGridHelper.SnapCorner(3.7, 4.2, grid);
+            Assert.AreEqual(3.7, x, 1e-9);
+            Assert.AreEqual(4.2, y, 1e-9);
+        }
     }
 }

@@ -87,6 +87,29 @@ namespace KnockBox.DndMapper.Pages.Components
             }
         }
 
+        private async Task ResetAspectRatio()
+        {
+            if (_image is null) return;
+            if (_image.OriginalWidth <= 0 || _image.OriginalHeight <= 0) return;
+
+            double safeHeight = Math.Max(1e-9, _image.Height);
+            double origAspect = Math.Max(1e-9, _image.OriginalWidth / _image.OriginalHeight);
+            double curAspect = _image.Width / safeHeight;
+            double nw = _image.Width;
+            double nh = _image.Height;
+            if (curAspect > origAspect)
+            {
+                // Width is over-stretched — shrink it to match aspect.
+                nw = safeHeight * origAspect;
+            }
+            else
+            {
+                // Height is over-stretched (or already correct) — shrink height.
+                nh = _image.Width / origAspect;
+            }
+            await Commit(w: nw, h: nh);
+        }
+
         private async Task OnToggleLock(bool locked)
         {
             if (UserService.CurrentUser is null) return;
