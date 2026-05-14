@@ -1,6 +1,7 @@
 using System.Globalization;
 using KnockBox.Core.Components.Shared;
 using KnockBox.Core.Services.State.Users;
+using KnockBox.DndMapper.Helpers;
 using KnockBox.DndMapper.Services.Logic.Games;
 using KnockBox.DndMapper.Services.State.Games;
 using KnockBox.DndMapper.Services.State.Games.Data;
@@ -73,13 +74,10 @@ namespace KnockBox.DndMapper.Pages.Components
         private async Task ChangeLayer(int delta)
         {
             if (_image is null || UserService.CurrentUser is null) return;
-            var current = _image.LayerOrder;
-            int target = delta switch
-            {
-                int.MaxValue => int.MaxValue,
-                int.MinValue => 0,
-                _ => current + delta,
-            };
+
+            var map = State.Maps.FirstOrDefault(m => m.Id == MapId);
+            if (LayerOrderResolver.Resolve(delta, _image.LayerOrder, map?.Images.Count ?? 0) is not int target) return;
+
             var result = Engine.ReorderImageLayerAsync(State, UserService.CurrentUser, MapId, ImageId, target);
             if (result.TryGetFailure(out var err))
             {

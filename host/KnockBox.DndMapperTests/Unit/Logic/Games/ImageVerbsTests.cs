@@ -341,5 +341,6 @@ namespace KnockBox.DndMapperTests.Unit.Logic.Games
             Assert.AreEqual(0, _state.Maps[0].Images[0].LayerOrder);
             Assert.AreEqual(a.Id, _state.Maps[0].Images[0].Id);
         }
+
     }
 }

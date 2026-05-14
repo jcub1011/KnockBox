@@ -66,24 +66,31 @@ namespace KnockBox.DndMapperTests.Unit.Helpers
         }
 
         [TestMethod]
-        public void SnapCorner_OutOfBounds_Clamps()
+        public void SnapCorner_OutOfBounds_NotClamped_RoundsOnly()
         {
+            // Images are allowed to extend past the grid (decorative overlays, oversized
+            // maps); SnapCorner only rounds to whole cells, it does not clamp.
             var grid = Grid(true, w: 10, h: 10);
-            var (lowX, lowY) = SnapToGridHelper.SnapCorner(-5, -2, grid);
-            var (highX, highY) = SnapToGridHelper.SnapCorner(99, 99, grid);
-            Assert.AreEqual(0, lowX, 1e-9);
-            Assert.AreEqual(0, lowY, 1e-9);
-            Assert.AreEqual(10, highX, 1e-9);
-            Assert.AreEqual(10, highY, 1e-9);
+            var (lowX, lowY) = SnapToGridHelper.SnapCorner(-5.3, -2.7, grid);
+            var (highX, highY) = SnapToGridHelper.SnapCorner(99.4, 99.6, grid);
+            Assert.AreEqual(-5, lowX, 1e-9);
+            Assert.AreEqual(-3, lowY, 1e-9);
+            Assert.AreEqual(99, highX, 1e-9);
+            Assert.AreEqual(100, highY, 1e-9);
         }
 
         [TestMethod]
-        public void SnapCorner_NoSnap_ReturnsClampedRaw()
+        public void SnapCorner_NoSnap_ReturnsRawUnchanged()
         {
             var grid = Grid(false, w: 10, h: 10);
             var (x, y) = SnapToGridHelper.SnapCorner(3.7, 4.2, grid);
             Assert.AreEqual(3.7, x, 1e-9);
             Assert.AreEqual(4.2, y, 1e-9);
+
+            // Even off-grid values pass through untouched when snapping is off.
+            var (ox, oy) = SnapToGridHelper.SnapCorner(-5.5, 999.25, grid);
+            Assert.AreEqual(-5.5, ox, 1e-9);
+            Assert.AreEqual(999.25, oy, 1e-9);
         }
     }
 }

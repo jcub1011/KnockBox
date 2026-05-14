@@ -25,8 +25,10 @@ namespace KnockBox.DndMapper.Services.Logic.Games
         private const long PerFileCapBytes = 5L * 1024 * 1024;
         private const long PerRoomCapBytes = 10L * 1024 * 1024;
         // Large enough to (a) MIME-sniff the magic bytes and (b) locate JPEG SOF markers
-        // past EXIF/JFIF metadata for intrinsic dimension extraction.
-        private const int SniffHeadLength = 4096;
+        // past EXIF/JFIF metadata for intrinsic dimension extraction. A JPEG APPn segment
+        // is bounded by a 16-bit length field, so 64 KB covers any single segment (phone
+        // EXIF blocks can easily exceed 4 KB when embedded thumbnails are present).
+        private const int SniffHeadLength = 64 * 1024;
 
         private readonly ILogger<DndMapperGameEngine> _logger;
         private readonly ILogger<DndMapperGameState> _stateLogger;

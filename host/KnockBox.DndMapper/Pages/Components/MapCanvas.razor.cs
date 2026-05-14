@@ -7,10 +7,11 @@ using KnockBox.DndMapper.Services.State.Games;
 using KnockBox.DndMapper.Services.State.Games.Data;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
+using Microsoft.JSInterop;
 
 namespace KnockBox.DndMapper.Pages.Components
 {
-    public partial class MapCanvas : DisposableComponent
+    public partial class MapCanvas : DisposableComponent, IAsyncDisposable
     {
         [Parameter, EditorRequired] public DndMapperGameState State { get; set; } = default!;
         [Parameter, EditorRequired] public Map Map { get; set; } = default!;
@@ -23,6 +24,8 @@ namespace KnockBox.DndMapper.Pages.Components
 
         [Inject] protected DndMapperGameEngine Engine { get; set; } = default!;
         [Inject] protected IUserService UserService { get; set; } = default!;
+        [Inject] protected IJSRuntime JSRuntime { get; set; } = default!;
+        [Inject] protected ILogger<MapCanvas> Logger { get; set; } = default!;
 
         private const double MinZoom = 0.10;
         private const double MaxZoom = 10.0;
@@ -47,9 +50,16 @@ namespace KnockBox.DndMapper.Pages.Components
 
         private bool _spaceHeld;
         private bool _shiftHeld;
+        private bool _ctrlHeld;
 
         private bool LocalShowGridLines { get; set; } = true;
         private bool _gridInitialized;
+
+        // Real on-screen scale (CSS pixels per cell). Captured from the SVG's
+        // getScreenCTM at the start of a drag/pan; 0 = not yet measured (fallback to
+        // CellPixels*zoom). Cached for the duration of the gesture and cleared on mouse-up.
+        private double _pxPerCell;
+        private IJSObjectReference? _metricsModule;
 
         // ── Image transform drag state ───────────────────────────────────
         internal enum HandleKind { Body, NW, NE, SW, SE, Rotate }
@@ -97,8 +107,45 @@ namespace KnockBox.DndMapper.Pages.Components
             {
                 try { await _frameRef.FocusAsync(preventScroll: true); }
                 catch { /* element not focusable yet — ignore */ }
+
+                try
+                {
+                    _metricsModule = await JSRuntime.InvokeAsync<IJSObjectReference>(
+                        "import", "./_content/KnockBox.DndMapper/js/dndMapperSvgMetrics.js");
+                }
+                catch (JSDisconnectedException) { /* circuit teardown */ }
+                catch (Exception ex)
+                {
+                    Logger.LogWarning(ex, "Failed to load SVG metrics JS module.");
+                }
             }
             await base.OnAfterRenderAsync(firstRender);
+        }
+
+        private async ValueTask CaptureScaleAsync()
+        {
+            if (_metricsModule is null) return;
+            try
+            {
+                double scale = await _metricsModule.InvokeAsync<double>("getPixelsPerCell", _svgId);
+                if (scale > 0) _pxPerCell = scale;
+            }
+            catch (JSDisconnectedException) { /* circuit teardown */ }
+            catch (Exception ex)
+            {
+                Logger.LogWarning(ex, "Failed to read SVG screen scale; falling back to CellPixels*zoom.");
+            }
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            if (_metricsModule is not null)
+            {
+                try { await _metricsModule.DisposeAsync(); }
+                catch (JSDisconnectedException) { /* circuit teardown */ }
+                _metricsModule = null;
+            }
+            Dispose();
         }
 
         private static string F(double value) =>
@@ -150,15 +197,17 @@ namespace KnockBox.DndMapper.Pages.Components
         {
             if (e.Key == " " || e.Code == "Space") _spaceHeld = true;
             if (e.Key == "Shift") _shiftHeld = true;
+            if (e.Key == "Control") _ctrlHeld = true;
         }
 
         private void OnKeyUp(KeyboardEventArgs e)
         {
             if (e.Key == " " || e.Code == "Space") _spaceHeld = false;
             if (e.Key == "Shift") _shiftHeld = false;
+            if (e.Key == "Control") _ctrlHeld = false;
         }
 
-        private void OnSvgMouseDown(MouseEventArgs e)
+        private async Task OnSvgMouseDown(MouseEventArgs e)
         {
             // Middle-button always pans. Any left-button event reaching the SVG (background
             // rect, or a locked-image picker whose pointer-events are off) starts a "pan"
@@ -166,6 +215,12 @@ namespace KnockBox.DndMapper.Pages.Components
             // ClickDeadZonePixels (see OnSvgMouseUp). Picker/handle rects stopPropagation,
             // so legitimate image interactions don't reach here.
             if (e.Button != MiddleMouseButton && e.Button != LeftMouseButton) return;
+            BeginPan(e);
+            await CaptureScaleAsync();
+        }
+
+        private void BeginPan(MouseEventArgs e)
+        {
             _panning = true;
             _panButton = e.Button;
             _panMoved = false;
@@ -189,9 +244,9 @@ namespace KnockBox.DndMapper.Pages.Components
                 if (Math.Abs(totalDx) > ClickDeadZonePixels || Math.Abs(totalDy) > ClickDeadZonePixels)
                     _panMoved = true;
 
-                double pixelsPerCell = Math.Max(1, Map.Grid.CellPixels);
-                _panX -= dx / (pixelsPerCell * _zoom);
-                _panY -= dy / (pixelsPerCell * _zoom);
+                double pxPerCell = ActualPxPerCell();
+                _panX -= dx / pxPerCell;
+                _panY -= dy / pxPerCell;
                 ClampPan();
                 return;
             }
@@ -237,17 +292,31 @@ namespace KnockBox.DndMapper.Pages.Components
                 _drag = null;
                 StateHasChanged();
             }
+
+            // Invalidate the cached scale so the next gesture re-measures (handles
+            // window resize / layout shifts between gestures).
+            _pxPerCell = 0;
             await Task.CompletedTask;
         }
 
         private (double dx, double dy) ClientDeltaToCells(double pxDx, double pxDy)
         {
-            double pixelsPerCell = Math.Max(1, Map.Grid.CellPixels);
-            return (pxDx / (pixelsPerCell * _zoom), pxDy / (pixelsPerCell * _zoom));
+            double pxPerCell = ActualPxPerCell();
+            return (pxDx / pxPerCell, pxDy / pxPerCell);
         }
+
+        // Real on-screen scale captured from getScreenCTM at gesture start; if that
+        // hasn't run yet (or JS interop failed) fall back to the configured CellPixels
+        // adjusted for the current zoom — which matches the old behavior.
+        private double ActualPxPerCell() =>
+            _pxPerCell > 0 ? _pxPerCell : Math.Max(1, Map.Grid.CellPixels * _zoom);
 
         private async Task OnImageMouseDown(MouseEventArgs e, MapImage img)
         {
+            // Picker rect stopPropagation swallows mousedown for any button, so the SVG
+            // pan handler never sees a middle-click landing on an image. Start the pan
+            // directly here instead.
+            if (e.Button == MiddleMouseButton) { BeginPan(e); await CaptureScaleAsync(); return; }
             if (!IsHost || e.Button != LeftMouseButton) return;
             // Space-held pan takes precedence — let the SVG handler pan instead.
             if (_spaceHeld) return;
@@ -259,13 +328,16 @@ namespace KnockBox.DndMapper.Pages.Components
                 await SelectedImageIdChanged.InvokeAsync(img.Id);
             }
             _drag = NewDrag(e, img, HandleKind.Body);
+            await CaptureScaleAsync();
         }
 
-        private void OnHandleMouseDown(MouseEventArgs e, MapImage img, HandleKind kind)
+        private async Task OnHandleMouseDown(MouseEventArgs e, MapImage img, HandleKind kind)
         {
+            if (e.Button == MiddleMouseButton) { BeginPan(e); await CaptureScaleAsync(); return; }
             if (!IsHost || e.Button != LeftMouseButton) return;
             if (img.Locked) return;
             _drag = NewDrag(e, img, kind);
+            await CaptureScaleAsync();
         }
 
         private static DragState NewDrag(MouseEventArgs e, MapImage img, HandleKind kind) => new()
@@ -353,6 +425,9 @@ namespace KnockBox.DndMapper.Pages.Components
         {
             if (!Map.Grid.SnapToGrid) return;
             if (d.Kind == HandleKind.Rotate) return;
+            // Hold Ctrl to bypass grid snap for this single move/resize (acts like
+            // Shift for free aspect ratio — a temporary modifier, not persistent state).
+            if (_ctrlHeld) return;
 
             if (d.Kind == HandleKind.Body)
             {
