@@ -78,5 +78,20 @@ namespace KnockBox.DndMapperTests.Unit.Logic.Games
             var result = _engine.UpdateImageShareTokenAsync(_state, _host, Guid.NewGuid(), _image.Id, Guid.NewGuid());
             Assert.IsTrue(result.IsFailure);
         }
+
+        [TestMethod]
+        public void UpdateImageShareTokenAsync_ImageInOtherMap_ReturnsError()
+        {
+            // Image exists in the seeded map; caller targets a different
+            // (real, distinct) map. FindImageAndMap searches the specified
+            // map only, so the lookup must fail and the token must not change.
+            Assert.IsTrue(_engine.CreateMapAsync(_state, _host, "Other").TryGetSuccess(out var otherMapId));
+            var originalToken = _state.Maps[0].Images.Single().ShareToken;
+
+            var result = _engine.UpdateImageShareTokenAsync(_state, _host, otherMapId, _image.Id, Guid.NewGuid());
+
+            Assert.IsTrue(result.IsFailure);
+            Assert.AreEqual(originalToken, _state.Maps[0].Images.Single().ShareToken);
+        }
     }
 }

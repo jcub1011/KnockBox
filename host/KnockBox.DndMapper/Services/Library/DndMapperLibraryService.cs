@@ -75,6 +75,14 @@ namespace KnockBox.DndMapper.Services.Library
         /// exists, and subscribes to the state's change feed for debounced
         /// auto-save. Idempotent: a second call against an already-attached
         /// service returns success without reopening.
+        /// <para>
+        /// The service is registered <c>Scoped</c> (one instance per circuit),
+        /// so under normal DI lifetime <c>AttachAsync</c> is called exactly
+        /// once per host page. The idempotence is a safety net for
+        /// <c>ImageUploadButton</c>'s lazy-attach path and is intentionally
+        /// not safe to rely on for re-running the republish-on-reconnect
+        /// pass — that path only fires inside the first call.
+        /// </para>
         /// </summary>
         public async ValueTask<Result> AttachAsync(DndMapperGameState state, User host, CancellationToken ct = default)
         {
