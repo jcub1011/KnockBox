@@ -41,6 +41,7 @@ namespace KnockBox.DndMapper.Services.Library
 
         private IIndexedDatabase? _db;
         private DndMapperGameState? _state;
+        private User? _host;
         private IDisposable? _stateSub;
         private Timer? _saveTimer;
         private CancellationTokenSource? _saveCts;
@@ -87,6 +88,7 @@ namespace KnockBox.DndMapper.Services.Library
 
             _db = db;
             _state = state;
+            _host = host;
             _saveCts = new CancellationTokenSource();
 
             var countResult = await _db.RunAsync<long>(
@@ -114,7 +116,67 @@ namespace KnockBox.DndMapper.Services.Library
             _saveTimer = new Timer(OnSaveTimerTick, state: null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
             _stateSub = state.StateChangedEventManager.Subscribe(OnStateChangedAsync);
 
+            // Reconnect path: if the state already carries images from a prior
+            // circuit (1-minute reconnect grace), their ShareTokens are dead.
+            // Re-load each blob from IndexedDB, publish a fresh share, and
+            // broadcast the new token via the engine. Failures here are
+            // logged but non-fatal — the player UI keeps the placeholder
+            // until the next attempt.
+            await RepublishExistingImagesAsync(state, host, ct);
+
             return Result.Success;
+        }
+
+        private async ValueTask RepublishExistingImagesAsync(DndMapperGameState state, User host, CancellationToken ct)
+        {
+            if (_db is null) return;
+            var imageIds = new List<(Guid MapId, Guid ImageId)>();
+            state.WithExclusiveRead(() =>
+            {
+                foreach (var map in state.Maps)
+                    foreach (var image in map.Images)
+                        imageIds.Add((map.Id, image.Id));
+            });
+
+            foreach (var (mapId, imageId) in imageIds)
+            {
+                if (ct.IsCancellationRequested) return;
+                if (_shareCache.ContainsKey(imageId)) continue; // already wired
+
+                var blobResult = await _db.RunAsync<IndexedDbBlob?>(
+                    [DndMapperLibrarySchema.ImagesStore],
+                    TransactionMode.ReadOnly,
+                    async (tx, token) =>
+                    {
+                        var images = tx.BlobObjectStore(DndMapperLibrarySchema.ImagesStore);
+                        return await images.GetAsync(IndexedDbKey.String(imageId.ToString("D")), token);
+                    },
+                    ct);
+
+                if (!blobResult.TryGetSuccess(out var blob) || blob is null)
+                {
+                    _logger.LogWarning("Reconnect: image {ImageId} no longer in IndexedDB; leaving placeholder.", imageId);
+                    continue;
+                }
+
+                IBlobShare share;
+                try { share = await blob.PublishForSharingAsync(options: null, ct); }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Reconnect: failed to republish image {ImageId}.", imageId);
+                    await SafeDisposeAsync(blob);
+                    continue;
+                }
+
+                _blobCache[imageId] = blob;
+                _shareCache[imageId] = share;
+
+                var update = _engine.UpdateImageShareTokenAsync(state, host, mapId, imageId, share.Token);
+                if (update.TryGetFailure(out var uerr))
+                {
+                    _logger.LogWarning("Reconnect: engine rejected new share token for image {ImageId}: {Error}", imageId, uerr.PublicMessage);
+                }
+            }
         }
 
         /// <summary>
@@ -571,22 +633,37 @@ namespace KnockBox.DndMapper.Services.Library
                 _saveTimer = null;
             }
 
-            // 2. Drain any in-flight flush so the DB handle is safe to dispose.
+            // 2. Broadcast the disconnect to player circuits by nulling every
+            //    image's ShareToken in state. Player UIs render placeholders
+            //    immediately rather than waiting for the next 410 from the
+            //    soon-to-be-evicted capability URL. The state lives on past
+            //    this circuit (1-minute grace) so this mutation is durable
+            //    until the host reconnects and republishes.
+            if (_state is not null && _host is not null)
+            {
+                var clear = _engine.ClearAllImageShareTokensAsync(_state, _host);
+                if (clear.TryGetFailure(out var cerr))
+                    _logger.LogWarning("Failed to clear image share tokens on detach: {Error}", cerr.PublicMessage);
+            }
+
+            // 3. Drain any in-flight flush so the DB handle is safe to dispose.
             try { await _saveLock.WaitAsync(TimeSpan.FromSeconds(2)); }
             catch { /* ignore */ }
             try
             {
-                // 3. Drop the state subscription.
+                // 4. Drop the state subscription.
                 _stateSub?.Dispose();
                 _stateSub = null;
 
-                // 4. Release cached blobs and shares.
+                // 5. Release cached blobs and shares (also revokes blob: URLs
+                //    on the JS side; the SafeDispose wrapper swallows
+                //    JSDisconnectedException if the circuit is already dead).
                 foreach (var share in _shareCache.Values) await SafeDisposeAsync(share);
                 _shareCache.Clear();
                 foreach (var blob in _blobCache.Values) await SafeDisposeAsync(blob);
                 _blobCache.Clear();
 
-                // 5. Close the DB.
+                // 6. Close the DB.
                 if (_db is not null)
                 {
                     await SafeDisposeAsync(_db);
