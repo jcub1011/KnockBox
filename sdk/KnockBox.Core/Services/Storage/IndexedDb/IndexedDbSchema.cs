@@ -59,6 +59,14 @@ namespace KnockBox.Core.Services.Storage.IndexedDb
         public DeclaredStoreKind Kind { get; init; }
         public KeyPath? KeyPath { get; init; }
         public bool AutoIncrement { get; init; }
+
+        /// <summary>
+        /// Indexes to create on this store during schema apply. See
+        /// <see cref="DeclaredIndex"/> for the current SDK story on index
+        /// usage — indexes declared here are reified on-disk, but the
+        /// <see cref="IIndexedDatabase"/> query surface does not yet read
+        /// from them.
+        /// </summary>
         public IReadOnlyList<DeclaredIndex>? Indexes { get; init; }
 
         public DeclaredStore(string name, DeclaredStoreKind kind)
@@ -74,6 +82,25 @@ namespace KnockBox.Core.Services.Storage.IndexedDb
         Blob,
     }
 
+    /// <summary>
+    /// Declarative description of a secondary index on an object store.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Indexes are created on-disk by the JS-side upgrade pass when this
+    /// store is reconciled, regardless of whether any SDK call currently
+    /// reads from them. The query surface on <see cref="IIndexedDatabase"/>
+    /// is intentionally narrow — single-key Get/Put/Delete by primary key,
+    /// plus <c>Count</c> with an optional <see cref="KeyRange"/> — and does
+    /// not yet expose <c>getAll</c> / index lookups.
+    /// </para>
+    /// <para>
+    /// Declaring an index today is a forward-compatibility hook: it
+    /// reserves the index on the persistent schema so a future atomic
+    /// <c>Index*SingleAsync</c> surface can read from it without requiring
+    /// a schema version bump on every consumer.
+    /// </para>
+    /// </remarks>
     public sealed record DeclaredIndex
     {
         public string Name { get; init; }

@@ -107,6 +107,12 @@ export function openDatabase(name, version, declaredStores, dotNetBridgeRef) {
             return;
         }
 
+        // Captures the *original* exception thrown by applyDeclaredStoresSync
+        // so request.onerror can surface it through mapDomError. Without
+        // this, an aborted upgrade collapses into a generic AbortError and
+        // the underlying cause (bad keyPath, duplicate index, ...) is lost.
+        let upgradeError = null;
+
         request.onupgradeneeded = (event) => {
             const upgradeTx = request.transaction;
             const db = event.target.result;
@@ -117,8 +123,10 @@ export function openDatabase(name, version, declaredStores, dotNetBridgeRef) {
             try {
                 applyDeclaredStoresSync(upgradeTx, db, declaredStores || []);
             } catch (e) {
+                upgradeError = e;
                 try { upgradeTx.abort(); } catch (_) { /* ignore */ }
-                // The open request will surface AbortError via onerror.
+                // request.onerror fires with AbortError after the abort
+                // bounces back; we substitute upgradeError there.
             }
         };
 
@@ -140,7 +148,7 @@ export function openDatabase(name, version, declaredStores, dotNetBridgeRef) {
                 objectStoreNames: Array.from(db.objectStoreNames),
             }));
         };
-        request.onerror = () => resolve(fail(mapDomError(request.error)));
+        request.onerror = () => resolve(fail(mapDomError(upgradeError || request.error)));
         request.onblocked = () => resolve(fail({
             kind: "Blocked",
             jsName: null,
