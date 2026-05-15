@@ -407,6 +407,7 @@ namespace KnockBox.Core.Components.Shared
                     await _jsModule.InvokeVoidAsync("dispose", _svgId);
                 }
                 catch (JSDisconnectedException) { }
+                catch (ObjectDisposedException) { }
                 catch (Exception ex)
                 {
                     Logger.LogWarning(ex, "[SVGCanvas] DisposeAsync: error during JS dispose — svgId={SvgId}", _svgId);
@@ -417,6 +418,7 @@ namespace KnockBox.Core.Components.Shared
                     await _jsModule.DisposeAsync();
                 }
                 catch (JSDisconnectedException) { }
+                catch (ObjectDisposedException) { }
             }
             _dotNetRef?.Dispose();
         }
