@@ -134,6 +134,21 @@ namespace KnockBox.DndMapper.Pages.Components
             }
         }
 
+        // Reassign an NPC/HostExtra token to a registered player, promoting it
+        // to a PlayerToken. The dropdown is the host's primary affordance for
+        // wiring up hydrated-from-library content with the current session's
+        // joiners.
+        private async Task OnReassignToPlayer(Token t, string? raw)
+        {
+            if (UserService.CurrentUser is null) return;
+            if (string.IsNullOrEmpty(raw)) return;
+            var result = Engine.ReassignTokenOwnerAsync(State, UserService.CurrentUser, t.Id, raw, TokenType.PlayerToken);
+            if (result.TryGetFailure(out var err))
+            {
+                await PushToast(err.PublicMessage, DndMapperToastTone.Danger);
+            }
+        }
+
         private void OnDeleteRequest(Token t) => _pendingDelete = t;
         private void CancelDelete() => _pendingDelete = null;
 

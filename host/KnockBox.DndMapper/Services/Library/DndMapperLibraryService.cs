@@ -1,6 +1,7 @@
 using KnockBox.Core.Primitives.Returns;
 using KnockBox.Core.Services.State.Users;
 using KnockBox.Core.Services.Storage.IndexedDb;
+using KnockBox.DndMapper.Models;
 using KnockBox.DndMapper.Services.Logic.Games;
 using KnockBox.DndMapper.Services.State.Games;
 using KnockBox.DndMapper.Services.State.Games.Data;
@@ -228,6 +229,187 @@ namespace KnockBox.DndMapper.Services.Library
             _blobCache[imageId] = blob;
             _shareCache[imageId] = share;
             return ValueResult<MapImage>.FromValue(added);
+        }
+
+        /// <summary>
+        /// Reads the persisted snapshot and replays it into the live state.
+        /// Loads every map's image blobs from IndexedDB, publishes fresh
+        /// blob-shares, and atomically swaps state.Maps / state.Sheets /
+        /// state.Settings / state.AttributeSchema inside one Execute so
+        /// subscribers see a single change. Tokens hydrate as NPCToken with
+        /// no owner; the host reassigns via ReassignTokenOwnerAsync.
+        /// </summary>
+        public async ValueTask<Result> HydrateAsync(CancellationToken ct = default)
+        {
+            ThrowIfDisposed();
+            if (_db is null || _state is null) return Result.FromError("Library is not attached.");
+
+            // Pause autosave for the duration of hydration so we don't write
+            // a half-built snapshot back over the one we're loading.
+            _saveTimer?.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+
+            // 1. Read snapshot.
+            var snapKey = IndexedDbKey.String(DndMapperLibrarySchema.LibraryStoreKey);
+            var readResult = await _db.RunAsync<LibrarySnapshot?>(
+                [DndMapperLibrarySchema.LibraryStore],
+                TransactionMode.ReadOnly,
+                async (tx, token) =>
+                {
+                    var library = tx.ObjectStore<LibrarySnapshot>(DndMapperLibrarySchema.LibraryStore);
+                    return await library.GetAsync(snapKey, token);
+                },
+                ct);
+
+            if (!readResult.TryGetSuccess(out var snapshot))
+            {
+                readResult.TryGetFailure(out var rerr);
+                return Result.FromError($"Failed to read library snapshot: {rerr.Message}");
+            }
+            if (snapshot is null) return Result.Success; // nothing to hydrate
+
+            // 2. Pre-load every image blob and publish a share outside the lock.
+            //    Build a parallel structure mapping imageId -> fresh MapImage.
+            var hydratedImages = new Dictionary<Guid, MapImage>();
+            foreach (var mapSnap in snapshot.Maps)
+            {
+                foreach (var imgSnap in mapSnap.Images)
+                {
+                    if (ct.IsCancellationRequested) return Result.FromCancellation();
+
+                    var blobResult = await _db.RunAsync<IndexedDbBlob?>(
+                        [DndMapperLibrarySchema.ImagesStore],
+                        TransactionMode.ReadOnly,
+                        async (tx, token) =>
+                        {
+                            var images = tx.BlobObjectStore(DndMapperLibrarySchema.ImagesStore);
+                            return await images.GetAsync(IndexedDbKey.String(imgSnap.Id.ToString("D")), token);
+                        },
+                        ct);
+
+                    if (!blobResult.TryGetSuccess(out var blob) || blob is null)
+                    {
+                        // Snapshot referenced a missing blob — log and skip; the
+                        // image will not be hydrated. Players see no entry.
+                        _logger.LogWarning("Image {ImageId} referenced by snapshot is missing from IndexedDB; skipping.", imgSnap.Id);
+                        continue;
+                    }
+
+                    IBlobShare share;
+                    try { share = await blob.PublishForSharingAsync(options: null, ct); }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Failed to republish share for hydrated image {ImageId}.", imgSnap.Id);
+                        await SafeDisposeAsync(blob);
+                        continue;
+                    }
+
+                    _blobCache[imgSnap.Id] = blob;
+                    _shareCache[imgSnap.Id] = share;
+                    hydratedImages[imgSnap.Id] = new MapImage
+                    {
+                        Id = imgSnap.Id,
+                        ContentType = imgSnap.ContentType,
+                        ShareToken = share.Token,
+                        X = imgSnap.X,
+                        Y = imgSnap.Y,
+                        Width = imgSnap.Width,
+                        Height = imgSnap.Height,
+                        OriginalWidth = imgSnap.OriginalWidth,
+                        OriginalHeight = imgSnap.OriginalHeight,
+                        Rotation = imgSnap.Rotation,
+                        Opacity = imgSnap.Opacity,
+                        LayerOrder = imgSnap.LayerOrder,
+                        Locked = imgSnap.Locked,
+                        ByteSize = imgSnap.ByteSize,
+                    };
+                }
+            }
+
+            // 3. Apply atomically inside one Execute. Subscribers see one
+            //    StateChanged notification covering the entire hydration.
+            var state = _state;
+            var attrSchema = LibrarySnapshotMapper.ToAttributeSchema(snapshot.AttributeSchema);
+            var execResult = state.Execute(() =>
+            {
+                state.SetSettings(snapshot.Settings.Clone());
+                state.SetAttributeSchema(attrSchema);
+
+                state.Maps.Clear();
+                long totalBytes = 0;
+                foreach (var mapSnap in snapshot.Maps.OrderBy(m => m.ListOrder))
+                {
+                    var map = new Map
+                    {
+                        Id = mapSnap.Id,
+                        Name = mapSnap.Name,
+                        ListOrder = mapSnap.ListOrder,
+                        CreatedUtc = mapSnap.CreatedUtc,
+                        Grid = mapSnap.Grid.Clone(),
+                        DefaultSpawnPosition = mapSnap.DefaultSpawnX is double sx && mapSnap.DefaultSpawnY is double sy
+                            ? (sx, sy)
+                            : null,
+                    };
+                    foreach (var imgSnap in mapSnap.Images.OrderBy(i => i.LayerOrder))
+                    {
+                        if (hydratedImages.TryGetValue(imgSnap.Id, out var image))
+                        {
+                            map.Images.Add(image);
+                            totalBytes += image.ByteSize;
+                        }
+                    }
+                    foreach (var tokSnap in mapSnap.Tokens)
+                    {
+                        // All persisted tokens hydrate as NPCs with no owner.
+                        // The host promotes any of them to PlayerToken via
+                        // ReassignTokenOwnerAsync after players join.
+                        map.Tokens.Add(new Token
+                        {
+                            Id = tokSnap.Id,
+                            Type = TokenType.NPCToken,
+                            OwnerUserId = null,
+                            RepresentsUserId = null,
+                            Name = tokSnap.Name,
+                            Color = tokSnap.Color,
+                            IconKind = tokSnap.IconKind,
+                            MapId = tokSnap.MapId,
+                            X = tokSnap.X,
+                            Y = tokSnap.Y,
+                            SheetId = tokSnap.SheetId,
+                            Hidden = tokSnap.Hidden,
+                        });
+                    }
+                    state.Maps.Add(map);
+                }
+                state.SetBytesUsed(totalBytes);
+
+                state.Sheets.Clear();
+                foreach (var sheetSnap in snapshot.Sheets)
+                {
+                    var sheet = new CharacterSheet
+                    {
+                        Id = sheetSnap.Id,
+                        OwnerUserId = null,
+                        CharacterName = sheetSnap.CharacterName,
+                        Notes = sheetSnap.Notes,
+                        Hp = sheetSnap.Hp,
+                        MaxHp = sheetSnap.MaxHp,
+                    };
+                    foreach (var kv in sheetSnap.Values)
+                        sheet.Values[kv.Key] = LibrarySnapshotMapper.ToAttributeValue(kv.Value);
+                    state.Sheets[sheet.Id] = sheet;
+                }
+
+                // Activate the first map if any exist so the host doesn't
+                // land on an empty canvas after hydration.
+                var first = state.Maps.OrderBy(m => m.ListOrder).FirstOrDefault();
+                state.SetActiveMapId(first?.Id);
+            });
+
+            if (execResult.IsCanceled) return Result.FromCancellation();
+            if (execResult.TryGetFailure(out var execErr)) return Result.FromError(execErr);
+
+            HasExistingLibrary = true;
+            return Result.Success;
         }
 
         /// <summary>

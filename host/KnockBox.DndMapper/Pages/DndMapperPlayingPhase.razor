@@ -37,6 +37,27 @@
         }
 
         <main class="dndm-canvas-area">
+            @if (IsHost && _libraryBannerVisible)
+            {
+                <div class="dndm-library-banner" role="status">
+                    <div class="dndm-library-banner__copy">
+                        <strong>Saved content from a previous session is available.</strong>
+                        <span>Load your maps, tokens, sheets and settings — or start fresh.</span>
+                    </div>
+                    <div class="dndm-library-banner__actions">
+                        <button class="dndm-btn" type="button" disabled="@_hydrating" @onclick="OnLoadLibrary">
+                            @(_hydrating ? "Loading…" : "Load")
+                        </button>
+                        <button class="dndm-btn dndm-btn--ghost" type="button" disabled="@_hydrating" @onclick="OnDiscardLibrary">
+                            Start fresh
+                        </button>
+                    </div>
+                    @if (_hydrateError is not null)
+                    {
+                        <div class="dndm-library-banner__error">@_hydrateError</div>
+                    }
+                </div>
+            }
             @if (ActiveMap is null)
             {
                 <div class="dndm-empty">

@@ -87,6 +87,21 @@
                             </select>
                         </label>
                     }
+                    @if (State.Players.Count > 0)
+                    {
+                        <label class="dndm-tokenp-metalabel" title="Promote this NPC to a player-owned token">
+                            <span>Reassign</span>
+                            <select class="dndm-select"
+                                    value=""
+                                    @onchange="@(e => OnReassignToPlayer(t, (string?)e.Value))">
+                                <option value="">— give to player —</option>
+                                @foreach (var p in State.Players)
+                                {
+                                    <option value="@p.User.Id">@p.DisplayName</option>
+                                }
+                            </select>
+                        </label>
+                    }
                 </div>
             }
         }

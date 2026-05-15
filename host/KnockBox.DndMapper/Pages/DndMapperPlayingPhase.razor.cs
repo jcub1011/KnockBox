@@ -1,6 +1,8 @@
 using System.Globalization;
+using KnockBox.Core.Services.State.Users;
 using KnockBox.DndMapper.Models;
 using KnockBox.DndMapper.Pages.Components;
+using KnockBox.DndMapper.Services.Library;
 using KnockBox.DndMapper.Services.State.Games;
 using KnockBox.DndMapper.Services.State.Games.Data;
 using Microsoft.AspNetCore.Components;
@@ -22,6 +24,12 @@ namespace KnockBox.DndMapper.Pages
 
         [Inject] protected IJSRuntime JSRuntime { get; set; } = default!;
         [Inject] protected ILogger<DndMapperPlayingPhase> Logger { get; set; } = default!;
+        [Inject] protected DndMapperLibraryService Library { get; set; } = default!;
+        [Inject] protected IUserService UserService { get; set; } = default!;
+
+        private bool _libraryBannerVisible;
+        private bool _hydrating;
+        private string? _hydrateError;
 
         private readonly DndMapperToastService _toasts = new();
         private readonly DiceRollerConfig _diceConfig = new();
@@ -61,6 +69,71 @@ namespace KnockBox.DndMapper.Pages
         private void TogglePerms() => _permsOpen = !_permsOpen;
         private void ToggleLeftRail() => _leftCollapsed = !_leftCollapsed;
         private void ToggleRightRail() => _rightCollapsed = !_rightCollapsed;
+
+        protected override async Task OnInitializedAsync()
+        {
+            await base.OnInitializedAsync();
+            if (!IsHost || UserService.CurrentUser is null) return;
+
+            // Host-only: open the per-browser library and probe whether a
+            // previous-session snapshot exists. The banner is rendered when
+            // it does; the user picks Load or Start fresh.
+            var attach = await Library.AttachAsync(State, UserService.CurrentUser);
+            if (attach.TryGetFailure(out var err))
+            {
+                Logger.LogWarning("Failed to attach DnD Mapper library on host page: {Error}", err.PublicMessage);
+                return;
+            }
+            _libraryBannerVisible = Library.HasExistingLibrary;
+        }
+
+        private async Task OnLoadLibrary()
+        {
+            if (_hydrating || !IsHost) return;
+            _hydrating = true;
+            _hydrateError = null;
+            StateHasChanged();
+            try
+            {
+                var result = await Library.HydrateAsync();
+                if (result.TryGetFailure(out var err))
+                {
+                    _hydrateError = err.PublicMessage;
+                    Logger.LogWarning("DnD Mapper hydration failed: {Error}", err.PublicMessage);
+                    return;
+                }
+                _libraryBannerVisible = false;
+            }
+            finally
+            {
+                _hydrating = false;
+                StateHasChanged();
+            }
+        }
+
+        private async Task OnDiscardLibrary()
+        {
+            if (_hydrating || !IsHost) return;
+            _hydrating = true;
+            _hydrateError = null;
+            StateHasChanged();
+            try
+            {
+                var result = await Library.DiscardLibraryAsync();
+                if (result.TryGetFailure(out var err))
+                {
+                    _hydrateError = err.PublicMessage;
+                    Logger.LogWarning("DnD Mapper discard failed: {Error}", err.PublicMessage);
+                    return;
+                }
+                _libraryBannerVisible = false;
+            }
+            finally
+            {
+                _hydrating = false;
+                StateHasChanged();
+            }
+        }
 
         protected override async Task OnAfterRenderAsync(bool firstRender)
         {
