@@ -12,7 +12,14 @@ namespace KnockBox.DndMapper.Services.Library
     internal static class DndMapperLibrarySchema
     {
         public const string DatabaseName = "KnockBox.DndMapper";
-        public const int CurrentVersion = 1;
+        // v2 (2026-05): switched the schema to the declarative Stores path
+        // because the previous OnUpgrade callback couldn't survive the C#
+        // round-trip — the IDB spec leaves a versionchange transaction's
+        // active flag false outside IDB event handlers, so any schema op
+        // issued from the resumed handler aborts the upgrade. Bump the
+        // version any time DeclaredStores changes so the upgrade fires
+        // against already-installed databases.
+        public const int CurrentVersion = 2;
 
         /// <summary>Singleton record holding the host's persisted library snapshot (JSON).</summary>
         public const string LibraryStore = "library";
@@ -23,22 +30,13 @@ namespace KnockBox.DndMapper.Services.Library
         /// <summary>Per-image blob bytes, keyed by <c>MapImage.Id.ToString()</c>.</summary>
         public const string ImagesStore = "images";
 
-        public static IndexedDbSchema Create()
-            => new(DatabaseName, CurrentVersion)
-            {
-                OnUpgrade = UpgradeAsync,
-            };
+        private static readonly IReadOnlyList<DeclaredStore> DeclaredStores =
+        [
+            new(LibraryStore, DeclaredStoreKind.Json),
+            new(ImagesStore, DeclaredStoreKind.Blob),
+        ];
 
-        private static ValueTask UpgradeAsync(IUpgradeContext ctx, int oldVersion, int newVersion, CancellationToken ct)
-        {
-            // v0 -> v1: fresh-install path. New stores get a default keyPath of
-            // null (caller-supplied keys), matching how the service writes records.
-            if (oldVersion < 1)
-            {
-                ctx.CreateJsonObjectStore(LibraryStore);
-                ctx.CreateBlobObjectStore(ImagesStore);
-            }
-            return ValueTask.CompletedTask;
-        }
+        public static IndexedDbSchema Create()
+            => new(DatabaseName, CurrentVersion) { Stores = DeclaredStores };
     }
 }

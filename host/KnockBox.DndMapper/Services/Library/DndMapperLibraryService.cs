@@ -76,12 +76,13 @@ namespace KnockBox.DndMapper.Services.Library
         /// auto-save. Idempotent: a second call against an already-attached
         /// service returns success without reopening.
         /// <para>
-        /// The service is registered <c>Scoped</c> (one instance per circuit),
-        /// so under normal DI lifetime <c>AttachAsync</c> is called exactly
-        /// once per host page. The idempotence is a safety net for
-        /// <c>ImageUploadButton</c>'s lazy-attach path and is intentionally
-        /// not safe to rely on for re-running the republish-on-reconnect
-        /// pass — that path only fires inside the first call.
+        /// The service is registered <c>Scoped</c> (one instance per circuit).
+        /// A single circuit may host more than one DnD Mapper session in
+        /// sequence (user leaves room A then enters room B without losing the
+        /// circuit), so the lifecycle is Attach → DetachAsync → Attach. A
+        /// fresh attach after detach reopens the DB, re-probes the snapshot,
+        /// and re-runs republish; the idempotence on a *live* attach is just
+        /// a safety net for <c>ImageUploadButton</c>'s lazy-attach path.
         /// </para>
         /// </summary>
         public async ValueTask<Result> AttachAsync(DndMapperGameState state, User host, CancellationToken ct = default)
@@ -92,12 +93,11 @@ namespace KnockBox.DndMapper.Services.Library
 
             if (_db is not null) return Result.Success;
 
-            var openResult = await _indexedDb.OpenAsync(DndMapperLibrarySchema.Create(), ct);
-            if (!openResult.TryGetSuccess(out var db))
+            var openOrRecover = await OpenWithRecoveryAsync(ct);
+            if (!openOrRecover.TryGetSuccess(out var db))
             {
-                openResult.TryGetFailure(out var err);
-                _logger.LogError("Failed to open DnD Mapper IndexedDB: {Error}", err.Message);
-                return Result.FromError($"Failed to open library database: {err.Message}");
+                openOrRecover.TryGetFailure(out var oerr);
+                return Result.FromError(oerr);
             }
 
             _db = db;
@@ -105,15 +105,7 @@ namespace KnockBox.DndMapper.Services.Library
             _host = host;
             _saveCts = new CancellationTokenSource();
 
-            var countResult = await _db.RunAsync<long>(
-                [DndMapperLibrarySchema.LibraryStore],
-                TransactionMode.ReadOnly,
-                async (tx, token) =>
-                {
-                    var library = tx.JsonObjectStore(DndMapperLibrarySchema.LibraryStore);
-                    return await library.CountAsync(range: null, token);
-                },
-                ct);
+            var countResult = await _db.CountSingleAsync(DndMapperLibrarySchema.LibraryStore, range: null, ct);
 
             if (countResult.TryGetSuccess(out var count))
             {
@@ -141,6 +133,69 @@ namespace KnockBox.DndMapper.Services.Library
             return Result.Success;
         }
 
+        /// <summary>
+        /// Opens the IndexedDB and verifies the expected stores exist. If the
+        /// DB opens at the target version but is missing one or both stores —
+        /// the symptom of a partially-applied upgrade transaction left over
+        /// from a stale build — the broken database is deleted and reopened
+        /// once so a fresh upgrade can run from <c>v0</c>. A second failure
+        /// surfaces as an error to the caller; we never delete more than once
+        /// per Attach.
+        /// </summary>
+        private async ValueTask<ValueResult<IIndexedDatabase>> OpenWithRecoveryAsync(CancellationToken ct)
+        {
+            var openResult = await _indexedDb.OpenAsync(DndMapperLibrarySchema.Create(), ct);
+            if (!openResult.TryGetSuccess(out var db))
+            {
+                openResult.TryGetFailure(out var err);
+                _logger.LogError("Failed to open DnD Mapper IndexedDB: {Error}", err.Message);
+                return ValueResult<IIndexedDatabase>.FromError($"Failed to open library database: {err.Message}");
+            }
+
+            if (HasExpectedStores(db)) return ValueResult<IIndexedDatabase>.FromValue(db);
+
+            _logger.LogWarning(
+                "DnD Mapper IndexedDB opened at v{Version} but is missing expected stores; actual store list: [{Stores}]. Recreating the database.",
+                db.Version, string.Join(", ", db.ObjectStoreNames));
+
+            await SafeDisposeAsync(db);
+            var deleteResult = await _indexedDb.DeleteDatabaseAsync(DndMapperLibrarySchema.DatabaseName, ct);
+            if (deleteResult.TryGetFailure(out var delErr))
+            {
+                _logger.LogError("Failed to delete corrupt DnD Mapper IndexedDB during recovery: {Error}", delErr.Message);
+                return ValueResult<IIndexedDatabase>.FromError(
+                    $"Failed to recover library database: {delErr.Message}");
+            }
+
+            var reopenResult = await _indexedDb.OpenAsync(DndMapperLibrarySchema.Create(), ct);
+            if (!reopenResult.TryGetSuccess(out var reopened))
+            {
+                reopenResult.TryGetFailure(out var rerr);
+                _logger.LogError("Failed to reopen DnD Mapper IndexedDB after recovery: {Error}", rerr.Message);
+                return ValueResult<IIndexedDatabase>.FromError(
+                    $"Failed to reopen library database after recovery: {rerr.Message}");
+            }
+
+            if (!HasExpectedStores(reopened))
+            {
+                _logger.LogError(
+                    "DnD Mapper IndexedDB still missing stores after recovery; actual store list: [{Stores}].",
+                    string.Join(", ", reopened.ObjectStoreNames));
+                await SafeDisposeAsync(reopened);
+                return ValueResult<IIndexedDatabase>.FromError(
+                    "Library database is missing expected object stores after recovery; the schema upgrade did not apply.");
+            }
+
+            return ValueResult<IIndexedDatabase>.FromValue(reopened);
+        }
+
+        private static bool HasExpectedStores(IIndexedDatabase db)
+        {
+            var stores = db.ObjectStoreNames;
+            return stores.Contains(DndMapperLibrarySchema.LibraryStore)
+                && stores.Contains(DndMapperLibrarySchema.ImagesStore);
+        }
+
         private async ValueTask RepublishExistingImagesAsync(DndMapperGameState state, User host, CancellationToken ct)
         {
             if (_db is null) return;
@@ -157,14 +212,9 @@ namespace KnockBox.DndMapper.Services.Library
                 if (ct.IsCancellationRequested) return;
                 if (_shareCache.ContainsKey(imageId)) continue; // already wired
 
-                var blobResult = await _db.RunAsync<IndexedDbBlob?>(
-                    [DndMapperLibrarySchema.ImagesStore],
-                    TransactionMode.ReadOnly,
-                    async (tx, token) =>
-                    {
-                        var images = tx.BlobObjectStore(DndMapperLibrarySchema.ImagesStore);
-                        return await images.GetAsync(IndexedDbKey.String(imageId.ToString("D")), token);
-                    },
+                var blobResult = await _db.BlobGetSingleAsync(
+                    DndMapperLibrarySchema.ImagesStore,
+                    IndexedDbKey.String(imageId.ToString("D")),
                     ct);
 
                 if (!blobResult.TryGetSuccess(out var blob) || blob is null)
@@ -236,19 +286,7 @@ namespace KnockBox.DndMapper.Services.Library
 
             // Step 2: persist the blob into the images store.
             var key = IndexedDbKey.String(imageId.ToString("D"));
-            var putResult = await _db.RunAsync(
-                [DndMapperLibrarySchema.ImagesStore],
-                TransactionMode.ReadWrite,
-                async (tx, token) =>
-                {
-                    var images = tx.BlobObjectStore(DndMapperLibrarySchema.ImagesStore);
-                    var put = await images.PutAsync(blob, key, token);
-                    if (put.IsSuccess) return Result<IndexedDbError>.Success;
-                    put.TryGetFailure(out var perr);
-                    return Result<IndexedDbError>.FromError(perr);
-                },
-                ct);
-
+            var putResult = await _db.BlobPutSingleAsync(DndMapperLibrarySchema.ImagesStore, blob, key, ct);
             if (!putResult.IsSuccess)
             {
                 putResult.TryGetFailure(out var perr);
@@ -360,15 +398,8 @@ namespace KnockBox.DndMapper.Services.Library
 
             // 1. Read snapshot.
             var snapKey = IndexedDbKey.String(DndMapperLibrarySchema.LibraryStoreKey);
-            var readResult = await _db.RunAsync<LibrarySnapshot?>(
-                [DndMapperLibrarySchema.LibraryStore],
-                TransactionMode.ReadOnly,
-                async (tx, token) =>
-                {
-                    var library = tx.ObjectStore<LibrarySnapshot>(DndMapperLibrarySchema.LibraryStore);
-                    return await library.GetAsync(snapKey, token);
-                },
-                ct);
+            var readResult = await _db.JsonGetSingleAsync<LibrarySnapshot>(
+                DndMapperLibrarySchema.LibraryStore, snapKey, ct);
 
             if (!readResult.TryGetSuccess(out var snapshot))
             {
@@ -386,14 +417,9 @@ namespace KnockBox.DndMapper.Services.Library
                 {
                     if (ct.IsCancellationRequested) return Result.FromCancellation();
 
-                    var blobResult = await _db.RunAsync<IndexedDbBlob?>(
-                        [DndMapperLibrarySchema.ImagesStore],
-                        TransactionMode.ReadOnly,
-                        async (tx, token) =>
-                        {
-                            var images = tx.BlobObjectStore(DndMapperLibrarySchema.ImagesStore);
-                            return await images.GetAsync(IndexedDbKey.String(imgSnap.Id.ToString("D")), token);
-                        },
+                    var blobResult = await _db.BlobGetSingleAsync(
+                        DndMapperLibrarySchema.ImagesStore,
+                        IndexedDbKey.String(imgSnap.Id.ToString("D")),
                         ct);
 
                     if (!blobResult.TryGetSuccess(out var blob) || blob is null)
@@ -539,27 +565,8 @@ namespace KnockBox.DndMapper.Services.Library
             await _saveLock.WaitAsync(ct);
             try
             {
-                var result = await _db.RunAsync(
+                var result = await _db.ClearStoresAsync(
                     [DndMapperLibrarySchema.LibraryStore, DndMapperLibrarySchema.ImagesStore],
-                    TransactionMode.ReadWrite,
-                    async (tx, token) =>
-                    {
-                        var library = tx.JsonObjectStore(DndMapperLibrarySchema.LibraryStore);
-                        var libClear = await library.ClearAsync(token);
-                        if (!libClear.IsSuccess)
-                        {
-                            libClear.TryGetFailure(out var lerr);
-                            return Result<IndexedDbError>.FromError(lerr);
-                        }
-                        var images = tx.BlobObjectStore(DndMapperLibrarySchema.ImagesStore);
-                        var imgClear = await images.ClearAsync(token);
-                        if (!imgClear.IsSuccess)
-                        {
-                            imgClear.TryGetFailure(out var ierr);
-                            return Result<IndexedDbError>.FromError(ierr);
-                        }
-                        return Result<IndexedDbError>.Success;
-                    },
                     ct);
 
                 if (!result.IsSuccess)
@@ -639,18 +646,8 @@ namespace KnockBox.DndMapper.Services.Library
                 }
 
                 var key = IndexedDbKey.String(DndMapperLibrarySchema.LibraryStoreKey);
-                var writeResult = await db.RunAsync(
-                    [DndMapperLibrarySchema.LibraryStore],
-                    TransactionMode.ReadWrite,
-                    async (tx, token) =>
-                    {
-                        var library = tx.ObjectStore<LibrarySnapshot>(DndMapperLibrarySchema.LibraryStore);
-                        var put = await library.PutAsync(snapshot, key, token);
-                        if (put.IsSuccess) return Result<IndexedDbError>.Success;
-                        put.TryGetFailure(out var perr);
-                        return Result<IndexedDbError>.FromError(perr);
-                    },
-                    cts.Token);
+                var writeResult = await db.JsonPutSingleAsync(
+                    DndMapperLibrarySchema.LibraryStore, snapshot, key, cts.Token);
 
                 if (!writeResult.IsSuccess)
                 {
@@ -684,10 +681,25 @@ namespace KnockBox.DndMapper.Services.Library
             }
         }
 
-        public async ValueTask DisposeAsync()
+        /// <summary>
+        /// Tears down the current attachment — cancels the auto-save timer,
+        /// broadcasts placeholder share tokens to player circuits, drains the
+        /// in-flight flush, releases cached blob/share handles, and closes the
+        /// IndexedDB — but leaves the service in a state where a fresh
+        /// <see cref="AttachAsync"/> can re-bind to a new
+        /// <see cref="DndMapperGameState"/>.
+        /// <para>
+        /// Called from <c>DndMapperPlayingPhase.DisposeAsync</c> on page
+        /// teardown. The DI scope (circuit) keeps this service alive — and
+        /// reusable — beyond a single page mount; only <see cref="DisposeAsync"/>
+        /// at scope teardown disposes the synchronization primitives. Idempotent:
+        /// a second call against an already-detached service is a no-op.
+        /// </para>
+        /// </summary>
+        public async ValueTask DetachAsync()
         {
             if (_disposed) return;
-            _disposed = true;
+            if (_db is null) return;
 
             // 1. Stop the debounce timer and prevent the in-flight callback
             //    from queuing further work.
@@ -705,11 +717,24 @@ namespace KnockBox.DndMapper.Services.Library
             //    soon-to-be-evicted capability URL. The state lives on past
             //    this circuit (1-minute grace) so this mutation is durable
             //    until the host reconnects and republishes.
+            //
+            // Two benign-race outcomes get downgraded to Debug:
+            //   • "State was disposed." — host left and ended the game; the
+            //     state is already gone and there are no player circuits to
+            //     broadcast to.
+            //   • "State was disposed during execute." — the dispose ran
+            //     concurrently with this mutation.
+            // Anything else stays at Warning.
             if (_state is not null && _host is not null)
             {
                 var clear = _engine.ClearAllImageShareTokensAsync(_state, _host);
                 if (clear.TryGetFailure(out var cerr))
-                    _logger.LogWarning("Failed to clear image share tokens on detach: {Error}", cerr.PublicMessage);
+                {
+                    if (IsStateDisposedRace(cerr.PublicMessage))
+                        _logger.LogDebug("Skipped image share-token clear on detach: {Error}", cerr.PublicMessage);
+                    else
+                        _logger.LogWarning("Failed to clear image share tokens on detach: {Error}", cerr.PublicMessage);
+                }
             }
 
             // 3. Drain any in-flight flush so the DB handle is safe to dispose.
@@ -739,14 +764,32 @@ namespace KnockBox.DndMapper.Services.Library
                     await SafeDisposeAsync(_db);
                     _db = null;
                 }
+
+                // 7. Reset the attachment state so a fresh AttachAsync can
+                //    re-bind. _saveLock survives (re-attach reuses it);
+                //    _disposed is NOT set.
+                _state = null;
+                _host = null;
+                HasExistingLibrary = false;
+                Interlocked.Exchange(ref _pendingDirty, 0);
+                _saveCts?.Dispose();
+                _saveCts = null;
             }
             finally
             {
                 if (locked) _saveLock.Release();
-                _saveLock.Dispose();
-                _saveCts?.Dispose();
-                _saveCts = null;
             }
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            if (_disposed) return;
+            // Detach first so the active attachment (if any) is torn down with
+            // share-token clearing and DB close. Detach is a no-op when the
+            // service is already detached.
+            await DetachAsync();
+            _disposed = true;
+            _saveLock.Dispose();
         }
 
         private void ThrowIfDisposed()
@@ -754,22 +797,20 @@ namespace KnockBox.DndMapper.Services.Library
             if (_disposed) throw new ObjectDisposedException(nameof(DndMapperLibraryService));
         }
 
+        // Matches the unified failure messages AbstractGameState returns when
+        // an Execute lands on a disposed state (both already-disposed and
+        // during-execute paths). Used by DetachAsync to keep the share-token
+        // clear race off the Warning channel — the host leaving and the
+        // game state disposing are the same event from the engine's view.
+        private static bool IsStateDisposedRace(string message) =>
+            message is "State was disposed." or "State was disposed during execute.";
+
         private async ValueTask SafeDeleteAsync(IndexedDbKey key)
         {
             if (_db is null) return;
             try
             {
-                await _db.RunAsync(
-                    [DndMapperLibrarySchema.ImagesStore],
-                    TransactionMode.ReadWrite,
-                    async (tx, token) =>
-                    {
-                        var images = tx.BlobObjectStore(DndMapperLibrarySchema.ImagesStore);
-                        var del = await images.DeleteAsync(key, token);
-                        if (del.IsSuccess) return Result<IndexedDbError>.Success;
-                        del.TryGetFailure(out var derr);
-                        return Result<IndexedDbError>.FromError(derr);
-                    });
+                await _db.DeleteSingleAsync(DndMapperLibrarySchema.ImagesStore, key);
             }
             catch (Exception ex)
             {

@@ -220,16 +220,18 @@ namespace KnockBox.DndMapper.Pages
             // before we start tearing down their target.
             base.Dispose();
 
-            // Tear the library down first so player UIs get placeholders via
+            // Detach the library first so player UIs get placeholders via
             // ClearAllImageShareTokensAsync before the circuit's JS handle
-            // is dropped. DI also disposes scoped services on circuit end,
-            // but explicit dispose here lets us control ordering and surfaces
-            // any failure through our logger.
+            // is dropped. DetachAsync leaves the (DI-scoped) service alive
+            // and re-attachable, so a host who leaves this room and joins
+            // another in the same circuit gets a clean re-Attach. Final
+            // disposal happens when the circuit ends and DI tears down the
+            // scope.
             if (IsHost)
             {
-                try { await Library.DisposeAsync(); }
+                try { await Library.DetachAsync(); }
                 catch (JSDisconnectedException) { /* circuit teardown */ }
-                catch (Exception ex) { Logger.LogWarning(ex, "Failed to dispose DnD Mapper library on page teardown."); }
+                catch (Exception ex) { Logger.LogWarning(ex, "Failed to detach DnD Mapper library on page teardown."); }
             }
 
             if (_resizeModule is not null)
