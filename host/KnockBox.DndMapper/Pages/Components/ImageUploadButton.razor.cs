@@ -29,7 +29,6 @@ namespace KnockBox.DndMapper.Pages.Components
         private bool _uploading;
         private int _batchDone;
         private int _batchTotal;
-        private bool _libraryAttached;
 
         private bool _disabled => _uploading || State.ActiveMapId is null;
 
@@ -99,16 +98,13 @@ namespace KnockBox.DndMapper.Pages.Components
             if (UserService.CurrentUser is null) return "no user";
 
             // Lazy-attach so smoke testing works without the parent page wiring
-            // hydration. AttachAsync is idempotent — the parent page's call in a
-            // later task short-circuits.
-            if (!_libraryAttached)
-            {
-                var attach = await Library.AttachAsync(State, UserService.CurrentUser, ComponentDetached);
-                if (attach.TryGetFailure(out var attachErr))
-                    return attachErr.PublicMessage;
-                if (attach.IsCanceled) return "canceled";
-                _libraryAttached = true;
-            }
+            // hydration. AttachAsync is idempotent (the parent page's host-only
+            // attach short-circuits), so we don't need a local guard — that
+            // would just go stale across page detach/reattach.
+            var attach = await Library.AttachAsync(State, UserService.CurrentUser, ComponentDetached);
+            if (attach.TryGetFailure(out var attachErr))
+                return attachErr.PublicMessage;
+            if (attach.IsCanceled) return "canceled";
 
             // Look up the active map's CellPixels under a read lock so we can
             // convert sniffed pixel dimensions into cell units (matching the

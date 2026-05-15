@@ -87,7 +87,17 @@
                             </select>
                         </label>
                     }
-                    @if (State.Players.Count > 0)
+                    @{
+                        // Skip players who already own a PlayerToken on this map —
+                        // the engine rejects the duplicate, so showing them would
+                        // resolve only to a toast error.
+                        var ownedHere = _activeMap.Tokens
+                            .Where(tk => tk.Type == TokenType.PlayerToken && tk.OwnerUserId is not null)
+                            .Select(tk => tk.OwnerUserId!)
+                            .ToHashSet();
+                        var eligible = State.Players.Where(p => !ownedHere.Contains(p.User.Id)).ToList();
+                    }
+                    @if (eligible.Count > 0)
                     {
                         <label class="dndm-tokenp-metalabel" title="Promote this NPC to a player-owned token">
                             <span>Reassign</span>
@@ -95,7 +105,7 @@
                                     value=""
                                     @onchange="@(e => OnReassignToPlayer(t, (string?)e.Value))">
                                 <option value="">— give to player —</option>
-                                @foreach (var p in State.Players)
+                                @foreach (var p in eligible)
                                 {
                                     <option value="@p.User.Id">@p.DisplayName</option>
                                 }
