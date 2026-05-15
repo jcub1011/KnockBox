@@ -1,4 +1,5 @@
 using System.Globalization;
+using KnockBox.Core.Components.Shared;
 using KnockBox.Core.Services.State.Users;
 using KnockBox.DndMapper.Models;
 using KnockBox.DndMapper.Pages.Components;
@@ -10,7 +11,7 @@ using Microsoft.JSInterop;
 
 namespace KnockBox.DndMapper.Pages
 {
-    public partial class DndMapperPlayingPhase : ComponentBase, IAsyncDisposable
+    public partial class DndMapperPlayingPhase : DisposableComponent, IAsyncDisposable
     {
         private const int MinRailPx = 200;
         private const int MaxRailPx = 600;
@@ -78,7 +79,7 @@ namespace KnockBox.DndMapper.Pages
             // Host-only: open the per-browser library and probe whether a
             // previous-session snapshot exists. The banner is rendered when
             // it does; the user picks Load or Start fresh.
-            var attach = await Library.AttachAsync(State, UserService.CurrentUser);
+            var attach = await Library.AttachAsync(State, UserService.CurrentUser, ComponentDetached);
             if (attach.TryGetFailure(out var err))
             {
                 Logger.LogWarning("Failed to attach DnD Mapper library on host page: {Error}", err.PublicMessage);
@@ -90,12 +91,14 @@ namespace KnockBox.DndMapper.Pages
         private async Task OnLoadLibrary()
         {
             if (_hydrating || !IsHost) return;
+            // Set the guard before the first await so a rapid second click
+            // can't slip past while the disabled binding is still rendering.
             _hydrating = true;
             _hydrateError = null;
             StateHasChanged();
             try
             {
-                var result = await Library.HydrateAsync();
+                var result = await Library.HydrateAsync(ComponentDetached);
                 if (result.TryGetFailure(out var err))
                 {
                     _hydrateError = err.PublicMessage;
@@ -114,12 +117,13 @@ namespace KnockBox.DndMapper.Pages
         private async Task OnDiscardLibrary()
         {
             if (_hydrating || !IsHost) return;
+            // Set the guard before the first await; see OnLoadLibrary.
             _hydrating = true;
             _hydrateError = null;
             StateHasChanged();
             try
             {
-                var result = await Library.DiscardLibraryAsync();
+                var result = await Library.DiscardLibraryAsync(ComponentDetached);
                 if (result.TryGetFailure(out var err))
                 {
                     _hydrateError = err.PublicMessage;
@@ -211,6 +215,11 @@ namespace KnockBox.DndMapper.Pages
 
         public async ValueTask DisposeAsync()
         {
+            // Cancel ComponentDetached first so any awaits on Library calls
+            // (Attach, Hydrate, Discard) that are still in flight abort
+            // before we start tearing down their target.
+            base.Dispose();
+
             // Tear the library down first so player UIs get placeholders via
             // ClearAllImageShareTokensAsync before the circuit's JS handle
             // is dropped. DI also disposes scoped services on circuit end,
