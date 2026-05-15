@@ -9,28 +9,40 @@ namespace KnockBox.DndMapper.Services.Library
 {
     /// <summary>
     /// Circuit-scoped orchestrator for the host's persistent DnD Mapper library.
-    /// Owns the IndexedDB handle, the per-image blob cache, and the per-image
-    /// blob-share cache; routes uploads through (a) blob create, (b) IndexedDB
-    /// put, (c) share publish, (d) engine state mutation, with rollback if (d)
-    /// fails.
+    /// Owns the IndexedDB handle, the per-image blob cache, the per-image
+    /// blob-share cache, and the debounced auto-save loop. Routes uploads
+    /// through (a) blob create, (b) IndexedDB put, (c) share publish, (d)
+    /// engine state mutation, with rollback if (d) fails.
     /// <para>
     /// The engine itself is a singleton and intentionally has no IndexedDB
     /// dependency — it accepts pre-validated <see cref="MapImage"/> metadata.
     /// This service exists on the host's circuit only; non-host callers may
-    /// resolve it from DI but should not call its members. Future tasks layer
-    /// hydration and debounced auto-save on top of this skeleton.
+    /// resolve it from DI but should not call its members.
     /// </para>
     /// </summary>
     public sealed class DndMapperLibraryService : IAsyncDisposable
     {
+        // 500 ms quiet-period before flushing accumulated state changes to
+        // IndexedDB. Coalesces high-frequency mutations (token drag, slider
+        // scrubbing) into one write per burst.
+        private static readonly TimeSpan SaveDebounce = TimeSpan.FromMilliseconds(500);
+
         private readonly IIndexedDbService _indexedDb;
         private readonly DndMapperGameEngine _engine;
         private readonly ILogger<DndMapperLibraryService> _logger;
 
         private readonly Dictionary<Guid, IndexedDbBlob> _blobCache = new();
         private readonly Dictionary<Guid, IBlobShare> _shareCache = new();
+        // Serializes concurrent saves so we never overlap two write transactions
+        // on the same store; also gives DisposeAsync a way to await an in-flight
+        // flush before tearing down the DB handle.
+        private readonly SemaphoreSlim _saveLock = new(1, 1);
 
         private IIndexedDatabase? _db;
+        private DndMapperGameState? _state;
+        private IDisposable? _stateSub;
+        private Timer? _saveTimer;
+        private CancellationTokenSource? _saveCts;
         private bool _disposed;
 
         public DndMapperLibraryService(
@@ -51,8 +63,9 @@ namespace KnockBox.DndMapper.Services.Library
         public bool HasExistingLibrary { get; private set; }
 
         /// <summary>
-        /// Opens the IndexedDB and reports whether a previous-session snapshot
-        /// exists. Idempotent: a second call against an already-attached
+        /// Opens the IndexedDB, reports whether a previous-session snapshot
+        /// exists, and subscribes to the state's change feed for debounced
+        /// auto-save. Idempotent: a second call against an already-attached
         /// service returns success without reopening.
         /// </summary>
         public async ValueTask<Result> AttachAsync(DndMapperGameState state, User host, CancellationToken ct = default)
@@ -72,6 +85,8 @@ namespace KnockBox.DndMapper.Services.Library
             }
 
             _db = db;
+            _state = state;
+            _saveCts = new CancellationTokenSource();
 
             var countResult = await _db.RunAsync<long>(
                 [DndMapperLibrarySchema.LibraryStore],
@@ -93,6 +108,10 @@ namespace KnockBox.DndMapper.Services.Library
                 _logger.LogWarning("Failed to probe DnD Mapper library store for existing content: {Error}", err.Message);
                 HasExistingLibrary = false;
             }
+
+            // Stand up the debounce timer in a stopped state and subscribe.
+            _saveTimer = new Timer(OnSaveTimerTick, state: null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+            _stateSub = state.StateChangedEventManager.Subscribe(OnStateChangedAsync);
 
             return Result.Success;
         }
@@ -211,23 +230,193 @@ namespace KnockBox.DndMapper.Services.Library
             return ValueResult<MapImage>.FromValue(added);
         }
 
+        /// <summary>
+        /// Deletes every record in the library database (snapshot + all image
+        /// blobs) and clears in-memory handle caches. Used by the host UI's
+        /// "Start fresh" affordance. The IndexedDB stays open with empty stores
+        /// so subsequent auto-saves and uploads continue to work.
+        /// </summary>
+        public async ValueTask<Result> DiscardLibraryAsync(CancellationToken ct = default)
+        {
+            ThrowIfDisposed();
+            if (_db is null) return Result.FromError("Library is not attached.");
+
+            // Stop the debounce timer first so an in-flight tick doesn't
+            // re-write the snapshot we're about to delete.
+            _saveTimer?.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+
+            await _saveLock.WaitAsync(ct);
+            try
+            {
+                var result = await _db.RunAsync(
+                    [DndMapperLibrarySchema.LibraryStore, DndMapperLibrarySchema.ImagesStore],
+                    TransactionMode.ReadWrite,
+                    async (tx, token) =>
+                    {
+                        var library = tx.JsonObjectStore(DndMapperLibrarySchema.LibraryStore);
+                        var libClear = await library.ClearAsync(token);
+                        if (!libClear.IsSuccess)
+                        {
+                            libClear.TryGetFailure(out var lerr);
+                            return Result<IndexedDbError>.FromError(lerr);
+                        }
+                        var images = tx.BlobObjectStore(DndMapperLibrarySchema.ImagesStore);
+                        var imgClear = await images.ClearAsync(token);
+                        if (!imgClear.IsSuccess)
+                        {
+                            imgClear.TryGetFailure(out var ierr);
+                            return Result<IndexedDbError>.FromError(ierr);
+                        }
+                        return Result<IndexedDbError>.Success;
+                    },
+                    ct);
+
+                if (!result.IsSuccess)
+                {
+                    result.TryGetFailure(out var err);
+                    return Result.FromError($"Failed to clear library: {err.Message}");
+                }
+
+                foreach (var share in _shareCache.Values) await SafeDisposeAsync(share);
+                _shareCache.Clear();
+                foreach (var blob in _blobCache.Values) await SafeDisposeAsync(blob);
+                _blobCache.Clear();
+                HasExistingLibrary = false;
+                return Result.Success;
+            }
+            finally
+            {
+                _saveLock.Release();
+            }
+        }
+
+        // ── Debounced auto-save ───────────────────────────────────────────────
+
+        private ValueTask OnStateChangedAsync()
+        {
+            // Subscribers are invoked OUTSIDE the state's Execute lock; restart
+            // the debounce timer cheaply on every event.
+            _saveTimer?.Change(SaveDebounce, Timeout.InfiniteTimeSpan);
+            return ValueTask.CompletedTask;
+        }
+
+        private void OnSaveTimerTick(object? _)
+        {
+            // Fire-and-forget — the Timer callback signature is sync. Failures
+            // are logged inside FlushSnapshotAsync; the next state change will
+            // reschedule us.
+            _ = FlushSnapshotAsync();
+        }
+
+        private async Task FlushSnapshotAsync()
+        {
+            if (_disposed) return;
+            var db = _db;
+            var state = _state;
+            var cts = _saveCts;
+            if (db is null || state is null || cts is null || cts.IsCancellationRequested) return;
+
+            if (!await _saveLock.WaitAsync(TimeSpan.Zero))
+            {
+                // Another flush is already running; the latest state will get
+                // picked up by the next debounce tick once the timer is rearmed
+                // by subsequent StateChanged events.
+                return;
+            }
+            try
+            {
+                if (_disposed || cts.IsCancellationRequested) return;
+
+                // Build the snapshot under the state's read lock so we don't
+                // race with a concurrent Execute. The read action is pure-sync
+                // (no I/O) so use the synchronous overload, capturing via
+                // closure. Exit the lock BEFORE doing IndexedDB I/O.
+                LibrarySnapshot? snapshot = null;
+                var readResult = state.WithExclusiveRead(() => { snapshot = LibrarySnapshotMapper.FromState(state); });
+                if (!readResult.IsSuccess || snapshot is null)
+                {
+                    _logger.LogWarning("Auto-save read of game state failed; skipping flush.");
+                    return;
+                }
+
+                var key = IndexedDbKey.String(DndMapperLibrarySchema.LibraryStoreKey);
+                var writeResult = await db.RunAsync(
+                    [DndMapperLibrarySchema.LibraryStore],
+                    TransactionMode.ReadWrite,
+                    async (tx, token) =>
+                    {
+                        var library = tx.ObjectStore<LibrarySnapshot>(DndMapperLibrarySchema.LibraryStore);
+                        var put = await library.PutAsync(snapshot, key, token);
+                        if (put.IsSuccess) return Result<IndexedDbError>.Success;
+                        put.TryGetFailure(out var perr);
+                        return Result<IndexedDbError>.FromError(perr);
+                    },
+                    cts.Token);
+
+                if (!writeResult.IsSuccess)
+                {
+                    writeResult.TryGetFailure(out var werr);
+                    _logger.LogWarning("DnD Mapper auto-save write failed: {Error}", werr.Message);
+                }
+                else
+                {
+                    HasExistingLibrary = true;
+                }
+            }
+            catch (OperationCanceledException) { /* shutting down */ }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "DnD Mapper auto-save flush threw unexpectedly.");
+            }
+            finally
+            {
+                _saveLock.Release();
+            }
+        }
+
         public async ValueTask DisposeAsync()
         {
             if (_disposed) return;
             _disposed = true;
 
-            foreach (var share in _shareCache.Values)
-                await SafeDisposeAsync(share);
-            _shareCache.Clear();
-
-            foreach (var blob in _blobCache.Values)
-                await SafeDisposeAsync(blob);
-            _blobCache.Clear();
-
-            if (_db is not null)
+            // 1. Stop the debounce timer and prevent the in-flight callback
+            //    from queuing further work.
+            try { _saveCts?.Cancel(); } catch { /* ignore */ }
+            if (_saveTimer is not null)
             {
-                await SafeDisposeAsync(_db);
-                _db = null;
+                _saveTimer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+                await _saveTimer.DisposeAsync();
+                _saveTimer = null;
+            }
+
+            // 2. Drain any in-flight flush so the DB handle is safe to dispose.
+            try { await _saveLock.WaitAsync(TimeSpan.FromSeconds(2)); }
+            catch { /* ignore */ }
+            try
+            {
+                // 3. Drop the state subscription.
+                _stateSub?.Dispose();
+                _stateSub = null;
+
+                // 4. Release cached blobs and shares.
+                foreach (var share in _shareCache.Values) await SafeDisposeAsync(share);
+                _shareCache.Clear();
+                foreach (var blob in _blobCache.Values) await SafeDisposeAsync(blob);
+                _blobCache.Clear();
+
+                // 5. Close the DB.
+                if (_db is not null)
+                {
+                    await SafeDisposeAsync(_db);
+                    _db = null;
+                }
+            }
+            finally
+            {
+                try { _saveLock.Release(); } catch { /* ignore */ }
+                _saveLock.Dispose();
+                _saveCts?.Dispose();
+                _saveCts = null;
             }
         }
 
