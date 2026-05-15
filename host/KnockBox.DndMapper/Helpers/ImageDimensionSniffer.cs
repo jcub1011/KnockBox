@@ -1,6 +1,6 @@
 using System.Buffers.Binary;
 
-namespace KnockBox.DndMapper.Services.Logic.Games.Http
+namespace KnockBox.DndMapper.Helpers
 {
     /// Best-effort intrinsic pixel-dimension reader for PNG, JPEG, and WebP.
     /// Operates on a head buffer captured during upload; if the dimensions

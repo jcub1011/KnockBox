@@ -1,4 +1,4 @@
-namespace KnockBox.DndMapper.Services.Logic.Games.Http
+namespace KnockBox.DndMapper.Helpers
 {
     /// Tight allow-list of image MIME types accepted by the DnD Mapper image
     /// upload path. SVG is deliberately rejected: its content can carry embedded

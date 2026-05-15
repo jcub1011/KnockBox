@@ -1,6 +1,6 @@
-using KnockBox.DndMapper.Services.Logic.Games.Http;
+using KnockBox.DndMapper.Helpers;
 
-namespace KnockBox.DndMapperTests.Unit.Logic.Games.Http
+namespace KnockBox.DndMapperTests.Unit.Helpers
 {
     [TestClass]
     public class ImageDimensionSnifferTests
