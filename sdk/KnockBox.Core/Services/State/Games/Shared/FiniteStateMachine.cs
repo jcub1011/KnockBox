@@ -106,7 +106,7 @@ namespace KnockBox.Core.Services.State.Games.Shared
                 if (chainedState is null)
                     return Result.Success;
 
-                // OnEnter requested a chained transition � exit the current state and enter the next
+                // OnEnter requested a chained transition — exit the current state and enter the next
                 if (state.OnExit(context).TryGetFailure(out var exitError))
                     return exitError;
 

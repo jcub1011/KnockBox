@@ -156,6 +156,16 @@ public sealed class AsyncMutexTests
     }
 
     [TestMethod]
+    public void Release_AfterDispose_Throws()
+    {
+        var mutex = new AsyncMutex();
+        mutex.Wait();
+        mutex.Dispose();
+
+        Assert.ThrowsExactly<ObjectDisposedException>(() => mutex.Release());
+    }
+
+    [TestMethod]
     public async Task HeavyContention_AllWaitersComplete_NoStarvation()
     {
         using var mutex = new AsyncMutex();

@@ -18,7 +18,10 @@ namespace KnockBox.Core.Primitives.ThreadSafety
     /// <see cref="CancellationTokenRegistration"/> marks the queued
     /// <see cref="TaskCompletionSource"/> canceled on token fire. The waiter
     /// remains physically in the queue until <see cref="Release"/> reaches it
-    /// and observes the canceled state — no per-cancellation queue rebuild.</para>
+    /// and observes the canceled state — no per-cancellation queue rebuild.
+    /// Once the returned <see cref="ValueTask"/> completes successfully, the
+    /// caller owns the lock and is responsible for <see cref="Release"/> — even
+    /// if the supplied cancellation token fires afterwards.</para>
     /// <para><b>FIFO:</b> non-canceled waiters are served strictly in the
     /// order they called <see cref="WaitAsync(CancellationToken)"/>.</para>
     /// <para><b>Disposal:</b> all queued waiters complete with
@@ -99,6 +102,7 @@ namespace KnockBox.Core.Primitives.ThreadSafety
                 TaskCompletionSource? next = null;
                 lock (_gate)
                 {
+                    ObjectDisposedException.ThrowIf(_disposed, this);
                     if (!_held) throw new InvalidOperationException("AsyncMutex released without being held.");
 
                     if (_waiters is not null && _waiters.Count > 0)

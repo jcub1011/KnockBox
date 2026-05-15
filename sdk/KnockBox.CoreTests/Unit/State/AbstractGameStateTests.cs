@@ -75,6 +75,18 @@ public sealed class AbstractGameStateTests
     }
 
     [TestMethod]
+    public void SetJoinable_FromInsideAnotherStatesExecute_Throws()
+    {
+        using var stateA = MakeState();
+        using var stateB = MakeState();
+
+        stateA.Execute(() =>
+        {
+            Assert.Throws<InvalidOperationException>(() => stateB.SetJoinable(true));
+        });
+    }
+
+    [TestMethod]
     public async Task SetJoinable_InsideExecute_FiresStateChanged()
     {
         using var state = MakeState();

@@ -439,10 +439,13 @@ namespace KnockBox.Core.Services.State.Games.Shared
         /// Kicks the player.
         /// </summary>
         /// <remarks>
-        /// The kicked-set mutation is routed through <see cref="Execute(Action)"/> so subscribers
-        /// observe the change. The token is disposed *after* <see cref="Execute"/> returns to avoid
-        /// re-entering the non-reentrant execute lock — the dispose action itself
-        /// re-enters <see cref="Execute"/> to remove the player from the cached array.
+        /// The kick mutates both the kicked-set and the player array inline inside
+        /// <see cref="Execute(Action)"/> so subscribers observe a single consistent transition.
+        /// The player's registration token is not disposed here — it is disposed later by the
+        /// player's session lifecycle, at which point the token's self-check (matching its own
+        /// reference against the current entry's <c>Token</c>) fails and the dispose becomes a
+        /// no-op. <c>PlayerUnregistered</c> subscribers are invoked outside the execute lock so
+        /// they may safely call <see cref="Execute(Action)"/>.
         /// </remarks>
         public Result KickPlayer(User player)
         {

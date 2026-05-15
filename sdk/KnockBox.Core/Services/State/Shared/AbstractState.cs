@@ -10,7 +10,7 @@ namespace KnockBox.Core.Services.State.Shared
     /// <see cref="PropertyUpdateResult"/> on completion.
     /// </summary>
     /// <remarks>
-    /// Most games do not subclass this directly � use
+    /// Most games do not subclass this directly — use
     /// <see cref="Games.Shared.AbstractGameState"/> for per-room state. This
     /// class powers utility states (session caches, drawing canvases, etc.)
     /// where property-level change tracking and dependency ordering pay off.
