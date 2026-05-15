@@ -45,9 +45,11 @@ internal sealed class IndexedDbService : IIndexedDbService, IAsyncDisposable
 
         var db = new IndexedDatabase(
             _interop,
-            _loggerFactory.CreateLogger<IndexedDatabase>(),
+            _loggerFactory,
             resp.DbId, schema.Name, resp.Version,
-            resp.ObjectStoreNames, bridgeRef);
+            resp.ObjectStoreNames,
+            schema.JsonOptions ?? IndexedDbWireFormat.DefaultJsonOptions,
+            bridgeRef);
         bridge.AttachDatabase(db);
         return db;
     }

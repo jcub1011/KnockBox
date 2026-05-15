@@ -56,7 +56,10 @@ internal sealed class VersionChangeBridge
         var existing = existingSchema.ToDictionary(
             kv => kv.Key,
             kv => (IReadOnlyList<string>)kv.Value);
-        var ctx = new UpgradeContext(_interop, upgradeTxId, oldVersion, newVersion, existing);
+        var ctx = new UpgradeContext(
+            _interop, upgradeTxId, oldVersion, newVersion,
+            _schema.JsonOptions ?? IndexedDbWireFormat.DefaultJsonOptions,
+            existing);
 
         try
         {
@@ -68,9 +71,11 @@ internal sealed class VersionChangeBridge
             _logger.LogError(ex,
                 "User OnUpgrade handler for database '{DatabaseName}' (v{Old} -> v{New}) threw; upgrade will abort.",
                 _schema.Name, oldVersion, newVersion);
+            ctx.Deactivate();
             throw;
         }
 
+        ctx.Deactivate();
         return ctx.DrainPending();
     }
 

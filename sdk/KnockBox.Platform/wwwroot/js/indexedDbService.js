@@ -111,7 +111,15 @@ export function openDatabase(name, version, hasUpgrade, dotNetUpgradeRef) {
                 return;
             }
 
-            const upgradeTxId = register(upgradeTx, "tx-upgrade");
+            // Register as kind "tx" with isUpgrade so the normal store ops
+            // can target this tx during data migration.
+            const upgradeTxId = nextHandleId++;
+            handles.set(upgradeTxId, {
+                obj: upgradeTx,
+                kind: "tx",
+                extras: { mode: "readwrite", alive: true, isUpgrade: true, storeNames: null },
+            });
+
             const existingSchema = {};
             const db = event.target.result;
             for (const storeName of db.objectStoreNames) {
@@ -134,6 +142,8 @@ export function openDatabase(name, version, hasUpgrade, dotNetUpgradeRef) {
                 try { upgradeTx.abort(); } catch (_) { /* ignore */ }
                 // The open request will surface AbortError via onerror.
             } finally {
+                const rec = handles.get(upgradeTxId);
+                if (rec) rec.extras.alive = false;
                 handles.delete(upgradeTxId);
             }
         };
@@ -227,6 +237,293 @@ export function deleteDatabase(name) {
         }));
     });
 }
+
+// ---------------------------------------------------------------------------
+// Key / range envelope conversion
+// ---------------------------------------------------------------------------
+
+function unwrapKey(env) {
+    if (env == null) return undefined;
+    switch (env.kind) {
+        case "string": return env.value;
+        case "number": return env.value;
+        case "date":   return new Date(env.value);
+        case "binary": {
+            const bin = atob(env.value);
+            const bytes = new Uint8Array(bin.length);
+            for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+            return bytes.buffer;
+        }
+        case "array":  return env.value.map(unwrapKey);
+        default: throw new Error(`Unknown key envelope kind: ${env.kind}`);
+    }
+}
+
+function wrapKey(value) {
+    if (value === null || value === undefined) return null;
+    if (typeof value === "string") return { kind: "string", value };
+    if (typeof value === "number") return { kind: "number", value };
+    if (value instanceof Date)     return { kind: "date", value: value.toISOString() };
+    if (value instanceof ArrayBuffer) {
+        const bytes = new Uint8Array(value);
+        let bin = "";
+        for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+        return { kind: "binary", value: btoa(bin) };
+    }
+    if (Array.isArray(value)) return { kind: "array", value: value.map(wrapKey) };
+    throw new Error(`Cannot wrap key value of type ${typeof value}`);
+}
+
+function unwrapRange(env) {
+    if (env == null) return null;
+    const lower = env.lower != null ? unwrapKey(env.lower) : undefined;
+    const upper = env.upper != null ? unwrapKey(env.upper) : undefined;
+    if (lower !== undefined && upper !== undefined) {
+        return IDBKeyRange.bound(lower, upper, !!env.lowerOpen, !!env.upperOpen);
+    }
+    if (lower !== undefined) return IDBKeyRange.lowerBound(lower, !!env.lowerOpen);
+    if (upper !== undefined) return IDBKeyRange.upperBound(upper, !!env.upperOpen);
+    return null; // unbounded
+}
+
+// ---------------------------------------------------------------------------
+// Transactions
+// ---------------------------------------------------------------------------
+
+const KEEPALIVE_SENTINEL = "__knockbox_keepalive_sentinel__";
+
+function scheduleKeepAlive(record) {
+    if (!record || !record.extras.alive) return;
+    if (record.extras.isUpgrade) return; // upgrade tx is held alive by the onupgradeneeded promise.
+    const tx = record.obj;
+    let firstStoreName;
+    try { firstStoreName = tx.objectStoreNames[0]; } catch (_) { return; }
+    if (!firstStoreName) return;
+    let store;
+    try { store = tx.objectStore(firstStoreName); } catch (_) { return; }
+    let req;
+    try { req = store.get(KEEPALIVE_SENTINEL); } catch (_) { return; }
+    req.onsuccess = () => scheduleKeepAlive(record);
+    req.onerror = () => { /* tx ending — no-op */ };
+}
+
+export function beginTransaction(dbId, storeNames, mode, dotNetCompletionRef) {
+    try {
+        const db = getHandle(dbId, "db").obj;
+        const modeStr = mode === 1 ? "readwrite" : "readonly";
+        const tx = db.transaction(storeNames, modeStr);
+
+        const txId = nextHandleId++;
+        const record = {
+            obj: tx,
+            kind: "tx",
+            extras: {
+                mode: modeStr,
+                alive: true,
+                isUpgrade: false,
+                storeNames: storeNames.slice(),
+                dotNetCompletionRef,
+            },
+        };
+        handles.set(txId, record);
+
+        tx.oncomplete = () => {
+            record.extras.alive = false;
+            try { dotNetCompletionRef.invokeMethodAsync("OnComplete"); } catch (_) { /* ref disposed */ }
+        };
+        tx.onerror = () => {
+            record.extras.alive = false;
+            const e = tx.error;
+            try {
+                dotNetCompletionRef.invokeMethodAsync(
+                    "OnError",
+                    e?.name || null,
+                    e?.message || (e ? String(e) : null));
+            } catch (_) { /* ref disposed */ }
+        };
+        tx.onabort = () => {
+            record.extras.alive = false;
+            try { dotNetCompletionRef.invokeMethodAsync("OnAbort"); } catch (_) { /* ref disposed */ }
+        };
+
+        scheduleKeepAlive(record);
+        return ok({ txId });
+    } catch (e) {
+        return fail(mapDomError(e));
+    }
+}
+
+export function commitTransaction(txId) {
+    try {
+        const record = getHandle(txId, "tx");
+        record.extras.alive = false;
+        if (typeof record.obj.commit === "function") {
+            try { record.obj.commit(); } catch (_) { /* may already be committing */ }
+        }
+        handles.delete(txId);
+        return ok();
+    } catch (e) {
+        return fail(mapDomError(e));
+    }
+}
+
+export function abortTransaction(txId) {
+    try {
+        const record = getHandle(txId, "tx");
+        record.extras.alive = false;
+        try { record.obj.abort(); } catch (_) { /* already done */ }
+        handles.delete(txId);
+        return ok();
+    } catch (e) {
+        return fail(mapDomError(e));
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Schema ops invoked mid-upgrade (when C# triggers a flush before a data op)
+// ---------------------------------------------------------------------------
+
+export function upgradeApplySchemaOps(upgradeTxId, ops) {
+    try {
+        const record = getHandle(upgradeTxId, "tx");
+        if (!record.extras.isUpgrade) {
+            return fail({
+                kind: "TransactionInactive",
+                jsName: null,
+                message: "upgradeApplySchemaOps called against a non-upgrade transaction.",
+            });
+        }
+        applySchemaOpsSync(record.obj, ops || []);
+        return ok();
+    } catch (e) {
+        return fail(mapDomError(e));
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Object store ops
+// ---------------------------------------------------------------------------
+
+function withStore(txId, storeName, doWork) {
+    return new Promise((resolve) => {
+        let record;
+        try {
+            record = getHandle(txId, "tx");
+        } catch (e) {
+            resolve(fail({
+                kind: "TransactionInactive",
+                jsName: null,
+                message: `Transaction handle ${txId} not found.`,
+            }));
+            return;
+        }
+        if (!record.extras.alive) {
+            resolve(fail({
+                kind: "TransactionInactive",
+                jsName: null,
+                message: "Transaction is no longer active.",
+            }));
+            return;
+        }
+        let store;
+        try {
+            store = record.obj.objectStore(storeName);
+        } catch (e) {
+            resolve(fail(mapDomError(e)));
+            return;
+        }
+        try {
+            doWork(record, store, resolve);
+        } catch (e) {
+            resolve(fail(mapDomError(e)));
+        }
+    });
+}
+
+function finishWith(record, request, resolve, mapValue) {
+    request.onsuccess = () => {
+        try { resolve(ok(mapValue ? mapValue(request.result) : request.result)); }
+        finally { scheduleKeepAlive(record); }
+    };
+    request.onerror = () => resolve(fail(mapDomError(request.error)));
+}
+
+export function storeGet(txId, storeName, keyEnv) {
+    return withStore(txId, storeName, (record, store, resolve) => {
+        const req = store.get(unwrapKey(keyEnv));
+        finishWith(record, req, resolve, v => (v === undefined ? null : v));
+    });
+}
+
+export function storeGetAll(txId, storeName, rangeEnv, count) {
+    return withStore(txId, storeName, (record, store, resolve) => {
+        const range = unwrapRange(rangeEnv);
+        const req = count != null ? store.getAll(range, count) : store.getAll(range);
+        finishWith(record, req, resolve);
+    });
+}
+
+export function storeGetAllKeys(txId, storeName, rangeEnv, count) {
+    return withStore(txId, storeName, (record, store, resolve) => {
+        const range = unwrapRange(rangeEnv);
+        const req = count != null ? store.getAllKeys(range, count) : store.getAllKeys(range);
+        finishWith(record, req, resolve, keys => keys.map(wrapKey));
+    });
+}
+
+export function storeCount(txId, storeName, rangeEnv) {
+    return withStore(txId, storeName, (record, store, resolve) => {
+        const range = unwrapRange(rangeEnv);
+        const req = range ? store.count(range) : store.count();
+        finishWith(record, req, resolve);
+    });
+}
+
+export function storeAdd(txId, storeName, value, keyEnv) {
+    return withStore(txId, storeName, (record, store, resolve) => {
+        const key = unwrapKey(keyEnv);
+        const req = key !== undefined ? store.add(value, key) : store.add(value);
+        finishWith(record, req, resolve, k => wrapKey(k));
+    });
+}
+
+export function storePut(txId, storeName, value, keyEnv) {
+    return withStore(txId, storeName, (record, store, resolve) => {
+        const key = unwrapKey(keyEnv);
+        const req = key !== undefined ? store.put(value, key) : store.put(value);
+        finishWith(record, req, resolve, k => wrapKey(k));
+    });
+}
+
+export function storeDelete(txId, storeName, keyEnv) {
+    return withStore(txId, storeName, (record, store, resolve) => {
+        const req = store.delete(unwrapKey(keyEnv));
+        finishWith(record, req, resolve, () => undefined);
+    });
+}
+
+export function storeDeleteRange(txId, storeName, rangeEnv) {
+    return withStore(txId, storeName, (record, store, resolve) => {
+        const range = unwrapRange(rangeEnv);
+        if (!range) {
+            resolve(fail({ kind: "Data", jsName: null, message: "DeleteRange requires a non-empty range." }));
+            return;
+        }
+        const req = store.delete(range);
+        finishWith(record, req, resolve, () => undefined);
+    });
+}
+
+export function storeClear(txId, storeName) {
+    return withStore(txId, storeName, (record, store, resolve) => {
+        const req = store.clear();
+        finishWith(record, req, resolve, () => undefined);
+    });
+}
+
+// ---------------------------------------------------------------------------
+// Pre-existing exports below
+// ---------------------------------------------------------------------------
 
 export async function listDatabases() {
     if (typeof indexedDB.databases !== "function") {

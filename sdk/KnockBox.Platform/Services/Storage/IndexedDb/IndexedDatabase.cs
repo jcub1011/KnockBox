@@ -1,5 +1,7 @@
+using System.Text.Json;
 using KnockBox.Core.Primitives.Returns;
 using KnockBox.Core.Services.Storage.IndexedDb;
+using Microsoft.Extensions.Logging;
 using Microsoft.JSInterop;
 
 namespace KnockBox.Platform.Services.Storage.IndexedDb;
@@ -7,7 +9,9 @@ namespace KnockBox.Platform.Services.Storage.IndexedDb;
 internal sealed class IndexedDatabase : IIndexedDatabase
 {
     private readonly IndexedDbInterop _interop;
+    private readonly ILoggerFactory _loggerFactory;
     private readonly ILogger<IndexedDatabase> _logger;
+    private readonly JsonSerializerOptions _jsonOptions;
     private readonly int _dbId;
     private readonly DotNetObjectReference<VersionChangeBridge> _bridgeRef;
     private bool _disposed;
@@ -20,15 +24,18 @@ internal sealed class IndexedDatabase : IIndexedDatabase
 
     public IndexedDatabase(
         IndexedDbInterop interop,
-        ILogger<IndexedDatabase> logger,
+        ILoggerFactory loggerFactory,
         int dbId,
         string name,
         int version,
         IReadOnlyList<string> objectStoreNames,
+        JsonSerializerOptions jsonOptions,
         DotNetObjectReference<VersionChangeBridge> bridgeRef)
     {
         _interop = interop;
-        _logger = logger;
+        _loggerFactory = loggerFactory;
+        _logger = loggerFactory.CreateLogger<IndexedDatabase>();
+        _jsonOptions = jsonOptions;
         _dbId = dbId;
         Name = name;
         Version = version;
@@ -37,21 +44,131 @@ internal sealed class IndexedDatabase : IIndexedDatabase
     }
 
     public IIndexedDbTransaction BeginTransaction(IReadOnlyList<string> storeNames, TransactionMode mode)
-        => throw new NotImplementedException("Transactions land in Phase 2 of the IndexedDB rollout.");
+    {
+        if (storeNames.Count == 0)
+            throw new ArgumentException("At least one store name is required.", nameof(storeNames));
 
-    public ValueTask<ValueResult<T, IndexedDbError>> RunAsync<T>(
+        var bridge = new TxCompletionBridge();
+        var bridgeRef = DotNetObjectReference.Create(bridge);
+        var storeNamesArr = storeNames.ToArray();
+
+        // beginTransaction is synchronous in IDB; the JS wrapper still resolves
+        // a promise (its envelope arrives async via SignalR). Block-on-sync is
+        // not viable in Blazor Server, so we adopt a different convention:
+        // BeginTransaction returns immediately with a pending tx that defers
+        // its txId resolution to the first op. The current rollout does NOT
+        // implement that deferral — callers should prefer RunAsync, which
+        // handles the async-begin path internally.
+        throw new NotSupportedException(
+            "Synchronous BeginTransaction is not implementable over JS interop. " +
+            "Use RunAsync(...) instead — it begins the transaction asynchronously, " +
+            "runs the supplied work, and commits or aborts based on the result.");
+    }
+
+    public async ValueTask<ValueResult<T, IndexedDbError>> RunAsync<T>(
         IReadOnlyList<string> storeNames,
         TransactionMode mode,
         Func<IIndexedDbTransaction, CancellationToken, ValueTask<ValueResult<T, IndexedDbError>>> work,
         CancellationToken ct = default)
-        => throw new NotImplementedException("Transactions land in Phase 2 of the IndexedDB rollout.");
+    {
+        if (storeNames.Count == 0)
+            throw new ArgumentException("At least one store name is required.", nameof(storeNames));
 
-    public ValueTask<Result<IndexedDbError>> RunAsync(
+        var bridge = new TxCompletionBridge();
+        var bridgeRef = DotNetObjectReference.Create(bridge);
+
+        var beginResult = await _interop.InvokeAsync<BeginTransactionResponse>(
+            "beginTransaction", ct, _dbId, storeNames.ToArray(), (int)mode, bridgeRef)
+            .ConfigureAwait(false);
+        if (!beginResult.TryGetSuccess(out var begin))
+        {
+            bridgeRef.Dispose();
+            if (beginResult.IsCanceled) return ValueResult<T, IndexedDbError>.Canceled;
+            return beginResult.Error.Error;
+        }
+
+        var tx = new IndexedDbTransaction(
+            _interop,
+            _loggerFactory.CreateLogger<IndexedDbTransaction>(),
+            begin.TxId, mode, storeNames, _jsonOptions, bridge, bridgeRef);
+
+        try
+        {
+            ValueResult<T, IndexedDbError> workResult;
+            try
+            {
+                workResult = await work(tx, ct).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                await tx.AbortAsync(CancellationToken.None).ConfigureAwait(false);
+                return ValueResult<T, IndexedDbError>.Canceled;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex,
+                    "RunAsync<{T}> on database '{DatabaseName}' threw inside the user delegate; aborting.",
+                    typeof(T).Name, Name);
+                await tx.AbortAsync(CancellationToken.None).ConfigureAwait(false);
+                throw;
+            }
+
+            if (workResult.IsCanceled)
+            {
+                await tx.AbortAsync(CancellationToken.None).ConfigureAwait(false);
+                return ValueResult<T, IndexedDbError>.Canceled;
+            }
+
+            if (!workResult.IsSuccess)
+            {
+                await tx.AbortAsync(CancellationToken.None).ConfigureAwait(false);
+                return workResult;
+            }
+
+            var commit = await tx.CommitAsync(ct).ConfigureAwait(false);
+            if (commit.TryGetFailure(out var commitErr)) return commitErr;
+            if (commit.IsCanceled) return ValueResult<T, IndexedDbError>.Canceled;
+
+            try
+            {
+                await tx.Completed.ConfigureAwait(false);
+            }
+            catch (IndexedDbTransactionException txEx)
+            {
+                return txEx.Error;
+            }
+
+            return workResult;
+        }
+        finally
+        {
+            await tx.DisposeAsync().ConfigureAwait(false);
+        }
+    }
+
+    public async ValueTask<Result<IndexedDbError>> RunAsync(
         IReadOnlyList<string> storeNames,
         TransactionMode mode,
         Func<IIndexedDbTransaction, CancellationToken, ValueTask<Result<IndexedDbError>>> work,
         CancellationToken ct = default)
-        => throw new NotImplementedException("Transactions land in Phase 2 of the IndexedDB rollout.");
+    {
+        var wrapped = await RunAsync<bool>(
+            storeNames, mode,
+            async (tx, innerCt) =>
+            {
+                var r = await work(tx, innerCt).ConfigureAwait(false);
+                if (r.IsCanceled) return ValueResult<bool, IndexedDbError>.Canceled;
+                if (r.TryGetFailure(out var err)) return err;
+                return true;
+            },
+            ct).ConfigureAwait(false);
+
+        if (wrapped.IsCanceled) return Result<IndexedDbError>.Canceled;
+        if (wrapped.TryGetFailure(out var failure)) return failure;
+        return Result<IndexedDbError>.Success;
+    }
+
+    private sealed record BeginTransactionResponse(int TxId);
 
     internal async ValueTask RaiseVersionChangeRequestedAsync()
     {
