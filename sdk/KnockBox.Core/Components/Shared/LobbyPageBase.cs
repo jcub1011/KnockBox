@@ -30,6 +30,7 @@ namespace KnockBox.Core.Components.Shared
         protected string RoomCode { get; private set; } = string.Empty;
 
         private IDisposable? _stateSubscription;
+        private IDisposable? _stateDisposedSubscription;
         private IDisposable? _tickSubscription;
         private bool _kickHandled;
         private bool _initialized;
@@ -74,7 +75,7 @@ namespace KnockBox.Core.Components.Shared
 
             GameState = gameState;
             RoomCode = session.LobbyRegistration.Code;
-            GameState.OnStateDisposed += HandleStateDisposed;
+            _stateDisposedSubscription = GameState.SubscribeStateDisposed(HandleStateDisposed);
             _stateSubscription = GameState.StateChangedEventManager.Subscribe(OnStateChangedAsync);
 
             if (IsHost() && TryGetHostTick(out var tickAction, out var tickInterval))
@@ -137,7 +138,7 @@ namespace KnockBox.Core.Components.Shared
         {
             OnLobbyDisposing();
             _tickSubscription?.Dispose();
-            GameState?.OnStateDisposed -= HandleStateDisposed;
+            _stateDisposedSubscription?.Dispose();
             _stateSubscription?.Dispose();
             base.Dispose();
         }

@@ -59,11 +59,11 @@ namespace KnockBox.DndMapper.Services.Logic.Games
 
             var state = new DndMapperGameState(host, _stateLogger);
             state.Execute(() => state.SetJoinable(true));
-            state.PlayerUnregistered += player => HandlePlayerLeft(state, player);
+            state.SubscribePlayerUnregistered(player => HandlePlayerLeft(state, player));
             // Closure captures only the Guid (not the state) so there is no cross-session leak.
-            // AbstractGameState.Dispose nulls OnStateDisposed after firing.
+            // AbstractGameState.Dispose clears its listener arrays after firing.
             var sessionId = state.SessionId;
-            state.OnStateDisposed += () => CleanupRoomStorage(sessionId);
+            state.SubscribeStateDisposed(() => CleanupRoomStorage(sessionId));
             _logger.LogInformation("Created DnD Mapper game state with host [{userId}].", host.Id);
             return Task.FromResult<ValueResult<AbstractGameState>>(state);
         }

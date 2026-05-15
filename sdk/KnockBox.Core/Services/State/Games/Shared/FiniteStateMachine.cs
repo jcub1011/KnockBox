@@ -19,8 +19,21 @@ namespace KnockBox.Core.Services.State.Games.Shared
     public class FiniteStateMachine<TContext, TCommand>(ILogger? logger = null)
         : IFiniteStateMachine<TContext, TCommand>
     {
-        public IThreadSafeEventManager<StateChangeArgs<TContext, TCommand>> StateChangedManager { get; } 
-            = new ThreadSafeEventManager<StateChangeArgs<TContext, TCommand>>(logger);
+        // Lazy-init: most FSMs never have an external subscriber, so the
+        // ThreadSafeEventManager (lock + listener[]) is allocated only on the
+        // first access to StateChangedManager. Subsequent Notify calls find a
+        // published instance via volatile read.
+        private ThreadSafeEventManager<StateChangeArgs<TContext, TCommand>>? _stateChangedManager;
+        public IThreadSafeEventManager<StateChangeArgs<TContext, TCommand>> StateChangedManager
+        {
+            get
+            {
+                var existing = Volatile.Read(ref _stateChangedManager);
+                if (existing is not null) return existing;
+                var created = new ThreadSafeEventManager<StateChangeArgs<TContext, TCommand>>(logger);
+                return Interlocked.CompareExchange(ref _stateChangedManager, created, null) ?? created;
+            }
+        }
 
         public IGameState<TContext, TCommand>? CurrentState { get; protected set; } = null;
 
@@ -78,7 +91,9 @@ namespace KnockBox.Core.Services.State.Games.Shared
 
             while (true)
             {
-                StateChangedManager.Notify(new(previousState, state));
+                // Skip notification entirely when no subscriber has ever
+                // accessed the manager â€” leaves the manager unallocated.
+                Volatile.Read(ref _stateChangedManager)?.Notify(new(previousState, state));
 
                 if (state is null)
                     return Result.Success;
@@ -91,7 +106,7 @@ namespace KnockBox.Core.Services.State.Games.Shared
                 if (chainedState is null)
                     return Result.Success;
 
-                // OnEnter requested a chained transition — exit the current state and enter the next
+                // OnEnter requested a chained transition ï¿½ exit the current state and enter the next
                 if (state.OnExit(context).TryGetFailure(out var exitError))
                     return exitError;
 

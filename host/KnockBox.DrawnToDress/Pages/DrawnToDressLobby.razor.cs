@@ -31,6 +31,7 @@ namespace KnockBox.DrawnToDress.Pages
         private GamePhase? _lastAnnouncedPhase;
 
         private IDisposable? _stateSubscription;
+        private IDisposable? _stateDisposedSubscription;
         private IDisposable? _tickSubscription;
 
         protected override async Task OnInitializedAsync()
@@ -70,7 +71,7 @@ namespace KnockBox.DrawnToDress.Pages
                 return;
             }
 
-            GameState.OnStateDisposed += HandleStateDisposed;
+            _stateDisposedSubscription = GameState.SubscribeStateDisposed(HandleStateDisposed);
             _stateSubscription = GameState.StateChangedEventManager.Subscribe(async () =>
             {
                 await InvokeAsync(() =>
@@ -150,10 +151,7 @@ namespace KnockBox.DrawnToDress.Pages
         public override void Dispose()
         {
             _tickSubscription?.Dispose();
-            if (GameState is not null)
-            {
-                GameState.OnStateDisposed -= HandleStateDisposed;
-            }
+            _stateDisposedSubscription?.Dispose();
             _stateSubscription?.Dispose();
             base.Dispose();
         }

@@ -69,7 +69,7 @@ namespace KnockBox.DndMapperTests.Unit
         public void EndSessionAsync_HostCaller_DisposesState()
         {
             bool disposed = false;
-            _state.OnStateDisposed += () => disposed = true;
+            _state.SubscribeStateDisposed(() => disposed = true);
             var end = _engine.EndSessionAsync(_state, _host);
             Assert.IsTrue(end.IsSuccess);
             Assert.IsTrue(disposed);

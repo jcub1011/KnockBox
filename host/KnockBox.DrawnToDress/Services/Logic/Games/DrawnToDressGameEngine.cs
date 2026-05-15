@@ -32,7 +32,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games
 
             var gameState = new DrawnToDressGameState(host, stateLogger);
             gameState.Execute(() => gameState.SetJoinable(true));
-            gameState.PlayerUnregistered += player => HandlePlayerLeft(player, gameState);
+            gameState.SubscribePlayerUnregistered(player => HandlePlayerLeft(player, gameState));
 
             // Create the context and FSM so the lobby state is active from the start.
             var context = new DrawnToDressGameContext(gameState, logger, randomNumberService);

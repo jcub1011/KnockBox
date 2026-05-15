@@ -10,7 +10,7 @@ namespace KnockBox.Core.Services.State.Shared
     /// <see cref="PropertyUpdateResult"/> on completion.
     /// </summary>
     /// <remarks>
-    /// Most games do not subclass this directly — use
+    /// Most games do not subclass this directly ï¿½ use
     /// <see cref="Games.Shared.AbstractGameState"/> for per-room state. This
     /// class powers utility states (session caches, drawing canvases, etc.)
     /// where property-level change tracking and dependency ordering pay off.
@@ -116,10 +116,37 @@ namespace KnockBox.Core.Services.State.Shared
 
         #region Properties, Fields, and Events
 
-        private readonly ConcurrentDictionary<string, Registration> _registrations = new(StringComparer.Ordinal);
-        private readonly ConcurrentDictionary<string, PropertyState> _states = new(StringComparer.Ordinal);
-        private readonly ConcurrentDictionary<string, SharedUpdate> _inflightUpdates = new(StringComparer.Ordinal);
+        // Lazy: most subclasses register a handful of properties or none, so the
+        // three ConcurrentDictionary instances are deferred until first write.
+        // Read paths short-circuit on null.
+        private ConcurrentDictionary<string, Registration>? _registrations;
+        private ConcurrentDictionary<string, PropertyState>? _states;
+        private ConcurrentDictionary<string, SharedUpdate>? _inflightUpdates;
         private int _disposed;
+
+        private ConcurrentDictionary<string, Registration> EnsureRegistrations()
+        {
+            var existing = Volatile.Read(ref _registrations);
+            if (existing is not null) return existing;
+            var created = new ConcurrentDictionary<string, Registration>(StringComparer.Ordinal);
+            return Interlocked.CompareExchange(ref _registrations, created, null) ?? created;
+        }
+
+        private ConcurrentDictionary<string, PropertyState> EnsureStates()
+        {
+            var existing = Volatile.Read(ref _states);
+            if (existing is not null) return existing;
+            var created = new ConcurrentDictionary<string, PropertyState>(StringComparer.Ordinal);
+            return Interlocked.CompareExchange(ref _states, created, null) ?? created;
+        }
+
+        private ConcurrentDictionary<string, SharedUpdate> EnsureInflightUpdates()
+        {
+            var existing = Volatile.Read(ref _inflightUpdates);
+            if (existing is not null) return existing;
+            var created = new ConcurrentDictionary<string, SharedUpdate>(StringComparer.Ordinal);
+            return Interlocked.CompareExchange(ref _inflightUpdates, created, null) ?? created;
+        }
 
         public event IState<TSelf>.PropertyStateChangedDelegate? PropertyStateChanged;
 
@@ -128,7 +155,10 @@ namespace KnockBox.Core.Services.State.Shared
         public PropertyState GetPropertyState(string propertyName)
         {
             ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) == 1, this);
-            return _states.TryGetValue(propertyName, out var state) ? state : PropertyState.Uninitialized;
+            var states = Volatile.Read(ref _states);
+            return states is not null && states.TryGetValue(propertyName, out var state)
+                ? state
+                : PropertyState.Uninitialized;
         }
 
         public Task<List<UpdateResult>> UpdatePropertiesAsync(
@@ -216,12 +246,14 @@ namespace KnockBox.Core.Services.State.Shared
 
             ArgumentNullException.ThrowIfNull(updateAction);
 
+            var registrations = EnsureRegistrations();
+
             // Ensure dependencies are registered first
             if (propertyDependencies is not null && propertyDependencies.Length > 0)
             {
                 foreach (var dependency in propertyDependencies)
                 {
-                    if (!_registrations.ContainsKey(dependency))
+                    if (!registrations.ContainsKey(dependency))
                         throw new InvalidOperationException($"Dependency '{dependency}' is not registered. Make sure dependencies are registered first.");
                 }
             }
@@ -229,7 +261,7 @@ namespace KnockBox.Core.Services.State.Shared
             // Register
             var registration = new Registration(propertyName, updateAction, propertyDependencies);
 
-            if (!_registrations.TryAdd(propertyName, registration))
+            if (!registrations.TryAdd(propertyName, registration))
             {
                 throw new InvalidOperationException($"A duplicate update registration was made for property '{propertyName}'.");
             }
@@ -244,23 +276,24 @@ namespace KnockBox.Core.Services.State.Shared
             SemaphoreSlim concurrencySemaphore,
             Func<string, Task<UpdateResult>> dependencyResolver)
         {
+            var inflightUpdates = EnsureInflightUpdates();
             while (true)
             {
-                if (_inflightUpdates.TryGetValue(propertyName, out var existing))
+                if (inflightUpdates.TryGetValue(propertyName, out var existing))
                 {
                     if (!existing.Task.IsCompleted) return existing;
 
-                    _inflightUpdates.TryRemove(propertyName, out _);
+                    inflightUpdates.TryRemove(propertyName, out _);
                     continue;
                 }
 
                 var created = new SharedUpdate(ct => RunUpdateAsync(propertyName, concurrencySemaphore, ct, dependencyResolver));
 
-                if (_inflightUpdates.TryAdd(propertyName, created))
+                if (inflightUpdates.TryAdd(propertyName, created))
                 {
                     _ = created.Task.ContinueWith(_ =>
                     {
-                        _inflightUpdates.TryRemove(propertyName, out var _);
+                        inflightUpdates.TryRemove(propertyName, out var _);
                         created.Dispose();
                     }, TaskScheduler.Default);
 
@@ -277,7 +310,8 @@ namespace KnockBox.Core.Services.State.Shared
         {
             try
             {
-                if (!_registrations.TryGetValue(propertyName, out var reg))
+                var registrations = Volatile.Read(ref _registrations);
+                if (registrations is null || !registrations.TryGetValue(propertyName, out var reg))
                 {
                     SetPropertyStatus(propertyName, PropertyState.Errored);
                     return new UpdateResult(propertyName, new InvalidOperationException($"No updater registered for property '{propertyName}'."));
@@ -354,6 +388,7 @@ namespace KnockBox.Core.Services.State.Shared
             var tempMarks = new HashSet<string>(StringComparer.Ordinal); // recursion stack
             var permMarks = new HashSet<string>(StringComparer.Ordinal); // fully processed
             List<string>? missingUpdaters = null;
+            var registrations = Volatile.Read(ref _registrations);
 
             void Visit(string property)
             {
@@ -368,7 +403,7 @@ namespace KnockBox.Core.Services.State.Shared
                 if (!tempMarks.Add(property))
                     throw new InvalidOperationException($"Cycle detected in property dependencies at '{property}'.");
 
-                if (_registrations.TryGetValue(property, out var reg))
+                if (registrations is not null && registrations.TryGetValue(property, out var reg))
                 {
                     if (reg.Dependencies is not null && reg.Dependencies.Length > 0)
                     {
@@ -406,7 +441,7 @@ namespace KnockBox.Core.Services.State.Shared
         private void SetPropertyStatus(string propertyName, PropertyState newState)
         {
             bool changed = false;
-            _states.AddOrUpdate(propertyName,
+            EnsureStates().AddOrUpdate(propertyName,
                 _ => { changed = true; return newState; },
                 (_, old) => { changed = old != newState; return newState; });
 
@@ -421,12 +456,16 @@ namespace KnockBox.Core.Services.State.Shared
         {
             if (Interlocked.Exchange(ref _disposed, 1) == 1) return;
 
-            foreach (var update in _inflightUpdates.Values)
-                update.Dispose();
+            var inflightUpdates = Volatile.Read(ref _inflightUpdates);
+            if (inflightUpdates is not null)
+            {
+                foreach (var update in inflightUpdates.Values)
+                    update.Dispose();
+                inflightUpdates.Clear();
+            }
 
-            _inflightUpdates.Clear();
-            _registrations.Clear();
-            _states.Clear();
+            Volatile.Read(ref _registrations)?.Clear();
+            Volatile.Read(ref _states)?.Clear();
 
             GC.SuppressFinalize(this);
         }

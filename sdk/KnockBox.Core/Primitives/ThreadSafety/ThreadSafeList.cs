@@ -187,14 +187,23 @@ namespace KnockBox.Core.Primitives.ThreadSafety
         public IEnumerator<TElement> GetEnumerator()
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
+            // The scope is disposed before the enumerator is consumed, so we
+            // must snapshot the contents once for the returned enumerator's
+            // lifetime. Cost: one array allocation per enumeration.
             using var scope = EnterReadLockScope();
-            return GetEnumerator(scope);
+            var snapshot = _list.ToArray();
+            return ((IEnumerable<TElement>)snapshot).GetEnumerator();
         }
 
         public IEnumerator<TElement> GetEnumerator(IRWLockScope scope)
         {
             AssertReadLockHeld(scope);
-            return ((IEnumerable<TElement>)[.. _list]).GetEnumerator();
+            // The caller owns a live read scope for the enumeration lifetime,
+            // so concurrent mutation is impossible — enumerate the backing
+            // list directly without copying. Boxes the List<T>.Enumerator
+            // struct (small) but avoids the full array copy that was here
+            // previously.
+            return _list.GetEnumerator();
         }
 
         public void Dispose()
