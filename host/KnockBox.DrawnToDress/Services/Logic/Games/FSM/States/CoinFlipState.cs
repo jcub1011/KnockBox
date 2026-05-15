@@ -185,7 +185,6 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
             }
 
             SetupCurrentFlip(context);
-            context.State.StateChangedEventManager.Notify();
             return null;
         }
 

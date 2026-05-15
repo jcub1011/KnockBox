@@ -398,6 +398,28 @@ Subscriptions are obtained via `state.StateChangedEventManager.Subscribe(Func<Va
 
 The `PlayerUnregistered` event is fired after a player is successfully removed from the game (disconnected, left, or kicked). It is raised *outside* the execute lock so subscribers may safely call `Execute` in response.
 
+#### Notify outside the lock — load-bearing rule
+
+`StateChangedEventManager.Notify()` (and `NotifyStateChanged()` on `AbstractGameState`, which forwards to it) **must only be called after the executeLock has been released**. The framework already does this for you: `Execute` / `ExecuteAsync` fire exactly one `Notify` in their `finally` block after `Release()`. Game code should not raise an additional inline notification from inside an `Execute`-wrapped mutator.
+
+Concretely, `SetPhase`-style methods on per-game `AbstractGameState` subclasses must look like:
+
+```csharp
+// CORRECT — relies on Execute's post-release Notify
+public void SetPhase(GamePhase phase) => Phase = phase;
+
+// WRONG — inline Notify holds the executeLock through subscriber work
+public void SetPhase(GamePhase phase) { Phase = phase; NotifyStateChanged(); }
+```
+
+Why this is load-bearing, not stylistic: subscribers are usually Razor components that call `InvokeAsync(StateHasChanged)`. When the calling thread is already on a Blazor circuit dispatcher (the common case — the mutation originated from a player's UI event), `InvokeAsync` runs the work item synchronously, and `StateHasChanged` runs the renderer synchronously, **including child-component disposal and JS-interop teardown**, before returning. If the executeLock is still held during that chain, the next mutation on the same state (or even a re-entrant call from a Dispose handler) blocks on the lock, and the dispatcher cannot make progress — a hard deadlock. This was the root cause of the `OutfitCustomization → VotingRoundSetup` regression in Drawn To Dress: the in-lock Notify fired while transitioning out of a phase whose subtree owned SVG canvases with JS interop, and the synchronous Dispose chain blocked indefinitely.
+
+Calling `Notify` inline also defeats Execute's coalescing: multiple mutations inside one `Execute` should produce a single fan-out, not one per field write.
+
+The same rule applies to any FSM-state code that calls `context.State.StateChangedEventManager.Notify()` directly — that call site is *inside* `Execute` (every engine wraps FSM work in `state.Execute(...)`), so it is just as unsafe and equally redundant. Prefer ending the FSM transition normally and letting `Execute`'s `finally` do the notification.
+
+If you have a genuine need to mid-Execute publish progress to subscribers (rare; the only legitimate motivation we've found is the per-keystroke draft-update path), use the documented `Execute bypass` pattern instead — see the `Codeword.Pages.CluePhase.OnClueInput` exception above.
+
 #### Exclusive Read Access
 
 The state exposes `WithExclusiveRead` and `WithExclusiveReadAsync` for non-mutating reads that still need serialization with the execute lock. Unlike `Execute`/`ExecuteAsync`, these do *not* call `NotifyStateChanged` after releasing the lock.

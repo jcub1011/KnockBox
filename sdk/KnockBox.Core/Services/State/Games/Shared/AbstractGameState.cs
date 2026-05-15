@@ -936,9 +936,14 @@ namespace KnockBox.Core.Services.State.Games.Shared
 
         /// <summary>
         /// Dispatches the state-change notification. Sync handlers run on the calling
-        /// thread (after the execute lock has been released); async handlers are
-        /// awaited fire-and-forget so the caller is never blocked by a slow subscriber.
-        /// No <c>Task.Run</c> closure is allocated on the sync-completion path.
+        /// thread; async handlers are awaited fire-and-forget. <b>Callers must only
+        /// invoke this AFTER releasing <see cref="_executeLock"/></b> — see
+        /// <see cref="Execute(Action)"/>'s finally block, which is the single
+        /// in-class call site that satisfies that rule. Subscribers commonly call
+        /// Blazor's <c>InvokeAsync</c> + <c>StateHasChanged</c>, and the
+        /// resulting renderer work (including child-component disposal and JS
+        /// interop teardown) runs synchronously on the calling dispatcher; doing
+        /// that while holding the executeLock deadlocks.
         /// </summary>
         private void Notify()
         {

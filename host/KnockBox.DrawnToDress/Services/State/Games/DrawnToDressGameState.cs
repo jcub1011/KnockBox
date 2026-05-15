@@ -162,13 +162,14 @@ namespace KnockBox.DrawnToDress.Services.State.Games
         // ── Methods ───────────────────────────────────────────────────────────
 
         /// <summary>
-        /// Updates the current phase and notifies state-change listeners.
+        /// Updates the current phase. Notification is intentionally NOT raised here —
+        /// callers run inside <c>Execute</c>/<c>ExecuteAsync</c>, which fires
+        /// <c>NotifyStateChanged</c> exactly once after the lock is released.
+        /// Calling Notify inline would run subscribers while the executeLock is held
+        /// and can deadlock the Blazor dispatcher (see arch doc:
+        /// "Notify outside the lock").
         /// </summary>
-        public void SetPhase(GamePhase phase)
-        {
-            Phase = phase;
-            NotifyStateChanged();
-        }
+        public void SetPhase(GamePhase phase) => Phase = phase;
 
     }
 

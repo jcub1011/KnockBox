@@ -115,12 +115,21 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games
         /// </summary>
         public Result Tick(DrawnToDressGameContext context, DateTimeOffset now)
         {
-            return context.State.Execute(() =>
+            var executeResult = context.State.Execute(() =>
             {
                 var fsmResult = context.Fsm.Tick(context, now);
                 if (fsmResult.TryGetFailure(out var err))
                     logger.LogError("FSM tick error: {msg}", err.PublicMessage);
             });
+
+            if (executeResult.TryGetFailure(out var execErr))
+            {
+                logger.LogError(
+                    "Tick Execute failed: {msg} | {detail}",
+                    execErr.PublicMessage, execErr.InternalMessage);
+                return execErr;
+            }
+            return Result.Success;
         }
 
         // ── Player-leave handling ─────────────────────────────────────────────

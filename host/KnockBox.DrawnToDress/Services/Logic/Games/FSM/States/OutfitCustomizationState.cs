@@ -168,7 +168,6 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
             if (player is not null)
             {
                 player.DraftOutfitName = cmd.DraftName;
-                context.State.StateChangedEventManager.Notify();
             }
             return null;
         }

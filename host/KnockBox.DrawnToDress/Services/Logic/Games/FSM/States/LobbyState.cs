@@ -102,7 +102,6 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
                     }
                     cmd.Config.Normalize();
                     context.State.Config = cmd.Config;
-                    context.State.StateChangedEventManager.Notify();
                     context.Logger.LogDebug("Host [{id}] updated config.", cmd.PlayerId);
                     return null;
 
