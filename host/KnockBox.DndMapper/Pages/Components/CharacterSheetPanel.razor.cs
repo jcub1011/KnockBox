@@ -202,7 +202,11 @@ namespace KnockBox.DndMapper.Pages.Components
             if (result.TryGetSuccess(out var newId))
             {
                 _activeSheetId = newId;
+                return;
             }
+            // Cancellation path: log via toast so the user isn't left wondering
+            // why the click did nothing.
+            if (Toasts is not null) await Toasts.Push("Sheet creation was canceled.", DndMapperToastTone.Warning);
         }
 
         private async Task ConfirmCreateNpcSheet()

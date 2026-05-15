@@ -1,16 +1,64 @@
-.dndm-rolllog { display: flex; flex-direction: column; min-height: 0; }
+/* The rail itself owns scrolling (overflow: auto on .dndm-rail-content), so
+   the roll-log no longer needs its own scroll container — it just grows
+   naturally until the visible-entry cap kicks in. */
+.dndm-rolllog { display: flex; flex-direction: column; }
 
 .dndm-rolllog-actions {
     display: inline-flex;
     gap: 0.35rem;
+    align-items: center;
+}
+
+.dndm-rolllog-rollbtn {
+    font-variant-numeric: tabular-nums;
+    min-width: 5.5rem;
+}
+
+.dndm-rolllog-seeall {
+    align-self: center;
+    margin-top: 0.35rem;
+}
+
+/* History modal: a wider card with its own scroll region for the entry list. */
+.dndm-rolllog-history {
+    width: min(640px, calc(100vw - 2rem));
+}
+
+.dndm-rolllog-history-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+}
+
+.dndm-rolllog-history-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    padding-right: 0.25rem;
+}
+
+.dndm-rolllog-history-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem;
+    margin-top: 0.75rem;
+}
+
+.dndm-rolllog-history-hint {
+    color: #7a7464;
+    font-size: 0.75rem;
+    font-style: italic;
 }
 
 .dndm-rolllog-body {
     display: flex;
     flex-direction: column;
     gap: 0.4rem;
-    overflow-y: auto;
-    max-height: 100%;
     padding: 0.5rem 0.6rem;
 }
 
@@ -43,14 +91,32 @@
     font-size: 0.8rem;
 }
 
+.dndm-rolllog-formula {
+    color: #cdb98e;
+    background: #1f1f30;
+    border: 1px solid #2c2c44;
+    border-radius: 2px;
+    padding: 0.02rem 0.3rem;
+    font-size: 0.7rem;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.5px;
+}
+
 .dndm-rolllog-mode {
-    margin-left: auto;
     background: #4a3c20;
     color: #e8b849;
     font-size: 0.65rem;
     letter-spacing: 1px;
     padding: 0.05rem 0.3rem;
     border-radius: 2px;
+}
+
+.dndm-rolllog-time {
+    margin-left: auto;
+    color: #7a7464;
+    font-size: 0.7rem;
+    font-variant-numeric: tabular-nums;
+    font-family: var(--font-primary);
 }
 
 .dndm-rolllog-dice {

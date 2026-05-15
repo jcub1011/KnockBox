@@ -645,18 +645,21 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             // Host can create any sheet (NPC or owned). A non-host player may only
             // create a single sheet for themselves; once they have one they must use
             // the existing sheet rather than spawn duplicates.
-            bool isHost = IsHost(state, caller);
-            if (!isHost)
-            {
-                if (ownerUserId != caller.Id)
-                    return ValueResult<Guid>.FromError("Players may only create a sheet they own.");
-                if (state.Sheets.Values.Any(s => s.OwnerUserId == caller.Id))
-                    return ValueResult<Guid>.FromError("You already have a character sheet.");
-            }
+            // The duplicate check runs *inside* state.Execute so two concurrent
+            // requests can't both pass the guard and end up with two sheets.
+            if (!IsHost(state, caller) && ownerUserId != caller.Id)
+                return ValueResult<Guid>.FromError("Players may only create a sheet they own.");
 
             Guid newId = Guid.NewGuid();
+            string? error = null;
             var exec = state.Execute(() =>
             {
+                if (!IsHost(state, caller) && state.Sheets.Values.Any(s => s.OwnerUserId == caller.Id))
+                {
+                    error = "You already have a character sheet.";
+                    return;
+                }
+
                 var sheet = new CharacterSheet
                 {
                     Id = newId,
@@ -669,6 +672,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
 
             if (exec.IsCanceled) return ValueResult<Guid>.FromCancellation();
             if (exec.TryGetFailure(out var err)) return ValueResult<Guid>.FromError(err);
+            if (error is not null) return ValueResult<Guid>.FromError(error);
             return ValueResult<Guid>.FromValue(newId);
         }
 
@@ -815,8 +819,10 @@ namespace KnockBox.DndMapper.Services.Logic.Games
 
             if (request.Mode != RollMode.Normal)
             {
-                if (request.Dice.Count != 1 || request.Dice[0].Count != 1 || request.Dice[0].Sides != 20)
-                    return ValueResult<RollResult>.FromError("Advantage/Disadvantage requires exactly one d20.");
+                // Adv/Dis applies to any single-die roll — d20 is the common case,
+                // but coin-flip-style mechanics on smaller/larger dice are legal too.
+                if (request.Dice.Count != 1 || request.Dice[0].Count != 1)
+                    return ValueResult<RollResult>.FromError("Advantage/Disadvantage requires exactly one die.");
             }
 
             int? attributeModifier = null;
@@ -847,8 +853,11 @@ namespace KnockBox.DndMapper.Services.Logic.Games
 
             if (request.Mode != RollMode.Normal)
             {
-                int second = _rng.GetRandomInt(1, 21, RandomType.Fast);
-                rolls.Add(new DieRoll(20, second, false));
+                // The guard above ensures Dice has exactly one term with Count==1,
+                // so the second die uses the same Sides as the first.
+                int sides = request.Dice[0].Sides;
+                int second = _rng.GetRandomInt(1, sides + 1, RandomType.Fast);
+                rolls.Add(new DieRoll(sides, second, false));
 
                 int firstResult = rolls[0].Result;
                 int secondResult = rolls[1].Result;
@@ -863,6 +872,10 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                 + request.FlatModifier
                 + (attributeModifier ?? 0);
 
+            // Captured at roll time so the log can show the original request
+            // shape rather than reconstructing it from the rolled dice.
+            string formula = string.Join("+", request.Dice.Select(t => $"{t.Count}d{t.Sides}"));
+
             var result = new RollResult(
                 Id: Guid.NewGuid(),
                 RollerUserId: caller.Id,
@@ -873,7 +886,8 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                 FlatModifier: request.FlatModifier,
                 AttributeModifier: attributeModifier,
                 Label: request.Label ?? string.Empty,
-                TimestampUtc: DateTime.UtcNow);
+                TimestampUtc: DateTime.UtcNow,
+                Formula: formula);
 
             var exec = state.Execute(() => state.AppendRoll(result));
             if (exec.IsCanceled) return ValueResult<RollResult>.FromCancellation();

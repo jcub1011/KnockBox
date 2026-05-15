@@ -14,5 +14,10 @@ namespace KnockBox.DndMapper.Services.State.Games.Data
         int FlatModifier,
         int? AttributeModifier,
         string Label,
-        DateTime TimestampUtc);
+        DateTime TimestampUtc,
+        // Compact dice-formula identifier captured from the original RollRequest,
+        // e.g. "1d20", "2d6+1d8". Recorded at roll time so consumers don't have
+        // to reverse-engineer it from the per-die rolls (Adv/Dis adds an extra
+        // discarded die that would otherwise need to be filtered back out).
+        string Formula);
 }

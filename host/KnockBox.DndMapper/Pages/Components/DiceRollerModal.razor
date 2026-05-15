@@ -103,7 +103,7 @@
                 </div>
                 @if (!CanAdvDis)
                 {
-                    <span class="dndm-dice-hint">Adv/Dis only when rolling exactly 1d20.</span>
+                    <span class="dndm-dice-hint">Adv/Dis only when rolling exactly one die.</span>
                 }
             </section>
 
@@ -117,7 +117,7 @@
         </div>
 
         <footer class="dndm-dice-footer">
-            <button class="dndm-btn dndm-btn--ghost" type="button" @onclick="OnClose">Cancel</button>
+            <button class="dndm-btn dndm-btn--ghost" type="button" @onclick="OnClose">Close</button>
             <button class="dndm-btn dndm-btn--primary" type="button"
                     disabled="@(!CanSubmit)"
                     @onclick="OnSubmit">Roll</button>

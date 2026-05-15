@@ -65,7 +65,9 @@ namespace KnockBox.DndMapper.Pages.Components
         }
 
         private int TotalDiceCount => Config.Terms.Sum(t => Math.Max(0, t.Count));
-        private bool CanAdvDis => Config.Terms.Count == 1 && Config.Terms[0].Count == 1 && Config.Terms[0].Sides == 20;
+        // Adv/Dis is enabled for any single-die roll, not just d20 — the engine
+        // matches this rule and rolls a second die of the same size.
+        private bool CanAdvDis => Config.Terms.Count == 1 && Config.Terms[0].Count == 1;
         private bool CanRollInitiative => PickerSheet is not null
             && State.AttributeSchema.Rows.Any(r => r.Name.Equals("DEX", StringComparison.OrdinalIgnoreCase));
 
@@ -80,7 +82,7 @@ namespace KnockBox.DndMapper.Pages.Components
                 ? i : fallback;
         }
 
-        private void AddTerm() => Config.Terms.Add(new DiceTerm(1, 6));
+        private void AddTerm() => Config.Terms.Add(new DiceTerm(1, 20));
 
         private void RemoveTerm(int idx)
         {

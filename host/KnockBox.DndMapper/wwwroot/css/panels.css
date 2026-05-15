@@ -229,3 +229,74 @@
 }
 .dndm-toggle input:checked + .dndm-toggle-track { background: rgba(232, 184, 73, 0.3); border-color: var(--dndm-gold); }
 .dndm-toggle input:checked + .dndm-toggle-track::after { transform: translateX(16px); background: var(--dndm-gold); }
+
+/* Shared modal chrome. Defined unscoped so any component that renders
+   .dndm-modal-overlay / .dndm-modal-card / .dndm-modal-title picks up the
+   styling. Per-component scoped CSS (ConfirmModal, MapSettingsModal,
+   DiceRollerModal) only owns its content-specific rules. */
+.dndm-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(7, 7, 14, 0.65);
+    backdrop-filter: blur(2px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
+}
+
+.dndm-modal-card {
+    min-width: 320px;
+    max-width: 480px;
+    /* 4rem padding + 100px accounts for the app-level page header so the
+       modal never tucks under it on shorter viewports. */
+    max-height: calc(100vh - 4rem - 100px);
+    background: #1a1a2e;
+    color: #ede4d3;
+    border: 1px solid rgba(168, 85, 247, 0.35);
+    border-radius: 8px;
+    padding: 1.25rem 1.5rem 1rem;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6);
+    font-family: var(--font-primary);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.dndm-modal-title {
+    margin: 0 0 0.5rem 0;
+    font-family: Georgia, "IM Fell English", "EB Garamond", serif;
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: #e8b849;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+
+.dndm-modal-message {
+    margin: 0 0 1rem 0;
+    font-size: 0.95rem;
+    line-height: 1.45;
+    color: #d8cfbe;
+}
+
+.dndm-modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.6rem;
+}
+
+.dndm-modal-body {
+    margin: 0 0 1rem 0;
+    /* Card uses flex column + overflow hidden; let the body absorb leftover
+       space and scroll when content exceeds the card height. */
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+}
+
+.dndm-modal-error {
+    color: #e26b6b;
+    font-size: 0.85rem;
+    margin: 0.4rem 0 0;
+}

@@ -12,15 +12,12 @@
     <div class="dnd-mapper-playing @(IsHost ? "dnd-mapper-playing--host" : null)
                 @(_leftCollapsed ? "dnd-mapper-playing--left-collapsed" : null)
                 @(_rightCollapsed ? "dnd-mapper-playing--right-collapsed" : null)"
+         @ref="_rootRef"
          style="@RootStyle">
 
         @if (IsHost)
         {
             <aside class="dndm-rail dndm-rail--left">
-                <button class="dndm-rail-toggle"
-                        type="button"
-                        title="@(_leftCollapsed ? "Expand" : "Collapse")"
-                        @onclick="ToggleLeftRail">@(_leftCollapsed ? "›" : "‹")</button>
                 <div class="dndm-rail-content">
                     <HostMapSwitcher State="State" />
                     <HostTokenPanel State="State" />
@@ -29,12 +26,13 @@
                                     SelectedImageId="_selectedImageId"
                                     SelectedImageIdChanged="OnSelectedImageIdChanged" />
                 </div>
-                @if (!_leftCollapsed)
-                {
-                    <div class="dndm-rail-resize dndm-rail-resize--left"
-                         @ref="_leftHandleRef"
-                         title="Drag to resize"></div>
-                }
+                @* Always render the resize handle so its JS bindings stay
+                   attached to a stable DOM node across rail collapses /
+                   re-renders. Drag = resize; click without drag = toggle
+                   collapse (handled in dndMapperRailResize.js). *@
+                <div class="dndm-rail-resize dndm-rail-resize--left"
+                     @ref="_leftHandleRef"
+                     title="Drag to resize, click to collapse"></div>
             </aside>
         }
 
@@ -75,16 +73,10 @@
         </main>
 
         <aside class="dndm-rail dndm-rail--right">
-            <button class="dndm-rail-toggle"
-                    type="button"
-                    title="@(_rightCollapsed ? "Expand" : "Collapse")"
-                    @onclick="ToggleRightRail">@(_rightCollapsed ? "‹" : "›")</button>
-            @if (!_rightCollapsed)
-            {
-                <div class="dndm-rail-resize dndm-rail-resize--right"
-                     @ref="_rightHandleRef"
-                     title="Drag to resize"></div>
-            }
+            @* See left rail comment. *@
+            <div class="dndm-rail-resize dndm-rail-resize--right"
+                 @ref="_rightHandleRef"
+                 title="Drag to resize, click to collapse"></div>
             <div class="dndm-rail-content">
                 <CharacterSheetPanel State="State" CurrentUserId="@CurrentUserId" IsHost="IsHost" />
                 <RollLogPanel State="State"

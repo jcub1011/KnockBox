@@ -42,6 +42,11 @@
     display: flex;
     flex-direction: column;
     min-width: 0;
+    /* Confine vertical extent to the grid track so .dndm-rail-content's
+       overflow: auto actually clips and shows a scrollbar — without this,
+       the rail grows to fit its content and content gets pushed offscreen. */
+    min-height: 0;
+    overflow: hidden;
 }
 
 .dndm-rail--right {
@@ -64,27 +69,6 @@
     display: none;
 }
 
-.dndm-rail-toggle {
-    position: absolute;
-    top: 50%;
-    width: 18px;
-    height: 36px;
-    transform: translateY(-50%);
-    background: #1a1a2e;
-    color: #cdb98e;
-    border: 1px solid #2c2c44;
-    border-radius: 3px;
-    cursor: pointer;
-    z-index: 5;
-    font-family: var(--dndm-display);
-    font-size: 0.95rem;
-    line-height: 1;
-    padding: 0;
-}
-
-.dndm-rail--left .dndm-rail-toggle { right: -10px; }
-.dndm-rail--right .dndm-rail-toggle { left: -10px; }
-
 .dndm-rail-resize {
     position: absolute;
     top: 0;
@@ -94,6 +78,17 @@
     cursor: col-resize;
     z-index: 4;
     touch-action: none;
+    /* Prevent the browser from starting a text selection if pointerdown's
+       preventDefault somehow doesn't run (e.g. stale JS bindings after a
+       re-render); the JS handler also calls preventDefault. */
+    user-select: none;
+    -webkit-user-select: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #cdb98e;
+    font-family: var(--dndm-display);
+    font-size: 0.95rem;
 }
 
 .dndm-rail-resize:hover,
@@ -103,6 +98,29 @@
 
 .dndm-rail-resize--left { right: 0; }
 .dndm-rail-resize--right { left: 0; }
+
+/* When the rail is collapsed, stretch the handle to fill the narrow gutter
+   so the whole strip is clickable to expand. The handle stays in the DOM
+   either way; only its dimensions and chevron content change. */
+.dnd-mapper-playing--left-collapsed .dndm-rail--left .dndm-rail-resize,
+.dnd-mapper-playing--right-collapsed .dndm-rail--right .dndm-rail-resize {
+    left: 0;
+    right: 0;
+    width: auto;
+    cursor: pointer;
+    background: rgba(232, 184, 73, 0.08);
+}
+
+/* Chevron hint: shown on the resize handle indicating which way a click will
+   move the rail. The character flips based on side and collapsed state so the
+   arrow always points away from the rail content. */
+.dndm-rail-resize::before {
+    content: '';
+    pointer-events: none;
+}
+
+.dnd-mapper-playing--left-collapsed .dndm-rail--left .dndm-rail-resize::before { content: '›'; }
+.dnd-mapper-playing--right-collapsed .dndm-rail--right .dndm-rail-resize::before { content: '‹'; }
 
 .dndm-canvas-area {
     position: relative;

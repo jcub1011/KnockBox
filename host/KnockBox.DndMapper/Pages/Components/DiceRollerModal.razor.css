@@ -1,8 +1,5 @@
 .dndm-dice {
     width: min(440px, calc(100vw - 2rem));
-    max-height: calc(100vh - 4rem);
-    display: flex;
-    flex-direction: column;
 }
 
 .dndm-dice-header {
@@ -16,6 +13,8 @@
     display: flex;
     flex-direction: column;
     gap: 0.6rem;
+    flex: 1 1 auto;
+    min-height: 0;
     overflow-y: auto;
     padding-right: 0.25rem;
 }

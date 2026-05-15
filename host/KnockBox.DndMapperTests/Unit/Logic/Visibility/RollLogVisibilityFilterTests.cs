@@ -18,7 +18,8 @@ namespace KnockBox.DndMapperTests.Unit.Logic.Visibility
                 FlatModifier: 0,
                 AttributeModifier: null,
                 Label: "test",
-                TimestampUtc: DateTime.UtcNow);
+                TimestampUtc: DateTime.UtcNow,
+                Formula: "1d20");
 
         [TestMethod]
         public void VisibleTo_HostSeesAllRolls()

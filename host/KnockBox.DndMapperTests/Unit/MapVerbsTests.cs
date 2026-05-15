@@ -325,6 +325,41 @@ namespace KnockBox.DndMapperTests.Unit
         }
 
         [TestMethod]
+        public void SpawnNpcTokenAsync_EvenGrid_PlacesAtCellCenter()
+        {
+            var c = _engine.CreateMapAsync(_state, _host, "Even");
+            Assert.IsTrue(c.TryGetSuccess(out var mapId));
+            Assert.IsTrue(_engine.UpdateGridAsync(_state, _host,
+                mapId, new GridConfig { WidthCells = 10, HeightCells = 10 }).IsSuccess);
+
+            var spawn = _engine.SpawnNpcTokenAsync(_state, _host, mapId, "Goblin");
+            Assert.IsTrue(spawn.TryGetSuccess(out var tokenId));
+
+            var token = _state.Maps.Single(m => m.Id == mapId).Tokens.Single(t => t.Id == tokenId);
+            // Floor-then-center: 10/2 -> 5, +0.5 -> 5.5. Centers must never sit
+            // on a grid intersection (e.g. 5.0).
+            Assert.AreEqual(5.5, token.X, 1e-9);
+            Assert.AreEqual(5.5, token.Y, 1e-9);
+        }
+
+        [TestMethod]
+        public void SpawnNpcTokenAsync_OddGrid_PlacesAtCellCenter()
+        {
+            var c = _engine.CreateMapAsync(_state, _host, "Odd");
+            Assert.IsTrue(c.TryGetSuccess(out var mapId));
+            Assert.IsTrue(_engine.UpdateGridAsync(_state, _host,
+                mapId, new GridConfig { WidthCells = 11, HeightCells = 11 }).IsSuccess);
+
+            var spawn = _engine.SpawnNpcTokenAsync(_state, _host, mapId, "Goblin");
+            Assert.IsTrue(spawn.TryGetSuccess(out var tokenId));
+
+            var token = _state.Maps.Single(m => m.Id == mapId).Tokens.Single(t => t.Id == tokenId);
+            // Floor(11/2)=5, +0.5 -> 5.5 (still a cell center for odd grids).
+            Assert.AreEqual(5.5, token.X, 1e-9);
+            Assert.AreEqual(5.5, token.Y, 1e-9);
+        }
+
+        [TestMethod]
         public void UpdateGridAsync_ShrinkGrid_ClampsTokenPositionsToNewBounds()
         {
             var c = _engine.CreateMapAsync(_state, _host, "A");

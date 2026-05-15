@@ -16,7 +16,6 @@ namespace KnockBox.DndMapper.Pages.Components
         private int _cellPixels;
         private bool _snap;
         private bool _showGrid;
-        private string _lineColor = "#222";
         private string? _error;
 
         private Guid? _syncedFor;
@@ -33,7 +32,6 @@ namespace KnockBox.DndMapper.Pages.Components
                 _cellPixels = Map.Grid.CellPixels;
                 _snap = Map.Grid.SnapToGrid;
                 _showGrid = Map.Grid.ShowGridLines;
-                _lineColor = Map.Grid.LineColor;
                 _error = null;
             }
             base.OnParametersSet();
@@ -62,7 +60,7 @@ namespace KnockBox.DndMapper.Pages.Components
                 CellPixels = _cellPixels,
                 SnapToGrid = _snap,
                 ShowGridLines = _showGrid,
-                LineColor = _lineColor,
+                LineColor = Map?.Grid.LineColor ?? "#222",
             };
             await OnSave.InvokeAsync(grid);
         }

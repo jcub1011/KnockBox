@@ -159,6 +159,60 @@ namespace KnockBox.DndMapperTests.Unit
         }
 
         [TestMethod]
+        public void RollAsync_AdvantageWithSingleD6_KeepsHigherAndRollsSecondD6()
+        {
+            SetupRng(2, 5);
+            var req = new RollRequest(new[] { new DiceTerm(1, 6) }, null, 0, RollMode.Advantage, "");
+            var result = _engine.RollAsync(_state, _host, req);
+            Assert.IsTrue(result.TryGetSuccess(out var roll));
+            Assert.AreEqual(2, roll.Rolls.Count);
+            // Second die must share the size of the configured term, not be hardcoded to d20.
+            Assert.AreEqual(6, roll.Rolls[0].Sides);
+            Assert.AreEqual(6, roll.Rolls[1].Sides);
+            Assert.AreEqual(5, roll.Total);
+            Assert.IsTrue(roll.Rolls[0].Discarded);
+            Assert.IsFalse(roll.Rolls[1].Discarded);
+        }
+
+        [TestMethod]
+        public void RollAsync_DisadvantageWithSingleD8_KeepsLowerAndRollsSecondD8()
+        {
+            SetupRng(7, 3);
+            var req = new RollRequest(new[] { new DiceTerm(1, 8) }, null, 0, RollMode.Disadvantage, "");
+            var result = _engine.RollAsync(_state, _host, req);
+            Assert.IsTrue(result.TryGetSuccess(out var roll));
+            Assert.AreEqual(8, roll.Rolls[0].Sides);
+            Assert.AreEqual(8, roll.Rolls[1].Sides);
+            Assert.AreEqual(3, roll.Total);
+            Assert.IsTrue(roll.Rolls[0].Discarded);
+        }
+
+        [TestMethod]
+        public void RollAsync_PopulatesFormulaFromDiceTerms()
+        {
+            SetupRng(3, 5, 7);
+            var req = new RollRequest(
+                new[] { new DiceTerm(2, 6), new DiceTerm(1, 8) },
+                null, 0, RollMode.Normal, "");
+            var result = _engine.RollAsync(_state, _host, req);
+            Assert.IsTrue(result.TryGetSuccess(out var roll));
+            // Formula captures original request shape, not the expanded per-die rolls.
+            Assert.AreEqual("2d6+1d8", roll.Formula);
+        }
+
+        [TestMethod]
+        public void RollAsync_PopulatesFormulaForAdvantage_DoesNotDoubleDie()
+        {
+            SetupRng(5, 17);
+            var req = new RollRequest(new[] { new DiceTerm(1, 20) }, null, 0, RollMode.Advantage, "");
+            var result = _engine.RollAsync(_state, _host, req);
+            Assert.IsTrue(result.TryGetSuccess(out var roll));
+            // Adv adds a second die internally, but the formula reflects the
+            // original single-die request — the Mode field carries the ADV info.
+            Assert.AreEqual("1d20", roll.Formula);
+        }
+
+        [TestMethod]
         public void RollAsync_AppendsToRollLog()
         {
             SetupRng(10);
@@ -168,14 +222,14 @@ namespace KnockBox.DndMapperTests.Unit
         }
 
         [TestMethod]
-        public void RollAsync_RollLogCappedAt200_DropsOldest()
+        public void RollAsync_RollLogCappedAtRollLogCap_DropsOldest()
         {
-            // Pre-fill with 200 numbers, then 1 more.
-            var values = Enumerable.Repeat(10, 201).ToArray();
+            int cap = DndMapperGameState.RollLogCap;
+            var values = Enumerable.Repeat(10, cap + 1).ToArray();
             SetupRng(values);
             var req = new RollRequest(new[] { new DiceTerm(1, 20) }, null, 0, RollMode.Normal, "");
-            for (int i = 0; i < 201; i++) _engine.RollAsync(_state, _host, req);
-            Assert.AreEqual(200, _state.RollLog.Count);
+            for (int i = 0; i < cap + 1; i++) _engine.RollAsync(_state, _host, req);
+            Assert.AreEqual(cap, _state.RollLog.Count);
         }
 
         [TestMethod]

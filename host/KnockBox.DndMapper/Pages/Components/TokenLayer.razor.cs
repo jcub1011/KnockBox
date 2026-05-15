@@ -131,10 +131,14 @@ namespace KnockBox.DndMapper.Pages.Components
             var (sx, sy) = SnapToGridHelper.Snap(x, y, Map.Grid);
 
             var result = GameEngine.MoveTokenAsync(State, UserService.CurrentUser, tokenId, sx, sy);
-            // Close any open stack popover so the user isn't stuck looking at chips
-            // that no longer reflect the underlying stack composition.
-            _expandedCell = null;
-            if (!result.IsSuccess && _jsModule is not null)
+            if (result.IsSuccess)
+            {
+                // Close any open stack popover only on a successful move — the
+                // chip layout no longer reflects the underlying stack composition.
+                // On failure we keep the popover open so the user can retry.
+                _expandedCell = null;
+            }
+            else if (_jsModule is not null)
             {
                 try
                 {

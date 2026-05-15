@@ -38,6 +38,7 @@ namespace KnockBox.DndMapper.Pages
 
         private ElementReference _leftHandleRef;
         private ElementReference _rightHandleRef;
+        private ElementReference _rootRef;
 
         private IJSObjectReference? _resizeModule;
         private DotNetObjectReference<DndMapperPlayingPhase>? _dotNetRef;
@@ -88,10 +89,10 @@ namespace KnockBox.DndMapper.Pages
             {
                 try
                 {
-                    await _resizeModule.InvokeVoidAsync("attach", _rightHandleRef, "right", _dotNetRef);
+                    await _resizeModule.InvokeVoidAsync("attach", _rightHandleRef, "right", _dotNetRef, _rootRef);
                     if (IsHost)
                     {
-                        await _resizeModule.InvokeVoidAsync("attach", _leftHandleRef, "left", _dotNetRef);
+                        await _resizeModule.InvokeVoidAsync("attach", _leftHandleRef, "left", _dotNetRef, _rootRef);
                     }
                     _resizeAttached = true;
                 }
@@ -106,7 +107,16 @@ namespace KnockBox.DndMapper.Pages
         }
 
         [JSInvokable]
-        public async Task OnRailResize(string side, int px)
+        public async Task OnRailToggleCollapse(string side)
+        {
+            if (side == "left") _leftCollapsed = !_leftCollapsed;
+            else if (side == "right") _rightCollapsed = !_rightCollapsed;
+            else return;
+            await InvokeAsync(StateHasChanged);
+        }
+
+        [JSInvokable]
+        public async Task OnRailResize(string side, int px, bool persist)
         {
             px = Math.Clamp(px, MinRailPx, MaxRailPx);
             if (side == "left") _leftRailPx = px;
@@ -115,7 +125,10 @@ namespace KnockBox.DndMapper.Pages
 
             await InvokeAsync(StateHasChanged);
 
-            if (_resizeModule is not null)
+            // Only persist on pointer release (`persist=true`). Throttled
+            // pointermove updates pass `persist=false` so we don't hit
+            // localStorage dozens of times per second.
+            if (persist && _resizeModule is not null)
             {
                 try { await _resizeModule.InvokeVoidAsync("save", side, Role, px); }
                 catch (JSDisconnectedException) { /* circuit teardown */ }

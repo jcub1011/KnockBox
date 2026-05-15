@@ -32,7 +32,7 @@
                     <circle cx="0.06" cy="0.06" r="0.45"
                             fill="#3a3858" stroke="#1a1a2e" stroke-width="0.05" opacity="0.9" />
                 </g>
-                @RenderToken(top, onClick: () => OpenStack(stack.Cell), suppressDrag: true)
+                @RenderToken(top, onClick: () => OpenStack(stack.Cell), suppressDrag: true, overrideX: cx, overrideY: cy)
                 <g @key="@($"stack-badge-{stack.Cell.CellX}-{stack.Cell.CellY}")"
                    class="dndm-token-stack-badge"
                    pointer-events="none"
@@ -106,7 +106,7 @@
 </g>
 
 @code {
-    private RenderFragment RenderToken(Token token, Action? onClick = null, bool suppressDrag = false) => builder =>
+    private RenderFragment RenderToken(Token token, Action? onClick = null, bool suppressDrag = false, double? overrideX = null, double? overrideY = null) => builder =>
     {
         builder.OpenElement(0, "g");
         builder.SetKey(token.Id);
@@ -116,7 +116,9 @@
         {
             builder.AddAttribute(3, "onclick", Microsoft.AspNetCore.Components.EventCallback.Factory.Create(this, onClick));
         }
-        builder.AddAttribute(4, "transform", $"translate({Fmt(token.X)} {Fmt(token.Y)})");
+        double tx = overrideX ?? token.X;
+        double ty = overrideY ?? token.Y;
+        builder.AddAttribute(4, "transform", $"translate({Fmt(tx)} {Fmt(ty)})");
 
         if (!string.IsNullOrEmpty(token.Name))
         {

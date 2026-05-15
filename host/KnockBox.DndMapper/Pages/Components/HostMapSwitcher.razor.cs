@@ -120,14 +120,18 @@ namespace KnockBox.DndMapper.Pages.Components
         private async Task OnSettingsSaved(GridConfig grid)
         {
             var target = _settingsTarget;
-            _settingsTarget = null;
             if (target is null || UserService.CurrentUser is null) return;
 
             var result = Engine.UpdateGridAsync(State, UserService.CurrentUser, target.Id, grid);
             if (result.TryGetFailure(out var err))
             {
+                // Keep the modal open so the user can correct values; surface the
+                // error via toast since the modal's own _error path is limited to
+                // local validation failures.
                 await PushToast(err.PublicMessage, DndMapperToastTone.Danger);
+                return;
             }
+            _settingsTarget = null;
         }
 
         private void CancelDelete() => _pendingDelete = null;

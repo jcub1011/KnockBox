@@ -7,7 +7,7 @@ namespace KnockBox.DndMapper.Services.State.Games
 {
     public sealed class DndMapperGameState : AbstractGameState
     {
-        public const int RollLogCap = 200;
+        public const int RollLogCap = 50;
 
         public DndMapperPhase Phase { get; private set; } = DndMapperPhase.Lobby;
         public DndMapperSettings Settings { get; private set; } = new();
