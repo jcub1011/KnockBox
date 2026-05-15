@@ -160,10 +160,15 @@ export function openDatabase(name, version, hasUpgrade, dotNetUpgradeRef) {
                     } catch (_) { /* circuit gone */ }
                 }
             };
+            // Snapshot index metadata so C# can answer IIndex<T>.KeyPath /
+            // Unique / MultiEntry synchronously. A single readonly tx over
+            // every store is the minimal way to access indexNames.
+            const schema = snapshotSchema(db);
             resolve(ok({
                 dbId,
                 version: db.version,
                 objectStoreNames: Array.from(db.objectStoreNames),
+                schema,
             }));
         };
         request.onerror = () => resolve(fail(mapDomError(request.error)));
@@ -173,6 +178,33 @@ export function openDatabase(name, version, hasUpgrade, dotNetUpgradeRef) {
             message: `Open blocked: another connection holds '${name}' open at an older version.`,
         }));
     });
+}
+
+function snapshotSchema(db) {
+    const result = {};
+    const names = Array.from(db.objectStoreNames);
+    if (names.length === 0) return result;
+    let tx;
+    try { tx = db.transaction(names, "readonly"); }
+    catch (_) { return result; }
+    for (const storeName of names) {
+        let store;
+        try { store = tx.objectStore(storeName); } catch (_) { continue; }
+        const indexes = {};
+        for (const idxName of store.indexNames) {
+            let idx;
+            try { idx = store.index(idxName); } catch (_) { continue; }
+            const kp = idx.keyPath;
+            indexes[idxName] = {
+                keyPath: Array.isArray(kp) ? Array.from(kp) : [kp],
+                unique: !!idx.unique,
+                multiEntry: !!idx.multiEntry,
+            };
+        }
+        result[storeName] = { indexes };
+    }
+    // Tx has no pending requests so it commits naturally without effect.
+    return result;
 }
 
 function applySchemaOpsSync(upgradeTx, ops) {
@@ -518,6 +550,192 @@ export function storeClear(txId, storeName) {
     return withStore(txId, storeName, (record, store, resolve) => {
         const req = store.clear();
         finishWith(record, req, resolve, () => undefined);
+    });
+}
+
+// ---------------------------------------------------------------------------
+// Index ops (mirror store ops; resolves index via store.index(name))
+// ---------------------------------------------------------------------------
+
+function withIndex(txId, storeName, indexName, doWork) {
+    return new Promise((resolve) => {
+        let record;
+        try { record = getHandle(txId, "tx"); }
+        catch (e) {
+            resolve(fail({ kind: "TransactionInactive", jsName: null, message: `Transaction ${txId} not found.` }));
+            return;
+        }
+        if (!record.extras.alive) {
+            resolve(fail({ kind: "TransactionInactive", jsName: null, message: "Transaction is no longer active." }));
+            return;
+        }
+        let idx;
+        try { idx = record.obj.objectStore(storeName).index(indexName); }
+        catch (e) { resolve(fail(mapDomError(e))); return; }
+        try { doWork(record, idx, resolve); }
+        catch (e) { resolve(fail(mapDomError(e))); }
+    });
+}
+
+export function indexGet(txId, storeName, indexName, keyEnv) {
+    return withIndex(txId, storeName, indexName, (record, idx, resolve) => {
+        const req = idx.get(unwrapKey(keyEnv));
+        finishWith(record, req, resolve, v => (v === undefined ? null : v));
+    });
+}
+
+export function indexGetAll(txId, storeName, indexName, rangeEnv, count) {
+    return withIndex(txId, storeName, indexName, (record, idx, resolve) => {
+        const range = unwrapRange(rangeEnv);
+        const req = count != null ? idx.getAll(range, count) : idx.getAll(range);
+        finishWith(record, req, resolve);
+    });
+}
+
+export function indexGetAllKeys(txId, storeName, indexName, rangeEnv, count) {
+    return withIndex(txId, storeName, indexName, (record, idx, resolve) => {
+        const range = unwrapRange(rangeEnv);
+        // For indexes, getAllKeys returns PRIMARY keys (the store key, not the index key).
+        const req = count != null ? idx.getAllKeys(range, count) : idx.getAllKeys(range);
+        finishWith(record, req, resolve, keys => keys.map(wrapKey));
+    });
+}
+
+export function indexCount(txId, storeName, indexName, rangeEnv) {
+    return withIndex(txId, storeName, indexName, (record, idx, resolve) => {
+        const range = unwrapRange(rangeEnv);
+        const req = range ? idx.count(range) : idx.count();
+        finishWith(record, req, resolve);
+    });
+}
+
+// ---------------------------------------------------------------------------
+// Cursors
+// ---------------------------------------------------------------------------
+
+const CURSOR_DIRS = ["next", "nextunique", "prev", "prevunique"];
+
+function packCursorEntry(cursor, mode) {
+    if (mode === "keyOnly") {
+        return { key: wrapKey(cursor.key), primaryKey: wrapKey(cursor.primaryKey) };
+    }
+    return { key: wrapKey(cursor.key), primaryKey: wrapKey(cursor.primaryKey), value: cursor.value };
+}
+
+export function openCursor(txId, storeName, indexName, rangeEnv, direction, mode) {
+    return new Promise((resolve) => {
+        let record;
+        try { record = getHandle(txId, "tx"); }
+        catch (e) {
+            resolve(fail({ kind: "TransactionInactive", jsName: null, message: `Transaction ${txId} not found.` }));
+            return;
+        }
+        if (!record.extras.alive) {
+            resolve(fail({ kind: "TransactionInactive", jsName: null, message: "Transaction is no longer active." }));
+            return;
+        }
+        const dirStr = CURSOR_DIRS[direction] || "next";
+        const range = unwrapRange(rangeEnv);
+        let target;
+        try {
+            const store = record.obj.objectStore(storeName);
+            target = indexName ? store.index(indexName) : store;
+        } catch (e) {
+            resolve(fail(mapDomError(e)));
+            return;
+        }
+        let req;
+        try {
+            req = mode === "keyOnly"
+                ? target.openKeyCursor(range, dirStr)
+                : target.openCursor(range, dirStr);
+        } catch (e) {
+            resolve(fail(mapDomError(e)));
+            return;
+        }
+        req.onsuccess = () => {
+            const cursor = req.result;
+            if (!cursor) {
+                resolve(ok({ cursorId: null, hasFirst: false, entry: null }));
+                scheduleKeepAlive(record);
+                return;
+            }
+            const cursorId = nextHandleId++;
+            handles.set(cursorId, {
+                obj: cursor,
+                kind: "cursor",
+                extras: { mode, request: req, txRecord: record },
+            });
+            resolve(ok({ cursorId, hasFirst: true, entry: packCursorEntry(cursor, mode) }));
+            scheduleKeepAlive(record);
+        };
+        req.onerror = () => resolve(fail(mapDomError(req.error)));
+    });
+}
+
+function withCursor(cursorId, doWork) {
+    return new Promise((resolve) => {
+        let record;
+        try { record = getHandle(cursorId, "cursor"); }
+        catch (e) { resolve(fail(mapDomError(e))); return; }
+        try { doWork(record, resolve); }
+        catch (e) { resolve(fail(mapDomError(e))); }
+    });
+}
+
+export function cursorContinue(cursorId, keyEnv) {
+    return withCursor(cursorId, (record, resolve) => {
+        const cursor = record.obj;
+        const req = record.extras.request;
+        req.onsuccess = () => {
+            const c = req.result;
+            if (!c) {
+                resolve(ok({ done: true, entry: null }));
+                scheduleKeepAlive(record.extras.txRecord);
+                return;
+            }
+            resolve(ok({ done: false, entry: packCursorEntry(c, record.extras.mode) }));
+            scheduleKeepAlive(record.extras.txRecord);
+        };
+        req.onerror = () => resolve(fail(mapDomError(req.error)));
+        try {
+            if (keyEnv != null) cursor.continue(unwrapKey(keyEnv));
+            else cursor.continue();
+        } catch (e) { resolve(fail(mapDomError(e))); }
+    });
+}
+
+export function cursorAdvance(cursorId, count) {
+    return withCursor(cursorId, (record, resolve) => {
+        const cursor = record.obj;
+        const req = record.extras.request;
+        req.onsuccess = () => {
+            const c = req.result;
+            if (!c) {
+                resolve(ok({ done: true, entry: null }));
+                scheduleKeepAlive(record.extras.txRecord);
+                return;
+            }
+            resolve(ok({ done: false, entry: packCursorEntry(c, record.extras.mode) }));
+            scheduleKeepAlive(record.extras.txRecord);
+        };
+        req.onerror = () => resolve(fail(mapDomError(req.error)));
+        try { cursor.advance(count); }
+        catch (e) { resolve(fail(mapDomError(e))); }
+    });
+}
+
+export function cursorUpdate(cursorId, value) {
+    return withCursor(cursorId, (record, resolve) => {
+        const req = record.obj.update(value);
+        finishWith(record.extras.txRecord, req, resolve, () => undefined);
+    });
+}
+
+export function cursorDelete(cursorId) {
+    return withCursor(cursorId, (record, resolve) => {
+        const req = record.obj.delete();
+        finishWith(record.extras.txRecord, req, resolve, () => undefined);
     });
 }
 

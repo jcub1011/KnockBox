@@ -98,13 +98,21 @@ internal sealed class ObjectStore<TValue> : IObjectStore<TValue>
         => StoreOps.ClearAsync(_tx, Name, ct);
 
     public IIndex<TValue> Index(string name)
-        => throw new NotImplementedException("Indexes land in Phase 3 of the IndexedDB rollout.");
+    {
+        if (!_tx.TryGetIndexSchema(Name, name, out var schema))
+        {
+            throw new InvalidOperationException(
+                $"Index '{name}' is not defined on store '{Name}'. " +
+                "Index metadata is captured at database-open time and is not available during an upgrade callback.");
+        }
+        return new TypedIndex<TValue>(_tx, Name, name, schema);
+    }
 
     public ValueTask<ValueResult<IIndexedDbCursor<TValue>, IndexedDbError>> OpenCursorAsync(
         KeyRange? range = null, CursorDirection direction = CursorDirection.Next, CancellationToken ct = default)
-        => throw new NotImplementedException("Cursors land in Phase 3 of the IndexedDB rollout.");
+        => CursorOpen.OpenValueAsync<TValue>(_tx, Name, indexName: null, range, direction, ct);
 
     public ValueTask<ValueResult<IIndexedDbKeyCursor, IndexedDbError>> OpenKeyCursorAsync(
         KeyRange? range = null, CursorDirection direction = CursorDirection.Next, CancellationToken ct = default)
-        => throw new NotImplementedException("Cursors land in Phase 3 of the IndexedDB rollout.");
+        => CursorOpen.OpenKeyAsync(_tx, Name, indexName: null, range, direction, ct);
 }

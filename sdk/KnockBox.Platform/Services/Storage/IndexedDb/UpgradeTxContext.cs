@@ -30,4 +30,17 @@ internal sealed class UpgradeTxContext : ITxContext
         JsonOptions = jsonOptions;
         _isActive = isActive;
     }
+
+    /// <summary>
+    /// Index metadata is not exposed during an upgrade — the schema is being
+    /// mutated in flight and the per-index <c>keyPath</c> / <c>unique</c> /
+    /// <c>multiEntry</c> values aren't snapshotted until the upgrade tx
+    /// commits. <see cref="IObjectStore{TValue}.Index"/> against this context
+    /// surfaces an <see cref="InvalidOperationException"/> as a result.
+    /// </summary>
+    public bool TryGetIndexSchema(string storeName, string indexName, out IndexSchema schema)
+    {
+        schema = default!;
+        return false;
+    }
 }

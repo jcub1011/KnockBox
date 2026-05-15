@@ -12,6 +12,7 @@ internal sealed class IndexedDatabase : IIndexedDatabase
     private readonly ILoggerFactory _loggerFactory;
     private readonly ILogger<IndexedDatabase> _logger;
     private readonly JsonSerializerOptions _jsonOptions;
+    private readonly IReadOnlyDictionary<string, StoreSchema> _schema;
     private readonly int _dbId;
     private readonly DotNetObjectReference<VersionChangeBridge> _bridgeRef;
     private bool _disposed;
@@ -30,12 +31,14 @@ internal sealed class IndexedDatabase : IIndexedDatabase
         int version,
         IReadOnlyList<string> objectStoreNames,
         JsonSerializerOptions jsonOptions,
+        IReadOnlyDictionary<string, StoreSchema> schema,
         DotNetObjectReference<VersionChangeBridge> bridgeRef)
     {
         _interop = interop;
         _loggerFactory = loggerFactory;
         _logger = loggerFactory.CreateLogger<IndexedDatabase>();
         _jsonOptions = jsonOptions;
+        _schema = schema;
         _dbId = dbId;
         Name = name;
         Version = version;
@@ -90,7 +93,7 @@ internal sealed class IndexedDatabase : IIndexedDatabase
         var tx = new IndexedDbTransaction(
             _interop,
             _loggerFactory.CreateLogger<IndexedDbTransaction>(),
-            begin.TxId, mode, storeNames, _jsonOptions, bridge, bridgeRef);
+            begin.TxId, mode, storeNames, _jsonOptions, _schema, bridge, bridgeRef);
 
         try
         {

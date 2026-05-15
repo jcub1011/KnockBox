@@ -10,6 +10,7 @@ internal sealed class IndexedDbTransaction : IIndexedDbTransaction, ITxContext
     private readonly ILogger<IndexedDbTransaction> _logger;
     private readonly TxCompletionBridge _bridge;
     private readonly DotNetObjectReference<TxCompletionBridge> _bridgeRef;
+    private readonly IReadOnlyDictionary<string, StoreSchema> _schema;
     private readonly object _stateLock = new();
     private bool _active = true;
     private bool _disposed;
@@ -38,6 +39,7 @@ internal sealed class IndexedDbTransaction : IIndexedDbTransaction, ITxContext
         TransactionMode mode,
         IReadOnlyList<string> storeNames,
         JsonSerializerOptions jsonOptions,
+        IReadOnlyDictionary<string, StoreSchema> schema,
         TxCompletionBridge bridge,
         DotNetObjectReference<TxCompletionBridge> bridgeRef)
     {
@@ -47,8 +49,16 @@ internal sealed class IndexedDbTransaction : IIndexedDbTransaction, ITxContext
         Mode = mode;
         StoreNames = storeNames;
         JsonOptions = jsonOptions;
+        _schema = schema;
         _bridge = bridge;
         _bridgeRef = bridgeRef;
+    }
+
+    public bool TryGetIndexSchema(string storeName, string indexName, out IndexSchema schema)
+    {
+        schema = default!;
+        return _schema.TryGetValue(storeName, out var store)
+            && store.Indexes.TryGetValue(indexName, out schema!);
     }
 
     public IObjectStore<TValue> ObjectStore<TValue>(string name)

@@ -77,13 +77,21 @@ internal sealed class JsonObjectStore : IJsonObjectStore
         => StoreOps.CountAsync(_tx, Name, range, ct);
 
     public IIndex Index(string name)
-        => throw new NotImplementedException("Indexes land in Phase 3 of the IndexedDB rollout.");
+    {
+        if (!_tx.TryGetIndexSchema(Name, name, out var schema))
+        {
+            throw new InvalidOperationException(
+                $"Index '{name}' is not defined on store '{Name}'. " +
+                "Index metadata is captured at database-open time and is not available during an upgrade callback.");
+        }
+        return new JsonIndex(_tx, Name, name, schema);
+    }
 
     public ValueTask<ValueResult<IJsonObjectCursor, IndexedDbError>> OpenCursorAsync(
         KeyRange? range = null, CursorDirection direction = CursorDirection.Next, CancellationToken ct = default)
-        => throw new NotImplementedException("Cursors land in Phase 3 of the IndexedDB rollout.");
+        => CursorOpen.OpenJsonAsync(_tx, Name, indexName: null, range, direction, ct);
 
     public ValueTask<ValueResult<IIndexedDbKeyCursor, IndexedDbError>> OpenKeyCursorAsync(
         KeyRange? range = null, CursorDirection direction = CursorDirection.Next, CancellationToken ct = default)
-        => throw new NotImplementedException("Cursors land in Phase 3 of the IndexedDB rollout.");
+        => CursorOpen.OpenKeyAsync(_tx, Name, indexName: null, range, direction, ct);
 }

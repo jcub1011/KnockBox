@@ -14,4 +14,12 @@ internal interface ITxContext
     int TxId { get; }
     JsonSerializerOptions JsonOptions { get; }
     bool IsActive { get; }
+
+    /// <summary>
+    /// Looks up the immutable metadata for a previously-defined index on the
+    /// given store. Returns <see langword="false"/> when the index does not
+    /// exist (or, during an upgrade callback, has not yet been committed to
+    /// the schema snapshot the context observes).
+    /// </summary>
+    bool TryGetIndexSchema(string storeName, string indexName, out IndexSchema schema);
 }

@@ -49,6 +49,7 @@ internal sealed class IndexedDbService : IIndexedDbService, IAsyncDisposable
             resp.DbId, schema.Name, resp.Version,
             resp.ObjectStoreNames,
             schema.JsonOptions ?? IndexedDbWireFormat.DefaultJsonOptions,
+            resp.Schema ?? new Dictionary<string, StoreSchema>(),
             bridgeRef);
         bridge.AttachDatabase(db);
         return db;
@@ -99,6 +100,10 @@ internal sealed class IndexedDbService : IIndexedDbService, IAsyncDisposable
     public ValueTask DisposeAsync() => _interop.DisposeAsync();
 }
 
-internal sealed record OpenDatabaseResponse(int DbId, int Version, IReadOnlyList<string> ObjectStoreNames);
+internal sealed record OpenDatabaseResponse(
+    int DbId,
+    int Version,
+    IReadOnlyList<string> ObjectStoreNames,
+    Dictionary<string, StoreSchema>? Schema);
 internal sealed record ListDatabasesResponse(IReadOnlyList<DatabaseInfoEntry> Infos);
 internal sealed record DatabaseInfoEntry(string Name, int Version);
