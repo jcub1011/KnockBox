@@ -49,28 +49,6 @@ internal sealed class IndexedDatabase : IIndexedDatabase
         _bridgeRef = bridgeRef;
     }
 
-    public IIndexedDbTransaction BeginTransaction(IReadOnlyList<string> storeNames, TransactionMode mode)
-    {
-        if (storeNames.Count == 0)
-            throw new ArgumentException("At least one store name is required.", nameof(storeNames));
-
-        var bridge = new TxCompletionBridge();
-        var bridgeRef = DotNetObjectReference.Create(bridge);
-        var storeNamesArr = storeNames.ToArray();
-
-        // beginTransaction is synchronous in IDB; the JS wrapper still resolves
-        // a promise (its envelope arrives async via SignalR). Block-on-sync is
-        // not viable in Blazor Server, so we adopt a different convention:
-        // BeginTransaction returns immediately with a pending tx that defers
-        // its txId resolution to the first op. The current rollout does NOT
-        // implement that deferral — callers should prefer RunAsync, which
-        // handles the async-begin path internally.
-        throw new NotSupportedException(
-            "Synchronous BeginTransaction is not implementable over JS interop. " +
-            "Use RunAsync(...) instead — it begins the transaction asynchronously, " +
-            "runs the supplied work, and commits or aborts based on the result.");
-    }
-
     public async ValueTask<ValueResult<T, IndexedDbError>> RunAsync<T>(
         IReadOnlyList<string> storeNames,
         TransactionMode mode,
@@ -175,8 +153,6 @@ internal sealed class IndexedDatabase : IIndexedDatabase
         return Result<IndexedDbError>.Success;
     }
 
-    private sealed record BeginTransactionResponse(int TxId);
-
     internal async ValueTask RaiseVersionChangeRequestedAsync()
     {
         var handler = VersionChangeRequested;
@@ -216,3 +192,5 @@ internal sealed class IndexedDatabase : IIndexedDatabase
         _bridgeRef.Dispose();
     }
 }
+
+internal sealed record BeginTransactionResponse(int TxId);

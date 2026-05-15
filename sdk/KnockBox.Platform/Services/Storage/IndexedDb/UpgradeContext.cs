@@ -101,24 +101,24 @@ internal sealed class UpgradeContext : IUpgradeContext
         _pendingOps.Add(new SchemaOp(Type: "deleteStore", Name: name));
     }
 
-    public IObjectStore<TValue> ObjectStore<TValue>(string name)
+    public async ValueTask<IObjectStore<TValue>> ObjectStoreAsync<TValue>(string name)
     {
         EnsureStoreExists(name);
-        FlushPendingSchemaOpsBeforeData();
+        await FlushPendingSchemaOpsBeforeDataAsync().ConfigureAwait(false);
         return new ObjectStore<TValue>(_txContext, name);
     }
 
-    public IJsonObjectStore JsonObjectStore(string name)
+    public async ValueTask<IJsonObjectStore> JsonObjectStoreAsync(string name)
     {
         EnsureStoreExists(name);
-        FlushPendingSchemaOpsBeforeData();
+        await FlushPendingSchemaOpsBeforeDataAsync().ConfigureAwait(false);
         return new JsonObjectStore(_txContext, name);
     }
 
-    public IBlobObjectStore BlobObjectStore(string name)
+    public async ValueTask<IBlobObjectStore> BlobObjectStoreAsync(string name)
     {
         EnsureStoreExists(name);
-        FlushPendingSchemaOpsBeforeData();
+        await FlushPendingSchemaOpsBeforeDataAsync().ConfigureAwait(false);
         return new BlobObjectStore(_txContext, _loggerFactory, _shareRegistry, name);
     }
 
@@ -131,22 +131,22 @@ internal sealed class UpgradeContext : IUpgradeContext
 
     /// <summary>
     /// Schema mutations are queued by C# but must reach JS before any data op
-    /// runs against the affected store. Pending ops are flushed synchronously
-    /// from the JS-side <c>applySchemaOpsSync</c>; we instead call into JS to
-    /// drain whatever has been queued so far without round-tripping through
-    /// the OnUpgrade return value.
+    /// runs against the affected store. Awaited from the async store
+    /// accessors so the JS-side <c>upgradeApplySchemaOps</c> message is
+    /// observed before any subsequent data op is dispatched.
     /// </summary>
-    private void FlushPendingSchemaOpsBeforeData()
+    private async ValueTask FlushPendingSchemaOpsBeforeDataAsync()
     {
         if (_pendingOps.Count == 0) return;
         var batch = _pendingOps.ToArray();
         _pendingOps.Clear();
-        // Fire-and-forget on the JS side: the upgrade tx is still active so
-        // the synchronous JS applySchemaOps runs to completion before the next
-        // data op fires (it's sequenced on the same SignalR pipe). A failure
-        // surfaces on the next data op as TransactionInactive.
-        _ = _interop.InvokeVoidAsync(
-            "upgradeApplySchemaOps", CancellationToken.None, _upgradeTxId, batch).AsTask();
+        var result = await _interop.InvokeVoidAsync(
+            "upgradeApplySchemaOps", CancellationToken.None, _upgradeTxId, batch).ConfigureAwait(false);
+        if (result.TryGetFailure(out var err))
+        {
+            throw new InvalidOperationException(
+                $"upgradeApplySchemaOps failed: [{err.Kind}] {err.Message}");
+        }
     }
 
     internal void Queue(SchemaOp op) => _pendingOps.Add(op);

@@ -49,14 +49,27 @@ namespace KnockBox.Core.Services.Storage.IndexedDb
         /// <summary>Permanently removes the named store and all its data.</summary>
         void DeleteObjectStore(string name);
 
-        /// <summary>Typed POCO data view of an existing JSON store, for migration.</summary>
-        IObjectStore<TValue> ObjectStore<TValue>(string name);
+        /// <summary>
+        /// Typed POCO data view of an existing JSON store, for migration.
+        /// Awaiting this also flushes any queued schema mutations (store
+        /// creates / index changes / store deletes) to JS so the returned
+        /// handle sees the post-mutation schema.
+        /// </summary>
+        ValueTask<IObjectStore<TValue>> ObjectStoreAsync<TValue>(string name);
 
-        /// <summary>Untyped JSON data view of an existing JSON store, for migration.</summary>
-        IJsonObjectStore JsonObjectStore(string name);
+        /// <summary>
+        /// Untyped JSON data view of an existing JSON store, for migration.
+        /// See <see cref="ObjectStoreAsync{TValue}"/> for the schema-flush
+        /// behavior.
+        /// </summary>
+        ValueTask<IJsonObjectStore> JsonObjectStoreAsync(string name);
 
-        /// <summary>Blob data view of an existing blob store, for migration.</summary>
-        IBlobObjectStore BlobObjectStore(string name);
+        /// <summary>
+        /// Blob data view of an existing blob store, for migration. See
+        /// <see cref="ObjectStoreAsync{TValue}"/> for the schema-flush
+        /// behavior.
+        /// </summary>
+        ValueTask<IBlobObjectStore> BlobObjectStoreAsync(string name);
     }
 
     /// <summary>

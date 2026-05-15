@@ -11,7 +11,7 @@ namespace KnockBox.Platform.Services.Storage.IndexedDb;
 /// and translates JS-side disconnections into <see cref="IndexedDbError"/>s
 /// instead of leaked exceptions.
 /// </summary>
-internal sealed class IndexedDbInterop : IAsyncDisposable
+internal class IndexedDbInterop : IAsyncDisposable
 {
     private const string ModulePath = "/_content/KnockBox.Platform/js/indexedDbService.js";
 
@@ -28,7 +28,7 @@ internal sealed class IndexedDbInterop : IAsyncDisposable
             _jsRuntime.InvokeAsync<IJSObjectReference>("import", ModulePath).AsTask());
     }
 
-    public async ValueTask<ValueResult<JsonElement, IndexedDbError>> InvokeRawAsync(
+    public virtual async ValueTask<ValueResult<JsonElement, IndexedDbError>> InvokeRawAsync(
         string method, CancellationToken ct, params object?[] args)
     {
         try
@@ -57,7 +57,7 @@ internal sealed class IndexedDbInterop : IAsyncDisposable
         }
     }
 
-    public async ValueTask<ValueResult<T, IndexedDbError>> InvokeAsync<T>(
+    public virtual async ValueTask<ValueResult<T, IndexedDbError>> InvokeAsync<T>(
         string method, CancellationToken ct, params object?[] args)
     {
         var raw = await InvokeRawAsync(method, ct, args).ConfigureAwait(false);
@@ -78,7 +78,7 @@ internal sealed class IndexedDbInterop : IAsyncDisposable
         }
     }
 
-    public async ValueTask<Result<IndexedDbError>> InvokeVoidAsync(
+    public virtual async ValueTask<Result<IndexedDbError>> InvokeVoidAsync(
         string method, CancellationToken ct, params object?[] args)
     {
         var raw = await InvokeRawAsync(method, ct, args).ConfigureAwait(false);
@@ -115,7 +115,7 @@ internal sealed class IndexedDbInterop : IAsyncDisposable
         return new IndexedDbError(IndexedDbErrorMapper.ParseKind(kind), msg, jsName);
     }
 
-    public async ValueTask DisposeAsync()
+    public virtual async ValueTask DisposeAsync()
     {
         if (_disposed) return;
         _disposed = true;

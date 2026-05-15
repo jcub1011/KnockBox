@@ -19,7 +19,7 @@ public static class BlobShareEndpoint
         return endpoints.MapGet("/blob-share/{token:guid}", HandleAsync);
     }
 
-    private static async Task HandleAsync(HttpContext context, Guid token)
+    internal static async Task HandleAsync(HttpContext context, Guid token)
     {
         var services = context.RequestServices;
         var registry = services.GetRequiredService<BlobShareRegistry>();
@@ -38,14 +38,13 @@ public static class BlobShareEndpoint
         context.Response.Headers.CacheControl = entry.CacheControl ?? "no-store, private";
 
         var ct = context.RequestAborted;
-        const int chunkSize = 16 * 1024;
         long offset = 0;
         var body = context.Response.Body;
 
         while (offset < entry.Length)
         {
             ct.ThrowIfCancellationRequested();
-            var requested = (int)Math.Min(chunkSize, entry.Length - offset);
+            var requested = (int)Math.Min(IndexedDbBlobChunking.ChunkSize, entry.Length - offset);
             byte[] chunk;
             try
             {

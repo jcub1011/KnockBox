@@ -14,14 +14,6 @@ namespace KnockBox.Core.Services.Storage.IndexedDb
         IReadOnlyList<string> ObjectStoreNames { get; }
 
         /// <summary>
-        /// Begins a transaction over one or more stores. The returned handle
-        /// MUST be disposed; failing to commit before disposal aborts.
-        /// </summary>
-        IIndexedDbTransaction BeginTransaction(
-            IReadOnlyList<string> storeNames,
-            TransactionMode mode);
-
-        /// <summary>
         /// Runs <paramref name="work"/> inside a transaction, committing on a
         /// successful result and aborting on failure or exception. Awaits
         /// <see cref="IIndexedDbTransaction.Completed"/> before returning, so

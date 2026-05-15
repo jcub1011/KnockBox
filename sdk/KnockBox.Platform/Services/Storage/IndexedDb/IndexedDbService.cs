@@ -15,11 +15,22 @@ internal sealed class IndexedDbService : IIndexedDbService, IAsyncDisposable
         IJSRuntime jsRuntime,
         ILoggerFactory loggerFactory,
         BlobShareRegistry shareRegistry)
+        : this(new IndexedDbInterop(jsRuntime, loggerFactory.CreateLogger<IndexedDbInterop>()),
+               loggerFactory, shareRegistry)
+    {
+    }
+
+    // Test seam: lets unit tests inject a mocked interop without constructing
+    // a real Blazor IJSRuntime. Not part of the public surface.
+    internal IndexedDbService(
+        IndexedDbInterop interop,
+        ILoggerFactory loggerFactory,
+        BlobShareRegistry shareRegistry)
     {
         _loggerFactory = loggerFactory;
         _logger = loggerFactory.CreateLogger<IndexedDbService>();
         _shareRegistry = shareRegistry;
-        _interop = new IndexedDbInterop(jsRuntime, loggerFactory.CreateLogger<IndexedDbInterop>());
+        _interop = interop;
     }
 
     public async ValueTask<ValueResult<IIndexedDatabase, IndexedDbError>> OpenAsync(
@@ -131,6 +142,9 @@ internal sealed class IndexedDbService : IIndexedDbService, IAsyncDisposable
     public async ValueTask<IndexedDbBlob> CreateBlobAsync(
         Stream stream, long length, string contentType, bool leaveOpen = false, CancellationToken ct = default)
     {
+        ArgumentNullException.ThrowIfNull(stream);
+        if (!stream.CanRead)
+            throw new ArgumentException("Stream must be readable.", nameof(stream));
         if (length < 0) throw new ArgumentOutOfRangeException(nameof(length), "Length must be non-negative.");
 
         try

@@ -30,8 +30,9 @@ internal sealed class IndexedDbBlobImpl : IndexedDbBlob
     private readonly string _contentType;
     private readonly long _length;
     private readonly ConcurrentBag<Guid> _publishedShares = new();
+    private readonly object _prepareLock = new();
     private string? _cachedObjectUrl;
-    private bool _readPrepared;
+    private Task? _prepareTask;
     private bool _disposed;
 
     public override string ContentType => _contentType;
@@ -65,10 +66,10 @@ internal sealed class IndexedDbBlobImpl : IndexedDbBlob
         {
             var requested = (int)Math.Min(IndexedDbBlobChunking.ChunkSize, _length - offset);
             var chunk = await ReadChunkAsync(offset, requested, ct).ConfigureAwait(false);
-            chunk.AsSpan().CopyTo(buffer.AsSpan((int)offset));
-            offset += chunk.Length;
             if (chunk.Length == 0)
                 throw new IOException($"blobReadChunk returned 0 bytes at offset {offset} of {_length}.");
+            chunk.AsSpan().CopyTo(buffer.AsSpan((int)offset));
+            offset += chunk.Length;
         }
         return buffer;
     }
@@ -147,9 +148,21 @@ internal sealed class IndexedDbBlobImpl : IndexedDbBlob
         }
     }
 
-    private async ValueTask EnsureReadPreparedAsync(CancellationToken ct)
+    /// <summary>
+    /// Caches the in-flight prepare call so concurrent readers share one
+    /// JS-side snapshot. A failed prepare is cached too — subsequent callers
+    /// observe the same <see cref="IOException"/> rather than retrying.
+    /// </summary>
+    private Task EnsureReadPreparedAsync(CancellationToken ct)
     {
-        if (_readPrepared) return;
+        lock (_prepareLock)
+        {
+            return _prepareTask ??= PrepareReadAsync(ct);
+        }
+    }
+
+    private async Task PrepareReadAsync(CancellationToken ct)
+    {
         var result = await _interop.InvokeAsync<BlobPrepareReadResponse>(
             "blobPrepareRead", ct, _blobId).ConfigureAwait(false);
         if (!result.TryGetSuccess(out _))
@@ -159,12 +172,11 @@ internal sealed class IndexedDbBlobImpl : IndexedDbBlob
                 : $"[{result.Error.Error.Kind}] {result.Error.Error.Message}";
             throw new IOException("blobPrepareRead failed: " + msg);
         }
-        _readPrepared = true;
     }
 
     internal async ValueTask<byte[]> ReadChunkAsync(long offset, int count, CancellationToken ct)
     {
-        if (!_readPrepared) await EnsureReadPreparedAsync(ct).ConfigureAwait(false);
+        await EnsureReadPreparedAsync(ct).ConfigureAwait(false);
         var result = await _interop.InvokeAsync<BlobChunkResponse>(
             "blobReadChunk", ct, _blobId, offset, count).ConfigureAwait(false);
         if (!result.TryGetSuccess(out var chunk))
