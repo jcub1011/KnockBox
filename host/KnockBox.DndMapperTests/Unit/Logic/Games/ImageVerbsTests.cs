@@ -3,7 +3,6 @@ using KnockBox.DndMapper.Services.Logic.Games;
 using KnockBox.DndMapper.Services.State.Games;
 using KnockBox.DndMapper.Services.State.Games.Data;
 using KnockBox.DndMapperTests.Helpers;
-using Microsoft.Extensions.Logging;
 
 namespace KnockBox.DndMapperTests.Unit.Logic.Games
 {
@@ -13,32 +12,27 @@ namespace KnockBox.DndMapperTests.Unit.Logic.Games
         private DndMapperGameEngine _engine = default!;
         private DndMapperGameState _state = default!;
         private User _host = default!;
-        private InMemoryPluginStorage _storage = default!;
         private Guid _mapId;
 
         [TestInitialize]
         public void Setup()
         {
-            _storage = new InMemoryPluginStorage();
-            (_engine, _state, _host, _) = EngineTestFactory.Build(_storage);
+            (_engine, _state, _host, _) = EngineTestFactory.Build();
             var create = _engine.CreateMapAsync(_state, _host, "M");
             Assert.IsTrue(create.TryGetSuccess(out _mapId));
         }
 
-        private MapImage SeedImage(long bytes = 100, string ext = "png")
-        {
-            var img = new MapImage
+        private static MapImage SeedImage(long bytes = 100, string contentType = "image/png")
+            => new()
             {
                 Id = Guid.NewGuid(),
-                RelativePath = $"{_state.SessionId}/images/{Guid.NewGuid()}.{ext}",
+                ContentType = contentType,
+                ShareToken = Guid.NewGuid(),
                 Width = 10,
                 Height = 10,
                 Opacity = 1.0,
                 ByteSize = bytes,
             };
-            _storage.Seed(img.RelativePath, new byte[bytes]);
-            return img;
-        }
 
         // ── AddImageAsync ─────────────────────────────────────────────────────────
 
@@ -90,6 +84,40 @@ namespace KnockBox.DndMapperTests.Unit.Logic.Games
             Assert.AreEqual(1, b.LayerOrder);
             Assert.AreEqual(2, c.LayerOrder);
             Assert.AreEqual(150, _state.BytesUsed);
+        }
+
+        [TestMethod]
+        public void AddImageAsync_PerFileCapExceeded_ReturnsError()
+        {
+            var img = SeedImage(bytes: (5L * 1024 * 1024) + 1);
+            var result = _engine.AddImageAsync(_state, _host, _mapId, img);
+            Assert.IsTrue(result.IsFailure);
+            Assert.AreEqual(0, _state.BytesUsed);
+        }
+
+        [TestMethod]
+        public void AddImageAsync_RoomCapExceeded_ReturnsError()
+        {
+            // Each image is under the 5 MB per-file cap; combined they're under
+            // the 10 MB room cap; the third pushes past 10 MB and must be rejected.
+            var a = SeedImage(bytes: 4L * 1024 * 1024);
+            var b = SeedImage(bytes: 4L * 1024 * 1024);
+            Assert.IsTrue(_engine.AddImageAsync(_state, _host, _mapId, a).IsSuccess);
+            Assert.IsTrue(_engine.AddImageAsync(_state, _host, _mapId, b).IsSuccess);
+
+            var tooBig = SeedImage(bytes: 3L * 1024 * 1024);
+            var result = _engine.AddImageAsync(_state, _host, _mapId, tooBig);
+
+            Assert.IsTrue(result.IsFailure);
+            Assert.AreEqual(8L * 1024 * 1024, _state.BytesUsed);
+        }
+
+        [TestMethod]
+        public void AddImageAsync_UnsupportedContentType_ReturnsError()
+        {
+            var img = SeedImage(contentType: "image/gif");
+            var result = _engine.AddImageAsync(_state, _host, _mapId, img);
+            Assert.IsTrue(result.IsFailure);
         }
 
         // ── UpdateImageTransformAsync ─────────────────────────────────────────────
@@ -179,56 +207,19 @@ namespace KnockBox.DndMapperTests.Unit.Logic.Games
         // ── RemoveImageAsync ──────────────────────────────────────────────────────
 
         [TestMethod]
-        public void RemoveImageAsync_HostCaller_RemovesFromListDeletesFromStorageDecrementsBytes()
+        public void RemoveImageAsync_HostCaller_RemovesFromListAndDecrementsBytes()
         {
             var a = SeedImage(50); _engine.AddImageAsync(_state, _host, _mapId, a);
             var b = SeedImage(75); _engine.AddImageAsync(_state, _host, _mapId, b);
             Assert.AreEqual(125, _state.BytesUsed);
-            Assert.IsTrue(_storage.Exists(a.RelativePath));
 
             var result = _engine.RemoveImageAsync(_state, _host, _mapId, a.Id);
 
             Assert.IsTrue(result.IsSuccess);
             Assert.AreEqual(1, _state.Maps[0].Images.Count);
             Assert.AreEqual(75, _state.BytesUsed);
-            Assert.IsFalse(_storage.Exists(a.RelativePath));
             // Remaining image's LayerOrder compacted to 0.
             Assert.AreEqual(0, _state.Maps[0].Images[0].LayerOrder);
-        }
-
-        [TestMethod]
-        public void RemoveImageAsync_StorageDeleteFails_ReturnsSuccessAndLogs()
-        {
-            // Rebuild the engine with a capturing logger so we can assert the warning.
-            var storage = new InMemoryPluginStorage();
-            var logger = new CapturingLogger<DndMapperGameEngine>();
-            var (engine, state, host, _) = EngineTestFactory.Build(storage, logger);
-            var createResult = engine.CreateMapAsync(state, host, "M");
-            Assert.IsTrue(createResult.TryGetSuccess(out var mapId));
-
-            var a = new MapImage
-            {
-                Id = Guid.NewGuid(),
-                RelativePath = $"{state.SessionId}/images/{Guid.NewGuid()}.png",
-                Width = 10, Height = 10, Opacity = 1.0,
-                ByteSize = 50,
-            };
-            storage.Seed(a.RelativePath, new byte[50]);
-            engine.AddImageAsync(state, host, mapId, a);
-
-            var boom = new IOException("boom");
-            storage.DeleteOverride = _ => throw boom;
-
-            var result = engine.RemoveImageAsync(state, host, mapId, a.Id);
-
-            // Verb succeeds even though disk delete failed; in-memory state is the source of truth.
-            Assert.IsTrue(result.IsSuccess);
-            Assert.AreEqual(0, state.Maps[0].Images.Count);
-            Assert.AreEqual(0, state.BytesUsed);
-
-            var warning = logger.Warnings.FirstOrDefault(w => w.Message.Contains("Failed to delete image file"));
-            Assert.IsNotNull(warning.Message, "Expected a warning log for the failed disk delete.");
-            Assert.AreSame(boom, warning.Exception);
         }
 
         [TestMethod]
@@ -253,28 +244,6 @@ namespace KnockBox.DndMapperTests.Unit.Logic.Games
             Assert.IsTrue(result.IsSuccess);
             Assert.AreEqual(0, _state.Maps.Count);
             Assert.AreEqual(0, _state.BytesUsed);
-            Assert.IsFalse(_storage.Exists(a.RelativePath));
-            Assert.IsFalse(_storage.Exists(b.RelativePath));
-            Assert.IsFalse(_storage.Exists(c.RelativePath));
-        }
-
-        // ── Session-end cleanup ───────────────────────────────────────────────────
-
-        [TestMethod]
-        public void Dispose_FiresStorageCleanup_RemovesAllSessionFiles()
-        {
-            var a = SeedImage(50); _engine.AddImageAsync(_state, _host, _mapId, a);
-            var b = SeedImage(50); _engine.AddImageAsync(_state, _host, _mapId, b);
-
-            // Add an unrelated file to ensure the cleanup is scoped.
-            _storage.Seed("other-session/images/foo.png", new byte[10]);
-
-            _state.Dispose();
-
-            Assert.IsFalse(_storage.Exists(a.RelativePath));
-            Assert.IsFalse(_storage.Exists(b.RelativePath));
-            Assert.IsTrue(_storage.Exists("other-session/images/foo.png"),
-                "Cleanup should be scoped to the session prefix.");
         }
 
         // ── SetImageLockedAsync ───────────────────────────────────────────────────
@@ -341,6 +310,5 @@ namespace KnockBox.DndMapperTests.Unit.Logic.Games
             Assert.AreEqual(0, _state.Maps[0].Images[0].LayerOrder);
             Assert.AreEqual(a.Id, _state.Maps[0].Images[0].Id);
         }
-
     }
 }

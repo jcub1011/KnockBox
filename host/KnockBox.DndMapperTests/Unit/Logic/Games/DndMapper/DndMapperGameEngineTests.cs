@@ -26,7 +26,6 @@ namespace KnockBox.DndMapper.Tests.Unit.Logic
             _host = UserFactory.Create("Host", "host1");
 
             _engine = new DndMapperGameEngine(
-                new TestPluginContext(new InMemoryPluginStorage()),
                 _engineLoggerMock.Object,
                 _stateLoggerMock.Object,
                 _rngMock.Object);

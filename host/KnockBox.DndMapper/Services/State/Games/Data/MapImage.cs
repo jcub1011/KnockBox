@@ -3,7 +3,12 @@ namespace KnockBox.DndMapper.Services.State.Games.Data
     public sealed class MapImage
     {
         public Guid Id { get; set; }
-        public string RelativePath { get; set; } = string.Empty;
+        public string ContentType { get; set; } = string.Empty;
+        // Live blob-share token published by the host's circuit. Null when the host is
+        // disconnected; player UIs render a placeholder until the host reconnects and
+        // republishes. Never persisted to IndexedDB — capability tokens are
+        // circuit-scoped and recomputed on every attach.
+        public Guid? ShareToken { get; set; }
         public double X { get; set; }
         public double Y { get; set; }
         public double Width { get; set; }

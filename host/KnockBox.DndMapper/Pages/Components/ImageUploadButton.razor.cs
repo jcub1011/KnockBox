@@ -88,25 +88,15 @@ namespace KnockBox.DndMapper.Pages.Components
             await PushToast(summary.Message, summary.Tone);
         }
 
-        private async Task<string?> UploadSingleAsync(IBrowserFile file, Guid mapId)
+        private Task<string?> UploadSingleAsync(IBrowserFile file, Guid mapId)
         {
-            if (file.Size > MaxImageBytes) return "exceeds 5 MB";
-            try
-            {
-                using var stream = file.OpenReadStream(MaxImageBytes);
-                var result = await Engine.SaveImageAsync(
-                    State, UserService.CurrentUser!, mapId, stream, file.Size, ComponentDetached);
-
-                if (result.TryGetSuccess(out _)) return null;
-                if (result.TryGetFailure(out var err)) return err.PublicMessage;
-                return "upload failed";
-            }
-            catch (OperationCanceledException) { return "canceled"; }
-            catch (Exception ex)
-            {
-                Logger.LogWarning(ex, "Image upload failed for {File}.", file.Name);
-                return "upload failed";
-            }
+            if (file.Size > MaxImageBytes) return Task.FromResult<string?>("exceeds 5 MB");
+            // Upload pipeline is being migrated to IndexedDB-backed
+            // DndMapperLibraryService; wired up in a follow-on task. The previous
+            // SaveImageAsync (server-side IPluginStorage) has been removed.
+            _ = file;
+            _ = mapId;
+            return Task.FromResult<string?>("upload temporarily disabled during IndexedDB migration");
         }
 
         private Task PushToast(string message, DndMapperToastTone tone)

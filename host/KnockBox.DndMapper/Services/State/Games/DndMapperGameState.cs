@@ -20,10 +20,6 @@ namespace KnockBox.DndMapper.Services.State.Games
         public Dictionary<Guid, CharacterSheet> Sheets { get; } = [];
         public List<RollResult> RollLog { get; } = [];
 
-        // Used as the per-room storage prefix for uploaded images and as the cleanup key
-        // when the state is disposed. New per state; never reused across sessions.
-        public Guid SessionId { get; } = Guid.NewGuid();
-
         // Running total of bytes consumed by uploaded images on this state. Used to
         // enforce the per-room 10 MB cap. Mutated only by image verbs inside Execute.
         public long BytesUsed { get; private set; }

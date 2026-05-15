@@ -10,22 +10,24 @@ namespace KnockBox.DndMapperTests.Helpers
     {
         public static (DndMapperGameEngine engine, DndMapperGameState state, User host, SequentialRng rng) Build(
             params int[] rngValues)
-            => Build(storage: new InMemoryPluginStorage(), rngValues: rngValues);
+            => Build(storage: null, engineLogger: null, rngValues: rngValues);
 
+        // The `storage` parameter is preserved as no-op for backwards-compat with tests
+        // that still pass it. After the IndexedDB migration the engine no longer touches
+        // IPluginStorage; image bytes live in the host's browser, not on the server.
         public static (DndMapperGameEngine engine, DndMapperGameState state, User host, SequentialRng rng) Build(
-            InMemoryPluginStorage storage,
+            InMemoryPluginStorage? storage,
             params int[] rngValues)
             => Build(storage, engineLogger: null, rngValues: rngValues);
 
         public static (DndMapperGameEngine engine, DndMapperGameState state, User host, SequentialRng rng) Build(
-            InMemoryPluginStorage storage,
+            InMemoryPluginStorage? storage,
             ILogger<DndMapperGameEngine>? engineLogger,
             params int[] rngValues)
         {
+            _ = storage; // accepted for compatibility; engine no longer uses IPluginStorage.
             var rng = new SequentialRng(rngValues);
-            var context = new TestPluginContext(storage);
             var engine = new DndMapperGameEngine(
-                context,
                 engineLogger ?? NullLogger<DndMapperGameEngine>.Instance,
                 NullLogger<DndMapperGameState>.Instance,
                 rng);
