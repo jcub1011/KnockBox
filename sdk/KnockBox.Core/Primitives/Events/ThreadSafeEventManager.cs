@@ -112,13 +112,25 @@ namespace KnockBox.Core.Primitives.Events
             return ThreadSafeEventManagerHelper.DispatchAsync(snapshot, SafeInvokeAsync);
         }
 
+        /// <summary>
+        /// Dispatches the notification. Sync handlers run on the calling thread;
+        /// only pending async handlers are awaited fire-and-forget. The
+        /// zero-subscriber and all-sync paths allocate nothing.
+        /// </summary>
         public void Notify()
         {
-            _ = Task.Run(async () =>
+            var snapshot = Volatile.Read(ref _listeners);
+            if (snapshot.Length == 0) return;
+
+            for (int i = 0; i < snapshot.Length; i++)
             {
-                try { await NotifyAsync(); }
-                catch (Exception ex) { logger?.LogError(ex, "Error notifying subscribers."); }
-            });
+                ValueTask vt;
+                try { vt = snapshot[i](); }
+                catch (Exception ex) { logger?.LogError(ex, "Error notifying subscriber."); continue; }
+
+                if (vt.IsCompletedSuccessfully) continue;
+                _ = AwaitValueTaskAsync(vt);
+            }
         }
 
         private Task SafeInvokeAsync(Func<ValueTask> callback)
@@ -179,13 +191,25 @@ namespace KnockBox.Core.Primitives.Events
             return ThreadSafeEventManagerHelper.DispatchAsync(snapshot, cb => SafeInvokeAsync(cb, args));
         }
 
+        /// <summary>
+        /// Dispatches the notification. Sync handlers run on the calling thread;
+        /// only pending async handlers are awaited fire-and-forget. The
+        /// zero-subscriber and all-sync paths allocate nothing.
+        /// </summary>
         public void Notify(TEventArgs args)
         {
-            _ = Task.Run(async () =>
+            var snapshot = Volatile.Read(ref _listeners);
+            if (snapshot.Length == 0) return;
+
+            for (int i = 0; i < snapshot.Length; i++)
             {
-                try { await NotifyAsync(args); }
-                catch (Exception ex) { logger?.LogError(ex, "Error notifying subscribers with args [{args}].", args); }
-            });
+                ValueTask vt;
+                try { vt = snapshot[i](args); }
+                catch (Exception ex) { logger?.LogError(ex, "Error notifying subscriber."); continue; }
+
+                if (vt.IsCompletedSuccessfully) continue;
+                _ = AwaitValueTaskAsync(vt);
+            }
         }
 
         private Task SafeInvokeAsync(Func<TEventArgs, ValueTask> callback, TEventArgs args)

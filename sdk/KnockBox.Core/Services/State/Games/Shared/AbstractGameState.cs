@@ -40,8 +40,8 @@ namespace KnockBox.Core.Services.State.Games.Shared
     /// <para><b>Concurrency contract:</b> mutations must flow through
     /// <see cref="Execute(Action)"/> / <c>ExecuteAsync</c>, which acquire a
     /// per-state <c>SemaphoreSlim(1,1)</c>, run the caller's lambda, release
-    /// the lock, and <i>then</i> fire <see cref="StateChangedEventManager"/>.
-    /// Non-mutating serialized reads use
+    /// the lock, and <i>then</i> fire state-change notifications via
+    /// <see cref="StateChangedEventManager"/>. Non-mutating serialized reads use
     /// <c>WithExclusiveRead</c> / <c>WithExclusiveReadAsync</c> — those do not
     /// notify subscribers. Direct field writes from outside these helpers
     /// bypass both the lock and the notification and should be avoided.</para>
@@ -50,37 +50,76 @@ namespace KnockBox.Core.Services.State.Games.Shared
     /// <c>Execute</c> reentrantly without deadlocking. The
     /// <see cref="PlayerUnregistered"/> event is raised with the same
     /// "outside-the-lock" guarantee for the same reason.</para>
-    /// <para><b>Lifecycle:</b> the owning lobby disposes the state when the
-    /// game ends or the host leaves; the <see cref="OnStateDisposed"/> event
-    /// lets pages and background handlers unsubscribe cleanly.</para>
+    /// <para><b>Memory layout:</b> this class implements
+    /// <see cref="IThreadSafeEventManager"/> directly to avoid allocating a
+    /// separate manager object per lobby, and lazily allocates the scheduling
+    /// subsystem (CTS + callback list) only on the first
+    /// <see cref="ScheduleCallback"/> call. Player / kicked-user reads are
+    /// served from volatile snapshot arrays rebuilt only when membership
+    /// changes, so concurrent reads need no additional lock.</para>
     /// </remarks>
-    public abstract class AbstractGameState(User host, ILogger logger) : IDisposable
+    public abstract class AbstractGameState : IDisposable, IThreadSafeEventManager
     {
-        private readonly Lock _disposeLock = new();
+        // Single shared sync root: guards listener mutations (subscribe/unsubscribe)
+        // and lazy-init/mutation of _scheduledCallbacks. Player and kicked-set
+        // mutations are serialized by _executeLock instead.
+        private readonly Lock _syncRoot = new();
         private readonly AsyncLocal<bool> _isExecuting = new();
         private readonly SemaphoreSlim _executeLock = new(1, 1);
-        private readonly Lock _scheduledLock = new();
-        private readonly List<CancellationTokenSource> _scheduledCallbacks = [];
-        private readonly Lock _playerLock = new();
-        private volatile PlayerEntry[] _cachedPlayerEntries = [];
+        private readonly User _host;
+        private readonly ILogger _logger;
+
+        // Mutated only inside Execute. Read by IsKicked/KickedPlayers via volatile snapshot fields.
         private readonly Dictionary<string, PlayerEntry> _players = [];
-        private readonly Dictionary<string, User> _kickedPlayers = [];
-        private readonly CancellationTokenSource _disposeCts = new();
+        // Hot read: Players, RosterIncludingHost, KickedPlayers, IsKicked.
+        private volatile PlayerEntry[] _cachedPlayerEntries = [];
+        private volatile PlayerEntry[] _cachedRoster;
+        private volatile User[] _cachedKickedUsers = [];
+
+        // Inlined IThreadSafeEventManager state. Snapshot is read lock-free; writes
+        // copy-on-swap under _syncRoot.
+        private Func<ValueTask>[] _listeners = [];
+
+        // Lazily allocated — most states never schedule callbacks. Both fields are
+        // published via _syncRoot the first time ScheduleCallback runs.
+        private CancellationTokenSource? _disposeCts;
+        private List<CancellationTokenSource>? _scheduledCallbacks;
+
         private int _disposed;
+
+        protected AbstractGameState(User host, ILogger logger)
+        {
+            _host = host;
+            _logger = logger;
+            // Roster always contains the host at index 0; players are appended on join.
+            _cachedRoster = [new PlayerEntry(host, host.Name, null)];
+        }
 
         /// <summary>
         /// Notifies all subscribers that the state has changed.
         /// </summary>
-        protected void NotifyStateChanged()
-        {
-            StateChangedEventManager.Notify();
-        }
+        protected void NotifyStateChanged() => Notify();
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal void UpdatePlayerCacheUnsafe()
         {
             ThrowIfNotExecuting();
-            _cachedPlayerEntries = [.. _players.Values];
+
+            var count = _players.Count;
+            var entries = count == 0 ? [] : new PlayerEntry[count];
+            var roster = new PlayerEntry[count + 1];
+            roster[0] = new PlayerEntry(_host, _host.Name, null);
+
+            int i = 0;
+            foreach (var entry in _players.Values)
+            {
+                entries[i] = entry;
+                roster[i + 1] = entry;
+                i++;
+            }
+
+            _cachedPlayerEntries = entries;
+            _cachedRoster = roster;
         }
 
         /// <summary>
@@ -113,13 +152,14 @@ namespace KnockBox.Core.Services.State.Games.Shared
         public event Action<User>? PlayerUnregistered;
 
         /// <summary>
-        /// Raises when any state changes.
+        /// Raises when any state changes. The state manages its own subscriber
+        /// list (this property returns <c>this</c>) so no additional event-manager
+        /// object is allocated per lobby.
         /// </summary>
-        public readonly IThreadSafeEventManager StateChangedEventManager
-            = new ThreadSafeEventManager(logger);
+        public IThreadSafeEventManager StateChangedEventManager => this;
 
         /// <summary>
-        /// If this lobby is open for players to join. 
+        /// If this lobby is open for players to join.
         /// This does not indicate if there is room available, just that the game state is in the phase for players to join.
         /// </summary>
         public bool IsJoinable { get; private set; }
@@ -127,7 +167,7 @@ namespace KnockBox.Core.Services.State.Games.Shared
         /// <summary>
         /// The host of the game.
         /// </summary>
-        public User Host => host;
+        public User Host => _host;
 
         /// <summary>
         /// The players in this game. Each entry carries both the authoritative
@@ -141,45 +181,42 @@ namespace KnockBox.Core.Services.State.Games.Shared
         /// registered player. The host's entry carries a null <c>Token</c>
         /// (the host isn't a registered player) and a <c>DisplayName</c> equal
         /// to <c>Host.Name</c>; player entries carry the per-lobby
-        /// disambiguated <c>DisplayName</c>. Use this instead of composing
-        /// a host-plus-players sequence at each call site.
+        /// disambiguated <c>DisplayName</c>. Returns a cached snapshot — no
+        /// allocation per read.
         /// </summary>
-        public IEnumerable<PlayerEntry> RosterIncludingHost
-        {
-            get
-            {
-                yield return new PlayerEntry(Host, Host.Name, Token: null);
-                foreach (var entry in Players) yield return entry;
-            }
-        }
+        public IReadOnlyList<PlayerEntry> RosterIncludingHost => _cachedRoster;
 
         /// <summary>
-        /// Players that have been kicked from this game.
+        /// Players that have been kicked from this game. Reads return a cached
+        /// snapshot rebuilt on kick; no allocation per read.
         /// </summary>
-        public IReadOnlyList<User> KickedPlayers
-        {
-            get
-            {
-                using var scope = _playerLock.EnterScope();
-                if (_kickedPlayers.Count == 0) return [];
-                var result = new User[_kickedPlayers.Count];
-                int i = 0;
-                foreach (var user in _kickedPlayers.Values)
-                    result[i++] = user;
-                return result;
-            }
-        }
+        public IReadOnlyList<User> KickedPlayers => _cachedKickedUsers;
 
         /// <summary>
         /// Checks if a player has been kicked from this game.
         /// </summary>
-        /// <param name="user"></param>
-        /// <returns></returns>
         public bool IsKicked(User? user)
         {
             if (user is null) return false;
-            using var scope = _playerLock.EnterScope();
-            return _kickedPlayers.ContainsKey(user.Id);
+            var snapshot = _cachedKickedUsers;
+            for (int i = 0; i < snapshot.Length; i++)
+            {
+                if (string.Equals(snapshot[i].Id, user.Id, StringComparison.Ordinal))
+                    return true;
+            }
+            return false;
+        }
+
+        private bool IsKickedByIdUnsafe(string userId)
+        {
+            // Read inside Execute; snapshot is stable for the duration.
+            var snapshot = _cachedKickedUsers;
+            for (int i = 0; i < snapshot.Length; i++)
+            {
+                if (string.Equals(snapshot[i].Id, userId, StringComparison.Ordinal))
+                    return true;
+            }
+            return false;
         }
 
         /// <summary>
@@ -208,15 +245,14 @@ namespace KnockBox.Core.Services.State.Games.Shared
                     return;
                 }
 
-                if (Host.Id == player.Id)
+                if (_host.Id == player.Id)
                 {
                     registration = ValueResult<IDisposable>.FromError("Host cannot be a player in the game.");
                     registrationSet = true;
                     return;
                 }
 
-                using var scope = _playerLock.EnterScope();
-                if (_kickedPlayers.ContainsKey(player.Id))
+                if (IsKickedByIdUnsafe(player.Id))
                 {
                     registration = ValueResult<IDisposable>.FromError("You have been kicked from this lobby and cannot rejoin.", $"Player [{player.Name}] was kicked and cannot rejoin.");
                     registrationSet = true;
@@ -254,7 +290,7 @@ namespace KnockBox.Core.Services.State.Games.Shared
 
                 bool IsNameTaken(string name)
                 {
-                    if (string.Equals(Host.Name, name, StringComparison.Ordinal)) return true;
+                    if (string.Equals(_host.Name, name, StringComparison.Ordinal)) return true;
                     foreach (var entry in _players.Values)
                     {
                         if (string.Equals(entry.DisplayName, name, StringComparison.Ordinal))
@@ -264,22 +300,16 @@ namespace KnockBox.Core.Services.State.Games.Shared
                 }
 
                 // Self-reference allows the dispose closure to verify that this is still the
-                // authoritative token for this player.  If the player re-registers before
+                // authoritative token for this player. If the player re-registers before
                 // disposing (e.g. re-joining from the home page during the grace period), the
                 // old token is superseded and its dispose becomes a no-op, so the player is
                 // not accidentally removed from the lobby.
-                //
-                // The variable must be declared nullable and assigned on the next line so that
-                // the closure can capture the variable itself (not a value) and still see the
-                // final reference once the constructor completes — a standard C# self-referential
-                // closure pattern.
                 DisposableAction? unsubscriber = null;
                 unsubscriber = new DisposableAction(() =>
                 {
                     bool shouldFire = false;
                     Execute(() =>
                     {
-                        using var innerScope = _playerLock.EnterScope();
                         if (_players.TryGetValue(player.Id, out var current) && ReferenceEquals(current.Token, unsubscriber))
                         {
                             _players.Remove(player.Id);
@@ -294,9 +324,9 @@ namespace KnockBox.Core.Services.State.Games.Shared
                 UpdatePlayerCacheUnsafe();
 
                 if (!isRejoin)
-                    logger.LogInformation("User [{userId}] entered game [{type}] hosted by user [{hostId}].", player.Id, GetType().Name, Host.Id);
+                    _logger.LogInformation("User [{userId}] entered game [{type}] hosted by user [{hostId}].", player.Id, GetType().Name, _host.Id);
                 else
-                    logger.LogInformation("User [{userId}] rejoined game [{type}] hosted by user [{hostId}].", player.Id, GetType().Name, Host.Id);
+                    _logger.LogInformation("User [{userId}] rejoined game [{type}] hosted by user [{hostId}].", player.Id, GetType().Name, _host.Id);
 
                 registration = unsubscriber;
                 registrationSet = true;
@@ -323,10 +353,15 @@ namespace KnockBox.Core.Services.State.Games.Shared
 
             var result = Execute(() =>
             {
-                using var scope = _playerLock.EnterScope();
                 if (_players.TryGetValue(player.Id, out var registration))
                 {
-                    _kickedPlayers[player.Id] = player;
+                    // Append to the kicked snapshot, then remove from the player dict.
+                    var existing = _cachedKickedUsers;
+                    var updated = new User[existing.Length + 1];
+                    if (existing.Length > 0) Array.Copy(existing, updated, existing.Length);
+                    updated[existing.Length] = player;
+                    _cachedKickedUsers = updated;
+
                     _players.Remove(player.Id);
                     UpdatePlayerCacheUnsafe();
                     token = registration.Token;
@@ -360,9 +395,6 @@ namespace KnockBox.Core.Services.State.Games.Shared
         /// <summary>
         /// Executes the provided action async.
         /// </summary>
-        /// <param name="action"></param>
-        /// <param name="ct"></param>
-        /// <returns></returns>
         public async ValueTask<Result> ExecuteAsync(Func<ValueTask> action, CancellationToken ct = default)
         {
             if (TryGetDisposeError(out var ode))
@@ -401,15 +433,13 @@ namespace KnockBox.Core.Services.State.Games.Shared
             }
             finally
             {
-                if (notify) StateChangedEventManager.Notify();
+                if (notify) Notify();
             }
         }
 
         /// <summary>
         /// Executes the provided action sync.
         /// </summary>
-        /// <param name="action"></param>
-        /// <returns></returns>
         public Result Execute(Action action)
         {
             if (TryGetDisposeError(out var ode)) return Result.FromError("State was disposed.", ode.ToString());
@@ -446,16 +476,13 @@ namespace KnockBox.Core.Services.State.Games.Shared
             }
             finally
             {
-                if (notify) StateChangedEventManager.Notify();
+                if (notify) Notify();
             }
         }
 
         /// <summary>
         /// Executes the provided action sync with return.
         /// </summary>
-        /// <typeparam name="TReturn"></typeparam>
-        /// <param name="action"></param>
-        /// <returns></returns>
         public ValueResult<TReturn> Execute<TReturn>(Func<TReturn> action)
         {
             if (TryGetDisposeError(out var ode)) return ValueResult<TReturn>.FromError("State was disposed.", ode.ToString());
@@ -492,15 +519,13 @@ namespace KnockBox.Core.Services.State.Games.Shared
             }
             finally
             {
-                if (notify) StateChangedEventManager.Notify();
+                if (notify) Notify();
             }
         }
 
         /// <summary>
         /// Executes the action with exclusive read access to the game state.
         /// </summary>
-        /// <param name="action"></param>
-        /// <returns></returns>
         public async ValueTask<Result> WithExclusiveReadAsync(Func<ValueTask> action, CancellationToken ct = default)
         {
             if (TryGetDisposeError(out var ode)) return Result.FromError("State was disposed.", ode.ToString());
@@ -539,8 +564,6 @@ namespace KnockBox.Core.Services.State.Games.Shared
         /// <summary>
         /// Executes the action with exclusive read access to the game state.
         /// </summary>
-        /// <param name="action"></param>
-        /// <returns></returns>
         public Result WithExclusiveRead(Action action)
         {
             if (TryGetDisposeError(out var ode)) return Result.FromError("State was disposed.", ode.ToString());
@@ -584,23 +607,23 @@ namespace KnockBox.Core.Services.State.Games.Shared
         /// work before it runs. Both <see cref="IScheduledCallbackHandle.Cancel"/> and
         /// <see cref="IDisposable.Dispose"/> are idempotent and safe to call after the owning state
         /// has been disposed. All outstanding callbacks are automatically cancelled when the state
-        /// is disposed.
+        /// is disposed. The scheduling subsystem (CTS + list) is allocated lazily on first call,
+        /// so states that never schedule pay no overhead.
         /// </remarks>
-        /// <param name="delay">How long to wait before executing the action.</param>
-        /// <param name="action">The action to run inside <see cref="ExecuteAsync"/>.</param>
         public ValueResult<IScheduledCallbackHandle> ScheduleCallback(TimeSpan delay, Func<Task> action)
         {
             if (TryGetDisposeError(out var ode))
             {
-                logger.LogError(ode, "Error scheduling callback.");
+                _logger.LogError(ode, "Error scheduling callback.");
                 return ValueResult<IScheduledCallbackHandle>.FromError("Unable to schedule callback.", ode.ToString());
             }
 
-            var cts = CancellationTokenSource.CreateLinkedTokenSource(_disposeCts.Token);
+            var disposeCts = EnsureScheduling();
+            var cts = CancellationTokenSource.CreateLinkedTokenSource(disposeCts.Token);
 
-            lock (_scheduledLock)
+            lock (_syncRoot)
             {
-                _scheduledCallbacks.Add(cts);
+                _scheduledCallbacks!.Add(cts);
             }
 
             _ = Task.Run(async () =>
@@ -609,7 +632,7 @@ namespace KnockBox.Core.Services.State.Games.Shared
                 {
                     await Task.Delay(delay, cts.Token);
 
-                    if (_disposeCts.IsCancellationRequested)
+                    if (disposeCts.IsCancellationRequested)
                         return;
 
                     await ExecuteAsync(() => new ValueTask(action()), cts.Token);
@@ -620,13 +643,13 @@ namespace KnockBox.Core.Services.State.Games.Shared
                 }
                 catch (Exception ex)
                 {
-                    logger.LogError(ex, "Error executing scheduled callback.");
+                    _logger.LogError(ex, "Error executing scheduled callback.");
                 }
                 finally
                 {
-                    lock (_scheduledLock)
+                    lock (_syncRoot)
                     {
-                        _scheduledCallbacks.Remove(cts);
+                        _scheduledCallbacks?.Remove(cts);
                     }
                     cts.Dispose();
                 }
@@ -635,10 +658,24 @@ namespace KnockBox.Core.Services.State.Games.Shared
             return new ScheduledCallbackHandle(cts);
         }
 
+        private CancellationTokenSource EnsureScheduling()
+        {
+            var existing = Volatile.Read(ref _disposeCts);
+            if (existing is not null) return existing;
+
+            lock (_syncRoot)
+            {
+                if (_disposeCts is null)
+                {
+                    _scheduledCallbacks = [];
+                    _disposeCts = new CancellationTokenSource();
+                }
+                return _disposeCts;
+            }
+        }
+
         /// <summary>
-        /// Opaque handle returned by <see cref="ScheduleCallback"/>. Wraps the linked CTS so that
-        /// callers can <see cref="Cancel"/> or <see cref="Dispose"/> idempotently without risk of
-        /// double-disposing a CTS that is owned by the scheduling state.
+        /// Opaque handle returned by <see cref="ScheduleCallback"/>.
         /// </summary>
         private sealed class ScheduledCallbackHandle : IScheduledCallbackHandle
         {
@@ -680,16 +717,21 @@ namespace KnockBox.Core.Services.State.Games.Shared
             // rather than waiting for GC to detect the cycle.
             OnStateDisposed = null;
             PlayerUnregistered = null;
+            // Drop subscribers too — they hold component references via captures.
+            lock (_syncRoot) { _listeners = []; }
 
-            _disposeCts.Cancel();
-
+            CancellationTokenSource? disposeCts;
             CancellationTokenSource[] pendingCallbacks;
-
-            lock (_scheduledLock)
+            lock (_syncRoot)
             {
-                pendingCallbacks = [.. _scheduledCallbacks];
-                _scheduledCallbacks.Clear();
+                disposeCts = _disposeCts;
+                pendingCallbacks = _scheduledCallbacks is { Count: > 0 } list
+                    ? [.. list]
+                    : [];
+                _scheduledCallbacks?.Clear();
             }
+
+            disposeCts?.Cancel();
 
             foreach (var cts in pendingCallbacks)
             {
@@ -701,13 +743,10 @@ namespace KnockBox.Core.Services.State.Games.Shared
                 catch { } // Ignore canceled and disposed exceptions
             }
 
-            lock (_disposeLock)
-            {
-                _executeLock.Dispose();
-                _disposeCts.Dispose();
-            }
+            _executeLock.Dispose();
+            disposeCts?.Dispose();
 
-            logger.LogInformation("Game state [{type}] ended with host [{id}].", GetType().Name, Host.Id);
+            _logger.LogInformation("Game state [{type}] ended with host [{id}].", GetType().Name, _host.Id);
 
             GC.SuppressFinalize(this);
         }
@@ -732,10 +771,11 @@ namespace KnockBox.Core.Services.State.Games.Shared
         private void SafeInvoke(Action? @event, string eventName)
         {
             if (@event is null) return;
-            foreach (Action handler in @event.GetInvocationList().Cast<Action>())
+            var invocationList = @event.GetInvocationList();
+            for (int i = 0; i < invocationList.Length; i++)
             {
-                try { handler(); }
-                catch (Exception ex) { logger.LogError(ex, "Subscriber to [{Event}] threw.", eventName); }
+                try { ((Action)invocationList[i])(); }
+                catch (Exception ex) { _logger.LogError(ex, "Subscriber to [{Event}] threw.", eventName); }
             }
         }
 
@@ -746,10 +786,90 @@ namespace KnockBox.Core.Services.State.Games.Shared
         private void SafeInvoke<T>(Action<T>? @event, T arg, string eventName)
         {
             if (@event is null) return;
-            foreach (Action<T> handler in @event.GetInvocationList().Cast<Action<T>>())
+            var invocationList = @event.GetInvocationList();
+            for (int i = 0; i < invocationList.Length; i++)
             {
-                try { handler(arg); }
-                catch (Exception ex) { logger.LogError(ex, "Subscriber to [{Event}] threw.", eventName); }
+                try { ((Action<T>)invocationList[i])(arg); }
+                catch (Exception ex) { _logger.LogError(ex, "Subscriber to [{Event}] threw.", eventName); }
+            }
+        }
+
+        // ── IThreadSafeEventManager ──────────────────────────────────────────────
+
+        IDisposable IThreadSafeEventManager.Subscribe(Func<ValueTask> callback)
+        {
+            ArgumentNullException.ThrowIfNull(callback);
+
+            lock (_syncRoot)
+            {
+                _listeners = ThreadSafeEventManagerHelper.AddListener(_listeners, callback);
+            }
+
+            return new DisposableAction(() =>
+            {
+                lock (_syncRoot)
+                {
+                    _listeners = ThreadSafeEventManagerHelper.RemoveListener(_listeners, callback);
+                }
+            });
+        }
+
+        Task IThreadSafeEventManager.NotifyAsync()
+        {
+            Func<ValueTask>[] snapshot;
+            lock (_syncRoot) { snapshot = _listeners; }
+            return ThreadSafeEventManagerHelper.DispatchAsync(snapshot, SafeInvokeListenerAsync);
+        }
+
+        void IThreadSafeEventManager.Notify() => Notify();
+
+        /// <summary>
+        /// Dispatches the state-change notification. Sync handlers run on the calling
+        /// thread (after the execute lock has been released); async handlers are
+        /// awaited fire-and-forget so the caller is never blocked by a slow subscriber.
+        /// No <c>Task.Run</c> closure is allocated on the sync-completion path.
+        /// </summary>
+        private void Notify()
+        {
+            var snapshot = Volatile.Read(ref _listeners);
+            if (snapshot.Length == 0) return;
+
+            for (int i = 0; i < snapshot.Length; i++)
+            {
+                ValueTask vt;
+                try
+                {
+                    vt = snapshot[i]();
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error notifying subscriber.");
+                    continue;
+                }
+
+                if (vt.IsCompletedSuccessfully) continue;
+                _ = AwaitListenerAsync(vt);
+            }
+        }
+
+        private async Task AwaitListenerAsync(ValueTask vt)
+        {
+            try { await vt.ConfigureAwait(false); }
+            catch (Exception ex) { _logger.LogError(ex, "Error notifying subscriber."); }
+        }
+
+        private Task SafeInvokeListenerAsync(Func<ValueTask> callback)
+        {
+            try
+            {
+                var vt = callback();
+                if (vt.IsCompletedSuccessfully) return Task.CompletedTask;
+                return AwaitListenerAsync(vt);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error notifying subscriber.");
+                return Task.CompletedTask;
             }
         }
     }
