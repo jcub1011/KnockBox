@@ -680,8 +680,12 @@ namespace KnockBox.DndMapper.Services.Library
             }
 
             // 3. Drain any in-flight flush so the DB handle is safe to dispose.
-            try { await _saveLock.WaitAsync(TimeSpan.FromSeconds(2)); }
-            catch { /* ignore */ }
+            //    _saveLock is only released in the finally if we actually
+            //    acquired it; on timeout we proceed with teardown anyway since
+            //    the alternative is leaking the DB handle forever.
+            bool locked;
+            try { locked = await _saveLock.WaitAsync(TimeSpan.FromSeconds(2)); }
+            catch { locked = false; }
             try
             {
                 // 4. Drop the state subscription.
@@ -705,7 +709,7 @@ namespace KnockBox.DndMapper.Services.Library
             }
             finally
             {
-                try { _saveLock.Release(); } catch { /* ignore */ }
+                if (locked) _saveLock.Release();
                 _saveLock.Dispose();
                 _saveCts?.Dispose();
                 _saveCts = null;
