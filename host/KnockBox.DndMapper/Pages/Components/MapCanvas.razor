@@ -47,14 +47,31 @@
                 var rot = draft?.Rot ?? img.Rotation;
                 var cx = x + w / 2;
                 var cy = y + h / 2;
-                <image @key="img.Id"
-                       href="@($"/api/plugins/dnd-mapper/{RoomCode}/images/{img.Id}")"
-                       x="@F(x)" y="@F(y)"
-                       width="@F(w)" height="@F(h)"
-                       transform="@($"rotate({F(rot)} {F(cx)} {F(cy)})")"
-                       opacity="@F(img.Opacity)"
-                       preserveAspectRatio="none"
-                       pointer-events="none" />
+                @if (img.ShareToken is Guid shareToken)
+                {
+                    <image @key="img.Id"
+                           href="@($"/blob-share/{shareToken:D}")"
+                           x="@F(x)" y="@F(y)"
+                           width="@F(w)" height="@F(h)"
+                           transform="@($"rotate({F(rot)} {F(cx)} {F(cy)})")"
+                           opacity="@F(img.Opacity)"
+                           preserveAspectRatio="none"
+                           pointer-events="none" />
+                }
+                else
+                {
+                    // Host disconnected: the blob-share capability is gone. Render a
+                    // muted placeholder so the player sees the layer outline; the
+                    // host's reconnect republish path will broadcast a fresh token
+                    // via UpdateImageShareTokenAsync and the <image> swaps back in.
+                    <rect @key="img.Id"
+                          x="@F(x)" y="@F(y)"
+                          width="@F(w)" height="@F(h)"
+                          transform="@($"rotate({F(rot)} {F(cx)} {F(cy)})")"
+                          fill="#1c2128" stroke="#3d444c" stroke-width="0.04" stroke-dasharray="0.2,0.1"
+                          opacity="@F(Math.Min(img.Opacity, 0.6))"
+                          pointer-events="none" />
+                }
             }
 
             @if (IsHost)

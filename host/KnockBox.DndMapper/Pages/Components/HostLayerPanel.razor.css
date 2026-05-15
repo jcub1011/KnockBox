@@ -42,6 +42,15 @@
     flex: 0 0 auto;
 }
 
+.dndm-layer-thumb--placeholder {
+    /* Diagonal-stripe pattern indicates the host disconnected and the
+       blob-share token has expired. The image will return automatically
+       when the host's reconnect republishes the share. */
+    background:
+        repeating-linear-gradient(45deg, #1c2128 0 6px, #2c2c44 6px 12px);
+    border-style: dashed;
+}
+
 .dndm-layer-meta {
     display: flex;
     align-items: center;
