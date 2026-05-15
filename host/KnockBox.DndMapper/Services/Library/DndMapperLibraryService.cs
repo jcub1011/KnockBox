@@ -46,6 +46,12 @@ namespace KnockBox.DndMapper.Services.Library
         private Timer? _saveTimer;
         private CancellationTokenSource? _saveCts;
         private bool _disposed;
+        // Set to 1 by every StateChanged; cleared by a flush right before it
+        // reads state. If a StateChanged fires *during* an in-flight flush
+        // (or a flush returns early on lock collision), this flag stays 1 and
+        // FlushSnapshotAsync re-arms the debounce timer after release so the
+        // last burst of edits doesn't get lost when no further events fire.
+        private int _pendingDirty;
 
         public DndMapperLibraryService(
             IIndexedDbService indexedDb,
@@ -572,7 +578,11 @@ namespace KnockBox.DndMapper.Services.Library
         private ValueTask OnStateChangedAsync()
         {
             // Subscribers are invoked OUTSIDE the state's Execute lock; restart
-            // the debounce timer cheaply on every event.
+            // the debounce timer cheaply on every event. _pendingDirty=1
+            // signals to any concurrent flush that more changes arrived; on
+            // that flush's release it re-arms us if the timer didn't already
+            // fire from this Change() call.
+            Interlocked.Exchange(ref _pendingDirty, 1);
             _saveTimer?.Change(SaveDebounce, Timeout.InfiniteTimeSpan);
             return ValueTask.CompletedTask;
         }
@@ -595,14 +605,18 @@ namespace KnockBox.DndMapper.Services.Library
 
             if (!await _saveLock.WaitAsync(TimeSpan.Zero))
             {
-                // Another flush is already running; the latest state will get
-                // picked up by the next debounce tick once the timer is rearmed
-                // by subsequent StateChanged events.
+                // Another flush is already running; _pendingDirty stays set so
+                // the in-flight flush re-arms us on release.
                 return;
             }
             try
             {
                 if (_disposed || cts.IsCancellationRequested) return;
+
+                // Take ownership of the dirty signal before we read state; any
+                // StateChanged that fires while we're mid-write will set it
+                // back to 1 and trigger a re-arm in the finally.
+                Interlocked.Exchange(ref _pendingDirty, 0);
 
                 // Build the snapshot under the state's read lock so we don't
                 // race with a concurrent Execute. The read action is pure-sync
@@ -648,6 +662,17 @@ namespace KnockBox.DndMapper.Services.Library
             finally
             {
                 _saveLock.Release();
+
+                // If a StateChanged fired during the flush (or a colliding
+                // flush bailed without clearing the flag), re-arm so the
+                // trailing edits get written.
+                if (!_disposed
+                    && Volatile.Read(ref _pendingDirty) == 1
+                    && _saveCts is not null
+                    && !_saveCts.IsCancellationRequested)
+                {
+                    _saveTimer?.Change(SaveDebounce, Timeout.InfiniteTimeSpan);
+                }
             }
         }
 

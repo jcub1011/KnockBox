@@ -160,9 +160,11 @@ namespace KnockBox.DndMapper.Services.Library
 
         public static AttributeSchema ToAttributeSchema(AttributeSchemaSnapshot snap)
         {
-            // For built-in presets, prefer the canonical factory so any future
-            // preset evolutions are picked up rather than frozen in the snapshot.
-            // For Custom, replay the persisted rows.
+            // Built-in presets always rebuild from FromPreset so future preset
+            // definition changes flow into existing snapshots. The trade-off:
+            // in-place row edits to a built-in preset are intentionally not
+            // persisted — switch the schema to Custom if you want edits to
+            // survive a reload.
             if (snap.Preset != AttributePreset.Custom)
                 return AttributeSchema.FromPreset(snap.Preset);
 
