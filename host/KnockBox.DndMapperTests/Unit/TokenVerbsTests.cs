@@ -44,14 +44,15 @@ namespace KnockBox.DndMapperTests.Unit
         }
 
         [TestMethod]
-        public void SpawnPlayerTokenInternal_AssignsPaletteColorByPlayerSlot()
+        public void SpawnPlayerTokenInternal_DefaultColorIsDerivedFromPlayerName()
         {
             var (mapId, players) = CreateMapWithPlayers("P1", "P2");
             var map = _state.Maps.Single(m => m.Id == mapId);
             var p1Token = map.Tokens.First(t => t.OwnerUserId == players[0].Id);
             var p2Token = map.Tokens.First(t => t.OwnerUserId == players[1].Id);
-            Assert.AreEqual("#1f77b4", p1Token.Color);
-            Assert.AreEqual("#ff7f0e", p2Token.Color);
+            Assert.AreEqual(DefaultColorPalette.FromName("P1"), p1Token.Color);
+            Assert.AreEqual(DefaultColorPalette.FromName("P2"), p2Token.Color);
+            Assert.AreNotEqual(p1Token.Color, p2Token.Color);
         }
 
         [TestMethod]
@@ -70,14 +71,14 @@ namespace KnockBox.DndMapperTests.Unit
         }
 
         [TestMethod]
-        public void SpawnNpcTokenAsync_HostCaller_CreatesNeutralColorToken()
+        public void SpawnNpcTokenAsync_HostCaller_DefaultColorIsDerivedFromName()
         {
             var mapId = CreateAndActivateMap();
             var spawn = _engine.SpawnNpcTokenAsync(_state, _host, mapId, "Goblin");
             Assert.IsTrue(spawn.TryGetSuccess(out var tokenId));
             var token = _state.Maps.Single(m => m.Id == mapId).Tokens.Single(t => t.Id == tokenId);
             Assert.AreEqual(TokenType.NPCToken, token.Type);
-            Assert.AreEqual("#888", token.Color);
+            Assert.AreEqual(DefaultColorPalette.FromName("Goblin"), token.Color);
             Assert.IsNull(token.OwnerUserId);
         }
 
@@ -112,8 +113,11 @@ namespace KnockBox.DndMapperTests.Unit
         }
 
         [TestMethod]
-        public void SpawnNpcTokenAsync_WithRepresents_AssignsRepresentedPlayerSlotColor()
+        public void SpawnNpcTokenAsync_WithRepresents_DefaultColorStillDerivedFromTokenName()
         {
+            // Represents-an-existing-player NPCs (DMPCs, abandoned-player stand-ins)
+            // still seed their default color from the NPC's own name; the host can
+            // always override later if they want to mirror the player's color.
             var mapId = CreateAndActivateMap();
             var player = EngineTestFactory.RegisterPlayer(_state, "Alice");
 
@@ -122,7 +126,7 @@ namespace KnockBox.DndMapperTests.Unit
             var token = _state.Maps.Single(m => m.Id == mapId).Tokens.Single(t => t.Id == tokenId);
             Assert.AreEqual(TokenType.NPCToken, token.Type);
             Assert.AreEqual(player.Id, token.RepresentsUserId);
-            Assert.AreEqual("#1f77b4", token.Color); // slot 0 palette color
+            Assert.AreEqual(DefaultColorPalette.FromName("Alice (DMPC)"), token.Color);
         }
 
         [TestMethod]

@@ -97,6 +97,83 @@ namespace KnockBox.DndMapperTests.Unit.Services.Library
             Assert.AreEqual(original.AttributeSchema.Preset, reread.AttributeSchema.Preset);
         }
 
+        [TestMethod]
+        public void Snapshot_PreservesTokenColorNameAndIconKind()
+        {
+            // Token.Color, Name, and IconKind are part of the persistence contract:
+            // a name-derived default color (set at spawn time), a renamed NPC, and
+            // an icon-kind change must all survive a JSON round-trip.
+            var (engine, state, host, _) = EngineTestFactory.Build();
+            Assert.IsTrue(engine.CreateMapAsync(state, host, "Cavern").TryGetSuccess(out var mapId));
+            Assert.IsTrue(engine.SetActiveMapAsync(state, host, mapId).IsSuccess);
+
+            Assert.IsTrue(engine.SpawnNpcTokenAsync(state, host, mapId, "Goblin").TryGetSuccess(out var goblinId));
+            Assert.IsTrue(engine.SpawnNpcTokenAsync(state, host, mapId, "Bandit").TryGetSuccess(out var banditId));
+            // Host renames + recolors one NPC; the other keeps its FromName default.
+            Assert.IsTrue(engine.UpdateTokenAsync(state, host, banditId, "Cutpurse", "#abcdef", TokenIconKind.Solid).IsSuccess);
+
+            var json = JsonSerializer.Serialize(LibrarySnapshotMapper.FromState(state), JsonOptions);
+            var reread = JsonSerializer.Deserialize<LibrarySnapshot>(json, JsonOptions);
+
+            Assert.IsNotNull(reread);
+            var tokens = reread!.Maps.Single().Tokens.ToDictionary(t => t.Id);
+            Assert.AreEqual("Goblin", tokens[goblinId].Name);
+            Assert.AreEqual(DefaultColorPalette.FromName("Goblin"), tokens[goblinId].Color);
+            Assert.AreEqual(TokenIconKind.Initial, tokens[goblinId].IconKind);
+            Assert.AreEqual("Cutpurse", tokens[banditId].Name);
+            Assert.AreEqual("#abcdef", tokens[banditId].Color);
+            Assert.AreEqual(TokenIconKind.Solid, tokens[banditId].IconKind);
+        }
+
+        [TestMethod]
+        public void Snapshot_PreservesSheetCharacterNameNotesHpAndAttributeValues()
+        {
+            // CharacterName, Notes, Hp/MaxHp, and Values are the user-visible payload
+            // of a sheet and must all survive a JSON round-trip.
+            var (engine, state, host, _) = EngineTestFactory.Build();
+            Assert.IsTrue(engine.CreateSheetAsync(state, host, ownerUserId: null, "Bat")
+                .TryGetSuccess(out var sheetId));
+            Assert.IsTrue(engine.UpdateSheetFreeFieldsAsync(state, host, sheetId,
+                characterName: "Vampire Bat", notes: "Hangs from ceiling", hp: 4, maxHp: 7).IsSuccess);
+            var firstAttr = state.AttributeSchema.Rows[0].Name;
+            Assert.IsTrue(engine.UpdateSheetAttributeAsync(state, host, sheetId, firstAttr,
+                AttributeValue.Score(18)).IsSuccess);
+
+            var json = JsonSerializer.Serialize(LibrarySnapshotMapper.FromState(state), JsonOptions);
+            var reread = JsonSerializer.Deserialize<LibrarySnapshot>(json, JsonOptions);
+
+            Assert.IsNotNull(reread);
+            var sheet = reread!.Sheets.Single(s => s.Id == sheetId);
+            Assert.AreEqual("Vampire Bat", sheet.CharacterName);
+            Assert.AreEqual("Hangs from ceiling", sheet.Notes);
+            Assert.AreEqual(4, sheet.Hp);
+            Assert.AreEqual(7, sheet.MaxHp);
+            Assert.IsTrue(sheet.Values.TryGetValue(firstAttr, out var v));
+            Assert.AreEqual(AttributeValueType.Score, v!.Type);
+            Assert.AreEqual(18, v.IntValue);
+        }
+
+        [TestMethod]
+        public void Snapshot_PlayerColorChange_PersistsThroughRoundTrip()
+        {
+            // A player using MyTokenPanel changes their own token's color via
+            // UpdateTokenAsync; the new color must round-trip just like a host pick.
+            var (engine, state, host, _) = EngineTestFactory.Build();
+            Assert.IsTrue(engine.CreateMapAsync(state, host, "M").TryGetSuccess(out var mapId));
+            var player = EngineTestFactory.RegisterPlayer(state, "Alice");
+            Assert.IsTrue(engine.SetActiveMapAsync(state, host, mapId).IsSuccess);
+            var pToken = state.Maps.Single().Tokens.Single(t => t.OwnerUserId == player.Id);
+
+            Assert.IsTrue(engine.UpdateTokenAsync(state, player, pToken.Id, pToken.Name, "#123456", pToken.IconKind).IsSuccess);
+
+            var json = JsonSerializer.Serialize(LibrarySnapshotMapper.FromState(state), JsonOptions);
+            var reread = JsonSerializer.Deserialize<LibrarySnapshot>(json, JsonOptions);
+
+            Assert.IsNotNull(reread);
+            var roundTripped = reread!.Maps.Single().Tokens.Single(t => t.Id == pToken.Id);
+            Assert.AreEqual("#123456", roundTripped.Color);
+        }
+
         // ── AttributeSchema mapping ──────────────────────────────────────────────
 
         [TestMethod]

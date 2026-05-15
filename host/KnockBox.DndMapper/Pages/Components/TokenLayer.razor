@@ -93,7 +93,7 @@
                                       dominant-baseline="central"
                                       font-size="0.45"
                                       font-weight="bold"
-                                      fill="#ffffff"
+                                      fill="@TextFillFor(tok)"
                                       class="unselectable">
                                 @tok.Name.Substring(0, 1).ToUpperInvariant()
                             </svg:text>
@@ -127,11 +127,25 @@
             builder.CloseElement();
         }
 
-        builder.OpenElement(10, "circle");
-        builder.AddAttribute(11, "r", "0.45");
-        builder.AddAttribute(12, "fill", FillFor(token));
-        builder.AddAttribute(13, "stroke", string.IsNullOrEmpty(token.Color) ? "#888" : token.Color);
-        builder.AddAttribute(14, "stroke-width", "0.06");
+        // Gold "this is yours" halo rendered only on the viewer's own circuit so
+        // each player can locate their token at a glance without exposing ownership
+        // to other viewers.
+        if (!string.IsNullOrEmpty(token.OwnerUserId) && token.OwnerUserId == CurrentUserId)
+        {
+            builder.OpenElement(7, "circle");
+            builder.AddAttribute(8, "r", "0.55");
+            builder.AddAttribute(9, "fill", "none");
+            builder.AddAttribute(10, "stroke", "#FFD700");
+            builder.AddAttribute(11, "stroke-width", "0.08");
+            builder.AddAttribute(12, "pointer-events", "none");
+            builder.CloseElement();
+        }
+
+        builder.OpenElement(13, "circle");
+        builder.AddAttribute(14, "r", "0.45");
+        builder.AddAttribute(15, "fill", FillFor(token));
+        builder.AddAttribute(16, "stroke", string.IsNullOrEmpty(token.Color) ? "#888" : token.Color);
+        builder.AddAttribute(17, "stroke-width", "0.06");
         builder.CloseElement();
 
         if (token.IconKind == TokenIconKind.Initial && !string.IsNullOrEmpty(token.Name))
@@ -141,7 +155,7 @@
             builder.AddAttribute(22, "dominant-baseline", "central");
             builder.AddAttribute(23, "font-size", "0.5");
             builder.AddAttribute(24, "font-weight", "bold");
-            builder.AddAttribute(25, "fill", "#ffffff");
+            builder.AddAttribute(25, "fill", TextFillFor(token));
             builder.AddAttribute(26, "class", "unselectable");
             builder.AddContent(27, token.Name[..1].ToUpperInvariant());
             builder.CloseElement();

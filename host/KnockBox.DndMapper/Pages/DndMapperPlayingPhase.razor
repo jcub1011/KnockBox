@@ -101,6 +101,10 @@
                  @ref="_rightHandleRef"
                  title="Drag to resize, click to collapse"></div>
             <div class="dndm-rail-content">
+                @if (!IsHost)
+                {
+                    <MyTokenPanel State="State" />
+                }
                 <CharacterSheetPanel State="State" CurrentUserId="@CurrentUserId" IsHost="IsHost" />
                 <RollLogPanel State="State"
                               Config="_diceConfig"

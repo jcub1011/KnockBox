@@ -168,6 +168,9 @@ namespace KnockBox.DndMapper.Pages.Components
             return token.Color;
         }
 
+        private static string TextFillFor(Token token)
+            => TokenTextContrast.TextFillFor(token.Color);
+
         public async ValueTask DisposeAsync()
         {
             _stateSub?.Dispose();

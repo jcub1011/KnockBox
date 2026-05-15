@@ -79,10 +79,9 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                 if (state.ActiveMapId is Guid mapId &&
                     state.Maps.FirstOrDefault(m => m.Id == mapId) is Map activeMap)
                 {
-                    int slot = 0;
                     foreach (var entry in state.Players)
                     {
-                        SpawnPlayerTokenInternal(state, activeMap, entry.User, slot++);
+                        SpawnPlayerTokenInternal(state, activeMap, entry.User);
                     }
                 }
             });
@@ -253,12 +252,10 @@ namespace KnockBox.DndMapper.Services.Logic.Games
 
                 state.SetActiveMapId(mapId);
 
-                int slot = 0;
                 foreach (var entry in state.Players)
                 {
                     if (!map.Tokens.Any(t => t.Type == TokenType.PlayerToken && t.OwnerUserId == entry.User.Id))
-                        SpawnPlayerTokenInternal(state, map, entry.User, slot);
-                    slot++;
+                        SpawnPlayerTokenInternal(state, map, entry.User);
                 }
             });
 
@@ -327,24 +324,15 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                     return;
                 }
 
-                int slot = -1;
-                User? targetUser = null;
-                for (int i = 0; i < state.Players.Count; i++)
-                {
-                    if (state.Players[i].User.Id == userId)
-                    {
-                        slot = i;
-                        targetUser = state.Players[i].User;
-                        break;
-                    }
-                }
+                User? targetUser = state.Players
+                    .FirstOrDefault(p => p.User.Id == userId).User;
                 if (targetUser is null)
                 {
                     error = "Target user is not a registered player.";
                     return;
                 }
 
-                newTokenId = SpawnPlayerTokenInternal(state, map, targetUser, slot);
+                newTokenId = SpawnPlayerTokenInternal(state, map, targetUser);
             });
 
             if (exec.IsCanceled) return ValueResult<Guid>.FromCancellation();
@@ -389,12 +377,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                 var map = state.Maps.FirstOrDefault(m => m.Id == mapId);
                 if (map is null) { error = "Unknown map id."; return; }
 
-                string color = DefaultColorPalette.Neutral;
-                if (representsUserId is not null)
-                {
-                    int slot = state.Players.ToList().FindIndex(p => p.User.Id == representsUserId);
-                    if (slot >= 0) color = DefaultColorPalette.ForPlayerSlot(slot);
-                }
+                string color = DefaultColorPalette.FromName(name);
 
                 newId = Guid.NewGuid();
                 var (cx, cy) = ResolveSpawn(map, atX, atY);
@@ -1306,7 +1289,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
 
         // ── Internal helpers (must be called from inside Execute) ─────────────────
 
-        private Guid SpawnPlayerTokenInternal(DndMapperGameState state, Map map, User player, int slot)
+        private Guid SpawnPlayerTokenInternal(DndMapperGameState state, Map map, User player)
         {
             // Reuse existing session-scoped sheet if the player already has one.
             var existingSheet = state.Sheets.Values.FirstOrDefault(s => s.OwnerUserId == player.Id);
@@ -1337,7 +1320,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                 OwnerUserId = player.Id,
                 RepresentsUserId = null,
                 Name = player.Name,
-                Color = DefaultColorPalette.ForPlayerSlot(slot),
+                Color = DefaultColorPalette.FromName(player.Name),
                 IconKind = TokenIconKind.Initial,
                 MapId = map.Id,
                 X = sx,
