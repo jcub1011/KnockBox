@@ -1,5 +1,6 @@
 using KnockBox.Core.Plugins;
 using KnockBox.DndMapper.Components;
+using KnockBox.DndMapper.Services.Library;
 using KnockBox.DndMapper.Services.Logic.Games;
 using Microsoft.AspNetCore.Components;
 
@@ -11,7 +12,10 @@ namespace KnockBox.DndMapper
             PluginManifest.FromEmbeddedResourceOrThrow(typeof(DndMapperModule).Assembly);
 
         public void RegisterServices(IPluginRegistration registration)
-            => registration.AddGameEngine<DndMapperGameEngine>();
+        {
+            registration.AddGameEngine<DndMapperGameEngine>();
+            registration.AddScoped<DndMapperLibraryService, DndMapperLibraryService>();
+        }
 
         public RenderFragment GetButtonContent() => builder =>
         {
