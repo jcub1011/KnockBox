@@ -229,6 +229,22 @@ namespace KnockBox.DndMapperTests.Unit.Logic.Games
             Assert.IsTrue(result.IsFailure);
         }
 
+        [TestMethod]
+        public void RemoveImageAsync_NullsShareTokenOnRemovedImage()
+        {
+            // The host's library disposes the cached IBlobShare on remove, but
+            // the MapImage instance can outlive removal (UI alias, snapshot
+            // mid-write). Nulling the ShareToken in the same Execute prevents
+            // a dangling capability token from leaking into any later read.
+            var img = SeedImage();
+            Assert.IsTrue(_engine.AddImageAsync(_state, _host, _mapId, img).IsSuccess);
+            Assert.IsNotNull(img.ShareToken);
+
+            Assert.IsTrue(_engine.RemoveImageAsync(_state, _host, _mapId, img.Id).IsSuccess);
+
+            Assert.IsNull(img.ShareToken);
+        }
+
         // ── DeleteMapAsync image cascade ──────────────────────────────────────────
 
         [TestMethod]

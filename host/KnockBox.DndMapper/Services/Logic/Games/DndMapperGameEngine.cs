@@ -1149,6 +1149,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                 if (idx < 0) { error = "Unknown image id."; return; }
 
                 var image = map.Images[idx];
+                image.ShareToken = null;
                 map.Images.RemoveAt(idx);
                 state.AdjustBytesUsed(-image.ByteSize);
 

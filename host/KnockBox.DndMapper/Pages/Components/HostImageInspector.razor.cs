@@ -2,6 +2,7 @@ using System.Globalization;
 using KnockBox.Core.Components.Shared;
 using KnockBox.Core.Services.State.Users;
 using KnockBox.DndMapper.Helpers;
+using KnockBox.DndMapper.Services.Library;
 using KnockBox.DndMapper.Services.Logic.Games;
 using KnockBox.DndMapper.Services.State.Games;
 using KnockBox.DndMapper.Services.State.Games.Data;
@@ -17,6 +18,7 @@ namespace KnockBox.DndMapper.Pages.Components
         [Parameter] public EventCallback OnClose { get; set; }
 
         [Inject] protected DndMapperGameEngine Engine { get; set; } = default!;
+        [Inject] protected DndMapperLibraryService Library { get; set; } = default!;
         [Inject] protected IUserService UserService { get; set; } = default!;
         [CascadingParameter] public DndMapperToastService? Toasts { get; set; }
 
@@ -124,7 +126,7 @@ namespace KnockBox.DndMapper.Pages.Components
         {
             _pendingDelete = false;
             if (UserService.CurrentUser is null) return;
-            var result = Engine.RemoveImageAsync(State, UserService.CurrentUser, MapId, ImageId);
+            var result = await Library.RemoveImageAsync(State, UserService.CurrentUser, MapId, ImageId, ComponentDetached);
             if (result.TryGetFailure(out var err))
             {
                 await PushToast(err.PublicMessage, DndMapperToastTone.Danger);

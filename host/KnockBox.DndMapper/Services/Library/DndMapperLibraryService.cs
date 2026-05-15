@@ -168,8 +168,7 @@ namespace KnockBox.DndMapper.Services.Library
                     continue;
                 }
 
-                _blobCache[imageId] = blob;
-                _shareCache[imageId] = share;
+                await ReplaceCacheEntryAsync(imageId, blob, share);
 
                 var update = _engine.UpdateImageShareTokenAsync(state, host, mapId, imageId, share.Token);
                 if (update.TryGetFailure(out var uerr))
@@ -288,9 +287,44 @@ namespace KnockBox.DndMapper.Services.Library
                 return addResult;
             }
 
+            await ReplaceCacheEntryAsync(imageId, blob, share);
+            return ValueResult<MapImage>.FromValue(added);
+        }
+
+        /// <summary>
+        /// Removes an image: forwards to the engine, then (on success) deletes
+        /// the IndexedDB row and disposes the cached blob + share handles so
+        /// JS-side resources don't leak for the rest of the circuit.
+        /// </summary>
+        public async ValueTask<Result> RemoveImageAsync(
+            DndMapperGameState state,
+            User host,
+            Guid mapId,
+            Guid imageId,
+            CancellationToken ct = default)
+        {
+            ThrowIfDisposed();
+            if (_db is null) return Result.FromError("Library is not attached.");
+
+            var engineResult = _engine.RemoveImageAsync(state, host, mapId, imageId);
+            if (!engineResult.IsSuccess) return engineResult;
+
+            await SafeDeleteAsync(IndexedDbKey.String(imageId.ToString("D")));
+
+            if (_shareCache.Remove(imageId, out var share)) await SafeDisposeAsync(share);
+            if (_blobCache.Remove(imageId, out var blob)) await SafeDisposeAsync(blob);
+
+            return Result.Success;
+        }
+
+        // Replaces (or inserts) the cached blob + share for an image, disposing
+        // any previous handles so we never silently overwrite a live JS resource.
+        private async ValueTask ReplaceCacheEntryAsync(Guid imageId, IndexedDbBlob blob, IBlobShare share)
+        {
+            if (_shareCache.Remove(imageId, out var oldShare)) await SafeDisposeAsync(oldShare);
+            if (_blobCache.Remove(imageId, out var oldBlob)) await SafeDisposeAsync(oldBlob);
             _blobCache[imageId] = blob;
             _shareCache[imageId] = share;
-            return ValueResult<MapImage>.FromValue(added);
         }
 
         /// <summary>
@@ -365,8 +399,7 @@ namespace KnockBox.DndMapper.Services.Library
                         continue;
                     }
 
-                    _blobCache[imgSnap.Id] = blob;
-                    _shareCache[imgSnap.Id] = share;
+                    await ReplaceCacheEntryAsync(imgSnap.Id, blob, share);
                     hydratedImages[imgSnap.Id] = new MapImage
                     {
                         Id = imgSnap.Id,
