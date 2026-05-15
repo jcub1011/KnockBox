@@ -35,7 +35,7 @@ public sealed class MemoryLeakTests
             "openDatabase", It.IsAny<CancellationToken>(), It.IsAny<object?[]>()))
             .Returns((string _, CancellationToken __, object?[] args) =>
             {
-                capturedRef = (DotNetObjectReference<VersionChangeBridge>)args[3]!;
+                capturedRef = (DotNetObjectReference<VersionChangeBridge>)args[4]!;
                 return new ValueTask<ValueResult<OpenDatabaseResponse, IndexedDbError>>(
                     new IndexedDbError(IndexedDbErrorKind.Version, "vc"));
             });
@@ -56,7 +56,7 @@ public sealed class MemoryLeakTests
             "openDatabase", It.IsAny<CancellationToken>(), It.IsAny<object?[]>()))
             .Returns((string _, CancellationToken __, object?[] args) =>
             {
-                capturedRef = (DotNetObjectReference<VersionChangeBridge>)args[3]!;
+                capturedRef = (DotNetObjectReference<VersionChangeBridge>)args[4]!;
                 return new ValueTask<ValueResult<OpenDatabaseResponse, IndexedDbError>>(
                     ValueResult<OpenDatabaseResponse, IndexedDbError>.Canceled);
             });
@@ -77,7 +77,7 @@ public sealed class MemoryLeakTests
             "openDatabase", It.IsAny<CancellationToken>(), It.IsAny<object?[]>()))
             .Returns((string _, CancellationToken __, object?[] args) =>
             {
-                capturedRef = (DotNetObjectReference<VersionChangeBridge>)args[3]!;
+                capturedRef = (DotNetObjectReference<VersionChangeBridge>)args[4]!;
                 return new ValueTask<ValueResult<OpenDatabaseResponse, IndexedDbError>>(
                     (ValueResult<OpenDatabaseResponse, IndexedDbError>)
                     new OpenDatabaseResponse(1, 1, Array.Empty<string>(), new Dictionary<string, StoreSchema>()));

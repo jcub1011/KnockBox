@@ -40,8 +40,9 @@ internal sealed class IndexedDbService : IIndexedDbService, IAsyncDisposable
         var bridgeRef = DotNetObjectReference.Create(bridge);
 
         var hasUpgrade = schema.OnUpgrade is not null;
+        var declaredStores = SerializeDeclaredStores(schema.Stores);
         var result = await _interop.InvokeAsync<OpenDatabaseResponse>(
-            "openDatabase", ct, schema.Name, schema.Version, hasUpgrade, bridgeRef)
+            "openDatabase", ct, schema.Name, schema.Version, declaredStores, hasUpgrade, bridgeRef)
             .ConfigureAwait(false);
 
         if (!result.TryGetSuccess(out var resp))
@@ -207,6 +208,34 @@ internal sealed class IndexedDbService : IIndexedDbService, IAsyncDisposable
     }
 
     public ValueTask DisposeAsync() => _interop.DisposeAsync();
+
+    // Projects the declared store list into the camelCase shape consumed by
+    // applyDeclaredStoresSync in indexedDbService.js. Returns null when no
+    // stores are declared so the JS side can short-circuit.
+    private static object?[]? SerializeDeclaredStores(IReadOnlyList<DeclaredStore>? stores)
+    {
+        if (stores is null || stores.Count == 0) return null;
+        var result = new object?[stores.Count];
+        for (var i = 0; i < stores.Count; i++)
+        {
+            var s = stores[i];
+            result[i] = new
+            {
+                name = s.Name,
+                kind = s.Kind == DeclaredStoreKind.Blob ? "blob" : "json",
+                keyPath = s.KeyPath?.Paths.ToArray(),
+                autoIncrement = s.AutoIncrement,
+                indexes = s.Indexes?.Select(idx => new
+                {
+                    name = idx.Name,
+                    keyPath = idx.KeyPath.Paths.ToArray(),
+                    unique = idx.Unique,
+                    multiEntry = idx.MultiEntry,
+                }).ToArray(),
+            };
+        }
+        return result;
+    }
 }
 
 internal sealed record OpenDatabaseResponse(

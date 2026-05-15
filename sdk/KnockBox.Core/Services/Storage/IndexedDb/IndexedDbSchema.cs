@@ -19,12 +19,23 @@ namespace KnockBox.Core.Services.Storage.IndexedDb
         public int Version { get; init; }
 
         /// <summary>
-        /// Schema-upgrade callback. Receives an <see cref="IUpgradeContext"/>
-        /// that can create / delete / mutate object stores and indexes and
-        /// migrate data. Required on first open of a database (when
-        /// <c>oldVersion == 0</c>) and on every version bump — passing
-        /// <see langword="null"/> against a missing or out-of-date database
-        /// fails the open with <see cref="IndexedDbErrorKind.Version"/>.
+        /// Declarative store list applied synchronously by the JS-side
+        /// upgrade handler. Stores in this list that don't exist are
+        /// created; stores not in the list are left alone (the list
+        /// describes the desired minimum, not an exclusive set). Apply
+        /// declaratively here whenever possible — see <see cref="OnUpgrade"/>
+        /// for why the async-callback path is unreliable for schema work.
+        /// </summary>
+        public IReadOnlyList<DeclaredStore>? Stores { get; init; }
+
+        /// <summary>
+        /// Optional data-migration callback. Runs AFTER <see cref="Stores"/>
+        /// have been applied. Use this only for migrating existing rows
+        /// between schema versions, not for declaring schema — schema work
+        /// belongs on <see cref="Stores"/> because the IDB spec leaves the
+        /// versionchange transaction's <i>active</i> flag <c>false</c>
+        /// outside IDB event handlers, so any schema op issued from a
+        /// resumed async function aborts the upgrade.
         /// </summary>
         public UpgradeHandler? OnUpgrade { get; init; }
 
@@ -39,6 +50,47 @@ namespace KnockBox.Core.Services.Storage.IndexedDb
         {
             Name = name;
             Version = version;
+        }
+    }
+
+    /// <summary>
+    /// Declarative description of an object store applied during a JS-side
+    /// schema reconciliation pass. The reconciliation is idempotent: an
+    /// existing store with the same name is kept and any missing indexes are
+    /// added, no destructive changes occur.
+    /// </summary>
+    public sealed record DeclaredStore
+    {
+        public string Name { get; init; }
+        public DeclaredStoreKind Kind { get; init; }
+        public KeyPath? KeyPath { get; init; }
+        public bool AutoIncrement { get; init; }
+        public IReadOnlyList<DeclaredIndex>? Indexes { get; init; }
+
+        public DeclaredStore(string name, DeclaredStoreKind kind)
+        {
+            Name = name;
+            Kind = kind;
+        }
+    }
+
+    public enum DeclaredStoreKind
+    {
+        Json,
+        Blob,
+    }
+
+    public sealed record DeclaredIndex
+    {
+        public string Name { get; init; }
+        public KeyPath KeyPath { get; init; }
+        public bool Unique { get; init; }
+        public bool MultiEntry { get; init; }
+
+        public DeclaredIndex(string name, KeyPath keyPath)
+        {
+            Name = name;
+            KeyPath = keyPath;
         }
     }
 

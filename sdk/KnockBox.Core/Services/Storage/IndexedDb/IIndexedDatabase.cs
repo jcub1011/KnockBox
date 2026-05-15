@@ -43,5 +43,43 @@ namespace KnockBox.Core.Services.Storage.IndexedDb
         /// should drop any pending work and dispose this database promptly.
         /// </summary>
         event Func<ValueTask>? VersionChangeRequested;
+
+        // ─── Atomic single-op transactions ────────────────────────────────────
+        //
+        // Each begins a tx, issues one IDB request, and resolves on the JS-side
+        // tx.oncomplete — the entire lifecycle stays inside one JS Promise.
+        // Prefer these over RunAsync for one-shot reads / writes: under the
+        // IDB v3 spec the transaction's active flag is reset between event-
+        // loop tasks, so any store call issued from C# after the begin-tx
+        // SignalR round-trip throws TransactionInactiveError. The atomic
+        // routines sidestep that entirely.
+
+        /// <summary>Counts entries in <paramref name="storeName"/> (optionally bounded by <paramref name="range"/>) in a single atomic readonly transaction.</summary>
+        ValueTask<ValueResult<long, IndexedDbError>> CountSingleAsync(
+            string storeName, KeyRange? range = null, CancellationToken ct = default);
+
+        /// <summary>Reads a single JSON record by key in a single atomic readonly transaction. Returns <see langword="null"/> on miss.</summary>
+        ValueTask<ValueResult<T?, IndexedDbError>> JsonGetSingleAsync<T>(
+            string storeName, IndexedDbKey key, CancellationToken ct = default);
+
+        /// <summary>Writes a single JSON record under <paramref name="key"/> in a single atomic readwrite transaction.</summary>
+        ValueTask<ValueResult<IndexedDbKey, IndexedDbError>> JsonPutSingleAsync<T>(
+            string storeName, T value, IndexedDbKey? key = null, CancellationToken ct = default);
+
+        /// <summary>Reads a single blob record by key in a single atomic readonly transaction. Returns <see langword="null"/> on miss.</summary>
+        ValueTask<ValueResult<IndexedDbBlob?, IndexedDbError>> BlobGetSingleAsync(
+            string storeName, IndexedDbKey key, CancellationToken ct = default);
+
+        /// <summary>Writes a single blob under <paramref name="key"/> in a single atomic readwrite transaction.</summary>
+        ValueTask<ValueResult<IndexedDbKey, IndexedDbError>> BlobPutSingleAsync(
+            string storeName, IndexedDbBlob blob, IndexedDbKey? key = null, CancellationToken ct = default);
+
+        /// <summary>Deletes a single record by key in a single atomic readwrite transaction. No-op on miss.</summary>
+        ValueTask<Result<IndexedDbError>> DeleteSingleAsync(
+            string storeName, IndexedDbKey key, CancellationToken ct = default);
+
+        /// <summary>Clears the named stores in a single atomic readwrite transaction.</summary>
+        ValueTask<Result<IndexedDbError>> ClearStoresAsync(
+            IReadOnlyList<string> storeNames, CancellationToken ct = default);
     }
 }

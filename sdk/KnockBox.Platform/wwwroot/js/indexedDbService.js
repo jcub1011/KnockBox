@@ -94,7 +94,7 @@ export function releaseHandles(ids) {
 // Database lifecycle
 // ---------------------------------------------------------------------------
 
-export function openDatabase(name, version, hasUpgrade, dotNetUpgradeRef) {
+export function openDatabase(name, version, declaredStores, hasUpgrade, dotNetUpgradeRef) {
     return new Promise((resolve) => {
         let request;
         try {
@@ -104,15 +104,32 @@ export function openDatabase(name, version, hasUpgrade, dotNetUpgradeRef) {
             return;
         }
 
-        request.onupgradeneeded = async (event) => {
+        request.onupgradeneeded = (event) => {
             const upgradeTx = request.transaction;
-            if (!hasUpgrade) {
+            const db = event.target.result;
+
+            // Apply declared stores synchronously. Schema reconciliation
+            // happens entirely on the JS side so the versionchange tx never
+            // has to survive a C# await — that's unreliable because the IDB
+            // spec leaves the tx's active flag false outside of IDB event
+            // handlers, so any schema op issued from a resumed async function
+            // would throw and abort the upgrade.
+            try {
+                applyDeclaredStoresSync(upgradeTx, db, declaredStores || []);
+            } catch (e) {
                 try { upgradeTx.abort(); } catch (_) { /* ignore */ }
-                return;
+                return; // open request surfaces AbortError via onerror.
             }
 
-            // Register as kind "tx" with isUpgrade so the normal store ops
-            // can target this tx during data migration.
+            // No data-migration callback registered → schema-only upgrade,
+            // tx commits naturally after this handler returns.
+            if (!hasUpgrade) return;
+
+            // Data-migration callback path. Register the tx so C# data ops
+            // can target it during the await, but be aware: arbitrary
+            // microtask-scoped data ops are unreliable against a paused
+            // versionchange tx. Migration callbacks should keep their work
+            // request-driven (one await per request, no Task.Delay etc.).
             const upgradeTxId = nextHandleId++;
             handles.set(upgradeTxId, {
                 obj: upgradeTx,
@@ -121,31 +138,27 @@ export function openDatabase(name, version, hasUpgrade, dotNetUpgradeRef) {
             });
 
             const existingSchema = {};
-            const db = event.target.result;
             for (const storeName of db.objectStoreNames) {
                 const store = upgradeTx.objectStore(storeName);
                 existingSchema[storeName] = Array.from(store.indexNames);
             }
 
-            try {
-                const ops = await dotNetUpgradeRef.invokeMethodAsync(
-                    "OnUpgrade",
-                    upgradeTxId,
-                    event.oldVersion,
-                    event.newVersion || version,
-                    existingSchema);
-                // Apply the ops synchronously while still inside the upgrade
-                // tx — the open request's onsuccess won't fire until this
-                // handler resolves and the tx commits.
-                applySchemaOpsSync(upgradeTx, ops || []);
-            } catch (e) {
-                try { upgradeTx.abort(); } catch (_) { /* ignore */ }
-                // The open request will surface AbortError via onerror.
-            } finally {
-                const rec = handles.get(upgradeTxId);
-                if (rec) rec.extras.alive = false;
-                handles.delete(upgradeTxId);
-            }
+            (async () => {
+                try {
+                    await dotNetUpgradeRef.invokeMethodAsync(
+                        "OnUpgrade",
+                        upgradeTxId,
+                        event.oldVersion,
+                        event.newVersion || version,
+                        existingSchema);
+                } catch (e) {
+                    try { upgradeTx.abort(); } catch (_) { /* ignore */ }
+                } finally {
+                    const rec = handles.get(upgradeTxId);
+                    if (rec) rec.extras.alive = false;
+                    handles.delete(upgradeTxId);
+                }
+            })();
         };
 
         request.onsuccess = () => {
@@ -205,6 +218,43 @@ function snapshotSchema(db) {
     }
     // Tx has no pending requests so it commits naturally without effect.
     return result;
+}
+
+// Reconciles the live DB against a declarative store list, creating any
+// stores that don't yet exist and adding any missing indexes on stores that
+// do. Idempotent — re-running against an already-reconciled DB is a no-op.
+// Never deletes stores or indexes; declarative schemas describe the desired
+// minimum, not an exclusive set.
+function applyDeclaredStoresSync(upgradeTx, db, declaredStores) {
+    if (!declaredStores || declaredStores.length === 0) return;
+    const existing = new Set();
+    for (const n of db.objectStoreNames) existing.add(n);
+    for (const decl of declaredStores) {
+        let store;
+        if (!existing.has(decl.name)) {
+            const options = {};
+            if (decl.keyPath && decl.keyPath.length > 0) {
+                options.keyPath = decl.keyPath.length === 1 ? decl.keyPath[0] : decl.keyPath;
+            }
+            if (decl.autoIncrement) options.autoIncrement = true;
+            store = db.createObjectStore(decl.name, options);
+            existing.add(decl.name);
+        } else {
+            store = upgradeTx.objectStore(decl.name);
+        }
+        if (decl.indexes && decl.indexes.length > 0) {
+            const existingIndexes = new Set();
+            for (const i of store.indexNames) existingIndexes.add(i);
+            for (const idx of decl.indexes) {
+                if (existingIndexes.has(idx.name)) continue;
+                const idxKeyPath = idx.keyPath.length === 1 ? idx.keyPath[0] : idx.keyPath;
+                store.createIndex(idx.name, idxKeyPath, {
+                    unique: !!idx.unique,
+                    multiEntry: !!idx.multiEntry,
+                });
+            }
+        }
+    }
 }
 
 function applySchemaOpsSync(upgradeTx, ops) {
@@ -326,7 +376,7 @@ const KEEPALIVE_SENTINEL = "__knockbox_keepalive_sentinel__";
 
 function scheduleKeepAlive(record) {
     if (!record || !record.extras.alive) return;
-    if (record.extras.isUpgrade) return; // upgrade tx is held alive by the onupgradeneeded promise.
+    if (record.extras.isUpgrade) return; // upgrade tx is held alive by pending requests issued from onupgradeneeded.
     const tx = record.obj;
     let firstStoreName;
     try { firstStoreName = tx.objectStoreNames[0]; } catch (_) { return; }
@@ -550,6 +600,124 @@ export function storeClear(txId, storeName) {
     return withStore(txId, storeName, (record, store, resolve) => {
         const req = store.clear();
         finishWith(record, req, resolve, () => undefined);
+    });
+}
+
+// ---------------------------------------------------------------------------
+// Single-op atomic transactions
+//
+// Each begins a transaction, issues exactly one request, and resolves on
+// tx.oncomplete — all without re-entering C#. The whole lifecycle stays
+// inside one JS Promise so the transaction's IDB active flag is true when
+// each store method runs. The split-tx pattern (beginTransaction →
+// SignalR round-trip → store op) is unreliable under the IDB v3 spec
+// because the active flag is reset between event-loop tasks, so any
+// store call issued from a microtask outside an IDB event handler
+// throws TransactionInactiveError. These atomic routines are the
+// supported path for one-shot reads / writes.
+// ---------------------------------------------------------------------------
+
+function singleOpTx(dbId, storeNames, mode, body) {
+    return new Promise((resolve) => {
+        let db;
+        try { db = getHandle(dbId, "db").obj; }
+        catch (e) { resolve(fail(mapDomError(e))); return; }
+        let tx;
+        try { tx = db.transaction(storeNames, mode); }
+        catch (e) { resolve(fail(mapDomError(e))); return; }
+
+        let payload = null;
+        let settled = false;
+
+        try {
+            body(tx, (value) => { payload = value; });
+        } catch (e) {
+            settled = true;
+            try { tx.abort(); } catch (_) { /* ignore */ }
+            resolve(fail(mapDomError(e)));
+            return;
+        }
+
+        tx.oncomplete = () => { if (!settled) { settled = true; resolve(ok(payload)); } };
+        tx.onerror = () => { if (!settled) { settled = true; resolve(fail(mapDomError(tx.error))); } };
+        tx.onabort = () => { if (!settled) { settled = true; resolve(fail(mapDomError(tx.error))); } };
+    });
+}
+
+// Wires onsuccess on a request to record the (optionally transformed) value.
+// Request onerror is left to bubble to tx.onerror, where singleOpTx handles
+// it. Setting an empty onerror prevents Chrome from logging it as unhandled.
+function bindRequest(req, recordResult, transform) {
+    req.onsuccess = () => recordResult(transform ? transform(req.result) : req.result);
+    req.onerror = () => { /* surfaced via tx.onerror */ };
+}
+
+export function singleOpCount(dbId, storeName, rangeEnv) {
+    return singleOpTx(dbId, [storeName], "readonly", (tx, record) => {
+        const store = tx.objectStore(storeName);
+        const range = unwrapRange(rangeEnv);
+        const req = range ? store.count(range) : store.count();
+        bindRequest(req, record);
+    });
+}
+
+export function singleOpJsonGet(dbId, storeName, keyEnv) {
+    return singleOpTx(dbId, [storeName], "readonly", (tx, record) => {
+        const store = tx.objectStore(storeName);
+        const req = store.get(unwrapKey(keyEnv));
+        bindRequest(req, record, v => (v === undefined ? null : v));
+    });
+}
+
+export function singleOpJsonPut(dbId, storeName, value, keyEnv) {
+    return singleOpTx(dbId, [storeName], "readwrite", (tx, record) => {
+        const store = tx.objectStore(storeName);
+        const key = unwrapKey(keyEnv);
+        const req = key !== undefined ? store.put(value, key) : store.put(value);
+        bindRequest(req, record, k => wrapKey(k));
+    });
+}
+
+export function singleOpBlobGet(dbId, storeName, keyEnv) {
+    return singleOpTx(dbId, [storeName], "readonly", (tx, record) => {
+        const store = tx.objectStore(storeName);
+        const req = store.get(unwrapKey(keyEnv));
+        bindRequest(req, record, blob => {
+            if (!blob) return null;
+            const blobId = registerBlob(blob);
+            return { blobId, contentType: blob.type, length: blob.size };
+        });
+    });
+}
+
+export function singleOpBlobPut(dbId, storeName, blobId, keyEnv) {
+    return singleOpTx(dbId, [storeName], "readwrite", (tx, record) => {
+        const blob = getHandle(blobId, "blob").obj;
+        const store = tx.objectStore(storeName);
+        const key = unwrapKey(keyEnv);
+        const req = key !== undefined ? store.put(blob, key) : store.put(blob);
+        bindRequest(req, record, k => wrapKey(k));
+    });
+}
+
+export function singleOpDelete(dbId, storeName, keyEnv) {
+    return singleOpTx(dbId, [storeName], "readwrite", (tx, record) => {
+        const store = tx.objectStore(storeName);
+        const req = store.delete(unwrapKey(keyEnv));
+        bindRequest(req, record, () => null);
+    });
+}
+
+export function clearStoresAtomic(dbId, storeNames) {
+    return singleOpTx(dbId, storeNames, "readwrite", (tx, record) => {
+        // Schedule one clear() per store synchronously. With pending requests
+        // queued, the tx stays alive until tx.oncomplete; we don't need an
+        // explicit "last" handler since oncomplete fires after the final
+        // request completes.
+        for (const sn of storeNames) {
+            tx.objectStore(sn).clear();
+        }
+        record(null);
     });
 }
 

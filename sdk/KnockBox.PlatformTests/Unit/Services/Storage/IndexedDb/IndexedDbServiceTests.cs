@@ -52,7 +52,7 @@ public sealed class IndexedDbServiceTests
                 "openDatabase", It.IsAny<CancellationToken>(), It.IsAny<object?[]>()))
             .Returns((string _, CancellationToken __, object?[] args) =>
             {
-                capturedBridgeRef = (DotNetObjectReference<VersionChangeBridge>)args[3]!;
+                capturedBridgeRef = (DotNetObjectReference<VersionChangeBridge>)args[4]!;
                 return new ValueTask<ValueResult<OpenDatabaseResponse, IndexedDbError>>(
                     new IndexedDbError(IndexedDbErrorKind.Version, "version mismatch"));
             });
@@ -79,7 +79,7 @@ public sealed class IndexedDbServiceTests
                 "openDatabase", It.IsAny<CancellationToken>(), It.IsAny<object?[]>()))
             .Returns((string _, CancellationToken __, object?[] args) =>
             {
-                capturedBridgeRef = (DotNetObjectReference<VersionChangeBridge>)args[3]!;
+                capturedBridgeRef = (DotNetObjectReference<VersionChangeBridge>)args[4]!;
                 return new ValueTask<ValueResult<OpenDatabaseResponse, IndexedDbError>>(
                     ValueResult<OpenDatabaseResponse, IndexedDbError>.Canceled);
             });
