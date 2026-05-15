@@ -1,14 +1,17 @@
 // IndexedDB ES module for KnockBox.Platform.
 //
-// All exports return a {ok, value?, error?} envelope so the C#-side
+// Every export returns a {ok, value?, error?} envelope so the C#-side
 // IndexedDbInterop.UnpackEnvelope can translate uniformly. Handle IDs are
 // integers minted here; C# never invents one.
 //
-// The upgrade protocol returns the queued schema ops from OnUpgrade so that
-// they get applied SYNCHRONOUSLY inside the original onupgradeneeded
-// callback — the upgrade transaction stays alive across the single await
-// because we never re-enter the event loop between "C# OnUpgrade resolves"
-// and "schema ops apply".
+// There is intentionally no multi-step transaction API. The IDB v3 spec
+// resets a transaction's active flag at the end of each event-loop task
+// and inside each request handler, which means any IDB call issued from
+// a Blazor microtask sitting after a SignalR round-trip throws
+// TransactionInactiveError. Every store op below begins a tx, issues one
+// request (or one synchronous request burst for clearStoresAtomic), and
+// resolves on tx.oncomplete — all within one JS Promise — so the rule
+// is never broken.
 
 const handles = new Map();
 let nextHandleId = 1;
@@ -94,7 +97,7 @@ export function releaseHandles(ids) {
 // Database lifecycle
 // ---------------------------------------------------------------------------
 
-export function openDatabase(name, version, declaredStores, hasUpgrade, dotNetUpgradeRef) {
+export function openDatabase(name, version, declaredStores, dotNetBridgeRef) {
     return new Promise((resolve) => {
         let request;
         try {
@@ -107,81 +110,34 @@ export function openDatabase(name, version, declaredStores, hasUpgrade, dotNetUp
         request.onupgradeneeded = (event) => {
             const upgradeTx = request.transaction;
             const db = event.target.result;
-
-            // Apply declared stores synchronously. Schema reconciliation
-            // happens entirely on the JS side so the versionchange tx never
-            // has to survive a C# await — that's unreliable because the IDB
-            // spec leaves the tx's active flag false outside of IDB event
-            // handlers, so any schema op issued from a resumed async function
-            // would throw and abort the upgrade.
+            // Declarative reconciliation runs synchronously inside the
+            // upgrade event handler, so the tx's active flag is true for
+            // every createObjectStore / createIndex call. The tx commits
+            // naturally after the handler returns.
             try {
                 applyDeclaredStoresSync(upgradeTx, db, declaredStores || []);
             } catch (e) {
                 try { upgradeTx.abort(); } catch (_) { /* ignore */ }
-                return; // open request surfaces AbortError via onerror.
+                // The open request will surface AbortError via onerror.
             }
-
-            // No data-migration callback registered → schema-only upgrade,
-            // tx commits naturally after this handler returns.
-            if (!hasUpgrade) return;
-
-            // Data-migration callback path. Register the tx so C# data ops
-            // can target it during the await, but be aware: arbitrary
-            // microtask-scoped data ops are unreliable against a paused
-            // versionchange tx. Migration callbacks should keep their work
-            // request-driven (one await per request, no Task.Delay etc.).
-            const upgradeTxId = nextHandleId++;
-            handles.set(upgradeTxId, {
-                obj: upgradeTx,
-                kind: "tx",
-                extras: { mode: "readwrite", alive: true, isUpgrade: true, storeNames: null },
-            });
-
-            const existingSchema = {};
-            for (const storeName of db.objectStoreNames) {
-                const store = upgradeTx.objectStore(storeName);
-                existingSchema[storeName] = Array.from(store.indexNames);
-            }
-
-            (async () => {
-                try {
-                    await dotNetUpgradeRef.invokeMethodAsync(
-                        "OnUpgrade",
-                        upgradeTxId,
-                        event.oldVersion,
-                        event.newVersion || version,
-                        existingSchema);
-                } catch (e) {
-                    try { upgradeTx.abort(); } catch (_) { /* ignore */ }
-                } finally {
-                    const rec = handles.get(upgradeTxId);
-                    if (rec) rec.extras.alive = false;
-                    handles.delete(upgradeTxId);
-                }
-            })();
         };
 
         request.onsuccess = () => {
             const db = request.result;
             const dbId = register(db, "db");
-            // Wire onversionchange so other tabs requesting an upgrade can
-            // notify the owning IndexedDatabase to close.
+            // Wire onversionchange so a different tab requesting an upgrade
+            // can notify the owning IndexedDatabase to close.
             db.onversionchange = () => {
-                if (dotNetUpgradeRef) {
+                if (dotNetBridgeRef) {
                     try {
-                        dotNetUpgradeRef.invokeMethodAsync("OnVersionChange").catch(() => {});
+                        dotNetBridgeRef.invokeMethodAsync("OnVersionChange").catch(() => {});
                     } catch (_) { /* circuit gone */ }
                 }
             };
-            // Snapshot index metadata so C# can answer IIndex<T>.KeyPath /
-            // Unique / MultiEntry synchronously. A single readonly tx over
-            // every store is the minimal way to access indexNames.
-            const schema = snapshotSchema(db);
             resolve(ok({
                 dbId,
                 version: db.version,
                 objectStoreNames: Array.from(db.objectStoreNames),
-                schema,
             }));
         };
         request.onerror = () => resolve(fail(mapDomError(request.error)));
@@ -191,33 +147,6 @@ export function openDatabase(name, version, declaredStores, hasUpgrade, dotNetUp
             message: `Open blocked: another connection holds '${name}' open at an older version.`,
         }));
     });
-}
-
-function snapshotSchema(db) {
-    const result = {};
-    const names = Array.from(db.objectStoreNames);
-    if (names.length === 0) return result;
-    let tx;
-    try { tx = db.transaction(names, "readonly"); }
-    catch (_) { return result; }
-    for (const storeName of names) {
-        let store;
-        try { store = tx.objectStore(storeName); } catch (_) { continue; }
-        const indexes = {};
-        for (const idxName of store.indexNames) {
-            let idx;
-            try { idx = store.index(idxName); } catch (_) { continue; }
-            const kp = idx.keyPath;
-            indexes[idxName] = {
-                keyPath: Array.isArray(kp) ? Array.from(kp) : [kp],
-                unique: !!idx.unique,
-                multiEntry: !!idx.multiEntry,
-            };
-        }
-        result[storeName] = { indexes };
-    }
-    // Tx has no pending requests so it commits naturally without effect.
-    return result;
 }
 
 // Reconciles the live DB against a declarative store list, creating any
@@ -257,42 +186,6 @@ function applyDeclaredStoresSync(upgradeTx, db, declaredStores) {
     }
 }
 
-function applySchemaOpsSync(upgradeTx, ops) {
-    const db = upgradeTx.db;
-    for (const op of ops) {
-        switch (op.type) {
-            case "createStore": {
-                const options = {};
-                if (op.keyPath && op.keyPath.length > 0) {
-                    options.keyPath = op.keyPath.length === 1 ? op.keyPath[0] : op.keyPath;
-                }
-                if (op.autoIncrement) options.autoIncrement = true;
-                db.createObjectStore(op.name, options);
-                break;
-            }
-            case "deleteStore":
-                db.deleteObjectStore(op.name);
-                break;
-            case "createIndex": {
-                const store = upgradeTx.objectStore(op.storeName);
-                const keyPath = op.keyPath.length === 1 ? op.keyPath[0] : op.keyPath;
-                store.createIndex(op.name, keyPath, {
-                    unique: !!op.unique,
-                    multiEntry: !!op.multiEntry,
-                });
-                break;
-            }
-            case "deleteIndex": {
-                const store = upgradeTx.objectStore(op.storeName);
-                store.deleteIndex(op.name);
-                break;
-            }
-            default:
-                throw new Error(`Unknown schema op type: ${op.type}`);
-        }
-    }
-}
-
 export function closeDatabase(dbId) {
     const entry = handles.get(dbId);
     if (!entry || entry.kind !== "db") return ok();
@@ -318,6 +211,26 @@ export function deleteDatabase(name) {
             message: `Delete blocked: an open connection holds '${name}'.`,
         }));
     });
+}
+
+export async function listDatabases() {
+    if (typeof indexedDB.databases !== "function") {
+        return fail({
+            kind: "NotSupported",
+            jsName: null,
+            message: "indexedDB.databases() is not supported by this user agent.",
+        });
+    }
+    try {
+        const dbs = await indexedDB.databases();
+        return ok({
+            infos: dbs
+                .filter(d => typeof d.name === "string" && typeof d.version === "number")
+                .map(d => ({ name: d.name, version: d.version })),
+        });
+    } catch (e) {
+        return fail(mapDomError(e));
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -369,252 +282,7 @@ function unwrapRange(env) {
 }
 
 // ---------------------------------------------------------------------------
-// Transactions
-// ---------------------------------------------------------------------------
-
-const KEEPALIVE_SENTINEL = "__knockbox_keepalive_sentinel__";
-
-function scheduleKeepAlive(record) {
-    if (!record || !record.extras.alive) return;
-    if (record.extras.isUpgrade) return; // upgrade tx is held alive by pending requests issued from onupgradeneeded.
-    const tx = record.obj;
-    let firstStoreName;
-    try { firstStoreName = tx.objectStoreNames[0]; } catch (_) { return; }
-    if (!firstStoreName) return;
-    let store;
-    try { store = tx.objectStore(firstStoreName); } catch (_) { return; }
-    let req;
-    try { req = store.get(KEEPALIVE_SENTINEL); } catch (_) { return; }
-    req.onsuccess = () => scheduleKeepAlive(record);
-    req.onerror = () => { /* tx ending — no-op */ };
-}
-
-export function beginTransaction(dbId, storeNames, mode, dotNetCompletionRef) {
-    try {
-        const db = getHandle(dbId, "db").obj;
-        const modeStr = mode === 1 ? "readwrite" : "readonly";
-        const tx = db.transaction(storeNames, modeStr);
-
-        const txId = nextHandleId++;
-        const record = {
-            obj: tx,
-            kind: "tx",
-            extras: {
-                mode: modeStr,
-                alive: true,
-                isUpgrade: false,
-                storeNames: storeNames.slice(),
-                dotNetCompletionRef,
-            },
-        };
-        handles.set(txId, record);
-
-        tx.oncomplete = () => {
-            record.extras.alive = false;
-            try { dotNetCompletionRef.invokeMethodAsync("OnComplete"); } catch (_) { /* ref disposed */ }
-        };
-        tx.onerror = () => {
-            record.extras.alive = false;
-            const e = tx.error;
-            try {
-                dotNetCompletionRef.invokeMethodAsync(
-                    "OnError",
-                    e?.name || null,
-                    e?.message || (e ? String(e) : null));
-            } catch (_) { /* ref disposed */ }
-        };
-        tx.onabort = () => {
-            record.extras.alive = false;
-            try { dotNetCompletionRef.invokeMethodAsync("OnAbort"); } catch (_) { /* ref disposed */ }
-        };
-
-        scheduleKeepAlive(record);
-        return ok({ txId });
-    } catch (e) {
-        return fail(mapDomError(e));
-    }
-}
-
-export function commitTransaction(txId) {
-    try {
-        const record = getHandle(txId, "tx");
-        record.extras.alive = false;
-        if (typeof record.obj.commit === "function") {
-            try { record.obj.commit(); } catch (_) { /* may already be committing */ }
-        }
-        handles.delete(txId);
-        return ok();
-    } catch (e) {
-        return fail(mapDomError(e));
-    }
-}
-
-export function abortTransaction(txId) {
-    try {
-        const record = getHandle(txId, "tx");
-        record.extras.alive = false;
-        try { record.obj.abort(); } catch (_) { /* already done */ }
-        handles.delete(txId);
-        return ok();
-    } catch (e) {
-        return fail(mapDomError(e));
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Schema ops invoked mid-upgrade (when C# triggers a flush before a data op)
-// ---------------------------------------------------------------------------
-
-export function upgradeApplySchemaOps(upgradeTxId, ops) {
-    try {
-        const record = getHandle(upgradeTxId, "tx");
-        if (!record.extras.isUpgrade) {
-            return fail({
-                kind: "TransactionInactive",
-                jsName: null,
-                message: "upgradeApplySchemaOps called against a non-upgrade transaction.",
-            });
-        }
-        applySchemaOpsSync(record.obj, ops || []);
-        return ok();
-    } catch (e) {
-        return fail(mapDomError(e));
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Object store ops
-// ---------------------------------------------------------------------------
-
-function withStore(txId, storeName, doWork) {
-    return new Promise((resolve) => {
-        let record;
-        try {
-            record = getHandle(txId, "tx");
-        } catch (e) {
-            resolve(fail({
-                kind: "TransactionInactive",
-                jsName: null,
-                message: `Transaction handle ${txId} not found.`,
-            }));
-            return;
-        }
-        if (!record.extras.alive) {
-            resolve(fail({
-                kind: "TransactionInactive",
-                jsName: null,
-                message: "Transaction is no longer active.",
-            }));
-            return;
-        }
-        let store;
-        try {
-            store = record.obj.objectStore(storeName);
-        } catch (e) {
-            resolve(fail(mapDomError(e)));
-            return;
-        }
-        try {
-            doWork(record, store, resolve);
-        } catch (e) {
-            resolve(fail(mapDomError(e)));
-        }
-    });
-}
-
-function finishWith(record, request, resolve, mapValue) {
-    request.onsuccess = () => {
-        try { resolve(ok(mapValue ? mapValue(request.result) : request.result)); }
-        finally { scheduleKeepAlive(record); }
-    };
-    request.onerror = () => resolve(fail(mapDomError(request.error)));
-}
-
-export function storeGet(txId, storeName, keyEnv) {
-    return withStore(txId, storeName, (record, store, resolve) => {
-        const req = store.get(unwrapKey(keyEnv));
-        finishWith(record, req, resolve, v => (v === undefined ? null : v));
-    });
-}
-
-export function storeGetAll(txId, storeName, rangeEnv, count) {
-    return withStore(txId, storeName, (record, store, resolve) => {
-        const range = unwrapRange(rangeEnv);
-        const req = count != null ? store.getAll(range, count) : store.getAll(range);
-        finishWith(record, req, resolve);
-    });
-}
-
-export function storeGetAllKeys(txId, storeName, rangeEnv, count) {
-    return withStore(txId, storeName, (record, store, resolve) => {
-        const range = unwrapRange(rangeEnv);
-        const req = count != null ? store.getAllKeys(range, count) : store.getAllKeys(range);
-        finishWith(record, req, resolve, keys => keys.map(wrapKey));
-    });
-}
-
-export function storeCount(txId, storeName, rangeEnv) {
-    return withStore(txId, storeName, (record, store, resolve) => {
-        const range = unwrapRange(rangeEnv);
-        const req = range ? store.count(range) : store.count();
-        finishWith(record, req, resolve);
-    });
-}
-
-export function storeAdd(txId, storeName, value, keyEnv) {
-    return withStore(txId, storeName, (record, store, resolve) => {
-        const key = unwrapKey(keyEnv);
-        const req = key !== undefined ? store.add(value, key) : store.add(value);
-        finishWith(record, req, resolve, k => wrapKey(k));
-    });
-}
-
-export function storePut(txId, storeName, value, keyEnv) {
-    return withStore(txId, storeName, (record, store, resolve) => {
-        const key = unwrapKey(keyEnv);
-        const req = key !== undefined ? store.put(value, key) : store.put(value);
-        finishWith(record, req, resolve, k => wrapKey(k));
-    });
-}
-
-export function storeDelete(txId, storeName, keyEnv) {
-    return withStore(txId, storeName, (record, store, resolve) => {
-        const req = store.delete(unwrapKey(keyEnv));
-        finishWith(record, req, resolve, () => undefined);
-    });
-}
-
-export function storeDeleteRange(txId, storeName, rangeEnv) {
-    return withStore(txId, storeName, (record, store, resolve) => {
-        const range = unwrapRange(rangeEnv);
-        if (!range) {
-            resolve(fail({ kind: "Data", jsName: null, message: "DeleteRange requires a non-empty range." }));
-            return;
-        }
-        const req = store.delete(range);
-        finishWith(record, req, resolve, () => undefined);
-    });
-}
-
-export function storeClear(txId, storeName) {
-    return withStore(txId, storeName, (record, store, resolve) => {
-        const req = store.clear();
-        finishWith(record, req, resolve, () => undefined);
-    });
-}
-
-// ---------------------------------------------------------------------------
-// Single-op atomic transactions
-//
-// Each begins a transaction, issues exactly one request, and resolves on
-// tx.oncomplete — all without re-entering C#. The whole lifecycle stays
-// inside one JS Promise so the transaction's IDB active flag is true when
-// each store method runs. The split-tx pattern (beginTransaction →
-// SignalR round-trip → store op) is unreliable under the IDB v3 spec
-// because the active flag is reset between event-loop tasks, so any
-// store call issued from a microtask outside an IDB event handler
-// throws TransactionInactiveError. These atomic routines are the
-// supported path for one-shot reads / writes.
+// Atomic single-op transactions
 // ---------------------------------------------------------------------------
 
 function singleOpTx(dbId, storeNames, mode, body) {
@@ -722,207 +390,7 @@ export function clearStoresAtomic(dbId, storeNames) {
 }
 
 // ---------------------------------------------------------------------------
-// Index ops (mirror store ops; resolves index via store.index(name))
-// ---------------------------------------------------------------------------
-
-function withIndex(txId, storeName, indexName, doWork) {
-    return new Promise((resolve) => {
-        let record;
-        try { record = getHandle(txId, "tx"); }
-        catch (e) {
-            resolve(fail({ kind: "TransactionInactive", jsName: null, message: `Transaction ${txId} not found.` }));
-            return;
-        }
-        if (!record.extras.alive) {
-            resolve(fail({ kind: "TransactionInactive", jsName: null, message: "Transaction is no longer active." }));
-            return;
-        }
-        let idx;
-        try { idx = record.obj.objectStore(storeName).index(indexName); }
-        catch (e) { resolve(fail(mapDomError(e))); return; }
-        try { doWork(record, idx, resolve); }
-        catch (e) { resolve(fail(mapDomError(e))); }
-    });
-}
-
-export function indexGet(txId, storeName, indexName, keyEnv) {
-    return withIndex(txId, storeName, indexName, (record, idx, resolve) => {
-        const req = idx.get(unwrapKey(keyEnv));
-        finishWith(record, req, resolve, v => (v === undefined ? null : v));
-    });
-}
-
-export function indexGetAll(txId, storeName, indexName, rangeEnv, count) {
-    return withIndex(txId, storeName, indexName, (record, idx, resolve) => {
-        const range = unwrapRange(rangeEnv);
-        const req = count != null ? idx.getAll(range, count) : idx.getAll(range);
-        finishWith(record, req, resolve);
-    });
-}
-
-export function indexGetAllKeys(txId, storeName, indexName, rangeEnv, count) {
-    return withIndex(txId, storeName, indexName, (record, idx, resolve) => {
-        const range = unwrapRange(rangeEnv);
-        // For indexes, getAllKeys returns PRIMARY keys (the store key, not the index key).
-        const req = count != null ? idx.getAllKeys(range, count) : idx.getAllKeys(range);
-        finishWith(record, req, resolve, keys => keys.map(wrapKey));
-    });
-}
-
-export function indexCount(txId, storeName, indexName, rangeEnv) {
-    return withIndex(txId, storeName, indexName, (record, idx, resolve) => {
-        const range = unwrapRange(rangeEnv);
-        const req = range ? idx.count(range) : idx.count();
-        finishWith(record, req, resolve);
-    });
-}
-
-// ---------------------------------------------------------------------------
-// Cursors
-// ---------------------------------------------------------------------------
-
-const CURSOR_DIRS = ["next", "nextunique", "prev", "prevunique"];
-
-function packCursorEntry(cursor, mode) {
-    if (mode === "keyOnly") {
-        return { key: wrapKey(cursor.key), primaryKey: wrapKey(cursor.primaryKey) };
-    }
-    if (mode === "blob") {
-        const blob = cursor.value;
-        const blobId = nextHandleId++;
-        handles.set(blobId, {
-            obj: blob,
-            kind: "blob",
-            extras: { contentType: blob.type, length: blob.size, objectUrl: null, readSnapshot: null },
-        });
-        return {
-            key: wrapKey(cursor.key),
-            primaryKey: wrapKey(cursor.primaryKey),
-            value: { blobId, contentType: blob.type, length: blob.size },
-        };
-    }
-    return { key: wrapKey(cursor.key), primaryKey: wrapKey(cursor.primaryKey), value: cursor.value };
-}
-
-export function openCursor(txId, storeName, indexName, rangeEnv, direction, mode) {
-    return new Promise((resolve) => {
-        let record;
-        try { record = getHandle(txId, "tx"); }
-        catch (e) {
-            resolve(fail({ kind: "TransactionInactive", jsName: null, message: `Transaction ${txId} not found.` }));
-            return;
-        }
-        if (!record.extras.alive) {
-            resolve(fail({ kind: "TransactionInactive", jsName: null, message: "Transaction is no longer active." }));
-            return;
-        }
-        const dirStr = CURSOR_DIRS[direction] || "next";
-        const range = unwrapRange(rangeEnv);
-        let target;
-        try {
-            const store = record.obj.objectStore(storeName);
-            target = indexName ? store.index(indexName) : store;
-        } catch (e) {
-            resolve(fail(mapDomError(e)));
-            return;
-        }
-        let req;
-        try {
-            req = mode === "keyOnly"
-                ? target.openKeyCursor(range, dirStr)
-                : target.openCursor(range, dirStr);
-        } catch (e) {
-            resolve(fail(mapDomError(e)));
-            return;
-        }
-        req.onsuccess = () => {
-            const cursor = req.result;
-            if (!cursor) {
-                resolve(ok({ cursorId: null, hasFirst: false, entry: null }));
-                scheduleKeepAlive(record);
-                return;
-            }
-            const cursorId = nextHandleId++;
-            handles.set(cursorId, {
-                obj: cursor,
-                kind: "cursor",
-                extras: { mode, request: req, txRecord: record },
-            });
-            resolve(ok({ cursorId, hasFirst: true, entry: packCursorEntry(cursor, mode) }));
-            scheduleKeepAlive(record);
-        };
-        req.onerror = () => resolve(fail(mapDomError(req.error)));
-    });
-}
-
-function withCursor(cursorId, doWork) {
-    return new Promise((resolve) => {
-        let record;
-        try { record = getHandle(cursorId, "cursor"); }
-        catch (e) { resolve(fail(mapDomError(e))); return; }
-        try { doWork(record, resolve); }
-        catch (e) { resolve(fail(mapDomError(e))); }
-    });
-}
-
-export function cursorContinue(cursorId, keyEnv) {
-    return withCursor(cursorId, (record, resolve) => {
-        const cursor = record.obj;
-        const req = record.extras.request;
-        req.onsuccess = () => {
-            const c = req.result;
-            if (!c) {
-                resolve(ok({ done: true, entry: null }));
-                scheduleKeepAlive(record.extras.txRecord);
-                return;
-            }
-            resolve(ok({ done: false, entry: packCursorEntry(c, record.extras.mode) }));
-            scheduleKeepAlive(record.extras.txRecord);
-        };
-        req.onerror = () => resolve(fail(mapDomError(req.error)));
-        try {
-            if (keyEnv != null) cursor.continue(unwrapKey(keyEnv));
-            else cursor.continue();
-        } catch (e) { resolve(fail(mapDomError(e))); }
-    });
-}
-
-export function cursorAdvance(cursorId, count) {
-    return withCursor(cursorId, (record, resolve) => {
-        const cursor = record.obj;
-        const req = record.extras.request;
-        req.onsuccess = () => {
-            const c = req.result;
-            if (!c) {
-                resolve(ok({ done: true, entry: null }));
-                scheduleKeepAlive(record.extras.txRecord);
-                return;
-            }
-            resolve(ok({ done: false, entry: packCursorEntry(c, record.extras.mode) }));
-            scheduleKeepAlive(record.extras.txRecord);
-        };
-        req.onerror = () => resolve(fail(mapDomError(req.error)));
-        try { cursor.advance(count); }
-        catch (e) { resolve(fail(mapDomError(e))); }
-    });
-}
-
-export function cursorUpdate(cursorId, value) {
-    return withCursor(cursorId, (record, resolve) => {
-        const req = record.obj.update(value);
-        finishWith(record.extras.txRecord, req, resolve, () => undefined);
-    });
-}
-
-export function cursorDelete(cursorId) {
-    return withCursor(cursorId, (record, resolve) => {
-        const req = record.obj.delete();
-        finishWith(record.extras.txRecord, req, resolve, () => undefined);
-    });
-}
-
-// ---------------------------------------------------------------------------
-// Blobs
+// Blob lifecycle (create / read / object URL)
 // ---------------------------------------------------------------------------
 
 const blobUploads = new Map();
@@ -1036,81 +504,6 @@ export function blobCreateObjectUrl(blobId) {
             entry.extras.objectUrl = URL.createObjectURL(entry.obj);
         }
         return ok({ url: entry.extras.objectUrl });
-    } catch (e) {
-        return fail(mapDomError(e));
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Blob store ops
-// ---------------------------------------------------------------------------
-
-export function blobStoreGet(txId, storeName, keyEnv) {
-    return withStore(txId, storeName, (record, store, resolve) => {
-        const req = store.get(unwrapKey(keyEnv));
-        req.onsuccess = () => {
-            const blob = req.result;
-            if (!blob) {
-                resolve(ok(null));
-                scheduleKeepAlive(record);
-                return;
-            }
-            const blobId = registerBlob(blob);
-            resolve(ok({ blobId, contentType: blob.type, length: blob.size }));
-            scheduleKeepAlive(record);
-        };
-        req.onerror = () => resolve(fail(mapDomError(req.error)));
-    });
-}
-
-function storeBlobOp(txId, storeName, blobId, keyEnv, methodName) {
-    return withStore(txId, storeName, (record, store, resolve) => {
-        let blob;
-        try { blob = getHandle(blobId, "blob").obj; }
-        catch (e) { resolve(fail(mapDomError(e))); return; }
-        const key = unwrapKey(keyEnv);
-        const req = key !== undefined ? store[methodName](blob, key) : store[methodName](blob);
-        finishWith(record, req, resolve, k => wrapKey(k));
-    });
-}
-
-export function blobStoreAdd(txId, storeName, blobId, keyEnv) {
-    return storeBlobOp(txId, storeName, blobId, keyEnv, "add");
-}
-
-export function blobStorePut(txId, storeName, blobId, keyEnv) {
-    return storeBlobOp(txId, storeName, blobId, keyEnv, "put");
-}
-
-export function cursorUpdateBlob(cursorId, blobId) {
-    return withCursor(cursorId, (record, resolve) => {
-        let blob;
-        try { blob = getHandle(blobId, "blob").obj; }
-        catch (e) { resolve(fail(mapDomError(e))); return; }
-        const req = record.obj.update(blob);
-        finishWith(record.extras.txRecord, req, resolve, () => undefined);
-    });
-}
-
-// ---------------------------------------------------------------------------
-// Pre-existing exports below
-// ---------------------------------------------------------------------------
-
-export async function listDatabases() {
-    if (typeof indexedDB.databases !== "function") {
-        return fail({
-            kind: "NotSupported",
-            jsName: null,
-            message: "indexedDB.databases() is not supported by this user agent.",
-        });
-    }
-    try {
-        const dbs = await indexedDB.databases();
-        return ok({
-            infos: dbs
-                .filter(d => typeof d.name === "string" && typeof d.version === "number")
-                .map(d => ({ name: d.name, version: d.version })),
-        });
     } catch (e) {
         return fail(mapDomError(e));
     }

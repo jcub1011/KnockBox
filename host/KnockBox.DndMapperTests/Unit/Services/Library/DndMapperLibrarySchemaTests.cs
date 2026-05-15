@@ -22,17 +22,6 @@ namespace KnockBox.DndMapperTests.Unit.Services.Library
         }
 
         [TestMethod]
-        public void Schema_NoOnUpgradeCallback()
-        {
-            // Schema work runs synchronously through Stores. The async OnUpgrade
-            // path is reserved for data migration only and is intentionally
-            // null for DnD Mapper.
-            var schema = DndMapperLibrarySchema.Create();
-
-            Assert.IsNull(schema.OnUpgrade);
-        }
-
-        [TestMethod]
         public void Schema_VersionMatchesCurrent()
         {
             var schema = DndMapperLibrarySchema.Create();

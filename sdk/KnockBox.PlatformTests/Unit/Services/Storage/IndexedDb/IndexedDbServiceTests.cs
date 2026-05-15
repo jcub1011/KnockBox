@@ -15,7 +15,7 @@ public sealed class IndexedDbServiceTests
         => new(interop, NullLoggerFactory.Instance, registry);
 
     private static OpenDatabaseResponse OpenSuccess(int dbId = 1, int version = 1, params string[] stores)
-        => new(dbId, version, stores, new Dictionary<string, StoreSchema>());
+        => new(dbId, version, stores);
 
     [TestMethod]
     public async Task OpenAsync_HappyPath_ReturnsDatabase()
@@ -52,7 +52,7 @@ public sealed class IndexedDbServiceTests
                 "openDatabase", It.IsAny<CancellationToken>(), It.IsAny<object?[]>()))
             .Returns((string _, CancellationToken __, object?[] args) =>
             {
-                capturedBridgeRef = (DotNetObjectReference<VersionChangeBridge>)args[4]!;
+                capturedBridgeRef = (DotNetObjectReference<VersionChangeBridge>)args[3]!;
                 return new ValueTask<ValueResult<OpenDatabaseResponse, IndexedDbError>>(
                     new IndexedDbError(IndexedDbErrorKind.Version, "version mismatch"));
             });
@@ -79,7 +79,7 @@ public sealed class IndexedDbServiceTests
                 "openDatabase", It.IsAny<CancellationToken>(), It.IsAny<object?[]>()))
             .Returns((string _, CancellationToken __, object?[] args) =>
             {
-                capturedBridgeRef = (DotNetObjectReference<VersionChangeBridge>)args[4]!;
+                capturedBridgeRef = (DotNetObjectReference<VersionChangeBridge>)args[3]!;
                 return new ValueTask<ValueResult<OpenDatabaseResponse, IndexedDbError>>(
                     ValueResult<OpenDatabaseResponse, IndexedDbError>.Canceled);
             });

@@ -80,41 +80,4 @@ internal static class IndexedDbTestHelpers
 
     public static BlobShareRegistry NewRegistry() => new(NullLogger<BlobShareRegistry>.Instance);
 
-    /// <summary>
-    /// Stand-in for <see cref="IndexedDbTransaction"/> / <see cref="UpgradeTxContext"/>
-    /// in tests of stores, cursors, and indexes. Construct with a mocked
-    /// interop; toggle <see cref="IsActive"/> to simulate post-commit/abort
-    /// state; register index schemas via <see cref="WithIndex"/> for index
-    /// lookups.
-    /// </summary>
-    internal sealed class TestTxContext : ITxContext
-    {
-        private readonly Dictionary<string, Dictionary<string, IndexSchema>> _indexes = new();
-
-        public IndexedDbInterop Interop { get; }
-        public int TxId { get; init; } = 1;
-        public JsonSerializerOptions JsonOptions { get; init; } = IndexedDbWireFormat.DefaultJsonOptions;
-        public bool IsActive { get; set; } = true;
-
-        public TestTxContext(IndexedDbInterop interop) { Interop = interop; }
-
-        public TestTxContext WithIndex(string storeName, string indexName, IndexSchema schema)
-        {
-            if (!_indexes.TryGetValue(storeName, out var bucket))
-            {
-                bucket = new Dictionary<string, IndexSchema>();
-                _indexes[storeName] = bucket;
-            }
-            bucket[indexName] = schema;
-            return this;
-        }
-
-        public bool TryGetIndexSchema(string storeName, string indexName, out IndexSchema schema)
-        {
-            if (_indexes.TryGetValue(storeName, out var bucket) && bucket.TryGetValue(indexName, out schema!))
-                return true;
-            schema = default!;
-            return false;
-        }
-    }
 }

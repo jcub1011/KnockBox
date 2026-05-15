@@ -13,7 +13,6 @@ internal sealed class IndexedDatabase : IIndexedDatabase
     private readonly ILogger<IndexedDatabase> _logger;
     private readonly BlobShareRegistry _shareRegistry;
     private readonly JsonSerializerOptions _jsonOptions;
-    private readonly IReadOnlyDictionary<string, StoreSchema> _schema;
     private readonly int _dbId;
     private readonly DotNetObjectReference<VersionChangeBridge> _bridgeRef;
     private bool _disposed;
@@ -33,7 +32,6 @@ internal sealed class IndexedDatabase : IIndexedDatabase
         int version,
         IReadOnlyList<string> objectStoreNames,
         JsonSerializerOptions jsonOptions,
-        IReadOnlyDictionary<string, StoreSchema> schema,
         DotNetObjectReference<VersionChangeBridge> bridgeRef)
     {
         _interop = interop;
@@ -41,7 +39,6 @@ internal sealed class IndexedDatabase : IIndexedDatabase
         _logger = loggerFactory.CreateLogger<IndexedDatabase>();
         _shareRegistry = shareRegistry;
         _jsonOptions = jsonOptions;
-        _schema = schema;
         _dbId = dbId;
         Name = name;
         Version = version;
@@ -49,119 +46,12 @@ internal sealed class IndexedDatabase : IIndexedDatabase
         _bridgeRef = bridgeRef;
     }
 
-    public async ValueTask<ValueResult<T, IndexedDbError>> RunAsync<T>(
-        IReadOnlyList<string> storeNames,
-        TransactionMode mode,
-        Func<IIndexedDbTransaction, CancellationToken, ValueTask<ValueResult<T, IndexedDbError>>> work,
-        CancellationToken ct = default)
-    {
-        if (storeNames.Count == 0)
-            throw new ArgumentException("At least one store name is required.", nameof(storeNames));
-
-        var bridge = new TxCompletionBridge();
-        var bridgeRef = DotNetObjectReference.Create(bridge);
-
-        var beginResult = await _interop.InvokeAsync<BeginTransactionResponse>(
-            "beginTransaction", ct, _dbId, storeNames.ToArray(), (int)mode, bridgeRef)
-            .ConfigureAwait(false);
-        if (!beginResult.TryGetSuccess(out var begin))
-        {
-            bridgeRef.Dispose();
-            if (beginResult.IsCanceled) return ValueResult<T, IndexedDbError>.Canceled;
-            return beginResult.Error.Error;
-        }
-
-        var tx = new IndexedDbTransaction(
-            _interop,
-            _loggerFactory,
-            _shareRegistry,
-            begin.TxId, mode, storeNames, _jsonOptions, _schema, bridge, bridgeRef);
-
-        try
-        {
-            ValueResult<T, IndexedDbError> workResult;
-            try
-            {
-                workResult = await work(tx, ct).ConfigureAwait(false);
-            }
-            catch (OperationCanceledException)
-            {
-                await tx.AbortAsync(CancellationToken.None).ConfigureAwait(false);
-                return ValueResult<T, IndexedDbError>.Canceled;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex,
-                    "RunAsync<{T}> on database '{DatabaseName}' threw inside the user delegate; aborting.",
-                    typeof(T).Name, Name);
-                await tx.AbortAsync(CancellationToken.None).ConfigureAwait(false);
-                throw;
-            }
-
-            if (workResult.IsCanceled)
-            {
-                await tx.AbortAsync(CancellationToken.None).ConfigureAwait(false);
-                return ValueResult<T, IndexedDbError>.Canceled;
-            }
-
-            if (!workResult.IsSuccess)
-            {
-                await tx.AbortAsync(CancellationToken.None).ConfigureAwait(false);
-                return workResult;
-            }
-
-            var commit = await tx.CommitAsync(ct).ConfigureAwait(false);
-            if (commit.TryGetFailure(out var commitErr)) return commitErr;
-            if (commit.IsCanceled) return ValueResult<T, IndexedDbError>.Canceled;
-
-            try
-            {
-                await tx.Completed.ConfigureAwait(false);
-            }
-            catch (IndexedDbTransactionException txEx)
-            {
-                return txEx.Error;
-            }
-
-            return workResult;
-        }
-        finally
-        {
-            await tx.DisposeAsync().ConfigureAwait(false);
-        }
-    }
-
-    public async ValueTask<Result<IndexedDbError>> RunAsync(
-        IReadOnlyList<string> storeNames,
-        TransactionMode mode,
-        Func<IIndexedDbTransaction, CancellationToken, ValueTask<Result<IndexedDbError>>> work,
-        CancellationToken ct = default)
-    {
-        var wrapped = await RunAsync<bool>(
-            storeNames, mode,
-            async (tx, innerCt) =>
-            {
-                var r = await work(tx, innerCt).ConfigureAwait(false);
-                if (r.IsCanceled) return ValueResult<bool, IndexedDbError>.Canceled;
-                if (r.TryGetFailure(out var err)) return err;
-                return true;
-            },
-            ct).ConfigureAwait(false);
-
-        if (wrapped.IsCanceled) return Result<IndexedDbError>.Canceled;
-        if (wrapped.TryGetFailure(out var failure)) return failure;
-        return Result<IndexedDbError>.Success;
-    }
-
-    // ─── Atomic single-op transactions ───────────────────────────────────────
-
     public async ValueTask<ValueResult<long, IndexedDbError>> CountSingleAsync(
         string storeName, KeyRange? range = null, CancellationToken ct = default)
     {
-        var result = await _interop.InvokeAsync<long>(
+        return await _interop.InvokeAsync<long>(
             "singleOpCount", ct, _dbId, storeName, IndexedDbWireFormat.ToRangeEnvelope(range))
             .ConfigureAwait(false);
-        return result;
     }
 
     public async ValueTask<ValueResult<T?, IndexedDbError>> JsonGetSingleAsync<T>(
@@ -189,8 +79,6 @@ internal sealed class IndexedDatabase : IIndexedDatabase
     public async ValueTask<ValueResult<IndexedDbKey, IndexedDbError>> JsonPutSingleAsync<T>(
         string storeName, T value, IndexedDbKey? key = null, CancellationToken ct = default)
     {
-        // Serialize T to a JsonElement so the JS side sees the same shape it
-        // would for a tx-scoped put.
         var json = JsonSerializer.SerializeToElement(value, _jsonOptions);
         var raw = await _interop.InvokeRawAsync(
             "singleOpJsonPut", ct, _dbId, storeName, json, IndexedDbWireFormat.ToKeyEnvelope(key))
@@ -250,20 +138,18 @@ internal sealed class IndexedDatabase : IIndexedDatabase
     public async ValueTask<Result<IndexedDbError>> DeleteSingleAsync(
         string storeName, IndexedDbKey key, CancellationToken ct = default)
     {
-        var result = await _interop.InvokeVoidAsync(
+        return await _interop.InvokeVoidAsync(
             "singleOpDelete", ct, _dbId, storeName, IndexedDbWireFormat.ToKeyEnvelope(key))
             .ConfigureAwait(false);
-        return result;
     }
 
     public async ValueTask<Result<IndexedDbError>> ClearStoresAsync(
         IReadOnlyList<string> storeNames, CancellationToken ct = default)
     {
         if (storeNames.Count == 0) return Result<IndexedDbError>.Success;
-        var result = await _interop.InvokeVoidAsync(
+        return await _interop.InvokeVoidAsync(
             "clearStoresAtomic", ct, _dbId, storeNames.ToArray())
             .ConfigureAwait(false);
-        return result;
     }
 
     internal async ValueTask RaiseVersionChangeRequestedAsync()
@@ -305,5 +191,3 @@ internal sealed class IndexedDatabase : IIndexedDatabase
         _bridgeRef.Dispose();
     }
 }
-
-internal sealed record BeginTransactionResponse(int TxId);

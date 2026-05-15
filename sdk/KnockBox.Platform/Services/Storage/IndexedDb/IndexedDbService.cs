@@ -36,13 +36,12 @@ internal sealed class IndexedDbService : IIndexedDbService, IAsyncDisposable
     public async ValueTask<ValueResult<IIndexedDatabase, IndexedDbError>> OpenAsync(
         IndexedDbSchema schema, CancellationToken ct = default)
     {
-        var bridge = new VersionChangeBridge(_interop, _loggerFactory, _shareRegistry, schema);
+        var bridge = new VersionChangeBridge(_loggerFactory);
         var bridgeRef = DotNetObjectReference.Create(bridge);
 
-        var hasUpgrade = schema.OnUpgrade is not null;
         var declaredStores = SerializeDeclaredStores(schema.Stores);
         var result = await _interop.InvokeAsync<OpenDatabaseResponse>(
-            "openDatabase", ct, schema.Name, schema.Version, declaredStores, hasUpgrade, bridgeRef)
+            "openDatabase", ct, schema.Name, schema.Version, declaredStores, bridgeRef)
             .ConfigureAwait(false);
 
         if (!result.TryGetSuccess(out var resp))
@@ -64,7 +63,6 @@ internal sealed class IndexedDbService : IIndexedDbService, IAsyncDisposable
             resp.DbId, schema.Name, resp.Version,
             resp.ObjectStoreNames,
             schema.JsonOptions ?? IndexedDbWireFormat.DefaultJsonOptions,
-            resp.Schema ?? new Dictionary<string, StoreSchema>(),
             bridgeRef);
         bridge.AttachDatabase(db);
         return db;
@@ -241,7 +239,6 @@ internal sealed class IndexedDbService : IIndexedDbService, IAsyncDisposable
 internal sealed record OpenDatabaseResponse(
     int DbId,
     int Version,
-    IReadOnlyList<string> ObjectStoreNames,
-    Dictionary<string, StoreSchema>? Schema);
+    IReadOnlyList<string> ObjectStoreNames);
 internal sealed record ListDatabasesResponse(IReadOnlyList<DatabaseInfoEntry> Infos);
 internal sealed record DatabaseInfoEntry(string Name, int Version);

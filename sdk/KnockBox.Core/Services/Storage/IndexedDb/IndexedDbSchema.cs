@@ -4,12 +4,19 @@ namespace KnockBox.Core.Services.Storage.IndexedDb
 {
     /// <summary>
     /// Declarative description of a database used by
-    /// <see cref="IIndexedDbService.OpenAsync"/>. The <see cref="OnUpgrade"/>
-    /// callback is invoked inside the browser's <c>versionchange</c> transaction
-    /// when the requested <see cref="Version"/> exceeds the version currently
-    /// stored on disk (including the fresh-database case where the on-disk
-    /// version is <c>0</c>).
+    /// <see cref="IIndexedDbService.OpenAsync"/>. The store list is applied
+    /// synchronously by the JS-side upgrade handler when the requested
+    /// <see cref="Version"/> exceeds the version currently stored on disk,
+    /// including the fresh-database case (on-disk version <c>0</c>).
     /// </summary>
+    /// <remarks>
+    /// There is no async data-migration hook. Versionchange transactions stop
+    /// being IDB-active outside of their event handlers, so any C#-driven
+    /// migration that crosses a SignalR await would abort the upgrade. If
+    /// you need to rewrite existing rows, do it in a pass that runs after
+    /// open completes — one record per <c>JsonPutSingleAsync</c> /
+    /// <c>BlobPutSingleAsync</c>.
+    /// </remarks>
     public sealed record IndexedDbSchema
     {
         /// <summary>Database name, scoped to the current origin.</summary>
@@ -22,25 +29,12 @@ namespace KnockBox.Core.Services.Storage.IndexedDb
         /// Declarative store list applied synchronously by the JS-side
         /// upgrade handler. Stores in this list that don't exist are
         /// created; stores not in the list are left alone (the list
-        /// describes the desired minimum, not an exclusive set). Apply
-        /// declaratively here whenever possible — see <see cref="OnUpgrade"/>
-        /// for why the async-callback path is unreliable for schema work.
+        /// describes the desired minimum, not an exclusive set).
         /// </summary>
         public IReadOnlyList<DeclaredStore>? Stores { get; init; }
 
         /// <summary>
-        /// Optional data-migration callback. Runs AFTER <see cref="Stores"/>
-        /// have been applied. Use this only for migrating existing rows
-        /// between schema versions, not for declaring schema — schema work
-        /// belongs on <see cref="Stores"/> because the IDB spec leaves the
-        /// versionchange transaction's <i>active</i> flag <c>false</c>
-        /// outside IDB event handlers, so any schema op issued from a
-        /// resumed async function aborts the upgrade.
-        /// </summary>
-        public UpgradeHandler? OnUpgrade { get; init; }
-
-        /// <summary>
-        /// Serializer options used for typed object stores opened from this
+        /// Serializer options used for JSON object stores opened from this
         /// database. <see langword="null"/> selects the Core default
         /// (case-insensitive property names, ignore nulls on write).
         /// </summary>
@@ -93,15 +87,4 @@ namespace KnockBox.Core.Services.Storage.IndexedDb
             KeyPath = keyPath;
         }
     }
-
-    /// <summary>
-    /// Schema upgrade delegate. Invoked from C# inside the JS-side
-    /// <c>versionchange</c> transaction. The callback may itself perform
-    /// async operations via the supplied <paramref name="ctx"/>.
-    /// </summary>
-    public delegate ValueTask UpgradeHandler(
-        IUpgradeContext ctx,
-        int oldVersion,
-        int newVersion,
-        CancellationToken ct);
 }
