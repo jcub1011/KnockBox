@@ -1018,6 +1018,12 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                 }
                 else if (newType == TokenType.NPCToken)
                 {
+                    if (newOwnerUserId is not null
+                        && !state.Players.Any(p => p.User.Id == newOwnerUserId))
+                    {
+                        error = "Owner user id is not a registered player.";
+                        return;
+                    }
                     token.Type = TokenType.NPCToken;
                     token.OwnerUserId = newOwnerUserId; // null = host-owned NPC, non-null = player-owned NPC
                     token.RepresentsUserId = null;

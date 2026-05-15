@@ -107,6 +107,35 @@ namespace KnockBox.DndMapperTests.Unit.Logic.Games
         }
 
         [TestMethod]
+        public void ReassignTokenOwnerAsync_NpcWithUnregisteredOwnerUserId_ReturnsError()
+        {
+            var tokenId = SpawnNpc();
+
+            var result = _engine.ReassignTokenOwnerAsync(_state, _host, tokenId, "not-a-player", TokenType.NPCToken);
+
+            Assert.IsTrue(result.IsFailure);
+            var token = _state.Maps[0].Tokens.Single(t => t.Id == tokenId);
+            Assert.AreEqual(TokenType.NPCToken, token.Type);
+            Assert.IsNull(token.OwnerUserId);
+        }
+
+        [TestMethod]
+        public void ReassignTokenOwnerAsync_NpcWithNullOwner_PreservesHostOwnedNpc()
+        {
+            var player = EngineTestFactory.RegisterPlayer(_state);
+            var tokenId = SpawnNpc();
+            // First make it player-owned so the null reassignment is meaningful.
+            Assert.IsTrue(_engine.ReassignTokenOwnerAsync(_state, _host, tokenId, player.Id, TokenType.NPCToken).IsSuccess);
+
+            var result = _engine.ReassignTokenOwnerAsync(_state, _host, tokenId, newOwnerUserId: null, TokenType.NPCToken);
+
+            Assert.IsTrue(result.IsSuccess);
+            var token = _state.Maps[0].Tokens.Single(t => t.Id == tokenId);
+            Assert.AreEqual(TokenType.NPCToken, token.Type);
+            Assert.IsNull(token.OwnerUserId);
+        }
+
+        [TestMethod]
         public void ReassignTokenOwnerAsync_NonHostCaller_ReturnsError()
         {
             var player = EngineTestFactory.RegisterPlayer(_state);
