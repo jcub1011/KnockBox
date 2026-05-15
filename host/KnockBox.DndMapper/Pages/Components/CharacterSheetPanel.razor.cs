@@ -209,6 +209,17 @@ namespace KnockBox.DndMapper.Pages.Components
             if (Toasts is not null) await Toasts.Push("Sheet creation was canceled.", DndMapperToastTone.Warning);
         }
 
+        private async Task OnAssignSheetToPlayer(CharacterSheet sheet, string? raw)
+        {
+            if (UserService.CurrentUser is null) return;
+            if (string.IsNullOrEmpty(raw)) return;
+            var result = Engine.AssignSheetToPlayerAsync(State, UserService.CurrentUser, sheet.Id, raw);
+            if (result.TryGetFailure(out var err) && Toasts is not null)
+            {
+                await Toasts.Push(err.PublicMessage, DndMapperToastTone.Danger);
+            }
+        }
+
         private async Task ConfirmCreateNpcSheet()
         {
             if (UserService.CurrentUser is null) return;

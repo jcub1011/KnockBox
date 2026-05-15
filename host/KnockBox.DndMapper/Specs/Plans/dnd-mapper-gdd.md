@@ -45,10 +45,10 @@ Existing platform behaviour applies: a disconnected user has a **1-minute grace 
 
 **Player unregistration (post-grace).** When `PlayerUnregistered` fires for a player, the engine handler runs inside `state.ExecuteAsync` and:
 
-1. Iterates every `PlayerToken` owned by the player. Each is converted in place: `Type` → `HostExtraToken`, `OwnerUserId` → `null`, `RepresentsUserId` → the departing player's userId. The token's position, sheet reference, name, and color are preserved. This means the host (and only the host, under default `OwnerOrHost`) can move the abandoned character; the display still attributes it to the original player.
-2. The character sheet is left intact (still in `Sheets`, still referenced by the converted tokens). The host may delete it via `DeleteSheetAsync` if desired.
+1. Iterates every `PlayerToken` owned by the player. Each is converted in place: `Type` → `NPCToken`, `OwnerUserId` → `null`, `RepresentsUserId` → the departing player's userId. The token's position, sheet reference, name, and color are preserved. This means the host (and only the host, under default `OwnerOrHost`) can move the abandoned character; the display still attributes it to the original player.
+2. The character sheet is also orphaned: `OwnerUserId` → `null`, `RepresentsUserId` → the departing player's userId. The sheet stays in `Sheets` and is still referenced by the converted tokens. The host may delete it, edit it, or reassign the whole character to another player via `AssignSheetToPlayerAsync` / `AssignCharacterToPlayerAsync`.
 
-**No rejoin after grace expiry.** Once `PlayerUnregistered` has fired, the user cannot rejoin: the platform's `RegisterPlayer` rejects any registration once the session has started (`IsJoinable == false`), so the door is closed for the rest of the session. The previously-converted `HostExtraToken`(s) and old sheet remain on the board for the host to keep, repurpose, or delete.
+**No rejoin after grace expiry.** Once `PlayerUnregistered` has fired, the user cannot rejoin: the platform's `RegisterPlayer` rejects any registration once the session has started (`IsJoinable == false`), so the door is closed for the rest of the session. The orphaned NPC token(s) and sheet remain on the board for the host to keep, repurpose, or hand off to another player.
 
 **Host disconnect.** The host's circuit also has a 1-minute grace window. While disconnected the session continues and players can still interact with the map. If the host does not return within grace, the engine runs `EndSessionAsync` and everyone returns home.
 
@@ -193,24 +193,23 @@ Each client has its own pan (px offset) and zoom (scalar). These are **client-lo
 
 ### 7.1 Token types
 
-| Type            | Owned by                | Sheet            | Movable by (default)                        |
-| --------------- | ----------------------- | ---------------- | ------------------------------------------- |
-| `PlayerToken`   | A specific `userId`     | One required     | Owner + host                                 |
-| `NPCToken`      | Host (collective) by default; if `PlayersCanCreateNPCs = true`, the creating player's `userId` is assigned as `OwnerUserId`. | None or simple | Host always; creating player if `PlayersCanCreateNPCs = true` (subject to `TokenMovement` setting). |
-| `HostExtraToken`| Host (collective), but flagged "represents player X" optionally | Optional | Host only                                    |
+| Type          | Owned by                | Sheet    | Movable by (default)                        |
+| ------------- | ----------------------- | -------- | ------------------------------------------- |
+| `PlayerToken` | A specific `userId`     | One required | Owner + host                                 |
+| `NPCToken`    | Host (collective) by default. When `PlayersCanCreateNPCs = true` and a player creates one, the creating player's `userId` is assigned as `OwnerUserId`. May optionally carry `RepresentsUserId` when the host wants the NPC to stand in for a specific player (a DMPC, or the auto-orphan of a `PlayerToken` whose player left mid-session). | Optional | Host always; creating player if `PlayersCanCreateNPCs = true` (subject to `TokenMovement` setting). |
 
-Per the role decision in §2.2: a player owns **one `PlayerToken` per map they have appeared on** (auto-spawned by `SetActiveMapAsync` when the player has no token on the newly active map — see §4.2 and §12) and **exactly one session-scoped `CharacterSheet`** (§8.4). All of that player's per-map tokens reference the same `SheetId`, so attribute changes propagate everywhere. The host can spawn any number of `NPCToken`s (no sheet) or `HostExtraToken`s (with optional sheet, useful for piloting absent players' characters or running DMPCs).
+Per the role decision in §2.2: a player owns **one `PlayerToken` per map they have appeared on** (auto-spawned by `SetActiveMapAsync` when the player has no token on the newly active map — see §4.2 and §12) and **exactly one session-scoped `CharacterSheet`** (§8.4). All of that player's per-map tokens reference the same `SheetId`, so attribute changes propagate everywhere. The host can spawn any number of `NPCToken`s — with or without a sheet, and with or without `RepresentsUserId` set — covering monsters, friendly NPCs, DMPCs, and orphaned characters under one type.
 
 ### 7.2 Token record
 
 | Field         | Type            | Notes                                                                                  |
 | ------------- | --------------- | -------------------------------------------------------------------------------------- |
 | `Id`          | `Guid`          |                                                                                        |
-| `Type`        | enum            | `PlayerToken` / `NPCToken` / `HostExtraToken`.                                          |
+| `Type`        | enum            | `PlayerToken` / `NPCToken`.                                                              |
 | `OwnerUserId` | `string?`       | Set for `PlayerToken`; null otherwise (or creating player's userId for NPCs when `PlayersCanCreateNPCs = true`). Used to enforce "move own" permission. |
-| `RepresentsUserId` | `string?`  | Set on `HostExtraToken` when piloting an absent player's character; null otherwise. Display-only — does not affect permission checks. |
+| `RepresentsUserId` | `string?`  | Optional on `NPCToken`. Set when the NPC stands in for a specific player (DMPC or the auto-orphan of a departed player's `PlayerToken`); null otherwise. Display-only — does not affect permission checks. |
 | `Name`        | `string`        | Player display name by default for `PlayerToken`; host-chosen otherwise.                |
-| `Color`       | `string`        | Border/highlight color. **Default by token type**: `PlayerToken` — deterministic palette color assigned by player slot index (0-based, cycling through a fixed 8-color palette); `HostExtraToken` — the slot color of the player named by `RepresentsUserId` if set, else neutral grey (`#888`); `NPCToken` — neutral grey (`#888`). Player can override for own token; host picks for NPC/extra tokens. |
+| `Color`       | `string`        | Border/highlight color. **Default by token type**: `PlayerToken` — deterministic palette color assigned by player slot index (0-based, cycling through a fixed 8-color palette); `NPCToken` — the slot color of the player named by `RepresentsUserId` when that field is set, else neutral grey (`#888`). Player can override for own token; host picks for NPCs. |
 | `IconKind`    | `enum`          | v1: `Initial` (first letter of Name) or `Solid` colored disc. Image upload — see O-4.   |
 | `MapId`       | `Guid`          | The map this token currently lives on.                                                  |
 | `X`, `Y`      | `double`        | Cell coordinates.                                                                       |
@@ -235,7 +234,7 @@ Token drag uses an SVG-based interaction modeled on the existing `outfitItemDrag
 
 ### 7.4 Multiple tokens for the host
 
-The host's "Tokens" panel lists all NPC and host-extra tokens with a "+ Add" button. Adding spawns one at the center of the active map. Each is editable (name, color, sheet attach/detach, hidden flag, delete).
+The host's "Tokens" panel lists all NPC tokens (every non-`PlayerToken`) with a "+ NPC" button. Adding spawns one at the center of the active map. Each row is editable: name, color, sheet attach/detach, hidden flag, optional `RepresentsUserId` picker (to tag the NPC as standing in for a specific player), and an "Assign to player" picker that promotes the NPC (and any attached sheet) to a `PlayerToken` owned by that player.
 
 ---
 
@@ -459,7 +458,7 @@ Engine methods (verbs):
 
 - **Maps**: `CreateMapAsync`, `RenameMapAsync`, `DeleteMapAsync` (cascade: every `MapImage` on the map is deleted from `IPluginStorage` and the per-room byte total is decremented per §5.5; all tokens on the map are permanently removed from state; if it was the active map, `ActiveMapId` shifts to the next map in list order or `null` if none remain; clients show an empty canvas when `ActiveMapId` is null), `DuplicateMapAsync`, `ReorderMapsAsync` (writes `Map.ListOrder` from the host's drag-reorder gesture per §4.2), `SetActiveMapAsync` (triggers `SpawnPlayerTokenAsync` for any registered player who has no token on the newly active map — see §7.1), `UpdateGridAsync`.
 - **Images**: `AddImageAsync` (called by upload endpoint after disk write), `UpdateImageTransformAsync`, `ReorderImageLayerAsync`, `RemoveImageAsync` (deletes the file from `IPluginStorage` and decrements the per-room byte total per §5.5).
-- **Tokens**: `SpawnPlayerTokenAsync` (called at session start for all lobby players and on `SetActiveMapAsync` for any registered player who has no token on the newly active map; places token at `Map.DefaultSpawnPosition` or map center; reuses the player's existing session-scoped `CharacterSheet` if one already exists, otherwise creates one), `SpawnNpcTokenAsync`, `SpawnHostExtraTokenAsync`, `MoveTokenAsync`, `UpdateTokenAsync` (rename/recolor/icon), `RemoveTokenAsync`, `SetTokenHiddenAsync`, `ConvertAbandonedPlayerTokensAsync` (internal — invoked by the `PlayerUnregistered` handler per §2.3 to flip a departing player's `PlayerToken`s to `HostExtraToken` with `RepresentsUserId = oldUserId`).
+- **Tokens**: `SpawnPlayerTokenAsync` (called at session start for all lobby players and on `SetActiveMapAsync` for any registered player who has no token on the newly active map; places token at `Map.DefaultSpawnPosition` or map center; reuses the player's existing session-scoped `CharacterSheet` if one already exists, otherwise creates one), `SpawnNpcTokenAsync` (optional `representsUserId` parameter — host-only when set — covers both regular NPCs and DMPC stand-ins), `MoveTokenAsync`, `UpdateTokenAsync` (rename/recolor/icon), `RemoveTokenAsync`, `SetTokenHiddenAsync`, `SetTokenSheetAsync`, `SetTokenRepresentsAsync`, `AssignCharacterToPlayerAsync` / `AssignSheetToPlayerAsync` (host hands an NPC character — token(s) and any attached sheet — to a registered player; the symmetric counterpart of the auto-orphan below), `ConvertAbandonedPlayerCharacterInternal` (internal — invoked by the `PlayerUnregistered` handler per §2.3 to flip a departing player's `PlayerToken`s to `NPCToken` with `RepresentsUserId = oldUserId`, and orphan the player's sheet the same way).
 - **Sheets**: `CreateSheetAsync`, `UpdateSheetAttributeAsync`, `UpdateSheetFreeFieldsAsync` (name/notes/hp — `Hp`/`MaxHp` are nullable; if unset the HP row is hidden in the sheet panel), `DeleteSheetAsync`, `ChangeSchemaAsync` (cascade: attributes whose name matches the new schema retain their value, type mismatch resets to default; attributes absent from the new schema are removed from all sheets).
 - **Dice**: `RollAsync`.
 - **Combat (v1.x — deferred, see §9.5)**: `StartInitiativeAsync` (host; creates CombatState in WaitingForRolls with selected NPC + all player combatants), `SubmitInitiativeRollAsync` (player; rolls d20 + DEX modifier, stores in CombatantEntry), `SetNpcInitiativeAsync` (host; manual entry or auto-roll for an NPC combatant), `ForceInitiativeRollAsync` (host; force-rolls for a player who hasn't rolled), `AdvanceTurnAsync` (host; next turn, wraps + increments RoundNumber at end of order), `AddCombatantAsync` (host; insert NPC mid-combat at initiative position), `RemoveCombatantAsync` (host; delete combatant, auto-advance if it was their turn), `EndCombatAsync` (host; clears ActiveCombat).

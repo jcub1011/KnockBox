@@ -34,13 +34,6 @@ namespace KnockBox.DndMapper.Pages.Components
             base.OnInitialized();
         }
 
-        private static string TypeLabel(TokenType t) => t switch
-        {
-            TokenType.NPCToken => "NPC",
-            TokenType.HostExtraToken => "Extra",
-            _ => "",
-        };
-
         private (double? X, double? Y) SpawnAnchor() =>
             _activeMap is not null && Viewport?.GetCenterFor(_activeMap.Id) is { } center
                 ? (center.X, center.Y)
@@ -51,19 +44,7 @@ namespace KnockBox.DndMapper.Pages.Components
             if (UserService.CurrentUser is null || _activeMap is null) return;
             var name = $"NPC {_activeMap.Tokens.Count(t => t.Type == TokenType.NPCToken) + 1}";
             var (ax, ay) = SpawnAnchor();
-            var result = Engine.SpawnNpcTokenAsync(State, UserService.CurrentUser, _activeMap.Id, name, ax, ay);
-            if (result.TryGetFailure(out var err))
-            {
-                await PushToast(err.PublicMessage, DndMapperToastTone.Danger);
-            }
-        }
-
-        private async Task OnAddHostExtra()
-        {
-            if (UserService.CurrentUser is null || _activeMap is null) return;
-            var name = $"Extra {_activeMap.Tokens.Count(t => t.Type == TokenType.HostExtraToken) + 1}";
-            var (ax, ay) = SpawnAnchor();
-            var result = Engine.SpawnHostExtraTokenAsync(State, UserService.CurrentUser, _activeMap.Id, name, representsUserId: null, ax, ay);
+            var result = Engine.SpawnNpcTokenAsync(State, UserService.CurrentUser, _activeMap.Id, name, representsUserId: null, ax, ay);
             if (result.TryGetFailure(out var err))
             {
                 await PushToast(err.PublicMessage, DndMapperToastTone.Danger);
@@ -134,15 +115,14 @@ namespace KnockBox.DndMapper.Pages.Components
             }
         }
 
-        // Reassign an NPC/HostExtra token to a registered player, promoting it
-        // to a PlayerToken. The dropdown is the host's primary affordance for
-        // wiring up hydrated-from-library content with the current session's
-        // joiners.
-        private async Task OnReassignToPlayer(Token t, string? raw)
+        // Assign an NPC token (and its attached sheet, if any) to a
+        // registered player in one atomic operation — the symmetric counterpart
+        // of the auto-orphan that runs when a player leaves mid-session.
+        private async Task OnAssignToPlayer(Token t, string? raw)
         {
             if (UserService.CurrentUser is null) return;
             if (string.IsNullOrEmpty(raw)) return;
-            var result = Engine.ReassignTokenOwnerAsync(State, UserService.CurrentUser, t.Id, raw, TokenType.PlayerToken);
+            var result = Engine.AssignCharacterToPlayerAsync(State, UserService.CurrentUser, t.Id, raw);
             if (result.TryGetFailure(out var err))
             {
                 await PushToast(err.PublicMessage, DndMapperToastTone.Danger);

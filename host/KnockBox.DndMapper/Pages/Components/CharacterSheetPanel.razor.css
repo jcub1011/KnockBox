@@ -39,6 +39,25 @@
     padding-bottom: 0.5rem;
 }
 
+.dndm-sheet-origin {
+    font-size: 0.7rem;
+    color: #7a7464;
+    font-style: italic;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin: -0.3rem 0 0.65rem;
+}
+
+.dndm-sheet-assign {
+    margin: 0 0 0.65rem;
+}
+
+.dndm-sheet-assign .dndm-label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
 .dndm-sheet-name {
     font-family: var(--dndm-display);
     font-size: 1.1rem;

@@ -95,7 +95,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
         private void HandlePlayerLeft(DndMapperGameState state, User player)
         {
             // PlayerUnregistered fires OUTSIDE the lock — re-entering Execute is safe.
-            state.Execute(() => ConvertAbandonedPlayerTokensInternal(state, player));
+            state.Execute(() => ConvertAbandonedPlayerCharacterInternal(state, player));
         }
 
         // ── Map verbs ─────────────────────────────────────────────────────────────
@@ -353,53 +353,34 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             return ValueResult<Guid>.FromValue(newTokenId);
         }
 
-        public ValueResult<Guid> SpawnNpcTokenAsync(DndMapperGameState state, User caller, Guid mapId, string name, double? atX = null, double? atY = null)
+        /// <summary>
+        /// Spawns an NPC on the given map. When <paramref name="representsUserId"/>
+        /// is non-null the NPC is a "stand-in" for that player (a DMPC, or the orphan
+        /// of a player who left mid-session) and the caller must be the host. When
+        /// it's null the NPC is a regular non-player creature; the host may always
+        /// create one, players may create one only when
+        /// <c>DndMapperSettings.PlayersCanCreateNPCs</c> is set.
+        /// </summary>
+        public ValueResult<Guid> SpawnNpcTokenAsync(
+            DndMapperGameState state,
+            User caller,
+            Guid mapId,
+            string name,
+            string? representsUserId = null,
+            double? atX = null,
+            double? atY = null)
         {
             if (state is null) return ValueResult<Guid>.FromError("State is required.");
             if (caller is null) return ValueResult<Guid>.FromError("Caller is required.");
             if (string.IsNullOrWhiteSpace(name)) return ValueResult<Guid>.FromError("Token name is required.");
 
             bool isHost = IsHost(state, caller);
+            if (representsUserId is not null && !isHost)
+                return ValueResult<Guid>.FromError("Only the host may spawn an NPC that represents a player.");
             if (!isHost && !state.Settings.PlayersCanCreateNPCs)
                 return ValueResult<Guid>.FromError("Players are not permitted to create NPC tokens.");
             if (!isHost && !state.Players.Any(p => p.User.Id == caller.Id))
                 return ValueResult<Guid>.FromError("Only registered players or the host may create NPC tokens.");
-
-            Guid newId = default;
-            string? error = null;
-            var exec = state.Execute(() =>
-            {
-                var map = state.Maps.FirstOrDefault(m => m.Id == mapId);
-                if (map is null) { error = "Unknown map id."; return; }
-
-                newId = Guid.NewGuid();
-                var (cx, cy) = ResolveSpawn(map, atX, atY);
-                map.Tokens.Add(new Token
-                {
-                    Id = newId,
-                    Type = TokenType.NPCToken,
-                    OwnerUserId = isHost ? null : caller.Id,
-                    Name = name,
-                    Color = DefaultColorPalette.Neutral,
-                    IconKind = TokenIconKind.Initial,
-                    MapId = mapId,
-                    X = cx,
-                    Y = cy,
-                });
-            });
-
-            if (exec.IsCanceled) return ValueResult<Guid>.FromCancellation();
-            if (exec.TryGetFailure(out var execErr)) return ValueResult<Guid>.FromError(execErr);
-            if (error is not null) return ValueResult<Guid>.FromError(error);
-            return ValueResult<Guid>.FromValue(newId);
-        }
-
-        public ValueResult<Guid> SpawnHostExtraTokenAsync(DndMapperGameState state, User caller, Guid mapId, string name, string? representsUserId, double? atX = null, double? atY = null)
-        {
-            if (state is null) return ValueResult<Guid>.FromError("State is required.");
-            if (caller is null) return ValueResult<Guid>.FromError("Caller is required.");
-            if (string.IsNullOrWhiteSpace(name)) return ValueResult<Guid>.FromError("Token name is required.");
-            if (!IsHost(state, caller)) return ValueResult<Guid>.FromError("Only the host may spawn extra tokens.");
 
             Guid newId = default;
             string? error = null;
@@ -420,8 +401,8 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                 map.Tokens.Add(new Token
                 {
                     Id = newId,
-                    Type = TokenType.HostExtraToken,
-                    OwnerUserId = null,
+                    Type = TokenType.NPCToken,
+                    OwnerUserId = isHost ? null : caller.Id,
                     RepresentsUserId = representsUserId,
                     Name = name,
                     Color = color,
@@ -530,7 +511,10 @@ namespace KnockBox.DndMapper.Services.Logic.Games
 
         /// <summary>
         /// Sets or clears the character sheet attached to a token. Host-only.
-        /// Pass <c>null</c> to detach. The sheet must exist if non-null.
+        /// Pass <c>null</c> to detach. The sheet must exist if non-null. Rejects
+        /// attaching a player-owned sheet to an NPC (player sheets are personal to
+        /// their owner) or attaching a sheet that's already linked to
+        /// a different token (one character per sheet).
         /// </summary>
         public Result SetTokenSheetAsync(DndMapperGameState state, User caller, Guid tokenId, Guid? sheetId)
         {
@@ -543,10 +527,26 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             {
                 var (token, _) = FindTokenAndMap(state, tokenId);
                 if (token is null) { error = "Unknown token id."; return; }
-                if (sheetId is Guid sid && !state.Sheets.ContainsKey(sid))
+                if (sheetId is Guid sid)
                 {
-                    error = "Unknown sheet id.";
-                    return;
+                    if (!state.Sheets.TryGetValue(sid, out var sheet))
+                    {
+                        error = "Unknown sheet id.";
+                        return;
+                    }
+                    if (sheet.OwnerUserId is not null)
+                    {
+                        error = "That sheet belongs to a player.";
+                        return;
+                    }
+                    var attachedElsewhere = state.Maps
+                        .SelectMany(m => m.Tokens)
+                        .Any(other => other.Id != tokenId && other.SheetId == sid);
+                    if (attachedElsewhere)
+                    {
+                        error = "That sheet is already attached to another token.";
+                        return;
+                    }
                 }
                 token.SheetId = sheetId;
             });
@@ -557,8 +557,9 @@ namespace KnockBox.DndMapper.Services.Logic.Games
         }
 
         /// <summary>
-        /// Sets or clears the player a host-extra token represents. Host-only.
-        /// Only valid on <see cref="TokenType.HostExtraToken"/>. Pass <c>null</c> to clear.
+        /// Sets or clears the player an NPC token represents. Host-only.
+        /// Not valid on <see cref="TokenType.PlayerToken"/> (player tokens are
+        /// auto-managed). Pass <c>null</c> to clear.
         /// </summary>
         public Result SetTokenRepresentsAsync(DndMapperGameState state, User caller, Guid tokenId, string? representsUserId)
         {
@@ -571,9 +572,9 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             {
                 var (token, _) = FindTokenAndMap(state, tokenId);
                 if (token is null) { error = "Unknown token id."; return; }
-                if (token.Type != TokenType.HostExtraToken)
+                if (token.Type == TokenType.PlayerToken)
                 {
-                    error = "Only host-extra tokens may represent a player.";
+                    error = "Player tokens cannot represent another player.";
                     return;
                 }
                 if (representsUserId is not null
@@ -977,8 +978,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
         /// Reassigns a token's type and ownership. Host-only. Used when hydrating a
         /// previous session's player tokens (loaded as NPCToken with OwnerUserId=null)
         /// and giving them to a currently-registered player. Also accepts
-        /// <see cref="TokenType.NPCToken"/> / <see cref="TokenType.HostExtraToken"/>
-        /// for arbitrary host-driven reassignment.
+        /// <see cref="TokenType.NPCToken"/> for arbitrary host-driven reassignment.
         /// </summary>
         public Result ReassignTokenOwnerAsync(DndMapperGameState state, User caller, Guid tokenId, string? newOwnerUserId, TokenType newType)
         {
@@ -1028,18 +1028,6 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                     token.OwnerUserId = newOwnerUserId; // null = host-owned NPC, non-null = player-owned NPC
                     token.RepresentsUserId = null;
                 }
-                else if (newType == TokenType.HostExtraToken)
-                {
-                    if (newOwnerUserId is not null
-                        && !state.Players.Any(p => p.User.Id == newOwnerUserId))
-                    {
-                        error = "Represents user id is not a registered player.";
-                        return;
-                    }
-                    token.Type = TokenType.HostExtraToken;
-                    token.OwnerUserId = null;
-                    token.RepresentsUserId = newOwnerUserId;
-                }
                 else
                 {
                     error = "Unsupported token type.";
@@ -1050,6 +1038,154 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             if (exec.IsCanceled) return Result.FromCancellation();
             if (exec.TryGetFailure(out var execErr)) return Result.FromError(execErr);
             return error is null ? Result.Success : Result.FromError(error);
+        }
+
+        /// <summary>
+        /// Host-only. Promotes an <see cref="TokenType.NPCToken"/> to a
+        /// <see cref="TokenType.PlayerToken"/> owned by
+        /// <paramref name="newOwnerUserId"/>. If the token has an attached sheet,
+        /// the sheet's ownership transfers too — and every other token across every
+        /// map that references the same sheet is promoted in the same lock
+        /// acquisition. This is the symmetric counterpart of the auto-conversion that
+        /// runs when a player leaves mid-session (which orphans all of the player's
+        /// tokens on every map, plus their sheet).
+        /// </summary>
+        /// <remarks>
+        /// Rejects if the target player already owns a <see cref="TokenType.PlayerToken"/>
+        /// on any affected map or already owns a different <see cref="CharacterSheet"/>;
+        /// the host must resolve those conflicts first.
+        /// </remarks>
+        public Result AssignCharacterToPlayerAsync(DndMapperGameState state, User caller, Guid tokenId, string newOwnerUserId)
+        {
+            if (state is null) return Result.FromError("State is required.");
+            if (caller is null) return Result.FromError("Caller is required.");
+            if (!IsHost(state, caller)) return Result.FromError("Only the host may assign characters to players.");
+            if (string.IsNullOrWhiteSpace(newOwnerUserId)) return Result.FromError("Target player id is required.");
+
+            string? error = null;
+            var exec = state.Execute(() =>
+            {
+                var (token, _) = FindTokenAndMap(state, tokenId);
+                if (token is null) { error = "Unknown token id."; return; }
+
+                CharacterSheet? sheet = null;
+                if (token.SheetId is Guid sheetId)
+                    state.Sheets.TryGetValue(sheetId, out sheet);
+
+                error = AssignCharacterInternal(state, sheet, anchorToken: token, newOwnerUserId);
+            });
+
+            if (exec.IsCanceled) return Result.FromCancellation();
+            if (exec.TryGetFailure(out var execErr)) return Result.FromError(execErr);
+            return error is null ? Result.Success : Result.FromError(error);
+        }
+
+        /// <summary>
+        /// Host-only. Transfers ownership of a sheet (currently host/NPC-owned) to a
+        /// registered player, and promotes every <see cref="TokenType.NPCToken"/>
+        /// linked to that sheet across every map to a <see cref="TokenType.PlayerToken"/>
+        /// owned by the same player. Use this for sheets that have no current token
+        /// (e.g. a sheet built in advance, or an orphaned sheet whose tokens were
+        /// already cleaned up).
+        /// </summary>
+        public Result AssignSheetToPlayerAsync(DndMapperGameState state, User caller, Guid sheetId, string newOwnerUserId)
+        {
+            if (state is null) return Result.FromError("State is required.");
+            if (caller is null) return Result.FromError("Caller is required.");
+            if (!IsHost(state, caller)) return Result.FromError("Only the host may assign characters to players.");
+            if (string.IsNullOrWhiteSpace(newOwnerUserId)) return Result.FromError("Target player id is required.");
+
+            string? error = null;
+            var exec = state.Execute(() =>
+            {
+                if (!state.Sheets.TryGetValue(sheetId, out var sheet))
+                {
+                    error = "Unknown sheet id.";
+                    return;
+                }
+
+                error = AssignCharacterInternal(state, sheet, anchorToken: null, newOwnerUserId);
+            });
+
+            if (exec.IsCanceled) return Result.FromCancellation();
+            if (exec.TryGetFailure(out var execErr)) return Result.FromError(execErr);
+            return error is null ? Result.Success : Result.FromError(error);
+        }
+
+        // Shared promotion logic for AssignCharacterToPlayerAsync (token-keyed) and
+        // AssignSheetToPlayerAsync (sheet-keyed). Must be called from inside Execute.
+        // Returns null on success or an error message on failure (caller surfaces it
+        // through Result.FromError).
+        private static string? AssignCharacterInternal(
+            DndMapperGameState state,
+            CharacterSheet? sheet,
+            Token? anchorToken,
+            string newOwnerUserId)
+        {
+            if (!state.Players.Any(p => p.User.Id == newOwnerUserId))
+                return "Target user is not a registered player.";
+
+            // Reject if the sheet is already owned by a different player. Re-assigning
+            // to the *same* owner would be a no-op for the sheet but might still mean
+            // tokens need promoting (rare), so allow it through and let the token-state
+            // check below catch the genuinely no-op case.
+            if (sheet is not null && sheet.OwnerUserId is not null && sheet.OwnerUserId != newOwnerUserId)
+                return "Sheet is already owned by another player.";
+
+            // Two characters per player is out of scope. Block if the target already
+            // owns *some other* sheet.
+            if (state.Sheets.Values.Any(s =>
+                    s.OwnerUserId == newOwnerUserId && (sheet is null || s.Id != sheet.Id)))
+                return "Target player already owns a character sheet.";
+
+            // Collect every token that should be promoted: the anchor (if supplied)
+            // plus every token across every map that references this sheet.
+            var tokensToPromote = new List<Token>();
+            if (sheet is not null)
+            {
+                foreach (var map in state.Maps)
+                    foreach (var t in map.Tokens)
+                        if (t.SheetId == sheet.Id)
+                            tokensToPromote.Add(t);
+            }
+            if (anchorToken is not null && !tokensToPromote.Contains(anchorToken))
+                tokensToPromote.Add(anchorToken);
+
+            // Every promoted token must currently be an NPC. A PlayerToken would
+            // mean this is already (partly) the target player's character.
+            foreach (var t in tokensToPromote)
+            {
+                if (t.Type == TokenType.PlayerToken)
+                    return "Token is already a player token.";
+            }
+
+            // The target player must not already own a different PlayerToken on any
+            // map we'd be promoting onto.
+            foreach (var t in tokensToPromote)
+            {
+                var map = state.Maps.FirstOrDefault(m => m.Id == t.MapId);
+                if (map is null) continue;
+                if (map.Tokens.Any(other =>
+                        other.Id != t.Id
+                        && other.Type == TokenType.PlayerToken
+                        && other.OwnerUserId == newOwnerUserId))
+                    return "Target player already owns a token on one of the affected maps.";
+            }
+
+            // All validation passed — mutate.
+            foreach (var t in tokensToPromote)
+            {
+                t.Type = TokenType.PlayerToken;
+                t.OwnerUserId = newOwnerUserId;
+                t.RepresentsUserId = null;
+            }
+            if (sheet is not null)
+            {
+                sheet.OwnerUserId = newOwnerUserId;
+                sheet.RepresentsUserId = null;
+            }
+
+            return null;
         }
 
         public Result UpdateImageTransformAsync(
@@ -1211,7 +1347,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             return tokenId;
         }
 
-        private static void ConvertAbandonedPlayerTokensInternal(DndMapperGameState state, User departingPlayer)
+        private static void ConvertAbandonedPlayerCharacterInternal(DndMapperGameState state, User departingPlayer)
         {
             foreach (var map in state.Maps)
             {
@@ -1219,10 +1355,19 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                 {
                     if (token.Type == TokenType.PlayerToken && token.OwnerUserId == departingPlayer.Id)
                     {
-                        token.Type = TokenType.HostExtraToken;
+                        token.Type = TokenType.NPCToken;
                         token.OwnerUserId = null;
                         token.RepresentsUserId = departingPlayer.Id;
                     }
+                }
+            }
+
+            foreach (var sheet in state.Sheets.Values)
+            {
+                if (sheet.OwnerUserId == departingPlayer.Id)
+                {
+                    sheet.OwnerUserId = null;
+                    sheet.RepresentsUserId = departingPlayer.Id;
                 }
             }
         }

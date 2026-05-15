@@ -57,6 +57,54 @@
                            @oninput="@(e => OnNameInput(sheet, (string?)e.Value))"
                            @onblur="@(() => CommitFreeFields(sheet))" />
                 </div>
+                @if (sheet.OwnerUserId is null && sheet.RepresentsUserId is not null)
+                {
+                    <div class="dndm-sheet-origin" title="This character was orphaned when its player left the session.">
+                        Originally a player character
+                    </div>
+                }
+                @if (IsHost && sheet.OwnerUserId is null)
+                {
+                    // A character's tokens may span multiple maps via a shared SheetId;
+                    // exclude players who already own a different sheet OR a PlayerToken
+                    // on any map this character has a token on — those collide with the
+                    // engine's promotion guards and would only surface as a toast error.
+                    var affectedMapIds = State.Maps
+                        .SelectMany(m => m.Tokens)
+                        .Where(t => t.SheetId == sheet.Id)
+                        .Select(t => t.MapId)
+                        .ToHashSet();
+                    var blockedByToken = State.Maps
+                        .Where(m => affectedMapIds.Contains(m.Id))
+                        .SelectMany(m => m.Tokens)
+                        .Where(t => t.Type == TokenType.PlayerToken && t.OwnerUserId is not null)
+                        .Select(t => t.OwnerUserId!)
+                        .ToHashSet();
+                    var blockedBySheet = State.Sheets.Values
+                        .Where(s => s.OwnerUserId is not null && s.Id != sheet.Id)
+                        .Select(s => s.OwnerUserId!)
+                        .ToHashSet();
+                    var eligible = State.Players
+                        .Where(p => !blockedByToken.Contains(p.User.Id) && !blockedBySheet.Contains(p.User.Id))
+                        .ToList();
+                    if (eligible.Count > 0)
+                    {
+                        <div class="dndm-sheet-assign">
+                            <label class="dndm-label" title="Hand this character (sheet + every token referencing it) to a player">
+                                <span>Assign to</span>
+                                <select class="dndm-select"
+                                        value=""
+                                        @onchange="@(e => OnAssignSheetToPlayer(sheet, (string?)e.Value))">
+                                    <option value="">— give to player —</option>
+                                    @foreach (var p in eligible)
+                                    {
+                                        <option value="@p.User.Id">@p.DisplayName</option>
+                                    }
+                                </select>
+                            </label>
+                        </div>
+                    }
+                }
 
                 <div class="dndm-sheet-attrs">
                     @foreach (var row in State.AttributeSchema.Rows)

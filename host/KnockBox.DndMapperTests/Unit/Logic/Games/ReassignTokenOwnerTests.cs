@@ -78,21 +78,6 @@ namespace KnockBox.DndMapperTests.Unit.Logic.Games
         }
 
         [TestMethod]
-        public void ReassignTokenOwnerAsync_ToHostExtra_ClearsOwnerSetsRepresents()
-        {
-            var player = EngineTestFactory.RegisterPlayer(_state);
-            var tokenId = SpawnNpc();
-
-            var result = _engine.ReassignTokenOwnerAsync(_state, _host, tokenId, player.Id, TokenType.HostExtraToken);
-
-            Assert.IsTrue(result.IsSuccess);
-            var token = _state.Maps[0].Tokens.Single(t => t.Id == tokenId);
-            Assert.AreEqual(TokenType.HostExtraToken, token.Type);
-            Assert.IsNull(token.OwnerUserId);
-            Assert.AreEqual(player.Id, token.RepresentsUserId);
-        }
-
-        [TestMethod]
         public void ReassignTokenOwnerAsync_ToNpcWithOwner_AllowsPlayerOwnedNpc()
         {
             var player = EngineTestFactory.RegisterPlayer(_state);
