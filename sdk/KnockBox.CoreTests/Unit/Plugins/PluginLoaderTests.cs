@@ -494,4 +494,163 @@ public sealed class PluginLoaderTests
         }
         finally { Directory.Delete(tempDir, recursive: true); }
     }
+
+    // ─── SelectShareableWinners ────────────────────────────────────────────
+
+    private static PluginLoader.PluginDependency Dep(string name, string version, string path = "") =>
+        new(name, Version.Parse(version), path);
+
+    private static IReadOnlyList<IReadOnlyList<PluginLoader.PluginDependency>> PerPlugin(
+        params PluginLoader.PluginDependency[][] plugins) =>
+        plugins.Select(p => (IReadOnlyList<PluginLoader.PluginDependency>)p).ToList();
+
+    [TestMethod]
+    public void SelectShareableWinners_GroupsSameMajorMinor_AndPicksHighestPatch()
+    {
+        var deps = PerPlugin(
+            new[] { Dep("Shared.Lib", "1.2.3", "a") },
+            new[] { Dep("Shared.Lib", "1.2.7", "b") });
+        var winners = PluginLoader.SelectShareableWinners(
+            deps,
+            getPublicKeyToken: _ => null,
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase));
+
+        Assert.AreEqual(1, winners.Count);
+        Assert.AreEqual("Shared.Lib", winners[0].SimpleName);
+        Assert.AreEqual(new Version(1, 2, 7), winners[0].Version);
+        Assert.AreEqual("b", winners[0].DllPath);
+        Assert.AreEqual(2, winners[0].RequesterCount);
+    }
+
+    [TestMethod]
+    public void SelectShareableWinners_SkipsGroupsWithOnlyOnePlugin()
+    {
+        var deps = PerPlugin(
+            new[] { Dep("Lonely.Lib", "1.0.0") },
+            new[] { Dep("Other.Lib", "1.0.0") });
+        var winners = PluginLoader.SelectShareableWinners(
+            deps,
+            _ => null,
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase));
+
+        Assert.AreEqual(0, winners.Count);
+    }
+
+    [TestMethod]
+    public void SelectShareableWinners_DifferentMinorVersionsAreNotShared()
+    {
+        var deps = PerPlugin(
+            new[] { Dep("Multi.Lib", "1.2.3") },
+            new[] { Dep("Multi.Lib", "1.3.0") });
+        var winners = PluginLoader.SelectShareableWinners(
+            deps,
+            _ => null,
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase));
+
+        Assert.AreEqual(0, winners.Count);
+    }
+
+    [TestMethod]
+    public void SelectShareableWinners_DifferentMajorVersionsAreNotShared()
+    {
+        var deps = PerPlugin(
+            new[] { Dep("Multi.Lib", "1.2.3") },
+            new[] { Dep("Multi.Lib", "2.2.3") });
+        var winners = PluginLoader.SelectShareableWinners(
+            deps,
+            _ => null,
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase));
+
+        Assert.AreEqual(0, winners.Count);
+    }
+
+    [TestMethod]
+    public void SelectShareableWinners_SkipsNamesAlreadyInHostAssemblies()
+    {
+        var deps = PerPlugin(
+            new[] { Dep("KnockBox.Core", "1.0.0") },
+            new[] { Dep("KnockBox.Core", "1.0.0") });
+        var hostNames = new HashSet<string>(["KnockBox.Core"], StringComparer.OrdinalIgnoreCase);
+        var winners = PluginLoader.SelectShareableWinners(deps, _ => null, hostNames);
+
+        Assert.AreEqual(0, winners.Count);
+    }
+
+    [TestMethod]
+    public void SelectShareableWinners_SkipsForbiddenDependencies()
+    {
+        var deps = PerPlugin(
+            new[] { Dep("KnockBox.Platform", "1.0.0") },
+            new[] { Dep("KnockBox.Platform", "1.0.0") });
+        var winners = PluginLoader.SelectShareableWinners(
+            deps,
+            _ => null,
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase));
+
+        Assert.AreEqual(0, winners.Count);
+    }
+
+    [TestMethod]
+    public void SelectShareableWinners_DifferentPublicKeyTokensAreNotGrouped()
+    {
+        var deps = PerPlugin(
+            new[] { Dep("Strong.Lib", "1.2.3", "pathA") },
+            new[] { Dep("Strong.Lib", "1.2.3", "pathB") });
+        byte[] TokenFor(string path) => path == "pathA" ? new byte[] { 1 } : new byte[] { 2 };
+        var winners = PluginLoader.SelectShareableWinners(
+            deps,
+            TokenFor,
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase));
+
+        Assert.AreEqual(0, winners.Count);
+    }
+
+    [TestMethod]
+    public void SelectShareableWinners_CountsDistinctPluginsNotDuplicateEntries()
+    {
+        // Same plugin (index 0) lists the dep twice for some pathological reason — it
+        // must not count as two requesters.
+        var deps = PerPlugin(
+            new[] { Dep("Dup.Lib", "1.2.3"), Dep("Dup.Lib", "1.2.4") });
+        var winners = PluginLoader.SelectShareableWinners(
+            deps,
+            _ => null,
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase));
+
+        Assert.AreEqual(0, winners.Count);
+    }
+
+    [TestMethod]
+    public void InspectDepsJson_PopulatesDependencies_WhenDllExistsInPluginFolder()
+    {
+        var logger = new Mock<ILogger<PluginLoader>>();
+        var loader = new PluginLoader(logger.Object);
+        var tempDir = Path.Combine(Path.GetTempPath(), "knockbox-pluginloader-tests-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempDir);
+        try
+        {
+            var dllPath = Path.Combine(tempDir, "Sample.Plugin.dll");
+            File.WriteAllText(dllPath, string.Empty);
+            // Co-locate a "dependency" DLL on disk so the probe in InspectDepsJson succeeds.
+            File.WriteAllText(Path.Combine(tempDir, "Shared.Lib.dll"), string.Empty);
+            var depsJsonPath = Path.ChangeExtension(dllPath, ".deps.json");
+            File.WriteAllText(depsJsonPath, """
+                {
+                    "runtimeTarget": { "name": ".NETCoreApp,Version=v10.0", "signature": "" },
+                    "libraries": {
+                        "Sample.Plugin/1.0.0": { "type": "project", "serviceable": false, "sha512": "" },
+                        "Shared.Lib/1.2.3": { "type": "package", "serviceable": true, "sha512": "" },
+                        "Missing.Lib/9.9.9": { "type": "package", "serviceable": true, "sha512": "" }
+                    }
+                }
+                """);
+
+            var result = loader.InspectDepsJson(dllPath);
+
+            // Sample.Plugin.dll exists too, so it's reported; Missing.Lib has no DLL, so it isn't.
+            Assert.IsTrue(result.Dependencies.Any(d => d.SimpleName == "Shared.Lib" && d.Version == new Version(1, 2, 3)));
+            Assert.IsFalse(result.Dependencies.Any(d => d.SimpleName == "Missing.Lib"));
+        }
+        finally { Directory.Delete(tempDir, recursive: true); }
+    }
 }

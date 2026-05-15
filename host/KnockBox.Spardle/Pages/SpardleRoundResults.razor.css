@@ -126,8 +126,22 @@
     background: var(--spd-bg-panel-solid);
     border: 1px solid var(--spd-border);
     border-radius: 6px;
-    animation: spd-slam-subtle 0.35s ease-out both;
-    animation-delay: calc(var(--row-idx, 0) * 80ms);
+    animation: spd-results-stack-in 0.42s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+    animation-delay: calc(var(--row-idx, 0) * 110ms + 0.15s);
+}
+
+@keyframes spd-results-stack-in {
+    0% {
+        opacity: 0;
+        transform: translateY(-56px) scale(0.96);
+    }
+    65% {
+        transform: translateY(6px) scale(1.015);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
 }
 
 .spd-results-row-me {

@@ -33,7 +33,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games
 
             var gameState = new CardCounterGameState(host, stateLogger);
             gameState.Execute(() => gameState.SetJoinable(true));
-            gameState.PlayerUnregistered += player => HandlePlayerLeft(player, gameState);
+            gameState.SubscribePlayerUnregistered(player => HandlePlayerLeft(player, gameState));
             logger.LogInformation("Created CardCounter state with host [{id}].", host.Id);
             return gameState;
         }

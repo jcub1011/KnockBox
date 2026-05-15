@@ -48,11 +48,11 @@ public class SpardleState(User host, ILogger logger) : AbstractGameState(host, l
     public double DifficultyMultiplier { get; set; } = 2.0;
     
     // Dynamic defaults
-    public bool WaitForAll { get; set; } = false;
+    public bool WaitForAll { get; set; } = true;
     public bool RevealAnswer { get; set; } = true;
 
     // Game state
-    public int TotalRounds { get; set; } = 3;
+    public int TotalRounds { get; set; } = 5;
     public int CurrentRound { get; set; } = 0;
     public string TargetWord { get; set; } = string.Empty;
     public DateTime? RoundStartTime { get; set; }
@@ -67,7 +67,19 @@ public class SpardleState(User host, ILogger logger) : AbstractGameState(host, l
     public string? LastCompletedAnswer { get; set; }
 
     // Word lists
-    public ImmutableList<string> CustomWordPool { get; set; } = [];
+    // CustomWordPool is the canonical ordered list (drives display + round-queue selection).
+    // CustomWordPoolLookup is the O(1) membership view consumed by SpardleEngine.ValidateGuess;
+    // it auto-derives from the setter so callers cannot desync the two.
+    public ImmutableList<string> CustomWordPool
+    {
+        get;
+        set
+        {
+            field = value;
+            CustomWordPoolLookup = value.ToImmutableHashSet(StringComparer.Ordinal);
+        }
+    } = [];
+    public ImmutableHashSet<string> CustomWordPoolLookup { get; private set; } = ImmutableHashSet<string>.Empty;
     public ImmutableList<string> RoundQueue { get; set; } = [];
 
     // Player tracking. Writes are owned by SpardleEngine and only ever happen inside

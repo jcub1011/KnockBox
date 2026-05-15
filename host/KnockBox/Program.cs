@@ -1,10 +1,10 @@
 using KnockBox.Services.Logic.Admin;
 using KnockBox.Services.Logic.Games.Shared;
-using KnockBox.Services.Logic.Storage;
 using KnockBox.Admin;
 using KnockBox.Components;
 using KnockBox.Platform;
 using KnockBox.Platform.Games;
+using KnockBox.Platform.Services.Storage.IndexedDb;
 using KnockBox.Platform.Storage;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Hosting.Server;
@@ -31,7 +31,7 @@ namespace KnockBox
                 .Get<AdminOptions>() ?? new AdminOptions();
 
             // Register IStoragePathService early so we can use it for logging and plugin discovery.
-            var storagePath = new StoragePathService();
+            var storagePath = new DefaultStoragePathService();
             builder.Services.AddSingleton<IStoragePathService>(storagePath);
 
             var logDirectory = storagePath.GetLogDirectory();
@@ -124,6 +124,11 @@ namespace KnockBox
 
             // ── Endpoints ────────────────────────────────────────────────────
             app.MapKnockBoxPlatformEndpoints<App>();
+
+            // /blob-share/{token:guid} — capability-URL fetch endpoint for
+            // IIndexedDbBlob.PublishForSharingAsync. The host streams bytes
+            // from the originating Blazor circuit straight into the response.
+            app.MapBlobShareEndpoint();
 
             // Admin log download endpoint.
             MapAdminLogDownload(app, adminOptions.Port);

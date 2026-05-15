@@ -47,6 +47,14 @@ namespace KnockBox.Core.Services.Drawing
             "transform", "data-type", "fill-rule",
         ];
 
+        // Per-thread StringBuilder cache: avoids the per-Sanitize allocation that
+        // would otherwise fire on every drawing load / stroke replay. We retain the
+        // builder only when its capacity stays under MAX_RETAINED_SB_CAPACITY so a
+        // one-off huge SVG cannot pin a giant char buffer for the thread's lifetime.
+        [ThreadStatic]
+        private static StringBuilder? t_sb;
+        private const int MAX_RETAINED_SB_CAPACITY = 16 * 1024;
+
         /// <summary>
         /// Sanitizes SVG inner markup (strokes only, no <c>&lt;svg&gt;</c> wrapper) by
         /// retaining only <c>path</c> and <c>circle</c> elements with the allowed
@@ -58,16 +66,19 @@ namespace KnockBox.Core.Services.Drawing
             if (string.IsNullOrWhiteSpace(svgContent)) return null;
             if (svgContent.Length > MAX_SVG_CONTENT_LENGTH) return null;
 
+            var sb = t_sb;
+            if (sb is null) sb = new StringBuilder();
+            else { t_sb = null; sb.Clear(); }
+
             try
             {
                 using var reader = XmlReader.Create(
-                    new StringReader($"<svg xmlns='http://www.w3.org/2000/svg'>{svgContent}</svg>"), 
+                    new StringReader($"<svg xmlns='http://www.w3.org/2000/svg'>{svgContent}</svg>"),
                     XmlReaderSettings);
 
                 // Wrap inner markup in a temporary <svg> root for parsing.
                 var doc = XDocument.Load(reader, LoadOptions.None);
 
-                var sb = new StringBuilder();
                 SanitizeElements(doc.Root!.Elements(), sb);
                 return sb.Length > 0 ? sb.ToString() : null;
             }
@@ -75,6 +86,14 @@ namespace KnockBox.Core.Services.Drawing
             {
                 // Unparseable content is discarded entirely.
                 return null;
+            }
+            finally
+            {
+                if (sb.Capacity <= MAX_RETAINED_SB_CAPACITY)
+                {
+                    sb.Clear();
+                    t_sb = sb;
+                }
             }
         }
 

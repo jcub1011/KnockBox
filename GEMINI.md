@@ -36,7 +36,7 @@ KnockBox is a Blazor Server application that hosts party games as **runtime-load
 2. **References**: Reference `KnockBox.Core` only. **Do not** reference the Host or other games.
 3. **MSBuild**: Include `<Import Project="..\Directory.Plugin.targets" />` in the `.csproj`.
 4. **State**: Subclass `AbstractGameState` for per-room data.
-5. **Engine**: Subclass `AbstractGameEngine` (Singleton) for logic. Register via `services.AddGameEngine<TEngine>(RouteIdentifier)`.
+5. **Engine**: Subclass `AbstractGameEngine` (Singleton) for logic. Register via `registration.AddGameEngine<TEngine>()` on the `IPluginRegistration` passed to `RegisterServices`; the route is read from the manifest's `RouteIdentifier`.
 6. **Module**: Implement `IGameModule` to define the plugin's metadata and DI registrations.
 7. **UI**: Inherit from `DisposableComponent`. Use `@page "/room/{route-identifier}/{ObfuscatedRoomCode}"`.
 8. **Host Reference**: In `KnockBox.csproj`, add a reference with `ReferenceOutputAssembly="false" Private="false"` to ensure transitive builds without compile-time coupling.

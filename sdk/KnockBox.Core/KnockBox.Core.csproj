@@ -42,13 +42,12 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- Contracts-only dependencies. Nothing in KnockBox.Core ties it to
-         a specific host implementation, logger, or DI container; the
-         abstractions packages above are enough for plugins to compile
-         against in isolation. -->
-    <PackageReference Include="Microsoft.AspNetCore.Components.Web" Version="10.0.5" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.5" />
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.5" />
+    <!-- ASP.NET Core shared framework — needed so the IGameEngineHttpHandler
+         contract can use HttpContext / IResult, and so Razor components and
+         logging/DI abstractions are available for plugins. Plugins already run
+         inside the ASP.NET host process, so this is a non-additive runtime
+         dependency for them; M02 makes the HTTP types visible at compile time. -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <!-- SourceLink embeds commit + repo URL into the PDB so NuGet consumers
          can step-into KnockBox.Core sources directly from GitHub. PrivateAssets
          keeps the package out of transitive dependency lists. -->

@@ -126,6 +126,23 @@ public partial class SpardleRoom : LobbyPageBase<SpardleState>
         }
     }
 
+    private async Task HandleGiveUp()
+    {
+        if (GameState is null || UserService.CurrentUser is null) return;
+        if (IsHostObserver) return;
+        if (GameState.Phase != GamePhase.Playing) return;
+
+        if (!GameState.TryGetPlayerState(UserService.CurrentUser.Id, out var playerState)) return;
+        if (playerState.HasFinishedRound) return;
+
+        var result = GameEngine.GiveUp(GameState, UserService.CurrentUser);
+        if (!result.IsSuccess && result.TryGetFailure(out var failure))
+        {
+            await ShowToast(failure.PublicMessage.ToUpperInvariant(), SpardleToast.ToastTone.Danger);
+        }
+        StateHasChanged();
+    }
+
     private async Task ShowToast(string message, SpardleToast.ToastTone tone)
     {
         _toastCts?.Cancel();

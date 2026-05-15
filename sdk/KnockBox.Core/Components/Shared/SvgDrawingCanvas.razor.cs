@@ -83,9 +83,18 @@ namespace KnockBox.Core.Components.Shared
         private IJSObjectReference? _jsModule;
         private DotNetObjectReference<SvgDrawingCanvas>? _dotNetRef;
 
-        private readonly string _svgId = $"svg-canvas-{Guid.NewGuid():N}";
-        private string _colorInputId => $"color-{_svgId}";
-        private string _sizeInputId => $"size-{_svgId}";
+        private readonly string _svgId;
+        private readonly string _colorInputId;
+        private readonly string _sizeInputId;
+
+        public SvgDrawingCanvas()
+        {
+            // Computed once per component lifetime so Razor renders don't re-allocate
+            // these strings every diff cycle.
+            _svgId = $"svg-canvas-{Guid.NewGuid():N}";
+            _colorInputId = $"color-{_svgId}";
+            _sizeInputId = $"size-{_svgId}";
+        }
 
         private string _currentColor = "#000000";
         private string _customSwatchColor = "#808080";
@@ -398,6 +407,7 @@ namespace KnockBox.Core.Components.Shared
                     await _jsModule.InvokeVoidAsync("dispose", _svgId);
                 }
                 catch (JSDisconnectedException) { }
+                catch (ObjectDisposedException) { }
                 catch (Exception ex)
                 {
                     Logger.LogWarning(ex, "[SVGCanvas] DisposeAsync: error during JS dispose — svgId={SvgId}", _svgId);
@@ -408,6 +418,7 @@ namespace KnockBox.Core.Components.Shared
                     await _jsModule.DisposeAsync();
                 }
                 catch (JSDisconnectedException) { }
+                catch (ObjectDisposedException) { }
             }
             _dotNetRef?.Dispose();
         }

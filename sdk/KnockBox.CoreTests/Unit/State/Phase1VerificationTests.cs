@@ -98,8 +98,8 @@ public sealed class Phase1VerificationTests
         state.Execute(() => state.SetJoinable(true));
 
         var secondHandlerCalled = false;
-        state.PlayerUnregistered += _ => throw new InvalidOperationException("boom");
-        state.PlayerUnregistered += _ => secondHandlerCalled = true;
+        state.SubscribePlayerUnregistered(_ => throw new InvalidOperationException("boom"));
+        state.SubscribePlayerUnregistered(_ => secondHandlerCalled = true);
 
         var player = MakeUser("P1");
         var reg = state.RegisterPlayer(player);
@@ -116,8 +116,8 @@ public sealed class Phase1VerificationTests
         var state = MakeState();
 
         var secondHandlerCalled = false;
-        state.OnStateDisposed += () => throw new InvalidOperationException("boom");
-        state.OnStateDisposed += () => secondHandlerCalled = true;
+        state.SubscribeStateDisposed(() => throw new InvalidOperationException("boom"));
+        state.SubscribeStateDisposed(() => secondHandlerCalled = true);
 
         state.Dispose();
 

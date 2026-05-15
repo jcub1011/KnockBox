@@ -1,0 +1,179 @@
+@using System.Globalization
+@using KnockBox.Core.Components.Shared
+@using KnockBox.DndMapper.Helpers
+@using KnockBox.DndMapper.Models
+@using KnockBox.DndMapper.Services.State.Games
+@using KnockBox.DndMapper.Services.State.Games.Data
+@inherits DisposableComponent
+@implements IAsyncDisposable
+
+<g class="dndm-token-layer">
+    @if (Map is not null)
+    {
+        @foreach (var stack in Stacks)
+        {
+            bool isExpanded = _expandedCell == stack.Cell;
+            if (stack.Tokens.Count == 1)
+            {
+                @RenderToken(stack.Tokens[0])
+            }
+            else if (!isExpanded)
+            {
+                @* Stacked-card visual: two shadow rings under the topmost token, plus a count badge. *@
+                var top = stack.Tokens[^1];
+                var cx = stack.Cell.CellX + 0.5;
+                var cy = stack.Cell.CellY + 0.5;
+                <g @key="@($"stack-shadow-{stack.Cell.CellX}-{stack.Cell.CellY}")"
+                   class="dndm-token-stack-shadows"
+                   pointer-events="none"
+                   transform="@($"translate({Fmt(cx)} {Fmt(cy)})")">
+                    <circle cx="0.12" cy="0.12" r="0.45"
+                            fill="#2a2840" stroke="#1a1a2e" stroke-width="0.05" opacity="0.85" />
+                    <circle cx="0.06" cy="0.06" r="0.45"
+                            fill="#3a3858" stroke="#1a1a2e" stroke-width="0.05" opacity="0.9" />
+                </g>
+                @RenderToken(top, onClick: () => OpenStack(stack.Cell), suppressDrag: true, overrideX: cx, overrideY: cy)
+                <g @key="@($"stack-badge-{stack.Cell.CellX}-{stack.Cell.CellY}")"
+                   class="dndm-token-stack-badge"
+                   pointer-events="none"
+                   transform="@($"translate({Fmt(cx + 0.32)} {Fmt(cy - 0.32)})")">
+                    <circle r="0.18" fill="#e8b849" stroke="#1a1a2e" stroke-width="0.04" />
+                    <svg:text text-anchor="middle"
+                              dominant-baseline="central"
+                              font-size="0.22"
+                              font-weight="bold"
+                              fill="#1a1a2e"
+                              class="unselectable">@stack.Tokens.Count</svg:text>
+                </g>
+            }
+        }
+
+        @if (_expandedCell is TokenCellKey cell && Stacks.FirstOrDefault(s => s.Cell == cell) is { } expandedStack && expandedStack.Tokens.Count > 1)
+        {
+            var n = expandedStack.Tokens.Count;
+            var spacing = 1.0;
+            var totalWidth = (n - 1) * spacing;
+            var rowCx = Math.Clamp(cell.CellX + 0.5, totalWidth / 2 + 0.5, Map.Grid.WidthCells - totalWidth / 2 - 0.5);
+            var below = cell.CellY < 1;
+            var rowCy = below ? cell.CellY + 1.7 : cell.CellY - 0.7;
+            var anchorCx = cell.CellX + 0.5;
+            var anchorCy = cell.CellY + 0.5;
+
+            <rect class="dndm-token-popover-backdrop"
+                  x="0" y="0"
+                  width="@Map.Grid.WidthCells" height="@Map.Grid.HeightCells"
+                  fill="rgba(7,7,14,0.35)"
+                  @onclick="CloseStack" />
+
+            <g class="dndm-token-popover" pointer-events="all">
+                <line x1="@Fmt(anchorCx)" y1="@Fmt(anchorCy)"
+                      x2="@Fmt(rowCx)" y2="@Fmt(rowCy)"
+                      stroke="#e8b849" stroke-width="0.04" stroke-dasharray="0.1 0.08"
+                      pointer-events="none" />
+                @for (int i = 0; i < n; i++)
+                {
+                    var tok = expandedStack.Tokens[i];
+                    var chipX = rowCx + (i - (n - 1) / 2.0) * spacing;
+                    var chipY = rowCy;
+                    <g @key="@($"chip-{tok.Id}")"
+                       class="@($"dndm-token dndm-token--chip{(tok.Hidden ? " dndm-token--hidden" : "")}")"
+                       data-token-id="@tok.Id"
+                       transform="@($"translate({Fmt(chipX)} {Fmt(chipY)})")">
+                        @if (!string.IsNullOrEmpty(tok.Name))
+                        {
+                            <svg:title>@tok.Name</svg:title>
+                        }
+                        <circle r="0.4"
+                                fill="@FillFor(tok)"
+                                stroke="#e8b849"
+                                stroke-width="0.06" />
+                        @if (tok.IconKind == TokenIconKind.Initial && !string.IsNullOrEmpty(tok.Name))
+                        {
+                            <svg:text text-anchor="middle"
+                                      dominant-baseline="central"
+                                      font-size="0.45"
+                                      font-weight="bold"
+                                      fill="@TextFillFor(tok)"
+                                      class="unselectable">
+                                @tok.Name.Substring(0, 1).ToUpperInvariant()
+                            </svg:text>
+                        }
+                    </g>
+                }
+            </g>
+        }
+    }
+</g>
+
+@code {
+    private RenderFragment RenderToken(Token token, Action? onClick = null, bool suppressDrag = false, double? overrideX = null, double? overrideY = null) => builder =>
+    {
+        builder.OpenElement(0, "g");
+        builder.SetKey(token.Id);
+        builder.AddAttribute(1, "class", TokenCssClass(token));
+        if (!suppressDrag) builder.AddAttribute(2, "data-token-id", token.Id.ToString());
+        if (onClick is not null)
+        {
+            builder.AddAttribute(3, "onclick", Microsoft.AspNetCore.Components.EventCallback.Factory.Create(this, onClick));
+        }
+        double tx = overrideX ?? token.X;
+        double ty = overrideY ?? token.Y;
+        builder.AddAttribute(4, "transform", $"translate({Fmt(tx)} {Fmt(ty)})");
+
+        if (!string.IsNullOrEmpty(token.Name))
+        {
+            builder.OpenElement(5, "title");
+            builder.AddContent(6, token.Name);
+            builder.CloseElement();
+        }
+
+        // Gold "this is yours" halo rendered only on the viewer's own circuit so
+        // each player can locate their token at a glance without exposing ownership
+        // to other viewers.
+        if (!string.IsNullOrEmpty(token.OwnerUserId) && token.OwnerUserId == CurrentUserId)
+        {
+            builder.OpenElement(7, "circle");
+            builder.AddAttribute(8, "r", "0.55");
+            builder.AddAttribute(9, "fill", "none");
+            builder.AddAttribute(10, "stroke", "#FFD700");
+            builder.AddAttribute(11, "stroke-width", "0.08");
+            builder.AddAttribute(12, "pointer-events", "none");
+            builder.CloseElement();
+        }
+
+        builder.OpenElement(13, "circle");
+        builder.AddAttribute(14, "r", "0.45");
+        builder.AddAttribute(15, "fill", FillFor(token));
+        builder.AddAttribute(16, "stroke", string.IsNullOrEmpty(token.Color) ? "#888" : token.Color);
+        builder.AddAttribute(17, "stroke-width", "0.06");
+        builder.CloseElement();
+
+        if (token.IconKind == TokenIconKind.Initial && !string.IsNullOrEmpty(token.Name))
+        {
+            builder.OpenElement(20, "text");
+            builder.AddAttribute(21, "text-anchor", "middle");
+            builder.AddAttribute(22, "dominant-baseline", "central");
+            builder.AddAttribute(23, "font-size", "0.5");
+            builder.AddAttribute(24, "font-weight", "bold");
+            builder.AddAttribute(25, "fill", TextFillFor(token));
+            builder.AddAttribute(26, "class", "unselectable");
+            builder.AddContent(27, token.Name[..1].ToUpperInvariant());
+            builder.CloseElement();
+        }
+
+        if (IsHost && token.Hidden)
+        {
+            builder.OpenElement(30, "line");
+            builder.AddAttribute(31, "x1", "-0.4");
+            builder.AddAttribute(32, "y1", "-0.4");
+            builder.AddAttribute(33, "x2", "0.4");
+            builder.AddAttribute(34, "y2", "0.4");
+            builder.AddAttribute(35, "stroke", "#ff4444");
+            builder.AddAttribute(36, "stroke-width", "0.08");
+            builder.AddAttribute(37, "pointer-events", "none");
+            builder.CloseElement();
+        }
+
+        builder.CloseElement();
+    };
+}

@@ -1,0 +1,86 @@
+.dndm-upload {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.2rem;
+    padding: 0.6rem 0.5rem;
+    background: var(--dndm-bg-elev);
+    border: 1px dashed var(--dndm-border-strong);
+    border-radius: 4px;
+    color: var(--dndm-text);
+    cursor: pointer;
+    text-align: center;
+    transition: border-color 120ms, background 120ms;
+}
+
+.dndm-upload:hover {
+    border-color: var(--dndm-gold);
+    background: var(--dndm-bg-elev-hover);
+}
+
+.dndm-upload--disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.dndm-upload-label {
+    font-family: var(--dndm-display);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    font-size: 0.8rem;
+    color: var(--dndm-gold);
+}
+
+.dndm-upload-hint {
+    font-size: 0.7rem;
+    color: var(--dndm-text-muted);
+    letter-spacing: 0.5px;
+}
+
+/* `<InputFile>` renders its own <input> from a child component, so the parent's
+   scoped-CSS attribute does not attach to it — class selectors on the input fail
+   silently. Use ::deep to escape the scope and visually hide the native file picker. */
+.dndm-upload ::deep input[type="file"],
+.dndm-upload-compact ::deep input[type="file"] {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+    opacity: 0;
+}
+
+.dndm-upload-compact {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.15rem 0.5rem;
+    background: var(--dndm-bg-elev);
+    border: 1px solid var(--dndm-border-strong);
+    border-radius: 3px;
+    color: var(--dndm-gold);
+    cursor: pointer;
+    font-family: var(--dndm-display);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-size: 0.72rem;
+    transition: border-color 120ms, background 120ms;
+    position: relative;
+}
+
+.dndm-upload-compact:hover {
+    border-color: var(--dndm-gold);
+    background: var(--dndm-bg-elev-hover);
+}
+
+.dndm-upload-compact--disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+}

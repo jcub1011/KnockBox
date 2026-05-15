@@ -177,7 +177,7 @@ public override async Task<ValueResult<AbstractGameState>> CreateStateAsync(
 
 #### StartAsync
 
-Validates the caller is the host, then calls `state.Execute(() => state.UpdateJoinableStatus(false))` to close the lobby and begin the session.
+Validates the caller is the host, then calls `state.Execute(() => state.SetJoinable(false))` to close the lobby and begin the session.
 
 ```csharp
 public override async Task<Result> StartAsync(

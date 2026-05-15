@@ -44,16 +44,26 @@
             @if (lastRound is not null)
             {
                 int rowIdx = 0;
-                foreach (var outcome in lastRound.Outcomes.OrderBy(o => o.Dnf ? 999 : o.Placement))
+                // Order by post-round cumulative score so the row order matches the standings
+                // shown in the TOTAL column. This-round Placement is preserved as the
+                // RANK column accent; ties fall back to it, then to display name.
+                var orderedOutcomes = lastRound.Outcomes
+                    .Select(o => (Outcome: o,
+                                  TotalScore: State.PlayerStates.TryGetValue(o.UserId, out var ps) ? ps.TotalScore : 0))
+                    .OrderByDescending(t => t.TotalScore)
+                    .ThenBy(t => t.Outcome.Dnf ? 999 : t.Outcome.Placement)
+                    .ThenBy(t => t.Outcome.DisplayName, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+                foreach (var (outcome, totalScore) in orderedOutcomes)
                 {
                     bool isMe = outcome.UserId == UserService.CurrentUser?.Id;
-                    int totalScore = State.PlayerStates.TryGetValue(outcome.UserId, out var ps) ? ps.TotalScore : 0;
                     string rankClass = outcome.Dnf ? "spd-results-rank-dnf"
                         : outcome.Placement == 1 ? "spd-results-rank-gold"
                         : outcome.Placement == 2 ? "spd-results-rank-silver"
                         : outcome.Placement == 3 ? "spd-results-rank-bronze"
                         : "spd-results-rank-other";
                     <div class="spd-results-row @(isMe ? "spd-results-row-me" : "")"
+                         @key="outcome.UserId"
                          style="--row-idx:@rowIdx;">
                         <span class="spd-results-rank @rankClass">
                             @(outcome.Dnf ? "—" : outcome.Placement.ToString())

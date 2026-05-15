@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 The repo is split into two solutions (new SLNX format):
 - `sdk/KnockBox.Sdk.slnx` — the SDK NuGet packages (`KnockBox.Core`, `KnockBox.Platform`, `KnockBox.Plugins.Analyzer`, `KnockBox.Templates`) plus `KnockBox.CoreTests` and `KnockBox.PlatformTests`.
-- `host/KnockBox.Host.slnx` — the `KnockBox` host app, its tests, and the eight first-party game plugins (CardCounter, Codeword, DiceSimulator, DrawnToDress, HiddenAgenda, Operator, Spardle, TaskMaster) with their tests.
+- `host/KnockBox.Host.slnx` — the `KnockBox` host app, its tests, and the nine first-party game plugins (CardCounter, Codeword, DiceSimulator, DndMapper, DrawnToDress, HiddenAgenda, Operator, Spardle, TaskMaster) with their tests.
 
 Target framework is `net10.0`.
 
@@ -31,7 +31,7 @@ KnockBox is a Blazor Server host (`KnockBox`) that loads each party game as a **
 - `KnockBox.csproj` references `KnockBox.Core` and `KnockBox.Platform` directly (both from `sdk/`), and each game plugin via `<ProjectReference>` with `ReferenceOutputAssembly="false" Private="false"` — those plugin refs exist *only* to force plugins to build transitively. Do not drop those attributes and do not `using` any game-project type from the host.
 - Each game project is a Razor Class Library that imports `..\Directory.Plugin.targets` (the shared targets file lives at `host/Directory.Plugin.targets`). The target copies the plugin's primary DLL, `.deps.json`, scoped-CSS bundle, and `wwwroot/` into `host/KnockBox/bin/{Config}/{TFM}/games/{PluginName}/` after `Build`.
 - At startup, `Program.cs` calls `PluginLoader.LoadModules(AppContext.BaseDirectory/games)`. Each plugin is loaded into its own `PluginLoadContext` (ALC) rooted at `games/{PluginName}/`; shared contracts (`KnockBox.Core`, BCL, logging/DI abstractions) are deferred to the default ALC so type identity is preserved across the host/plugin boundary.
-- Each plugin exposes exactly one `IGameModule` (public parameterless ctor) in `sdk/KnockBox.Core/Plugins/IGameModule.cs`. Its `RegisterServices` typically calls the Core helper `services.AddGameEngine<TEngine>(RouteIdentifier)`, which registers the engine as a singleton *and* as a keyed `AbstractGameEngine` under `RouteIdentifier`. Razor pages inject the concrete engine; `LobbyService.CreateLobbyAsync` resolves the engine generically via `GetKeyedService<AbstractGameEngine>(routeIdentifier)`.
+- Each plugin exposes exactly one `IGameModule` (public parameterless ctor) in `sdk/KnockBox.Core/Plugins/IGameModule.cs`. Its `RegisterServices` typically calls `registration.AddGameEngine<TEngine>()` on the supplied `IPluginRegistration`, which registers the engine as a singleton *and* as a keyed `AbstractGameEngine` under the manifest's `RouteIdentifier`. Razor pages inject the concrete engine; `LobbyService.CreateLobbyAsync` resolves the engine generically via `GetKeyedService<AbstractGameEngine>(routeIdentifier)`.
 - Plugin `wwwroot/` folders are mounted at `/_content/{PluginName}` by `Program.MapPluginStaticAssets`, matching Blazor's RCL convention. Reference plugin assets as `_content/KnockBox.{GameName}/...`.
 - The `RouteIdentifier` on `IGameModule` **must** match the route segment in the plugin's `@page` directive (e.g., `"card-counter"` ↔ `@page "/room/card-counter/{ObfuscatedRoomCode}"`). Mismatch = 404 at navigation time.
 
@@ -48,9 +48,17 @@ KnockBox is a Blazor Server host (`KnockBox`) that loads each party game as a **
 - `IUserService` and `IGameSessionService` are scoped per Blazor circuit. `GameSessionState` is transient in DI but cached per user-id by `ISessionServiceProvider`, which keeps the session alive through a **1-minute grace period** when a circuit drops. If the user reconnects within the window the session is re-attached; otherwise `GameSessionState.Dispose()` unregisters the player.
 - Lobby URIs are `room/{routeIdentifier}/{guidA}-{guidB}`. Game pages must validate in `OnInitializedAsync` that the session exists and the URL matches `session.LobbyRegistration.Uri`, else redirect home.
 
-### DI registration order (`Program.cs`)
+### Persistence and storage
 
-`RegisterRepositories` → `RegisterValidators` → `RegisterStateServices` → `PluginLoader.LoadModules` → `RegisterLogic(pluginLoadResult)` → navigation + drawing services. `RegisterLogic` iterates `pluginLoadResult.Modules`, invokes each module's `RegisterServices`, registers the module as an `IGameModule` singleton (the home page enumerates these to build the game list), and finally registers `GamePluginAssemblies` so `Routes.razor` can bind `AdditionalAssemblies`.
+- `IStoragePathService` (default impl `DefaultStoragePathService` in `sdk/KnockBox.Platform/Services/Logic/Storage/`) anchors persisted state at `{KNOCKBOX_DATA_ROOT}` if that env var is set, otherwise `{AppContext.BaseDirectory}/data`. Resolved **once** at process start — mutating the env var mid-run does nothing.
+- Layout under the data root: `admin/` (settings + games-state), `logs/` (Serilog daily rolls), `plugins/{routeIdentifier}/` (per-plugin storage).
+- First-party plugins always load from `{install}/games/` (staged by `Directory.Plugin.targets`). Third-party plugins load from `{KNOCKBOX_DATA_ROOT}/games/` and **only** when the admin "third-party plugins" toggle is on. `Program.cs` reads that toggle from disk via `AdminSettingsService.ReadThirdPartyToggleFromDisk` *before* `AddKnockBoxPlatform`, so the discovery path list is final by the time DI is built.
+- Plugins should write through `IPluginStorage` (`sdk/KnockBox.Core/Plugins/IPluginStorage.cs`) — paths are relative-only; absolute paths and `..` traversal are rejected. This is a **contract-level boundary, not a runtime sandbox**: plugins can still call `System.IO` directly, which is an authoring violation rather than a runtime block.
+- `KnockBox.Plugins.Analyzer` ships KB1001–KB1004 Roslyn analyzers that flag sandbox-escape APIs (filesystem, HTTP, process, environment) at compile time. First-party plugins reference it through `host/Directory.Plugin.targets`, which adds a `ProjectReference ... OutputItemType="Analyzer" ReferenceOutputAssembly="false"` to every plugin csproj that imports the targets file. The analyzer also ships with the public `dotnet new knockbox-game` template (`KnockBox.Templates`) so third-party authors get the same build-time checks. The analyzer project lives in both `sdk/KnockBox.Sdk.slnx` and `host/KnockBox.Host.slnx` so it's part of the host build graph.
+
+### DI registration order (inside `AddKnockBoxPlatform`)
+
+The orchestration lives inside the `AddKnockBoxPlatform` extension method (`sdk/KnockBox.Platform/KnockBoxPlatformExtensions.cs`), which `Program.cs` calls during host setup. The order is `RegisterRepositories` → `RegisterValidators` → `RegisterStateServices` → `PluginLoader.LoadModules` → `RegisterLogic(pluginLoadResult)` → navigation + drawing services. `RegisterLogic` iterates `pluginLoadResult.Modules`, invokes each module's `RegisterServices`, registers the module as an `IGameModule` singleton (the home page enumerates these to build the game list), and finally registers `GamePluginAssemblies` so `Routes.razor` can bind `AdditionalAssemblies`.
 
 ### Adding a new game
 

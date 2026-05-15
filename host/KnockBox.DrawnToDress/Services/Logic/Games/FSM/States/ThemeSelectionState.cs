@@ -195,7 +195,6 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
             context.State.PlayerThemeSubmissions[cmd.PlayerId] = cmd.ThemeText;
             context.Logger.LogDebug(
                 "Player [{id}] submitted theme: \"{text}\".", cmd.PlayerId, cmd.ThemeText);
-            context.State.StateChangedEventManager.Notify();
 
             // Advance once every registered player has submitted.
             if (context.GamePlayers.Count > 0 &&
@@ -243,7 +242,6 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
             context.State.ThemeVotes[cmd.PlayerId] = cmd.ThemeId;
             context.Logger.LogDebug(
                 "Player [{id}] voted for theme [{themeId}].", cmd.PlayerId, cmd.ThemeId);
-            context.State.StateChangedEventManager.Notify();
 
             // Advance once every registered player has voted.
             if (context.GamePlayers.Count > 0 &&

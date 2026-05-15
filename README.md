@@ -38,6 +38,50 @@ Operator checklist before dropping a plugin into `data/games/`:
 
 Plugin authors: see [`docs/making-a-game-plugin.md`](docs/making-a-game-plugin.md) for the packaging and trust-model obligations you owe your downstream operators.
 
+## Persistence
+
+The host writes all operator-managed state into a single data root:
+
+| Subdirectory | Contents |
+| --- | --- |
+| `admin/settings.json` (+ `.bak`) | Admin password hash (PBKDF2) and the third-party-plugins toggle. |
+| `admin/games-state.json` | List of disabled game route identifiers. |
+| `logs/knockbox-YYYYMMDD.log` | Rolling Serilog files; 31-day retention. |
+| `plugins/{routeIdentifier}/` | Per-plugin storage written through `IPluginStorage`. |
+| `games/` | Operator-installed third-party plugins (only consulted when the admin toggle is on). |
+
+**Updates wipe the host install dir on most deployment workflows, so the data root must be persisted out-of-band.** Pick one of the two options below before you ship to production — otherwise every update resets every admin setting.
+
+### Docker
+
+The published image declares `VOLUME /app/data`, so even a `docker run` with no `-v` flag survives container recreation via an anonymous volume. For real deployments, mount a named volume or bind mount instead so backups and migrations are tractable:
+
+```bash
+docker volume create knockbox-data
+docker run -d --name knockbox \
+  -p 8080:8080 -p 8081:8081 \
+  -v knockbox-data:/app/data \
+  jabobb/knockbox:latest
+```
+
+To upgrade: `docker stop knockbox && docker rm knockbox && docker pull jabobb/knockbox:latest && docker run … -v knockbox-data:/app/data …`. The volume — and therefore every persisted file above — is reattached to the new container untouched.
+
+> **Note:** `docker run --rm` removes anonymous volumes too, so the `VOLUME` declaration only protects operators using non-`--rm` runs. The named-volume example above is the recommended deployment shape; the `VOLUME` directive is a safety net for first-time runs without `-v`, not a substitute for explicit volume management.
+
+### Non-Docker (zip release / `dotnet publish`)
+
+The host honours `KNOCKBOX_DATA_ROOT`. Set it to a directory **outside** the install folder before the process starts; the host writes all state under that path instead of the default `{install}/data/`. The variable is read once during startup (Serilog captures the log path immediately), so it must be set in the service unit / shell environment rather than after launch.
+
+```bash
+# Linux systemd unit (Environment=...)
+KNOCKBOX_DATA_ROOT=/var/lib/knockbox
+
+# Windows service / PowerShell
+$env:KNOCKBOX_DATA_ROOT = "C:\ProgramData\KnockBox"
+```
+
+Updates that replace the install directory then leave the data root intact. First-party plugins that ship inside the release artifact are still loaded from `{install}/games/` and intentionally do **not** follow the override.
+
 ## How the plugin system works (1-minute mental model)
 
 - The host `KnockBox.csproj` references plugins with `ReferenceOutputAssembly="false" Private="false"`. Those references exist **only** to make the plugins build transitively — the host takes no compile-time dependency on plugin types.
@@ -154,7 +198,7 @@ public class CoinFlipGameEngine(
                 $"Parameter {nameof(host)} was null."));
 
         var state = new CoinFlipGameState(host, stateLogger);
-        state.UpdateJoinableStatus(true);
+        state.SetJoinable(true);
         return Task.FromResult(ValueResult<AbstractGameState>.FromValue(state));
     }
 
@@ -169,7 +213,7 @@ public class CoinFlipGameEngine(
         if (host != s.Host)
             return Task.FromResult(Result.FromError("Only the host can start the game."));
 
-        return Task.FromResult(s.Execute(() => s.UpdateJoinableStatus(false)));
+        return Task.FromResult(s.Execute(() => s.SetJoinable(false)));
     }
 
     public Result Flip(CoinFlipGameState state) =>
@@ -328,9 +372,9 @@ public class CoinFlipModule : IGameModule
     public string Description => "Flip a coin.";
     public string RouteIdentifier => "coin-flip";
 
-    public void RegisterServices(IServiceCollection services)
+    public void RegisterServices(IPluginRegistration registration)
     {
-        services.AddGameEngine<CoinFlipGameEngine>(RouteIdentifier);
+        registration.AddGameEngine<CoinFlipGameEngine>();
     }
 
     public RenderFragment GetButtonContent() => builder =>
@@ -342,7 +386,7 @@ public class CoinFlipModule : IGameModule
 ```
 
 - **Public parameterless constructor is required.** `PluginLoader` activates it via reflection.
-- `services.AddGameEngine<TEngine>(routeIdentifier)` (see [`sdk/KnockBox.Core/Plugins/GameModuleServiceCollectionExtensions.cs`](sdk/KnockBox.Core/Plugins/GameModuleServiceCollectionExtensions.cs)) registers `TEngine` as a singleton **and** re-exposes the same instance as a keyed `AbstractGameEngine` under `routeIdentifier`. Razor pages inject the concrete engine; `LobbyService.CreateLobbyAsync` resolves `GetKeyedService<AbstractGameEngine>(routeIdentifier)` when spinning up a room.
+- `IPluginRegistration.AddGameEngine<TEngine>()` (parameterless — see [`sdk/KnockBox.Core/Plugins/GameModuleServiceCollectionExtensions.cs`](sdk/KnockBox.Core/Plugins/GameModuleServiceCollectionExtensions.cs)) registers `TEngine` as a singleton **and** re-exposes the same instance as a keyed `AbstractGameEngine` under the route from `IPluginManifest.RouteIdentifier`. Razor pages inject the concrete engine; `LobbyService.CreateLobbyAsync` resolves `GetKeyedService<AbstractGameEngine>(routeIdentifier)` when spinning up a room.
 - **`RouteIdentifier` must match your page's `@page` route segment verbatim** — e.g., `"coin-flip"` ↔ `@page "/room/coin-flip/{ObfuscatedRoomCode}"`.
 - `GetButtonContent()` is the inner fragment of the game's tile on the home screen. The host wraps it in a `<button>` that owns click handling, disabled state, aria-label, and layout sizing — your fragment just owns the visual design. It is typical to point this at a small Razor component under `Components/`.
 
@@ -442,4 +486,4 @@ Building the host transitively builds your plugin and stages it into `host/Knock
 
 - [`host/KnockBox/Specs/knockbox-platform-architecture.md`](host/KnockBox/Specs/knockbox-platform-architecture.md) — the authoritative architecture reference (ALC isolation, session lifecycle, DI order, lobby routing).
 - [`CLAUDE.md`](CLAUDE.md) — build/test commands and additional contributor notes.
-- Existing plugins under `host/` (`KnockBox.CardCounter`, `KnockBox.Codeword`, `KnockBox.DiceSimulator`, `KnockBox.DrawnToDress`, `KnockBox.Operator`) — concrete examples of the patterns above at varying complexity. `host/KnockBox.DiceSimulator` is the simplest starting reference.
+- Existing plugins under `host/` (`KnockBox.CardCounter`, `KnockBox.Codeword`, `KnockBox.DiceSimulator`, `KnockBox.DndMapper`, `KnockBox.DrawnToDress`, `KnockBox.HiddenAgenda`, `KnockBox.Operator`, `KnockBox.Spardle`, `KnockBox.TaskMaster`) — concrete examples of the patterns above at varying complexity. `host/KnockBox.DiceSimulator` is the simplest starting reference.

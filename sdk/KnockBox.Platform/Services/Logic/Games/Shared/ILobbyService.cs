@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using KnockBox.Core.Primitives.Returns;
 using KnockBox.Core.Services.Logic.Games.Shared;
 using KnockBox.Core.Services.State.Users;
@@ -40,5 +41,16 @@ namespace KnockBox.Platform.Games
         /// should union with the full plugin list if they want a complete table.
         /// </summary>
         IReadOnlyDictionary<string, int> GetLobbyCountsByRoute();
+
+        /// <summary>
+        /// Looks up a lobby by its full obfuscated URI
+        /// (<c>room/{routeIdentifier}/{guidA}-{guidB}</c>). Used by the plugin
+        /// HTTP dispatcher to resolve a room from a request path; the URI's two
+        /// random GUIDs serve as the access token for that endpoint family.
+        /// </summary>
+        /// <param name="uri">The full lobby URI as stored on <see cref="LobbyRegistration.Uri"/>.</param>
+        /// <param name="registration">The matching registration on success; <c>null</c> on miss.</param>
+        /// <returns><c>true</c> if a lobby with the given URI exists; otherwise <c>false</c>.</returns>
+        bool TryGetByUri(string uri, [NotNullWhen(true)] out LobbyRegistration? registration);
     }
 }

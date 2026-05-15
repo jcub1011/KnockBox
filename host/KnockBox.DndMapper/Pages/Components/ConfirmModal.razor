@@ -1,0 +1,13 @@
+@if (IsOpen)
+{
+    <div class="dndm-modal-overlay" @onclick="OnCancelInternal">
+        <div class="dndm-modal-card" role="dialog" aria-modal="true" @onclick:stopPropagation="true">
+            <h3 class="dndm-modal-title">@Title</h3>
+            <p class="dndm-modal-message">@Message</p>
+            <div class="dndm-modal-actions">
+                <button class="dndm-btn dndm-btn--ghost" type="button" @onclick="OnCancelInternal">@CancelText</button>
+                <button class="dndm-btn dndm-btn--danger" type="button" @onclick="OnConfirmInternal">@ConfirmText</button>
+            </div>
+        </div>
+    </div>
+}

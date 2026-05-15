@@ -399,11 +399,14 @@ public class SpardleEngine(
                 .GroupBy(p => (0, (p.Ps.FinishedAt ?? DateTime.MaxValue).Ticks));
         }
 
+        int wordLength = s.TargetWord.Length;
         var outcomes = new List<PlayerRoundOutcome>();
         int placement = 1;
+        int? lowestSolverPoints = null;
         foreach (var group in solverGroups)
         {
-            int points = PointsForPlacement(placement, solved: true);
+            int points = PointsForSolver(wordLength, placement);
+            lowestSolverPoints = points;
             foreach (var member in group)
             {
                 outcomes.Add(new PlayerRoundOutcome
@@ -420,8 +423,13 @@ public class SpardleEngine(
             placement += group.Count();
         }
 
+        // Anchor non-solver scores against the lowest solver. If no one solved, fall
+        // back to what 1st place would have paid so the round still has stakes.
+        int nonSolverAnchor = lowestSolverPoints ?? PointsForSolver(wordLength, 1);
+
         foreach (var (user, displayName, ps) in dnfs)
         {
+            int bestCorrect = BestCorrectCount(ps.Guesses);
             outcomes.Add(new PlayerRoundOutcome
             {
                 UserId = user.Id,
@@ -429,7 +437,7 @@ public class SpardleEngine(
                 GuessCount = ps.Guesses.Count,
                 FinishedAt = ps.FinishedAt,
                 Dnf = true,
-                PointsAwarded = 0,
+                PointsAwarded = PointsForNonSolver(wordLength, bestCorrect, nonSolverAnchor),
                 Placement = 0
             });
         }
@@ -437,16 +445,36 @@ public class SpardleEngine(
         return outcomes;
     }
 
-    public static int PointsForPlacement(int placement, bool solved)
+    internal static int PointsForSolver(int wordLength, int placement)
     {
-        if (!solved) return 0;
-        return placement switch
+        if (wordLength <= 0 || placement <= 0) return 0;
+        double raw = (10.0 * Math.Log10(wordLength) + wordLength) / placement;
+        return (int)Math.Floor(raw);
+    }
+
+    // Non-solver points = floor((bestCorrectCount / wordLength) * anchorPoints).
+    // anchorPoints is the lowest solver's score this round (or what 1st place would have
+    // paid when no one solved). Because bestCorrectCount ≤ wordLength-1 for any non-solver,
+    // this is structurally guaranteed to be < anchorPoints — solvers always beat non-solvers.
+    internal static int PointsForNonSolver(int wordLength, int bestCorrectCount, int anchorPoints)
+    {
+        if (wordLength <= 0 || bestCorrectCount <= 0 || anchorPoints <= 0) return 0;
+        double pct = (double)bestCorrectCount / wordLength;
+        return (int)Math.Floor(pct * anchorPoints);
+    }
+
+    internal static int BestCorrectCount(IReadOnlyList<GuessResult> guesses)
+    {
+        int best = 0;
+        for (int i = 0; i < guesses.Count; i++)
         {
-            1 => 10,
-            2 => 5,
-            3 => 2,
-            _ => 1
-        };
+            int count = 0;
+            var statuses = guesses[i].Statuses;
+            for (int j = 0; j < statuses.Length; j++)
+                if (statuses[j] == LetterStatus.Correct) count++;
+            if (count > best) best = count;
+        }
+        return best;
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -501,6 +529,34 @@ public class SpardleEngine(
         return Result.FromCancellation();
     }
 
+    public Result GiveUp(SpardleState state, User player)
+    {
+        var executeResult = state.Execute<Result>(() =>
+        {
+            if (player.Id == state.Host.Id && !state.HostIsParticipant)
+                return Result.FromError("Host is observing and cannot give up.");
+
+            if (state.Phase != GamePhase.Playing || !state.IsRoundActive)
+                return Result.FromError("Round is not active.");
+
+            if (!state.TryGetPlayerState(player.Id, out var pState))
+                return Result.FromError("You are not a participant in this round.");
+
+            if (pState.HasFinishedRound) return Result.Success;
+
+            pState.HasFinishedRound = true;
+            pState.Dnf = true;
+            pState.FinishedAt = DateTime.UtcNow;
+
+            CheckRoundEnd(state);
+            return Result.Success;
+        });
+
+        if (executeResult.TryGetSuccess(out var inner)) return inner;
+        if (executeResult.TryGetFailure(out var err)) return Result.FromError(err);
+        return Result.FromCancellation();
+    }
+
     private Result ValidateGuess(SpardleState state, PlayerState pState, string guess)
     {
         if (guess.Length != state.TargetWord.Length)
@@ -536,9 +592,12 @@ public class SpardleEngine(
             }
         }
 
+        if (state.CustomWordPoolLookup.Contains(guess))
+            return Result.Success;
+
         if (!state.AllowDictionaryFallback)
         {
-            if (!state.CustomWordPool.Contains(guess) && !wordListService.IsInPool(state.WordPoolMode, guess))
+            if (!wordListService.IsInPool(state.WordPoolMode, guess))
                 return Result.FromError("Word not in list.");
         }
         else
@@ -632,7 +691,7 @@ public class SpardleEngine(
     {
         if (length <= 0) return 6;
         double g = 6.0 + multiplier * Math.Log2((double)length / 5.0);
-        return Math.Max(1, (int)Math.Round(g, MidpointRounding.AwayFromZero));
+        return Math.Max(6, (int)Math.Round(g, MidpointRounding.AwayFromZero));
     }
 
     private void CheckRoundEnd(SpardleState state)

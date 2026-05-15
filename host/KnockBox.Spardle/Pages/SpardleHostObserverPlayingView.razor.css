@@ -218,10 +218,10 @@
 .spd-obs-status {
     flex: 0 0 auto;
     align-self: flex-start;
-    padding: 0.2rem 0.55rem;
-    font-size: 0.7rem;
+    padding: 0.35rem 0.85rem;
+    font-size: clamp(1.05rem, 1.6vw, 1.4rem);
     font-weight: 800;
-    letter-spacing: 0.16em;
+    letter-spacing: 0.12em;
     text-transform: uppercase;
     border-radius: 999px;
     background: rgba(255, 255, 255, 0.05);
@@ -240,4 +240,100 @@
 .spd-obs-dnf {
     color: var(--spd-danger);
     background: rgba(255, 46, 99, 0.12);
+}
+
+/* ============================================================
+   ROUND-OUTCOME BOARD TREATMENTS
+   ----------------------------------------------------------------
+   Solved (HasFinishedRound && !Dnf): a single skeleton-style
+   glint sweeps diagonally across the mini-board, and the row
+   that solved is crowned in a pulsing gold halo.
+
+   DNF (Dnf == true): the mini-board is desaturated and dimmed
+   via a backdrop overlay.
+   ============================================================ */
+
+@keyframes spd-obs-glint {
+    0%, 60% { transform: translateX(-100%); }
+    100%    { transform: translateX(100%); }
+}
+
+@keyframes spd-obs-row-winner-pulse {
+    0%, 100% {
+        box-shadow:
+            0 0 0 2px hsla(45, 100%, 65%, 0.95),
+            0 0 14px 1px hsla(45, 100%, 60%, 0.65),
+            0 0 26px 4px hsla(45, 100%, 55%, 0.35);
+    }
+    50% {
+        box-shadow:
+            0 0 0 2px hsla(48, 100%, 80%, 1),
+            0 0 22px 3px hsla(45, 100%, 60%, 0.95),
+            0 0 36px 6px hsla(45, 100%, 55%, 0.55);
+    }
+}
+
+/* --- Solved board: skeleton glint sweep --------------------- */
+.spd-obs-card-solved .spd-obs-mini {
+    position: relative;
+    overflow: hidden;
+}
+
+.spd-obs-card-solved .spd-obs-mini::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+        110deg,
+        transparent 35%,
+        rgba(255, 255, 255, 0.28) 50%,
+        transparent 65%
+    );
+    transform: translateX(-100%);
+    animation: spd-obs-glint 2.6s ease-in-out infinite;
+    pointer-events: none;
+    z-index: 4;
+}
+
+/* --- Champion's plate (the row that solved) ----------------- */
+.spd-obs-card-solved .spd-obs-row-winner {
+    position: relative;
+    z-index: 5;
+    border-radius: 0.28rem;
+    animation: spd-obs-row-winner-pulse 1.8s ease-in-out infinite;
+}
+
+.spd-obs-card-solved .spd-obs-row-winner .spd-obs-tile-correct {
+    box-shadow:
+        0 0 18px 1px var(--spd-correct-glow),
+        inset 0 0 8px rgba(255, 255, 255, 0.4),
+        inset 0 -2px 5px hsla(45, 100%, 55%, 0.3);
+    border: none;
+}
+
+/* --- DNF board: desaturated dim overlay --------------------- */
+.spd-obs-card-dnf .spd-obs-name {
+    color: var(--spd-ink-dim, rgba(255, 255, 255, 0.6));
+}
+
+.spd-obs-card-dnf .spd-obs-mini {
+    position: relative;
+}
+
+.spd-obs-card-dnf .spd-obs-mini::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 4;
+    pointer-events: none;
+    background: rgba(10, 12, 20, 0.55);
+    backdrop-filter: grayscale(0.92) brightness(0.6) saturate(0.5);
+    -webkit-backdrop-filter: grayscale(0.92) brightness(0.6) saturate(0.5);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .spd-obs-card-solved .spd-obs-mini::before,
+    .spd-obs-card-solved .spd-obs-row-winner {
+        animation: none;
+    }
 }

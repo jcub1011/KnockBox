@@ -48,6 +48,7 @@ public partial class MyGameLobby : DisposableComponent
     // Must be disposed in Dispose() — otherwise the state holds a reference to
     // this component and leaks the circuit after navigation. Non-negotiable.
     private IDisposable? _stateSubscription;
+    private IDisposable? _stateDisposedSubscription;
 
     private bool IsHost => GameState?.Host.Id == UserService.CurrentUser?.Id;
     private bool CanStart => GameState is not null && GameState.Players.Count > 0;
@@ -82,7 +83,7 @@ public partial class MyGameLobby : DisposableComponent
 
         // Dispose-listener: when the lobby ends (host leaves / game over /
         // explicit close), leave the session and go home.
-        GameState.OnStateDisposed += HandleStateDisposed;
+        _stateDisposedSubscription = GameState.SubscribeStateDisposed(HandleStateDisposed);
 
         // Re-render this component whenever the state mutates. InvokeAsync
         // marshals the StateHasChanged call back onto the Blazor render
@@ -118,12 +119,10 @@ public partial class MyGameLobby : DisposableComponent
 
     public override void Dispose()
     {
-        if (GameState is not null)
-            GameState.OnStateDisposed -= HandleStateDisposed;
-
-        // Dispose the subscription BEFORE base.Dispose(). If we don't, the
+        // Dispose subscriptions BEFORE base.Dispose(). If we don't, the
         // StateChangedEventManager keeps a live Func<ValueTask> reference to
         // this component's closure and the circuit leaks.
+        _stateDisposedSubscription?.Dispose();
         _stateSubscription?.Dispose();
         base.Dispose();
     }

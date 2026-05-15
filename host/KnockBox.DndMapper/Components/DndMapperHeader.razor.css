@@ -1,0 +1,103 @@
+.dndm-header-container {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
+    height: 64px;
+    background: #1a1a2e;
+    border-bottom: 2px solid rgba(168, 85, 247, 0.3);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    flex: 1;
+}
+
+.dndm-header-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    text-decoration: none;
+}
+
+.dndm-header-text {
+    font-size: 1.1rem;
+    font-weight: 900;
+    color: #e8b849;
+    letter-spacing: 2px;
+}
+
+.dndm-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.dndm-header-actions ::deep .dndm-header-code {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    background: rgba(168, 85, 247, 0.05);
+    border: 1px solid rgba(168, 85, 247, 0.3);
+    border-radius: 4px;
+    padding: 6px 16px;
+    color: #ede4d3;
+    cursor: pointer;
+    min-width: 130px;
+}
+
+.dndm-header-actions ::deep .dndm-header-code-cover,
+.dndm-header-actions ::deep .dndm-header-code-value {
+    grid-area: 1 / 1;
+    transition: opacity 0.2s ease;
+}
+
+.dndm-header-actions ::deep .dndm-header-code-cover {
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    color: #a855f7;
+    text-transform: uppercase;
+}
+
+.dndm-header-actions ::deep .dndm-header-code-value {
+    opacity: 0;
+    pointer-events: none;
+    font-size: 1rem;
+    font-weight: 800;
+    letter-spacing: 2px;
+    color: #e8b849;
+}
+
+.dndm-header-actions ::deep .dndm-header-code.revealed .dndm-header-code-cover {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.dndm-header-actions ::deep .dndm-header-code.revealed .dndm-header-code-value {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.dndm-header-leave {
+    background: rgba(231, 76, 60, 0.1);
+    border: 1.5px solid #e74c3c;
+    border-radius: 50%;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #e74c3c;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.dndm-header-leave:hover {
+    background: #e74c3c;
+    color: #fff;
+}
+
+@media (max-width: 600px) {
+    .dndm-header-text {
+        display: none;
+    }
+}

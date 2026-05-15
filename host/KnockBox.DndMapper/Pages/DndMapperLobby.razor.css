@@ -1,0 +1,30 @@
+.dndm-content {
+    padding: 24px;
+    color: #ede4d3;
+    font-family: var(--font-primary);
+}
+
+.dndm-content .card {
+    background: #1a1a2e;
+    border: 1px solid rgba(168, 85, 247, 0.3);
+    border-radius: 8px;
+    padding: 20px;
+}
+
+.dndm-content h3,
+.dndm-content h4 {
+    color: #e8b849;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+
+.dndm-content .player-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.dndm-content .card + .card {
+    margin-top: 16px;
+}

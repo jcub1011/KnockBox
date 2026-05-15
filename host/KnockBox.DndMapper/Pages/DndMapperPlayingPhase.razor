@@ -1,0 +1,145 @@
+@using KnockBox.Core.Components.Shared
+@using KnockBox.DndMapper.Models
+@using KnockBox.DndMapper.Pages.Components
+@using KnockBox.DndMapper.Services.State.Games
+@using KnockBox.DndMapper.Services.State.Games.Data
+@inherits DisposableComponent
+
+<HeadContent>
+    <link href="_content/KnockBox.DndMapper/css/panels.css" rel="stylesheet" />
+</HeadContent>
+
+<CascadingValue Value="_viewport" IsFixed="true">
+<CascadingValue Value="_toasts" IsFixed="true">
+    <div class="dnd-mapper-playing @(IsHost ? "dnd-mapper-playing--host" : null)
+                @(_leftCollapsed ? "dnd-mapper-playing--left-collapsed" : null)
+                @(_rightCollapsed ? "dnd-mapper-playing--right-collapsed" : null)"
+         @ref="_rootRef"
+         style="@RootStyle">
+
+        @if (IsHost)
+        {
+            <aside class="dndm-rail dndm-rail--left">
+                <div class="dndm-rail-content">
+                    <HostMapSwitcher State="State" />
+                    <HostTokenPanel State="State" />
+                    <HostLayerPanel State="State"
+                                    RoomCode="@RoomCode"
+                                    SelectedImageId="_selectedImageId"
+                                    SelectedImageIdChanged="OnSelectedImageIdChanged" />
+                </div>
+                @* Always render the resize handle so its JS bindings stay
+                   attached to a stable DOM node across rail collapses /
+                   re-renders. Drag = resize; click without drag = toggle
+                   collapse (handled in dndMapperRailResize.js). *@
+                <div class="dndm-rail-resize dndm-rail-resize--left"
+                     @ref="_leftHandleRef"
+                     title="Drag to resize, click to collapse"></div>
+            </aside>
+        }
+
+        <main class="dndm-canvas-area">
+            @if (IsHost && _libraryBannerVisible)
+            {
+                <div class="dndm-library-banner" role="status">
+                    <div class="dndm-library-banner__copy">
+                        <strong>Saved content from a previous session is available.</strong>
+                        <span>Load your maps, tokens, sheets and settings — or start fresh.</span>
+                    </div>
+                    <div class="dndm-library-banner__actions">
+                        <button class="dndm-btn" type="button" disabled="@_hydrating" @onclick="OnLoadLibrary">
+                            @(_hydrating ? "Loading…" : "Load")
+                        </button>
+                        <button class="dndm-btn dndm-btn--ghost" type="button" disabled="@_hydrating" @onclick="OnDiscardLibrary">
+                            Start fresh
+                        </button>
+                    </div>
+                    @if (_hydrateError is not null)
+                    {
+                        <div class="dndm-library-banner__error">@_hydrateError</div>
+                    }
+                </div>
+            }
+            @if (ActiveMap is null)
+            {
+                <div class="dndm-empty">
+                    @if (IsHost)
+                    {
+                        <span>No active map. Create one from the <strong>Maps</strong> panel.</span>
+                    }
+                    else
+                    {
+                        <span>Waiting for the host to choose a map…</span>
+                    }
+                </div>
+            }
+            else
+            {
+                <MapCanvas State="State"
+                           Map="ActiveMap"
+                           RoomCode="@RoomCode"
+                           IsHost="IsHost"
+                           CurrentUserId="@CurrentUserId"
+                           SelectedImageId="_selectedImageId"
+                           SelectedImageIdChanged="OnSelectedImageIdChanged" />
+
+                @if (IsHost && _selectedImageId is Guid imgId && State.ActiveMapId is Guid mapId)
+                {
+                    <div class="dndm-canvas-inspector">
+                        <HostImageInspector State="State"
+                                            MapId="mapId"
+                                            ImageId="imgId"
+                                            OnClose="@(() => _selectedImageId = null)" />
+                    </div>
+                }
+            }
+        </main>
+
+        <aside class="dndm-rail dndm-rail--right">
+            @* See left rail comment. *@
+            <div class="dndm-rail-resize dndm-rail-resize--right"
+                 @ref="_rightHandleRef"
+                 title="Drag to resize, click to collapse"></div>
+            <div class="dndm-rail-content">
+                @if (!IsHost)
+                {
+                    <MyTokenPanel State="State" />
+                }
+                <CharacterSheetPanel State="State" CurrentUserId="@CurrentUserId" IsHost="IsHost" />
+                <RollLogPanel State="State"
+                              Config="_diceConfig"
+                              CurrentUserId="@CurrentUserId"
+                              IsHost="IsHost"
+                              OnOpenSettings="@(() => _diceOpen = true)" />
+            </div>
+        </aside>
+
+        @if (IsHost)
+        {
+            <div class="dndm-floating-actions">
+                <button class="dndm-btn" type="button" @onclick="TogglePerms">Permissions</button>
+                <EndSessionButton State="State" />
+            </div>
+        }
+
+        @if (_diceOpen)
+        {
+            <DiceRollerModal State="State"
+                             Config="_diceConfig"
+                             CurrentUserId="@CurrentUserId"
+                             IsHost="IsHost"
+                             OnClose="@(() => _diceOpen = false)" />
+        }
+        @if (IsHost && _permsOpen)
+        {
+            <div class="dndm-modal-overlay" @onclick="@(() => _permsOpen = false)">
+                <div @onclick:stopPropagation="true">
+                    <PermissionsPanel State="State" OnClose="@(() => _permsOpen = false)" />
+                </div>
+            </div>
+        }
+
+        <DndMapperToast Service="_toasts" />
+    </div>
+</CascadingValue>
+</CascadingValue>

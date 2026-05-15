@@ -91,6 +91,46 @@
     color: var(--spd-ink-mute);
 }
 
+.spd-play-top-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: clamp(6px, 1vw, 10px);
+    flex-shrink: 0;
+}
+
+.spd-give-up-btn {
+    padding: clamp(6px, 0.9vw, 8px) clamp(10px, 1.3vw, 14px);
+    background: var(--spd-bg-panel-solid);
+    border: 2px solid #000;
+    border-radius: 4px;
+    font-family: var(--spd-font-display);
+    font-size: clamp(0.7rem, 0.9vw, 0.8rem);
+    letter-spacing: 0.18em;
+    color: var(--spd-ink-mute);
+    cursor: pointer;
+    box-shadow: 3px 3px 0 #000;
+    transition: transform 0.1s, box-shadow 0.1s, background-color 0.15s, color 0.15s;
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+.spd-give-up-btn:hover {
+    transform: translate(-1px, -1px);
+    box-shadow: 4px 4px 0 #000;
+    color: var(--spd-ink);
+}
+
+.spd-give-up-btn.spd-give-up-armed {
+    background: var(--spd-danger);
+    color: #fff;
+    animation: spd-give-up-pulse 800ms ease-in-out infinite;
+}
+
+@keyframes spd-give-up-pulse {
+    0%, 100% { box-shadow: 3px 3px 0 #000; }
+    50% { box-shadow: 3px 3px 0 #000, 0 0 12px rgba(255, 46, 99, 0.6); }
+}
+
 .spd-play-hc-toggle {
     display: inline-flex;
     align-items: center;

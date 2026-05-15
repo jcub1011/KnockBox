@@ -26,6 +26,7 @@ namespace KnockBox.Operator.Pages
         [Parameter] public string ObfuscatedRoomCode { get; set; } = default!;
 
         private IDisposable? _stateSubscription;
+        private IDisposable? _stateDisposedSubscription;
         private IDisposable? _tickSubscription;
         private bool _kickHandled;
 
@@ -55,7 +56,7 @@ namespace KnockBox.Operator.Pages
 
             GameState = gameState;
 
-            GameState.OnStateDisposed += HandleGameStateDisposed;
+            _stateDisposedSubscription = GameState.SubscribeStateDisposed(HandleGameStateDisposed);
 
             _stateSubscription = GameState.StateChangedEventManager.Subscribe(async () =>
             {
@@ -93,8 +94,7 @@ namespace KnockBox.Operator.Pages
         public override void Dispose()
         {
             _tickSubscription?.Dispose();
-            if (GameState != null)
-                GameState.OnStateDisposed -= HandleGameStateDisposed;
+            _stateDisposedSubscription?.Dispose();
             _stateSubscription?.Dispose();
             base.Dispose();
         }
