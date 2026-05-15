@@ -1,0 +1,167 @@
+using System.Text.Json;
+using KnockBox.Core.Primitives.Returns;
+using KnockBox.Core.Services.Storage.IndexedDb;
+
+namespace KnockBox.Platform.Services.Storage.IndexedDb;
+
+/// <summary>
+/// Schema-mutation op queued by <see cref="UpgradeContext"/>. Sent in bulk to JS
+/// during <see cref="UpgradeContext.FlushAsync"/>; the receiver runs the ops in
+/// order on the live versionchange transaction.
+/// </summary>
+internal sealed record SchemaOp(
+    string Type,
+    string Name,
+    string? StoreName = null,
+    string[]? KeyPath = null,
+    bool? AutoIncrement = null,
+    bool? Unique = null,
+    bool? MultiEntry = null);
+
+internal sealed class UpgradeContext : IUpgradeContext
+{
+    private readonly IndexedDbInterop _interop;
+    private readonly ILoggerFactory _loggerFactory;
+    private readonly BlobShareRegistry _shareRegistry;
+    private readonly int _upgradeTxId;
+    private readonly JsonSerializerOptions _jsonOptions;
+    private readonly UpgradeTxContext _txContext;
+    private readonly List<SchemaOp> _pendingOps = new();
+    private readonly Dictionary<string, UpgradeStoreHandle> _storeHandles;
+    private readonly List<string> _storeNames;
+    private bool _active = true;
+
+    public int OldVersion { get; }
+    public int NewVersion { get; }
+    public IReadOnlyList<string> ObjectStoreNames => _storeNames;
+
+    public UpgradeContext(
+        IndexedDbInterop interop,
+        ILoggerFactory loggerFactory,
+        BlobShareRegistry shareRegistry,
+        int upgradeTxId,
+        int oldVersion,
+        int newVersion,
+        JsonSerializerOptions jsonOptions,
+        IReadOnlyDictionary<string, IReadOnlyList<string>> existingSchema)
+    {
+        _interop = interop;
+        _loggerFactory = loggerFactory;
+        _shareRegistry = shareRegistry;
+        _upgradeTxId = upgradeTxId;
+        _jsonOptions = jsonOptions;
+        _txContext = new UpgradeTxContext(interop, upgradeTxId, jsonOptions, () => _active);
+        OldVersion = oldVersion;
+        NewVersion = newVersion;
+        _storeNames = existingSchema.Keys.ToList();
+        _storeHandles = new Dictionary<string, UpgradeStoreHandle>(existingSchema.Count);
+        foreach (var (name, indexNames) in existingSchema)
+        {
+            _storeHandles[name] = new UpgradeStoreHandle(this, name, indexNames.ToList());
+        }
+    }
+
+    internal void Deactivate() => _active = false;
+
+    public IUpgradeStoreHandle CreateJsonObjectStore(string name, KeyPath? keyPath = null, bool autoIncrement = false)
+        => CreateStore(name, keyPath, autoIncrement);
+
+    public IUpgradeStoreHandle CreateBlobObjectStore(string name, KeyPath? keyPath = null, bool autoIncrement = false)
+        => CreateStore(name, keyPath, autoIncrement);
+
+    private IUpgradeStoreHandle CreateStore(string name, KeyPath? keyPath, bool autoIncrement)
+    {
+        if (_storeHandles.ContainsKey(name))
+            throw new InvalidOperationException($"Object store '{name}' already exists in this database.");
+
+        _pendingOps.Add(new SchemaOp(
+            Type: "createStore",
+            Name: name,
+            KeyPath: keyPath?.Paths.ToArray(),
+            AutoIncrement: autoIncrement ? true : null));
+
+        _storeNames.Add(name);
+        var handle = new UpgradeStoreHandle(this, name, new List<string>());
+        _storeHandles[name] = handle;
+        return handle;
+    }
+
+    public IUpgradeStoreHandle Store(string name)
+    {
+        if (!_storeHandles.TryGetValue(name, out var handle))
+            throw new InvalidOperationException($"Object store '{name}' does not exist in this database.");
+        return handle;
+    }
+
+    public void DeleteObjectStore(string name)
+    {
+        if (!_storeHandles.Remove(name))
+            throw new InvalidOperationException($"Object store '{name}' does not exist in this database.");
+        _storeNames.Remove(name);
+        _pendingOps.Add(new SchemaOp(Type: "deleteStore", Name: name));
+    }
+
+    public async ValueTask<IObjectStore<TValue>> ObjectStoreAsync<TValue>(string name)
+    {
+        EnsureStoreExists(name);
+        await FlushPendingSchemaOpsBeforeDataAsync().ConfigureAwait(false);
+        return new ObjectStore<TValue>(_txContext, name);
+    }
+
+    public async ValueTask<IJsonObjectStore> JsonObjectStoreAsync(string name)
+    {
+        EnsureStoreExists(name);
+        await FlushPendingSchemaOpsBeforeDataAsync().ConfigureAwait(false);
+        return new JsonObjectStore(_txContext, name);
+    }
+
+    public async ValueTask<IBlobObjectStore> BlobObjectStoreAsync(string name)
+    {
+        EnsureStoreExists(name);
+        await FlushPendingSchemaOpsBeforeDataAsync().ConfigureAwait(false);
+        return new BlobObjectStore(_txContext, _loggerFactory, _shareRegistry, name);
+    }
+
+    private void EnsureStoreExists(string name)
+    {
+        if (!_storeHandles.ContainsKey(name))
+            throw new InvalidOperationException(
+                $"Object store '{name}' does not exist (or has not yet been created in this upgrade).");
+    }
+
+    /// <summary>
+    /// Schema mutations are queued by C# but must reach JS before any data op
+    /// runs against the affected store. Awaited from the async store
+    /// accessors so the JS-side <c>upgradeApplySchemaOps</c> message is
+    /// observed before any subsequent data op is dispatched.
+    /// </summary>
+    private async ValueTask FlushPendingSchemaOpsBeforeDataAsync()
+    {
+        if (_pendingOps.Count == 0) return;
+        var batch = _pendingOps.ToArray();
+        _pendingOps.Clear();
+        var result = await _interop.InvokeVoidAsync(
+            "upgradeApplySchemaOps", CancellationToken.None, _upgradeTxId, batch).ConfigureAwait(false);
+        if (result.TryGetFailure(out var err))
+        {
+            throw new InvalidOperationException(
+                $"upgradeApplySchemaOps failed: [{err.Kind}] {err.Message}");
+        }
+    }
+
+    internal void Queue(SchemaOp op) => _pendingOps.Add(op);
+
+    /// <summary>
+    /// Drains the queued schema ops so <see cref="VersionChangeBridge.OnUpgrade"/>
+    /// can return them across the JS boundary. Sending the ops back as the
+    /// return value of <c>OnUpgrade</c> (rather than via a separate JS call)
+    /// keeps the upgrade transaction alive across the single
+    /// <c>await</c> in <c>onupgradeneeded</c>.
+    /// </summary>
+    internal SchemaOp[] DrainPending()
+    {
+        var batch = _pendingOps.ToArray();
+        _pendingOps.Clear();
+        return batch;
+    }
+}

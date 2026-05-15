@@ -3,8 +3,10 @@ using System.Runtime.Loader;
 using KnockBox.Core.Plugins;
 using KnockBox.Core.Services.Drawing;
 using KnockBox.Core.Services.Navigation;
+using KnockBox.Core.Services.Storage.IndexedDb;
 using KnockBox.Platform.Games;
 using KnockBox.Platform.Plugins;
+using KnockBox.Platform.Services.Storage.IndexedDb;
 using KnockBox.Platform.Storage;
 using KnockBox.Services.Drawing;
 using KnockBox.Services.Navigation;
@@ -104,6 +106,18 @@ public static class KnockBoxPlatformExtensions
                 // without retaining 10 batches per circuit.
                 o.MaxBufferedUnacknowledgedRenderBatches = 4;
             });
+
+        // Cross-circuit registry for IIndexedDbBlob.PublishForSharingAsync —
+        // singleton so the /blob-share/{token} HTTP endpoint can resolve a
+        // token published by any circuit. Entries hold a fetcher closure
+        // capturing the originating circuit's blob; the host streams bytes
+        // through the closure without ever persisting them.
+        builder.Services.AddSingleton<BlobShareRegistry>();
+
+        // Per-circuit gateway to the browser's IndexedDB. Scoped so the cached
+        // JS module reference stays bound to one Blazor circuit; the impl
+        // disposes that reference when the scope ends.
+        builder.Services.AddScoped<IIndexedDbService, IndexedDbService>();
 
         // Core service registrations
         builder.Services.RegisterRepositories();

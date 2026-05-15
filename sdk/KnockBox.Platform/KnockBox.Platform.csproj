@@ -89,6 +89,9 @@
     <!-- Grants the in-repo test projects access to internal types. -->
     <InternalsVisibleTo Include="KnockBox.PlatformTests" />
     <InternalsVisibleTo Include="KnockBoxTests" />
+    <!-- Castle DynamicProxy (used by Moq) generates proxies in this assembly;
+         needs visibility to subclass internal types like IndexedDbInterop. -->
+    <InternalsVisibleTo Include="DynamicProxyGenAssembly2" />
   </ItemGroup>
 
 </Project>
