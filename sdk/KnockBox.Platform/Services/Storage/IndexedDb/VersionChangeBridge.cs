@@ -19,17 +19,20 @@ internal sealed class VersionChangeBridge
     private readonly IndexedDbInterop _interop;
     private readonly ILoggerFactory _loggerFactory;
     private readonly ILogger<VersionChangeBridge> _logger;
+    private readonly BlobShareRegistry _shareRegistry;
     private readonly IndexedDbSchema _schema;
     private IndexedDatabase? _database;
 
     public VersionChangeBridge(
         IndexedDbInterop interop,
         ILoggerFactory loggerFactory,
+        BlobShareRegistry shareRegistry,
         IndexedDbSchema schema)
     {
         _interop = interop;
         _loggerFactory = loggerFactory;
         _logger = loggerFactory.CreateLogger<VersionChangeBridge>();
+        _shareRegistry = shareRegistry;
         _schema = schema;
     }
 
@@ -59,7 +62,7 @@ internal sealed class VersionChangeBridge
             kv => kv.Key,
             kv => (IReadOnlyList<string>)kv.Value);
         var ctx = new UpgradeContext(
-            _interop, _loggerFactory, upgradeTxId, oldVersion, newVersion,
+            _interop, _loggerFactory, _shareRegistry, upgradeTxId, oldVersion, newVersion,
             _schema.JsonOptions ?? IndexedDbWireFormat.DefaultJsonOptions,
             existing);
 

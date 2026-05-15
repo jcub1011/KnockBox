@@ -9,6 +9,7 @@ internal sealed class IndexedDbTransaction : IIndexedDbTransaction, ITxContext
 {
     private readonly ILogger<IndexedDbTransaction> _logger;
     private readonly ILoggerFactory _loggerFactory;
+    private readonly BlobShareRegistry _shareRegistry;
     private readonly TxCompletionBridge _bridge;
     private readonly DotNetObjectReference<TxCompletionBridge> _bridgeRef;
     private readonly IReadOnlyDictionary<string, StoreSchema> _schema;
@@ -36,6 +37,7 @@ internal sealed class IndexedDbTransaction : IIndexedDbTransaction, ITxContext
     public IndexedDbTransaction(
         IndexedDbInterop interop,
         ILoggerFactory loggerFactory,
+        BlobShareRegistry shareRegistry,
         int txId,
         TransactionMode mode,
         IReadOnlyList<string> storeNames,
@@ -46,6 +48,7 @@ internal sealed class IndexedDbTransaction : IIndexedDbTransaction, ITxContext
     {
         Interop = interop;
         _loggerFactory = loggerFactory;
+        _shareRegistry = shareRegistry;
         _logger = loggerFactory.CreateLogger<IndexedDbTransaction>();
         TxId = txId;
         Mode = mode;
@@ -78,7 +81,7 @@ internal sealed class IndexedDbTransaction : IIndexedDbTransaction, ITxContext
     public IBlobObjectStore BlobObjectStore(string name)
     {
         EnsureStoreInScope(name);
-        return new BlobObjectStore(this, _loggerFactory, name);
+        return new BlobObjectStore(this, _loggerFactory, _shareRegistry, name);
     }
 
     public async ValueTask<Result<IndexedDbError>> CommitAsync(CancellationToken ct = default)

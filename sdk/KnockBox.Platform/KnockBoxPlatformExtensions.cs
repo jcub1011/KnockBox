@@ -107,6 +107,13 @@ public static class KnockBoxPlatformExtensions
                 o.MaxBufferedUnacknowledgedRenderBatches = 4;
             });
 
+        // Cross-circuit registry for IIndexedDbBlob.PublishForSharingAsync —
+        // singleton so the /blob-share/{token} HTTP endpoint can resolve a
+        // token published by any circuit. Entries hold a fetcher closure
+        // capturing the originating circuit's blob; the host streams bytes
+        // through the closure without ever persisting them.
+        builder.Services.AddSingleton<BlobShareRegistry>();
+
         // Per-circuit gateway to the browser's IndexedDB. Scoped so the cached
         // JS module reference stays bound to one Blazor circuit; the impl
         // disposes that reference when the scope ends.

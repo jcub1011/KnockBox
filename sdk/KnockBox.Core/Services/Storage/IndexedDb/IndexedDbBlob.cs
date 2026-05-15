@@ -47,6 +47,24 @@ namespace KnockBox.Core.Services.Storage.IndexedDb
         /// </summary>
         public abstract ValueTask<string> CreateObjectUrlAsync(CancellationToken ct = default);
 
+        /// <summary>
+        /// Publishes this blob as an HTTP-fetchable resource that other
+        /// clients can render directly (e.g. an <c>&lt;img src&gt;</c> on a
+        /// different user's browser). The server does NOT persist the bytes
+        /// — when the share URL is fetched, the host streams chunks from
+        /// this blob's originating circuit straight into the HTTP response,
+        /// holding only one chunk buffer in flight.
+        /// <para>
+        /// The returned <see cref="IBlobShare"/> must be disposed (or its
+        /// owning blob disposed) to revoke the URL. The capability URL
+        /// itself is unguessable (a fresh <see cref="Guid"/>); document and
+        /// scope its distribution accordingly.
+        /// </para>
+        /// </summary>
+        public abstract ValueTask<IBlobShare> PublishForSharingAsync(
+            BlobShareOptions? options = null,
+            CancellationToken ct = default);
+
         public abstract ValueTask DisposeAsync();
     }
 }

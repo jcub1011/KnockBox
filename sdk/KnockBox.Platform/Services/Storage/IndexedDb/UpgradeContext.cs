@@ -22,6 +22,7 @@ internal sealed class UpgradeContext : IUpgradeContext
 {
     private readonly IndexedDbInterop _interop;
     private readonly ILoggerFactory _loggerFactory;
+    private readonly BlobShareRegistry _shareRegistry;
     private readonly int _upgradeTxId;
     private readonly JsonSerializerOptions _jsonOptions;
     private readonly UpgradeTxContext _txContext;
@@ -37,6 +38,7 @@ internal sealed class UpgradeContext : IUpgradeContext
     public UpgradeContext(
         IndexedDbInterop interop,
         ILoggerFactory loggerFactory,
+        BlobShareRegistry shareRegistry,
         int upgradeTxId,
         int oldVersion,
         int newVersion,
@@ -45,6 +47,7 @@ internal sealed class UpgradeContext : IUpgradeContext
     {
         _interop = interop;
         _loggerFactory = loggerFactory;
+        _shareRegistry = shareRegistry;
         _upgradeTxId = upgradeTxId;
         _jsonOptions = jsonOptions;
         _txContext = new UpgradeTxContext(interop, upgradeTxId, jsonOptions, () => _active);
@@ -116,7 +119,7 @@ internal sealed class UpgradeContext : IUpgradeContext
     {
         EnsureStoreExists(name);
         FlushPendingSchemaOpsBeforeData();
-        return new BlobObjectStore(_txContext, _loggerFactory, name);
+        return new BlobObjectStore(_txContext, _loggerFactory, _shareRegistry, name);
     }
 
     private void EnsureStoreExists(string name)

@@ -9,6 +9,7 @@ internal sealed class BlobObjectCursor
 {
     private readonly ITxContext _tx;
     private readonly ILoggerFactory _loggerFactory;
+    private readonly BlobShareRegistry _shareRegistry;
     private readonly int _cursorId;
     private readonly bool _hasBufferedFirst;
     private CursorEntry<IndexedDbBlob>? _current;
@@ -21,11 +22,13 @@ internal sealed class BlobObjectCursor
     public BlobObjectCursor(
         ITxContext tx,
         ILoggerFactory loggerFactory,
+        BlobShareRegistry shareRegistry,
         int cursorId,
         CursorEntry<IndexedDbBlob>? firstEntry)
     {
         _tx = tx;
         _loggerFactory = loggerFactory;
+        _shareRegistry = shareRegistry;
         _cursorId = cursorId;
         if (firstEntry.HasValue)
         {
@@ -48,7 +51,7 @@ internal sealed class BlobObjectCursor
             _current = null;
             return false;
         }
-        _current = ParseEntry(_tx.Interop, _loggerFactory, resp.Entry.Value);
+        _current = ParseEntry(_tx.Interop, _loggerFactory, _shareRegistry, resp.Entry.Value);
         return true;
     }
 
@@ -62,7 +65,7 @@ internal sealed class BlobObjectCursor
             return step.Error.Error;
         }
         if (resp.Done || resp.Entry is null) { _current = null; return Result<IndexedDbError>.Success; }
-        _current = ParseEntry(_tx.Interop, _loggerFactory, resp.Entry.Value);
+        _current = ParseEntry(_tx.Interop, _loggerFactory, _shareRegistry, resp.Entry.Value);
         return Result<IndexedDbError>.Success;
     }
 
@@ -77,7 +80,7 @@ internal sealed class BlobObjectCursor
             return step.Error.Error;
         }
         if (resp.Done || resp.Entry is null) { _current = null; return Result<IndexedDbError>.Success; }
-        _current = ParseEntry(_tx.Interop, _loggerFactory, resp.Entry.Value);
+        _current = ParseEntry(_tx.Interop, _loggerFactory, _shareRegistry, resp.Entry.Value);
         return Result<IndexedDbError>.Success;
     }
 
@@ -116,7 +119,7 @@ internal sealed class BlobObjectCursor
     }
 
     internal static CursorEntry<IndexedDbBlob> ParseEntry(
-        IndexedDbInterop interop, ILoggerFactory loggerFactory, JsonElement entry)
+        IndexedDbInterop interop, ILoggerFactory loggerFactory, BlobShareRegistry shareRegistry, JsonElement entry)
     {
         var key = IndexedDbWireFormat.FromKeyEnvelope(entry.GetProperty("key"));
         var primaryKey = IndexedDbWireFormat.FromKeyEnvelope(entry.GetProperty("primaryKey"));
@@ -127,6 +130,7 @@ internal sealed class BlobObjectCursor
         var blob = new IndexedDbBlobImpl(
             interop,
             loggerFactory.CreateLogger<IndexedDbBlobImpl>(),
+            shareRegistry,
             blobId, contentType, length);
         return new CursorEntry<IndexedDbBlob>(key, primaryKey, blob);
     }

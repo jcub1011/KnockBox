@@ -8,13 +8,19 @@ internal sealed class BlobObjectStore : IBlobObjectStore
 {
     private readonly ITxContext _tx;
     private readonly ILoggerFactory _loggerFactory;
+    private readonly BlobShareRegistry _shareRegistry;
 
     public string Name { get; }
 
-    public BlobObjectStore(ITxContext tx, ILoggerFactory loggerFactory, string name)
+    public BlobObjectStore(
+        ITxContext tx,
+        ILoggerFactory loggerFactory,
+        BlobShareRegistry shareRegistry,
+        string name)
     {
         _tx = tx;
         _loggerFactory = loggerFactory;
+        _shareRegistry = shareRegistry;
         Name = name;
     }
 
@@ -99,11 +105,11 @@ internal sealed class BlobObjectStore : IBlobObjectStore
         if (!resp.HasFirst || resp.CursorId is null)
         {
             return ValueResult<IBlobObjectCursor, IndexedDbError>.FromValue(
-                new BlobObjectCursor(_tx, _loggerFactory, cursorId: -1, firstEntry: null));
+                new BlobObjectCursor(_tx, _loggerFactory, _shareRegistry, cursorId: -1, firstEntry: null));
         }
-        var firstEntry = BlobObjectCursor.ParseEntry(_tx.Interop, _loggerFactory, resp.Entry!.Value);
+        var firstEntry = BlobObjectCursor.ParseEntry(_tx.Interop, _loggerFactory, _shareRegistry, resp.Entry!.Value);
         return ValueResult<IBlobObjectCursor, IndexedDbError>.FromValue(
-            new BlobObjectCursor(_tx, _loggerFactory, resp.CursorId.Value, firstEntry));
+            new BlobObjectCursor(_tx, _loggerFactory, _shareRegistry, resp.CursorId.Value, firstEntry));
     }
 
     public ValueTask<ValueResult<IIndexedDbKeyCursor, IndexedDbError>> OpenKeyCursorAsync(
@@ -118,6 +124,7 @@ internal sealed class BlobObjectStore : IBlobObjectStore
         return new IndexedDbBlobImpl(
             _tx.Interop,
             _loggerFactory.CreateLogger<IndexedDbBlobImpl>(),
+            _shareRegistry,
             blobId, contentType, length);
     }
 }

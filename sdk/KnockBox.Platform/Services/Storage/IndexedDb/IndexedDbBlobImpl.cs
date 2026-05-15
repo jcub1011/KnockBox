@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Text.Json.Serialization;
 using KnockBox.Core.Services.Storage.IndexedDb;
 
@@ -24,9 +25,11 @@ internal sealed class IndexedDbBlobImpl : IndexedDbBlob
 {
     private readonly IndexedDbInterop _interop;
     private readonly ILogger<IndexedDbBlobImpl> _logger;
+    private readonly BlobShareRegistry _shareRegistry;
     private readonly int _blobId;
     private readonly string _contentType;
     private readonly long _length;
+    private readonly ConcurrentBag<Guid> _publishedShares = new();
     private string? _cachedObjectUrl;
     private bool _readPrepared;
     private bool _disposed;
@@ -39,12 +42,14 @@ internal sealed class IndexedDbBlobImpl : IndexedDbBlob
     public IndexedDbBlobImpl(
         IndexedDbInterop interop,
         ILogger<IndexedDbBlobImpl> logger,
+        BlobShareRegistry shareRegistry,
         int blobId,
         string contentType,
         long length)
     {
         _interop = interop;
         _logger = logger;
+        _shareRegistry = shareRegistry;
         _blobId = blobId;
         _contentType = contentType;
         _length = length;
@@ -93,10 +98,45 @@ internal sealed class IndexedDbBlobImpl : IndexedDbBlob
         return _cachedObjectUrl;
     }
 
+    public override async ValueTask<IBlobShare> PublishForSharingAsync(
+        BlobShareOptions? options = null, CancellationToken ct = default)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        await EnsureReadPreparedAsync(ct).ConfigureAwait(false);
+
+        var token = Guid.NewGuid();
+        var absoluteExpiry = options?.AbsoluteExpiry is { } abs
+            ? DateTimeOffset.UtcNow.Add(abs)
+            : (DateTimeOffset?)null;
+
+        var entry = new BlobShareEntry
+        {
+            Token = token,
+            ContentType = _contentType,
+            Length = _length,
+            CacheControl = options?.CacheControl,
+            AbsoluteExpiresAt = absoluteExpiry,
+            SlidingExpiry = options?.SlidingExpiry,
+            Fetcher = ReadChunkAsync,
+        };
+        _shareRegistry.Register(entry);
+        _publishedShares.Add(token);
+
+        var url = $"/blob-share/{token:D}";
+        return new BlobShare(_shareRegistry, token, url, _contentType, _length);
+    }
+
     public override async ValueTask DisposeAsync()
     {
         if (_disposed) return;
         _disposed = true;
+        // Revoke any outstanding shares this blob backs — the fetcher closure
+        // captures `this`, so once we're disposed the share would otherwise
+        // serve from a blob whose underlying JS handle is gone.
+        foreach (var token in _publishedShares)
+        {
+            _shareRegistry.Remove(token);
+        }
         var result = await _interop.InvokeVoidAsync(
             "releaseHandle", CancellationToken.None, _blobId).ConfigureAwait(false);
         if (result.TryGetFailure(out var err))

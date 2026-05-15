@@ -11,6 +11,7 @@ internal sealed class IndexedDatabase : IIndexedDatabase
     private readonly IndexedDbInterop _interop;
     private readonly ILoggerFactory _loggerFactory;
     private readonly ILogger<IndexedDatabase> _logger;
+    private readonly BlobShareRegistry _shareRegistry;
     private readonly JsonSerializerOptions _jsonOptions;
     private readonly IReadOnlyDictionary<string, StoreSchema> _schema;
     private readonly int _dbId;
@@ -26,6 +27,7 @@ internal sealed class IndexedDatabase : IIndexedDatabase
     public IndexedDatabase(
         IndexedDbInterop interop,
         ILoggerFactory loggerFactory,
+        BlobShareRegistry shareRegistry,
         int dbId,
         string name,
         int version,
@@ -37,6 +39,7 @@ internal sealed class IndexedDatabase : IIndexedDatabase
         _interop = interop;
         _loggerFactory = loggerFactory;
         _logger = loggerFactory.CreateLogger<IndexedDatabase>();
+        _shareRegistry = shareRegistry;
         _jsonOptions = jsonOptions;
         _schema = schema;
         _dbId = dbId;
@@ -93,6 +96,7 @@ internal sealed class IndexedDatabase : IIndexedDatabase
         var tx = new IndexedDbTransaction(
             _interop,
             _loggerFactory,
+            _shareRegistry,
             begin.TxId, mode, storeNames, _jsonOptions, _schema, bridge, bridgeRef);
 
         try

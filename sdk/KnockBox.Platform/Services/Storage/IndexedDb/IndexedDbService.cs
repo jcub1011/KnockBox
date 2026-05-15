@@ -9,18 +9,23 @@ internal sealed class IndexedDbService : IIndexedDbService, IAsyncDisposable
     private readonly IndexedDbInterop _interop;
     private readonly ILoggerFactory _loggerFactory;
     private readonly ILogger<IndexedDbService> _logger;
+    private readonly BlobShareRegistry _shareRegistry;
 
-    public IndexedDbService(IJSRuntime jsRuntime, ILoggerFactory loggerFactory)
+    public IndexedDbService(
+        IJSRuntime jsRuntime,
+        ILoggerFactory loggerFactory,
+        BlobShareRegistry shareRegistry)
     {
         _loggerFactory = loggerFactory;
         _logger = loggerFactory.CreateLogger<IndexedDbService>();
+        _shareRegistry = shareRegistry;
         _interop = new IndexedDbInterop(jsRuntime, loggerFactory.CreateLogger<IndexedDbInterop>());
     }
 
     public async ValueTask<ValueResult<IIndexedDatabase, IndexedDbError>> OpenAsync(
         IndexedDbSchema schema, CancellationToken ct = default)
     {
-        var bridge = new VersionChangeBridge(_interop, _loggerFactory, schema);
+        var bridge = new VersionChangeBridge(_interop, _loggerFactory, _shareRegistry, schema);
         var bridgeRef = DotNetObjectReference.Create(bridge);
 
         var hasUpgrade = schema.OnUpgrade is not null;
@@ -43,6 +48,7 @@ internal sealed class IndexedDbService : IIndexedDbService, IAsyncDisposable
         var db = new IndexedDatabase(
             _interop,
             _loggerFactory,
+            _shareRegistry,
             resp.DbId, schema.Name, resp.Version,
             resp.ObjectStoreNames,
             schema.JsonOptions ?? IndexedDbWireFormat.DefaultJsonOptions,
@@ -118,6 +124,7 @@ internal sealed class IndexedDbService : IIndexedDbService, IAsyncDisposable
         return new IndexedDbBlobImpl(
             _interop,
             _loggerFactory.CreateLogger<IndexedDbBlobImpl>(),
+            _shareRegistry,
             resp.BlobId, contentType, resp.Length);
     }
 
@@ -173,6 +180,7 @@ internal sealed class IndexedDbService : IIndexedDbService, IAsyncDisposable
             return new IndexedDbBlobImpl(
                 _interop,
                 _loggerFactory.CreateLogger<IndexedDbBlobImpl>(),
+                _shareRegistry,
                 finishResp.BlobId, contentType, finishResp.Length);
         }
         finally
