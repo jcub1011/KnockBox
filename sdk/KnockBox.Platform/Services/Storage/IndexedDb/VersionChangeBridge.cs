@@ -17,17 +17,19 @@ namespace KnockBox.Platform.Services.Storage.IndexedDb;
 internal sealed class VersionChangeBridge
 {
     private readonly IndexedDbInterop _interop;
+    private readonly ILoggerFactory _loggerFactory;
     private readonly ILogger<VersionChangeBridge> _logger;
     private readonly IndexedDbSchema _schema;
     private IndexedDatabase? _database;
 
     public VersionChangeBridge(
         IndexedDbInterop interop,
-        ILogger<VersionChangeBridge> logger,
+        ILoggerFactory loggerFactory,
         IndexedDbSchema schema)
     {
         _interop = interop;
-        _logger = logger;
+        _loggerFactory = loggerFactory;
+        _logger = loggerFactory.CreateLogger<VersionChangeBridge>();
         _schema = schema;
     }
 
@@ -57,7 +59,7 @@ internal sealed class VersionChangeBridge
             kv => kv.Key,
             kv => (IReadOnlyList<string>)kv.Value);
         var ctx = new UpgradeContext(
-            _interop, upgradeTxId, oldVersion, newVersion,
+            _interop, _loggerFactory, upgradeTxId, oldVersion, newVersion,
             _schema.JsonOptions ?? IndexedDbWireFormat.DefaultJsonOptions,
             existing);
 

@@ -92,7 +92,7 @@ internal sealed class IndexedDatabase : IIndexedDatabase
 
         var tx = new IndexedDbTransaction(
             _interop,
-            _loggerFactory.CreateLogger<IndexedDbTransaction>(),
+            _loggerFactory,
             begin.TxId, mode, storeNames, _jsonOptions, _schema, bridge, bridgeRef);
 
         try

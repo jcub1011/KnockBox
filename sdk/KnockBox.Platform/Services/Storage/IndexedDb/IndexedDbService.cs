@@ -20,10 +20,7 @@ internal sealed class IndexedDbService : IIndexedDbService, IAsyncDisposable
     public async ValueTask<ValueResult<IIndexedDatabase, IndexedDbError>> OpenAsync(
         IndexedDbSchema schema, CancellationToken ct = default)
     {
-        var bridge = new VersionChangeBridge(
-            _interop,
-            _loggerFactory.CreateLogger<VersionChangeBridge>(),
-            schema);
+        var bridge = new VersionChangeBridge(_interop, _loggerFactory, schema);
         var bridgeRef = DotNetObjectReference.Create(bridge);
 
         var hasUpgrade = schema.OnUpgrade is not null;
@@ -91,11 +88,101 @@ internal sealed class IndexedDbService : IIndexedDbService, IAsyncDisposable
 
     public ValueTask<IndexedDbBlob> CreateBlobAsync(
         ReadOnlyMemory<byte> bytes, string contentType, CancellationToken ct = default)
-        => throw new NotImplementedException("Blob support lands in Phase 4 of the IndexedDB rollout.");
+    {
+        // Small payloads (one chunk) take the single-call createBlobFromBytes
+        // path; anything larger goes through the chunked stream upload to keep
+        // a single SignalR message under the receive limit.
+        if (bytes.Length <= IndexedDbBlobChunking.ChunkSize)
+        {
+            return CreateBlobFromBytesAsync(bytes, contentType, ct);
+        }
+        // Fall through to the stream path with a backing MemoryStream.
+        var arr = bytes.ToArray();
+        return CreateBlobAsync(new MemoryStream(arr, writable: false), arr.LongLength, contentType, leaveOpen: false, ct);
+    }
 
-    public ValueTask<IndexedDbBlob> CreateBlobAsync(
+    private async ValueTask<IndexedDbBlob> CreateBlobFromBytesAsync(
+        ReadOnlyMemory<byte> bytes, string contentType, CancellationToken ct)
+    {
+        var base64 = Convert.ToBase64String(bytes.Span);
+        var result = await _interop.InvokeAsync<BlobCreateResponse>(
+            "createBlobFromBytes", ct, base64, contentType).ConfigureAwait(false);
+        if (!result.TryGetSuccess(out var resp))
+        {
+            var msg = result.IsCanceled
+                ? "Blob creation was canceled."
+                : $"[{result.Error.Error.Kind}] {result.Error.Error.Message}";
+            _logger.LogError("createBlobFromBytes failed: {Message}", msg);
+            throw new IOException("createBlobFromBytes failed: " + msg);
+        }
+        return new IndexedDbBlobImpl(
+            _interop,
+            _loggerFactory.CreateLogger<IndexedDbBlobImpl>(),
+            resp.BlobId, contentType, resp.Length);
+    }
+
+    public async ValueTask<IndexedDbBlob> CreateBlobAsync(
         Stream stream, long length, string contentType, bool leaveOpen = false, CancellationToken ct = default)
-        => throw new NotImplementedException("Blob support lands in Phase 4 of the IndexedDB rollout.");
+    {
+        if (length < 0) throw new ArgumentOutOfRangeException(nameof(length), "Length must be non-negative.");
+
+        try
+        {
+            var begin = await _interop.InvokeAsync<BlobStreamBeginResponse>(
+                "createBlobStreamBegin", ct, contentType, length).ConfigureAwait(false);
+            if (!begin.TryGetSuccess(out var beginResp))
+            {
+                var msg = begin.IsCanceled
+                    ? "Blob stream upload was canceled."
+                    : $"[{begin.Error.Error.Kind}] {begin.Error.Error.Message}";
+                throw new IOException("createBlobStreamBegin failed: " + msg);
+            }
+
+            var uploadId = beginResp.UploadId;
+            var buffer = new byte[IndexedDbBlobChunking.ChunkSize];
+            long total = 0;
+            while (total < length)
+            {
+                var toRead = (int)Math.Min(buffer.Length, length - total);
+                var read = await stream.ReadAsync(buffer.AsMemory(0, toRead), ct).ConfigureAwait(false);
+                if (read == 0)
+                {
+                    throw new IOException(
+                        $"Source stream ended at byte {total} of {length}; expected {length} bytes total.");
+                }
+                var base64 = Convert.ToBase64String(buffer, 0, read);
+                var append = await _interop.InvokeVoidAsync(
+                    "createBlobStreamAppend", ct, uploadId, base64).ConfigureAwait(false);
+                if (append.TryGetFailure(out var appendErr))
+                {
+                    throw new IOException(
+                        $"createBlobStreamAppend failed: [{appendErr.Kind}] {appendErr.Message}");
+                }
+                total += read;
+            }
+
+            var finish = await _interop.InvokeAsync<BlobCreateResponse>(
+                "createBlobStreamFinish", ct, uploadId).ConfigureAwait(false);
+            if (!finish.TryGetSuccess(out var finishResp))
+            {
+                var msg = finish.IsCanceled
+                    ? "Blob stream finalization was canceled."
+                    : $"[{finish.Error.Error.Kind}] {finish.Error.Error.Message}";
+                throw new IOException("createBlobStreamFinish failed: " + msg);
+            }
+            return new IndexedDbBlobImpl(
+                _interop,
+                _loggerFactory.CreateLogger<IndexedDbBlobImpl>(),
+                finishResp.BlobId, contentType, finishResp.Length);
+        }
+        finally
+        {
+            if (!leaveOpen)
+            {
+                await stream.DisposeAsync().ConfigureAwait(false);
+            }
+        }
+    }
 
     public ValueTask DisposeAsync() => _interop.DisposeAsync();
 }

@@ -21,6 +21,7 @@ internal sealed record SchemaOp(
 internal sealed class UpgradeContext : IUpgradeContext
 {
     private readonly IndexedDbInterop _interop;
+    private readonly ILoggerFactory _loggerFactory;
     private readonly int _upgradeTxId;
     private readonly JsonSerializerOptions _jsonOptions;
     private readonly UpgradeTxContext _txContext;
@@ -35,6 +36,7 @@ internal sealed class UpgradeContext : IUpgradeContext
 
     public UpgradeContext(
         IndexedDbInterop interop,
+        ILoggerFactory loggerFactory,
         int upgradeTxId,
         int oldVersion,
         int newVersion,
@@ -42,6 +44,7 @@ internal sealed class UpgradeContext : IUpgradeContext
         IReadOnlyDictionary<string, IReadOnlyList<string>> existingSchema)
     {
         _interop = interop;
+        _loggerFactory = loggerFactory;
         _upgradeTxId = upgradeTxId;
         _jsonOptions = jsonOptions;
         _txContext = new UpgradeTxContext(interop, upgradeTxId, jsonOptions, () => _active);
@@ -110,7 +113,11 @@ internal sealed class UpgradeContext : IUpgradeContext
     }
 
     public IBlobObjectStore BlobObjectStore(string name)
-        => throw new NotImplementedException("Blob stores during upgrade land in Phase 4 of the IndexedDB rollout.");
+    {
+        EnsureStoreExists(name);
+        FlushPendingSchemaOpsBeforeData();
+        return new BlobObjectStore(_txContext, _loggerFactory, name);
+    }
 
     private void EnsureStoreExists(string name)
     {

@@ -8,6 +8,7 @@ namespace KnockBox.Platform.Services.Storage.IndexedDb;
 internal sealed class IndexedDbTransaction : IIndexedDbTransaction, ITxContext
 {
     private readonly ILogger<IndexedDbTransaction> _logger;
+    private readonly ILoggerFactory _loggerFactory;
     private readonly TxCompletionBridge _bridge;
     private readonly DotNetObjectReference<TxCompletionBridge> _bridgeRef;
     private readonly IReadOnlyDictionary<string, StoreSchema> _schema;
@@ -34,7 +35,7 @@ internal sealed class IndexedDbTransaction : IIndexedDbTransaction, ITxContext
 
     public IndexedDbTransaction(
         IndexedDbInterop interop,
-        ILogger<IndexedDbTransaction> logger,
+        ILoggerFactory loggerFactory,
         int txId,
         TransactionMode mode,
         IReadOnlyList<string> storeNames,
@@ -44,7 +45,8 @@ internal sealed class IndexedDbTransaction : IIndexedDbTransaction, ITxContext
         DotNetObjectReference<TxCompletionBridge> bridgeRef)
     {
         Interop = interop;
-        _logger = logger;
+        _loggerFactory = loggerFactory;
+        _logger = loggerFactory.CreateLogger<IndexedDbTransaction>();
         TxId = txId;
         Mode = mode;
         StoreNames = storeNames;
@@ -74,7 +76,10 @@ internal sealed class IndexedDbTransaction : IIndexedDbTransaction, ITxContext
     }
 
     public IBlobObjectStore BlobObjectStore(string name)
-        => throw new NotImplementedException("Blob stores land in Phase 4 of the IndexedDB rollout.");
+    {
+        EnsureStoreInScope(name);
+        return new BlobObjectStore(this, _loggerFactory, name);
+    }
 
     public async ValueTask<Result<IndexedDbError>> CommitAsync(CancellationToken ct = default)
     {

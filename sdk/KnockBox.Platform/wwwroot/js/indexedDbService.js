@@ -74,7 +74,7 @@ export function releaseHandle(id) {
         if (entry.kind === "db") {
             try { entry.obj.close(); } catch (_) { /* already closed */ }
         }
-        if (entry.kind === "blob-url" && entry.extras?.objectUrl) {
+        if (entry.kind === "blob" && entry.extras?.objectUrl) {
             try { URL.revokeObjectURL(entry.extras.objectUrl); } catch (_) { /* ignore */ }
         }
     } finally {
@@ -619,6 +619,20 @@ function packCursorEntry(cursor, mode) {
     if (mode === "keyOnly") {
         return { key: wrapKey(cursor.key), primaryKey: wrapKey(cursor.primaryKey) };
     }
+    if (mode === "blob") {
+        const blob = cursor.value;
+        const blobId = nextHandleId++;
+        handles.set(blobId, {
+            obj: blob,
+            kind: "blob",
+            extras: { contentType: blob.type, length: blob.size, objectUrl: null, readSnapshot: null },
+        });
+        return {
+            key: wrapKey(cursor.key),
+            primaryKey: wrapKey(cursor.primaryKey),
+            value: { blobId, contentType: blob.type, length: blob.size },
+        };
+    }
     return { key: wrapKey(cursor.key), primaryKey: wrapKey(cursor.primaryKey), value: cursor.value };
 }
 
@@ -735,6 +749,177 @@ export function cursorUpdate(cursorId, value) {
 export function cursorDelete(cursorId) {
     return withCursor(cursorId, (record, resolve) => {
         const req = record.obj.delete();
+        finishWith(record.extras.txRecord, req, resolve, () => undefined);
+    });
+}
+
+// ---------------------------------------------------------------------------
+// Blobs
+// ---------------------------------------------------------------------------
+
+const blobUploads = new Map();
+
+function decodeBase64(b64) {
+    const bin = atob(b64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return bytes;
+}
+
+function encodeBase64(bytes) {
+    let bin = "";
+    for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+    return btoa(bin);
+}
+
+function registerBlob(blob) {
+    const blobId = nextHandleId++;
+    handles.set(blobId, {
+        obj: blob,
+        kind: "blob",
+        extras: { contentType: blob.type, length: blob.size, objectUrl: null, readSnapshot: null },
+    });
+    return blobId;
+}
+
+export function createBlobFromBytes(base64, contentType) {
+    try {
+        const bytes = decodeBase64(base64);
+        const blob = new Blob([bytes], { type: contentType });
+        return ok({ blobId: registerBlob(blob), length: blob.size });
+    } catch (e) {
+        return fail(mapDomError(e));
+    }
+}
+
+export function createBlobStreamBegin(contentType, length) {
+    const uploadId = nextHandleId++;
+    blobUploads.set(uploadId, { chunks: [], contentType, expectedLength: length, received: 0 });
+    return ok({ uploadId });
+}
+
+export function createBlobStreamAppend(uploadId, base64) {
+    const upload = blobUploads.get(uploadId);
+    if (!upload) {
+        return fail({ kind: "Data", jsName: null, message: `Blob upload ${uploadId} not found.` });
+    }
+    try {
+        const bytes = decodeBase64(base64);
+        upload.chunks.push(bytes);
+        upload.received += bytes.length;
+        return ok();
+    } catch (e) {
+        return fail(mapDomError(e));
+    }
+}
+
+export function createBlobStreamFinish(uploadId) {
+    const upload = blobUploads.get(uploadId);
+    if (!upload) {
+        return fail({ kind: "Data", jsName: null, message: `Blob upload ${uploadId} not found.` });
+    }
+    blobUploads.delete(uploadId);
+    try {
+        const blob = new Blob(upload.chunks, { type: upload.contentType });
+        return ok({ blobId: registerBlob(blob), length: blob.size });
+    } catch (e) {
+        return fail(mapDomError(e));
+    }
+}
+
+export async function blobPrepareRead(blobId) {
+    try {
+        const entry = getHandle(blobId, "blob");
+        if (!entry.extras.readSnapshot) {
+            const buf = await entry.obj.arrayBuffer();
+            entry.extras.readSnapshot = new Uint8Array(buf);
+        }
+        return ok({
+            length: entry.extras.readSnapshot.length,
+            contentType: entry.extras.contentType,
+        });
+    } catch (e) {
+        return fail(mapDomError(e));
+    }
+}
+
+export function blobReadChunk(blobId, offset, count) {
+    try {
+        const entry = getHandle(blobId, "blob");
+        const snap = entry.extras.readSnapshot;
+        if (!snap) {
+            return fail({
+                kind: "Data", jsName: null,
+                message: "blobPrepareRead must be called before blobReadChunk.",
+            });
+        }
+        const end = Math.min(offset + count, snap.length);
+        const slice = end > offset ? snap.subarray(offset, end) : new Uint8Array(0);
+        return ok({ base64: encodeBase64(slice) });
+    } catch (e) {
+        return fail(mapDomError(e));
+    }
+}
+
+export function blobCreateObjectUrl(blobId) {
+    try {
+        const entry = getHandle(blobId, "blob");
+        if (!entry.extras.objectUrl) {
+            entry.extras.objectUrl = URL.createObjectURL(entry.obj);
+        }
+        return ok({ url: entry.extras.objectUrl });
+    } catch (e) {
+        return fail(mapDomError(e));
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Blob store ops
+// ---------------------------------------------------------------------------
+
+export function blobStoreGet(txId, storeName, keyEnv) {
+    return withStore(txId, storeName, (record, store, resolve) => {
+        const req = store.get(unwrapKey(keyEnv));
+        req.onsuccess = () => {
+            const blob = req.result;
+            if (!blob) {
+                resolve(ok(null));
+                scheduleKeepAlive(record);
+                return;
+            }
+            const blobId = registerBlob(blob);
+            resolve(ok({ blobId, contentType: blob.type, length: blob.size }));
+            scheduleKeepAlive(record);
+        };
+        req.onerror = () => resolve(fail(mapDomError(req.error)));
+    });
+}
+
+function storeBlobOp(txId, storeName, blobId, keyEnv, methodName) {
+    return withStore(txId, storeName, (record, store, resolve) => {
+        let blob;
+        try { blob = getHandle(blobId, "blob").obj; }
+        catch (e) { resolve(fail(mapDomError(e))); return; }
+        const key = unwrapKey(keyEnv);
+        const req = key !== undefined ? store[methodName](blob, key) : store[methodName](blob);
+        finishWith(record, req, resolve, k => wrapKey(k));
+    });
+}
+
+export function blobStoreAdd(txId, storeName, blobId, keyEnv) {
+    return storeBlobOp(txId, storeName, blobId, keyEnv, "add");
+}
+
+export function blobStorePut(txId, storeName, blobId, keyEnv) {
+    return storeBlobOp(txId, storeName, blobId, keyEnv, "put");
+}
+
+export function cursorUpdateBlob(cursorId, blobId) {
+    return withCursor(cursorId, (record, resolve) => {
+        let blob;
+        try { blob = getHandle(blobId, "blob").obj; }
+        catch (e) { resolve(fail(mapDomError(e))); return; }
+        const req = record.obj.update(blob);
         finishWith(record.extras.txRecord, req, resolve, () => undefined);
     });
 }
