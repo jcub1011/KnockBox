@@ -198,7 +198,7 @@ public class CoinFlipGameEngine(
                 $"Parameter {nameof(host)} was null."));
 
         var state = new CoinFlipGameState(host, stateLogger);
-        state.UpdateJoinableStatus(true);
+        state.SetJoinable(true);
         return Task.FromResult(ValueResult<AbstractGameState>.FromValue(state));
     }
 
@@ -213,7 +213,7 @@ public class CoinFlipGameEngine(
         if (host != s.Host)
             return Task.FromResult(Result.FromError("Only the host can start the game."));
 
-        return Task.FromResult(s.Execute(() => s.UpdateJoinableStatus(false)));
+        return Task.FromResult(s.Execute(() => s.SetJoinable(false)));
     }
 
     public Result Flip(CoinFlipGameState state) =>
@@ -372,9 +372,9 @@ public class CoinFlipModule : IGameModule
     public string Description => "Flip a coin.";
     public string RouteIdentifier => "coin-flip";
 
-    public void RegisterServices(IServiceCollection services)
+    public void RegisterServices(IPluginRegistration registration)
     {
-        services.AddGameEngine<CoinFlipGameEngine>(RouteIdentifier);
+        registration.AddGameEngine<CoinFlipGameEngine>();
     }
 
     public RenderFragment GetButtonContent() => builder =>
@@ -386,7 +386,7 @@ public class CoinFlipModule : IGameModule
 ```
 
 - **Public parameterless constructor is required.** `PluginLoader` activates it via reflection.
-- `services.AddGameEngine<TEngine>(routeIdentifier)` (see [`sdk/KnockBox.Core/Plugins/GameModuleServiceCollectionExtensions.cs`](sdk/KnockBox.Core/Plugins/GameModuleServiceCollectionExtensions.cs)) registers `TEngine` as a singleton **and** re-exposes the same instance as a keyed `AbstractGameEngine` under `routeIdentifier`. Razor pages inject the concrete engine; `LobbyService.CreateLobbyAsync` resolves `GetKeyedService<AbstractGameEngine>(routeIdentifier)` when spinning up a room.
+- `IPluginRegistration.AddGameEngine<TEngine>()` (parameterless — see [`sdk/KnockBox.Core/Plugins/GameModuleServiceCollectionExtensions.cs`](sdk/KnockBox.Core/Plugins/GameModuleServiceCollectionExtensions.cs)) registers `TEngine` as a singleton **and** re-exposes the same instance as a keyed `AbstractGameEngine` under the route from `IPluginManifest.RouteIdentifier`. Razor pages inject the concrete engine; `LobbyService.CreateLobbyAsync` resolves `GetKeyedService<AbstractGameEngine>(routeIdentifier)` when spinning up a room.
 - **`RouteIdentifier` must match your page's `@page` route segment verbatim** — e.g., `"coin-flip"` ↔ `@page "/room/coin-flip/{ObfuscatedRoomCode}"`.
 - `GetButtonContent()` is the inner fragment of the game's tile on the home screen. The host wraps it in a `<button>` that owns click handling, disabled state, aria-label, and layout sizing — your fragment just owns the visual design. It is typical to point this at a small Razor component under `Components/`.
 
@@ -486,4 +486,4 @@ Building the host transitively builds your plugin and stages it into `host/Knock
 
 - [`host/KnockBox/Specs/knockbox-platform-architecture.md`](host/KnockBox/Specs/knockbox-platform-architecture.md) — the authoritative architecture reference (ALC isolation, session lifecycle, DI order, lobby routing).
 - [`CLAUDE.md`](CLAUDE.md) — build/test commands and additional contributor notes.
-- Existing plugins under `host/` (`KnockBox.CardCounter`, `KnockBox.Codeword`, `KnockBox.DiceSimulator`, `KnockBox.DrawnToDress`, `KnockBox.Operator`) — concrete examples of the patterns above at varying complexity. `host/KnockBox.DiceSimulator` is the simplest starting reference.
+- Existing plugins under `host/` (`KnockBox.CardCounter`, `KnockBox.Codeword`, `KnockBox.DiceSimulator`, `KnockBox.DndMapper`, `KnockBox.DrawnToDress`, `KnockBox.HiddenAgenda`, `KnockBox.Operator`, `KnockBox.Spardle`, `KnockBox.TaskMaster`) — concrete examples of the patterns above at varying complexity. `host/KnockBox.DiceSimulator` is the simplest starting reference.

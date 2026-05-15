@@ -1,0 +1,66 @@
+@using KnockBox.Core.Components.Shared
+@using KnockBox.DndMapper.Models
+@using KnockBox.DndMapper.Services.State.Games
+@inherits DisposableComponent
+
+<section class="dndm-panel dndm-permp">
+    <header class="dndm-panel-header">
+        <span>Permissions</span>
+        @if (!Embedded)
+        {
+            <button class="dndm-btn dndm-btn--icon dndm-btn--small" type="button" title="Close"
+                    @onclick="OnClose">×</button>
+        }
+    </header>
+    <div class="dndm-panel-body">
+        <div class="dndm-panel-section">
+            <span class="dndm-label">Token movement</span>
+            <div class="dndm-pillgroup">
+                <button class="@PillCls(State.Settings.TokenMovement == TokenMovementPolicy.OwnerOrHost)"
+                        type="button"
+                        @onclick="@(() => SetTokenMovement(TokenMovementPolicy.OwnerOrHost))">Owner / Host</button>
+                <button class="@PillCls(State.Settings.TokenMovement == TokenMovementPolicy.Anyone)"
+                        type="button"
+                        @onclick="@(() => SetTokenMovement(TokenMovementPolicy.Anyone))">Anyone</button>
+                <button class="@PillCls(State.Settings.TokenMovement == TokenMovementPolicy.HostOnly)"
+                        type="button"
+                        @onclick="@(() => SetTokenMovement(TokenMovementPolicy.HostOnly))">Host only</button>
+            </div>
+        </div>
+
+        <div class="dndm-panel-section">
+            <span class="dndm-label">Sheet edits by others</span>
+            <div class="dndm-pillgroup">
+                <button class="@PillCls(State.Settings.SheetEditByOthers == SheetEditPolicy.OwnersOnly)"
+                        type="button"
+                        @onclick="@(() => SetSheetEdit(SheetEditPolicy.OwnersOnly))">Owners</button>
+                <button class="@PillCls(State.Settings.SheetEditByOthers == SheetEditPolicy.OwnersAndHost)"
+                        type="button"
+                        @onclick="@(() => SetSheetEdit(SheetEditPolicy.OwnersAndHost))">Owners + Host</button>
+                <button class="@PillCls(State.Settings.SheetEditByOthers == SheetEditPolicy.Anyone)"
+                        type="button"
+                        @onclick="@(() => SetSheetEdit(SheetEditPolicy.Anyone))">Anyone</button>
+            </div>
+        </div>
+
+        <div class="dndm-panel-section">
+            <label class="dndm-toggle">
+                <input type="checkbox"
+                       checked="@State.Settings.RollsVisibleToPlayers"
+                       @onchange="@(e => SetRollsVisible(e.Value is bool b && b))" />
+                <span class="dndm-toggle-track"></span>
+                <span>Rolls visible to players</span>
+            </label>
+        </div>
+
+        <div class="dndm-panel-section">
+            <label class="dndm-toggle">
+                <input type="checkbox"
+                       checked="@State.Settings.PlayersCanCreateNPCs"
+                       @onchange="@(e => SetPlayersCanCreateNpcs(e.Value is bool b && b))" />
+                <span class="dndm-toggle-track"></span>
+                <span>Players can create NPCs</span>
+            </label>
+        </div>
+    </div>
+</section>

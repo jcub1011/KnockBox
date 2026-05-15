@@ -4,6 +4,7 @@ using KnockBox.Core.Services.Logic.Games.Shared;
 using KnockBox.Core.Services.State.Games.Shared;
 using KnockBox.Core.Services.State.Users;
 using System.Collections.Concurrent;
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using KnockBox.Core.Plugins;
@@ -17,6 +18,10 @@ namespace KnockBox.Services.Logic.Games.Shared
         private readonly IGameAvailabilityService _gameAvailability;
         private readonly ILogger<LobbyService> _logger;
         private readonly ConcurrentDictionary<string, LobbyRegistration> _lobbies = [];
+        // Secondary index keyed by the full lobby URI (`room/{routeIdentifier}/{guidA}-{guidB}`)
+        // so the plugin HTTP dispatcher can resolve a room from a request path.
+        // Mutated in lockstep with `_lobbies` (TryAdd on create; TryRemove on close + shutdown).
+        private readonly ConcurrentDictionary<string, LobbyRegistration> _lobbiesByUri = new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, GameRegistration> _gamesByRoute;
         private int _shuttingDown;
 
@@ -58,6 +63,8 @@ namespace KnockBox.Services.Logic.Games.Shared
 
             if (!_lobbies.TryRemove(NormalizeLobbyCode(registration.Code), out var removed))
                 return Result.FromError($"Lobby with code [{registration.Code}] not found.");
+
+            _lobbiesByUri.TryRemove(removed.Uri, out _);
 
             removed.State.Dispose();
 
@@ -131,6 +138,12 @@ namespace KnockBox.Services.Logic.Games.Shared
                 }
 
                 gameState = null; // Successfully added to _lobbies; ownership transferred.
+
+                // Mirror into the URI index. The URI is built from the route id
+                // and a fresh GUID pair, so collision is not a real concern; if
+                // it ever fires we'd see it as a missed dispatcher lookup.
+                _lobbiesByUri.TryAdd(lobbyUri, lobbyRegistration);
+
                 return lobbyRegistration;
             }
             catch (OperationCanceledException)
@@ -160,6 +173,17 @@ namespace KnockBox.Services.Logic.Games.Shared
                 return Task.FromResult(ValueResult<UserRegistration>.FromError(registrationResult.Error.Error));
 
             return Task.FromResult<ValueResult<UserRegistration>>(new UserRegistration(user, unsubscriber, registration));
+        }
+
+        public bool TryGetByUri(string uri, [NotNullWhen(true)] out LobbyRegistration? registration)
+        {
+            if (string.IsNullOrEmpty(uri))
+            {
+                registration = null;
+                return false;
+            }
+
+            return _lobbiesByUri.TryGetValue(uri, out registration);
         }
 
         public IReadOnlyDictionary<string, int> GetLobbyCountsByRoute()
@@ -210,6 +234,7 @@ namespace KnockBox.Services.Logic.Games.Shared
             // Snapshot first so we don't mutate the collection while enumerating.
             var snapshot = _lobbies.ToArray();
             _lobbies.Clear();
+            _lobbiesByUri.Clear();
 
             foreach (var kvp in snapshot)
             {

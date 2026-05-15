@@ -1,0 +1,87 @@
+.dndm-canvas-frame {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    background: #14141f;
+    color: #ede4d3;
+    outline: none;
+}
+
+.dndm-canvas-frame:focus {
+    outline: none;
+}
+
+.dndm-canvas-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    background: #1a1a2e;
+    border-bottom: 1px solid #2c2c44;
+    font-size: 0.875rem;
+    user-select: none;
+}
+
+.dndm-grid-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    cursor: pointer;
+}
+
+.dndm-zoom-btn {
+    background: #262640;
+    color: inherit;
+    border: 1px solid #3a3a5c;
+    border-radius: 4px;
+    padding: 0.15rem 0.5rem;
+    cursor: pointer;
+    line-height: 1;
+}
+
+.dndm-zoom-btn:hover {
+    background: #34345a;
+}
+
+.dndm-zoom-readout {
+    min-width: 3.5em;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    color: #cdb98e;
+}
+
+.dndm-map-canvas {
+    flex: 1 1 auto;
+    width: 100%;
+    height: 100%;
+    background: #0e1117;
+    cursor: grab;
+    touch-action: none;
+}
+
+.dndm-map-canvas:active {
+    cursor: grabbing;
+}
+
+.dndm-image-pickers rect {
+    cursor: pointer;
+}
+
+.dndm-image-handle {
+    fill: #e8b849;
+    stroke: #1a1208;
+    stroke-width: 0.03;
+    cursor: nwse-resize;
+}
+
+.dndm-image-handle--rot {
+    cursor: grab;
+}
+
+.dndm-image-rotline {
+    stroke: #e8b849;
+    stroke-width: 0.04;
+    stroke-dasharray: 0.1 0.1;
+}

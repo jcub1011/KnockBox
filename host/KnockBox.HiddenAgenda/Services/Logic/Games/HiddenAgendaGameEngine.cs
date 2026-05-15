@@ -31,7 +31,7 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games
 
             var gameState = new HiddenAgendaGameState(host, stateLogger);
             gameState.Execute(() => gameState.SetJoinable(true));
-            gameState.PlayerUnregistered += player => HandlePlayerLeft(player, gameState);
+            gameState.SubscribePlayerUnregistered(player => HandlePlayerLeft(player, gameState));
             logger.LogInformation("Created gameState with user [{userId}] as host.", host.Id);
             return Task.FromResult<ValueResult<AbstractGameState>>(gameState);
         }

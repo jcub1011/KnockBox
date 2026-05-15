@@ -1,0 +1,141 @@
+@using KnockBox.Core.Components.Shared
+@using KnockBox.DndMapper.Models
+@using KnockBox.DndMapper.Services.State.Games
+@using KnockBox.DndMapper.Services.State.Games.Data
+@inherits DisposableComponent
+
+<section class="dndm-panel dndm-tokenp">
+    <header class="dndm-panel-header">
+        <span>Tokens</span>
+        <div class="dndm-tokenp-add">
+            <button class="dndm-btn dndm-btn--small"
+                    type="button"
+                    title="Add NPC token"
+                    disabled="@(_activeMap is null)"
+                    @onclick="OnAddNpc">+ NPC</button>
+        </div>
+    </header>
+    <div class="dndm-panel-body">
+        @if (_activeMap is null)
+        {
+            <div class="dndm-panel-empty">No active map.</div>
+        }
+        else if (Tokens.Count == 0)
+        {
+            <div class="dndm-panel-empty">No NPC tokens on this map.</div>
+        }
+        else
+        {
+            @foreach (var t in Tokens)
+            {
+                <div @key="t.Id" class="dndm-tokenp-row">
+                    <input type="color"
+                           value="@t.Color"
+                           class="dndm-tokenp-color"
+                           @onchange="@(e => OnColorChanged(t, (string?)e.Value))" />
+                    <input class="dndm-input dndm-tokenp-name"
+                           value="@t.Name"
+                           @onchange="@(e => OnNameChanged(t, (string?)e.Value))" />
+                    <button class="dndm-btn dndm-btn--small dndm-btn--icon"
+                            type="button"
+                            title="@(t.IconKind == TokenIconKind.Initial ? "Show initial" : "Solid circle")"
+                            @onclick="@(() => OnToggleIcon(t))">
+                        @(t.IconKind == TokenIconKind.Initial ? "A" : "●")
+                    </button>
+                    <button class="dndm-btn dndm-btn--small dndm-btn--icon"
+                            type="button"
+                            title="@(t.Hidden ? "Hidden — click to reveal" : "Visible — click to hide")"
+                            @onclick="@(() => OnToggleHidden(t))">
+                        @(t.Hidden ? "H" : "V")
+                    </button>
+                    <button class="dndm-btn dndm-btn--small dndm-btn--icon dndm-btn--danger"
+                            type="button"
+                            title="Delete token"
+                            @onclick="@(() => OnDeleteRequest(t))">×</button>
+                    <span class="dndm-tokenp-tag">NPC</span>
+                </div>
+                <div @key="@($"{t.Id}-meta")" class="dndm-tokenp-meta">
+                    @{
+                        // Sheets already attached to a *different* token, and sheets owned
+                        // by a player (player sheets are managed automatically with that
+                        // player's PlayerToken), should not appear as picks for this NPC.
+                        // The currently-attached sheet always remains in the list so it
+                        // shows as selected.
+                        var attachedElsewhere = State.Maps
+                            .SelectMany(m => m.Tokens)
+                            .Where(other => other.Id != t.Id && other.SheetId is not null)
+                            .Select(other => other.SheetId!.Value)
+                            .ToHashSet();
+                        var pickableSheets = State.Sheets.Values
+                            .Where(s => s.Id == t.SheetId
+                                || (s.OwnerUserId is null && !attachedElsewhere.Contains(s.Id)))
+                            .OrderBy(s => s.CharacterName)
+                            .ToList();
+                    }
+                    <label class="dndm-tokenp-metalabel">
+                        <span>Sheet</span>
+                        <select class="dndm-select"
+                                @onchange="@(e => OnSheetChanged(t, (string?)e.Value))">
+                            <option value="">— none —</option>
+                            @foreach (var s in pickableSheets)
+                            {
+                                <option value="@s.Id" selected="@(t.SheetId == s.Id)">
+                                    @(string.IsNullOrEmpty(s.CharacterName) ? "(unnamed)" : s.CharacterName)
+                                </option>
+                            }
+                        </select>
+                    </label>
+                    <label class="dndm-tokenp-metalabel" title="Tag this NPC as standing in for a player (e.g. a DMPC)">
+                        <span>Represents</span>
+                        <select class="dndm-select"
+                                @onchange="@(e => OnRepresentsChanged(t, (string?)e.Value))">
+                            <option value="">— none —</option>
+                            @foreach (var p in State.Players)
+                            {
+                                <option value="@p.User.Id" selected="@(t.RepresentsUserId == p.User.Id)">@p.DisplayName</option>
+                            }
+                        </select>
+                    </label>
+                    @{
+                        // Skip players who already own a PlayerToken on this map or
+                        // already own a different sheet — the engine rejects both
+                        // cases, so showing them would resolve only to a toast error.
+                        var ownedHere = _activeMap.Tokens
+                            .Where(tk => tk.Type == TokenType.PlayerToken && tk.OwnerUserId is not null)
+                            .Select(tk => tk.OwnerUserId!)
+                            .ToHashSet();
+                        var hasOtherSheet = State.Sheets.Values
+                            .Where(s => s.OwnerUserId is not null && s.Id != t.SheetId)
+                            .Select(s => s.OwnerUserId!)
+                            .ToHashSet();
+                        var eligible = State.Players
+                            .Where(p => !ownedHere.Contains(p.User.Id) && !hasOtherSheet.Contains(p.User.Id))
+                            .ToList();
+                    }
+                    @if (eligible.Count > 0)
+                    {
+                        <label class="dndm-tokenp-metalabel" title="Assign this character (token + sheet) to a player">
+                            <span>Assign to</span>
+                            <select class="dndm-select"
+                                    value=""
+                                    @onchange="@(e => OnAssignToPlayer(t, (string?)e.Value))">
+                                <option value="">— give to player —</option>
+                                @foreach (var p in eligible)
+                                {
+                                    <option value="@p.User.Id">@p.DisplayName</option>
+                                }
+                            </select>
+                        </label>
+                    }
+                </div>
+            }
+        }
+    </div>
+</section>
+
+<ConfirmModal IsOpen="_pendingDelete is not null"
+              Title="Delete token?"
+              Message="@($"This removes \"{_pendingDelete?.Name}\" from the map.")"
+              ConfirmText="Delete"
+              OnConfirm="ConfirmDelete"
+              OnCancel="CancelDelete" />

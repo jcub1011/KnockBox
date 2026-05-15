@@ -1,0 +1,55 @@
+@using KnockBox.DndMapper.Services.State.Games.Data
+@if (IsOpen && Map is not null)
+{
+    <div class="dndm-modal-overlay" @onclick="OnCancelInternal">
+        <div class="dndm-modal-card" role="dialog" aria-modal="true" @onclick:stopPropagation="true">
+            <h3 class="dndm-modal-title">Map settings — @Map.Name</h3>
+
+            <div class="dndm-modal-body dndm-mapsettings">
+                <label class="dndm-label">
+                    Width (cells)
+                    <input type="number" min="5" max="200"
+                           class="dndm-input dndm-input--num"
+                           value="@_width"
+                           @onchange="@(e => _width = ParseInt(e.Value, _width))" />
+                </label>
+                <label class="dndm-label">
+                    Height (cells)
+                    <input type="number" min="5" max="200"
+                           class="dndm-input dndm-input--num"
+                           value="@_height"
+                           @onchange="@(e => _height = ParseInt(e.Value, _height))" />
+                </label>
+                <label class="dndm-label">
+                    Cell size (pixels)
+                    <input type="number" min="8" max="200"
+                           class="dndm-input dndm-input--num"
+                           value="@_cellPixels"
+                           @onchange="@(e => _cellPixels = ParseInt(e.Value, _cellPixels))" />
+                </label>
+                <label class="dndm-label dndm-mapsettings-check">
+                    <input type="checkbox" checked="@_snap"
+                           @onchange="@(e => _snap = (bool)(e.Value ?? false))" />
+                    Snap tokens to grid
+                </label>
+                <label class="dndm-label dndm-mapsettings-check">
+                    <input type="checkbox" checked="@_showGrid"
+                           @onchange="@(e => _showGrid = (bool)(e.Value ?? false))" />
+                    Show grid lines
+                </label>
+                @if (!string.IsNullOrEmpty(_error))
+                {
+                    <div class="dndm-modal-error">@_error</div>
+                }
+                <div class="dndm-mapsettings-hint">
+                    Shrinking the grid will keep any tokens that fall outside the new bounds by snapping them to the nearest in-bounds cell. Images are not moved.
+                </div>
+            </div>
+
+            <div class="dndm-modal-actions">
+                <button class="dndm-btn dndm-btn--ghost" type="button" @onclick="OnCancelInternal">Cancel</button>
+                <button class="dndm-btn dndm-btn--primary" type="button" @onclick="OnSaveInternal">Save</button>
+            </div>
+        </div>
+    </div>
+}

@@ -1,0 +1,26 @@
+.dndm-mytokenp-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.25rem 0.1rem;
+}
+
+.dndm-mytokenp-color {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    border: 1px solid #3a3a5c;
+    background: transparent;
+    cursor: pointer;
+    padding: 0;
+    flex: 0 0 auto;
+}
+
+.dndm-mytokenp-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    color: #ede4d3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}

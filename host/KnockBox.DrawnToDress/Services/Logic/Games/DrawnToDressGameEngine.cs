@@ -32,7 +32,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games
 
             var gameState = new DrawnToDressGameState(host, stateLogger);
             gameState.Execute(() => gameState.SetJoinable(true));
-            gameState.PlayerUnregistered += player => HandlePlayerLeft(player, gameState);
+            gameState.SubscribePlayerUnregistered(player => HandlePlayerLeft(player, gameState));
 
             // Create the context and FSM so the lobby state is active from the start.
             var context = new DrawnToDressGameContext(gameState, logger, randomNumberService);
@@ -115,12 +115,21 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games
         /// </summary>
         public Result Tick(DrawnToDressGameContext context, DateTimeOffset now)
         {
-            return context.State.Execute(() =>
+            var executeResult = context.State.Execute(() =>
             {
                 var fsmResult = context.Fsm.Tick(context, now);
                 if (fsmResult.TryGetFailure(out var err))
                     logger.LogError("FSM tick error: {msg}", err.PublicMessage);
             });
+
+            if (executeResult.TryGetFailure(out var execErr))
+            {
+                logger.LogError(
+                    "Tick Execute failed: {msg} | {detail}",
+                    execErr.PublicMessage, execErr.InternalMessage);
+                return execErr;
+            }
+            return Result.Success;
         }
 
         // ── Player-leave handling ─────────────────────────────────────────────

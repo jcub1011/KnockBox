@@ -1,0 +1,24 @@
+.dndm-tile {
+    padding: 18px 20px 16px 20px;
+    background: #1a1a2e;
+    color: #ede4d3;
+    text-align: center;
+    font-family: var(--font-primary);
+}
+
+.dndm-tile-name {
+    font-size: 1.4rem;
+    font-weight: 800;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: #e8b849;
+}
+
+.dndm-tile-tag {
+    margin-top: 6px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.6px;
+    color: #9b8ec4;
+    text-transform: uppercase;
+}

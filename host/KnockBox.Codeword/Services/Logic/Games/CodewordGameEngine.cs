@@ -32,7 +32,7 @@ namespace KnockBox.Codeword.Services.Logic.Games
 
             var gameState = new CodewordGameState(host, stateLogger);
             gameState.Execute(() => gameState.SetJoinable(true));
-            gameState.PlayerUnregistered += player => HandlePlayerLeft(player, gameState);
+            gameState.SubscribePlayerUnregistered(player => HandlePlayerLeft(player, gameState));
             logger.LogInformation("Created Codeword state with host [{id}].", host.Id);
             return Task.FromResult<ValueResult<AbstractGameState>>(gameState);
         }

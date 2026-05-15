@@ -1,0 +1,15 @@
+@using KnockBox.Core.Components.Shared
+@inherits DisposableComponent
+
+@if (Service is not null && Service.Entries.Count > 0)
+{
+    <div class="dndm-toast-stack" aria-live="polite">
+        @foreach (var entry in Service.Entries)
+        {
+            <div @key="entry.Id" class="@CssFor(entry)">
+                <span class="dndm-toast-icon">@IconFor(entry.Tone)</span>
+                <span class="dndm-toast-message">@entry.Message</span>
+            </div>
+        }
+    </div>
+}

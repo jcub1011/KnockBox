@@ -3,6 +3,9 @@
     <Build />
   </Project>
   <Project Path="../sdk/KnockBox.Core/KnockBox.Core.csproj" />
+  <Project Path="../sdk/KnockBox.PlatformTests/KnockBox.PlatformTests.csproj" />
+  <Project Path="../sdk/KnockBox.Plugins.Analyzer/KnockBox.Plugins.Analyzer.csproj" />
+  <Project Path="../sdk/KnockBox.Plugins.AnalyzerTests/KnockBox.Plugins.AnalyzerTests.csproj" />
   <Project Path="../sdk/KnockBox.Tooling/KnockBox.Tooling.csproj" />
   <Project Path="../sdk/KnockBox.Platform/KnockBox.Platform.csproj" />
   <Project Path="KnockBox/KnockBox.csproj" />
@@ -23,4 +26,6 @@
   <Project Path="KnockBox.TaskMasterTests/KnockBox.TaskMasterTests.csproj" />
   <Project Path="KnockBox.Spardle/KnockBox.Spardle.csproj" />
   <Project Path="KnockBox.SpardleTests/KnockBox.SpardleTests.csproj" />
+  <Project Path="KnockBox.DndMapper/KnockBox.DndMapper.csproj" />
+  <Project Path="KnockBox.DndMapperTests/KnockBox.DndMapperTests.csproj" />
 </Solution>

@@ -1,0 +1,24 @@
+@using KnockBox.Core.Components.Shared
+@using KnockBox.DndMapper.Models
+@using KnockBox.DndMapper.Services.State.Games
+@using KnockBox.DndMapper.Services.State.Games.Data
+@inherits DisposableComponent
+
+@if (MyToken is Token t)
+{
+    <section class="dndm-panel dndm-mytokenp">
+        <header class="dndm-panel-header">
+            <span>My Token</span>
+        </header>
+        <div class="dndm-panel-body">
+            <div class="dndm-mytokenp-row">
+                <input type="color"
+                       value="@t.Color"
+                       class="dndm-mytokenp-color"
+                       title="Change my token color"
+                       @onchange="@(e => OnColorChanged(t, (string?)e.Value))" />
+                <span class="dndm-mytokenp-name">@t.Name</span>
+            </div>
+        </div>
+    </section>
+}

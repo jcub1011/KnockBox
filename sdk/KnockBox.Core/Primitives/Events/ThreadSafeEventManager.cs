@@ -112,13 +112,33 @@ namespace KnockBox.Core.Primitives.Events
             return ThreadSafeEventManagerHelper.DispatchAsync(snapshot, SafeInvokeAsync);
         }
 
+        /// <summary>
+        /// Dispatches the notification. Sync handlers run on the calling thread;
+        /// only pending async handlers are awaited fire-and-forget. The
+        /// zero-subscriber and all-sync paths allocate nothing.
+        /// <para><b>Lock-discipline contract:</b> when this manager belongs to an
+        /// <c>AbstractGameState</c> (or any state that serializes mutations through
+        /// its own lock), <c>Notify</c> must only be called <i>after</i> that lock
+        /// has been released. Subscribers commonly call Blazor <c>InvokeAsync</c> +
+        /// <c>StateHasChanged</c>; the resulting renderer work runs synchronously
+        /// on the calling dispatcher, and doing that while the state lock is held
+        /// will deadlock. See <c>knockbox-platform-architecture.md</c>
+        /// (Concurrency → "Notify outside the lock").</para>
+        /// </summary>
         public void Notify()
         {
-            _ = Task.Run(async () =>
+            var snapshot = Volatile.Read(ref _listeners);
+            if (snapshot.Length == 0) return;
+
+            for (int i = 0; i < snapshot.Length; i++)
             {
-                try { await NotifyAsync(); }
-                catch (Exception ex) { logger?.LogError(ex, "Error notifying subscribers."); }
-            });
+                ValueTask vt;
+                try { vt = snapshot[i](); }
+                catch (Exception ex) { logger?.LogError(ex, "Error notifying subscriber."); continue; }
+
+                if (vt.IsCompletedSuccessfully) continue;
+                _ = AwaitValueTaskAsync(vt);
+            }
         }
 
         private Task SafeInvokeAsync(Func<ValueTask> callback)
@@ -179,13 +199,26 @@ namespace KnockBox.Core.Primitives.Events
             return ThreadSafeEventManagerHelper.DispatchAsync(snapshot, cb => SafeInvokeAsync(cb, args));
         }
 
+        /// <summary>
+        /// Dispatches the notification. Sync handlers run on the calling thread;
+        /// only pending async handlers are awaited fire-and-forget. The
+        /// zero-subscriber and all-sync paths allocate nothing. See the non-generic
+        /// <c>Notify()</c> for the lock-discipline contract.
+        /// </summary>
         public void Notify(TEventArgs args)
         {
-            _ = Task.Run(async () =>
+            var snapshot = Volatile.Read(ref _listeners);
+            if (snapshot.Length == 0) return;
+
+            for (int i = 0; i < snapshot.Length; i++)
             {
-                try { await NotifyAsync(args); }
-                catch (Exception ex) { logger?.LogError(ex, "Error notifying subscribers with args [{args}].", args); }
-            });
+                ValueTask vt;
+                try { vt = snapshot[i](args); }
+                catch (Exception ex) { logger?.LogError(ex, "Error notifying subscriber."); continue; }
+
+                if (vt.IsCompletedSuccessfully) continue;
+                _ = AwaitValueTaskAsync(vt);
+            }
         }
 
         private Task SafeInvokeAsync(Func<TEventArgs, ValueTask> callback, TEventArgs args)

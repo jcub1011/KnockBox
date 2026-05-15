@@ -1,0 +1,31 @@
+/* Modal chrome (.dndm-modal-overlay/-card/-title/-body/-actions/-error) is
+   defined unscoped in wwwroot/css/panels.css. Only the MapSettings-specific
+   layout lives here. */
+
+.dndm-mapsettings {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.dndm-mapsettings .dndm-label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    font-size: 0.8rem;
+    color: #b6ad99;
+}
+
+.dndm-mapsettings-check {
+    flex-direction: row !important;
+    align-items: center;
+    gap: 0.5rem !important;
+    color: #ede4d3 !important;
+}
+
+.dndm-mapsettings-hint {
+    font-size: 0.78rem;
+    color: #7a7464;
+    font-style: italic;
+    margin-top: 0.3rem;
+}

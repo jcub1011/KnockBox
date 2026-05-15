@@ -1,0 +1,15 @@
+@using KnockBox.DndMapper.Services.State.Games
+
+@if (IsHost())
+{
+    <button class="dndm-btn dndm-btn--danger" type="button" @onclick="@(() => _open = true)">
+        End Session
+    </button>
+    <ConfirmModal IsOpen="_open"
+                  Title="End Session?"
+                  Message="Ends the session for everyone, deletes uploaded image files, and returns all clients to the home page. Cannot be undone."
+                  ConfirmText="End Session"
+                  CancelText="Cancel"
+                  OnConfirm="DoEnd"
+                  OnCancel="@(() => _open = false)" />
+}

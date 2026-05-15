@@ -1,0 +1,36 @@
+@using Microsoft.AspNetCore.Components.Forms
+@using KnockBox.Core.Components.Shared
+@using KnockBox.DndMapper.Services.State.Games
+@inherits DisposableComponent
+
+@if (Compact)
+{
+    <label class="dndm-upload-compact @(_disabled ? "dndm-upload-compact--disabled" : null)"
+           title="Upload one or more images (PNG · JPEG · WebP · ≤ 5 MB each)">
+        @if (_uploading) { <span>@($"{_batchDone}/{_batchTotal}")</span> } else { <span>+ Image</span> }
+        <InputFile OnChange="OnFileSelected"
+                   accept="image/png,image/jpeg,image/webp"
+                   multiple
+                   disabled="@_disabled" />
+    </label>
+}
+else
+{
+    <label class="dndm-upload @(_disabled ? "dndm-upload--disabled" : null)">
+        <span class="dndm-upload-label">
+            @if (_uploading)
+            {
+                <span>@($"Uploading {_batchDone}/{_batchTotal}…")</span>
+            }
+            else
+            {
+                <span>+ Upload Images</span>
+            }
+        </span>
+        <span class="dndm-upload-hint">PNG · JPEG · WebP · ≤ 5 MB each</span>
+        <InputFile OnChange="OnFileSelected"
+                   accept="image/png,image/jpeg,image/webp"
+                   multiple
+                   disabled="@_disabled" />
+    </label>
+}

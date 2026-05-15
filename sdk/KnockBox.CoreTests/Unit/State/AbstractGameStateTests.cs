@@ -75,6 +75,18 @@ public sealed class AbstractGameStateTests
     }
 
     [TestMethod]
+    public void SetJoinable_FromInsideAnotherStatesExecute_Throws()
+    {
+        using var stateA = MakeState();
+        using var stateB = MakeState();
+
+        stateA.Execute(() =>
+        {
+            Assert.Throws<InvalidOperationException>(() => stateB.SetJoinable(true));
+        });
+    }
+
+    [TestMethod]
     public async Task SetJoinable_InsideExecute_FiresStateChanged()
     {
         using var state = MakeState();
@@ -237,7 +249,7 @@ public sealed class AbstractGameStateTests
         state.Execute(() => state.SetJoinable(true));
         var player = MakeUser();
         int eventCount = 0;
-        state.PlayerUnregistered += _ => eventCount++;
+        state.SubscribePlayerUnregistered(_ => eventCount++);
 
         var firstReg = state.RegisterPlayer(player);
         Assert.IsTrue(firstReg.TryGetSuccess(out var oldToken));
@@ -255,7 +267,7 @@ public sealed class AbstractGameStateTests
         state.Execute(() => state.SetJoinable(true));
         var player = MakeUser();
         User? unregisteredPlayer = null;
-        state.PlayerUnregistered += u => unregisteredPlayer = u;
+        state.SubscribePlayerUnregistered(u => unregisteredPlayer = u);
 
         state.RegisterPlayer(player); // oldToken — will be superseded
         var secondReg = state.RegisterPlayer(player);
@@ -288,7 +300,7 @@ public sealed class AbstractGameStateTests
         state.Execute(() => state.SetJoinable(true));
         var player = MakeUser();
         User? unregisteredPlayer = null;
-        state.PlayerUnregistered += u => unregisteredPlayer = u;
+        state.SubscribePlayerUnregistered(u => unregisteredPlayer = u);
 
         var reg = state.RegisterPlayer(player);
         reg.TryGetSuccess(out var unsubscriber);
@@ -362,11 +374,11 @@ public sealed class AbstractGameStateTests
 
         var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         int fired = 0;
-        state.PlayerUnregistered += _ =>
+        state.SubscribePlayerUnregistered(_ =>
         {
             if (Interlocked.Increment(ref fired) == 1)
                 tcs.TrySetResult();
-        };
+        });
 
         state.KickPlayer(player);
 
@@ -723,7 +735,7 @@ public sealed class AbstractGameStateTests
     {
         var state = MakeState();
         var fired = false;
-        state.OnStateDisposed += () => fired = true;
+        state.SubscribeStateDisposed(() => fired = true);
 
         state.Dispose();
 

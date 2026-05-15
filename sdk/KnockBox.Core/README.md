@@ -35,8 +35,8 @@ public sealed class MyGameModule : IGameModule
     public string Description => "A tiny example game.";
     public string RouteIdentifier => "my-game";  // must match your @page route
 
-    public void RegisterServices(IServiceCollection services)
-        => services.AddGameEngine<MyGameEngine>(RouteIdentifier);
+    public void RegisterServices(IPluginRegistration registration)
+        => registration.AddGameEngine<MyGameEngine>();
 
     public RenderFragment GetButtonContent() => b => { /* home-page tile */ };
 }
@@ -58,7 +58,7 @@ public sealed class MyGameEngine(ILogger<MyGameEngine> logger,
         User host, CancellationToken ct = default)
     {
         var state = new MyGameState(host, stateLogger);
-        state.UpdateJoinableStatus(true);
+        state.SetJoinable(true);
         return Task.FromResult<ValueResult<AbstractGameState>>(state);
     }
 
@@ -67,7 +67,7 @@ public sealed class MyGameEngine(ILogger<MyGameEngine> logger,
     {
         if (state is not MyGameState s || host != s.Host)
             return Task.FromResult(Result.FromError("Only the host can start."));
-        return Task.FromResult(s.Execute(() => s.UpdateJoinableStatus(false)));
+        return Task.FromResult(s.Execute(() => s.SetJoinable(false)));
     }
 }
 ```

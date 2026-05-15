@@ -1,0 +1,60 @@
+.dndm-tokenp-add { display: inline-flex; gap: 0.3rem; }
+
+.dndm-tokenp-row {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.25rem 0.1rem;
+    border-bottom: 1px dashed rgba(255, 255, 255, 0.04);
+}
+
+.dndm-tokenp-color {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 1px solid #3a3a5c;
+    background: transparent;
+    cursor: pointer;
+    padding: 0;
+    flex: 0 0 auto;
+}
+
+.dndm-tokenp-name {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.dndm-tokenp-meta {
+    display: flex;
+    gap: 0.5rem;
+    padding: 0 0.1rem 0.4rem 1.85rem;
+    border-bottom: 1px dashed rgba(255, 255, 255, 0.04);
+    flex-wrap: wrap;
+}
+
+.dndm-tokenp-metalabel {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    flex: 1 1 8rem;
+    min-width: 0;
+}
+
+.dndm-tokenp-metalabel > span {
+    font-size: 0.65rem;
+    color: #7a7464;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.dndm-tokenp-tag {
+    flex: 0 0 auto;
+    font-size: 0.65rem;
+    padding: 0.1rem 0.35rem;
+    background: #14141f;
+    color: #cdb98e;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-radius: 2px;
+    border: 1px solid #2c2c44;
+}

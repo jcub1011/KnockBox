@@ -1,0 +1,99 @@
+.dndm-mapsw { display: flex; flex-direction: column; }
+
+.dndm-mapsw-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 0.4rem;
+    overflow-y: auto;
+}
+
+.dndm-mapsw-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.5rem;
+    background: #14141f;
+    border: 1px solid #2c2c44;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: border-color 120ms, background 120ms;
+}
+
+.dndm-mapsw-row:hover {
+    background: #1a1a2e;
+    border-color: #3a3a5c;
+}
+
+.dndm-mapsw-row--active {
+    border-left: 3px solid #e8b849;
+    background: linear-gradient(90deg, rgba(232, 184, 73, 0.1), transparent);
+}
+
+.dndm-mapsw-thumb {
+    flex: 0 0 auto;
+    width: 32px;
+    height: 32px;
+    background: #0e1117;
+    border: 1px solid #3a3a5c;
+    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--dndm-display);
+    color: #cdb98e;
+    font-size: 0.85rem;
+    position: relative;
+}
+
+.dndm-mapsw-thumb-tag {
+    font-size: 0.7rem;
+    font-variant-numeric: tabular-nums;
+    color: #ede4d3;
+    font-weight: 600;
+}
+
+.dndm-mapsw-thumb-blank { color: #4a4a66; font-size: 1.2rem; }
+
+.dndm-mapsw-row-main {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    min-width: 0;
+}
+
+.dndm-mapsw-name {
+    color: #ede4d3;
+    font-size: 0.875rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dndm-mapsw-meta {
+    color: #7a7464;
+    font-size: 0.7rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.dndm-mapsw-rename {
+    background: #0e1117;
+    border: 1px solid #e8b849;
+    border-radius: 3px;
+    color: #ede4d3;
+    padding: 0.2rem 0.4rem;
+    font-size: 0.875rem;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.dndm-mapsw-actions {
+    display: flex;
+    gap: 0.15rem;
+    flex: 0 0 auto;
+    opacity: 0.45;
+    transition: opacity 120ms;
+}
+
+.dndm-mapsw-row:hover .dndm-mapsw-actions { opacity: 1; }
