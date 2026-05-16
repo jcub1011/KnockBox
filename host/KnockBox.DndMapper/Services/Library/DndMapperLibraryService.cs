@@ -494,56 +494,8 @@ namespace KnockBox.DndMapper.Services.Library
 
             // 2. Pre-load every image blob and publish a share outside the lock.
             //    Build a parallel structure mapping imageId -> fresh MapImage.
-            var hydratedImages = new Dictionary<Guid, MapImage>();
-            foreach (var mapSnap in snapshot.Maps)
-            {
-                foreach (var imgSnap in mapSnap.Images)
-                {
-                    if (ct.IsCancellationRequested) return Result.FromCancellation();
-
-                    var blobResult = await _db.BlobGetSingleAsync(
-                        DndMapperLibrarySchema.ImagesStore,
-                        IndexedDbKey.String(imgSnap.Id.ToString("D")),
-                        ct);
-
-                    if (!blobResult.TryGetSuccess(out var blob) || blob is null)
-                    {
-                        // Snapshot referenced a missing blob — log and skip; the
-                        // image will not be hydrated. Players see no entry.
-                        _logger.LogWarning("Image {ImageId} referenced by snapshot is missing from IndexedDB; skipping.", imgSnap.Id);
-                        continue;
-                    }
-
-                    IBlobShare share;
-                    try { share = await blob.PublishForSharingAsync(options: null, ct); }
-                    catch (Exception ex)
-                    {
-                        _logger.LogWarning(ex, "Failed to republish share for hydrated image {ImageId}.", imgSnap.Id);
-                        await SafeDisposeAsync(blob);
-                        continue;
-                    }
-
-                    await ReplaceCacheEntryAsync(imgSnap.Id, blob, share);
-                    hydratedImages[imgSnap.Id] = new MapImage
-                    {
-                        Id = imgSnap.Id,
-                        ContentType = imgSnap.ContentType,
-                        ShareToken = share.Token,
-                        X = imgSnap.X,
-                        Y = imgSnap.Y,
-                        Width = imgSnap.Width,
-                        Height = imgSnap.Height,
-                        OriginalWidth = imgSnap.OriginalWidth,
-                        OriginalHeight = imgSnap.OriginalHeight,
-                        Rotation = imgSnap.Rotation,
-                        Opacity = imgSnap.Opacity,
-                        LayerOrder = imgSnap.LayerOrder,
-                        Locked = imgSnap.Locked,
-                        Hidden = imgSnap.Hidden,
-                        ByteSize = imgSnap.ByteSize,
-                    };
-                }
-            }
+            var hydratedImages = await HydrateImagesFromSnapshotAsync(_db, snapshot, ct);
+            if (ct.IsCancellationRequested) return Result.FromCancellation();
 
             // 3. Apply atomically inside one Execute. Subscribers see one
             //    StateChanged notification covering the entire hydration.
@@ -643,6 +595,68 @@ namespace KnockBox.DndMapper.Services.Library
 
             HasExistingLibrary = true;
             return Result.Success;
+        }
+
+        // Pulls every image blob referenced by the snapshot, publishes a fresh
+        // share for each, and returns a parallel map of imageId -> hydrated
+        // MapImage. Missing blobs and republish failures are logged and skipped
+        // — callers see fewer images than the snapshot references, never an
+        // exception. The cache is updated in lock-step so the new share is
+        // owned by this service for the rest of the circuit.
+        private async ValueTask<Dictionary<Guid, MapImage>> HydrateImagesFromSnapshotAsync(
+            IIndexedDatabase db,
+            LibrarySnapshot snapshot,
+            CancellationToken ct)
+        {
+            var hydrated = new Dictionary<Guid, MapImage>();
+            foreach (var mapSnap in snapshot.Maps)
+            {
+                foreach (var imgSnap in mapSnap.Images)
+                {
+                    if (ct.IsCancellationRequested) return hydrated;
+
+                    var blobResult = await db.BlobGetSingleAsync(
+                        DndMapperLibrarySchema.ImagesStore,
+                        IndexedDbKey.String(imgSnap.Id.ToString("D")),
+                        ct);
+
+                    if (!blobResult.TryGetSuccess(out var blob) || blob is null)
+                    {
+                        _logger.LogWarning("Image {ImageId} referenced by snapshot is missing from IndexedDB; skipping.", imgSnap.Id);
+                        continue;
+                    }
+
+                    IBlobShare share;
+                    try { share = await blob.PublishForSharingAsync(options: null, ct); }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Failed to republish share for hydrated image {ImageId}.", imgSnap.Id);
+                        await SafeDisposeAsync(blob);
+                        continue;
+                    }
+
+                    await ReplaceCacheEntryAsync(imgSnap.Id, blob, share);
+                    hydrated[imgSnap.Id] = new MapImage
+                    {
+                        Id = imgSnap.Id,
+                        ContentType = imgSnap.ContentType,
+                        ShareToken = share.Token,
+                        X = imgSnap.X,
+                        Y = imgSnap.Y,
+                        Width = imgSnap.Width,
+                        Height = imgSnap.Height,
+                        OriginalWidth = imgSnap.OriginalWidth,
+                        OriginalHeight = imgSnap.OriginalHeight,
+                        Rotation = imgSnap.Rotation,
+                        Opacity = imgSnap.Opacity,
+                        LayerOrder = imgSnap.LayerOrder,
+                        Locked = imgSnap.Locked,
+                        Hidden = imgSnap.Hidden,
+                        ByteSize = imgSnap.ByteSize,
+                    };
+                }
+            }
+            return hydrated;
         }
 
         /// <summary>
