@@ -28,6 +28,14 @@ namespace KnockBox.DndMapper.Services.Library
         public AttributeSchemaSnapshot AttributeSchema { get; init; } = new();
         public List<MapSnapshot> Maps { get; init; } = [];
         public List<SheetSnapshot> Sheets { get; init; } = [];
+        public List<NamedTemplateSnapshot> CustomTemplates { get; init; } = [];
+    }
+
+    internal sealed record NamedTemplateSnapshot
+    {
+        public Guid Id { get; init; }
+        public string Name { get; init; } = string.Empty;
+        public List<AttributeRowSnapshot> Rows { get; init; } = [];
     }
 
     internal sealed record MapSnapshot
@@ -57,6 +65,7 @@ namespace KnockBox.DndMapper.Services.Library
         public double Opacity { get; init; } = 1.0;
         public int LayerOrder { get; init; }
         public bool Locked { get; init; }
+        public bool Hidden { get; init; }
         public long ByteSize { get; init; }
         // Intentionally no ShareToken: the capability is per-circuit and is
         // recomputed on every Attach via PublishForSharingAsync.
@@ -140,6 +149,20 @@ namespace KnockBox.DndMapper.Services.Library
                 .Select(ToSheetSnapshot)
                 .ToList();
 
+            var templates = state.CustomTemplates.Values
+                .Select(t => new NamedTemplateSnapshot
+                {
+                    Id = t.Id,
+                    Name = t.Name,
+                    Rows = t.Rows.Select(r => new AttributeRowSnapshot
+                    {
+                        Name = r.Name,
+                        Type = r.Type,
+                        Default = ToValueSnapshot(r.Default),
+                    }).ToList(),
+                })
+                .ToList();
+
             return new LibrarySnapshot
             {
                 SchemaVersion = 1,
@@ -147,6 +170,7 @@ namespace KnockBox.DndMapper.Services.Library
                 AttributeSchema = ToSchemaSnapshot(state.AttributeSchema),
                 Maps = maps,
                 Sheets = sheets,
+                CustomTemplates = templates,
             };
         }
 
@@ -208,6 +232,7 @@ namespace KnockBox.DndMapper.Services.Library
             Opacity = image.Opacity,
             LayerOrder = image.LayerOrder,
             Locked = image.Locked,
+            Hidden = image.Hidden,
             ByteSize = image.ByteSize,
         };
 

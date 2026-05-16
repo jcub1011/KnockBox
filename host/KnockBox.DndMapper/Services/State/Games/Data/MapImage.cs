@@ -20,6 +20,11 @@ namespace KnockBox.DndMapper.Services.State.Games.Data
         public double Opacity { get; set; } = 1.0;
         public int LayerOrder { get; set; }
         public bool Locked { get; set; }
+        // Host-toggled visibility. When true the image is excluded from the SVG
+        // for every viewer (host and players) and cannot be selected from the
+        // layers panel. The layer row remains visible to the host so they can
+        // toggle it back on.
+        public bool Hidden { get; set; }
         public long ByteSize { get; set; }
     }
 }

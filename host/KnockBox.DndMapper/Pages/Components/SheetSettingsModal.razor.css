@@ -1,0 +1,87 @@
+.dndm-sheet-settings-modal {
+    /* dndm-modal-card already supplies the chrome (background, border,
+       shadow, rounded corners). Override only the size for this larger
+       multi-section modal. */
+    min-width: 0;
+    width: min(560px, calc(100vw - 2rem));
+    max-width: min(560px, calc(100vw - 2rem));
+    max-height: calc(100vh - 4rem);
+}
+
+.dndm-sheet-settings-modal .dndm-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.dndm-sheet-settings-modal .dndm-modal-title {
+    margin: 0;
+}
+
+.dndm-sheet-settings-modal .dndm-modal-body {
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+    margin: 0 0 0.75rem 0;
+}
+
+.dndm-sheet-settings-modal .dndm-modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+}
+
+.dndm-sheet-settings-schema-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-top: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.dndm-sheet-settings-hint {
+    color: #7a7464;
+    font-size: 0.75rem;
+    font-style: italic;
+    flex: 1 1 12rem;
+}
+
+.dndm-template-list {
+    list-style: none;
+    margin: 0.25rem 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.dndm-template-row {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.25rem 0.4rem;
+    background: #14141f;
+    border: 1px solid #2c2c44;
+    border-radius: 3px;
+}
+
+.dndm-template-name {
+    flex: 1 1 auto;
+    color: #ede4d3;
+}
+
+.dndm-template-count {
+    color: #7a7464;
+    font-size: 0.75rem;
+}
+
+.dndm-template-save {
+    display: flex;
+    gap: 0.4rem;
+    margin-top: 0.4rem;
+}
+
+.dndm-template-save .dndm-input { flex: 1 1 auto; min-width: 0; }

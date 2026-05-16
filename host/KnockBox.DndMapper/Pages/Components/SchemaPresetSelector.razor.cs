@@ -21,6 +21,13 @@ namespace KnockBox.DndMapper.Pages.Components
         private AttributeSchema? _pendingSchema;
         private string? _customError;
         private bool _customMode;
+        // Tracks the currently-selected preset chip in draft mode. Null until
+        // the host actually clicks a preset; falls back to State.AttributeSchema.Preset
+        // for the active highlight.
+        private AttributePreset? _draftPreset;
+        // True once the host has made any change in this session that isn't
+        // yet committed; the Save Changes button enables when set.
+        private bool _hasPendingChanges;
 
         private sealed class CustomRowDraft
         {
@@ -40,6 +47,10 @@ namespace KnockBox.DndMapper.Pages.Components
         }
 
         private bool ShowCustomEditor => _customMode || State.AttributeSchema.Preset == AttributePreset.Custom;
+
+        // Public so the modal's Discard / Close button can ask whether a
+        // confirm prompt is needed before closing.
+        public bool HasPendingChanges => _hasPendingChanges;
 
         private void SyncCustomRowsFromState()
         {
@@ -62,15 +73,18 @@ namespace KnockBox.DndMapper.Pages.Components
             _ => string.Empty,
         };
 
-        private string PillCls(AttributePreset preset)
-        {
-            var current = _customMode ? AttributePreset.Custom : State.AttributeSchema.Preset;
-            return current == preset ? "active" : string.Empty;
-        }
+        private AttributePreset EffectivePreset =>
+            _draftPreset ?? (_customMode ? AttributePreset.Custom : State.AttributeSchema.Preset);
 
-        private async Task SelectPreset(AttributePreset picked)
+        private string PillCls(AttributePreset preset) =>
+            EffectivePreset == preset ? "active" : string.Empty;
+
+        private void SelectPreset(AttributePreset picked)
         {
             if (UserService.CurrentUser is null) return;
+
+            _draftPreset = picked;
+            _hasPendingChanges = true;
 
             if (picked == AttributePreset.Custom)
             {
@@ -78,26 +92,70 @@ namespace KnockBox.DndMapper.Pages.Components
                 if (_customRows.Count == 0)
                     _customRows.Add(new CustomRowDraft());
                 _customError = null;
+            }
+            else
+            {
+                _customMode = false;
+                _customError = null;
+            }
+        }
+
+        // Resolves the user-edited draft to an AttributeSchema. Returns null if
+        // validation fails (and surfaces the error via _customError).
+        private AttributeSchema? BuildDraftSchema()
+        {
+            var preset = EffectivePreset;
+            if (preset != AttributePreset.Custom)
+                return AttributeSchema.FromPreset(preset);
+
+            var rows = BuildRowsFromDrafts(out var error);
+            if (rows is null)
+            {
+                _customError = error;
+                return null;
+            }
+            _customError = null;
+            return new AttributeSchema(AttributePreset.Custom, rows);
+        }
+
+        public async Task SaveChangesAsync()
+        {
+            if (UserService.CurrentUser is null) return;
+            if (!_hasPendingChanges) return;
+
+            var schema = BuildDraftSchema();
+            if (schema is null) return;
+
+            // Skip the commit if the draft matches what's already live.
+            if (State.AttributeSchema.Preset == schema.Preset &&
+                State.AttributeSchema.Rows.SequenceEqual(schema.Rows))
+            {
+                _hasPendingChanges = false;
+                _draftPreset = null;
                 return;
             }
 
-            _customMode = false;
-            if (picked == State.AttributeSchema.Preset) return;
-            var preset = AttributeSchema.FromPreset(picked);
-            await ApplyOrPromptAsync(preset);
-        }
-
-        private async Task ApplyOrPromptAsync(AttributeSchema schema)
-        {
             if (State.Phase == DndMapperPhase.Lobby)
             {
                 ApplyDirect(schema);
+                _hasPendingChanges = false;
+                _draftPreset = null;
                 return;
             }
 
             _pendingSchema = schema;
             _cascadeOpen = true;
             await Task.CompletedTask;
+        }
+
+        // Drop in-progress edits and snap the draft back to the live schema.
+        public void DiscardChanges()
+        {
+            _draftPreset = null;
+            _hasPendingChanges = false;
+            _customError = null;
+            _customMode = State.AttributeSchema.Preset == AttributePreset.Custom;
+            SyncCustomRowsFromState();
         }
 
         private void ApplyDirect(AttributeSchema schema)
@@ -110,13 +168,14 @@ namespace KnockBox.DndMapper.Pages.Components
             }
         }
 
-        private async Task ConfirmCascade()
+        private void ConfirmCascade()
         {
             if (_pendingSchema is null) { _cascadeOpen = false; return; }
             ApplyDirect(_pendingSchema);
             _pendingSchema = null;
             _cascadeOpen = false;
-            await Task.CompletedTask;
+            _hasPendingChanges = false;
+            _draftPreset = null;
         }
 
         private void CancelCascade()
@@ -125,58 +184,49 @@ namespace KnockBox.DndMapper.Pages.Components
             _cascadeOpen = false;
         }
 
-        private async Task AddRow()
+        private void AddRow()
         {
             _customRows.Add(new CustomRowDraft());
-            await TryAutoApplyAsync();
+            MarkDirty();
         }
 
-        private async Task RemoveRow(int idx)
+        private void RemoveRow(int idx)
         {
             if (idx >= 0 && idx < _customRows.Count) _customRows.RemoveAt(idx);
-            await TryAutoApplyAsync();
+            MarkDirty();
         }
 
-        private async Task UpdateName(int idx, string name)
+        private void UpdateName(int idx, string name)
         {
             if (idx < 0 || idx >= _customRows.Count) return;
             _customRows[idx].Name = name;
-            await TryAutoApplyAsync();
+            MarkDirty();
         }
 
-        private async Task UpdateType(int idx, string? raw)
+        private void UpdateType(int idx, string? raw)
         {
             if (idx < 0 || idx >= _customRows.Count) return;
             if (Enum.TryParse<AttributeValueType>(raw, out var type))
                 _customRows[idx].Type = type;
-            await TryAutoApplyAsync();
+            MarkDirty();
         }
 
-        private async Task UpdateDefault(int idx, string value)
+        private void UpdateDefault(int idx, string value)
         {
             if (idx < 0 || idx >= _customRows.Count) return;
             _customRows[idx].Default = value;
-            await TryAutoApplyAsync();
+            MarkDirty();
         }
 
-        private async Task TryAutoApplyAsync()
+        private void MarkDirty()
         {
-            var rows = BuildRowsFromDrafts(out var error);
-            if (rows is null)
-            {
-                _customError = error;
-                return;
-            }
+            // Once the host starts editing rows, treat the schema as Custom in
+            // the draft so a later Save commits row edits even if no preset
+            // pill was clicked.
+            _draftPreset = AttributePreset.Custom;
+            _customMode = true;
+            _hasPendingChanges = true;
             _customError = null;
-
-            if (State.AttributeSchema.Preset == AttributePreset.Custom &&
-                State.AttributeSchema.Rows.SequenceEqual(rows))
-            {
-                return;
-            }
-
-            var schema = new AttributeSchema(AttributePreset.Custom, rows);
-            await ApplyOrPromptAsync(schema);
         }
 
         private List<AttributeRow>? BuildRowsFromDrafts(out string? error)

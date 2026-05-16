@@ -27,6 +27,7 @@
                                     RoomCode="@RoomCode"
                                     SelectedImageId="_selectedImageId"
                                     SelectedImageIdChanged="OnSelectedImageIdChanged" />
+                    <HostSavesPanel />
                 </div>
                 @* Always render the resize handle so its JS bindings stay
                    attached to a stable DOM node across rail collapses /
@@ -117,7 +118,14 @@
         @if (IsHost)
         {
             <div class="dndm-floating-actions">
-                <button class="dndm-btn" type="button" @onclick="TogglePerms">Permissions</button>
+                @if (_isSaving)
+                {
+                    <span class="dndm-save-indicator" title="A save is in progress.">
+                        <span class="dndm-save-spinner" aria-hidden="true"></span>
+                        Saving…
+                    </span>
+                }
+                <button class="dndm-btn" type="button" @onclick="TogglePerms">Settings</button>
                 <EndSessionButton State="State" />
             </div>
         }

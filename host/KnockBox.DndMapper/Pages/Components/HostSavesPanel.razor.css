@@ -1,0 +1,80 @@
+.dndm-savesp .dndm-panel-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    padding: 0.4rem 0.5rem;
+}
+
+.dndm-saves-create {
+    display: flex;
+    gap: 0.3rem;
+    align-items: center;
+}
+
+.dndm-saves-create .dndm-input {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.dndm-saves-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.dndm-saves-row {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.3rem 0.4rem;
+    background: #14141f;
+    border: 1px solid #2c2c44;
+    border-radius: 3px;
+}
+
+.dndm-saves-row--auto {
+    border-left: 2px solid #e8b849;
+}
+
+.dndm-saves-meta {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.dndm-saves-name {
+    color: #ede4d3;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dndm-saves-row--auto .dndm-saves-name {
+    font-style: italic;
+}
+
+.dndm-saves-when {
+    color: #7a7464;
+    font-size: 0.7rem;
+}
+
+.dndm-saves-actions {
+    display: flex;
+    gap: 0.25rem;
+    flex-wrap: wrap;
+}
+
+.dndm-saves-renameinput {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.dndm-saves-error {
+    color: #ff8a8a;
+    font-size: 0.75rem;
+}

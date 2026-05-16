@@ -50,8 +50,11 @@ namespace KnockBox.DndMapper.Pages
         private ElementReference _rootRef;
 
         private IJSObjectReference? _resizeModule;
+        private IJSObjectReference? _unloadGuardModule;
         private DotNetObjectReference<DndMapperPlayingPhase>? _dotNetRef;
         private bool _resizeAttached;
+        private bool _isSaving;
+        private bool _unloadGuardActive;
 
         private Map? ActiveMap =>
             State.ActiveMapId is Guid id
@@ -86,6 +89,32 @@ namespace KnockBox.DndMapper.Pages
                 return;
             }
             _libraryBannerVisible = Library.HasExistingLibrary;
+            Library.SavingChanged += OnSavingChanged;
+        }
+
+        private void OnSavingChanged()
+        {
+            _isSaving = Library.IsSaving;
+            _ = InvokeAsync(async () =>
+            {
+                StateHasChanged();
+                if (_unloadGuardModule is null) return;
+                try
+                {
+                    if (_isSaving && !_unloadGuardActive)
+                    {
+                        await _unloadGuardModule.InvokeVoidAsync("enable");
+                        _unloadGuardActive = true;
+                    }
+                    else if (!_isSaving && _unloadGuardActive)
+                    {
+                        await _unloadGuardModule.InvokeVoidAsync("disable");
+                        _unloadGuardActive = false;
+                    }
+                }
+                catch (JSDisconnectedException) { /* circuit teardown */ }
+                catch (Exception ex) { Logger.LogWarning(ex, "Failed to toggle unload guard."); }
+            });
         }
 
         private async Task OnLoadLibrary()
@@ -147,6 +176,11 @@ namespace KnockBox.DndMapper.Pages
                 {
                     _resizeModule = await JSRuntime.InvokeAsync<IJSObjectReference>(
                         "import", "./_content/KnockBox.DndMapper/js/dndMapperRailResize.js");
+                    if (IsHost)
+                    {
+                        _unloadGuardModule = await JSRuntime.InvokeAsync<IJSObjectReference>(
+                            "import", "./_content/KnockBox.DndMapper/js/dndMapperUnloadGuard.js");
+                    }
 
                     _rightRailPx = await _resizeModule.InvokeAsync<int>("load", "right", Role, DefaultRightPx);
                     if (IsHost)
@@ -229,9 +263,23 @@ namespace KnockBox.DndMapper.Pages
             // scope.
             if (IsHost)
             {
+                Library.SavingChanged -= OnSavingChanged;
                 try { await Library.DetachAsync(); }
                 catch (JSDisconnectedException) { /* circuit teardown */ }
                 catch (Exception ex) { Logger.LogWarning(ex, "Failed to detach DnD Mapper library on page teardown."); }
+            }
+
+            if (_unloadGuardModule is not null)
+            {
+                try
+                {
+                    if (_unloadGuardActive) await _unloadGuardModule.InvokeVoidAsync("disable");
+                }
+                catch (JSDisconnectedException) { /* circuit teardown */ }
+                catch (Exception) { /* ignore */ }
+                try { await _unloadGuardModule.DisposeAsync(); }
+                catch (JSDisconnectedException) { /* circuit teardown */ }
+                catch (Exception) { /* ignore */ }
             }
 
             if (_resizeModule is not null)

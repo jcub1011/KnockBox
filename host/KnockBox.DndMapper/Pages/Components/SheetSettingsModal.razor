@@ -1,0 +1,79 @@
+@using KnockBox.Core.Components.Shared
+@using KnockBox.DndMapper.Models
+@using KnockBox.DndMapper.Services.State.Games
+@using KnockBox.DndMapper.Services.State.Games.Data
+@inherits DisposableComponent
+
+<div class="dndm-modal-overlay" @onclick="DiscardAndClose">
+    <div class="dndm-modal-card dndm-sheet-settings-modal" role="dialog" aria-modal="true" @onclick:stopPropagation="true">
+        <header class="dndm-modal-header">
+            <h3 class="dndm-modal-title">Sheet settings</h3>
+            <button class="dndm-btn dndm-btn--icon dndm-btn--small" type="button" title="Close (discards unsaved schema changes)"
+                    @onclick="DiscardAndClose">×</button>
+        </header>
+        <div class="dndm-modal-body">
+            <div class="dndm-panel-section">
+                <SchemaPresetSelector State="State" @ref="_schemaSelector" />
+                <div class="dndm-sheet-settings-schema-actions">
+                    <button class="dndm-btn dndm-btn--primary" type="button"
+                            @onclick="SaveSchemaChanges">Save Changes</button>
+                    <span class="dndm-sheet-settings-hint">Schema changes apply only when you click Save Changes.</span>
+                </div>
+            </div>
+
+            <div class="dndm-panel-section">
+                <span class="dndm-label">Saved templates</span>
+                @if (State.CustomTemplates.Count == 0)
+                {
+                    <div class="dndm-panel-empty">No saved templates yet.</div>
+                }
+                else
+                {
+                    <ul class="dndm-template-list">
+                        @foreach (var kv in State.CustomTemplates.OrderBy(kv => kv.Value.Name, StringComparer.OrdinalIgnoreCase))
+                        {
+                            var t = kv.Value;
+                            <li @key="t.Id" class="dndm-template-row">
+                                <span class="dndm-template-name">@t.Name</span>
+                                <span class="dndm-template-count">@t.Rows.Count rows</span>
+                                <button class="dndm-btn dndm-btn--small" type="button"
+                                        @onclick="@(() => ApplyTemplate(t.Id))">Apply</button>
+                                <button class="dndm-btn dndm-btn--small dndm-btn--ghost dndm-btn--danger"
+                                        type="button"
+                                        @onclick="@(() => DeleteTemplate(t.Id))">Delete</button>
+                            </li>
+                        }
+                    </ul>
+                }
+                <div class="dndm-template-save">
+                    <input class="dndm-input"
+                           type="text"
+                           placeholder="Template name"
+                           value="@_newTemplateName"
+                           @oninput="@(e => _newTemplateName = (string?)e.Value ?? string.Empty)" />
+                    <button class="dndm-btn dndm-btn--small dndm-btn--primary"
+                            type="button"
+                            disabled="@string.IsNullOrWhiteSpace(_newTemplateName)"
+                            @onclick="SaveCurrentAsTemplate">Save current as new template</button>
+                </div>
+                @if (_templateError is string err)
+                {
+                    <div class="dndm-custom-error">@err</div>
+                }
+            </div>
+
+            <div class="dndm-panel-section">
+                <label class="dndm-toggle">
+                    <input type="checkbox"
+                           checked="@State.Settings.HpTrackingEnabled"
+                           @onchange="@(e => SetHpTracking(e.Value is bool b && b))" />
+                    <span class="dndm-toggle-track"></span>
+                    <span>HP tracking enabled</span>
+                </label>
+            </div>
+        </div>
+        <footer class="dndm-modal-footer">
+            <button class="dndm-btn" type="button" @onclick="DiscardAndClose">Close</button>
+        </footer>
+    </div>
+</div>

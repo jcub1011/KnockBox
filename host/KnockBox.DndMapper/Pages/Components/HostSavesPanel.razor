@@ -1,0 +1,103 @@
+@using KnockBox.Core.Components.Shared
+@using KnockBox.DndMapper.Services.Library
+@inherits DisposableComponent
+
+<section class="dndm-panel dndm-savesp">
+    <header class="dndm-panel-header">
+        <span>Saves</span>
+        <button class="dndm-btn dndm-btn--small" type="button" title="Save current state to a new slot"
+                @onclick="OpenCreate">+ New</button>
+    </header>
+    <div class="dndm-panel-body">
+        @if (_creating)
+        {
+            <div class="dndm-saves-create">
+                <input class="dndm-input"
+                       placeholder="Slot name"
+                       value="@_newName"
+                       @oninput="@(e => _newName = (string?)e.Value ?? string.Empty)" />
+                <button class="dndm-btn dndm-btn--small dndm-btn--primary"
+                        type="button"
+                        disabled="@string.IsNullOrWhiteSpace(_newName)"
+                        @onclick="ConfirmCreate">Save</button>
+                <button class="dndm-btn dndm-btn--small dndm-btn--ghost"
+                        type="button"
+                        @onclick="CancelCreate">Cancel</button>
+            </div>
+        }
+        @if (_slots.Count == 0)
+        {
+            <div class="dndm-panel-empty">No saves yet.</div>
+        }
+        else
+        {
+            <ul class="dndm-saves-list">
+                @foreach (var s in _slots)
+                {
+                    var isAuto = s.Kind == SlotKind.Auto;
+                    <li @key="s.Id" class="@($"dndm-saves-row{(isAuto ? " dndm-saves-row--auto" : string.Empty)}")">
+                        @if (_renamingId == s.Id)
+                        {
+                            <input class="dndm-input dndm-saves-renameinput"
+                                   value="@_renameDraft"
+                                   @oninput="@(e => _renameDraft = (string?)e.Value ?? string.Empty)" />
+                            <button class="dndm-btn dndm-btn--small dndm-btn--primary" type="button"
+                                    disabled="@string.IsNullOrWhiteSpace(_renameDraft)"
+                                    @onclick="@(() => ConfirmRename(s.Id))">OK</button>
+                            <button class="dndm-btn dndm-btn--small dndm-btn--ghost" type="button"
+                                    @onclick="CancelRename">×</button>
+                        }
+                        else
+                        {
+                            <div class="dndm-saves-meta">
+                                <span class="dndm-saves-name">@s.Name</span>
+                                <span class="dndm-saves-when" title="@s.UpdatedUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")">
+                                    @FormatRelative(s.UpdatedUtc)
+                                </span>
+                            </div>
+                            <div class="dndm-saves-actions">
+                                <button class="dndm-btn dndm-btn--small" type="button"
+                                        @onclick="@(() => RequestLoad(s.Id))">Load</button>
+                                @if (!isAuto)
+                                {
+                                    <button class="dndm-btn dndm-btn--small" type="button"
+                                            title="Overwrite this slot with current state"
+                                            @onclick="@(() => RequestOverwrite(s.Id))">Save</button>
+                                    <button class="dndm-btn dndm-btn--small dndm-btn--ghost" type="button"
+                                            @onclick="@(() => BeginRename(s))">Rename</button>
+                                    <button class="dndm-btn dndm-btn--small dndm-btn--danger" type="button"
+                                            @onclick="@(() => RequestDelete(s.Id))">Delete</button>
+                                }
+                            </div>
+                        }
+                    </li>
+                }
+            </ul>
+        }
+        @if (_error is string err)
+        {
+            <div class="dndm-saves-error">@err</div>
+        }
+    </div>
+</section>
+
+<ConfirmModal IsOpen="_pendingDelete is not null"
+              Title="Delete save slot?"
+              Message="@($"This permanently removes \"{_pendingDeleteName}\".")"
+              ConfirmText="Delete"
+              OnConfirm="ConfirmDelete"
+              OnCancel="@(() => { _pendingDelete = null; _pendingDeleteName = string.Empty; })" />
+
+<ConfirmModal IsOpen="_pendingOverwrite is not null"
+              Title="Overwrite save?"
+              Message="@($"This replaces \"{_pendingOverwriteName}\" with the current state.")"
+              ConfirmText="Overwrite"
+              OnConfirm="ConfirmOverwrite"
+              OnCancel="@(() => { _pendingOverwrite = null; _pendingOverwriteName = string.Empty; })" />
+
+<ConfirmModal IsOpen="_pendingLoad is not null"
+              Title="Load this save?"
+              Message="@($"Loading \"{_pendingLoadName}\" replaces the current state. Unsaved changes go to Auto Save first.")"
+              ConfirmText="Load"
+              OnConfirm="ConfirmLoad"
+              OnCancel="@(() => { _pendingLoad = null; _pendingLoadName = string.Empty; })" />

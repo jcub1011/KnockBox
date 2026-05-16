@@ -14,6 +14,7 @@ namespace KnockBox.DndMapper.Pages.Components
 
         [Inject] protected DndMapperGameEngine Engine { get; set; } = default!;
         [Inject] protected IUserService UserService { get; set; } = default!;
+        [Inject] protected Services.TokenFocusService TokenFocus { get; set; } = default!;
         [CascadingParameter] public DndMapperToastService? Toasts { get; set; }
         [CascadingParameter] public DndMapperViewport? Viewport { get; set; }
 
@@ -130,6 +131,8 @@ namespace KnockBox.DndMapper.Pages.Components
         }
 
         private void OnDeleteRequest(Token t) => _pendingDelete = t;
+
+        private void OnRowDoubleClick(Token t) => TokenFocus.Focus(t.Id);
         private void CancelDelete() => _pendingDelete = null;
 
         private async Task ConfirmDelete()

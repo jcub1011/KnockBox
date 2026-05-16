@@ -450,6 +450,15 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                 token.Name = name;
                 token.Color = color;
                 token.IconKind = iconKind;
+
+                // Propagate to a linked sheet so the two stay in sync. Guarded
+                // by value-compare to avoid pointless StateChanged churn.
+                if (token.SheetId is Guid linkedSheetId
+                    && state.Sheets.TryGetValue(linkedSheetId, out var linkedSheet)
+                    && linkedSheet.CharacterName != name)
+                {
+                    linkedSheet.CharacterName = name;
+                }
             });
 
             if (exec.IsCanceled) return Result.FromCancellation();
@@ -529,6 +538,20 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                     {
                         error = "That sheet is already attached to another token.";
                         return;
+                    }
+
+                    // Name inheritance on link: prefer the sheet name when it has one
+                    // (resolves the "both already named" case in the sheet's favor);
+                    // otherwise fall back to copying the token name onto the sheet.
+                    if (!string.IsNullOrWhiteSpace(sheet.CharacterName)
+                        && token.Name != sheet.CharacterName)
+                    {
+                        token.Name = sheet.CharacterName;
+                    }
+                    else if (!string.IsNullOrWhiteSpace(token.Name)
+                        && sheet.CharacterName != token.Name)
+                    {
+                        sheet.CharacterName = token.Name;
                     }
                 }
                 token.SheetId = sheetId;
@@ -676,6 +699,17 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                 sheet.Notes = notes ?? string.Empty;
                 sheet.Hp = hp;
                 sheet.MaxHp = maxHp;
+
+                // Propagate rename to every linked token so the token roster
+                // and SVG label stay in sync with the sheet.
+                foreach (var map in state.Maps)
+                {
+                    foreach (var token in map.Tokens)
+                    {
+                        if (token.SheetId == sheetId && token.Name != characterName)
+                            token.Name = characterName;
+                    }
+                }
             });
 
             if (exec.IsCanceled) return Result.FromCancellation();
@@ -737,6 +771,74 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             if (exec.IsCanceled) return Result.FromCancellation();
             if (exec.TryGetFailure(out var err)) return Result.FromError(err);
             return Result.Success;
+        }
+
+        // ── Named-template verbs ─────────────────────────────────────────────────
+
+        public ValueResult<Guid> SaveCustomTemplateAsync(DndMapperGameState state, User caller, string name)
+        {
+            if (state is null) return ValueResult<Guid>.FromError("State is required.");
+            if (caller is null) return ValueResult<Guid>.FromError("Caller is required.");
+            if (string.IsNullOrWhiteSpace(name)) return ValueResult<Guid>.FromError("Template name cannot be empty.");
+            if (name.Length > MaxNameLength) return ValueResult<Guid>.FromError($"Template name cannot exceed {MaxNameLength} characters.");
+            if (!IsHost(state, caller)) return ValueResult<Guid>.FromError("Only the host may save attribute templates.");
+
+            var trimmed = name.Trim();
+            var newId = Guid.NewGuid();
+            string? error = null;
+            var exec = state.Execute(() =>
+            {
+                if (state.CustomTemplates.Values.Any(t =>
+                        string.Equals(t.Name, trimmed, StringComparison.OrdinalIgnoreCase)))
+                {
+                    error = "A template with that name already exists.";
+                    return;
+                }
+
+                state.CustomTemplates[newId] = new NamedTemplate
+                {
+                    Id = newId,
+                    Name = trimmed,
+                    Rows = [.. state.AttributeSchema.Rows],
+                };
+            });
+
+            if (exec.IsCanceled) return ValueResult<Guid>.FromCancellation();
+            if (exec.TryGetFailure(out var execErr)) return ValueResult<Guid>.FromError(execErr);
+            if (error is not null) return ValueResult<Guid>.FromError(error);
+            return ValueResult<Guid>.FromValue(newId);
+        }
+
+        public Result DeleteCustomTemplateAsync(DndMapperGameState state, User caller, Guid templateId)
+        {
+            if (state is null) return Result.FromError("State is required.");
+            if (caller is null) return Result.FromError("Caller is required.");
+            if (!IsHost(state, caller)) return Result.FromError("Only the host may delete attribute templates.");
+
+            string? error = null;
+            var exec = state.Execute(() =>
+            {
+                if (!state.CustomTemplates.Remove(templateId)) { error = "Unknown template id."; return; }
+            });
+
+            if (exec.IsCanceled) return Result.FromCancellation();
+            if (exec.TryGetFailure(out var execErr)) return Result.FromError(execErr);
+            return error is null ? Result.Success : Result.FromError(error);
+        }
+
+        public Result ApplyCustomTemplateAsync(DndMapperGameState state, User caller, Guid templateId)
+        {
+            if (state is null) return Result.FromError("State is required.");
+            if (caller is null) return Result.FromError("Caller is required.");
+            if (!IsHost(state, caller)) return Result.FromError("Only the host may apply attribute templates.");
+
+            if (!state.CustomTemplates.TryGetValue(templateId, out var template))
+                return Result.FromError("Unknown template id.");
+
+            // Cascade through the existing schema-change path so sheets get their
+            // values reseeded under one Execute and emit a single StateChanged.
+            var schema = new AttributeSchema(AttributePreset.Custom, [.. template.Rows]);
+            return ChangeSchemaAsync(state, caller, schema);
         }
 
         // ── Settings verb ─────────────────────────────────────────────────────────
@@ -1251,6 +1353,29 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                 var (image, _) = FindImageAndMap(state, mapId, imageId);
                 if (image is null) { error = "Unknown map or image id."; return; }
                 image.Locked = locked;
+            });
+
+            if (exec.IsCanceled) return Result.FromCancellation();
+            if (exec.TryGetFailure(out var execErr)) return Result.FromError(execErr);
+            return error is null ? Result.Success : Result.FromError(error);
+        }
+
+        /// <summary>
+        /// Hides or shows an image. Host-only. Hidden images are excluded from
+        /// the canvas render for everyone and from the layer-selection grid.
+        /// </summary>
+        public Result SetImageHiddenAsync(DndMapperGameState state, User caller, Guid mapId, Guid imageId, bool hidden)
+        {
+            if (state is null) return Result.FromError("State is required.");
+            if (caller is null) return Result.FromError("Caller is required.");
+            if (!IsHost(state, caller)) return Result.FromError("Only the host may hide or show images.");
+
+            string? error = null;
+            var exec = state.Execute(() =>
+            {
+                var (image, _) = FindImageAndMap(state, mapId, imageId);
+                if (image is null) { error = "Unknown map or image id."; return; }
+                image.Hidden = hidden;
             });
 
             if (exec.IsCanceled) return Result.FromCancellation();

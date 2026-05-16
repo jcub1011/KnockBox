@@ -85,17 +85,19 @@
                       title="@r.TimestampUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")">@FormatTimestamp(r.TimestampUtc)</time>
             </header>
             <div class="dndm-rolllog-dice">
-                @foreach (var d in r.Rolls)
-                {
-                    <span class="@($"dndm-die{(d.Discarded ? " dndm-die--discarded" : "")}")"
-                          title="@($"d{d.Sides}")">@d.Result</span>
-                }
-                @if (r.FlatModifier != 0 || r.AttributeModifier is not null)
-                {
-                    var mods = (r.FlatModifier) + (r.AttributeModifier ?? 0);
-                    <span class="dndm-rolllog-mod">@(mods >= 0 ? "+" : "")@mods</span>
-                }
-                <span class="dndm-rolllog-total">= <strong>@r.Total</strong></span>
+                <span class="dndm-rolllog-total"><strong>@r.Total</strong></span>
+                <span class="dndm-rolllog-dice-detail">
+                    @foreach (var d in r.Rolls)
+                    {
+                        <span class="@($"dndm-die{(d.Discarded ? " dndm-die--discarded" : "")}")"
+                              title="@($"d{d.Sides}")">@d.Result</span>
+                    }
+                    @if (r.FlatModifier != 0 || r.AttributeModifier is not null)
+                    {
+                        var mods = (r.FlatModifier) + (r.AttributeModifier ?? 0);
+                        <span class="dndm-rolllog-mod">@(mods >= 0 ? "+" : "")@mods</span>
+                    }
+                </span>
             </div>
         </article>
     };

@@ -8,20 +8,26 @@
 <section class="dndm-panel dndm-sheet">
     <header class="dndm-panel-header">
         <span>Character Sheet</span>
-        @if (IsHost)
-        {
-            <button class="dndm-btn dndm-btn--small"
-                    type="button"
-                    title="Create a host-only NPC/monster sheet"
-                    @onclick="OpenNpcModal">+ NPC Sheet</button>
-        }
-        else if (!HasOwnSheet)
-        {
-            <button class="dndm-btn dndm-btn--small"
-                    type="button"
-                    title="Create your character sheet"
-                    @onclick="CreateMySheet">+ My Sheet</button>
-        }
+        <span class="dndm-sheet-header-actions">
+            @if (IsHost)
+            {
+                <button class="dndm-btn dndm-btn--small"
+                        type="button"
+                        title="Create a host-only NPC/monster sheet"
+                        @onclick="OpenNpcModal">+ NPC Sheet</button>
+                <button class="dndm-btn dndm-btn--small dndm-btn--icon"
+                        type="button"
+                        title="Sheet settings"
+                        @onclick="OpenSheetSettings">⚙</button>
+            }
+            else if (!HasOwnSheet)
+            {
+                <button class="dndm-btn dndm-btn--small"
+                        type="button"
+                        title="Create your character sheet"
+                        @onclick="CreateMySheet">+ My Sheet</button>
+            }
+        </span>
     </header>
 
     @if (VisibleSheets.Count == 0)
@@ -30,19 +36,37 @@
     }
     else
     {
-        <div class="dndm-sheet-tabs" role="tablist">
-            @foreach (var s in VisibleSheets)
-            {
-                var active = s.Id == _activeSheetId;
-                <button @key="s.Id"
-                        class="@($"dndm-sheet-tab{(active ? " dndm-sheet-tab--active" : "")}")"
-                        type="button"
-                        role="tab"
-                        @onclick="@(() => SelectSheet(s.Id))">
-                    @(string.IsNullOrEmpty(s.CharacterName) ? "(unnamed)" : s.CharacterName)
-                </button>
-            }
-        </div>
+        @if (VisibleSheets.Count > 4)
+        {
+            var activeId = ActiveSheet?.Id;
+            <div class="dndm-sheet-tabs dndm-sheet-tabs--dropdown">
+                <select class="dndm-select dndm-sheet-tab-select"
+                        @onchange="@(e => OnSheetDropdownChanged((string?)e.Value))">
+                    @foreach (var s in VisibleSheets.OrderBy(s => s.CharacterName, StringComparer.OrdinalIgnoreCase))
+                    {
+                        <option value="@s.Id" selected="@(activeId == s.Id)">
+                            @(string.IsNullOrEmpty(s.CharacterName) ? "(unnamed)" : s.CharacterName)
+                        </option>
+                    }
+                </select>
+            </div>
+        }
+        else
+        {
+            <div class="dndm-sheet-tabs" role="tablist">
+                @foreach (var s in VisibleSheets)
+                {
+                    var active = s.Id == _activeSheetId;
+                    <button @key="s.Id"
+                            class="@($"dndm-sheet-tab{(active ? " dndm-sheet-tab--active" : "")}")"
+                            type="button"
+                            role="tab"
+                            @onclick="@(() => SelectSheet(s.Id))">
+                        @(string.IsNullOrEmpty(s.CharacterName) ? "(unnamed)" : s.CharacterName)
+                    </button>
+                }
+            </div>
+        }
 
         @if (ActiveSheet is { } sheet)
         {
@@ -140,7 +164,7 @@
                     }
                 </div>
 
-                @if (canSeePrivate)
+                @if (canSeePrivate && State.Settings.HpTrackingEnabled)
                 {
                     <div class="dndm-sheet-section">
                         <span class="dndm-label">HP</span>
@@ -176,7 +200,10 @@
                             </div>
                         }
                     </div>
+                }
 
+                @if (canSeePrivate)
+                {
                     <div class="dndm-sheet-section">
                         <span class="dndm-label">Notes</span>
                         <textarea class="dndm-textarea"
@@ -191,6 +218,11 @@
         }
     }
 </section>
+
+@if (_sheetSettingsOpen)
+{
+    <SheetSettingsModal State="State" OnClose="@(() => _sheetSettingsOpen = false)" />
+}
 
 @if (_npcModalOpen)
 {

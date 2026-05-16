@@ -28,33 +28,42 @@
         {
             @foreach (var t in Tokens)
             {
-                <div @key="t.Id" class="dndm-tokenp-row">
+                <div @key="t.Id" class="dndm-tokenp-row" title="Double-click to center the canvas on this token"
+                     @ondblclick="@(() => OnRowDoubleClick(t))">
                     <input type="color"
                            value="@t.Color"
                            class="dndm-tokenp-color"
                            @onchange="@(e => OnColorChanged(t, (string?)e.Value))" />
-                    <input class="dndm-input dndm-tokenp-name"
-                           value="@t.Name"
-                           @onchange="@(e => OnNameChanged(t, (string?)e.Value))" />
-                    <button class="dndm-btn dndm-btn--small dndm-btn--icon"
-                            type="button"
-                            title="@(t.IconKind == TokenIconKind.Initial ? "Show initial" : "Solid circle")"
-                            @onclick="@(() => OnToggleIcon(t))">
-                        @(t.IconKind == TokenIconKind.Initial ? "A" : "●")
-                    </button>
-                    <button class="dndm-btn dndm-btn--small dndm-btn--icon"
-                            type="button"
-                            title="@(t.Hidden ? "Hidden — click to reveal" : "Visible — click to hide")"
-                            @onclick="@(() => OnToggleHidden(t))">
-                        @(t.Hidden ? "H" : "V")
-                    </button>
+                    <div class="dndm-tokenp-name-wrap">
+                        <input class="dndm-input dndm-tokenp-name"
+                               value="@t.Name"
+                               @onchange="@(e => OnNameChanged(t, (string?)e.Value))" />
+                        <button class="dndm-btn dndm-btn--small dndm-btn--icon dndm-tokenp-initialbtn"
+                                type="button"
+                                title="@(t.IconKind == TokenIconKind.Initial ? "Initial shown — click to use a solid circle" : "Solid circle — click to show initial")"
+                                @onclick="@(() => OnToggleIcon(t))"
+                                @onclick:stopPropagation="true"
+                                @ondblclick:stopPropagation="true">
+                            @TokenIcons.Eye(t.IconKind == TokenIconKind.Initial)
+                        </button>
+                    </div>
                     <button class="dndm-btn dndm-btn--small dndm-btn--icon dndm-btn--danger"
                             type="button"
                             title="Delete token"
-                            @onclick="@(() => OnDeleteRequest(t))">×</button>
+                            @onclick="@(() => OnDeleteRequest(t))"
+                            @onclick:stopPropagation="true"
+                            @ondblclick:stopPropagation="true">×</button>
                     <span class="dndm-tokenp-tag">NPC</span>
                 </div>
                 <div @key="@($"{t.Id}-meta")" class="dndm-tokenp-meta">
+                    <button class="dndm-btn dndm-btn--small dndm-btn--icon dndm-tokenp-eyebtn"
+                            type="button"
+                            title="@(t.Hidden ? "Hidden — click to reveal" : "Visible — click to hide")"
+                            @onclick="@(() => OnToggleHidden(t))"
+                            @onclick:stopPropagation="true"
+                            @ondblclick:stopPropagation="true">
+                        @TokenIcons.Eye(!t.Hidden)
+                    </button>
                     @{
                         // Sheets already attached to a *different* token, and sheets owned
                         // by a player (player sheets are managed automatically with that

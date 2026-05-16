@@ -203,3 +203,28 @@
     background: transparent;
     border-color: #4a4a4a;
 }
+
+.dndm-save-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    color: #cdb98e;
+    font-size: 0.8rem;
+    background: rgba(20, 20, 31, 0.85);
+    padding: 0.2rem 0.5rem;
+    border-radius: 3px;
+    border: 1px solid #2c2c44;
+}
+
+.dndm-save-spinner {
+    width: 0.85rem;
+    height: 0.85rem;
+    border: 2px solid #4a3c20;
+    border-top-color: #e8b849;
+    border-radius: 50%;
+    animation: dndm-save-spin 0.9s linear infinite;
+}
+
+@keyframes dndm-save-spin {
+    to { transform: rotate(360deg); }
+}

@@ -3,6 +3,7 @@ using KnockBox.Core.Components.Shared;
 using KnockBox.Core.Services.State.Users;
 using KnockBox.DndMapper.Helpers;
 using KnockBox.DndMapper.Models;
+using KnockBox.DndMapper.Services;
 using KnockBox.DndMapper.Services.Logic.Games;
 using KnockBox.DndMapper.Services.State.Games;
 using KnockBox.DndMapper.Services.State.Games.Data;
@@ -27,6 +28,7 @@ namespace KnockBox.DndMapper.Pages.Components
         [Inject] protected IUserService UserService { get; set; } = default!;
         [Inject] protected IJSRuntime JSRuntime { get; set; } = default!;
         [Inject] protected ILogger<MapCanvas> Logger { get; set; } = default!;
+        [Inject] protected TokenFocusService TokenFocus { get; set; } = default!;
 
         [CascadingParameter] public DndMapperViewport? Viewport { get; set; }
 
@@ -104,6 +106,25 @@ namespace KnockBox.DndMapper.Pages.Components
             base.OnParametersSet();
         }
 
+        protected override void OnInitialized()
+        {
+            TokenFocus.Focused += OnTokenFocusRequested;
+            base.OnInitialized();
+        }
+
+        private async void OnTokenFocusRequested(Guid tokenId)
+        {
+            if (Map is null) return;
+            var token = Map.Tokens.FirstOrDefault(t => t.Id == tokenId);
+            if (token is null) return;
+            double viewW = Map.Grid.WidthCells / _zoom;
+            double viewH = Map.Grid.HeightCells / _zoom;
+            _panX = token.X - viewW / 2.0;
+            _panY = token.Y - viewH / 2.0;
+            PublishViewport();
+            await InvokeAsync(StateHasChanged);
+        }
+
         private void PublishViewport()
         {
             if (Viewport is null || Map is null) return;
@@ -151,6 +172,7 @@ namespace KnockBox.DndMapper.Pages.Components
 
         public async ValueTask DisposeAsync()
         {
+            TokenFocus.Focused -= OnTokenFocusRequested;
             if (_metricsModule is not null)
             {
                 try { await _metricsModule.DisposeAsync(); }
@@ -193,12 +215,9 @@ namespace KnockBox.DndMapper.Pages.Components
 
         private void ClampPan()
         {
-            double viewW = Map.Grid.WidthCells / _zoom;
-            double viewH = Map.Grid.HeightCells / _zoom;
-            double maxPanX = Math.Max(0, Map.Grid.WidthCells - viewW);
-            double maxPanY = Math.Max(0, Map.Grid.HeightCells - viewH);
-            _panX = Math.Clamp(_panX, -viewW * 0.25, maxPanX + viewW * 0.25);
-            _panY = Math.Clamp(_panY, -viewH * 0.25, maxPanY + viewH * 0.25);
+            // Pan is unbounded by design — the host frequently needs to scroll past
+            // grid edges (off-map sticky notes, secondary scenes). ResetView still
+            // re-centers on (0, 0).
         }
 
         private void OnWheel(WheelEventArgs e)

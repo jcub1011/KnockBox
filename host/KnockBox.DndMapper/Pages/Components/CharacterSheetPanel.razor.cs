@@ -28,6 +28,7 @@ namespace KnockBox.DndMapper.Pages.Components
 
         private bool _npcModalOpen;
         private string _npcNameDraft = string.Empty;
+        private bool _sheetSettingsOpen;
 
         private bool HasOwnSheet =>
             State.Sheets.Values.Any(s => s.OwnerUserId == CurrentUserId);
@@ -81,6 +82,11 @@ namespace KnockBox.DndMapper.Pages.Components
         {
             _activeSheetId = id;
             EnsureDraftSynced();
+        }
+
+        private void OnSheetDropdownChanged(string? raw)
+        {
+            if (Guid.TryParse(raw, out var id)) SelectSheet(id);
         }
 
         private void OnNameInput(CharacterSheet sheet, string? value)
@@ -179,6 +185,8 @@ namespace KnockBox.DndMapper.Pages.Components
             _npcNameDraft = string.Empty;
             _npcModalOpen = true;
         }
+
+        private void OpenSheetSettings() => _sheetSettingsOpen = true;
 
         private void CloseNpcModal() => _npcModalOpen = false;
 

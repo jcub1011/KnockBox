@@ -37,7 +37,7 @@
 
         @if (Map.Images.Count > 0)
         {
-            @foreach (var img in Map.Images.OrderBy(i => i.LayerOrder))
+            @foreach (var img in Map.Images.Where(i => !i.Hidden).OrderBy(i => i.LayerOrder))
             {
                 var draft = (IsHost && _drag is { ImageId: var dId } && dId == img.Id) ? _drag : null;
                 var x = draft?.X ?? img.X;
@@ -77,7 +77,7 @@
             @if (IsHost)
             {
                 <g class="dndm-image-pickers">
-                    @foreach (var img in Map.Images.OrderBy(i => i.LayerOrder))
+                    @foreach (var img in Map.Images.Where(i => !i.Hidden).OrderBy(i => i.LayerOrder))
                     {
                         // Locked images and Space-pan mode disable the picker so the click
                         // falls through to the SVG and starts a pan.
@@ -121,7 +121,7 @@
                     CurrentUserId="@CurrentUserId"
                     SvgId="@_svgId" />
 
-        @if (IsHost && SelectedImage is { Locked: false } sel)
+        @if (IsHost && SelectedImage is { Locked: false, Hidden: false } sel)
         {
             var s = (_drag is { ImageId: var did } && did == sel.Id) ? _drag : null;
             var sx = s?.X ?? sel.X;

@@ -18,6 +18,7 @@ namespace KnockBox.DndMapper.Services.State.Games
         public Guid? ActiveMapId { get; private set; }
 
         public Dictionary<Guid, CharacterSheet> Sheets { get; } = [];
+        public Dictionary<Guid, NamedTemplate> CustomTemplates { get; } = [];
         public List<RollResult> RollLog { get; } = [];
 
         // Running total of bytes consumed by uploaded images on this state. Used to

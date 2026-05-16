@@ -6,6 +6,7 @@
     gap: 0.35rem;
     padding: 0.25rem 0.1rem;
     border-bottom: 1px dashed rgba(255, 255, 255, 0.04);
+    cursor: default;
 }
 
 .dndm-tokenp-color {
@@ -19,15 +20,43 @@
     flex: 0 0 auto;
 }
 
+.dndm-tokenp-eyebtn {
+    /* Pinned to the start of the meta row so it lines up under the color picker. */
+    flex: 0 0 auto;
+    align-self: center;
+    margin-bottom: 0.1rem;
+    padding: 0.3rem;
+}
+
+.dndm-tokenp-name-wrap {
+    position: relative;
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+}
+
 .dndm-tokenp-name {
     flex: 1 1 auto;
     min-width: 0;
+    padding-right: 1.9rem;
 }
+
+.dndm-tokenp-initialbtn {
+    position: absolute;
+    top: 50%;
+    right: 0.2rem;
+    transform: translateY(-50%);
+    padding: 0 0.25rem;
+    background: transparent;
+    border-color: transparent;
+}
+
+.dndm-tokenp-initialbtn:hover { background: rgba(255, 255, 255, 0.06); }
 
 .dndm-tokenp-meta {
     display: flex;
     gap: 0.5rem;
-    padding: 0 0.1rem 0.4rem 1.85rem;
+    padding: 0 0.1rem 0.4rem 0;
     border-bottom: 1px dashed rgba(255, 255, 255, 0.04);
     flex-wrap: wrap;
 }

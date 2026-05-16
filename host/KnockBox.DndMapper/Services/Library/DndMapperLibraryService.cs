@@ -70,6 +70,27 @@ namespace KnockBox.DndMapper.Services.Library
         /// </summary>
         public bool HasExistingLibrary { get; private set; }
 
+        // True while either an auto-save is in flight (lock held by FlushSnapshotAsync)
+        // or a state change is pending in the debounce window, or a manual slot
+        // operation is mutating IndexedDB. The host UI subscribes to SavingChanged
+        // to show a "Saving…" indicator and toggle the beforeunload guard.
+        public bool IsSaving { get; private set; }
+        public event Action? SavingChanged;
+        // Bumped each time the slot list mutates so the saves panel can refresh.
+        public event Action? SlotsChanged;
+
+        private int _manualOpsInFlight;
+        private void SetSaving(bool v)
+        {
+            if (IsSaving == v) return;
+            IsSaving = v;
+            try { SavingChanged?.Invoke(); } catch { /* subscriber failures shouldn't kill the flush */ }
+        }
+        private void NotifySlotsChanged()
+        {
+            try { SlotsChanged?.Invoke(); } catch { /* same */ }
+        }
+
         /// <summary>
         /// Opens the IndexedDB, reports whether a previous-session snapshot
         /// exists, and subscribes to the state's change feed for debounced
@@ -105,18 +126,18 @@ namespace KnockBox.DndMapper.Services.Library
             _host = host;
             _saveCts = new CancellationTokenSource();
 
-            var countResult = await _db.CountSingleAsync(DndMapperLibrarySchema.LibraryStore, range: null, ct);
+            // v2→v3 migration: lift the legacy `library/singleton` snapshot into
+            // the Auto Save slot and seed the slots index. Idempotent.
+            await EnsureMigratedAsync(_db, ct);
 
-            if (countResult.TryGetSuccess(out var count))
-            {
-                HasExistingLibrary = count > 0;
-            }
-            else
-            {
-                countResult.TryGetFailure(out var err);
-                _logger.LogWarning("Failed to probe DnD Mapper library store for existing content: {Error}", err.Message);
-                HasExistingLibrary = false;
-            }
+            // "Existing content" now means the Auto Save slot exists in the
+            // index (the banner offers to load it).
+            var slotsResult = await _db.JsonGetSingleAsync<SlotsIndex>(
+                DndMapperLibrarySchema.SlotsIndexStore,
+                IndexedDbKey.String(DndMapperLibrarySchema.SlotsIndexKey), ct);
+            HasExistingLibrary = slotsResult.TryGetSuccess(out var idx)
+                && idx is not null
+                && idx.Slots.Any(s => s.Id == DndMapperLibrarySchema.AutoSlotId);
 
             // Stand up the debounce timer in a stopped state and subscribe.
             _saveTimer = new Timer(OnSaveTimerTick, state: null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
@@ -193,7 +214,66 @@ namespace KnockBox.DndMapper.Services.Library
         {
             var stores = db.ObjectStoreNames;
             return stores.Contains(DndMapperLibrarySchema.LibraryStore)
+                && stores.Contains(DndMapperLibrarySchema.SlotsIndexStore)
                 && stores.Contains(DndMapperLibrarySchema.ImagesStore);
+        }
+
+        // Migrates a pre-v3 layout (single `library/singleton` snapshot, no
+        // slots index) to the multi-slot layout. Idempotent: a no-op when the
+        // slots index already exists. Always returns success; failures are
+        // logged but won't block attach (the host can fall back to Start fresh).
+        private async ValueTask EnsureMigratedAsync(IIndexedDatabase db, CancellationToken ct)
+        {
+            var indexKey = IndexedDbKey.String(DndMapperLibrarySchema.SlotsIndexKey);
+            var idxResult = await db.JsonGetSingleAsync<SlotsIndex>(
+                DndMapperLibrarySchema.SlotsIndexStore, indexKey, ct);
+
+            if (idxResult.TryGetSuccess(out var existingIdx) && existingIdx is not null) return;
+
+            // Look for a legacy `library/singleton` record from v2.
+            var legacyKey = IndexedDbKey.String(DndMapperLibrarySchema.LegacySingletonKey);
+            var legacy = await db.JsonGetSingleAsync<LibrarySnapshot>(
+                DndMapperLibrarySchema.LibraryStore, legacyKey, ct);
+
+            var index = new SlotsIndex();
+            if (legacy.TryGetSuccess(out var legacySnap) && legacySnap is not null)
+            {
+                // Move legacy snapshot under the reserved Auto Save id.
+                var autoKey = IndexedDbKey.String(DndMapperLibrarySchema.AutoSlotId);
+                var write = await db.JsonPutSingleAsync(
+                    DndMapperLibrarySchema.LibraryStore, legacySnap, autoKey, ct);
+                if (write.IsSuccess)
+                {
+                    await SafeLibraryDeleteAsync(db, legacyKey);
+                    index.Slots.Add(new SlotIndexEntry
+                    {
+                        Id = DndMapperLibrarySchema.AutoSlotId,
+                        Name = DndMapperLibrarySchema.AutoSlotName,
+                        Kind = SlotKind.Auto,
+                        UpdatedUtc = DateTime.UtcNow,
+                    });
+                }
+                else
+                {
+                    write.TryGetFailure(out var werr);
+                    _logger.LogWarning("Failed to migrate legacy library snapshot to slot: {Error}", werr.Message);
+                }
+            }
+
+            // Write a (possibly empty) index so subsequent attaches skip migration.
+            var putIdx = await db.JsonPutSingleAsync(
+                DndMapperLibrarySchema.SlotsIndexStore, index, indexKey, ct);
+            if (!putIdx.IsSuccess)
+            {
+                putIdx.TryGetFailure(out var perr);
+                _logger.LogWarning("Failed to initialize slots index: {Error}", perr.Message);
+            }
+        }
+
+        private async ValueTask SafeLibraryDeleteAsync(IIndexedDatabase db, IndexedDbKey key)
+        {
+            try { await db.DeleteSingleAsync(DndMapperLibrarySchema.LibraryStore, key); }
+            catch (Exception ex) { _logger.LogWarning(ex, "Best-effort delete of library record failed."); }
         }
 
         private async ValueTask RepublishExistingImagesAsync(DndMapperGameState state, User host, CancellationToken ct)
@@ -387,17 +467,21 @@ namespace KnockBox.DndMapper.Services.Library
         /// subscribers see a single change. Tokens hydrate as NPCToken with
         /// no owner; the host reassigns via ReassignTokenOwnerAsync.
         /// </summary>
-        public async ValueTask<Result> HydrateAsync(CancellationToken ct = default)
+        public ValueTask<Result> HydrateAsync(CancellationToken ct = default)
+            => LoadSlotAsync(DndMapperLibrarySchema.AutoSlotId, ct);
+
+        public async ValueTask<Result> LoadSlotAsync(string slotId, CancellationToken ct = default)
         {
             ThrowIfDisposed();
             if (_db is null || _state is null) return Result.FromError("Library is not attached.");
+            if (string.IsNullOrWhiteSpace(slotId)) return Result.FromError("Slot id is required.");
 
             // Pause autosave for the duration of hydration so we don't write
             // a half-built snapshot back over the one we're loading.
             _saveTimer?.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
 
-            // 1. Read snapshot.
-            var snapKey = IndexedDbKey.String(DndMapperLibrarySchema.LibraryStoreKey);
+            // 1. Read snapshot from the requested slot.
+            var snapKey = IndexedDbKey.String(slotId);
             var readResult = await _db.JsonGetSingleAsync<LibrarySnapshot>(
                 DndMapperLibrarySchema.LibraryStore, snapKey, ct);
 
@@ -455,6 +539,7 @@ namespace KnockBox.DndMapper.Services.Library
                         Opacity = imgSnap.Opacity,
                         LayerOrder = imgSnap.LayerOrder,
                         Locked = imgSnap.Locked,
+                        Hidden = imgSnap.Hidden,
                         ByteSize = imgSnap.ByteSize,
                     };
                 }
@@ -534,6 +619,19 @@ namespace KnockBox.DndMapper.Services.Library
                     state.Sheets[sheet.Id] = sheet;
                 }
 
+                state.CustomTemplates.Clear();
+                foreach (var t in snapshot.CustomTemplates)
+                {
+                    state.CustomTemplates[t.Id] = new NamedTemplate
+                    {
+                        Id = t.Id,
+                        Name = t.Name,
+                        Rows = t.Rows
+                            .Select(r => new AttributeRow(r.Name, r.Type, LibrarySnapshotMapper.ToAttributeValue(r.Default)))
+                            .ToList(),
+                    };
+                }
+
                 // Activate the first map if any exist so the host doesn't
                 // land on an empty canvas after hydration.
                 var first = state.Maps.OrderBy(m => m.ListOrder).FirstOrDefault();
@@ -566,7 +664,9 @@ namespace KnockBox.DndMapper.Services.Library
             try
             {
                 var result = await _db.ClearStoresAsync(
-                    [DndMapperLibrarySchema.LibraryStore, DndMapperLibrarySchema.ImagesStore],
+                    [DndMapperLibrarySchema.LibraryStore,
+                     DndMapperLibrarySchema.SlotsIndexStore,
+                     DndMapperLibrarySchema.ImagesStore],
                     ct);
 
                 if (!result.IsSuccess)
@@ -598,6 +698,10 @@ namespace KnockBox.DndMapper.Services.Library
             // that flush's release it re-arms us if the timer didn't already
             // fire from this Change() call.
             Interlocked.Exchange(ref _pendingDirty, 1);
+            // Flip the indicator now — the user has unsaved work, even if the
+            // write itself is still 500 ms away. FlushSnapshotAsync clears it
+            // when the lock is released.
+            SetSaving(true);
             _saveTimer?.Change(SaveDebounce, Timeout.InfiniteTimeSpan);
             return ValueTask.CompletedTask;
         }
@@ -645,7 +749,7 @@ namespace KnockBox.DndMapper.Services.Library
                     return;
                 }
 
-                var key = IndexedDbKey.String(DndMapperLibrarySchema.LibraryStoreKey);
+                var key = IndexedDbKey.String(DndMapperLibrarySchema.AutoSlotId);
                 var writeResult = await db.JsonPutSingleAsync(
                     DndMapperLibrarySchema.LibraryStore, snapshot, key, cts.Token);
 
@@ -657,6 +761,10 @@ namespace KnockBox.DndMapper.Services.Library
                 else
                 {
                     HasExistingLibrary = true;
+                    await TouchSlotEntryAsync(db,
+                        DndMapperLibrarySchema.AutoSlotId,
+                        DndMapperLibrarySchema.AutoSlotName,
+                        SlotKind.Auto, cts.Token);
                 }
             }
             catch (OperationCanceledException) { /* shutting down */ }
@@ -670,13 +778,17 @@ namespace KnockBox.DndMapper.Services.Library
 
                 // If a StateChanged fired during the flush (or a colliding
                 // flush bailed without clearing the flag), re-arm so the
-                // trailing edits get written.
+                // trailing edits get written; otherwise clear the indicator.
                 if (!_disposed
                     && Volatile.Read(ref _pendingDirty) == 1
                     && _saveCts is not null
                     && !_saveCts.IsCancellationRequested)
                 {
                     _saveTimer?.Change(SaveDebounce, Timeout.InfiniteTimeSpan);
+                }
+                else if (_manualOpsInFlight == 0)
+                {
+                    SetSaving(false);
                 }
             }
         }
@@ -804,6 +916,255 @@ namespace KnockBox.DndMapper.Services.Library
         // game state disposing are the same event from the engine's view.
         private static bool IsStateDisposedRace(string message) =>
             message is "State was disposed." or "State was disposed during execute.";
+
+        // ── Slot management ───────────────────────────────────────────────
+
+        public async ValueTask<ValueResult<IReadOnlyList<SlotInfo>>> ListSlotsAsync(CancellationToken ct = default)
+        {
+            ThrowIfDisposed();
+            if (_db is null) return ValueResult<IReadOnlyList<SlotInfo>>.FromError("Library is not attached.");
+
+            var idx = await ReadSlotsIndexAsync(_db, ct);
+            // Auto Save pinned to the top, then manual slots by most-recent-first.
+            var ordered = idx.Slots
+                .OrderBy(s => s.Kind == SlotKind.Auto ? 0 : 1)
+                .ThenByDescending(s => s.UpdatedUtc)
+                .Select(s => new SlotInfo(s.Id, s.Name, s.Kind, s.UpdatedUtc))
+                .ToList();
+            return ValueResult<IReadOnlyList<SlotInfo>>.FromValue(ordered);
+        }
+
+        public async ValueTask<ValueResult<string>> CreateSlotAsync(string name, CancellationToken ct = default)
+        {
+            ThrowIfDisposed();
+            if (_db is null || _state is null) return ValueResult<string>.FromError("Library is not attached.");
+            if (string.IsNullOrWhiteSpace(name)) return ValueResult<string>.FromError("Slot name cannot be empty.");
+            var trimmed = name.Trim();
+            if (trimmed.Length > 60) return ValueResult<string>.FromError("Slot name cannot exceed 60 characters.");
+
+            Interlocked.Increment(ref _manualOpsInFlight);
+            SetSaving(true);
+            try
+            {
+                var idx = await ReadSlotsIndexAsync(_db, ct);
+                if (idx.Slots.Any(s => s.Kind == SlotKind.Manual
+                        && string.Equals(s.Name, trimmed, StringComparison.OrdinalIgnoreCase)))
+                {
+                    return ValueResult<string>.FromError("A slot with that name already exists.");
+                }
+
+                var snapshot = TakeSnapshot();
+                if (snapshot is null) return ValueResult<string>.FromError("Failed to read current state for save.");
+
+                var slotId = Guid.NewGuid().ToString("D");
+                var key = IndexedDbKey.String(slotId);
+                var write = await _db.JsonPutSingleAsync(DndMapperLibrarySchema.LibraryStore, snapshot, key, ct);
+                if (!write.IsSuccess)
+                {
+                    write.TryGetFailure(out var werr);
+                    return ValueResult<string>.FromError($"Failed to write slot: {werr.Message}");
+                }
+
+                idx.Slots.Add(new SlotIndexEntry
+                {
+                    Id = slotId,
+                    Name = trimmed,
+                    Kind = SlotKind.Manual,
+                    UpdatedUtc = DateTime.UtcNow,
+                });
+                var idxResult = await WriteSlotsIndexAsync(_db, idx, ct);
+                if (!idxResult.IsSuccess)
+                {
+                    idxResult.TryGetFailure(out var ierr);
+                    return ValueResult<string>.FromError($"Failed to update slots index: {ierr.PublicMessage}");
+                }
+
+                NotifySlotsChanged();
+                return ValueResult<string>.FromValue(slotId);
+            }
+            finally
+            {
+                if (Interlocked.Decrement(ref _manualOpsInFlight) == 0 && Volatile.Read(ref _pendingDirty) == 0)
+                    SetSaving(false);
+            }
+        }
+
+        public async ValueTask<Result> SaveToSlotAsync(string slotId, CancellationToken ct = default)
+        {
+            ThrowIfDisposed();
+            if (_db is null || _state is null) return Result.FromError("Library is not attached.");
+            if (string.IsNullOrWhiteSpace(slotId)) return Result.FromError("Slot id is required.");
+            if (slotId == DndMapperLibrarySchema.AutoSlotId)
+                return Result.FromError("Auto Save is written automatically; choose a manual slot or Save As.");
+
+            Interlocked.Increment(ref _manualOpsInFlight);
+            SetSaving(true);
+            try
+            {
+                var idx = await ReadSlotsIndexAsync(_db, ct);
+                var entry = idx.Slots.FirstOrDefault(s => s.Id == slotId);
+                if (entry is null) return Result.FromError("Unknown slot id.");
+
+                var snapshot = TakeSnapshot();
+                if (snapshot is null) return Result.FromError("Failed to read current state for save.");
+
+                var key = IndexedDbKey.String(slotId);
+                var write = await _db.JsonPutSingleAsync(DndMapperLibrarySchema.LibraryStore, snapshot, key, ct);
+                if (!write.IsSuccess)
+                {
+                    write.TryGetFailure(out var werr);
+                    return Result.FromError($"Failed to write slot: {werr.Message}");
+                }
+
+                // Replace the entry with one carrying the new timestamp.
+                idx.Slots.Remove(entry);
+                idx.Slots.Add(entry with { UpdatedUtc = DateTime.UtcNow });
+                var idxResult = await WriteSlotsIndexAsync(_db, idx, ct);
+                if (!idxResult.IsSuccess)
+                {
+                    idxResult.TryGetFailure(out var ierr);
+                    return Result.FromError($"Failed to update slots index: {ierr.PublicMessage}");
+                }
+
+                NotifySlotsChanged();
+                return Result.Success;
+            }
+            finally
+            {
+                if (Interlocked.Decrement(ref _manualOpsInFlight) == 0 && Volatile.Read(ref _pendingDirty) == 0)
+                    SetSaving(false);
+            }
+        }
+
+        public async ValueTask<Result> DeleteSlotAsync(string slotId, CancellationToken ct = default)
+        {
+            ThrowIfDisposed();
+            if (_db is null) return Result.FromError("Library is not attached.");
+            if (string.IsNullOrWhiteSpace(slotId)) return Result.FromError("Slot id is required.");
+            if (slotId == DndMapperLibrarySchema.AutoSlotId)
+                return Result.FromError("The Auto Save slot cannot be deleted.");
+
+            Interlocked.Increment(ref _manualOpsInFlight);
+            SetSaving(true);
+            try
+            {
+                var idx = await ReadSlotsIndexAsync(_db, ct);
+                var entry = idx.Slots.FirstOrDefault(s => s.Id == slotId);
+                if (entry is null) return Result.FromError("Unknown slot id.");
+
+                var del = await _db.DeleteSingleAsync(DndMapperLibrarySchema.LibraryStore, IndexedDbKey.String(slotId), ct);
+                if (!del.IsSuccess)
+                {
+                    del.TryGetFailure(out var derr);
+                    return Result.FromError($"Failed to delete slot: {derr.Message}");
+                }
+
+                idx.Slots.Remove(entry);
+                var idxResult = await WriteSlotsIndexAsync(_db, idx, ct);
+                if (!idxResult.IsSuccess)
+                {
+                    idxResult.TryGetFailure(out var ierr);
+                    return Result.FromError($"Failed to update slots index: {ierr.PublicMessage}");
+                }
+                NotifySlotsChanged();
+                return Result.Success;
+            }
+            finally
+            {
+                if (Interlocked.Decrement(ref _manualOpsInFlight) == 0 && Volatile.Read(ref _pendingDirty) == 0)
+                    SetSaving(false);
+            }
+        }
+
+        public async ValueTask<Result> RenameSlotAsync(string slotId, string newName, CancellationToken ct = default)
+        {
+            ThrowIfDisposed();
+            if (_db is null) return Result.FromError("Library is not attached.");
+            if (string.IsNullOrWhiteSpace(slotId)) return Result.FromError("Slot id is required.");
+            if (slotId == DndMapperLibrarySchema.AutoSlotId)
+                return Result.FromError("The Auto Save slot cannot be renamed.");
+            if (string.IsNullOrWhiteSpace(newName)) return Result.FromError("Slot name cannot be empty.");
+            var trimmed = newName.Trim();
+            if (trimmed.Length > 60) return Result.FromError("Slot name cannot exceed 60 characters.");
+
+            Interlocked.Increment(ref _manualOpsInFlight);
+            SetSaving(true);
+            try
+            {
+                var idx = await ReadSlotsIndexAsync(_db, ct);
+                var entry = idx.Slots.FirstOrDefault(s => s.Id == slotId);
+                if (entry is null) return Result.FromError("Unknown slot id.");
+                if (idx.Slots.Any(s => s.Id != slotId
+                        && s.Kind == SlotKind.Manual
+                        && string.Equals(s.Name, trimmed, StringComparison.OrdinalIgnoreCase)))
+                    return Result.FromError("A slot with that name already exists.");
+
+                idx.Slots.Remove(entry);
+                idx.Slots.Add(entry with { Name = trimmed });
+                var idxResult = await WriteSlotsIndexAsync(_db, idx, ct);
+                if (!idxResult.IsSuccess)
+                {
+                    idxResult.TryGetFailure(out var ierr);
+                    return Result.FromError($"Failed to update slots index: {ierr.PublicMessage}");
+                }
+                NotifySlotsChanged();
+                return Result.Success;
+            }
+            finally
+            {
+                if (Interlocked.Decrement(ref _manualOpsInFlight) == 0 && Volatile.Read(ref _pendingDirty) == 0)
+                    SetSaving(false);
+            }
+        }
+
+        private LibrarySnapshot? TakeSnapshot()
+        {
+            var state = _state;
+            if (state is null) return null;
+            LibrarySnapshot? snapshot = null;
+            var read = state.WithExclusiveRead(() => { snapshot = LibrarySnapshotMapper.FromState(state); });
+            return read.IsSuccess ? snapshot : null;
+        }
+
+        private async ValueTask<SlotsIndex> ReadSlotsIndexAsync(IIndexedDatabase db, CancellationToken ct)
+        {
+            var res = await db.JsonGetSingleAsync<SlotsIndex>(
+                DndMapperLibrarySchema.SlotsIndexStore,
+                IndexedDbKey.String(DndMapperLibrarySchema.SlotsIndexKey), ct);
+            if (res.TryGetSuccess(out var idx) && idx is not null) return idx;
+            return new SlotsIndex();
+        }
+
+        private async ValueTask<Result> WriteSlotsIndexAsync(IIndexedDatabase db, SlotsIndex idx, CancellationToken ct)
+        {
+            var res = await db.JsonPutSingleAsync(
+                DndMapperLibrarySchema.SlotsIndexStore, idx,
+                IndexedDbKey.String(DndMapperLibrarySchema.SlotsIndexKey), ct);
+            if (res.IsSuccess) return Result.Success;
+            res.TryGetFailure(out var err);
+            return Result.FromError(err.Message);
+        }
+
+        private async ValueTask TouchSlotEntryAsync(IIndexedDatabase db, string slotId, string name, SlotKind kind, CancellationToken ct)
+        {
+            var idx = await ReadSlotsIndexAsync(db, ct);
+            var existing = idx.Slots.FirstOrDefault(s => s.Id == slotId);
+            if (existing is not null) idx.Slots.Remove(existing);
+            idx.Slots.Add(new SlotIndexEntry
+            {
+                Id = slotId,
+                Name = name,
+                Kind = kind,
+                UpdatedUtc = DateTime.UtcNow,
+            });
+            var write = await WriteSlotsIndexAsync(db, idx, ct);
+            if (!write.IsSuccess)
+            {
+                write.TryGetFailure(out var werr);
+                _logger.LogWarning("Failed to touch slot index for {SlotId}: {Error}", slotId, werr.PublicMessage);
+            }
+            NotifySlotsChanged();
+        }
 
         private async ValueTask SafeDeleteAsync(IndexedDbKey key)
         {
