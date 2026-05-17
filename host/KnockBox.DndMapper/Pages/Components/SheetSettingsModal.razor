@@ -36,10 +36,10 @@
                                 {
                                     <span class="dndm-template-badge dndm-template-badge--active">Selected</span>
                                 }
+                                <button class="dndm-btn dndm-btn--small" type="button"
+                                        @onclick="@(() => ApplyTemplate(t.Id))">Apply</button>
                                 @if (!t.IsBuiltIn)
                                 {
-                                    <button class="dndm-btn dndm-btn--small" type="button"
-                                            @onclick="@(() => ApplyTemplate(t.Id))">Apply</button>
                                     <button class="dndm-btn dndm-btn--small dndm-btn--ghost dndm-btn--danger"
                                             type="button"
                                             @onclick="@(() => DeleteTemplate(t.Id))">Delete</button>

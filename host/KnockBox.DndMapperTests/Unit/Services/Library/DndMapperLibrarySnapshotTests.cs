@@ -213,6 +213,29 @@ namespace KnockBox.DndMapperTests.Unit.Services.Library
             Assert.AreEqual(12, schema.Rows[0].Default.IntValue);
         }
 
+        // ── Built-in templates are not serialized ────────────────────────────────
+
+        [TestMethod]
+        public void FromState_OmitsBuiltInTemplatesFromCustomTemplates()
+        {
+            // A fresh state seeds the three built-in templates. Snapshots intentionally
+            // skip these so they can evolve across releases without rotting old saves.
+            var (engine, state, host, _) = EngineTestFactory.Build();
+            IReadOnlyList<AttributeRow> rows =
+                [new("STR", AttributeValueType.Score, AttributeValue.Score(10))];
+            Assert.IsTrue(engine.CreateCustomTemplateAsync(state, host, "MyTpl", rows)
+                .TryGetSuccess(out var userTplId));
+
+            // Sanity: state contains 3 built-ins + 1 user template.
+            Assert.AreEqual(4, state.CustomTemplates.Count);
+
+            var snap = LibrarySnapshotMapper.FromState(state);
+
+            Assert.AreEqual(1, snap.CustomTemplates.Count);
+            Assert.AreEqual(userTplId, snap.CustomTemplates[0].Id);
+            Assert.AreEqual("MyTpl", snap.CustomTemplates[0].Name);
+        }
+
         [TestMethod]
         public void AttributeValue_TextAndModifier_RoundTripThroughSnapshot()
         {

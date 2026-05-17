@@ -36,8 +36,27 @@ namespace KnockBox.DndMapper.Pages.Components
 
         protected override void OnInitialized()
         {
-            _stateSub = State.StateChangedEventManager.Subscribe(async () => await InvokeAsync(StateHasChanged));
+            _stateSub = State.StateChangedEventManager.Subscribe(OnStateChangedAsync);
             base.OnInitialized();
+        }
+
+        // Prune draft state for templates that no longer exist (Reset Session,
+        // host-side deletes, library load) before re-rendering so the modal
+        // doesn't hold stale entries indefinitely.
+        private async ValueTask OnStateChangedAsync()
+        {
+            var live = State.CustomTemplates;
+            if (_drafts.Count > 0)
+            {
+                var orphans = _drafts.Keys.Where(k => !live.ContainsKey(k)).ToList();
+                foreach (var k in orphans)
+                {
+                    _drafts.Remove(k);
+                    _draftErrors.Remove(k);
+                }
+            }
+            if (_expandedId is Guid id && !live.ContainsKey(id)) _expandedId = null;
+            await InvokeAsync(StateHasChanged);
         }
 
         // Content-equality match against the live AttributeSchema. A template is
@@ -205,7 +224,7 @@ namespace KnockBox.DndMapper.Pages.Components
         // Source rows for "save as new": the currently-open template. For user
         // templates this reflects any auto-saved edits already committed to
         // state. Built-ins use their seeded rows.
-        private async Task SaveOpenAsTemplate()
+        private void SaveOpenAsTemplate()
         {
             if (UserService.CurrentUser is null) return;
             if (OpenTemplate is null) return;
@@ -219,7 +238,6 @@ namespace KnockBox.DndMapper.Pages.Components
                 return;
             }
             _newTemplateName = string.Empty;
-            await Task.CompletedTask;
         }
 
         private async Task ApplyTemplate(Guid id)
