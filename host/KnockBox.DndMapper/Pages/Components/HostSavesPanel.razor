@@ -35,7 +35,10 @@
                 @foreach (var s in _slots)
                 {
                     var isAuto = s.Kind == SlotKind.Auto;
-                    <li @key="s.Id" class="@($"dndm-saves-row{(isAuto ? " dndm-saves-row--auto" : string.Empty)}")">
+                    <li @key="s.Id"
+                        class="@($"dndm-saves-row{(isAuto ? " dndm-saves-row--auto" : string.Empty)}{(isAuto || _renamingId == s.Id ? string.Empty : " dndm-saves-row--loadable")}")"
+                        title="@(isAuto || _renamingId == s.Id ? null : "Double-click to load")"
+                        @ondblclick="@(() => { if (!isAuto && _renamingId != s.Id) RequestLoad(s.Id); })">
                         @if (_renamingId == s.Id)
                         {
                             <input class="dndm-input dndm-saves-renameinput"
@@ -58,15 +61,41 @@
                             <div class="dndm-saves-actions">
                                 @if (!isAuto)
                                 {
-                                    <button class="dndm-btn dndm-btn--small" type="button"
-                                            @onclick="@(() => RequestLoad(s.Id))">Load</button>
-                                    <button class="dndm-btn dndm-btn--small" type="button"
+                                    <button class="dndm-btn dndm-btn--small dndm-btn--icon" type="button"
                                             title="Overwrite this slot with current state"
-                                            @onclick="@(() => RequestOverwrite(s.Id))">Save</button>
-                                    <button class="dndm-btn dndm-btn--small dndm-btn--ghost" type="button"
-                                            @onclick="@(() => BeginRename(s))">Rename</button>
-                                    <button class="dndm-btn dndm-btn--small dndm-btn--danger" type="button"
-                                            @onclick="@(() => RequestDelete(s.Id))">Delete</button>
+                                            @onclick="@(() => RequestOverwrite(s.Id))">
+                                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none"
+                                             stroke="currentColor" stroke-width="2"
+                                             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                                            <polyline points="17 21 17 13 7 13 7 21" />
+                                            <polyline points="7 3 7 8 15 8" />
+                                        </svg>
+                                    </button>
+                                    <button class="dndm-btn dndm-btn--small dndm-btn--ghost dndm-btn--icon" type="button"
+                                            title="Rename"
+                                            @onclick="@(() => BeginRename(s))">
+                                        <span class="dndm-savesp-renameicon" aria-hidden="true">R<svg class="dndm-savesp-cursor" viewBox="0 0 6 14" width="6" height="14"
+                                                 fill="none" stroke="currentColor" stroke-width="1.2"
+                                                 stroke-linecap="round">
+                                                <line x1="3" y1="2" x2="3" y2="12" />
+                                                <line x1="1" y1="2" x2="5" y2="2" />
+                                                <line x1="1" y1="12" x2="5" y2="12" />
+                                            </svg></span>
+                                    </button>
+                                    <button class="dndm-btn dndm-btn--small dndm-btn--danger dndm-btn--icon" type="button"
+                                            title="Delete"
+                                            @onclick="@(() => RequestDelete(s.Id))">
+                                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none"
+                                             stroke="currentColor" stroke-width="2"
+                                             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                            <polyline points="3 6 5 6 21 6" />
+                                            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                                            <line x1="10" y1="11" x2="10" y2="17" />
+                                            <line x1="14" y1="11" x2="14" y2="17" />
+                                            <path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" />
+                                        </svg>
+                                    </button>
                                 }
                             </div>
                         }

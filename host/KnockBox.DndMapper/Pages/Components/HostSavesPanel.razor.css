@@ -40,6 +40,34 @@
     border-left: 3px solid var(--dndm-ember);
 }
 
+/* Loadable rows are interactive: dbl-click loads, hover hints at it. */
+.dndm-saves-row--loadable {
+    cursor: pointer;
+    transition: border-color 120ms ease, background 120ms ease;
+}
+
+.dndm-saves-row--loadable:hover {
+    border-color: var(--dndm-ember);
+    background: rgba(196, 116, 56, 0.10);
+}
+
+/* Rename icon: bold "R" followed by a blinking text cursor. */
+.dndm-savesp-renameicon {
+    display: inline-flex;
+    align-items: center;
+    gap: 1px;
+    font-family: var(--font-primary);
+    font-weight: 700;
+    font-size: 0.95rem;
+    line-height: 1;
+}
+
+.dndm-savesp-cursor {
+    display: inline-block;
+    margin-left: 2px;
+    flex: 0 0 auto;
+}
+
 .dndm-saves-meta {
     flex: 1 1 auto;
     display: flex;
