@@ -3,68 +3,79 @@
     --dndm-rail-w-right: 320px;
     --dndm-rail-collapsed: 28px;
 
+    /* Effective rail-occupied widths, accounting for collapsed state and
+       (for the left rail) host-only rendering. UI overlays use these so
+       they don't tuck behind a rail. */
+    --dndm-rail-pad-left: 0px;
+    --dndm-rail-pad-right: var(--dndm-rail-w-right);
+
     position: relative;
-    display: grid;
-    grid-template-columns: 1fr var(--dndm-rail-w-right);
-    grid-template-rows: 1fr;
     width: 100%;
     height: 100%;
-    background: #0e1117;
-    color: #ede4d3;
+    background: var(--dndm-void);
+    color: var(--dndm-text);
     font-family: var(--font-primary);
     overflow: hidden;
 }
 
-.dnd-mapper-playing--host {
-    grid-template-columns: var(--dndm-rail-w-left) 1fr var(--dndm-rail-w-right);
-}
-
-.dnd-mapper-playing--host.dnd-mapper-playing--left-collapsed {
-    grid-template-columns: var(--dndm-rail-collapsed) 1fr var(--dndm-rail-w-right);
-}
-
-.dnd-mapper-playing--right-collapsed {
-    grid-template-columns: 1fr var(--dndm-rail-collapsed);
-}
-
-.dnd-mapper-playing--host.dnd-mapper-playing--right-collapsed {
-    grid-template-columns: var(--dndm-rail-w-left) 1fr var(--dndm-rail-collapsed);
-}
-
-.dnd-mapper-playing--host.dnd-mapper-playing--left-collapsed.dnd-mapper-playing--right-collapsed {
-    grid-template-columns: var(--dndm-rail-collapsed) 1fr var(--dndm-rail-collapsed);
-}
+.dnd-mapper-playing--host { --dndm-rail-pad-left: var(--dndm-rail-w-left); }
+.dnd-mapper-playing--host.dnd-mapper-playing--left-collapsed { --dndm-rail-pad-left: var(--dndm-rail-collapsed); }
+.dnd-mapper-playing--right-collapsed { --dndm-rail-pad-right: var(--dndm-rail-collapsed); }
 
 .dndm-rail {
-    position: relative;
-    background: #14141f;
-    border-right: 1px solid #2c2c44;
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    /* The rail itself MUST NOT use backdrop-filter / transform / filter,
+       since any of those would turn it into a containing block for any
+       `position: fixed` descendant — modals rendered from inside a rail
+       panel would then be clipped to the rail's box. Push the darken+blur
+       into a ::before pseudo-element, which doesn't affect descendants. */
     display: flex;
     flex-direction: column;
     min-width: 0;
-    /* Confine vertical extent to the grid track so .dndm-rail-content's
-       overflow: auto actually clips and shows a scrollbar — without this,
-       the rail grows to fit its content and content gets pushed offscreen. */
     min-height: 0;
     overflow: hidden;
+    z-index: 5;
+    box-shadow: 0 0 16px rgba(0, 0, 0, 0.45);
+}
+
+.dndm-rail::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+        var(--dndm-noise),
+        linear-gradient(180deg, rgba(20, 17, 14, 0.72) 0%, rgba(16, 13, 11, 0.78) 100%);
+    background-size: 240px 240px, 100% 100%;
+    background-repeat: repeat, no-repeat;
+    backdrop-filter: blur(10px) saturate(0.85);
+    -webkit-backdrop-filter: blur(10px) saturate(0.85);
+    z-index: -1;
+    pointer-events: none;
+}
+
+.dndm-rail--left { border-right: 1px solid var(--dndm-border-accent); }
+.dndm-rail--right { border-left: 1px solid var(--dndm-border-accent); }
+
+.dndm-rail--left {
+    left: 0;
+    width: var(--dndm-rail-w-left);
 }
 
 .dndm-rail--right {
-    border-right: 0;
-    border-left: 1px solid #2c2c44;
+    right: 0;
+    width: var(--dndm-rail-w-right);
 }
+
+.dnd-mapper-playing--left-collapsed .dndm-rail--left { width: var(--dndm-rail-collapsed); }
+.dnd-mapper-playing--right-collapsed .dndm-rail--right { width: var(--dndm-rail-collapsed); }
 
 .dndm-rail-content {
     display: flex;
     flex-direction: column;
     gap: 0.6rem;
     padding: 0.5rem;
-    /* Extra bottom padding so the floating Settings / Reset Session buttons
-       (.dndm-floating-actions, bottom-right of the playing root) don't overlap
-       the last item in the right rail when content fills or exceeds the
-       viewport. Applied to both rails for symmetry and to keep any future
-       bottom-anchored overlays clear. */
-    padding-bottom: 3.5rem;
     overflow: auto;
     flex: 1 1 auto;
     min-height: 0;
@@ -92,14 +103,14 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #cdb98e;
-    font-family: var(--dndm-display);
+    color: var(--dndm-ember);
+    font-family: var(--font-primary);
     font-size: 0.95rem;
 }
 
 .dndm-rail-resize:hover,
 .dndm-rail-resize:active {
-    background: rgba(232, 184, 73, 0.25);
+    background: rgba(196, 116, 56, 0.22);
 }
 
 .dndm-rail-resize--left { right: 0; }
@@ -114,7 +125,7 @@
     right: 0;
     width: auto;
     cursor: pointer;
-    background: rgba(232, 184, 73, 0.08);
+    background: rgba(196, 116, 56, 0.10);
 }
 
 /* Chevron hint: shown on the resize handle indicating which way a click will
@@ -129,10 +140,11 @@
 .dnd-mapper-playing--right-collapsed .dndm-rail--right .dndm-rail-resize::before { content: '‹'; }
 
 .dndm-canvas-area {
-    position: relative;
+    position: absolute;
+    inset: 0;
     display: flex;
     overflow: hidden;
-    background: #0e1117;
+    background: var(--dndm-void);
 }
 
 .dndm-canvas-area > :global(.dndm-canvas-frame) { flex: 1 1 auto; }
@@ -140,9 +152,9 @@
 .dndm-canvas-inspector {
     position: absolute;
     top: 0.75rem;
-    right: 0.75rem;
+    right: calc(0.75rem + var(--dndm-rail-pad-right));
     width: 260px;
-    z-index: 4;
+    z-index: 6;
 }
 
 .dndm-empty {
@@ -150,7 +162,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #7a7464;
+    color: var(--dndm-text-muted);
     font-style: italic;
     text-align: center;
     padding: 2rem;
@@ -159,7 +171,7 @@
 .dndm-floating-actions {
     position: absolute;
     bottom: 1rem;
-    right: 1rem;
+    right: calc(1rem + var(--dndm-rail-pad-right));
     display: flex;
     gap: 0.5rem;
     z-index: 6;
@@ -168,20 +180,42 @@
 .dndm-library-banner {
     position: absolute;
     top: 0.75rem;
-    left: 50%;
+    /* Center over the visible area between the two rails. */
+    left: calc(50% + (var(--dndm-rail-pad-left) - var(--dndm-rail-pad-right)) / 2);
     transform: translateX(-50%);
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
-    padding: 0.75rem 1rem;
-    background: #1c2128;
-    border: 1px solid #e8b849;
-    border-radius: 6px;
-    color: #ede4d3;
-    font-size: 0.9rem;
+    padding: 0.75rem 1rem 0.75rem 1.4rem;
+    background:
+        var(--dndm-noise),
+        var(--dndm-panel-vignette),
+        var(--dndm-panel-gradient);
+    background-size: 240px 240px, 100% 100%, 100% 100%;
+    background-repeat: repeat, no-repeat, no-repeat;
+    border: 1px solid var(--dndm-border);
+    border-radius: 4px;
+    color: var(--dndm-text);
+    font-size: 1rem;
+    font-family: var(--font-primary);
     z-index: 7;
     max-width: min(640px, 90%);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
+    box-shadow:
+        inset 0 1px 0 var(--dndm-highlight),
+        0 4px 14px rgba(0, 0, 0, 0.6),
+        0 0 0 1px var(--dndm-border-accent);
+}
+
+.dndm-library-banner::before {
+    content: "";
+    position: absolute;
+    left: 0.5rem;
+    top: 0.85rem;
+    width: 3px;
+    height: 14px;
+    border-radius: 1px;
+    background: linear-gradient(180deg, var(--dndm-ember-hi), var(--dndm-ember) 60%, #6e3a1a 100%);
+    box-shadow: 0 0 6px rgba(232, 144, 85, 0.35);
 }
 
 .dndm-library-banner__copy {
@@ -191,7 +225,9 @@
 }
 
 .dndm-library-banner__copy strong {
-    color: #e8b849;
+    color: var(--dndm-ember);
+    font-family: var(--font-primary);
+    font-weight: 600;
 }
 
 .dndm-library-banner__actions {
@@ -201,32 +237,30 @@
 }
 
 .dndm-library-banner__error {
-    color: #ff7676;
-    font-size: 0.85rem;
-}
-
-.dndm-btn--ghost {
-    background: transparent;
-    border-color: #4a4a4a;
+    color: var(--dndm-danger);
+    font-size: 0.95rem;
+    font-style: italic;
 }
 
 .dndm-save-indicator {
     display: inline-flex;
     align-items: center;
     gap: 0.4rem;
-    color: #cdb98e;
-    font-size: 0.8rem;
-    background: rgba(20, 20, 31, 0.85);
-    padding: 0.2rem 0.5rem;
+    color: var(--dndm-text-dim);
+    font-size: 1rem;
+    font-family: var(--font-primary);
+    background: var(--dndm-bg-elev);
+    padding: 0.25rem 0.55rem;
     border-radius: 3px;
-    border: 1px solid #2c2c44;
+    border: 1px solid var(--dndm-border);
+    box-shadow: inset 0 1px 0 var(--dndm-highlight);
 }
 
 .dndm-save-spinner {
     width: 0.85rem;
     height: 0.85rem;
-    border: 2px solid #4a3c20;
-    border-top-color: #e8b849;
+    border: 2px solid var(--dndm-border);
+    border-top-color: var(--dndm-ember);
     border-radius: 50%;
     animation: dndm-save-spin 0.9s linear infinite;
 }

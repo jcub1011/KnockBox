@@ -191,8 +191,62 @@ namespace KnockBox.DndMapper.Pages.Components
         private void ZoomIn() => SetZoom(_zoom * 1.25);
         private void ZoomOut() => SetZoom(_zoom / 1.25);
 
-        private void ResetView()
+        private sealed class ViewportMetrics
         {
+            public double SvgWidth { get; set; }
+            public double SvgHeight { get; set; }
+            public double LeftPx { get; set; }
+            public double RightPx { get; set; }
+        }
+
+        private async Task ResetView()
+        {
+            // Fit the map into the visible region (full SVG minus the left/right
+            // rail widths). Rails overlay the canvas, so without this offset the
+            // map would center under the rails. JS round-trip is one frame; if
+            // metrics aren't available, fall back to plain pan=0, zoom=1.
+            if (_metricsModule is not null)
+            {
+                try
+                {
+                    var m = await _metricsModule.InvokeAsync<ViewportMetrics?>("getViewportMetrics", _svgId);
+                    if (m is not null && m.SvgWidth > 0 && m.SvgHeight > 0
+                        && Map.Grid.WidthCells > 0 && Map.Grid.HeightCells > 0)
+                    {
+                        double pxW = m.SvgWidth, pxH = m.SvgHeight;
+                        double L = m.LeftPx, R = m.RightPx;
+                        double vw = Math.Max(1.0, pxW - L - R);
+                        double vh = Math.Max(1.0, pxH);
+                        double W = Map.Grid.WidthCells, H = Map.Grid.HeightCells;
+                        // Pixels-per-cell at zoom=1 under xMidYMid meet.
+                        double basePxPerCell = Math.Min(pxW / W, pxH / H);
+                        double mapPxW = basePxPerCell * W;
+                        double mapPxH = basePxPerCell * H;
+                        double fitZoom = Math.Min(vw / mapPxW, vh / mapPxH);
+                        fitZoom = Math.Clamp(fitZoom, MinZoom, MaxZoom);
+                        // viewBox spans (W/fitZoom, H/fitZoom) world units. Under
+                        // xMidYMid meet, the viewBox CENTER (not the map center)
+                        // is what lands at the SVG pixel center. So to put the
+                        // map center at SVG center we need panX = (W - VW)/2;
+                        // then shift further by (R - L)/(2·s) to recenter into
+                        // the visible-area midpoint between the two rails.
+                        double VW = W / fitZoom;
+                        double VH = H / fitZoom;
+                        double scale = fitZoom * basePxPerCell;
+                        double dxPx = (L - R) / 2.0;
+                        _zoom = fitZoom;
+                        _panX = (W - VW) / 2.0 - dxPx / scale;
+                        _panY = (H - VH) / 2.0;
+                        PublishViewport();
+                        return;
+                    }
+                }
+                catch (JSDisconnectedException) { /* circuit teardown */ }
+                catch (Exception ex)
+                {
+                    Logger.LogWarning(ex, "Failed to measure viewport for ResetView; falling back.");
+                }
+            }
             _panX = 0;
             _panY = 0;
             _zoom = 1.0;

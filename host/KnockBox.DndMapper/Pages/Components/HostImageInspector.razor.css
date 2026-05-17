@@ -9,10 +9,10 @@
 
 .dndm-imgi-grid input[type="number"] { width: 100%; }
 
-.dndm-imgi-grid input[type="range"] { width: 100%; accent-color: #e8b849; }
+.dndm-imgi-grid input[type="range"] { width: 100%; accent-color: var(--dndm-gilt); }
 
 .dndm-imgi-opacity-readout {
-    color: #cdb98e;
+    color: var(--dndm-text-dim);
     font-variant-numeric: tabular-nums;
     font-size: 0.75rem;
     text-align: right;
@@ -34,7 +34,7 @@
 .dndm-imgi-layer-readout {
     min-width: 1.5rem;
     text-align: center;
-    color: #cdb98e;
+    color: var(--dndm-text-dim);
     font-variant-numeric: tabular-nums;
 }
 

@@ -30,13 +30,14 @@
     align-items: center;
     gap: 0.4rem;
     padding: 0.3rem 0.4rem;
-    background: #14141f;
-    border: 1px solid #2c2c44;
+    background: var(--dndm-bg-panel-2);
+    border: 1px solid var(--dndm-border);
     border-radius: 3px;
+    box-shadow: inset 0 1px 0 rgba(232, 144, 85, 0.06);
 }
 
 .dndm-saves-row--auto {
-    border-left: 2px solid #e8b849;
+    border-left: 3px solid var(--dndm-ember);
 }
 
 .dndm-saves-meta {
@@ -47,8 +48,9 @@
 }
 
 .dndm-saves-name {
-    color: #ede4d3;
-    font-weight: 600;
+    color: var(--dndm-text);
+    font-family: var(--font-primary);
+    font-weight: 500;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -59,8 +61,8 @@
 }
 
 .dndm-saves-when {
-    color: #7a7464;
-    font-size: 0.7rem;
+    color: var(--dndm-text-muted);
+    font-size: 0.8rem;
 }
 
 .dndm-saves-actions {
@@ -75,6 +77,7 @@
 }
 
 .dndm-saves-error {
-    color: #ff8a8a;
-    font-size: 0.75rem;
+    color: var(--dndm-danger);
+    font-size: 0.85rem;
+    font-style: italic;
 }

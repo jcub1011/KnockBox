@@ -42,20 +42,20 @@
 }
 
 .dndm-layer-row:hover {
-    background: rgba(232, 184, 73, 0.08);
+    background: rgba(196, 116, 56, 0.12);
 }
 
 .dndm-layer-row--selected {
-    background: rgba(232, 184, 73, 0.15);
-    border-color: #e8b849;
+    background: rgba(196, 116, 56, 0.22);
+    border-color: var(--dndm-ember);
 }
 
 .dndm-layer-thumb {
     width: 36px;
     height: 36px;
     object-fit: contain;
-    background: #0e1117;
-    border: 1px solid #2c2c44;
+    background: var(--dndm-bg-deep);
+    border: 1px solid var(--dndm-border-strong);
     border-radius: 3px;
     flex: 0 0 auto;
 }
@@ -65,7 +65,7 @@
        blob-share token has expired. The image will return automatically
        when the host's reconnect republishes the share. */
     background:
-        repeating-linear-gradient(45deg, #1c2128 0 6px, #2c2c44 6px 12px);
+        repeating-linear-gradient(45deg, var(--dndm-bg-panel-2) 0 6px, var(--dndm-border) 6px 12px);
     border-style: dashed;
 }
 
@@ -73,11 +73,11 @@
     display: flex;
     align-items: center;
     gap: 0.4rem;
-    color: #cdb98e;
+    color: var(--dndm-text-dim);
     font-variant-numeric: tabular-nums;
-    font-size: 0.8rem;
+    font-size: 0.9rem;
 }
 
 .dndm-layer-lock {
-    font-size: 0.85rem;
+    font-size: 0.95rem;
 }

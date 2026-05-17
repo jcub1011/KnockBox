@@ -1,70 +1,131 @@
 .dndm-header-container {
+    --dndm-display: "Cormorant Garamond", "EB Garamond", Georgia, serif;
+
+    position: relative;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0 20px;
+    padding: 0 24px;
     height: 64px;
-    background: #1a1a2e;
-    border-bottom: 2px solid rgba(168, 85, 247, 0.3);
-    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
     flex: 1;
+    color: var(--dndm-text);
+    font-family: var(--font-primary);
+    border-bottom: 1px solid var(--dndm-border);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.6);
+
+    background-color: #161210;
+    background-image:
+        /* faint warm grain */
+        url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 320 80'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.22 0 0 0 0 0.16 0 0 0 0 0.10 0 0 0 0.30 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.35'/></svg>"),
+        /* faint ember bloom at center */
+        radial-gradient(ellipse at 50% 100%, rgba(196, 116, 56, 0.10), transparent 65%),
+        /* base dark gradient */
+        linear-gradient(180deg, #1d1814 0%, #161210 70%, #100c0a 100%);
+    background-size: 320px 80px, 100% 100%, 100% 100%;
+    background-repeat: repeat, no-repeat, no-repeat;
 }
 
+/* Faint copper hairline under the header — replaces the scalloped torn-page edge. */
+.dndm-header-container::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -1px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(196, 116, 56, 0.4) 20%, rgba(196, 116, 56, 0.4) 80%, transparent);
+    pointer-events: none;
+}
+
+/* Brand */
 .dndm-header-brand {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 14px;
     text-decoration: none;
+    color: var(--dndm-text);
+    transition: letter-spacing 200ms ease;
 }
 
 .dndm-header-text {
-    font-size: 1.1rem;
-    font-weight: 900;
-    color: #e8b849;
-    letter-spacing: 2px;
+    font-family: var(--dndm-display);
+    font-size: 1.55rem;
+    font-weight: 500;
+    font-style: italic;
+    letter-spacing: 0.5px;
+    color: var(--dndm-text);
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.6);
 }
 
+.dndm-header-flourish {
+    color: var(--dndm-ember);
+    font-size: 1.15rem;
+    line-height: 1;
+    opacity: 0.75;
+    transition: transform 200ms ease;
+}
+
+.dndm-header-brand:hover .dndm-header-flourish--left { transform: translateX(-3px); }
+.dndm-header-brand:hover .dndm-header-flourish--right { transform: translateX(3px); }
+
+/* Actions */
 .dndm-header-actions {
     display: flex;
     align-items: center;
     gap: 16px;
 }
 
+/* Room-code: dark pill with copper hairline. */
 .dndm-header-actions ::deep .dndm-header-code {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 2px;
-    background: rgba(168, 85, 247, 0.05);
-    border: 1px solid rgba(168, 85, 247, 0.3);
-    border-radius: 4px;
-    padding: 6px 16px;
-    color: #ede4d3;
+    position: relative;
+    display: grid;
+    place-items: center;
+    background:
+        linear-gradient(180deg, rgba(196, 116, 56, 0.10), rgba(0, 0, 0, 0.25)),
+        var(--dndm-bg-elev);
+    border: 1px solid var(--dndm-border);
+    border-radius: 3px;
+    padding: 8px 18px;
+    color: var(--dndm-text);
     cursor: pointer;
-    min-width: 130px;
+    min-width: 140px;
+    box-shadow:
+        inset 0 1px 0 rgba(232, 144, 85, 0.10),
+        0 1px 2px rgba(0, 0, 0, 0.5);
+    transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.dndm-header-actions ::deep .dndm-header-code:hover {
+    border-color: var(--dndm-ember);
+    box-shadow:
+        inset 0 1px 0 rgba(232, 144, 85, 0.18),
+        0 0 10px rgba(196, 116, 56, 0.25);
 }
 
 .dndm-header-actions ::deep .dndm-header-code-cover,
 .dndm-header-actions ::deep .dndm-header-code-value {
     grid-area: 1 / 1;
     transition: opacity 0.2s ease;
+    text-align: center;
 }
 
 .dndm-header-actions ::deep .dndm-header-code-cover {
-    font-size: 0.65rem;
+    font-family: var(--font-primary);
+    font-size: 0.62rem;
     font-weight: 700;
-    letter-spacing: 1.5px;
-    color: #a855f7;
+    letter-spacing: 2px;
+    color: var(--dndm-text-muted);
     text-transform: uppercase;
 }
 
 .dndm-header-actions ::deep .dndm-header-code-value {
     opacity: 0;
     pointer-events: none;
-    font-size: 1rem;
-    font-weight: 800;
-    letter-spacing: 2px;
-    color: #e8b849;
+    font-family: var(--font-primary);
+    font-size: 1.05rem;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    color: var(--dndm-text);
 }
 
 .dndm-header-actions ::deep .dndm-header-code.revealed .dndm-header-code-cover {
@@ -77,27 +138,50 @@
     pointer-events: auto;
 }
 
+/* Leave button — circular ember coal. */
 .dndm-header-leave {
-    background: rgba(231, 76, 60, 0.1);
-    border: 1.5px solid #e74c3c;
+    position: relative;
+    width: 38px;
+    height: 38px;
     border-radius: 50%;
-    width: 36px;
-    height: 36px;
+    border: 1px solid #4a2a14;
+    padding: 0;
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #e74c3c;
+    color: #1a1208;
     cursor: pointer;
-    transition: all 0.2s;
+    background:
+        radial-gradient(circle at 35% 28%, var(--dndm-ember-hi) 0%, var(--dndm-ember) 55%, #6e3a1a 100%);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 220, 180, 0.4),
+        inset 0 -2px 4px rgba(0, 0, 0, 0.5),
+        0 2px 4px rgba(0, 0, 0, 0.6),
+        0 0 10px rgba(232, 144, 85, 0.22);
+    transition: transform 180ms ease, filter 180ms ease, box-shadow 180ms ease;
 }
 
 .dndm-header-leave:hover {
-    background: #e74c3c;
-    color: #fff;
+    transform: scale(1.06);
+    filter: brightness(1.12);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 220, 180, 0.5),
+        inset 0 -2px 4px rgba(0, 0, 0, 0.5),
+        0 2px 6px rgba(0, 0, 0, 0.6),
+        0 0 16px rgba(232, 144, 85, 0.4);
 }
 
 @media (max-width: 600px) {
-    .dndm-header-text {
+    .dndm-header-text,
+    .dndm-header-flourish {
         display: none;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .dndm-header-leave,
+    .dndm-header-flourish,
+    .dndm-header-brand {
+        transition: none;
     }
 }
