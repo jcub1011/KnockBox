@@ -1,118 +1,207 @@
 .dndm-tile {
+    /* Self-contained: the tile renders on the home page, which does NOT load
+       panels.css, so the global --dndm-* variables don't resolve here. Define
+       everything we depend on locally so the design ports anywhere. */
     --dndm-display: "Cormorant Garamond", "EB Garamond", Georgia, serif;
+    --dndm-text: #ece0cc;
+    --dndm-text-dim: #b29a7e;
+    --dndm-ember: #c4743a;
+    --dndm-ember-hi: #e89055;
 
     position: relative;
-    padding: 22px 22px 18px;
-    text-align: center;
-    color: var(--dndm-text);
-    font-family: var(--font-primary);
+    width: 100%;
+    height: 100%;
     overflow: hidden;
     isolation: isolate;
-    border: 1px solid var(--dndm-border);
-    border-radius: 5px;
+    border-radius: 11px;
+    color: var(--dndm-text);
+    font-family: var(--font-primary);
 
-    background-color: var(--dndm-bg-panel);
-    background-image:
-        /* faint warm grain */
-        url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 240 240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.22 0 0 0 0 0.16 0 0 0 0 0.10 0 0 0 0.30 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.4'/></svg>"),
-        /* banked-ember glow rising from the lower-left corner */
-        radial-gradient(ellipse at 15% 110%, rgba(232, 144, 85, 0.18), transparent 55%),
-        /* base dark gradient */
-        linear-gradient(160deg, #221b16 0%, #19140f 55%, #14100c 100%);
-    background-size: 240px 240px, 100% 100%, 100% 100%;
-    background-repeat: repeat, no-repeat, no-repeat;
-    box-shadow:
-        inset 0 1px 0 rgba(232, 144, 85, 0.08),
-        0 2px 10px rgba(0, 0, 0, 0.6);
-    transition: border-color 220ms ease, box-shadow 220ms ease, transform 220ms ease;
+    background:
+        radial-gradient(ellipse at 50% 120%, rgba(232, 144, 85, 0.22) 0%, transparent 55%),
+        linear-gradient(180deg, #1d1814 0%, #14100c 65%, #0a0806 100%);
+    transition: filter 240ms ease;
 }
 
-.dndm-tile:hover {
-    border-color: var(--dndm-ember);
-    box-shadow:
-        inset 0 1px 0 rgba(232, 144, 85, 0.16),
-        0 4px 18px rgba(0, 0, 0, 0.7),
-        0 0 24px rgba(196, 116, 56, 0.22);
-}
+.game-tile-surface:hover .dndm-tile { filter: brightness(1.08) saturate(1.05); }
 
-/* Glowing-coal mark — replaces the old wax seal. Small, off-axis. */
-.dndm-tile-seal {
+/* ─── Battle-map grid scene ───────────────────────────────────── */
+.dndm-tile-canvas {
     position: absolute;
-    top: 14px;
-    left: 14px;
-    width: 10px;
-    height: 32px;
-    border-radius: 2px;
-    display: block;
-    background: linear-gradient(180deg, var(--dndm-ember-hi) 0%, var(--dndm-ember) 55%, #6e3a1a 100%);
-    box-shadow:
-        inset 0 1px 0 rgba(255, 220, 180, 0.35),
-        0 0 10px rgba(232, 144, 85, 0.45);
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+    pointer-events: none;
+}
+
+.dndm-tile-grid-line {
+    fill: none;
+    stroke: rgba(196, 116, 56, 0.22);
+    stroke-width: 0.4;
+}
+
+.dndm-tile-grid-rect {
+    fill: url(#dndm-tile-grid);
+}
+
+.dndm-tile-grid-glow {
+    fill: url(#dndm-tile-glow);
+}
+
+.dndm-tile-wall {
+    fill: none;
+    stroke: rgba(196, 116, 56, 0.55);
+    stroke-width: 2.2;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+}
+
+.dndm-tile-token {
+    stroke-width: 1.2;
+    transform-origin: center;
+    transform-box: fill-box;
+    animation: dndm-tile-token-pulse 3.4s ease-in-out infinite;
+}
+
+.dndm-tile-token--ally {
+    fill: #e89055;
+    stroke: #fde0b8;
+    filter: drop-shadow(0 0 4px rgba(232, 144, 85, 0.55));
+}
+
+.dndm-tile-token--foe {
+    fill: #b04a3a;
+    stroke: #f0c8b8;
+    filter: drop-shadow(0 0 4px rgba(176, 74, 58, 0.5));
+}
+
+.dndm-tile-canvas .dndm-tile-token:nth-of-type(2) { animation-delay: 0.7s; }
+.dndm-tile-canvas .dndm-tile-token:nth-of-type(3) { animation-delay: 1.4s; }
+.dndm-tile-canvas .dndm-tile-token:nth-of-type(4) { animation-delay: 2.1s; }
+
+@keyframes dndm-tile-token-pulse {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50%      { transform: scale(1.08); opacity: 0.92; }
+}
+
+/* ─── d20 die corner ornament ─────────────────────────────────── */
+.dndm-tile-die {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 58px;
+    height: 58px;
     z-index: 2;
+    color: var(--dndm-ember-hi);
+    filter: drop-shadow(0 0 14px rgba(232, 144, 85, 0.45));
+    transition: transform 600ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.dndm-tile-die-shell {
+    fill: rgba(16, 12, 8, 0.92);
+    stroke: var(--dndm-ember-hi);
+    stroke-width: 1.8;
+    stroke-linejoin: round;
+}
+
+.dndm-tile-die-face {
+    stroke: rgba(232, 144, 85, 0.45);
+    stroke-width: 0.8;
+    stroke-linejoin: round;
+}
+
+.dndm-tile-die-face--bright { fill: rgba(232, 144, 85, 0.28); }
+.dndm-tile-die-face--mid    { fill: rgba(196, 116, 56, 0.18); }
+.dndm-tile-die-face--dim    { fill: rgba(20, 16, 12, 0.55); }
+
+.dndm-tile-die-num {
+    fill: #fde0b8;
+    font-family: var(--font-primary);
+    font-size: 17px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    paint-order: stroke;
+    stroke: rgba(0, 0, 0, 0.6);
+    stroke-width: 0.8;
+}
+
+.game-tile-surface:hover .dndm-tile-die {
+    transform: rotate(-20deg) scale(1.06);
+}
+
+/* ─── Title plaque ────────────────────────────────────────────── */
+.dndm-tile-plaque {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 3;
+    padding: 16px 18px 18px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    background:
+        linear-gradient(180deg, transparent 0%, rgba(8, 6, 4, 0.72) 35%, rgba(4, 3, 2, 0.95) 100%);
+    backdrop-filter: blur(3px) saturate(0.9);
+    -webkit-backdrop-filter: blur(3px) saturate(0.9);
+}
+
+/* Thin copper rule above the title — like an inset plaque edge. */
+.dndm-tile-plaque::before {
+    content: "";
+    position: absolute;
+    left: 28px;
+    right: 28px;
+    top: 8px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent 0%, var(--dndm-ember) 30%, var(--dndm-ember-hi) 50%, var(--dndm-ember) 70%, transparent 100%);
+    opacity: 0.7;
+    box-shadow: 0 0 6px rgba(232, 144, 85, 0.4);
 }
 
 .dndm-tile-name {
-    margin-top: 6px;
     font-family: var(--dndm-display);
-    font-size: 1.65rem;
+    font-size: 1.85rem;
     font-weight: 500;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.6px;
     color: var(--dndm-text);
     line-height: 1;
     display: inline-flex;
     align-items: baseline;
-    justify-content: center;
     gap: 1px;
+    margin-bottom: 6px;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.7);
 }
 
 .dndm-tile-name-drop {
-    font-size: 2.55rem;
-    font-weight: 600;
-    color: var(--dndm-ember);
-    text-shadow: 0 0 8px rgba(232, 144, 85, 0.35);
-    line-height: 0.9;
-    margin-right: 2px;
+    font-size: 2.8rem;
+    font-weight: 700;
+    font-style: italic;
+    color: var(--dndm-ember-hi);
+    line-height: 0.85;
+    margin-right: 4px;
+    text-shadow:
+        0 0 16px rgba(232, 144, 85, 0.65),
+        0 0 4px rgba(232, 144, 85, 0.9),
+        0 2px 4px rgba(0, 0, 0, 0.8);
 }
 
 .dndm-tile-name-rest {
     font-style: italic;
 }
 
-.dndm-tile-rule {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin: 10px auto 8px;
-    color: var(--dndm-gilt);
-    font-size: 0.85rem;
-    line-height: 1;
-}
-
-.dndm-tile-rule::before,
-.dndm-tile-rule::after {
-    content: "";
-    flex: 0 1 70px;
-    height: 1px;
-    background: linear-gradient(90deg, transparent, var(--dndm-gilt) 40%, var(--dndm-gilt) 60%, transparent);
-    opacity: 0.55;
-}
-
-.dndm-tile-rule-glyph {
-    padding: 0 8px;
-    color: var(--dndm-ember);
-    transform: translateY(-1px);
-}
-
 .dndm-tile-tag {
-    margin-top: 2px;
     font-family: var(--font-primary);
-    font-size: 0.95rem;
+    font-size: 0.78rem;
     color: var(--dndm-text-dim);
-    letter-spacing: 0.2px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .dndm-tile {
-        transition: none;
-    }
+    .dndm-tile,
+    .dndm-tile-die,
+    .dndm-tile-token { transition: none; animation: none; }
 }

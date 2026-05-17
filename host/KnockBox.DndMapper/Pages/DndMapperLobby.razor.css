@@ -1,11 +1,28 @@
 .dndm-content {
+    /* Fill the room layout's content area so the home-screen scrolling
+       background doesn't bleed through behind the lobby cards. */
+    min-height: 100%;
+    box-sizing: border-box;
     padding: 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
     color: var(--dndm-text);
     font-family: var(--font-primary);
+    background:
+        var(--dndm-noise),
+        radial-gradient(ellipse at 50% 18%, rgba(196, 116, 56, 0.10), transparent 60%),
+        var(--dndm-void);
+    background-size: 240px 240px, 100% 100%, 100% 100%;
+    background-repeat: repeat, no-repeat, no-repeat;
 }
 
 .dndm-content .card {
     position: relative;
+    width: 100%;
+    max-width: 760px;
+    box-sizing: border-box;
     background-color: var(--dndm-bg-panel);
     background-image:
         var(--dndm-noise),
@@ -28,9 +45,11 @@
     font-family: var(--dndm-display);
     font-style: italic;
     font-weight: 500;
+    font-size: 1.4rem;
     letter-spacing: 0.5px;
     text-transform: none;
     margin-top: 0;
+    margin-bottom: 0.5rem;
     text-shadow: 0 0 8px rgba(196, 116, 56, 0.2);
 }
 
@@ -41,6 +60,68 @@
     margin-top: 12px;
 }
 
-.dndm-content .card + .card {
-    margin-top: 16px;
+/* Player chip — styled as a kickable button. Subtle ember accent on hover
+   hints at the destructive action (the title attribute confirms "kick"). */
+.dndm-content .player-list .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    background: var(--dndm-bg-elev);
+    color: var(--dndm-text);
+    border: 1px solid var(--dndm-border);
+    border-radius: 999px;
+    padding: 0.4rem 0.9rem;
+    font-family: var(--font-primary);
+    font-size: 0.95rem;
+    cursor: pointer;
+    line-height: 1.1;
+    transition: background 140ms ease, border-color 140ms ease, color 140ms ease, box-shadow 140ms ease;
+    box-shadow: inset 0 1px 0 var(--dndm-highlight);
 }
+
+.dndm-content .player-list .btn:hover {
+    background: rgba(176, 74, 58, 0.18);
+    border-color: var(--dndm-danger);
+    color: #fbe8e0;
+    box-shadow:
+        inset 0 1px 0 rgba(232, 144, 85, 0.1),
+        0 0 10px rgba(176, 74, 58, 0.25);
+}
+
+/* Start Session — primary ember CTA, matching panels.css .dndm-btn--primary. */
+.dndm-content .btn-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    background: linear-gradient(180deg, var(--dndm-ember-hi), var(--dndm-ember) 55%, #8a4a22 100%);
+    border: 1px solid #5a2e14;
+    color: #1a1208;
+    border-radius: 3px;
+    padding: 0.6rem 1.2rem;
+    font-family: var(--font-primary);
+    font-size: 1rem;
+    font-weight: 600;
+    letter-spacing: 0.4px;
+    cursor: pointer;
+    line-height: 1.1;
+    text-shadow: 0 1px 0 rgba(255, 220, 180, 0.35);
+    transition: background 140ms ease, box-shadow 140ms ease;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 220, 180, 0.4),
+        inset 0 -1px 2px rgba(0, 0, 0, 0.45),
+        0 2px 6px rgba(0, 0, 0, 0.55),
+        0 0 10px rgba(232, 144, 85, 0.18);
+}
+
+.dndm-content .btn-primary:hover {
+    background: linear-gradient(180deg, #f0a268, var(--dndm-ember-hi) 55%, var(--dndm-ember) 100%);
+    color: #100a04;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 220, 180, 0.5),
+        inset 0 -1px 2px rgba(0, 0, 0, 0.45),
+        0 2px 8px rgba(0, 0, 0, 0.6),
+        0 0 16px rgba(232, 144, 85, 0.32);
+}
+
+.dndm-content .mt-3 { margin-top: 1rem; }

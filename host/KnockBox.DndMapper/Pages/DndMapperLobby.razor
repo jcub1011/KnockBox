@@ -12,9 +12,6 @@
             @if (UserService.CurrentUser?.Id == State.Host.Id)
             {
                 <div class="card">
-                    <SchemaPresetSelector State="@State" />
-                </div>
-                <div class="card">
                     <PermissionsPanel State="@State" Embedded="true" />
                 </div>
             }
