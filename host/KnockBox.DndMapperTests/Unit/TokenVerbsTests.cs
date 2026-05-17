@@ -156,10 +156,27 @@ namespace KnockBox.DndMapperTests.Unit
             var (mapId, players) = CreateMapWithPlayers("Alice");
             var token = _state.Maps.Single(m => m.Id == mapId).Tokens.Single();
 
+            // Engine snaps to cell center (x.5, y.5) when SnapToGrid is on, even
+            // if a stale client sent an intersection-aligned coordinate.
             var move = _engine.MoveTokenAsync(_state, players[0], token.Id, 5, 5);
             Assert.IsTrue(move.IsSuccess);
-            Assert.AreEqual(5, token.X);
-            Assert.AreEqual(5, token.Y);
+            Assert.AreEqual(4.5, token.X);
+            Assert.AreEqual(4.5, token.Y);
+        }
+
+        [TestMethod]
+        public void MoveTokenAsync_SnapEnabled_SnapsToCellCenter_EvenForOffCenterInput()
+        {
+            var (mapId, players) = CreateMapWithPlayers("Alice");
+            var token = _state.Maps.Single(m => m.Id == mapId).Tokens.Single();
+
+            // Off-center input (3.2, 7.8) should land at the nearest cell center.
+            // SnapToGridHelper.Snap rounds (x - 0.5) and adds 0.5 back, so the
+            // result is the cell whose center is closest.
+            var move = _engine.MoveTokenAsync(_state, players[0], token.Id, 3.2, 7.8);
+            Assert.IsTrue(move.IsSuccess);
+            Assert.AreEqual(3.5, token.X);
+            Assert.AreEqual(7.5, token.Y);
         }
 
         [TestMethod]

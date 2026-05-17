@@ -122,6 +122,16 @@ header a {
     }
 }
 
+/* Suppress the animated diagonal background when a game-room is mounted.
+   At 4K the rotated 300vmax × 300vmax layer creates a multi-hundred-MB GPU
+   texture; the compositor intermittently drops it, which shows through any
+   layer on top (with backdrop-filter etc.) as diagonal transparency. Game
+   rooms tag themselves with data-game-room so this rule scopes per-plugin. */
+.main:has([data-game-room])::before {
+    animation: none;
+    background-image: none;
+}
+
 article {
     position: relative;
     display: flex;

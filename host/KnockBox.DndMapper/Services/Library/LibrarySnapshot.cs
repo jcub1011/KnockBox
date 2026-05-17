@@ -150,6 +150,7 @@ namespace KnockBox.DndMapper.Services.Library
                 .ToList();
 
             var templates = state.CustomTemplates.Values
+                .Where(t => !t.IsBuiltIn)
                 .Select(t => new NamedTemplateSnapshot
                 {
                     Id = t.Id,

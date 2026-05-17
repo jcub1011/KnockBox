@@ -59,6 +59,12 @@
     flex-direction: column;
     gap: 0.6rem;
     padding: 0.5rem;
+    /* Extra bottom padding so the floating Settings / Reset Session buttons
+       (.dndm-floating-actions, bottom-right of the playing root) don't overlap
+       the last item in the right rail when content fills or exceeds the
+       viewport. Applied to both rails for symmetry and to keep any future
+       bottom-anchored overlays clear. */
+    padding-bottom: 3.5rem;
     overflow: auto;
     flex: 1 1 auto;
     min-height: 0;

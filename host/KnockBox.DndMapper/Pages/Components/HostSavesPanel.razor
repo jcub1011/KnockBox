@@ -56,10 +56,10 @@
                                 </span>
                             </div>
                             <div class="dndm-saves-actions">
-                                <button class="dndm-btn dndm-btn--small" type="button"
-                                        @onclick="@(() => RequestLoad(s.Id))">Load</button>
                                 @if (!isAuto)
                                 {
+                                    <button class="dndm-btn dndm-btn--small" type="button"
+                                            @onclick="@(() => RequestLoad(s.Id))">Load</button>
                                     <button class="dndm-btn dndm-btn--small" type="button"
                                             title="Overwrite this slot with current state"
                                             @onclick="@(() => RequestOverwrite(s.Id))">Save</button>

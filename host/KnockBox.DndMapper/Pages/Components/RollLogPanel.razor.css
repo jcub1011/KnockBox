@@ -3,15 +3,87 @@
    naturally until the visible-entry cap kicks in. */
 .dndm-rolllog { display: flex; flex-direction: column; }
 
-.dndm-rolllog-actions {
-    display: inline-flex;
-    gap: 0.35rem;
-    align-items: center;
+.dndm-rolllog-rollbar {
+    display: flex;
+    justify-content: stretch;
 }
 
 .dndm-rolllog-rollbtn {
     font-variant-numeric: tabular-nums;
-    min-width: 5.5rem;
+    flex: 1 1 auto;
+    min-height: 2.25rem;
+    font-size: 0.95rem;
+}
+
+.dndm-rolllog-config {
+    border: 1px solid #2c2c44;
+    border-radius: 3px;
+    background: #14141f;
+}
+
+.dndm-rolllog-config-summary {
+    cursor: pointer;
+    padding: 0.4rem 0.55rem;
+    color: #cdb98e;
+    font-family: var(--dndm-display);
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    user-select: none;
+}
+
+.dndm-rolllog-config[open] .dndm-rolllog-config-summary {
+    border-bottom: 1px solid #2c2c44;
+}
+
+.dndm-rolllog-config-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+    padding: 0.5rem 0.6rem;
+}
+
+.dndm-dice-quick-row {
+    display: flex;
+    gap: 0.3rem;
+    flex-wrap: wrap;
+}
+
+.dndm-dice-term {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    margin-right: 0.4rem;
+    margin-bottom: 0.3rem;
+}
+
+.dndm-dice-term-d {
+    color: #cdb98e;
+    font-family: var(--dndm-display);
+    font-size: 1rem;
+}
+
+.dndm-dice-term-sides { width: 4.5rem; }
+
+.dndm-dice-totalcount {
+    margin-top: 0.4rem;
+    font-size: 0.75rem;
+    color: #b6ad99;
+    font-variant-numeric: tabular-nums;
+}
+
+.dndm-dice-hint {
+    display: block;
+    margin-top: 0.3rem;
+    font-size: 0.7rem;
+    color: #7a7464;
+    font-style: italic;
+}
+
+.dndm-rolllog-entries {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
 }
 
 .dndm-rolllog-seeall {

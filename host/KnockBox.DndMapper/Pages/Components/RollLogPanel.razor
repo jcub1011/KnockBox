@@ -8,34 +8,142 @@
 
 <section class="dndm-panel dndm-rolllog">
     <header class="dndm-panel-header">
-        <span>Roll Log</span>
-        <span class="dndm-rolllog-actions">
-            <button class="dndm-btn dndm-btn--small dndm-btn--primary dndm-rolllog-rollbtn"
+        <span>Roll</span>
+    </header>
+    <div class="dndm-panel-body dndm-rolllog-body">
+        <div class="dndm-rolllog-rollbar">
+            <button class="dndm-btn dndm-btn--primary dndm-rolllog-rollbtn"
                     type="button"
                     title="@QuickRollTitle"
                     disabled="@(!CanQuickRoll)"
                     @onclick="QuickRoll">🎲 @QuickRollLabel</button>
-            <button class="dndm-btn dndm-btn--small dndm-btn--icon"
-                    type="button"
-                    title="Dice settings"
-                    @onclick="OpenSettings">⚙</button>
-        </span>
-    </header>
-    <div class="dndm-panel-body dndm-rolllog-body">
-        @if (Visible.Count == 0)
-        {
-            <div class="dndm-panel-empty">No rolls yet.</div>
-        }
-        else
-        {
-            @foreach (var r in Visible)
+        </div>
+
+        <details class="dndm-rolllog-config">
+            <summary class="dndm-rolllog-config-summary">Configuration</summary>
+            <div class="dndm-rolllog-config-body">
+                <section class="dndm-dice-quick">
+                    <span class="dndm-label">Quick</span>
+                    <div class="dndm-dice-quick-row">
+                        <button class="dndm-btn dndm-btn--small" type="button" @onclick="@(() => QuickPreset(1, 20, "d20"))">d20</button>
+                        <button class="dndm-btn dndm-btn--small" type="button" @onclick="@(() => QuickPreset(2, 6, "2d6"))">2d6</button>
+                        @if (CanRollInitiative)
+                        {
+                            <button class="dndm-btn dndm-btn--small" type="button" @onclick="InitiativePreset">Initiative</button>
+                        }
+                    </div>
+                </section>
+
+                <section class="dndm-dice-custom">
+                    <span class="dndm-label">Custom</span>
+                    @foreach (var (term, idx) in Config.Terms.Select((t, i) => (t, i)))
+                    {
+                        <div @key="idx" class="dndm-dice-term">
+                            <input type="number" min="0" max="20"
+                                   class="dndm-input dndm-input--num"
+                                   value="@term.Count"
+                                   @onchange="@(e => UpdateTermCount(idx, ParseInt(e.Value, term.Count)))" />
+                            <span class="dndm-dice-term-d">d</span>
+                            <select class="dndm-select dndm-dice-term-sides"
+                                    @onchange="@(e => UpdateTermSides(idx, ParseInt(e.Value, term.Sides)))">
+                                @foreach (var s in DieSizes)
+                                {
+                                    <option value="@s" selected="@(s == term.Sides)">@s</option>
+                                }
+                            </select>
+                            @if (Config.Terms.Count > 1)
+                            {
+                                <button class="dndm-btn dndm-btn--small dndm-btn--icon"
+                                        type="button"
+                                        title="Remove"
+                                        @onclick="@(() => RemoveTerm(idx))">×</button>
+                            }
+                        </div>
+                    }
+                    <button class="dndm-btn dndm-btn--small dndm-btn--ghost" type="button" @onclick="AddTerm">+ Add die</button>
+                    <div class="dndm-dice-totalcount">Total dice: <strong>@TotalDiceCount</strong> / 20</div>
+                </section>
+
+                <section>
+                    <span class="dndm-label">Attribute mod</span>
+                    <select class="dndm-select" @onchange="@(e => OnAttributeChange((string?)e.Value))">
+                        <option value="">— none —</option>
+                        @if (PickerSheet is not null)
+                        {
+                            @foreach (var row in State.AttributeSchema.Rows)
+                            {
+                                if (row.Type == AttributeValueType.Score || row.Type == AttributeValueType.Modifier)
+                                {
+                                    <option value="@row.Name" selected="@(Config.AttributeName == row.Name)">@row.Name</option>
+                                }
+                            }
+                        }
+                    </select>
+                    @if (IsHost && _pickableSheets.Count > 1)
+                    {
+                        <span class="dndm-label" style="margin-top:0.4rem">From sheet</span>
+                        <select class="dndm-select" @onchange="@(e => OnSheetChange((string?)e.Value))">
+                            @foreach (var s in _pickableSheets)
+                            {
+                                <option value="@s.Id" selected="@(Config.PickerSheetId == s.Id)">@(string.IsNullOrEmpty(s.CharacterName) ? "(unnamed)" : s.CharacterName)</option>
+                            }
+                        </select>
+                    }
+                </section>
+
+                <section>
+                    <span class="dndm-label">Flat modifier</span>
+                    <input type="number"
+                           class="dndm-input dndm-input--num"
+                           value="@Config.FlatModifier"
+                           @onchange="@(e => OnFlatModChange(e.Value))" />
+                </section>
+
+                <section>
+                    <span class="dndm-label">Mode</span>
+                    <div class="dndm-pillgroup">
+                        <button class="@PillCls(Config.Mode == RollMode.Normal)" type="button"
+                                @onclick="@(() => SetMode(RollMode.Normal))">Normal</button>
+                        <button class="@PillCls(Config.Mode == RollMode.Advantage)" type="button"
+                                disabled="@(!CanAdvDis)"
+                                @onclick="@(() => SetMode(RollMode.Advantage))">Adv</button>
+                        <button class="@PillCls(Config.Mode == RollMode.Disadvantage)" type="button"
+                                disabled="@(!CanAdvDis)"
+                                @onclick="@(() => SetMode(RollMode.Disadvantage))">Dis</button>
+                    </div>
+                    @if (!CanAdvDis)
+                    {
+                        <span class="dndm-dice-hint">Adv/Dis only when rolling exactly one die.</span>
+                    }
+                </section>
+
+                <section>
+                    <span class="dndm-label">Label</span>
+                    <input class="dndm-input"
+                           value="@Config.Label"
+                           @onchange="@(e => OnLabelChange((string?)e.Value))"
+                           placeholder="Attack roll, save vs fear…" />
+                </section>
+            </div>
+        </details>
+
+        <div class="dndm-rolllog-entries">
+            <span class="dndm-label">Rolls</span>
+            @if (Visible.Count == 0)
             {
-                @RenderEntry(r)
+                <div class="dndm-panel-empty">No rolls yet.</div>
             }
-        }
-        <button class="dndm-btn dndm-btn--small dndm-btn--ghost dndm-rolllog-seeall"
-                type="button"
-                @onclick="OpenHistory">See All Rolls</button>
+            else
+            {
+                @foreach (var r in Visible)
+                {
+                    @RenderEntry(r)
+                }
+            }
+            <button class="dndm-btn dndm-btn--small dndm-btn--ghost dndm-rolllog-seeall"
+                    type="button"
+                    @onclick="OpenHistory">See All Rolls</button>
+        </div>
     </div>
 </section>
 

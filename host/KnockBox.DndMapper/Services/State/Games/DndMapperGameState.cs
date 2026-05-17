@@ -25,9 +25,34 @@ namespace KnockBox.DndMapper.Services.State.Games
         // enforce the per-room 10 MB cap. Mutated only by image verbs inside Execute.
         public long BytesUsed { get; private set; }
 
+        // Deterministic IDs so library snapshots that reference built-ins by
+        // name don't accidentally collide with user-saved templates.
+        public static readonly Guid BuiltInDnD5eCoreId = new("d0000000-0000-0000-0000-000000000001");
+        public static readonly Guid BuiltInDnD5ePlusSkillsId = new("d0000000-0000-0000-0000-000000000002");
+        public static readonly Guid BuiltInSimpleD20Id = new("d0000000-0000-0000-0000-000000000003");
+
         public DndMapperGameState(User host, ILogger<DndMapperGameState> logger)
             : base(host, logger)
         {
+            SeedBuiltInTemplates();
+        }
+
+        internal void SeedBuiltInTemplates()
+        {
+            AddBuiltIn(BuiltInDnD5eCoreId, "D&D 5e core", AttributePreset.DnD5eCore);
+            AddBuiltIn(BuiltInDnD5ePlusSkillsId, "D&D 5e + skills", AttributePreset.DnD5ePlusCommonSkills);
+            AddBuiltIn(BuiltInSimpleD20Id, "Simple d20", AttributePreset.SimpleD20);
+
+            void AddBuiltIn(Guid id, string name, AttributePreset preset)
+            {
+                CustomTemplates[id] = new NamedTemplate
+                {
+                    Id = id,
+                    Name = name,
+                    Rows = [.. AttributeSchema.FromPreset(preset).Rows],
+                    IsBuiltIn = true,
+                };
+            }
         }
 
         internal void SetPhase(DndMapperPhase phase) => Phase = phase;

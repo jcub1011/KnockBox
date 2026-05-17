@@ -572,6 +572,10 @@ namespace KnockBox.DndMapper.Services.Library
                 }
 
                 state.CustomTemplates.Clear();
+                // Re-seed built-ins before user templates so they're always
+                // present (snapshots never serialize built-ins; their rows can
+                // evolve across releases).
+                state.SeedBuiltInTemplates();
                 foreach (var t in snapshot.CustomTemplates)
                 {
                     state.CustomTemplates[t.Id] = new NamedTemplate

@@ -421,8 +421,13 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                     return;
                 }
 
-                token.X = newX;
-                token.Y = newY;
+                // Authoritative snap: clients always send pre-snapped coordinates,
+                // but a stale client or stack-offset preview can land between cells.
+                // Re-applying server-side guarantees tokens come to rest on cell
+                // centers whenever the map's grid has SnapToGrid enabled.
+                var (sx, sy) = SnapToGridHelper.Snap(newX, newY, map.Grid);
+                token.X = sx;
+                token.Y = sy;
             });
 
             if (exec.IsCanceled) return Result.FromCancellation();
@@ -809,6 +814,48 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             return ValueResult<Guid>.FromValue(newId);
         }
 
+        public ValueResult<Guid> CreateCustomTemplateAsync(DndMapperGameState state, User caller, string name, IReadOnlyList<AttributeRow> rows)
+        {
+            if (state is null) return ValueResult<Guid>.FromError("State is required.");
+            if (caller is null) return ValueResult<Guid>.FromError("Caller is required.");
+            if (string.IsNullOrWhiteSpace(name)) return ValueResult<Guid>.FromError("Template name cannot be empty.");
+            if (name.Length > MaxNameLength) return ValueResult<Guid>.FromError($"Template name cannot exceed {MaxNameLength} characters.");
+            if (rows is null || rows.Count == 0) return ValueResult<Guid>.FromError("Template must have at least one row.");
+            if (!IsHost(state, caller)) return ValueResult<Guid>.FromError("Only the host may save attribute templates.");
+
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var row in rows)
+            {
+                if (string.IsNullOrWhiteSpace(row.Name)) return ValueResult<Guid>.FromError("Row name cannot be empty.");
+                if (!seen.Add(row.Name.Trim())) return ValueResult<Guid>.FromError($"Duplicate row name '{row.Name}'.");
+            }
+
+            var trimmed = name.Trim();
+            var newId = Guid.NewGuid();
+            string? error = null;
+            var exec = state.Execute(() =>
+            {
+                if (state.CustomTemplates.Values.Any(t =>
+                        string.Equals(t.Name, trimmed, StringComparison.OrdinalIgnoreCase)))
+                {
+                    error = "A template with that name already exists.";
+                    return;
+                }
+
+                state.CustomTemplates[newId] = new NamedTemplate
+                {
+                    Id = newId,
+                    Name = trimmed,
+                    Rows = [.. rows],
+                };
+            });
+
+            if (exec.IsCanceled) return ValueResult<Guid>.FromCancellation();
+            if (exec.TryGetFailure(out var execErr)) return ValueResult<Guid>.FromError(execErr);
+            if (error is not null) return ValueResult<Guid>.FromError(error);
+            return ValueResult<Guid>.FromValue(newId);
+        }
+
         public Result DeleteCustomTemplateAsync(DndMapperGameState state, User caller, Guid templateId)
         {
             if (state is null) return Result.FromError("State is required.");
@@ -818,7 +865,64 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             string? error = null;
             var exec = state.Execute(() =>
             {
-                if (!state.CustomTemplates.Remove(templateId)) { error = "Unknown template id."; return; }
+                if (!state.CustomTemplates.TryGetValue(templateId, out var existing)) { error = "Unknown template id."; return; }
+                if (existing.IsBuiltIn) { error = "Built-in templates cannot be deleted."; return; }
+                state.CustomTemplates.Remove(templateId);
+            });
+
+            if (exec.IsCanceled) return Result.FromCancellation();
+            if (exec.TryGetFailure(out var execErr)) return Result.FromError(execErr);
+            return error is null ? Result.Success : Result.FromError(error);
+        }
+
+        public Result UpdateCustomTemplateAsync(DndMapperGameState state, User caller, Guid templateId, IReadOnlyList<AttributeRow> rows)
+        {
+            if (state is null) return Result.FromError("State is required.");
+            if (caller is null) return Result.FromError("Caller is required.");
+            if (rows is null || rows.Count == 0) return Result.FromError("Template must have at least one row.");
+            if (!IsHost(state, caller)) return Result.FromError("Only the host may edit attribute templates.");
+
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var row in rows)
+            {
+                if (string.IsNullOrWhiteSpace(row.Name)) return Result.FromError("Row name cannot be empty.");
+                if (!seen.Add(row.Name.Trim())) return Result.FromError($"Duplicate row name '{row.Name}'.");
+            }
+
+            string? error = null;
+            var exec = state.Execute(() =>
+            {
+                if (!state.CustomTemplates.TryGetValue(templateId, out var existing)) { error = "Unknown template id."; return; }
+                if (existing.IsBuiltIn) { error = "Built-in templates cannot be edited."; return; }
+                existing.Rows = [.. rows];
+            });
+
+            if (exec.IsCanceled) return Result.FromCancellation();
+            if (exec.TryGetFailure(out var execErr)) return Result.FromError(execErr);
+            return error is null ? Result.Success : Result.FromError(error);
+        }
+
+        public Result RenameCustomTemplateAsync(DndMapperGameState state, User caller, Guid templateId, string newName)
+        {
+            if (state is null) return Result.FromError("State is required.");
+            if (caller is null) return Result.FromError("Caller is required.");
+            if (string.IsNullOrWhiteSpace(newName)) return Result.FromError("Template name cannot be empty.");
+            if (newName.Length > MaxNameLength) return Result.FromError($"Template name cannot exceed {MaxNameLength} characters.");
+            if (!IsHost(state, caller)) return Result.FromError("Only the host may rename attribute templates.");
+
+            var trimmed = newName.Trim();
+            string? error = null;
+            var exec = state.Execute(() =>
+            {
+                if (!state.CustomTemplates.TryGetValue(templateId, out var existing)) { error = "Unknown template id."; return; }
+                if (existing.IsBuiltIn) { error = "Built-in templates cannot be renamed."; return; }
+                if (state.CustomTemplates.Values.Any(t => t.Id != templateId &&
+                        string.Equals(t.Name, trimmed, StringComparison.OrdinalIgnoreCase)))
+                {
+                    error = "A template with that name already exists.";
+                    return;
+                }
+                existing.Name = trimmed;
             });
 
             if (exec.IsCanceled) return Result.FromCancellation();
@@ -966,6 +1070,35 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             if (state.IsDisposed) return Result.FromError("Session has already ended.");
 
             state.Dispose();
+            return Result.Success;
+        }
+
+        /// <summary>
+        /// Reverts the live session to a clean state without disposing it. Clears
+        /// maps, sheets, rolls, settings, attribute schema and byte counters in
+        /// one Execute. Saved templates (including built-ins) are preserved so
+        /// the host doesn't lose their library when starting fresh.
+        /// </summary>
+        public Result ResetSessionAsync(DndMapperGameState state, User caller)
+        {
+            if (state is null) return Result.FromError("State is required.");
+            if (caller is null) return Result.FromError("Caller is required.");
+            if (!IsHost(state, caller)) return Result.FromError("Only the host may reset the session.");
+            if (state.IsDisposed) return Result.FromError("Session has already ended.");
+
+            var exec = state.Execute(() =>
+            {
+                state.Maps.Clear();
+                state.SetActiveMapId(null);
+                state.Sheets.Clear();
+                state.RollLog.Clear();
+                state.SetSettings(new DndMapperSettings());
+                state.SetAttributeSchema(AttributeSchema.FromPreset(AttributePreset.DnD5eCore));
+                state.SetBytesUsed(0);
+            });
+
+            if (exec.IsCanceled) return Result.FromCancellation();
+            if (exec.TryGetFailure(out var err)) return Result.FromError(err);
             return Result.Success;
         }
 
