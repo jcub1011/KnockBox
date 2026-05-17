@@ -1471,6 +1471,31 @@ namespace KnockBox.DndMapper.Services.Logic.Games
         }
 
         /// <summary>
+        /// Renames an image layer. Host-only. Trims the new name; empty strings
+        /// are allowed (clears the name so the Layers panel falls back to its
+        /// default "Layer #N" label).
+        /// </summary>
+        public Result SetImageNameAsync(DndMapperGameState state, User caller, Guid mapId, Guid imageId, string name)
+        {
+            if (state is null) return Result.FromError("State is required.");
+            if (caller is null) return Result.FromError("Caller is required.");
+            if (!IsHost(state, caller)) return Result.FromError("Only the host may rename image layers.");
+
+            var trimmed = (name ?? string.Empty).Trim();
+            string? error = null;
+            var exec = state.Execute(() =>
+            {
+                var (image, _) = FindImageAndMap(state, mapId, imageId);
+                if (image is null) { error = "Unknown map or image id."; return; }
+                image.Name = trimmed;
+            });
+
+            if (exec.IsCanceled) return Result.FromCancellation();
+            if (exec.TryGetFailure(out var execErr)) return Result.FromError(execErr);
+            return error is null ? Result.Success : Result.FromError(error);
+        }
+
+        /// <summary>
         /// Locks or unlocks an image. Host-only. Locked images cannot have their
         /// transform changed or layer reordered until unlocked. Removal still works.
         /// </summary>

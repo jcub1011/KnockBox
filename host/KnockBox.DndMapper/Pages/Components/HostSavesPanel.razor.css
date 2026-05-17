@@ -51,22 +51,7 @@
     background: rgba(196, 116, 56, 0.10);
 }
 
-/* Rename icon: bold "R" followed by a blinking text cursor. */
-.dndm-savesp-renameicon {
-    display: inline-flex;
-    align-items: center;
-    gap: 1px;
-    font-family: var(--font-primary);
-    font-weight: 700;
-    font-size: 0.95rem;
-    line-height: 1;
-}
-
-.dndm-savesp-cursor {
-    display: inline-block;
-    margin-left: 2px;
-    flex: 0 0 auto;
-}
+/* Rename icon styling moved to shared panels.css as .dndm-rename-icon. */
 
 .dndm-saves-meta {
     flex: 1 1 auto;

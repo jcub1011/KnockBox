@@ -11,10 +11,10 @@
         <span class="dndm-sheet-header-actions">
             @if (IsHost)
             {
-                <button class="dndm-btn dndm-btn--small"
+                <button class="dndm-btn dndm-btn--small dndm-btn--icon"
                         type="button"
                         title="Create a host-only NPC/monster sheet"
-                        @onclick="OpenNpcModal">+ NPC Sheet</button>
+                        @onclick="OpenNpcModal">+</button>
                 <button class="dndm-btn dndm-btn--small dndm-btn--icon"
                         type="button"
                         title="Sheet settings"
@@ -36,37 +36,103 @@
     }
     else
     {
-        @if (VisibleSheets.Count > 4)
-        {
-            var activeId = ActiveSheet?.Id;
-            <div class="dndm-sheet-tabs dndm-sheet-tabs--dropdown">
-                <select class="dndm-select dndm-sheet-tab-select"
-                        @onchange="@(e => OnSheetDropdownChanged((string?)e.Value))">
-                    @foreach (var s in VisibleSheets.OrderBy(s => s.CharacterName, StringComparer.OrdinalIgnoreCase))
+        <div class="dndm-sheet-tabbar">
+            @if (VisibleSheets.Count > 4)
+            {
+                var activeId = ActiveSheet?.Id;
+                <div class="dndm-sheet-tabs dndm-sheet-tabs--dropdown">
+                    @if (_renamingSheetId is not null && ActiveSheet is not null)
                     {
-                        <option value="@s.Id" selected="@(activeId == s.Id)">
-                            @(string.IsNullOrEmpty(s.CharacterName) ? "(unnamed)" : s.CharacterName)
-                        </option>
+                        <input class="dndm-input dndm-sheet-tab-rename"
+                               @ref="_renameInputRef"
+                               value="@_renameSheetDraft"
+                               @oninput="OnRenameInput"
+                               @onkeydown="OnRenameKeyDown"
+                               @onblur="CommitSheetRename" />
                     }
-                </select>
-            </div>
-        }
-        else
-        {
-            <div class="dndm-sheet-tabs" role="tablist">
-                @foreach (var s in VisibleSheets)
-                {
-                    var active = s.Id == _activeSheetId;
-                    <button @key="s.Id"
-                            class="@($"dndm-sheet-tab{(active ? " dndm-sheet-tab--active" : "")}")"
-                            type="button"
-                            role="tab"
-                            @onclick="@(() => SelectSheet(s.Id))">
-                        @(string.IsNullOrEmpty(s.CharacterName) ? "(unnamed)" : s.CharacterName)
-                    </button>
-                }
-            </div>
-        }
+                    else
+                    {
+                        <select class="dndm-select dndm-sheet-tab-select"
+                                @onchange="@(e => OnSheetDropdownChanged((string?)e.Value))">
+                            @foreach (var s in VisibleSheets.OrderBy(s => s.CharacterName, StringComparer.OrdinalIgnoreCase))
+                            {
+                                <option value="@s.Id" selected="@(activeId == s.Id)">
+                                    @(string.IsNullOrEmpty(s.CharacterName) ? "(unnamed)" : s.CharacterName)
+                                </option>
+                            }
+                        </select>
+                        @if (ActiveSheet is { } dropdownActive)
+                        {
+                            <button class="dndm-btn dndm-btn--small dndm-btn--icon dndm-btn--ghost"
+                                    type="button"
+                                    title="Rename selected sheet"
+                                    @onclick="@(() => BeginSheetRename(dropdownActive))">
+                                <span class="dndm-rename-icon" aria-hidden="true">R<svg viewBox="0 0 6 14" width="6" height="14"
+                                         fill="none" stroke="currentColor" stroke-width="1.2"
+                                         stroke-linecap="round">
+                                        <line x1="3" y1="2" x2="3" y2="12" />
+                                        <line x1="1" y1="2" x2="5" y2="2" />
+                                        <line x1="1" y1="12" x2="5" y2="12" />
+                                    </svg></span>
+                            </button>
+                        }
+                    }
+                </div>
+            }
+            else
+            {
+                <div class="dndm-sheet-tabs" role="tablist">
+                    @{
+                        // When _activeSheetId is null (first render), fall back to ActiveSheet
+                        // so the auto-selected first sheet shows as the active tab.
+                        var effectiveActiveId = _activeSheetId ?? ActiveSheet?.Id;
+                    }
+                    @foreach (var s in VisibleSheets)
+                    {
+                        var active = s.Id == effectiveActiveId;
+                        if (_renamingSheetId == s.Id)
+                        {
+                            <input @key="@($"rename-{s.Id}")"
+                                   class="dndm-input dndm-sheet-tab-rename"
+                                   @ref="_renameInputRef"
+                                   value="@_renameSheetDraft"
+                                   @oninput="OnRenameInput"
+                                   @onkeydown="OnRenameKeyDown"
+                                   @onblur="CommitSheetRename" />
+                        }
+                        else
+                        {
+                            <button @key="s.Id"
+                                    class="@($"dndm-sheet-tab{(active ? " dndm-sheet-tab--active" : "")}")"
+                                    type="button"
+                                    role="tab"
+                                    title="Double-click to rename"
+                                    @onclick="@(() => SelectSheet(s.Id))"
+                                    @ondblclick="@(() => BeginSheetRename(s))">
+                                @(string.IsNullOrEmpty(s.CharacterName) ? "(unnamed)" : s.CharacterName)
+                            </button>
+                        }
+                    }
+                </div>
+            }
+            @if (IsHost && ActiveSheet is { } activeForDelete && _renamingSheetId is null)
+            {
+                <button class="dndm-btn dndm-btn--small dndm-btn--icon dndm-btn--danger dndm-sheet-tabbar-delete"
+                        type="button"
+                        title="Delete current character sheet"
+                        @onclick="@(() => RequestDeleteSheet(activeForDelete))">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none"
+                         stroke="currentColor" stroke-width="2"
+                         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <polyline points="3 6 5 6 21 6" />
+                        <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                        <line x1="10" y1="11" x2="10" y2="17" />
+                        <line x1="14" y1="11" x2="14" y2="17" />
+                        <path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" />
+                    </svg>
+                </button>
+            }
+        </div>
 
         @if (ActiveSheet is { } sheet)
         {
@@ -74,13 +140,6 @@
             var canSeePrivate = SheetVisibilityHelper.CanSeeNotesAndHp(sheet, CurrentUserId, IsHost);
 
             <div class="dndm-panel-body dndm-sheet-body">
-                <div class="dndm-sheet-namerow">
-                    <input class="dndm-input dndm-sheet-name"
-                           value="@sheet.CharacterName"
-                           disabled="@(!canEdit)"
-                           @oninput="@(e => OnNameInput(sheet, (string?)e.Value))"
-                           @onblur="@(() => CommitFreeFields(sheet))" />
-                </div>
                 @if (sheet.OwnerUserId is null && sheet.RepresentsUserId is not null)
                 {
                     <div class="dndm-sheet-origin" title="This character was orphaned when its player left the session.">
@@ -223,6 +282,13 @@
 {
     <SheetSettingsModal State="State" OnClose="@(() => _sheetSettingsOpen = false)" />
 }
+
+<ConfirmModal IsOpen="_pendingDeleteSheet is not null"
+              Title="Delete character sheet?"
+              Message="@($"This permanently removes \"{_pendingDeleteSheetName}\" and detaches it from any tokens.")"
+              ConfirmText="Delete"
+              OnConfirm="ConfirmDeleteSheet"
+              OnCancel="CancelDeleteSheet" />
 
 @if (_npcModalOpen)
 {

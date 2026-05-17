@@ -3,6 +3,10 @@ namespace KnockBox.DndMapper.Services.State.Games.Data
     public sealed class MapImage
     {
         public Guid Id { get; set; }
+        // Host-set display name for this layer in the Layers panel. Empty until
+        // the host renames the layer; the panel falls back to "Layer #N" using
+        // LayerOrder when this is empty.
+        public string Name { get; set; } = string.Empty;
         public string ContentType { get; set; } = string.Empty;
         // Live blob-share token published by the host's circuit. Null when the host is
         // disconnected; player UIs render a placeholder until the host reconnects and

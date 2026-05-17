@@ -100,6 +100,20 @@
     color: var(--dndm-text);
     letter-spacing: 0.4px;
     text-transform: none;
+    cursor: pointer;
+    user-select: none;
+}
+
+/* Collapsed: hide everything in the panel except the header itself. The
+   .dndm-panel-header click handler (dndMapperPanelCollapse.js) toggles the
+   --collapsed class on the panel. */
+.dndm-panel--collapsed > :not(.dndm-panel-header) {
+    display: none !important;
+}
+
+.dndm-panel--collapsed .dndm-panel-header::after {
+    /* No content below — drop the rule so the header doesn't look hollow. */
+    opacity: 0;
 }
 
 /* Subtle ember anchor at the start of every panel header. */
@@ -451,4 +465,20 @@
     font-size: 0.85rem;
     margin: 0.4rem 0 0;
     font-style: italic;
+}
+
+/* Rename icon — bold "R" followed by a static I-beam glyph. Used by any
+   "rename" affordance button (saves panel, character-sheet dropdown, …). */
+.dndm-rename-icon {
+    display: inline-flex;
+    align-items: center;
+    font-family: var(--font-primary);
+    font-weight: 700;
+    font-size: 0.95rem;
+    line-height: 1;
+}
+
+.dndm-rename-icon svg {
+    margin-left: 2px;
+    flex: 0 0 auto;
 }

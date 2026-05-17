@@ -1,13 +1,48 @@
 .dndm-sheet { display: flex; flex-direction: column; }
 
+.dndm-sheet-tabbar {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.4rem 0.4rem 0;
+    min-width: 0;
+}
+
+.dndm-sheet-tabbar-delete {
+    flex: 0 0 auto;
+}
+
 .dndm-sheet-tabs {
     display: flex;
     gap: 0.2rem;
-    padding: 0.4rem 0.4rem 0;
-    flex-wrap: wrap;
+    flex: 1 1 auto;
+    min-width: 0;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    /* Thin scrollbar so the tabs row doesn't get visually overpowered by chrome. */
+    scrollbar-width: thin;
+    scrollbar-color: var(--dndm-border-accent) transparent;
 }
 
+.dndm-sheet-tabs::-webkit-scrollbar { height: 6px; }
+.dndm-sheet-tabs::-webkit-scrollbar-track { background: transparent; }
+.dndm-sheet-tabs::-webkit-scrollbar-thumb {
+    background: var(--dndm-border-accent);
+    border-radius: 3px;
+}
+
+/* Dropdown variant keeps its select sizing — no scroll behavior needed. */
+.dndm-sheet-tabs--dropdown {
+    overflow: visible;
+    align-items: center;
+}
+
+.dndm-sheet-tabs--dropdown .dndm-select { flex: 1 1 auto; }
+
 .dndm-sheet-tab {
+    flex: 0 0 auto;
+    white-space: nowrap;
     background: transparent;
     color: var(--dndm-text-dim);
     border: 1px solid transparent;
@@ -29,16 +64,25 @@
     font-weight: 500;
 }
 
+/* Inline-rename input that replaces a tab (or the dropdown) while editing. */
+.dndm-sheet-tab-rename {
+    flex: 0 1 auto;
+    min-width: 6rem;
+    max-width: 16rem;
+    font-size: 1rem;
+    padding: 0.3rem 0.55rem;
+}
+
+.dndm-sheet-tabs--dropdown .dndm-sheet-tab-rename {
+    flex: 1 1 auto;
+    max-width: none;
+}
+
 .dndm-sheet-body {
     padding: 0.5rem 0.75rem;
     border-top: 0;
 }
 
-.dndm-sheet-namerow {
-    margin-bottom: 0.65rem;
-    border-bottom: 1px dashed var(--dndm-ink-soft);
-    padding-bottom: 0.5rem;
-}
 
 .dndm-sheet-origin {
     font-size: 0.82rem;

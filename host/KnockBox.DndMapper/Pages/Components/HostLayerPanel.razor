@@ -25,6 +25,40 @@
                         + (selected ? " dndm-layer-row--selected" : string.Empty)
                         + (hidden ? " dndm-layer-row--hidden" : string.Empty);
                     <li @key="img.Id" class="@cls">
+                        <div class="dndm-layer-clickarea"
+                             @onclick="@(() => OnRowClick(img))">
+                            @if (img.ShareToken is Guid shareToken)
+                            {
+                                <img class="dndm-layer-thumb"
+                                     src="@($"/blob-share/{shareToken:D}")"
+                                     alt="layer @img.LayerOrder" />
+                            }
+                            else
+                            {
+                                <div class="dndm-layer-thumb dndm-layer-thumb--placeholder"
+                                     title="Image share offline; will reconnect shortly."></div>
+                            }
+                            @if (_renamingImageId == img.Id)
+                            {
+                                <input class="dndm-input dndm-layer-name-input"
+                                       @ref="_renameInputRef"
+                                       value="@_renameLayerDraft"
+                                       @oninput="OnLayerRenameInput"
+                                       @onkeydown="OnLayerRenameKeyDown"
+                                       @onblur="CommitLayerRename"
+                                       @onclick:stopPropagation="true"
+                                       @ondblclick:stopPropagation="true" />
+                            }
+                            else
+                            {
+                                <span class="dndm-layer-name"
+                                      title="Double-click to rename"
+                                      @ondblclick="@(() => BeginLayerRename(img))"
+                                      @ondblclick:stopPropagation="true">
+                                    @(string.IsNullOrWhiteSpace(img.Name) ? $"Layer #{img.LayerOrder}" : img.Name)
+                                </span>
+                            }
+                        </div>
                         <button class="dndm-btn dndm-btn--small dndm-btn--icon dndm-layer-eyebtn"
                                 type="button"
                                 title="@(hidden ? "Hidden — click to show" : "Visible — click to hide")"
@@ -39,23 +73,6 @@
                                 @onclick:stopPropagation="true">
                             @(img.Locked ? "🔒" : "🔓")
                         </button>
-                        <div class="dndm-layer-clickarea"
-                             @onclick="@(() => OnRowClick(img))">
-                            @if (img.ShareToken is Guid shareToken)
-                            {
-                                <img class="dndm-layer-thumb"
-                                     src="@($"/blob-share/{shareToken:D}")"
-                                     alt="layer @img.LayerOrder" />
-                            }
-                            else
-                            {
-                                <div class="dndm-layer-thumb dndm-layer-thumb--placeholder"
-                                     title="Image share offline; will reconnect shortly."></div>
-                            }
-                            <span class="dndm-layer-meta">
-                                <span class="dndm-layer-order">#@img.LayerOrder</span>
-                            </span>
-                        </div>
                     </li>
                 }
             </ul>

@@ -643,6 +643,7 @@ namespace KnockBox.DndMapper.Services.Library
                     hydrated[imgSnap.Id] = new MapImage
                     {
                         Id = imgSnap.Id,
+                        Name = imgSnap.Name,
                         ContentType = imgSnap.ContentType,
                         ShareToken = share.Token,
                         X = imgSnap.X,
@@ -669,6 +670,12 @@ namespace KnockBox.DndMapper.Services.Library
         /// "Start fresh" affordance. The IndexedDB stays open with empty stores
         /// so subsequent auto-saves and uploads continue to work.
         /// </summary>
+        /// <summary>
+        /// "Start fresh" — drops only the auto-save snapshot of the previous
+        /// session so the host begins with a clean board and the banner stops
+        /// showing. Named save slots and image blobs are preserved; users can
+        /// still access them from the Saves panel afterward.
+        /// </summary>
         public async ValueTask<Result> DiscardLibraryAsync(CancellationToken ct = default)
         {
             ThrowIfDisposed();
@@ -681,22 +688,20 @@ namespace KnockBox.DndMapper.Services.Library
             await _saveLock.WaitAsync(ct);
             try
             {
+                // Clear only the live snapshot store. SlotsIndexStore (named
+                // saves) and ImagesStore (image blobs referenced by those
+                // slots) are intentionally left intact — the user clicked
+                // "Start fresh", not "Delete everything".
                 var result = await _db.ClearStoresAsync(
-                    [DndMapperLibrarySchema.LibraryStore,
-                     DndMapperLibrarySchema.SlotsIndexStore,
-                     DndMapperLibrarySchema.ImagesStore],
+                    [DndMapperLibrarySchema.LibraryStore],
                     ct);
 
                 if (!result.IsSuccess)
                 {
                     result.TryGetFailure(out var err);
-                    return Result.FromError($"Failed to clear library: {err.Message}");
+                    return Result.FromError($"Failed to clear session snapshot: {err.Message}");
                 }
 
-                foreach (var share in _shareCache.Values) await SafeDisposeAsync(share);
-                _shareCache.Clear();
-                foreach (var blob in _blobCache.Values) await SafeDisposeAsync(blob);
-                _blobCache.Clear();
                 HasExistingLibrary = false;
                 return Result.Success;
             }

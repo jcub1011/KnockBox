@@ -69,13 +69,25 @@
     border-style: dashed;
 }
 
-.dndm-layer-meta {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    color: var(--dndm-text-dim);
-    font-variant-numeric: tabular-nums;
-    font-size: 0.9rem;
+.dndm-layer-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    color: var(--dndm-text);
+    font-family: var(--font-primary);
+    font-size: 0.95rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    user-select: none;
+}
+
+.dndm-layer-row--hidden .dndm-layer-name { color: var(--dndm-text-dim); }
+
+.dndm-layer-name-input {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 0.3rem 0.5rem;
+    font-size: 0.95rem;
 }
 
 .dndm-layer-lock {

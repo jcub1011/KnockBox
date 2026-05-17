@@ -6,6 +6,7 @@ using KnockBox.DndMapper.Services.Logic.Visibility;
 using KnockBox.DndMapper.Services.State.Games;
 using KnockBox.DndMapper.Services.State.Games.Data;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Web;
 
 namespace KnockBox.DndMapper.Pages.Components
 {
@@ -22,13 +23,23 @@ namespace KnockBox.DndMapper.Pages.Components
         private IDisposable? _stateSub;
         private Guid? _activeSheetId;
 
-        private string _nameDraft = string.Empty;
         private string _notesDraft = string.Empty;
         private Guid? _draftFor;
 
         private bool _npcModalOpen;
         private string _npcNameDraft = string.Empty;
         private bool _sheetSettingsOpen;
+
+        private Guid? _pendingDeleteSheet;
+        private string _pendingDeleteSheetName = string.Empty;
+
+        // Inline-rename state: dbl-click a tab (or click the rename icon in the
+        // dropdown variant) sets _renamingSheetId; the matching tab renders an
+        // input bound to _renameSheetDraft. Enter / blur commits; Escape cancels.
+        private Guid? _renamingSheetId;
+        private string _renameSheetDraft = string.Empty;
+        private ElementReference _renameInputRef;
+        private bool _renameFocusPending;
 
         private bool HasOwnSheet =>
             State.Sheets.Values.Any(s => s.OwnerUserId == CurrentUserId);
@@ -55,6 +66,17 @@ namespace KnockBox.DndMapper.Pages.Components
             base.OnInitialized();
         }
 
+        protected override async Task OnAfterRenderAsync(bool firstRender)
+        {
+            if (_renameFocusPending && _renamingSheetId is not null)
+            {
+                _renameFocusPending = false;
+                try { await _renameInputRef.FocusAsync(preventScroll: true); }
+                catch { /* element not yet attached / circuit teardown */ }
+            }
+            await base.OnAfterRenderAsync(firstRender);
+        }
+
         protected override void OnParametersSet()
         {
             EnsureDraftSynced();
@@ -67,13 +89,12 @@ namespace KnockBox.DndMapper.Pages.Components
             if (sheet is null)
             {
                 _draftFor = null;
-                _nameDraft = _notesDraft = string.Empty;
+                _notesDraft = string.Empty;
                 return;
             }
             if (_draftFor != sheet.Id)
             {
                 _draftFor = sheet.Id;
-                _nameDraft = sheet.CharacterName;
                 _notesDraft = sheet.Notes;
             }
         }
@@ -87,12 +108,6 @@ namespace KnockBox.DndMapper.Pages.Components
         private void OnSheetDropdownChanged(string? raw)
         {
             if (Guid.TryParse(raw, out var id)) SelectSheet(id);
-        }
-
-        private void OnNameInput(CharacterSheet sheet, string? value)
-        {
-            _draftFor = sheet.Id;
-            _nameDraft = value ?? string.Empty;
         }
 
         private void OnNotesInput(string? value)
@@ -123,14 +138,64 @@ namespace KnockBox.DndMapper.Pages.Components
         private async Task CommitFreeFields(CharacterSheet sheet)
         {
             if (UserService.CurrentUser is null) return;
-            var name = string.IsNullOrWhiteSpace(_nameDraft) ? sheet.CharacterName : _nameDraft.Trim();
-            if (name == sheet.CharacterName && _notesDraft == sheet.Notes) return;
+            if (_notesDraft == sheet.Notes) return;
             var result = Engine.UpdateSheetFreeFieldsAsync(
-                State, UserService.CurrentUser, sheet.Id, name, _notesDraft, sheet.Hp, sheet.MaxHp);
+                State, UserService.CurrentUser, sheet.Id, sheet.CharacterName, _notesDraft, sheet.Hp, sheet.MaxHp);
             if (result.TryGetFailure(out var err) && Toasts is not null)
             {
                 await Toasts.Push(err.PublicMessage, DndMapperToastTone.Danger);
             }
+        }
+
+        private void BeginSheetRename(CharacterSheet sheet)
+        {
+            _renamingSheetId = sheet.Id;
+            _renameSheetDraft = sheet.CharacterName ?? string.Empty;
+            _renameFocusPending = true;
+        }
+
+        private void CancelSheetRename()
+        {
+            _renamingSheetId = null;
+            _renameSheetDraft = string.Empty;
+        }
+
+        private void OnRenameInput(ChangeEventArgs e)
+        {
+            _renameSheetDraft = e.Value as string ?? string.Empty;
+        }
+
+        private async Task OnRenameKeyDown(KeyboardEventArgs e)
+        {
+            if (e.Key == "Enter") await CommitSheetRename();
+            else if (e.Key == "Escape") CancelSheetRename();
+        }
+
+        private async Task CommitSheetRename()
+        {
+            if (_renamingSheetId is not Guid id)
+            {
+                CancelSheetRename();
+                return;
+            }
+            if (UserService.CurrentUser is null
+                || !State.Sheets.TryGetValue(id, out var sheet))
+            {
+                CancelSheetRename();
+                return;
+            }
+            var trimmed = (_renameSheetDraft ?? string.Empty).Trim();
+            var newName = string.IsNullOrEmpty(trimmed) ? sheet.CharacterName : trimmed;
+            if (newName != sheet.CharacterName)
+            {
+                var result = Engine.UpdateSheetFreeFieldsAsync(
+                    State, UserService.CurrentUser, sheet.Id, newName, sheet.Notes, sheet.Hp, sheet.MaxHp);
+                if (result.TryGetFailure(out var err) && Toasts is not null)
+                {
+                    await Toasts.Push(err.PublicMessage, DndMapperToastTone.Danger);
+                }
+            }
+            CancelSheetRename();
         }
 
         private async Task InitializeHp(CharacterSheet sheet)
@@ -226,6 +291,38 @@ namespace KnockBox.DndMapper.Pages.Components
             {
                 await Toasts.Push(err.PublicMessage, DndMapperToastTone.Danger);
             }
+        }
+
+        private void RequestDeleteSheet(CharacterSheet sheet)
+        {
+            _pendingDeleteSheet = sheet.Id;
+            _pendingDeleteSheetName = string.IsNullOrWhiteSpace(sheet.CharacterName)
+                ? "(unnamed)" : sheet.CharacterName;
+        }
+
+        private void CancelDeleteSheet()
+        {
+            _pendingDeleteSheet = null;
+            _pendingDeleteSheetName = string.Empty;
+        }
+
+        private async Task ConfirmDeleteSheet()
+        {
+            if (UserService.CurrentUser is null || _pendingDeleteSheet is not Guid id)
+            {
+                CancelDeleteSheet();
+                return;
+            }
+            var result = Engine.DeleteSheetAsync(State, UserService.CurrentUser, id);
+            if (result.TryGetFailure(out var err) && Toasts is not null)
+            {
+                await Toasts.Push(err.PublicMessage, DndMapperToastTone.Danger);
+            }
+            else if (_activeSheetId == id)
+            {
+                _activeSheetId = null;
+            }
+            CancelDeleteSheet();
         }
 
         private async Task ConfirmCreateNpcSheet()

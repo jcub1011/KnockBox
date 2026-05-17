@@ -54,6 +54,7 @@ namespace KnockBox.DndMapper.Services.Library
     internal sealed record MapImageSnapshot
     {
         public Guid Id { get; init; }
+        public string Name { get; init; } = string.Empty;
         public string ContentType { get; init; } = string.Empty;
         public double X { get; init; }
         public double Y { get; init; }
@@ -222,6 +223,7 @@ namespace KnockBox.DndMapper.Services.Library
         private static MapImageSnapshot ToImageSnapshot(MapImage image) => new()
         {
             Id = image.Id,
+            Name = image.Name,
             ContentType = image.ContentType,
             X = image.X,
             Y = image.Y,

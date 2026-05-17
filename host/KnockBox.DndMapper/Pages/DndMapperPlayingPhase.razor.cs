@@ -50,6 +50,7 @@ namespace KnockBox.DndMapper.Pages
 
         private IJSObjectReference? _resizeModule;
         private IJSObjectReference? _unloadGuardModule;
+        private IJSObjectReference? _collapseModule;
         private DotNetObjectReference<DndMapperPlayingPhase>? _dotNetRef;
         private bool _resizeAttached;
         private bool _isSaving;
@@ -174,6 +175,9 @@ namespace KnockBox.DndMapper.Pages
                 {
                     _resizeModule = await JSRuntime.InvokeAsync<IJSObjectReference>(
                         "import", "./_content/KnockBox.DndMapper/js/dndMapperRailResize.js");
+                    _collapseModule = await JSRuntime.InvokeAsync<IJSObjectReference>(
+                        "import", "./_content/KnockBox.DndMapper/js/dndMapperPanelCollapse.js");
+                    await _collapseModule.InvokeVoidAsync("ensureInstalled");
                     if (IsHost)
                     {
                         _unloadGuardModule = await JSRuntime.InvokeAsync<IJSObjectReference>(
@@ -291,6 +295,15 @@ namespace KnockBox.DndMapper.Pages
                 catch (Exception) { /* ignore */ }
 
                 try { await _resizeModule.DisposeAsync(); }
+                catch (JSDisconnectedException) { /* circuit teardown */ }
+                catch (Exception) { /* ignore */ }
+            }
+            if (_collapseModule is not null)
+            {
+                try { await _collapseModule.InvokeVoidAsync("dispose"); }
+                catch (JSDisconnectedException) { /* circuit teardown */ }
+                catch (Exception) { /* ignore */ }
+                try { await _collapseModule.DisposeAsync(); }
                 catch (JSDisconnectedException) { /* circuit teardown */ }
                 catch (Exception) { /* ignore */ }
             }

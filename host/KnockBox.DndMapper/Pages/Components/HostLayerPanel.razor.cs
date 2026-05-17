@@ -4,6 +4,7 @@ using KnockBox.DndMapper.Services.Logic.Games;
 using KnockBox.DndMapper.Services.State.Games;
 using KnockBox.DndMapper.Services.State.Games.Data;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Web;
 
 namespace KnockBox.DndMapper.Pages.Components
 {
@@ -22,10 +23,29 @@ namespace KnockBox.DndMapper.Pages.Components
 
         private IDisposable? _stateSub;
 
+        // Inline-rename state for layer rows. Dbl-clicking a layer's name swaps
+        // the label for an input bound to _renameLayerDraft; Enter / blur
+        // commits, Escape cancels.
+        private Guid? _renamingImageId;
+        private string _renameLayerDraft = string.Empty;
+        private ElementReference _renameInputRef;
+        private bool _renameFocusPending;
+
         protected override void OnInitialized()
         {
             _stateSub = State.StateChangedEventManager.Subscribe(async () => await InvokeAsync(StateHasChanged));
             base.OnInitialized();
+        }
+
+        protected override async Task OnAfterRenderAsync(bool firstRender)
+        {
+            if (_renameFocusPending && _renamingImageId is not null)
+            {
+                _renameFocusPending = false;
+                try { await _renameInputRef.FocusAsync(preventScroll: true); }
+                catch { /* element not yet attached / circuit teardown */ }
+            }
+            await base.OnAfterRenderAsync(firstRender);
         }
 
         private Map? ActiveMap
@@ -75,6 +95,60 @@ namespace KnockBox.DndMapper.Pages.Components
             {
                 await SelectedImageIdChanged.InvokeAsync(null);
             }
+        }
+
+        private void BeginLayerRename(MapImage img)
+        {
+            _renamingImageId = img.Id;
+            _renameLayerDraft = img.Name ?? string.Empty;
+            _renameFocusPending = true;
+        }
+
+        private void CancelLayerRename()
+        {
+            _renamingImageId = null;
+            _renameLayerDraft = string.Empty;
+        }
+
+        private void OnLayerRenameInput(ChangeEventArgs e)
+        {
+            _renameLayerDraft = e.Value as string ?? string.Empty;
+        }
+
+        private async Task OnLayerRenameKeyDown(KeyboardEventArgs e)
+        {
+            if (e.Key == "Enter") await CommitLayerRename();
+            else if (e.Key == "Escape") CancelLayerRename();
+        }
+
+        private async Task CommitLayerRename()
+        {
+            if (_renamingImageId is not Guid imageId)
+            {
+                CancelLayerRename();
+                return;
+            }
+            if (UserService.CurrentUser is null || State.ActiveMapId is not Guid mapId)
+            {
+                CancelLayerRename();
+                return;
+            }
+            var img = ActiveMap?.Images.FirstOrDefault(i => i.Id == imageId);
+            if (img is null)
+            {
+                CancelLayerRename();
+                return;
+            }
+            var trimmed = (_renameLayerDraft ?? string.Empty).Trim();
+            if (trimmed != (img.Name ?? string.Empty))
+            {
+                var result = Engine.SetImageNameAsync(State, UserService.CurrentUser, mapId, imageId, trimmed);
+                if (result.TryGetFailure(out var err) && Toasts is not null)
+                {
+                    await Toasts.Push(err.PublicMessage, DndMapperToastTone.Danger);
+                }
+            }
+            CancelLayerRename();
         }
 
         public override void Dispose()
