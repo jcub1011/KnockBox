@@ -55,7 +55,7 @@
                                       title="Double-click to rename"
                                       @ondblclick="@(() => BeginLayerRename(img))"
                                       @ondblclick:stopPropagation="true">
-                                    @(string.IsNullOrWhiteSpace(img.Name) ? $"Layer #{img.LayerOrder}" : img.Name)
+                                    @img.DisplayName
                                 </span>
                             }
                         </div>

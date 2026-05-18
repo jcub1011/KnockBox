@@ -100,12 +100,10 @@ namespace KnockBox.DndMapper.Pages.Components
         private void BeginLayerRename(MapImage img)
         {
             _renamingImageId = img.Id;
-            // Mirror the visible label: when Name is blank the row shows the
-            // auto-generated "Layer #N" fallback, so the rename input should
-            // open on that same text rather than empty.
-            _renameLayerDraft = string.IsNullOrWhiteSpace(img.Name)
-                ? $"Layer #{img.LayerOrder}"
-                : img.Name;
+            // Mirror the visible label so the rename input opens on the same
+            // text the user sees (including the synthetic "Layer #N" fallback
+            // when Name is blank).
+            _renameLayerDraft = img.DisplayName;
             _renameFocusPending = true;
         }
 
@@ -146,10 +144,10 @@ namespace KnockBox.DndMapper.Pages.Components
             }
             var trimmed = (_renameLayerDraft ?? string.Empty).Trim();
             // If the layer currently has no persisted name, the input opened on the
-            // synthetic "Layer #N" fallback — leaving that unchanged should not
-            // persist the fallback as a real name.
+            // synthetic fallback (MapImage.DisplayName) — leaving that unchanged
+            // should not persist the fallback as a real name.
             bool isUnchangedFallback = string.IsNullOrWhiteSpace(img.Name)
-                && trimmed == $"Layer #{img.LayerOrder}";
+                && trimmed == img.DisplayName;
             if (!isUnchangedFallback && trimmed != (img.Name ?? string.Empty))
             {
                 var result = Engine.SetImageNameAsync(State, UserService.CurrentUser, mapId, imageId, trimmed);

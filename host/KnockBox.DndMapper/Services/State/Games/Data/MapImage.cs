@@ -30,5 +30,11 @@ namespace KnockBox.DndMapper.Services.State.Games.Data
         // toggle it back on.
         public bool Hidden { get; set; }
         public long ByteSize { get; set; }
+
+        // Single source of truth for the layer label the host sees. Used by the
+        // Layers panel view AND by the inline-rename flow so the rename input
+        // opens on the same text that's currently shown — keep view and
+        // rename-detection in sync by routing both through this property.
+        public string DisplayName => string.IsNullOrWhiteSpace(Name) ? $"Layer #{LayerOrder}" : Name;
     }
 }

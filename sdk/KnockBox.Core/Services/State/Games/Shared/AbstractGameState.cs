@@ -453,7 +453,7 @@ namespace KnockBox.Core.Services.State.Games.Shared
         }
 
         /// <summary>
-        /// Kicks the player.
+        /// Kicks the player. Only the host may kick.
         /// </summary>
         /// <remarks>
         /// The kick mutates both the kicked-set and the player array inline inside
@@ -464,8 +464,13 @@ namespace KnockBox.Core.Services.State.Games.Shared
         /// no-op. <c>PlayerUnregistered</c> subscribers are invoked outside the execute lock so
         /// they may safely call <see cref="Execute(Action)"/>.
         /// </remarks>
-        public Result KickPlayer(User player)
+        public Result KickPlayer(User caller, User player)
         {
+            ArgumentNullException.ThrowIfNull(caller);
+            ArgumentNullException.ThrowIfNull(player);
+            if (caller.Id != _host.Id)
+                return Result.FromError("Only the host may kick players.");
+
             IDisposable? token = null;
 
             var result = Execute(() =>

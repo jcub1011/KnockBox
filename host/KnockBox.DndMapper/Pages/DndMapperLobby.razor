@@ -27,7 +27,7 @@
                         @if (isHost)
                         {
                             <button class="btn" title="Click to kick player."
-                                    @onclick="() => State.KickPlayer(entry.User)">
+                                    @onclick="() => State.KickPlayer(UserService.CurrentUser!, entry.User)">
                                 @entry.DisplayName @(entry.User.Id == State.Host.Id ? "(Host)" : "")
                             </button>
                         }

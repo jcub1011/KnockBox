@@ -146,7 +146,7 @@ namespace KnockBox.DrawnToDress.Pages
             // Kicking is a lobby-level state operation (same pattern as CardCounter).
             // It does not need to go through the FSM because it has no game-logic side-effects
             // while still in the lobby phase.
-            var result = GameState.KickPlayer(match.Value.User);
+            var result = GameState.KickPlayer(UserService.CurrentUser, match.Value.User);
             if (result.TryGetFailure(out var err))
             {
                 Logger.LogWarning("Error kicking player: {msg}", err.PublicMessage);

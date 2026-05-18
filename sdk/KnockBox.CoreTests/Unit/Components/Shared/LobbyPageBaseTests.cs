@@ -336,7 +336,7 @@ public sealed class LobbyPageBaseTests
         using var state = new TestGameState(host, NullLogger.Instance);
         state.Execute(() => state.SetJoinable(true));
         state.RegisterPlayer(player);
-        state.KickPlayer(player);
+        state.KickPlayer(host, player);
 
         var nav = new StubNavigationService();
         var session = new StubGameSessionService(new UserRegistration(player, Mock.Of<IDisposable>(), MakeLobby(state)));

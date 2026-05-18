@@ -7,6 +7,11 @@ namespace KnockBox.DndMapper.Services.Logic.Visibility
     /// Pure visibility / edit-permission rules for character sheets.
     /// Host is always exempt — <c>viewerIsHost == true</c> short-circuits to
     /// allowed regardless of the configured <see cref="SheetEditPolicy"/>.
+    /// Note that <see cref="SheetEditPolicy.HostOnly"/> applies to edits only:
+    /// it means only the host may edit (sheet owners included are blocked),
+    /// not that only the host may see the sheet — visibility is governed
+    /// separately by <see cref="CanSeeSheet"/> and the per-game
+    /// <c>PlayersCanSeeOtherSheets</c> setting.
     /// </summary>
     public static class SheetVisibilityHelper
     {
