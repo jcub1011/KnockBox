@@ -1,0 +1,161 @@
+@using KnockBox.Core.Components.Shared
+@using KnockBox.DndMapper.Models
+@using KnockBox.DndMapper.Services.State.Games
+@using KnockBox.DndMapper.Services.State.Games.Data
+@inherits DisposableComponent
+
+<div class="dndm-effects">
+    <div class="dndm-effects-head">
+        <span class="dndm-label dndm-effects-label">Status Effects</span>
+        <div class="dndm-effects-head-actions">
+            @if (CanEdit)
+            {
+                <button class="dndm-btn dndm-btn--small dndm-btn--icon"
+                        type="button"
+                        title="Apply a new effect"
+                        @onclick="OpenAdder">+</button>
+            }
+            @if (IsHost)
+            {
+                <button class="dndm-btn dndm-btn--small dndm-btn--icon dndm-btn--ghost"
+                        type="button"
+                        title="Manage effect templates"
+                        @onclick="@(() => _libraryOpen = true)">⚙</button>
+            }
+        </div>
+    </div>
+
+    @if (Sheet.StatusEffects.Count == 0 && !_adderOpen)
+    {
+        <div class="dndm-effects-empty">No active effects.</div>
+    }
+    else
+    {
+        <ul class="dndm-effects-list">
+            @foreach (var effect in Sheet.StatusEffects)
+            {
+                <li @key="effect.Id" class="dndm-effect-chip" title="@FormatTooltip(effect)">
+                    <span class="dndm-effect-glyph" aria-hidden="true">◆</span>
+                    <span class="dndm-effect-body">
+                        <span class="dndm-effect-name">@effect.Name</span>
+                        <span class="dndm-effect-delta">@FormatDeltaSummary(effect)</span>
+                    </span>
+                    @if (CanEdit)
+                    {
+                        <button class="dndm-effect-remove"
+                                type="button"
+                                title="Remove effect"
+                                @onclick="@(() => RemoveEffect(effect.Id))">×</button>
+                    }
+                </li>
+            }
+        </ul>
+    }
+
+    @if (_adderOpen)
+    {
+        <div class="dndm-effect-adder">
+            <div class="dndm-effect-adder-head">
+                <span class="dndm-label">New effect</span>
+                <button class="dndm-effect-close" type="button"
+                        title="Cancel" @onclick="CloseAdder">×</button>
+            </div>
+
+            @if (State.StatusEffectTemplates.Count > 0)
+            {
+                <label class="dndm-label dndm-label--inline">Quick‑apply from template</label>
+                <div class="dndm-effect-template-row">
+                    <select class="dndm-select"
+                            value="@_selectedTemplateId"
+                            @onchange="@(e => OnTemplateChosen((string?)e.Value))">
+                        <option value="">— template —</option>
+                        @foreach (var t in State.StatusEffectTemplates)
+                        {
+                            <option value="@t.Id">@t.Name</option>
+                        }
+                    </select>
+                </div>
+                <div class="dndm-effect-adder-rule"></div>
+            }
+
+            <label class="dndm-label">Name</label>
+            <input class="dndm-input"
+                   placeholder="e.g. Brain Fog"
+                   value="@_draftName"
+                   @oninput="@(e => _draftName = (string?)e.Value ?? string.Empty)" />
+
+            <label class="dndm-label">Attribute modifiers</label>
+            @if (_draftDeltas.Count == 0)
+            {
+                <div class="dndm-effect-empty-deltas">No attribute deltas. Use “+ add” to set one.</div>
+            }
+            @foreach (var (delta, idx) in _draftDeltas.Select((d, i) => (d, i)))
+            {
+                <div @key="idx" class="dndm-effect-delta-row">
+                    <select class="dndm-select"
+                            value="@delta.AttributeName"
+                            @onchange="@(e => UpdateDeltaName(idx, (string?)e.Value))">
+                        @foreach (var row in State.AttributeSchema.Rows)
+                        {
+                            <option value="@row.Name">@row.Name</option>
+                        }
+                    </select>
+                    <input type="number"
+                           class="dndm-input dndm-input--num"
+                           value="@delta.Delta"
+                           @onchange="@(e => UpdateDeltaValue(idx, ParseInt(e.Value, 0)))" />
+                    <button class="dndm-btn dndm-btn--icon dndm-btn--small dndm-btn--ghost"
+                            type="button"
+                            title="Remove row"
+                            @onclick="@(() => RemoveDeltaRow(idx))">−</button>
+                </div>
+            }
+            <button class="dndm-btn dndm-btn--small dndm-btn--ghost"
+                    type="button"
+                    @onclick="AddDeltaRow">+ attribute delta</button>
+
+            <div class="dndm-effect-hp-grid">
+                <label class="dndm-label">MaxHP Δ</label>
+                <input type="number"
+                       class="dndm-input dndm-input--num"
+                       value="@(_draftMaxHpDelta?.ToString() ?? string.Empty)"
+                       placeholder="—"
+                       @onchange="@(e => _draftMaxHpDelta = ParseNullableInt(e.Value))" />
+                <label class="dndm-label">On‑apply HP Δ</label>
+                <input type="number"
+                       class="dndm-input dndm-input--num"
+                       value="@(_draftOnApplyDelta?.ToString() ?? string.Empty)"
+                       placeholder="—"
+                       @onchange="@(e => _draftOnApplyDelta = ParseNullableInt(e.Value))" />
+            </div>
+
+            <label class="dndm-label">Notes</label>
+            <textarea class="dndm-textarea"
+                      rows="2"
+                      placeholder="optional"
+                      value="@_draftNotes"
+                      @oninput="@(e => _draftNotes = (string?)e.Value ?? string.Empty)"></textarea>
+
+            @if (_adderError is not null)
+            {
+                <div class="dndm-effect-error">@_adderError</div>
+            }
+
+            <div class="dndm-effect-adder-actions">
+                <button class="dndm-btn dndm-btn--ghost dndm-btn--small"
+                        type="button"
+                        @onclick="CloseAdder">Cancel</button>
+                <button class="dndm-btn dndm-btn--primary dndm-btn--small"
+                        type="button"
+                        disabled="@string.IsNullOrWhiteSpace(_draftName)"
+                        @onclick="ApplyDraft">Apply</button>
+            </div>
+        </div>
+    }
+</div>
+
+@if (_libraryOpen)
+{
+    <StatusEffectTemplateLibraryModal State="State"
+                                       OnClose="@(() => _libraryOpen = false)" />
+}

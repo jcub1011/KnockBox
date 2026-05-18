@@ -1,0 +1,97 @@
+@using KnockBox.Core.Components.Shared
+@using KnockBox.DndMapper.Services.State.Games
+@using KnockBox.DndMapper.Services.State.Games.Data
+@inherits DisposableComponent
+
+@*  Initiative banner (v1.x §9.5).
+
+    Renders on every client when combat is active. WaitingForRolls phase
+    shows a checklist with a prominent "Roll Initiative!" button on the
+    viewer's own row. Active phase shows the ordered turn list with the
+    current combatant highlighted. *@
+
+@if (State.ActiveCombat is not null)
+{
+    var combat = State.ActiveCombat;
+    <section class="dndm-initiative-banner @(combat.Phase == CombatPhase.Active ? "dndm-initiative-banner--active" : "dndm-initiative-banner--waiting")"
+             role="status">
+
+        <header class="dndm-initiative-banner-head">
+            <span class="dndm-initiative-banner-glyph" aria-hidden="true">⚔</span>
+            @if (combat.Phase == CombatPhase.Active)
+            {
+                <span class="dndm-initiative-banner-title">
+                    <span class="dndm-initiative-banner-round-label">Round</span>
+                    <span class="dndm-initiative-banner-round">@combat.RoundNumber</span>
+                </span>
+            }
+            else
+            {
+                <span class="dndm-initiative-banner-title">Awaiting initiative…</span>
+            }
+            <span class="dndm-initiative-banner-spacer"></span>
+            @if (combat.Phase == CombatPhase.Active)
+            {
+                <span class="dndm-initiative-banner-progress">
+                    @(combat.CurrentTurnIndex + 1) / @combat.TurnOrder.Count
+                </span>
+            }
+            else
+            {
+                <span class="dndm-initiative-banner-progress">
+                    @combat.TurnOrder.Count(e => e.InitiativeRoll is not null) / @combat.TurnOrder.Count
+                    rolled
+                </span>
+            }
+        </header>
+
+        <ol class="dndm-initiative-list">
+            @foreach (var (entry, idx) in combat.TurnOrder.Select((e, i) => (e, i)))
+            {
+                var isCurrent = combat.Phase == CombatPhase.Active && idx == combat.CurrentTurnIndex;
+                var isOwn = entry.OwnerUserId == CurrentUserId;
+                var rolled = entry.InitiativeRoll is not null;
+                <li @key="entry.Id"
+                    class="dndm-initiative-entry
+                           @(isCurrent ? " dndm-initiative-entry--current" : null)
+                           @(isOwn ? " dndm-initiative-entry--own" : null)
+                           @(!rolled ? " dndm-initiative-entry--unrolled" : null)">
+                    <span class="dndm-initiative-tick" aria-hidden="true">
+                        @if (combat.Phase == CombatPhase.WaitingForRolls)
+                        {
+                            @(rolled ? "✓" : "—")
+                        }
+                        else
+                        {
+                            <span class="dndm-initiative-order">@(idx + 1)</span>
+                        }
+                    </span>
+                    <span class="dndm-initiative-name">
+                        @entry.Name
+                        @if (entry.OwnerUserId is null)
+                        {
+                            <span class="dndm-initiative-badge">NPC</span>
+                        }
+                        @if (entry.IsForceRolled)
+                        {
+                            <span class="dndm-initiative-badge dndm-initiative-badge--forced"
+                                  title="Forced by the GM because this player hadn't rolled">forced</span>
+                        }
+                    </span>
+                    <span class="dndm-initiative-roll">
+                        @(entry.InitiativeRoll?.ToString() ?? "—")
+                    </span>
+
+                    @if (combat.Phase == CombatPhase.WaitingForRolls && isOwn && !rolled)
+                    {
+                        <button class="dndm-btn dndm-btn--primary dndm-btn--small dndm-initiative-roll-btn"
+                                type="button"
+                                @onclick="OnRollInitiative">
+                            Roll Initiative!
+                        </button>
+                    }
+                </li>
+            }
+        </ol>
+    </section>
+}

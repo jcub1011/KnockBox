@@ -223,6 +223,11 @@
                     }
                 </div>
 
+                <StatusEffectsPanel State="State"
+                                    Sheet="sheet"
+                                    IsHost="IsHost"
+                                    CanEdit="canEdit" />
+
                 @if (canSeePrivate && State.Settings.HpTrackingEnabled)
                 {
                     <div class="dndm-sheet-section">

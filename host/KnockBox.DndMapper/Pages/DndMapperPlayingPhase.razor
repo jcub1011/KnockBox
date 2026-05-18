@@ -28,6 +28,7 @@
                                     RoomCode="@RoomCode"
                                     SelectedImageId="_selectedImageId"
                                     SelectedImageIdChanged="OnSelectedImageIdChanged" />
+                    <HostInitiativePanel State="State" />
                     <HostSavesPanel />
                 </div>
                 @* Always render the resize handle so its JS bindings stay
@@ -77,6 +78,8 @@
             }
             else
             {
+                <InitiativeBanner State="State" CurrentUserId="@CurrentUserId" />
+
                 <MapCanvas State="State"
                            Map="ActiveMap"
                            RoomCode="@RoomCode"

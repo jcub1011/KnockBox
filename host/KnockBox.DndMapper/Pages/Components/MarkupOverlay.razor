@@ -1,0 +1,61 @@
+@using KnockBox.Core.Components.Shared
+@using KnockBox.DndMapper.Services.State.Games
+@using KnockBox.DndMapper.Services.State.Games.Data
+@inherits DisposableComponent
+
+@*  Markup overlay (v1.x, §5.6).
+
+    Two render branches sit between the image layer and the token layer of
+    MapCanvas:
+
+    Host + toggle on  → interactive SvgDrawingCanvas with full toolbar.
+    Everyone else     → read-only canvas with ShowToolbar=false; the
+                        component's pointer-events:none lets player drags
+                        fall through to the token layer beneath. *@
+
+@*  Two-mode markup surface — see §5.6 of the GDD.
+    The wrapper is positioned absolutely over the map by MapCanvas's CSS
+    (`.dndm-markup-overlay-mount`). We size the inner SvgDrawingCanvas at
+    100% / 100% so it fills that mount; both surfaces use the same
+    viewBox in grid-cell units, so strokes land on the same map cells the
+    host clicked regardless of container aspect ratio. *@
+@*  The drawing canvas runs in *pixel space* — viewBox is sized in CSS
+    pixels (cells × CellPixels) so a 1-pixel stroke on screen is a
+    1-pixel stroke in the saved markup. On commit we wrap the result in
+    a `scale(1/CellPixels)` transform so the persisted markup is in the
+    map's cell coordinate system and renders directly inside MapCanvas's
+    cell-unit viewBox.
+
+    BackgroundSvgContent is shown as a reference layer behind the active
+    drawing; it's already in cell coords (post-conversion), so we wrap
+    it in the inverse scale to compose it with the pixel-space canvas. *@
+@{
+    var pxW = Map.Grid.WidthCells * Map.Grid.CellPixels;
+    var pxH = Map.Grid.HeightCells * Map.Grid.CellPixels;
+    var bg = string.IsNullOrWhiteSpace(Map.MarkupSvg)
+        ? null
+        : $"<g transform=\"scale({Map.Grid.CellPixels})\">{Map.MarkupSvg}</g>";
+}
+
+@if (IsActive)
+{
+    <SvgDrawingCanvas @ref="_canvas"
+                      Width="100%"
+                      Height="100%"
+                      ShowToolbar="true"
+                      BackgroundColor="transparent"
+                      ViewBoxWidth="@pxW"
+                      ViewBoxHeight="@pxH"
+                      BackgroundSvgContent="@bg"
+                      StrokeCompleted="OnStrokeCompleted" />
+}
+else
+{
+    <SvgDrawingCanvas Width="100%"
+                      Height="100%"
+                      ShowToolbar="false"
+                      BackgroundColor="transparent"
+                      ViewBoxWidth="@pxW"
+                      ViewBoxHeight="@pxH"
+                      BackgroundSvgContent="@bg" />
+}

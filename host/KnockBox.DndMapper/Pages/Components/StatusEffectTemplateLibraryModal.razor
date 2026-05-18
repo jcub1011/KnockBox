@@ -1,0 +1,154 @@
+@using KnockBox.Core.Components.Shared
+@using KnockBox.DndMapper.Models
+@using KnockBox.DndMapper.Services.State.Games
+@using KnockBox.DndMapper.Services.State.Games.Data
+@inherits DisposableComponent
+
+<div class="dndm-modal-overlay" @onclick="OnClose">
+    <div class="dndm-modal-card dndm-effect-library-modal"
+         role="dialog" aria-modal="true"
+         @onclick:stopPropagation="true">
+        <header class="dndm-modal-header">
+            <h3 class="dndm-modal-title">Effect Library</h3>
+            <button class="dndm-btn dndm-btn--icon dndm-btn--small" type="button" title="Close"
+                    @onclick="OnClose">×</button>
+        </header>
+
+        <div class="dndm-modal-body">
+            <div class="dndm-effect-library-tagline">
+                Prepare common effects ahead of time. Applying a template clones it onto a
+                sheet — editing the template later never touches in‑flight instances.
+            </div>
+
+            <div class="dndm-effect-library-list">
+                @if (State.StatusEffectTemplates.Count == 0)
+                {
+                    <div class="dndm-panel-empty">No templates yet. Forge one below.</div>
+                }
+                else
+                {
+                    @foreach (var t in State.StatusEffectTemplates)
+                    {
+                        <div @key="t.Id" class="dndm-effect-template">
+                            <div class="dndm-effect-template-head">
+                                <span class="dndm-effect-template-glyph" aria-hidden="true">◆</span>
+                                @if (_editingId == t.Id)
+                                {
+                                    <input class="dndm-input dndm-effect-template-rename"
+                                           value="@_editNameDraft"
+                                           autofocus
+                                           @oninput="@(e => _editNameDraft = (string?)e.Value ?? string.Empty)" />
+                                }
+                                else
+                                {
+                                    <span class="dndm-effect-template-name">@t.Name</span>
+                                }
+                                <span class="dndm-effect-template-summary">@SummariseTemplate(t)</span>
+                                <div class="dndm-effect-template-actions">
+                                    @if (_editingId == t.Id)
+                                    {
+                                        <button class="dndm-btn dndm-btn--small dndm-btn--primary"
+                                                type="button"
+                                                @onclick="CommitTemplateEdit">Save</button>
+                                        <button class="dndm-btn dndm-btn--small dndm-btn--ghost"
+                                                type="button"
+                                                @onclick="CancelTemplateEdit">Cancel</button>
+                                    }
+                                    else
+                                    {
+                                        <button class="dndm-btn dndm-btn--small dndm-btn--ghost"
+                                                type="button"
+                                                title="Edit"
+                                                @onclick="@(() => BeginTemplateEdit(t))">Edit</button>
+                                        <button class="dndm-btn dndm-btn--small dndm-btn--ghost dndm-btn--danger"
+                                                type="button"
+                                                title="Delete (already-applied instances stay)"
+                                                @onclick="@(() => DeleteTemplate(t.Id))">Delete</button>
+                                    }
+                                </div>
+                            </div>
+
+                            @if (_editingId == t.Id)
+                            {
+                                <div class="dndm-effect-template-editor">
+                                    <label class="dndm-label">Attribute modifiers</label>
+                                    @foreach (var (delta, idx) in _editDeltas.Select((d, i) => (d, i)))
+                                    {
+                                        <div @key="idx" class="dndm-effect-delta-row">
+                                            <select class="dndm-select"
+                                                    value="@delta.AttributeName"
+                                                    @onchange="@(e => UpdateEditDeltaName(idx, (string?)e.Value))">
+                                                @foreach (var row in State.AttributeSchema.Rows)
+                                                {
+                                                    <option value="@row.Name">@row.Name</option>
+                                                }
+                                            </select>
+                                            <input type="number"
+                                                   class="dndm-input dndm-input--num"
+                                                   value="@delta.Delta"
+                                                   @onchange="@(e => UpdateEditDeltaValue(idx, e.Value))" />
+                                            <button class="dndm-btn dndm-btn--icon dndm-btn--small dndm-btn--ghost"
+                                                    type="button"
+                                                    @onclick="@(() => RemoveEditDelta(idx))">−</button>
+                                        </div>
+                                    }
+                                    <button class="dndm-btn dndm-btn--small dndm-btn--ghost"
+                                            type="button"
+                                            @onclick="AddEditDelta">+ attribute delta</button>
+
+                                    <div class="dndm-effect-hp-grid">
+                                        <label class="dndm-label">MaxHP Δ</label>
+                                        <input type="number" class="dndm-input dndm-input--num"
+                                               value="@(_editMaxHp?.ToString() ?? string.Empty)"
+                                               placeholder="—"
+                                               @onchange="@(e => _editMaxHp = ParseNullableInt(e.Value))" />
+                                        <label class="dndm-label">On‑apply HP Δ</label>
+                                        <input type="number" class="dndm-input dndm-input--num"
+                                               value="@(_editOnApply?.ToString() ?? string.Empty)"
+                                               placeholder="—"
+                                               @onchange="@(e => _editOnApply = ParseNullableInt(e.Value))" />
+                                    </div>
+
+                                    <label class="dndm-label">Notes</label>
+                                    <textarea class="dndm-textarea" rows="2"
+                                              value="@_editNotes"
+                                              @oninput="@(e => _editNotes = (string?)e.Value ?? string.Empty)"></textarea>
+                                </div>
+                            }
+                        </div>
+                    }
+                }
+            </div>
+
+            <div class="dndm-effect-library-rule"></div>
+
+            <div class="dndm-effect-library-create">
+                <div class="dndm-effect-library-create-head">
+                    <span class="dndm-label dndm-label--inline">Forge a new template</span>
+                </div>
+                <div class="dndm-effect-library-create-row">
+                    <input class="dndm-input"
+                           placeholder="Template name (e.g. Brain Fog)"
+                           value="@_newName"
+                           @oninput="@(e => _newName = (string?)e.Value ?? string.Empty)" />
+                    <button class="dndm-btn dndm-btn--primary dndm-btn--small"
+                            type="button"
+                            disabled="@string.IsNullOrWhiteSpace(_newName)"
+                            @onclick="CreateBlankTemplate">Create</button>
+                </div>
+                <div class="dndm-effect-library-hint">
+                    New templates start empty. Click <em>Edit</em> on a row to add deltas and HP shifts.
+                </div>
+            </div>
+
+            @if (_error is not null)
+            {
+                <div class="dndm-modal-error">@_error</div>
+            }
+        </div>
+
+        <footer class="dndm-modal-actions">
+            <button class="dndm-btn" type="button" @onclick="OnClose">Done</button>
+        </footer>
+    </div>
+</div>

@@ -1,0 +1,115 @@
+/* Status effect template library modal — the host's "tool bench" for
+   forging reusable status effects. Same Forge & Ember chrome as other
+   modals; the row treatment is bolder than the in-place adder because
+   this is dedicated authoring time, not quick application. */
+
+::deep .dndm-effect-library-modal {
+    min-width: 460px;
+    max-width: 620px;
+    width: min(620px, calc(100vw - 4rem));
+}
+
+::deep .dndm-effect-library-tagline {
+    font-style: italic;
+    font-size: 0.9rem;
+    color: var(--dndm-text-dim);
+    margin-bottom: 0.75rem;
+    line-height: 1.45;
+    border-left: 2px solid var(--dndm-border-accent);
+    padding: 0.25rem 0 0.25rem 0.7rem;
+}
+
+::deep .dndm-effect-library-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+    max-height: 50vh;
+    overflow-y: auto;
+    padding-right: 0.25rem;
+}
+
+::deep .dndm-effect-template {
+    background: rgba(12, 10, 8, 0.55);
+    border: 1px solid var(--dndm-border);
+    border-left: 2px solid var(--dndm-ember);
+    border-radius: 2px;
+    padding: 0.55rem 0.7rem;
+    box-shadow: inset 0 1px 0 var(--dndm-highlight);
+}
+
+::deep .dndm-effect-template-head {
+    display: grid;
+    grid-template-columns: 14px auto 1fr auto;
+    gap: 0.55rem;
+    align-items: center;
+}
+
+::deep .dndm-effect-template-glyph {
+    color: var(--dndm-ember-hi);
+    text-shadow: 0 0 6px rgba(232, 144, 85, 0.5);
+    font-size: 0.75rem;
+    line-height: 1;
+}
+
+::deep .dndm-effect-template-name {
+    font-family: var(--dndm-display);
+    font-style: italic;
+    font-size: 1.12rem;
+    color: var(--dndm-text);
+    letter-spacing: 0.25px;
+}
+
+::deep .dndm-effect-template-rename {
+    max-width: 14rem;
+}
+
+::deep .dndm-effect-template-summary {
+    font-family: var(--font-primary);
+    font-size: 0.82rem;
+    color: var(--dndm-text-dim);
+    font-variant-numeric: tabular-nums;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: right;
+}
+
+::deep .dndm-effect-template-actions {
+    display: inline-flex;
+    gap: 0.3rem;
+    justify-self: end;
+}
+
+::deep .dndm-effect-template-editor {
+    margin-top: 0.55rem;
+    padding-top: 0.5rem;
+    border-top: 1px dashed var(--dndm-ink-soft);
+}
+
+::deep .dndm-effect-template-editor .dndm-label {
+    margin-top: 0.4rem;
+}
+
+::deep .dndm-effect-library-rule {
+    height: 1px;
+    margin: 0.85rem 0 0.55rem;
+    background: linear-gradient(90deg, transparent, var(--dndm-gilt) 12%, var(--dndm-gilt) 88%, transparent);
+    opacity: 0.35;
+}
+
+::deep .dndm-effect-library-create-head {
+    margin-bottom: 0.35rem;
+}
+
+::deep .dndm-effect-library-create-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 0.45rem;
+}
+
+::deep .dndm-effect-library-hint {
+    margin-top: 0.4rem;
+    font-size: 0.82rem;
+    color: var(--dndm-text-muted);
+    font-style: italic;
+}

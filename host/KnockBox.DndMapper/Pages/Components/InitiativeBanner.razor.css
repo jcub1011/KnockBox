@@ -1,0 +1,247 @@
+/* Initiative banner — visible to all clients while combat is active.
+   Pinned at the top of the main canvas area as a thin, important strip.
+   Layout adapts: WaitingForRolls shows a checklist with a per-player
+   "Roll Initiative!" CTA; Active shows the ordered turn list with the
+   current combatant highlighted. */
+
+::deep .dndm-initiative-banner {
+    position: relative;
+    background-color: rgba(25, 21, 18, 0.92);
+    background-image:
+        var(--dndm-noise),
+        var(--dndm-panel-vignette),
+        linear-gradient(180deg, rgba(29, 24, 20, 0.7) 0%, rgba(25, 21, 18, 0.6) 60%, rgba(20, 17, 14, 0.7) 100%);
+    background-position: center, center, center;
+    background-size: 240px 240px, 100% 100%, 100% 100%;
+    background-repeat: repeat, no-repeat, no-repeat;
+    border: 1px solid var(--dndm-border-accent);
+    border-radius: 3px;
+    color: var(--dndm-text);
+    margin: 0.4rem 0.6rem 0.6rem;
+    box-shadow:
+        inset 0 1px 0 var(--dndm-highlight),
+        0 4px 14px rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+}
+
+/* Subtle ember bar along the bottom edge — references the panel-header
+   anchor, but here it spans the full banner because combat is the
+   "headline event" while it's active. */
+::deep .dndm-initiative-banner::after {
+    content: "";
+    position: absolute;
+    left: 0.6rem;
+    right: 0.6rem;
+    bottom: -1px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--dndm-ember) 12%, var(--dndm-ember) 88%, transparent);
+    opacity: 0.55;
+}
+
+::deep .dndm-initiative-banner--active {
+    border-color: var(--dndm-ember);
+    box-shadow:
+        inset 0 1px 0 var(--dndm-highlight),
+        0 0 14px rgba(232, 144, 85, 0.18),
+        0 4px 14px rgba(0, 0, 0, 0.6);
+}
+
+::deep .dndm-initiative-banner-head {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0.55rem 0.85rem 0.4rem;
+    border-bottom: 1px dashed var(--dndm-ink-soft);
+}
+
+::deep .dndm-initiative-banner-glyph {
+    color: var(--dndm-ember-hi);
+    font-size: 1.15rem;
+    text-shadow: 0 0 8px rgba(232, 144, 85, 0.5);
+    line-height: 1;
+}
+
+::deep .dndm-initiative-banner-title {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.45rem;
+    font-family: var(--dndm-display);
+    font-style: italic;
+    font-size: 1.15rem;
+    color: var(--dndm-text);
+    letter-spacing: 0.3px;
+}
+
+::deep .dndm-initiative-banner-round-label {
+    font-size: 0.85rem;
+    color: var(--dndm-text-dim);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    font-style: normal;
+    font-family: var(--font-primary);
+}
+
+::deep .dndm-initiative-banner-round {
+    font-size: 1.5rem;
+    color: var(--dndm-ember-hi);
+    font-variant-numeric: tabular-nums;
+    text-shadow: 0 0 8px rgba(232, 144, 85, 0.35);
+}
+
+::deep .dndm-initiative-banner-spacer {
+    flex: 1 1 auto;
+}
+
+::deep .dndm-initiative-banner-progress {
+    font-family: var(--font-primary);
+    font-size: 0.8rem;
+    color: var(--dndm-text-dim);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.4px;
+}
+
+/* ─── Combatant list ─────────────────────────────────────────────── */
+::deep .dndm-initiative-list {
+    list-style: none;
+    margin: 0;
+    padding: 0.35rem 0.55rem 0.55rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+::deep .dndm-initiative-entry {
+    display: grid;
+    grid-template-columns: 28px 1fr auto auto;
+    gap: 0.6rem;
+    align-items: center;
+    padding: 0.35rem 0.55rem;
+    background: rgba(12, 10, 8, 0.45);
+    border: 1px solid transparent;
+    border-radius: 2px;
+    transition: background 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
+}
+
+::deep .dndm-initiative-entry:hover {
+    background: rgba(12, 10, 8, 0.65);
+}
+
+::deep .dndm-initiative-entry--unrolled {
+    color: var(--dndm-text-dim);
+}
+
+::deep .dndm-initiative-entry--own {
+    border-color: var(--dndm-border-accent);
+}
+
+::deep .dndm-initiative-entry--current {
+    background: linear-gradient(180deg, rgba(196, 116, 56, 0.22), rgba(12, 10, 8, 0.6));
+    border-color: var(--dndm-ember);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 220, 180, 0.18),
+        0 0 12px rgba(232, 144, 85, 0.18);
+}
+
+::deep .dndm-initiative-entry--current .dndm-initiative-name {
+    color: #f5e8d3;
+    text-shadow: 0 0 6px rgba(232, 144, 85, 0.25);
+}
+
+::deep .dndm-initiative-tick {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 14px;
+    background: var(--dndm-bg-deep);
+    border: 1px solid var(--dndm-border);
+    color: var(--dndm-text-dim);
+    font-family: var(--font-primary);
+    font-size: 0.9rem;
+    font-variant-numeric: tabular-nums;
+}
+
+::deep .dndm-initiative-entry--current .dndm-initiative-tick {
+    background: linear-gradient(180deg, var(--dndm-ember-hi), var(--dndm-ember) 60%, #6e3a1a 100%);
+    border-color: #5a2e14;
+    color: #1a1208;
+    text-shadow: 0 1px 0 rgba(255, 220, 180, 0.35);
+    box-shadow: 0 0 6px rgba(232, 144, 85, 0.4);
+    font-weight: 700;
+}
+
+::deep .dndm-initiative-order {
+    font-weight: 600;
+}
+
+::deep .dndm-initiative-name {
+    font-family: var(--dndm-display);
+    font-style: italic;
+    font-size: 1.05rem;
+    letter-spacing: 0.2px;
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.45rem;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+::deep .dndm-initiative-badge {
+    font-family: var(--font-primary);
+    font-style: normal;
+    font-size: 0.65rem;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--dndm-text-muted);
+    padding: 0.1rem 0.4rem;
+    border: 1px solid var(--dndm-ink-soft);
+    border-radius: 2px;
+    line-height: 1.2;
+}
+
+::deep .dndm-initiative-badge--forced {
+    color: var(--dndm-ember-hi);
+    border-color: var(--dndm-ember);
+}
+
+::deep .dndm-initiative-roll {
+    font-family: var(--font-primary);
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: var(--dndm-text);
+    font-variant-numeric: tabular-nums;
+    min-width: 2.5ch;
+    text-align: right;
+}
+
+::deep .dndm-initiative-entry--unrolled .dndm-initiative-roll {
+    color: var(--dndm-text-muted);
+    font-weight: 400;
+}
+
+::deep .dndm-initiative-roll-btn {
+    /* Pull the CTA inline at the end of the row */
+    white-space: nowrap;
+    animation: dndm-initiative-pulse 2s ease-in-out infinite;
+}
+
+@keyframes dndm-initiative-pulse {
+    0%, 100% {
+        box-shadow:
+            inset 0 1px 0 rgba(255, 220, 180, 0.4),
+            inset 0 -1px 2px rgba(0, 0, 0, 0.45),
+            0 2px 6px rgba(0, 0, 0, 0.55),
+            0 0 10px rgba(232, 144, 85, 0.18);
+    }
+    50% {
+        box-shadow:
+            inset 0 1px 0 rgba(255, 220, 180, 0.4),
+            inset 0 -1px 2px rgba(0, 0, 0, 0.45),
+            0 2px 6px rgba(0, 0, 0, 0.55),
+            0 0 18px rgba(232, 144, 85, 0.5);
+    }
+}

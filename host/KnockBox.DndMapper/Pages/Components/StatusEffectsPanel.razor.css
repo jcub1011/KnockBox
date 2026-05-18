@@ -1,0 +1,216 @@
+/* Status effects panel — nested inside CharacterSheetPanel.
+   Aesthetic: Forge & Ember. Effects render as ember-edged "branded iron"
+   chips; the in-place adder reads as a single-purpose forge tablet. */
+
+::deep .dndm-effects {
+    margin-top: 0.6rem;
+    padding-top: 0.55rem;
+    border-top: 1px dashed var(--dndm-ink-soft);
+}
+
+::deep .dndm-effects-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.45rem;
+}
+
+::deep .dndm-effects-label {
+    margin-bottom: 0;
+    font-family: var(--dndm-display);
+    font-style: italic;
+    font-size: 1.02rem;
+    color: var(--dndm-text);
+    letter-spacing: 0.4px;
+}
+
+::deep .dndm-effects-head-actions {
+    display: inline-flex;
+    gap: 0.35rem;
+}
+
+::deep .dndm-effects-empty {
+    padding: 0.45rem 0;
+    color: var(--dndm-text-muted);
+    font-style: italic;
+    font-size: 0.9rem;
+}
+
+/* ─── Chip list ─────────────────────────────────────────────────── */
+::deep .dndm-effects-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+::deep .dndm-effect-chip {
+    position: relative;
+    display: grid;
+    grid-template-columns: 14px 1fr auto;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0.4rem 0.55rem 0.4rem 0.5rem;
+    background: linear-gradient(180deg, rgba(196, 116, 56, 0.08) 0%, rgba(34, 27, 22, 0.4) 80%);
+    border: 1px solid var(--dndm-border);
+    border-left: 2px solid var(--dndm-ember);
+    border-radius: 2px;
+    box-shadow:
+        inset 0 1px 0 var(--dndm-highlight),
+        0 1px 2px rgba(0, 0, 0, 0.45);
+}
+
+::deep .dndm-effect-glyph {
+    font-size: 0.7rem;
+    color: var(--dndm-ember-hi);
+    text-shadow: 0 0 6px rgba(232, 144, 85, 0.5);
+    line-height: 1;
+    text-align: center;
+}
+
+::deep .dndm-effect-body {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+::deep .dndm-effect-name {
+    font-family: var(--dndm-display);
+    font-style: italic;
+    font-size: 1rem;
+    color: var(--dndm-text);
+    letter-spacing: 0.2px;
+    line-height: 1.15;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+::deep .dndm-effect-delta {
+    font-family: var(--font-primary);
+    font-size: 0.78rem;
+    color: var(--dndm-text-dim);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.15px;
+    margin-top: 0.05rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+::deep .dndm-effect-remove {
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--dndm-text-muted);
+    width: 22px;
+    height: 22px;
+    border-radius: 2px;
+    cursor: pointer;
+    font-size: 1.1rem;
+    line-height: 1;
+    transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+
+::deep .dndm-effect-remove:hover {
+    background: rgba(176, 74, 58, 0.18);
+    color: #f5c8bc;
+    border-color: rgba(176, 74, 58, 0.5);
+}
+
+/* ─── In-place adder ───────────────────────────────────────────── */
+::deep .dndm-effect-adder {
+    margin-top: 0.55rem;
+    padding: 0.65rem 0.7rem 0.75rem;
+    background: rgba(12, 10, 8, 0.65);
+    border: 1px solid var(--dndm-border-accent);
+    border-radius: 3px;
+    box-shadow: inset 0 1px 0 var(--dndm-highlight), 0 2px 8px rgba(0, 0, 0, 0.55);
+}
+
+::deep .dndm-effect-adder-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.45rem;
+}
+
+::deep .dndm-effect-adder-head .dndm-label {
+    margin: 0;
+    font-family: var(--dndm-display);
+    font-style: italic;
+    font-size: 1.05rem;
+    color: var(--dndm-ember-hi);
+}
+
+::deep .dndm-effect-close {
+    background: transparent;
+    border: 0;
+    color: var(--dndm-text-muted);
+    cursor: pointer;
+    font-size: 1.15rem;
+    line-height: 1;
+    padding: 0 4px;
+}
+::deep .dndm-effect-close:hover { color: var(--dndm-text); }
+
+::deep .dndm-effect-adder .dndm-label {
+    margin-top: 0.45rem;
+}
+::deep .dndm-effect-adder .dndm-label--inline {
+    margin-top: 0;
+}
+
+::deep .dndm-effect-template-row {
+    margin-bottom: 0.35rem;
+}
+
+::deep .dndm-effect-adder-rule {
+    height: 1px;
+    margin: 0.6rem 0 0.4rem;
+    background: linear-gradient(90deg, transparent, var(--dndm-gilt) 15%, var(--dndm-gilt) 85%, transparent);
+    opacity: 0.32;
+}
+
+::deep .dndm-effect-empty-deltas {
+    padding: 0.3rem 0 0.1rem;
+    color: var(--dndm-text-muted);
+    font-style: italic;
+    font-size: 0.85rem;
+}
+
+::deep .dndm-effect-delta-row {
+    display: grid;
+    grid-template-columns: 1fr 5rem auto;
+    gap: 0.4rem;
+    margin-top: 0.35rem;
+    align-items: center;
+}
+
+::deep .dndm-effect-hp-grid {
+    display: grid;
+    grid-template-columns: auto 1fr auto 1fr;
+    gap: 0.35rem 0.5rem;
+    align-items: center;
+    margin-top: 0.5rem;
+}
+
+::deep .dndm-effect-hp-grid .dndm-label {
+    margin: 0;
+    white-space: nowrap;
+}
+
+::deep .dndm-effect-adder-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.4rem;
+    margin-top: 0.75rem;
+}
+
+::deep .dndm-effect-error {
+    margin-top: 0.5rem;
+    color: var(--dndm-danger);
+    font-style: italic;
+    font-size: 0.85rem;
+}

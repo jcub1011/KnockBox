@@ -7,7 +7,9 @@
      tabindex="0"
      @ref="_frameRef"
      @onkeydown="OnKeyDown"
-     @onkeyup="OnKeyUp">
+     @onkeyup="OnKeyUp"
+     @oncontextmenu="OnContextMenu"
+     @oncontextmenu:preventDefault="true">
     <div class="dndm-canvas-toolbar">
         <label class="dndm-grid-toggle">
             <input type="checkbox" checked="@LocalShowGridLines" @onchange="OnToggleGrid" />
@@ -17,8 +19,16 @@
         <span class="dndm-zoom-readout">@($"{_zoom * 100:0}%")</span>
         <button class="dndm-zoom-btn" type="button" @onclick="ZoomIn" title="Zoom in">+</button>
         <button class="dndm-zoom-btn" type="button" @onclick="ResetView" title="Reset view">⟲</button>
+        @if (IsHost)
+        {
+            <button class="dndm-zoom-btn dndm-markup-toggle @(_markupActive ? "dndm-markup-toggle--active" : null)"
+                    type="button"
+                    title="@(_markupActive ? "Stop drawing (markup stays on the map)" : "Draw markup over the map")"
+                    @onclick="ToggleMarkup">✎</button>
+        }
     </div>
 
+    <div class="dndm-canvas-stage">
     <svg id="@_svgId"
          class="dndm-map-canvas"
          viewBox="@ViewBoxString"
@@ -115,6 +125,15 @@
             </g>
         }
 
+        @* Saved markup renders inline so pan + zoom apply uniformly across all
+           viewers (host's interactive overlay below uses a fixed viewBox). *@
+        @if (!string.IsNullOrWhiteSpace(Map.MarkupSvg))
+        {
+            <g class="dndm-markup-readonly" pointer-events="none">
+                @((MarkupString)Map.MarkupSvg)
+            </g>
+        }
+
         <TokenLayer State="State"
                     Map="Map"
                     IsHost="IsHost"
@@ -159,4 +178,35 @@
             </g>
         }
     </svg>
+
+    @if (IsHost && _markupActive)
+    {
+        @* Sits inside .dndm-canvas-stage so its inset:0 covers exactly
+           the visible map area. Both this surface and the underlying
+           MapCanvas SVG use the same preserveAspectRatio rule, so a
+           stroke at viewBox coords (5, 5) lands on the same cell. *@
+        <div class="dndm-markup-overlay-mount">
+            <MarkupOverlay State="State" Map="Map" IsActive="true" />
+        </div>
+    }
+    </div>
+
+    @if (IsHost && _contextMenuOpen)
+    {
+        <div class="dndm-context-veil"
+             @onclick="CloseContextMenu"
+             @oncontextmenu="CloseContextMenu"
+             @oncontextmenu:preventDefault="true"></div>
+        <div class="dndm-context-menu"
+             style="@($"left: {F(_contextMenuClientX)}px; top: {F(_contextMenuClientY)}px;")"
+             @onclick:stopPropagation="true">
+            <div class="dndm-context-menu-head">
+                Cell @(_contextMenuMapX.ToString("0.#")), @(_contextMenuMapY.ToString("0.#"))
+            </div>
+            <button class="dndm-context-menu-item" type="button" @onclick="RequestCenterEveryone">
+                <span class="dndm-context-menu-glyph" aria-hidden="true">⊙</span>
+                <span>Centre everyone here</span>
+            </button>
+        </div>
+    }
 </div>

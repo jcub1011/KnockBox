@@ -1,0 +1,209 @@
+/* Host's initiative tracker panel — lives in the left rail.
+   Forge & Ember chrome, slightly tighter rows than the player banner
+   since the GM is reading a tool surface rather than a stage. */
+
+::deep .dndm-initiative-host-state {
+    font-family: var(--font-primary);
+    font-style: normal;
+    font-size: 0.75rem;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--dndm-ember-hi);
+    text-shadow: 0 0 6px rgba(232, 144, 85, 0.3);
+}
+
+::deep .dndm-initiative-host-blurb {
+    margin: 0 0 0.7rem 0;
+    color: var(--dndm-text-dim);
+    font-size: 0.88rem;
+    line-height: 1.5;
+    font-style: italic;
+    padding-left: 0.6rem;
+    border-left: 2px solid var(--dndm-border-accent);
+}
+
+::deep .dndm-initiative-empty {
+    color: var(--dndm-text-muted);
+    font-style: italic;
+    font-size: 0.88rem;
+    padding: 0.4rem 0;
+}
+
+/* ─── NPC picker ────────────────────────────────────────────────── */
+::deep .dndm-initiative-picker {
+    list-style: none;
+    margin: 0 0 0.55rem 0;
+    padding: 0;
+    max-height: 40vh;
+    overflow-y: auto;
+}
+
+::deep .dndm-initiative-picker-item {
+    padding: 0.25rem 0;
+}
+
+::deep .dndm-initiative-picker-row {
+    display: grid;
+    grid-template-columns: 18px 14px 1fr;
+    gap: 0.55rem;
+    align-items: center;
+    padding: 0.3rem 0.45rem;
+    background: rgba(12, 10, 8, 0.45);
+    border: 1px solid var(--dndm-border);
+    border-radius: 2px;
+    cursor: pointer;
+    transition: background 120ms ease, border-color 120ms ease;
+}
+
+::deep .dndm-initiative-picker-row:hover {
+    background: rgba(196, 116, 56, 0.12);
+    border-color: var(--dndm-border-accent);
+}
+
+::deep .dndm-initiative-picker-swatch {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 1px solid var(--dndm-border-strong);
+    box-shadow: inset 0 0 0 1px rgba(255, 220, 180, 0.12);
+}
+
+::deep .dndm-initiative-picker-name {
+    font-family: var(--dndm-display);
+    font-style: italic;
+    font-size: 0.98rem;
+    color: var(--dndm-text);
+    letter-spacing: 0.2px;
+}
+
+::deep .dndm-initiative-picker-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.4rem;
+    margin-top: 0.4rem;
+}
+
+/* ─── Active host rows ──────────────────────────────────────────── */
+::deep .dndm-initiative-host-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+}
+
+::deep .dndm-initiative-host-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+
+::deep .dndm-initiative-host-row {
+    display: grid;
+    grid-template-columns: 1.5rem 1fr auto;
+    gap: 0.45rem;
+    align-items: center;
+    padding: 0.4rem 0.55rem;
+    background: rgba(12, 10, 8, 0.5);
+    border: 1px solid var(--dndm-border);
+    border-radius: 2px;
+}
+
+::deep .dndm-initiative-host-row > .dndm-initiative-host-name {
+    grid-column: span 1;
+}
+
+/* Waiting variant uses a 2-column layout (no order index, name fills) */
+::deep .dndm-initiative-host-row:not(.dndm-initiative-host-row--current):not(:has(.dndm-initiative-host-order)) {
+    grid-template-columns: 1fr auto;
+}
+
+::deep .dndm-initiative-host-row--rolled {
+    border-left: 2px solid var(--dndm-ember);
+}
+
+::deep .dndm-initiative-host-row--current {
+    background: linear-gradient(180deg, rgba(196, 116, 56, 0.25), rgba(12, 10, 8, 0.6));
+    border-color: var(--dndm-ember);
+    box-shadow: inset 0 1px 0 rgba(255, 220, 180, 0.18), 0 0 10px rgba(232, 144, 85, 0.15);
+}
+
+::deep .dndm-initiative-host-order {
+    font-family: var(--font-primary);
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    color: var(--dndm-ember-hi);
+    text-align: center;
+}
+
+::deep .dndm-initiative-host-name {
+    font-family: var(--dndm-display);
+    font-style: italic;
+    font-size: 1rem;
+    color: var(--dndm-text);
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.4rem;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+::deep .dndm-initiative-host-roll {
+    font-family: var(--font-primary);
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: var(--dndm-text);
+    font-variant-numeric: tabular-nums;
+    min-width: 2.5ch;
+    text-align: right;
+}
+
+::deep .dndm-initiative-host-npc-actions {
+    display: inline-flex;
+    gap: 0.35rem;
+    align-items: center;
+}
+
+::deep .dndm-initiative-host-npc-actions .dndm-input--num {
+    width: 4rem;
+}
+
+::deep .dndm-initiative-host-remove {
+    padding: 0.2rem 0.45rem;
+    font-size: 0.85rem;
+    color: var(--dndm-text-muted);
+}
+
+::deep .dndm-initiative-host-remove:hover {
+    color: var(--dndm-danger);
+    border-color: var(--dndm-danger);
+    background: rgba(176, 74, 58, 0.15);
+}
+
+::deep .dndm-initiative-host-actions {
+    display: flex;
+    gap: 0.4rem;
+    margin-top: 0.3rem;
+}
+
+::deep .dndm-initiative-host-actions .dndm-btn--primary {
+    flex: 1 1 auto;
+}
+
+::deep .dndm-initiative-host-add {
+    padding: 0.55rem 0.65rem;
+    background: rgba(12, 10, 8, 0.55);
+    border: 1px solid var(--dndm-border-accent);
+    border-radius: 2px;
+    margin-top: 0.35rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+::deep .dndm-initiative-host-add-row {
+    display: grid;
+    grid-template-columns: 1fr 4.5rem auto;
+    gap: 0.4rem;
+    align-items: center;
+}

@@ -106,10 +106,68 @@ namespace KnockBox.DndMapper.Pages.Components
             base.OnParametersSet();
         }
 
+        // ── Markup overlay (v1.x — §5.6) ─────────────────────────────────
+        // Host-only toggle: when true, an interactive SvgDrawingCanvas covers the
+        // map. The read-only saved markup is rendered inline on the SVG so pan
+        // and zoom apply uniformly for everyone.
+        private bool _markupActive;
+        internal bool MarkupActive => _markupActive;
+
+        // ── Centre-viewport broadcast (v1.x — §6.4) ──────────────────────
+        // Last-seen request Nonce. When the server pushes a new request with a
+        // fresh nonce, every client (including the host who sent it) recentres.
+        private Guid? _lastSeenCenterNonce;
+
+        // ── Right-click context menu ─────────────────────────────────────
+        private bool _contextMenuOpen;
+        private double _contextMenuClientX;
+        private double _contextMenuClientY;
+        // Map-space coordinates of the right-clicked cell (already snapped to grid
+        // when grid snap is enabled). Captured at open-time so subsequent menu
+        // actions act on the cell the user actually right-clicked.
+        private double _contextMenuMapX;
+        private double _contextMenuMapY;
+
+        private IDisposable? _stateSub;
+
         protected override void OnInitialized()
         {
             TokenFocus.Focused += OnTokenFocusRequested;
+            _stateSub = State.StateChangedEventManager.Subscribe(OnStateChanged);
+            // Seed the "last seen" nonce so an existing request from before the
+            // page loaded doesn't snap the viewport on first render.
+            _lastSeenCenterNonce = State.PendingCenterRequest?.Nonce;
             base.OnInitialized();
+        }
+
+        private async ValueTask OnStateChanged()
+        {
+            // Reactor for the host's "centre everyone here" broadcast. Compare
+            // against the last-seen nonce so identical successive requests still
+            // re-centre (the engine issues a fresh Guid on every verb call).
+            var req = State.PendingCenterRequest;
+            if (req is not null && req.Nonce != _lastSeenCenterNonce && req.MapId == Map.Id)
+            {
+                _lastSeenCenterNonce = req.Nonce;
+                double viewW = Map.Grid.WidthCells / _zoom;
+                double viewH = Map.Grid.HeightCells / _zoom;
+                _panX = req.X - viewW / 2.0;
+                _panY = req.Y - viewH / 2.0;
+                PublishViewport();
+            }
+            await InvokeAsync(StateHasChanged);
+        }
+
+        private async Task ToggleMarkup()
+        {
+            _markupActive = !_markupActive;
+            if (_markupActive)
+            {
+                // The interactive drawing surface uses a fixed 0..W × 0..H viewBox
+                // (in grid cell units), so the host must be at 1.0 zoom / 0,0 pan
+                // for the stroke to land on the intended cell. ResetView snaps both.
+                await ResetView();
+            }
         }
 
         private async void OnTokenFocusRequested(Guid tokenId)
@@ -173,6 +231,7 @@ namespace KnockBox.DndMapper.Pages.Components
         public async ValueTask DisposeAsync()
         {
             TokenFocus.Focused -= OnTokenFocusRequested;
+            _stateSub?.Dispose();
             if (_metricsModule is not null)
             {
                 try { await _metricsModule.DisposeAsync(); }
@@ -180,6 +239,65 @@ namespace KnockBox.DndMapper.Pages.Components
                 _metricsModule = null;
             }
             Dispose();
+        }
+
+        // ── Right-click context menu handlers ─────────────────────────────
+        private async Task OnContextMenu(MouseEventArgs e)
+        {
+            if (!IsHost) return;
+
+            // Resolve the click into map-space coordinates so menu actions
+            // (e.g. "centre everyone here") can use the targeted cell.
+            var (mx, my) = await ClientToMapAsync(e.ClientX, e.ClientY);
+            if (Map.Grid.SnapToGrid)
+            {
+                mx = Math.Floor(mx) + 0.5;
+                my = Math.Floor(my) + 0.5;
+            }
+
+            _contextMenuMapX = mx;
+            _contextMenuMapY = my;
+            _contextMenuClientX = e.ClientX;
+            _contextMenuClientY = e.ClientY;
+            _contextMenuOpen = true;
+        }
+
+        private void CloseContextMenu() => _contextMenuOpen = false;
+
+        private void RequestCenterEveryone()
+        {
+            _contextMenuOpen = false;
+            var user = UserService.CurrentUser;
+            if (user is null) return;
+            Engine.RequestCenterViewportAsync(State, user, Map.Id, _contextMenuMapX, _contextMenuMapY);
+        }
+
+        private async Task<(double X, double Y)> ClientToMapAsync(double clientX, double clientY)
+        {
+            // The SVG viewBox already maps screen pixels into grid-cell units;
+            // recover the cell coords from the cached pixel scale + current pan.
+            await CaptureScaleAsync();
+            if (_pxPerCell <= 0) return (0, 0);
+            try
+            {
+                if (_metricsModule is null) return (_panX, _panY);
+                var rect = await _metricsModule.InvokeAsync<ViewportMetrics?>("getViewportMetrics", _svgId);
+                if (rect is null || rect.SvgWidth == 0) return (_panX, _panY);
+                // getViewportMetrics returns the SVG box dimensions in client px;
+                // the SVG itself is offset by getBoundingClientRect.left/top, which
+                // we don't have here. Approximate by using the difference between
+                // client position and the metrics' "left" offset (rails width). For
+                // M01 ship this is good enough for the centre-viewport affordance.
+                double localX = clientX - rect.LeftPx;
+                double localY = clientY;
+                double mapX = _panX + localX / _pxPerCell;
+                double mapY = _panY + localY / _pxPerCell;
+                return (mapX, mapY);
+            }
+            catch
+            {
+                return (_panX, _panY);
+            }
         }
 
         private static string F(double value) =>
