@@ -129,6 +129,20 @@ namespace KnockBox.DndMapper.Pages.Components
         private static string FormatMod(int mod) =>
             mod >= 0 ? $"+{mod}" : mod.ToString(CultureInfo.InvariantCulture);
 
+        // Tooltip for the Max HP effective indicator — lists every StatusEffect
+        // whose MaxHpDelta is non-zero with name + signed delta.
+        private static string FormatMaxHpBreakdown(CharacterSheet sheet)
+        {
+            var lines = new List<string>();
+            foreach (var effect in sheet.StatusEffects)
+            {
+                if (effect.MaxHpDelta is not int d || d == 0) continue;
+                var sign = d >= 0 ? "+" : "−";
+                lines.Add($"{effect.Name}: {sign}{Math.Abs(d)}");
+            }
+            return lines.Count == 0 ? string.Empty : string.Join("\n", lines);
+        }
+
         // Tooltip for the Status Effects column — first entry is the base
         // value, the rest are per-effect deltas in encounter order. Drop the
         // base line when there are no deltas (the cell shows "—" already).

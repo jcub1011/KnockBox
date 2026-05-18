@@ -21,6 +21,10 @@ namespace KnockBox.DndMapper.Services.State.Games
         public Dictionary<Guid, NamedTemplate> CustomTemplates { get; } = [];
         public List<RollResult> RollLog { get; } = [];
 
+        // Host-managed roll templates that ride with the save slot and are
+        // visible to every sheet. Players can't author or edit these.
+        public List<RollTemplate> GlobalRollTemplates { get; } = [];
+
         // Status-effect templates live as children of NamedTemplate
         // (attribute schemas). This id pins which schema the Effect Library
         // modal and the quick-apply dropdown read from. Null when the active
@@ -39,6 +43,43 @@ namespace KnockBox.DndMapper.Services.State.Games
         public static readonly Guid BuiltInDnD5eCoreId = new("d0000000-0000-0000-0000-000000000001");
         public static readonly Guid BuiltInDnD5ePlusSkillsId = new("d0000000-0000-0000-0000-000000000002");
         public static readonly Guid BuiltInSimpleD20Id = new("d0000000-0000-0000-0000-000000000003");
+
+        // Built-in roll templates — bare dice with no attribute mod or flat,
+        // never serialized, never edited. The set is intentionally small;
+        // anything more elaborate (Initiative +DEX, attack rolls, etc.)
+        // belongs as a host-authored global or a per-sheet template.
+        public static readonly Guid BuiltInRollD4Id = new("d0000000-0000-0000-0000-000000000101");
+        public static readonly Guid BuiltInRollD6Id = new("d0000000-0000-0000-0000-000000000102");
+        public static readonly Guid BuiltInRollD8Id = new("d0000000-0000-0000-0000-000000000103");
+        public static readonly Guid BuiltInRollD10Id = new("d0000000-0000-0000-0000-000000000104");
+        public static readonly Guid BuiltInRollD12Id = new("d0000000-0000-0000-0000-000000000105");
+        public static readonly Guid BuiltInRollD20Id = new("d0000000-0000-0000-0000-000000000106");
+        public static readonly Guid BuiltInRollD100Id = new("d0000000-0000-0000-0000-000000000107");
+        public static readonly Guid BuiltInRoll2d6Id = new("d0000000-0000-0000-0000-000000000108");
+        public static readonly Guid BuiltInRoll4d6Id = new("d0000000-0000-0000-0000-000000000109");
+
+        public static readonly IReadOnlyList<RollTemplate> BuiltInRollTemplates =
+        [
+            BuiltInRoll(BuiltInRollD4Id, "d4", 1, 4),
+            BuiltInRoll(BuiltInRollD6Id, "d6", 1, 6),
+            BuiltInRoll(BuiltInRollD8Id, "d8", 1, 8),
+            BuiltInRoll(BuiltInRollD10Id, "d10", 1, 10),
+            BuiltInRoll(BuiltInRollD12Id, "d12", 1, 12),
+            BuiltInRoll(BuiltInRollD20Id, "d20", 1, 20),
+            BuiltInRoll(BuiltInRollD100Id, "d100", 1, 100),
+            BuiltInRoll(BuiltInRoll2d6Id, "2d6", 2, 6),
+            BuiltInRoll(BuiltInRoll4d6Id, "4d6", 4, 6),
+        ];
+
+        private static RollTemplate BuiltInRoll(Guid id, string name, int count, int sides) =>
+            new(id, name, [new DiceTerm(count, sides)], 0, RollMode.Normal, null, name, RollTemplateScope.BuiltIn);
+
+        public static bool IsBuiltInRollTemplateId(Guid id)
+        {
+            foreach (var t in BuiltInRollTemplates)
+                if (t.Id == id) return true;
+            return false;
+        }
 
         public DndMapperGameState(User host, ILogger<DndMapperGameState> logger)
             : base(host, logger)

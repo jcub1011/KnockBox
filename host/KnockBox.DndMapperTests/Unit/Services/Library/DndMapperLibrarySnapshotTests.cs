@@ -38,7 +38,7 @@ namespace KnockBox.DndMapperTests.Unit.Services.Library
 
             var snap = LibrarySnapshotMapper.FromState(state);
 
-            Assert.AreEqual(2, snap.SchemaVersion);
+            Assert.AreEqual(3, snap.SchemaVersion);
             Assert.HasCount(1, snap.Maps);
             Assert.AreEqual("Forest", snap.Maps[0].Name);
             Assert.HasCount(1, snap.Maps[0].Tokens);
@@ -310,7 +310,87 @@ namespace KnockBox.DndMapperTests.Unit.Services.Library
             var sheet = reread.Sheets.Single(s => s.Id == sheetId);
             Assert.HasCount(1, sheet.StatusEffects);
             Assert.AreEqual("Bleed", sheet.StatusEffects[0].Name);
-            Assert.AreEqual(2, reread.SchemaVersion);
+            Assert.AreEqual(3, reread.SchemaVersion);
+        }
+
+        // ── Roll-template persistence (V3) ───────────────────────────────────────
+
+        [TestMethod]
+        public void FromState_PersistsGlobalRollTemplates()
+        {
+            var (engine, state, host, _) = EngineTestFactory.Build();
+            Assert.IsTrue(engine.CreateGlobalRollTemplateAsync(state, host, "Initiative",
+                [new DiceTerm(1, 20)], 0, RollMode.Normal, "DEX", "Initiative").IsSuccess);
+
+            var snap = LibrarySnapshotMapper.FromState(state);
+
+            Assert.HasCount(1, snap.GlobalRollTemplates);
+            Assert.AreEqual("Initiative", snap.GlobalRollTemplates[0].Name);
+            Assert.AreEqual("DEX", snap.GlobalRollTemplates[0].AttributeName);
+            Assert.HasCount(1, snap.GlobalRollTemplates[0].Dice);
+            Assert.AreEqual(20, snap.GlobalRollTemplates[0].Dice[0].Sides);
+        }
+
+        [TestMethod]
+        public void FromState_PersistsSheetRollTemplates()
+        {
+            var (engine, state, host, _) = EngineTestFactory.Build();
+            Assert.IsTrue(engine.CreateSheetAsync(state, host, ownerUserId: null, "Goblin")
+                .TryGetSuccess(out var sheetId));
+            Assert.IsTrue(engine.CreateSheetRollTemplateAsync(state, host, sheetId, "Spell",
+                [new DiceTerm(1, 20)], 5, RollMode.Normal, "INT", "Spell").IsSuccess);
+
+            var snap = LibrarySnapshotMapper.FromState(state);
+            var sheetSnap = snap.Sheets.Single(s => s.Id == sheetId);
+
+            Assert.HasCount(1, sheetSnap.RollTemplates);
+            Assert.AreEqual("Spell", sheetSnap.RollTemplates[0].Name);
+            Assert.AreEqual(5, sheetSnap.RollTemplates[0].FlatModifier);
+            Assert.AreEqual("INT", sheetSnap.RollTemplates[0].AttributeName);
+        }
+
+        [TestMethod]
+        public void Snapshot_RollTemplates_RoundTripThroughJson()
+        {
+            var (engine, state, host, _) = EngineTestFactory.Build();
+            Assert.IsTrue(engine.CreateGlobalRollTemplateAsync(state, host, "Init",
+                [new DiceTerm(1, 20)], 0, RollMode.Normal, "DEX", "Init").IsSuccess);
+            Assert.IsTrue(engine.CreateSheetAsync(state, host, ownerUserId: null, "G")
+                .TryGetSuccess(out var sheetId));
+            Assert.IsTrue(engine.CreateSheetRollTemplateAsync(state, host, sheetId, "Atk",
+                [new DiceTerm(1, 20)], 5, RollMode.Advantage, "STR", "Atk").IsSuccess);
+
+            var json = JsonSerializer.Serialize(LibrarySnapshotMapper.FromState(state), JsonOptions);
+            var reread = JsonSerializer.Deserialize<LibrarySnapshot>(json, JsonOptions);
+
+            Assert.IsNotNull(reread);
+            Assert.HasCount(1, reread!.GlobalRollTemplates);
+            Assert.AreEqual("DEX", reread.GlobalRollTemplates[0].AttributeName);
+            var sheet = reread.Sheets.Single(s => s.Id == sheetId);
+            Assert.HasCount(1, sheet.RollTemplates);
+            Assert.AreEqual(RollMode.Advantage, sheet.RollTemplates[0].Mode);
+            Assert.AreEqual(5, sheet.RollTemplates[0].FlatModifier);
+        }
+
+        [TestMethod]
+        public void FromRollTemplateSnapshot_AssignsScopeFromLocation()
+        {
+            var snap = new RollTemplateSnapshot
+            {
+                Id = Guid.NewGuid(),
+                Name = "x",
+                Dice = [new DiceTermSnapshot { Count = 1, Sides = 20 }],
+                FlatModifier = 0,
+                Mode = RollMode.Normal,
+                AttributeName = null,
+                Label = "x",
+            };
+
+            var asGlobal = LibrarySnapshotMapper.FromRollTemplateSnapshot(snap, RollTemplateScope.Global);
+            var asSheet = LibrarySnapshotMapper.FromRollTemplateSnapshot(snap, RollTemplateScope.Sheet);
+
+            Assert.AreEqual(RollTemplateScope.Global, asGlobal.Scope);
+            Assert.AreEqual(RollTemplateScope.Sheet, asSheet.Scope);
         }
 
         [TestMethod]

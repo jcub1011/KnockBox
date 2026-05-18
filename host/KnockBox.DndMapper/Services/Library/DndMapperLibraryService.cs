@@ -577,8 +577,14 @@ namespace KnockBox.DndMapper.Services.Library
                         sheet.Values[kv.Key] = LibrarySnapshotMapper.ToAttributeValue(kv.Value);
                     foreach (var effectSnap in sheetSnap.StatusEffects)
                         sheet.StatusEffects.Add(LibrarySnapshotMapper.FromStatusEffectSnapshot(effectSnap));
+                    foreach (var rtSnap in sheetSnap.RollTemplates)
+                        sheet.RollTemplates.Add(LibrarySnapshotMapper.FromRollTemplateSnapshot(rtSnap, RollTemplateScope.Sheet));
                     state.Sheets[sheet.Id] = sheet;
                 }
+
+                state.GlobalRollTemplates.Clear();
+                foreach (var rtSnap in snapshot.GlobalRollTemplates)
+                    state.GlobalRollTemplates.Add(LibrarySnapshotMapper.FromRollTemplateSnapshot(rtSnap, RollTemplateScope.Global));
 
                 state.CustomTemplates.Clear();
                 // Re-seed built-ins before user templates so their Rows are

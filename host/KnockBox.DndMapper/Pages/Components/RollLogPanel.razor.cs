@@ -37,6 +37,8 @@ namespace KnockBox.DndMapper.Pages.Components
 
         private List<CharacterSheet> _pickableSheets = [];
 
+        private bool _libraryOpen;
+
         protected override void OnInitialized()
         {
             _stateSub = State.StateChangedEventManager.Subscribe(async () => await InvokeAsync(StateHasChanged));
@@ -157,10 +159,84 @@ namespace KnockBox.DndMapper.Pages.Components
             }
         }
 
+        private bool HasAssignedSheet =>
+            !IsHost && State.Sheets.Values.Any(s => s.OwnerUserId == CurrentUserId);
+
+        // The sheet whose per-sheet roll templates the panel should surface
+        // and the library modal should author against. Players are pinned to
+        // their assigned sheet; the host follows the From Sheet picker.
+        private CharacterSheet? ActiveSheetForTemplates =>
+            IsHost
+                ? PickerSheet
+                : State.Sheets.Values.FirstOrDefault(s => s.OwnerUserId == CurrentUserId);
+
+        private IEnumerable<RollTemplate> VisibleRollTemplates
+        {
+            get
+            {
+                foreach (var t in DndMapperGameState.BuiltInRollTemplates) yield return t;
+                foreach (var t in State.GlobalRollTemplates) yield return t;
+                var sheet = ActiveSheetForTemplates;
+                if (sheet is not null)
+                {
+                    foreach (var t in sheet.RollTemplates) yield return t;
+                }
+            }
+        }
+
+        private static string ScopeClass(RollTemplateScope scope) => scope switch
+        {
+            RollTemplateScope.BuiltIn => "dndm-chip--builtin",
+            RollTemplateScope.Global => "dndm-chip--global",
+            RollTemplateScope.Sheet => "dndm-chip--sheet",
+            _ => string.Empty,
+        };
+
+        private static string TemplateTooltip(RollTemplate t)
+        {
+            var dice = string.Join("+", t.Dice.Select(d => $"{d.Count}d{d.Sides}"));
+            var attr = string.IsNullOrEmpty(t.AttributeName) ? string.Empty : $" +{t.AttributeName}";
+            var flat = t.FlatModifier == 0
+                ? string.Empty
+                : (t.FlatModifier > 0 ? $" +{t.FlatModifier}" : $" {t.FlatModifier}");
+            var mode = t.Mode switch
+            {
+                RollMode.Advantage => " (ADV)",
+                RollMode.Disadvantage => " (DIS)",
+                _ => string.Empty,
+            };
+            return $"{dice}{attr}{flat}{mode}";
+        }
+
+        // Applies a template's configured dice / flat / mode / label / attribute
+        // into the shared Config. Missing-attribute resolution: if the active
+        // schema doesn't carry the template's AttributeName, leave the field
+        // unselected so the next roll uses no attribute mod. Restoring the
+        // schema later re-binds without data loss because the template's
+        // stored name is never mutated by a schema swap.
+        private void ApplyTemplate(RollTemplate t)
+        {
+            Config.Terms = [.. t.Dice];
+            Config.FlatModifier = t.FlatModifier;
+            Config.Mode = t.Mode;
+            Config.Label = t.Label ?? string.Empty;
+
+            if (!string.IsNullOrEmpty(t.AttributeName)
+                && State.AttributeSchema.Rows.Any(r => r.Name == t.AttributeName))
+            {
+                Config.AttributeName = t.AttributeName;
+            }
+            else
+            {
+                Config.AttributeName = null;
+            }
+        }
+
+        private void OpenTemplateLibrary() => _libraryOpen = true;
+        private void CloseTemplateLibrary() => _libraryOpen = false;
+
         private int TotalDiceCount => Config.Terms.Sum(t => Math.Max(0, t.Count));
         private bool CanAdvDis => Config.Terms.Count == 1 && Config.Terms[0].Count == 1;
-        private bool CanRollInitiative => PickerSheet is not null
-            && State.AttributeSchema.Rows.Any(r => r.Name.Equals("DEX", StringComparison.OrdinalIgnoreCase));
 
         private static string PillCls(bool active) => active ? "active" : string.Empty;
 
@@ -211,24 +287,6 @@ namespace KnockBox.DndMapper.Pages.Components
         private void OnFlatModChange(object? raw) => Config.FlatModifier = ParseInt(raw, Config.FlatModifier);
 
         private void SetMode(RollMode mode) => Config.Mode = mode;
-
-        private void QuickPreset(int count, int sides, string label)
-        {
-            Config.Terms = [new DiceTerm(count, sides)];
-            Config.AttributeName = null;
-            Config.FlatModifier = 0;
-            Config.Mode = RollMode.Normal;
-            Config.Label = label;
-        }
-
-        private void InitiativePreset()
-        {
-            Config.Terms = [new DiceTerm(1, 20)];
-            Config.AttributeName = "DEX";
-            Config.FlatModifier = 0;
-            Config.Mode = RollMode.Normal;
-            Config.Label = "Initiative";
-        }
 
         public override void Dispose()
         {

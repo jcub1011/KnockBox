@@ -23,14 +23,19 @@
             <summary class="dndm-rolllog-config-summary">Configuration</summary>
             <div class="dndm-rolllog-config-body">
                 <section class="dndm-dice-quick">
-                    <span class="dndm-label">Quick</span>
+                    <span class="dndm-label">Templates</span>
                     <div class="dndm-dice-quick-row">
-                        <button class="dndm-btn dndm-btn--small" type="button" @onclick="@(() => QuickPreset(1, 20, "d20"))">d20</button>
-                        <button class="dndm-btn dndm-btn--small" type="button" @onclick="@(() => QuickPreset(2, 6, "2d6"))">2d6</button>
-                        @if (CanRollInitiative)
+                        @foreach (var t in VisibleRollTemplates)
                         {
-                            <button class="dndm-btn dndm-btn--small" type="button" @onclick="InitiativePreset">Initiative</button>
+                            <button @key="t.Id"
+                                    class="@($"dndm-btn dndm-btn--small {ScopeClass(t.Scope)}")"
+                                    type="button"
+                                    title="@TemplateTooltip(t)"
+                                    @onclick="@(() => ApplyTemplate(t))">@t.Name</button>
                         }
+                        <button class="dndm-btn dndm-btn--small dndm-btn--ghost"
+                                type="button"
+                                @onclick="OpenTemplateLibrary">Manage…</button>
                     </div>
                 </section>
 
@@ -64,32 +69,35 @@
                     <div class="dndm-dice-totalcount">Total dice: <strong>@TotalDiceCount</strong> / 20</div>
                 </section>
 
-                <section>
-                    <span class="dndm-label">Attribute mod</span>
-                    <select class="dndm-select" @onchange="@(e => OnAttributeChange((string?)e.Value))">
-                        <option value="">— none —</option>
-                        @if (PickerSheet is not null)
-                        {
-                            @foreach (var row in State.AttributeSchema.Rows)
+                @if (IsHost || HasAssignedSheet)
+                {
+                    <section>
+                        <span class="dndm-label">Attribute mod</span>
+                        <select class="dndm-select" @onchange="@(e => OnAttributeChange((string?)e.Value))">
+                            <option value="">— none —</option>
+                            @if (PickerSheet is not null)
                             {
-                                if (row.Type == AttributeValueType.Score || row.Type == AttributeValueType.Modifier)
+                                @foreach (var row in State.AttributeSchema.Rows)
                                 {
-                                    <option value="@row.Name" selected="@(Config.AttributeName == row.Name)">@row.Name</option>
+                                    if (row.Type == AttributeValueType.Score || row.Type == AttributeValueType.Modifier)
+                                    {
+                                        <option value="@row.Name" selected="@(Config.AttributeName == row.Name)">@row.Name</option>
+                                    }
                                 }
                             }
-                        }
-                    </select>
-                    @if (IsHost && _pickableSheets.Count > 1)
-                    {
-                        <span class="dndm-label" style="margin-top:0.4rem">From sheet</span>
-                        <select class="dndm-select" @onchange="@(e => OnSheetChange((string?)e.Value))">
-                            @foreach (var s in _pickableSheets)
-                            {
-                                <option value="@s.Id" selected="@(Config.PickerSheetId == s.Id)">@(string.IsNullOrEmpty(s.CharacterName) ? "(unnamed)" : s.CharacterName)</option>
-                            }
                         </select>
-                    }
-                </section>
+                        @if (IsHost)
+                        {
+                            <span class="dndm-label" style="margin-top:0.4rem">From sheet</span>
+                            <select class="dndm-select" @onchange="@(e => OnSheetChange((string?)e.Value))">
+                                @foreach (var s in _pickableSheets)
+                                {
+                                    <option value="@s.Id" selected="@(Config.PickerSheetId == s.Id)">@(string.IsNullOrEmpty(s.CharacterName) ? "(unnamed)" : s.CharacterName)</option>
+                                }
+                            </select>
+                        }
+                    </section>
+                }
 
                 <section>
                     <span class="dndm-label">Flat modifier</span>
@@ -146,6 +154,15 @@
         </div>
     </div>
 </section>
+
+@if (_libraryOpen)
+{
+    <RollTemplateLibraryModal State="State"
+                              Sheet="ActiveSheetForTemplates"
+                              Caller="@(UserService.CurrentUser)"
+                              IsHost="IsHost"
+                              OnClose="CloseTemplateLibrary" />
+}
 
 @if (_historyOpen)
 {

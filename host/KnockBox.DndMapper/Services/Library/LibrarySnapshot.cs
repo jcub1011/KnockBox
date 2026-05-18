@@ -23,7 +23,7 @@ namespace KnockBox.DndMapper.Services.Library
     /// </remarks>
     internal sealed record LibrarySnapshot
     {
-        public int SchemaVersion { get; init; } = 2;
+        public int SchemaVersion { get; init; } = 3;
         public DndMapperSettings Settings { get; init; } = new();
         public AttributeSchemaSnapshot AttributeSchema { get; init; } = new();
         // Set when the live schema came from a known NamedTemplate (built-in
@@ -33,6 +33,28 @@ namespace KnockBox.DndMapper.Services.Library
         public List<MapSnapshot> Maps { get; init; } = [];
         public List<SheetSnapshot> Sheets { get; init; } = [];
         public List<NamedTemplateSnapshot> CustomTemplates { get; init; } = [];
+        // Host-managed roll templates that ride with the save slot. Built-ins
+        // are never serialized; sheet-scoped templates ride on SheetSnapshot.
+        public List<RollTemplateSnapshot> GlobalRollTemplates { get; init; } = [];
+    }
+
+    internal sealed record RollTemplateSnapshot
+    {
+        public Guid Id { get; init; }
+        public string Name { get; init; } = string.Empty;
+        public List<DiceTermSnapshot> Dice { get; init; } = [];
+        public int FlatModifier { get; init; }
+        public RollMode Mode { get; init; } = RollMode.Normal;
+        public string? AttributeName { get; init; }
+        public string Label { get; init; } = string.Empty;
+        // Scope is implicit by location (LibrarySnapshot.GlobalRollTemplates →
+        // Global; SheetSnapshot.RollTemplates → Sheet) so we don't store it.
+    }
+
+    internal sealed record DiceTermSnapshot
+    {
+        public int Count { get; init; }
+        public int Sides { get; init; }
     }
 
     internal sealed record NamedTemplateSnapshot
@@ -131,6 +153,7 @@ namespace KnockBox.DndMapper.Services.Library
         public int? Hp { get; init; }
         public int? MaxHp { get; init; }
         public List<StatusEffectSnapshot> StatusEffects { get; init; } = [];
+        public List<RollTemplateSnapshot> RollTemplates { get; init; } = [];
         // OwnerUserId not persisted (see TokenSnapshot rationale).
     }
 
@@ -210,15 +233,40 @@ namespace KnockBox.DndMapper.Services.Library
 
             return new LibrarySnapshot
             {
-                SchemaVersion = 2,
+                SchemaVersion = 3,
                 Settings = state.Settings.Clone(),
                 AttributeSchema = ToSchemaSnapshot(state.AttributeSchema),
                 ActiveSchemaTemplateId = state.ActiveSchemaTemplateId,
                 Maps = maps,
                 Sheets = sheets,
                 CustomTemplates = templates,
+                GlobalRollTemplates = state.GlobalRollTemplates
+                    .Select(ToRollTemplateSnapshot)
+                    .ToList(),
             };
         }
+
+        public static RollTemplateSnapshot ToRollTemplateSnapshot(RollTemplate t) => new()
+        {
+            Id = t.Id,
+            Name = t.Name,
+            Dice = t.Dice.Select(d => new DiceTermSnapshot { Count = d.Count, Sides = d.Sides }).ToList(),
+            FlatModifier = t.FlatModifier,
+            Mode = t.Mode,
+            AttributeName = t.AttributeName,
+            Label = t.Label,
+        };
+
+        public static RollTemplate FromRollTemplateSnapshot(RollTemplateSnapshot s, RollTemplateScope scope) =>
+            new(
+                s.Id,
+                s.Name,
+                s.Dice.Select(d => new DiceTerm(d.Count, d.Sides)).ToList(),
+                s.FlatModifier,
+                s.Mode,
+                s.AttributeName,
+                s.Label,
+                scope);
 
         public static StatusEffectTemplateSnapshot ToStatusEffectTemplateSnapshot(StatusEffectTemplate t) => new()
         {
@@ -359,6 +407,7 @@ namespace KnockBox.DndMapper.Services.Library
             Hp = sheet.Hp,
             MaxHp = sheet.MaxHp,
             StatusEffects = sheet.StatusEffects.Select(ToStatusEffectSnapshot).ToList(),
+            RollTemplates = sheet.RollTemplates.Select(ToRollTemplateSnapshot).ToList(),
         };
     }
 }

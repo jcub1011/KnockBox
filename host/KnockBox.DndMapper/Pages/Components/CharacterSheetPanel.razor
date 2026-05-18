@@ -297,6 +297,12 @@
                                        value="@sheet.MaxHp"
                                        disabled="@(!canEdit)"
                                        @onchange="@(e => OnMaxHpDirect(sheet, (string?)e.Value))" />
+                                @{ var effMax = EffectiveMaxHpResolver.ResolveEffectiveMaxHp(sheet); }
+                                @if (effMax is int em && em != sheet.MaxHp)
+                                {
+                                    <span class="dndm-sheet-hp-effective @(em > sheet.MaxHp ? "is-pos" : "is-neg")"
+                                          title="@FormatMaxHpBreakdown(sheet)">(eff: @em)</span>
+                                }
                                 <button class="dndm-btn dndm-btn--small dndm-btn--icon"
                                         type="button"
                                         disabled="@(!canEdit)"

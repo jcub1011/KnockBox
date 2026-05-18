@@ -1597,6 +1597,198 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                 sheet.Hp = max;
         }
 
+        // ── Roll template verbs ───────────────────────────────────────────────────
+        //
+        // Three tiers exist for roll templates:
+        //   - Built-in: ships with the plugin, static, never edited.
+        //   - Global: lives on DndMapperGameState, host-managed, visible to every sheet.
+        //   - Sheet: lives on CharacterSheet, the sheet owner OR host can manage.
+        //
+        // Roll templates store an optional AttributeName that is *not* mutated on
+        // schema changes — at apply time the panel resolves missing names to
+        // "unselected" so the binding restores when the schema returns.
+
+        private static string? ValidateRollDice(
+            IReadOnlyList<DiceTerm>? dice, RollMode mode)
+        {
+            if (dice is null || dice.Count == 0) return "At least one dice term is required.";
+
+            int totalDice = 0;
+            foreach (var term in dice)
+            {
+                if (term.Count < 1) return "Each dice term must roll at least one die.";
+                if (Array.IndexOf(AllowedDieSides, term.Sides) < 0)
+                    return $"Unsupported die size d{term.Sides}.";
+                totalDice += term.Count;
+            }
+            if (totalDice > MaxRollDiceCount)
+                return "Cannot roll more than 20 dice in a single request.";
+
+            if (mode != RollMode.Normal && (dice.Count != 1 || dice[0].Count != 1))
+                return "Advantage/Disadvantage requires exactly one die.";
+
+            return null;
+        }
+
+        public ValueResult<Guid> CreateGlobalRollTemplateAsync(
+            DndMapperGameState state, User caller, string name,
+            IReadOnlyList<DiceTerm> dice, int flatModifier, RollMode mode,
+            string? attributeName, string? label)
+        {
+            if (state is null) return ValueResult<Guid>.FromError("State is required.");
+            if (caller is null) return ValueResult<Guid>.FromError("Caller is required.");
+            if (string.IsNullOrWhiteSpace(name)) return ValueResult<Guid>.FromError("Template name is required.");
+            if (name.Length > MaxNameLength) return ValueResult<Guid>.FromError($"Template name cannot exceed {MaxNameLength} characters.");
+            if (!IsHost(state, caller)) return ValueResult<Guid>.FromError("Only the host may manage global roll templates.");
+            if (ValidateRollDice(dice, mode) is string diceErr) return ValueResult<Guid>.FromError(diceErr);
+
+            var newId = Guid.NewGuid();
+            var template = new RollTemplate(
+                newId, name, [.. dice], flatModifier, mode,
+                string.IsNullOrWhiteSpace(attributeName) ? null : attributeName,
+                label ?? string.Empty, RollTemplateScope.Global);
+
+            var exec = state.Execute(() => state.GlobalRollTemplates.Add(template));
+            if (exec.IsCanceled) return ValueResult<Guid>.FromCancellation();
+            if (exec.TryGetFailure(out var err)) return ValueResult<Guid>.FromError(err);
+            return ValueResult<Guid>.FromValue(newId);
+        }
+
+        public Result UpdateGlobalRollTemplateAsync(
+            DndMapperGameState state, User caller, Guid templateId, string name,
+            IReadOnlyList<DiceTerm> dice, int flatModifier, RollMode mode,
+            string? attributeName, string? label)
+        {
+            if (state is null) return Result.FromError("State is required.");
+            if (caller is null) return Result.FromError("Caller is required.");
+            if (string.IsNullOrWhiteSpace(name)) return Result.FromError("Template name is required.");
+            if (name.Length > MaxNameLength) return Result.FromError($"Template name cannot exceed {MaxNameLength} characters.");
+            if (!IsHost(state, caller)) return Result.FromError("Only the host may manage global roll templates.");
+            if (DndMapperGameState.IsBuiltInRollTemplateId(templateId))
+                return Result.FromError("Built-in roll templates cannot be edited.");
+            if (ValidateRollDice(dice, mode) is string diceErr) return Result.FromError(diceErr);
+
+            string? error = null;
+            var exec = state.Execute(() =>
+            {
+                int idx = state.GlobalRollTemplates.FindIndex(t => t.Id == templateId);
+                if (idx < 0) { error = "Unknown template id."; return; }
+                state.GlobalRollTemplates[idx] = new RollTemplate(
+                    templateId, name, [.. dice], flatModifier, mode,
+                    string.IsNullOrWhiteSpace(attributeName) ? null : attributeName,
+                    label ?? string.Empty, RollTemplateScope.Global);
+            });
+            if (exec.IsCanceled) return Result.FromCancellation();
+            if (exec.TryGetFailure(out var execErr)) return Result.FromError(execErr);
+            return error is null ? Result.Success : Result.FromError(error);
+        }
+
+        public Result DeleteGlobalRollTemplateAsync(DndMapperGameState state, User caller, Guid templateId)
+        {
+            if (state is null) return Result.FromError("State is required.");
+            if (caller is null) return Result.FromError("Caller is required.");
+            if (!IsHost(state, caller)) return Result.FromError("Only the host may manage global roll templates.");
+            if (DndMapperGameState.IsBuiltInRollTemplateId(templateId))
+                return Result.FromError("Built-in roll templates cannot be deleted.");
+
+            string? error = null;
+            var exec = state.Execute(() =>
+            {
+                int idx = state.GlobalRollTemplates.FindIndex(t => t.Id == templateId);
+                if (idx < 0) { error = "Unknown template id."; return; }
+                state.GlobalRollTemplates.RemoveAt(idx);
+            });
+            if (exec.IsCanceled) return Result.FromCancellation();
+            if (exec.TryGetFailure(out var execErr)) return Result.FromError(execErr);
+            return error is null ? Result.Success : Result.FromError(error);
+        }
+
+        public ValueResult<Guid> CreateSheetRollTemplateAsync(
+            DndMapperGameState state, User caller, Guid sheetId, string name,
+            IReadOnlyList<DiceTerm> dice, int flatModifier, RollMode mode,
+            string? attributeName, string? label)
+        {
+            if (state is null) return ValueResult<Guid>.FromError("State is required.");
+            if (caller is null) return ValueResult<Guid>.FromError("Caller is required.");
+            if (string.IsNullOrWhiteSpace(name)) return ValueResult<Guid>.FromError("Template name is required.");
+            if (name.Length > MaxNameLength) return ValueResult<Guid>.FromError($"Template name cannot exceed {MaxNameLength} characters.");
+            if (ValidateRollDice(dice, mode) is string diceErr) return ValueResult<Guid>.FromError(diceErr);
+
+            if (!state.Sheets.TryGetValue(sheetId, out var sheet))
+                return ValueResult<Guid>.FromError("Unknown sheet id.");
+            if (!IsHost(state, caller) && sheet.OwnerUserId != caller.Id)
+                return ValueResult<Guid>.FromError("You may only manage roll templates on your own sheet.");
+
+            var newId = Guid.NewGuid();
+            var template = new RollTemplate(
+                newId, name, [.. dice], flatModifier, mode,
+                string.IsNullOrWhiteSpace(attributeName) ? null : attributeName,
+                label ?? string.Empty, RollTemplateScope.Sheet);
+
+            var exec = state.Execute(() => sheet.RollTemplates.Add(template));
+            if (exec.IsCanceled) return ValueResult<Guid>.FromCancellation();
+            if (exec.TryGetFailure(out var err)) return ValueResult<Guid>.FromError(err);
+            return ValueResult<Guid>.FromValue(newId);
+        }
+
+        public Result UpdateSheetRollTemplateAsync(
+            DndMapperGameState state, User caller, Guid sheetId, Guid templateId, string name,
+            IReadOnlyList<DiceTerm> dice, int flatModifier, RollMode mode,
+            string? attributeName, string? label)
+        {
+            if (state is null) return Result.FromError("State is required.");
+            if (caller is null) return Result.FromError("Caller is required.");
+            if (string.IsNullOrWhiteSpace(name)) return Result.FromError("Template name is required.");
+            if (name.Length > MaxNameLength) return Result.FromError($"Template name cannot exceed {MaxNameLength} characters.");
+            if (DndMapperGameState.IsBuiltInRollTemplateId(templateId))
+                return Result.FromError("Built-in roll templates cannot be edited.");
+            if (ValidateRollDice(dice, mode) is string diceErr) return Result.FromError(diceErr);
+
+            if (!state.Sheets.TryGetValue(sheetId, out var sheet))
+                return Result.FromError("Unknown sheet id.");
+            if (!IsHost(state, caller) && sheet.OwnerUserId != caller.Id)
+                return Result.FromError("You may only manage roll templates on your own sheet.");
+
+            string? error = null;
+            var exec = state.Execute(() =>
+            {
+                int idx = sheet.RollTemplates.FindIndex(t => t.Id == templateId);
+                if (idx < 0) { error = "Unknown template id."; return; }
+                sheet.RollTemplates[idx] = new RollTemplate(
+                    templateId, name, [.. dice], flatModifier, mode,
+                    string.IsNullOrWhiteSpace(attributeName) ? null : attributeName,
+                    label ?? string.Empty, RollTemplateScope.Sheet);
+            });
+            if (exec.IsCanceled) return Result.FromCancellation();
+            if (exec.TryGetFailure(out var execErr)) return Result.FromError(execErr);
+            return error is null ? Result.Success : Result.FromError(error);
+        }
+
+        public Result DeleteSheetRollTemplateAsync(
+            DndMapperGameState state, User caller, Guid sheetId, Guid templateId)
+        {
+            if (state is null) return Result.FromError("State is required.");
+            if (caller is null) return Result.FromError("Caller is required.");
+            if (DndMapperGameState.IsBuiltInRollTemplateId(templateId))
+                return Result.FromError("Built-in roll templates cannot be deleted.");
+
+            if (!state.Sheets.TryGetValue(sheetId, out var sheet))
+                return Result.FromError("Unknown sheet id.");
+            if (!IsHost(state, caller) && sheet.OwnerUserId != caller.Id)
+                return Result.FromError("You may only manage roll templates on your own sheet.");
+
+            string? error = null;
+            var exec = state.Execute(() =>
+            {
+                int idx = sheet.RollTemplates.FindIndex(t => t.Id == templateId);
+                if (idx < 0) { error = "Unknown template id."; return; }
+                sheet.RollTemplates.RemoveAt(idx);
+            });
+            if (exec.IsCanceled) return Result.FromCancellation();
+            if (exec.TryGetFailure(out var execErr)) return Result.FromError(execErr);
+            return error is null ? Result.Success : Result.FromError(error);
+        }
+
         // ── Dice verb ─────────────────────────────────────────────────────────────
 
         public ValueResult<RollResult> RollAsync(DndMapperGameState state, User caller, RollRequest request)

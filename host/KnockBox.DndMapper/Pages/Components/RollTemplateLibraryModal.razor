@@ -1,0 +1,221 @@
+@using KnockBox.Core.Components.Shared
+@using KnockBox.DndMapper.Models
+@using KnockBox.DndMapper.Services.State.Games
+@using KnockBox.DndMapper.Services.State.Games.Data
+@inherits DisposableComponent
+
+<div class="dndm-modal-overlay" @onclick="OnClose">
+    <div class="dndm-modal-card dndm-effect-library-modal dndm-roll-library-modal"
+         role="dialog" aria-modal="true"
+         @onclick:stopPropagation="true">
+        <header class="dndm-modal-header">
+            <h3 class="dndm-modal-title">Roll Templates</h3>
+            <button class="dndm-btn dndm-btn--icon dndm-btn--small" type="button" title="Close"
+                    @onclick="OnClose">×</button>
+        </header>
+
+        <div class="dndm-modal-body">
+            <div class="dndm-effect-library-tagline">
+                Built-in templates ship with the game and can't be changed.
+                Global templates ride with the save slot — only the host can author them.
+                Per-sheet templates belong to one character sheet and travel with it.
+            </div>
+
+            <section class="dndm-roll-library-section">
+                <h4 class="dndm-roll-library-section-title">Built-in</h4>
+                <div class="dndm-dice-quick-row">
+                    @foreach (var t in DndMapperGameState.BuiltInRollTemplates)
+                    {
+                        <span @key="t.Id" class="dndm-btn dndm-btn--small dndm-chip--builtin" title="@Summarise(t)">@t.Name</span>
+                    }
+                </div>
+            </section>
+
+            <section class="dndm-roll-library-section">
+                <h4 class="dndm-roll-library-section-title">Global (save slot)</h4>
+                @if (State.GlobalRollTemplates.Count == 0)
+                {
+                    <div class="dndm-panel-empty">No global templates yet.</div>
+                }
+                else
+                {
+                    @foreach (var t in State.GlobalRollTemplates)
+                    {
+                        @RenderRow(t, /*canEdit*/ IsHost, /*scope*/ RollTemplateScope.Global)
+                    }
+                }
+                @if (IsHost)
+                {
+                    @RenderCreateForm(RollTemplateScope.Global)
+                }
+            </section>
+
+            <section class="dndm-roll-library-section">
+                <h4 class="dndm-roll-library-section-title">
+                    @(Sheet is null ? "For this sheet" : $"For {SheetDisplayName(Sheet)}")
+                </h4>
+                @if (Sheet is null)
+                {
+                    <div class="dndm-panel-empty">No assigned character sheet — only built-in and global rolls are available.</div>
+                }
+                else
+                {
+                    @if (Sheet.RollTemplates.Count == 0)
+                    {
+                        <div class="dndm-panel-empty">No templates for this sheet yet.</div>
+                    }
+                    else
+                    {
+                        @foreach (var t in Sheet.RollTemplates)
+                        {
+                            @RenderRow(t, /*canEdit*/ CanEditSheetTemplates, /*scope*/ RollTemplateScope.Sheet)
+                        }
+                    }
+                    @if (CanEditSheetTemplates)
+                    {
+                        @RenderCreateForm(RollTemplateScope.Sheet)
+                    }
+                }
+            </section>
+
+            @if (_error is not null)
+            {
+                <div class="dndm-modal-error">@_error</div>
+            }
+        </div>
+
+        <footer class="dndm-modal-actions">
+            <button class="dndm-btn" type="button" @onclick="OnClose">Done</button>
+        </footer>
+    </div>
+</div>
+
+@code {
+    private RenderFragment RenderRow(RollTemplate t, bool canEdit, RollTemplateScope scope) => __builder =>
+    {
+        <div @key="t.Id" class="dndm-effect-template">
+            <div class="dndm-effect-template-head">
+                <span class="dndm-effect-template-glyph" aria-hidden="true">🎲</span>
+                @if (_editingId == t.Id)
+                {
+                    <input class="dndm-input dndm-effect-template-rename"
+                           value="@_editName"
+                           @oninput="@(e => _editName = (string?)e.Value ?? string.Empty)" />
+                }
+                else
+                {
+                    <span class="dndm-effect-template-name">@t.Name</span>
+                }
+                <span class="dndm-effect-template-summary">@Summarise(t)</span>
+                <div class="dndm-effect-template-actions">
+                    @if (_editingId == t.Id)
+                    {
+                        <button class="dndm-btn dndm-btn--small dndm-btn--primary"
+                                type="button"
+                                @onclick="@(() => CommitEdit(scope))">Save</button>
+                        <button class="dndm-btn dndm-btn--small dndm-btn--ghost"
+                                type="button"
+                                @onclick="CancelEdit">Cancel</button>
+                    }
+                    else if (canEdit)
+                    {
+                        <button class="dndm-btn dndm-btn--small dndm-btn--ghost"
+                                type="button"
+                                @onclick="@(() => BeginEdit(t))">Edit</button>
+                        <button class="dndm-btn dndm-btn--small dndm-btn--ghost dndm-btn--danger"
+                                type="button"
+                                @onclick="@(() => Delete(t.Id, scope))">Delete</button>
+                    }
+                </div>
+            </div>
+            @if (_editingId == t.Id)
+            {
+                @RenderEditor()
+            }
+        </div>
+    };
+
+    private RenderFragment RenderEditor() => __builder =>
+    {
+        <div class="dndm-effect-template-editor">
+            <label class="dndm-label">Dice</label>
+            @foreach (var (term, idx) in _editDice.Select((d, i) => (d, i)))
+            {
+                <div @key="idx" class="dndm-dice-term">
+                    <input type="number" min="0" max="20"
+                           class="dndm-input dndm-input--num"
+                           value="@term.Count"
+                           @onchange="@(e => UpdateDiceCount(idx, e.Value))" />
+                    <span class="dndm-dice-term-d">d</span>
+                    <select class="dndm-select dndm-dice-term-sides"
+                            @onchange="@(e => UpdateDiceSides(idx, e.Value))">
+                        @foreach (var s in DieSizes)
+                        {
+                            <option value="@s" selected="@(s == term.Sides)">@s</option>
+                        }
+                    </select>
+                    @if (_editDice.Count > 1)
+                    {
+                        <button class="dndm-btn dndm-btn--small dndm-btn--icon"
+                                type="button"
+                                title="Remove"
+                                @onclick="@(() => RemoveDice(idx))">×</button>
+                    }
+                </div>
+            }
+            <button class="dndm-btn dndm-btn--small dndm-btn--ghost" type="button" @onclick="AddDice">+ Add die</button>
+
+            <div class="dndm-effect-hp-grid">
+                <label class="dndm-label">Flat modifier</label>
+                <input type="number" class="dndm-input dndm-input--num"
+                       value="@_editFlat"
+                       @onchange="@(e => _editFlat = ParseInt(e.Value, _editFlat))" />
+                <label class="dndm-label">Mode</label>
+                <select class="dndm-select" @onchange="@(e => OnEditModeChange((string?)e.Value))">
+                    <option value="Normal" selected="@(_editMode == RollMode.Normal)">Normal</option>
+                    <option value="Advantage" selected="@(_editMode == RollMode.Advantage)">Adv</option>
+                    <option value="Disadvantage" selected="@(_editMode == RollMode.Disadvantage)">Dis</option>
+                </select>
+                <label class="dndm-label">Attribute</label>
+                <select class="dndm-select" @onchange="@(e => _editAttr = string.IsNullOrEmpty((string?)e.Value) ? null : (string?)e.Value)">
+                    <option value="">— none —</option>
+                    @foreach (var row in State.AttributeSchema.Rows)
+                    {
+                        if (row.Type == AttributeValueType.Score || row.Type == AttributeValueType.Modifier)
+                        {
+                            <option value="@row.Name" selected="@(_editAttr == row.Name)">@row.Name</option>
+                        }
+                    }
+                </select>
+                <label class="dndm-label">Label</label>
+                <input class="dndm-input"
+                       value="@_editLabel"
+                       @oninput="@(e => _editLabel = (string?)e.Value ?? string.Empty)" />
+            </div>
+        </div>
+    };
+
+    private RenderFragment RenderCreateForm(RollTemplateScope scope) => __builder =>
+    {
+        <div class="dndm-effect-library-create">
+            <div class="dndm-effect-library-create-head">
+                <span class="dndm-label dndm-label--inline">
+                    @(scope == RollTemplateScope.Global ? "Forge a new global template" : "Forge a new template for this sheet")
+                </span>
+            </div>
+            <div class="dndm-effect-library-create-row">
+                <input class="dndm-input"
+                       placeholder="Template name (e.g. Spell Attack)"
+                       value="@_newName"
+                       @oninput="@(e => _newName = (string?)e.Value ?? string.Empty)" />
+                <button class="dndm-btn dndm-btn--primary dndm-btn--small"
+                        type="button"
+                        disabled="@string.IsNullOrWhiteSpace(_newName)"
+                        @onclick="@(() => CreateBlank(scope))">Create</button>
+            </div>
+            <div class="dndm-effect-library-hint">
+                New templates start as a single d20 with no modifier. Click <em>Edit</em> on a row to customise.
+            </div>
+        </div>
+    };
+}

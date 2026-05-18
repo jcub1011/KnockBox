@@ -49,6 +49,16 @@
     flex-wrap: wrap;
 }
 
+/* Subtle tints so the three roll-template tiers read at a glance without
+   shouting — built-ins stay neutral, globals lean ember, sheet customs lean
+   ink. */
+.dndm-dice-quick-row .dndm-chip--global {
+    border-color: var(--dndm-ember, currentColor);
+}
+.dndm-dice-quick-row .dndm-chip--sheet {
+    border-color: var(--dndm-border-accent);
+}
+
 .dndm-dice-term {
     display: inline-flex;
     align-items: center;
