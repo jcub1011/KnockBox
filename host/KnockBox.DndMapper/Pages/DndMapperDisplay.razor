@@ -1,0 +1,155 @@
+@page "/room/dnd-mapper/{ObfuscatedRoomCode}/display"
+@using KnockBox.Core.Services.State.Shared
+@using KnockBox.DndMapper.Services.State.Games
+@using KnockBox.DndMapper.Services.State.Games.Data
+@inject IGameRoomObserver Observer
+@implements IDisposable
+
+<PageTitle>DnD Mapper — Display</PageTitle>
+
+<HeadContent>
+    <link href="_content/KnockBox.DndMapper/KnockBox.DndMapper.styles.css" rel="stylesheet" />
+</HeadContent>
+
+@if (_state is null)
+{
+    <div class="dndm-display dndm-display--error">
+        <h1>Room not found</h1>
+        <p>The room code <code>@ObfuscatedRoomCode</code> is not active.</p>
+    </div>
+}
+else
+{
+    <div class="dndm-display">
+        @if (_state.ActiveCombat is not null)
+        {
+            <div class="dndm-display__banner">
+                @if (_state.ActiveCombat.Phase == CombatPhase.Active)
+                {
+                    <strong>Round @_state.ActiveCombat.RoundNumber</strong>
+                    @foreach (var (entry, idx) in _state.ActiveCombat.TurnOrder.Select((e, i) => (e, i)))
+                    {
+                        <span class="@(idx == _state.ActiveCombat.CurrentTurnIndex ? "dndm-display__turn dndm-display__turn--current" : "dndm-display__turn")">
+                            @entry.Name (@entry.InitiativeRoll)
+                        </span>
+                    }
+                }
+                else
+                {
+                    <strong>Waiting for initiative rolls…</strong>
+                    @foreach (var entry in _state.ActiveCombat.TurnOrder)
+                    {
+                        <span class="dndm-display__turn">@entry.Name @(entry.InitiativeRoll is null ? "—" : "✓")</span>
+                    }
+                }
+            </div>
+        }
+
+        <div class="dndm-display__canvas">
+            @if (_activeMap is not null)
+            {
+                <svg xmlns="http://www.w3.org/2000/svg"
+                     viewBox="0 0 @_activeMap.Grid.WidthCells @_activeMap.Grid.HeightCells"
+                     preserveAspectRatio="xMidYMid meet">
+
+                    @foreach (var img in _activeMap.Images.Where(i => !i.Hidden).OrderBy(i => i.LayerOrder))
+                    {
+                        var url = ResolveImageUrl(img);
+                        <image href="@url"
+                               x="@img.X" y="@img.Y"
+                               width="@img.Width" height="@img.Height"
+                               opacity="@img.Opacity"
+                               transform="rotate(@img.Rotation @(img.X + img.Width / 2) @(img.Y + img.Height / 2))" />
+                    }
+
+                    @if (!string.IsNullOrWhiteSpace(_activeMap.MarkupSvg))
+                    {
+                        <g class="dndm-display__markup">@((MarkupString)_activeMap.MarkupSvg)</g>
+                    }
+
+                    @foreach (var token in _activeMap.Tokens.Where(t => !t.Hidden))
+                    {
+                        <g transform="translate(@token.X @token.Y)">
+                            <circle cx="0.5" cy="0.5" r="0.4" fill="@token.Color" stroke="#000" stroke-width="0.04" />
+                            <text x="0.5" y="0.55" text-anchor="middle" font-size="0.4" fill="#fff" font-weight="bold">
+                                @(token.Name.Length > 0 ? token.Name[0].ToString() : "?")
+                            </text>
+                        </g>
+                    }
+                </svg>
+            }
+            else
+            {
+                <div class="dndm-display__empty">No active map.</div>
+            }
+        </div>
+
+        @if (_state.Settings.RollsVisibleToPlayers && _state.RollLog.Count > 0)
+        {
+            <aside class="dndm-display__rolls">
+                <h2>Rolls</h2>
+                <ul>
+                    @foreach (var roll in _state.RollLog.TakeLast(10).Reverse())
+                    {
+                        <li>
+                            <strong>@(string.IsNullOrEmpty(roll.Label) ? "Roll" : roll.Label)</strong>
+                            — @roll.Total
+                            @if (roll.ForcedByUserId is not null)
+                            {
+                                <em>(forced by GM)</em>
+                            }
+                        </li>
+                    }
+                </ul>
+            </aside>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public string ObfuscatedRoomCode { get; set; } = string.Empty;
+
+    private DndMapperGameState? _state;
+    private Map? _activeMap;
+    private ObserverAttachment? _attachment;
+    private IDisposable? _subscription;
+
+    protected override void OnInitialized()
+    {
+        var result = Observer.Attach("dnd-mapper", ObfuscatedRoomCode);
+        if (!result.TryGetSuccess(out var attachment)) return;
+        _attachment = attachment;
+        if (attachment.State is not DndMapperGameState dndState) return;
+        _state = dndState;
+        _subscription = dndState.StateChangedEventManager.Subscribe(OnStateChanged);
+        RefreshActiveMap();
+    }
+
+    private async ValueTask OnStateChanged()
+    {
+        RefreshActiveMap();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private void RefreshActiveMap()
+    {
+        _activeMap = _state?.ActiveMapId is Guid id
+            ? _state.Maps.FirstOrDefault(m => m.Id == id)
+            : null;
+    }
+
+    private string ResolveImageUrl(MapImage img)
+    {
+        // The host plugin serves uploaded images via its existing image endpoint.
+        // Display view uses the same share-token-keyed URL pattern that players use.
+        if (img.ShareToken is Guid token)
+            return $"/api/plugins/dnd-mapper/{ObfuscatedRoomCode}/images/{img.Id}?t={token}";
+        return string.Empty;
+    }
+
+    public void Dispose()
+    {
+        _subscription?.Dispose();
+        _attachment?.Lifetime.Dispose();
+    }
+}

@@ -976,6 +976,560 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             return Result.Success;
         }
 
+        // ── Centre-viewport broadcast (v1.x — §6.4) ───────────────────────────────
+
+        public Result RequestCenterViewportAsync(DndMapperGameState state, User caller, Guid mapId, double x, double y)
+        {
+            if (state is null) return Result.FromError("State is required.");
+            if (caller is null) return Result.FromError("Caller is required.");
+            if (!IsHost(state, caller)) return Result.FromError("Only the host may centre everyone's viewport.");
+
+            string? error = null;
+            var exec = state.Execute(() =>
+            {
+                if (!state.Maps.Any(m => m.Id == mapId)) { error = "Unknown map id."; return; }
+                state.SetPendingCenterRequest(new CenterViewportRequest(mapId, x, y, Guid.NewGuid()));
+            });
+
+            if (exec.IsCanceled) return Result.FromCancellation();
+            if (exec.TryGetFailure(out var execErr)) return Result.FromError(execErr);
+            return error is null ? Result.Success : Result.FromError(error);
+        }
+
+        // ── Initiative tracker (v1.x — §9.5) ──────────────────────────────────────
+
+        public Result StartInitiativeAsync(DndMapperGameState state, User caller, IReadOnlyList<Guid>? npcTokenIds)
+        {
+            if (state is null) return Result.FromError("State is required.");
+            if (caller is null) return Result.FromError("Caller is required.");
+            if (!IsHost(state, caller)) return Result.FromError("Only the host may start initiative.");
+
+            string? error = null;
+            var exec = state.Execute(() =>
+            {
+                if (state.ActiveCombat is not null) { error = "Combat is already active."; return; }
+
+                var combat = new CombatState { Phase = CombatPhase.WaitingForRolls, RoundNumber = 1 };
+                var seenTokenIds = new HashSet<Guid>();
+
+                if (npcTokenIds is not null)
+                {
+                    foreach (var tokenId in npcTokenIds)
+                    {
+                        var (token, _) = FindTokenAndMap(state, tokenId);
+                        if (token is null) { error = $"Unknown token id {tokenId}."; return; }
+                        if (token.Type != TokenType.NPCToken) { error = "Only NPC tokens can be added to combat selection."; return; }
+                        if (!seenTokenIds.Add(tokenId)) continue;
+                        combat.TurnOrder.Add(new CombatantEntry
+                        {
+                            Id = Guid.NewGuid(),
+                            TokenId = tokenId,
+                            Name = token.Name,
+                            OwnerUserId = null,
+                        });
+                    }
+                }
+
+                foreach (var entry in state.Players)
+                {
+                    var token = state.Maps
+                        .SelectMany(m => m.Tokens)
+                        .FirstOrDefault(t => t.Type == TokenType.PlayerToken && t.OwnerUserId == entry.User.Id);
+                    combat.TurnOrder.Add(new CombatantEntry
+                    {
+                        Id = Guid.NewGuid(),
+                        TokenId = token?.Id ?? Guid.Empty,
+                        Name = token?.Name ?? entry.User.Name,
+                        OwnerUserId = entry.User.Id,
+                    });
+                }
+
+                if (combat.TurnOrder.Count == 0) { error = "Cannot start initiative with no combatants."; return; }
+
+                state.SetActiveCombat(combat);
+            });
+
+            if (exec.IsCanceled) return Result.FromCancellation();
+            if (exec.TryGetFailure(out var execErr)) return Result.FromError(execErr);
+            return error is null ? Result.Success : Result.FromError(error);
+        }
+
+        public Result SubmitInitiativeRollAsync(DndMapperGameState state, User caller)
+        {
+            if (state is null) return Result.FromError("State is required.");
+            if (caller is null) return Result.FromError("Caller is required.");
+
+            int dexModifier = ResolveDexModifier(state, caller.Id);
+            int d20 = _rng.GetRandomInt(1, 21, RandomType.Fast);
+            int total = d20 + dexModifier;
+
+            string? error = null;
+            var exec = state.Execute(() =>
+            {
+                if (state.ActiveCombat is null) { error = "No active combat."; return; }
+                if (state.ActiveCombat.Phase != CombatPhase.WaitingForRolls) { error = "Initiative phase has ended."; return; }
+                var entry = state.ActiveCombat.TurnOrder.FirstOrDefault(e => e.OwnerUserId == caller.Id);
+                if (entry is null) { error = "You are not a combatant in this initiative."; return; }
+                if (entry.InitiativeRoll is not null) return; // no-op
+
+                entry.InitiativeRoll = total;
+                state.AppendRoll(BuildInitiativeRollResult(caller.Id, null, d20, dexModifier, total));
+                TryTransitionToActive(state);
+            });
+
+            if (exec.IsCanceled) return Result.FromCancellation();
+            if (exec.TryGetFailure(out var execErr)) return Result.FromError(execErr);
+            return error is null ? Result.Success : Result.FromError(error);
+        }
+
+        public Result SetNpcInitiativeAsync(DndMapperGameState state, User caller, Guid combatantId, int roll)
+        {
+            if (state is null) return Result.FromError("State is required.");
+            if (caller is null) return Result.FromError("Caller is required.");
+            if (!IsHost(state, caller)) return Result.FromError("Only the host may set NPC initiative.");
+
+            string? error = null;
+            var exec = state.Execute(() =>
+            {
+                if (state.ActiveCombat is null) { error = "No active combat."; return; }
+                if (state.ActiveCombat.Phase != CombatPhase.WaitingForRolls) { error = "Initiative phase has ended."; return; }
+                var entry = state.ActiveCombat.TurnOrder.FirstOrDefault(e => e.Id == combatantId);
+                if (entry is null) { error = "Unknown combatant id."; return; }
+                if (entry.OwnerUserId is not null) { error = "Use ForceInitiativeRollAsync for player combatants."; return; }
+
+                entry.InitiativeRoll = roll;
+                TryTransitionToActive(state);
+            });
+
+            if (exec.IsCanceled) return Result.FromCancellation();
+            if (exec.TryGetFailure(out var execErr)) return Result.FromError(execErr);
+            return error is null ? Result.Success : Result.FromError(error);
+        }
+
+        public Result ForceInitiativeRollAsync(DndMapperGameState state, User caller, Guid combatantId)
+        {
+            if (state is null) return Result.FromError("State is required.");
+            if (caller is null) return Result.FromError("Caller is required.");
+            if (!IsHost(state, caller)) return Result.FromError("Only the host may force initiative rolls.");
+
+            int d20 = _rng.GetRandomInt(1, 21, RandomType.Fast);
+
+            string? error = null;
+            var exec = state.Execute(() =>
+            {
+                if (state.ActiveCombat is null) { error = "No active combat."; return; }
+                if (state.ActiveCombat.Phase != CombatPhase.WaitingForRolls) { error = "Initiative phase has ended."; return; }
+                var entry = state.ActiveCombat.TurnOrder.FirstOrDefault(e => e.Id == combatantId);
+                if (entry is null) { error = "Unknown combatant id."; return; }
+                if (entry.OwnerUserId is null) { error = "Force-roll is only valid for player combatants."; return; }
+                if (entry.InitiativeRoll is not null) { error = "Player has already rolled."; return; }
+
+                int dexModifier = ResolveDexModifier(state, entry.OwnerUserId);
+                int total = d20 + dexModifier;
+                entry.InitiativeRoll = total;
+                entry.IsForceRolled = true;
+                state.AppendRoll(BuildInitiativeRollResult(entry.OwnerUserId, caller.Id, d20, dexModifier, total));
+                TryTransitionToActive(state);
+            });
+
+            if (exec.IsCanceled) return Result.FromCancellation();
+            if (exec.TryGetFailure(out var execErr)) return Result.FromError(execErr);
+            return error is null ? Result.Success : Result.FromError(error);
+        }
+
+        public Result AdvanceTurnAsync(DndMapperGameState state, User caller)
+        {
+            if (state is null) return Result.FromError("State is required.");
+            if (caller is null) return Result.FromError("Caller is required.");
+            if (!IsHost(state, caller)) return Result.FromError("Only the host may advance the turn.");
+
+            string? error = null;
+            var exec = state.Execute(() =>
+            {
+                if (state.ActiveCombat is null) { error = "No active combat."; return; }
+                if (state.ActiveCombat.Phase != CombatPhase.Active) { error = "Combat is not in the active phase."; return; }
+                if (state.ActiveCombat.TurnOrder.Count == 0) { error = "Turn order is empty."; return; }
+
+                state.ActiveCombat.CurrentTurnIndex++;
+                if (state.ActiveCombat.CurrentTurnIndex >= state.ActiveCombat.TurnOrder.Count)
+                {
+                    state.ActiveCombat.CurrentTurnIndex = 0;
+                    state.ActiveCombat.RoundNumber++;
+                }
+            });
+
+            if (exec.IsCanceled) return Result.FromCancellation();
+            if (exec.TryGetFailure(out var execErr)) return Result.FromError(execErr);
+            return error is null ? Result.Success : Result.FromError(error);
+        }
+
+        public ValueResult<Guid> AddCombatantAsync(DndMapperGameState state, User caller, Guid tokenId, int initiativeRoll)
+        {
+            if (state is null) return ValueResult<Guid>.FromError("State is required.");
+            if (caller is null) return ValueResult<Guid>.FromError("Caller is required.");
+            if (!IsHost(state, caller)) return ValueResult<Guid>.FromError("Only the host may add combatants.");
+
+            var newId = Guid.NewGuid();
+            string? error = null;
+            var exec = state.Execute(() =>
+            {
+                if (state.ActiveCombat is null) { error = "No active combat."; return; }
+                var (token, _) = FindTokenAndMap(state, tokenId);
+                if (token is null) { error = "Unknown token id."; return; }
+
+                var entry = new CombatantEntry
+                {
+                    Id = newId,
+                    TokenId = tokenId,
+                    Name = token.Name,
+                    OwnerUserId = token.Type == TokenType.PlayerToken ? token.OwnerUserId : null,
+                    InitiativeRoll = initiativeRoll,
+                };
+                int insertIdx = TurnOrderSorter.FindInsertionIndex(state.ActiveCombat.TurnOrder, entry);
+                state.ActiveCombat.TurnOrder.Insert(insertIdx, entry);
+
+                if (state.ActiveCombat.Phase == CombatPhase.Active
+                    && insertIdx <= state.ActiveCombat.CurrentTurnIndex)
+                {
+                    state.ActiveCombat.CurrentTurnIndex++;
+                }
+            });
+
+            if (exec.IsCanceled) return ValueResult<Guid>.FromCancellation();
+            if (exec.TryGetFailure(out var execErr)) return ValueResult<Guid>.FromError(execErr);
+            if (error is not null) return ValueResult<Guid>.FromError(error);
+            return ValueResult<Guid>.FromValue(newId);
+        }
+
+        public Result RemoveCombatantAsync(DndMapperGameState state, User caller, Guid combatantId)
+        {
+            if (state is null) return Result.FromError("State is required.");
+            if (caller is null) return Result.FromError("Caller is required.");
+            if (!IsHost(state, caller)) return Result.FromError("Only the host may remove combatants.");
+
+            string? error = null;
+            var exec = state.Execute(() =>
+            {
+                if (state.ActiveCombat is null) { error = "No active combat."; return; }
+                var idx = state.ActiveCombat.TurnOrder.FindIndex(e => e.Id == combatantId);
+                if (idx < 0) { error = "Unknown combatant id."; return; }
+
+                bool removingCurrent = state.ActiveCombat.Phase == CombatPhase.Active && idx == state.ActiveCombat.CurrentTurnIndex;
+                state.ActiveCombat.TurnOrder.RemoveAt(idx);
+
+                if (state.ActiveCombat.TurnOrder.Count == 0)
+                {
+                    state.SetActiveCombat(null);
+                    return;
+                }
+
+                if (state.ActiveCombat.Phase == CombatPhase.Active)
+                {
+                    if (idx < state.ActiveCombat.CurrentTurnIndex)
+                    {
+                        state.ActiveCombat.CurrentTurnIndex--;
+                    }
+                    else if (removingCurrent)
+                    {
+                        // Stay at idx (which now points to the next combatant), wrap if past end.
+                        if (state.ActiveCombat.CurrentTurnIndex >= state.ActiveCombat.TurnOrder.Count)
+                        {
+                            state.ActiveCombat.CurrentTurnIndex = 0;
+                            state.ActiveCombat.RoundNumber++;
+                        }
+                    }
+                }
+            });
+
+            if (exec.IsCanceled) return Result.FromCancellation();
+            if (exec.TryGetFailure(out var execErr)) return Result.FromError(execErr);
+            return error is null ? Result.Success : Result.FromError(error);
+        }
+
+        public Result EndCombatAsync(DndMapperGameState state, User caller)
+        {
+            if (state is null) return Result.FromError("State is required.");
+            if (caller is null) return Result.FromError("Caller is required.");
+            if (!IsHost(state, caller)) return Result.FromError("Only the host may end combat.");
+
+            var exec = state.Execute(() => state.SetActiveCombat(null));
+            if (exec.IsCanceled) return Result.FromCancellation();
+            if (exec.TryGetFailure(out var execErr)) return Result.FromError(execErr);
+            return Result.Success;
+        }
+
+        private static void TryTransitionToActive(DndMapperGameState state)
+        {
+            if (state.ActiveCombat is null) return;
+            if (state.ActiveCombat.Phase != CombatPhase.WaitingForRolls) return;
+            if (state.ActiveCombat.TurnOrder.Any(e => e.InitiativeRoll is null)) return;
+
+            var sorted = TurnOrderSorter.Sort(state.ActiveCombat.TurnOrder);
+            state.ActiveCombat.TurnOrder.Clear();
+            state.ActiveCombat.TurnOrder.AddRange(sorted);
+            state.ActiveCombat.Phase = CombatPhase.Active;
+            state.ActiveCombat.CurrentTurnIndex = 0;
+        }
+
+        private static int ResolveDexModifier(DndMapperGameState state, string userId)
+        {
+            var sheet = state.Sheets.Values.FirstOrDefault(s => s.OwnerUserId == userId);
+            if (sheet is null) return 0;
+            // Look up DEX case-insensitively; falls back to 0 for schemas without DEX.
+            foreach (var (name, value) in sheet.Values)
+            {
+                if (string.Equals(name, "DEX", StringComparison.OrdinalIgnoreCase))
+                    return value.GetModifier() ?? 0;
+            }
+            return 0;
+        }
+
+        private static RollResult BuildInitiativeRollResult(string rollerUserId, string? forcedByUserId, int d20, int dexModifier, int total)
+        {
+            return new RollResult(
+                Id: Guid.NewGuid(),
+                RollerUserId: rollerUserId,
+                ForcedByUserId: forcedByUserId,
+                Rolls: [new DieRoll(20, d20, false)],
+                Total: total,
+                Mode: RollMode.Normal,
+                FlatModifier: 0,
+                AttributeModifier: dexModifier,
+                Label: "Initiative",
+                TimestampUtc: DateTime.UtcNow,
+                Formula: "1d20",
+                ModifierBreakdown: null);
+        }
+
+        // ── Markup overlay (v1.x — §5.6) ──────────────────────────────────────────
+
+        public Result UpdateMapMarkupAsync(DndMapperGameState state, User caller, Guid mapId, string? svgContent)
+        {
+            if (state is null) return Result.FromError("State is required.");
+            if (caller is null) return Result.FromError("Caller is required.");
+            if (!IsHost(state, caller)) return Result.FromError("Only the host may update map markup.");
+
+            // Sanitise outside the lock — XML parsing is non-trivial work.
+            var sanitized = KnockBox.Core.Services.Drawing.SvgContentSanitizer.Sanitize(svgContent);
+            if (string.IsNullOrWhiteSpace(sanitized)) sanitized = null;
+
+            string? error = null;
+            var exec = state.Execute(() =>
+            {
+                var map = state.Maps.FirstOrDefault(m => m.Id == mapId);
+                if (map is null) { error = "Unknown map id."; return; }
+                map.MarkupSvg = sanitized;
+            });
+
+            if (exec.IsCanceled) return Result.FromCancellation();
+            if (exec.TryGetFailure(out var execErr)) return Result.FromError(execErr);
+            return error is null ? Result.Success : Result.FromError(error);
+        }
+
+        public Result ClearMapMarkupAsync(DndMapperGameState state, User caller, Guid mapId)
+            => UpdateMapMarkupAsync(state, caller, mapId, null);
+
+        // ── Status effects (v1.x — §8.5) ──────────────────────────────────────────
+
+        public ValueResult<Guid> ApplyStatusEffectAsync(
+            DndMapperGameState state,
+            User caller,
+            Guid sheetId,
+            string name,
+            IReadOnlyList<AttributeDelta>? attributeDeltas,
+            int? maxHpDelta,
+            int? onApplyHpDelta,
+            string? notes)
+        {
+            if (state is null) return ValueResult<Guid>.FromError("State is required.");
+            if (caller is null) return ValueResult<Guid>.FromError("Caller is required.");
+            if (string.IsNullOrWhiteSpace(name)) return ValueResult<Guid>.FromError("Status effect name is required.");
+            if (name.Length > MaxNameLength) return ValueResult<Guid>.FromError($"Status effect name cannot exceed {MaxNameLength} characters.");
+
+            var newId = Guid.NewGuid();
+            string? error = null;
+            var exec = state.Execute(() =>
+            {
+                if (!state.Sheets.TryGetValue(sheetId, out var sheet)) { error = "Unknown sheet id."; return; }
+                if (!CanEditSheet(state, caller, sheet)) { error = "You are not permitted to edit this sheet."; return; }
+
+                var effect = new StatusEffect
+                {
+                    Id = newId,
+                    Name = name,
+                    AttributeDeltas = attributeDeltas is null ? [] : [.. attributeDeltas],
+                    MaxHpDelta = maxHpDelta,
+                    OnApplyHpDelta = onApplyHpDelta,
+                    Notes = notes ?? string.Empty,
+                    AppliedUtc = DateTime.UtcNow,
+                };
+                sheet.StatusEffects.Add(effect);
+
+                if (sheet.Hp is int hp && onApplyHpDelta is int delta)
+                    sheet.Hp = hp + delta;
+
+                ClampHpToEffectiveMax(sheet);
+            });
+
+            if (exec.IsCanceled) return ValueResult<Guid>.FromCancellation();
+            if (exec.TryGetFailure(out var execErr)) return ValueResult<Guid>.FromError(execErr);
+            if (error is not null) return ValueResult<Guid>.FromError(error);
+            return ValueResult<Guid>.FromValue(newId);
+        }
+
+        public Result UpdateStatusEffectAsync(
+            DndMapperGameState state,
+            User caller,
+            Guid sheetId,
+            Guid effectId,
+            string name,
+            IReadOnlyList<AttributeDelta>? attributeDeltas,
+            int? maxHpDelta,
+            int? onApplyHpDelta,
+            string? notes)
+        {
+            if (state is null) return Result.FromError("State is required.");
+            if (caller is null) return Result.FromError("Caller is required.");
+            if (string.IsNullOrWhiteSpace(name)) return Result.FromError("Status effect name is required.");
+            if (name.Length > MaxNameLength) return Result.FromError($"Status effect name cannot exceed {MaxNameLength} characters.");
+
+            string? error = null;
+            var exec = state.Execute(() =>
+            {
+                if (!state.Sheets.TryGetValue(sheetId, out var sheet)) { error = "Unknown sheet id."; return; }
+                if (!CanEditSheet(state, caller, sheet)) { error = "You are not permitted to edit this sheet."; return; }
+                var effect = sheet.StatusEffects.FirstOrDefault(e => e.Id == effectId);
+                if (effect is null) { error = "Unknown status effect id."; return; }
+
+                effect.Name = name;
+                effect.AttributeDeltas = attributeDeltas is null ? [] : [.. attributeDeltas];
+                effect.MaxHpDelta = maxHpDelta;
+                effect.OnApplyHpDelta = onApplyHpDelta;
+                effect.Notes = notes ?? string.Empty;
+
+                ClampHpToEffectiveMax(sheet);
+            });
+
+            if (exec.IsCanceled) return Result.FromCancellation();
+            if (exec.TryGetFailure(out var execErr)) return Result.FromError(execErr);
+            return error is null ? Result.Success : Result.FromError(error);
+        }
+
+        public Result RemoveStatusEffectAsync(DndMapperGameState state, User caller, Guid sheetId, Guid effectId)
+        {
+            if (state is null) return Result.FromError("State is required.");
+            if (caller is null) return Result.FromError("Caller is required.");
+
+            string? error = null;
+            var exec = state.Execute(() =>
+            {
+                if (!state.Sheets.TryGetValue(sheetId, out var sheet)) { error = "Unknown sheet id."; return; }
+                if (!CanEditSheet(state, caller, sheet)) { error = "You are not permitted to edit this sheet."; return; }
+                var idx = sheet.StatusEffects.FindIndex(e => e.Id == effectId);
+                if (idx < 0) { error = "Unknown status effect id."; return; }
+                sheet.StatusEffects.RemoveAt(idx);
+                ClampHpToEffectiveMax(sheet);
+            });
+
+            if (exec.IsCanceled) return Result.FromCancellation();
+            if (exec.TryGetFailure(out var execErr)) return Result.FromError(execErr);
+            return error is null ? Result.Success : Result.FromError(error);
+        }
+
+        public ValueResult<Guid> CreateStatusEffectTemplateAsync(
+            DndMapperGameState state,
+            User caller,
+            string name,
+            IReadOnlyList<AttributeDelta>? attributeDeltas,
+            int? maxHpDelta,
+            int? onApplyHpDelta,
+            string? notes)
+        {
+            if (state is null) return ValueResult<Guid>.FromError("State is required.");
+            if (caller is null) return ValueResult<Guid>.FromError("Caller is required.");
+            if (string.IsNullOrWhiteSpace(name)) return ValueResult<Guid>.FromError("Template name is required.");
+            if (name.Length > MaxNameLength) return ValueResult<Guid>.FromError($"Template name cannot exceed {MaxNameLength} characters.");
+            if (!IsHost(state, caller)) return ValueResult<Guid>.FromError("Only the host may manage status effect templates.");
+
+            var newId = Guid.NewGuid();
+            var exec = state.Execute(() =>
+            {
+                state.StatusEffectTemplates.Add(new StatusEffectTemplate
+                {
+                    Id = newId,
+                    Name = name,
+                    AttributeDeltas = attributeDeltas is null ? [] : [.. attributeDeltas],
+                    MaxHpDelta = maxHpDelta,
+                    OnApplyHpDelta = onApplyHpDelta,
+                    Notes = notes ?? string.Empty,
+                });
+            });
+
+            if (exec.IsCanceled) return ValueResult<Guid>.FromCancellation();
+            if (exec.TryGetFailure(out var execErr)) return ValueResult<Guid>.FromError(execErr);
+            return ValueResult<Guid>.FromValue(newId);
+        }
+
+        public Result UpdateStatusEffectTemplateAsync(
+            DndMapperGameState state,
+            User caller,
+            Guid templateId,
+            string name,
+            IReadOnlyList<AttributeDelta>? attributeDeltas,
+            int? maxHpDelta,
+            int? onApplyHpDelta,
+            string? notes)
+        {
+            if (state is null) return Result.FromError("State is required.");
+            if (caller is null) return Result.FromError("Caller is required.");
+            if (string.IsNullOrWhiteSpace(name)) return Result.FromError("Template name is required.");
+            if (name.Length > MaxNameLength) return Result.FromError($"Template name cannot exceed {MaxNameLength} characters.");
+            if (!IsHost(state, caller)) return Result.FromError("Only the host may manage status effect templates.");
+
+            string? error = null;
+            var exec = state.Execute(() =>
+            {
+                var template = state.StatusEffectTemplates.FirstOrDefault(t => t.Id == templateId);
+                if (template is null) { error = "Unknown template id."; return; }
+
+                template.Name = name;
+                template.AttributeDeltas = attributeDeltas is null ? [] : [.. attributeDeltas];
+                template.MaxHpDelta = maxHpDelta;
+                template.OnApplyHpDelta = onApplyHpDelta;
+                template.Notes = notes ?? string.Empty;
+            });
+
+            if (exec.IsCanceled) return Result.FromCancellation();
+            if (exec.TryGetFailure(out var execErr)) return Result.FromError(execErr);
+            return error is null ? Result.Success : Result.FromError(error);
+        }
+
+        public Result DeleteStatusEffectTemplateAsync(DndMapperGameState state, User caller, Guid templateId)
+        {
+            if (state is null) return Result.FromError("State is required.");
+            if (caller is null) return Result.FromError("Caller is required.");
+            if (!IsHost(state, caller)) return Result.FromError("Only the host may manage status effect templates.");
+
+            string? error = null;
+            var exec = state.Execute(() =>
+            {
+                var idx = state.StatusEffectTemplates.FindIndex(t => t.Id == templateId);
+                if (idx < 0) { error = "Unknown template id."; return; }
+                state.StatusEffectTemplates.RemoveAt(idx);
+            });
+
+            if (exec.IsCanceled) return Result.FromCancellation();
+            if (exec.TryGetFailure(out var execErr)) return Result.FromError(execErr);
+            return error is null ? Result.Success : Result.FromError(error);
+        }
+
+        private static void ClampHpToEffectiveMax(CharacterSheet sheet)
+        {
+            var effectiveMax = EffectiveMaxHpResolver.ResolveEffectiveMaxHp(sheet);
+            if (effectiveMax is int max && sheet.Hp is int hp && hp > max)
+                sheet.Hp = max;
+        }
+
         // ── Dice verb ─────────────────────────────────────────────────────────────
 
         public ValueResult<RollResult> RollAsync(DndMapperGameState state, User caller, RollRequest request)
@@ -1006,6 +1560,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             }
 
             int? attributeModifier = null;
+            IReadOnlyList<ContributionEntry>? contributionBreakdown = null;
             if (request.AttributeRef is AttributeRef attrRef)
             {
                 if (!state.Sheets.TryGetValue(attrRef.SheetId, out var sheet))
@@ -1015,10 +1570,15 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                 if (sheet.OwnerUserId is not null && sheet.OwnerUserId != caller.Id && !IsHost(state, caller))
                     return ValueResult<RollResult>.FromError("You may only reference your own attributes (or be host).");
 
-                var modifier = attrValue.GetModifier();
-                if (modifier is null)
+                var baseModifier = attrValue.GetModifier();
+                if (baseModifier is null)
                     return ValueResult<RollResult>.FromError("Referenced attribute does not produce a numeric modifier.");
-                attributeModifier = modifier;
+
+                var (contributionTotal, breakdown) = AttributeContributionResolver.Resolve(sheet, attrRef.AttributeName, baseModifier.Value);
+                attributeModifier = contributionTotal;
+                // breakdown[0] is the base attribute; effects come after. Only retain
+                // the list for downstream rendering when status effects contributed.
+                if (breakdown.Count > 1) contributionBreakdown = breakdown;
             }
 
             var rolls = new List<DieRoll>(totalDice + (request.Mode == RollMode.Normal ? 0 : 1));
@@ -1056,6 +1616,24 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             // shape rather than reconstructing it from the rolled dice.
             string formula = string.Join("+", request.Dice.Select(t => $"{t.Count}d{t.Sides}"));
 
+            string? modifierBreakdown = null;
+            if (contributionBreakdown is { Count: > 1 })
+            {
+                int diceSum = rolls.Where(r => !r.Discarded).Sum(r => r.Result);
+                var parts = new List<string> { diceSum.ToString() };
+                foreach (var entry in contributionBreakdown)
+                {
+                    var sign = entry.Delta >= 0 ? "+" : "−";
+                    parts.Add($"{sign} {Math.Abs(entry.Delta)} ({entry.Source})");
+                }
+                if (request.FlatModifier != 0)
+                {
+                    var sign = request.FlatModifier >= 0 ? "+" : "−";
+                    parts.Add($"{sign} {Math.Abs(request.FlatModifier)}");
+                }
+                modifierBreakdown = $"{string.Join(" ", parts)} = {total}";
+            }
+
             var result = new RollResult(
                 Id: Guid.NewGuid(),
                 RollerUserId: caller.Id,
@@ -1067,7 +1645,8 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                 AttributeModifier: attributeModifier,
                 Label: request.Label ?? string.Empty,
                 TimestampUtc: DateTime.UtcNow,
-                Formula: formula);
+                Formula: formula,
+                ModifierBreakdown: modifierBreakdown);
 
             var exec = state.Execute(() => state.AppendRoll(result));
             if (exec.IsCanceled) return ValueResult<RollResult>.FromCancellation();

@@ -5,6 +5,7 @@ using KnockBox.Services.Logic.Games.Shared;
 using KnockBox.Core.Services.State.Games.Shared;
 using KnockBox.Services.State.Games.Shared;
 using KnockBox.Services.State.Shared;
+using KnockBox.Platform.Services.State.Shared;
 using KnockBox.Core.Services.State.Users;
 using KnockBox.Services.State.Users;
 using Microsoft.Extensions.DependencyInjection;
@@ -42,6 +43,10 @@ namespace KnockBox.Services.Registrations.States
             // GameSessionService is the per-circuit proxy that forwards session operations to
             // the user-id-backed GameSessionState, keeping navigation logic circuit-local.
             services.AddScoped<IGameSessionService, GameSessionService>();
+
+            // Read-only observer attach for screen-shareable display views — looks up
+            // the room state by route + obfuscated code without registering a user.
+            services.AddSingleton<IGameRoomObserver, GameRoomObserver>();
 
             return services;
         }

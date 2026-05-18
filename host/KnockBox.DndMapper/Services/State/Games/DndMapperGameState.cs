@@ -20,6 +20,10 @@ namespace KnockBox.DndMapper.Services.State.Games
         public Dictionary<Guid, CharacterSheet> Sheets { get; } = [];
         public Dictionary<Guid, NamedTemplate> CustomTemplates { get; } = [];
         public List<RollResult> RollLog { get; } = [];
+        public List<StatusEffectTemplate> StatusEffectTemplates { get; } = [];
+
+        public CombatState? ActiveCombat { get; private set; }
+        public CenterViewportRequest? PendingCenterRequest { get; private set; }
 
         // Running total of bytes consumed by uploaded images on this state. Used to
         // enforce the per-room 10 MB cap. Mutated only by image verbs inside Execute.
@@ -65,6 +69,8 @@ namespace KnockBox.DndMapper.Services.State.Games
         internal void SetSettings(DndMapperSettings settings) => Settings = settings;
         internal void SetAttributeSchema(AttributeSchema schema) => AttributeSchema = schema;
         internal void SetActiveMapId(Guid? mapId) => ActiveMapId = mapId;
+        internal void SetActiveCombat(CombatState? combat) => ActiveCombat = combat;
+        internal void SetPendingCenterRequest(CenterViewportRequest? request) => PendingCenterRequest = request;
         internal void SetBytesUsed(long value) => BytesUsed = value < 0 ? 0 : value;
         internal void AdjustBytesUsed(long delta) => BytesUsed = Math.Max(0, BytesUsed + delta);
 

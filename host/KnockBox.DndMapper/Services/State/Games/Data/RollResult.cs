@@ -19,5 +19,9 @@ namespace KnockBox.DndMapper.Services.State.Games.Data
         // e.g. "1d20", "2d6+1d8". Recorded at roll time so consumers don't have
         // to reverse-engineer it from the per-die rolls (Adv/Dis adds an extra
         // discarded die that would otherwise need to be filtered back out).
-        string Formula);
+        string Formula,
+        // Human-readable breakdown when status effects contributed to the
+        // attribute modifier — e.g. "12 + 2 (INT) − 5 (Brain Fog) = 9". Null
+        // when no effects contributed; rendering falls back to the plain total.
+        string? ModifierBreakdown = null);
 }
