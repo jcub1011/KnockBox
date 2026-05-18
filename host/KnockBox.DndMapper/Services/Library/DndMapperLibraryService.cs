@@ -151,6 +151,13 @@ namespace KnockBox.DndMapper.Services.Library
             // until the next attempt.
             await RepublishExistingImagesAsync(state, host, ct);
 
+            // Notify subscribers (e.g. HostSavesPanel) that the slots are now
+            // readable. Without this, a panel that mounted while Attach was
+            // still awaiting the IndexedDB open would have cached a "Library
+            // is not attached" error and would never refresh until a state
+            // change happened to trigger one. Firing here clears that race.
+            NotifySlotsChanged();
+
             return Result.Success;
         }
 
@@ -671,10 +678,12 @@ namespace KnockBox.DndMapper.Services.Library
         /// so subsequent auto-saves and uploads continue to work.
         /// </summary>
         /// <summary>
-        /// "Start fresh" — drops only the auto-save snapshot of the previous
-        /// session so the host begins with a clean board and the banner stops
-        /// showing. Named save slots and image blobs are preserved; users can
-        /// still access them from the Saves panel afterward.
+        /// "Start fresh" — drops ONLY the Auto Save record so the host begins
+        /// with a clean board and the banner stops showing. Named slot
+        /// snapshots live in the same <see cref="DndMapperLibrarySchema.LibraryStore"/>
+        /// keyed by their own GUIDs and are intentionally left intact, as are
+        /// their image blobs. The next auto-save tick will recreate the
+        /// <c>__auto__</c> record from the (clean) current state.
         /// </summary>
         public async ValueTask<Result> DiscardLibraryAsync(CancellationToken ct = default)
         {
@@ -688,21 +697,39 @@ namespace KnockBox.DndMapper.Services.Library
             await _saveLock.WaitAsync(ct);
             try
             {
-                // Clear only the live snapshot store. SlotsIndexStore (named
-                // saves) and ImagesStore (image blobs referenced by those
-                // slots) are intentionally left intact — the user clicked
+                // Delete ONLY the auto-save record from LibraryStore. Manual
+                // slot snapshots (keyed by their slot GUID in the same store)
+                // and the ImagesStore are preserved — the user clicked
                 // "Start fresh", not "Delete everything".
-                var result = await _db.ClearStoresAsync(
-                    [DndMapperLibrarySchema.LibraryStore],
-                    ct);
-
-                if (!result.IsSuccess)
+                var autoKey = IndexedDbKey.String(DndMapperLibrarySchema.AutoSlotId);
+                var delResult = await _db.DeleteSingleAsync(
+                    DndMapperLibrarySchema.LibraryStore, autoKey, ct);
+                if (!delResult.IsSuccess)
                 {
-                    result.TryGetFailure(out var err);
-                    return Result.FromError($"Failed to clear session snapshot: {err.Message}");
+                    delResult.TryGetFailure(out var derr);
+                    return Result.FromError($"Failed to clear auto-save: {derr.Message}");
+                }
+
+                // Drop the __auto__ entry from the slots index so the Saves
+                // panel doesn't show a stale "Auto Save" row pointing at the
+                // record we just deleted. The next auto-save flush re-adds it.
+                var idx = await ReadSlotsIndexAsync(_db, ct);
+                var removed = idx.Slots.RemoveAll(s => s.Id == DndMapperLibrarySchema.AutoSlotId) > 0;
+                if (removed)
+                {
+                    var idxResult = await WriteSlotsIndexAsync(_db, idx, ct);
+                    if (!idxResult.IsSuccess)
+                    {
+                        idxResult.TryGetFailure(out var ierr);
+                        return Result.FromError($"Failed to update slots index: {ierr.PublicMessage}");
+                    }
                 }
 
                 HasExistingLibrary = false;
+                // Always notify — even if __auto__ wasn't in the index, a
+                // panel that previously cached "Library is not attached" from
+                // an Attach race still needs this nudge to re-refresh.
+                NotifySlotsChanged();
                 return Result.Success;
             }
             finally
