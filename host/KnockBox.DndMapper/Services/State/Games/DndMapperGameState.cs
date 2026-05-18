@@ -20,7 +20,12 @@ namespace KnockBox.DndMapper.Services.State.Games
         public Dictionary<Guid, CharacterSheet> Sheets { get; } = [];
         public Dictionary<Guid, NamedTemplate> CustomTemplates { get; } = [];
         public List<RollResult> RollLog { get; } = [];
-        public List<StatusEffectTemplate> StatusEffectTemplates { get; } = [];
+
+        // Status-effect templates live as children of NamedTemplate
+        // (attribute schemas). This id pins which schema the Effect Library
+        // modal and the quick-apply dropdown read from. Null when the active
+        // schema is a free-form Custom one not yet saved as a named template.
+        public Guid? ActiveSchemaTemplateId { get; private set; }
 
         public CombatState? ActiveCombat { get; private set; }
         public CenterViewportRequest? PendingCenterRequest { get; private set; }
@@ -39,7 +44,24 @@ namespace KnockBox.DndMapper.Services.State.Games
             : base(host, logger)
         {
             SeedBuiltInTemplates();
+            ActiveSchemaTemplateId = BuiltInDnD5eCoreId;
         }
+
+        // Maps a preset onto its deterministic built-in template id so the
+        // Effect Library can find the active schema's effects without the
+        // caller having to track the id explicitly.
+        public static Guid? BuiltInTemplateIdFor(AttributePreset preset) => preset switch
+        {
+            AttributePreset.DnD5eCore => BuiltInDnD5eCoreId,
+            AttributePreset.DnD5ePlusCommonSkills => BuiltInDnD5ePlusSkillsId,
+            AttributePreset.SimpleD20 => BuiltInSimpleD20Id,
+            _ => null,
+        };
+
+        public NamedTemplate? GetActiveSchemaTemplate()
+            => ActiveSchemaTemplateId is { } id && CustomTemplates.TryGetValue(id, out var t)
+                ? t
+                : null;
 
         // Players who joined the lobby before the game started may rejoin
         // mid-session (e.g. after a circuit drop past the reconnect grace
@@ -68,6 +90,7 @@ namespace KnockBox.DndMapper.Services.State.Games
         internal void SetPhase(DndMapperPhase phase) => Phase = phase;
         internal void SetSettings(DndMapperSettings settings) => Settings = settings;
         internal void SetAttributeSchema(AttributeSchema schema) => AttributeSchema = schema;
+        internal void SetActiveSchemaTemplateId(Guid? id) => ActiveSchemaTemplateId = id;
         internal void SetActiveMapId(Guid? mapId) => ActiveMapId = mapId;
         internal void SetActiveCombat(CombatState? combat) => ActiveCombat = combat;
         internal void SetPendingCenterRequest(CenterViewportRequest? request) => PendingCenterRequest = request;

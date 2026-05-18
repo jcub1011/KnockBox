@@ -38,7 +38,7 @@ namespace KnockBox.DndMapperTests.Unit.Services.Library
 
             var snap = LibrarySnapshotMapper.FromState(state);
 
-            Assert.AreEqual(1, snap.SchemaVersion);
+            Assert.AreEqual(2, snap.SchemaVersion);
             Assert.HasCount(1, snap.Maps);
             Assert.AreEqual("Forest", snap.Maps[0].Name);
             Assert.HasCount(1, snap.Maps[0].Tokens);
@@ -213,13 +213,15 @@ namespace KnockBox.DndMapperTests.Unit.Services.Library
             Assert.AreEqual(12, schema.Rows[0].Default.IntValue);
         }
 
-        // ── Built-in templates are not serialized ────────────────────────────────
+        // ── Built-ins are serialized so their status-effect templates can ride along ─
 
         [TestMethod]
-        public void FromState_OmitsBuiltInTemplatesFromCustomTemplates()
+        public void FromState_IncludesBuiltInTemplates_WithIsBuiltInFlag()
         {
-            // A fresh state seeds the three built-in templates. Snapshots intentionally
-            // skip these so they can evolve across releases without rotting old saves.
+            // Built-ins must round-trip because hosts can author status-effect
+            // templates underneath them. The Rows on built-ins are still
+            // re-seeded from the preset on load (snapshot Rows are ignored
+            // for IsBuiltIn entries), so preset evolution remains safe.
             var (engine, state, host, _) = EngineTestFactory.Build();
             IReadOnlyList<AttributeRow> rows =
                 [new("STR", AttributeValueType.Score, AttributeValue.Score(10))];
@@ -231,9 +233,84 @@ namespace KnockBox.DndMapperTests.Unit.Services.Library
 
             var snap = LibrarySnapshotMapper.FromState(state);
 
-            Assert.HasCount(1, snap.CustomTemplates);
-            Assert.AreEqual(userTplId, snap.CustomTemplates[0].Id);
-            Assert.AreEqual("MyTpl", snap.CustomTemplates[0].Name);
+            Assert.HasCount(4, snap.CustomTemplates);
+            var user = snap.CustomTemplates.Single(t => t.Id == userTplId);
+            Assert.AreEqual("MyTpl", user.Name);
+            Assert.IsFalse(user.IsBuiltIn);
+            Assert.AreEqual(3, snap.CustomTemplates.Count(t => t.IsBuiltIn));
+        }
+
+        // ── Status-effect persistence (V2) ───────────────────────────────────────
+
+        [TestMethod]
+        public void FromState_PersistsStatusEffectTemplates_UnderBuiltInSchema()
+        {
+            var (engine, state, host, _) = EngineTestFactory.Build();
+            Assert.IsTrue(engine.CreateStatusEffectTemplateAsync(state, host, "Frostbite",
+                [new AttributeDelta("STR", -2)], null, null, "icy").IsSuccess);
+
+            var snap = LibrarySnapshotMapper.FromState(state);
+
+            var core = snap.CustomTemplates.Single(t => t.Id == KnockBox.DndMapper.Services.State.Games.DndMapperGameState.BuiltInDnD5eCoreId);
+            Assert.HasCount(1, core.StatusEffectTemplates);
+            Assert.AreEqual("Frostbite", core.StatusEffectTemplates[0].Name);
+            Assert.AreEqual(-2, core.StatusEffectTemplates[0].AttributeDeltas[0].Delta);
+            Assert.AreEqual("STR", core.StatusEffectTemplates[0].AttributeDeltas[0].AttributeName);
+            Assert.AreEqual("icy", core.StatusEffectTemplates[0].Notes);
+        }
+
+        [TestMethod]
+        public void FromState_PersistsActiveSchemaTemplateId()
+        {
+            var (_, state, _, _) = EngineTestFactory.Build();
+            var snap = LibrarySnapshotMapper.FromState(state);
+            Assert.AreEqual(KnockBox.DndMapper.Services.State.Games.DndMapperGameState.BuiltInDnD5eCoreId,
+                snap.ActiveSchemaTemplateId);
+        }
+
+        [TestMethod]
+        public void FromState_PersistsAppliedStatusEffectsOnSheets()
+        {
+            var (engine, state, host, _) = EngineTestFactory.Build();
+            Assert.IsTrue(engine.CreateSheetAsync(state, host, ownerUserId: null, "Goblin")
+                .TryGetSuccess(out var sheetId));
+            Assert.IsTrue(engine.ApplyStatusEffectAsync(state, host, sheetId, "Bleed",
+                [new AttributeDelta("STR", -1)], maxHpDelta: null, onApplyHpDelta: -3, notes: "bleeding").IsSuccess);
+
+            var snap = LibrarySnapshotMapper.FromState(state);
+
+            var sheetSnap = snap.Sheets.Single(s => s.Id == sheetId);
+            Assert.HasCount(1, sheetSnap.StatusEffects);
+            Assert.AreEqual("Bleed", sheetSnap.StatusEffects[0].Name);
+            Assert.AreEqual(-3, sheetSnap.StatusEffects[0].OnApplyHpDelta);
+            Assert.AreEqual("bleeding", sheetSnap.StatusEffects[0].Notes);
+        }
+
+        [TestMethod]
+        public void Snapshot_RoundTripsStatusEffects_ThroughJson()
+        {
+            var (engine, state, host, _) = EngineTestFactory.Build();
+            Assert.IsTrue(engine.CreateStatusEffectTemplateAsync(state, host, "Frostbite",
+                [new AttributeDelta("STR", -2)], null, null, "icy").IsSuccess);
+            Assert.IsTrue(engine.CreateSheetAsync(state, host, ownerUserId: null, "Goblin")
+                .TryGetSuccess(out var sheetId));
+            Assert.IsTrue(engine.ApplyStatusEffectAsync(state, host, sheetId, "Bleed",
+                [new AttributeDelta("STR", -1)], null, null, null).IsSuccess);
+
+            var snap = LibrarySnapshotMapper.FromState(state);
+            var json = JsonSerializer.Serialize(snap, JsonOptions);
+            var reread = JsonSerializer.Deserialize<LibrarySnapshot>(json, JsonOptions);
+
+            Assert.IsNotNull(reread);
+            var core = reread!.CustomTemplates.Single(t => t.IsBuiltIn
+                && t.Id == KnockBox.DndMapper.Services.State.Games.DndMapperGameState.BuiltInDnD5eCoreId);
+            Assert.HasCount(1, core.StatusEffectTemplates);
+            Assert.AreEqual("Frostbite", core.StatusEffectTemplates[0].Name);
+
+            var sheet = reread.Sheets.Single(s => s.Id == sheetId);
+            Assert.HasCount(1, sheet.StatusEffects);
+            Assert.AreEqual("Bleed", sheet.StatusEffects[0].Name);
+            Assert.AreEqual(2, reread.SchemaVersion);
         }
 
         [TestMethod]

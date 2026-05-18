@@ -1,6 +1,7 @@
 using System.Globalization;
 using KnockBox.Core.Components.Shared;
 using KnockBox.Core.Services.State.Users;
+using KnockBox.DndMapper.Helpers;
 using KnockBox.DndMapper.Services.Logic.Games;
 using KnockBox.DndMapper.Services.Logic.Visibility;
 using KnockBox.DndMapper.Services.State.Games;
@@ -124,6 +125,27 @@ namespace KnockBox.DndMapper.Pages.Components
 
         private static string FormatMod(int? mod) =>
             mod is null ? "—" : (mod.Value >= 0 ? $"+{mod.Value}" : mod.Value.ToString(CultureInfo.InvariantCulture));
+
+        private static string FormatMod(int mod) =>
+            mod >= 0 ? $"+{mod}" : mod.ToString(CultureInfo.InvariantCulture);
+
+        // Tooltip for the Status Effects column — first entry is the base
+        // value, the rest are per-effect deltas in encounter order. Drop the
+        // base line when there are no deltas (the cell shows "—" already).
+        private static string FormatBreakdown(IReadOnlyList<ContributionEntry> entries)
+        {
+            if (entries is null || entries.Count <= 1) return string.Empty;
+            var lines = new List<string>(entries.Count);
+            // Index 0 is the base contributor: "ATTR: 14".
+            lines.Add($"Base: {entries[0].Delta}");
+            for (int i = 1; i < entries.Count; i++)
+            {
+                var e = entries[i];
+                var sign = e.Delta >= 0 ? "+" : "−";
+                lines.Add($"{e.Source}: {sign}{Math.Abs(e.Delta)}");
+            }
+            return string.Join("\n", lines);
+        }
 
         private async Task CommitAttribute(CharacterSheet sheet, AttributeRow row, AttributeValue value)
         {

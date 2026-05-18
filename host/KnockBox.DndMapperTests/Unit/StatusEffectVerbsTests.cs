@@ -159,7 +159,7 @@ namespace KnockBox.DndMapperTests.Unit
 
             var d = _engine.DeleteStatusEffectTemplateAsync(_state, _host, id);
             Assert.IsTrue(d.IsSuccess);
-            Assert.IsEmpty(_state.StatusEffectTemplates);
+            Assert.IsEmpty(_state.GetActiveSchemaTemplate()!.StatusEffectTemplates);
         }
 
         [TestMethod]
@@ -176,7 +176,7 @@ namespace KnockBox.DndMapperTests.Unit
 
             _engine.DeleteStatusEffectTemplateAsync(_state, _host, templateId);
 
-            Assert.IsEmpty(_state.StatusEffectTemplates);
+            Assert.IsEmpty(_state.GetActiveSchemaTemplate()!.StatusEffectTemplates);
             Assert.HasCount(1, _state.Sheets[sheetId].StatusEffects);
         }
 

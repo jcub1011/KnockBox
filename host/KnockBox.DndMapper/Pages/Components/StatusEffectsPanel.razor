@@ -61,7 +61,11 @@
                         title="Cancel" @onclick="CloseAdder">×</button>
             </div>
 
-            @if (State.StatusEffectTemplates.Count > 0)
+            @{
+                var quickTemplates = State.GetActiveSchemaTemplate()?.StatusEffectTemplates
+                    ?? new List<StatusEffectTemplate>();
+            }
+            @if (quickTemplates.Count > 0)
             {
                 <label class="dndm-label dndm-label--inline">Quick‑apply from template</label>
                 <div class="dndm-effect-template-row">
@@ -69,7 +73,7 @@
                             value="@_selectedTemplateId"
                             @onchange="@(e => OnTemplateChosen((string?)e.Value))">
                         <option value="">— template —</option>
-                        @foreach (var t in State.StatusEffectTemplates)
+                        @foreach (var t in quickTemplates)
                         {
                             <option value="@t.Id">@t.Name</option>
                         }

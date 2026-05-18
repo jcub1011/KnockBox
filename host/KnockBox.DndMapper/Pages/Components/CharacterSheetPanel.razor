@@ -1,4 +1,5 @@
 @using KnockBox.Core.Components.Shared
+@using KnockBox.DndMapper.Helpers
 @using KnockBox.DndMapper.Models
 @using KnockBox.DndMapper.Services.Logic.Visibility
 @using KnockBox.DndMapper.Services.State.Games
@@ -189,39 +190,78 @@
                     }
                 }
 
-                <div class="dndm-sheet-attrs">
-                    @foreach (var row in State.AttributeSchema.Rows)
-                    {
-                        var current = sheet.Values.TryGetValue(row.Name, out var v) ? v : row.Default;
-                        <div @key="row.Name" class="dndm-sheet-attr">
-                            <span class="dndm-sheet-attr-name">@row.Name</span>
-                            @switch (row.Type)
-                            {
-                                case AttributeValueType.Score:
-                                    <input type="number"
-                                           class="dndm-input dndm-input--num"
-                                           value="@(current.IntValue ?? 10)"
-                                           disabled="@(!canEdit)"
-                                           @onchange="@(e => CommitAttribute(sheet, row, AttributeValue.Score(ParseInt(e.Value, 10))))" />
-                                    <span class="dndm-sheet-attr-mod">@FormatMod(current.GetModifier())</span>
-                                    break;
-                                case AttributeValueType.Modifier:
-                                    <input type="number"
-                                           class="dndm-input dndm-input--num"
-                                           value="@(current.IntValue ?? 0)"
-                                           disabled="@(!canEdit)"
-                                           @onchange="@(e => CommitAttribute(sheet, row, AttributeValue.Modifier(ParseInt(e.Value, 0))))" />
-                                    break;
-                                case AttributeValueType.Text:
-                                    <input class="dndm-input"
-                                           value="@(current.StringValue ?? string.Empty)"
-                                           disabled="@(!canEdit)"
-                                           @onchange="@(e => CommitAttribute(sheet, row, AttributeValue.Text(((string?)e.Value) ?? string.Empty)))" />
-                                    break;
-                            }
-                        </div>
-                    }
-                </div>
+                <table class="dndm-sheet-attr-table">
+                    <thead>
+                        <tr>
+                            <th class="dndm-sheet-attr-col-name">Attribute</th>
+                            <th class="dndm-sheet-attr-col-base">Base Value</th>
+                            <th class="dndm-sheet-attr-col-effects" title="Sum of attribute deltas from active status effects.">Status Effects</th>
+                            <th class="dndm-sheet-attr-col-adj" title="The modifier added to rolls — (Base + Status Effects) through this attribute's scoring mode.">Roll Adjustment</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var row in State.AttributeSchema.Rows)
+                        {
+                            var current = sheet.Values.TryGetValue(row.Name, out var v) ? v : row.Default;
+                            var contrib = AttributeContributionResolver.Resolve(sheet, row.Name, current);
+                            var effectDelta = (contrib.EffectiveValue.IntValue ?? 0) - (current.IntValue ?? 0);
+                            var effectsCls = effectDelta == 0 ? "" : effectDelta < 0 ? "is-neg" : "is-pos";
+                            <tr @key="row.Name">
+                                <td class="dndm-sheet-attr-col-name">@row.Name</td>
+                                <td class="dndm-sheet-attr-col-base">
+                                    @switch (row.Type)
+                                    {
+                                        case AttributeValueType.Score:
+                                            <input type="number"
+                                                   class="dndm-input dndm-input--num"
+                                                   value="@(current.IntValue ?? 10)"
+                                                   disabled="@(!canEdit)"
+                                                   @onchange="@(e => CommitAttribute(sheet, row, AttributeValue.Score(ParseInt(e.Value, 10))))" />
+                                            break;
+                                        case AttributeValueType.Modifier:
+                                            <input type="number"
+                                                   class="dndm-input dndm-input--num"
+                                                   value="@(current.IntValue ?? 0)"
+                                                   disabled="@(!canEdit)"
+                                                   @onchange="@(e => CommitAttribute(sheet, row, AttributeValue.Modifier(ParseInt(e.Value, 0))))" />
+                                            break;
+                                        case AttributeValueType.Text:
+                                            <input class="dndm-input"
+                                                   value="@(current.StringValue ?? string.Empty)"
+                                                   disabled="@(!canEdit)"
+                                                   @onchange="@(e => CommitAttribute(sheet, row, AttributeValue.Text(((string?)e.Value) ?? string.Empty)))" />
+                                            break;
+                                    }
+                                </td>
+                                <td class="@($"dndm-sheet-attr-col-effects {effectsCls}")"
+                                    title="@FormatBreakdown(contrib.ValueBreakdown)">
+                                    @if (row.Type == AttributeValueType.Text)
+                                    {
+                                        <span class="dndm-sheet-attr-dash">—</span>
+                                    }
+                                    else if (effectDelta == 0)
+                                    {
+                                        <span class="dndm-sheet-attr-dash">—</span>
+                                    }
+                                    else
+                                    {
+                                        @FormatMod(effectDelta)
+                                    }
+                                </td>
+                                <td class="dndm-sheet-attr-col-adj">
+                                    @if (row.Type == AttributeValueType.Text)
+                                    {
+                                        <span class="dndm-sheet-attr-dash">—</span>
+                                    }
+                                    else
+                                    {
+                                        @FormatMod(contrib.EffectiveModifier)
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
 
                 <StatusEffectsPanel State="State"
                                     Sheet="sheet"

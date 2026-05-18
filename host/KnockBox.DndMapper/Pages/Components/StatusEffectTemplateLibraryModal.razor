@@ -20,14 +20,34 @@
                 sheet — editing the template later never touches in‑flight instances.
             </div>
 
+            @{
+                var activeSchema = State.GetActiveSchemaTemplate();
+                var templates = activeSchema?.StatusEffectTemplates ?? new List<StatusEffectTemplate>();
+            }
+
+            @if (activeSchema is null)
+            {
+                <div class="dndm-effect-library-scope">
+                    The current attribute schema isn't a saved template yet — effects belong to schemas,
+                    so save the schema as a template (Sheet Settings → Save As) before forging effects here.
+                </div>
+            }
+            else
+            {
+                <div class="dndm-effect-library-scope">
+                    Effects belong to the <strong>@activeSchema.Name</strong> schema. Switching schemas hides
+                    them; deleting <strong>@activeSchema.Name</strong> deletes them.
+                </div>
+            }
+
             <div class="dndm-effect-library-list">
-                @if (State.StatusEffectTemplates.Count == 0)
+                @if (templates.Count == 0)
                 {
-                    <div class="dndm-panel-empty">No templates yet. Forge one below.</div>
+                    <div class="dndm-panel-empty">@(activeSchema is null ? "No active schema." : "No templates yet. Forge one below.")</div>
                 }
                 else
                 {
-                    @foreach (var t in State.StatusEffectTemplates)
+                    @foreach (var t in templates)
                     {
                         <div @key="t.Id" class="dndm-effect-template">
                             <div class="dndm-effect-template-head">
@@ -130,10 +150,11 @@
                     <input class="dndm-input"
                            placeholder="Template name (e.g. Brain Fog)"
                            value="@_newName"
+                           disabled="@(activeSchema is null)"
                            @oninput="@(e => _newName = (string?)e.Value ?? string.Empty)" />
                     <button class="dndm-btn dndm-btn--primary dndm-btn--small"
                             type="button"
-                            disabled="@string.IsNullOrWhiteSpace(_newName)"
+                            disabled="@(activeSchema is null || string.IsNullOrWhiteSpace(_newName))"
                             @onclick="CreateBlankTemplate">Create</button>
                 </div>
                 <div class="dndm-effect-library-hint">

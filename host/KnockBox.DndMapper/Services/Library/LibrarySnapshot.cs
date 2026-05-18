@@ -23,9 +23,13 @@ namespace KnockBox.DndMapper.Services.Library
     /// </remarks>
     internal sealed record LibrarySnapshot
     {
-        public int SchemaVersion { get; init; } = 1;
+        public int SchemaVersion { get; init; } = 2;
         public DndMapperSettings Settings { get; init; } = new();
         public AttributeSchemaSnapshot AttributeSchema { get; init; } = new();
+        // Set when the live schema came from a known NamedTemplate (built-in
+        // or user-saved). Null for free-form Custom schemas. Drives which
+        // NamedTemplate's effect library is "active" on load.
+        public Guid? ActiveSchemaTemplateId { get; init; }
         public List<MapSnapshot> Maps { get; init; } = [];
         public List<SheetSnapshot> Sheets { get; init; } = [];
         public List<NamedTemplateSnapshot> CustomTemplates { get; init; } = [];
@@ -35,7 +39,37 @@ namespace KnockBox.DndMapper.Services.Library
     {
         public Guid Id { get; init; }
         public string Name { get; init; } = string.Empty;
+        public bool IsBuiltIn { get; init; }
         public List<AttributeRowSnapshot> Rows { get; init; } = [];
+        // Host-authored status-effect templates scoped to this schema.
+        public List<StatusEffectTemplateSnapshot> StatusEffectTemplates { get; init; } = [];
+    }
+
+    internal sealed record StatusEffectTemplateSnapshot
+    {
+        public Guid Id { get; init; }
+        public string Name { get; init; } = string.Empty;
+        public List<AttributeDeltaSnapshot> AttributeDeltas { get; init; } = [];
+        public int? MaxHpDelta { get; init; }
+        public int? OnApplyHpDelta { get; init; }
+        public string Notes { get; init; } = string.Empty;
+    }
+
+    internal sealed record StatusEffectSnapshot
+    {
+        public Guid Id { get; init; }
+        public string Name { get; init; } = string.Empty;
+        public List<AttributeDeltaSnapshot> AttributeDeltas { get; init; } = [];
+        public int? MaxHpDelta { get; init; }
+        public int? OnApplyHpDelta { get; init; }
+        public string Notes { get; init; } = string.Empty;
+        public DateTime AppliedUtc { get; init; }
+    }
+
+    internal sealed record AttributeDeltaSnapshot
+    {
+        public string AttributeName { get; init; } = string.Empty;
+        public int Delta { get; init; }
     }
 
     internal sealed record MapSnapshot
@@ -96,6 +130,7 @@ namespace KnockBox.DndMapper.Services.Library
         public string Notes { get; init; } = string.Empty;
         public int? Hp { get; init; }
         public int? MaxHp { get; init; }
+        public List<StatusEffectSnapshot> StatusEffects { get; init; } = [];
         // OwnerUserId not persisted (see TokenSnapshot rationale).
     }
 
@@ -150,31 +185,94 @@ namespace KnockBox.DndMapper.Services.Library
                 .Select(ToSheetSnapshot)
                 .ToList();
 
+            // Persist every NamedTemplate (built-in or user). For built-ins we
+            // still write Rows so older hosts can read it, but on load the
+            // seeded Rows are authoritative — only the StatusEffectTemplates
+            // ride along to round-trip the host's authoring under built-in
+            // schemas.
             var templates = state.CustomTemplates.Values
-                .Where(t => !t.IsBuiltIn)
                 .Select(t => new NamedTemplateSnapshot
                 {
                     Id = t.Id,
                     Name = t.Name,
+                    IsBuiltIn = t.IsBuiltIn,
                     Rows = t.Rows.Select(r => new AttributeRowSnapshot
                     {
                         Name = r.Name,
                         Type = r.Type,
                         Default = ToValueSnapshot(r.Default),
                     }).ToList(),
+                    StatusEffectTemplates = t.StatusEffectTemplates
+                        .Select(ToStatusEffectTemplateSnapshot)
+                        .ToList(),
                 })
                 .ToList();
 
             return new LibrarySnapshot
             {
-                SchemaVersion = 1,
+                SchemaVersion = 2,
                 Settings = state.Settings.Clone(),
                 AttributeSchema = ToSchemaSnapshot(state.AttributeSchema),
+                ActiveSchemaTemplateId = state.ActiveSchemaTemplateId,
                 Maps = maps,
                 Sheets = sheets,
                 CustomTemplates = templates,
             };
         }
+
+        public static StatusEffectTemplateSnapshot ToStatusEffectTemplateSnapshot(StatusEffectTemplate t) => new()
+        {
+            Id = t.Id,
+            Name = t.Name,
+            AttributeDeltas = t.AttributeDeltas.Select(d => new AttributeDeltaSnapshot
+            {
+                AttributeName = d.AttributeName,
+                Delta = d.Delta,
+            }).ToList(),
+            MaxHpDelta = t.MaxHpDelta,
+            OnApplyHpDelta = t.OnApplyHpDelta,
+            Notes = t.Notes,
+        };
+
+        public static StatusEffectSnapshot ToStatusEffectSnapshot(StatusEffect e) => new()
+        {
+            Id = e.Id,
+            Name = e.Name,
+            AttributeDeltas = e.AttributeDeltas.Select(d => new AttributeDeltaSnapshot
+            {
+                AttributeName = d.AttributeName,
+                Delta = d.Delta,
+            }).ToList(),
+            MaxHpDelta = e.MaxHpDelta,
+            OnApplyHpDelta = e.OnApplyHpDelta,
+            Notes = e.Notes,
+            AppliedUtc = e.AppliedUtc,
+        };
+
+        public static StatusEffectTemplate FromStatusEffectTemplateSnapshot(StatusEffectTemplateSnapshot s) => new()
+        {
+            Id = s.Id,
+            Name = s.Name,
+            AttributeDeltas = s.AttributeDeltas
+                .Select(d => new AttributeDelta(d.AttributeName, d.Delta))
+                .ToList(),
+            MaxHpDelta = s.MaxHpDelta,
+            OnApplyHpDelta = s.OnApplyHpDelta,
+            Notes = s.Notes,
+        };
+
+        public static StatusEffect FromStatusEffectSnapshot(StatusEffectSnapshot s) => new()
+        {
+            Id = s.Id,
+            Name = s.Name,
+            AttributeDeltas = s.AttributeDeltas
+                .Select(d => new AttributeDelta(d.AttributeName, d.Delta))
+                .ToList(),
+            MaxHpDelta = s.MaxHpDelta,
+            OnApplyHpDelta = s.OnApplyHpDelta,
+            Notes = s.Notes,
+            AppliedUtc = s.AppliedUtc,
+        };
 
         public static AttributeValue ToAttributeValue(AttributeValueSnapshot snap) => snap.Type switch
         {
@@ -260,6 +358,7 @@ namespace KnockBox.DndMapper.Services.Library
             Notes = sheet.Notes,
             Hp = sheet.Hp,
             MaxHp = sheet.MaxHp,
+            StatusEffects = sheet.StatusEffects.Select(ToStatusEffectSnapshot).ToList(),
         };
     }
 }

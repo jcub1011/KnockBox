@@ -575,25 +575,52 @@ namespace KnockBox.DndMapper.Services.Library
                     };
                     foreach (var kv in sheetSnap.Values)
                         sheet.Values[kv.Key] = LibrarySnapshotMapper.ToAttributeValue(kv.Value);
+                    foreach (var effectSnap in sheetSnap.StatusEffects)
+                        sheet.StatusEffects.Add(LibrarySnapshotMapper.FromStatusEffectSnapshot(effectSnap));
                     state.Sheets[sheet.Id] = sheet;
                 }
 
                 state.CustomTemplates.Clear();
-                // Re-seed built-ins before user templates so they're always
-                // present (snapshots never serialize built-ins; their rows can
-                // evolve across releases).
+                // Re-seed built-ins before user templates so their Rows are
+                // re-derived from the in-code preset definitions (which can
+                // evolve across releases); the snapshot's persisted Rows are
+                // ignored for built-ins.
                 state.SeedBuiltInTemplates();
                 foreach (var t in snapshot.CustomTemplates)
                 {
-                    state.CustomTemplates[t.Id] = new NamedTemplate
+                    var existing = state.CustomTemplates.TryGetValue(t.Id, out var seeded) ? seeded : null;
+                    if (existing is { IsBuiltIn: true })
                     {
-                        Id = t.Id,
-                        Name = t.Name,
-                        Rows = t.Rows
-                            .Select(r => new AttributeRow(r.Name, r.Type, LibrarySnapshotMapper.ToAttributeValue(r.Default)))
-                            .ToList(),
-                    };
+                        // Built-in: keep seeded Rows, overlay persisted effects.
+                        existing.StatusEffectTemplates.Clear();
+                        foreach (var s in t.StatusEffectTemplates)
+                            existing.StatusEffectTemplates.Add(LibrarySnapshotMapper.FromStatusEffectTemplateSnapshot(s));
+                    }
+                    else
+                    {
+                        state.CustomTemplates[t.Id] = new NamedTemplate
+                        {
+                            Id = t.Id,
+                            Name = t.Name,
+                            IsBuiltIn = false,
+                            Rows = t.Rows
+                                .Select(r => new AttributeRow(r.Name, r.Type, LibrarySnapshotMapper.ToAttributeValue(r.Default)))
+                                .ToList(),
+                            StatusEffectTemplates = t.StatusEffectTemplates
+                                .Select(LibrarySnapshotMapper.FromStatusEffectTemplateSnapshot)
+                                .ToList(),
+                        };
+                    }
                 }
+
+                // Restore the active schema pointer. Default V1 snapshots have
+                // no id stored; fall back to the deterministic id for the
+                // persisted preset so the library lands on the right schema.
+                var resolvedActiveId = snapshot.ActiveSchemaTemplateId
+                    ?? DndMapperGameState.BuiltInTemplateIdFor(snapshot.AttributeSchema.Preset);
+                if (resolvedActiveId is { } rid && !state.CustomTemplates.ContainsKey(rid))
+                    resolvedActiveId = null;
+                state.SetActiveSchemaTemplateId(resolvedActiveId);
 
                 // Activate the first map if any exist so the host doesn't
                 // land on an empty canvas after hydration.

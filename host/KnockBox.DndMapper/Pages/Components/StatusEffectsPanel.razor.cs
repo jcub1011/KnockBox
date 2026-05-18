@@ -46,7 +46,8 @@ namespace KnockBox.DndMapper.Pages.Components
         {
             _selectedTemplateId = value ?? string.Empty;
             if (!Guid.TryParse(_selectedTemplateId, out var id)) return;
-            var template = State.StatusEffectTemplates.FirstOrDefault(t => t.Id == id);
+            var template = State.GetActiveSchemaTemplate()?.StatusEffectTemplates
+                .FirstOrDefault(t => t.Id == id);
             if (template is null) return;
             // Clone template fields into the draft — applying decouples per §8.5.3.
             _draftName = template.Name;

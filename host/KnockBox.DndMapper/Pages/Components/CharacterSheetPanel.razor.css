@@ -118,37 +118,77 @@
     border-bottom-color: var(--dndm-ember);
 }
 
-.dndm-sheet-attrs {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 0.3rem;
+.dndm-sheet-attr-table {
+    width: 100%;
+    border-collapse: collapse;
     margin-bottom: 0.6rem;
+    font-size: 0.95rem;
+    table-layout: fixed;
 }
 
-.dndm-sheet-attr {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.2rem 0;
+.dndm-sheet-attr-table th {
+    text-align: left;
+    color: var(--dndm-ember);
+    font-family: var(--font-primary);
+    font-weight: 500;
+    font-size: 0.82rem;
+    letter-spacing: 0.3px;
+    padding: 0.25rem 0.35rem;
+    border-bottom: 1px solid var(--dndm-border-accent);
+    white-space: nowrap;
 }
 
-.dndm-sheet-attr-name {
-    flex: 0 0 6.5rem;
+.dndm-sheet-attr-table td {
+    padding: 0.25rem 0.35rem;
+    color: var(--dndm-text);
+    vertical-align: middle;
+    border-bottom: 1px dashed var(--dndm-ink-soft);
+}
+
+.dndm-sheet-attr-table tbody tr:last-child td { border-bottom: 0; }
+
+.dndm-sheet-attr-col-name {
     color: var(--dndm-text-dim);
     font-family: var(--font-primary);
     letter-spacing: 0.3px;
-    font-size: 1.05rem;
+    width: 32%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
-.dndm-sheet-attr-mod {
-    flex: 0 0 auto;
-    min-width: 2.5rem;
+.dndm-sheet-attr-col-base {
+    width: 28%;
+}
+
+.dndm-sheet-attr-col-base .dndm-input {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+}
+
+.dndm-sheet-attr-col-effects {
+    width: 20%;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    font-family: var(--font-primary);
+}
+
+.dndm-sheet-attr-col-effects.is-neg { color: var(--dndm-danger, #d57878); }
+.dndm-sheet-attr-col-effects.is-pos { color: #6ed27e; }
+
+.dndm-sheet-attr-col-adj {
+    width: 20%;
+    text-align: right;
     color: var(--dndm-ember);
     font-variant-numeric: tabular-nums;
     text-align: right;
     font-weight: 700;
-    font-size: 1.05rem;
     font-family: var(--font-primary);
+}
+
+.dndm-sheet-attr-dash {
+    color: var(--dndm-text-muted);
 }
 
 .dndm-sheet-section { padding: 0.6rem 0; border-top: 1px dashed var(--dndm-ink-soft); }

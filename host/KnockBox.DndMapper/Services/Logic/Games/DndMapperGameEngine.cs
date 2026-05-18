@@ -763,7 +763,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             return error is null ? Result.Success : Result.FromError(error);
         }
 
-        public Result ChangeSchemaAsync(DndMapperGameState state, User caller, AttributeSchema newSchema)
+        public Result ChangeSchemaAsync(DndMapperGameState state, User caller, AttributeSchema newSchema, Guid? sourceTemplateId = null)
         {
             if (state is null) return Result.FromError("State is required.");
             if (caller is null) return Result.FromError("Caller is required.");
@@ -773,6 +773,15 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             var exec = state.Execute(() =>
             {
                 state.SetAttributeSchema(newSchema);
+
+                // Caller-supplied id wins; otherwise infer from the preset
+                // (built-in presets resolve to their deterministic ids, Custom
+                // resolves to null — a free-form schema with no library bucket).
+                var resolvedId = sourceTemplateId
+                    ?? DndMapperGameState.BuiltInTemplateIdFor(newSchema.Preset);
+                if (resolvedId is { } id && !state.CustomTemplates.ContainsKey(id))
+                    resolvedId = null;
+                state.SetActiveSchemaTemplateId(resolvedId);
 
                 foreach (var sheet in state.Sheets.Values)
                 {
@@ -882,7 +891,32 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             {
                 if (!state.CustomTemplates.TryGetValue(templateId, out var existing)) { error = "Unknown template id."; return; }
                 if (existing.IsBuiltIn) { error = "Built-in templates cannot be deleted."; return; }
+
+                // Effect templates ride along on the NamedTemplate, so removing
+                // it from the dictionary cascade-removes its library.
                 state.CustomTemplates.Remove(templateId);
+
+                // If the host just deleted the schema they were standing on,
+                // snap the session back to DnD 5e core (a built-in, so always
+                // present) and rebuild every sheet under that schema.
+                if (state.ActiveSchemaTemplateId == templateId)
+                {
+                    var fallback = AttributeSchema.FromPreset(AttributePreset.DnD5eCore);
+                    state.SetAttributeSchema(fallback);
+                    state.SetActiveSchemaTemplateId(DndMapperGameState.BuiltInDnD5eCoreId);
+                    foreach (var sheet in state.Sheets.Values)
+                    {
+                        var oldValues = new Dictionary<string, AttributeValue>(sheet.Values);
+                        sheet.Values.Clear();
+                        foreach (var row in fallback.Rows)
+                        {
+                            if (oldValues.TryGetValue(row.Name, out var keep) && keep.Type == row.Type)
+                                sheet.Values[row.Name] = keep;
+                            else
+                                sheet.Values[row.Name] = row.Default;
+                        }
+                    }
+                }
             });
 
             if (exec.IsCanceled) return Result.FromCancellation();
@@ -954,11 +988,21 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             if (!state.CustomTemplates.TryGetValue(templateId, out var template))
                 return Result.FromError("Unknown template id.");
 
-            // Cascade through the existing schema-change path so sheets get their
-            // values reseeded under one Execute and emit a single StateChanged.
-            var schema = new AttributeSchema(AttributePreset.Custom, [.. template.Rows]);
-            return ChangeSchemaAsync(state, caller, schema);
+            // Built-in templates have a real preset; user templates land on Custom.
+            // Either way, ChangeSchemaAsync gets the source id so the active
+            // schema's status-effect library follows the schema swap.
+            var preset = template.IsBuiltIn
+                ? PresetForBuiltInTemplateId(templateId)
+                : AttributePreset.Custom;
+            var schema = new AttributeSchema(preset, [.. template.Rows]);
+            return ChangeSchemaAsync(state, caller, schema, templateId);
         }
+
+        private static AttributePreset PresetForBuiltInTemplateId(Guid id) =>
+            id == DndMapperGameState.BuiltInDnD5eCoreId ? AttributePreset.DnD5eCore
+            : id == DndMapperGameState.BuiltInDnD5ePlusSkillsId ? AttributePreset.DnD5ePlusCommonSkills
+            : id == DndMapperGameState.BuiltInSimpleD20Id ? AttributePreset.SimpleD20
+            : AttributePreset.Custom;
 
         // ── Settings verb ─────────────────────────────────────────────────────────
 
@@ -1463,9 +1507,16 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             if (!IsHost(state, caller)) return ValueResult<Guid>.FromError("Only the host may manage status effect templates.");
 
             var newId = Guid.NewGuid();
+            string? error = null;
             var exec = state.Execute(() =>
             {
-                state.StatusEffectTemplates.Add(new StatusEffectTemplate
+                var schema = state.GetActiveSchemaTemplate();
+                if (schema is null)
+                {
+                    error = "Save the current schema as a template before authoring status effects.";
+                    return;
+                }
+                schema.StatusEffectTemplates.Add(new StatusEffectTemplate
                 {
                     Id = newId,
                     Name = name,
@@ -1478,6 +1529,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
 
             if (exec.IsCanceled) return ValueResult<Guid>.FromCancellation();
             if (exec.TryGetFailure(out var execErr)) return ValueResult<Guid>.FromError(execErr);
+            if (error is not null) return ValueResult<Guid>.FromError(error);
             return ValueResult<Guid>.FromValue(newId);
         }
 
@@ -1500,7 +1552,9 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             string? error = null;
             var exec = state.Execute(() =>
             {
-                var template = state.StatusEffectTemplates.FirstOrDefault(t => t.Id == templateId);
+                var schema = state.GetActiveSchemaTemplate();
+                if (schema is null) { error = "No active schema."; return; }
+                var template = schema.StatusEffectTemplates.FirstOrDefault(t => t.Id == templateId);
                 if (template is null) { error = "Unknown template id."; return; }
 
                 template.Name = name;
@@ -1524,9 +1578,11 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             string? error = null;
             var exec = state.Execute(() =>
             {
-                var idx = state.StatusEffectTemplates.FindIndex(t => t.Id == templateId);
+                var schema = state.GetActiveSchemaTemplate();
+                if (schema is null) { error = "No active schema."; return; }
+                var idx = schema.StatusEffectTemplates.FindIndex(t => t.Id == templateId);
                 if (idx < 0) { error = "Unknown template id."; return; }
-                state.StatusEffectTemplates.RemoveAt(idx);
+                schema.StatusEffectTemplates.RemoveAt(idx);
             });
 
             if (exec.IsCanceled) return Result.FromCancellation();
@@ -1715,6 +1771,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                 state.RollLog.Clear();
                 state.SetSettings(new DndMapperSettings());
                 state.SetAttributeSchema(AttributeSchema.FromPreset(AttributePreset.DnD5eCore));
+                state.SetActiveSchemaTemplateId(DndMapperGameState.BuiltInDnD5eCoreId);
                 state.SetBytesUsed(0);
             });
 

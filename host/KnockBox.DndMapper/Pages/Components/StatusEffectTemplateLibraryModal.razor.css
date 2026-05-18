@@ -9,6 +9,30 @@
     width: min(620px, calc(100vw - 4rem));
 }
 
+::deep .dndm-effect-library-modal .dndm-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+::deep .dndm-effect-library-modal .dndm-modal-title { margin: 0; }
+
+::deep .dndm-effect-library-scope {
+    font-size: 0.85rem;
+    color: var(--dndm-text-muted);
+    margin-bottom: 0.5rem;
+}
+
+::deep .dndm-effect-library-scope strong {
+    color: var(--dndm-ember);
+    font-family: var(--dndm-display);
+    font-style: italic;
+    font-weight: 500;
+    letter-spacing: 0.3px;
+}
+
 ::deep .dndm-effect-library-tagline {
     font-style: italic;
     font-size: 0.9rem;
