@@ -58,7 +58,7 @@
                 <button class="dndm-btn dndm-btn--primary"
                         type="button"
                         @onclick="OpenNpcPicker">
-                    Start Initiative
+                    Start Combat
                 </button>
             </div>
         }
@@ -123,7 +123,7 @@
                                 type="button"
                                 title="Roll d20 + modifier for every NPC that hasn't rolled yet"
                                 @onclick="RollAllNpcs">
-                            🎲 Roll all NPCs
+                            🎲 Roll Unset NPCs
                         </button>
                     </div>
                 }
@@ -156,7 +156,7 @@
                                     <input type="number"
                                            class="dndm-input dndm-input--num"
                                            placeholder="roll"
-                                           value="@(_npcDrafts.GetValueOrDefault(entry.Id, "")) "
+                                           value="@(_npcDrafts.GetValueOrDefault(entry.Id, ""))"
                                            @oninput="@(e => OnNpcDraftInput(entry.Id, (string?)e.Value))"
                                            @onkeydown="@(e => OnNpcDraftKey(e, entry.Id))" />
                                     <button class="dndm-btn dndm-btn--small dndm-btn--primary"

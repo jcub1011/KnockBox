@@ -191,12 +191,18 @@
                 }
 
                 <table class="dndm-sheet-attr-table">
+                    <colgroup>
+                        <col span="1" style="width: 100%;"/>
+                        <col span="1" style="width: 80px;"/>
+                        <col span="1" style="width: 65px;"/>
+                        <col span="1" style="width: 75px;"/>
+                    </colgroup>
                     <thead>
                         <tr>
                             <th class="dndm-sheet-attr-col-name">Attribute</th>
-                            <th class="dndm-sheet-attr-col-base">Base Value</th>
-                            <th class="dndm-sheet-attr-col-effects" title="Sum of attribute deltas from active status effects.">Status Effects</th>
-                            <th class="dndm-sheet-attr-col-adj" title="The modifier added to rolls — (Base + Status Effects) through this attribute's scoring mode.">Roll Adjustment</th>
+                            <th class="dndm-sheet-attr-col-base">Level</th>
+                            <th class="dndm-sheet-attr-col-effects" title="Sum of attribute deltas from active status effects.">Effects</th>
+                            <th class="dndm-sheet-attr-col-adj" title="The modifier added to rolls — (Base + Status Effects) through this attribute's scoring mode.">Roll Mod.</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -282,16 +288,13 @@
                         else
                         {
                             <div class="dndm-sheet-hp">
-                                <button class="dndm-btn dndm-btn--small dndm-btn--icon"
-                                        type="button"
-                                        disabled="@(!canEdit)"
-                                        @onclick="@(() => StepHp(sheet, -1))">−</button>
+                                <span class="dndm-sheet-hp-sep">Cur.</span>
                                 <input type="number"
                                        class="dndm-input dndm-input--num"
                                        value="@sheet.Hp"
                                        disabled="@(!canEdit)"
                                        @onchange="@(e => OnHpDirect(sheet, (string?)e.Value))" />
-                                <span class="dndm-sheet-hp-sep">/</span>
+                                <span class="dndm-sheet-hp-sep">/ Max</span>
                                 <input type="number"
                                        class="dndm-input dndm-input--num"
                                        value="@sheet.MaxHp"
@@ -303,10 +306,6 @@
                                     <span class="dndm-sheet-hp-effective @(em > sheet.MaxHp ? "is-pos" : "is-neg")"
                                           title="@FormatMaxHpBreakdown(sheet)">(eff: @em)</span>
                                 }
-                                <button class="dndm-btn dndm-btn--small dndm-btn--icon"
-                                        type="button"
-                                        disabled="@(!canEdit)"
-                                        @onclick="@(() => StepHp(sheet, +1))">+</button>
                             </div>
                         }
                     </div>
