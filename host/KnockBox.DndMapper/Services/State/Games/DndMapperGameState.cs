@@ -118,12 +118,19 @@ namespace KnockBox.DndMapper.Services.State.Games
 
             void AddBuiltIn(Guid id, string name, AttributePreset preset)
             {
+                var rows = AttributeSchema.FromPreset(preset).Rows;
                 CustomTemplates[id] = new NamedTemplate
                 {
                     Id = id,
                     Name = name,
-                    Rows = [.. AttributeSchema.FromPreset(preset).Rows],
+                    Rows = [.. rows],
                     IsBuiltIn = true,
+                    // Default to "DEX" when the preset has a DEX row, matching
+                    // long-standing d20 initiative convention. Custom presets
+                    // start unset and fall back to the legacy case-insensitive
+                    // DEX lookup until the host picks one.
+                    InitiativeAttributeName = rows.Any(r => string.Equals(r.Name, "DEX", StringComparison.OrdinalIgnoreCase))
+                        ? "DEX" : null,
                 };
             }
         }

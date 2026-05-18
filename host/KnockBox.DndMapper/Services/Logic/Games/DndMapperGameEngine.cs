@@ -1103,9 +1103,9 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             if (state is null) return Result.FromError("State is required.");
             if (caller is null) return Result.FromError("Caller is required.");
 
-            int dexModifier = ResolveDexModifier(state, caller.Id);
+            int modifier = ResolveInitiativeModifier(state, caller.Id);
             int d20 = _rng.GetRandomInt(1, 21, RandomType.Fast);
-            int total = d20 + dexModifier;
+            int total = d20 + modifier;
 
             string? error = null;
             var exec = state.Execute(() =>
@@ -1117,7 +1117,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                 if (entry.InitiativeRoll is not null) return; // no-op
 
                 entry.InitiativeRoll = total;
-                state.AppendRoll(BuildInitiativeRollResult(caller.Id, null, d20, dexModifier, total));
+                state.AppendRoll(BuildInitiativeRollResult(caller.Id, null, d20, modifier, total));
                 TryTransitionToActive(state);
             });
 
@@ -1168,17 +1168,80 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                 if (entry.OwnerUserId is null) { error = "Force-roll is only valid for player combatants."; return; }
                 if (entry.InitiativeRoll is not null) { error = "Player has already rolled."; return; }
 
-                int dexModifier = ResolveDexModifier(state, entry.OwnerUserId);
-                int total = d20 + dexModifier;
+                int modifier = ResolveInitiativeModifier(state, entry.OwnerUserId);
+                int total = d20 + modifier;
                 entry.InitiativeRoll = total;
                 entry.IsForceRolled = true;
-                state.AppendRoll(BuildInitiativeRollResult(entry.OwnerUserId, caller.Id, d20, dexModifier, total));
+                state.AppendRoll(BuildInitiativeRollResult(entry.OwnerUserId, caller.Id, d20, modifier, total));
                 TryTransitionToActive(state);
             });
 
             if (exec.IsCanceled) return Result.FromCancellation();
             if (exec.TryGetFailure(out var execErr)) return Result.FromError(execErr);
             return error is null ? Result.Success : Result.FromError(error);
+        }
+
+        // Rolls initiative for every NPC combatant that hasn't yet rolled, in
+        // a single Execute. Each NPC gets its own d20 + modifier (resolved
+        // from its attached character sheet, if any — NPCs without a sheet
+        // roll bare d20). Already-rolled NPCs are skipped so a host who
+        // entered a number manually keeps it. Each roll is logged as
+        // ForcedByUserId = caller so the audit trail attributes the bulk roll
+        // to the host.
+        public Result RollAllNpcInitiativeAsync(DndMapperGameState state, User caller)
+        {
+            if (state is null) return Result.FromError("State is required.");
+            if (caller is null) return Result.FromError("Caller is required.");
+            if (!IsHost(state, caller)) return Result.FromError("Only the host may roll for NPCs.");
+
+            string? error = null;
+            var exec = state.Execute(() =>
+            {
+                if (state.ActiveCombat is null) { error = "No active combat."; return; }
+                if (state.ActiveCombat.Phase != CombatPhase.WaitingForRolls) { error = "Initiative phase has ended."; return; }
+
+                foreach (var entry in state.ActiveCombat.TurnOrder)
+                {
+                    if (entry.OwnerUserId is not null) continue;       // players
+                    if (entry.InitiativeRoll is not null) continue;    // already rolled or manually set
+
+                    var sheet = FindSheetForToken(state, entry.TokenId);
+                    int modifier = ResolveInitiativeModifierForSheet(state, sheet);
+                    int d20 = _rng.GetRandomInt(1, 21, RandomType.Fast);
+                    int total = d20 + modifier;
+
+                    entry.InitiativeRoll = total;
+                    // Use the NPC's representing user id (or null for true NPCs)
+                    // as the roller and tag the host as the forcing party so
+                    // the log makes sense.
+                    state.AppendRoll(BuildInitiativeRollResult(
+                        rollerUserId: entry.OwnerUserId ?? caller.Id,
+                        forcedByUserId: caller.Id,
+                        d20: d20,
+                        dexModifier: modifier,
+                        total: total));
+                }
+
+                TryTransitionToActive(state);
+            });
+            if (exec.IsCanceled) return Result.FromCancellation();
+            if (exec.TryGetFailure(out var execErr)) return Result.FromError(execErr);
+            return error is null ? Result.Success : Result.FromError(error);
+        }
+
+        private static CharacterSheet? FindSheetForToken(DndMapperGameState state, Guid tokenId)
+        {
+            foreach (var map in state.Maps)
+            {
+                foreach (var token in map.Tokens)
+                {
+                    if (token.Id != tokenId) continue;
+                    if (token.SheetId is Guid sid && state.Sheets.TryGetValue(sid, out var sheet))
+                        return sheet;
+                    return null;
+                }
+            }
+            return null;
         }
 
         public Result AdvanceTurnAsync(DndMapperGameState state, User caller)
@@ -1320,20 +1383,57 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             state.ActiveCombat.CurrentTurnIndex = 0;
         }
 
-        private static int ResolveDexModifier(DndMapperGameState state, string userId)
+        // Resolves the initiative modifier for the owner of a sheet. Reads
+        // the active schema template's InitiativeAttributeName when set,
+        // otherwise falls back to the legacy case-insensitive "DEX" lookup
+        // so older saves and free-form Custom schemas keep working. Routes
+        // through AttributeContributionResolver so active status effects
+        // (e.g. "Slowed" with DEX −3) apply the same way they would to a
+        // normal roll — §8.5 attribute-value semantics.
+        private static int ResolveInitiativeModifier(DndMapperGameState state, string userId)
+            => ResolveInitiativeModifierForSheet(state, state.Sheets.Values.FirstOrDefault(s => s.OwnerUserId == userId));
+
+        private static int ResolveInitiativeModifierForSheet(DndMapperGameState state, CharacterSheet? sheet)
         {
-            var sheet = state.Sheets.Values.FirstOrDefault(s => s.OwnerUserId == userId);
             if (sheet is null) return 0;
-            // Look up DEX case-insensitively; falls back to 0 for schemas without
-            // DEX. Routes through the resolver so any active status effects
-            // (e.g. "Slowed" with DEX −3) apply to initiative the same way
-            // they apply to normal rolls — §8.5 attribute-value semantics.
+            var configured = state.GetActiveSchemaTemplate()?.InitiativeAttributeName;
+            if (!string.IsNullOrEmpty(configured)
+                && sheet.Values.TryGetValue(configured, out var configuredValue))
+            {
+                return AttributeContributionResolver.Resolve(sheet, configured, configuredValue).EffectiveModifier;
+            }
+
+            // Legacy fallback: case-insensitive DEX search.
             foreach (var (name, value) in sheet.Values)
             {
                 if (!string.Equals(name, "DEX", StringComparison.OrdinalIgnoreCase)) continue;
                 return AttributeContributionResolver.Resolve(sheet, name, value).EffectiveModifier;
             }
             return 0;
+        }
+
+        public Result SetInitiativeAttributeAsync(DndMapperGameState state, User caller, string? attributeName)
+        {
+            if (state is null) return Result.FromError("State is required.");
+            if (caller is null) return Result.FromError("Caller is required.");
+            if (!IsHost(state, caller)) return Result.FromError("Only the host may change the initiative attribute.");
+
+            string? error = null;
+            var exec = state.Execute(() =>
+            {
+                var schema = state.GetActiveSchemaTemplate();
+                if (schema is null) { error = "Save the current schema as a template before configuring initiative."; return; }
+                if (!string.IsNullOrEmpty(attributeName)
+                    && !state.AttributeSchema.Rows.Any(r => r.Name == attributeName))
+                {
+                    error = "Unknown attribute name for the active schema.";
+                    return;
+                }
+                schema.InitiativeAttributeName = string.IsNullOrEmpty(attributeName) ? null : attributeName;
+            });
+            if (exec.IsCanceled) return Result.FromCancellation();
+            if (exec.TryGetFailure(out var execErr)) return Result.FromError(execErr);
+            return error is null ? Result.Success : Result.FromError(error);
         }
 
         private static string FormatSigned(int value)

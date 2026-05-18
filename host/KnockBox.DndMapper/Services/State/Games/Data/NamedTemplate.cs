@@ -16,5 +16,9 @@ namespace KnockBox.DndMapper.Services.State.Games.Data
         // the active schema hides templates from other schemas; deleting this
         // template cascades the list away.
         public List<StatusEffectTemplate> StatusEffectTemplates { get; set; } = [];
+        // Attribute name used as the initiative modifier under this schema.
+        // Null means "fall back to DEX case-insensitively" (legacy behaviour).
+        // The selector lives on the Combat panel and writes through the engine.
+        public string? InitiativeAttributeName { get; set; }
     }
 }

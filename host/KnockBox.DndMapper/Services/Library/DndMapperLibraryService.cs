@@ -601,6 +601,12 @@ namespace KnockBox.DndMapper.Services.Library
                         existing.StatusEffectTemplates.Clear();
                         foreach (var s in t.StatusEffectTemplates)
                             existing.StatusEffectTemplates.Add(LibrarySnapshotMapper.FromStatusEffectTemplateSnapshot(s));
+                        // Only overlay InitiativeAttributeName when the snapshot
+                        // carries one — older slots leave it null and the
+                        // seeded default ("DEX" for presets containing DEX)
+                        // wins.
+                        if (!string.IsNullOrEmpty(t.InitiativeAttributeName))
+                            existing.InitiativeAttributeName = t.InitiativeAttributeName;
                     }
                     else
                     {
@@ -615,6 +621,7 @@ namespace KnockBox.DndMapper.Services.Library
                             StatusEffectTemplates = t.StatusEffectTemplates
                                 .Select(LibrarySnapshotMapper.FromStatusEffectTemplateSnapshot)
                                 .ToList(),
+                            InitiativeAttributeName = t.InitiativeAttributeName,
                         };
                     }
                 }

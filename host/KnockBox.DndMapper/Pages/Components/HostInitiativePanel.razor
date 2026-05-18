@@ -6,7 +6,7 @@
 
 <section class="dndm-panel dndm-initiative">
     <header class="dndm-panel-header">
-        <span>Initiative</span>
+        <span>Combat</span>
         @if (State.ActiveCombat is not null)
         {
             <span class="dndm-initiative-host-state">
@@ -16,6 +16,34 @@
             </span>
         }
     </header>
+
+    @{
+        var initSchema = State.GetActiveSchemaTemplate();
+    }
+    <div class="dndm-panel-body dndm-initiative-host-config">
+        <label class="dndm-label">Initiative modifier</label>
+        @if (initSchema is null)
+        {
+            <div class="dndm-initiative-empty">Save the current schema as a template to pick an initiative attribute.</div>
+        }
+        else
+        {
+            <select class="dndm-select"
+                    @onchange="@(e => OnInitiativeAttributeChange((string?)e.Value))">
+                <option value="">— none (bare d20) —</option>
+                @foreach (var row in State.AttributeSchema.Rows)
+                {
+                    if (row.Type == AttributeValueType.Score || row.Type == AttributeValueType.Modifier)
+                    {
+                        <option value="@row.Name" selected="@(initSchema.InitiativeAttributeName == row.Name)">@row.Name</option>
+                    }
+                }
+            </select>
+            <div class="dndm-initiative-host-config-hint">
+                Saved with the <strong>@initSchema.Name</strong> schema. Players and forced rolls add this attribute's modifier to their d20.
+            </div>
+        }
+    </div>
 
     @if (State.ActiveCombat is null)
     {
@@ -88,6 +116,17 @@
 
             @if (combat.Phase == CombatPhase.WaitingForRolls)
             {
+                @if (AnyUnrolledNpc())
+                {
+                    <div class="dndm-initiative-host-bulkroll">
+                        <button class="dndm-btn dndm-btn--small dndm-btn--primary"
+                                type="button"
+                                title="Roll d20 + modifier for every NPC that hasn't rolled yet"
+                                @onclick="RollAllNpcs">
+                            🎲 Roll all NPCs
+                        </button>
+                    </div>
+                }
                 <div class="dndm-initiative-host-rows">
                     @foreach (var entry in combat.TurnOrder)
                     {

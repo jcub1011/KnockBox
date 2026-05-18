@@ -65,6 +65,9 @@ namespace KnockBox.DndMapper.Services.Library
         public List<AttributeRowSnapshot> Rows { get; init; } = [];
         // Host-authored status-effect templates scoped to this schema.
         public List<StatusEffectTemplateSnapshot> StatusEffectTemplates { get; init; } = [];
+        // Attribute name used as the initiative modifier under this schema.
+        // Null means "fall back to legacy DEX search".
+        public string? InitiativeAttributeName { get; init; }
     }
 
     internal sealed record StatusEffectTemplateSnapshot
@@ -228,6 +231,7 @@ namespace KnockBox.DndMapper.Services.Library
                     StatusEffectTemplates = t.StatusEffectTemplates
                         .Select(ToStatusEffectTemplateSnapshot)
                         .ToList(),
+                    InitiativeAttributeName = t.InitiativeAttributeName,
                 })
                 .ToList();
 

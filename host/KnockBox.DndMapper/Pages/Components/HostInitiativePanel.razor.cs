@@ -91,6 +91,29 @@ namespace KnockBox.DndMapper.Pages.Components
             if (result.TryGetFailure(out var err)) _error = err.PublicMessage;
         }
 
+        private void OnInitiativeAttributeChange(string? raw)
+        {
+            _error = null;
+            var user = UserService.CurrentUser;
+            if (user is null) return;
+            var result = Engine.SetInitiativeAttributeAsync(State, user, raw);
+            if (result.TryGetFailure(out var err)) _error = err.PublicMessage;
+        }
+
+        private void RollAllNpcs()
+        {
+            _error = null;
+            var user = UserService.CurrentUser;
+            if (user is null) return;
+            var result = Engine.RollAllNpcInitiativeAsync(State, user);
+            if (result.TryGetFailure(out var err)) _error = err.PublicMessage;
+        }
+
+        private bool AnyUnrolledNpc() =>
+            State.ActiveCombat is { } c
+            && c.Phase == CombatPhase.WaitingForRolls
+            && c.TurnOrder.Any(e => e.OwnerUserId is null && e.InitiativeRoll is null);
+
         private void OnNpcDraftInput(Guid combatantId, string? value)
             => _npcDrafts[combatantId] = value ?? string.Empty;
 
