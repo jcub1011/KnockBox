@@ -27,7 +27,7 @@ namespace KnockBox.DndMapper.Pages.Components
         private List<Token> Tokens =>
             _activeMap is null
                 ? []
-                : [.. _activeMap.Tokens.Where(t => t.Type != TokenType.PlayerToken)];
+                : [.. _activeMap.Tokens];
 
         protected override void OnInitialized()
         {

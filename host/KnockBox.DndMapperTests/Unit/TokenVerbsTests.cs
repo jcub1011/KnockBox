@@ -574,14 +574,26 @@ namespace KnockBox.DndMapperTests.Unit
         }
 
         [TestMethod]
-        public void AssignSheetToPlayerAsync_SheetAlreadyPlayerOwned_ReturnsError()
+        public void AssignSheetToPlayerAsync_SheetAlreadyPlayerOwned_TransfersToNewOwner()
         {
+            // Re-assigning a character from one player to another is allowed —
+            // the host uses this to hand off a character mid-session. The target
+            // must not already own a different sheet (separate test).
             var (_, players) = CreateMapWithPlayers("Alice");
             var aliceSheetId = _state.Sheets.Values.Single(s => s.OwnerUserId == players[0].Id).Id;
             var bob = EngineTestFactory.RegisterPlayer(_state, "Bob");
 
             var result = _engine.AssignSheetToPlayerAsync(_state, _host, aliceSheetId, bob.Id);
-            Assert.IsTrue(result.IsFailure);
+            Assert.IsTrue(result.IsSuccess, $"AssignSheetToPlayerAsync failed: {result}");
+
+            var sheet = _state.Sheets[aliceSheetId];
+            Assert.AreEqual(bob.Id, sheet.OwnerUserId);
+            Assert.IsNull(sheet.RepresentsUserId);
+            foreach (var token in _state.Maps.SelectMany(m => m.Tokens).Where(t => t.SheetId == aliceSheetId))
+            {
+                Assert.AreEqual(TokenType.PlayerToken, token.Type);
+                Assert.AreEqual(bob.Id, token.OwnerUserId);
+            }
         }
 
         [TestMethod]

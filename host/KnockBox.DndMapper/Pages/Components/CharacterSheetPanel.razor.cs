@@ -46,7 +46,7 @@ namespace KnockBox.DndMapper.Pages.Components
 
         private List<CharacterSheet> VisibleSheets =>
             [.. State.Sheets.Values
-                .Where(s => SheetVisibilityHelper.CanSeeSheet(s, IsHost))
+                .Where(s => SheetVisibilityHelper.CanSeeSheet(s, CurrentUserId, IsHost, State.Settings.PlayersCanSeeOtherSheets))
                 .OrderBy(s => s.OwnerUserId == CurrentUserId ? 0 : 1)
                 .ThenBy(s => s.CharacterName)];
 

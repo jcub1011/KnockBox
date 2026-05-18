@@ -37,6 +37,12 @@ namespace KnockBox.DndMapper.Services.State.Games
             SeedBuiltInTemplates();
         }
 
+        // Players who joined the lobby before the game started may rejoin
+        // mid-session (e.g. after a circuit drop past the reconnect grace
+        // window). Strangers and kicked players are still rejected by the
+        // base gates.
+        protected override bool AllowRejoinAfterStart => true;
+
         internal void SeedBuiltInTemplates()
         {
             AddBuiltIn(BuiltInDnD5eCoreId, "D&D 5e core", AttributePreset.DnD5eCore);

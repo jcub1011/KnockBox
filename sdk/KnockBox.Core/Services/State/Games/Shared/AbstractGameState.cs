@@ -97,6 +97,10 @@ namespace KnockBox.Core.Services.State.Games.Shared
         private volatile PlayerEntry[] _cachedPlayerEntries = [];
         private volatile PlayerEntry[] _cachedRoster;
         private volatile User[] _cachedKickedUsers = [];
+        // Ids of every user that has successfully registered (and not been kicked).
+        // Used by RegisterPlayer to admit lobby members back after IsJoinable goes
+        // false, gated on AllowRejoinAfterStart. Mutated only inside Execute.
+        private readonly HashSet<string> _everJoinedIds = new(StringComparer.Ordinal);
 
         // Inlined IThreadSafeEventManager state. Snapshot is read lock-free; writes
         // copy-on-swap under _syncRoot.
@@ -241,6 +245,18 @@ namespace KnockBox.Core.Services.State.Games.Shared
         public bool IsJoinable { get; private set; }
 
         /// <summary>
+        /// When <c>true</c>, players who successfully joined the lobby before
+        /// <see cref="IsJoinable"/> was set to <c>false</c> may still re-register
+        /// after game start (e.g. after a circuit drop past the reconnect grace
+        /// window). Strangers — anyone who never joined the open lobby — are
+        /// still rejected by the <c>!IsJoinable</c> gate, and kicked players are
+        /// still blocked by the kicked-set. Defaults to <c>false</c> so existing
+        /// games keep their current "no late joiners" behavior; opt in by
+        /// overriding.
+        /// </summary>
+        protected virtual bool AllowRejoinAfterStart => false;
+
+        /// <summary>
         /// The host of the game.
         /// </summary>
         public User Host => _host;
@@ -314,7 +330,7 @@ namespace KnockBox.Core.Services.State.Games.Shared
 
             var exec = Execute(() =>
             {
-                if (!IsJoinable)
+                if (!IsJoinable && !(AllowRejoinAfterStart && _everJoinedIds.Contains(player.Id)))
                 {
                     registration = ValueResult<IDisposable>.FromError("The game is not currently joinable.");
                     registrationSet = true;
@@ -419,6 +435,7 @@ namespace KnockBox.Core.Services.State.Games.Shared
                     nextEntries[entries.Length] = new PlayerEntry(player, displayName, unsubscriber);
                 }
                 PublishPlayerEntries(nextEntries);
+                _everJoinedIds.Add(player.Id);
 
                 if (!isRejoin)
                     _logger.LogInformation("User [{userId}] entered game [{type}] hosted by user [{hostId}].", player.Id, GetType().Name, _host.Id);
@@ -464,6 +481,10 @@ namespace KnockBox.Core.Services.State.Games.Shared
                     if (existing.Length > 0) Array.Copy(existing, updatedKicked, existing.Length);
                     updatedKicked[existing.Length] = player;
                     _cachedKickedUsers = updatedKicked;
+
+                    // Drop the kicked user from the rejoin allowlist so the
+                    // AllowRejoinAfterStart gate cannot bypass the kicked-set.
+                    _everJoinedIds.Remove(player.Id);
 
                     // Build the new player array without the kicked entry, then republish.
                     var nextEntries = new PlayerEntry[current.Length - 1];

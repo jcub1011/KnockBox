@@ -55,6 +55,13 @@ namespace KnockBox.DndMapper.Pages.Components
             await Apply(next);
         }
 
+        private async Task SetPlayersCanSeeOtherSheets(bool v)
+        {
+            var next = State.Settings.Clone();
+            next.PlayersCanSeeOtherSheets = v;
+            await Apply(next);
+        }
+
         private async Task Apply(Services.State.Games.Data.DndMapperSettings next)
         {
             if (UserService.CurrentUser is null) return;

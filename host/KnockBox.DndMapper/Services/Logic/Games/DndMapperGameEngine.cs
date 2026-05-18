@@ -558,6 +558,21 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                     {
                         sheet.CharacterName = token.Name;
                     }
+
+                    // Attaching a sheet to a player-owned token transfers
+                    // sheet ownership to that player so the sheet shows up in
+                    // their character-sheet panel. Reject if the target player
+                    // already owns a different sheet (one character per player).
+                    if (token.Type == TokenType.PlayerToken && token.OwnerUserId is string ownerId)
+                    {
+                        if (state.Sheets.Values.Any(s => s.OwnerUserId == ownerId && s.Id != sid))
+                        {
+                            error = "Target player already owns a character sheet.";
+                            return;
+                        }
+                        sheet.OwnerUserId = ownerId;
+                        sheet.RepresentsUserId = null;
+                    }
                 }
                 token.SheetId = sheetId;
             });
@@ -1343,15 +1358,9 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             if (!state.Players.Any(p => p.User.Id == newOwnerUserId))
                 return "Target user is not a registered player.";
 
-            // Reject if the sheet is already owned by a different player. Re-assigning
-            // to the *same* owner would be a no-op for the sheet but might still mean
-            // tokens need promoting (rare), so allow it through and let the token-state
-            // check below catch the genuinely no-op case.
-            if (sheet is not null && sheet.OwnerUserId is not null && sheet.OwnerUserId != newOwnerUserId)
-                return "Sheet is already owned by another player.";
-
             // Two characters per player is out of scope. Block if the target already
-            // owns *some other* sheet.
+            // owns *some other* sheet. (Transferring the same sheet to a different
+            // player is allowed — that's the host re-assigning a character.)
             if (state.Sheets.Values.Any(s =>
                     s.OwnerUserId == newOwnerUserId && (sheet is null || s.Id != sheet.Id)))
                 return "Target player already owns a character sheet.";
@@ -1369,12 +1378,13 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             if (anchorToken is not null && !tokensToPromote.Contains(anchorToken))
                 tokensToPromote.Add(anchorToken);
 
-            // Every promoted token must currently be an NPC. A PlayerToken would
-            // mean this is already (partly) the target player's character.
-            foreach (var t in tokensToPromote)
+            // PlayerTokens are allowed as sources — that's a transfer from one
+            // player to another. Reject only the genuine no-op: every token is
+            // already owned by the requested target.
+            if (tokensToPromote.Count > 0
+                && tokensToPromote.All(t => t.Type == TokenType.PlayerToken && t.OwnerUserId == newOwnerUserId))
             {
-                if (t.Type == TokenType.PlayerToken)
-                    return "Token is already a player token.";
+                return "Token is already owned by that player.";
             }
 
             // The target player must not already own a different PlayerToken on any
@@ -1667,7 +1677,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             if (IsHost(state, caller)) return true;
             return state.Settings.SheetEditByOthers switch
             {
-                SheetEditPolicy.OwnersOnly => sheet.OwnerUserId is not null && sheet.OwnerUserId == caller.Id,
+                SheetEditPolicy.HostOnly => false,
                 SheetEditPolicy.OwnersAndHost => sheet.OwnerUserId is not null && sheet.OwnerUserId == caller.Id,
                 SheetEditPolicy.Anyone => state.Players.Any(p => p.User.Id == caller.Id),
                 _ => false,

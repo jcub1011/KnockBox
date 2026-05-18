@@ -80,35 +80,34 @@ namespace KnockBox.DndMapperTests.Unit
         }
 
         [TestMethod]
-        public void UpdateSheetAttributeAsync_OwnersOnly_OwnerCanEditOwnSheet()
+        public void UpdateSheetAttributeAsync_HostOnly_OwnerCannotEditOwnSheet()
         {
             var player = EngineTestFactory.RegisterPlayer(_state);
             var sheetId = SeedSheetForPlayer(player.Id);
-            _engine.UpdateSettingsAsync(_state, _host, new DndMapperSettings { SheetEditByOthers = SheetEditPolicy.OwnersOnly });
+            _engine.UpdateSettingsAsync(_state, _host, new DndMapperSettings { SheetEditByOthers = SheetEditPolicy.HostOnly });
 
             var update = _engine.UpdateSheetAttributeAsync(_state, player, sheetId, "STR", AttributeValue.Score(16));
-            Assert.IsTrue(update.IsSuccess);
-            Assert.AreEqual(16, _state.Sheets[sheetId].Values["STR"].IntValue);
+            Assert.IsTrue(update.IsFailure);
         }
 
         [TestMethod]
-        public void UpdateSheetAttributeAsync_OwnersOnly_NonOwnerNonHostCannotEdit()
+        public void UpdateSheetAttributeAsync_HostOnly_NonOwnerNonHostCannotEdit()
         {
             var owner = EngineTestFactory.RegisterPlayer(_state, "Owner");
             var other = EngineTestFactory.RegisterPlayer(_state, "Other");
             var sheetId = SeedSheetForPlayer(owner.Id);
-            _engine.UpdateSettingsAsync(_state, _host, new DndMapperSettings { SheetEditByOthers = SheetEditPolicy.OwnersOnly });
+            _engine.UpdateSettingsAsync(_state, _host, new DndMapperSettings { SheetEditByOthers = SheetEditPolicy.HostOnly });
 
             var update = _engine.UpdateSheetAttributeAsync(_state, other, sheetId, "STR", AttributeValue.Score(16));
             Assert.IsTrue(update.IsFailure);
         }
 
         [TestMethod]
-        public void UpdateSheetAttributeAsync_OwnersOnly_HostCanEditAnySheet()
+        public void UpdateSheetAttributeAsync_HostOnly_HostCanEditAnySheet()
         {
             var player = EngineTestFactory.RegisterPlayer(_state);
             var sheetId = SeedSheetForPlayer(player.Id);
-            _engine.UpdateSettingsAsync(_state, _host, new DndMapperSettings { SheetEditByOthers = SheetEditPolicy.OwnersOnly });
+            _engine.UpdateSettingsAsync(_state, _host, new DndMapperSettings { SheetEditByOthers = SheetEditPolicy.HostOnly });
 
             var update = _engine.UpdateSheetAttributeAsync(_state, _host, sheetId, "STR", AttributeValue.Score(16));
             Assert.IsTrue(update.IsSuccess);

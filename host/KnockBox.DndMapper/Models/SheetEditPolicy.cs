@@ -2,7 +2,7 @@ namespace KnockBox.DndMapper.Models
 {
     public enum SheetEditPolicy
     {
-        OwnersOnly,
+        HostOnly,
         OwnersAndHost,
         Anyone
     }

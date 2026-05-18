@@ -19,12 +19,24 @@
             <div class="card">
                 <h4>Players</h4>
                 <div class="player-list">
+                    @{
+                        var isHost = UserService.CurrentUser?.Id == State.Host.Id;
+                    }
                     @foreach (var entry in State.Players)
                     {
-                        <button class="btn" title="Click to kick player."
-                                @onclick="() => State.KickPlayer(entry.User)">
-                            @entry.DisplayName @(entry.User.Id == State.Host.Id ? "(Host)" : "")
-                        </button>
+                        @if (isHost)
+                        {
+                            <button class="btn" title="Click to kick player."
+                                    @onclick="() => State.KickPlayer(entry.User)">
+                                @entry.DisplayName @(entry.User.Id == State.Host.Id ? "(Host)" : "")
+                            </button>
+                        }
+                        else
+                        {
+                            <span class="btn">
+                                @entry.DisplayName @(entry.User.Id == State.Host.Id ? "(Host)" : "")
+                            </span>
+                        }
                     }
                 </div>
                 @if (UserService.CurrentUser?.Id == State.Host.Id)

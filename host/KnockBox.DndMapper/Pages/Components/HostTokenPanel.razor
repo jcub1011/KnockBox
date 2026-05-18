@@ -63,7 +63,7 @@
                             <path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" />
                         </svg>
                     </button>
-                    <span class="dndm-tokenp-tag">NPC</span>
+                    <span class="dndm-tokenp-tag">@(t.Type == TokenType.PlayerToken ? "Player" : "NPC")</span>
                 </div>
                 <div @key="@($"{t.Id}-meta")" class="dndm-tokenp-meta">
                     <button class="dndm-btn dndm-btn--small dndm-btn--icon dndm-tokenp-eyebtn"
