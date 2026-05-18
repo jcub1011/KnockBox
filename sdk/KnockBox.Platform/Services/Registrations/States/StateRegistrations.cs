@@ -1,6 +1,8 @@
+using KnockBox.Core.Services.Browser;
 using KnockBox.Core.Services.State.Shared;
 using KnockBox.Core.Services.Logic.Games.Shared;
 using KnockBox.Platform.Games;
+using KnockBox.Services.Browser;
 using KnockBox.Services.Logic.Games.Shared;
 using KnockBox.Core.Services.State.Games.Shared;
 using KnockBox.Services.State.Games.Shared;
@@ -47,6 +49,10 @@ namespace KnockBox.Services.Registrations.States
             // Read-only observer attach for screen-shareable display views — looks up
             // the room state by route + obfuscated code without registering a user.
             services.AddSingleton<IGameRoomObserver, GameRoomObserver>();
+
+            // Wake-lock service is per-circuit so each connected user manages their own
+            // browser-side Screen Wake Lock independently.
+            services.AddScoped<IWakeLockService, WakeLockService>();
 
             return services;
         }

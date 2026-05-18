@@ -1,5 +1,6 @@
 ﻿using KnockBox.Core.Components.Shared;
 using KnockBox.Core.Primitives.Returns;
+using KnockBox.Core.Services.Browser;
 using KnockBox.Core.Services.Logic.Games.Shared;
 using KnockBox.Core.Services.Navigation;
 using KnockBox.Core.Services.State.Games.Shared;
@@ -28,6 +29,8 @@ public sealed class LobbyPageBaseTests
     {
         public Task InvokeOnInitializedAsync() => OnInitializedAsync();
         public void InvokeOnAfterRender(bool firstRender) => OnAfterRender(firstRender);
+        public Task InvokeOnAfterRenderAsync(bool firstRender) => OnAfterRenderAsync(firstRender);
+        public IWakeLockService PublicWakeLockService => WakeLockService;
 
         public bool LobbyInitCalled { get; private set; }
         protected override Task OnLobbyInitializedAsync()
@@ -135,6 +138,24 @@ public sealed class LobbyPageBaseTests
         public void Dispose() => Disposed = true;
     }
 
+    private sealed class StubWakeLockService : IWakeLockService
+    {
+        public int AcquireCount { get; private set; }
+        public int ReleaseCount { get; private set; }
+        public Queue<bool> AcquireResults { get; } = new();
+        public ValueTask<bool> AcquireAsync(CancellationToken ct = default)
+        {
+            AcquireCount++;
+            var result = AcquireResults.Count > 0 ? AcquireResults.Dequeue() : true;
+            return ValueTask.FromResult(result);
+        }
+        public ValueTask ReleaseAsync()
+        {
+            ReleaseCount++;
+            return ValueTask.CompletedTask;
+        }
+    }
+
     // ── Helpers ──────────────────────────────────────────────────────────────
 
     private static User MakeUser(string name = "Player") => new(name, Guid.NewGuid().ToString());
@@ -161,13 +182,15 @@ public sealed class LobbyPageBaseTests
         IUserService userService,
         IGameSessionService sessionService,
         INavigationService navigationService,
-        ITickService? tickService = null)
+        ITickService? tickService = null,
+        IWakeLockService? wakeLockService = null)
     {
         var services = new ServiceCollection();
         services.AddSingleton(sessionService);
         services.AddSingleton(navigationService);
         services.AddSingleton(userService);
         services.AddSingleton(tickService ?? new StubTickService());
+        services.AddSingleton(wakeLockService ?? new StubWakeLockService());
         services.AddSingleton<ILoggerFactory>(NullLoggerFactory.Instance);
 
         var page = new TestLobbyPage();
@@ -410,5 +433,133 @@ public sealed class LobbyPageBaseTests
 
         Assert.IsTrue(page.LobbyDisposingCalled, "OnLobbyDisposing must run during Dispose.");
         Assert.IsTrue(tickSubscription.Disposed, "Tick subscription must be disposed.");
+    }
+
+    // ── Wake lock acquire/release ────────────────────────────────────────────
+
+    [TestMethod]
+    public async Task OnAfterRenderAsync_AfterInit_AcquiresWakeLockOnce()
+    {
+        var user = MakeUser();
+        using var state = new TestGameState(user, NullLogger.Instance);
+        var registration = MakeUserRegistration(user, state);
+
+        var nav = new StubNavigationService();
+        var session = new StubGameSessionService(registration);
+        var wakeLock = new StubWakeLockService();
+        var page = MakePage("abc-def", new StubUserService(user), session, nav, wakeLockService: wakeLock);
+
+        await page.InvokeOnInitializedAsync();
+        await page.InvokeOnAfterRenderAsync(firstRender: true);
+        await page.InvokeOnAfterRenderAsync(firstRender: false);
+
+        Assert.AreEqual(1, wakeLock.AcquireCount, "Acquire should be idempotent across multiple renders.");
+    }
+
+    [TestMethod]
+    public async Task OnAfterRenderAsync_FirstRenderBeforeInitCompletes_StillAcquiresOnLaterRender()
+    {
+        // Regression guard: when OnInitializedAsync awaits past the first render,
+        // _initialized is false at firstRender=true. The wake lock must still be
+        // acquired on the next render rather than being skipped forever.
+        var user = MakeUser();
+        using var state = new TestGameState(user, NullLogger.Instance);
+        var registration = MakeUserRegistration(user, state);
+
+        var nav = new StubNavigationService();
+        var session = new StubGameSessionService(registration);
+        var wakeLock = new StubWakeLockService();
+        var page = MakePage("abc-def", new StubUserService(user), session, nav, wakeLockService: wakeLock);
+
+        // Simulate Blazor's "first render fires while async init is still pending":
+        // render arrives before _initialized = true.
+        await page.InvokeOnAfterRenderAsync(firstRender: true);
+        Assert.AreEqual(0, wakeLock.AcquireCount, "Should not acquire before init completes.");
+
+        await page.InvokeOnInitializedAsync();
+        await page.InvokeOnAfterRenderAsync(firstRender: false);
+
+        Assert.AreEqual(1, wakeLock.AcquireCount, "Should acquire on the next render after init completes.");
+    }
+
+    [TestMethod]
+    public async Task OnAfterRenderAsync_KickedPlayer_DoesNotAcquireWakeLock()
+    {
+        var host = MakeUser("Host");
+        var player = MakeUser("Player");
+        using var state = new TestGameState(host, NullLogger.Instance);
+        state.Execute(() => state.SetJoinable(true));
+        state.RegisterPlayer(player);
+        state.KickPlayer(player);
+
+        var nav = new StubNavigationService();
+        var session = new StubGameSessionService(new UserRegistration(player, Mock.Of<IDisposable>(), MakeLobby(state)));
+        var wakeLock = new StubWakeLockService();
+        var page = MakePage("abc-def", new StubUserService(player), session, nav, wakeLockService: wakeLock);
+
+        await page.InvokeOnInitializedAsync();
+        page.InvokeOnAfterRender(firstRender: true);  // sets _kickHandled = true
+        await page.InvokeOnAfterRenderAsync(firstRender: true);
+
+        Assert.AreEqual(0, wakeLock.AcquireCount, "Kicked player should not acquire a wake lock before navigation.");
+    }
+
+    [TestMethod]
+    public async Task OnAfterRenderAsync_NotInitialized_DoesNotAcquire()
+    {
+        var user = MakeUser();
+        var nav = new StubNavigationService();
+        var session = new StubGameSessionService(null);
+        var wakeLock = new StubWakeLockService();
+        var page = MakePage("abc-def", new StubUserService(user), session, nav, wakeLockService: wakeLock);
+
+        await page.InvokeOnAfterRenderAsync(firstRender: true);
+
+        Assert.AreEqual(0, wakeLock.AcquireCount);
+    }
+
+    [TestMethod]
+    public async Task Dispose_ReleasesWakeLock()
+    {
+        var user = MakeUser();
+        using var state = new TestGameState(user, NullLogger.Instance);
+        var registration = MakeUserRegistration(user, state);
+
+        var nav = new StubNavigationService();
+        var session = new StubGameSessionService(registration);
+        var wakeLock = new StubWakeLockService();
+        var page = MakePage("abc-def", new StubUserService(user), session, nav, wakeLockService: wakeLock);
+
+        await page.InvokeOnInitializedAsync();
+        await page.InvokeOnAfterRenderAsync(firstRender: true);
+
+        page.Dispose();
+
+        Assert.AreEqual(1, wakeLock.ReleaseCount, "Dispose must release the wake lock.");
+    }
+
+    [TestMethod]
+    public async Task OnAfterRenderAsync_AcquireFails_RetriesOnNextRender()
+    {
+        // A transient JSDisconnect during initial circuit warm-up causes
+        // AcquireAsync to return false. The page must un-stick its
+        // _wakeLockAcquired guard so the next render tries again.
+        var user = MakeUser();
+        using var state = new TestGameState(user, NullLogger.Instance);
+        var registration = MakeUserRegistration(user, state);
+
+        var nav = new StubNavigationService();
+        var session = new StubGameSessionService(registration);
+        var wakeLock = new StubWakeLockService();
+        wakeLock.AcquireResults.Enqueue(false);  // first attempt fails
+        wakeLock.AcquireResults.Enqueue(true);   // second attempt succeeds
+        var page = MakePage("abc-def", new StubUserService(user), session, nav, wakeLockService: wakeLock);
+
+        await page.InvokeOnInitializedAsync();
+        await page.InvokeOnAfterRenderAsync(firstRender: true);
+        await page.InvokeOnAfterRenderAsync(firstRender: false);
+        await page.InvokeOnAfterRenderAsync(firstRender: false);
+
+        Assert.AreEqual(2, wakeLock.AcquireCount, "Failed acquire must retry, successful acquire must not.");
     }
 }
