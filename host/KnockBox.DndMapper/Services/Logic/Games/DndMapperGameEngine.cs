@@ -1275,14 +1275,20 @@ namespace KnockBox.DndMapper.Services.Logic.Games
         {
             var sheet = state.Sheets.Values.FirstOrDefault(s => s.OwnerUserId == userId);
             if (sheet is null) return 0;
-            // Look up DEX case-insensitively; falls back to 0 for schemas without DEX.
+            // Look up DEX case-insensitively; falls back to 0 for schemas without
+            // DEX. Routes through the resolver so any active status effects
+            // (e.g. "Slowed" with DEX −3) apply to initiative the same way
+            // they apply to normal rolls — §8.5 attribute-value semantics.
             foreach (var (name, value) in sheet.Values)
             {
-                if (string.Equals(name, "DEX", StringComparison.OrdinalIgnoreCase))
-                    return value.GetModifier() ?? 0;
+                if (!string.Equals(name, "DEX", StringComparison.OrdinalIgnoreCase)) continue;
+                return AttributeContributionResolver.Resolve(sheet, name, value).EffectiveModifier;
             }
             return 0;
         }
+
+        private static string FormatSigned(int value)
+            => value >= 0 ? $"+{value}" : $"−{Math.Abs(value)}";
 
         private static RollResult BuildInitiativeRollResult(string rollerUserId, string? forcedByUserId, int d20, int dexModifier, int total)
         {
@@ -1560,7 +1566,9 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             }
 
             int? attributeModifier = null;
-            IReadOnlyList<ContributionEntry>? contributionBreakdown = null;
+            AttributeContribution? contribution = null;
+            AttributeValue? baseAttrValue = null;
+            string? attrName = null;
             if (request.AttributeRef is AttributeRef attrRef)
             {
                 if (!state.Sheets.TryGetValue(attrRef.SheetId, out var sheet))
@@ -1570,15 +1578,18 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                 if (sheet.OwnerUserId is not null && sheet.OwnerUserId != caller.Id && !IsHost(state, caller))
                     return ValueResult<RollResult>.FromError("You may only reference your own attributes (or be host).");
 
-                var baseModifier = attrValue.GetModifier();
-                if (baseModifier is null)
+                if (attrValue.GetModifier() is null)
                     return ValueResult<RollResult>.FromError("Referenced attribute does not produce a numeric modifier.");
 
-                var (contributionTotal, breakdown) = AttributeContributionResolver.Resolve(sheet, attrRef.AttributeName, baseModifier.Value);
-                attributeModifier = contributionTotal;
-                // breakdown[0] is the base attribute; effects come after. Only retain
-                // the list for downstream rendering when status effects contributed.
-                if (breakdown.Count > 1) contributionBreakdown = breakdown;
+                // §8.5 semantics: deltas apply to the attribute *value*; the
+                // scoring mode then converts the modified value to a roll
+                // modifier. The resolver handles both Score (re-floor after
+                // delta) and Modifier (straight pass-through) types.
+                var resolved = AttributeContributionResolver.Resolve(sheet, attrRef.AttributeName, attrValue);
+                attributeModifier = resolved.EffectiveModifier;
+                baseAttrValue = attrValue;
+                attrName = attrRef.AttributeName;
+                if (resolved.ValueBreakdown.Count > 1) contribution = resolved;
             }
 
             var rolls = new List<DieRoll>(totalDice + (request.Mode == RollMode.Normal ? 0 : 1));
@@ -1617,21 +1628,32 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             string formula = string.Join("+", request.Dice.Select(t => $"{t.Count}d{t.Sides}"));
 
             string? modifierBreakdown = null;
-            if (contributionBreakdown is { Count: > 1 })
+            if (contribution is AttributeContribution c && baseAttrValue is AttributeValue bv && attrName is not null)
             {
-                int diceSum = rolls.Where(r => !r.Discarded).Sum(r => r.Result);
-                var parts = new List<string> { diceSum.ToString() };
-                foreach (var entry in contributionBreakdown)
+                // Two-stage explanation: first the value chain (base ± deltas),
+                // then the dice expression. Lets the reader see *why* the
+                // modifier ended up where it did when status effects re-shape
+                // a Score-type attribute non-linearly (e.g. INT 14 − 5 → 9 → mod −1,
+                // not 2 − 5 = −3).
+                var valueParts = new List<string> { (bv.IntValue ?? 0).ToString() };
+                foreach (var entry in c.ValueBreakdown.Skip(1))
                 {
                     var sign = entry.Delta >= 0 ? "+" : "−";
-                    parts.Add($"{sign} {Math.Abs(entry.Delta)} ({entry.Source})");
+                    valueParts.Add($"{sign} {Math.Abs(entry.Delta)} ({entry.Source})");
                 }
+                int effectiveRaw = c.EffectiveValue.IntValue ?? 0;
+                string scoringTail = bv.Type == AttributeValueType.Score
+                    ? $" = {effectiveRaw} → mod {FormatSigned(c.EffectiveModifier)}"
+                    : $" = mod {FormatSigned(c.EffectiveModifier)}";
+
+                int diceSum = rolls.Where(r => !r.Discarded).Sum(r => r.Result);
+                var dicePieces = new List<string> { diceSum.ToString(), $"{(c.EffectiveModifier >= 0 ? "+" : "−")} {Math.Abs(c.EffectiveModifier)} ({attrName})" };
                 if (request.FlatModifier != 0)
-                {
-                    var sign = request.FlatModifier >= 0 ? "+" : "−";
-                    parts.Add($"{sign} {Math.Abs(request.FlatModifier)}");
-                }
-                modifierBreakdown = $"{string.Join(" ", parts)} = {total}";
+                    dicePieces.Add($"{(request.FlatModifier >= 0 ? "+" : "−")} {Math.Abs(request.FlatModifier)}");
+
+                modifierBreakdown =
+                    $"{attrName}: {string.Join(" ", valueParts)}{scoringTail}; "
+                    + $"{string.Join(" ", dicePieces)} = {total}";
             }
 
             var result = new RollResult(

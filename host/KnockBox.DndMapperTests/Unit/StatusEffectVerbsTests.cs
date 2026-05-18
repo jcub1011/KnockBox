@@ -183,14 +183,17 @@ namespace KnockBox.DndMapperTests.Unit
         // ── Roll integration (covered in DiceTests too, lightweight smoke here) ──
 
         [TestMethod]
-        public void RollWithActiveEffect_AppliesDeltaAndPopulatesBreakdown()
+        public void RollWithActiveEffect_AppliesDeltaToValueAndRecomputesModifier()
         {
-            // Sequential RNG always returns 10 for the d20 → final = 10 + base + delta.
+            // §8.5 semantics: deltas modify the attribute *value*, then the
+            // scoring mode derives the modifier. For Score attributes that
+            // re-floors after subtraction, so a 14 INT − 5 lands at score 9 →
+            // mod −1, NOT modifier 2 − 5 = −3.
             (var engine, var state, var host, var rng) = EngineTestFactory.Build(10);
             var player = EngineTestFactory.RegisterPlayer(state);
             var sheet = engine.CreateSheetAsync(state, player, player.Id, "Char");
             Assert.IsTrue(sheet.TryGetSuccess(out var sheetId));
-            engine.UpdateSheetAttributeAsync(state, host, sheetId, "INT", AttributeValue.Score(14)); // mod +2
+            engine.UpdateSheetAttributeAsync(state, host, sheetId, "INT", AttributeValue.Score(14)); // base mod +2
             engine.ApplyStatusEffectAsync(state, host, sheetId, "Brain Fog",
                 [new AttributeDelta("INT", -5)], null, null, null);
 
@@ -202,9 +205,66 @@ namespace KnockBox.DndMapperTests.Unit
                 Label: "INT check"));
 
             Assert.IsTrue(roll.TryGetSuccess(out var result));
-            Assert.AreEqual(10 + 2 - 5, result.Total);
+            // d20=10, score 14 - 5 = 9, mod = floor((9-10)/2) = -1, total = 10 + (-1) = 9.
+            Assert.AreEqual(9, result.Total);
+            Assert.AreEqual(-1, result.AttributeModifier);
             Assert.IsNotNull(result.ModifierBreakdown);
             StringAssert.Contains(result.ModifierBreakdown, "Brain Fog");
+        }
+
+        [TestMethod]
+        public void RollWithActiveEffect_ModifierTypeAttribute_PassesDeltaThrough()
+        {
+            // Modifier-type attributes have no scoring conversion, so delta
+            // arithmetic on the value matches delta arithmetic on the
+            // modifier — but the path through the resolver must be the same.
+            (var engine, var state, var host, _) = EngineTestFactory.Build(10);
+            var player = EngineTestFactory.RegisterPlayer(state);
+            engine.ChangeSchemaAsync(state, host, AttributeSchema.FromPreset(AttributePreset.SimpleD20));
+            var sheet = engine.CreateSheetAsync(state, player, player.Id, "Char");
+            Assert.IsTrue(sheet.TryGetSuccess(out var sheetId));
+            engine.UpdateSheetAttributeAsync(state, host, sheetId, "Modifier", AttributeValue.Modifier(3));
+            engine.ApplyStatusEffectAsync(state, host, sheetId, "Hexed",
+                [new AttributeDelta("Modifier", -2)], null, null, null);
+
+            var roll = engine.RollAsync(state, player, new RollRequest(
+                Dice: [new DiceTerm(1, 20)],
+                AttributeRef: new AttributeRef(sheetId, "Modifier"),
+                FlatModifier: 0,
+                Mode: RollMode.Normal,
+                Label: "check"));
+
+            Assert.IsTrue(roll.TryGetSuccess(out var result));
+            // d20=10, mod 3 - 2 = 1, total = 11.
+            Assert.AreEqual(11, result.Total);
+            Assert.AreEqual(1, result.AttributeModifier);
+        }
+
+        [TestMethod]
+        public void RollWithStackedEffects_AppliesAllDeltasToValue()
+        {
+            // Two stacked -5 INT effects → score 14 - 10 = 4 → mod floor((4-10)/2) = -3.
+            // Naïve modifier-arithmetic would give 2 - 5 - 5 = -8 (wrong).
+            (var engine, var state, var host, _) = EngineTestFactory.Build(10);
+            var player = EngineTestFactory.RegisterPlayer(state);
+            var sheet = engine.CreateSheetAsync(state, player, player.Id, "Char");
+            Assert.IsTrue(sheet.TryGetSuccess(out var sheetId));
+            engine.UpdateSheetAttributeAsync(state, host, sheetId, "INT", AttributeValue.Score(14));
+            engine.ApplyStatusEffectAsync(state, host, sheetId, "Brain Fog",
+                [new AttributeDelta("INT", -5)], null, null, null);
+            engine.ApplyStatusEffectAsync(state, host, sheetId, "Brain Fog",
+                [new AttributeDelta("INT", -5)], null, null, null);
+
+            var roll = engine.RollAsync(state, player, new RollRequest(
+                Dice: [new DiceTerm(1, 20)],
+                AttributeRef: new AttributeRef(sheetId, "INT"),
+                FlatModifier: 0,
+                Mode: RollMode.Normal,
+                Label: "INT check"));
+
+            Assert.IsTrue(roll.TryGetSuccess(out var result));
+            Assert.AreEqual(10 - 3, result.Total);
+            Assert.AreEqual(-3, result.AttributeModifier);
         }
     }
 }
