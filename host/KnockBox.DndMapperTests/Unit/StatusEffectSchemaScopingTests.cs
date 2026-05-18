@@ -139,5 +139,17 @@ namespace KnockBox.DndMapperTests.Unit
                 .TryGetSuccess(out var forkId));
             Assert.IsEmpty(_state.CustomTemplates[forkId].StatusEffectTemplates);
         }
+
+        [TestMethod]
+        public void ApplyCustomTemplate_OnBuiltInId_SetsBothActivePointerAndPreset()
+        {
+            // Applying a built-in template id must drive the schema to its
+            // real preset (not Custom). Exercises the IsBuiltIn branch of
+            // ApplyCustomTemplateAsync and PresetForBuiltInTemplateId.
+            Assert.IsTrue(_engine.ApplyCustomTemplateAsync(_state, _host,
+                DndMapperGameState.BuiltInSimpleD20Id).IsSuccess);
+            Assert.AreEqual(DndMapperGameState.BuiltInSimpleD20Id, _state.ActiveSchemaTemplateId);
+            Assert.AreEqual(AttributePreset.SimpleD20, _state.AttributeSchema.Preset);
+        }
     }
 }

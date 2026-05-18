@@ -1211,11 +1211,12 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                     int total = d20 + modifier;
 
                     entry.InitiativeRoll = total;
-                    // Use the NPC's representing user id (or null for true NPCs)
-                    // as the roller and tag the host as the forcing party so
-                    // the log makes sense.
+                    // The loop above skips player entries, so NPCs are the
+                    // only thing here; the host is recorded as both roller
+                    // and forcing party so the audit log attributes the
+                    // bulk roll to the host that triggered it.
                     state.AppendRoll(BuildInitiativeRollResult(
-                        rollerUserId: entry.OwnerUserId ?? caller.Id,
+                        rollerUserId: caller.Id,
                         forcedByUserId: caller.Id,
                         d20: d20,
                         dexModifier: modifier,

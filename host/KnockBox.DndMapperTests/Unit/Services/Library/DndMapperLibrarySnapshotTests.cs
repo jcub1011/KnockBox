@@ -393,6 +393,69 @@ namespace KnockBox.DndMapperTests.Unit.Services.Library
             Assert.AreEqual(RollTemplateScope.Sheet, asSheet.Scope);
         }
 
+        // ── V1 backward compatibility ────────────────────────────────────────────
+
+        [TestMethod]
+        public void Snapshot_LoadsV1Json_WithoutNewFields_DeserializesWithSensibleDefaults()
+        {
+            // Hand-rolled V1 shape: SchemaVersion = 1, no ActiveSchemaTemplateId,
+            // no GlobalRollTemplates, NamedTemplate entries lack IsBuiltIn /
+            // StatusEffectTemplates / InitiativeAttributeName, SheetSnapshot
+            // lacks StatusEffects / RollTemplates. Built-in templates were
+            // filtered out before serialization in V1, so CustomTemplates
+            // carries only user-saved entries. Proves the DTO defaults keep
+            // older disk slots loadable.
+            const string v1Json = """
+            {
+              "SchemaVersion": 1,
+              "Settings": {},
+              "AttributeSchema": { "Preset": 0, "Rows": [] },
+              "Maps": [],
+              "Sheets": [
+                {
+                  "Id": "11111111-1111-1111-1111-111111111111",
+                  "CharacterName": "Goblin",
+                  "Values": {},
+                  "Notes": "",
+                  "Hp": null,
+                  "MaxHp": null
+                }
+              ],
+              "CustomTemplates": [
+                {
+                  "Id": "22222222-2222-2222-2222-222222222222",
+                  "Name": "MyTpl",
+                  "Rows": []
+                }
+              ]
+            }
+            """;
+
+            var snap = JsonSerializer.Deserialize<LibrarySnapshot>(v1Json, JsonOptions);
+
+            Assert.IsNotNull(snap);
+            Assert.AreEqual(1, snap!.SchemaVersion);
+            Assert.IsNull(snap.ActiveSchemaTemplateId);
+            Assert.IsEmpty(snap.GlobalRollTemplates);
+
+            Assert.HasCount(1, snap.Sheets);
+            Assert.IsEmpty(snap.Sheets[0].StatusEffects);
+            Assert.IsEmpty(snap.Sheets[0].RollTemplates);
+
+            Assert.HasCount(1, snap.CustomTemplates);
+            var tpl = snap.CustomTemplates[0];
+            Assert.IsFalse(tpl.IsBuiltIn);
+            Assert.IsEmpty(tpl.StatusEffectTemplates);
+            Assert.IsNull(tpl.InitiativeAttributeName);
+
+            // The fallback the load path relies on for V1's missing
+            // ActiveSchemaTemplateId: infer from the persisted preset.
+            Assert.AreEqual(
+                KnockBox.DndMapper.Services.State.Games.DndMapperGameState.BuiltInDnD5eCoreId,
+                KnockBox.DndMapper.Services.State.Games.DndMapperGameState.BuiltInTemplateIdFor(
+                    snap.AttributeSchema.Preset));
+        }
+
         [TestMethod]
         public void AttributeValue_TextAndModifier_RoundTripThroughSnapshot()
         {

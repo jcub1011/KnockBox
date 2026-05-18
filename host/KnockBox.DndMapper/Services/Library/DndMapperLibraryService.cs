@@ -601,11 +601,12 @@ namespace KnockBox.DndMapper.Services.Library
                         existing.StatusEffectTemplates.Clear();
                         foreach (var s in t.StatusEffectTemplates)
                             existing.StatusEffectTemplates.Add(LibrarySnapshotMapper.FromStatusEffectTemplateSnapshot(s));
-                        // Only overlay InitiativeAttributeName when the snapshot
-                        // carries one — older slots leave it null and the
-                        // seeded default ("DEX" for presets containing DEX)
-                        // wins.
-                        if (!string.IsNullOrEmpty(t.InitiativeAttributeName))
+                        // V3+ trusts the persisted value verbatim (including
+                        // null/empty — the host can pick "— none (bare d20) —"
+                        // and that choice survives reload). V1 snapshots
+                        // predate the field entirely; the seeded default
+                        // ("DEX" for presets containing DEX) wins.
+                        if (snapshot.SchemaVersion >= 3)
                             existing.InitiativeAttributeName = t.InitiativeAttributeName;
                     }
                     else

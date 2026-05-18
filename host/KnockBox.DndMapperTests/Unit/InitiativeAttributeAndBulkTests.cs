@@ -222,5 +222,27 @@ namespace KnockBox.DndMapperTests.Unit
             var core = snap.CustomTemplates.Single(t => t.Id == DndMapperGameState.BuiltInDnD5eCoreId);
             Assert.AreEqual("WIS", core.InitiativeAttributeName);
         }
+
+        [TestMethod]
+        public void InitiativeAttribute_RoundTripsThroughSnapshot_UnderUserCustomSchema()
+        {
+            // User-saved Custom schemas take a different load-path branch from
+            // built-ins (the snapshot value is written verbatim). Pin that
+            // InitiativeAttributeName persists on a non-built-in template.
+            IReadOnlyList<AttributeRow> rows =
+            [
+                new("STR", AttributeValueType.Score, AttributeValue.Score(10)),
+                new("DEX", AttributeValueType.Score, AttributeValue.Score(10)),
+            ];
+            Assert.IsTrue(_engine.CreateCustomTemplateAsync(_state, _host, "Homebrew", rows)
+                .TryGetSuccess(out var hbId));
+            Assert.IsTrue(_engine.ApplyCustomTemplateAsync(_state, _host, hbId).IsSuccess);
+            Assert.IsTrue(_engine.SetInitiativeAttributeAsync(_state, _host, "STR").IsSuccess);
+
+            var snap = KnockBox.DndMapper.Services.Library.LibrarySnapshotMapper.FromState(_state);
+            var hb = snap.CustomTemplates.Single(t => t.Id == hbId);
+            Assert.IsFalse(hb.IsBuiltIn);
+            Assert.AreEqual("STR", hb.InitiativeAttributeName);
+        }
     }
 }
