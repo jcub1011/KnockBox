@@ -62,7 +62,7 @@ namespace KnockBox.DndMapperTests.Unit
             var start = _engine.StartAsync(_host, _state).GetAwaiter().GetResult();
             Assert.IsTrue(start.IsSuccess);
             Assert.IsNull(_state.ActiveMapId);
-            Assert.AreEqual(0, _state.Maps.Count);
+            Assert.IsEmpty(_state.Maps);
         }
 
         [TestMethod]

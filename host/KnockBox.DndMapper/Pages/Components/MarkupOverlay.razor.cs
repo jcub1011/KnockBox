@@ -15,6 +15,7 @@ namespace KnockBox.DndMapper.Pages.Components
 
         [Inject] protected DndMapperGameEngine Engine { get; set; } = default!;
         [Inject] protected IUserService UserService { get; set; } = default!;
+        [CascadingParameter] public DndMapperToastService? Toasts { get; set; }
 
         private SvgDrawingCanvas? _canvas;
 
@@ -38,7 +39,11 @@ namespace KnockBox.DndMapper.Pages.Components
             var svg = await _canvas.GetSvgContentAsync();
             if (string.IsNullOrWhiteSpace(svg))
             {
-                Engine.UpdateMapMarkupAsync(State, user, Map.Id, null);
+                var clearResult = Engine.UpdateMapMarkupAsync(State, user, Map.Id, null);
+                if (clearResult.TryGetFailure(out var clearErr) && Toasts is not null)
+                {
+                    await Toasts.Push(clearErr.PublicMessage, DndMapperToastTone.Danger);
+                }
                 return;
             }
 
@@ -47,7 +52,11 @@ namespace KnockBox.DndMapper.Pages.Components
             // where comma is the decimal separator — SVG requires `.`.
             var scaleStr = inv.ToString("0.######", System.Globalization.CultureInfo.InvariantCulture);
             var wrapped = $"<g transform=\"scale({scaleStr})\">{svg}</g>";
-            Engine.UpdateMapMarkupAsync(State, user, Map.Id, wrapped);
+            var saveResult = Engine.UpdateMapMarkupAsync(State, user, Map.Id, wrapped);
+            if (saveResult.TryGetFailure(out var saveErr) && Toasts is not null)
+            {
+                await Toasts.Push(saveErr.PublicMessage, DndMapperToastTone.Danger);
+            }
         }
     }
 }

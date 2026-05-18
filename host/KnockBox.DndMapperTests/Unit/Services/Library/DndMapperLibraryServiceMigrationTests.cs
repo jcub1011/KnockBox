@@ -26,7 +26,7 @@ namespace KnockBox.DndMapperTests.Unit.Services.Library
 
             var listed = await library.ListSlotsAsync();
             Assert.IsTrue(listed.TryGetSuccess(out var slots));
-            Assert.AreEqual(0, slots.Count, "Empty slots index after fresh attach.");
+            Assert.IsEmpty(slots, "Empty slots index after fresh attach.");
 
             Assert.IsTrue(db.JsonStores.TryGetValue(DndMapperLibrarySchema.SlotsIndexStore, out var idxStore));
             Assert.IsTrue(idxStore!.ContainsKey(DndMapperLibrarySchema.SlotsIndexKey),
@@ -57,7 +57,7 @@ namespace KnockBox.DndMapperTests.Unit.Services.Library
 
             var listed = await library.ListSlotsAsync();
             Assert.IsTrue(listed.TryGetSuccess(out var slots));
-            Assert.AreEqual(1, slots.Count);
+            Assert.HasCount(1, slots);
             Assert.AreEqual(DndMapperLibrarySchema.AutoSlotId, slots[0].Id);
             Assert.AreEqual(SlotKind.Auto, slots[0].Kind);
         }

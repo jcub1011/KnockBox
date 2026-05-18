@@ -172,15 +172,27 @@ namespace KnockBox.DndMapper.Pages.Components
 
         private async void OnTokenFocusRequested(Guid tokenId)
         {
-            if (Map is null) return;
-            var token = Map.Tokens.FirstOrDefault(t => t.Id == tokenId);
-            if (token is null) return;
-            double viewW = Map.Grid.WidthCells / _zoom;
-            double viewH = Map.Grid.HeightCells / _zoom;
-            _panX = token.X - viewW / 2.0;
-            _panY = token.Y - viewH / 2.0;
-            PublishViewport();
-            await InvokeAsync(StateHasChanged);
+            // `async void` because the underlying event delegate is
+            // `Action<Guid>` (synchronous); any exception thrown after the
+            // first await would otherwise escape into the sync context and
+            // crash the Blazor circuit. Catch everything here and log.
+            try
+            {
+                if (Map is null) return;
+                var token = Map.Tokens.FirstOrDefault(t => t.Id == tokenId);
+                if (token is null) return;
+                double viewW = Map.Grid.WidthCells / _zoom;
+                double viewH = Map.Grid.HeightCells / _zoom;
+                _panX = token.X - viewW / 2.0;
+                _panY = token.Y - viewH / 2.0;
+                PublishViewport();
+                await InvokeAsync(StateHasChanged);
+            }
+            catch (ObjectDisposedException) { /* component disposed */ }
+            catch (Exception ex)
+            {
+                Logger.LogWarning(ex, "Failed to focus token {TokenId}.", tokenId);
+            }
         }
 
         private void PublishViewport()

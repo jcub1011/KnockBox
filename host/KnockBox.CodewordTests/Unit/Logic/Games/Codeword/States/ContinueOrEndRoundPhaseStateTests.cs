@@ -63,7 +63,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
             Assert.AreEqual(CodewordGamePhase.ContinueOrEndRound, _state.Phase);
             // 4 alive → majority requires 3.
             Assert.AreEqual(3, _state.EndGameVoteStatus.RequiredVotes);
-            Assert.AreEqual(0, _state.EndGameVoteStatus.VotedToEnd.Count);
+            Assert.IsEmpty(_state.EndGameVoteStatus.VotedToEnd);
             foreach (var p in _context.GetAlivePlayers())
                 Assert.IsNull(p.ContinueOrEndVote);
         }
@@ -78,8 +78,8 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
 
             Assert.IsTrue(result.IsSuccess);
             Assert.IsNull(result.Value);
-            Assert.AreEqual(false, _state.GamePlayers["p0"].ContinueOrEndVote);
-            Assert.AreEqual(0, _state.EndGameVoteStatus.VotedToEnd.Count);
+            Assert.IsFalse(_state.GamePlayers["p0"].ContinueOrEndVote);
+            Assert.IsEmpty(_state.EndGameVoteStatus.VotedToEnd);
         }
 
         [TestMethod]
@@ -89,13 +89,13 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
             phase.OnEnter(_context);
 
             phase.HandleCommand(_context, new ContinueOrEndRoundVoteCommand("p0", VoteToEnd: true));
-            Assert.AreEqual(true, _state.GamePlayers["p0"].ContinueOrEndVote);
-            Assert.IsTrue(_state.EndGameVoteStatus.VotedToEnd.Contains("p0"));
+            Assert.IsTrue(_state.GamePlayers["p0"].ContinueOrEndVote);
+            Assert.Contains("p0", _state.EndGameVoteStatus.VotedToEnd);
 
             // Second click on same option rescinds.
             phase.HandleCommand(_context, new ContinueOrEndRoundVoteCommand("p0", VoteToEnd: true));
             Assert.IsNull(_state.GamePlayers["p0"].ContinueOrEndVote);
-            Assert.IsFalse(_state.EndGameVoteStatus.VotedToEnd.Contains("p0"));
+            Assert.DoesNotContain("p0", _state.EndGameVoteStatus.VotedToEnd);
         }
 
         [TestMethod]
@@ -107,8 +107,8 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
             phase.HandleCommand(_context, new ContinueOrEndRoundVoteCommand("p0", VoteToEnd: true));
             phase.HandleCommand(_context, new ContinueOrEndRoundVoteCommand("p0", VoteToEnd: false));
 
-            Assert.AreEqual(false, _state.GamePlayers["p0"].ContinueOrEndVote);
-            Assert.IsFalse(_state.EndGameVoteStatus.VotedToEnd.Contains("p0"));
+            Assert.IsFalse(_state.GamePlayers["p0"].ContinueOrEndVote);
+            Assert.DoesNotContain("p0", _state.EndGameVoteStatus.VotedToEnd);
         }
 
         [TestMethod]
@@ -180,9 +180,9 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
             Assert.IsTrue(result.IsSuccess);
             Assert.IsInstanceOfType<CluePhaseState>(result.Value);
             // Non-voters were defaulted to continue.
-            Assert.AreEqual(false, _state.GamePlayers["p1"].ContinueOrEndVote);
-            Assert.AreEqual(false, _state.GamePlayers["p2"].ContinueOrEndVote);
-            Assert.AreEqual(false, _state.GamePlayers["p3"].ContinueOrEndVote);
+            Assert.IsFalse(_state.GamePlayers["p1"].ContinueOrEndVote);
+            Assert.IsFalse(_state.GamePlayers["p2"].ContinueOrEndVote);
+            Assert.IsFalse(_state.GamePlayers["p3"].ContinueOrEndVote);
         }
 
     }

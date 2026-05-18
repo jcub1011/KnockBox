@@ -76,9 +76,9 @@ public sealed class LogicRegistrationsTests
         var module = new DoubleEngineModule("twice");
         services.RegisterLogic(new PluginLoadResult([ToLoadedPlugin(module)], []), logger);
 
-        Assert.IsTrue(
-            logger.Errors.Any(e => e.Contains("AddGameEngine", StringComparison.Ordinal)
-                                 && e.Contains("2", StringComparison.Ordinal)),
+        Assert.Contains(
+            e => e.Contains("AddGameEngine", StringComparison.Ordinal)
+                                 && e.Contains("2", StringComparison.Ordinal), logger.Errors,
             "An Error must be logged explaining that AddGameEngine was called more than once.");
     }
 
@@ -91,9 +91,9 @@ public sealed class LogicRegistrationsTests
         var module = new NoEngineModule("empty");
         services.RegisterLogic(new PluginLoadResult([ToLoadedPlugin(module)], []), logger);
 
-        Assert.IsTrue(
-            logger.Errors.Any(e => e.Contains("AddGameEngine", StringComparison.Ordinal)
-                                 && e.Contains("0", StringComparison.Ordinal)),
+        Assert.Contains(
+            e => e.Contains("AddGameEngine", StringComparison.Ordinal)
+                                 && e.Contains("0", StringComparison.Ordinal), logger.Errors,
             "An Error must be logged explaining that AddGameEngine was never called.");
 
         var provider = services.BuildServiceProvider();

@@ -39,12 +39,12 @@ namespace KnockBox.DndMapperTests.Unit.Services.Library
             var snap = LibrarySnapshotMapper.FromState(state);
 
             Assert.AreEqual(1, snap.SchemaVersion);
-            Assert.AreEqual(1, snap.Maps.Count);
+            Assert.HasCount(1, snap.Maps);
             Assert.AreEqual("Forest", snap.Maps[0].Name);
-            Assert.AreEqual(1, snap.Maps[0].Tokens.Count);
-            Assert.AreEqual(1, snap.Maps[0].Images.Count);
+            Assert.HasCount(1, snap.Maps[0].Tokens);
+            Assert.HasCount(1, snap.Maps[0].Images);
             Assert.AreEqual("image/png", snap.Maps[0].Images[0].ContentType);
-            Assert.AreEqual(1, snap.Sheets.Count);
+            Assert.HasCount(1, snap.Sheets);
             Assert.AreEqual(AttributePreset.DnD5eCore, snap.AttributeSchema.Preset);
         }
 
@@ -90,10 +90,10 @@ namespace KnockBox.DndMapperTests.Unit.Services.Library
 
             Assert.IsNotNull(reread);
             Assert.AreEqual(original.SchemaVersion, reread!.SchemaVersion);
-            Assert.AreEqual(original.Maps.Count, reread.Maps.Count);
+            Assert.HasCount(original.Maps.Count, reread.Maps);
             Assert.AreEqual(original.Maps[0].Name, reread.Maps[0].Name);
             Assert.AreEqual(original.Maps[0].Tokens[0].Name, reread.Maps[0].Tokens[0].Name);
-            Assert.AreEqual(original.Sheets.Count, reread.Sheets.Count);
+            Assert.HasCount(original.Sheets.Count, reread.Sheets);
             Assert.AreEqual(original.AttributeSchema.Preset, reread.AttributeSchema.Preset);
         }
 
@@ -185,7 +185,7 @@ namespace KnockBox.DndMapperTests.Unit.Services.Library
             var snap = new AttributeSchemaSnapshot { Preset = AttributePreset.DnD5eCore, Rows = [] };
             var schema = LibrarySnapshotMapper.ToAttributeSchema(snap);
             Assert.AreEqual(AttributePreset.DnD5eCore, schema.Preset);
-            Assert.IsTrue(schema.Rows.Count > 0, "DnD5eCore preset should have non-empty rows.");
+            Assert.IsNotEmpty(schema.Rows, "DnD5eCore preset should have non-empty rows.");
         }
 
         [TestMethod]
@@ -208,7 +208,7 @@ namespace KnockBox.DndMapperTests.Unit.Services.Library
             var schema = LibrarySnapshotMapper.ToAttributeSchema(snap);
 
             Assert.AreEqual(AttributePreset.Custom, schema.Preset);
-            Assert.AreEqual(1, schema.Rows.Count);
+            Assert.HasCount(1, schema.Rows);
             Assert.AreEqual("Spice", schema.Rows[0].Name);
             Assert.AreEqual(12, schema.Rows[0].Default.IntValue);
         }
@@ -227,11 +227,11 @@ namespace KnockBox.DndMapperTests.Unit.Services.Library
                 .TryGetSuccess(out var userTplId));
 
             // Sanity: state contains 3 built-ins + 1 user template.
-            Assert.AreEqual(4, state.CustomTemplates.Count);
+            Assert.HasCount(4, state.CustomTemplates);
 
             var snap = LibrarySnapshotMapper.FromState(state);
 
-            Assert.AreEqual(1, snap.CustomTemplates.Count);
+            Assert.HasCount(1, snap.CustomTemplates);
             Assert.AreEqual(userTplId, snap.CustomTemplates[0].Id);
             Assert.AreEqual("MyTpl", snap.CustomTemplates[0].Name);
         }

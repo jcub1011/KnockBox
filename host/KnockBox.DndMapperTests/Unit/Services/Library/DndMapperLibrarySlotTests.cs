@@ -62,7 +62,7 @@ namespace KnockBox.DndMapperTests.Unit.Services.Library
 
                 var listed = await library.ListSlotsAsync();
                 Assert.IsTrue(listed.TryGetSuccess(out var slots));
-                Assert.IsTrue(slots.Any(s => s.Id == slotId && s.Name == "Campaign A" && s.Kind == SlotKind.Manual));
+                Assert.Contains(s => s.Id == slotId && s.Name == "Campaign A" && s.Kind == SlotKind.Manual, slots);
 
                 Assert.IsTrue(db.JsonStores[DndMapperLibrarySchema.LibraryStore].ContainsKey(slotId),
                     "Snapshot must be written under the slot's id.");
@@ -99,7 +99,7 @@ namespace KnockBox.DndMapperTests.Unit.Services.Library
 
                 idx = (SlotsIndex)db.JsonStores[DndMapperLibrarySchema.SlotsIndexStore][DndMapperLibrarySchema.SlotsIndexKey];
                 var after = idx.Slots.Single(s => s.Id == slotId).UpdatedUtc;
-                Assert.IsTrue(after > before, "SaveToSlotAsync should bump UpdatedUtc.");
+                Assert.IsGreaterThan(before, after, "SaveToSlotAsync should bump UpdatedUtc.");
             }
             finally { await library.DisposeAsync(); }
         }
@@ -130,7 +130,7 @@ namespace KnockBox.DndMapperTests.Unit.Services.Library
                 Assert.IsFalse(db.JsonStores[DndMapperLibrarySchema.LibraryStore].ContainsKey(slotId));
                 var listed = await library.ListSlotsAsync();
                 Assert.IsTrue(listed.TryGetSuccess(out var slots));
-                Assert.IsFalse(slots.Any(s => s.Id == slotId));
+                Assert.DoesNotContain(s => s.Id == slotId, slots);
             }
             finally { await library.DisposeAsync(); }
         }
@@ -195,7 +195,7 @@ namespace KnockBox.DndMapperTests.Unit.Services.Library
 
                 var listed = await library.ListSlotsAsync();
                 Assert.IsTrue(listed.TryGetSuccess(out var slots));
-                Assert.AreEqual(3, slots.Count);
+                Assert.HasCount(3, slots);
                 Assert.AreEqual(SlotKind.Auto, slots[0].Kind);
                 Assert.AreEqual(bId, slots[1].Id);
                 Assert.AreEqual(aId, slots[2].Id);
@@ -247,14 +247,14 @@ namespace KnockBox.DndMapperTests.Unit.Services.Library
 
             state.WithExclusiveRead(() =>
             {
-                Assert.AreEqual(1, state.Maps.Count);
+                Assert.HasCount(1, state.Maps);
                 var map = state.Maps[0];
-                Assert.AreEqual(1, map.Images.Count, "Only the image with a backing blob should be hydrated.");
+                Assert.HasCount(1, map.Images, "Only the image with a backing blob should be hydrated.");
                 Assert.AreEqual(imgPresent, map.Images[0].Id);
             });
 
-            Assert.IsTrue(
-                logger.Entries.Any(e => e.Message.Contains(imgMissing.ToString())),
+            Assert.Contains(
+                e => e.Message.Contains(imgMissing.ToString()), logger.Entries,
                 "Missing-blob skip should log a warning naming the image id.");
         }
 

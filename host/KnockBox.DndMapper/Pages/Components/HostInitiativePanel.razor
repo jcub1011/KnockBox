@@ -128,6 +128,10 @@
                         </div>
                     }
                 </div>
+                @if (_error is not null)
+                {
+                    <div class="dndm-modal-error">@_error</div>
+                }
             }
             else
             {

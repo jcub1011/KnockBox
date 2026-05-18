@@ -81,7 +81,7 @@ public sealed class BlobShareRegistryTests
         var before = entry.LastAccessedUtc;
         var found = registry.TryGetAndTouch(entry.Token);
         Assert.IsNotNull(found);
-        Assert.IsTrue(entry.LastAccessedUtc > before);
+        Assert.IsGreaterThan(before, entry.LastAccessedUtc);
     }
 
     [TestMethod]

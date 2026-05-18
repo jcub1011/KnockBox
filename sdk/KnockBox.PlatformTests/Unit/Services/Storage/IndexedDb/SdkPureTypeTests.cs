@@ -213,7 +213,7 @@ public sealed class IndexedDbWireFormatTests
         var back = IndexedDbWireFormat.FromKeyEnvelope(jsonRound);
         Assert.AreEqual(IndexedDbKeyKind.Array, back.Kind);
         var arr = (IReadOnlyList<IndexedDbKey>)back.Value!;
-        Assert.AreEqual(2, arr.Count);
+        Assert.HasCount(2, arr);
         Assert.AreEqual("a", arr[0].Value);
         Assert.AreEqual(2.0, (double)arr[1].Value!);
     }

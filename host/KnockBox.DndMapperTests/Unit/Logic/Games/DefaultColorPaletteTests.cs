@@ -40,7 +40,7 @@ namespace KnockBox.DndMapperTests.Unit.Logic.Games
             var colors = sample.Select(DefaultColorPalette.FromName).Distinct().Count();
             // Probabilistic but the sample is tiny and the hash space is 360 hues —
             // require at least 4 distinct colors out of 5 names.
-            Assert.IsTrue(colors >= 4, $"Expected ≥4 distinct colors, got {colors}.");
+            Assert.IsGreaterThanOrEqualTo(4, colors, $"Expected ≥4 distinct colors, got {colors}.");
         }
 
         [TestMethod]

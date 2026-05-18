@@ -96,10 +96,10 @@ namespace KnockBox.DndMapper.Pages
             _isSaving = Library.IsSaving;
             _ = InvokeAsync(async () =>
             {
-                StateHasChanged();
-                if (_unloadGuardModule is null) return;
                 try
                 {
+                    StateHasChanged();
+                    if (_unloadGuardModule is null) return;
                     if (_isSaving && !_unloadGuardActive)
                     {
                         await _unloadGuardModule.InvokeVoidAsync("enable");
@@ -112,6 +112,7 @@ namespace KnockBox.DndMapper.Pages
                     }
                 }
                 catch (JSDisconnectedException) { /* circuit teardown */ }
+                catch (ObjectDisposedException) { /* component disposed */ }
                 catch (Exception ex) { Logger.LogWarning(ex, "Failed to toggle unload guard."); }
             });
         }

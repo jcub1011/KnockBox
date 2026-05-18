@@ -84,9 +84,11 @@ namespace KnockBox.DndMapper.Pages.Components
 
         private void ForcePlayerRoll(Guid combatantId)
         {
+            _error = null;
             var user = UserService.CurrentUser;
             if (user is null) return;
-            Engine.ForceInitiativeRollAsync(State, user, combatantId);
+            var result = Engine.ForceInitiativeRollAsync(State, user, combatantId);
+            if (result.TryGetFailure(out var err)) _error = err.PublicMessage;
         }
 
         private void OnNpcDraftInput(Guid combatantId, string? value)
@@ -103,29 +105,37 @@ namespace KnockBox.DndMapper.Pages.Components
             if (!int.TryParse(draft, NumberStyles.Integer, CultureInfo.InvariantCulture, out var n)) return;
             var user = UserService.CurrentUser;
             if (user is null) return;
-            Engine.SetNpcInitiativeAsync(State, user, combatantId, n);
+            _error = null;
+            var result = Engine.SetNpcInitiativeAsync(State, user, combatantId, n);
+            if (result.TryGetFailure(out var err)) { _error = err.PublicMessage; return; }
             _npcDrafts.Remove(combatantId);
         }
 
         private void AdvanceTurn()
         {
+            _error = null;
             var user = UserService.CurrentUser;
             if (user is null) return;
-            Engine.AdvanceTurnAsync(State, user);
+            var result = Engine.AdvanceTurnAsync(State, user);
+            if (result.TryGetFailure(out var err)) _error = err.PublicMessage;
         }
 
         private void EndCombat()
         {
+            _error = null;
             var user = UserService.CurrentUser;
             if (user is null) return;
-            Engine.EndCombatAsync(State, user);
+            var result = Engine.EndCombatAsync(State, user);
+            if (result.TryGetFailure(out var err)) _error = err.PublicMessage;
         }
 
         private void RemoveCombatant(Guid combatantId)
         {
+            _error = null;
             var user = UserService.CurrentUser;
             if (user is null) return;
-            Engine.RemoveCombatantAsync(State, user, combatantId);
+            var result = Engine.RemoveCombatantAsync(State, user, combatantId);
+            if (result.TryGetFailure(out var err)) _error = err.PublicMessage;
         }
 
         private void AddCombatant()

@@ -50,7 +50,7 @@ namespace KnockBox.DndMapperTests.Unit
             Assert.IsTrue(r.IsSuccess);
             Assert.IsNotNull(_state.ActiveCombat);
             Assert.AreEqual(CombatPhase.WaitingForRolls, _state.ActiveCombat!.Phase);
-            Assert.AreEqual(2, _state.ActiveCombat.TurnOrder.Count);
+            Assert.HasCount(2, _state.ActiveCombat.TurnOrder);
         }
 
         [TestMethod]
@@ -79,7 +79,7 @@ namespace KnockBox.DndMapperTests.Unit
             Assert.IsTrue(r.IsSuccess);
             // Only one combatant — auto-transition fires.
             Assert.AreEqual(CombatPhase.Active, _state.ActiveCombat!.Phase);
-            Assert.IsTrue(_state.RollLog.Any(rr => rr.Label == "Initiative" && rr.RollerUserId == player.Id));
+            Assert.Contains(rr => rr.Label == "Initiative" && rr.RollerUserId == player.Id, _state.RollLog);
         }
 
         [TestMethod]
@@ -155,9 +155,26 @@ namespace KnockBox.DndMapperTests.Unit
             Assert.IsTrue(add.IsSuccess);
 
             // Insertion index 0 (NPC outranks). CurrentTurnIndex must shift from 0 → 1.
-            Assert.AreEqual(2, _state.ActiveCombat!.TurnOrder.Count);
+            Assert.HasCount(2, _state.ActiveCombat!.TurnOrder);
             Assert.AreEqual(p1.Id, _state.ActiveCombat.TurnOrder[1].OwnerUserId);
             Assert.AreEqual(1, _state.ActiveCombat.CurrentTurnIndex);
+        }
+
+        [TestMethod]
+        public void AddCombatant_DuplicateToken_Rejected()
+        {
+            var p1 = EngineTestFactory.RegisterPlayer(_state, "P1");
+            _engine.StartInitiativeAsync(_state, _host, []);
+            _engine.SubmitInitiativeRollAsync(_state, p1);
+
+            var npcId = SeedNpcToken();
+            var first = _engine.AddCombatantAsync(_state, _host, npcId, 15);
+            Assert.IsTrue(first.IsSuccess);
+
+            var second = _engine.AddCombatantAsync(_state, _host, npcId, 18);
+            Assert.IsTrue(second.IsFailure);
+            // Turn order still has exactly the original two entries (P1 + first NPC).
+            Assert.HasCount(2, _state.ActiveCombat!.TurnOrder);
         }
 
         [TestMethod]
@@ -185,7 +202,7 @@ namespace KnockBox.DndMapperTests.Unit
             var current = _state.ActiveCombat.TurnOrder[_state.ActiveCombat.CurrentTurnIndex];
             int beforeCount = _state.ActiveCombat.TurnOrder.Count;
             _engine.RemoveCombatantAsync(_state, _host, current.Id);
-            Assert.AreEqual(beforeCount - 1, _state.ActiveCombat.TurnOrder.Count);
+            Assert.HasCount(beforeCount - 1, _state.ActiveCombat.TurnOrder);
         }
 
         [TestMethod]

@@ -41,7 +41,7 @@ namespace KnockBox.DndMapperTests.Unit
                 [new AttributeDelta("INT", -5)], null, null, null);
             Assert.IsTrue(r1.IsSuccess);
             Assert.IsTrue(r2.IsSuccess);
-            Assert.AreEqual(2, _state.Sheets[sheetId].StatusEffects.Count);
+            Assert.HasCount(2, _state.Sheets[sheetId].StatusEffects);
         }
 
         [TestMethod]
@@ -159,7 +159,7 @@ namespace KnockBox.DndMapperTests.Unit
 
             var d = _engine.DeleteStatusEffectTemplateAsync(_state, _host, id);
             Assert.IsTrue(d.IsSuccess);
-            Assert.AreEqual(0, _state.StatusEffectTemplates.Count);
+            Assert.IsEmpty(_state.StatusEffectTemplates);
         }
 
         [TestMethod]
@@ -176,8 +176,8 @@ namespace KnockBox.DndMapperTests.Unit
 
             _engine.DeleteStatusEffectTemplateAsync(_state, _host, templateId);
 
-            Assert.AreEqual(0, _state.StatusEffectTemplates.Count);
-            Assert.AreEqual(1, _state.Sheets[sheetId].StatusEffects.Count);
+            Assert.IsEmpty(_state.StatusEffectTemplates);
+            Assert.HasCount(1, _state.Sheets[sheetId].StatusEffects);
         }
 
         // ── Roll integration (covered in DiceTests too, lightweight smoke here) ──

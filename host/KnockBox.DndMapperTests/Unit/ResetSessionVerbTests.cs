@@ -62,10 +62,10 @@ namespace KnockBox.DndMapperTests.Unit
             var reset = _engine.ResetSessionAsync(_state, _host);
             Assert.IsTrue(reset.IsSuccess);
 
-            Assert.AreEqual(0, _state.Maps.Count);
+            Assert.IsEmpty(_state.Maps);
             Assert.IsNull(_state.ActiveMapId);
-            Assert.AreEqual(0, _state.Sheets.Count);
-            Assert.AreEqual(0, _state.RollLog.Count);
+            Assert.IsEmpty(_state.Sheets);
+            Assert.IsEmpty(_state.RollLog);
             Assert.AreEqual(0, _state.BytesUsed);
             Assert.AreEqual(new DndMapperSettings().HpTrackingEnabled, _state.Settings.HpTrackingEnabled);
             Assert.AreEqual(AttributePreset.DnD5eCore, _state.AttributeSchema.Preset);

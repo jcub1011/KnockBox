@@ -193,7 +193,7 @@ public sealed class DefaultPluginStorageTests
 
             var results = storage.EnumerateFiles("never/existed", "*").ToArray();
 
-            Assert.AreEqual(0, results.Length);
+            Assert.IsEmpty(results);
         }
         finally { SafeDelete(root); }
     }

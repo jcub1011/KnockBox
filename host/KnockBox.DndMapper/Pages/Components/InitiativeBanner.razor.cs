@@ -13,6 +13,7 @@ namespace KnockBox.DndMapper.Pages.Components
 
         [Inject] protected DndMapperGameEngine Engine { get; set; } = default!;
         [Inject] protected IUserService UserService { get; set; } = default!;
+        [CascadingParameter] public DndMapperToastService? Toasts { get; set; }
 
         private IDisposable? _stateSub;
 
@@ -28,11 +29,15 @@ namespace KnockBox.DndMapper.Pages.Components
             base.Dispose();
         }
 
-        private void OnRollInitiative()
+        private async Task OnRollInitiative()
         {
             var user = UserService.CurrentUser;
             if (user is null) return;
-            Engine.SubmitInitiativeRollAsync(State, user);
+            var result = Engine.SubmitInitiativeRollAsync(State, user);
+            if (result.TryGetFailure(out var err) && Toasts is not null)
+            {
+                await Toasts.Push(err.PublicMessage, DndMapperToastTone.Danger);
+            }
         }
     }
 }

@@ -42,7 +42,7 @@ public sealed class KnockBoxPlatformExtensionsTests
         options.AddGameModule<FakeModule>();
 
         Assert.AreEqual(PluginDiscoveryMode.Directory, options.PluginDiscovery);
-        Assert.AreEqual(1, options.ExplicitModules.Count);
+        Assert.HasCount(1, options.ExplicitModules);
     }
 
     [TestMethod]

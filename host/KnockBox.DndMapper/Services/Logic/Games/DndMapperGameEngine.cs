@@ -1176,6 +1176,11 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                 if (state.ActiveCombat is null) { error = "No active combat."; return; }
                 var (token, _) = FindTokenAndMap(state, tokenId);
                 if (token is null) { error = "Unknown token id."; return; }
+                if (state.ActiveCombat.TurnOrder.Any(e => e.TokenId == tokenId))
+                {
+                    error = "Token is already a combatant.";
+                    return;
+                }
 
                 var entry = new CombatantEntry
                 {

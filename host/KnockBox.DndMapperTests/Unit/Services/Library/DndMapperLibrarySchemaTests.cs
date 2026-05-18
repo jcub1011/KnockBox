@@ -12,7 +12,7 @@ namespace KnockBox.DndMapperTests.Unit.Services.Library
             var schema = DndMapperLibrarySchema.Create();
 
             Assert.IsNotNull(schema.Stores, "Schema must declare its stores so JS can reconcile synchronously.");
-            Assert.AreEqual(3, schema.Stores!.Count);
+            Assert.HasCount(3, schema.Stores);
 
             var library = schema.Stores.Single(s => s.Name == DndMapperLibrarySchema.LibraryStore);
             Assert.AreEqual(DeclaredStoreKind.Json, library.Kind);

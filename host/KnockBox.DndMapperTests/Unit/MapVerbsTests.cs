@@ -25,7 +25,7 @@ namespace KnockBox.DndMapperTests.Unit
         {
             var result = _engine.CreateMapAsync(_state, _host, "Tavern");
             Assert.IsTrue(result.TryGetSuccess(out var newId));
-            Assert.AreEqual(1, _state.Maps.Count);
+            Assert.HasCount(1, _state.Maps);
             Assert.AreEqual(0, _state.Maps[0].ListOrder);
             Assert.AreEqual(newId, _state.Maps[0].Id);
             Assert.AreEqual("Tavern", _state.Maps[0].Name);
@@ -93,7 +93,7 @@ namespace KnockBox.DndMapperTests.Unit
 
             var del = _engine.DeleteMapAsync(_state, _host, mapId);
             Assert.IsTrue(del.IsSuccess);
-            Assert.AreEqual(0, _state.Maps.Count);
+            Assert.IsEmpty(_state.Maps);
         }
 
         [TestMethod]
@@ -149,7 +149,7 @@ namespace KnockBox.DndMapperTests.Unit
 
             Assert.AreEqual(50, clone.Grid.WidthCells);
             Assert.AreNotSame(source.Grid, clone.Grid);
-            Assert.AreEqual(0, clone.Tokens.Count);
+            Assert.IsEmpty(clone.Tokens);
             Assert.AreEqual("Source (copy)", clone.Name);
         }
 
@@ -230,7 +230,7 @@ namespace KnockBox.DndMapperTests.Unit
             _engine.SetActiveMapAsync(_state, _host, mapId);
 
             var map = _state.Maps.Single(m => m.Id == mapId);
-            Assert.AreEqual(1, map.Tokens.Count);
+            Assert.HasCount(1, map.Tokens);
             var token = map.Tokens[0];
             Assert.AreEqual(TokenType.PlayerToken, token.Type);
             Assert.AreEqual(player.Id, token.OwnerUserId);
@@ -246,7 +246,7 @@ namespace KnockBox.DndMapperTests.Unit
             // calling SetActiveMap again should not add a second token
             _engine.SetActiveMapAsync(_state, _host, mapId);
 
-            Assert.AreEqual(1, _state.Maps.Single(m => m.Id == mapId).Tokens.Count);
+            Assert.HasCount(1, _state.Maps.Single(m => m.Id == mapId).Tokens);
         }
 
         [TestMethod]
@@ -377,10 +377,10 @@ namespace KnockBox.DndMapperTests.Unit
             Assert.IsTrue(update.IsSuccess);
 
             var token = _state.Maps.Single(m => m.Id == mapId).Tokens.Single(t => t.Id == tokenId);
-            Assert.IsTrue(token.X <= 10 - 0.5 + 1e-6, $"Token X {token.X} should be clamped within new width.");
-            Assert.IsTrue(token.Y <= 8 - 0.5 + 1e-6, $"Token Y {token.Y} should be clamped within new height.");
-            Assert.IsTrue(token.X >= 0.5 - 1e-6);
-            Assert.IsTrue(token.Y >= 0.5 - 1e-6);
+            Assert.IsLessThanOrEqualTo(10 - 0.5 + 1e-6, token.X, $"Token X {token.X} should be clamped within new width.");
+            Assert.IsLessThanOrEqualTo(8 - 0.5 + 1e-6, token.Y, $"Token Y {token.Y} should be clamped within new height.");
+            Assert.IsGreaterThanOrEqualTo(0.5 - 1e-6, token.X);
+            Assert.IsGreaterThanOrEqualTo(0.5 - 1e-6, token.Y);
         }
     }
 }
