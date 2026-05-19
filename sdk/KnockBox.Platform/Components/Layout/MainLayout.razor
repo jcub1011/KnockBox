@@ -8,7 +8,7 @@
 @inherits LayoutComponentBase
 @implements IDisposable
 
-<div class="main">
+<div class="main @(_isOnHomePage ? "" : "in-game")">
     @{
         GameSessionService.TryGetCurrentSession(out var currentSession);
         RenderFragment? customHeader = null;
