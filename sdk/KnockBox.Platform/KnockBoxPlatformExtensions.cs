@@ -186,22 +186,19 @@ public static class KnockBoxPlatformExtensions
             var pluginLogger = bootstrapLoggerFactory.CreateLogger<PluginLoader>();
             var loader = new PluginLoader(pluginLogger);
 
-            var plugins = new List<LoadedPlugin>();
-            var assemblies = new List<Assembly>();
-
-            // The caller (or the default `["games"]`) owns path selection. The
-            // platform no longer resolves host services via a throwaway
-            // BuildServiceProvider — hosts with admin-style gating should
-            // populate PluginsPaths directly inside their configure callback.
+            // Combine library and game roots into a single LoadModules call so the
+            // loader's library-first ordering applies across roots. Each plugin's
+            // manifest still authoritatively decides whether it's a game or library —
+            // the root folder is only a convention to keep first-party staging tidy.
+            // Library paths are listed first to make the ordering visible to a reader
+            // skimming logs, even though the loader re-sorts internally.
+            var allRoots = new List<string>(options.LibrariesPaths.Count + options.PluginsPaths.Count);
+            foreach (var rawPath in options.LibrariesPaths)
+                allRoots.Add(ResolvePluginsPath(rawPath));
             foreach (var rawPath in options.PluginsPaths)
-            {
-                var pluginsPath = ResolvePluginsPath(rawPath);
-                var result = loader.LoadModules(pluginsPath);
-                plugins.AddRange(result.Plugins);
-                assemblies.AddRange(result.Assemblies);
-            }
+                allRoots.Add(ResolvePluginsPath(rawPath));
 
-            pluginLoadResult = new PluginLoadResult(plugins, assemblies.Distinct().ToList());
+            pluginLoadResult = loader.LoadModules(allRoots);
         }
 
         // Navigation + drawing services. Registered BEFORE RegisterLogic so that

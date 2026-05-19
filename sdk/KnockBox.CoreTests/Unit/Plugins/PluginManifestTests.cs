@@ -543,6 +543,251 @@ public sealed class PluginManifestTests
         Assert.AreEqual("embedded-fixture", manifest.RouteIdentifier);
     }
 
+    // ─── TryParse — kind ────────────────────────────────────────────────────
+
+    [TestMethod]
+    public void TryParse_ManifestWithoutKind_DefaultsToGame()
+    {
+        using var stream = StreamFor(ValidManifest);
+
+        var result = PluginManifest.TryParse(stream);
+
+        Assert.IsTrue(result.TryGetSuccess(out var manifest));
+        Assert.AreEqual(PluginKind.Game, manifest.Kind);
+    }
+
+    [TestMethod]
+    [DataRow("game")]
+    [DataRow("Game")]
+    [DataRow("GAME")]
+    public void TryParse_KindGameCaseInsensitive_ParsesToGame(string kind)
+    {
+        var json = AddField(ValidManifest, "kind", $"\"{kind}\"");
+        using var stream = StreamFor(json);
+
+        var result = PluginManifest.TryParse(stream);
+
+        Assert.IsTrue(result.TryGetSuccess(out var manifest));
+        Assert.AreEqual(PluginKind.Game, manifest.Kind);
+    }
+
+    [TestMethod]
+    [DataRow("library")]
+    [DataRow("Library")]
+    [DataRow("LIBRARY")]
+    public void TryParse_KindLibraryCaseInsensitive_ParsesToLibrary(string kind)
+    {
+        var json = AddField(ValidManifest, "kind", $"\"{kind}\"");
+        using var stream = StreamFor(json);
+
+        var result = PluginManifest.TryParse(stream);
+
+        Assert.IsTrue(result.TryGetSuccess(out var manifest));
+        Assert.AreEqual(PluginKind.Library, manifest.Kind);
+    }
+
+    [TestMethod]
+    public void TryParse_UnknownKind_FailsListingKnownKinds()
+    {
+        var json = AddField(ValidManifest, "kind", "\"plugin\"");
+        using var stream = StreamFor(json);
+
+        var result = PluginManifest.TryParse(stream);
+
+        AssertFailureContains(result, "plugin", "game", "library");
+    }
+
+    [TestMethod]
+    public void TryParse_KindNotString_Fails()
+    {
+        var json = AddField(ValidManifest, "kind", "42");
+        using var stream = StreamFor(json);
+
+        var result = PluginManifest.TryParse(stream);
+
+        AssertFailureContains(result, "kind", "string");
+    }
+
+    [TestMethod]
+    public void TryParse_KindExplicitlyNull_DefaultsToGame()
+    {
+        var json = AddField(ValidManifest, "kind", "null");
+        using var stream = StreamFor(json);
+
+        var result = PluginManifest.TryParse(stream);
+
+        Assert.IsTrue(result.TryGetSuccess(out var manifest));
+        Assert.AreEqual(PluginKind.Game, manifest.Kind);
+    }
+
+    // ─── TryParse — exportedContracts ───────────────────────────────────────
+
+    [TestMethod]
+    public void TryParse_ManifestWithoutExportedContracts_DefaultsToEmpty()
+    {
+        using var stream = StreamFor(ValidManifest);
+
+        var result = PluginManifest.TryParse(stream);
+
+        Assert.IsTrue(result.TryGetSuccess(out var manifest));
+        Assert.AreEqual(0, manifest.ExportedContracts.Count);
+    }
+
+    [TestMethod]
+    public void TryParse_LibraryWithValidExportedContracts_RoundTrips()
+    {
+        var json = AddField(ValidManifest, "kind", "\"library\"");
+        json = AddField(json, "exportedContracts", """["Foo.Contracts", "Bar-Baz_v2.Contracts"]""");
+        using var stream = StreamFor(json);
+
+        var result = PluginManifest.TryParse(stream);
+
+        Assert.IsTrue(result.TryGetSuccess(out var manifest));
+        Assert.AreEqual(2, manifest.ExportedContracts.Count);
+        Assert.AreEqual("Foo.Contracts", manifest.ExportedContracts[0]);
+        Assert.AreEqual("Bar-Baz_v2.Contracts", manifest.ExportedContracts[1]);
+    }
+
+    [TestMethod]
+    public void TryParse_GameWithNonEmptyExportedContracts_FailsExplaining()
+    {
+        var json = AddField(ValidManifest, "exportedContracts", """["Foo.Contracts"]""");
+        using var stream = StreamFor(json);
+
+        var result = PluginManifest.TryParse(stream);
+
+        AssertFailureContains(result, "exportedContracts", "library");
+    }
+
+    [TestMethod]
+    public void TryParse_ExportedContractsNotArray_Fails()
+    {
+        var json = AddField(ValidManifest, "kind", "\"library\"");
+        json = AddField(json, "exportedContracts", """{"key": "value"}""");
+        using var stream = StreamFor(json);
+
+        var result = PluginManifest.TryParse(stream);
+
+        AssertFailureContains(result, "exportedContracts", "array");
+    }
+
+    [TestMethod]
+    public void TryParse_ExportedContractsContainsNonString_Fails()
+    {
+        var json = AddField(ValidManifest, "kind", "\"library\"");
+        json = AddField(json, "exportedContracts", """["Foo.Contracts", 42]""");
+        using var stream = StreamFor(json);
+
+        var result = PluginManifest.TryParse(stream);
+
+        AssertFailureContains(result, "exportedContracts", "string");
+    }
+
+    [TestMethod]
+    public void TryParse_ExportedContractsContainsEmpty_Fails()
+    {
+        var json = AddField(ValidManifest, "kind", "\"library\"");
+        json = AddField(json, "exportedContracts", """["", "Foo.Contracts"]""");
+        using var stream = StreamFor(json);
+
+        var result = PluginManifest.TryParse(stream);
+
+        AssertFailureContains(result, "exportedContracts");
+    }
+
+    [TestMethod]
+    [DataRow("Foo Contracts")]
+    [DataRow("Foo/Contracts")]
+    [DataRow("Foo*Contracts")]
+    public void TryParse_ExportedContractsInvalidCharacters_Fails(string badName)
+    {
+        var json = AddField(ValidManifest, "kind", "\"library\"");
+        json = AddField(json, "exportedContracts", $"""["{badName}"]""");
+        using var stream = StreamFor(json);
+
+        var result = PluginManifest.TryParse(stream);
+
+        AssertFailureContains(result, "exportedContracts");
+    }
+
+    [TestMethod]
+    public void TryParse_ExportedContractsContainsDuplicate_Fails()
+    {
+        var json = AddField(ValidManifest, "kind", "\"library\"");
+        json = AddField(json, "exportedContracts", """["Foo.Contracts", "Foo.Contracts"]""");
+        using var stream = StreamFor(json);
+
+        var result = PluginManifest.TryParse(stream);
+
+        AssertFailureContains(result, "exportedContracts", "Foo.Contracts");
+    }
+
+    // ─── TryParse — library SemVer enforcement ──────────────────────────────
+
+    [TestMethod]
+    public void TryParse_LibraryWithMajorMinorPatch_Succeeds()
+    {
+        var json = AddField(ValidManifest, "kind", "\"library\"");
+        json = ReplaceFieldValue(json, "version", "\"1.2.3\"");
+        using var stream = StreamFor(json);
+
+        var result = PluginManifest.TryParse(stream);
+
+        Assert.IsTrue(result.TryGetSuccess(out var manifest));
+        Assert.AreEqual(new Version(1, 2, 3), manifest.Version);
+    }
+
+    [TestMethod]
+    public void TryParse_LibraryWithMajorMinorOnly_Fails()
+    {
+        var json = AddField(ValidManifest, "kind", "\"library\"");
+        json = ReplaceFieldValue(json, "version", "\"1.2\"");
+        using var stream = StreamFor(json);
+
+        var result = PluginManifest.TryParse(stream);
+
+        AssertFailureContains(result, "version", "Major.Minor.Patch");
+    }
+
+    [TestMethod]
+    public void TryParse_LibraryWithRevisionComponent_Fails()
+    {
+        var json = AddField(ValidManifest, "kind", "\"library\"");
+        json = ReplaceFieldValue(json, "version", "\"1.2.3.4\"");
+        using var stream = StreamFor(json);
+
+        var result = PluginManifest.TryParse(stream);
+
+        AssertFailureContains(result, "version", "Major.Minor.Patch");
+    }
+
+    [TestMethod]
+    public void TryParse_LibraryWithZeroRevision_Succeeds()
+    {
+        // System.Version("1.2.3.0") parses with Revision=0; that's not the
+        // ambiguous case our policy is trying to reject (1.2.3.4 would be).
+        var json = AddField(ValidManifest, "kind", "\"library\"");
+        json = ReplaceFieldValue(json, "version", "\"1.2.3.0\"");
+        using var stream = StreamFor(json);
+
+        var result = PluginManifest.TryParse(stream);
+
+        Assert.IsTrue(result.TryGetSuccess(out _));
+    }
+
+    [TestMethod]
+    public void TryParse_GameWithMajorMinorOnly_StillSucceeds()
+    {
+        // Game manifests don't have the strict SemVer requirement libraries do,
+        // so the existing "1.0" / "1.2.3.4" formats still work.
+        var json = ReplaceFieldValue(ValidManifest, "version", "\"1.0\"");
+        using var stream = StreamFor(json);
+
+        var result = PluginManifest.TryParse(stream);
+
+        Assert.IsTrue(result.TryGetSuccess(out _));
+    }
+
     // ─── helpers ────────────────────────────────────────────────────────────
 
     private static string ValidManifestWithCapabilities(string capabilitiesJsonArray) =>

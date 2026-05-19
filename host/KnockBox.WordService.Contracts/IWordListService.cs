@@ -1,9 +1,7 @@
-using KnockBox.Spardle.Models;
-
-namespace KnockBox.Spardle.Services;
+namespace KnockBox.WordService.Contracts;
 
 /// <summary>
-/// Read-only access to the Spardle word pools.
+/// Read-only access to the shared word pools.
 /// Lookups take <see cref="ReadOnlySpan{T}"/> of char so callers can avoid
 /// allocating substrings on hot paths (e.g., compound word decomposition).
 /// </summary>

@@ -1,6 +1,6 @@
-using KnockBox.Spardle.Services;
+using KnockBox.WordService.Services;
 
-namespace KnockBox.SpardleTests.Unit;
+namespace KnockBox.WordServiceTests.Unit;
 
 [TestClass]
 public class WordPoolTests

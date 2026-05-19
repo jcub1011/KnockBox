@@ -1,7 +1,6 @@
 using System.Text;
-using KnockBox.Spardle.Models;
 
-namespace KnockBox.Spardle.Services;
+namespace KnockBox.WordService.Contracts;
 
 /// <summary>
 /// Ergonomic wrappers around <see cref="IWordListService"/>. The core API exposes

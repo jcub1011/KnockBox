@@ -54,7 +54,9 @@ internal sealed class DefaultPluginRegistration : IPluginRegistration
         typeof(IPluginRegistration),
         typeof(IPluginManifest),
         typeof(IPluginStorage),
+        typeof(IPluginModule),
         typeof(IGameModule),
+        typeof(ILibraryModule),
         typeof(AbstractGameEngine),
         typeof(AbstractGameState),
 
@@ -111,9 +113,21 @@ internal sealed class DefaultPluginRegistration : IPluginRegistration
     /// Builds a host-owned snapshot from the current service collection. Closed-generic
     /// service types (e.g. <c>ILogger&lt;Foo&gt;</c>) are included as-is; the check side
     /// also reduces closed generics to their open definition, so either shape suffices.
-    /// Call this exactly once, before the plugin loop starts, to avoid blocking one
-    /// plugin's registrations from shadowing another's.
     /// </summary>
+    /// <remarks>
+    /// Re-snapshot cadence (see <c>LogicRegistrations.RegisterLogic</c>):
+    /// <list type="bullet">
+    ///   <item>Once before pass 1 starts — captures everything the host registered
+    ///   so plugins can't shadow platform services.</item>
+    ///   <item>Once before EACH library plugin in pass 1 — captures services
+    ///   previously-loaded libraries registered, so library B can't shadow
+    ///   library A.</item>
+    ///   <item>Once at the end of pass 1 — captures all library-exported services
+    ///   so game plugins in pass 2 can't shadow them.</item>
+    ///   <item>Game pass keeps the once-before-the-loop semantics; two games
+    ///   shadowing each other remains last-wins by design.</item>
+    /// </list>
+    /// </remarks>
     public static FrozenSet<Type> CaptureHostOwnedServiceTypes(IServiceCollection services)
     {
         var types = new HashSet<Type>();

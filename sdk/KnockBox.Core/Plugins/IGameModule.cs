@@ -3,7 +3,10 @@ using Microsoft.AspNetCore.Components;
 namespace KnockBox.Core.Plugins;
 
 /// <summary>
-/// Represents a game plugin discovered at runtime by <c>PluginLoader</c>.
+/// Represents a user-facing game plugin discovered at runtime by
+/// <c>PluginLoader</c>. Inherits <see cref="IPluginModule.Manifest"/> and
+/// <see cref="IPluginModule.RegisterServices"/> from the base interface; only
+/// game-tile-specific overrides live here.
 /// </summary>
 /// <remarks>
 /// The set of <see cref="IGameModule"/> instances resolved from the DI
@@ -15,24 +18,8 @@ namespace KnockBox.Core.Plugins;
 /// plugin hot-reload is ever introduced, those caches will need explicit
 /// invalidation.
 /// </remarks>
-public interface IGameModule
+public interface IGameModule : IPluginModule
 {
-    /// <summary>
-    /// The plugin's manifest. Must agree with the <c>plugin.json</c> the loader
-    /// parsed from disk; mismatched manifests cause the loader to reject the
-    /// plugin. A plugin almost always populates this by reading its own
-    /// embedded <c>plugin.json</c> via
-    /// <see cref="PluginManifest.FromEmbeddedResource(System.Reflection.Assembly)"/>.
-    /// </summary>
-    IPluginManifest Manifest { get; }
-
-    /// <summary>
-    /// Registers plugin-owned services. The only way to register the game's
-    /// engine, plus any plugin-private helpers. The host never hands plugins a
-    /// raw <c>IServiceCollection</c>.
-    /// </summary>
-    void RegisterServices(IPluginRegistration registration);
-
     /// <summary>
     /// Optionally returns a custom header fragment rendered inside the host's
     /// <c>&lt;header&gt;</c> element while the user is inside this game's

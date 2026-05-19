@@ -1,7 +1,7 @@
-using KnockBox.Spardle.Models;
+using KnockBox.WordService.Contracts;
 using Microsoft.Extensions.Logging;
 
-namespace KnockBox.Spardle.Services;
+namespace KnockBox.WordService.Services;
 
 public sealed class WordListService : IWordListService
 {
@@ -21,15 +21,15 @@ public sealed class WordListService : IWordListService
 
     // Assembly.Location returns the on-disk path for plugins loaded via
     // PluginLoadContext.LoadFromAssemblyPath; falls back to the host's
-    // games/KnockBox.Spardle/Data layout for single-file publishes where
-    // Location is empty.
+    // libraries/KnockBox.WordService/Data layout for single-file publishes
+    // where Location is empty.
     private static string ResolveDataDir()
     {
         var asmLocation = typeof(WordListService).Assembly.Location;
         var asmDir = string.IsNullOrEmpty(asmLocation) ? null : Path.GetDirectoryName(asmLocation);
         if (!string.IsNullOrEmpty(asmDir))
             return Path.Combine(asmDir, "Data");
-        return Path.Combine(AppContext.BaseDirectory, "games", "KnockBox.Spardle", "Data");
+        return Path.Combine(AppContext.BaseDirectory, "libraries", "KnockBox.WordService", "Data");
     }
 
     public bool IsValidWord(ReadOnlySpan<char> word)

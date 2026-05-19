@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -16,14 +16,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\KnockBox.Spardle\KnockBox.Spardle.csproj" />
-    <ProjectReference Include="..\..\sdk\KnockBox.Core\KnockBox.Core.csproj" />
-    <!--
-      Tests that exercise SpardleEngine against the real word service need the
-      impl (WordListService class) and the contracts (IWordListService,
-      WordPoolMode). The host wires these via DI at runtime; tests just
-      construct WordListService directly.
-    -->
     <ProjectReference Include="..\KnockBox.WordService\KnockBox.WordService.csproj" />
     <ProjectReference Include="..\KnockBox.WordService.Contracts\KnockBox.WordService.Contracts.csproj" />
   </ItemGroup>

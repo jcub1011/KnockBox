@@ -1,6 +1,6 @@
 using System.Text;
 
-namespace KnockBox.Spardle.Services;
+namespace KnockBox.WordService.Services;
 
 /// <summary>
 /// Read-only set of fixed-length ASCII words backed by a packed byte buffer.

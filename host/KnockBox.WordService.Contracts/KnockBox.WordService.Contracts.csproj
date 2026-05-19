@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Contract assembly for the KnockBox.WordService library plugin. Holds only
+    public interfaces and POCO types (IWordListService, WordPoolMode) that
+    consuming game plugins reference at compile time.
+
+    Deliberately has NO ProjectReferences to KnockBox.Core or any other
+    KnockBox.* project, and does NOT import Directory.Plugin.targets or
+    Directory.Library.targets. It is a pure interface-only sidecar that:
+      - is built and staged INTO the library plugin's libraries/{Name}/ folder
+        by Directory.Library.targets when the library csproj declares it via
+        <PluginExportedContract>;
+      - is referenced by consuming game plugins (via ProjectReference today,
+        via NuGet PackageReference if/when this assembly is published);
+      - is promoted into the default ALC by PluginLoader at host startup so
+        every consumer sees the same CLR type for the interfaces declared here.
+
+    Versioning rule: the <Version> below MUST match the library plugin's
+    <Version> so the loader's Major.Minor coexistence policy stays coherent. To
+    avoid drift, keep both csproj <Version> properties bound to the same
+    MSBuild variable (or commit them as identical literals).
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <Version>1.0.0</Version>
+    <Description>Public contract interfaces for the KnockBox.WordService library plugin.</Description>
+  </PropertyGroup>
+
+</Project>

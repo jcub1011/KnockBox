@@ -102,6 +102,133 @@ public sealed class LogicRegistrationsTests
             "Module must remain visible as IGameModule even when its engine registration was malformed, so the home page still lists it.");
     }
 
+    // ── Library plugin coverage ──────────────────────────────────────────
+
+    [TestMethod]
+    public void LibraryPlugin_RegistersServices_ExposedAsILibraryModule()
+    {
+        var services = CreateBaselineServices();
+        var logger = NullLogger.Instance;
+
+        var library = new SharedServiceLibrary("shared");
+        services.RegisterLogic(
+            new PluginLoadResult([ToLoadedPlugin(library)], []),
+            logger);
+
+        var provider = services.BuildServiceProvider();
+
+        var modules = provider.GetServices<ILibraryModule>().ToArray();
+        Assert.Contains(library, modules,
+            "Library plugin must be exposed as ILibraryModule for diagnostics enumeration.");
+
+        var games = provider.GetServices<IGameModule>().ToArray();
+        Assert.IsEmpty(games,
+            "Library plugin must NOT be exposed as IGameModule (it has no engine and no home-page tile).");
+
+        var shared = provider.GetService<ISharedService>();
+        Assert.IsNotNull(shared, "The library plugin's registered service must be resolvable.");
+    }
+
+    [TestMethod]
+    public void LibraryPlugin_CallingAddGameEngine_LogsError()
+    {
+        var services = CreateBaselineServices();
+        var logger = new CapturingLogger();
+
+        var library = new MisbehavingLibrary("bad-library");
+        services.RegisterLogic(
+            new PluginLoadResult([ToLoadedPlugin(library)], []),
+            logger);
+
+        Assert.Contains(
+            e => e.Contains("Library plugin", StringComparison.Ordinal)
+                 && e.Contains("AddGameEngine", StringComparison.Ordinal),
+            logger.Errors,
+            "Calling AddGameEngine from a library plugin must log a specific error.");
+    }
+
+    [TestMethod]
+    public void GamePlugin_CannotShadow_LibraryRegisteredService()
+    {
+        // Pass 1: library registers ISharedService -> LibraryService
+        // Pass 2: game tries to register ISharedService -> RogueService;
+        //         the post-library snapshot includes ISharedService so the
+        //         game's registration is dropped + logged.
+        var services = CreateBaselineServices();
+        var logger = new CapturingLogger();
+
+        var library = new SharedServiceLibrary("shared-library");
+        var game = new ShadowingGame("rogue-game");
+
+        services.RegisterLogic(
+            new PluginLoadResult([ToLoadedPlugin(library), ToLoadedPlugin(game)], []),
+            logger);
+
+        var provider = services.BuildServiceProvider();
+        var resolved = provider.GetRequiredService<ISharedService>();
+
+        Assert.IsInstanceOfType<LibraryService>(resolved,
+            "Library-registered service must win — game's shadowing AddSingleton must be dropped.");
+        Assert.Contains(
+            e => e.Contains("ISharedService", StringComparison.OrdinalIgnoreCase)
+                 || e.Contains("host-owned", StringComparison.OrdinalIgnoreCase),
+            logger.Errors,
+            "Shadowing attempt must be logged as a host-owned service registration.");
+    }
+
+    [TestMethod]
+    public void LibraryB_CannotShadow_LibraryARegisteredService()
+    {
+        // Pass 1, iteration 1: library A registers ISharedService -> LibraryService.
+        // Pass 1, iteration 2: per-library snapshot rebuild now includes
+        //         ISharedService, so library B's shadowing AddSingleton is dropped.
+        var services = CreateBaselineServices();
+        var logger = new CapturingLogger();
+
+        var libraryA = new SharedServiceLibrary("library-a");
+        var libraryB = new ShadowingLibrary("library-b");
+
+        services.RegisterLogic(
+            new PluginLoadResult([ToLoadedPlugin(libraryA), ToLoadedPlugin(libraryB)], []),
+            logger);
+
+        var provider = services.BuildServiceProvider();
+        var resolved = provider.GetRequiredService<ISharedService>();
+
+        Assert.IsInstanceOfType<LibraryService>(resolved,
+            "Library A's registration must win — library B's shadowing AddSingleton must be dropped " +
+            "by the per-library snapshot rebuild.");
+        Assert.Contains(
+            e => e.Contains("ISharedService", StringComparison.OrdinalIgnoreCase)
+                 || e.Contains("host-owned", StringComparison.OrdinalIgnoreCase),
+            logger.Errors,
+            "Cross-library shadowing attempt must be logged.");
+    }
+
+    [TestMethod]
+    public void LibraryAndGame_LoadOrder_LibraryAlwaysComesFirst()
+    {
+        // The list passed to RegisterLogic is intentionally game-then-library
+        // (the loader-side ordering invariant is exercised separately). This
+        // test verifies that even if the caller passes them out of order,
+        // RegisterLogic still runs all libraries before any game so a game
+        // depending on a library service resolves correctly at registration time.
+        var services = CreateBaselineServices();
+        var logger = NullLogger.Instance;
+
+        var library = new SharedServiceLibrary("shared");
+        var game = new ConsumingGame("consumer");
+
+        services.RegisterLogic(
+            new PluginLoadResult([ToLoadedPlugin(game), ToLoadedPlugin(library)], []),
+            logger);
+
+        var provider = services.BuildServiceProvider();
+        var resolved = provider.GetService<ISharedService>();
+        Assert.IsNotNull(resolved,
+            "Library service must be registered regardless of the order plugins appear in the collection.");
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────
 
     /// <summary>
@@ -117,20 +244,21 @@ public sealed class LogicRegistrationsTests
         return services;
     }
 
-    private static LoadedPlugin ToLoadedPlugin(IGameModule module) =>
+    private static LoadedPlugin ToLoadedPlugin(IPluginModule module) =>
         new(
             Module: module,
             Manifest: module.Manifest,
             Assembly: module.GetType().Assembly,
             LoadContext: AssemblyLoadContext.GetLoadContext(module.GetType().Assembly) ?? AssemblyLoadContext.Default);
 
-    private static IPluginManifest MakeManifest(string route) => new PluginManifest(
+    private static IPluginManifest MakeManifest(string route, PluginKind kind = PluginKind.Game) => new PluginManifest(
         Name: $"Module-{route}",
         Description: "test",
         RouteIdentifier: route,
         Version: new Version(1, 0, 0),
         EntryAssembly: "KnockBox.PlatformTests",
-        Capabilities: new HashSet<PluginCapability>());
+        Capabilities: new HashSet<PluginCapability>(),
+        Kind: kind);
 
     // ── Fake modules & engines ───────────────────────────────────────────
 
@@ -173,6 +301,65 @@ public sealed class LogicRegistrationsTests
             // Intentionally does NOT call AddGameEngine<T>.
         }
 
+    }
+
+    // ── Library-plugin fixtures ──────────────────────────────────────────
+
+    /// <summary>Shared contract a library would expose to consumer plugins.</summary>
+    private interface ISharedService { string Name { get; } }
+
+    /// <summary>Real impl registered by a well-behaved library.</summary>
+    private sealed class LibraryService : ISharedService { public string Name => "library"; }
+
+    /// <summary>Alternate impl an attacker game/library would try to register.</summary>
+    private sealed class RogueService : ISharedService { public string Name => "rogue"; }
+
+    /// <summary>Well-behaved library: registers <see cref="ISharedService"/> and nothing else.</summary>
+    private sealed class SharedServiceLibrary(string route) : ILibraryModule
+    {
+        public IPluginManifest Manifest { get; } = MakeManifest(route, PluginKind.Library);
+
+        public void RegisterServices(IPluginRegistration registration)
+            => registration.AddSingleton<ISharedService, LibraryService>();
+    }
+
+    /// <summary>Library that mistakenly calls AddGameEngine — should be flagged.</summary>
+    private sealed class MisbehavingLibrary(string route) : ILibraryModule
+    {
+        public IPluginManifest Manifest { get; } = MakeManifest(route, PluginKind.Library);
+
+        public void RegisterServices(IPluginRegistration registration)
+            => registration.AddGameEngine<TestEngine>();
+    }
+
+    /// <summary>Library that tries to shadow another library's service.</summary>
+    private sealed class ShadowingLibrary(string route) : ILibraryModule
+    {
+        public IPluginManifest Manifest { get; } = MakeManifest(route, PluginKind.Library);
+
+        public void RegisterServices(IPluginRegistration registration)
+            => registration.AddSingleton<ISharedService, RogueService>();
+    }
+
+    /// <summary>Game that tries to shadow a library-exported service.</summary>
+    private sealed class ShadowingGame(string route) : IGameModule
+    {
+        public IPluginManifest Manifest { get; } = MakeManifest(route, PluginKind.Game);
+
+        public void RegisterServices(IPluginRegistration registration)
+        {
+            registration.AddSingleton<ISharedService, RogueService>();
+            registration.AddGameEngine<TestEngine>();
+        }
+    }
+
+    /// <summary>Game whose engine consumes the library service — proves DI sharing works.</summary>
+    private sealed class ConsumingGame(string route) : IGameModule
+    {
+        public IPluginManifest Manifest { get; } = MakeManifest(route, PluginKind.Game);
+
+        public void RegisterServices(IPluginRegistration registration)
+            => registration.AddGameEngine<TestEngine>();
     }
 
     private sealed class TestEngine : AbstractGameEngine

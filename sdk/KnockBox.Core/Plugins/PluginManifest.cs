@@ -18,8 +18,14 @@ public sealed partial record PluginManifest(
     string EntryAssembly,
     IReadOnlySet<PluginCapability> Capabilities,
     string? TileAsset = null,
-    bool WorkInProgress = false) : IPluginManifest
+    bool WorkInProgress = false,
+    PluginKind Kind = PluginKind.Game,
+    IReadOnlyList<string>? ExportedContracts = null) : IPluginManifest
 {
+    /// <inheritdoc/>
+    public IReadOnlyList<string> ExportedContracts { get; init; } =
+        ExportedContracts ?? Array.Empty<string>();
+
     /// <summary>
     /// The one supported <c>plugin.json</c> schema version. Bump (and add
     /// migration handling) if the on-disk shape changes.
@@ -37,11 +43,21 @@ public sealed partial record PluginManifest(
     [GeneratedRegex(@"^[a-z0-9-]+$")]
     private static partial Regex RouteIdentifierPattern();
 
+    [GeneratedRegex(@"^[A-Za-z0-9._-]+$")]
+    private static partial Regex ExportedContractNamePattern();
+
     private static readonly FrozenDictionary<string, PluginCapability> CapabilityByName =
         new Dictionary<string, PluginCapability>(StringComparer.OrdinalIgnoreCase)
         {
             ["config"] = PluginCapability.Config,
             ["storage"] = PluginCapability.Storage,
+        }.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
+
+    private static readonly FrozenDictionary<string, PluginKind> KindByName =
+        new Dictionary<string, PluginKind>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["game"] = PluginKind.Game,
+            ["library"] = PluginKind.Library,
         }.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
@@ -235,6 +251,101 @@ public sealed partial record PluginManifest(
                 workInProgress = wipElement.GetBoolean();
             }
 
+            var kind = PluginKind.Game;
+            if (root.TryGetProperty("kind", out var kindElement)
+                && kindElement.ValueKind != JsonValueKind.Null)
+            {
+                if (kindElement.ValueKind != JsonValueKind.String)
+                {
+                    return ValueResult<PluginManifest>.FromError(
+                        "plugin.json 'kind' must be a string.");
+                }
+
+                var rawKind = kindElement.GetString()!;
+                if (!KindByName.TryGetValue(rawKind, out kind))
+                {
+                    return ValueResult<PluginManifest>.FromError(
+                        $"plugin.json declares unknown kind [{rawKind}]. Known kinds: " +
+                        string.Join(", ", KindByName.Keys) + ".");
+                }
+            }
+
+            var exportedContracts = Array.Empty<string>();
+            if (root.TryGetProperty("exportedContracts", out var exportedElement)
+                && exportedElement.ValueKind != JsonValueKind.Null)
+            {
+                if (exportedElement.ValueKind != JsonValueKind.Array)
+                {
+                    return ValueResult<PluginManifest>.FromError(
+                        "plugin.json 'exportedContracts' must be an array of strings.");
+                }
+
+                var collected = new List<string>();
+                var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var entry in exportedElement.EnumerateArray())
+                {
+                    if (entry.ValueKind != JsonValueKind.String)
+                    {
+                        return ValueResult<PluginManifest>.FromError(
+                            "plugin.json 'exportedContracts' entries must be strings.");
+                    }
+
+                    var raw = entry.GetString();
+                    if (string.IsNullOrWhiteSpace(raw))
+                    {
+                        return ValueResult<PluginManifest>.FromError(
+                            "plugin.json 'exportedContracts' entries must not be empty or whitespace.");
+                    }
+
+                    if (!ExportedContractNamePattern().IsMatch(raw))
+                    {
+                        return ValueResult<PluginManifest>.FromError(
+                            $"plugin.json 'exportedContracts' entry [{raw}] must match ^[A-Za-z0-9._-]+$.");
+                    }
+
+                    if (!seen.Add(raw))
+                    {
+                        return ValueResult<PluginManifest>.FromError(
+                            $"plugin.json 'exportedContracts' entry [{raw}] is listed more than once.");
+                    }
+
+                    collected.Add(raw);
+                }
+
+                exportedContracts = collected.ToArray();
+            }
+
+            // Cross-field rules:
+            //   - exportedContracts is library-only. Games declaring contracts is almost
+            //     always an authoring mistake (the contract type should live in a sibling
+            //     library plugin), so reject loudly rather than silently dropping the list.
+            //   - libraries must use strict Major.Minor.Patch SemVer. The loader's
+            //     coexistence policy partitions libraries by (entryAssembly, Major, Minor)
+            //     and picks the highest Patch; a 2-component or 4-component version makes
+            //     that policy ambiguous.
+            if (kind == PluginKind.Game && exportedContracts.Length > 0)
+            {
+                return ValueResult<PluginManifest>.FromError(
+                    "plugin.json declares 'exportedContracts' but kind is 'game'. " +
+                    "Only library plugins may export contracts; move the contract types " +
+                    "into a sibling library plugin or set kind to 'library'.");
+            }
+
+            if (kind == PluginKind.Library)
+            {
+                // System.Version yields Build = -1 when the third component is absent and
+                // Revision = -1 when the fourth is absent. Require Build >= 0 (patch
+                // present) and Revision <= 0 (no fourth component, or explicitly zero).
+                if (version.Build < 0 || version.Revision > 0)
+                {
+                    return ValueResult<PluginManifest>.FromError(
+                        $"plugin.json version [{versionString}] for a library plugin must use strict " +
+                        "Major.Minor.Patch SemVer (e.g. '1.2.3'); two-component or four-component-with-revision " +
+                        "versions are not allowed because the loader's coexistence policy depends on " +
+                        "Major.Minor grouping and Patch dedup.");
+                }
+            }
+
             var manifest = new PluginManifest(
                 Name: name,
                 Description: description,
@@ -243,7 +354,9 @@ public sealed partial record PluginManifest(
                 EntryAssembly: entryAssembly,
                 Capabilities: capabilities,
                 TileAsset: tileAsset,
-                WorkInProgress: workInProgress);
+                WorkInProgress: workInProgress,
+                Kind: kind,
+                ExportedContracts: exportedContracts);
 
             return ValueResult<PluginManifest>.FromValue(manifest);
         }

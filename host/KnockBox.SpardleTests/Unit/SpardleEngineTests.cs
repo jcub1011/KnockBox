@@ -3,7 +3,8 @@ using KnockBox.Core.Services.Logic.RandomGeneration;
 using KnockBox.Core.Services.State.Users;
 using KnockBox.Spardle;
 using KnockBox.Spardle.Models;
-using KnockBox.Spardle.Services;
+using KnockBox.WordService.Contracts;
+using KnockBox.WordService.Services;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 

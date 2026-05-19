@@ -7,13 +7,8 @@ public enum LetterStatus
     Correct
 }
 
-public enum WordPoolMode
-{
-    NytStandard,
-    FullDictionary,
-    HostDefined,
-    CsvUpload
-}
+// WordPoolMode moved to KnockBox.WordService.Contracts so the shared word-service
+// library plugin owns the enum alongside IWordListService.
 
 public enum WordOrderMode
 {

@@ -33,6 +33,18 @@ public sealed class KnockBoxPlatformOptions
     /// </summary>
     public IList<string> PluginsPaths { get; } = ["games"];
 
+    /// <summary>
+    /// Relative (to <c>AppContext.BaseDirectory</c>) or absolute paths to the
+    /// directories that contain library plugin folders. Only used in
+    /// <see cref="PluginDiscoveryMode.Directory"/> mode.
+    /// Defaults to a single entry: <c>"libraries"</c>. Library plugins are loaded
+    /// and registered before any game plugin so games consuming library-exported
+    /// services resolve correctly. The folder is only a convention — a plugin
+    /// folder's <see cref="IPluginManifest.Kind"/> still wins if a misplaced
+    /// game manifest is found under <c>libraries/</c> or vice-versa.
+    /// </summary>
+    public IList<string> LibrariesPaths { get; } = ["libraries"];
+
     private readonly List<IGameModule> _explicitModules = [];
     private readonly List<Assembly> _explicitAssemblies = [];
 

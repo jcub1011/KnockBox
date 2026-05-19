@@ -1,8 +1,8 @@
-using KnockBox.Spardle.Models;
-using KnockBox.Spardle.Services;
+using KnockBox.WordService.Contracts;
+using KnockBox.WordService.Services;
 using Microsoft.Extensions.Logging.Abstractions;
 
-namespace KnockBox.SpardleTests.Unit;
+namespace KnockBox.WordServiceTests.Unit;
 
 [TestClass]
 public class WordListServiceTests

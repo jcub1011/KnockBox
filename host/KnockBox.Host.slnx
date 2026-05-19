@@ -30,4 +30,7 @@
   <Project Path="KnockBox.DndMapperTests/KnockBox.DndMapperTests.csproj" />
   <Project Path="KnockBox.AlphaChain/KnockBox.AlphaChain.csproj" />
   <Project Path="KnockBox.AlphaChainTests/KnockBox.AlphaChainTests.csproj" />
+  <Project Path="KnockBox.WordService.Contracts/KnockBox.WordService.Contracts.csproj" />
+  <Project Path="KnockBox.WordService/KnockBox.WordService.csproj" />
+  <Project Path="KnockBox.WordServiceTests/KnockBox.WordServiceTests.csproj" />
 </Solution>

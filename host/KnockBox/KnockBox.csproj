@@ -78,6 +78,16 @@
                       ReferenceOutputAssembly="false" Private="false" />
     <ProjectReference Include="..\KnockBox.AlphaChain\KnockBox.AlphaChain.csproj"
                       ReferenceOutputAssembly="false" Private="false" />
+    <!--
+      Library plugins. Same ReferenceOutputAssembly="false" Private="false" pattern
+      as game plugins: built transitively so libraries/{Plugin}/ is populated
+      before CopyLibrariesToPublish runs, but no compile-time dependency.
+      KnockBox.WordService.Contracts is built transitively as a ProjectReference
+      of both KnockBox.WordService (the library plugin) and KnockBox.Spardle
+      (a consumer), so it does not need an explicit entry here.
+    -->
+    <ProjectReference Include="..\KnockBox.WordService\KnockBox.WordService.csproj"
+                      ReferenceOutputAssembly="false" Private="false" />
   </ItemGroup>
 
   <!--
@@ -89,6 +99,7 @@
   -->
   <PropertyGroup>
     <PluginStagingDir>$(MSBuildProjectDirectory)\bin\$(Configuration)\$(TargetFramework)\games\</PluginStagingDir>
+    <LibraryStagingDir>$(MSBuildProjectDirectory)\bin\$(Configuration)\$(TargetFramework)\libraries\</LibraryStagingDir>
   </PropertyGroup>
 
   <!--
@@ -138,6 +149,23 @@
           DestinationFiles="@(PluginPublishFiles->'$(PublishDir)games\%(RecursiveDir)%(Filename)%(Extension)')"
           SkipUnchangedFiles="true"
           Condition="'@(PluginPublishFiles)' != ''" />
+  </Target>
+
+  <!--
+    Same mechanism as CopyPluginsToPublish but for the libraries/ folder. Library
+    plugins stage themselves into KnockBox/bin/.../libraries/{Plugin}/ via
+    Directory.Library.targets; this target mirrors that into $(PublishDir)libraries/.
+    Library staging is optional — a build with zero library plugins produces
+    no libraries/ folder, so we skip silently rather than erroring.
+  -->
+  <Target Name="CopyLibrariesToPublish" AfterTargets="Publish">
+    <ItemGroup>
+      <LibraryPublishFiles Include="$(LibraryStagingDir)**\*.*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(LibraryPublishFiles)"
+          DestinationFiles="@(LibraryPublishFiles->'$(PublishDir)libraries\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true"
+          Condition="'@(LibraryPublishFiles)' != ''" />
   </Target>
 
 </Project>
