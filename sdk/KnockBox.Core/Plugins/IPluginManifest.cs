@@ -53,11 +53,11 @@ public interface IPluginManifest
     /// <summary>
     /// Optional plugin-relative path (forward-slash separated, e.g.
     /// <c>"tile.svg"</c> or <c>"assets/tile.svg"</c>) to an SVG the host
-    /// renders as the plugin's home-page tile in place of
-    /// <see cref="IGameModule.GetButtonContent"/>. The host resolves it against
+    /// renders as the plugin's home-page tile. The host resolves it against
     /// the plugin's static-asset mount at
-    /// <c>_content/{EntryAssembly}/{TileAsset}</c>. <c>null</c> means "render
-    /// my Razor tile via GetButtonContent."
+    /// <c>_content/{EntryAssembly}/{TileAsset}</c>. <c>null</c> means the host
+    /// renders a hot-pink fallback labeled with the plugin's
+    /// <see cref="Name"/>.
     /// </summary>
     string? TileAsset => null;
 

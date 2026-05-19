@@ -19,12 +19,6 @@ namespace KnockBox.DndMapper
             registration.AddScoped<TokenFocusService, TokenFocusService>();
         }
 
-        public RenderFragment GetButtonContent() => builder =>
-        {
-            builder.OpenComponent<DndMapperTile>(0);
-            builder.CloseComponent();
-        };
-
         public RenderFragment? GetCustomHeader() => builder =>
         {
             builder.OpenComponent<DndMapperHeader>(0);

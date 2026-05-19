@@ -72,12 +72,11 @@ public interface IGameModule
 {
     IPluginManifest Manifest { get; }
     void RegisterServices(IPluginRegistration registration);
-    RenderFragment GetButtonContent();
     RenderFragment? GetCustomHeader() => null;
 }
 ```
 
-Identity — name, description, `RouteIdentifier`, `Version`, `EntryAssembly`, declared capabilities — lives on the `IPluginManifest` returned by `Manifest`. The manifest is typically read from an embedded `plugin.json` resource so the in-code copy and the on-disk copy come from the same source file:
+Identity — name, description, `RouteIdentifier`, `Version`, `EntryAssembly`, declared capabilities, and the home-page `TileAsset` SVG path — all live on the `IPluginManifest` returned by `Manifest`. The manifest is typically read from an embedded `plugin.json` resource so the in-code copy and the on-disk copy come from the same source file:
 
 ```csharp
 public class CardCounterModule : IGameModule
@@ -87,14 +86,10 @@ public class CardCounterModule : IGameModule
 
     public void RegisterServices(IPluginRegistration registration)
         => registration.AddGameEngine<CardCounterGameEngine>();
-
-    public RenderFragment GetButtonContent() => builder =>
-    {
-        builder.OpenComponent<CardCounterTile>(0);
-        builder.CloseComponent();
-    };
 }
 ```
+
+The home-page tile is rendered by the host from `Manifest.TileAsset` — a plugin-relative path to an SVG in the plugin's `wwwroot/` (e.g. `"tile.svg"`). If the manifest has no `tileAsset`, the host shows a hot-pink fallback labeled with `Manifest.Name`. Plugins flagged `workInProgress: true` get a shared "Work In Progress" hazard-tape overlay rendered on top.
 
 ### `plugin.json` + `IPluginManifest`
 
@@ -712,9 +707,11 @@ Adding a game requires these steps:
 
 5. **Create Razor page(s)** — add one or more pages inheriting `DisposableComponent` with `@page "/room/{route-identifier}/{ObfuscatedRoomCode}"`. Inject the concrete engine via DI, subscribe to `state.StateChangedEventManager`, validate the session in `OnInitializedAsync`, enforce host-only `StartAsync` at the page layer, and dispose the subscription in `Dispose()`. Any `wwwroot/` assets are served automatically from `/_content/KnockBox.{GameName}`.
 
-6. **Author `plugin.json`** — create a `plugin.json` at the plugin project root with `schemaVersion`, `name`, `description`, `routeIdentifier`, `version`, `entryAssembly`, and `capabilities`. Mark it as an `<EmbeddedResource>` in the csproj so `PluginManifest.FromEmbeddedResourceOrThrow` can read it, and `Directory.Plugin.targets` will also copy it alongside the DLL into `games/`. The `routeIdentifier` must match the route segment used in the game's `@page` directives.
+6. **Author `plugin.json`** — create a `plugin.json` at the plugin project root with `schemaVersion`, `name`, `description`, `routeIdentifier`, `version`, `entryAssembly`, and `capabilities`. Optionally add `tileAsset` (path to an SVG in your plugin's `wwwroot/` — rendered as the home-page tile) and `workInProgress: true` (overlays a shared "Work In Progress" band). Mark `plugin.json` as an `<EmbeddedResource>` in the csproj so `PluginManifest.FromEmbeddedResourceOrThrow` can read it, and `Directory.Plugin.targets` will also copy it alongside the DLL into `games/`. The `routeIdentifier` must match the route segment used in the game's `@page` directives.
 
-7. **Implement `IGameModule`** — add a class to the game project with a public parameterless constructor (returning within 5 seconds). Expose the manifest via `PluginManifest.FromEmbeddedResourceOrThrow(typeof(MyModule).Assembly)`, implement `GetButtonContent()` to render the home-page tile, and in `RegisterServices(IPluginRegistration registration)` call `registration.AddGameEngine<YourEngine>()` (plus any other game-specific DI). Optionally override `GetCustomHeader()` to replace the host's default in-room header.
+7. **Author the tile SVG** — drop a `tile.svg` (300×200 viewBox recommended; the host enforces a 3:2 aspect ratio on the rendered tile) into `wwwroot/` and reference it from `plugin.json`'s `tileAsset`. The plugin's `wwwroot/` is staged into `games/{PluginName}/wwwroot/` and mounted at `/_content/{PluginName}/`. If you skip this, the home page renders a hot-pink fallback with the plugin's name.
+
+8. **Implement `IGameModule`** — add a class to the game project with a public parameterless constructor (returning within 5 seconds). Expose the manifest via `PluginManifest.FromEmbeddedResourceOrThrow(typeof(MyModule).Assembly)`, and in `RegisterServices(IPluginRegistration registration)` call `registration.AddGameEngine<YourEngine>()` (plus any other game-specific DI). Optionally override `GetCustomHeader()` to replace the host's default in-room header.
 
 No changes to `KnockBox`, `KnockBox.Core`, or any other game project are required. After a rebuild the platform discovers the new plugin, registers its engine, mounts its static assets, and the game appears on the home page automatically.
 

@@ -1,5 +1,4 @@
 using KnockBox.AlphaChain;
-using KnockBox.Core.Plugins;
 
 namespace KnockBox.AlphaChain.Tests.Unit
 {
@@ -14,14 +13,7 @@ namespace KnockBox.AlphaChain.Tests.Unit
             Assert.AreEqual("Alpha Chain", module.Manifest.Name);
             Assert.AreEqual("alpha-chain", module.Manifest.RouteIdentifier);
             Assert.AreEqual("KnockBox.AlphaChain", module.Manifest.EntryAssembly);
-        }
-
-        [TestMethod]
-        public void GetButtonContent_ReturnsNull_SoHostRendersFallbackTile()
-        {
-            IGameModule module = new AlphaChainModule();
-
-            Assert.IsNull(module.GetButtonContent());
+            Assert.IsTrue(module.Manifest.WorkInProgress);
         }
 
         [TestMethod]

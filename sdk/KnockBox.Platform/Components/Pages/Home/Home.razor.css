@@ -243,9 +243,10 @@
     padding: 0 16px 16px 16px;
 }
 
-/* Structural shell only — each game module owns its own visual design via
-   GetButtonContent() or a tileAsset SVG. Height is driven by the contained
-   .game-tile-surface's aspect-ratio so SVGs never get clipped on resize. */
+/* Structural shell only — each game plugin owns its own visual design via a
+   `tileAsset` SVG (or falls back to the hot-pink fallback if none is declared).
+   Height is driven by the contained .game-tile-surface's aspect-ratio so SVGs
+   never get clipped on resize. */
 .game-tile {
     padding: 0;
     border: 0;

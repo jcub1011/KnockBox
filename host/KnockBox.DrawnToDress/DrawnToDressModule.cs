@@ -13,12 +13,6 @@ namespace KnockBox.DrawnToDress
         public void RegisterServices(IPluginRegistration registration)
             => registration.AddGameEngine<DrawnToDressGameEngine>();
 
-        public RenderFragment GetButtonContent() => builder =>
-        {
-            builder.OpenComponent<DrawnToDressTile>(0);
-            builder.CloseComponent();
-        };
-
         public RenderFragment? GetCustomHeader() => builder =>
         {
             builder.OpenComponent<DrawnToDressHeader>(0);

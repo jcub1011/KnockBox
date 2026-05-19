@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Starter home-page tile for this plugin. 300x200 viewBox = 3:2 aspect,
+    matching the host's enforced tile container. Replace this with your
+    actual game's tile art.
+
+    The host's `.game-tile-surface` class supplies the border, rounded
+    corners, drop shadow, and hover/active animation around this image —
+    so this SVG only needs to render the interior visual.
+
+    Web fonts won't load inside an <img>-loaded SVG. If you want a
+    specific font, base64-embed a subsetted WOFF2 via @font-face inside
+    this file's <style> element (see scripts/embed-tile-fonts.py in the
+    KnockBox repo for an example).
+-->
+<svg xmlns="http://www.w3.org/2000/svg"
+     viewBox="0 0 300 200"
+     preserveAspectRatio="xMidYMid slice"
+     aria-hidden="true">
+    <rect width="300" height="200" fill="#2a2a2a"/>
+    <text x="150" y="110" text-anchor="middle"
+          font-family="system-ui, sans-serif"
+          font-size="28" font-weight="700" fill="#fff">My Game</text>
+</svg>

@@ -1,5 +1,4 @@
 using KnockBox.Core.Plugins;
-using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Logging;
 using Moq;
 
@@ -24,7 +23,6 @@ public sealed class TestPluginModuleA : IGameModule
 
     public IPluginManifest Manifest => FixtureManifest;
     public void RegisterServices(IPluginRegistration registration) { }
-    public RenderFragment GetButtonContent() => _ => { };
 }
 
 /// <summary>
@@ -41,7 +39,6 @@ public sealed class TestPluginModuleThrowingCtor : IGameModule
 
     public IPluginManifest Manifest => throw new InvalidOperationException("unreachable");
     public void RegisterServices(IPluginRegistration registration) { }
-    public RenderFragment GetButtonContent() => _ => { };
 }
 
 [TestClass]

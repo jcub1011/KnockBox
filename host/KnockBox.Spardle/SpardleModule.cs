@@ -15,12 +15,6 @@ public class SpardleModule : IGameModule
         registration.AddGameEngine<SpardleEngine>();
     }
 
-    public RenderFragment GetButtonContent() => builder =>
-    {
-        builder.OpenComponent<SpardleTile>(0);
-        builder.CloseComponent();
-    };
-
     public RenderFragment? GetCustomHeader() => builder =>
     {
         builder.OpenComponent<SpardleHeader>(0);

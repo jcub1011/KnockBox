@@ -141,7 +141,6 @@ public sealed class LogicRegistrationsTests
         public void RegisterServices(IPluginRegistration registration)
             => registration.AddGameEngine<TestEngine>();
 
-        public RenderFragment GetButtonContent() => _ => { };
     }
 
     private sealed class ThrowingModule(string route) : IGameModule
@@ -151,7 +150,6 @@ public sealed class LogicRegistrationsTests
         public void RegisterServices(IPluginRegistration registration)
             => throw new InvalidOperationException("intentional");
 
-        public RenderFragment GetButtonContent() => _ => { };
     }
 
     private sealed class DoubleEngineModule(string route) : IGameModule
@@ -164,7 +162,6 @@ public sealed class LogicRegistrationsTests
             registration.AddGameEngine<TestEngine>();
         }
 
-        public RenderFragment GetButtonContent() => _ => { };
     }
 
     private sealed class NoEngineModule(string route) : IGameModule
@@ -176,7 +173,6 @@ public sealed class LogicRegistrationsTests
             // Intentionally does NOT call AddGameEngine<T>.
         }
 
-        public RenderFragment GetButtonContent() => _ => { };
     }
 
     private sealed class TestEngine : AbstractGameEngine

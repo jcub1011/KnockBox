@@ -13,12 +13,6 @@ namespace KnockBox.Operator
         public void RegisterServices(IPluginRegistration registration)
             => registration.AddGameEngine<OperatorGameEngine>();
 
-        public RenderFragment GetButtonContent() => builder =>
-        {
-            builder.OpenComponent<OperatorTile>(0);
-            builder.CloseComponent();
-        };
-
         public RenderFragment? GetCustomHeader() => builder =>
         {
             builder.OpenComponent<OperatorHeader>(0);

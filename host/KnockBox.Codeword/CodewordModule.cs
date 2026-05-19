@@ -13,12 +13,6 @@ namespace KnockBox.Codeword
         public void RegisterServices(IPluginRegistration registration)
             => registration.AddGameEngine<CodewordGameEngine>();
 
-        public RenderFragment GetButtonContent() => builder =>
-        {
-            builder.OpenComponent<CodewordTile>(0);
-            builder.CloseComponent();
-        };
-
         public RenderFragment? GetCustomHeader() => builder =>
         {
             builder.OpenComponent<CodewordHeader>(0);

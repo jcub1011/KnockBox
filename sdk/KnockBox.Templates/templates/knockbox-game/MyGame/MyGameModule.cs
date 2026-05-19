@@ -4,18 +4,15 @@
 // The KnockBox host's PluginLoader reads plugin.json from this plugin's folder,
 // loads the assembly, reflects for a public parameterless-ctor IGameModule
 // whose Manifest.RouteIdentifier matches the manifest on disk, and invokes
-// RegisterServices during DI build. Afterwards it asks GetButtonContent() for
-// the tile shown on the home page.
+// RegisterServices during DI build. The home-page tile comes from the
+// `tileAsset` SVG declared in plugin.json — not from this class.
 //
 // You rarely change this file after the first day: edit plugin.json for
-// identity (name, description, route, version, capabilities), wire one
-// AddGameEngine<T>() call inside RegisterServices, and point GetButtonContent
-// at your tile component.
+// identity (name, description, route, version, tileAsset, capabilities) and
+// wire one AddGameEngine<T>() call inside RegisterServices.
 // -----------------------------------------------------------------------------
 
 using KnockBox.Core.Plugins;
-using Microsoft.AspNetCore.Components;
-using MyGame.Components;
 
 namespace MyGame;
 
@@ -61,20 +58,4 @@ public class MyGameModule : IGameModule
         //      resolve it generically via GetKeyedService<AbstractGameEngine>(route).
         registration.AddGameEngine<MyGameGameEngine>();
     }
-
-    /// <summary>
-    /// Returns the inner content of this game's tile on the home page. The host
-    /// owns the surrounding <c>&lt;button&gt;</c> (click handler, disabled state,
-    /// aria-label, layout). This fragment owns the visual design — artwork,
-    /// typography, animations — that distinguishes the game from other tiles.
-    /// </summary>
-    public RenderFragment GetButtonContent() => builder =>
-    {
-        // Replace MyGameTile with whatever Razor component you want rendered
-        // inside the home-page tile. Scoped CSS on that component ships as
-        // wwwroot/{PluginName}.styles.css and is served from
-        // /_content/{PluginName}/{PluginName}.styles.css by the platform.
-        builder.OpenComponent<MyGameTile>(0);
-        builder.CloseComponent();
-    };
 }

@@ -154,9 +154,8 @@ h1:focus {
     box-shadow: 8px 8px 0 #000;
 }
 
-/* Default tile shown when a plugin declares neither a `tileAsset` in its
-   manifest nor a non-null GetButtonContent() override. Hot pink so it's
-   unmistakable that the plugin still needs tile art. */
+/* Default tile shown when a plugin's manifest has no `tileAsset` declared.
+   Hot pink so it's unmistakable that the plugin still needs tile art. */
 .game-tile-fallback {
     background-color: #ff1493;
     color: #fff;

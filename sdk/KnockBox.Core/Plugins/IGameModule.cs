@@ -34,24 +34,6 @@ public interface IGameModule
     void RegisterServices(IPluginRegistration registration);
 
     /// <summary>
-    /// Returns the inner content rendered inside the game's tile button on the
-    /// Home screen, or <c>null</c> to let the host decide. The host owns the
-    /// surrounding <c>&lt;button&gt;</c> wrapper (click handler, disabled
-    /// state, aria-label, layout sizing); this fragment owns the visual design
-    /// that distinguishes the game from other tiles.
-    /// </summary>
-    /// <remarks>
-    /// The host resolves the tile in this order:
-    /// (1) if <see cref="IPluginManifest.TileAsset"/> is set, the host renders
-    /// that SVG as the tile and ignores this method;
-    /// (2) otherwise, if this method returns non-null, the host renders the
-    /// returned fragment;
-    /// (3) otherwise, the host renders a default hot-pink fallback tile
-    /// showing the plugin's <see cref="IPluginManifest.Name"/>.
-    /// </remarks>
-    RenderFragment? GetButtonContent() => null;
-
-    /// <summary>
     /// Optionally returns a custom header fragment rendered inside the host's
     /// <c>&lt;header&gt;</c> element while the user is inside this game's
     /// room. Return <c>null</c> (the default) to inherit the host's built-in
