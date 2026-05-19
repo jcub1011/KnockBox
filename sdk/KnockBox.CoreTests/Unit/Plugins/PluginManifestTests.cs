@@ -227,6 +227,70 @@ public sealed class PluginManifestTests
         AssertFailureContains(result, "tileAsset", "..");
     }
 
+    // ─── TryParse — workInProgress ──────────────────────────────────────────
+
+    [TestMethod]
+    public void TryParse_ManifestWithoutWorkInProgress_DefaultsToFalse()
+    {
+        using var stream = StreamFor(ValidManifest);
+
+        var result = PluginManifest.TryParse(stream);
+
+        Assert.IsTrue(result.TryGetSuccess(out var manifest));
+        Assert.IsFalse(manifest.WorkInProgress);
+    }
+
+    [TestMethod]
+    public void TryParse_WorkInProgressTrue_IsTrue()
+    {
+        var json = AddField(ValidManifest, "workInProgress", "true");
+        using var stream = StreamFor(json);
+
+        var result = PluginManifest.TryParse(stream);
+
+        Assert.IsTrue(result.TryGetSuccess(out var manifest));
+        Assert.IsTrue(manifest.WorkInProgress);
+    }
+
+    [TestMethod]
+    public void TryParse_WorkInProgressFalse_IsFalse()
+    {
+        var json = AddField(ValidManifest, "workInProgress", "false");
+        using var stream = StreamFor(json);
+
+        var result = PluginManifest.TryParse(stream);
+
+        Assert.IsTrue(result.TryGetSuccess(out var manifest));
+        Assert.IsFalse(manifest.WorkInProgress);
+    }
+
+    [TestMethod]
+    public void TryParse_WorkInProgressExplicitNull_DefaultsToFalse()
+    {
+        var json = AddField(ValidManifest, "workInProgress", "null");
+        using var stream = StreamFor(json);
+
+        var result = PluginManifest.TryParse(stream);
+
+        Assert.IsTrue(result.TryGetSuccess(out var manifest));
+        Assert.IsFalse(manifest.WorkInProgress);
+    }
+
+    [TestMethod]
+    [DataRow("\"true\"")]
+    [DataRow("1")]
+    [DataRow("0")]
+    [DataRow("[]")]
+    public void TryParse_WorkInProgressNonBoolean_Fails(string rawValue)
+    {
+        var json = AddField(ValidManifest, "workInProgress", rawValue);
+        using var stream = StreamFor(json);
+
+        var result = PluginManifest.TryParse(stream);
+
+        AssertFailureContains(result, "workInProgress", "boolean");
+    }
+
     // ─── TryParse — schemaVersion errors ────────────────────────────────────
 
     [TestMethod]

@@ -118,6 +118,42 @@ h1:focus {
     box-shadow: 2px 2px 0 #000;
 }
 
+/* Work-in-progress overlay applied when a plugin sets `workInProgress: true`
+   in its manifest. The host renders a shared SVG (hazard-tape band + label)
+   inside the same `.game-tile` button as the tile image. The tile image
+   below is desaturated via `.game-tile-img.is-wip` so the overlay reads as
+   "this game isn't ready" without hiding the underlying art. */
+.game-tile-wip-overlay {
+    position: absolute;
+    inset: 5px;
+    width: calc(100% - 10px);
+    aspect-ratio: 3 / 2;
+    border-radius: 11px;
+    pointer-events: none;
+    user-select: none;
+    -webkit-user-drag: none;
+    z-index: 2;
+}
+
+/* Desaturate the tile body when WIP — applies to SVG <img> tiles AND to legacy
+   Razor tile roots (which also wear .game-tile-surface). The hot-pink
+   .game-tile-fallback is intentionally exempt so its "needs art" signal stays
+   loud even when a plugin is also flagged WIP. */
+.game-tile.is-wip > .game-tile-surface:not(.game-tile-fallback) {
+    filter: grayscale(1) opacity(0.7);
+}
+
+/* WIP tiles don't pop on hover/active. The game isn't playable yet, so the
+   interactive cue would be misleading. Suppresses both the surface's own
+   :hover/:active and the parent-button-driven variant added above. */
+.game-tile.is-wip > .game-tile-surface:hover,
+.game-tile.is-wip > .game-tile-surface:active,
+.game-tile.is-wip:hover > .game-tile-surface,
+.game-tile.is-wip:active > .game-tile-surface {
+    transform: none;
+    box-shadow: 8px 8px 0 #000;
+}
+
 /* Default tile shown when a plugin declares neither a `tileAsset` in its
    manifest nor a non-null GetButtonContent() override. Hot pink so it's
    unmistakable that the plugin still needs tile art. */

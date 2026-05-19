@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg"
+     viewBox="0 0 300 200"
+     preserveAspectRatio="xMidYMid slice"
+     aria-hidden="true">
+    <style>
+/* EMBEDDED FONTS BEGIN */
+@font-face {
+    font-family: 'Lexend';
+    font-style: normal;
+    font-weight: 900;
+    src: url('data:font/woff2;base64,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') format('woff2');
+}
+@font-face {
+    font-family: 'Google Sans Code';
+    font-style: normal;
+    font-weight: 800;
+    src: url('data:font/woff2;base64,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') format('woff2');
+}
+@font-face {
+    font-family: 'Google Sans Code';
+    font-style: normal;
+    font-weight: 700;
+    src: url('data:font/woff2;base64,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') format('woff2');
+}
+/* EMBEDDED FONTS END */
+        @keyframes op-bloom-pulse {
+            0%, 100% { opacity: 0.7; }
+            50%      { opacity: 1; }
+        }
+        @keyframes op-delta-float-loop {
+            0%, 70%, 100% { opacity: 0; transform: translateY(4px); }
+            10%, 50%      { opacity: 1; transform: translateY(0); }
+        }
+        .op-bloom {
+            animation: op-bloom-pulse 4s ease-in-out infinite;
+        }
+        .op-delta {
+            animation: op-delta-float-loop 3s ease-out infinite;
+            transform-origin: center;
+            transform-box: fill-box;
+        }
+
+        .op-deck-card-body { fill: url(#op-deck-grad); stroke: #000; stroke-width: 2; }
+        .op-deck-card-inner-stripes { fill: url(#op-deck-stripes); }
+        .op-deck-card-inner-border { fill: none; stroke: rgba(230, 57, 70, 0.35); stroke-width: 1; }
+
+        .op-operator-card-body { fill: #fffbeb; stroke: #000; stroke-width: 2; }
+        .op-operator-card-rail { fill: #ffd166; }
+        .op-symbol {
+            fill: #000;
+            font-family: 'Google Sans Code', 'Courier New', monospace;
+            font-size: 38px;
+            font-weight: 900;
+        }
+
+        .op-delta-text {
+            fill: #2ecc71;
+            font-family: 'Google Sans Code', 'Courier New', monospace;
+            font-size: 11px;
+            font-weight: 900;
+            filter: drop-shadow(0 0 4px rgba(46, 204, 113, 0.6));
+        }
+        .op-score-value {
+            fill: #ffd166;
+            font-family: 'Google Sans Code', 'Courier New', monospace;
+            font-size: 22px;
+            font-weight: 900;
+            filter: drop-shadow(0 0 6px rgba(255, 209, 102, 0.4));
+        }
+        .op-name {
+            fill: #e63946;
+            font-family: 'Lexend', system-ui, sans-serif;
+            font-size: 22px;
+            font-weight: 900;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+        }
+        .op-tag {
+            fill: rgba(255, 251, 235, 0.5);
+            font-family: 'Google Sans Code', 'Courier New', monospace;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+        }
+    </style>
+
+    <defs>
+        <radialGradient id="op-bg" cx="0.5" cy="0.6" r="0.7">
+            <stop offset="0%"   stop-color="#1a0606"/>
+            <stop offset="60%"  stop-color="#0f0505"/>
+            <stop offset="100%" stop-color="#050202"/>
+        </radialGradient>
+        <radialGradient id="op-bloom-grad" cx="0.5" cy="0.55" r="0.55">
+            <stop offset="0%"  stop-color="#e63946" stop-opacity="0.22"/>
+            <stop offset="30%" stop-color="#e63946" stop-opacity="0.08"/>
+            <stop offset="65%" stop-color="#e63946" stop-opacity="0"/>
+        </radialGradient>
+        <linearGradient id="op-deck-grad" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%"   stop-color="#3d0000"/>
+            <stop offset="50%"  stop-color="#1a0a0a"/>
+            <stop offset="100%" stop-color="#3d0000"/>
+        </linearGradient>
+        <pattern id="op-deck-stripes" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+            <rect width="6" height="4" fill="transparent"/>
+            <rect y="4" width="6" height="1" fill="rgba(230, 57, 70, 0.15)"/>
+        </pattern>
+        <filter id="op-name-shadow" x="-10%" y="-30%" width="120%" height="160%">
+            <feDropShadow dx="2" dy="2" stdDeviation="0" flood-color="#000" flood-opacity="1"/>
+            <feDropShadow dx="0" dy="0" stdDeviation="6" flood-color="#e63946" flood-opacity="0.4"/>
+        </filter>
+    </defs>
+
+    <!-- Dark red base + pulsing bloom -->
+    <rect width="300" height="200" fill="url(#op-bg)"/>
+    <rect class="op-bloom" width="300" height="200" fill="url(#op-bloom-grad)"/>
+
+    <!-- Stage: two deck card backs + one operator card.
+         Stage origin ~ (80, 30). Cards are 44x62. -->
+    <!-- Back card 2 (back row, more rotated) -->
+    <g transform="rotate(-7 102 67)">
+        <rect x="80" y="36" width="44" height="62" rx="6" class="op-deck-card-body"/>
+        <rect x="83" y="39" width="38" height="56" rx="4" class="op-deck-card-inner-stripes"/>
+        <rect x="85" y="41" width="34" height="52" rx="3" class="op-deck-card-inner-border"/>
+    </g>
+    <!-- Back card 1 (slightly less rotated, offset right) -->
+    <g transform="rotate(-3 110 65)">
+        <rect x="88" y="34" width="44" height="62" rx="6" class="op-deck-card-body"/>
+        <rect x="91" y="37" width="38" height="56" rx="4" class="op-deck-card-inner-stripes"/>
+        <rect x="93" y="39" width="34" height="52" rx="3" class="op-deck-card-inner-border"/>
+    </g>
+    <!-- Operator card (front, rotated +5deg) -->
+    <g transform="rotate(5 124 61)">
+        <rect x="102" y="30" width="44" height="62" rx="8" class="op-operator-card-body"/>
+        <rect x="102" y="30" width="4"  height="62" rx="2" class="op-operator-card-rail"/>
+        <text x="126" y="73" text-anchor="middle" class="op-symbol">+</text>
+    </g>
+
+    <!-- Score block top-right -->
+    <text class="op-delta op-delta-text" x="260" y="34" text-anchor="end">+1</text>
+    <text x="270" y="64" text-anchor="end" class="op-score-value">7</text>
+
+    <!-- Title + tagline -->
+    <text x="150" y="148" text-anchor="middle" class="op-name" filter="url(#op-name-shadow)">OPERATOR</text>
+    <text x="150" y="172" text-anchor="middle" class="op-tag">Stack operators. Strike opponents.</text>
+</svg>

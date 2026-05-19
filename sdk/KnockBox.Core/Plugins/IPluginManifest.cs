@@ -62,6 +62,14 @@ public interface IPluginManifest
     string? TileAsset => null;
 
     /// <summary>
+    /// When <c>true</c>, the host overlays a shared "Work In Progress" SVG on
+    /// top of the plugin's tile and desaturates the underlying art. Intended
+    /// to flag a game that's still being built so it's visible on the home
+    /// page without claiming to be ready. Defaults to <c>false</c>.
+    /// </summary>
+    bool WorkInProgress => false;
+
+    /// <summary>
     /// Returns <c>true</c> if <paramref name="capability"/> was declared in this
     /// manifest.
     /// </summary>

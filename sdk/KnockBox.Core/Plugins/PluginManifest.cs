@@ -17,7 +17,8 @@ public sealed partial record PluginManifest(
     Version Version,
     string EntryAssembly,
     IReadOnlySet<PluginCapability> Capabilities,
-    string? TileAsset = null) : IPluginManifest
+    string? TileAsset = null,
+    bool WorkInProgress = false) : IPluginManifest
 {
     /// <summary>
     /// The one supported <c>plugin.json</c> schema version. Bump (and add
@@ -220,6 +221,20 @@ public sealed partial record PluginManifest(
                 tileAsset = validatedTileAsset;
             }
 
+            bool workInProgress = false;
+            if (root.TryGetProperty("workInProgress", out var wipElement)
+                && wipElement.ValueKind != JsonValueKind.Null)
+            {
+                if (wipElement.ValueKind != JsonValueKind.True
+                    && wipElement.ValueKind != JsonValueKind.False)
+                {
+                    return ValueResult<PluginManifest>.FromError(
+                        "plugin.json 'workInProgress' must be a boolean.");
+                }
+
+                workInProgress = wipElement.GetBoolean();
+            }
+
             var manifest = new PluginManifest(
                 Name: name,
                 Description: description,
@@ -227,7 +242,8 @@ public sealed partial record PluginManifest(
                 Version: version,
                 EntryAssembly: entryAssembly,
                 Capabilities: capabilities,
-                TileAsset: tileAsset);
+                TileAsset: tileAsset,
+                WorkInProgress: workInProgress);
 
             return ValueResult<PluginManifest>.FromValue(manifest);
         }

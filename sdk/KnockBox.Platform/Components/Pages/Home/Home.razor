@@ -47,7 +47,7 @@
         <div class="game-grid">
             @foreach (var module in VisibleGameModules)
             {
-                <button class="game-tile" aria-label="@module.Manifest.Name" disabled="@(!CanJoinOrCreate)" @onclick="() => CreateLobby(module.Manifest.RouteIdentifier)">
+                <button class="game-tile @(module.Manifest.WorkInProgress ? "is-wip" : null)" aria-label="@module.Manifest.Name" disabled="@(!CanJoinOrCreate)" @onclick="() => CreateLobby(module.Manifest.RouteIdentifier)">
                     @if (module.Manifest.TileAsset is { } tileAsset)
                     {
                         <img class="game-tile-img game-tile-surface"
@@ -65,6 +65,14 @@
                         <div class="game-tile-surface game-tile-fallback">
                             @module.Manifest.Name
                         </div>
+                    }
+                    @if (module.Manifest.WorkInProgress)
+                    {
+                        <img class="game-tile-wip-overlay"
+                             src="_content/KnockBox.Platform/wip-overlay.svg"
+                             alt=""
+                             aria-hidden="true"
+                             draggable="false" />
                     }
                 </button>
             }

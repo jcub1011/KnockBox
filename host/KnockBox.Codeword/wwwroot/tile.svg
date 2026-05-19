@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg"
+     viewBox="0 0 300 200"
+     preserveAspectRatio="xMidYMid slice"
+     aria-hidden="true">
+    <style>
+/* EMBEDDED FONTS BEGIN */
+@font-face {
+    font-family: 'Share Tech Mono';
+    font-style: normal;
+    font-weight: 400;
+    src: url('data:font/woff2;base64,d09GMgABAAAAAAgcAA0AAAAAENgAAAfIAAEAxQAAAAAAAAAAAAAAAAAAAAAAAAAAGyAcgQgGYACBRBEICpRcjyYBNgIkA4EyC14ABCAFhBoHIBvfDKOidlFOcIp/Jth0agu+oSGyELcMmcS2DIZoON+kbjBpylhe7vGil5vwDQGe8uFxW2/AdRE6JYxM+BwCbswMzLrMYpfZFq3p7N5dYPY/CKrRdVEOsMRCli0JXyPq6ip8WQIaEQr1rqlj3QZgI/pUWH33/3+t1b2LN5aQTEsgkxIhwlv98+YjPrOYDSKW9HQ/nRBpYp5NGiETEiGRSaFiYptomJRZdwupKPbfnUEBaA0prEBFx2oZtIQIAP4HAGAVEimNcOOuhdX5JaBLs2vL4ewBGcTEpRYSQFhaVJiNrro9OlmzqEdLFkNUAZqjLew1CRyIZVFP0wtCAU1NQjNAMEZHAAgsS2XAk3IGBG2atTKxd4Nfm7LH6RCORtPW/c+Ano1PljtSX5QHQEMIQADMIV0hBGURYZNmDxpFy/6+XBGKCLHU9FicZKnSZStQpFKdBk3NwT7hKPEIY+xcZiWqfy+U6PenO9iB9revvfFZutD5trW1LW1uUxvbQPBKakNknqzHImaBXVzaz92ihZqt1RVyHY48dAibIpNTHM4yTeYvB9Mp5UpkxKg9RCJmLhcxw06qFKfbcSk3dWat7FNRplOWE7lGxYVSOS5M10slhz2u2BIHg8no8pq48+tm4AUPPduLi75fwWCXV6Gv+9Dke+wXdwAwbeko7IAyxCCmaklTc+bphoEiCG+nith8aqMxJyu8ETY48b1pTF9JV7+loCwnlBeFONI6yqHk4ntWdfLDI5QlCS1oOGPmlDeRYrJgxvmG6CmyQsDqKK1Ye/7EVvUZCbfdGXHZlqY2XrEZzU2KbjPS6xWVVTFT25jG+zJRCb2WG/g4VyQLVg+fdxJ4XU5/MU+53yjOyO5mK09GrTLNk3qxjgz7XwVcFT3WKnMU8zBdrgFXkGOe0rVL1gQMByAjMVW6G+IU/IfWMwbX5yQECPBn0z2maS77P/liFI81Q3HMaRJC+645a1Yfz8sLUlw14My8GAwPd+syBVKGa0jD3UCJaFOOE8PaoQNWea7Wr6+Jt0UMikqOI3U70+xpa5tYQ9no8cTomsqHJVX+s2R2c+A21VfbADmEhIHJtSTFEhRf7+RQ2cii1m1SbUpeZalZbklWbuqgMfTX98epNIY1s2kMN0E7S3nbeoL1beUs7QScjNPFpZ7jD6WkxicOMa2ttxmsGqTyVE3HNov6+9N76nt/vqt1PBYMxaIgjtcJVe+xIiISizn3c+76CpF4GO+Yom6jTmmKsZISSC/outcl84D3mRF5CwJx0lJ5X+vLw+dVYvaoWi0/NiFfnz+S19VikYGfML+q2sBPnFeFq0waw9lzpTow1TS75eCS7XBZHEpjtYy5I8fvZU0aQ7VpkY2qunu1ylY1HPNsbBfN/GJZVcmSMZ6Zg2w4ZyNLlaiqsgY7mANYxmz1xNpKw5oSVQm1idrZwvG01o20VZzOkBiJR5ULtdO1Cytx1lHpVU9RZ05pPcLlkEquM9pIQiWNNhaNrNKoDmXUVpUxvzoPwP2YLfVZQ23fnyF1e30Mpr1fX6ZK1kYHa7rOndLP09qgnEsmc0bCfOhQLon1y9T87l7eX9xJ7CluECfjlEHDbmOMhBtMxioN1nec+o0lg2Fyc0iS16o9wfL6HlGfutoNsNNDsOmZa1KrrZvGxeu0Q1oT6V+zkEzPLhV3EgcqDtCxO2FdSbfLXEwWZzQROWEzWMKmeM1xnUVGYa3lzmUXV4OOMAxrtrK1iqQ/aB3LI9iSkpkyvjN5sXoaebka265eY3m2z7zNJeuPWFyLpnxGWzfvdlPJi8SOf4vDySrUfe4xQ9E89ngL3+Yh8xMK9WaHDlbNrcwtK/Rmx1Bxc6vqZo36L1jxufbcI2eVzadSNTs3O06MhLPZH9qqA0ufGZQ+rV3ZgqQo9qRJxRp2Qa1m8Gr6u/yxTpOhJrMlrd0K9VX0Dy8pI20IlodoQ9TTyULJju4+Lk7K2OjgSFkUCdSMIJN6Xeuu6LG8m21UTHi4C9CN8PXIJJmNbOMUMsW3u6FHPhkAnZtt3YG+9PsudYfQ90CHX91fS8mfWf9xEZ4RQZ5fl9Ynfc7C6Ywq9lrXZZ9n/ZaULuHmOBzqbHindCeOCMvNe+2AHjXeZEj3IeTSOqic4UcuEYxNCBqZ1ndLUd8NGYAtegEQQiKQgvOQ7QQABwDkgvCFgG/x6eUoABSOUocPjMrsEPw1JRS+AIALirFvAODiid8hPaqb++Q4AC0gAABQwN9MmsjfxvSI5qEvw0kgBXMF4IIyGFGIYugxCgbUwAcJiJUpgDxEoTe8pDOLRjDIQC446GWWt3QSZGKPPNSjBOmQG2Eif+RqFEW7g+Xqu/QoAK4YjZZQQbgtFrB6C6TIfqJW+GVjwihY4VeYAO2pnmFCmEY1UmQZ1gxiqt+lm8ORmoEoFSo1qVakkFktGvbI5QAwPOEODxLOvRYlu49arUKRmp0YTSrloxEtX00MLreHUZRawDxTnroIwp5EBc6vFS6311yRi6Ks54b3RFyt2CGfaBC4VrGxEpGvRL0u8pSIJZRbaOi4rF7DDonMHKqHEG3JnS83Hvf25oq4NYXqlFoO2phIAC7KxdVbHIbmEgg6ekrg4bq9YYpFB4gKQQvCVZ7sDq9IDnLQWC71ZQjxCvz/eCI+CgAA') format('woff2');
+}
+/* EMBEDDED FONTS END */
+        @keyframes ctc-blink {
+            0%, 49%   { opacity: 1; }
+            50%, 100% { opacity: 0; }
+        }
+        .ctc-caret {
+            fill: #a78bfa;
+            filter: drop-shadow(0 0 4px rgba(167, 139, 250, 0.55));
+            animation: ctc-blink 1s steps(1) infinite;
+        }
+        .ctc-prompt {
+            fill: #a78bfa;
+            font-family: 'Share Tech Mono', 'Google Sans Code', monospace;
+            font-size: 18px;
+            font-weight: 700;
+        }
+        .ctc-name {
+            fill: #fff;
+            font-family: 'Share Tech Mono', 'Google Sans Code', monospace;
+            font-size: 22px;
+            font-weight: 700;
+            letter-spacing: 2px;
+        }
+        .ctc-intel-label {
+            fill: #a78bfa;
+            font-family: 'Share Tech Mono', 'Google Sans Code', monospace;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 1.5px;
+        }
+        .ctc-classified {
+            fill: #fff;
+            font-family: 'Share Tech Mono', 'Google Sans Code', monospace;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 2.5px;
+        }
+        .ctc-tag {
+            fill: rgba(167, 139, 250, 0.7);
+            font-family: 'Share Tech Mono', 'Google Sans Code', monospace;
+            font-size: 10px;
+            font-weight: 600;
+            letter-spacing: 1.2px;
+            text-transform: uppercase;
+        }
+    </style>
+
+    <defs>
+        <radialGradient id="ctc-bg" cx="0.5" cy="0.5" r="0.8">
+            <stop offset="0%" stop-color="#1a1a2e"/>
+            <stop offset="100%" stop-color="#0f0f1a"/>
+        </radialGradient>
+        <pattern id="ctc-scanlines" width="4" height="4" patternUnits="userSpaceOnUse">
+            <rect width="4" height="2" fill="transparent"/>
+            <rect y="2" width="4" height="2" fill="rgba(0,0,0,0.18)"/>
+        </pattern>
+        <radialGradient id="ctc-vignette" cx="0.5" cy="0.5" r="0.8">
+            <stop offset="0%"  stop-color="#a78bfa" stop-opacity="0.06"/>
+            <stop offset="35%" stop-color="#000"    stop-opacity="0"/>
+            <stop offset="70%" stop-color="#000"    stop-opacity="0.25"/>
+            <stop offset="100%" stop-color="#000"   stop-opacity="0.55"/>
+        </radialGradient>
+        <filter id="ctc-glow-name" x="-10%" y="-30%" width="120%" height="160%">
+            <feDropShadow dx="0" dy="0" stdDeviation="3" flood-color="#a78bfa" flood-opacity="0.55"/>
+            <feDropShadow dx="0" dy="0" stdDeviation="7" flood-color="#a78bfa" flood-opacity="0.4"/>
+        </filter>
+    </defs>
+
+    <rect width="300" height="200" fill="url(#ctc-bg)"/>
+    <rect width="300" height="200" fill="url(#ctc-scanlines)"/>
+    <rect width="300" height="200" fill="url(#ctc-vignette)"/>
+
+    <!-- Prompt line: "> CODEWORD ▮" -->
+    <text x="22" y="70" class="ctc-prompt">&gt;</text>
+    <text x="40" y="70" class="ctc-name" filter="url(#ctc-glow-name)">CODEWORD</text>
+    <rect class="ctc-caret" x="187" y="55" width="8" height="18"/>
+
+    <!-- Intel line: "[INTEL]" label + redacted pill with "CLASSIFIED" -->
+    <text x="22" y="118" class="ctc-intel-label">[INTEL]</text>
+    <g>
+        <rect x="80" y="105" width="200" height="20" rx="10"
+              fill="rgba(167, 139, 250, 0.15)" stroke="rgba(167, 139, 250, 0.3)" stroke-width="1"/>
+        <rect x="80" y="105" width="200" height="20" rx="10"
+              fill="rgba(15, 15, 26, 0.85)"/>
+        <text x="180" y="119" text-anchor="middle" class="ctc-classified">CLASSIFIED</text>
+    </g>
+
+    <!-- Tagline -->
+    <text x="22" y="158" class="ctc-tag">Decode the intel. Smoke out the spy.</text>
+</svg>
