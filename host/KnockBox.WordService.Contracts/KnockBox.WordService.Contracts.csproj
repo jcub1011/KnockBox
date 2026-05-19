@@ -16,10 +16,13 @@
       - is promoted into the default ALC by PluginLoader at host startup so
         every consumer sees the same CLR type for the interfaces declared here.
 
-    Versioning rule: the <Version> below MUST match the library plugin's
-    <Version> so the loader's Major.Minor coexistence policy stays coherent. To
-    avoid drift, keep both csproj <Version> properties bound to the same
-    MSBuild variable (or commit them as identical literals).
+    Versioning rule: <Version>, <AssemblyVersion>, and <FileVersion> below
+    MUST all stay in sync — and the contracts' <Version> MUST match the
+    sibling library plugin's <Version>. The loader's contract-promotion
+    identity key is (simpleName, AssemblyName.Version, PublicKeyToken); pinning
+    <AssemblyVersion> explicitly here makes that key stable regardless of
+    publish format (single-file vs framework-dependent, etc.) and prevents the
+    implicit '1.0.0.0' from drifting if MSBuild's defaults ever change.
   -->
 
   <PropertyGroup>
@@ -27,6 +30,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <Version>1.0.0</Version>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
     <Description>Public contract interfaces for the KnockBox.WordService library plugin.</Description>
   </PropertyGroup>
 

@@ -2,6 +2,15 @@ namespace KnockBox.Platform.Storage;
 
 public interface IStoragePathService
 {
+    /// <summary>
+    /// Absolute path to the resolved data root — the parent of every other
+    /// directory this service exposes. Equal to <c>{KNOCKBOX_DATA_ROOT}</c>
+    /// when that environment variable is set, otherwise
+    /// <see cref="AppContext.BaseDirectory"/><c>/data</c>. Resolved once at
+    /// construction; later env-var mutations are not observed.
+    /// </summary>
+    string GetDataRoot();
+
     string GetAdminDirectory();
     string GetLogDirectory();
     string GetFirstPartyPluginsDirectory();

@@ -4,7 +4,15 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <!--
+      Keep Version, AssemblyVersion, and FileVersion in sync with the sibling
+      KnockBox.WordService.Contracts csproj — the loader groups libraries by
+      (entryAssembly, Major, Minor) and the contracts' AssemblyName.Version is
+      the dedup key for contract promotion.
+    -->
     <Version>1.0.0</Version>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
     <Description>Shared word-existence and dictionary lookup library plugin for word games.</Description>
   </PropertyGroup>
 

@@ -44,7 +44,7 @@ namespace KnockBox
             // admin settings, logs, and plugin storage on every redeploy —
             // checking `docker logs` for this line is the fastest way to
             // confirm the mount is wired correctly.
-            var dataRoot = Path.GetDirectoryName(logDirectory) ?? logDirectory;
+            var dataRoot = storagePath.GetDataRoot();
             var dataRootSource = string.IsNullOrWhiteSpace(
                 Environment.GetEnvironmentVariable("KNOCKBOX_DATA_ROOT"))
                     ? "default; set KNOCKBOX_DATA_ROOT to override"

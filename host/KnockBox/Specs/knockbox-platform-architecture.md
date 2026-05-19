@@ -249,6 +249,10 @@ Loading runs in three sequenced phases. The invariant — **all libraries finish
 
 3. **Service registration** (`LogicRegistrations.RegisterLogic`). Two passes: pass 1 registers every library plugin's services; pass 2 registers every game plugin's services and engines. A game plugin that depends on a library service whose library failed to load will fail loudly at lobby-creation time with a clear DI resolution error — games are never "partially loaded" against a missing library.
 
+Note on interaction with `PromoteShareableDependencies`: `PluginLoader` runs two distinct promotion passes against `AssemblyLoadContext.Default`. **Contract promotion** (per-contract, identity-dedup on `name + AssemblyName.Version + token`) runs first and only sees library plugins. **Shareable-dependency promotion** (per-dep, first-wins by Major.Minor) runs *after* contract promotion and operates on the union of every surviving library + game subdir. The simple names contract promotion adds to the promoted-assemblies set are visible to shareable-dep promotion, so a contract that's also a shareable dep never gets double-promoted. The two passes use different dedup keys by design: contracts require exact-identity sharing across ALCs, whereas multi-shipper deps tolerate compatible-version variance.
+
+`exportedContracts` is allowed to be empty for a library. A library that exports zero contracts can still register services keyed by types defined in `KnockBox.Core` (e.g. internal infrastructure shared across the host's own subsystems); contract promotion skips it and the activation phase treats it like any other library.
+
 ### Service Shadowing Rules
 
 `DefaultPluginRegistration` (`sdk/KnockBox.Platform/Plugins/DefaultPluginRegistration.cs`) silently drops registrations targeting service types in its host-owned denylist and logs an error naming the plugin and the offending service type. The denylist is a union of:
@@ -302,7 +306,7 @@ Mirror of the "Adding a New Game" section below, but with library-specific conve
        <PluginExportedContract Include="$(TargetDir){LibraryName}.Contracts.dll" />
      </ItemGroup>
      ```
-   - Add a `plugin.json` with `"kind": "library"` and `"exportedContracts": ["{LibraryName}.Contracts"]`. Use strict `Major.Minor.Patch` SemVer.
+   - Add a `plugin.json` with `"kind": "library"` and `"exportedContracts": ["{LibraryName}.Contracts"]`. Use strict `Major.Minor.Patch` SemVer. The manifest's `routeIdentifier` must still be present and match `^[a-z0-9-]+$`, but for a library it's only a per-plugin DI key — it never appears in navigation, so any unique kebab-case slug is fine (use the library's own name).
    - Implement `ILibraryModule` in a class with a public parameterless constructor. Its `RegisterServices` calls only `AddSingleton/AddScoped/AddTransient` for the contracts types — do **not** call `AddGameEngine`.
 
 3. **Wire into the host build graph**: add a `<ProjectReference ... ReferenceOutputAssembly="false" Private="false" />` to `host/KnockBox/KnockBox.csproj` so building the host transitively builds the library. The contracts assembly is built as a transitive dependency of the library plugin and consumers; no explicit host reference needed.

@@ -376,6 +376,7 @@ public sealed class LogicRegistrationsTests
     private sealed class TempStoragePathService : IStoragePathService
     {
         private readonly string _root = Path.Combine(Path.GetTempPath(), "knockbox-logicreg-tests", Guid.NewGuid().ToString("N"));
+        public string GetDataRoot() => _root;
         public string GetAdminDirectory() => Path.Combine(_root, "admin");
         public string GetLogDirectory() => Path.Combine(_root, "logs");
         public string GetFirstPartyPluginsDirectory() => Path.Combine(_root, "games");

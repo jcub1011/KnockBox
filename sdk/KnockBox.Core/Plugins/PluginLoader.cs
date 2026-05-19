@@ -91,7 +91,13 @@ namespace KnockBox.Core.Plugins
             if (rootPaths.Count == 0)
                 return PluginLoadResult.Empty;
 
+            // Dedup subdirs by canonical full path so a misconfigured host whose
+            // LibrariesPaths and PluginsPaths overlap (or whose roots are aliases
+            // of the same directory) doesn't discover the same plugin twice and
+            // promote its contracts twice. The first occurrence wins; later
+            // duplicates are logged so the misconfig is visible.
             var allSubdirs = new List<string>();
+            var seenSubdirs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var root in rootPaths)
             {
                 if (!Directory.Exists(root))
@@ -101,7 +107,20 @@ namespace KnockBox.Core.Plugins
                         root);
                     continue;
                 }
-                allSubdirs.AddRange(Directory.GetDirectories(root));
+                foreach (var subdir in Directory.GetDirectories(root))
+                {
+                    var canonical = Path.GetFullPath(subdir);
+                    if (seenSubdirs.Add(canonical))
+                    {
+                        allSubdirs.Add(subdir);
+                    }
+                    else
+                    {
+                        logger.LogInformation(
+                            "Plugin subdirectory [{Subdir}] is reachable from multiple roots; only the first occurrence is loaded.",
+                            canonical);
+                    }
+                }
             }
 
             if (allSubdirs.Count == 0)
@@ -350,11 +369,15 @@ namespace KnockBox.Core.Plugins
         /// exactly equal, the contract is promoted once and both libraries reuse
         /// it (e.g. v1.2 and v1.3 of the same library shipping the same contracts
         /// because the contract surface didn't change between minors).</para>
+        /// <para><b>Side effect:</b> <paramref name="promotedAssemblyNames"/> is
+        /// mutated — every successfully-promoted contract's simple name is added
+        /// so downstream phases (shareable-dep promotion, ALC isolation) treat
+        /// it as host-loaded. Pass a set you're prepared to see grow.</para>
         /// </remarks>
         internal IReadOnlyList<DiscoveredPlugin> PromoteExportedContracts(
             IReadOnlyList<DiscoveredPlugin> libraries,
             HashSet<string> originalHostAssemblies,
-            HashSet<string> hostAssemblyNames)
+            HashSet<string> promotedAssemblyNames)
         {
             var survivors = new List<DiscoveredPlugin>(libraries.Count);
 
@@ -445,7 +468,7 @@ namespace KnockBox.Core.Plugins
                     }
 
                     promotedByIdentity.Add(identity);
-                    hostAssemblyNames.Add(simpleName);
+                    promotedAssemblyNames.Add(simpleName);
 
                     logger.LogInformation(
                         "Promoted library contract [{Contract}] v{Version} into the default ALC for library plugin [{Library}].",
@@ -716,7 +739,7 @@ namespace KnockBox.Core.Plugins
         {
             var depsJsonPath = Path.ChangeExtension(pluginDllPath, ".deps.json");
             if (!File.Exists(depsJsonPath))
-                return default;
+                return new DepsInspection(null, null);
 
             try
             {
@@ -725,7 +748,7 @@ namespace KnockBox.Core.Plugins
 
                 if (!doc.RootElement.TryGetProperty("libraries", out var libraries) ||
                     libraries.ValueKind != JsonValueKind.Object)
-                    return default;
+                    return new DepsInspection(null, null);
 
                 string? forbidden = null;
                 Version? coreVersion = null;
@@ -776,7 +799,7 @@ namespace KnockBox.Core.Plugins
                     ex,
                     "Failed to parse .deps.json for plugin [{Dll}]; forbidden-dependency and Core-version checks will be skipped.",
                     pluginDllPath);
-                return default;
+                return new DepsInspection(null, null);
             }
         }
 
