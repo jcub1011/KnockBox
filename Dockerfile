@@ -24,10 +24,15 @@ RUN mkdir -p /app/data && chown -R $APP_UID:$APP_UID /app
 
 # Persisted state: admin settings, rolling Serilog logs, per-plugin storage,
 # and operator-installed third-party plugins all live under /app/data. The
-# VOLUME directive ensures Docker creates an anonymous volume by default if
-# the operator runs the image without `-v`, so data survives container
-# recreation. Production deployments should mount a named volume or bind
-# mount; see README.md.
+# VOLUME directive marks the path as a mount point so orchestrators
+# (Compose, Kubernetes, TrueNAS, ECS, …) treat it as external state, and so
+# layer writes to /app/data don't bloat the image. It is NOT a persistence
+# guarantee: a bare `docker run` attaches an anonymous volume that is
+# orphaned the moment the container is removed. Always mount /app/data to
+# a named volume or host path -- see README.md for named-volume and
+# bind-mount recipes (the bind-mount section covers TrueNAS Custom App and
+# Kubernetes-style deployments where the orchestrator recreates the
+# container on every image update).
 ENV KNOCKBOX_DATA_ROOT=/app/data
 VOLUME ["/app/data"]
 

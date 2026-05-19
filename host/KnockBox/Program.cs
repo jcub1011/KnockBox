@@ -37,6 +37,20 @@ namespace KnockBox
             var logDirectory = storagePath.GetLogDirectory();
             var logPath = Path.Combine(logDirectory, "knockbox-.log");
 
+            // Surface the resolved data root in stdout before Serilog starts.
+            // On orchestrators that recreate the container on image update
+            // (TrueNAS Custom Apps, Kubernetes, Portainer, ECS), missing a
+            // bind mount or persistent volume for /app/data silently wipes
+            // admin settings, logs, and plugin storage on every redeploy —
+            // checking `docker logs` for this line is the fastest way to
+            // confirm the mount is wired correctly.
+            var dataRoot = Path.GetDirectoryName(logDirectory) ?? logDirectory;
+            var dataRootSource = string.IsNullOrWhiteSpace(
+                Environment.GetEnvironmentVariable("KNOCKBOX_DATA_ROOT"))
+                    ? "default; set KNOCKBOX_DATA_ROOT to override"
+                    : "from KNOCKBOX_DATA_ROOT";
+            Console.WriteLine($"KnockBox data root: {dataRoot} ({dataRootSource})");
+
             builder.Host.UseSerilog((context, services, loggerConfig) =>
                 ApplySharedLoggerConfiguration(loggerConfig, context.Configuration, logPath)
                     .ReadFrom.Services(services));

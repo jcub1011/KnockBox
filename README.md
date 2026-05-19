@@ -54,7 +54,11 @@ The host writes all operator-managed state into a single data root:
 
 ### Docker
 
-The published image declares `VOLUME /app/data`, so even a `docker run` with no `-v` flag survives container recreation via an anonymous volume. For real deployments, mount a named volume or bind mount instead so backups and migrations are tractable:
+The image writes all persisted state to `/app/data` (set via `ENV KNOCKBOX_DATA_ROOT=/app/data`). The `VOLUME ["/app/data"]` directive in the Dockerfile only marks the path as a mount point — it is **not** a persistence guarantee. A bare `docker run` with no `-v` flag attaches an anonymous volume that is orphaned the instant the container is removed, so the next `docker rm` + `docker run` (or any orchestrator that recreates the container on image update) starts from an empty data root. Mount `/app/data` to a named volume or host path before going to production.
+
+The host logs the resolved data root at startup (`KnockBox data root: …`), so checking the container's first few stdout lines is the fastest way to confirm your mount is wired correctly.
+
+#### Named volume (plain Docker host)
 
 ```bash
 docker volume create knockbox-data
@@ -64,9 +68,34 @@ docker run -d --name knockbox \
   jabobb/knockbox:latest
 ```
 
-To upgrade: `docker stop knockbox && docker rm knockbox && docker pull jabobb/knockbox:latest && docker run … -v knockbox-data:/app/data …`. The volume — and therefore every persisted file above — is reattached to the new container untouched.
+To upgrade: `docker stop knockbox && docker rm knockbox && docker pull jabobb/knockbox:latest && docker run … -v knockbox-data:/app/data …`. The named volume — and therefore every persisted file above — is reattached to the new container untouched.
 
-> **Note:** `docker run --rm` removes anonymous volumes too, so the `VOLUME` declaration only protects operators using non-`--rm` runs. The named-volume example above is the recommended deployment shape; the `VOLUME` directive is a safety net for first-time runs without `-v`, not a substitute for explicit volume management.
+#### Bind mount (TrueNAS Custom App, Kubernetes, Portainer, cloud platforms)
+
+Platforms that recreate the container on every image update (TrueNAS Custom Apps, k8s rolling deploys, ECS task updates, Portainer stack redeploys) **require an explicit mount for `/app/data`**. Named volumes managed internally by the Docker engine are typically invisible to the orchestrator and get discarded along with the old container; bind-mounting a host directory keeps the data outside the container's lifecycle entirely.
+
+```bash
+# Plain docker, bind-mounting a host directory.
+docker run -d --name knockbox \
+  -p 8080:8080 -p 8081:8081 \
+  -v /mnt/tank/apps/knockbox/data:/app/data \
+  jabobb/knockbox:latest
+```
+
+The container runs as the aspnet base image's non-root user (`UID 1654`), so the host directory must be writable by that UID:
+
+```bash
+sudo mkdir -p /mnt/tank/apps/knockbox/data
+sudo chown -R 1654:1654 /mnt/tank/apps/knockbox/data
+```
+
+On **TrueNAS SCALE Custom App**:
+
+1. Pre-create a dataset or directory for KnockBox state, e.g. `/mnt/tank/apps/knockbox-data`.
+2. From a TrueNAS shell, set its ownership to `1654:1654` so the container user can write to it.
+3. In the app's *Storage* section, add an entry of type **Host Path**: host path `/mnt/tank/apps/knockbox-data`, container mount path `/app/data`.
+
+After applying, restart the app and check the container logs for the `KnockBox data root: /app/data …` line. The host directory should populate with `admin/`, `logs/`, and `plugins/` after the first interaction; subsequent image updates leave those files untouched.
 
 ### Non-Docker (zip release / `dotnet publish`)
 
