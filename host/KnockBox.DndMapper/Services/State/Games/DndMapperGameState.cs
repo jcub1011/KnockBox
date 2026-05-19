@@ -31,6 +31,14 @@ namespace KnockBox.DndMapper.Services.State.Games
         // schema is a free-form Custom one not yet saved as a named template.
         public Guid? ActiveSchemaTemplateId { get; private set; }
 
+        // Runtime source-of-truth for the attribute the engine adds to
+        // initiative rolls. Lives on state (not just on NamedTemplate) so the
+        // host can pick one even on a free-form Custom schema, and so the
+        // choice survives reload even when no named template is active.
+        // NamedTemplate.InitiativeAttributeName still carries each template's
+        // preferred attribute; applying a template syncs this field from it.
+        public string? InitiativeAttributeName { get; private set; }
+
         public CombatState? ActiveCombat { get; private set; }
         public CenterViewportRequest? PendingCenterRequest { get; private set; }
 
@@ -86,6 +94,7 @@ namespace KnockBox.DndMapper.Services.State.Games
         {
             SeedBuiltInTemplates();
             ActiveSchemaTemplateId = BuiltInDnD5eCoreId;
+            InitiativeAttributeName = CustomTemplates[BuiltInDnD5eCoreId].InitiativeAttributeName;
         }
 
         // Maps a preset onto its deterministic built-in template id so the
@@ -138,6 +147,7 @@ namespace KnockBox.DndMapper.Services.State.Games
         internal void SetSettings(DndMapperSettings settings) => Settings = settings;
         internal void SetAttributeSchema(AttributeSchema schema) => AttributeSchema = schema;
         internal void SetActiveSchemaTemplateId(Guid? id) => ActiveSchemaTemplateId = id;
+        internal void SetInitiativeAttributeName(string? name) => InitiativeAttributeName = string.IsNullOrEmpty(name) ? null : name;
         internal void SetActiveMapId(Guid? mapId) => ActiveMapId = mapId;
         internal void SetActiveCombat(CombatState? combat) => ActiveCombat = combat;
         internal void SetPendingCenterRequest(CenterViewportRequest? request) => PendingCenterRequest = request;

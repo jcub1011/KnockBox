@@ -636,6 +636,29 @@ namespace KnockBox.DndMapper.Services.Library
                     resolvedActiveId = null;
                 state.SetActiveSchemaTemplateId(resolvedActiveId);
 
+                // Restore the state-level initiative attribute. Newer snapshots
+                // carry it directly; for older ones we fall back to the active
+                // template's value, then to "DEX" if the schema has it (legacy
+                // d20 convention). Final guard validates against the actual
+                // schema rows so a stale value can't survive a schema swap.
+                string? restoredInitiative = snapshot.InitiativeAttributeName;
+                if (string.IsNullOrEmpty(restoredInitiative) && resolvedActiveId is { } activeId
+                    && state.CustomTemplates.TryGetValue(activeId, out var activeTemplate))
+                {
+                    restoredInitiative = activeTemplate.InitiativeAttributeName;
+                }
+                if (string.IsNullOrEmpty(restoredInitiative)
+                    && state.AttributeSchema.Rows.Any(r => string.Equals(r.Name, "DEX", StringComparison.OrdinalIgnoreCase)))
+                {
+                    restoredInitiative = "DEX";
+                }
+                if (!string.IsNullOrEmpty(restoredInitiative)
+                    && !state.AttributeSchema.Rows.Any(r => r.Name == restoredInitiative))
+                {
+                    restoredInitiative = null;
+                }
+                state.SetInitiativeAttributeName(restoredInitiative);
+
                 // Activate the first map if any exist so the host doesn't
                 // land on an empty canvas after hydration.
                 var first = state.Maps.OrderBy(m => m.ListOrder).FirstOrDefault();

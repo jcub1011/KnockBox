@@ -783,6 +783,25 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                     resolvedId = null;
                 state.SetActiveSchemaTemplateId(resolvedId);
 
+                // Re-derive the initiative attribute for the new schema:
+                //   1. If we landed on a template, take its preferred attribute.
+                //   2. Otherwise keep the current attribute if the new schema
+                //      still has a matching row (free-form edits that don't
+                //      drop the chosen attribute).
+                //   3. Fall back to "DEX" if the schema has one (legacy d20
+                //      convention), else null.
+                var schemaRowNames = newSchema.Rows.Select(r => r.Name).ToHashSet(StringComparer.Ordinal);
+                string? nextInitiative;
+                if (resolvedId is { } rid && state.CustomTemplates.TryGetValue(rid, out var resolvedTemplate))
+                    nextInitiative = resolvedTemplate.InitiativeAttributeName;
+                else if (state.InitiativeAttributeName is { } existing && schemaRowNames.Contains(existing))
+                    nextInitiative = existing;
+                else if (newSchema.Rows.Any(r => string.Equals(r.Name, "DEX", StringComparison.OrdinalIgnoreCase)))
+                    nextInitiative = "DEX";
+                else
+                    nextInitiative = null;
+                state.SetInitiativeAttributeName(nextInitiative);
+
                 foreach (var sheet in state.Sheets.Values)
                 {
                     var oldValues = new Dictionary<string, AttributeValue>(sheet.Values);
@@ -904,6 +923,8 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                     var fallback = AttributeSchema.FromPreset(AttributePreset.DnD5eCore);
                     state.SetAttributeSchema(fallback);
                     state.SetActiveSchemaTemplateId(DndMapperGameState.BuiltInDnD5eCoreId);
+                    state.SetInitiativeAttributeName(
+                        state.CustomTemplates[DndMapperGameState.BuiltInDnD5eCoreId].InitiativeAttributeName);
                     foreach (var sheet in state.Sheets.Values)
                     {
                         var oldValues = new Dictionary<string, AttributeValue>(sheet.Values);
@@ -1385,9 +1406,8 @@ namespace KnockBox.DndMapper.Services.Logic.Games
         }
 
         // Resolves the initiative modifier for the owner of a sheet. Reads
-        // the active schema template's InitiativeAttributeName when set,
-        // otherwise falls back to the legacy case-insensitive "DEX" lookup
-        // so older saves and free-form Custom schemas keep working. Routes
+        // the state-level InitiativeAttributeName, falling back to a
+        // case-insensitive "DEX" lookup so older saves keep working. Routes
         // through AttributeContributionResolver so active status effects
         // (e.g. "Slowed" with DEX −3) apply the same way they would to a
         // normal roll — §8.5 attribute-value semantics.
@@ -1397,14 +1417,15 @@ namespace KnockBox.DndMapper.Services.Logic.Games
         private static int ResolveInitiativeModifierForSheet(DndMapperGameState state, CharacterSheet? sheet)
         {
             if (sheet is null) return 0;
-            var configured = state.GetActiveSchemaTemplate()?.InitiativeAttributeName;
+            var configured = state.InitiativeAttributeName;
             if (!string.IsNullOrEmpty(configured)
                 && sheet.Values.TryGetValue(configured, out var configuredValue))
             {
                 return AttributeContributionResolver.Resolve(sheet, configured, configuredValue).EffectiveModifier;
             }
 
-            // Legacy fallback: case-insensitive DEX search.
+            // Legacy fallback: case-insensitive DEX search (older saves with
+            // no state-level InitiativeAttributeName persisted).
             foreach (var (name, value) in sheet.Values)
             {
                 if (!string.Equals(name, "DEX", StringComparison.OrdinalIgnoreCase)) continue;
@@ -1422,15 +1443,18 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             string? error = null;
             var exec = state.Execute(() =>
             {
-                var schema = state.GetActiveSchemaTemplate();
-                if (schema is null) { error = "Save the current schema as a template before configuring initiative."; return; }
                 if (!string.IsNullOrEmpty(attributeName)
                     && !state.AttributeSchema.Rows.Any(r => r.Name == attributeName))
                 {
                     error = "Unknown attribute name for the active schema.";
                     return;
                 }
-                schema.InitiativeAttributeName = string.IsNullOrEmpty(attributeName) ? null : attributeName;
+                state.SetInitiativeAttributeName(attributeName);
+                // Mirror onto the active template (if any) so re-applying the
+                // template later restores the host's choice.
+                var template = state.GetActiveSchemaTemplate();
+                if (template is not null)
+                    template.InitiativeAttributeName = string.IsNullOrEmpty(attributeName) ? null : attributeName;
             });
             if (exec.IsCanceled) return Result.FromCancellation();
             if (exec.TryGetFailure(out var execErr)) return Result.FromError(execErr);
@@ -2065,6 +2089,8 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                 state.SetSettings(new DndMapperSettings());
                 state.SetAttributeSchema(AttributeSchema.FromPreset(AttributePreset.DnD5eCore));
                 state.SetActiveSchemaTemplateId(DndMapperGameState.BuiltInDnD5eCoreId);
+                state.SetInitiativeAttributeName(
+                    state.CustomTemplates[DndMapperGameState.BuiltInDnD5eCoreId].InitiativeAttributeName);
                 state.SetBytesUsed(0);
             });
 

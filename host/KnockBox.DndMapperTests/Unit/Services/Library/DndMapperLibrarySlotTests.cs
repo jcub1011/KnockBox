@@ -258,6 +258,48 @@ namespace KnockBox.DndMapperTests.Unit.Services.Library
                 "Missing-blob skip should log a warning naming the image id.");
         }
 
+        // Regression: a save where the host had a free-form Custom schema
+        // active (so no NamedTemplate is tied to it) must still round-trip
+        // the chosen initiative attribute. Previously the Combat panel hid
+        // its dropdown after such a load because the attribute lived on the
+        // (absent) NamedTemplate. The attribute now lives on state.
+        [TestMethod]
+        public async Task LoadSlotAsync_RoundTripsInitiativeAttribute_OnFreeFormCustomSchema()
+        {
+            var (engine, state, host, _) = EngineTestFactory.Build();
+            var db = new FakeIndexedDbService();
+            await using var library = new DndMapperLibraryService(db, engine, NullLogger<DndMapperLibraryService>.Instance);
+            Assert.IsTrue((await library.AttachAsync(state, host)).IsSuccess);
+
+            var customSchema = new KnockBox.DndMapper.Services.State.Games.Data.AttributeSchema(
+                KnockBox.DndMapper.Models.AttributePreset.Custom,
+                [
+                    new KnockBox.DndMapper.Services.State.Games.Data.AttributeRow(
+                        "Power",
+                        KnockBox.DndMapper.Models.AttributeValueType.Score,
+                        KnockBox.DndMapper.Services.State.Games.Data.AttributeValue.Score(12)),
+                    new KnockBox.DndMapper.Services.State.Games.Data.AttributeRow(
+                        "Grace",
+                        KnockBox.DndMapper.Models.AttributeValueType.Score,
+                        KnockBox.DndMapper.Services.State.Games.Data.AttributeValue.Score(14)),
+                ]);
+            Assert.IsTrue(engine.ChangeSchemaAsync(state, host, customSchema).IsSuccess);
+            Assert.IsNull(state.ActiveSchemaTemplateId);
+            Assert.IsTrue(engine.SetInitiativeAttributeAsync(state, host, "Grace").IsSuccess);
+            Assert.AreEqual("Grace", state.InitiativeAttributeName);
+
+            var create = await library.CreateSlotAsync("Round-Trip-FreeForm");
+            Assert.IsTrue(create.TryGetSuccess(out var slotId));
+
+            var (engine2, state2, host2, _) = EngineTestFactory.Build();
+            await using var library2 = new DndMapperLibraryService(db, engine2, NullLogger<DndMapperLibraryService>.Instance);
+            Assert.IsTrue((await library2.AttachAsync(state2, host2)).IsSuccess);
+            Assert.IsTrue((await library2.LoadSlotAsync(slotId)).IsSuccess);
+
+            Assert.AreEqual("Grace", state2.InitiativeAttributeName,
+                "After loading, the state-level initiative attribute should be restored verbatim.");
+        }
+
         // Builds an attached library against a fresh fake DB. When seedLegacy is
         // true, plants a v2 snapshot so the post-migration Auto Save slot exists
         // (required for ListSlotsAsync ordering tests).

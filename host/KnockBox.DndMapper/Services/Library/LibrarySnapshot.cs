@@ -30,6 +30,10 @@ namespace KnockBox.DndMapper.Services.Library
         // or user-saved). Null for free-form Custom schemas. Drives which
         // NamedTemplate's effect library is "active" on load.
         public Guid? ActiveSchemaTemplateId { get; init; }
+        // State-level initiative attribute. Null on older snapshots (V1–V3);
+        // the load path then falls back to the active template's value (or
+        // the legacy DEX heuristic) so the host's choice still round-trips.
+        public string? InitiativeAttributeName { get; init; }
         public List<MapSnapshot> Maps { get; init; } = [];
         public List<SheetSnapshot> Sheets { get; init; } = [];
         public List<NamedTemplateSnapshot> CustomTemplates { get; init; } = [];
@@ -241,6 +245,7 @@ namespace KnockBox.DndMapper.Services.Library
                 Settings = state.Settings.Clone(),
                 AttributeSchema = ToSchemaSnapshot(state.AttributeSchema),
                 ActiveSchemaTemplateId = state.ActiveSchemaTemplateId,
+                InitiativeAttributeName = state.InitiativeAttributeName,
                 Maps = maps,
                 Sheets = sheets,
                 CustomTemplates = templates,

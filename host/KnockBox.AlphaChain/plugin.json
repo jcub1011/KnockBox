@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "name": "Alpha Chain",
+  "description": "An Alpha Chain placeholder game.",
+  "routeIdentifier": "alpha-chain",
+  "version": "1.0.0",
+  "entryAssembly": "KnockBox.AlphaChain",
+  "capabilities": []
+}

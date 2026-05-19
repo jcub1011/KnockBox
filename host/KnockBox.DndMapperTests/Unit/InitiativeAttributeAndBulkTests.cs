@@ -71,16 +71,19 @@ namespace KnockBox.DndMapperTests.Unit
         }
 
         [TestMethod]
-        public void SetInitiativeAttribute_FreeFormCustomSchema_Rejects()
+        public void SetInitiativeAttribute_FreeFormCustomSchema_Accepts()
         {
-            // Apply a free-form Custom schema (no source template id).
+            // Apply a free-form Custom schema (no source template id). Even with
+            // no named template, the host can configure the initiative attribute;
+            // the choice lives on state and round-trips through the snapshot.
             var custom = new AttributeSchema(AttributePreset.Custom,
                 [new AttributeRow("STR", AttributeValueType.Score, AttributeValue.Score(10))]);
             Assert.IsTrue(_engine.ChangeSchemaAsync(_state, _host, custom).IsSuccess);
             Assert.IsNull(_state.ActiveSchemaTemplateId);
 
             var r = _engine.SetInitiativeAttributeAsync(_state, _host, "STR");
-            Assert.IsTrue(r.IsFailure);
+            Assert.IsTrue(r.IsSuccess);
+            Assert.AreEqual("STR", _state.InitiativeAttributeName);
         }
 
         [TestMethod]

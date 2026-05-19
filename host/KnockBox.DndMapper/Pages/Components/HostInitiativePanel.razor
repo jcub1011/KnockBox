@@ -19,30 +19,31 @@
 
     @{
         var initSchema = State.GetActiveSchemaTemplate();
+        var initiativeAttr = State.InitiativeAttributeName;
     }
     <div class="dndm-panel-body dndm-initiative-host-config">
         <label class="dndm-label">Initiative modifier</label>
-        @if (initSchema is null)
-        {
-            <div class="dndm-initiative-empty">Save the current schema as a template to pick an initiative attribute.</div>
-        }
-        else
-        {
-            <select class="dndm-select"
-                    @onchange="@(e => OnInitiativeAttributeChange((string?)e.Value))">
-                <option value="">— none (bare d20) —</option>
-                @foreach (var row in State.AttributeSchema.Rows)
+        <select class="dndm-select"
+                @onchange="@(e => OnInitiativeAttributeChange((string?)e.Value))">
+            <option value="" selected="@string.IsNullOrEmpty(initiativeAttr)">— none (bare d20) —</option>
+            @foreach (var row in State.AttributeSchema.Rows)
+            {
+                if (row.Type == AttributeValueType.Score || row.Type == AttributeValueType.Modifier)
                 {
-                    if (row.Type == AttributeValueType.Score || row.Type == AttributeValueType.Modifier)
-                    {
-                        <option value="@row.Name" selected="@(initSchema.InitiativeAttributeName == row.Name)">@row.Name</option>
-                    }
+                    <option value="@row.Name" selected="@(initiativeAttr == row.Name)">@row.Name</option>
                 }
-            </select>
-            <div class="dndm-initiative-host-config-hint">
-                Saved with the <strong>@initSchema.Name</strong> schema. Players and forced rolls add this attribute's modifier to their d20.
-            </div>
-        }
+            }
+        </select>
+        <div class="dndm-initiative-host-config-hint">
+            @if (initSchema is null)
+            {
+                <span>Players and forced rolls add this attribute's modifier to their d20. Save the schema as a template if you want this choice to ride with it.</span>
+            }
+            else
+            {
+                <span>Saved with the <strong>@initSchema.Name</strong> schema. Players and forced rolls add this attribute's modifier to their d20.</span>
+            }
+        </div>
     </div>
 
     @if (State.ActiveCombat is null)
