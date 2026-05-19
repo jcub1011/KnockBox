@@ -1,4 +1,5 @@
 using KnockBox.AlphaChain;
+using KnockBox.Core.Plugins;
 
 namespace KnockBox.AlphaChain.Tests.Unit
 {
@@ -16,11 +17,11 @@ namespace KnockBox.AlphaChain.Tests.Unit
         }
 
         [TestMethod]
-        public void GetButtonContent_ReturnsNonNullFragment()
+        public void GetButtonContent_ReturnsNull_SoHostRendersFallbackTile()
         {
-            var module = new AlphaChainModule();
+            IGameModule module = new AlphaChainModule();
 
-            Assert.IsNotNull(module.GetButtonContent());
+            Assert.IsNull(module.GetButtonContent());
         }
 
         [TestMethod]

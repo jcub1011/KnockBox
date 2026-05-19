@@ -243,7 +243,9 @@
     padding: 0 16px 16px 16px;
 }
 
-/* Structural shell only — each game module owns its own visual design via GetButtonContent(). */
+/* Structural shell only — each game module owns its own visual design via
+   GetButtonContent() or a tileAsset SVG. Height is driven by the contained
+   .game-tile-surface's aspect-ratio so SVGs never get clipped on resize. */
 .game-tile {
     padding: 0;
     border: 0;
@@ -253,7 +255,6 @@
     font: inherit;
     color: inherit;
     transition: transform 0.15s ease;
-    height: 200px;
 }
 
 .game-tile:disabled {
@@ -267,6 +268,19 @@
     outline: 3px solid var(--accent-color);
     outline-offset: 3px;
     border-radius: 14px;
+}
+
+/* Renders when a plugin declares `tileAsset` in its manifest — collapses the
+   former multi-element Razor tile into a single <img>. The SVG owns its own
+   ambient animations via an internal <style> element. Width comes from the
+   parent button; height is left unset so .game-tile-surface's aspect-ratio
+   drives it. */
+.game-tile-img {
+    width: 100%;
+    display: block;
+    pointer-events: none;
+    user-select: none;
+    -webkit-user-drag: none;
 }
 
 /* ── Exit Transition ────────────────────────────────────────────────────── */

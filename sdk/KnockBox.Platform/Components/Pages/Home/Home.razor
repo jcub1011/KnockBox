@@ -48,7 +48,24 @@
             @foreach (var module in VisibleGameModules)
             {
                 <button class="game-tile" aria-label="@module.Manifest.Name" disabled="@(!CanJoinOrCreate)" @onclick="() => CreateLobby(module.Manifest.RouteIdentifier)">
-                    @module.GetButtonContent()
+                    @if (module.Manifest.TileAsset is { } tileAsset)
+                    {
+                        <img class="game-tile-img game-tile-surface"
+                             src="_content/@(module.Manifest.EntryAssembly)/@tileAsset"
+                             alt=""
+                             draggable="false"
+                             loading="lazy" />
+                    }
+                    else if (module.GetButtonContent() is { } legacyContent)
+                    {
+                        @legacyContent
+                    }
+                    else
+                    {
+                        <div class="game-tile-surface game-tile-fallback">
+                            @module.Manifest.Name
+                        </div>
+                    }
                 </button>
             }
         </div>

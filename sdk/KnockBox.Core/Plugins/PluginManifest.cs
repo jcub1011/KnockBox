@@ -16,7 +16,8 @@ public sealed partial record PluginManifest(
     string RouteIdentifier,
     Version Version,
     string EntryAssembly,
-    IReadOnlySet<PluginCapability> Capabilities) : IPluginManifest
+    IReadOnlySet<PluginCapability> Capabilities,
+    string? TileAsset = null) : IPluginManifest
 {
     /// <summary>
     /// The one supported <c>plugin.json</c> schema version. Bump (and add
@@ -202,16 +203,78 @@ public sealed partial record PluginManifest(
                 }
             }
 
+            string? tileAsset = null;
+            if (root.TryGetProperty("tileAsset", out var tileAssetElement)
+                && tileAssetElement.ValueKind != JsonValueKind.Null)
+            {
+                if (tileAssetElement.ValueKind != JsonValueKind.String)
+                {
+                    return ValueResult<PluginManifest>.FromError(
+                        "plugin.json 'tileAsset' must be a string.");
+                }
+
+                var raw = tileAssetElement.GetString()!;
+                if (!TryValidateTileAsset(raw, out var validatedTileAsset, out var tileAssetError))
+                    return ValueResult<PluginManifest>.FromError(tileAssetError);
+
+                tileAsset = validatedTileAsset;
+            }
+
             var manifest = new PluginManifest(
                 Name: name,
                 Description: description,
                 RouteIdentifier: routeIdentifier,
                 Version: version,
                 EntryAssembly: entryAssembly,
-                Capabilities: capabilities);
+                Capabilities: capabilities,
+                TileAsset: tileAsset);
 
             return ValueResult<PluginManifest>.FromValue(manifest);
         }
+    }
+
+    /// <summary>
+    /// Validates a manifest-declared <c>tileAsset</c> path. The path is a
+    /// plugin-wwwroot-relative reference that the host turns into a
+    /// <c>_content/{EntryAssembly}/{tileAsset}</c> URL — it never reaches a
+    /// filesystem call from plugin code, but rejecting absolute paths, parent
+    /// traversal, and backslashes here makes authoring mistakes loud at
+    /// manifest-load time and keeps the URL well-formed across platforms.
+    /// </summary>
+    private static bool TryValidateTileAsset(string raw, out string normalized, out string error)
+    {
+        normalized = string.Empty;
+
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            error = "plugin.json 'tileAsset' is empty or whitespace.";
+            return false;
+        }
+
+        if (raw.Contains('\\'))
+        {
+            error = $"plugin.json 'tileAsset' [{raw}] must use forward slashes, not backslashes.";
+            return false;
+        }
+
+        if (Path.IsPathRooted(raw))
+        {
+            error = $"plugin.json 'tileAsset' [{raw}] must be a relative path.";
+            return false;
+        }
+
+        foreach (var segment in raw.Split('/'))
+        {
+            if (segment == "..")
+            {
+                error = $"plugin.json 'tileAsset' [{raw}] must not contain '..' segments.";
+                return false;
+            }
+        }
+
+        normalized = raw;
+        error = string.Empty;
+        return true;
     }
 
     private enum StringFieldStatus

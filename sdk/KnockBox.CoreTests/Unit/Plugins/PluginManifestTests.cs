@@ -123,6 +123,110 @@ public sealed class PluginManifestTests
         AssertFailureContains(result, "capabilities", "array");
     }
 
+    // ─── TryParse — tileAsset ───────────────────────────────────────────────
+
+    [TestMethod]
+    public void TryParse_ManifestWithoutTileAsset_SucceedsWithNullTileAsset()
+    {
+        using var stream = StreamFor(ValidManifest);
+
+        var result = PluginManifest.TryParse(stream);
+
+        Assert.IsTrue(result.TryGetSuccess(out var manifest));
+        Assert.IsNull(manifest.TileAsset);
+    }
+
+    [TestMethod]
+    [DataRow("tile.svg")]
+    [DataRow("assets/tile.svg")]
+    [DataRow("a/b/c.svg")]
+    public void TryParse_ValidTileAsset_RoundTripsPath(string path)
+    {
+        var json = AddField(ValidManifest, "tileAsset", $"\"{path}\"");
+        using var stream = StreamFor(json);
+
+        var result = PluginManifest.TryParse(stream);
+
+        Assert.IsTrue(result.TryGetSuccess(out var manifest));
+        Assert.AreEqual(path, manifest.TileAsset);
+    }
+
+    [TestMethod]
+    public void TryParse_TileAssetExplicitlyNull_SucceedsWithNullTileAsset()
+    {
+        var json = AddField(ValidManifest, "tileAsset", "null");
+        using var stream = StreamFor(json);
+
+        var result = PluginManifest.TryParse(stream);
+
+        Assert.IsTrue(result.TryGetSuccess(out var manifest));
+        Assert.IsNull(manifest.TileAsset);
+    }
+
+    [TestMethod]
+    public void TryParse_TileAssetNotString_Fails()
+    {
+        var json = AddField(ValidManifest, "tileAsset", "42");
+        using var stream = StreamFor(json);
+
+        var result = PluginManifest.TryParse(stream);
+
+        AssertFailureContains(result, "tileAsset", "string");
+    }
+
+    [TestMethod]
+    [DataRow("")]
+    [DataRow("   ")]
+    public void TryParse_EmptyOrWhitespaceTileAsset_Fails(string value)
+    {
+        var json = AddField(ValidManifest, "tileAsset", $"\"{value}\"");
+        using var stream = StreamFor(json);
+
+        var result = PluginManifest.TryParse(stream);
+
+        AssertFailureContains(result, "tileAsset");
+    }
+
+    [TestMethod]
+    [DataRow("/abs/tile.svg")]
+    [DataRow("C:/Windows/tile.svg")]
+    public void TryParse_AbsoluteTileAssetPath_Fails(string path)
+    {
+        var json = AddField(ValidManifest, "tileAsset", $"\"{path}\"");
+        using var stream = StreamFor(json);
+
+        var result = PluginManifest.TryParse(stream);
+
+        AssertFailureContains(result, "tileAsset", "relative");
+    }
+
+    [TestMethod]
+    [DataRow("..\\tile.svg")]
+    [DataRow("assets\\tile.svg")]
+    public void TryParse_TileAssetWithBackslash_Fails(string path)
+    {
+        var json = AddField(ValidManifest, "tileAsset", $"\"{path.Replace("\\", "\\\\")}\"");
+        using var stream = StreamFor(json);
+
+        var result = PluginManifest.TryParse(stream);
+
+        AssertFailureContains(result, "tileAsset", "forward");
+    }
+
+    [TestMethod]
+    [DataRow("../tile.svg")]
+    [DataRow("a/../b.svg")]
+    [DataRow("..")]
+    public void TryParse_TileAssetWithParentTraversal_Fails(string path)
+    {
+        var json = AddField(ValidManifest, "tileAsset", $"\"{path}\"");
+        using var stream = StreamFor(json);
+
+        var result = PluginManifest.TryParse(stream);
+
+        AssertFailureContains(result, "tileAsset", "..");
+    }
+
     // ─── TryParse — schemaVersion errors ────────────────────────────────────
 
     [TestMethod]
@@ -412,6 +516,28 @@ public sealed class PluginManifestTests
             first = false;
             sb.Append('"').Append(property.Name).Append("\":").Append(property.Value.GetRawText());
         }
+        sb.Append('}');
+        return sb.ToString();
+    }
+
+    /// <summary>
+    /// Appends a new top-level property to a manifest JSON string. Used by the
+    /// tileAsset tests so the base <see cref="ValidManifest"/> stays untouched.
+    /// </summary>
+    private static string AddField(string json, string fieldName, string rawJsonValue)
+    {
+        using var doc = System.Text.Json.JsonDocument.Parse(json);
+        var sb = new StringBuilder();
+        sb.Append('{');
+        var first = true;
+        foreach (var property in doc.RootElement.EnumerateObject())
+        {
+            if (!first) sb.Append(',');
+            first = false;
+            sb.Append('"').Append(property.Name).Append("\":").Append(property.Value.GetRawText());
+        }
+        if (!first) sb.Append(',');
+        sb.Append('"').Append(fieldName).Append("\":").Append(rawJsonValue);
         sb.Append('}');
         return sb.ToString();
     }

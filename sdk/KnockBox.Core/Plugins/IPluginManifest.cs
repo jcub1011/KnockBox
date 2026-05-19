@@ -51,6 +51,17 @@ public interface IPluginManifest
     IReadOnlySet<PluginCapability> Capabilities { get; }
 
     /// <summary>
+    /// Optional plugin-relative path (forward-slash separated, e.g.
+    /// <c>"tile.svg"</c> or <c>"assets/tile.svg"</c>) to an SVG the host
+    /// renders as the plugin's home-page tile in place of
+    /// <see cref="IGameModule.GetButtonContent"/>. The host resolves it against
+    /// the plugin's static-asset mount at
+    /// <c>_content/{EntryAssembly}/{TileAsset}</c>. <c>null</c> means "render
+    /// my Razor tile via GetButtonContent."
+    /// </summary>
+    string? TileAsset => null;
+
+    /// <summary>
     /// Returns <c>true</c> if <paramref name="capability"/> was declared in this
     /// manifest.
     /// </summary>
