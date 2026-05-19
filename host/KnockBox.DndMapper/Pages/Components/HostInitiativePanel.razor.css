@@ -98,8 +98,8 @@
 
 ::deep .dndm-initiative-host-row {
     display: grid;
-    grid-template-columns: 1.5rem 1fr auto;
-    gap: 0.45rem;
+    grid-template-columns: 1.5rem 1fr auto 22px;
+    gap: 0.5rem;
     align-items: center;
     padding: 0.4rem 0.55rem;
     background: rgba(12, 10, 8, 0.5);

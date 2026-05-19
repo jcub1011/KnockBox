@@ -112,11 +112,15 @@ namespace KnockBox.DndMapper.Services.State.Games
 
         internal void SeedBuiltInTemplates()
         {
-            AddBuiltIn(BuiltInDnD5eCoreId, "D&D 5e core", AttributePreset.DnD5eCore);
-            AddBuiltIn(BuiltInDnD5ePlusSkillsId, "D&D 5e + skills", AttributePreset.DnD5ePlusCommonSkills);
-            AddBuiltIn(BuiltInSimpleD20Id, "Simple d20", AttributePreset.SimpleD20);
+            // Each built-in pins its own initiative attribute so combat works
+            // without the host having to configure one. User-saved Custom
+            // schemas still start unset and fall back to the legacy
+            // case-insensitive DEX lookup until the host picks one.
+            AddBuiltIn(BuiltInDnD5eCoreId, "D&D 5e core", AttributePreset.DnD5eCore, initiativeAttribute: "DEX");
+            AddBuiltIn(BuiltInDnD5ePlusSkillsId, "D&D 5e + skills", AttributePreset.DnD5ePlusCommonSkills, initiativeAttribute: "DEX");
+            AddBuiltIn(BuiltInSimpleD20Id, "Simple d20", AttributePreset.SimpleD20, initiativeAttribute: "Modifier");
 
-            void AddBuiltIn(Guid id, string name, AttributePreset preset)
+            void AddBuiltIn(Guid id, string name, AttributePreset preset, string initiativeAttribute)
             {
                 var rows = AttributeSchema.FromPreset(preset).Rows;
                 CustomTemplates[id] = new NamedTemplate
@@ -125,12 +129,7 @@ namespace KnockBox.DndMapper.Services.State.Games
                     Name = name,
                     Rows = [.. rows],
                     IsBuiltIn = true,
-                    // Default to "DEX" when the preset has a DEX row, matching
-                    // long-standing d20 initiative convention. Custom presets
-                    // start unset and fall back to the legacy case-insensitive
-                    // DEX lookup until the host picks one.
-                    InitiativeAttributeName = rows.Any(r => string.Equals(r.Name, "DEX", StringComparison.OrdinalIgnoreCase))
-                        ? "DEX" : null,
+                    InitiativeAttributeName = initiativeAttribute,
                 };
             }
         }

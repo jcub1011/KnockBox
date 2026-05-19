@@ -78,8 +78,6 @@
             }
             else
             {
-                <InitiativeBanner State="State" CurrentUserId="@CurrentUserId" />
-
                 <MapCanvas State="State"
                            Map="ActiveMap"
                            RoomCode="@RoomCode"
@@ -109,6 +107,7 @@
                 @if (!IsHost)
                 {
                     <MyTokenPanel State="State" />
+                    <InitiativeBanner State="State" CurrentUserId="@CurrentUserId" />
                 }
                 <CharacterSheetPanel State="State" CurrentUserId="@CurrentUserId" IsHost="IsHost" />
                 <RollLogPanel State="State"
