@@ -1,64 +1,163 @@
-/* Shared styling for the DnD Mapper UI panels (M05).
-   Loaded once from DndMapperPlayingPhase. Class prefix: dndm-. */
+/* Shared styling for the DnD Mapper UI panels.
+   Loaded once from DndMapperPlayingPhase. Class prefix: dndm-.
+   Aesthetic: Forge & Ember — charcoal/blackened-iron panels with banked
+   ember/copper accents. Tokens below remap names retained from the prior
+   parchment palette, so legacy refs in scoped CSS resolve onto the new
+   palette automatically. */
 
 :root {
-    --dndm-bg-deep: #0e1117;
-    --dndm-bg-panel: #1a1a2e;
-    --dndm-bg-panel-2: #14141f;
-    --dndm-bg-elev: #262640;
-    --dndm-bg-elev-hover: #34345a;
-    --dndm-border: #2c2c44;
-    --dndm-border-strong: #3a3a5c;
-    --dndm-border-accent: rgba(168, 85, 247, 0.35);
-    --dndm-text: #ede4d3;
-    --dndm-text-dim: #b6ad99;
-    --dndm-text-muted: #7a7464;
-    --dndm-gold: #e8b849;
-    --dndm-parchment: #cdb98e;
-    --dndm-danger: #e26b6b;
-    --dndm-success: #6dd6a1;
-    --dndm-display: Georgia, "IM Fell English", "EB Garamond", serif;
+    /* Surfaces */
+    --dndm-bg-deep:        #0c0a08;   /* forge-black wells (inputs, behind panel) */
+    --dndm-bg-panel:       #191512;   /* panel body */
+    --dndm-bg-panel-2:     #221b16;   /* alt rows / shadow */
+    --dndm-bg-elev:        #2a2018;   /* button rest */
+    --dndm-bg-elev-hover:  #382a1e;   /* button hover (ember-tinted) */
+
+    /* Lines */
+    --dndm-border:         #3a2d23;   /* blackened-iron hairline */
+    --dndm-border-strong:  #14100c;
+    --dndm-border-accent:  rgba(196, 116, 56, 0.32);  /* banked-ember copper */
+
+    /* Text */
+    --dndm-text:           #ece0cc;   /* warm ivory */
+    --dndm-text-dim:       #b29a7e;
+    --dndm-text-muted:     #7a6852;
+
+    /* Accents */
+    --dndm-ember:          #c4743a;   /* primary accent */
+    --dndm-ember-hi:       #e89055;   /* hot ember highlight */
+    --dndm-gold:           #8b6a3a;   /* muted copper-gold */
+    --dndm-gilt:           #8b6a3a;   /* alias → muted copper */
+    --dndm-wax:            #c4743a;   /* alias → ember (legacy refs) */
+    --dndm-wax-hi:         #e89055;   /* alias → ember-hi (legacy refs) */
+    --dndm-parchment:      #221b16;   /* alias → panel-2 (legacy refs) */
+
+    /* Semantic */
+    --dndm-danger:         #b04a3a;   /* rust-red */
+    --dndm-success:        #6a8a52;   /* oxidized moss */
+
+    /* Other */
+    --dndm-ink-soft:       rgba(196, 116, 56, 0.22);  /* faint divider over panel */
+    --dndm-void:           #07060a;   /* canvas */
+    --dndm-display:        "Cormorant Garamond", "EB Garamond", Georgia, serif;
+    --dndm-highlight:      rgba(232, 144, 85, 0.07);  /* subtle ember sheen for inset highlights */
+
+    /* Texture / composition */
+    --dndm-noise: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 240 240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.22 0 0 0 0 0.16 0 0 0 0 0.10 0 0 0 0.30 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.35'/></svg>");
+    --dndm-panel-gradient: linear-gradient(180deg, #1d1814 0%, #191512 55%, #14110e 100%);
+    --dndm-panel-vignette: radial-gradient(ellipse at 50% 0%, rgba(196, 116, 56, 0.06), transparent 60%);
 }
 
 /* ─── Panel shell ─────────────────────────────────────────────── */
 .dndm-panel {
-    background: var(--dndm-bg-panel);
-    border: 1px solid var(--dndm-border-accent);
-    border-radius: 6px;
+    position: relative;
+    /* Default (floating contexts: image inspector, settings/perms modal):
+       the panel supplies its own dark translucent background and blur so it
+       reads as a self-contained card over the canvas. Inside .dndm-rail the
+       rail already paints that overlay, so the override below flattens the
+       panel to avoid compounding darkens. */
+    background-color: rgba(25, 21, 18, 0.82);
+    background-image:
+        var(--dndm-noise),
+        var(--dndm-panel-vignette),
+        linear-gradient(180deg, rgba(29, 24, 20, 0.6) 0%, rgba(25, 21, 18, 0.5) 55%, rgba(20, 17, 14, 0.6) 100%);
+    background-position: center, center, center;
+    background-size: 240px 240px, 100% 100%, 100% 100%;
+    background-repeat: repeat, no-repeat, no-repeat;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid var(--dndm-border);
+    border-radius: 4px;
     color: var(--dndm-text);
     font-family: var(--font-primary);
+    font-size: 0.95rem;
+    box-shadow:
+        inset 0 1px 0 var(--dndm-highlight),
+        0 4px 14px rgba(0, 0, 0, 0.55);
+}
+
+/* Inside the rail (which already supplies the dark+blur overlay), flatten
+   panels so two stacked dark layers don't fight each other. */
+.dndm-rail .dndm-panel {
+    background: transparent;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border-color: var(--dndm-border-accent);
+    box-shadow: none;
 }
 
 .dndm-panel-header {
+    position: relative;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0.5rem 0.75rem;
-    border-bottom: 1px solid var(--dndm-border);
+    padding: 0.7rem 0.85rem 0.6rem 1.2rem;
+    border-bottom: 0;
     font-family: var(--dndm-display);
-    font-size: 0.8rem;
-    font-weight: 600;
-    color: var(--dndm-gold);
-    text-transform: uppercase;
-    letter-spacing: 1.5px;
+    font-style: italic;
+    font-size: 1.25rem;
+    font-weight: 500;
+    color: var(--dndm-text);
+    letter-spacing: 0.4px;
+    text-transform: none;
+    cursor: pointer;
+    user-select: none;
+}
+
+/* Collapsed: hide everything in the panel except the header itself. The
+   .dndm-panel-header click handler (dndMapperPanelCollapse.js) toggles the
+   --collapsed class on the panel. */
+.dndm-panel--collapsed > :not(.dndm-panel-header) {
+    display: none !important;
+}
+
+.dndm-panel--collapsed .dndm-panel-header::after {
+    /* No content below — drop the rule so the header doesn't look hollow. */
+    opacity: 0;
+}
+
+/* Subtle ember anchor at the start of every panel header. */
+.dndm-panel-header::before {
+    content: "";
+    position: absolute;
+    left: 0.5rem;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 3px;
+    height: 14px;
+    border-radius: 1px;
+    background: linear-gradient(180deg, var(--dndm-ember-hi), var(--dndm-ember) 60%, #6e3a1a 100%);
+    box-shadow: 0 0 6px rgba(232, 144, 85, 0.35);
+}
+
+/* Copper rule under the header. */
+.dndm-panel-header::after {
+    content: "";
+    position: absolute;
+    left: 0.75rem;
+    right: 0.75rem;
+    bottom: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--dndm-gilt) 15%, var(--dndm-gilt) 85%, transparent);
+    opacity: 0.35;
 }
 
 .dndm-panel-body {
-    padding: 0.5rem 0.75rem;
+    padding: 0.7rem 0.85rem;
 }
 
 .dndm-panel-section {
     padding: 0.5rem 0;
-    border-top: 1px solid var(--dndm-border);
+    border-top: 1px dashed var(--dndm-ink-soft);
 }
 .dndm-panel-section:first-child { border-top: 0; }
 
 .dndm-panel-empty {
     padding: 1rem 0.5rem;
     color: var(--dndm-text-muted);
-    font-style: italic;
-    font-size: 0.85rem;
+    font-size: 0.95rem;
     text-align: center;
+    font-family: var(--font-primary);
 }
 
 /* ─── Buttons ─────────────────────────────────────────────────── */
@@ -66,61 +165,87 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 0.35rem;
+    gap: 0.4rem;
     background: var(--dndm-bg-elev);
     color: var(--dndm-text);
-    border: 1px solid var(--dndm-border-strong);
-    border-radius: 4px;
-    padding: 0.35rem 0.75rem;
+    border: 1px solid var(--dndm-border);
+    border-radius: 3px;
+    padding: 0.5rem 0.95rem;
     font-family: var(--font-primary);
-    font-size: 0.85rem;
+    font-size: 0.95rem;
     cursor: pointer;
-    line-height: 1;
-    transition: background 120ms ease, border-color 120ms ease;
+    line-height: 1.1;
+    transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+    box-shadow: inset 0 1px 0 var(--dndm-highlight);
 }
 
 .dndm-btn:hover {
     background: var(--dndm-bg-elev-hover);
-    border-color: var(--dndm-parchment);
+    border-color: var(--dndm-border-accent);
+    color: #f5e8d3;
 }
 
 .dndm-btn:disabled {
-    opacity: 0.45;
+    opacity: 0.4;
     cursor: not-allowed;
 }
 
+/* Primary: glowing iron — ember gradient with warm-cream text. */
 .dndm-btn--primary {
-    background: linear-gradient(180deg, #b48a2a, #8a6818);
-    border-color: var(--dndm-gold);
+    background: linear-gradient(180deg, var(--dndm-ember-hi), var(--dndm-ember) 55%, #8a4a22 100%);
+    border-color: #5a2e14;
     color: #1a1208;
+    font-family: var(--font-primary);
     font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 1px;
+    letter-spacing: 0.4px;
+    text-shadow: 0 1px 0 rgba(255, 220, 180, 0.35);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 220, 180, 0.4),
+        inset 0 -1px 2px rgba(0, 0, 0, 0.45),
+        0 2px 6px rgba(0, 0, 0, 0.55),
+        0 0 10px rgba(232, 144, 85, 0.18);
 }
-.dndm-btn--primary:hover { background: linear-gradient(180deg, #c79832, #9a7619); }
+.dndm-btn--primary:hover {
+    background: linear-gradient(180deg, #f0a268, var(--dndm-ember-hi) 55%, var(--dndm-ember) 100%);
+    border-color: #5a2e14;
+    color: #100a04;
+}
 
 .dndm-btn--ghost {
     background: transparent;
     border-color: var(--dndm-border);
     color: var(--dndm-text-dim);
+    box-shadow: none;
 }
-.dndm-btn--ghost:hover { color: var(--dndm-text); border-color: var(--dndm-border-strong); }
+.dndm-btn--ghost:hover {
+    color: var(--dndm-text);
+    border-color: var(--dndm-border-accent);
+    background: rgba(196, 116, 56, 0.1);
+}
 
 .dndm-btn--danger {
-    background: #4a1f24;
-    border-color: var(--dndm-danger);
-    color: #f8d8d8;
+    background: linear-gradient(180deg, #c4584a, var(--dndm-danger) 55%, #6a2418 100%);
+    border-color: #4a1a14;
+    color: #fbe8e0;
+    font-family: var(--font-primary);
+    font-weight: 600;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 200, 180, 0.2),
+        0 2px 4px rgba(0, 0, 0, 0.5);
 }
-.dndm-btn--danger:hover { background: #6a2b32; }
+.dndm-btn--danger:hover {
+    background: linear-gradient(180deg, #d06556, var(--dndm-danger) 55%, #7a2c1c 100%);
+    color: #fff2eb;
+}
 
 .dndm-btn--icon {
-    padding: 0.25rem 0.5rem;
-    font-size: 1rem;
+    padding: 0.4rem 0.6rem;
+    font-size: 1.1rem;
 }
 
 .dndm-btn--small {
-    padding: 0.2rem 0.5rem;
-    font-size: 0.75rem;
+    padding: 0.35rem 0.65rem;
+    font-size: 0.85rem;
 }
 
 /* ─── Inputs ──────────────────────────────────────────────────── */
@@ -129,20 +254,23 @@
 .dndm-textarea {
     background: var(--dndm-bg-deep);
     color: var(--dndm-text);
-    border: 1px solid var(--dndm-border-strong);
-    border-radius: 3px;
-    padding: 0.3rem 0.45rem;
+    border: 1px solid var(--dndm-border);
+    border-radius: 2px;
+    padding: 0.45rem 0.6rem;
     font-family: var(--font-primary);
-    font-size: 0.85rem;
+    font-size: 0.95rem;
     width: 100%;
     box-sizing: border-box;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.55);
 }
 .dndm-input:focus,
 .dndm-select:focus,
 .dndm-textarea:focus {
     outline: none;
-    border-color: var(--dndm-gold);
-    box-shadow: 0 0 0 2px rgba(232, 184, 73, 0.15);
+    border-color: var(--dndm-ember);
+    box-shadow:
+        inset 0 1px 2px rgba(0, 0, 0, 0.55),
+        0 0 0 2px rgba(196, 116, 56, 0.28);
 }
 
 .dndm-textarea { resize: vertical; min-height: 60px; }
@@ -151,11 +279,12 @@
 
 .dndm-label {
     display: block;
-    font-size: 0.7rem;
+    font-size: 0.9rem;
     color: var(--dndm-text-dim);
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    margin-bottom: 0.2rem;
+    font-family: var(--font-primary);
+    text-transform: none;
+    letter-spacing: 0.3px;
+    margin-bottom: 0.25rem;
 }
 
 .dndm-row {
@@ -177,67 +306,77 @@
 /* ─── Radio pill group ────────────────────────────────────────── */
 .dndm-pillgroup {
     display: inline-flex;
-    border: 1px solid var(--dndm-border-strong);
-    border-radius: 4px;
+    border: 1px solid var(--dndm-border);
+    border-radius: 3px;
     overflow: hidden;
+    background: var(--dndm-bg-elev);
 }
 .dndm-pillgroup button {
     background: transparent;
     color: var(--dndm-text-dim);
     border: 0;
-    padding: 0.3rem 0.6rem;
-    font-size: 0.75rem;
+    padding: 0.45rem 0.85rem;
+    font-size: 0.9rem;
     font-family: var(--font-primary);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.3px;
     cursor: pointer;
 }
 .dndm-pillgroup button + button { border-left: 1px solid var(--dndm-border); }
-.dndm-pillgroup button:hover { color: var(--dndm-text); }
+.dndm-pillgroup button:hover { color: var(--dndm-text); background: rgba(196, 116, 56, 0.12); }
 .dndm-pillgroup button.active {
-    background: var(--dndm-gold);
+    background: linear-gradient(180deg, var(--dndm-ember-hi), var(--dndm-ember) 60%, #8a4a22 100%);
     color: #1a1208;
     font-weight: 600;
+    text-shadow: 0 1px 0 rgba(255, 220, 180, 0.3);
 }
 
 /* ─── Toggle switch ───────────────────────────────────────────── */
 .dndm-toggle {
     display: inline-flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.55rem;
     cursor: pointer;
     user-select: none;
-    font-size: 0.85rem;
+    font-size: 0.95rem;
+    color: var(--dndm-text);
 }
 .dndm-toggle input { position: absolute; opacity: 0; pointer-events: none; }
 .dndm-toggle-track {
     position: relative;
-    width: 32px; height: 16px;
-    background: var(--dndm-bg-elev);
-    border: 1px solid var(--dndm-border-strong);
-    border-radius: 8px;
-    transition: background 120ms ease;
+    width: 40px; height: 20px;
+    background: var(--dndm-bg-deep);
+    border: 1px solid var(--dndm-border);
+    border-radius: 10px;
+    transition: background 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
+    flex: 0 0 auto;
 }
 .dndm-toggle-track::after {
     content: '';
     position: absolute;
     top: 1px; left: 1px;
-    width: 12px; height: 12px;
+    width: 16px; height: 16px;
     border-radius: 50%;
-    background: var(--dndm-text-dim);
-    transition: transform 140ms ease, background 140ms ease;
+    background: var(--dndm-text-muted);
+    transition: transform 140ms ease, background 140ms ease, box-shadow 140ms ease;
 }
-.dndm-toggle input:checked + .dndm-toggle-track { background: rgba(232, 184, 73, 0.3); border-color: var(--dndm-gold); }
-.dndm-toggle input:checked + .dndm-toggle-track::after { transform: translateX(16px); background: var(--dndm-gold); }
+.dndm-toggle input:checked + .dndm-toggle-track {
+    background: rgba(196, 116, 56, 0.22);
+    border-color: var(--dndm-ember);
+    box-shadow: 0 0 6px rgba(232, 144, 85, 0.25);
+}
+.dndm-toggle input:checked + .dndm-toggle-track::after {
+    transform: translateX(20px);
+    background: radial-gradient(circle at 35% 30%, var(--dndm-ember-hi), var(--dndm-ember) 60%, #6e3a1a 100%);
+    box-shadow: inset 0 1px 0 rgba(255, 220, 180, 0.45), 0 0 4px rgba(232, 144, 85, 0.5);
+}
 
 /* Shared modal chrome. Defined unscoped so any component that renders
    .dndm-modal-overlay / .dndm-modal-card / .dndm-modal-title picks up the
-   styling. Per-component scoped CSS (ConfirmModal, MapSettingsModal,
-   DiceRollerModal) only owns its content-specific rules. */
+   styling. Per-component scoped CSS only owns its content-specific rules. */
 .dndm-modal-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(7, 7, 14, 0.65);
+    background: rgba(7, 7, 14, 0.72);
     backdrop-filter: blur(2px);
     display: flex;
     align-items: center;
@@ -246,38 +385,64 @@
 }
 
 .dndm-modal-card {
+    position: relative;
     min-width: 320px;
     max-width: 480px;
     /* 4rem padding + 100px accounts for the app-level page header so the
        modal never tucks under it on shorter viewports. */
     max-height: calc(100vh - 4rem - 100px);
-    background: #1a1a2e;
-    color: #ede4d3;
-    border: 1px solid rgba(168, 85, 247, 0.35);
-    border-radius: 8px;
+    color: var(--dndm-text);
+    border: 1px solid var(--dndm-border);
+    border-radius: 6px;
     padding: 1.25rem 1.5rem 1rem;
-    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6);
+    box-shadow:
+        inset 0 1px 0 var(--dndm-highlight),
+        0 14px 38px rgba(0, 0, 0, 0.78),
+        0 0 0 1px var(--dndm-border-accent);
     font-family: var(--font-primary);
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    background-color: var(--dndm-bg-panel);
+    background-image:
+        var(--dndm-noise),
+        var(--dndm-panel-vignette),
+        var(--dndm-panel-gradient);
+    background-position: center, center, center;
+    background-size: 240px 240px, 100% 100%, 100% 100%;
+    background-repeat: repeat, no-repeat, no-repeat;
 }
 
 .dndm-modal-title {
-    margin: 0 0 0.5rem 0;
-    font-family: Georgia, "IM Fell English", "EB Garamond", serif;
-    font-size: 1.15rem;
-    font-weight: 600;
-    color: #e8b849;
-    letter-spacing: 1px;
-    text-transform: uppercase;
+    position: relative;
+    margin: 0 0 0.75rem 0;
+    padding-bottom: 0.5rem;
+    font-family: var(--dndm-display);
+    font-style: italic;
+    font-size: 1.4rem;
+    font-weight: 500;
+    color: var(--dndm-text);
+    letter-spacing: 0.4px;
+    text-transform: none;
+}
+
+.dndm-modal-title::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--dndm-ember) 12%, var(--dndm-ember) 88%, transparent);
+    opacity: 0.4;
 }
 
 .dndm-modal-message {
     margin: 0 0 1rem 0;
     font-size: 0.95rem;
-    line-height: 1.45;
-    color: #d8cfbe;
+    line-height: 1.5;
+    color: var(--dndm-text-dim);
+    font-family: var(--font-primary);
 }
 
 .dndm-modal-actions {
@@ -296,7 +461,113 @@
 }
 
 .dndm-modal-error {
-    color: #e26b6b;
+    color: var(--dndm-danger);
     font-size: 0.85rem;
     margin: 0.4rem 0 0;
+    font-style: italic;
+}
+
+/* ─── Markup overlay (v1.x §5.6) — SvgDrawingCanvas overrides ─────
+   The platform's SvgDrawingCanvas paints its drawing area with an
+   opaque slate-grey background and outlines the viewBox with a dashed
+   stroke. When we mount it over the live map, the host needs to see
+   the map underneath — so these rules force every internal background
+   transparent inside the markup mount. Lives here (unscoped) because
+   the SvgDrawingCanvas elements belong to a different Blazor scope and
+   `::deep` selectors in the wrapper component's scoped CSS don't reach
+   across that boundary reliably. */
+.dndm-markup-overlay-mount .svg-drawing-canvas,
+.dndm-markup-overlay-mount .svg-canvas-drawing-area,
+.dndm-markup-overlay-mount .svg-canvas-base {
+    background: transparent !important;
+    background-color: transparent !important;
+}
+
+.dndm-markup-overlay-mount .svg-drawing-canvas {
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+}
+
+/* The dashed outline rect inside .svg-canvas-base marks the drawable
+   viewBox. The map's own grid already communicates that boundary, so
+   hide the rect — it just adds visual noise on top of the map. */
+.dndm-markup-overlay-mount .svg-canvas-base > rect {
+    display: none;
+}
+
+/* ── viewBox cell-unit fix ──
+   SvgDrawingCanvas was designed for pixel-unit viewBoxes (e.g. 800×600
+   for a drawing pad). It sets the SVG element's `width` and `height`
+   attributes to the viewBox dimensions, so passing cell-unit dimensions
+   (e.g. 30×20) makes the SVG intrinsically 30×20 CSS pixels. The
+   platform's `.has-viewbox > svg` rule then pins it at `width:auto;
+   max-width:100%` — which means the SVG never grows past 30×20 px
+   inside our overlay. Force every SVG inside the markup mount to fill
+   its parent; preserveAspectRatio="xMidYMid meet" still keeps strokes
+   aligned with map cells. */
+.dndm-markup-overlay-mount .svg-canvas-drawing-area > svg,
+.dndm-markup-overlay-mount .svg-canvas-drawing-area.has-viewbox > svg {
+    width: 100% !important;
+    height: 100% !important;
+    max-width: 100% !important;
+    max-height: 100% !important;
+}
+
+.dndm-markup-overlay-mount .svg-canvas-drawing-area {
+    place-items: stretch !important;
+}
+
+/* Float the drawing canvas's built-in toolbar absolutely over the
+   drawing area instead of letting it take a flex slice at the top.
+   Why: both the drawing surface and the underlying map SVG use
+   `preserveAspectRatio="xMidYMid meet"` to letterbox content. If the
+   toolbar consumed real vertical space, the drawing area would be
+   shorter than the map SVG, the letterboxed content would center in a
+   smaller box, and strokes would land shifted-up on the map by half
+   the toolbar height. Floating the toolbar keeps both surfaces the
+   exact same size and origin, so a stroke at screen (x, y) lands on
+   the map cell directly below it. */
+.dndm-markup-overlay-mount .svg-drawing-canvas {
+    position: relative;
+}
+
+.dndm-markup-overlay-mount .toolbar-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 10;
+    pointer-events: auto;
+}
+
+.dndm-markup-overlay-mount .svg-canvas-drawing-area {
+    flex: 1 1 100% !important;
+    height: 100% !important;
+}
+
+/* Restyle the drawing canvas's built-in toolbar to fit the Forge &
+   Ember palette so it doesn't fight the panel chrome underneath. */
+.dndm-markup-overlay-mount .svg-canvas-toolbar {
+    background: rgba(20, 17, 14, 0.86) !important;
+    border-bottom: 1px solid var(--dndm-border-accent) !important;
+    color: var(--dndm-text);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+}
+
+/* Rename icon — bold "R" followed by a static I-beam glyph. Used by any
+   "rename" affordance button (saves panel, character-sheet dropdown, …). */
+.dndm-rename-icon {
+    display: inline-flex;
+    align-items: center;
+    font-family: var(--font-primary);
+    font-weight: 700;
+    font-size: 0.95rem;
+    line-height: 1;
+}
+
+.dndm-rename-icon svg {
+    margin-left: 2px;
+    flex: 0 0 auto;
 }

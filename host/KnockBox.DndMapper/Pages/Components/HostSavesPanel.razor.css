@@ -1,0 +1,96 @@
+.dndm-savesp .dndm-panel-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    padding: 0.4rem 0.5rem;
+}
+
+.dndm-saves-create {
+    display: flex;
+    gap: 0.3rem;
+    align-items: center;
+}
+
+.dndm-saves-create .dndm-input {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.dndm-saves-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.dndm-saves-row {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.3rem 0.4rem;
+    background: var(--dndm-bg-panel-2);
+    border: 1px solid var(--dndm-border);
+    border-radius: 3px;
+    box-shadow: inset 0 1px 0 rgba(232, 144, 85, 0.06);
+}
+
+.dndm-saves-row--auto {
+    border-left: 3px solid var(--dndm-ember);
+}
+
+/* Loadable rows are interactive: dbl-click loads, hover hints at it. */
+.dndm-saves-row--loadable {
+    cursor: pointer;
+    transition: border-color 120ms ease, background 120ms ease;
+}
+
+.dndm-saves-row--loadable:hover {
+    border-color: var(--dndm-ember);
+    background: rgba(196, 116, 56, 0.10);
+}
+
+/* Rename icon styling moved to shared panels.css as .dndm-rename-icon. */
+
+.dndm-saves-meta {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.dndm-saves-name {
+    color: var(--dndm-text);
+    font-family: var(--font-primary);
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dndm-saves-row--auto .dndm-saves-name {
+    font-style: italic;
+}
+
+.dndm-saves-when {
+    color: var(--dndm-text-muted);
+    font-size: 0.8rem;
+}
+
+.dndm-saves-actions {
+    display: flex;
+    gap: 0.25rem;
+    flex-wrap: wrap;
+}
+
+.dndm-saves-renameinput {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.dndm-saves-error {
+    color: var(--dndm-danger);
+    font-size: 0.85rem;
+    font-style: italic;
+}

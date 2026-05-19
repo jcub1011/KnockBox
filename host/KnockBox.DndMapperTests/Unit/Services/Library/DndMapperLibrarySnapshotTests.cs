@@ -38,13 +38,13 @@ namespace KnockBox.DndMapperTests.Unit.Services.Library
 
             var snap = LibrarySnapshotMapper.FromState(state);
 
-            Assert.AreEqual(1, snap.SchemaVersion);
-            Assert.AreEqual(1, snap.Maps.Count);
+            Assert.AreEqual(3, snap.SchemaVersion);
+            Assert.HasCount(1, snap.Maps);
             Assert.AreEqual("Forest", snap.Maps[0].Name);
-            Assert.AreEqual(1, snap.Maps[0].Tokens.Count);
-            Assert.AreEqual(1, snap.Maps[0].Images.Count);
+            Assert.HasCount(1, snap.Maps[0].Tokens);
+            Assert.HasCount(1, snap.Maps[0].Images);
             Assert.AreEqual("image/png", snap.Maps[0].Images[0].ContentType);
-            Assert.AreEqual(1, snap.Sheets.Count);
+            Assert.HasCount(1, snap.Sheets);
             Assert.AreEqual(AttributePreset.DnD5eCore, snap.AttributeSchema.Preset);
         }
 
@@ -90,10 +90,10 @@ namespace KnockBox.DndMapperTests.Unit.Services.Library
 
             Assert.IsNotNull(reread);
             Assert.AreEqual(original.SchemaVersion, reread!.SchemaVersion);
-            Assert.AreEqual(original.Maps.Count, reread.Maps.Count);
+            Assert.HasCount(original.Maps.Count, reread.Maps);
             Assert.AreEqual(original.Maps[0].Name, reread.Maps[0].Name);
             Assert.AreEqual(original.Maps[0].Tokens[0].Name, reread.Maps[0].Tokens[0].Name);
-            Assert.AreEqual(original.Sheets.Count, reread.Sheets.Count);
+            Assert.HasCount(original.Sheets.Count, reread.Sheets);
             Assert.AreEqual(original.AttributeSchema.Preset, reread.AttributeSchema.Preset);
         }
 
@@ -185,7 +185,7 @@ namespace KnockBox.DndMapperTests.Unit.Services.Library
             var snap = new AttributeSchemaSnapshot { Preset = AttributePreset.DnD5eCore, Rows = [] };
             var schema = LibrarySnapshotMapper.ToAttributeSchema(snap);
             Assert.AreEqual(AttributePreset.DnD5eCore, schema.Preset);
-            Assert.IsTrue(schema.Rows.Count > 0, "DnD5eCore preset should have non-empty rows.");
+            Assert.IsNotEmpty(schema.Rows, "DnD5eCore preset should have non-empty rows.");
         }
 
         [TestMethod]
@@ -208,9 +208,252 @@ namespace KnockBox.DndMapperTests.Unit.Services.Library
             var schema = LibrarySnapshotMapper.ToAttributeSchema(snap);
 
             Assert.AreEqual(AttributePreset.Custom, schema.Preset);
-            Assert.AreEqual(1, schema.Rows.Count);
+            Assert.HasCount(1, schema.Rows);
             Assert.AreEqual("Spice", schema.Rows[0].Name);
             Assert.AreEqual(12, schema.Rows[0].Default.IntValue);
+        }
+
+        // ── Built-ins are serialized so their status-effect templates can ride along ─
+
+        [TestMethod]
+        public void FromState_IncludesBuiltInTemplates_WithIsBuiltInFlag()
+        {
+            // Built-ins must round-trip because hosts can author status-effect
+            // templates underneath them. The Rows on built-ins are still
+            // re-seeded from the preset on load (snapshot Rows are ignored
+            // for IsBuiltIn entries), so preset evolution remains safe.
+            var (engine, state, host, _) = EngineTestFactory.Build();
+            IReadOnlyList<AttributeRow> rows =
+                [new("STR", AttributeValueType.Score, AttributeValue.Score(10))];
+            Assert.IsTrue(engine.CreateCustomTemplateAsync(state, host, "MyTpl", rows)
+                .TryGetSuccess(out var userTplId));
+
+            // Sanity: state contains 3 built-ins + 1 user template.
+            Assert.HasCount(4, state.CustomTemplates);
+
+            var snap = LibrarySnapshotMapper.FromState(state);
+
+            Assert.HasCount(4, snap.CustomTemplates);
+            var user = snap.CustomTemplates.Single(t => t.Id == userTplId);
+            Assert.AreEqual("MyTpl", user.Name);
+            Assert.IsFalse(user.IsBuiltIn);
+            Assert.AreEqual(3, snap.CustomTemplates.Count(t => t.IsBuiltIn));
+        }
+
+        // ── Status-effect persistence (V2) ───────────────────────────────────────
+
+        [TestMethod]
+        public void FromState_PersistsStatusEffectTemplates_UnderBuiltInSchema()
+        {
+            var (engine, state, host, _) = EngineTestFactory.Build();
+            Assert.IsTrue(engine.CreateStatusEffectTemplateAsync(state, host, "Frostbite",
+                [new AttributeDelta("STR", -2)], null, null, "icy").IsSuccess);
+
+            var snap = LibrarySnapshotMapper.FromState(state);
+
+            var core = snap.CustomTemplates.Single(t => t.Id == KnockBox.DndMapper.Services.State.Games.DndMapperGameState.BuiltInDnD5eCoreId);
+            Assert.HasCount(1, core.StatusEffectTemplates);
+            Assert.AreEqual("Frostbite", core.StatusEffectTemplates[0].Name);
+            Assert.AreEqual(-2, core.StatusEffectTemplates[0].AttributeDeltas[0].Delta);
+            Assert.AreEqual("STR", core.StatusEffectTemplates[0].AttributeDeltas[0].AttributeName);
+            Assert.AreEqual("icy", core.StatusEffectTemplates[0].Notes);
+        }
+
+        [TestMethod]
+        public void FromState_PersistsActiveSchemaTemplateId()
+        {
+            var (_, state, _, _) = EngineTestFactory.Build();
+            var snap = LibrarySnapshotMapper.FromState(state);
+            Assert.AreEqual(KnockBox.DndMapper.Services.State.Games.DndMapperGameState.BuiltInDnD5eCoreId,
+                snap.ActiveSchemaTemplateId);
+        }
+
+        [TestMethod]
+        public void FromState_PersistsAppliedStatusEffectsOnSheets()
+        {
+            var (engine, state, host, _) = EngineTestFactory.Build();
+            Assert.IsTrue(engine.CreateSheetAsync(state, host, ownerUserId: null, "Goblin")
+                .TryGetSuccess(out var sheetId));
+            Assert.IsTrue(engine.ApplyStatusEffectAsync(state, host, sheetId, "Bleed",
+                [new AttributeDelta("STR", -1)], maxHpDelta: null, onApplyHpDelta: -3, notes: "bleeding").IsSuccess);
+
+            var snap = LibrarySnapshotMapper.FromState(state);
+
+            var sheetSnap = snap.Sheets.Single(s => s.Id == sheetId);
+            Assert.HasCount(1, sheetSnap.StatusEffects);
+            Assert.AreEqual("Bleed", sheetSnap.StatusEffects[0].Name);
+            Assert.AreEqual(-3, sheetSnap.StatusEffects[0].OnApplyHpDelta);
+            Assert.AreEqual("bleeding", sheetSnap.StatusEffects[0].Notes);
+        }
+
+        [TestMethod]
+        public void Snapshot_RoundTripsStatusEffects_ThroughJson()
+        {
+            var (engine, state, host, _) = EngineTestFactory.Build();
+            Assert.IsTrue(engine.CreateStatusEffectTemplateAsync(state, host, "Frostbite",
+                [new AttributeDelta("STR", -2)], null, null, "icy").IsSuccess);
+            Assert.IsTrue(engine.CreateSheetAsync(state, host, ownerUserId: null, "Goblin")
+                .TryGetSuccess(out var sheetId));
+            Assert.IsTrue(engine.ApplyStatusEffectAsync(state, host, sheetId, "Bleed",
+                [new AttributeDelta("STR", -1)], null, null, null).IsSuccess);
+
+            var snap = LibrarySnapshotMapper.FromState(state);
+            var json = JsonSerializer.Serialize(snap, JsonOptions);
+            var reread = JsonSerializer.Deserialize<LibrarySnapshot>(json, JsonOptions);
+
+            Assert.IsNotNull(reread);
+            var core = reread!.CustomTemplates.Single(t => t.IsBuiltIn
+                && t.Id == KnockBox.DndMapper.Services.State.Games.DndMapperGameState.BuiltInDnD5eCoreId);
+            Assert.HasCount(1, core.StatusEffectTemplates);
+            Assert.AreEqual("Frostbite", core.StatusEffectTemplates[0].Name);
+
+            var sheet = reread.Sheets.Single(s => s.Id == sheetId);
+            Assert.HasCount(1, sheet.StatusEffects);
+            Assert.AreEqual("Bleed", sheet.StatusEffects[0].Name);
+            Assert.AreEqual(3, reread.SchemaVersion);
+        }
+
+        // ── Roll-template persistence (V3) ───────────────────────────────────────
+
+        [TestMethod]
+        public void FromState_PersistsGlobalRollTemplates()
+        {
+            var (engine, state, host, _) = EngineTestFactory.Build();
+            Assert.IsTrue(engine.CreateGlobalRollTemplateAsync(state, host, "Initiative",
+                [new DiceTerm(1, 20)], 0, RollMode.Normal, "DEX", "Initiative").IsSuccess);
+
+            var snap = LibrarySnapshotMapper.FromState(state);
+
+            Assert.HasCount(1, snap.GlobalRollTemplates);
+            Assert.AreEqual("Initiative", snap.GlobalRollTemplates[0].Name);
+            Assert.AreEqual("DEX", snap.GlobalRollTemplates[0].AttributeName);
+            Assert.HasCount(1, snap.GlobalRollTemplates[0].Dice);
+            Assert.AreEqual(20, snap.GlobalRollTemplates[0].Dice[0].Sides);
+        }
+
+        [TestMethod]
+        public void FromState_PersistsSheetRollTemplates()
+        {
+            var (engine, state, host, _) = EngineTestFactory.Build();
+            Assert.IsTrue(engine.CreateSheetAsync(state, host, ownerUserId: null, "Goblin")
+                .TryGetSuccess(out var sheetId));
+            Assert.IsTrue(engine.CreateSheetRollTemplateAsync(state, host, sheetId, "Spell",
+                [new DiceTerm(1, 20)], 5, RollMode.Normal, "INT", "Spell").IsSuccess);
+
+            var snap = LibrarySnapshotMapper.FromState(state);
+            var sheetSnap = snap.Sheets.Single(s => s.Id == sheetId);
+
+            Assert.HasCount(1, sheetSnap.RollTemplates);
+            Assert.AreEqual("Spell", sheetSnap.RollTemplates[0].Name);
+            Assert.AreEqual(5, sheetSnap.RollTemplates[0].FlatModifier);
+            Assert.AreEqual("INT", sheetSnap.RollTemplates[0].AttributeName);
+        }
+
+        [TestMethod]
+        public void Snapshot_RollTemplates_RoundTripThroughJson()
+        {
+            var (engine, state, host, _) = EngineTestFactory.Build();
+            Assert.IsTrue(engine.CreateGlobalRollTemplateAsync(state, host, "Init",
+                [new DiceTerm(1, 20)], 0, RollMode.Normal, "DEX", "Init").IsSuccess);
+            Assert.IsTrue(engine.CreateSheetAsync(state, host, ownerUserId: null, "G")
+                .TryGetSuccess(out var sheetId));
+            Assert.IsTrue(engine.CreateSheetRollTemplateAsync(state, host, sheetId, "Atk",
+                [new DiceTerm(1, 20)], 5, RollMode.Advantage, "STR", "Atk").IsSuccess);
+
+            var json = JsonSerializer.Serialize(LibrarySnapshotMapper.FromState(state), JsonOptions);
+            var reread = JsonSerializer.Deserialize<LibrarySnapshot>(json, JsonOptions);
+
+            Assert.IsNotNull(reread);
+            Assert.HasCount(1, reread!.GlobalRollTemplates);
+            Assert.AreEqual("DEX", reread.GlobalRollTemplates[0].AttributeName);
+            var sheet = reread.Sheets.Single(s => s.Id == sheetId);
+            Assert.HasCount(1, sheet.RollTemplates);
+            Assert.AreEqual(RollMode.Advantage, sheet.RollTemplates[0].Mode);
+            Assert.AreEqual(5, sheet.RollTemplates[0].FlatModifier);
+        }
+
+        [TestMethod]
+        public void FromRollTemplateSnapshot_AssignsScopeFromLocation()
+        {
+            var snap = new RollTemplateSnapshot
+            {
+                Id = Guid.NewGuid(),
+                Name = "x",
+                Dice = [new DiceTermSnapshot { Count = 1, Sides = 20 }],
+                FlatModifier = 0,
+                Mode = RollMode.Normal,
+                AttributeName = null,
+                Label = "x",
+            };
+
+            var asGlobal = LibrarySnapshotMapper.FromRollTemplateSnapshot(snap, RollTemplateScope.Global);
+            var asSheet = LibrarySnapshotMapper.FromRollTemplateSnapshot(snap, RollTemplateScope.Sheet);
+
+            Assert.AreEqual(RollTemplateScope.Global, asGlobal.Scope);
+            Assert.AreEqual(RollTemplateScope.Sheet, asSheet.Scope);
+        }
+
+        // ── V1 backward compatibility ────────────────────────────────────────────
+
+        [TestMethod]
+        public void Snapshot_LoadsV1Json_WithoutNewFields_DeserializesWithSensibleDefaults()
+        {
+            // Hand-rolled V1 shape: SchemaVersion = 1, no ActiveSchemaTemplateId,
+            // no GlobalRollTemplates, NamedTemplate entries lack IsBuiltIn /
+            // StatusEffectTemplates / InitiativeAttributeName, SheetSnapshot
+            // lacks StatusEffects / RollTemplates. Built-in templates were
+            // filtered out before serialization in V1, so CustomTemplates
+            // carries only user-saved entries. Proves the DTO defaults keep
+            // older disk slots loadable.
+            const string v1Json = """
+            {
+              "SchemaVersion": 1,
+              "Settings": {},
+              "AttributeSchema": { "Preset": 0, "Rows": [] },
+              "Maps": [],
+              "Sheets": [
+                {
+                  "Id": "11111111-1111-1111-1111-111111111111",
+                  "CharacterName": "Goblin",
+                  "Values": {},
+                  "Notes": "",
+                  "Hp": null,
+                  "MaxHp": null
+                }
+              ],
+              "CustomTemplates": [
+                {
+                  "Id": "22222222-2222-2222-2222-222222222222",
+                  "Name": "MyTpl",
+                  "Rows": []
+                }
+              ]
+            }
+            """;
+
+            var snap = JsonSerializer.Deserialize<LibrarySnapshot>(v1Json, JsonOptions);
+
+            Assert.IsNotNull(snap);
+            Assert.AreEqual(1, snap!.SchemaVersion);
+            Assert.IsNull(snap.ActiveSchemaTemplateId);
+            Assert.IsEmpty(snap.GlobalRollTemplates);
+
+            Assert.HasCount(1, snap.Sheets);
+            Assert.IsEmpty(snap.Sheets[0].StatusEffects);
+            Assert.IsEmpty(snap.Sheets[0].RollTemplates);
+
+            Assert.HasCount(1, snap.CustomTemplates);
+            var tpl = snap.CustomTemplates[0];
+            Assert.IsFalse(tpl.IsBuiltIn);
+            Assert.IsEmpty(tpl.StatusEffectTemplates);
+            Assert.IsNull(tpl.InitiativeAttributeName);
+
+            // The fallback the load path relies on for V1's missing
+            // ActiveSchemaTemplateId: infer from the persisted preset.
+            Assert.AreEqual(
+                KnockBox.DndMapper.Services.State.Games.DndMapperGameState.BuiltInDnD5eCoreId,
+                KnockBox.DndMapper.Services.State.Games.DndMapperGameState.BuiltInTemplateIdFor(
+                    snap.AttributeSchema.Preset));
         }
 
         [TestMethod]

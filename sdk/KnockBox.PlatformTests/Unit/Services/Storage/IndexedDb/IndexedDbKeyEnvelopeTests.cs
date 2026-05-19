@@ -68,7 +68,7 @@ public sealed class IndexedDbKeyEnvelopeTests
         Assert.AreEqual(IndexedDbKeyKind.Array, parsed.Kind);
 
         var parts = (IReadOnlyList<IndexedDbKey>)parsed.Value!;
-        Assert.AreEqual(3, parts.Count);
+        Assert.HasCount(3, parts);
         Assert.AreEqual(IndexedDbKeyKind.String, parts[0].Kind);
         Assert.AreEqual("ns", parts[0].Value);
         Assert.AreEqual(IndexedDbKeyKind.Number, parts[1].Kind);

@@ -268,7 +268,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword
             // p0 votes end (1 of 3 — not majority).
             string p0Id = state.TurnManager.TurnOrder[0];
             _engine.VoteContinueOrEndRound(UserFactory.Create("dummy", p0Id), state, voteToEnd: true);
-            Assert.AreEqual(1, state.EndGameVoteStatus.VotedToEnd.Count);
+            Assert.HasCount(1, state.EndGameVoteStatus.VotedToEnd);
 
             // p1 leaves without voting.
             string p1Id = state.TurnManager.TurnOrder[1];
@@ -278,7 +278,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword
             // and p2/p3 still un-voted → stay in ContinueOrEndRound.
             Assert.AreEqual(CodewordGamePhase.ContinueOrEndRound, state.Phase);
             Assert.AreEqual(2, state.EndGameVoteStatus.RequiredVotes);
-            Assert.AreEqual(1, state.EndGameVoteStatus.VotedToEnd.Count);
+            Assert.HasCount(1, state.EndGameVoteStatus.VotedToEnd);
         }
 
         [TestMethod]

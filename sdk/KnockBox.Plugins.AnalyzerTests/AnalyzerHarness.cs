@@ -64,9 +64,9 @@ internal static class AnalyzerHarness
     {
         var diagnostics = await GetDiagnosticsAsync<TAnalyzer>(source);
 
-        Assert.AreEqual(
+        Assert.HasCount(
             1,
-            diagnostics.Length,
+            diagnostics,
             $"Expected exactly one diagnostic, got [{diagnostics.Length}]:{Environment.NewLine}" +
             string.Join(Environment.NewLine, diagnostics.Select(d => "  " + d)));
 
@@ -82,9 +82,8 @@ internal static class AnalyzerHarness
         where TAnalyzer : DiagnosticAnalyzer, new()
     {
         var diagnostics = await GetDiagnosticsAsync<TAnalyzer>(source);
-        Assert.AreEqual(
-            0,
-            diagnostics.Length,
+        Assert.IsEmpty(
+            diagnostics,
             $"Expected no diagnostics, got [{diagnostics.Length}]:{Environment.NewLine}" +
             string.Join(Environment.NewLine, diagnostics.Select(d => "  " + d)));
     }

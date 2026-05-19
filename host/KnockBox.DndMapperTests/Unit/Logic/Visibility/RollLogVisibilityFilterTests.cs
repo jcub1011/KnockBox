@@ -50,7 +50,7 @@ namespace KnockBox.DndMapperTests.Unit.Logic.Visibility
         public void VisibleTo_EmptyLog_ReturnsEmpty()
         {
             var visible = RollLogVisibilityFilter.VisibleTo([], "u1", viewerIsHost: false, rollsVisibleToPlayers: false).ToList();
-            Assert.AreEqual(0, visible.Count);
+            Assert.IsEmpty(visible);
         }
 
         [TestMethod]
@@ -65,7 +65,7 @@ namespace KnockBox.DndMapperTests.Unit.Logic.Visibility
                 Roll("u1"),
             };
             var visible = RollLogVisibilityFilter.VisibleTo(log, "u1", false, false).ToList();
-            Assert.AreEqual(3, visible.Count);
+            Assert.HasCount(3, visible);
             Assert.IsTrue(visible.All(r => r.RollerUserId == "u1"));
         }
     }

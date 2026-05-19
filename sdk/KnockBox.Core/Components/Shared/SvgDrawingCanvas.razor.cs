@@ -70,6 +70,14 @@ namespace KnockBox.Core.Components.Shared
         /// <summary>Height of the SVG viewBox coordinate space (device-independent units).</summary>
         [Parameter] public int? ViewBoxHeight { get; set; }
 
+        /// <summary>
+        /// Fires whenever the JS canvas reports a completed stroke (or undo / redo / fill /
+        /// clear). The argument is the current stroke count after the operation. Wrappers
+        /// (e.g. the DnD Mapper markup overlay) hook this to broadcast the latest serialized
+        /// SVG to all clients via their engine verb.
+        /// </summary>
+        [Parameter] public EventCallback<int> StrokeCompleted { get; set; }
+
         private string? ViewBoxAttribute => ViewBoxWidth.HasValue && ViewBoxHeight.HasValue
             ? $"0 0 {ViewBoxWidth} {ViewBoxHeight}"
             : null;
@@ -151,9 +159,11 @@ namespace KnockBox.Core.Components.Shared
 
         /// <summary>Called from JavaScript whenever a stroke is completed or undone.</summary>
         [JSInvokable]
-        public void OnStrokeCompleted(int strokeCount)
+        public async Task OnStrokeCompleted(int strokeCount)
         {
             _strokeCount = strokeCount;
+            if (StrokeCompleted.HasDelegate)
+                await StrokeCompleted.InvokeAsync(strokeCount);
         }
 
         /// <summary>Called from JavaScript when the active tool changes.</summary>

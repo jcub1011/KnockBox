@@ -86,7 +86,7 @@ public sealed class DefaultPluginRegistrationTests
         reg.AddSingleton<IProfanityFilter, FakeProfanityFilter>();
 
         // Registration must be dropped. Only the host's original registration remains.
-        Assert.AreEqual(1, services.Count(d => d.ServiceType == typeof(IProfanityFilter)));
+        Assert.ContainsSingle(d => d.ServiceType == typeof(IProfanityFilter), services);
     }
 
     [TestMethod]
@@ -97,7 +97,7 @@ public sealed class DefaultPluginRegistrationTests
 
         reg.AddScoped<ILobbyCodeService, FakeLobbyCodeService>();
 
-        Assert.AreEqual(1, services.Count(d => d.ServiceType == typeof(ILobbyCodeService)));
+        Assert.ContainsSingle(d => d.ServiceType == typeof(ILobbyCodeService), services);
     }
 
     [TestMethod]
@@ -108,7 +108,7 @@ public sealed class DefaultPluginRegistrationTests
 
         reg.AddTransient<IProfanityFilter, FakeProfanityFilter>();
 
-        Assert.AreEqual(1, services.Count(d => d.ServiceType == typeof(IProfanityFilter)));
+        Assert.ContainsSingle(d => d.ServiceType == typeof(IProfanityFilter), services);
     }
 
     [TestMethod]
@@ -119,7 +119,7 @@ public sealed class DefaultPluginRegistrationTests
 
         reg.AddSingleton<IProfanityFilter>(_ => new FakeProfanityFilter());
 
-        Assert.AreEqual(1, services.Count(d => d.ServiceType == typeof(IProfanityFilter)));
+        Assert.ContainsSingle(d => d.ServiceType == typeof(IProfanityFilter), services);
     }
 
     // ─── Denylist catches always-protected types regardless of snapshot ────
@@ -134,7 +134,7 @@ public sealed class DefaultPluginRegistrationTests
 
         reg.AddSingleton<AbstractGameEngine, DummyEngine>();
 
-        Assert.IsFalse(services.Any(d => d.ServiceType == typeof(AbstractGameEngine)));
+        Assert.DoesNotContain(d => d.ServiceType == typeof(AbstractGameEngine), services);
     }
 
     [TestMethod]
@@ -147,7 +147,7 @@ public sealed class DefaultPluginRegistrationTests
 
         reg.AddSingleton<ILogger<PluginServiceImpl>, FakeLogger>();
 
-        Assert.IsFalse(services.Any(d => d.ServiceType == typeof(ILogger<PluginServiceImpl>)));
+        Assert.DoesNotContain(d => d.ServiceType == typeof(ILogger<PluginServiceImpl>), services);
     }
 
     [TestMethod]
@@ -178,7 +178,7 @@ public sealed class DefaultPluginRegistrationTests
 
         reg.AddSingleton<IPluginService, PluginServiceImpl>();
 
-        Assert.IsTrue(services.Any(d => d.ServiceType == typeof(IPluginService)));
+        Assert.Contains(d => d.ServiceType == typeof(IPluginService), services);
     }
 
     [TestMethod]
@@ -189,10 +189,10 @@ public sealed class DefaultPluginRegistrationTests
 
         reg.AddGameEngine<DummyEngine>();
 
-        Assert.IsTrue(services.Any(d => d.ServiceType == typeof(DummyEngine)),
+        Assert.Contains(d => d.ServiceType == typeof(DummyEngine), services,
             "Concrete engine must be registered as a singleton.");
-        Assert.IsTrue(
-            services.Any(d => d.ServiceType == typeof(AbstractGameEngine) && d.IsKeyedService),
+        Assert.Contains(
+            d => d.ServiceType == typeof(AbstractGameEngine) && d.IsKeyedService, services,
             "Keyed AbstractGameEngine registration must also be present.");
         Assert.AreEqual(1, reg.GameEngineRegistrationCount);
     }
@@ -210,8 +210,8 @@ public sealed class DefaultPluginRegistrationTests
 
         var snapshot = DefaultPluginRegistration.CaptureHostOwnedServiceTypes(services);
 
-        Assert.IsTrue(snapshot.Contains(typeof(ILogger<DummyEngine>)));
-        Assert.IsTrue(snapshot.Contains(typeof(ILogger<>)));
+        Assert.Contains(typeof(ILogger<DummyEngine>), snapshot);
+        Assert.Contains(typeof(ILogger<>), snapshot);
     }
 
     private sealed class DummyEngine : AbstractGameEngine

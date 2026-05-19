@@ -133,6 +133,19 @@ namespace KnockBox.DndMapper.Pages.Components
             var result = GameEngine.MoveTokenAsync(State, UserService.CurrentUser, tokenId, sx, sy);
             if (result.IsSuccess)
             {
+                // Force the visual back to the authoritative coords. Required when
+                // the snapped drop lands on the same cell the drag started in —
+                // Blazor's transform-attribute diff is a no-op and would leave the
+                // JS-applied mid-cell transform in place.
+                if (_jsModule is not null)
+                {
+                    try
+                    {
+                        await _jsModule.InvokeVoidAsync("reconcileToken", SvgId, tokenIdStr, sx, sy);
+                    }
+                    catch (JSDisconnectedException) { /* circuit teardown */ }
+                }
+
                 // Close any open stack popover only on a successful move — the
                 // chip layout no longer reflects the underlying stack composition.
                 // On failure we keep the popover open so the user can retry.

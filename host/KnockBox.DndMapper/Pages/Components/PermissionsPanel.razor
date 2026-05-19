@@ -5,7 +5,7 @@
 
 <section class="dndm-panel dndm-permp">
     <header class="dndm-panel-header">
-        <span>Permissions</span>
+        <span>Settings</span>
         @if (!Embedded)
         {
             <button class="dndm-btn dndm-btn--icon dndm-btn--small" type="button" title="Close"
@@ -31,9 +31,9 @@
         <div class="dndm-panel-section">
             <span class="dndm-label">Sheet edits by others</span>
             <div class="dndm-pillgroup">
-                <button class="@PillCls(State.Settings.SheetEditByOthers == SheetEditPolicy.OwnersOnly)"
+                <button class="@PillCls(State.Settings.SheetEditByOthers == SheetEditPolicy.HostOnly)"
                         type="button"
-                        @onclick="@(() => SetSheetEdit(SheetEditPolicy.OwnersOnly))">Owners</button>
+                        @onclick="@(() => SetSheetEdit(SheetEditPolicy.HostOnly))">Host only</button>
                 <button class="@PillCls(State.Settings.SheetEditByOthers == SheetEditPolicy.OwnersAndHost)"
                         type="button"
                         @onclick="@(() => SetSheetEdit(SheetEditPolicy.OwnersAndHost))">Owners + Host</button>
@@ -60,6 +60,16 @@
                        @onchange="@(e => SetPlayersCanCreateNpcs(e.Value is bool b && b))" />
                 <span class="dndm-toggle-track"></span>
                 <span>Players can create NPCs</span>
+            </label>
+        </div>
+
+        <div class="dndm-panel-section">
+            <label class="dndm-toggle">
+                <input type="checkbox"
+                       checked="@State.Settings.PlayersCanSeeOtherSheets"
+                       @onchange="@(e => SetPlayersCanSeeOtherSheets(e.Value is bool b && b))" />
+                <span class="dndm-toggle-track"></span>
+                <span>Players can see other players' sheets</span>
             </label>
         </div>
     </div>

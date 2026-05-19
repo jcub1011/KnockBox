@@ -2,8 +2,10 @@
 @using KnockBox.Core.Services.State.Games.Shared
 
 <div class="dndm-header-container">
-    <a class="dndm-header-brand" href="@NavigationService.GetHomeUri()" title="Click to return home">
-        <span class="dndm-header-text">DND MAPPER</span>
+    <a class="dndm-header-brand" href="@NavigationService.GetHomeUri()" title="Return home">
+        <span class="dndm-header-flourish dndm-header-flourish--left" aria-hidden="true">&#10086;</span>
+        <span class="dndm-header-text">DnD Mapper</span>
+        <span class="dndm-header-flourish dndm-header-flourish--right" aria-hidden="true">&#10086;</span>
     </a>
 
     <div class="dndm-header-actions">
@@ -12,7 +14,7 @@
                         ValueClassName="dndm-header-code-value"
                         CoverText="SESSION ID" />
         <button class="dndm-header-leave" @onclick="Leave" title="Leave Session" aria-label="Leave Session">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
         </button>
     </div>
 </div>

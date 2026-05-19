@@ -94,6 +94,7 @@ Each `Map` contains:
 | `CreatedUtc`    | `DateTime`                 | Default sort fallback when `ListOrder` is unset.                 |
 | `ListOrder`     | `int`                      | Manual order index assigned by the host (drag-reorder in §4.3). New maps append at the next free index. The switcher always sorts by `ListOrder` ascending; `CreatedUtc` is only consulted as a tiebreak. |
 | `DefaultSpawnPosition` | `(double X, double Y)?` | Cell coordinates where player tokens are placed when auto-spawned on this map. If null, the system uses the map center. |
+| `MarkupSvg`     | `string?`                  | v1.x — see §5.6. Serialized inner SVG of the host's markup overlay for this map. `null` when empty. Always `null` in v1. |
 
 Tokens are **per-map**, not global — when the host switches maps, the tokens visible change. (This avoids the "where did everyone go?" UX problem of switching from a tavern interior to an outdoor wilderness map and dragging interior tokens along.) Each Map has an optional `DefaultSpawnPosition` (grid cell coordinates). When a player's token does not yet exist on a map that becomes active, `SpawnPlayerTokenAsync` places it at that position (or at the map center if unset). Token and sheet records are created for all lobby players when the session starts. After Start, no new players can register — the platform rejects `RegisterPlayer` once `IsJoinable` is false — so subsequent token auto-spawn only happens for players who were already registered before Start, and only when the host switches the active map (see `SetActiveMapAsync` in §12).
 
@@ -159,6 +160,60 @@ Images are deleted from disk on three triggers, each running through the engine 
 3. **Session end** (`DndMapperGameState.Dispose()`): enumerates any remaining per-room image files under the plugin's storage root and calls `IPluginStorage.Delete` for each.
 
 v1 has **no cross-session persistence** — every session starts empty. (See §15 — save/reload of campaigns is planned as a future feature.)
+
+---
+
+## 5.6 Markup overlay
+
+> **Scope**: deferred to v1.x. v1 ships without any markup affordance — hosts narrate or use the existing image-transform tools. The design below is preserved here so it can be implemented as a v1.x increment alongside Status Effects (§8.5), the initiative tracker (§9.5), and the display view (§13). References elsewhere in this doc — the `MarkupSvg` row on the map record (§4.2), engine verbs in §12, `MarkupOverlay.razor` in §13, the reused-utility row in §14, and the verification item in §17 — are likewise v1.x.
+
+### 5.6.1 Overview
+
+The host can toggle a transparent SVG drawing canvas on top of the active map and sketch temporary annotations — arrows, circles, paths, freehand lines, colored fills. Markup is **per-map** (parallels token and image scoping per §4.2): switching maps hides the current map's markup and reveals the destination map's; switching back restores the original drawing untouched. Markup is **visible to all participants** (players + the v1.x display view); only the **host** can draw, edit, or clear. It persists until the host hits "Clear All" on the canvas toolbar or the session ends.
+
+### 5.6.2 Reused component
+
+The platform already ships `SvgDrawingCanvas` (`sdk/KnockBox.Core/Components/Shared/SvgDrawingCanvas.razor`, code-behind `SvgDrawingCanvas.razor.cs`). DnD Mapper mounts this component verbatim — no markup-specific tools are added on top. The component already provides:
+
+- A built-in toolbar (`ShowToolbar = true`): freehand pen with a curated 6-color palette + custom-color picker, three preset stroke widths (S / M / L) plus a custom width input, eraser, paint bucket (flood-fill), undo, redo, clear-all, export-to-file.
+- `BackgroundColor` parameter — set to `transparent` for the overlay use case.
+- `ViewBoxWidth` / `ViewBoxHeight` parameters — align to the active map's `Grid.WidthCells` × `Grid.HeightCells` (in grid-cell units, matching the §6.3 coordinate system) so stroke positions are stable across client zoom levels and never drift when the map's `CellPixels` changes.
+- `GetSvgContentAsync()` — returns the full serialized SVG markup; already chunks the response in 12 KB pieces to stay under SignalR's 32 KB receive limit (see `ReadSvgInChunksAsync` in the component).
+- `OnStrokeCompleted(int strokeCount)` JSInvokable — fires after every completed stroke (including pen, eraser, flood-fill, clear-all). DnD Mapper hooks this as the broadcast trigger.
+- `BackgroundSvgContent` parameter + the existing `SvgContentSanitizer` — players and the display view render the host's markup by mounting a read-only `SvgDrawingCanvas` (`ShowToolbar = false`) with the broadcast SVG as `BackgroundSvgContent`. Because the read-only component sets `pointer-events: none` on its surface, player drags still hit the token layer underneath.
+
+### 5.6.3 State
+
+A single `MarkupSvg : string?` field on `Map` (added to the §4.2 table). No per-stroke records — the canvas component owns the stroke list and serializes the entire SVG on each broadcast. One string per map is simple and mirrors how `SvgClipboardService` (`sdk/KnockBox.Platform/Services/Drawing/SvgClipboardService.cs`) already handles drawings on the platform.
+
+### 5.6.4 Authoring flow (host)
+
+1. Host clicks a **Markup** toggle button on the DnD Mapper map toolbar. (This is the *outer* toolbar — separate from the canvas's internal toolbar — that controls whether the canvas is mounted on the host's view at all.)
+2. Toggle-on mounts `<SvgDrawingCanvas ShowToolbar="true" BackgroundColor="transparent" ViewBoxWidth="Grid.WidthCells" ViewBoxHeight="Grid.HeightCells" BackgroundSvgContent="@activeMap.MarkupSvg" />` over `MapCanvas.razor`. The initial render rehydrates any existing markup from the map.
+3. Host draws a stroke. The component's `OnStrokeCompleted` JSInvokable fires. The host page reads the full SVG via `GetSvgContentAsync()` and calls `engine.UpdateMapMarkupAsync(state, host, mapId, svg)`.
+4. The engine sanitizes the input via `SvgContentSanitizer`, writes `Map.MarkupSvg`, and notifies. All clients re-render.
+5. Toggle-off unmounts the canvas on the host's view, restoring full token interactivity. Strokes remain on `Map.MarkupSvg`, so the players' overlay stays visible. Re-toggling resumes drawing from where the host left off.
+6. The canvas's built-in "Clear All" button fires `OnStrokeCompleted(0)`. The host page sees an empty SVG and calls `engine.ClearMapMarkupAsync(state, host, mapId)`, which sets `Map.MarkupSvg = null`.
+
+Undo / redo / eraser live inside the host's canvas session via the component's internal undo stack; only the resulting *completed* SVG is broadcast. If the host undoes a stroke, `OnStrokeCompleted` fires again with the new count and we re-broadcast the resulting SVG — players just see whatever the host's current state serializes to.
+
+### 5.6.5 Viewing flow (players & display)
+
+Players render an always-on read-only `SvgDrawingCanvas` (`ShowToolbar = false`) layered between the image layer and the token layer of `MapCanvas.razor`. `BackgroundSvgContent` is rebound on every state-change notification. The component's `pointer-events: none` (set when `ShowToolbar = false` — see line 137 of the component) ensures player drags pass through to the tokens beneath.
+
+The v1.x display view (§13) renders markup identically — markup is part of the shared scene.
+
+### 5.6.6 Bandwidth notes
+
+Each completed host stroke broadcasts the entire SVG. For a typical session — a few arrows and circles — this is well under 32 KB and the component's chunked-read handles larger drawings. Append-only stroke-delta broadcasting is a deferred optimization; **not** needed for v1.x. Re-evaluate if dogfooding surfaces perceptible jank during high-churn drawing.
+
+### 5.6.7 Permissions
+
+Drawing, editing, and clearing markup is **host-only** — a hardcoded gate inside `UpdateMapMarkupAsync` / `ClearMapMarkupAsync`. The markup toggle button is not even rendered on player clients. No new entry in §11 (Permissions). Players see the markup but cannot interact with it.
+
+### 5.6.8 Lifetime
+
+Markup survives map switches (per-map storage on `Map.MarkupSvg`). The session-end teardown (§5.5 #3) does not need to do anything special — `Map.MarkupSvg` is in-memory state disposed with the rest of `DndMapperGameState`. No disk artifacts are created.
 
 ---
 
@@ -263,6 +318,7 @@ The chosen schema lives on `DndMapperGameState.AttributeSchema` and is broadcast
 | `Values`      | `Dictionary<string, AttributeValue>`  | Keyed by attribute name from the schema. `AttributeValue` is a discriminated union (int score, int modifier, text). |
 | `Notes`       | `string`                              | Free-text notes the owner can edit.                                                  |
 | `Hp`, `MaxHp` | `int?`                                | Optional v1 hit-point tracking (independent of schema). Visible to owner and host only; other players do not see HP values. Both are nullable — if unset, the HP row is hidden in the sheet panel. Edited via +/− stepper buttons (direct numeric entry also allowed). |
+| `StatusEffects` | `List<StatusEffect>`                | v1.x — see §8.5. Active temporary modifiers; cumulative; never mutate base attribute values or `MaxHp`. Empty list in v1. |
 
 ### 8.3 Editing & visibility
 
@@ -273,6 +329,81 @@ The chosen schema lives on `DndMapperGameState.AttributeSchema` and is broadcast
 ### 8.4 Where the sheet lives in state
 
 `CharacterSheet`s are **session-scoped, not map-scoped** (a character has the same stats regardless of which map you're on). Stored on `DndMapperGameState.Sheets : Dictionary<Guid, CharacterSheet>` with `Token.SheetId` referencing them.
+
+---
+
+## 8.5 Status Effects
+
+> **Scope**: deferred to v1.x. v1 ships with manual narration only (no status-effect model in state). The design below is preserved here so it can be implemented as a v1.x increment alongside the initiative tracker (§9.5) and display view (§13). References elsewhere in this doc — the `StatusEffects` row on the sheet record (§8.2), the attribute-contribution note in §9.3 step 4, `StatusEffectTemplates` on state and the verb list in §12, `StatusEffectsPanel.razor` in §13, and the verification item in §17 — are likewise v1.x.
+
+### 8.5.1 Overview
+
+A status effect is a temporary, named modifier attached to a `CharacterSheet`. Effects never mutate the sheet's base attribute values or `MaxHp`; instead they stack on top, and any dice roll that references an attribute (§9.3 step 4) sums the base attribute modifier plus every applicable `AttributeDelta` from every active status effect on that sheet. Effects are **cumulative** — applying the same template twice produces two stacked instances, each contributing its own deltas. Removal is per-instance; attribute and `MaxHpDelta` contributions disappear as soon as the instance is removed.
+
+A canonical example: the host defines a "Brain Fog" template with `(INT, −5)`. While that effect is active on a player's sheet, every INT-keyed roll the player makes resolves as `d20 + (sheet INT modifier) − 5`. Applying "Brain Fog" twice produces two stacked instances, totalling −10.
+
+### 8.5.2 Record shape
+
+```
+StatusEffect {
+    Id:               Guid               // instance id, unique within the sheet
+    Name:             string             // host-renameable, e.g. "Brain Fog"
+    AttributeDeltas:  List<AttributeDelta>
+    MaxHpDelta:       int?               // reversible — adjusts effective MaxHp while applied
+    OnApplyHpDelta:   int?               // one-time — applied to current Hp at apply time; NOT reversed on remove
+    Notes:            string             // optional, free-form
+    AppliedUtc:       DateTime
+}
+
+AttributeDelta {
+    AttributeName:  string   // must match an attribute in the active AttributeSchema
+    Delta:          int      // signed; e.g. -5 for "(Brain Fog) -5 INT"
+}
+```
+
+Stored as `CharacterSheet.StatusEffects : List<StatusEffect>`.
+
+### 8.5.3 Templates
+
+The host curates a session-scoped library of `StatusEffectTemplate` records (same shape as `StatusEffect` minus `Id` and `AppliedUtc`) under `DndMapperGameState.StatusEffectTemplates : List<StatusEffectTemplate>`. The intent is "prepare common effects ahead of time, apply with one click during play."
+
+Applying a template clones it into a new `StatusEffect` instance with a fresh `Id` and `AppliedUtc = UtcNow`. After application the instance is **fully decoupled** from the template — editing or deleting the template never touches in-flight instances, and renaming an instance (e.g. host applies "Brain Fog" then renames the instance to "Brain Fog (lesser)") never touches the template.
+
+Template management (create / edit / rename / delete) is **host-only**, gated at the engine and exposed via a settings cog in the status-effects panel UI. Templates are session-scoped; there is no cross-session persistence in v1.x (matches §15 / O-5).
+
+Effects may also be built ad-hoc — applying without a template is fully supported.
+
+### 8.5.4 Editing & visibility
+
+- Apply / edit / remove of a `StatusEffect` instance on a sheet obeys the existing `SheetEditByOthers` setting (§11). The host is always exempt, matching the §8.3 convention.
+- Effects are visible to **all participants** (same visibility rule as attribute values — public). The list of active effects is part of the public sheet view, so opponents can see "Brain Fog −5 INT" applied to a character.
+- Template library (create / edit / delete templates) is **host-only**.
+
+### 8.5.5 Dice roll integration
+
+When `engine.RollAsync` resolves an `AttributeRef` on a sheet, the attribute contribution is:
+
+```
+baseAttributeModifier  +  Σ (delta.Delta for every StatusEffect on the sheet, for every delta in AttributeDeltas where delta.AttributeName == attributeName)
+```
+
+The summed modifier participates in the final total exactly as the existing flat / attribute modifiers do. Per O-11 (§16), the default plan is to add an optional `RollResult.ModifierBreakdown : string` field so the roll log can render `"INT check: 12 + 2 (INT) − 5 (Brain Fog) = 9"` instead of opaque totals. `Label` remains the user-supplied roll name.
+
+Effects whose `AttributeDeltas` reference an attribute name that is not in the active `AttributeSchema` (e.g. after a schema change — §8.1) contribute zero; they are not auto-deleted, so reverting the schema restores their effect.
+
+### 8.5.6 HP semantics
+
+- `MaxHpDelta` adjusts the **effective** MaxHp shown on the sheet while the effect is active. Effective MaxHp = `Sheet.MaxHp + Σ (e.MaxHpDelta ?? 0 for every active StatusEffect e)`. When the effect is removed, the contribution drops out and effective MaxHp returns to the base value. Current Hp is clamped to effective MaxHp on every state mutation that touches either field.
+- `OnApplyHpDelta` is applied **once at apply time**: the engine adjusts current Hp by this delta inside the same `ExecuteAsync` block that appends the effect. It is **not reversed on remove** — this models "took 5 poison damage when the effect started." Hosts who want reversibility should use `MaxHpDelta` instead.
+- Either field is optional; templates and instances may omit both (attribute-only effect).
+
+### 8.5.7 UI sketch
+
+A new `StatusEffectsPanel.razor` component nested inside `CharacterSheetPanel.razor` (§13). Per sheet:
+
+- A compact list of active effects: name, summary of deltas (e.g. "INT −5, MaxHp −10"), and an "✕" remove button per row (visible / enabled subject to `SheetEditByOthers`).
+- A `+ Add` button opens a small editor: choose from the templates dropdown (host-curated library) or build ad-hoc; rename inline before applying.
+- A settings cog (host-only) opens the template library modal: list of templates with create / edit / rename / delete buttons. Each template editor binds `Name`, an attribute-delta editor (add/remove rows; each row a `(attribute dropdown, signed int)` pair), `MaxHpDelta`, `OnApplyHpDelta`, `Notes`.
 
 ---
 
@@ -301,7 +432,7 @@ RollRequest {
 1. Validates the user owns the referenced sheet, or is host.
 2. Validates the dice cap (§9.1) and the adv/dis precondition: when `Mode ≠ Normal`, `Dice` must contain exactly one entry of `(1, 20)` — otherwise the call is rejected. (Adv/dis is a d20-only mechanic; silently ignoring or coercing to the largest die would surprise users.)
 3. Calls existing `IRandomNumberService.GetRandomInt(1, sides+1, RandomType.Fast)` once per die. (Reuses the platform service the DiceSimulator plugin already uses.)
-4. Computes total: sum of dice (with adv/dis applied to the single d20 when Mode ≠ Normal), plus flat modifier, plus resolved attribute modifier.
+4. Computes total: sum of dice (with adv/dis applied to the single d20 when Mode ≠ Normal), plus flat modifier, plus resolved attribute modifier — where the attribute contribution is `baseModifier + Σ AttributeDelta.Delta` over every `StatusEffect` on the referenced sheet whose `AttributeDeltas` entry matches the attribute name (v1.x — see §8.5.5; in v1 `StatusEffects` is always empty so this reduces to the base modifier).
 5. Records a `RollResult` in `DndMapperGameState.RollLog : List<RollResult>` (capped at 200 most recent). Each `RollResult` carries `RollerUserId : string` (the participant the roll is *attributed* to). The `ForcedByUserId : string?` field (set when the host force-rolled on someone else's behalf — see §9.5.3 step 4) is reserved for the v1.x initiative tracker; in v1 it is always `null`.
 6. The full `RollLog` is broadcast to all clients via the standard state-change notification. The host always renders all results. Non-host clients render a result if `Settings.RollsVisibleToPlayers = true` OR `roll.RollerUserId == currentUserId`. **Note: this filtering is client-side** — the full log is on the wire. Server-side per-user diffing was considered and judged not worth the complexity for v1; the threat model is "casual friends playing a tabletop," not "adversarial competitors with custom clients."
 
@@ -448,6 +579,8 @@ public sealed class DndMapperGameState : AbstractGameState
 
     public CombatState? ActiveCombat { get; private set; }         // v1.x — always null in v1 (see §9.5)
 
+    public List<StatusEffectTemplate> StatusEffectTemplates { get; } // v1.x — host-curated, session-scoped (see §8.5)
+
     // Tokens live on Map.Tokens — not duplicated here.
 
     // All mutators are private; engine calls Execute(...) helpers.
@@ -461,6 +594,8 @@ Engine methods (verbs):
 - **Tokens**: `SpawnPlayerTokenAsync` (called at session start for all lobby players and on `SetActiveMapAsync` for any registered player who has no token on the newly active map; places token at `Map.DefaultSpawnPosition` or map center; reuses the player's existing session-scoped `CharacterSheet` if one already exists, otherwise creates one), `SpawnNpcTokenAsync` (optional `representsUserId` parameter — host-only when set — covers both regular NPCs and DMPC stand-ins), `MoveTokenAsync`, `UpdateTokenAsync` (rename/recolor/icon), `RemoveTokenAsync`, `SetTokenHiddenAsync`, `SetTokenSheetAsync`, `SetTokenRepresentsAsync`, `AssignCharacterToPlayerAsync` / `AssignSheetToPlayerAsync` (host hands an NPC character — token(s) and any attached sheet — to a registered player; the symmetric counterpart of the auto-orphan below), `ConvertAbandonedPlayerCharacterInternal` (internal — invoked by the `PlayerUnregistered` handler per §2.3 to flip a departing player's `PlayerToken`s to `NPCToken` with `RepresentsUserId = oldUserId`, and orphan the player's sheet the same way).
 - **Sheets**: `CreateSheetAsync`, `UpdateSheetAttributeAsync`, `UpdateSheetFreeFieldsAsync` (name/notes/hp — `Hp`/`MaxHp` are nullable; if unset the HP row is hidden in the sheet panel), `DeleteSheetAsync`, `ChangeSchemaAsync` (cascade: attributes whose name matches the new schema retain their value, type mismatch resets to default; attributes absent from the new schema are removed from all sheets).
 - **Dice**: `RollAsync`.
+- **Markup (v1.x — see §5.6)**: `UpdateMapMarkupAsync(state, host, mapId, svgContent)` — host-only; sanitizes via `SvgContentSanitizer`; writes `Map.MarkupSvg`; `null` / empty `svgContent` clears the field. Called by the host page on every `OnStrokeCompleted` callback from the canvas component. `ClearMapMarkupAsync(state, host, mapId)` — host-only convenience for the canvas's clear-all button; equivalent to calling `UpdateMapMarkupAsync` with `null`.
+- **Status effects (v1.x — see §8.5)**: `ApplyStatusEffectAsync` (appends a new instance to `Sheet.StatusEffects`; applies `OnApplyHpDelta` to current Hp once inside the same `ExecuteAsync` block; clamps current Hp to new effective MaxHp; permission: `SheetEditByOthers`), `UpdateStatusEffectAsync` (rename, edit attribute deltas / `MaxHpDelta` / notes; permission: `SheetEditByOthers`; editing `OnApplyHpDelta` after apply does **not** retroactively reapply it, only `MaxHpDelta` and `AttributeDeltas` re-take effect because they are evaluated each roll / render), `RemoveStatusEffectAsync` (deletes the instance; `MaxHpDelta` contribution drops out immediately and current Hp is reclamped; `OnApplyHpDelta` is **not** reversed; permission: `SheetEditByOthers`), `CreateStatusEffectTemplateAsync` / `UpdateStatusEffectTemplateAsync` / `DeleteStatusEffectTemplateAsync` (host-only; do **not** affect already-applied instances per §8.5.3).
 - **Combat (v1.x — deferred, see §9.5)**: `StartInitiativeAsync` (host; creates CombatState in WaitingForRolls with selected NPC + all player combatants), `SubmitInitiativeRollAsync` (player; rolls d20 + DEX modifier, stores in CombatantEntry), `SetNpcInitiativeAsync` (host; manual entry or auto-roll for an NPC combatant), `ForceInitiativeRollAsync` (host; force-rolls for a player who hasn't rolled), `AdvanceTurnAsync` (host; next turn, wraps + increments RoundNumber at end of order), `AddCombatantAsync` (host; insert NPC mid-combat at initiative position), `RemoveCombatantAsync` (host; delete combatant, auto-advance if it was their turn), `EndCombatAsync` (host; clears ActiveCombat).
 - **Settings**: `UpdateSettingsAsync`.
 - **Lifecycle**: `EndSessionAsync`.
@@ -477,7 +612,8 @@ host/KnockBox.DndMapper/Pages/
     DndMapperRoom.razor                   (NEW — entry; switches on Phase)
     DndMapperPlayingPhase.razor           (NEW — main play canvas, control view)
         Components/
-            MapCanvas.razor               (SVG: images + grid + tokens)
+            MapCanvas.razor               (SVG: images + grid + tokens; in v1.x also hosts MarkupOverlay between images and tokens)
+            MarkupOverlay.razor           (v1.x — see §5.6; thin wrapper around SvgDrawingCanvas with host vs. player branching; host markup-toggle button lives on the MapCanvas toolbar)
             TokenLayer.razor              (interactive, uses outfitItemDrag.js style interop; hidden tokens render as 50% opacity with an eye-slash overlay for the host only, and are not rendered at all for non-host players)
             HostMapSwitcher.razor         (host-only sidebar)
             HostImageInspector.razor      (host-only transform handles)
@@ -485,6 +621,7 @@ host/KnockBox.DndMapper/Pages/
             DiceRollerModal.razor
             RollLogPanel.razor            (filters results per §9.3 visibility rules)
             PermissionsPanel.razor        (host-only; mirrors §11)
+            StatusEffectsPanel.razor      (v1.x — see §8.5; nested in CharacterSheetPanel.razor)
             InitiativeBanner.razor        (v1.x — see §9.5)
             HostInitiativePanel.razor     (v1.x — see §9.5)
     DndMapperDisplay.razor                (v1.x — screen-shareable display view; see deferral note below)
@@ -522,6 +659,7 @@ The display view subscribes to that state and re-renders on every state change, 
 | Disposable component base     | `DisposableComponent` from `KnockBox.Core`.                                                   |
 | Phase-switch razor pattern    | `host/KnockBox.Spardle/Pages/SpardleRoom.razor`.                                              |
 | Per-player attribute pattern  | `host/KnockBox.HiddenAgenda/Services/State/Games/Data/HiddenAgendaPlayerState.cs` (richer per-player records). |
+| SVG drawing surface (v1.x)    | `SvgDrawingCanvas` (`sdk/KnockBox.Core/Components/Shared/SvgDrawingCanvas.razor`) — full pen / eraser / fill toolbar, transparent background mode, view-box-aware coordinates, chunked SVG read. Used by both host (interactive) and player (read-only) markup overlays. Paired with `SvgContentSanitizer` to scrub each host write in `UpdateMapMarkupAsync`. See §5.6. |
 
 **Net new infrastructure (platform)**: `IGameEngineHttpHandler` contract in `KnockBox.Core` SDK + a generic plugin-route dispatcher (`/api/plugins/{routeIdentifier}/{**path}`) in `KnockBox.Platform`. Drives both the image upload (§5.1) and image serve (§5.4) endpoints without leaking plugin-specific names into `Program.cs`.
 
@@ -533,7 +671,8 @@ The display view subscribes to that state and re-renders on every state change, 
 
 These are intentionally excluded from v1 to keep the design scoped. Any of them can be revisited as v1.x increments.
 
-- **Conditions and status effects** on combatants (poisoned, stunned, etc.) — manual narration only in v1.
+- **Status effects** — temporary, named, cumulative attribute / HP modifiers per sheet, with a host-managed template library. Full design at §8.5. Deferred to v1.x. v1 ships with manual narration only.
+- **Markup overlay** — a transparent host-drawn SVG layer over the active map. Visible to all participants, host-only authoring, per-map persistence, host-clears manually via the canvas toolbar. Full design at §5.6. Deferred to v1.x.
 - **Fog of war / vision masking** — host-controlled visibility regions.
 - **Hex grids**.
 - **Measurement tools** (ruler, AoE templates, line-of-sight).
@@ -565,6 +704,8 @@ These are intentionally excluded from v1 to keep the design scoped. Any of them 
 | O-8 | Per-room and per-image storage caps? **Closed.** | 5 MB / image, 10 MB / room (hardcoded). |
 | O-9 | Should players see each other's roll results? **Closed.** | Controlled by `RollsVisibleToPlayers` session setting (default `true`). Host always sees all rolls. |
 | O-10| Hidden tokens — should the host see a ghost so they don't forget? **Closed.** | Yes, ghosted with eye-slash overlay in the control view. |
+| O-12| Markup eraser semantics (v1.x — §5.6) — the canvas's eraser tool removes whole strokes; should the host be able to erase per-pixel within a stroke (would require a different canvas mode), or is whole-stroke erase plus undo plus clear-all sufficient? **Open.** | Whole-stroke erase only (the component's default). Re-evaluate after a v1.x dogfooding session. |
+| O-11| Roll-log breakdown for status effects (v1.x — §8.5) — extend `RollResult` with an optional `ModifierBreakdown : string` field, or fold the breakdown into the existing `Label`? **Open.** | Add `ModifierBreakdown`; `Label` stays the user-supplied roll name. |
 
 ---
 
@@ -586,7 +727,9 @@ When the implementation phase starts, the following validation matrix should be 
    - Host clicks "End Session"; both clients return home; uploaded image files are removed from disk.
 4. **Initiative tracker (v1.x — deferred)**: out of scope for v1; see §9.5. The v1.x verification matrix will cover: host starts initiative and selects two NPC tokens; both players and both NPC combatants appear in WaitingForRolls banner; one player rolls, the other doesn't; host force-rolls for the second player; host enters initiative for both NPCs; banner automatically transitions to Active phase showing sorted turn order with round 1; host clicks "Next Turn" through the full order, with the banner wrapping to round 2 on the last combatant; host removes one NPC mid-combat (if it was their turn, next combatant is highlighted); host ends combat and the banner disappears on all clients.
 5. **Display view (v1.x — deferred)**: out of scope for v1; see §13. The v1.x verification matrix will cover: any browser (including unauthenticated) opens the `/display` URL and confirms hidden tokens are absent, GM panels are absent, and the roll log is empty while `RollsVisibleToPlayers = false`; host sets `RollsVisibleToPlayers = true` and the display tab now shows the roll log.
-6. **Architecture invariant**: `KnockBox.csproj` still has zero `using` of `KnockBox.DndMapper` types; `ReferenceOutputAssembly="false"` on the project ref is preserved. The new `IGameEngineHttpHandler` contract (§5.1) lives in `KnockBox.Core` SDK and is opted into by `DndMapperGameEngine`; no plugin-specific names appear in `Program.cs`.
+6. **Status effects (v1.x — deferred)**: out of scope for v1; see §8.5. The v1.x verification matrix will cover: host opens the template settings, creates a "Brain Fog" template with `(INT, −5)`, applies it to a player's sheet; player rolls an INT check and the result reflects `base + INT − 5` with the breakdown visible in the roll log (per O-11); host applies the same template a second time and the deltas stack to −10; host removes one instance and the roll drops back to −5; host creates a "Wounded" template with `MaxHpDelta = -5` and `OnApplyHpDelta = -3`, applies it to a sheet at 20/20 HP, observes the sheet showing `current 17 / effective max 15`; host removes the effect and observes `current 17 / max 20` (`OnApplyHpDelta` not reversed); permission negative-path: with `SheetEditByOthers = OwnersOnly`, another (non-host) player cannot apply / edit / remove effects on a sheet they do not own; host can always do so; template management is rejected for any non-host caller.
+7. **Markup (v1.x — deferred)**: out of scope for v1; see §5.6. The v1.x verification matrix will cover: host toggles the markup overlay on, draws an arrow and circles a tile on the active map; both clients (player + host) see the markup; player attempts to click the markup toolbar toggle — button is not rendered for non-host clients; host switches to a second map and draws different markup, then switches back — the first map's markup is intact; host hits "Clear All" on the canvas toolbar — both clients see the markup disappear and `Map.MarkupSvg == null`; host disconnects and reconnects within the 1-minute grace window — markup is preserved (it lives on `DndMapperGameState`); host ends the session — `Map.MarkupSvg` is disposed with the rest of state and no disk artifacts remain (markup never touches `IPluginStorage`).
+8. **Architecture invariant**: `KnockBox.csproj` still has zero `using` of `KnockBox.DndMapper` types; `ReferenceOutputAssembly="false"` on the project ref is preserved. The new `IGameEngineHttpHandler` contract (§5.1) lives in `KnockBox.Core` SDK and is opted into by `DndMapperGameEngine`; no plugin-specific names appear in `Program.cs`.
 
 ---
 

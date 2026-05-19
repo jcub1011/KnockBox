@@ -1,0 +1,5 @@
+/* MarkupOverlay renders SvgDrawingCanvas directly. The platform
+   component lives in a separate Blazor scope, so the necessary
+   background / border / outline overrides are defined unscoped in
+   wwwroot/css/panels.css under `.dndm-markup-overlay-mount …`. This
+   file is intentionally empty (no scope-local styles needed). */

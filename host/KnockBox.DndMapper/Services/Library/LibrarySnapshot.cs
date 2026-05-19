@@ -23,11 +23,82 @@ namespace KnockBox.DndMapper.Services.Library
     /// </remarks>
     internal sealed record LibrarySnapshot
     {
-        public int SchemaVersion { get; init; } = 1;
+        public int SchemaVersion { get; init; } = 3;
         public DndMapperSettings Settings { get; init; } = new();
         public AttributeSchemaSnapshot AttributeSchema { get; init; } = new();
+        // Set when the live schema came from a known NamedTemplate (built-in
+        // or user-saved). Null for free-form Custom schemas. Drives which
+        // NamedTemplate's effect library is "active" on load.
+        public Guid? ActiveSchemaTemplateId { get; init; }
+        // State-level initiative attribute. Null on older snapshots (V1–V3);
+        // the load path then falls back to the active template's value (or
+        // the legacy DEX heuristic) so the host's choice still round-trips.
+        public string? InitiativeAttributeName { get; init; }
         public List<MapSnapshot> Maps { get; init; } = [];
         public List<SheetSnapshot> Sheets { get; init; } = [];
+        public List<NamedTemplateSnapshot> CustomTemplates { get; init; } = [];
+        // Host-managed roll templates that ride with the save slot. Built-ins
+        // are never serialized; sheet-scoped templates ride on SheetSnapshot.
+        public List<RollTemplateSnapshot> GlobalRollTemplates { get; init; } = [];
+    }
+
+    internal sealed record RollTemplateSnapshot
+    {
+        public Guid Id { get; init; }
+        public string Name { get; init; } = string.Empty;
+        public List<DiceTermSnapshot> Dice { get; init; } = [];
+        public int FlatModifier { get; init; }
+        public RollMode Mode { get; init; } = RollMode.Normal;
+        public string? AttributeName { get; init; }
+        public string Label { get; init; } = string.Empty;
+        // Scope is implicit by location (LibrarySnapshot.GlobalRollTemplates →
+        // Global; SheetSnapshot.RollTemplates → Sheet) so we don't store it.
+    }
+
+    internal sealed record DiceTermSnapshot
+    {
+        public int Count { get; init; }
+        public int Sides { get; init; }
+    }
+
+    internal sealed record NamedTemplateSnapshot
+    {
+        public Guid Id { get; init; }
+        public string Name { get; init; } = string.Empty;
+        public bool IsBuiltIn { get; init; }
+        public List<AttributeRowSnapshot> Rows { get; init; } = [];
+        // Host-authored status-effect templates scoped to this schema.
+        public List<StatusEffectTemplateSnapshot> StatusEffectTemplates { get; init; } = [];
+        // Attribute name used as the initiative modifier under this schema.
+        // Null means "fall back to legacy DEX search".
+        public string? InitiativeAttributeName { get; init; }
+    }
+
+    internal sealed record StatusEffectTemplateSnapshot
+    {
+        public Guid Id { get; init; }
+        public string Name { get; init; } = string.Empty;
+        public List<AttributeDeltaSnapshot> AttributeDeltas { get; init; } = [];
+        public int? MaxHpDelta { get; init; }
+        public int? OnApplyHpDelta { get; init; }
+        public string Notes { get; init; } = string.Empty;
+    }
+
+    internal sealed record StatusEffectSnapshot
+    {
+        public Guid Id { get; init; }
+        public string Name { get; init; } = string.Empty;
+        public List<AttributeDeltaSnapshot> AttributeDeltas { get; init; } = [];
+        public int? MaxHpDelta { get; init; }
+        public int? OnApplyHpDelta { get; init; }
+        public string Notes { get; init; } = string.Empty;
+        public DateTime AppliedUtc { get; init; }
+    }
+
+    internal sealed record AttributeDeltaSnapshot
+    {
+        public string AttributeName { get; init; } = string.Empty;
+        public int Delta { get; init; }
     }
 
     internal sealed record MapSnapshot
@@ -46,6 +117,7 @@ namespace KnockBox.DndMapper.Services.Library
     internal sealed record MapImageSnapshot
     {
         public Guid Id { get; init; }
+        public string Name { get; init; } = string.Empty;
         public string ContentType { get; init; } = string.Empty;
         public double X { get; init; }
         public double Y { get; init; }
@@ -57,6 +129,7 @@ namespace KnockBox.DndMapper.Services.Library
         public double Opacity { get; init; } = 1.0;
         public int LayerOrder { get; init; }
         public bool Locked { get; init; }
+        public bool Hidden { get; init; }
         public long ByteSize { get; init; }
         // Intentionally no ShareToken: the capability is per-circuit and is
         // recomputed on every Attach via PublishForSharingAsync.
@@ -86,6 +159,8 @@ namespace KnockBox.DndMapper.Services.Library
         public string Notes { get; init; } = string.Empty;
         public int? Hp { get; init; }
         public int? MaxHp { get; init; }
+        public List<StatusEffectSnapshot> StatusEffects { get; init; } = [];
+        public List<RollTemplateSnapshot> RollTemplates { get; init; } = [];
         // OwnerUserId not persisted (see TokenSnapshot rationale).
     }
 
@@ -140,15 +215,121 @@ namespace KnockBox.DndMapper.Services.Library
                 .Select(ToSheetSnapshot)
                 .ToList();
 
+            // Persist every NamedTemplate (built-in or user). For built-ins we
+            // still write Rows so older hosts can read it, but on load the
+            // seeded Rows are authoritative — only the StatusEffectTemplates
+            // ride along to round-trip the host's authoring under built-in
+            // schemas.
+            var templates = state.CustomTemplates.Values
+                .Select(t => new NamedTemplateSnapshot
+                {
+                    Id = t.Id,
+                    Name = t.Name,
+                    IsBuiltIn = t.IsBuiltIn,
+                    Rows = t.Rows.Select(r => new AttributeRowSnapshot
+                    {
+                        Name = r.Name,
+                        Type = r.Type,
+                        Default = ToValueSnapshot(r.Default),
+                    }).ToList(),
+                    StatusEffectTemplates = t.StatusEffectTemplates
+                        .Select(ToStatusEffectTemplateSnapshot)
+                        .ToList(),
+                    InitiativeAttributeName = t.InitiativeAttributeName,
+                })
+                .ToList();
+
             return new LibrarySnapshot
             {
-                SchemaVersion = 1,
+                SchemaVersion = 3,
                 Settings = state.Settings.Clone(),
                 AttributeSchema = ToSchemaSnapshot(state.AttributeSchema),
+                ActiveSchemaTemplateId = state.ActiveSchemaTemplateId,
+                InitiativeAttributeName = state.InitiativeAttributeName,
                 Maps = maps,
                 Sheets = sheets,
+                CustomTemplates = templates,
+                GlobalRollTemplates = state.GlobalRollTemplates
+                    .Select(ToRollTemplateSnapshot)
+                    .ToList(),
             };
         }
+
+        public static RollTemplateSnapshot ToRollTemplateSnapshot(RollTemplate t) => new()
+        {
+            Id = t.Id,
+            Name = t.Name,
+            Dice = t.Dice.Select(d => new DiceTermSnapshot { Count = d.Count, Sides = d.Sides }).ToList(),
+            FlatModifier = t.FlatModifier,
+            Mode = t.Mode,
+            AttributeName = t.AttributeName,
+            Label = t.Label,
+        };
+
+        public static RollTemplate FromRollTemplateSnapshot(RollTemplateSnapshot s, RollTemplateScope scope) =>
+            new(
+                s.Id,
+                s.Name,
+                s.Dice.Select(d => new DiceTerm(d.Count, d.Sides)).ToList(),
+                s.FlatModifier,
+                s.Mode,
+                s.AttributeName,
+                s.Label,
+                scope);
+
+        public static StatusEffectTemplateSnapshot ToStatusEffectTemplateSnapshot(StatusEffectTemplate t) => new()
+        {
+            Id = t.Id,
+            Name = t.Name,
+            AttributeDeltas = t.AttributeDeltas.Select(d => new AttributeDeltaSnapshot
+            {
+                AttributeName = d.AttributeName,
+                Delta = d.Delta,
+            }).ToList(),
+            MaxHpDelta = t.MaxHpDelta,
+            OnApplyHpDelta = t.OnApplyHpDelta,
+            Notes = t.Notes,
+        };
+
+        public static StatusEffectSnapshot ToStatusEffectSnapshot(StatusEffect e) => new()
+        {
+            Id = e.Id,
+            Name = e.Name,
+            AttributeDeltas = e.AttributeDeltas.Select(d => new AttributeDeltaSnapshot
+            {
+                AttributeName = d.AttributeName,
+                Delta = d.Delta,
+            }).ToList(),
+            MaxHpDelta = e.MaxHpDelta,
+            OnApplyHpDelta = e.OnApplyHpDelta,
+            Notes = e.Notes,
+            AppliedUtc = e.AppliedUtc,
+        };
+
+        public static StatusEffectTemplate FromStatusEffectTemplateSnapshot(StatusEffectTemplateSnapshot s) => new()
+        {
+            Id = s.Id,
+            Name = s.Name,
+            AttributeDeltas = s.AttributeDeltas
+                .Select(d => new AttributeDelta(d.AttributeName, d.Delta))
+                .ToList(),
+            MaxHpDelta = s.MaxHpDelta,
+            OnApplyHpDelta = s.OnApplyHpDelta,
+            Notes = s.Notes,
+        };
+
+        public static StatusEffect FromStatusEffectSnapshot(StatusEffectSnapshot s) => new()
+        {
+            Id = s.Id,
+            Name = s.Name,
+            AttributeDeltas = s.AttributeDeltas
+                .Select(d => new AttributeDelta(d.AttributeName, d.Delta))
+                .ToList(),
+            MaxHpDelta = s.MaxHpDelta,
+            OnApplyHpDelta = s.OnApplyHpDelta,
+            Notes = s.Notes,
+            AppliedUtc = s.AppliedUtc,
+        };
 
         public static AttributeValue ToAttributeValue(AttributeValueSnapshot snap) => snap.Type switch
         {
@@ -197,6 +378,7 @@ namespace KnockBox.DndMapper.Services.Library
         private static MapImageSnapshot ToImageSnapshot(MapImage image) => new()
         {
             Id = image.Id,
+            Name = image.Name,
             ContentType = image.ContentType,
             X = image.X,
             Y = image.Y,
@@ -208,6 +390,7 @@ namespace KnockBox.DndMapper.Services.Library
             Opacity = image.Opacity,
             LayerOrder = image.LayerOrder,
             Locked = image.Locked,
+            Hidden = image.Hidden,
             ByteSize = image.ByteSize,
         };
 
@@ -232,6 +415,8 @@ namespace KnockBox.DndMapper.Services.Library
             Notes = sheet.Notes,
             Hp = sheet.Hp,
             MaxHp = sheet.MaxHp,
+            StatusEffects = sheet.StatusEffects.Select(ToStatusEffectSnapshot).ToList(),
+            RollTemplates = sheet.RollTemplates.Select(ToRollTemplateSnapshot).ToList(),
         };
     }
 }

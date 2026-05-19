@@ -18,9 +18,10 @@ namespace KnockBox.HiddenAgenda.Pages
 
         private async Task KickPlayer(User player)
         {
+            if (UserService.CurrentUser is not { } caller) return;
             await GameState.ExecuteAsync(() =>
             {
-                GameState.KickPlayer(player);
+                GameState.KickPlayer(caller, player);
                 return ValueTask.CompletedTask;
             });
         }

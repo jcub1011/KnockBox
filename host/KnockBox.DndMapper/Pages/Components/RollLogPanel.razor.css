@@ -3,15 +3,97 @@
    naturally until the visible-entry cap kicks in. */
 .dndm-rolllog { display: flex; flex-direction: column; }
 
-.dndm-rolllog-actions {
-    display: inline-flex;
-    gap: 0.35rem;
-    align-items: center;
+.dndm-rolllog-rollbar {
+    display: flex;
+    justify-content: stretch;
 }
 
 .dndm-rolllog-rollbtn {
     font-variant-numeric: tabular-nums;
-    min-width: 5.5rem;
+    flex: 1 1 auto;
+    min-height: 2.25rem;
+    font-size: 0.95rem;
+}
+
+.dndm-rolllog-config {
+    border: 1px solid var(--dndm-border);
+    border-radius: 3px;
+    background: var(--dndm-bg-panel-2);
+    box-shadow: inset 0 1px 0 rgba(232, 144, 85, 0.06);
+}
+
+.dndm-rolllog-config-summary {
+    cursor: pointer;
+    padding: 0.4rem 0.6rem;
+    color: var(--dndm-text-dim);
+    font-family: var(--font-primary);
+    font-size: 1rem;
+    letter-spacing: 0.3px;
+    user-select: none;
+}
+
+.dndm-rolllog-config[open] .dndm-rolllog-config-summary {
+    border-bottom: 1px dashed var(--dndm-ink-soft);
+}
+
+.dndm-rolllog-config-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+    padding: 0.5rem 0.6rem;
+}
+
+.dndm-dice-quick-row {
+    display: flex;
+    gap: 0.3rem;
+    flex-wrap: wrap;
+}
+
+/* Subtle tints so the three roll-template tiers read at a glance without
+   shouting — built-ins stay neutral, globals lean ember, sheet customs lean
+   ink. */
+.dndm-dice-quick-row .dndm-chip--global {
+    border-color: var(--dndm-ember, currentColor);
+}
+.dndm-dice-quick-row .dndm-chip--sheet {
+    border-color: var(--dndm-border-accent);
+}
+
+.dndm-dice-term {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    margin-right: 0.4rem;
+    margin-bottom: 0.3rem;
+}
+
+.dndm-dice-term-d {
+    color: var(--dndm-text-dim);
+    font-family: var(--font-primary);
+    font-size: 1rem;
+}
+
+.dndm-dice-term-sides { width: 4.5rem; }
+
+.dndm-dice-totalcount {
+    margin-top: 0.4rem;
+    font-size: 0.95rem;
+    color: var(--dndm-text-dim);
+    font-variant-numeric: tabular-nums;
+}
+
+.dndm-dice-hint {
+    display: block;
+    margin-top: 0.3rem;
+    font-size: 0.8rem;
+    color: var(--dndm-text-muted);
+    font-style: italic;
+}
+
+.dndm-rolllog-entries {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
 }
 
 .dndm-rolllog-seeall {
@@ -50,8 +132,8 @@
 }
 
 .dndm-rolllog-history-hint {
-    color: #7a7464;
-    font-size: 0.75rem;
+    color: var(--dndm-text-muted);
+    font-size: 0.95rem;
     font-style: italic;
 }
 
@@ -63,11 +145,12 @@
 }
 
 .dndm-rolllog-entry {
-    background: #14141f;
-    border: 1px solid #2c2c44;
-    border-left: 2px solid #cdb98e;
+    background: var(--dndm-bg-panel-2);
+    border: 1px solid var(--dndm-border);
+    border-left: 3px solid var(--dndm-ember);
     border-radius: 3px;
-    padding: 0.35rem 0.5rem;
+    padding: 0.4rem 0.55rem;
+    box-shadow: inset 0 1px 0 rgba(232, 144, 85, 0.07);
 }
 
 .dndm-rolllog-meta {
@@ -79,42 +162,44 @@
 }
 
 .dndm-rolllog-roller {
-    color: #e8b849;
-    font-family: var(--dndm-display);
-    font-size: 0.85rem;
-    text-transform: uppercase;
-    letter-spacing: 1px;
+    color: var(--dndm-ember);
+    font-family: var(--font-primary);
+    font-size: 1rem;
+    letter-spacing: 0.3px;
 }
 
 .dndm-rolllog-label {
-    color: #ede4d3;
-    font-size: 0.8rem;
+    color: var(--dndm-text);
+    font-size: 0.95rem;
 }
 
 .dndm-rolllog-formula {
-    color: #cdb98e;
-    background: #1f1f30;
-    border: 1px solid #2c2c44;
+    color: var(--dndm-text-dim);
+    background: var(--dndm-bg-deep);
+    border: 1px solid var(--dndm-border);
     border-radius: 2px;
-    padding: 0.02rem 0.3rem;
-    font-size: 0.7rem;
+    padding: 0.02rem 0.35rem;
+    font-size: 0.82rem;
     font-variant-numeric: tabular-nums;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.4px;
 }
 
 .dndm-rolllog-mode {
-    background: #4a3c20;
-    color: #e8b849;
-    font-size: 0.65rem;
-    letter-spacing: 1px;
-    padding: 0.05rem 0.3rem;
+    background: linear-gradient(180deg, var(--dndm-ember-hi), var(--dndm-ember) 60%, #8a4a22 100%);
+    color: #1a1208;
+    font-family: var(--font-primary);
+    font-weight: 600;
+    font-size: 0.8rem;
+    letter-spacing: 0.5px;
+    padding: 0.05rem 0.4rem;
     border-radius: 2px;
+    text-shadow: 0 1px 0 rgba(255, 220, 180, 0.3);
 }
 
 .dndm-rolllog-time {
     margin-left: auto;
-    color: #7a7464;
-    font-size: 0.7rem;
+    color: var(--dndm-text-muted);
+    font-size: 0.8rem;
     font-variant-numeric: tabular-nums;
     font-family: var(--font-primary);
 }
@@ -125,32 +210,52 @@
     gap: 0.25rem;
     flex-wrap: wrap;
     font-variant-numeric: tabular-nums;
-    font-size: 0.85rem;
+    font-size: 0.95rem;
 }
 
 .dndm-die {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-width: 1.6rem;
-    height: 1.6rem;
+    min-width: 1.7rem;
+    height: 1.7rem;
     padding: 0 0.25rem;
-    background: #262640;
-    border: 1px solid #3a3a5c;
-    border-radius: 3px;
-    color: #ede4d3;
+    background:
+        radial-gradient(circle at 35% 30%, #2a2018 0%, #1a1410 70%, #14100c 100%);
+    border: 1px solid var(--dndm-border);
+    border-radius: 4px;
+    color: var(--dndm-text);
+    font-family: var(--font-primary);
     font-weight: 600;
+    box-shadow:
+        inset 0 1px 0 var(--dndm-highlight),
+        0 1px 2px rgba(0, 0, 0, 0.55);
 }
 
 .dndm-die--discarded {
     text-decoration: line-through;
-    opacity: 0.4;
+    opacity: 0.45;
 }
 
-.dndm-rolllog-mod { color: #cdb98e; }
+.dndm-rolllog-mod { color: var(--dndm-text-dim); }
 
 .dndm-rolllog-total {
-    margin-left: auto;
-    color: #e8b849;
-    font-size: 0.95rem;
+    color: var(--dndm-ember);
+    font-family: var(--font-primary);
+    font-size: 1.4rem;
+    font-weight: 700;
+    padding: 0 0.5rem 0 0.1rem;
+    border-right: 1px solid var(--dndm-border-accent);
+    margin-right: 0.3rem;
+    min-width: 1.6rem;
+    display: inline-flex;
+    align-items: center;
+    text-shadow: 0 0 8px rgba(232, 144, 85, 0.4);
+}
+
+.dndm-rolllog-dice-detail {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    flex-wrap: wrap;
 }

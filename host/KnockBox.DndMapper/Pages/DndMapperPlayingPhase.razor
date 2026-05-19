@@ -14,6 +14,7 @@
     <div class="dnd-mapper-playing @(IsHost ? "dnd-mapper-playing--host" : null)
                 @(_leftCollapsed ? "dnd-mapper-playing--left-collapsed" : null)
                 @(_rightCollapsed ? "dnd-mapper-playing--right-collapsed" : null)"
+         data-game-room="dnd-mapper"
          @ref="_rootRef"
          style="@RootStyle">
 
@@ -27,6 +28,8 @@
                                     RoomCode="@RoomCode"
                                     SelectedImageId="_selectedImageId"
                                     SelectedImageIdChanged="OnSelectedImageIdChanged" />
+                    <HostInitiativePanel State="State" />
+                    <HostSavesPanel />
                 </div>
                 @* Always render the resize handle so its JS bindings stay
                    attached to a stable DOM node across rail collapses /
@@ -104,32 +107,31 @@
                 @if (!IsHost)
                 {
                     <MyTokenPanel State="State" />
+                    <InitiativeBanner State="State" CurrentUserId="@CurrentUserId" />
                 }
                 <CharacterSheetPanel State="State" CurrentUserId="@CurrentUserId" IsHost="IsHost" />
                 <RollLogPanel State="State"
                               Config="_diceConfig"
                               CurrentUserId="@CurrentUserId"
-                              IsHost="IsHost"
-                              OnOpenSettings="@(() => _diceOpen = true)" />
+                              IsHost="IsHost" />
             </div>
         </aside>
 
         @if (IsHost)
         {
             <div class="dndm-floating-actions">
-                <button class="dndm-btn" type="button" @onclick="TogglePerms">Permissions</button>
+                @if (_isSaving)
+                {
+                    <span class="dndm-save-indicator" title="A save is in progress.">
+                        <span class="dndm-save-spinner" aria-hidden="true"></span>
+                        Saving…
+                    </span>
+                }
+                <button class="dndm-btn" type="button" @onclick="TogglePerms">Settings</button>
                 <EndSessionButton State="State" />
             </div>
         }
 
-        @if (_diceOpen)
-        {
-            <DiceRollerModal State="State"
-                             Config="_diceConfig"
-                             CurrentUserId="@CurrentUserId"
-                             IsHost="IsHost"
-                             OnClose="@(() => _diceOpen = false)" />
-        }
         @if (IsHost && _permsOpen)
         {
             <div class="dndm-modal-overlay" @onclick="@(() => _permsOpen = false)">

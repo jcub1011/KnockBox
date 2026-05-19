@@ -4,8 +4,8 @@
     height: 100%;
     display: flex;
     flex-direction: column;
-    background: #14141f;
-    color: #ede4d3;
+    background: var(--dndm-void);
+    color: var(--dndm-text);
     outline: none;
 }
 
@@ -14,14 +14,26 @@
 }
 
 .dndm-canvas-toolbar {
+    /* Toolbar sits at the top of the canvas-frame and now spans the full
+       canvas-area width (rails overlay the canvas). Inset its content past
+       the rails via padding so the controls stay clickable. */
     display: flex;
     align-items: center;
     gap: 0.75rem;
-    padding: 0.5rem 0.75rem;
-    background: #1a1a2e;
-    border-bottom: 1px solid #2c2c44;
-    font-size: 0.875rem;
+    padding: 0.5rem calc(0.85rem + var(--dndm-rail-pad-right, 0px)) 0.5rem calc(0.85rem + var(--dndm-rail-pad-left, 0px));
+    background:
+        var(--dndm-noise),
+        linear-gradient(180deg, #1d1814 0%, #161210 100%);
+    background-size: 240px 80px, 100% 100%;
+    background-repeat: repeat, no-repeat;
+    border-bottom: 1px solid var(--dndm-border-accent);
+    color: var(--dndm-text);
+    font-size: 0.95rem;
+    font-family: var(--font-primary);
     user-select: none;
+    box-shadow:
+        inset 0 1px 0 rgba(232, 144, 85, 0.06),
+        0 2px 4px rgba(0, 0, 0, 0.55);
 }
 
 .dndm-grid-toggle {
@@ -29,34 +41,39 @@
     align-items: center;
     gap: 0.35rem;
     cursor: pointer;
+    color: var(--dndm-text);
 }
 
 .dndm-zoom-btn {
-    background: #262640;
-    color: inherit;
-    border: 1px solid #3a3a5c;
-    border-radius: 4px;
-    padding: 0.15rem 0.5rem;
+    background: var(--dndm-bg-elev);
+    color: var(--dndm-text);
+    border: 1px solid var(--dndm-border);
+    border-radius: 3px;
+    padding: 0.15rem 0.55rem;
     cursor: pointer;
     line-height: 1;
+    box-shadow: inset 0 1px 0 var(--dndm-highlight);
 }
 
 .dndm-zoom-btn:hover {
-    background: #34345a;
+    background: var(--dndm-bg-elev-hover);
+    border-color: var(--dndm-border-accent);
 }
 
 .dndm-zoom-readout {
     min-width: 3.5em;
     text-align: center;
     font-variant-numeric: tabular-nums;
-    color: #cdb98e;
+    color: var(--dndm-text-dim);
+    font-family: var(--font-primary);
 }
 
+/* SVG map keeps the void background so colored tokens pop. */
 .dndm-map-canvas {
     flex: 1 1 auto;
     width: 100%;
     height: 100%;
-    background: #0e1117;
+    background: var(--dndm-void);
     cursor: grab;
     touch-action: none;
 }
@@ -69,8 +86,10 @@
     cursor: pointer;
 }
 
+/* Selection chrome retuned to ember to match the Forge & Ember palette.
+   Color-only change; the SVG-coordinate drag/drop math is unaffected. */
 .dndm-image-handle {
-    fill: #e8b849;
+    fill: #e89055;
     stroke: #1a1208;
     stroke-width: 0.03;
     cursor: nwse-resize;
@@ -81,7 +100,160 @@
 }
 
 .dndm-image-rotline {
-    stroke: #e8b849;
+    stroke: #e89055;
     stroke-width: 0.04;
     stroke-dasharray: 0.1 0.1;
+}
+
+/* ─── Markup overlay toggle button (v1.x §5.6) ──────────────────────
+   Lives in the canvas toolbar. Active state mirrors the ember-glow
+   primary button so the host has unambiguous feedback that they're
+   "live drawing". */
+.dndm-markup-toggle {
+    margin-left: 0.3rem;
+    font-size: 1.05rem;
+    line-height: 1;
+}
+
+.dndm-markup-toggle--active {
+    background: linear-gradient(180deg, var(--dndm-ember-hi), var(--dndm-ember) 55%, #8a4a22 100%);
+    border-color: #5a2e14;
+    color: #1a1208;
+    text-shadow: 0 1px 0 rgba(255, 220, 180, 0.35);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 220, 180, 0.4),
+        inset 0 -1px 2px rgba(0, 0, 0, 0.45),
+        0 0 8px rgba(232, 144, 85, 0.5);
+}
+
+/* Saved markup re-renders as a plain SVG group — let strokes paint
+   freely; the host-supplied `stroke` and `fill` attributes already
+   carry the colors they were drawn with. */
+.dndm-markup-readonly {
+    /* nothing — present for selector matching only */
+}
+
+/* Stage that holds the map SVG and the optional drawing overlay. It
+   fills the remainder of the canvas-frame below the toolbar; the SVG
+   inside takes 100% so it lays the floor, and the overlay mount sits
+   absolutely over it.
+
+   The frame itself is `display: flex` (column). To grow this stage to
+   fill remaining space we mark it as the flex auto-sized child. */
+.dndm-canvas-stage {
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.dndm-canvas-stage > svg.dndm-map-canvas {
+    flex: 1 1 auto;
+    min-height: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+/* The drawing surface mounts here when the host enables markup. It
+   covers the map region only — never the toolbar above, and never the
+   side rails (which overlap the canvas via absolute positioning). Both
+   the underlying SVG and the drawing surface share preserveAspectRatio
+   "xMidYMid meet" with a viewBox in grid-cell units, so a stroke at
+   (5, 5) lands on the same map cell regardless of container shape. */
+.dndm-markup-overlay-mount {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    /* Inset by the live rail widths inherited from .dnd-mapper-playing.
+       Rails overlap the canvas, so the visible map area is the canvas
+       minus those gutters — the drawing surface must match that area. */
+    left: var(--dndm-rail-pad-left, 0px);
+    right: var(--dndm-rail-pad-right, 0px);
+    z-index: 4;
+    display: flex;
+}
+
+.dndm-markup-overlay-mount > * {
+    flex: 1 1 auto;
+    min-height: 0;
+    width: 100%;
+    height: 100%;
+}
+
+/* ─── Right-click context menu (host, v1.x §6.4) ────────────────────
+   Tiny "forged tablet" floating menu. The veil sits behind it to
+   capture outside clicks (and the next right-click) and dismiss. */
+.dndm-context-veil {
+    position: fixed;
+    inset: 0;
+    z-index: 80;
+    background: transparent;
+}
+
+.dndm-context-menu {
+    position: fixed;
+    z-index: 81;
+    min-width: 200px;
+    background-color: rgba(25, 21, 18, 0.95);
+    background-image:
+        var(--dndm-noise),
+        var(--dndm-panel-vignette),
+        var(--dndm-panel-gradient);
+    background-size: 240px 240px, 100% 100%, 100% 100%;
+    background-repeat: repeat, no-repeat, no-repeat;
+    border: 1px solid var(--dndm-border);
+    border-radius: 3px;
+    color: var(--dndm-text);
+    font-family: var(--font-primary);
+    font-size: 0.92rem;
+    box-shadow:
+        inset 0 1px 0 var(--dndm-highlight),
+        0 8px 20px rgba(0, 0, 0, 0.72),
+        0 0 0 1px var(--dndm-border-accent);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    padding: 0.3rem;
+}
+
+.dndm-context-menu-head {
+    padding: 0.35rem 0.55rem 0.4rem;
+    font-family: var(--dndm-display);
+    font-style: italic;
+    font-size: 0.92rem;
+    color: var(--dndm-text-dim);
+    letter-spacing: 0.3px;
+    border-bottom: 1px solid var(--dndm-ink-soft);
+    margin-bottom: 0.25rem;
+}
+
+.dndm-context-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    width: 100%;
+    background: transparent;
+    color: var(--dndm-text);
+    border: 0;
+    padding: 0.45rem 0.55rem;
+    text-align: left;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: background 100ms ease, color 100ms ease;
+    font-family: var(--font-primary);
+}
+
+.dndm-context-menu-item:hover {
+    background: rgba(196, 116, 56, 0.15);
+    color: #f5e8d3;
+}
+
+.dndm-context-menu-glyph {
+    color: var(--dndm-ember-hi);
+    text-shadow: 0 0 6px rgba(232, 144, 85, 0.5);
+    font-size: 1rem;
+    line-height: 1;
+    width: 18px;
+    text-align: center;
 }

@@ -216,6 +216,29 @@ export function revertToken(svgId, tokenId) {
     applyTransform(group, info.x, info.y);
 }
 
+/**
+ * Force the visual transform back to the authoritative coords after an
+ * engine-accepted move. Needed when the server's snap lands on the same
+ * cell the drag started in — Blazor's SVG diff sees no transform change
+ * and skips the DOM update, leaving the token stranded at the JS-applied
+ * drag-end position.
+ * @param {string} svgId
+ * @param {string} tokenId
+ * @param {number} x
+ * @param {number} y
+ */
+export function reconcileToken(svgId, tokenId, x, y) {
+    const state = instances.get(svgId);
+    if (!state) return;
+    if (state.dragging?.tokenId === tokenId) return;
+    const info = state.tokens.get(tokenId);
+    if (info) { info.x = x; info.y = y; }
+    const group = state.svg?.querySelector(`[data-token-id="${cssEscape(tokenId)}"]`);
+    if (!group) return;
+    group.style.transition = '';
+    applyTransform(group, x, y);
+}
+
 function cssEscape(value) {
     if (typeof CSS !== 'undefined' && typeof CSS.escape === 'function') return CSS.escape(value);
     return String(value).replace(/[^a-zA-Z0-9-_]/g, (c) => `\\${c}`);

@@ -156,10 +156,27 @@ namespace KnockBox.DndMapperTests.Unit
             var (mapId, players) = CreateMapWithPlayers("Alice");
             var token = _state.Maps.Single(m => m.Id == mapId).Tokens.Single();
 
+            // Engine snaps to cell center (x.5, y.5) when SnapToGrid is on, even
+            // if a stale client sent an intersection-aligned coordinate.
             var move = _engine.MoveTokenAsync(_state, players[0], token.Id, 5, 5);
             Assert.IsTrue(move.IsSuccess);
-            Assert.AreEqual(5, token.X);
-            Assert.AreEqual(5, token.Y);
+            Assert.AreEqual(4.5, token.X);
+            Assert.AreEqual(4.5, token.Y);
+        }
+
+        [TestMethod]
+        public void MoveTokenAsync_SnapEnabled_SnapsToCellCenter_EvenForOffCenterInput()
+        {
+            var (mapId, players) = CreateMapWithPlayers("Alice");
+            var token = _state.Maps.Single(m => m.Id == mapId).Tokens.Single();
+
+            // Off-center input (3.2, 7.8) should land at the nearest cell center.
+            // SnapToGridHelper.Snap rounds (x - 0.5) and adds 0.5 back, so the
+            // result is the cell whose center is closest.
+            var move = _engine.MoveTokenAsync(_state, players[0], token.Id, 3.2, 7.8);
+            Assert.IsTrue(move.IsSuccess);
+            Assert.AreEqual(3.5, token.X);
+            Assert.AreEqual(7.5, token.Y);
         }
 
         [TestMethod]
@@ -273,7 +290,7 @@ namespace KnockBox.DndMapperTests.Unit
 
             var remove = _engine.RemoveTokenAsync(_state, _host, tokenId);
             Assert.IsTrue(remove.IsSuccess);
-            Assert.IsFalse(_state.Maps.Single(m => m.Id == mapId).Tokens.Any(t => t.Id == tokenId));
+            Assert.DoesNotContain(t => t.Id == tokenId, _state.Maps.Single(m => m.Id == mapId).Tokens);
         }
 
         [TestMethod]
@@ -338,8 +355,8 @@ namespace KnockBox.DndMapperTests.Unit
             _engine.SetActiveMapAsync(_state, _host, mapB);
 
             // Confirm player has a token on each map
-            Assert.IsTrue(_state.Maps.Single(m => m.Id == mapA).Tokens.Any(t => t.OwnerUserId == player.Id));
-            Assert.IsTrue(_state.Maps.Single(m => m.Id == mapB).Tokens.Any(t => t.OwnerUserId == player.Id));
+            Assert.Contains(t => t.OwnerUserId == player.Id, _state.Maps.Single(m => m.Id == mapA).Tokens);
+            Assert.Contains(t => t.OwnerUserId == player.Id, _state.Maps.Single(m => m.Id == mapB).Tokens);
 
             token.Dispose();
 
@@ -371,7 +388,7 @@ namespace KnockBox.DndMapperTests.Unit
 
             Assert.IsNull(sheet.OwnerUserId, "Sheet should be released to NPC ownership.");
             Assert.AreEqual(player.Id, sheet.RepresentsUserId, "Sheet should retain audit trail of original player.");
-            Assert.IsFalse(_state.Sheets.Values.Any(s => s.OwnerUserId == player.Id));
+            Assert.DoesNotContain(s => s.OwnerUserId == player.Id, _state.Sheets.Values);
         }
 
         // ── AssignCharacterToPlayerAsync ──────────────────────────────────────────
@@ -412,7 +429,7 @@ namespace KnockBox.DndMapperTests.Unit
             Assert.AreEqual(TokenType.PlayerToken, token.Type);
             Assert.AreEqual(player.Id, token.OwnerUserId);
             Assert.IsNull(token.SheetId);
-            Assert.IsFalse(_state.Sheets.Values.Any(s => s.OwnerUserId == player.Id));
+            Assert.DoesNotContain(s => s.OwnerUserId == player.Id, _state.Sheets.Values);
         }
 
         [TestMethod]
@@ -553,18 +570,30 @@ namespace KnockBox.DndMapperTests.Unit
             var sheet = _state.Sheets[sheetId];
             Assert.AreEqual(player.Id, sheet.OwnerUserId);
             Assert.IsNull(sheet.RepresentsUserId);
-            Assert.IsFalse(_state.Maps.SelectMany(m => m.Tokens).Any(t => t.SheetId == sheetId));
+            Assert.DoesNotContain(t => t.SheetId == sheetId, _state.Maps.SelectMany(m => m.Tokens));
         }
 
         [TestMethod]
-        public void AssignSheetToPlayerAsync_SheetAlreadyPlayerOwned_ReturnsError()
+        public void AssignSheetToPlayerAsync_SheetAlreadyPlayerOwned_TransfersToNewOwner()
         {
+            // Re-assigning a character from one player to another is allowed —
+            // the host uses this to hand off a character mid-session. The target
+            // must not already own a different sheet (separate test).
             var (_, players) = CreateMapWithPlayers("Alice");
             var aliceSheetId = _state.Sheets.Values.Single(s => s.OwnerUserId == players[0].Id).Id;
             var bob = EngineTestFactory.RegisterPlayer(_state, "Bob");
 
             var result = _engine.AssignSheetToPlayerAsync(_state, _host, aliceSheetId, bob.Id);
-            Assert.IsTrue(result.IsFailure);
+            Assert.IsTrue(result.IsSuccess, $"AssignSheetToPlayerAsync failed: {result}");
+
+            var sheet = _state.Sheets[aliceSheetId];
+            Assert.AreEqual(bob.Id, sheet.OwnerUserId);
+            Assert.IsNull(sheet.RepresentsUserId);
+            foreach (var token in _state.Maps.SelectMany(m => m.Tokens).Where(t => t.SheetId == aliceSheetId))
+            {
+                Assert.AreEqual(TokenType.PlayerToken, token.Type);
+                Assert.AreEqual(bob.Id, token.OwnerUserId);
+            }
         }
 
         [TestMethod]
@@ -671,7 +700,7 @@ namespace KnockBox.DndMapperTests.Unit
 
             var spawn = _engine.SpawnPlayerTokenAsync(_state, player, player.Id);
             Assert.IsTrue(spawn.TryGetSuccess(out var tokenId));
-            Assert.IsTrue(_state.Maps.Single(m => m.Id == mapId).Tokens.Any(t => t.Id == tokenId));
+            Assert.Contains(t => t.Id == tokenId, _state.Maps.Single(m => m.Id == mapId).Tokens);
         }
 
         [TestMethod]

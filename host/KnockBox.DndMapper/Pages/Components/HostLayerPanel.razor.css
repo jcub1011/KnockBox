@@ -16,28 +16,46 @@
 .dndm-layer-row {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.4rem;
     padding: 0.25rem 0.4rem;
     border-radius: 4px;
-    cursor: pointer;
     border: 1px solid transparent;
 }
 
+.dndm-layer-clickarea {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex: 1 1 auto;
+    cursor: pointer;
+    min-width: 0;
+}
+
+.dndm-layer-row--hidden .dndm-layer-clickarea {
+    opacity: 0.45;
+    filter: grayscale(0.7);
+    cursor: not-allowed;
+}
+
+.dndm-layer-eyebtn {
+    flex: 0 0 auto;
+}
+
 .dndm-layer-row:hover {
-    background: rgba(232, 184, 73, 0.08);
+    background: rgba(196, 116, 56, 0.12);
 }
 
 .dndm-layer-row--selected {
-    background: rgba(232, 184, 73, 0.15);
-    border-color: #e8b849;
+    background: rgba(196, 116, 56, 0.22);
+    border-color: var(--dndm-ember);
 }
 
 .dndm-layer-thumb {
     width: 36px;
     height: 36px;
     object-fit: contain;
-    background: #0e1117;
-    border: 1px solid #2c2c44;
+    background: var(--dndm-bg-deep);
+    border: 1px solid var(--dndm-border-strong);
     border-radius: 3px;
     flex: 0 0 auto;
 }
@@ -47,19 +65,31 @@
        blob-share token has expired. The image will return automatically
        when the host's reconnect republishes the share. */
     background:
-        repeating-linear-gradient(45deg, #1c2128 0 6px, #2c2c44 6px 12px);
+        repeating-linear-gradient(45deg, var(--dndm-bg-panel-2) 0 6px, var(--dndm-border) 6px 12px);
     border-style: dashed;
 }
 
-.dndm-layer-meta {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    color: #cdb98e;
-    font-variant-numeric: tabular-nums;
-    font-size: 0.8rem;
+.dndm-layer-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    color: var(--dndm-text);
+    font-family: var(--font-primary);
+    font-size: 0.95rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    user-select: none;
+}
+
+.dndm-layer-row--hidden .dndm-layer-name { color: var(--dndm-text-dim); }
+
+.dndm-layer-name-input {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 0.3rem 0.5rem;
+    font-size: 0.95rem;
 }
 
 .dndm-layer-lock {
-    font-size: 0.85rem;
+    font-size: 0.95rem;
 }

@@ -39,7 +39,7 @@ public class BoardGraphTests
         {
             var wingSpaces = _graph.Spaces.Values.Where(s => s.Wing == wing).ToList();
             Assert.AreEqual(4, wingSpaces.Count(s => s.SpotType == SpotType.Curation));
-            Assert.AreEqual(1, wingSpaces.Count(s => s.SpotType == SpotType.Event));
+            Assert.ContainsSingle(s => s.SpotType == SpotType.Event, wingSpaces);
         }
     }
 

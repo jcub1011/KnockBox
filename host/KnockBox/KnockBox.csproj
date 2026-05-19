@@ -76,6 +76,8 @@
                       ReferenceOutputAssembly="false" Private="false" />
     <ProjectReference Include="..\KnockBox.DndMapper\KnockBox.DndMapper.csproj"
                       ReferenceOutputAssembly="false" Private="false" />
+    <ProjectReference Include="..\KnockBox.AlphaChain\KnockBox.AlphaChain.csproj"
+                      ReferenceOutputAssembly="false" Private="false" />
   </ItemGroup>
 
   <!--

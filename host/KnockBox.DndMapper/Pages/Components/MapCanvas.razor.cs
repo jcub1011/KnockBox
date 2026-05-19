@@ -3,6 +3,7 @@ using KnockBox.Core.Components.Shared;
 using KnockBox.Core.Services.State.Users;
 using KnockBox.DndMapper.Helpers;
 using KnockBox.DndMapper.Models;
+using KnockBox.DndMapper.Services;
 using KnockBox.DndMapper.Services.Logic.Games;
 using KnockBox.DndMapper.Services.State.Games;
 using KnockBox.DndMapper.Services.State.Games.Data;
@@ -27,6 +28,7 @@ namespace KnockBox.DndMapper.Pages.Components
         [Inject] protected IUserService UserService { get; set; } = default!;
         [Inject] protected IJSRuntime JSRuntime { get; set; } = default!;
         [Inject] protected ILogger<MapCanvas> Logger { get; set; } = default!;
+        [Inject] protected TokenFocusService TokenFocus { get; set; } = default!;
 
         [CascadingParameter] public DndMapperViewport? Viewport { get; set; }
 
@@ -104,6 +106,95 @@ namespace KnockBox.DndMapper.Pages.Components
             base.OnParametersSet();
         }
 
+        // ── Markup overlay (v1.x — §5.6) ─────────────────────────────────
+        // Host-only toggle: when true, an interactive SvgDrawingCanvas covers the
+        // map. The read-only saved markup is rendered inline on the SVG so pan
+        // and zoom apply uniformly for everyone.
+        private bool _markupActive;
+        internal bool MarkupActive => _markupActive;
+
+        // ── Centre-viewport broadcast (v1.x — §6.4) ──────────────────────
+        // Last-seen request Nonce. When the server pushes a new request with a
+        // fresh nonce, every client (including the host who sent it) recentres.
+        private Guid? _lastSeenCenterNonce;
+
+        // ── Right-click context menu ─────────────────────────────────────
+        private bool _contextMenuOpen;
+        private double _contextMenuClientX;
+        private double _contextMenuClientY;
+        // Map-space coordinates of the right-clicked cell (already snapped to grid
+        // when grid snap is enabled). Captured at open-time so subsequent menu
+        // actions act on the cell the user actually right-clicked.
+        private double _contextMenuMapX;
+        private double _contextMenuMapY;
+
+        private IDisposable? _stateSub;
+
+        protected override void OnInitialized()
+        {
+            TokenFocus.Focused += OnTokenFocusRequested;
+            _stateSub = State.StateChangedEventManager.Subscribe(OnStateChanged);
+            // Seed the "last seen" nonce so an existing request from before the
+            // page loaded doesn't snap the viewport on first render.
+            _lastSeenCenterNonce = State.PendingCenterRequest?.Nonce;
+            base.OnInitialized();
+        }
+
+        private async ValueTask OnStateChanged()
+        {
+            // Reactor for the host's "centre everyone here" broadcast. Compare
+            // against the last-seen nonce so identical successive requests still
+            // re-centre (the engine issues a fresh Guid on every verb call).
+            var req = State.PendingCenterRequest;
+            if (req is not null && req.Nonce != _lastSeenCenterNonce && req.MapId == Map.Id)
+            {
+                _lastSeenCenterNonce = req.Nonce;
+                double viewW = Map.Grid.WidthCells / _zoom;
+                double viewH = Map.Grid.HeightCells / _zoom;
+                _panX = req.X - viewW / 2.0;
+                _panY = req.Y - viewH / 2.0;
+                PublishViewport();
+            }
+            await InvokeAsync(StateHasChanged);
+        }
+
+        private async Task ToggleMarkup()
+        {
+            _markupActive = !_markupActive;
+            if (_markupActive)
+            {
+                // The interactive drawing surface uses a fixed 0..W × 0..H viewBox
+                // (in grid cell units), so the host must be at 1.0 zoom / 0,0 pan
+                // for the stroke to land on the intended cell. ResetView snaps both.
+                await ResetView();
+            }
+        }
+
+        private async void OnTokenFocusRequested(Guid tokenId)
+        {
+            // `async void` because the underlying event delegate is
+            // `Action<Guid>` (synchronous); any exception thrown after the
+            // first await would otherwise escape into the sync context and
+            // crash the Blazor circuit. Catch everything here and log.
+            try
+            {
+                if (Map is null) return;
+                var token = Map.Tokens.FirstOrDefault(t => t.Id == tokenId);
+                if (token is null) return;
+                double viewW = Map.Grid.WidthCells / _zoom;
+                double viewH = Map.Grid.HeightCells / _zoom;
+                _panX = token.X - viewW / 2.0;
+                _panY = token.Y - viewH / 2.0;
+                PublishViewport();
+                await InvokeAsync(StateHasChanged);
+            }
+            catch (ObjectDisposedException) { /* component disposed */ }
+            catch (Exception ex)
+            {
+                Logger.LogWarning(ex, "Failed to focus token {TokenId}.", tokenId);
+            }
+        }
+
         private void PublishViewport()
         {
             if (Viewport is null || Map is null) return;
@@ -151,6 +242,8 @@ namespace KnockBox.DndMapper.Pages.Components
 
         public async ValueTask DisposeAsync()
         {
+            TokenFocus.Focused -= OnTokenFocusRequested;
+            _stateSub?.Dispose();
             if (_metricsModule is not null)
             {
                 try { await _metricsModule.DisposeAsync(); }
@@ -158,6 +251,65 @@ namespace KnockBox.DndMapper.Pages.Components
                 _metricsModule = null;
             }
             Dispose();
+        }
+
+        // ── Right-click context menu handlers ─────────────────────────────
+        private async Task OnContextMenu(MouseEventArgs e)
+        {
+            if (!IsHost) return;
+
+            // Resolve the click into map-space coordinates so menu actions
+            // (e.g. "centre everyone here") can use the targeted cell.
+            var (mx, my) = await ClientToMapAsync(e.ClientX, e.ClientY);
+            if (Map.Grid.SnapToGrid)
+            {
+                mx = Math.Floor(mx) + 0.5;
+                my = Math.Floor(my) + 0.5;
+            }
+
+            _contextMenuMapX = mx;
+            _contextMenuMapY = my;
+            _contextMenuClientX = e.ClientX;
+            _contextMenuClientY = e.ClientY;
+            _contextMenuOpen = true;
+        }
+
+        private void CloseContextMenu() => _contextMenuOpen = false;
+
+        private void RequestCenterEveryone()
+        {
+            _contextMenuOpen = false;
+            var user = UserService.CurrentUser;
+            if (user is null) return;
+            Engine.RequestCenterViewportAsync(State, user, Map.Id, _contextMenuMapX, _contextMenuMapY);
+        }
+
+        private async Task<(double X, double Y)> ClientToMapAsync(double clientX, double clientY)
+        {
+            // The SVG viewBox already maps screen pixels into grid-cell units;
+            // recover the cell coords from the cached pixel scale + current pan.
+            await CaptureScaleAsync();
+            if (_pxPerCell <= 0) return (0, 0);
+            try
+            {
+                if (_metricsModule is null) return (_panX, _panY);
+                var rect = await _metricsModule.InvokeAsync<ViewportMetrics?>("getViewportMetrics", _svgId);
+                if (rect is null || rect.SvgWidth == 0) return (_panX, _panY);
+                // getViewportMetrics returns the SVG box dimensions in client px;
+                // the SVG itself is offset by getBoundingClientRect.left/top, which
+                // we don't have here. Approximate by using the difference between
+                // client position and the metrics' "left" offset (rails width). For
+                // M01 ship this is good enough for the centre-viewport affordance.
+                double localX = clientX - rect.LeftPx;
+                double localY = clientY;
+                double mapX = _panX + localX / _pxPerCell;
+                double mapY = _panY + localY / _pxPerCell;
+                return (mapX, mapY);
+            }
+            catch
+            {
+                return (_panX, _panY);
+            }
         }
 
         private static string F(double value) =>
@@ -169,8 +321,62 @@ namespace KnockBox.DndMapper.Pages.Components
         private void ZoomIn() => SetZoom(_zoom * 1.25);
         private void ZoomOut() => SetZoom(_zoom / 1.25);
 
-        private void ResetView()
+        private sealed class ViewportMetrics
         {
+            public double SvgWidth { get; set; }
+            public double SvgHeight { get; set; }
+            public double LeftPx { get; set; }
+            public double RightPx { get; set; }
+        }
+
+        private async Task ResetView()
+        {
+            // Fit the map into the visible region (full SVG minus the left/right
+            // rail widths). Rails overlay the canvas, so without this offset the
+            // map would center under the rails. JS round-trip is one frame; if
+            // metrics aren't available, fall back to plain pan=0, zoom=1.
+            if (_metricsModule is not null)
+            {
+                try
+                {
+                    var m = await _metricsModule.InvokeAsync<ViewportMetrics?>("getViewportMetrics", _svgId);
+                    if (m is not null && m.SvgWidth > 0 && m.SvgHeight > 0
+                        && Map.Grid.WidthCells > 0 && Map.Grid.HeightCells > 0)
+                    {
+                        double pxW = m.SvgWidth, pxH = m.SvgHeight;
+                        double L = m.LeftPx, R = m.RightPx;
+                        double vw = Math.Max(1.0, pxW - L - R);
+                        double vh = Math.Max(1.0, pxH);
+                        double W = Map.Grid.WidthCells, H = Map.Grid.HeightCells;
+                        // Pixels-per-cell at zoom=1 under xMidYMid meet.
+                        double basePxPerCell = Math.Min(pxW / W, pxH / H);
+                        double mapPxW = basePxPerCell * W;
+                        double mapPxH = basePxPerCell * H;
+                        double fitZoom = Math.Min(vw / mapPxW, vh / mapPxH);
+                        fitZoom = Math.Clamp(fitZoom, MinZoom, MaxZoom);
+                        // viewBox spans (W/fitZoom, H/fitZoom) world units. Under
+                        // xMidYMid meet, the viewBox CENTER (not the map center)
+                        // is what lands at the SVG pixel center. So to put the
+                        // map center at SVG center we need panX = (W - VW)/2;
+                        // then shift further by (R - L)/(2·s) to recenter into
+                        // the visible-area midpoint between the two rails.
+                        double VW = W / fitZoom;
+                        double VH = H / fitZoom;
+                        double scale = fitZoom * basePxPerCell;
+                        double dxPx = (L - R) / 2.0;
+                        _zoom = fitZoom;
+                        _panX = (W - VW) / 2.0 - dxPx / scale;
+                        _panY = (H - VH) / 2.0;
+                        PublishViewport();
+                        return;
+                    }
+                }
+                catch (JSDisconnectedException) { /* circuit teardown */ }
+                catch (Exception ex)
+                {
+                    Logger.LogWarning(ex, "Failed to measure viewport for ResetView; falling back.");
+                }
+            }
             _panX = 0;
             _panY = 0;
             _zoom = 1.0;
@@ -193,12 +399,9 @@ namespace KnockBox.DndMapper.Pages.Components
 
         private void ClampPan()
         {
-            double viewW = Map.Grid.WidthCells / _zoom;
-            double viewH = Map.Grid.HeightCells / _zoom;
-            double maxPanX = Math.Max(0, Map.Grid.WidthCells - viewW);
-            double maxPanY = Math.Max(0, Map.Grid.HeightCells - viewH);
-            _panX = Math.Clamp(_panX, -viewW * 0.25, maxPanX + viewW * 0.25);
-            _panY = Math.Clamp(_panY, -viewH * 0.25, maxPanY + viewH * 0.25);
+            // Pan is unbounded by design — the host frequently needs to scroll past
+            // grid edges (off-map sticky notes, secondary scenes). ResetView still
+            // re-centers on (0, 0).
         }
 
         private void OnWheel(WheelEventArgs e)

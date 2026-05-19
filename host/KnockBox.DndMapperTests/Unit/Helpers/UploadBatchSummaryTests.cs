@@ -60,7 +60,7 @@ namespace KnockBox.DndMapperTests.Unit.Helpers
 
             Assert.AreEqual(60, truncated.Length);
             Assert.IsTrue(truncated.EndsWith('…'));
-            Assert.IsTrue(truncated.StartsWith(new string('a', 59)));
+            Assert.StartsWith(new string('a', 59), truncated);
         }
 
         [TestMethod]

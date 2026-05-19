@@ -165,7 +165,7 @@ namespace KnockBox.DndMapperTests.Unit
             var req = new RollRequest(new[] { new DiceTerm(1, 6) }, null, 0, RollMode.Advantage, "");
             var result = _engine.RollAsync(_state, _host, req);
             Assert.IsTrue(result.TryGetSuccess(out var roll));
-            Assert.AreEqual(2, roll.Rolls.Count);
+            Assert.HasCount(2, roll.Rolls);
             // Second die must share the size of the configured term, not be hardcoded to d20.
             Assert.AreEqual(6, roll.Rolls[0].Sides);
             Assert.AreEqual(6, roll.Rolls[1].Sides);
@@ -218,7 +218,7 @@ namespace KnockBox.DndMapperTests.Unit
             SetupRng(10);
             var req = new RollRequest(new[] { new DiceTerm(1, 20) }, null, 0, RollMode.Normal, "");
             _engine.RollAsync(_state, _host, req);
-            Assert.AreEqual(1, _state.RollLog.Count);
+            Assert.HasCount(1, _state.RollLog);
         }
 
         [TestMethod]
@@ -229,7 +229,7 @@ namespace KnockBox.DndMapperTests.Unit
             SetupRng(values);
             var req = new RollRequest(new[] { new DiceTerm(1, 20) }, null, 0, RollMode.Normal, "");
             for (int i = 0; i < cap + 1; i++) _engine.RollAsync(_state, _host, req);
-            Assert.AreEqual(cap, _state.RollLog.Count);
+            Assert.HasCount(cap, _state.RollLog);
         }
 
         [TestMethod]

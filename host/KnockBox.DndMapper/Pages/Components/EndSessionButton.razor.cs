@@ -18,11 +18,11 @@ namespace KnockBox.DndMapper.Pages.Components
         private bool IsHost() => UserService.CurrentUser is not null
             && UserService.CurrentUser.Id == State.Host.Id;
 
-        private async Task DoEnd()
+        private async Task DoReset()
         {
             if (UserService.CurrentUser is null) return;
 
-            var result = Engine.EndSessionAsync(State, UserService.CurrentUser);
+            var result = Engine.ResetSessionAsync(State, UserService.CurrentUser);
             _open = false;
             if (result.TryGetFailure(out var err))
             {

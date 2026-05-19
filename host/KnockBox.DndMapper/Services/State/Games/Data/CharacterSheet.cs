@@ -13,5 +13,7 @@ namespace KnockBox.DndMapper.Services.State.Games.Data
         public string Notes { get; set; } = string.Empty;
         public int? Hp { get; set; }
         public int? MaxHp { get; set; }
+        public List<StatusEffect> StatusEffects { get; } = [];
+        public List<RollTemplate> RollTemplates { get; } = [];
     }
 }

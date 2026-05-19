@@ -32,42 +32,34 @@ namespace KnockBox.DndMapperTests.Unit.Logic.Visibility
         }
 
         [TestMethod]
-        public void CanEdit_OwnersOnly_OwnerTrue()
+        public void CanEdit_HostOnly_OwnerFalse()
         {
+            // Under HostOnly the owner cannot edit their own sheet — only the host can.
             var s = Sheet("u1");
-            Assert.IsTrue(SheetVisibilityHelper.CanEdit(s, "u1", false, SheetEditPolicy.OwnersOnly));
+            Assert.IsFalse(SheetVisibilityHelper.CanEdit(s, "u1", false, SheetEditPolicy.HostOnly));
         }
 
         [TestMethod]
-        public void CanEdit_OwnersOnly_OtherPlayerFalse()
+        public void CanEdit_HostOnly_OtherPlayerFalse()
         {
             var s = Sheet("u1");
-            Assert.IsFalse(SheetVisibilityHelper.CanEdit(s, "u-other", false, SheetEditPolicy.OwnersOnly));
+            Assert.IsFalse(SheetVisibilityHelper.CanEdit(s, "u-other", false, SheetEditPolicy.HostOnly));
         }
 
         [TestMethod]
-        public void CanEdit_OwnersOnly_HostTrue()
+        public void CanEdit_HostOnly_HostTrue()
         {
             var s = Sheet("u1");
-            Assert.IsTrue(SheetVisibilityHelper.CanEdit(s, "u-other", true, SheetEditPolicy.OwnersOnly));
+            Assert.IsTrue(SheetVisibilityHelper.CanEdit(s, "u-other", true, SheetEditPolicy.HostOnly));
         }
 
         [TestMethod]
-        public void CanEdit_OwnersAndHost_BehavesLikeOwnersOnly()
+        public void CanEdit_OwnersAndHost_OwnerOrHost()
         {
-            // Documented identical behavior: host is always exempt regardless of policy,
-            // so OwnersOnly and OwnersAndHost produce the same outcome for every (sheet, viewer, host) tuple.
             var s = Sheet("u1");
-            string[] viewers = ["u1", "u-other"];
-            bool[] hosts = [false, true];
-            foreach (var v in viewers)
-            foreach (var h in hosts)
-            {
-                var only = SheetVisibilityHelper.CanEdit(s, v, h, SheetEditPolicy.OwnersOnly);
-                var andHost = SheetVisibilityHelper.CanEdit(s, v, h, SheetEditPolicy.OwnersAndHost);
-                Assert.AreEqual(only, andHost,
-                    $"Mismatch for viewer={v} host={h}: OwnersOnly={only}, OwnersAndHost={andHost}");
-            }
+            Assert.IsTrue(SheetVisibilityHelper.CanEdit(s, "u1", false, SheetEditPolicy.OwnersAndHost));
+            Assert.IsTrue(SheetVisibilityHelper.CanEdit(s, "u-other", true, SheetEditPolicy.OwnersAndHost));
+            Assert.IsFalse(SheetVisibilityHelper.CanEdit(s, "u-other", false, SheetEditPolicy.OwnersAndHost));
         }
 
         [TestMethod]
@@ -80,20 +72,36 @@ namespace KnockBox.DndMapperTests.Unit.Logic.Visibility
         }
 
         [TestMethod]
-        public void CanSeeSheet_OwnedSheet_VisibleToEveryone()
+        public void CanSeeSheet_OwnSheet_AlwaysVisibleToOwner()
         {
             var s = Sheet("u1");
-            Assert.IsTrue(SheetVisibilityHelper.CanSeeSheet(s, viewerIsHost: false));
-            Assert.IsTrue(SheetVisibilityHelper.CanSeeSheet(s, viewerIsHost: true));
+            Assert.IsTrue(SheetVisibilityHelper.CanSeeSheet(s, "u1", viewerIsHost: false, playersCanSeeOtherSheets: false));
+            Assert.IsTrue(SheetVisibilityHelper.CanSeeSheet(s, "u1", viewerIsHost: false, playersCanSeeOtherSheets: true));
         }
 
         [TestMethod]
-        public void CanSeeSheet_NpcSheet_HostOnly()
+        public void CanSeeSheet_OtherPlayerSheet_GatedByToggle()
         {
-            // Null owner = host-created NPC/monster sheet — players must not see it.
+            var s = Sheet("u1");
+            Assert.IsTrue(SheetVisibilityHelper.CanSeeSheet(s, "u-other", viewerIsHost: false, playersCanSeeOtherSheets: true));
+            Assert.IsFalse(SheetVisibilityHelper.CanSeeSheet(s, "u-other", viewerIsHost: false, playersCanSeeOtherSheets: false));
+        }
+
+        [TestMethod]
+        public void CanSeeSheet_Host_AlwaysSeesEverything()
+        {
+            var s = Sheet("u1");
             var npc = Sheet(null);
-            Assert.IsTrue(SheetVisibilityHelper.CanSeeSheet(npc, viewerIsHost: true));
-            Assert.IsFalse(SheetVisibilityHelper.CanSeeSheet(npc, viewerIsHost: false));
+            Assert.IsTrue(SheetVisibilityHelper.CanSeeSheet(s, "host", viewerIsHost: true, playersCanSeeOtherSheets: false));
+            Assert.IsTrue(SheetVisibilityHelper.CanSeeSheet(npc, "host", viewerIsHost: true, playersCanSeeOtherSheets: false));
+        }
+
+        [TestMethod]
+        public void CanSeeSheet_NpcSheet_NeverVisibleToPlayers()
+        {
+            var npc = Sheet(null);
+            Assert.IsFalse(SheetVisibilityHelper.CanSeeSheet(npc, "u1", viewerIsHost: false, playersCanSeeOtherSheets: true));
+            Assert.IsFalse(SheetVisibilityHelper.CanSeeSheet(npc, "u1", viewerIsHost: false, playersCanSeeOtherSheets: false));
         }
     }
 }

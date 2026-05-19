@@ -1,4 +1,5 @@
 @using KnockBox.Core.Components.Shared
+@using KnockBox.DndMapper.Helpers
 @using KnockBox.DndMapper.Models
 @using KnockBox.DndMapper.Services.Logic.Visibility
 @using KnockBox.DndMapper.Services.State.Games
@@ -8,20 +9,26 @@
 <section class="dndm-panel dndm-sheet">
     <header class="dndm-panel-header">
         <span>Character Sheet</span>
-        @if (IsHost)
-        {
-            <button class="dndm-btn dndm-btn--small"
-                    type="button"
-                    title="Create a host-only NPC/monster sheet"
-                    @onclick="OpenNpcModal">+ NPC Sheet</button>
-        }
-        else if (!HasOwnSheet)
-        {
-            <button class="dndm-btn dndm-btn--small"
-                    type="button"
-                    title="Create your character sheet"
-                    @onclick="CreateMySheet">+ My Sheet</button>
-        }
+        <span class="dndm-sheet-header-actions">
+            @if (IsHost)
+            {
+                <button class="dndm-btn dndm-btn--small dndm-btn--icon"
+                        type="button"
+                        title="Create a host-only NPC/monster sheet"
+                        @onclick="OpenNpcModal">+</button>
+                <button class="dndm-btn dndm-btn--small dndm-btn--icon"
+                        type="button"
+                        title="Sheet settings"
+                        @onclick="OpenSheetSettings">⚙</button>
+            }
+            else if (!HasOwnSheet)
+            {
+                <button class="dndm-btn dndm-btn--small"
+                        type="button"
+                        title="Create your character sheet"
+                        @onclick="CreateMySheet">+ My Sheet</button>
+            }
+        </span>
     </header>
 
     @if (VisibleSheets.Count == 0)
@@ -30,16 +37,100 @@
     }
     else
     {
-        <div class="dndm-sheet-tabs" role="tablist">
-            @foreach (var s in VisibleSheets)
+        <div class="dndm-sheet-tabbar">
+            @if (VisibleSheets.Count > 4)
             {
-                var active = s.Id == _activeSheetId;
-                <button @key="s.Id"
-                        class="@($"dndm-sheet-tab{(active ? " dndm-sheet-tab--active" : "")}")"
+                var activeId = ActiveSheet?.Id;
+                <div class="dndm-sheet-tabs dndm-sheet-tabs--dropdown">
+                    @if (_renamingSheetId is not null && ActiveSheet is not null)
+                    {
+                        <input class="dndm-input dndm-sheet-tab-rename"
+                               @ref="_renameInputRef"
+                               value="@_renameSheetDraft"
+                               @oninput="OnRenameInput"
+                               @onkeydown="OnRenameKeyDown"
+                               @onblur="CommitSheetRename" />
+                    }
+                    else
+                    {
+                        <select class="dndm-select dndm-sheet-tab-select"
+                                @onchange="@(e => OnSheetDropdownChanged((string?)e.Value))">
+                            @foreach (var s in VisibleSheets.OrderBy(s => s.CharacterName, StringComparer.OrdinalIgnoreCase))
+                            {
+                                <option value="@s.Id" selected="@(activeId == s.Id)">
+                                    @(string.IsNullOrEmpty(s.CharacterName) ? "(unnamed)" : s.CharacterName)
+                                </option>
+                            }
+                        </select>
+                        @if (ActiveSheet is { } dropdownActive)
+                        {
+                            <button class="dndm-btn dndm-btn--small dndm-btn--icon dndm-btn--ghost"
+                                    type="button"
+                                    title="Rename selected sheet"
+                                    @onclick="@(() => BeginSheetRename(dropdownActive))">
+                                <span class="dndm-rename-icon" aria-hidden="true">R<svg viewBox="0 0 6 14" width="6" height="14"
+                                         fill="none" stroke="currentColor" stroke-width="1.2"
+                                         stroke-linecap="round">
+                                        <line x1="3" y1="2" x2="3" y2="12" />
+                                        <line x1="1" y1="2" x2="5" y2="2" />
+                                        <line x1="1" y1="12" x2="5" y2="12" />
+                                    </svg></span>
+                            </button>
+                        }
+                    }
+                </div>
+            }
+            else
+            {
+                <div class="dndm-sheet-tabs" role="tablist">
+                    @{
+                        // When _activeSheetId is null (first render), fall back to ActiveSheet
+                        // so the auto-selected first sheet shows as the active tab.
+                        var effectiveActiveId = _activeSheetId ?? ActiveSheet?.Id;
+                    }
+                    @foreach (var s in VisibleSheets)
+                    {
+                        var active = s.Id == effectiveActiveId;
+                        if (_renamingSheetId == s.Id)
+                        {
+                            <input @key="@($"rename-{s.Id}")"
+                                   class="dndm-input dndm-sheet-tab-rename"
+                                   @ref="_renameInputRef"
+                                   value="@_renameSheetDraft"
+                                   @oninput="OnRenameInput"
+                                   @onkeydown="OnRenameKeyDown"
+                                   @onblur="CommitSheetRename" />
+                        }
+                        else
+                        {
+                            <button @key="s.Id"
+                                    class="@($"dndm-sheet-tab{(active ? " dndm-sheet-tab--active" : "")}")"
+                                    type="button"
+                                    role="tab"
+                                    title="Double-click to rename"
+                                    @onclick="@(() => SelectSheet(s.Id))"
+                                    @ondblclick="@(() => BeginSheetRename(s))">
+                                @(string.IsNullOrEmpty(s.CharacterName) ? "(unnamed)" : s.CharacterName)
+                            </button>
+                        }
+                    }
+                </div>
+            }
+            @if (IsHost && ActiveSheet is { } activeForDelete && _renamingSheetId is null)
+            {
+                <button class="dndm-btn dndm-btn--small dndm-btn--icon dndm-btn--danger dndm-sheet-tabbar-delete"
                         type="button"
-                        role="tab"
-                        @onclick="@(() => SelectSheet(s.Id))">
-                    @(string.IsNullOrEmpty(s.CharacterName) ? "(unnamed)" : s.CharacterName)
+                        title="Delete current character sheet"
+                        @onclick="@(() => RequestDeleteSheet(activeForDelete))">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none"
+                         stroke="currentColor" stroke-width="2"
+                         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <polyline points="3 6 5 6 21 6" />
+                        <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                        <line x1="10" y1="11" x2="10" y2="17" />
+                        <line x1="14" y1="11" x2="14" y2="17" />
+                        <path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" />
+                    </svg>
                 </button>
             }
         </div>
@@ -50,13 +141,6 @@
             var canSeePrivate = SheetVisibilityHelper.CanSeeNotesAndHp(sheet, CurrentUserId, IsHost);
 
             <div class="dndm-panel-body dndm-sheet-body">
-                <div class="dndm-sheet-namerow">
-                    <input class="dndm-input dndm-sheet-name"
-                           value="@sheet.CharacterName"
-                           disabled="@(!canEdit)"
-                           @oninput="@(e => OnNameInput(sheet, (string?)e.Value))"
-                           @onblur="@(() => CommitFreeFields(sheet))" />
-                </div>
                 @if (sheet.OwnerUserId is null && sheet.RepresentsUserId is not null)
                 {
                     <div class="dndm-sheet-origin" title="This character was orphaned when its player left the session.">
@@ -106,41 +190,91 @@
                     }
                 }
 
-                <div class="dndm-sheet-attrs">
-                    @foreach (var row in State.AttributeSchema.Rows)
-                    {
-                        var current = sheet.Values.TryGetValue(row.Name, out var v) ? v : row.Default;
-                        <div @key="row.Name" class="dndm-sheet-attr">
-                            <span class="dndm-sheet-attr-name">@row.Name</span>
-                            @switch (row.Type)
-                            {
-                                case AttributeValueType.Score:
-                                    <input type="number"
-                                           class="dndm-input dndm-input--num"
-                                           value="@(current.IntValue ?? 10)"
-                                           disabled="@(!canEdit)"
-                                           @onchange="@(e => CommitAttribute(sheet, row, AttributeValue.Score(ParseInt(e.Value, 10))))" />
-                                    <span class="dndm-sheet-attr-mod">@FormatMod(current.GetModifier())</span>
-                                    break;
-                                case AttributeValueType.Modifier:
-                                    <input type="number"
-                                           class="dndm-input dndm-input--num"
-                                           value="@(current.IntValue ?? 0)"
-                                           disabled="@(!canEdit)"
-                                           @onchange="@(e => CommitAttribute(sheet, row, AttributeValue.Modifier(ParseInt(e.Value, 0))))" />
-                                    break;
-                                case AttributeValueType.Text:
-                                    <input class="dndm-input"
-                                           value="@(current.StringValue ?? string.Empty)"
-                                           disabled="@(!canEdit)"
-                                           @onchange="@(e => CommitAttribute(sheet, row, AttributeValue.Text(((string?)e.Value) ?? string.Empty)))" />
-                                    break;
-                            }
-                        </div>
-                    }
-                </div>
+                <table class="dndm-sheet-attr-table">
+                    <colgroup>
+                        <col span="1" style="width: 100%;"/>
+                        <col span="1" style="width: 80px;"/>
+                        <col span="1" style="width: 65px;"/>
+                        <col span="1" style="width: 75px;"/>
+                    </colgroup>
+                    <thead>
+                        <tr>
+                            <th class="dndm-sheet-attr-col-name">Attribute</th>
+                            <th class="dndm-sheet-attr-col-base">Level</th>
+                            <th class="dndm-sheet-attr-col-effects" title="Sum of attribute deltas from active status effects.">Effects</th>
+                            <th class="dndm-sheet-attr-col-adj" title="The modifier added to rolls — (Base + Status Effects) through this attribute's scoring mode.">Roll Mod.</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var row in State.AttributeSchema.Rows)
+                        {
+                            var current = sheet.Values.TryGetValue(row.Name, out var v) ? v : row.Default;
+                            var contrib = AttributeContributionResolver.Resolve(sheet, row.Name, current);
+                            var effectDelta = (contrib.EffectiveValue.IntValue ?? 0) - (current.IntValue ?? 0);
+                            var effectsCls = effectDelta == 0 ? "" : effectDelta < 0 ? "is-neg" : "is-pos";
+                            <tr @key="row.Name">
+                                <td class="dndm-sheet-attr-col-name">@row.Name</td>
+                                <td class="dndm-sheet-attr-col-base">
+                                    @switch (row.Type)
+                                    {
+                                        case AttributeValueType.Score:
+                                            <input type="number"
+                                                   class="dndm-input dndm-input--num"
+                                                   value="@(current.IntValue ?? 10)"
+                                                   disabled="@(!canEdit)"
+                                                   @onchange="@(e => CommitAttribute(sheet, row, AttributeValue.Score(ParseInt(e.Value, 10))))" />
+                                            break;
+                                        case AttributeValueType.Modifier:
+                                            <input type="number"
+                                                   class="dndm-input dndm-input--num"
+                                                   value="@(current.IntValue ?? 0)"
+                                                   disabled="@(!canEdit)"
+                                                   @onchange="@(e => CommitAttribute(sheet, row, AttributeValue.Modifier(ParseInt(e.Value, 0))))" />
+                                            break;
+                                        case AttributeValueType.Text:
+                                            <input class="dndm-input"
+                                                   value="@(current.StringValue ?? string.Empty)"
+                                                   disabled="@(!canEdit)"
+                                                   @onchange="@(e => CommitAttribute(sheet, row, AttributeValue.Text(((string?)e.Value) ?? string.Empty)))" />
+                                            break;
+                                    }
+                                </td>
+                                <td class="@($"dndm-sheet-attr-col-effects {effectsCls}")"
+                                    title="@FormatBreakdown(contrib.ValueBreakdown)">
+                                    @if (row.Type == AttributeValueType.Text)
+                                    {
+                                        <span class="dndm-sheet-attr-dash">—</span>
+                                    }
+                                    else if (effectDelta == 0)
+                                    {
+                                        <span class="dndm-sheet-attr-dash">—</span>
+                                    }
+                                    else
+                                    {
+                                        @FormatMod(effectDelta)
+                                    }
+                                </td>
+                                <td class="dndm-sheet-attr-col-adj">
+                                    @if (row.Type == AttributeValueType.Text)
+                                    {
+                                        <span class="dndm-sheet-attr-dash">—</span>
+                                    }
+                                    else
+                                    {
+                                        @FormatMod(contrib.EffectiveModifier)
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
 
-                @if (canSeePrivate)
+                <StatusEffectsPanel State="State"
+                                    Sheet="sheet"
+                                    IsHost="IsHost"
+                                    CanEdit="canEdit" />
+
+                @if (canSeePrivate && State.Settings.HpTrackingEnabled)
                 {
                     <div class="dndm-sheet-section">
                         <span class="dndm-label">HP</span>
@@ -154,29 +288,31 @@
                         else
                         {
                             <div class="dndm-sheet-hp">
-                                <button class="dndm-btn dndm-btn--small dndm-btn--icon"
-                                        type="button"
-                                        disabled="@(!canEdit)"
-                                        @onclick="@(() => StepHp(sheet, -1))">−</button>
+                                <span class="dndm-sheet-hp-sep">Cur.</span>
                                 <input type="number"
                                        class="dndm-input dndm-input--num"
                                        value="@sheet.Hp"
                                        disabled="@(!canEdit)"
                                        @onchange="@(e => OnHpDirect(sheet, (string?)e.Value))" />
-                                <span class="dndm-sheet-hp-sep">/</span>
+                                <span class="dndm-sheet-hp-sep">/ Max</span>
                                 <input type="number"
                                        class="dndm-input dndm-input--num"
                                        value="@sheet.MaxHp"
                                        disabled="@(!canEdit)"
                                        @onchange="@(e => OnMaxHpDirect(sheet, (string?)e.Value))" />
-                                <button class="dndm-btn dndm-btn--small dndm-btn--icon"
-                                        type="button"
-                                        disabled="@(!canEdit)"
-                                        @onclick="@(() => StepHp(sheet, +1))">+</button>
+                                @{ var effMax = EffectiveMaxHpResolver.ResolveEffectiveMaxHp(sheet); }
+                                @if (effMax is int em && em != sheet.MaxHp)
+                                {
+                                    <span class="dndm-sheet-hp-effective @(em > sheet.MaxHp ? "is-pos" : "is-neg")"
+                                          title="@FormatMaxHpBreakdown(sheet)">(eff: @em)</span>
+                                }
                             </div>
                         }
                     </div>
+                }
 
+                @if (canSeePrivate)
+                {
                     <div class="dndm-sheet-section">
                         <span class="dndm-label">Notes</span>
                         <textarea class="dndm-textarea"
@@ -191,6 +327,18 @@
         }
     }
 </section>
+
+@if (_sheetSettingsOpen)
+{
+    <SheetSettingsModal State="State" OnClose="@(() => _sheetSettingsOpen = false)" />
+}
+
+<ConfirmModal IsOpen="_pendingDeleteSheet is not null"
+              Title="Delete character sheet?"
+              Message="@($"This permanently removes \"{_pendingDeleteSheetName}\" and detaches it from any tokens.")"
+              ConfirmText="Delete"
+              OnConfirm="ConfirmDeleteSheet"
+              OnCancel="CancelDeleteSheet" />
 
 @if (_npcModalOpen)
 {

@@ -332,7 +332,7 @@ public sealed class AbstractGameStateTests
         var player = MakeUser();
         state.RegisterPlayer(player);
 
-        var result = state.KickPlayer(player);
+        var result = state.KickPlayer(state.Host, player);
 
         Assert.IsTrue(result.IsSuccess);
         Assert.IsFalse(state.Players.Any(p => ReferenceEquals(p.User, player)));
@@ -345,7 +345,7 @@ public sealed class AbstractGameStateTests
         using var state = MakeState();
         var player = MakeUser();
 
-        var result = state.KickPlayer(player);
+        var result = state.KickPlayer(state.Host, player);
 
         Assert.IsTrue(result.IsFailure);
     }
@@ -357,7 +357,7 @@ public sealed class AbstractGameStateTests
         state.Execute(() => state.SetJoinable(true));
         var player = MakeUser();
         state.RegisterPlayer(player);
-        state.KickPlayer(player);
+        state.KickPlayer(state.Host, player);
 
         var result = state.RegisterPlayer(player);
 
@@ -380,7 +380,7 @@ public sealed class AbstractGameStateTests
                 tcs.TrySetResult();
         });
 
-        state.KickPlayer(player);
+        state.KickPlayer(state.Host, player);
 
         // Deterministically await the first notification.
         var completed = await Task.WhenAny(tcs.Task, Task.Delay(1000));
@@ -420,7 +420,7 @@ public sealed class AbstractGameStateTests
             return ValueTask.CompletedTask;
         });
 
-        state.KickPlayer(player);
+        state.KickPlayer(state.Host, player);
 
         // Deterministically await the first notification.
         var completed = await Task.WhenAny(tcs.Task, Task.Delay(1000));
@@ -437,7 +437,7 @@ public sealed class AbstractGameStateTests
         var player = MakeUser();
         state.RegisterPlayer(player);
 
-        state.KickPlayer(player);
+        state.KickPlayer(state.Host, player);
 
         Assert.IsFalse(state.Players.Any(p => ReferenceEquals(p.User, player)));
         Assert.IsTrue(state.IsKicked(player),
@@ -452,9 +452,101 @@ public sealed class AbstractGameStateTests
         var player = MakeUser();
         state.RegisterPlayer(player);
 
-        state.KickPlayer(player);
+        state.KickPlayer(state.Host, player);
 
         Assert.Contains(player, state.KickedPlayers);
+    }
+
+    [TestMethod]
+    public void KickPlayer_NonHostCaller_ReturnsFailureAndDoesNotKick()
+    {
+        using var state = MakeState();
+        state.Execute(() => state.SetJoinable(true));
+        var attacker = MakeUser("Attacker");
+        var victim = MakeUser("Victim");
+        state.RegisterPlayer(attacker);
+        state.RegisterPlayer(victim);
+
+        var result = state.KickPlayer(attacker, victim);
+
+        Assert.IsTrue(result.IsFailure, "Non-host caller should not be allowed to kick.");
+        Assert.IsTrue(state.Players.Any(p => ReferenceEquals(p.User, victim)),
+            "Victim must remain registered after a rejected kick.");
+        Assert.IsFalse(state.IsKicked(victim), "Victim must not be marked kicked.");
+    }
+
+    // ── AllowRejoinAfterStart ────────────────────────────────────────────────
+
+    private sealed class TestGameStateAllowingRejoin(User host, ILogger logger) : AbstractGameState(host, logger)
+    {
+        protected override bool AllowRejoinAfterStart => true;
+    }
+
+    [TestMethod]
+    public void RegisterPlayer_AfterStart_WithRejoinAllowed_AdmitsPriorPlayer()
+    {
+        using var state = new TestGameStateAllowingRejoin(MakeUser("Host"), MakeLogger());
+        state.Execute(() => state.SetJoinable(true));
+        var player = MakeUser();
+
+        var firstReg = state.RegisterPlayer(player);
+        Assert.IsTrue(firstReg.TryGetSuccess(out var firstUnsub));
+        firstUnsub!.Dispose();
+
+        state.Execute(() => state.SetJoinable(false));
+
+        var rejoin = state.RegisterPlayer(player);
+
+        Assert.IsTrue(rejoin.IsSuccess, "Prior lobby member should be allowed to rejoin after start.");
+    }
+
+    [TestMethod]
+    public void RegisterPlayer_AfterStart_WithRejoinAllowed_RejectsStranger()
+    {
+        using var state = new TestGameStateAllowingRejoin(MakeUser("Host"), MakeLogger());
+        // Never opened the lobby — stranger has no prior-join record.
+        var stranger = MakeUser("Stranger");
+
+        var result = state.RegisterPlayer(stranger);
+
+        Assert.IsTrue(result.IsFailure,
+            "AllowRejoinAfterStart should not let strangers in once IsJoinable is false.");
+    }
+
+    [TestMethod]
+    public void RegisterPlayer_AfterStart_WithRejoinAllowed_RejectsKickedPlayer()
+    {
+        var host = MakeUser("Host");
+        using var state = new TestGameStateAllowingRejoin(host, MakeLogger());
+        state.Execute(() => state.SetJoinable(true));
+        var player = MakeUser();
+        state.RegisterPlayer(player);
+        state.KickPlayer(host, player);
+        state.Execute(() => state.SetJoinable(false));
+
+        var rejoin = state.RegisterPlayer(player);
+
+        Assert.IsTrue(rejoin.IsFailure,
+            "Kicked players must not bypass the kicked-set via AllowRejoinAfterStart.");
+    }
+
+    [TestMethod]
+    public void RegisterPlayer_AfterStart_WithRejoinDisallowed_RejectsPriorPlayer()
+    {
+        // Default TestGameState leaves AllowRejoinAfterStart == false.
+        using var state = MakeState();
+        state.Execute(() => state.SetJoinable(true));
+        var player = MakeUser();
+        var firstReg = state.RegisterPlayer(player);
+        Assert.IsTrue(firstReg.TryGetSuccess(out var firstUnsub));
+        firstUnsub!.Dispose();
+
+        state.Execute(() => state.SetJoinable(false));
+
+        var rejoin = state.RegisterPlayer(player);
+
+        Assert.IsTrue(rejoin.IsFailure,
+            "Without AllowRejoinAfterStart, prior players must not be re-admitted once the lobby closes.");
     }
 
     // ── Execute ──────────────────────────────────────────────────────────────

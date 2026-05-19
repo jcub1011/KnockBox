@@ -34,7 +34,7 @@ public static class BlobShareEndpoint
 
         context.Response.ContentType = entry.ContentType;
         context.Response.ContentLength = entry.Length;
-        context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+        context.Response.Headers.XContentTypeOptions = "nosniff";
         context.Response.Headers.CacheControl = entry.CacheControl ?? "no-store, private";
 
         var ct = context.RequestAborted;

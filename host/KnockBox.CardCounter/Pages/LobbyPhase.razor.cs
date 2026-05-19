@@ -47,7 +47,7 @@ namespace KnockBox.CardCounter.Pages
                 return;
             }
 
-            var result = GameState.KickPlayer(GameState.Players[index].User);
+            var result = GameState.KickPlayer(UserService.CurrentUser!, GameState.Players[index].User);
             if (result.TryGetFailure(out var error))
             {
                 Logger.LogWarning("Error kicking player [{error}].", error.PublicMessage);

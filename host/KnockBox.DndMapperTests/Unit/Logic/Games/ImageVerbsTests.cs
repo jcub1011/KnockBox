@@ -44,7 +44,7 @@ namespace KnockBox.DndMapperTests.Unit.Logic.Games
             var result = _engine.AddImageAsync(_state, _host, _mapId, img);
 
             Assert.IsTrue(result.TryGetSuccess(out var added));
-            Assert.AreEqual(1, _state.Maps[0].Images.Count);
+            Assert.HasCount(1, _state.Maps[0].Images);
             Assert.AreEqual(0, added.LayerOrder);
             Assert.AreEqual(100, _state.BytesUsed);
         }
@@ -58,7 +58,7 @@ namespace KnockBox.DndMapperTests.Unit.Logic.Games
             var result = _engine.AddImageAsync(_state, player, _mapId, img);
 
             Assert.IsTrue(result.IsFailure);
-            Assert.AreEqual(0, _state.Maps[0].Images.Count);
+            Assert.IsEmpty(_state.Maps[0].Images);
         }
 
         [TestMethod]
@@ -216,7 +216,7 @@ namespace KnockBox.DndMapperTests.Unit.Logic.Games
             var result = _engine.RemoveImageAsync(_state, _host, _mapId, a.Id);
 
             Assert.IsTrue(result.IsSuccess);
-            Assert.AreEqual(1, _state.Maps[0].Images.Count);
+            Assert.HasCount(1, _state.Maps[0].Images);
             Assert.AreEqual(75, _state.BytesUsed);
             // Remaining image's LayerOrder compacted to 0.
             Assert.AreEqual(0, _state.Maps[0].Images[0].LayerOrder);
@@ -258,7 +258,7 @@ namespace KnockBox.DndMapperTests.Unit.Logic.Games
             var result = _engine.DeleteMapAsync(_state, _host, _mapId);
 
             Assert.IsTrue(result.IsSuccess);
-            Assert.AreEqual(0, _state.Maps.Count);
+            Assert.IsEmpty(_state.Maps);
             Assert.AreEqual(0, _state.BytesUsed);
         }
 

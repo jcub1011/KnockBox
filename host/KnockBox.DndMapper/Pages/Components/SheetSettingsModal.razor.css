@@ -1,0 +1,171 @@
+.dndm-sheet-settings-modal {
+    /* dndm-modal-card already supplies the chrome (background, border,
+       shadow, rounded corners). Override only the size for this larger
+       multi-section modal. */
+    min-width: 0;
+    width: min(640px, calc(100vw - 2rem));
+    max-width: min(640px, calc(100vw - 2rem));
+    max-height: calc(100vh - 4rem);
+}
+
+.dndm-sheet-settings-modal .dndm-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.dndm-sheet-settings-modal .dndm-modal-title {
+    margin: 0;
+}
+
+.dndm-sheet-settings-modal .dndm-modal-body {
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+    margin: 0 0 0.75rem 0;
+}
+
+.dndm-sheet-settings-modal .dndm-modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+}
+
+.dndm-template-list {
+    list-style: none;
+    margin: 0.25rem 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+
+.dndm-template-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    padding: 0.4rem 0.55rem;
+    background: var(--dndm-bg-panel-2);
+    border: 1px solid var(--dndm-border);
+    border-radius: 3px;
+    box-shadow: inset 0 1px 0 rgba(232, 144, 85, 0.07);
+}
+
+.dndm-template-row-head {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+}
+
+.dndm-template-name-btn {
+    background: transparent;
+    border: 0;
+    color: inherit;
+    cursor: pointer;
+    padding: 0;
+    flex: 1 1 auto;
+    text-align: left;
+    display: flex;
+    align-items: baseline;
+    gap: 0.35rem;
+    font: inherit;
+}
+
+.dndm-template-chevron {
+    color: var(--dndm-text-dim);
+    font-size: 0.95rem;
+    width: 0.9rem;
+    display: inline-block;
+}
+
+.dndm-template-name {
+    color: var(--dndm-text);
+    font-family: var(--font-primary);
+}
+
+.dndm-template-count {
+    color: var(--dndm-text-muted);
+    font-size: 0.95rem;
+}
+
+.dndm-template-badge {
+    color: var(--dndm-text-dim);
+    font-family: var(--font-primary);
+    font-size: 0.9rem;
+    letter-spacing: 0.3px;
+    border: 1px solid var(--dndm-border);
+    border-radius: 2px;
+    padding: 0 0.35rem;
+}
+
+.dndm-template-badge--active {
+    color: #1a1208;
+    background: linear-gradient(180deg, var(--dndm-ember-hi), var(--dndm-ember) 60%, #8a4a22 100%);
+    border-color: #5a2e14;
+    font-weight: 600;
+    text-shadow: 0 1px 0 rgba(255, 220, 180, 0.3);
+}
+
+.dndm-template-preview {
+    border-top: 1px dashed var(--dndm-ink-soft);
+    padding-top: 0.4rem;
+}
+
+.dndm-template-preview-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.95rem;
+}
+
+.dndm-template-preview-table th {
+    text-align: left;
+    color: var(--dndm-ember);
+    font-family: var(--font-primary);
+    font-weight: 500;
+    font-size: 0.88rem;
+    letter-spacing: 0.3px;
+    padding: 0.2rem 0.35rem;
+    border-bottom: 1px solid var(--dndm-border-accent);
+}
+
+.dndm-template-preview-table td {
+    padding: 0.2rem 0.35rem;
+    color: var(--dndm-text);
+    vertical-align: middle;
+}
+
+.dndm-template-preview-table td:last-child {
+    width: 1.75rem;
+    text-align: right;
+}
+
+.dndm-template-preview-table .dndm-input,
+.dndm-template-preview-table .dndm-select {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+}
+
+.dndm-template-preview-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-top: 0.35rem;
+}
+
+.dndm-template-save {
+    display: flex;
+    gap: 0.4rem;
+    margin-top: 0.4rem;
+}
+
+.dndm-template-save .dndm-input { flex: 1 1 auto; min-width: 0; }
+
+.dndm-custom-error {
+    color: var(--dndm-danger);
+    font-size: 0.9rem;
+    font-style: italic;
+}

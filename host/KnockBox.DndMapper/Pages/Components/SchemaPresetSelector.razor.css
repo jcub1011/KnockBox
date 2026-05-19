@@ -14,11 +14,12 @@
 
 .dndm-schema-selector .dndm-custom-row input,
 .dndm-schema-selector .dndm-custom-row select {
-    background: #1a1a2e;
-    color: #ede4d3;
-    border: 1px solid rgba(168, 85, 247, 0.3);
-    border-radius: 4px;
+    background: var(--dndm-bg-deep);
+    color: var(--dndm-text);
+    border: 1px solid var(--dndm-border);
+    border-radius: 3px;
     padding: 4px 6px;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.55);
 }
 
 .dndm-schema-selector .dndm-custom-actions {
@@ -29,6 +30,7 @@
 }
 
 .dndm-schema-selector .dndm-custom-error {
-    color: #f87171;
+    color: var(--dndm-danger);
     font-size: 0.85em;
+    font-style: italic;
 }

@@ -5,30 +5,60 @@
     align-items: center;
     gap: 0.35rem;
     padding: 0.25rem 0.1rem;
-    border-bottom: 1px dashed rgba(255, 255, 255, 0.04);
+    border-bottom: 1px dashed var(--dndm-ink-soft);
+    cursor: default;
 }
 
 .dndm-tokenp-color {
     width: 22px;
     height: 22px;
     border-radius: 50%;
-    border: 1px solid #3a3a5c;
+    border: 1px solid var(--dndm-border-strong);
     background: transparent;
     cursor: pointer;
     padding: 0;
     flex: 0 0 auto;
+    box-shadow: inset 0 0 0 1px rgba(232, 144, 85, 0.08);
+}
+
+.dndm-tokenp-eyebtn {
+    /* Pinned to the start of the meta row so it lines up under the color picker. */
+    flex: 0 0 auto;
+    align-self: center;
+    margin-bottom: 0.1rem;
+    padding: 0.3rem;
+}
+
+.dndm-tokenp-name-wrap {
+    position: relative;
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
 }
 
 .dndm-tokenp-name {
     flex: 1 1 auto;
     min-width: 0;
+    padding-right: 1.9rem;
 }
+
+.dndm-tokenp-initialbtn {
+    position: absolute;
+    top: 50%;
+    right: 0.2rem;
+    transform: translateY(-50%);
+    padding: 0 0.25rem;
+    background: transparent;
+    border-color: transparent;
+}
+
+.dndm-tokenp-initialbtn:hover { background: rgba(196, 116, 56, 0.16); }
 
 .dndm-tokenp-meta {
     display: flex;
     gap: 0.5rem;
-    padding: 0 0.1rem 0.4rem 1.85rem;
-    border-bottom: 1px dashed rgba(255, 255, 255, 0.04);
+    padding: 0 0.1rem 0.4rem 0;
+    border-bottom: 1px dashed var(--dndm-ink-soft);
     flex-wrap: wrap;
 }
 
@@ -41,20 +71,20 @@
 }
 
 .dndm-tokenp-metalabel > span {
-    font-size: 0.65rem;
-    color: #7a7464;
-    text-transform: uppercase;
-    letter-spacing: 1px;
+    font-size: 0.82rem;
+    color: var(--dndm-text-dim);
+    font-family: var(--font-primary);
+    letter-spacing: 0.3px;
 }
 
 .dndm-tokenp-tag {
     flex: 0 0 auto;
-    font-size: 0.65rem;
-    padding: 0.1rem 0.35rem;
-    background: #14141f;
-    color: #cdb98e;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+    font-size: 0.8rem;
+    padding: 0.1rem 0.4rem;
+    background: var(--dndm-bg-panel-2);
+    color: var(--dndm-text-dim);
+    font-family: var(--font-primary);
+    letter-spacing: 0.3px;
     border-radius: 2px;
-    border: 1px solid #2c2c44;
+    border: 1px solid var(--dndm-border);
 }

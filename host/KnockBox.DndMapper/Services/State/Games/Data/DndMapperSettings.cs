@@ -8,6 +8,8 @@ namespace KnockBox.DndMapper.Services.State.Games.Data
         public SheetEditPolicy SheetEditByOthers { get; set; } = SheetEditPolicy.OwnersAndHost;
         public bool RollsVisibleToPlayers { get; set; } = true;
         public bool PlayersCanCreateNPCs { get; set; } = false;
+        public bool HpTrackingEnabled { get; set; } = true;
+        public bool PlayersCanSeeOtherSheets { get; set; } = false;
 
         public DndMapperSettings Clone() => new()
         {
@@ -15,6 +17,8 @@ namespace KnockBox.DndMapper.Services.State.Games.Data
             SheetEditByOthers = SheetEditByOthers,
             RollsVisibleToPlayers = RollsVisibleToPlayers,
             PlayersCanCreateNPCs = PlayersCanCreateNPCs,
+            HpTrackingEnabled = HpTrackingEnabled,
+            PlayersCanSeeOtherSheets = PlayersCanSeeOtherSheets,
         };
     }
 }
