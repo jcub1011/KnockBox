@@ -16,13 +16,12 @@ Wire up real word play. This milestone adds dictionary-backed validation, the Sh
 ### Word list
 
 - `Services/Logic/WordList/IAlphaChainWordList.cs`:
-  - `ValueTask<bool> IsValidWordAsync(string word, CancellationToken ct);`
-  - This is the swappable boundary. The M2 implementation is a local CSV (below); a future milestone may replace it with an HTTP-backed dictionary API without touching any caller. `ValueTask` keeps the in-memory path allocation-free; `string` (not `ReadOnlySpan<char>`) so the contract works across `await` boundaries.
+  - `bool IsValidWord(ReadOnlySpan<char> word);`
+  - This is the swappable boundary. The M2 implementation is a small local CSV; the end-goal implementation is a Spardle-style in-process word list (likely a larger dataset and/or shared lookup structure). Keeping the contract sync + span-based matches Spardle's existing `WordListService` shape and avoids forcing callers into `await` for what is always an in-memory check.
 - `Services/Logic/WordList/AlphaChainWordList.cs`:
   - Port of `host/KnockBox.Spardle/Services/WordListService.cs` (cannot reference Spardle directly — re-implement inside this plugin).
   - Loads a CSV at construction. Source path resolves via `IPluginStorage` (preferred) or embedded resource fallback.
   - Builds a `HashSet<string>` (or per-length `byte[][]` pools if memory becomes a concern) for O(1) lookup.
-  - `IsValidWordAsync` returns `ValueTask.FromResult(...)` over the in-memory `HashSet` — no I/O, no allocation in the hot path. A future API-backed implementation will perform the network call inside the same method signature.
 - `wwwroot/dictionary.csv` — dictionary asset.
   - Decide between NY-Times-style (~5k common) vs. full (~250k); milestone defaults to NY-style to keep plugin staging small. Document the chosen source + license.
 - `AlphaChainModule.cs` — add `registration.AddSingleton<IAlphaChainWordList, AlphaChainWordList>();`.
@@ -63,7 +62,7 @@ Wire up real word play. This milestone adds dictionary-backed validation, the Sh
   3. Empty → `RejectedEmpty`.
   4. If `RequiredStartLetter != null` and `word[0] != RequiredStartLetter` → `RejectedChainBroken`.
   5. If `PlayedWords.Contains(word)` → `RejectedDuplicate`.
-  6. If `!await wordList.IsValidWordAsync(word, ct)` → `RejectedNotInDictionary`. (The surrounding `HandleCommandAsync` is already `async Task<bool>`; carry the `CancellationToken` from the FSM state interface.)
+  6. If `!wordList.IsValidWord(word)` → `RejectedNotInDictionary`.
   7. Compute `containsBanned = BannedLetter is { } b && word.Contains(b)`.
   8. `score = containsBanned ? 0 : word.Length;` (scoring pipeline lands in M3 — for now length only).
   9. Append to `PlayedWords`, set `LastWord = word`. If `BannedLetter == word[^1]` set `RequiredStartLetter = null`, else `RequiredStartLetter = word[^1]`.
@@ -98,7 +97,7 @@ Wire up real word play. This milestone adds dictionary-backed validation, the Sh
 
 ### Tests
 
-- `Unit/Logic/WordList/AlphaChainWordListTests.cs` — known-good / known-bad words; punctuation rejected. Tests call `IsValidWordAsync` and verify the implementation returns a completed `ValueTask` (no thread hops for the in-memory path).
+- `Unit/Logic/WordList/AlphaChainWordListTests.cs` — known-good / known-bad words; punctuation rejected.
 - `Unit/Logic/Games/AlphaChain/States/RoundStateTests.cs`:
   - Each rejection reason returns the right `SubmitWordResult`.
   - Banned letter inside word → `AcceptedZeroPointTax`, score = 0, chain continues.
@@ -131,4 +130,4 @@ Wire up real word play. This milestone adds dictionary-backed validation, the Sh
 - **Tick source:** Plugins do not own a hosted background service. Either rely on `ITickService` from the Razor circuit (problematic if every viewer fires ticks — gate to one designated tick driver, e.g., the host), or extend `AbstractGameEngine` with a server-side scheduler. Pick the simplest viable option and document it.
 - **Banned letter on first turn:** GDD does not say if the first word can include the banned letter. Default: yes, but it incurs the Zero-Point Tax. Document this in the milestone close-out notes.
 - **Casing & accents:** Normalize input to ASCII-lowercase; reject non-letters. The Spardle CSV is already ASCII; if a different dictionary is used, define the normalization rules here.
-- **Swappable dictionary boundary:** `IAlphaChainWordList` is intentionally async + `string`-typed so the local CSV implementation can be replaced with an HTTP-backed dictionary in a later milestone without rippling through callers. Do not narrow the signature to sync or `ReadOnlySpan<char>` for perf — the in-memory path already completes synchronously via `ValueTask.FromResult`.
+- **Swappable dictionary boundary:** `IAlphaChainWordList` is the seam where the dictionary backend can change. The M2 implementation is a local CSV; the end-goal is a Spardle-style in-process word list. Both are sync + span-based, so the contract stays sync + span-based — do not introduce `async`/`Task` to "future-proof" for an API backend, because the planned backend is not an API.
