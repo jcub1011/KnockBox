@@ -27,6 +27,18 @@
                     title="@(_markupActive ? "Stop drawing (markup stays on the map)" : "Draw markup over the map")"
                     @onclick="ToggleMarkup">✎</button>
 
+            <button class="dndm-zoom-btn dndm-focus-toggle @(_focusActive ? "dndm-focus-toggle--active" : null)"
+                    type="button"
+                    title="@(_focusActive ? "Stop drawing focus box (drag on the map to set it)" : "Focus box — drag on the map to zoom the display to a region")"
+                    @onclick="ToggleFocusMode">▭</button>
+            @if (State.FocusRect is not null)
+            {
+                <button class="dndm-zoom-btn dndm-focus-clear"
+                        type="button"
+                        title="Clear focus box (return display to full map)"
+                        @onclick="OnClearFocusClicked">✕</button>
+            }
+
             <span class="dndm-toolbar-sep" aria-hidden="true"></span>
 
             <button class="dndm-zoom-btn dndm-fog-btn @(FogContext.Mode == FogPaintMode.Paint ? "dndm-fog-btn--active" : null)"
@@ -172,6 +184,37 @@
             <g class="@(IsHost ? "dndm-fog dndm-fog--host" : "dndm-fog dndm-fog--player")" pointer-events="none">
                 <path d="@fogPath" fill="#000" fill-opacity="@fogOpacity" fill-rule="evenodd" />
             </g>
+        }
+
+        @* Focus box — host-only red outline. Drives the display view's
+           viewBox; the display view doesn't render the outline itself. *@
+        @if (IsHost && State.FocusRect is { } fr && fr.MapId == Map.Id)
+        {
+            @* Dark halo + red stroke. The 0.18-cell black underlay stays
+               visible against bright/red backgrounds where the red alone
+               would disappear. *@
+            <rect x="@F(fr.X)" y="@F(fr.Y)"
+                  width="@F(fr.Width)" height="@F(fr.Height)"
+                  fill="none" stroke="#000" stroke-width="0.18" stroke-opacity="0.6"
+                  pointer-events="none" />
+            <rect class="dndm-focus-rect"
+                  x="@F(fr.X)" y="@F(fr.Y)"
+                  width="@F(fr.Width)" height="@F(fr.Height)"
+                  fill="none" stroke="#e11d48" stroke-width="0.12"
+                  pointer-events="none" />
+        }
+        @if (IsHost && _focusActive && _focusDragStart is { } fs && _focusDragCurrent is { } fc)
+        {
+            var (fpx, fpy, fpw, fph) = NormalizeFocusDrag(fs, fc);
+            <rect x="@F(fpx)" y="@F(fpy)"
+                  width="@F(fpw)" height="@F(fph)"
+                  fill="none" stroke="#000" stroke-width="0.18" stroke-opacity="0.6"
+                  pointer-events="none" />
+            <rect class="dndm-focus-rect-preview"
+                  x="@F(fpx)" y="@F(fpy)"
+                  width="@F(fpw)" height="@F(fph)"
+                  fill="none" stroke="#e11d48" stroke-width="0.12" stroke-dasharray="0.4,0.25"
+                  pointer-events="none" />
         }
 
         <TokenLayer State="State"

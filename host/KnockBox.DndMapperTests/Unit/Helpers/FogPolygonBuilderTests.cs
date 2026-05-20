@@ -127,6 +127,33 @@ namespace KnockBox.DndMapperTests.Unit.Helpers
         }
 
         [TestMethod]
+        public void Build_SaddleTwoClustersShareSingleVertex_StaySeparate()
+        {
+            // Two 2x2 blocks touching only at vertex (2,2). Both rings pass
+            // through that vertex, so ChooseNext's right-turn ranking has to
+            // pick the candidate that keeps each ring self-contained instead
+            // of crossing into the opposite cluster.
+            //   ##..
+            //   ##..
+            //   ..##
+            //   ..##
+            var map = Make(4, 4,
+                (0, 0), (1, 0), (0, 1), (1, 1),
+                (2, 2), (3, 2), (2, 3), (3, 3));
+
+            var rings = FogPolygonBuilder.Build(map);
+
+            Assert.AreEqual(2, rings.Count);
+            foreach (var ring in rings) Assert.AreEqual(4, ring.Count);
+            var allVerts = rings.SelectMany(r => r).ToHashSet();
+            Assert.IsTrue(allVerts.SetEquals(new[]
+            {
+                (0, 0), (2, 0), (2, 2), (0, 2),
+                (2, 2), (4, 2), (4, 4), (2, 4),
+            }));
+        }
+
+        [TestMethod]
         public void BuildSvgPathData_FullyFogged_EmitsOuterRectanglePath()
         {
             var map = Make(4, 3);

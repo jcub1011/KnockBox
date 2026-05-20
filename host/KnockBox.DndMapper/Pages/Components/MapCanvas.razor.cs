@@ -117,6 +117,16 @@ namespace KnockBox.DndMapper.Pages.Components
         private bool _markupActive;
         internal bool MarkupActive => _markupActive;
 
+        // ── Focus box (host-only, drives display zoom) ───────────────────
+        // When _focusActive is true, a left-button drag on the SVG defines a
+        // rectangle that becomes the display view's viewBox. Mutually exclusive
+        // with markup + fog modes (each toggle clears the others).
+        private bool _focusActive;
+        // Drag corners in SVG user-space (grid cell units). Both set when a
+        // drag is in progress; both null otherwise.
+        private (double X, double Y)? _focusDragStart;
+        private (double X, double Y)? _focusDragCurrent;
+
         // ── Centre-viewport broadcast (v1.x — §6.4) ──────────────────────
         // Last-seen request Nonce. When the server pushes a new request with a
         // fresh nonce, every client (including the host who sent it) recentres.
@@ -236,7 +246,60 @@ namespace KnockBox.DndMapper.Pages.Components
                 // (in grid cell units), so the host must be at 1.0 zoom / 0,0 pan
                 // for the stroke to land on the intended cell. ResetView snaps both.
                 await ResetView();
+                // Exclusive with focus + fog tools.
+                _focusActive = false;
+                _focusDragStart = null;
+                _focusDragCurrent = null;
+                if (FogContext.Mode != FogPaintMode.Off)
+                    FogContext.Set(FogPaintMode.Off, FogContext.BrushRadius);
             }
+        }
+
+        private void ToggleFocusMode()
+        {
+            _focusActive = !_focusActive;
+            if (_focusActive)
+            {
+                _markupActive = false;
+                if (FogContext.Mode != FogPaintMode.Off)
+                    FogContext.Set(FogPaintMode.Off, FogContext.BrushRadius);
+            }
+            else
+            {
+                // Cancel any in-flight drag preview.
+                _focusDragStart = null;
+                _focusDragCurrent = null;
+            }
+        }
+
+        private void OnClearFocusClicked()
+        {
+            if (UserService.CurrentUser is null) return;
+            var result = Engine.ClearFocusRect(State, UserService.CurrentUser);
+            if (result.TryGetFailure(out var err))
+                Logger.LogWarning("ClearFocusRect failed: {Error}", err.PublicMessage);
+        }
+
+        // Returns the normalized (x, y, w, h) of the in-flight focus drag.
+        // When the grid toggle is on, snaps the corners outward (floor min,
+        // ceil max) so the committed rect encloses every cell the host
+        // dragged over — feels truer to "focus on these cells" than a
+        // round-to-nearest snap would.
+        internal (double X, double Y, double W, double H) NormalizeFocusDrag(
+            (double X, double Y) start, (double X, double Y) current)
+        {
+            double x0 = Math.Min(start.X, current.X);
+            double y0 = Math.Min(start.Y, current.Y);
+            double x1 = Math.Max(start.X, current.X);
+            double y1 = Math.Max(start.Y, current.Y);
+            if (LocalShowGridLines)
+            {
+                x0 = Math.Floor(x0);
+                y0 = Math.Floor(y0);
+                x1 = Math.Ceiling(x1);
+                y1 = Math.Ceiling(y1);
+            }
+            return (x0, y0, x1 - x0, y1 - y0);
         }
 
         private async void OnTokenFocusRequested(Guid tokenId)
@@ -520,6 +583,33 @@ namespace KnockBox.DndMapper.Pages.Components
             if (e.Key == "Control") _ctrlHeld = false;
         }
 
+        private async ValueTask<(double X, double Y)?> ClientToSvgPointAsync(double clientX, double clientY)
+        {
+            // Canonical accurate client→SVG-user-space conversion (uses
+            // getScreenCTM().inverse() on the SVG element), versus the
+            // approximate ClientToMapAsync above which is "good enough"
+            // for snapping a context-menu cell but not for precise drag
+            // coordinates.
+            if (_metricsModule is null) return null;
+            try
+            {
+                var pt = await _metricsModule.InvokeAsync<SvgPoint?>("clientToSvgPoint", _svgId, clientX, clientY);
+                return pt is null ? null : (pt.X, pt.Y);
+            }
+            catch (JSDisconnectedException) { return null; }
+            catch (Exception ex)
+            {
+                Logger.LogWarning(ex, "clientToSvgPoint failed.");
+                return null;
+            }
+        }
+
+        private sealed class SvgPoint
+        {
+            public double X { get; set; }
+            public double Y { get; set; }
+        }
+
         private async Task OnSvgMouseDown(MouseEventArgs e)
         {
             // Middle-button always pans. Any left-button event reaching the SVG (background
@@ -528,6 +618,19 @@ namespace KnockBox.DndMapper.Pages.Components
             // ClickDeadZonePixels (see OnSvgMouseUp). Picker/handle rects stopPropagation,
             // so legitimate image interactions don't reach here.
             if (e.Button != MiddleMouseButton && e.Button != LeftMouseButton) return;
+
+            // Focus-box mode intercepts left-clicks before fog/pan (middle still pans).
+            if (e.Button == LeftMouseButton && IsHost && _focusActive)
+            {
+                var pt = await ClientToSvgPointAsync(e.ClientX, e.ClientY);
+                if (pt is { } p)
+                {
+                    _focusDragStart = p;
+                    _focusDragCurrent = p;
+                    StateHasChanged();
+                }
+                return;
+            }
 
             // Fog paint/erase mode intercepts left-clicks (middle still pans).
             // The JS module handles the entire stroke client-side: it appends
@@ -584,6 +687,17 @@ namespace KnockBox.DndMapper.Pages.Components
 
         private async Task OnSvgMouseMove(MouseEventArgs e)
         {
+            if (_focusDragStart is not null)
+            {
+                var pt = await ClientToSvgPointAsync(e.ClientX, e.ClientY);
+                if (pt is { } p)
+                {
+                    _focusDragCurrent = p;
+                    StateHasChanged();
+                }
+                return;
+            }
+
             if (_panning)
             {
                 double dx = e.ClientX - _panLastClientX;
@@ -616,6 +730,22 @@ namespace KnockBox.DndMapper.Pages.Components
 
         private async Task OnSvgMouseUp(MouseEventArgs e)
         {
+            // Focus-box finalize: commit the drag as a focus rect (or drop if too small).
+            if (_focusDragStart is { } start && _focusDragCurrent is { } cur)
+            {
+                _focusDragStart = null;
+                _focusDragCurrent = null;
+                var (x, y, w, h) = NormalizeFocusDrag(start, cur);
+                if (UserService.CurrentUser is not null && w > 0 && h > 0)
+                {
+                    var result = Engine.SetFocusRect(State, UserService.CurrentUser, Map.Id, x, y, w, h);
+                    if (result.TryGetFailure(out var err))
+                        Logger.LogDebug("SetFocusRect rejected: {Error}", err.PublicMessage);
+                }
+                StateHasChanged();
+                return;
+            }
+
             // Pan finalize: if the left-button "pan" never moved, treat it as a background
             // click → deselect any selected image.
             if (_panning)

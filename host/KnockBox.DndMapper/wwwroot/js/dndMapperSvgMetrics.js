@@ -24,6 +24,26 @@ export function getPixelsPerCell(svgId) {
  * Returns null if the element isn't in the DOM or the playing root can't
  * be located.
  */
+/**
+ * Maps a client (CSS) point to SVG user-space coordinates (= grid cells, since
+ * the map's viewBox is denominated in cells). Uses the canonical
+ * createSVGPoint + getScreenCTM().inverse() pattern, which accounts for the
+ * SVG's bounding box, scroll, and any ancestor transforms.
+ *
+ * Returns null if the element isn't in the DOM or has no CTM yet.
+ */
+export function clientToSvgPoint(svgId, clientX, clientY) {
+    const svg = document.getElementById(svgId);
+    if (!svg) return null;
+    const ctm = svg.getScreenCTM();
+    if (!ctm) return null;
+    const pt = svg.createSVGPoint();
+    pt.x = clientX;
+    pt.y = clientY;
+    const p = pt.matrixTransform(ctm.inverse());
+    return { x: p.x, y: p.y };
+}
+
 export function getViewportMetrics(svgId) {
     const svg = document.getElementById(svgId);
     if (!svg) return null;

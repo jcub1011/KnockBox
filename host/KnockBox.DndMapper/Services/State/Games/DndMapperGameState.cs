@@ -42,6 +42,11 @@ namespace KnockBox.DndMapper.Services.State.Games
         public CombatState? ActiveCombat { get; private set; }
         public CenterViewportRequest? PendingCenterRequest { get; private set; }
 
+        // Host-drawn focus rectangle that drives the display view's SVG viewBox.
+        // Lives on state (so the display circuit can observe it), but is not
+        // serialized — a process restart clears it.
+        public FocusRect? FocusRect { get; private set; }
+
         // Running total of bytes consumed by uploaded images on this state. Used to
         // enforce the per-room 1 GB cap. Mutated only by image verbs inside Execute.
         public long BytesUsed { get; private set; }
@@ -151,6 +156,7 @@ namespace KnockBox.DndMapper.Services.State.Games
         internal void SetActiveMapId(Guid? mapId) => ActiveMapId = mapId;
         internal void SetActiveCombat(CombatState? combat) => ActiveCombat = combat;
         internal void SetPendingCenterRequest(CenterViewportRequest? request) => PendingCenterRequest = request;
+        internal void SetFocusRect(FocusRect? rect) => FocusRect = rect;
         internal void SetBytesUsed(long value) => BytesUsed = value < 0 ? 0 : value;
         internal void AdjustBytesUsed(long delta) => BytesUsed = Math.Max(0, BytesUsed + delta);
 

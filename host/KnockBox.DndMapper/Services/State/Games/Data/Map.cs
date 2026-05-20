@@ -17,10 +17,12 @@ namespace KnockBox.DndMapper.Services.State.Games.Data
         // Packed row-major bitset, length = (WidthCells * HeightCells + 7) / 8.
         // Empty array means "all cells revealed" — the engine verbs allocate on
         // first paint and ClearAllFogAsync resets to [] so the common case stays
-        // cheap. The setter is public because the library service assigns the
-        // deserialized array back directly during hydrate; at runtime mutation
-        // funnels through SetFogged under state.Execute.
-        public byte[] FogMask { get; set; } = [];
+        // cheap. Setter is internal so the bit-helper invariants stay enforceable
+        // at the assembly boundary; same-assembly callers (library hydrate +
+        // engine verbs) assign the array directly, external code routes through
+        // SetFogged. At runtime mutation funnels through SetFogged under
+        // state.Execute.
+        public byte[] FogMask { get; internal set; } = [];
 
         public bool IsFogged(int cx, int cy)
         {
@@ -46,7 +48,9 @@ namespace KnockBox.DndMapper.Services.State.Games.Data
         private void EnsureMaskAllocated()
         {
             if (FogMask.Length != 0) return;
-            var bytes = (Grid.WidthCells * Grid.HeightCells + 7) / 8;
+            // (long) cast prevents int overflow on absurdly large grids; the
+            // result is bounded by realistic map sizes and fits in int.
+            var bytes = (int)(((long)Grid.WidthCells * Grid.HeightCells + 7) / 8);
             FogMask = bytes > 0 ? new byte[bytes] : [];
         }
     }

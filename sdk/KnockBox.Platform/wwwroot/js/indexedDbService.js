@@ -442,6 +442,13 @@ export function createBlobFromBytes(base64, contentType) {
 // stream into one ArrayBuffer and constructs a Blob — no base64, no per-
 // chunk InvokeAsync loop. Returns the standard {ok, value} envelope so
 // IndexedDbService.CreateBlobAsync's unwrap path still applies.
+//
+// MEMORY: streamRef.arrayBuffer() materializes the full upload payload in
+// the JS heap before the Blob is constructed (the Blob then frees the
+// ArrayBuffer once IDB takes ownership). Peak JS-side memory is ~2x the
+// upload size during the handshake. With the per-file cap at 100 MB
+// (ImageUploadButton) this peaks near ~200 MB transiently — fine for
+// desktop browsers but worth keeping in mind if the cap rises.
 export async function createBlobFromDotNetStream(streamRef, contentType, _length) {
     try {
         const buffer = await streamRef.arrayBuffer();

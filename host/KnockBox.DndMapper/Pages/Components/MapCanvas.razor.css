@@ -162,6 +162,30 @@
     min-width: 1.75rem;
 }
 
+/* Focus-box tool sits next to the markup toggle in the toolbar. Active state
+   shares the same ember glow as markup/fog so the "this verb is armed" visual
+   language is consistent across host tools. */
+.dndm-focus-toggle {
+    font-size: 1.05rem;
+    line-height: 1;
+}
+
+.dndm-focus-toggle--active {
+    background: linear-gradient(180deg, var(--dndm-ember-hi), var(--dndm-ember) 55%, #8a4a22 100%);
+    border-color: #5a2e14;
+    color: #1a1208;
+    text-shadow: 0 1px 0 rgba(255, 220, 180, 0.35);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 220, 180, 0.4),
+        inset 0 -1px 2px rgba(0, 0, 0, 0.45),
+        0 0 8px rgba(232, 144, 85, 0.5);
+}
+
+.dndm-focus-clear {
+    font-size: 1rem;
+    line-height: 1;
+}
+
 /* Saved markup re-renders as a plain SVG group — let strokes paint
    freely; the host-supplied `stroke` and `fill` attributes already
    carry the colors they were drawn with. */

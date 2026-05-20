@@ -1061,6 +1061,70 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             return error is null ? Result.Success : Result.FromError(error);
         }
 
+        // ── Focus-box viewport (display zoom-to-region) ───────────────────────────
+
+        // Minimum rect dimension after clamping. Below this the display would
+        // be zoomed in so far that any tiny coordinate jitter would scroll the
+        // view wildly; also acts as the "zero-area" guard.
+        private const double MinFocusRectSize = 0.25;
+
+        public Result SetFocusRect(DndMapperGameState state, User caller, Guid mapId, double x, double y, double width, double height)
+        {
+            if (state is null) return Result.FromError("State is required.");
+            if (caller is null) return Result.FromError("Caller is required.");
+            if (!IsHost(state, caller)) return Result.FromError("Only the host may set the focus box.");
+            if (!double.IsFinite(x) || !double.IsFinite(y) || !double.IsFinite(width) || !double.IsFinite(height))
+                return Result.FromError("Focus box coordinates must be finite numbers.");
+            if (width <= 0 || height <= 0)
+                return Result.FromError("Focus box must have positive width and height.");
+
+            string? error = null;
+            var exec = state.Execute(() =>
+            {
+                var map = state.Maps.FirstOrDefault(m => m.Id == mapId);
+                if (map is null) { error = "Unknown map id."; return; }
+
+                // Clamp the rectangle into the map's cell bounds. A rect drawn
+                // partly off-canvas gets cropped to the on-canvas portion; a
+                // rect entirely outside collapses below MinFocusRectSize and
+                // is rejected below.
+                double mapW = map.Grid.WidthCells;
+                double mapH = map.Grid.HeightCells;
+
+                double x0 = Math.Clamp(x, 0, mapW);
+                double y0 = Math.Clamp(y, 0, mapH);
+                double x1 = Math.Clamp(x + width, 0, mapW);
+                double y1 = Math.Clamp(y + height, 0, mapH);
+
+                double w = x1 - x0;
+                double h = y1 - y0;
+                if (w < MinFocusRectSize || h < MinFocusRectSize)
+                {
+                    error = "Focus box is too small or outside the map.";
+                    return;
+                }
+
+                state.SetFocusRect(new FocusRect(mapId, x0, y0, w, h));
+            });
+
+            if (exec.IsCanceled) return Result.FromCancellation();
+            if (exec.TryGetFailure(out var execErr)) return Result.FromError(execErr);
+            return error is null ? Result.Success : Result.FromError(error);
+        }
+
+        public Result ClearFocusRect(DndMapperGameState state, User caller)
+        {
+            if (state is null) return Result.FromError("State is required.");
+            if (caller is null) return Result.FromError("Caller is required.");
+            if (!IsHost(state, caller)) return Result.FromError("Only the host may clear the focus box.");
+
+            var exec = state.Execute(() => state.SetFocusRect(null));
+
+            if (exec.IsCanceled) return Result.FromCancellation();
+            if (exec.TryGetFailure(out var err)) return Result.FromError(err);
+            return Result.Success;
+        }
+
         // ── Initiative tracker (v1.x — §9.5) ──────────────────────────────────────
 
         public Result StartInitiativeAsync(DndMapperGameState state, User caller, IReadOnlyList<Guid>? npcTokenIds)

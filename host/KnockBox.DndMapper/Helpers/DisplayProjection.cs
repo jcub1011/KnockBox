@@ -16,7 +16,8 @@ namespace KnockBox.DndMapper.Helpers
         string? MarkupSvg,
         CombatState? ActiveCombat,
         IReadOnlyList<RollResult> VisibleRollLog,
-        string FogPathData)
+        string FogPathData,
+        FocusRect? FocusRect)
     {
         public static DisplayProjection Build(DndMapperGameState state)
         {
@@ -27,7 +28,7 @@ namespace KnockBox.DndMapper.Helpers
                 : null;
 
             if (map is null)
-                return new DisplayProjection(null, [], [], null, state.ActiveCombat, [], string.Empty);
+                return new DisplayProjection(null, [], [], null, state.ActiveCombat, [], string.Empty, null);
 
             var images = ImageVisibilityFilter.VisibleImagesFor(map.Images, map, isHost: false)
                 .OrderBy(i => i.LayerOrder)
@@ -42,7 +43,12 @@ namespace KnockBox.DndMapper.Helpers
 
             var fogPath = FogPolygonBuilder.BuildSvgPathData(map);
 
-            return new DisplayProjection(map, images, tokens, map.MarkupSvg, state.ActiveCombat, rolls, fogPath);
+            // Focus rect only drives the display viewBox while the active map
+            // matches it — switching maps with a focus set elsewhere shouldn't
+            // crop the new map to a stale rectangle.
+            var focus = state.FocusRect is { } fr && fr.MapId == map.Id ? fr : null;
+
+            return new DisplayProjection(map, images, tokens, map.MarkupSvg, state.ActiveCombat, rolls, fogPath, focus);
         }
     }
 }
