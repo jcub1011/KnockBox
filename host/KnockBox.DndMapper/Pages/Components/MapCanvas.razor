@@ -1,3 +1,4 @@
+@using KnockBox.DndMapper.Services.Logic.Visibility
 @using KnockBox.DndMapper.Services.State.Games
 @using KnockBox.DndMapper.Services.State.Games.Data
 @using KnockBox.Core.Components.Shared
@@ -25,6 +26,29 @@
                     type="button"
                     title="@(_markupActive ? "Stop drawing (markup stays on the map)" : "Draw markup over the map")"
                     @onclick="ToggleMarkup">✎</button>
+
+            <span class="dndm-toolbar-sep" aria-hidden="true"></span>
+
+            <button class="dndm-zoom-btn dndm-fog-btn @(FogContext.Mode == FogPaintMode.Paint ? "dndm-fog-btn--active" : null)"
+                    type="button"
+                    title="Paint fog — drag on the map to hide cells"
+                    @onclick="OnTogglePaintMode">▒</button>
+            <button class="dndm-zoom-btn dndm-fog-btn @(FogContext.Mode == FogPaintMode.Erase ? "dndm-fog-btn--active" : null)"
+                    type="button"
+                    title="Erase fog — drag on the map to reveal cells"
+                    @onclick="OnToggleEraseMode">◌</button>
+            <button class="dndm-zoom-btn dndm-fog-brush"
+                    type="button"
+                    title="Brush size (click to cycle 1 → 2 → 3)"
+                    @onclick="OnCycleBrush">@FogContext.BrushRadius</button>
+            <button class="dndm-zoom-btn"
+                    type="button"
+                    title="Fill the entire map with fog"
+                    @onclick="OnFillFogClicked">▣</button>
+            <button class="dndm-zoom-btn"
+                    type="button"
+                    title="Clear all fog"
+                    @onclick="OnClearFogClicked">◻</button>
         }
     </div>
 
@@ -229,5 +253,23 @@
                 <span>Centre everyone here</span>
             </button>
         </div>
+    }
+
+    @if (IsHost)
+    {
+        <ConfirmModal IsOpen="_confirmFillFog"
+                      Title="Fog the entire map?"
+                      Message="Every cell will be hidden from players. You can erase areas afterward."
+                      ConfirmText="Fill with fog"
+                      CancelText="Cancel"
+                      OnConfirm="OnConfirmFillFog"
+                      OnCancel="OnCancelFillFog" />
+        <ConfirmModal IsOpen="_confirmClearFog"
+                      Title="Reveal the entire map?"
+                      Message="All fogged cells will be cleared. This can't be undone."
+                      ConfirmText="Clear all fog"
+                      CancelText="Cancel"
+                      OnConfirm="OnConfirmClearFog"
+                      OnCancel="OnCancelClearFog" />
     }
 </div>

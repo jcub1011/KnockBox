@@ -53,14 +53,28 @@ else
                      viewBox="0 0 @activeMap.Grid.WidthCells @activeMap.Grid.HeightCells"
                      preserveAspectRatio="xMidYMid meet">
 
+                    @* Match the host/player MapCanvas background so empty
+                       cells look identical across all three views. *@
+                    <rect x="0" y="0"
+                          width="@activeMap.Grid.WidthCells" height="@activeMap.Grid.HeightCells"
+                          fill="#0e1117" />
+
                     @foreach (var img in _projection.VisibleImages)
                     {
-                        var url = ResolveImageUrl(img);
-                        <image href="@url"
-                               x="@img.X" y="@img.Y"
-                               width="@img.Width" height="@img.Height"
-                               opacity="@img.Opacity"
-                               transform="rotate(@img.Rotation @(img.X + img.Width / 2) @(img.Y + img.Height / 2))" />
+                        // ShareToken is null while the host's circuit is between
+                        // publishes (e.g. just before reconnect republishes). The
+                        // display is read-only so we silently drop those images
+                        // instead of rendering a placeholder; they reappear within
+                        // one SignalR round-trip once the token is republished.
+                        if (img.ShareToken is Guid shareToken)
+                        {
+                            <image href="@($"/blob-share/{shareToken:D}")"
+                                   x="@img.X" y="@img.Y"
+                                   width="@img.Width" height="@img.Height"
+                                   opacity="@img.Opacity"
+                                   transform="rotate(@img.Rotation @(img.X + img.Width / 2) @(img.Y + img.Height / 2))"
+                                   preserveAspectRatio="none" />
+                        }
                     }
 
                     @if (!string.IsNullOrWhiteSpace(_projection.MarkupSvg))
@@ -141,15 +155,6 @@ else
         if (_state is not null)
             _projection = DisplayProjection.Build(_state);
         await InvokeAsync(StateHasChanged);
-    }
-
-    private string ResolveImageUrl(MapImage img)
-    {
-        // The host plugin serves uploaded images via its existing image endpoint.
-        // Display view uses the same share-token-keyed URL pattern that players use.
-        if (img.ShareToken is Guid token)
-            return $"/api/plugins/dnd-mapper/{ObfuscatedRoomCode}/images/{img.Id}?t={token}";
-        return string.Empty;
     }
 
     public void Dispose()

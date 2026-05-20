@@ -149,6 +149,66 @@ namespace KnockBox.DndMapper.Pages.Components
 
         private bool IsFogPaintActive => IsHost && FogContext.Mode != FogPaintMode.Off;
 
+        // ── Fog toolbar handlers ─────────────────────────────────────────
+        private bool _confirmFillFog;
+        private bool _confirmClearFog;
+
+        private void OnTogglePaintMode()
+        {
+            var next = FogContext.Mode == FogPaintMode.Paint ? FogPaintMode.Off : FogPaintMode.Paint;
+            FogContext.Set(next, FogContext.BrushRadius);
+        }
+
+        private void OnToggleEraseMode()
+        {
+            var next = FogContext.Mode == FogPaintMode.Erase ? FogPaintMode.Off : FogPaintMode.Erase;
+            FogContext.Set(next, FogContext.BrushRadius);
+        }
+
+        private void OnCycleBrush()
+        {
+            // 1 → 2 → 3 → 1. Cycling is more compact than three separate buttons
+            // and matches how the toolbar's zoom controls already work.
+            var next = FogContext.BrushRadius >= FogPaintContext.MaxBrush
+                ? FogPaintContext.MinBrush
+                : FogContext.BrushRadius + 1;
+            FogContext.Set(FogContext.Mode, next);
+        }
+
+        private void OnFillFogClicked()
+        {
+            if (Map is null) return;
+            _confirmFillFog = true;
+        }
+
+        private void OnClearFogClicked()
+        {
+            if (Map is null) return;
+            _confirmClearFog = true;
+        }
+
+        private void OnConfirmFillFog()
+        {
+            _confirmFillFog = false;
+            if (UserService.CurrentUser is null || Map is null) return;
+            var result = Engine.FillMapWithFogAsync(State, UserService.CurrentUser, Map.Id);
+            if (result.TryGetFailure(out var err))
+                Logger.LogWarning("FillMapWithFogAsync failed: {Error}", err.PublicMessage);
+        }
+
+        private void OnCancelFillFog() => _confirmFillFog = false;
+
+        private void OnConfirmClearFog()
+        {
+            _confirmClearFog = false;
+            if (UserService.CurrentUser is null || Map is null) return;
+            var result = Engine.ClearAllFogAsync(State, UserService.CurrentUser, Map.Id);
+            if (result.TryGetFailure(out var err))
+                Logger.LogWarning("ClearAllFogAsync failed: {Error}", err.PublicMessage);
+        }
+
+        private void OnCancelClearFog() => _confirmClearFog = false;
+
         private async ValueTask OnStateChanged()
         {
             // Reactor for the host's "centre everyone here" broadcast. Compare
@@ -470,14 +530,18 @@ namespace KnockBox.DndMapper.Pages.Components
             if (e.Button != MiddleMouseButton && e.Button != LeftMouseButton) return;
 
             // Fog paint/erase mode intercepts left-clicks (middle still pans).
-            // The JS module takes over pointermove/pointerup for the duration of
-            // the stroke and flushes cells back via FlushFogStroke.
+            // The JS module handles the entire stroke client-side: it appends
+            // its own preview <g> to the SVG and only calls back into .NET
+            // once the host releases the pointer, with the full cell list.
+            // That keeps the stroke snappy even when the SignalR round-trip
+            // is slow.
             if (e.Button == LeftMouseButton && IsFogPaintActive && _fogPaintModule is not null && _fogPaintRef is not null)
             {
+                var mode = FogContext.Mode == FogPaintMode.Paint ? "paint" : "erase";
                 try
                 {
                     await _fogPaintModule.InvokeVoidAsync(
-                        "beginStroke", _svgId, _fogPaintRef, FogContext.BrushRadius, e.ClientX, e.ClientY);
+                        "beginStroke", _svgId, _fogPaintRef, FogContext.BrushRadius, mode, e.ClientX, e.ClientY);
                 }
                 catch (JSDisconnectedException) { /* circuit teardown */ }
                 catch (Exception ex)
@@ -492,21 +556,17 @@ namespace KnockBox.DndMapper.Pages.Components
         }
 
         [JSInvokable]
-        public Task FlushFogStroke(int[] xs, int[] ys)
+        public Task ApplyFogStroke(int[] xs, int[] ys, bool fogged)
         {
             if (!IsHost || UserService.CurrentUser is null) return Task.CompletedTask;
             if (xs is null || ys is null || xs.Length == 0 || xs.Length != ys.Length) return Task.CompletedTask;
-            if (FogContext.Mode == FogPaintMode.Off) return Task.CompletedTask;
 
             var cells = new (int cx, int cy)[xs.Length];
             for (var i = 0; i < xs.Length; i++) cells[i] = (xs[i], ys[i]);
 
-            var result = Engine.PaintFogAsync(
-                State, UserService.CurrentUser, Map.Id, cells,
-                fogged: FogContext.Mode == FogPaintMode.Paint);
-
+            var result = Engine.PaintFogAsync(State, UserService.CurrentUser, Map.Id, cells, fogged);
             if (result.TryGetFailure(out var err))
-                Logger.LogWarning("PaintFogAsync flush failed: {Error}", err.PublicMessage);
+                Logger.LogWarning("PaintFogAsync stroke failed: {Error}", err.PublicMessage);
 
             return Task.CompletedTask;
         }
