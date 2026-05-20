@@ -38,8 +38,6 @@ namespace KnockBox.DndMapper.Pages.Components
         private const double MaxZoom = 10.0;
         private const int LeftMouseButton = 0;
         private const int MiddleMouseButton = 1;
-        // Pixel distance below which a left-button "pan" is treated as a click (= deselect).
-        private const double ClickDeadZonePixels = 3.0;
 
         private readonly string _svgId = $"dndm-svg-{Guid.NewGuid():N}";
         private ElementReference _frameRef;
@@ -47,13 +45,6 @@ namespace KnockBox.DndMapper.Pages.Components
         private double _panX;
         private double _panY;
         private double _zoom = 1.0;
-        private bool _panning;
-        private bool _panMoved;
-        private long _panButton;
-        private double _panLastClientX;
-        private double _panLastClientY;
-        private double _panStartClientX;
-        private double _panStartClientY;
 
         private bool _spaceHeld;
         private bool _shiftHeld;
@@ -69,6 +60,19 @@ namespace KnockBox.DndMapper.Pages.Components
         private IJSObjectReference? _metricsModule;
         private IJSObjectReference? _fogPaintModule;
         private DotNetObjectReference<MapCanvas>? _fogPaintRef;
+        private IJSObjectReference? _viewportModule;
+        private DotNetObjectReference<MapCanvas>? _viewportRef;
+        private string _currentJsMode = "none";
+        // Tracks (map id, grid dims) so we re-push when the map is swapped
+        // or its grid is resized.
+        private (Guid MapId, int Width, int Height)? _lastBoundsSent;
+
+        // Version-keyed memoization (paired with Map.FogVersion / Map.ImagesVersion).
+        private int _cachedFogVersion = -1;
+        private string _cachedFogPath = string.Empty;
+        private int _cachedImagesVersion = -1;
+        private List<MapImage>? _cachedVisibleImages;
+        private bool _cachedIsHost;
 
         // ── Image transform drag state ───────────────────────────────────
         internal enum HandleKind { Body, NW, NE, SW, SE, Rotate }
@@ -155,7 +159,11 @@ namespace KnockBox.DndMapper.Pages.Components
             base.OnInitialized();
         }
 
-        private void OnFogContextChanged() => InvokeAsync(StateHasChanged);
+        private void OnFogContextChanged()
+        {
+            _ = PushJsMode();
+            InvokeAsync(StateHasChanged);
+        }
 
         private bool IsFogPaintActive => IsHost && FogContext.Mode != FogPaintMode.Off;
 
@@ -233,6 +241,7 @@ namespace KnockBox.DndMapper.Pages.Components
                 _panX = req.X - viewW / 2.0;
                 _panY = req.Y - viewH / 2.0;
                 PublishViewport();
+                _ = PushJsViewBox();
             }
             await InvokeAsync(StateHasChanged);
         }
@@ -253,6 +262,7 @@ namespace KnockBox.DndMapper.Pages.Components
                 if (FogContext.Mode != FogPaintMode.Off)
                     FogContext.Set(FogPaintMode.Off, FogContext.BrushRadius);
             }
+            await PushJsMode();
         }
 
         private void ToggleFocusMode()
@@ -270,6 +280,7 @@ namespace KnockBox.DndMapper.Pages.Components
                 _focusDragStart = null;
                 _focusDragCurrent = null;
             }
+            _ = PushJsMode();
         }
 
         private void OnClearFocusClicked()
@@ -318,6 +329,7 @@ namespace KnockBox.DndMapper.Pages.Components
                 _panX = token.X - viewW / 2.0;
                 _panY = token.Y - viewH / 2.0;
                 PublishViewport();
+                await PushJsViewBox();
                 await InvokeAsync(StateHasChanged);
             }
             catch (ObjectDisposedException) { /* component disposed */ }
@@ -333,6 +345,84 @@ namespace KnockBox.DndMapper.Pages.Components
             double viewW = Map.Grid.WidthCells / _zoom;
             double viewH = Map.Grid.HeightCells / _zoom;
             Viewport.Set(Map.Id, _panX + viewW / 2.0, _panY + viewH / 2.0);
+        }
+
+        private string CurrentJsMode()
+        {
+            if (_markupActive) return "markup";
+            if (_focusActive) return "focus";
+            if (IsFogPaintActive) return "fog";
+            return "none";
+        }
+
+        private async ValueTask PushJsMode()
+        {
+            if (_viewportModule is null) return;
+            var next = CurrentJsMode();
+            if (next == _currentJsMode) return;
+            _currentJsMode = next;
+            try { await _viewportModule.InvokeVoidAsync("setMode", _svgId, next); }
+            catch (JSDisconnectedException) { /* circuit teardown */ }
+            catch (Exception ex) { Logger.LogWarning(ex, "viewport.setMode failed."); }
+        }
+
+        private async ValueTask PushJsViewBox()
+        {
+            if (_viewportModule is null) return;
+            try { await _viewportModule.InvokeVoidAsync("setViewBox", _svgId, _panX, _panY, _zoom); }
+            catch (JSDisconnectedException) { /* circuit teardown */ }
+            catch (Exception ex) { Logger.LogWarning(ex, "viewport.setViewBox failed."); }
+        }
+
+        private async ValueTask PushJsBounds()
+        {
+            if (_viewportModule is null || Map is null) return;
+            try
+            {
+                await _viewportModule.InvokeVoidAsync(
+                    "setBounds", _svgId,
+                    Map.Grid.WidthCells, Map.Grid.HeightCells);
+            }
+            catch (JSDisconnectedException) { /* circuit teardown */ }
+            catch (Exception ex) { Logger.LogWarning(ex, "viewport.setBounds failed."); }
+        }
+
+        [JSInvokable]
+        public async Task OnViewportChanged(double panX, double panY, double zoom, bool wasClickWithoutDrag)
+        {
+            _panX = panX;
+            _panY = panY;
+            _zoom = Math.Clamp(zoom, MinZoom, MaxZoom);
+            PublishViewport();
+            if (wasClickWithoutDrag && IsHost && SelectedImageId is not null)
+            {
+                await SelectedImageIdChanged.InvokeAsync(null);
+            }
+            StateHasChanged();
+        }
+
+        internal string GetFogPathCached()
+        {
+            if (Map.FogVersion != _cachedFogVersion)
+            {
+                _cachedFogPath = FogPolygonBuilder.BuildSvgPathData(Map);
+                _cachedFogVersion = Map.FogVersion;
+            }
+            return _cachedFogPath;
+        }
+
+        internal IEnumerable<MapImage> GetVisibleImagesCached()
+        {
+            if (Map.ImagesVersion != _cachedImagesVersion || _cachedVisibleImages is null || _cachedIsHost != IsHost)
+            {
+                _cachedVisibleImages = ImageVisibilityFilter
+                    .VisibleImagesFor(Map.Images, Map, IsHost)
+                    .OrderBy(i => i.LayerOrder)
+                    .ToList();
+                _cachedImagesVersion = Map.ImagesVersion;
+                _cachedIsHost = IsHost;
+            }
+            return _cachedVisibleImages;
         }
 
         protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -367,6 +457,36 @@ namespace KnockBox.DndMapper.Pages.Components
                     {
                         Logger.LogWarning(ex, "Failed to load fog-paint JS module.");
                     }
+                }
+
+                try
+                {
+                    _viewportModule = await JSRuntime.InvokeAsync<IJSObjectReference>(
+                        "import", "./_content/KnockBox.DndMapper/js/dndMapperViewport.js");
+                    _viewportRef = DotNetObjectReference.Create(this);
+                    _currentJsMode = CurrentJsMode();
+                    await _viewportModule.InvokeVoidAsync(
+                        "initialize", _svgId, _viewportRef, _panX, _panY, _zoom,
+                        Map.Grid.WidthCells, Map.Grid.HeightCells, _currentJsMode);
+                    _lastBoundsSent = (Map.Id, Map.Grid.WidthCells, Map.Grid.HeightCells);
+                }
+                catch (JSDisconnectedException) { /* circuit teardown */ }
+                catch (Exception ex)
+                {
+                    Logger.LogWarning(ex, "Failed to load viewport JS module.");
+                }
+            }
+            else if (_viewportModule is not null && Map is not null)
+            {
+                // Push new bounds on map swap or grid resize. Off-map content
+                // is handled by the SVG's overflow="visible" attribute, not
+                // by extending the viewBox, so ImagesVersion is not part of
+                // this tuple.
+                var current = (Map.Id, Map.Grid.WidthCells, Map.Grid.HeightCells);
+                if (_lastBoundsSent != current)
+                {
+                    _lastBoundsSent = current;
+                    await PushJsBounds();
                 }
             }
             await base.OnAfterRenderAsync(firstRender);
@@ -409,6 +529,17 @@ namespace KnockBox.DndMapper.Pages.Components
                 catch (JSDisconnectedException) { /* circuit teardown */ }
                 _metricsModule = null;
             }
+            if (_viewportModule is not null)
+            {
+                try { await _viewportModule.InvokeVoidAsync("dispose", _svgId); }
+                catch (JSDisconnectedException) { /* circuit teardown */ }
+                catch (Exception) { /* ignore */ }
+                try { await _viewportModule.DisposeAsync(); }
+                catch (JSDisconnectedException) { /* circuit teardown */ }
+                _viewportModule = null;
+            }
+            _viewportRef?.Dispose();
+            _viewportRef = null;
             Dispose();
         }
 
@@ -527,6 +658,7 @@ namespace KnockBox.DndMapper.Pages.Components
                         _panX = (W - VW) / 2.0 - dxPx / scale;
                         _panY = (H - VH) / 2.0;
                         PublishViewport();
+                        await PushJsViewBox();
                         return;
                     }
                 }
@@ -540,6 +672,7 @@ namespace KnockBox.DndMapper.Pages.Components
             _panY = 0;
             _zoom = 1.0;
             PublishViewport();
+            await PushJsViewBox();
         }
 
         private void SetZoom(double next)
@@ -554,6 +687,7 @@ namespace KnockBox.DndMapper.Pages.Components
             _zoom = next;
             ClampPan();
             PublishViewport();
+            _ = PushJsViewBox();
         }
 
         private void ClampPan()
@@ -561,12 +695,6 @@ namespace KnockBox.DndMapper.Pages.Components
             // Pan is unbounded by design — the host frequently needs to scroll past
             // grid edges (off-map sticky notes, secondary scenes). ResetView still
             // re-centers on (0, 0).
-        }
-
-        private void OnWheel(WheelEventArgs e)
-        {
-            double factor = e.DeltaY < 0 ? 1.1 : 1.0 / 1.1;
-            SetZoom(_zoom * factor);
         }
 
         private void OnKeyDown(KeyboardEventArgs e)
@@ -654,8 +782,9 @@ namespace KnockBox.DndMapper.Pages.Components
                 return;
             }
 
-            BeginPan(e);
-            await CaptureScaleAsync();
+            // Background left/middle click: the JS viewport module owns pan now.
+            // Just make sure subsequent move/up handlers don't try to act.
+            await Task.CompletedTask;
         }
 
         [JSInvokable]
@@ -674,17 +803,6 @@ namespace KnockBox.DndMapper.Pages.Components
             return Task.CompletedTask;
         }
 
-        private void BeginPan(MouseEventArgs e)
-        {
-            _panning = true;
-            _panButton = e.Button;
-            _panMoved = false;
-            _panLastClientX = e.ClientX;
-            _panLastClientY = e.ClientY;
-            _panStartClientX = e.ClientX;
-            _panStartClientY = e.ClientY;
-        }
-
         private async Task OnSvgMouseMove(MouseEventArgs e)
         {
             if (_focusDragStart is not null)
@@ -695,26 +813,6 @@ namespace KnockBox.DndMapper.Pages.Components
                     _focusDragCurrent = p;
                     StateHasChanged();
                 }
-                return;
-            }
-
-            if (_panning)
-            {
-                double dx = e.ClientX - _panLastClientX;
-                double dy = e.ClientY - _panLastClientY;
-                _panLastClientX = e.ClientX;
-                _panLastClientY = e.ClientY;
-
-                double totalDx = e.ClientX - _panStartClientX;
-                double totalDy = e.ClientY - _panStartClientY;
-                if (Math.Abs(totalDx) > ClickDeadZonePixels || Math.Abs(totalDy) > ClickDeadZonePixels)
-                    _panMoved = true;
-
-                double pxPerCell = ActualPxPerCell();
-                _panX -= dx / pxPerCell;
-                _panY -= dy / pxPerCell;
-                ClampPan();
-                PublishViewport();
                 return;
             }
 
@@ -744,20 +842,6 @@ namespace KnockBox.DndMapper.Pages.Components
                 }
                 StateHasChanged();
                 return;
-            }
-
-            // Pan finalize: if the left-button "pan" never moved, treat it as a background
-            // click → deselect any selected image.
-            if (_panning)
-            {
-                bool wasLeftClickWithoutDrag =
-                    _panButton == LeftMouseButton && !_panMoved && !_spaceHeld;
-                _panning = false;
-                _panMoved = false;
-                if (wasLeftClickWithoutDrag && IsHost && SelectedImageId is not null)
-                {
-                    await SelectedImageIdChanged.InvokeAsync(null);
-                }
             }
 
             if (_drag is { } d)
@@ -799,7 +883,16 @@ namespace KnockBox.DndMapper.Pages.Components
             // Picker rect stopPropagation swallows mousedown for any button, so the SVG
             // pan handler never sees a middle-click landing on an image. Start the pan
             // directly here instead.
-            if (e.Button == MiddleMouseButton) { BeginPan(e); await CaptureScaleAsync(); return; }
+            if (e.Button == MiddleMouseButton)
+            {
+                if (_viewportModule is not null)
+                {
+                    try { await _viewportModule.InvokeVoidAsync("forceBeginPan", _svgId, e.ClientX, e.ClientY, e.Button); }
+                    catch (JSDisconnectedException) { /* circuit teardown */ }
+                    catch (Exception ex) { Logger.LogWarning(ex, "viewport.forceBeginPan failed."); }
+                }
+                return;
+            }
             if (!IsHost || e.Button != LeftMouseButton) return;
             // Space-held pan takes precedence — let the SVG handler pan instead.
             if (_spaceHeld) return;
@@ -816,7 +909,16 @@ namespace KnockBox.DndMapper.Pages.Components
 
         private async Task OnHandleMouseDown(MouseEventArgs e, MapImage img, HandleKind kind)
         {
-            if (e.Button == MiddleMouseButton) { BeginPan(e); await CaptureScaleAsync(); return; }
+            if (e.Button == MiddleMouseButton)
+            {
+                if (_viewportModule is not null)
+                {
+                    try { await _viewportModule.InvokeVoidAsync("forceBeginPan", _svgId, e.ClientX, e.ClientY, e.Button); }
+                    catch (JSDisconnectedException) { /* circuit teardown */ }
+                    catch (Exception ex) { Logger.LogWarning(ex, "viewport.forceBeginPan failed."); }
+                }
+                return;
+            }
             if (!IsHost || e.Button != LeftMouseButton) return;
             if (img.Locked) return;
             _drag = NewDrag(e, img, kind);

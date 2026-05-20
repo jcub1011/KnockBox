@@ -65,12 +65,19 @@
     </div>
 
     <div class="dndm-canvas-stage">
+    @* viewBox is pinned to the map's base dimensions. All pan/zoom is
+       realized as a CSS transform applied by dndMapperViewport.js so the
+       SVG layer (with potentially very large embedded images) is
+       rasterized once and GPU-composited per frame, never re-rasterized.
+       overflow="visible" lets content with coordinates outside the
+       viewBox (e.g. images placed past the map edge) render past the
+       SVG element box; the parent .dndm-canvas-stage clips at the
+       visible window with overflow:hidden. *@
     <svg id="@_svgId"
          class="dndm-map-canvas"
-         viewBox="@ViewBoxString"
+         viewBox="@($"0 0 {Map.Grid.WidthCells} {Map.Grid.HeightCells}")"
          preserveAspectRatio="xMidYMid meet"
-         @onwheel="OnWheel"
-         @onwheel:preventDefault="true"
+         overflow="visible"
          @onmousedown="OnSvgMouseDown"
          @onmousemove="OnSvgMouseMove"
          @onmouseup="OnSvgMouseUp"
@@ -83,7 +90,7 @@
 
         @if (Map.Images.Count > 0)
         {
-            @foreach (var img in ImageVisibilityFilter.VisibleImagesFor(Map.Images, Map, IsHost).OrderBy(i => i.LayerOrder))
+            @foreach (var img in GetVisibleImagesCached())
             {
                 var draft = (IsHost && _drag is { ImageId: var dId } && dId == img.Id) ? _drag : null;
                 var x = draft?.X ?? img.X;
@@ -176,7 +183,7 @@
            element. Rendered between markup and tokens so tokens visually sit
            on top of fog for the host. *@
         @{
-            var fogPath = FogPolygonBuilder.BuildSvgPathData(Map);
+            var fogPath = GetFogPathCached();
         }
         @if (!string.IsNullOrEmpty(fogPath))
         {

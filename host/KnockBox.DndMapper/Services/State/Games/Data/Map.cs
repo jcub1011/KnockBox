@@ -24,6 +24,14 @@ namespace KnockBox.DndMapper.Services.State.Games.Data
         // state.Execute.
         public byte[] FogMask { get; internal set; } = [];
 
+        // Monotonic version counters paired with FogMask and Images. Bumped by
+        // engine verbs on every actual mutation so per-frame consumers (canvas
+        // memoization) can skip rebuild work when nothing relevant changed.
+        // Internal setter so same-assembly hydration paths can seed/bump
+        // explicitly without routing through SetFogged.
+        public int FogVersion { get; internal set; }
+        public int ImagesVersion { get; internal set; }
+
         public bool IsFogged(int cx, int cy)
         {
             if (FogMask.Length == 0) return false;
@@ -41,8 +49,11 @@ namespace KnockBox.DndMapper.Services.State.Games.Data
             var bit = cy * Grid.WidthCells + cx;
             var idx = bit >> 3;
             var mask = (byte)(1 << (bit & 7));
-            if (fogged) FogMask[idx] |= mask;
-            else FogMask[idx] = (byte)(FogMask[idx] & ~mask);
+            var before = FogMask[idx];
+            byte after = fogged ? (byte)(before | mask) : (byte)(before & ~mask);
+            if (after == before) return;
+            FogMask[idx] = after;
+            FogVersion++;
         }
 
         private void EnsureMaskAllocated()

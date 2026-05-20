@@ -206,6 +206,9 @@
     min-height: 0;
     display: flex;
     flex-direction: column;
+    /* The SVG inside applies a CSS transform during pan/zoom; clip it here
+       so a scaled-up SVG cannot visually spill over the sibling toolbar. */
+    overflow: hidden;
 }
 
 .dndm-canvas-stage > svg.dndm-map-canvas {

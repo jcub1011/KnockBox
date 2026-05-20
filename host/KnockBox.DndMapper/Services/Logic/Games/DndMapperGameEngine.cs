@@ -279,7 +279,12 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             {
                 var map = state.Maps.FirstOrDefault(m => m.Id == mapId);
                 if (map is null) { error = "Unknown map id."; return; }
+                bool gridDimsChanged = map.Grid.WidthCells != newGrid.WidthCells
+                    || map.Grid.HeightCells != newGrid.HeightCells;
                 map.Grid = newGrid.Clone();
+                // Mask bit layout is keyed off WidthCells; treat any dim change as a
+                // fog mutation so canvas memoization rebuilds the polygon.
+                if (gridDimsChanged && map.FogMask.Length > 0) map.FogVersion++;
 
                 // Tokens are stored at cell-center coordinates; clamp any that fall
                 // outside the new bounds to the nearest in-bounds cell center.
@@ -2194,6 +2199,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
 
                 image.LayerOrder = map.Images.Count;
                 map.Images.Add(image);
+                map.ImagesVersion++;
                 state.AdjustBytesUsed(image.ByteSize);
             });
 
@@ -2217,9 +2223,11 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             string? error = null;
             var exec = state.Execute(() =>
             {
-                var (image, _) = FindImageAndMap(state, mapId, imageId);
+                var (image, imageMap) = FindImageAndMap(state, mapId, imageId);
                 if (image is null) { error = "Unknown map or image id."; return; }
+                if (image.ShareToken == newToken) return;
                 image.ShareToken = newToken;
+                if (imageMap is not null) imageMap.ImagesVersion++;
             });
 
             if (exec.IsCanceled) return Result.FromCancellation();
@@ -2241,8 +2249,16 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             var exec = state.Execute(() =>
             {
                 foreach (var map in state.Maps)
+                {
+                    bool changed = false;
                     foreach (var image in map.Images)
+                    {
+                        if (image.ShareToken is null) continue;
                         image.ShareToken = null;
+                        changed = true;
+                    }
+                    if (changed) map.ImagesVersion++;
+                }
             });
 
             if (exec.IsCanceled) return Result.FromCancellation();
@@ -2472,7 +2488,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             string? error = null;
             var exec = state.Execute(() =>
             {
-                var (image, _) = FindImageAndMap(state, mapId, imageId);
+                var (image, imageMap) = FindImageAndMap(state, mapId, imageId);
                 if (image is null) { error = "Unknown map or image id."; return; }
                 if (image.Locked) { error = "Image is locked."; return; }
 
@@ -2482,6 +2498,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                 image.Height = height;
                 image.Rotation = rotation;
                 image.Opacity = opacity;
+                if (imageMap is not null) imageMap.ImagesVersion++;
             });
 
             if (exec.IsCanceled) return Result.FromCancellation();
@@ -2516,6 +2533,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
 
                 for (int i = 0; i < map.Images.Count; i++)
                     map.Images[i].LayerOrder = i;
+                map.ImagesVersion++;
             });
 
             if (exec.IsCanceled) return Result.FromCancellation();
@@ -2538,9 +2556,11 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             string? error = null;
             var exec = state.Execute(() =>
             {
-                var (image, _) = FindImageAndMap(state, mapId, imageId);
+                var (image, imageMap) = FindImageAndMap(state, mapId, imageId);
                 if (image is null) { error = "Unknown map or image id."; return; }
+                if (image.Name == trimmed) return;
                 image.Name = trimmed;
+                if (imageMap is not null) imageMap.ImagesVersion++;
             });
 
             if (exec.IsCanceled) return Result.FromCancellation();
@@ -2561,9 +2581,11 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             string? error = null;
             var exec = state.Execute(() =>
             {
-                var (image, _) = FindImageAndMap(state, mapId, imageId);
+                var (image, imageMap) = FindImageAndMap(state, mapId, imageId);
                 if (image is null) { error = "Unknown map or image id."; return; }
+                if (image.Locked == locked) return;
                 image.Locked = locked;
+                if (imageMap is not null) imageMap.ImagesVersion++;
             });
 
             if (exec.IsCanceled) return Result.FromCancellation();
@@ -2584,9 +2606,11 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             string? error = null;
             var exec = state.Execute(() =>
             {
-                var (image, _) = FindImageAndMap(state, mapId, imageId);
+                var (image, imageMap) = FindImageAndMap(state, mapId, imageId);
                 if (image is null) { error = "Unknown map or image id."; return; }
+                if (image.Hidden == hidden) return;
                 image.Hidden = hidden;
+                if (imageMap is not null) imageMap.ImagesVersion++;
             });
 
             if (exec.IsCanceled) return Result.FromCancellation();
@@ -2616,6 +2640,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
 
                 for (int i = 0; i < map.Images.Count; i++)
                     map.Images[i].LayerOrder = i;
+                map.ImagesVersion++;
             });
 
             if (exec.IsCanceled) return Result.FromCancellation();
@@ -2679,7 +2704,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                 var totalBits = map.Grid.WidthCells * map.Grid.HeightCells;
                 if (totalBits <= 0)
                 {
-                    map.FogMask = [];
+                    if (map.FogMask.Length > 0) { map.FogMask = []; map.FogVersion++; }
                     return;
                 }
 
@@ -2699,6 +2724,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                 }
 
                 map.FogMask = mask;
+                map.FogVersion++;
             });
 
             if (exec.IsCanceled) return Result.FromCancellation();
@@ -2717,7 +2743,9 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             {
                 var map = state.Maps.FirstOrDefault(m => m.Id == mapId);
                 if (map is null) { error = "Unknown map id."; return; }
+                if (map.FogMask.Length == 0) return;
                 map.FogMask = [];
+                map.FogVersion++;
             });
 
             if (exec.IsCanceled) return Result.FromCancellation();
