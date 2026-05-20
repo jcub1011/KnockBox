@@ -34,7 +34,7 @@ namespace KnockBox.DndMapper.Pages.Components
         private IEnumerable<Token> VisibleTokens =>
             Map is null
                 ? []
-                : TokenVisibilityFilter.VisibleTokensFor(Map.Tokens, IsHost);
+                : TokenVisibilityFilter.VisibleTokensFor(Map.Tokens, Map, IsHost);
 
         private List<TokenStack> Stacks => TokenStackGrouper.Group(VisibleTokens);
 

@@ -68,6 +68,16 @@ else
                         <g class="dndm-display__markup">@((MarkupString)_projection.MarkupSvg)</g>
                     }
 
+                    @if (_projection.FoggedCells.Count > 0)
+                    {
+                        <g class="dndm-display__fog">
+                            @foreach (var (cx, cy) in _projection.FoggedCells)
+                            {
+                                <rect x="@cx" y="@cy" width="1" height="1" fill="#000" />
+                            }
+                        </g>
+                    }
+
                     @foreach (var token in _projection.VisibleTokens)
                     {
                         <g transform="translate(@token.X @token.Y)">
@@ -111,7 +121,7 @@ else
     [Parameter] public string ObfuscatedRoomCode { get; set; } = string.Empty;
 
     private DndMapperGameState? _state;
-    private DisplayProjection _projection = new(null, [], [], null, null, []);
+    private DisplayProjection _projection = new(null, [], [], null, null, [], []);
     private ObserverAttachment? _attachment;
     private IDisposable? _subscription;
 
