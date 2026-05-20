@@ -105,7 +105,14 @@ public static class KnockBoxPlatformExtensions
                 // 4 batches is enough headroom for normal tick-to-render lag
                 // without retaining 10 batches per circuit.
                 o.MaxBufferedUnacknowledgedRenderBatches = 4;
-            });
+            })
+            // MaximumReceiveMessageSize is modestly bumped from the 32 KB
+            // Blazor default so the IndexedDb blob transport
+            // (IJSStreamReference / DotNetStreamReference) can frame 64 KB
+            // binary chunks with envelope headroom. Kept conservative so
+            // per-message memory exposure stays bounded if anything else
+            // pumps large payloads through the hub.
+            .AddHubOptions(o => o.MaximumReceiveMessageSize = 64 * 1024);
 
         // Cross-circuit registry for IIndexedDbBlob.PublishForSharingAsync —
         // singleton so the /blob-share/{token} HTTP endpoint can resolve a

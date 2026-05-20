@@ -145,6 +145,20 @@ namespace KnockBox.DndMapperTests.Unit.Helpers
             CollectionAssert.AreEqual(new[] { img }, result);
         }
 
+        [TestMethod]
+        public void Image_Hidden_Host_AlsoFiltered()
+        {
+            // Hidden is a "do not render" flag for everyone, not a player-only
+            // toggle. The host's canvas must exclude the image too — the host
+            // still sees the row in HostLayerPanel where the eye toggle is.
+            var map = Make();
+            var img = Img(2, 3, 4, 4, hidden: true);
+
+            var result = ImageVisibilityFilter.VisibleImagesFor(new[] { img }, map, isHost: true).ToList();
+
+            Assert.IsEmpty(result);
+        }
+
         // ── DisplayProjection integration ────────────────────────────────────
 
         [TestMethod]

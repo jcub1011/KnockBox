@@ -24,10 +24,13 @@ public sealed class BlobShareEndpointTests
         return (ctx, body, registry);
     }
 
+    // The new BlobShareEntry exposes a StreamOpener: one call yields a single
+    // Stream that the endpoint copies into the response. Tests inject a
+    // backing byte[] (wrapped in MemoryStream) or a throwing opener.
     private static BlobShareEntry MakeEntry(
         byte[] payload,
         string contentType = "application/octet-stream",
-        Func<long, int, CancellationToken, ValueTask<byte[]>>? fetcher = null,
+        Func<CancellationToken, ValueTask<Stream>>? streamOpener = null,
         string? cacheControl = null)
         => new()
         {
@@ -35,13 +38,8 @@ public sealed class BlobShareEndpointTests
             ContentType = contentType,
             Length = payload.LongLength,
             CacheControl = cacheControl,
-            Fetcher = fetcher ?? ((offset, count, ct) =>
-            {
-                var take = (int)Math.Min(count, payload.LongLength - offset);
-                var slice = new byte[take];
-                Array.Copy(payload, offset, slice, 0, take);
-                return ValueTask.FromResult(slice);
-            }),
+            StreamOpener = streamOpener
+                ?? (_ => ValueTask.FromResult<Stream>(new MemoryStream(payload, writable: false))),
         };
 
     [TestMethod]
@@ -86,12 +84,12 @@ public sealed class BlobShareEndpointTests
     }
 
     [TestMethod]
-    public async Task JsDisconnectedException_OnFirstChunk_Returns_410_AndEvicts()
+    public async Task JsDisconnectedException_BeforeAnyBytes_Returns_410_AndEvicts()
     {
         var (ctx, _, registry) = MakeContext();
         var entry = MakeEntry(
             new byte[64],
-            fetcher: (offset, count, ct) => throw new JSDisconnectedException("circuit gone"));
+            streamOpener: _ => throw new JSDisconnectedException("circuit gone"));
         registry.Register(entry);
 
         await BlobShareEndpoint.HandleAsync(ctx, entry.Token);
@@ -101,12 +99,12 @@ public sealed class BlobShareEndpointTests
     }
 
     [TestMethod]
-    public async Task UnexpectedException_OnFirstChunk_Returns_500()
+    public async Task UnexpectedException_BeforeAnyBytes_Returns_500()
     {
         var (ctx, _, registry) = MakeContext();
         var entry = MakeEntry(
             new byte[64],
-            fetcher: (offset, count, ct) => throw new IOException("boom"));
+            streamOpener: _ => throw new IOException("boom"));
         registry.Register(entry);
 
         await BlobShareEndpoint.HandleAsync(ctx, entry.Token);
@@ -118,42 +116,57 @@ public sealed class BlobShareEndpointTests
     public async Task MidStream_Disconnect_AbortsWithoutChangingStatus()
     {
         var (ctx, body, registry) = MakeContext();
-        var callCount = 0;
+        // A stream that yields one full ChunkSize block then throws on the
+        // next ReadAsync. CopyToAsync will surface the JSDisconnectedException
+        // mid-copy after the first chunk lands in the response body.
         var entry = MakeEntry(
             new byte[IndexedDbBlobChunking.ChunkSize * 3],
-            fetcher: (offset, count, ct) =>
-            {
-                callCount++;
-                if (callCount == 1)
-                {
-                    return ValueTask.FromResult(new byte[count]);
-                }
-                throw new JSDisconnectedException("dropped mid-stream");
-            });
+            streamOpener: _ => ValueTask.FromResult<Stream>(
+                new ThrowAfterFirstChunkStream(IndexedDbBlobChunking.ChunkSize)));
         registry.Register(entry);
 
         await BlobShareEndpoint.HandleAsync(ctx, entry.Token);
 
-        // First chunk was successfully streamed before the disconnect, so the
-        // 200 status line is already on the wire — status code is not flipped
-        // to 410. Body got partially written.
+        // First chunk made it through, so the 200 status is already on the
+        // wire — the endpoint can't flip to 410. The share is still evicted.
         Assert.AreEqual(StatusCodes.Status200OK, ctx.Response.StatusCode);
         Assert.AreEqual(IndexedDbBlobChunking.ChunkSize, body.Length);
         Assert.IsNull(registry.TryGetAndTouch(entry.Token));
     }
 
-    [TestMethod]
-    public async Task FetcherReturning_ZeroBytes_AbortsWithoutThrowing()
+    // Yields exactly one chunk-sized block, then throws JSDisconnectedException
+    // on the next read. Used to exercise the mid-stream disconnect path.
+    private sealed class ThrowAfterFirstChunkStream : Stream
     {
-        var (ctx, body, registry) = MakeContext();
-        var entry = MakeEntry(
-            new byte[128],
-            fetcher: (offset, count, ct) => ValueTask.FromResult(Array.Empty<byte>()));
-        registry.Register(entry);
+        private readonly int _firstChunkSize;
+        private int _bytesYielded;
 
-        await BlobShareEndpoint.HandleAsync(ctx, entry.Token);
+        public ThrowAfterFirstChunkStream(int firstChunkSize) { _firstChunkSize = firstChunkSize; }
 
-        Assert.AreEqual(StatusCodes.Status200OK, ctx.Response.StatusCode);
-        Assert.AreEqual(0, body.Length);
+        public override bool CanRead => true;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => _firstChunkSize * 3;
+        public override long Position { get => _bytesYielded; set => throw new NotSupportedException(); }
+
+        public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+        public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken ct)
+            => ReadAsync(buffer.AsMemory(offset, count), ct).AsTask();
+        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken ct = default)
+        {
+            if (_bytesYielded < _firstChunkSize)
+            {
+                var take = Math.Min(buffer.Length, _firstChunkSize - _bytesYielded);
+                buffer.Span[..take].Clear();
+                _bytesYielded += take;
+                return ValueTask.FromResult(take);
+            }
+            throw new JSDisconnectedException("dropped mid-stream");
+        }
+
+        public override void Flush() { }
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
     }
 }

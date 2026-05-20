@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Text.Json.Serialization;
 using KnockBox.Core.Services.Storage.IndexedDb;
+using Microsoft.JSInterop;
 
 namespace KnockBox.Platform.Services.Storage.IndexedDb;
 
@@ -8,18 +9,8 @@ internal sealed record BlobCreateResponse(
     [property: JsonPropertyName("blobId")] int BlobId,
     [property: JsonPropertyName("length")] long Length);
 
-internal sealed record BlobStreamBeginResponse(
-    [property: JsonPropertyName("uploadId")] int UploadId);
-
-internal sealed record BlobChunkResponse(
-    [property: JsonPropertyName("base64")] string Base64);
-
 internal sealed record BlobUrlResponse(
     [property: JsonPropertyName("url")] string Url);
-
-internal sealed record BlobPrepareReadResponse(
-    [property: JsonPropertyName("length")] long Length,
-    [property: JsonPropertyName("contentType")] string ContentType);
 
 internal sealed class IndexedDbBlobImpl : IndexedDbBlob
 {
@@ -30,9 +21,7 @@ internal sealed class IndexedDbBlobImpl : IndexedDbBlob
     private readonly string _contentType;
     private readonly long _length;
     private readonly ConcurrentBag<Guid> _publishedShares = new();
-    private readonly object _prepareLock = new();
     private string? _cachedObjectUrl;
-    private Task? _prepareTask;
     private bool _disposed;
 
     public override string ContentType => _contentType;
@@ -59,26 +48,101 @@ internal sealed class IndexedDbBlobImpl : IndexedDbBlob
     public override async ValueTask<byte[]> ReadAllBytesAsync(CancellationToken ct = default)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        await EnsureReadPreparedAsync(ct).ConfigureAwait(false);
-        var buffer = new byte[_length];
-        long offset = 0;
-        while (offset < _length)
-        {
-            var requested = (int)Math.Min(IndexedDbBlobChunking.ChunkSize, _length - offset);
-            var chunk = await ReadChunkAsync(offset, requested, ct).ConfigureAwait(false);
-            if (chunk.Length == 0)
-                throw new IOException($"blobReadChunk returned 0 bytes at offset {offset} of {_length}.");
-            chunk.AsSpan().CopyTo(buffer.AsSpan((int)offset));
-            offset += chunk.Length;
-        }
-        return buffer;
+        await using var stream = await OpenReadStreamAsync(_length, ct).ConfigureAwait(false);
+        using var buffer = new MemoryStream(capacity: (int)Math.Min(_length, int.MaxValue));
+        await stream.CopyToAsync(buffer, IndexedDbBlobChunking.ChunkSize, ct).ConfigureAwait(false);
+        return buffer.ToArray();
     }
 
     public override async ValueTask<Stream> OpenReadAsync(CancellationToken ct = default)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        await EnsureReadPreparedAsync(ct).ConfigureAwait(false);
-        return new IndexedDbReadStream(_interop, _blobId, _length);
+        return await OpenReadStreamAsync(_length, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Opens a binary read stream over SignalR for this blob. Blazor frames
+    /// the bytes natively (no base64, no JSON envelope).
+    /// <para>
+    /// CRITICAL: the returned stream WRAPS the <see cref="IJSStreamReference"/>
+    /// so its lifetime is bound to the stream's. Without the wrapper, the
+    /// streamRef goes out of scope as soon as this method returns and becomes
+    /// eligible for finalization. The finalizer calls
+    /// <c>DotNet.jsCallDispatcher.disposeJSObjectReferenceById</c> on the JS
+    /// side, which yanks the Blob from <c>_jsObjectReferences</c> — once that
+    /// happens the underlying <c>RemoteJSDataStream</c> hangs forever waiting
+    /// for bytes that will never come (manifests as
+    /// <see cref="TimeoutException"/> "Did not receive any data in the
+    /// allotted time" after 60 s, which Blazor escalates to a fatal circuit
+    /// error). Holding the streamRef inside the wrapper keeps it GC-rooted
+    /// for the entire <c>CopyToAsync</c>.
+    /// </para>
+    /// </summary>
+    internal async ValueTask<Stream> OpenReadStreamAsync(long maxAllowedSize, CancellationToken ct)
+    {
+        var streamRef = await _interop.InvokeStreamRefAsync(
+            "openBlobReadStream", ct, _blobId).ConfigureAwait(false);
+        var inner = await streamRef.OpenReadStreamAsync(maxAllowedSize, ct).ConfigureAwait(false);
+        return new StreamRefBoundStream(inner, streamRef);
+    }
+
+    /// <summary>
+    /// Pass-through Stream that keeps an <see cref="IJSStreamReference"/>
+    /// strongly referenced for the lifetime of the read. Disposing the
+    /// wrapper disposes both the inner stream and the streamRef (the latter
+    /// releases the JS-side Blob handle so memory doesn't leak).
+    /// </summary>
+    private sealed class StreamRefBoundStream : Stream
+    {
+        private readonly Stream _inner;
+        private readonly IJSStreamReference _streamRef;
+        private bool _disposed;
+
+        public StreamRefBoundStream(Stream inner, IJSStreamReference streamRef)
+        {
+            _inner = inner;
+            _streamRef = streamRef;
+        }
+
+        public override bool CanRead => _inner.CanRead;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => _inner.Length;
+        public override long Position { get => _inner.Position; set => throw new NotSupportedException(); }
+
+        public override int Read(byte[] buffer, int offset, int count) => _inner.Read(buffer, offset, count);
+        public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken ct)
+            => _inner.ReadAsync(buffer, offset, count, ct);
+        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken ct = default)
+            => _inner.ReadAsync(buffer, ct);
+
+        public override void Flush() => _inner.Flush();
+        public override Task FlushAsync(CancellationToken ct) => _inner.FlushAsync(ct);
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+
+        public override async ValueTask DisposeAsync()
+        {
+            if (_disposed) return;
+            _disposed = true;
+            await _inner.DisposeAsync().ConfigureAwait(false);
+            await _streamRef.DisposeAsync().ConfigureAwait(false);
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (_disposed) return;
+            _disposed = true;
+            if (disposing)
+            {
+                _inner.Dispose();
+                // IJSStreamReference is IAsyncDisposable only — fire-and-forget
+                // sync disposal is the best we can do in the sync Dispose path.
+                _ = _streamRef.DisposeAsync().AsTask();
+            }
+            base.Dispose(disposing);
+        }
     }
 
     public override async ValueTask<string> CreateObjectUrlAsync(CancellationToken ct = default)
@@ -99,11 +163,10 @@ internal sealed class IndexedDbBlobImpl : IndexedDbBlob
         return _cachedObjectUrl;
     }
 
-    public override async ValueTask<IBlobShare> PublishForSharingAsync(
+    public override ValueTask<IBlobShare> PublishForSharingAsync(
         BlobShareOptions? options = null, CancellationToken ct = default)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        await EnsureReadPreparedAsync(ct).ConfigureAwait(false);
 
         var token = Guid.NewGuid();
         var absoluteExpiry = options?.AbsoluteExpiry is { } abs
@@ -118,13 +181,17 @@ internal sealed class IndexedDbBlobImpl : IndexedDbBlob
             CacheControl = options?.CacheControl,
             AbsoluteExpiresAt = absoluteExpiry,
             SlidingExpiry = options?.SlidingExpiry,
-            Fetcher = ReadChunkAsync,
+            // Capture `this` (the blob impl) via the lambda so the registry
+            // entry can open a fresh SignalR-framed binary stream against
+            // the originating circuit's blob each time a player fetches.
+            StreamOpener = openCt => OpenReadStreamAsync(_length, openCt),
         };
         _shareRegistry.Register(entry);
         _publishedShares.Add(token);
 
         var url = $"/blob-share/{token:D}";
-        return new BlobShare(_shareRegistry, token, url, _contentType, _length);
+        IBlobShare share = new BlobShare(_shareRegistry, token, url, _contentType, _length);
+        return ValueTask.FromResult(share);
     }
 
     public override async ValueTask DisposeAsync()
@@ -148,55 +215,19 @@ internal sealed class IndexedDbBlobImpl : IndexedDbBlob
         }
     }
 
-    /// <summary>
-    /// Caches the in-flight prepare call so concurrent readers share one
-    /// JS-side snapshot. A failed prepare is cached too — subsequent callers
-    /// observe the same <see cref="IOException"/> rather than retrying.
-    /// </summary>
-    private Task EnsureReadPreparedAsync(CancellationToken ct)
-    {
-        lock (_prepareLock)
-        {
-            return _prepareTask ??= PrepareReadAsync(ct);
-        }
-    }
-
-    private async Task PrepareReadAsync(CancellationToken ct)
-    {
-        var result = await _interop.InvokeAsync<BlobPrepareReadResponse>(
-            "blobPrepareRead", ct, _blobId).ConfigureAwait(false);
-        if (!result.TryGetSuccess(out _))
-        {
-            var msg = result.IsCanceled
-                ? "Read prepare was canceled."
-                : $"[{result.Error.Error.Kind}] {result.Error.Error.Message}";
-            throw new IOException("blobPrepareRead failed: " + msg);
-        }
-    }
-
-    internal async ValueTask<byte[]> ReadChunkAsync(long offset, int count, CancellationToken ct)
-    {
-        await EnsureReadPreparedAsync(ct).ConfigureAwait(false);
-        var result = await _interop.InvokeAsync<BlobChunkResponse>(
-            "blobReadChunk", ct, _blobId, offset, count).ConfigureAwait(false);
-        if (!result.TryGetSuccess(out var chunk))
-        {
-            var msg = result.IsCanceled
-                ? "Chunk read was canceled."
-                : $"[{result.Error.Error.Kind}] {result.Error.Error.Message}";
-            throw new IOException("blobReadChunk failed: " + msg);
-        }
-        return Convert.FromBase64String(chunk.Base64);
-    }
 }
 
 internal static class IndexedDbBlobChunking
 {
     /// <summary>
-    /// 16 KB raw bytes per chunk. After base64 expansion (~33%) and JSON
-    /// envelope framing this stays comfortably under SignalR's default
-    /// MaximumReceiveMessageSize of 32 KB. The host project does not raise
-    /// that default (verified at planning time).
+    /// 64 KB buffer size used as the local copy-buffer when streaming blob
+    /// bytes through the SignalR-backed IJSStreamReference pipeline. Native
+    /// binary framing (no base64 expansion, no JSON envelope) means we can
+    /// go above the legacy 16 KB cap without per-message overhead becoming
+    /// the bottleneck; paired with the host's
+    /// <c>HubOptions.MaximumReceiveMessageSize = 64 KB</c> the cap stays
+    /// defensive against runaway per-message memory while still keeping
+    /// chunk overhead amortized.
     /// </summary>
-    public const int ChunkSize = 16 * 1024;
+    public const int ChunkSize = 64 * 1024;
 }

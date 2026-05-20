@@ -309,30 +309,27 @@ namespace KnockBox.DndMapper.Services.Library
                         imageIds.Add((map.Id, image.Id));
             });
 
-            foreach (var (mapId, imageId) in imageIds)
+            // Skip images already wired up by an earlier attach in this circuit.
+            var pending = imageIds.Where(p => !_shareCache.ContainsKey(p.ImageId)).ToArray();
+            if (pending.Length == 0) return;
+
+            // Run blob fetch + share publish in parallel for every pending
+            // image. Each pair is independent at the IDB level; the JS side
+            // can process them concurrently and SignalR streams the round-
+            // trips in parallel. This collapses a sequential 50× ~50 ms walk
+            // into a single parallel batch for the reconnect path.
+            var fetchTasks = pending
+                .Select(p => RepublishOneAsync(p.MapId, p.ImageId, ct).AsTask())
+                .ToArray();
+            var results = await Task.WhenAll(fetchTasks);
+
+            // Cache mutation + engine notify run serially since both touch
+            // shared state (the cache dictionaries are non-concurrent and
+            // engine.UpdateImageShareTokenAsync takes the state lock).
+            foreach (var (mapId, imageId, blob, share) in results)
             {
                 if (ct.IsCancellationRequested) return;
-                if (_shareCache.ContainsKey(imageId)) continue; // already wired
-
-                var blobResult = await _db.BlobGetSingleAsync(
-                    DndMapperLibrarySchema.ImagesStore,
-                    IndexedDbKey.String(imageId.ToString("D")),
-                    ct);
-
-                if (!blobResult.TryGetSuccess(out var blob) || blob is null)
-                {
-                    _logger.LogWarning("Reconnect: image {ImageId} no longer in IndexedDB; leaving placeholder.", imageId);
-                    continue;
-                }
-
-                IBlobShare share;
-                try { share = await blob.PublishForSharingAsync(options: null, ct); }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Reconnect: failed to republish image {ImageId}.", imageId);
-                    await SafeDisposeAsync(blob);
-                    continue;
-                }
+                if (blob is null || share is null) continue;
 
                 await ReplaceCacheEntryAsync(imageId, blob, share);
 
@@ -342,6 +339,34 @@ namespace KnockBox.DndMapper.Services.Library
                     _logger.LogWarning("Reconnect: engine rejected new share token for image {ImageId}: {Error}", imageId, uerr.PublicMessage);
                 }
             }
+        }
+
+        private async ValueTask<(Guid MapId, Guid ImageId, IndexedDbBlob? Blob, IBlobShare? Share)>
+            RepublishOneAsync(Guid mapId, Guid imageId, CancellationToken ct)
+        {
+            if (_db is null || ct.IsCancellationRequested) return (mapId, imageId, null, null);
+
+            var blobResult = await _db.BlobGetSingleAsync(
+                DndMapperLibrarySchema.ImagesStore,
+                IndexedDbKey.String(imageId.ToString("D")),
+                ct);
+
+            if (!blobResult.TryGetSuccess(out var blob) || blob is null)
+            {
+                _logger.LogWarning("Reconnect: image {ImageId} no longer in IndexedDB; leaving placeholder.", imageId);
+                return (mapId, imageId, null, null);
+            }
+
+            IBlobShare share;
+            try { share = await blob.PublishForSharingAsync(options: null, ct); }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Reconnect: failed to republish image {ImageId}.", imageId);
+                await SafeDisposeAsync(blob);
+                return (mapId, imageId, null, null);
+            }
+
+            return (mapId, imageId, blob, share);
         }
 
         /// <summary>
@@ -523,98 +548,41 @@ namespace KnockBox.DndMapper.Services.Library
             var hydratedImages = await HydrateImagesFromSnapshotAsync(_db, snapshot, ct);
             if (ct.IsCancellationRequested) return Result.FromCancellation();
 
-            // 3. Apply atomically inside one Execute. Subscribers see one
+            // 3. Pre-build the new state collections OFF the circuit thread.
+            //    All the LINQ/projection work (maps + tokens + sheets + roll
+            //    templates) happens here without the state lock; the Execute
+            //    lambda then only does bulk swaps, dropping lock-hold time
+            //    from 5-50 ms to sub-ms and freeing the circuit to paint
+            //    during the rebuild.
+            var hydration = await Task.Run(() => BuildHydration(snapshot, hydratedImages), ct);
+            if (ct.IsCancellationRequested) return Result.FromCancellation();
+
+            // 4. Apply atomically inside one Execute. Subscribers see one
             //    StateChanged notification covering the entire hydration.
             var state = _state;
-            var attrSchema = LibrarySnapshotMapper.ToAttributeSchema(snapshot.AttributeSchema);
             var execResult = state.Execute(() =>
             {
                 state.SetSettings(snapshot.Settings.Clone());
-                state.SetAttributeSchema(attrSchema);
+                state.SetAttributeSchema(hydration.AttrSchema);
 
                 state.Maps.Clear();
-                long totalBytes = 0;
-                foreach (var mapSnap in snapshot.Maps.OrderBy(m => m.ListOrder))
-                {
-                    var map = new Map
-                    {
-                        Id = mapSnap.Id,
-                        Name = mapSnap.Name,
-                        ListOrder = mapSnap.ListOrder,
-                        CreatedUtc = mapSnap.CreatedUtc,
-                        Grid = mapSnap.Grid.Clone(),
-                        DefaultSpawnPosition = mapSnap.DefaultSpawnX is double sx && mapSnap.DefaultSpawnY is double sy
-                            ? (sx, sy)
-                            : null,
-                        // Legacy snapshots (pre-fog) deserialize FogMask to [],
-                        // which Map.IsFogged treats as "all revealed".
-                        FogMask = mapSnap.FogMask ?? [],
-                    };
-                    foreach (var imgSnap in mapSnap.Images.OrderBy(i => i.LayerOrder))
-                    {
-                        if (hydratedImages.TryGetValue(imgSnap.Id, out var image))
-                        {
-                            map.Images.Add(image);
-                            totalBytes += image.ByteSize;
-                        }
-                    }
-                    foreach (var tokSnap in mapSnap.Tokens)
-                    {
-                        // All persisted tokens hydrate as NPCs with no owner.
-                        // The host promotes any of them to PlayerToken via
-                        // ReassignTokenOwnerAsync after players join.
-                        map.Tokens.Add(new Token
-                        {
-                            Id = tokSnap.Id,
-                            Type = TokenType.NPCToken,
-                            OwnerUserId = null,
-                            RepresentsUserId = null,
-                            Name = tokSnap.Name,
-                            Color = tokSnap.Color,
-                            IconKind = tokSnap.IconKind,
-                            MapId = tokSnap.MapId,
-                            X = tokSnap.X,
-                            Y = tokSnap.Y,
-                            SheetId = tokSnap.SheetId,
-                            Hidden = tokSnap.Hidden,
-                        });
-                    }
-                    state.Maps.Add(map);
-                }
-                state.SetBytesUsed(totalBytes);
+                state.Maps.AddRange(hydration.NewMaps);
+                state.SetBytesUsed(hydration.TotalBytes);
 
                 state.Sheets.Clear();
-                foreach (var sheetSnap in snapshot.Sheets)
-                {
-                    var sheet = new CharacterSheet
-                    {
-                        Id = sheetSnap.Id,
-                        OwnerUserId = null,
-                        CharacterName = sheetSnap.CharacterName,
-                        Notes = sheetSnap.Notes,
-                        Hp = sheetSnap.Hp,
-                        MaxHp = sheetSnap.MaxHp,
-                    };
-                    foreach (var kv in sheetSnap.Values)
-                        sheet.Values[kv.Key] = LibrarySnapshotMapper.ToAttributeValue(kv.Value);
-                    foreach (var effectSnap in sheetSnap.StatusEffects)
-                        sheet.StatusEffects.Add(LibrarySnapshotMapper.FromStatusEffectSnapshot(effectSnap));
-                    foreach (var rtSnap in sheetSnap.RollTemplates)
-                        sheet.RollTemplates.Add(LibrarySnapshotMapper.FromRollTemplateSnapshot(rtSnap, RollTemplateScope.Sheet));
-                    state.Sheets[sheet.Id] = sheet;
-                }
+                foreach (var (id, sheet) in hydration.NewSheets)
+                    state.Sheets[id] = sheet;
 
                 state.GlobalRollTemplates.Clear();
-                foreach (var rtSnap in snapshot.GlobalRollTemplates)
-                    state.GlobalRollTemplates.Add(LibrarySnapshotMapper.FromRollTemplateSnapshot(rtSnap, RollTemplateScope.Global));
+                state.GlobalRollTemplates.AddRange(hydration.NewGlobalRollTemplates);
 
-                state.CustomTemplates.Clear();
                 // Re-seed built-ins before user templates so their Rows are
                 // re-derived from the in-code preset definitions (which can
                 // evolve across releases); the snapshot's persisted Rows are
                 // ignored for built-ins.
+                state.CustomTemplates.Clear();
                 state.SeedBuiltInTemplates();
-                foreach (var t in snapshot.CustomTemplates)
+                foreach (var t in hydration.TemplateSnapshots)
                 {
                     var existing = state.CustomTemplates.TryGetValue(t.Id, out var seeded) ? seeded : null;
                     if (existing is { IsBuiltIn: true })
@@ -649,11 +617,10 @@ namespace KnockBox.DndMapper.Services.Library
                     }
                 }
 
-                // Restore the active schema pointer. Default V1 snapshots have
-                // no id stored; fall back to the deterministic id for the
-                // persisted preset so the library lands on the right schema.
-                var resolvedActiveId = snapshot.ActiveSchemaTemplateId
-                    ?? DndMapperGameState.BuiltInTemplateIdFor(snapshot.AttributeSchema.Preset);
+                // Restore the active schema pointer. The lookup id was computed
+                // off-circuit (preset → deterministic id); only the existence
+                // check needs the post-Seed CustomTemplates dictionary.
+                var resolvedActiveId = hydration.PreliminaryActiveSchemaId;
                 if (resolvedActiveId is { } rid && !state.CustomTemplates.ContainsKey(rid))
                     resolvedActiveId = null;
                 state.SetActiveSchemaTemplateId(resolvedActiveId);
@@ -681,10 +648,10 @@ namespace KnockBox.DndMapper.Services.Library
                 }
                 state.SetInitiativeAttributeName(restoredInitiative);
 
-                // Activate the first map if any exist so the host doesn't
-                // land on an empty canvas after hydration.
-                var first = state.Maps.OrderBy(m => m.ListOrder).FirstOrDefault();
-                state.SetActiveMapId(first?.Id);
+                // Activate the first map if any exist (NewMaps is already
+                // ordered by ListOrder by BuildHydration).
+                var firstId = hydration.NewMaps.Count > 0 ? hydration.NewMaps[0].Id : (Guid?)null;
+                state.SetActiveMapId(firstId);
             });
 
             if (execResult.IsCanceled) return Result.FromCancellation();
@@ -710,63 +677,92 @@ namespace KnockBox.DndMapper.Services.Library
         // share for each, and returns a parallel map of imageId -> hydrated
         // MapImage. Missing blobs and republish failures are logged and skipped
         // — callers see fewer images than the snapshot references, never an
-        // exception. The cache is updated in lock-step so the new share is
-        // owned by this service for the rest of the circuit.
+        // exception.
+        //
+        // Each image's (BlobGet → PublishForSharing) round-trip pair runs in
+        // parallel via Task.WhenAll; cache mutation (_blobCache / _shareCache)
+        // is serialized afterward since those dictionaries aren't thread-safe.
+        // For a 10-map / 5-image-per-map session this drops hydrate from ~50
+        // sequential round-trips on the circuit thread to one parallel batch.
         private async ValueTask<Dictionary<Guid, MapImage>> HydrateImagesFromSnapshotAsync(
             IIndexedDatabase db,
             LibrarySnapshot snapshot,
             CancellationToken ct)
         {
-            var hydrated = new Dictionary<Guid, MapImage>();
-            foreach (var mapSnap in snapshot.Maps)
+            var imgSnaps = snapshot.Maps.SelectMany(m => m.Images).ToArray();
+            if (imgSnaps.Length == 0) return new Dictionary<Guid, MapImage>();
+
+            var fetchTasks = imgSnaps
+                .Select(imgSnap => FetchAndPublishAsync(db, imgSnap, ct).AsTask())
+                .ToArray();
+            var results = await Task.WhenAll(fetchTasks);
+
+            var hydrated = new Dictionary<Guid, MapImage>(imgSnaps.Length);
+            foreach (var result in results)
             {
-                foreach (var imgSnap in mapSnap.Images)
-                {
-                    if (ct.IsCancellationRequested) return hydrated;
-
-                    var blobResult = await db.BlobGetSingleAsync(
-                        DndMapperLibrarySchema.ImagesStore,
-                        IndexedDbKey.String(imgSnap.Id.ToString("D")),
-                        ct);
-
-                    if (!blobResult.TryGetSuccess(out var blob) || blob is null)
-                    {
-                        _logger.LogWarning("Image {ImageId} referenced by snapshot is missing from IndexedDB; skipping.", imgSnap.Id);
-                        continue;
-                    }
-
-                    IBlobShare share;
-                    try { share = await blob.PublishForSharingAsync(options: null, ct); }
-                    catch (Exception ex)
-                    {
-                        _logger.LogWarning(ex, "Failed to republish share for hydrated image {ImageId}.", imgSnap.Id);
-                        await SafeDisposeAsync(blob);
-                        continue;
-                    }
-
-                    await ReplaceCacheEntryAsync(imgSnap.Id, blob, share);
-                    hydrated[imgSnap.Id] = new MapImage
-                    {
-                        Id = imgSnap.Id,
-                        Name = imgSnap.Name,
-                        ContentType = imgSnap.ContentType,
-                        ShareToken = share.Token,
-                        X = imgSnap.X,
-                        Y = imgSnap.Y,
-                        Width = imgSnap.Width,
-                        Height = imgSnap.Height,
-                        OriginalWidth = imgSnap.OriginalWidth,
-                        OriginalHeight = imgSnap.OriginalHeight,
-                        Rotation = imgSnap.Rotation,
-                        Opacity = imgSnap.Opacity,
-                        LayerOrder = imgSnap.LayerOrder,
-                        Locked = imgSnap.Locked,
-                        Hidden = imgSnap.Hidden,
-                        ByteSize = imgSnap.ByteSize,
-                    };
-                }
+                if (result.Blob is null || result.Share is null || result.Image is null) continue;
+                await ReplaceCacheEntryAsync(result.ImageId, result.Blob, result.Share);
+                hydrated[result.ImageId] = result.Image;
             }
             return hydrated;
+        }
+
+        // One-image fetch + publish step. Returns a tuple so the caller can
+        // dispatch the cache update serially against the (non-thread-safe)
+        // _blobCache / _shareCache dictionaries.
+        private readonly record struct ImageHydrationResult(
+            Guid ImageId,
+            IndexedDbBlob? Blob,
+            IBlobShare? Share,
+            MapImage? Image);
+
+        private async ValueTask<ImageHydrationResult> FetchAndPublishAsync(
+            IIndexedDatabase db,
+            MapImageSnapshot imgSnap,
+            CancellationToken ct)
+        {
+            if (ct.IsCancellationRequested) return new ImageHydrationResult(imgSnap.Id, null, null, null);
+
+            var blobResult = await db.BlobGetSingleAsync(
+                DndMapperLibrarySchema.ImagesStore,
+                IndexedDbKey.String(imgSnap.Id.ToString("D")),
+                ct);
+
+            if (!blobResult.TryGetSuccess(out var blob) || blob is null)
+            {
+                _logger.LogWarning("Image {ImageId} referenced by snapshot is missing from IndexedDB; skipping.", imgSnap.Id);
+                return new ImageHydrationResult(imgSnap.Id, null, null, null);
+            }
+
+            IBlobShare share;
+            try { share = await blob.PublishForSharingAsync(options: null, ct); }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to republish share for hydrated image {ImageId}.", imgSnap.Id);
+                await SafeDisposeAsync(blob);
+                return new ImageHydrationResult(imgSnap.Id, null, null, null);
+            }
+
+            var image = new MapImage
+            {
+                Id = imgSnap.Id,
+                Name = imgSnap.Name,
+                ContentType = imgSnap.ContentType,
+                ShareToken = share.Token,
+                X = imgSnap.X,
+                Y = imgSnap.Y,
+                Width = imgSnap.Width,
+                Height = imgSnap.Height,
+                OriginalWidth = imgSnap.OriginalWidth,
+                OriginalHeight = imgSnap.OriginalHeight,
+                Rotation = imgSnap.Rotation,
+                Opacity = imgSnap.Opacity,
+                LayerOrder = imgSnap.LayerOrder,
+                Locked = imgSnap.Locked,
+                Hidden = imgSnap.Hidden,
+                ByteSize = imgSnap.ByteSize,
+            };
+            return new ImageHydrationResult(imgSnap.Id, blob, share, image);
         }
 
         /// <summary>
@@ -827,6 +823,21 @@ namespace KnockBox.DndMapper.Services.Library
                     IndexedDbKey.String(autoSlot), ct);
 
                 _autoFlushHashes.Clear();
+
+                // Tear down the in-memory blob + share caches. The on-disk
+                // ImagesStore is left intact (the user clicked "Start fresh",
+                // not "Delete everything"), but the cached JS handles and
+                // their registered share tokens point at content that's no
+                // longer in the live state. Holding them would surface as:
+                //   • A subsequent load creating a fresh handle for the same
+                //     image and racing the dispose of the stale handle.
+                //   • Stale share tokens lingering in BlobShareRegistry that
+                //     resolve to disposed-by-the-next-load blobs.
+                // Disposing here gives the next load a clean slate.
+                foreach (var share in _shareCache.Values) await SafeDisposeAsync(share);
+                _shareCache.Clear();
+                foreach (var blob in _blobCache.Values) await SafeDisposeAsync(blob);
+                _blobCache.Clear();
 
                 // Drop the __auto__ entry from the slots index so the Saves
                 // panel doesn't show a stale "Auto Save" row pointing at the
@@ -1224,7 +1235,12 @@ namespace KnockBox.DndMapper.Services.Library
                     return ValueResult<string>.FromError("A slot with that name already exists.");
                 }
 
-                var shards = TakeSnapshot();
+                // Offload the snapshot read + LINQ projection to a thread-pool
+                // thread. TakeSnapshot's internal state.WithExclusiveRead still
+                // takes the lock synchronously, but on the pool thread instead
+                // of the circuit, so Blazor can keep painting while the
+                // snapshot is built.
+                var shards = await Task.Run(TakeSnapshot, ct);
                 if (shards is null) return ValueResult<string>.FromError("Failed to read current state for save.");
 
                 var slotId = Guid.NewGuid().ToString("D");
@@ -1276,7 +1292,10 @@ namespace KnockBox.DndMapper.Services.Library
                 var entry = idx.Slots.FirstOrDefault(s => s.Id == slotId);
                 if (entry is null) return Result.FromError("Unknown slot id.");
 
-                var shards = TakeSnapshot();
+                // See CreateSlotAsync for the rationale: snapshot work goes
+                // to a pool thread so the host's "Overwrite" click doesn't
+                // freeze the circuit while the LINQ projection runs.
+                var shards = await Task.Run(TakeSnapshot, ct);
                 if (shards is null) return Result.FromError("Failed to read current state for save.");
 
                 // Manual slots don't carry a per-slot hash cache: the user
@@ -1441,6 +1460,121 @@ namespace KnockBox.DndMapper.Services.Library
             LibraryCoreSnapshot Core,
             Dictionary<Guid, MapSnapshot> MapsById,
             Dictionary<Guid, SheetSnapshot> SheetsById);
+
+        // Pre-built artifacts of a hydrate pass assembled OUTSIDE the state
+        // lock (and off the circuit thread). The Execute lambda in
+        // LoadSlotAsync only does bulk swaps against these collections, so
+        // lock-hold time stays sub-ms regardless of map / token / sheet count.
+        //
+        // TemplateSnapshots stay in raw v3-snapshot form because their final
+        // shape depends on SeedBuiltInTemplates() — a state-mutating call
+        // that must run inside Execute.
+        private sealed record PreBuiltHydration(
+            AttributeSchema AttrSchema,
+            List<Map> NewMaps,
+            Dictionary<Guid, CharacterSheet> NewSheets,
+            List<RollTemplate> NewGlobalRollTemplates,
+            List<NamedTemplateSnapshot> TemplateSnapshots,
+            long TotalBytes,
+            Guid? PreliminaryActiveSchemaId);
+
+        private static PreBuiltHydration BuildHydration(
+            LibrarySnapshot snapshot,
+            Dictionary<Guid, MapImage> hydratedImages)
+        {
+            var attrSchema = LibrarySnapshotMapper.ToAttributeSchema(snapshot.AttributeSchema);
+
+            var newMaps = new List<Map>(snapshot.Maps.Count);
+            long totalBytes = 0;
+            foreach (var mapSnap in snapshot.Maps.OrderBy(m => m.ListOrder))
+            {
+                var map = new Map
+                {
+                    Id = mapSnap.Id,
+                    Name = mapSnap.Name,
+                    ListOrder = mapSnap.ListOrder,
+                    CreatedUtc = mapSnap.CreatedUtc,
+                    Grid = mapSnap.Grid.Clone(),
+                    DefaultSpawnPosition = mapSnap.DefaultSpawnX is double sx && mapSnap.DefaultSpawnY is double sy
+                        ? (sx, sy)
+                        : null,
+                    // Legacy snapshots (pre-fog) deserialize FogMask to [],
+                    // which Map.IsFogged treats as "all revealed".
+                    FogMask = mapSnap.FogMask ?? [],
+                };
+                foreach (var imgSnap in mapSnap.Images.OrderBy(i => i.LayerOrder))
+                {
+                    if (hydratedImages.TryGetValue(imgSnap.Id, out var image))
+                    {
+                        map.Images.Add(image);
+                        totalBytes += image.ByteSize;
+                    }
+                }
+                foreach (var tokSnap in mapSnap.Tokens)
+                {
+                    // All persisted tokens hydrate as NPCs with no owner.
+                    // The host promotes any of them to PlayerToken via
+                    // ReassignTokenOwnerAsync after players join.
+                    map.Tokens.Add(new Token
+                    {
+                        Id = tokSnap.Id,
+                        Type = TokenType.NPCToken,
+                        OwnerUserId = null,
+                        RepresentsUserId = null,
+                        Name = tokSnap.Name,
+                        Color = tokSnap.Color,
+                        IconKind = tokSnap.IconKind,
+                        MapId = tokSnap.MapId,
+                        X = tokSnap.X,
+                        Y = tokSnap.Y,
+                        SheetId = tokSnap.SheetId,
+                        Hidden = tokSnap.Hidden,
+                    });
+                }
+                newMaps.Add(map);
+            }
+
+            var newSheets = new Dictionary<Guid, CharacterSheet>(snapshot.Sheets.Count);
+            foreach (var sheetSnap in snapshot.Sheets)
+            {
+                var sheet = new CharacterSheet
+                {
+                    Id = sheetSnap.Id,
+                    OwnerUserId = null,
+                    CharacterName = sheetSnap.CharacterName,
+                    Notes = sheetSnap.Notes,
+                    Hp = sheetSnap.Hp,
+                    MaxHp = sheetSnap.MaxHp,
+                };
+                foreach (var kv in sheetSnap.Values)
+                    sheet.Values[kv.Key] = LibrarySnapshotMapper.ToAttributeValue(kv.Value);
+                foreach (var effectSnap in sheetSnap.StatusEffects)
+                    sheet.StatusEffects.Add(LibrarySnapshotMapper.FromStatusEffectSnapshot(effectSnap));
+                foreach (var rtSnap in sheetSnap.RollTemplates)
+                    sheet.RollTemplates.Add(LibrarySnapshotMapper.FromRollTemplateSnapshot(rtSnap, RollTemplateScope.Sheet));
+                newSheets[sheet.Id] = sheet;
+            }
+
+            var newGlobalRollTemplates = snapshot.GlobalRollTemplates
+                .Select(rt => LibrarySnapshotMapper.FromRollTemplateSnapshot(rt, RollTemplateScope.Global))
+                .ToList();
+
+            // Default V1 snapshots have no id stored; fall back to the
+            // deterministic id for the persisted preset so the library lands
+            // on the right schema. The existence check against state.CustomTemplates
+            // is deferred to inside Execute (it needs the post-Seed dict).
+            var preliminaryActiveId = snapshot.ActiveSchemaTemplateId
+                ?? DndMapperGameState.BuiltInTemplateIdFor(snapshot.AttributeSchema.Preset);
+
+            return new PreBuiltHydration(
+                attrSchema,
+                newMaps,
+                newSheets,
+                newGlobalRollTemplates,
+                snapshot.CustomTemplates,
+                totalBytes,
+                preliminaryActiveId);
+        }
 
         private ShardSet? TakeSnapshot()
         {

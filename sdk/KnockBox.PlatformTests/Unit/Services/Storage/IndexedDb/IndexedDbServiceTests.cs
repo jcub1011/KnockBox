@@ -175,8 +175,9 @@ public sealed class IndexedDbServiceTests
         Assert.AreEqual("application/octet-stream", blob.ContentType);
         interop.Verify(x => x.InvokeAsync<BlobCreateResponse>(
             "createBlobFromBytes", It.IsAny<CancellationToken>(), It.IsAny<object?[]>()), Times.Once);
-        interop.Verify(x => x.InvokeAsync<BlobStreamBeginResponse>(
-            "createBlobStreamBegin", It.IsAny<CancellationToken>(), It.IsAny<object?[]>()), Times.Never);
+        // The bytes path must not use the stream-upload path.
+        interop.Verify(x => x.InvokeAsync<BlobCreateResponse>(
+            "createBlobFromDotNetStream", It.IsAny<CancellationToken>(), It.IsAny<object?[]>()), Times.Never);
 
         await blob.DisposeAsync();
     }
@@ -198,11 +199,12 @@ public sealed class IndexedDbServiceTests
     [TestMethod]
     public async Task CreateBlobAsync_Bytes_LargerThanChunk_UsesStreamPath()
     {
+        // Payloads exceeding ChunkSize fall through to the stream path, which
+        // now hands a DotNetStreamReference to JS in a single InvokeAsync.
         var interop = IndexedDbTestHelpers.NewInteropMock();
         var len = IndexedDbBlobChunking.ChunkSize + 1;
-        interop.SetupTypedSuccess("createBlobStreamBegin", new BlobStreamBeginResponse(UploadId: 1));
-        interop.SetupVoidSuccess("createBlobStreamAppend");
-        interop.SetupTypedSuccess("createBlobStreamFinish", new BlobCreateResponse(BlobId: 7, Length: len));
+        interop.SetupTypedSuccess("createBlobFromDotNetStream",
+            new BlobCreateResponse(BlobId: 7, Length: len));
         interop.SetupVoidSuccess("releaseHandle");
 
         using var registry = IndexedDbTestHelpers.NewRegistry();
@@ -211,9 +213,9 @@ public sealed class IndexedDbServiceTests
         var blob = await service.CreateBlobAsync(new byte[len], "application/octet-stream");
 
         Assert.AreEqual(len, blob.Length);
-        // Two chunk appends: one full, one of length 1.
-        interop.Verify(x => x.InvokeVoidAsync(
-            "createBlobStreamAppend", It.IsAny<CancellationToken>(), It.IsAny<object?[]>()), Times.Exactly(2));
+        // Exactly one upload call — no per-chunk loop on the C# side.
+        interop.Verify(x => x.InvokeAsync<BlobCreateResponse>(
+            "createBlobFromDotNetStream", It.IsAny<CancellationToken>(), It.IsAny<object?[]>()), Times.Once);
 
         await blob.DisposeAsync();
     }
@@ -248,9 +250,8 @@ public sealed class IndexedDbServiceTests
     public async Task CreateBlobAsync_Stream_DisposesStreamByDefault()
     {
         var interop = IndexedDbTestHelpers.NewInteropMock();
-        interop.SetupTypedSuccess("createBlobStreamBegin", new BlobStreamBeginResponse(UploadId: 1));
-        interop.SetupVoidSuccess("createBlobStreamAppend");
-        interop.SetupTypedSuccess("createBlobStreamFinish", new BlobCreateResponse(BlobId: 7, Length: 3));
+        interop.SetupTypedSuccess("createBlobFromDotNetStream",
+            new BlobCreateResponse(BlobId: 7, Length: 3));
         interop.SetupVoidSuccess("releaseHandle");
 
         using var registry = IndexedDbTestHelpers.NewRegistry();
@@ -267,9 +268,8 @@ public sealed class IndexedDbServiceTests
     public async Task CreateBlobAsync_Stream_LeaveOpenTrue_DoesNotDispose()
     {
         var interop = IndexedDbTestHelpers.NewInteropMock();
-        interop.SetupTypedSuccess("createBlobStreamBegin", new BlobStreamBeginResponse(UploadId: 1));
-        interop.SetupVoidSuccess("createBlobStreamAppend");
-        interop.SetupTypedSuccess("createBlobStreamFinish", new BlobCreateResponse(BlobId: 7, Length: 3));
+        interop.SetupTypedSuccess("createBlobFromDotNetStream",
+            new BlobCreateResponse(BlobId: 7, Length: 3));
         interop.SetupVoidSuccess("releaseHandle");
 
         using var registry = IndexedDbTestHelpers.NewRegistry();
@@ -283,10 +283,10 @@ public sealed class IndexedDbServiceTests
     }
 
     [TestMethod]
-    public async Task CreateBlobAsync_Stream_BeginFailure_StillDisposesStream()
+    public async Task CreateBlobAsync_Stream_InteropFailure_StillDisposesStream()
     {
         var interop = IndexedDbTestHelpers.NewInteropMock();
-        interop.SetupTypedFailure<BlobStreamBeginResponse>("createBlobStreamBegin",
+        interop.SetupTypedFailure<BlobCreateResponse>("createBlobFromDotNetStream",
             new IndexedDbError(IndexedDbErrorKind.QuotaExceeded, "no room"));
 
         using var registry = IndexedDbTestHelpers.NewRegistry();
@@ -296,24 +296,7 @@ public sealed class IndexedDbServiceTests
         await Assert.ThrowsExactlyAsync<IOException>(async () =>
             await service.CreateBlobAsync(stream, length: 3, "application/octet-stream"));
         Assert.IsTrue(stream.WasDisposed,
-            "stream must be disposed in the finally block even when the JS begin call fails");
-    }
-
-    [TestMethod]
-    public async Task CreateBlobAsync_Stream_TruncatedSource_ThrowsAndDisposesStream()
-    {
-        var interop = IndexedDbTestHelpers.NewInteropMock();
-        interop.SetupTypedSuccess("createBlobStreamBegin", new BlobStreamBeginResponse(UploadId: 1));
-
-        using var registry = IndexedDbTestHelpers.NewRegistry();
-        var service = NewService(interop.Object, registry);
-
-        // Claim length 5 but only provide 2 bytes. Loop will see read==0 on
-        // the second iteration and throw.
-        var stream = new TrackingStream(new byte[] { 1, 2 });
-        await Assert.ThrowsExactlyAsync<IOException>(async () =>
-            await service.CreateBlobAsync(stream, length: 5, "application/octet-stream"));
-        Assert.IsTrue(stream.WasDisposed);
+            "stream must be disposed in the finally block even when the JS upload call fails");
     }
 
     [TestMethod]

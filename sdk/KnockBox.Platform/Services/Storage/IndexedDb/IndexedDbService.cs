@@ -148,56 +148,34 @@ internal sealed class IndexedDbService : IIndexedDbService, IAsyncDisposable
 
         try
         {
-            var begin = await _interop.InvokeAsync<BlobStreamBeginResponse>(
-                "createBlobStreamBegin", ct, contentType, length).ConfigureAwait(false);
-            if (!begin.TryGetSuccess(out var beginResp))
+            // DotNetStreamReference hands the C# stream to Blazor, which
+            // frames the bytes natively over SignalR (no base64, no JSON
+            // envelope). The JS side does one `streamRef.arrayBuffer()`
+            // read and constructs a Blob — no per-chunk InvokeAsync loop.
+            using var streamRef = new DotNetStreamReference(stream, leaveOpen: true);
+            var result = await _interop.InvokeAsync<BlobCreateResponse>(
+                "createBlobFromDotNetStream", ct, streamRef, contentType, length).ConfigureAwait(false);
+
+            if (!result.TryGetSuccess(out var resp))
             {
-                var msg = begin.IsCanceled
+                var msg = result.IsCanceled
                     ? "Blob stream upload was canceled."
-                    : $"[{begin.Error.Error.Kind}] {begin.Error.Error.Message}";
-                throw new IOException("createBlobStreamBegin failed: " + msg);
-            }
-
-            var uploadId = beginResp.UploadId;
-            var buffer = new byte[IndexedDbBlobChunking.ChunkSize];
-            long total = 0;
-            while (total < length)
-            {
-                var toRead = (int)Math.Min(buffer.Length, length - total);
-                var read = await stream.ReadAsync(buffer.AsMemory(0, toRead), ct).ConfigureAwait(false);
-                if (read == 0)
-                {
-                    throw new IOException(
-                        $"Source stream ended at byte {total} of {length}; expected {length} bytes total.");
-                }
-                var base64 = Convert.ToBase64String(buffer, 0, read);
-                var append = await _interop.InvokeVoidAsync(
-                    "createBlobStreamAppend", ct, uploadId, base64).ConfigureAwait(false);
-                if (append.TryGetFailure(out var appendErr))
-                {
-                    throw new IOException(
-                        $"createBlobStreamAppend failed: [{appendErr.Kind}] {appendErr.Message}");
-                }
-                total += read;
-            }
-
-            var finish = await _interop.InvokeAsync<BlobCreateResponse>(
-                "createBlobStreamFinish", ct, uploadId).ConfigureAwait(false);
-            if (!finish.TryGetSuccess(out var finishResp))
-            {
-                var msg = finish.IsCanceled
-                    ? "Blob stream finalization was canceled."
-                    : $"[{finish.Error.Error.Kind}] {finish.Error.Error.Message}";
-                throw new IOException("createBlobStreamFinish failed: " + msg);
+                    : $"[{result.Error.Error.Kind}] {result.Error.Error.Message}";
+                throw new IOException("createBlobFromDotNetStream failed: " + msg);
             }
             return new IndexedDbBlobImpl(
                 _interop,
                 _loggerFactory.CreateLogger<IndexedDbBlobImpl>(),
                 _shareRegistry,
-                finishResp.BlobId, contentType, finishResp.Length);
+                resp.BlobId, contentType, resp.Length);
         }
         finally
         {
+            // DotNetStreamReference's `leaveOpen: true` prevents Blazor from
+            // touching the stream lifecycle — we own it. Honor the caller's
+            // request (matching the legacy contract): default `false` means
+            // we dispose the source stream once the upload completes or
+            // throws.
             if (!leaveOpen)
             {
                 await stream.DisposeAsync().ConfigureAwait(false);

@@ -3,25 +3,30 @@ using KnockBox.DndMapper.Services.State.Games.Data;
 namespace KnockBox.DndMapper.Helpers
 {
     /// <summary>
-    /// Filters images for non-host viewers based on fog.
+    /// Filters images for canvas rendering. Two independent rules:
+    /// <list type="bullet">
+    /// <item><c>Hidden</c> images are excluded for everyone — host, players,
+    /// and the display view. The host still manages them via
+    /// <c>HostLayerPanel</c> (the row stays in the list, dimmed), where the
+    /// eye toggle restores visibility.</item>
+    /// <item>Fog visibility only applies to non-hosts: an image is hidden
+    /// from non-hosts when ALL FOUR CORNERS of its axis-aligned bounding box
+    /// fall on fogged cells. If any corner sits on a revealed cell the image
+    /// stays visible — a deliberate "lean toward showing" so partial reveals
+    /// during exploration don't strobe the whole image on and off as the
+    /// host paints adjacent cells. Rotation is approximated via the
+    /// unrotated AABB; heavy rotation is an accepted edge case in v1.</item>
+    /// </list>
     /// </summary>
-    /// <remarks>
-    /// Rule: an image is hidden from non-hosts when ALL FOUR CORNERS of its
-    /// axis-aligned bounding box fall on fogged cells. If any corner sits on a
-    /// revealed cell the image stays visible — a deliberate "lean toward
-    /// showing" so partial reveals during exploration don't strobe the whole
-    /// image on and off as the host paints adjacent cells. Rotation is
-    /// approximated via the unrotated AABB; heavy rotation is an accepted
-    /// edge case in v1.
-    /// </remarks>
     public static class ImageVisibilityFilter
     {
         public static IEnumerable<MapImage> VisibleImagesFor(IEnumerable<MapImage> images, Map map, bool isHost)
         {
             ArgumentNullException.ThrowIfNull(images);
             ArgumentNullException.ThrowIfNull(map);
-            if (isHost) return images;
-            return images.Where(img => !img.Hidden && AnyCornerRevealed(img, map));
+            var notHidden = images.Where(img => !img.Hidden);
+            if (isHost) return notHidden;
+            return notHidden.Where(img => AnyCornerRevealed(img, map));
         }
 
         private static bool AnyCornerRevealed(MapImage img, Map map)

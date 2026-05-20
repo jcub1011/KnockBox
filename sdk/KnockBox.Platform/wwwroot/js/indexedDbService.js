@@ -401,8 +401,9 @@ export function clearStoresAtomic(dbId, storeNames) {
 // Blob lifecycle (create / read / object URL)
 // ---------------------------------------------------------------------------
 
-const blobUploads = new Map();
-
+// Used by the small-payload createBlobFromBytes path for sub-ChunkSize
+// blobs; larger uploads go through createBlobFromDotNetStream which uses
+// native binary framing and skips base64 entirely.
 function decodeBase64(b64) {
     const bin = atob(b64);
     const bytes = new Uint8Array(bin.length);
@@ -410,18 +411,18 @@ function decodeBase64(b64) {
     return bytes;
 }
 
-function encodeBase64(bytes) {
-    let bin = "";
-    for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
-    return btoa(bin);
-}
-
 function registerBlob(blob) {
     const blobId = nextHandleId++;
     handles.set(blobId, {
         obj: blob,
         kind: "blob",
-        extras: { contentType: blob.type, length: blob.size, objectUrl: null, readSnapshot: null },
+        // readBuffer is the materialized in-memory Uint8Array, populated
+        // lazily by openBlobReadStream on first share fetch. Chromium keeps
+        // large IDB-stored Blobs file-backed, so the implicit arrayBuffer()
+        // Blazor would otherwise issue mid-stream can stall on the disk
+        // read — pre-materializing here lets every share fetch read from
+        // RAM and the IJSStreamReference handshake completes immediately.
+        extras: { contentType: blob.type, length: blob.size, objectUrl: null, readBuffer: null },
     });
     return blobId;
 }
@@ -436,73 +437,51 @@ export function createBlobFromBytes(base64, contentType) {
     }
 }
 
-export function createBlobStreamBegin(contentType, length) {
-    const uploadId = nextHandleId++;
-    blobUploads.set(uploadId, { chunks: [], contentType, expectedLength: length, received: 0 });
-    return ok({ uploadId });
-}
-
-export function createBlobStreamAppend(uploadId, base64) {
-    const upload = blobUploads.get(uploadId);
-    if (!upload) {
-        return fail({ kind: "Data", jsName: null, message: `Blob upload ${uploadId} not found.` });
-    }
+// Upload (C# → JS via DotNetStreamReference). Blazor frames the C#-side
+// stream's bytes natively over SignalR; the JS side reads the entire
+// stream into one ArrayBuffer and constructs a Blob — no base64, no per-
+// chunk InvokeAsync loop. Returns the standard {ok, value} envelope so
+// IndexedDbService.CreateBlobAsync's unwrap path still applies.
+export async function createBlobFromDotNetStream(streamRef, contentType, _length) {
     try {
-        const bytes = decodeBase64(base64);
-        upload.chunks.push(bytes);
-        upload.received += bytes.length;
-        return ok();
-    } catch (e) {
-        return fail(mapDomError(e));
-    }
-}
-
-export function createBlobStreamFinish(uploadId) {
-    const upload = blobUploads.get(uploadId);
-    if (!upload) {
-        return fail({ kind: "Data", jsName: null, message: `Blob upload ${uploadId} not found.` });
-    }
-    blobUploads.delete(uploadId);
-    try {
-        const blob = new Blob(upload.chunks, { type: upload.contentType });
+        const buffer = await streamRef.arrayBuffer();
+        const blob = new Blob([buffer], { type: contentType || "application/octet-stream" });
         return ok({ blobId: registerBlob(blob), length: blob.size });
     } catch (e) {
         return fail(mapDomError(e));
     }
 }
 
-export async function blobPrepareRead(blobId) {
-    try {
-        const entry = getHandle(blobId, "blob");
-        if (!entry.extras.readSnapshot) {
-            const buf = await entry.obj.arrayBuffer();
-            entry.extras.readSnapshot = new Uint8Array(buf);
-        }
-        return ok({
-            length: entry.extras.readSnapshot.length,
-            contentType: entry.extras.contentType,
-        });
-    } catch (e) {
-        return fail(mapDomError(e));
+// Download (JS → C# via IJSStreamReference). Returns the blob's bytes as
+// a Uint8Array; Blazor accepts Uint8Array as an IJSStreamReference source
+// and reads from it synchronously over native SignalR binary frames.
+//
+// IMPORTANT: this materialization is eager. Chromium keeps IDB-retrieved
+// Blobs larger than ~64 KB file-backed (the bytes live on disk in the
+// browser's blob storage and only become RAM-resident when .arrayBuffer()
+// is called). If we returned the raw Blob instead, Blazor's stream
+// protocol would issue a .arrayBuffer() AFTER the IJSStreamReference
+// handshake on the C# side, racing the disk read against the
+// `RemoteJSDataStream` "no data received in N seconds" timeout. The
+// observed symptom (large image fetch hangs 60 s on first attempt while
+// a small image fetch in the same load succeeds) is that exact race.
+// Materializing here, BEFORE we return to Blazor's wrapping logic,
+// guarantees the handshake completes and the first chunk leaves
+// immediately.
+//
+// The cached buffer survives until the blob handle is released — so
+// subsequent fetches of the same share token re-read from RAM.
+//
+// NOTE: this export intentionally does NOT use the {ok, value} envelope —
+// Blazor's stream-reference handshake reads the return value as the
+// streamable object itself.
+export async function openBlobReadStream(blobId) {
+    const entry = getHandle(blobId, "blob");
+    if (!entry.extras.readBuffer) {
+        const buf = await entry.obj.arrayBuffer();
+        entry.extras.readBuffer = new Uint8Array(buf);
     }
-}
-
-export function blobReadChunk(blobId, offset, count) {
-    try {
-        const entry = getHandle(blobId, "blob");
-        const snap = entry.extras.readSnapshot;
-        if (!snap) {
-            return fail({
-                kind: "Data", jsName: null,
-                message: "blobPrepareRead must be called before blobReadChunk.",
-            });
-        }
-        const end = Math.min(offset + count, snap.length);
-        const slice = end > offset ? snap.subarray(offset, end) : new Uint8Array(0);
-        return ok({ base64: encodeBase64(slice) });
-    } catch (e) {
-        return fail(mapDomError(e));
-    }
+    return entry.extras.readBuffer;
 }
 
 export function blobCreateObjectUrl(blobId) {

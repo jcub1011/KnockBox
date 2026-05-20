@@ -4,16 +4,19 @@ namespace KnockBox.Platform.Services.Storage.IndexedDb;
 
 /// <summary>
 /// Internal entry held by <see cref="BlobShareRegistry"/>. The
-/// <see cref="Fetcher"/> closure captures the originating
-/// <c>IndexedDbBlobImpl</c> and resolves chunk reads through its existing
-/// JS-interop pipeline.
+/// <see cref="StreamOpener"/> closure captures the originating
+/// <c>IndexedDbBlobImpl</c> and, when invoked, opens a single SignalR-
+/// backed <see cref="Stream"/> over the host's blob via
+/// <c>IJSStreamReference</c>. The endpoint then does one
+/// <c>CopyToAsync</c> into the HTTP response — no per-chunk interop
+/// round-trips, no base64.
 /// </summary>
 internal sealed class BlobShareEntry
 {
     public required Guid Token { get; init; }
     public required string ContentType { get; init; }
     public required long Length { get; init; }
-    public required Func<long, int, CancellationToken, ValueTask<byte[]>> Fetcher { get; init; }
+    public required Func<CancellationToken, ValueTask<Stream>> StreamOpener { get; init; }
     public string? CacheControl { get; init; }
     public DateTimeOffset? AbsoluteExpiresAt { get; init; }
     public TimeSpan? SlidingExpiry { get; init; }
