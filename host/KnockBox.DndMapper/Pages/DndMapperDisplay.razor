@@ -1,5 +1,6 @@
 @page "/room/dnd-mapper/{ObfuscatedRoomCode}/display"
 @using KnockBox.Core.Services.State.Shared
+@using KnockBox.DndMapper.Helpers
 @using KnockBox.DndMapper.Services.State.Games
 @using KnockBox.DndMapper.Services.State.Games.Data
 @inject IGameRoomObserver Observer
@@ -21,15 +22,15 @@
 else
 {
     <div class="dndm-display">
-        @if (_state.ActiveCombat is not null)
+        @if (_projection.ActiveCombat is not null)
         {
             <div class="dndm-display__banner">
-                @if (_state.ActiveCombat.Phase == CombatPhase.Active)
+                @if (_projection.ActiveCombat.Phase == CombatPhase.Active)
                 {
-                    <strong>Round @_state.ActiveCombat.RoundNumber</strong>
-                    @foreach (var (entry, idx) in _state.ActiveCombat.TurnOrder.Select((e, i) => (e, i)))
+                    <strong>Round @_projection.ActiveCombat.RoundNumber</strong>
+                    @foreach (var (entry, idx) in _projection.ActiveCombat.TurnOrder.Select((e, i) => (e, i)))
                     {
-                        <span class="@(idx == _state.ActiveCombat.CurrentTurnIndex ? "dndm-display__turn dndm-display__turn--current" : "dndm-display__turn")">
+                        <span class="@(idx == _projection.ActiveCombat.CurrentTurnIndex ? "dndm-display__turn dndm-display__turn--current" : "dndm-display__turn")">
                             @entry.Name (@entry.InitiativeRoll)
                         </span>
                     }
@@ -37,7 +38,7 @@ else
                 else
                 {
                     <strong>Waiting for initiative rolls…</strong>
-                    @foreach (var entry in _state.ActiveCombat.TurnOrder)
+                    @foreach (var entry in _projection.ActiveCombat.TurnOrder)
                     {
                         <span class="dndm-display__turn">@entry.Name @(entry.InitiativeRoll is null ? "—" : "✓")</span>
                     }
@@ -46,13 +47,13 @@ else
         }
 
         <div class="dndm-display__canvas">
-            @if (_activeMap is not null)
+            @if (_projection.ActiveMap is { } activeMap)
             {
                 <svg xmlns="http://www.w3.org/2000/svg"
-                     viewBox="0 0 @_activeMap.Grid.WidthCells @_activeMap.Grid.HeightCells"
+                     viewBox="0 0 @activeMap.Grid.WidthCells @activeMap.Grid.HeightCells"
                      preserveAspectRatio="xMidYMid meet">
 
-                    @foreach (var img in _activeMap.Images.Where(i => !i.Hidden).OrderBy(i => i.LayerOrder))
+                    @foreach (var img in _projection.VisibleImages)
                     {
                         var url = ResolveImageUrl(img);
                         <image href="@url"
@@ -62,12 +63,12 @@ else
                                transform="rotate(@img.Rotation @(img.X + img.Width / 2) @(img.Y + img.Height / 2))" />
                     }
 
-                    @if (!string.IsNullOrWhiteSpace(_activeMap.MarkupSvg))
+                    @if (!string.IsNullOrWhiteSpace(_projection.MarkupSvg))
                     {
-                        <g class="dndm-display__markup">@((MarkupString)_activeMap.MarkupSvg)</g>
+                        <g class="dndm-display__markup">@((MarkupString)_projection.MarkupSvg)</g>
                     }
 
-                    @foreach (var token in _activeMap.Tokens.Where(t => !t.Hidden))
+                    @foreach (var token in _projection.VisibleTokens)
                     {
                         <g transform="translate(@token.X @token.Y)">
                             <circle cx="0.5" cy="0.5" r="0.4" fill="@token.Color" stroke="#000" stroke-width="0.04" />
@@ -84,12 +85,12 @@ else
             }
         </div>
 
-        @if (_state.Settings.RollsVisibleToPlayers && _state.RollLog.Count > 0)
+        @if (_projection.VisibleRollLog.Count > 0)
         {
             <aside class="dndm-display__rolls">
                 <h2>Rolls</h2>
                 <ul>
-                    @foreach (var roll in _state.RollLog.TakeLast(10).Reverse())
+                    @foreach (var roll in _projection.VisibleRollLog)
                     {
                         <li>
                             <strong>@(string.IsNullOrEmpty(roll.Label) ? "Roll" : roll.Label)</strong>
@@ -110,7 +111,7 @@ else
     [Parameter] public string ObfuscatedRoomCode { get; set; } = string.Empty;
 
     private DndMapperGameState? _state;
-    private Map? _activeMap;
+    private DisplayProjection _projection = new(null, [], [], null, null, []);
     private ObserverAttachment? _attachment;
     private IDisposable? _subscription;
 
@@ -122,20 +123,14 @@ else
         if (attachment.State is not DndMapperGameState dndState) return;
         _state = dndState;
         _subscription = dndState.StateChangedEventManager.Subscribe(OnStateChanged);
-        RefreshActiveMap();
+        _projection = DisplayProjection.Build(dndState);
     }
 
     private async ValueTask OnStateChanged()
     {
-        RefreshActiveMap();
+        if (_state is not null)
+            _projection = DisplayProjection.Build(_state);
         await InvokeAsync(StateHasChanged);
-    }
-
-    private void RefreshActiveMap()
-    {
-        _activeMap = _state?.ActiveMapId is Guid id
-            ? _state.Maps.FirstOrDefault(m => m.Id == id)
-            : null;
     }
 
     private string ResolveImageUrl(MapImage img)

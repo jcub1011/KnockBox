@@ -27,6 +27,7 @@ namespace KnockBox.DndMapper.Pages
         [Inject] protected ILogger<DndMapperPlayingPhase> Logger { get; set; } = default!;
         [Inject] protected DndMapperLibraryService Library { get; set; } = default!;
         [Inject] protected IUserService UserService { get; set; } = default!;
+        [Inject] protected NavigationManager NavigationManager { get; set; } = default!;
 
         private bool _libraryBannerVisible;
         private bool _hydrating;
@@ -51,6 +52,7 @@ namespace KnockBox.DndMapper.Pages
         private IJSObjectReference? _resizeModule;
         private IJSObjectReference? _unloadGuardModule;
         private IJSObjectReference? _collapseModule;
+        private IJSObjectReference? _clipboardModule;
         private DotNetObjectReference<DndMapperPlayingPhase>? _dotNetRef;
         private bool _resizeAttached;
         private bool _isSaving;
@@ -70,6 +72,55 @@ namespace KnockBox.DndMapper.Pages
         private void OnSelectedImageIdChanged(Guid? id) => _selectedImageId = id;
 
         private void TogglePerms() => _permsOpen = !_permsOpen;
+
+        private async Task OnOpenDisplayClicked()
+        {
+            if (!IsHost) return;
+            var url = NavigationManager.ToAbsoluteUri($"room/dnd-mapper/{RoomCode}/display").ToString();
+
+            try
+            {
+                _clipboardModule ??= await JSRuntime.InvokeAsync<IJSObjectReference>(
+                    "import", "./_content/KnockBox.DndMapper/js/dndMapperClipboard.js");
+            }
+            catch (JSDisconnectedException) { /* circuit teardown */ }
+            catch (Exception ex)
+            {
+                Logger.LogWarning(ex, "Failed to import clipboard module.");
+            }
+
+            var copied = false;
+            if (_clipboardModule is not null)
+            {
+                try
+                {
+                    await _clipboardModule.InvokeVoidAsync("copy", url);
+                    copied = true;
+                }
+                catch (JSDisconnectedException) { /* circuit teardown */ return; }
+                catch (Exception)
+                {
+                    // Clipboard API can fail in insecure contexts or when the
+                    // browser denies permission. The new tab still opens, so
+                    // this is a soft failure — fall through to the open call.
+                }
+
+                try
+                {
+                    await _clipboardModule.InvokeVoidAsync("openTab", url);
+                }
+                catch (JSDisconnectedException) { /* circuit teardown */ }
+                catch (Exception ex)
+                {
+                    Logger.LogWarning(ex, "Failed to open display view tab.");
+                }
+            }
+
+            await _toasts.Push(
+                copied ? "Display link copied to clipboard." : "Opening display view…",
+                DndMapperToastTone.Info);
+        }
+
         private void ToggleLeftRail() => _leftCollapsed = !_leftCollapsed;
         private void ToggleRightRail() => _rightCollapsed = !_rightCollapsed;
 
@@ -305,6 +356,12 @@ namespace KnockBox.DndMapper.Pages
                 catch (JSDisconnectedException) { /* circuit teardown */ }
                 catch (Exception) { /* ignore */ }
                 try { await _collapseModule.DisposeAsync(); }
+                catch (JSDisconnectedException) { /* circuit teardown */ }
+                catch (Exception) { /* ignore */ }
+            }
+            if (_clipboardModule is not null)
+            {
+                try { await _clipboardModule.DisposeAsync(); }
                 catch (JSDisconnectedException) { /* circuit teardown */ }
                 catch (Exception) { /* ignore */ }
             }
