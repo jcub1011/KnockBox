@@ -7,6 +7,8 @@ using KnockBox.DndMapper.Models;
 using KnockBox.DndMapper.Services.Logic.Games;
 using KnockBox.DndMapper.Services.State.Games;
 using KnockBox.DndMapper.Services.State.Games.Data;
+using Microsoft.AspNetCore.Components;
+using Microsoft.JSInterop;
 
 namespace KnockBox.DndMapper.Services.Library
 {
@@ -30,8 +32,17 @@ namespace KnockBox.DndMapper.Services.Library
         // scrubbing) into one write per burst.
         private static readonly TimeSpan SaveDebounce = TimeSpan.FromMilliseconds(500);
 
+        // Plugin-owned ES module that decodes natural pixel dimensions from a
+        // blob: URL. Lives in this plugin's wwwroot so the shared adoption API
+        // (IIndexedDatabase.AdoptInputElementFilesAsync) can stay free of
+        // image-specific concerns.
+        private const string ImageDimensionsModulePath =
+            "/_content/KnockBox.DndMapper/js/dndMapperImageDimensions.js";
+
         private readonly IIndexedDbService _indexedDb;
         private readonly DndMapperGameEngine _engine;
+        private readonly IJSRuntime _jsRuntime;
+        private readonly Lazy<Task<IJSObjectReference>> _imageDimsModule;
         private readonly ILogger<DndMapperLibraryService> _logger;
 
         private readonly Dictionary<Guid, IndexedDbBlob> _blobCache = new();
@@ -71,11 +82,15 @@ namespace KnockBox.DndMapper.Services.Library
         public DndMapperLibraryService(
             IIndexedDbService indexedDb,
             DndMapperGameEngine engine,
+            IJSRuntime jsRuntime,
             ILogger<DndMapperLibraryService> logger)
         {
             _indexedDb = indexedDb;
             _engine = engine;
+            _jsRuntime = jsRuntime;
             _logger = logger;
+            _imageDimsModule = new Lazy<Task<IJSObjectReference>>(() =>
+                _jsRuntime.InvokeAsync<IJSObjectReference>("import", ImageDimensionsModulePath).AsTask());
         }
 
         /// <summary>
@@ -370,78 +385,181 @@ namespace KnockBox.DndMapper.Services.Library
         }
 
         /// <summary>
-        /// Uploads a new image. Stores the bytes in IndexedDB on the host's
-        /// browser, publishes a blob-share so other players can fetch it
-        /// through the host's circuit, then asks the engine to record the
-        /// metadata. The blob and the share are cached for the lifetime of
-        /// the circuit so subsequent re-publishes (after reconnect) can reuse
-        /// them without re-reading the bytes.
+        /// One file's outcome from
+        /// <see cref="UploadImagesFromInputElementAsync"/>. Successful
+        /// entries include the assigned <see cref="MapImage"/>; failed
+        /// entries carry a human-readable <see cref="Error"/> describing
+        /// which stage rejected the file (JS type/size filter, image decode,
+        /// IndexedDB put, engine cap, …).
         /// </summary>
-        public async ValueTask<ValueResult<MapImage>> AddImageAsync(
+        public sealed record UploadOutcome(
+            string Filename,
+            MapImage? Image,
+            string? Error);
+
+        /// <summary>
+        /// Pulls every file from the host's <c>&lt;input type="file"&gt;</c>
+        /// element straight into the host's IndexedDB on the JS side (bytes
+        /// never cross the SignalR boundary), then registers each image with
+        /// the engine. Returns one <see cref="UploadOutcome"/> per file in
+        /// selection order; per-file failures are reported on the outcome
+        /// rather than aborting the whole batch.
+        /// </summary>
+        public async ValueTask<ValueResult<IReadOnlyList<UploadOutcome>>>
+            UploadImagesFromInputElementAsync(
+                DndMapperGameState state,
+                User host,
+                Guid mapId,
+                ElementReference inputElement,
+                CancellationToken ct = default)
+        {
+            ThrowIfDisposed();
+            if (_db is null) return ValueResult<IReadOnlyList<UploadOutcome>>.FromError("Library is not attached.");
+            if (state is null) return ValueResult<IReadOnlyList<UploadOutcome>>.FromError("State is required.");
+            if (host is null) return ValueResult<IReadOnlyList<UploadOutcome>>.FromError("Host is required.");
+
+            // Convert pixel dimensions from the JS-side image decode into
+            // cell units. Falls back to 1 if the map has been removed
+            // between the user picking files and this call.
+            int cellPixels = 1;
+            bool mapMissing = false;
+            state.WithExclusiveRead(() =>
+            {
+                var map = state.Maps.FirstOrDefault(m => m.Id == mapId);
+                if (map is null) { mapMissing = true; return; }
+                cellPixels = Math.Max(1, map.Grid.CellPixels);
+            });
+            if (mapMissing) return ValueResult<IReadOnlyList<UploadOutcome>>.FromError("Map not found.");
+
+            var adoptResult = await _db.AdoptInputElementFilesAsync(
+                inputElement,
+                DndMapperLibrarySchema.ImagesStore,
+                new AdoptInputFilesOptions(
+                    AcceptedTypes: DndMapperGameEngine.AllowedImageContentTypeList,
+                    MaxBytes: DndMapperGameEngine.PerFileCapBytes),
+                ct);
+
+            if (adoptResult.IsCanceled) return ValueResult<IReadOnlyList<UploadOutcome>>.FromCancellation();
+            if (!adoptResult.TryGetSuccess(out var adopted))
+            {
+                adoptResult.TryGetFailure(out var aerr);
+                return ValueResult<IReadOnlyList<UploadOutcome>>.FromError(aerr.Message);
+            }
+
+            // Load the plugin-owned dimension decoder once for the batch. If
+            // the module import itself fails, surface that as a batch error
+            // (rather than mis-attributing it to per-file decode failures).
+            IJSObjectReference dimsModule;
+            try { dimsModule = await _imageDimsModule.Value.WaitAsync(ct); }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogError(ex, "Failed to load dndMapperImageDimensions.js.");
+                // Roll back any adopted blobs we won't use.
+                foreach (var item in adopted)
+                {
+                    if (item.Blob is null || item.Key is null) continue;
+                    await SafeDeleteAsync(IndexedDbKey.String(item.Key.Value.ToString("D")));
+                    await SafeDisposeAsync(item.Blob);
+                }
+                return ValueResult<IReadOnlyList<UploadOutcome>>.FromError("Image decoder unavailable.");
+            }
+
+            var outcomes = new List<UploadOutcome>(adopted.Count);
+            foreach (var item in adopted)
+            {
+                if (item.Error is not null || item.Blob is null || item.Key is null)
+                {
+                    outcomes.Add(new UploadOutcome(item.Filename, null, item.Error ?? "adoption failed"));
+                    continue;
+                }
+
+                int pxW, pxH;
+                try
+                {
+                    var url = await item.Blob.CreateObjectUrlAsync(ct);
+                    var dims = await dimsModule.InvokeAsync<ImageDimensionsDto>(
+                        "decodeImageDimensionsFromUrl", ct, url);
+                    pxW = dims.WidthPx;
+                    pxH = dims.HeightPx;
+                }
+                catch (OperationCanceledException) { throw; }
+                catch (Exception ex)
+                {
+                    _logger.LogInformation(ex, "Image dimension decode failed for {File}; rolling back.", item.Filename);
+                    await SafeDeleteAsync(IndexedDbKey.String(item.Key.Value.ToString("D")));
+                    await SafeDisposeAsync(item.Blob);
+                    outcomes.Add(new UploadOutcome(item.Filename, null, "not a decodable image"));
+                    continue;
+                }
+
+                var originalW = pxW > 0 ? pxW / (double)cellPixels : 0;
+                var originalH = pxH > 0 ? pxH / (double)cellPixels : 0;
+
+                var addResult = await AddAdoptedImageAsync(
+                    state, host, mapId, item.Key.Value, item.Blob, originalW, originalH, ct);
+                if (addResult.TryGetSuccess(out var image))
+                    outcomes.Add(new UploadOutcome(item.Filename, image, null));
+                else if (addResult.TryGetFailure(out var err))
+                    outcomes.Add(new UploadOutcome(item.Filename, null, err.PublicMessage));
+                else
+                    outcomes.Add(new UploadOutcome(item.Filename, null, "engine registration failed"));
+            }
+
+            return ValueResult<IReadOnlyList<UploadOutcome>>.FromValue(outcomes);
+        }
+
+        // Mirror of the { widthPx, heightPx } shape returned by
+        // dndMapperImageDimensions.js#decodeImageDimensionsFromUrl. Field
+        // names use the JS casing because Blazor's default JSInterop JSON
+        // options are camelCase-preserving.
+        private sealed record ImageDimensionsDto(int WidthPx, int HeightPx);
+
+        /// <summary>
+        /// Registers an image that the host's browser has already persisted
+        /// into the IndexedDB images store via
+        /// <see cref="IIndexedDatabase.AdoptInputElementFilesAsync"/>. The
+        /// bytes never crossed to the .NET side; this method publishes a
+        /// share, builds the <see cref="MapImage"/> from
+        /// <paramref name="adoptedBlob"/>'s metadata, and registers with the
+        /// engine. On engine rejection the IDB row and the JS-side blob
+        /// handle are rolled back so the slot is clean for retry.
+        /// </summary>
+        public async ValueTask<ValueResult<MapImage>> AddAdoptedImageAsync(
             DndMapperGameState state,
             User host,
             Guid mapId,
-            string contentType,
-            long byteSize,
+            Guid imageId,
+            IndexedDbBlob adoptedBlob,
             double originalWidthCells,
             double originalHeightCells,
-            Stream content,
             CancellationToken ct = default)
         {
             ThrowIfDisposed();
             if (_db is null) return ValueResult<MapImage>.FromError("Library is not attached. Call AttachAsync first.");
             if (state is null) return ValueResult<MapImage>.FromError("State is required.");
             if (host is null) return ValueResult<MapImage>.FromError("Host is required.");
-            if (content is null) return ValueResult<MapImage>.FromError("Image content stream is required.");
-            if (byteSize <= 0) return ValueResult<MapImage>.FromError("Byte size must be positive.");
+            if (adoptedBlob is null) return ValueResult<MapImage>.FromError("Blob handle is required.");
+            if (adoptedBlob.Length <= 0) return ValueResult<MapImage>.FromError("Adopted blob has non-positive length.");
 
-            var imageId = Guid.NewGuid();
-
-            // Step 1: hand the stream to the IndexedDB SDK, which chunks bytes
-            // across SignalR and constructs the JS-side Blob. The SDK takes
-            // ownership of the stream (we pass leaveOpen=false by default).
-            IndexedDbBlob blob;
-            try
-            {
-                blob = await _indexedDb.CreateBlobAsync(content, byteSize, contentType, leaveOpen: false, ct);
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                _logger.LogError(ex, "Failed to create IndexedDB blob for image {ImageId}.", imageId);
-                return ValueResult<MapImage>.FromError("Failed to buffer image into IndexedDB.");
-            }
-
-            // Step 2: persist the blob into the images store.
             var key = IndexedDbKey.String(imageId.ToString("D"));
-            var putResult = await _db.BlobPutSingleAsync(DndMapperLibrarySchema.ImagesStore, blob, key, ct);
-            if (!putResult.IsSuccess)
-            {
-                putResult.TryGetFailure(out var perr);
-                _logger.LogError("Failed to persist image {ImageId} to IndexedDB: {Error}", imageId, perr.Message);
-                await SafeDisposeAsync(blob);
-                return ValueResult<MapImage>.FromError($"Failed to persist image: {perr.Message}");
-            }
 
-            // Step 3: publish a blob-share so player circuits can fetch the bytes.
             IBlobShare share;
             try
             {
-                share = await blob.PublishForSharingAsync(options: null, ct);
+                share = await adoptedBlob.PublishForSharingAsync(options: null, ct);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 _logger.LogError(ex, "Failed to publish blob share for image {ImageId}.", imageId);
                 await SafeDeleteAsync(key);
-                await SafeDisposeAsync(blob);
+                await SafeDisposeAsync(adoptedBlob);
                 return ValueResult<MapImage>.FromError("Failed to publish image share.");
             }
 
-            // Step 4: register with the engine. If the engine rejects (cap race,
-            // unknown map id), roll back the blob, share, and stored row.
             var image = new MapImage
             {
                 Id = imageId,
-                ContentType = contentType,
+                ContentType = adoptedBlob.ContentType,
                 ShareToken = share.Token,
                 X = 0,
                 Y = 0,
@@ -453,7 +571,7 @@ namespace KnockBox.DndMapper.Services.Library
                 Opacity = 1.0,
                 LayerOrder = 0, // engine overwrites
                 Locked = false,
-                ByteSize = byteSize,
+                ByteSize = adoptedBlob.Length,
             };
 
             var addResult = _engine.AddImageAsync(state, host, mapId, image);
@@ -462,11 +580,11 @@ namespace KnockBox.DndMapper.Services.Library
                 _logger.LogInformation("Engine rejected image {ImageId}; rolling back blob.", imageId);
                 await SafeDisposeAsync(share);
                 await SafeDeleteAsync(key);
-                await SafeDisposeAsync(blob);
+                await SafeDisposeAsync(adoptedBlob);
                 return addResult;
             }
 
-            await ReplaceCacheEntryAsync(imageId, blob, share);
+            await ReplaceCacheEntryAsync(imageId, adoptedBlob, share);
             return ValueResult<MapImage>.FromValue(added);
         }
 

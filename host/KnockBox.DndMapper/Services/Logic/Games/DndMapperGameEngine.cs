@@ -22,15 +22,12 @@ namespace KnockBox.DndMapper.Services.Logic.Games
         // and the server only tracks metadata + the published share token. The caps still
         // enforce a 100 MB-per-file / 1 GB-per-room budget on what's *referenced* by state
         // so a misbehaving caller can't balloon AbstractGameState.
-        private const long PerFileCapBytes = 100L * 1024 * 1024;
+        internal const long PerFileCapBytes = 100L * 1024 * 1024;
         private const long PerRoomCapBytes = 1024L * 1024 * 1024;
 
-        private static readonly HashSet<string> AllowedImageContentTypes = new(StringComparer.OrdinalIgnoreCase)
-        {
-            "image/png",
-            "image/jpeg",
-            "image/webp",
-        };
+        internal static readonly IReadOnlyList<string> AllowedImageContentTypeList =
+            ["image/png", "image/jpeg", "image/webp"];
+        private static readonly HashSet<string> AllowedImageContentTypes = new(AllowedImageContentTypeList, StringComparer.OrdinalIgnoreCase);
 
         private readonly ILogger<DndMapperGameEngine> _logger;
         private readonly ILogger<DndMapperGameState> _stateLogger;

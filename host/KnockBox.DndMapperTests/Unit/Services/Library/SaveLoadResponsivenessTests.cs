@@ -34,7 +34,7 @@ namespace KnockBox.DndMapperTests.Unit.Services.Library
             // land in state with the same contents.
             var (engine, state, host, _) = EngineTestFactory.Build();
             var db = new FakeIndexedDbService();
-            await using var library = new DndMapperLibraryService(db, engine, NullLogger<DndMapperLibraryService>.Instance);
+            await using var library = new DndMapperLibraryService(db, engine, NullJsRuntime.Instance, NullLogger<DndMapperLibraryService>.Instance);
             Assert.IsTrue((await library.AttachAsync(state, host)).IsSuccess);
 
             // Two maps, fog on the first.
@@ -67,7 +67,7 @@ namespace KnockBox.DndMapperTests.Unit.Services.Library
 
             // Fresh state on the other end so the load actually has to rebuild.
             var (engine2, state2, host2, _) = EngineTestFactory.Build();
-            await using var library2 = new DndMapperLibraryService(db, engine2, NullLogger<DndMapperLibraryService>.Instance);
+            await using var library2 = new DndMapperLibraryService(db, engine2, NullJsRuntime.Instance, NullLogger<DndMapperLibraryService>.Instance);
             Assert.IsTrue((await library2.AttachAsync(state2, host2)).IsSuccess);
             Assert.IsTrue((await library2.LoadSlotAsync(slotId)).IsSuccess);
 
@@ -103,7 +103,7 @@ namespace KnockBox.DndMapperTests.Unit.Services.Library
             // branch of the template overlay loop inside Execute.
             var (engine, state, host, _) = EngineTestFactory.Build();
             var db = new FakeIndexedDbService();
-            await using var library = new DndMapperLibraryService(db, engine, NullLogger<DndMapperLibraryService>.Instance);
+            await using var library = new DndMapperLibraryService(db, engine, NullJsRuntime.Instance, NullLogger<DndMapperLibraryService>.Instance);
             Assert.IsTrue((await library.AttachAsync(state, host)).IsSuccess);
 
             var customSchema = new AttributeSchema(
@@ -124,7 +124,7 @@ namespace KnockBox.DndMapperTests.Unit.Services.Library
             Assert.IsTrue(create.TryGetSuccess(out var slotId));
 
             var (engine2, state2, host2, _) = EngineTestFactory.Build();
-            await using var library2 = new DndMapperLibraryService(db, engine2, NullLogger<DndMapperLibraryService>.Instance);
+            await using var library2 = new DndMapperLibraryService(db, engine2, NullJsRuntime.Instance, NullLogger<DndMapperLibraryService>.Instance);
             Assert.IsTrue((await library2.AttachAsync(state2, host2)).IsSuccess);
             Assert.IsTrue((await library2.LoadSlotAsync(slotId)).IsSuccess);
 
@@ -148,7 +148,7 @@ namespace KnockBox.DndMapperTests.Unit.Services.Library
             var (engine, state, host, _) = EngineTestFactory.Build();
             var db = new FakeIndexedDbService();
             var logger = new CapturingLogger<DndMapperLibraryService>();
-            await using var library = new DndMapperLibraryService(db, engine, logger);
+            await using var library = new DndMapperLibraryService(db, engine, NullJsRuntime.Instance, logger);
             Assert.IsTrue((await library.AttachAsync(state, host)).IsSuccess);
 
             var mapA = Guid.NewGuid();
@@ -222,7 +222,7 @@ namespace KnockBox.DndMapperTests.Unit.Services.Library
             // didn't lose anything in the offload.
             var (engine, state, host, _) = EngineTestFactory.Build();
             var db = new FakeIndexedDbService();
-            await using var library = new DndMapperLibraryService(db, engine, NullLogger<DndMapperLibraryService>.Instance);
+            await using var library = new DndMapperLibraryService(db, engine, NullJsRuntime.Instance, NullLogger<DndMapperLibraryService>.Instance);
             Assert.IsTrue((await library.AttachAsync(state, host)).IsSuccess);
 
             Assert.IsTrue(engine.CreateMapAsync(state, host, "Arena").TryGetSuccess(out var arenaId));
@@ -239,7 +239,7 @@ namespace KnockBox.DndMapperTests.Unit.Services.Library
             Assert.IsTrue((await library.SaveToSlotAsync(slotId)).IsSuccess);
 
             var (engine2, state2, host2, _) = EngineTestFactory.Build();
-            await using var library2 = new DndMapperLibraryService(db, engine2, NullLogger<DndMapperLibraryService>.Instance);
+            await using var library2 = new DndMapperLibraryService(db, engine2, NullJsRuntime.Instance, NullLogger<DndMapperLibraryService>.Instance);
             Assert.IsTrue((await library2.AttachAsync(state2, host2)).IsSuccess);
             Assert.IsTrue((await library2.LoadSlotAsync(slotId)).IsSuccess);
 

@@ -1,6 +1,8 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using KnockBox.Core.Primitives.Returns;
 using KnockBox.Core.Services.Storage.IndexedDb;
+using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Logging;
 using Microsoft.JSInterop;
 
@@ -151,6 +153,83 @@ internal sealed class IndexedDatabase : IIndexedDatabase
             "clearStoresAtomic", ct, _dbId, storeNames.ToArray())
             .ConfigureAwait(false);
     }
+
+    public async ValueTask<ValueResult<IReadOnlyList<AdoptedInputFile>, IndexedDbError>>
+        AdoptInputElementFilesAsync(
+            ElementReference inputElement,
+            string storeName,
+            AdoptInputFilesOptions options,
+            CancellationToken ct = default)
+    {
+        var jsOptions = new
+        {
+            acceptedTypes = options.AcceptedTypes,
+            maxBytes = options.MaxBytes,
+        };
+
+        var raw = await _interop.InvokeRawAsync(
+            "adoptInputElementFiles", ct, inputElement, _dbId, storeName, jsOptions)
+            .ConfigureAwait(false);
+        if (raw.IsCanceled)
+            return ValueResult<IReadOnlyList<AdoptedInputFile>, IndexedDbError>.Canceled;
+        if (!raw.TryGetSuccess(out var element))
+            return raw.Error.Error;
+
+        AdoptInputFilesPayload? payload;
+        try
+        {
+            payload = element.Deserialize<AdoptInputFilesPayload>(IndexedDbWireFormat.DefaultJsonOptions);
+        }
+        catch (JsonException ex)
+        {
+            return new IndexedDbError(IndexedDbErrorKind.Data,
+                $"Failed to parse adoptInputElementFiles result: {ex.Message}");
+        }
+        if (payload?.Items is null)
+        {
+            return new IndexedDbError(IndexedDbErrorKind.Data,
+                "adoptInputElementFiles returned no items array.");
+        }
+
+        var results = new List<AdoptedInputFile>(payload.Items.Count);
+        foreach (var item in payload.Items)
+        {
+            IndexedDbBlob? blob = null;
+            Guid? key = null;
+            if (item.Error is null && item.BlobId is int blobId && Guid.TryParse(item.Key, out var parsed))
+            {
+                key = parsed;
+                blob = new IndexedDbBlobImpl(
+                    _interop,
+                    _loggerFactory.CreateLogger<IndexedDbBlobImpl>(),
+                    _shareRegistry,
+                    blobId,
+                    item.ContentType ?? "application/octet-stream",
+                    item.Length);
+            }
+            results.Add(new AdoptedInputFile(
+                Filename: item.Filename ?? string.Empty,
+                ContentType: item.ContentType ?? string.Empty,
+                Length: item.Length,
+                Key: key,
+                Blob: blob,
+                Error: item.Error));
+        }
+        return ValueResult<IReadOnlyList<AdoptedInputFile>, IndexedDbError>.FromValue(results);
+    }
+
+    // Mirror of the JS envelope for adoptInputElementFiles. Per-file outcome
+    // carries either (BlobId + Key) on success or (Error) on failure.
+    private sealed record AdoptInputFilesPayload(
+        [property: JsonPropertyName("items")] List<AdoptInputFileItem> Items);
+
+    private sealed record AdoptInputFileItem(
+        [property: JsonPropertyName("filename")] string? Filename,
+        [property: JsonPropertyName("contentType")] string? ContentType,
+        [property: JsonPropertyName("length")] long Length,
+        [property: JsonPropertyName("key")] string? Key,
+        [property: JsonPropertyName("blobId")] int? BlobId,
+        [property: JsonPropertyName("error")] string? Error);
 
     internal async ValueTask RaiseVersionChangeRequestedAsync()
     {

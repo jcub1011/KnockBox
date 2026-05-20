@@ -427,6 +427,116 @@ function registerBlob(blob) {
     return blobId;
 }
 
+// Iterates the File entries inside an <input type="file"> element, persists
+// each one into IndexedDB under a freshly generated UUID key, and registers
+// a JS-side blob handle pointing to that File. The bytes NEVER cross the
+// SignalR boundary — the .NET side only sees the metadata in the returned
+// envelope. Per-file failures (type/size rejected, IDB put failed) are
+// reported as an `error` string on that entry rather than aborting the
+// whole batch, so the caller can summarize them per file.
+//
+// Strictly storage-layer: this function does not decode the bytes (image
+// dimensions, audio duration, page count, …). Callers that need format-
+// specific metadata should compose against the returned blob handle via
+// IndexedDbBlob.CreateObjectUrlAsync / OpenReadAsync in their own JS.
+//
+// options: { acceptedTypes?: string[], maxBytes?: number }
+export async function adoptInputElementFiles(inputElement, dbId, storeName, options) {
+    if (!inputElement || !inputElement.files) {
+        return fail({
+            kind: "Data",
+            jsName: null,
+            message: "inputElement is not an <input type=file> with a files collection.",
+        });
+    }
+
+    let db;
+    try { db = getHandle(dbId, "db").obj; }
+    catch (e) { return fail(mapDomError(e)); }
+
+    const acceptedTypes = options?.acceptedTypes || null;
+    const maxBytes = options?.maxBytes ?? Number.MAX_SAFE_INTEGER;
+
+    const files = Array.from(inputElement.files);
+    const items = [];
+    for (const file of files) {
+        const entry = { filename: file.name, contentType: file.type, length: file.size };
+
+        if (acceptedTypes && !acceptedTypes.includes(file.type)) {
+            entry.error = "type rejected";
+            items.push(entry);
+            continue;
+        }
+        if (file.size <= 0) {
+            entry.error = "empty file";
+            items.push(entry);
+            continue;
+        }
+        if (file.size > maxBytes) {
+            entry.error = `exceeds ${maxBytes} bytes`;
+            items.push(entry);
+            continue;
+        }
+
+        const key = generateUuid();
+        try {
+            await putBlobUnderKey(db, storeName, file, key);
+        } catch (e) {
+            entry.error = `indexeddb put failed: ${e?.message || e}`;
+            items.push(entry);
+            continue;
+        }
+
+        entry.key = key;
+        entry.blobId = registerBlob(file);
+        items.push(entry);
+    }
+
+    // Clear the input so the user can re-pick the same file later. Some user
+    // agents make .value read-only outside a user gesture; swallow that.
+    try { inputElement.value = ""; } catch (_) { /* ignore */ }
+
+    return ok({ items });
+}
+
+// One IDB transaction per file — mirrors singleOpBlobPut's contract so the
+// transaction's active-flag stays inside the synchronous request handler
+// (the IDB v3 reset rule that the comment at the top of this file calls
+// out applies here too).
+function putBlobUnderKey(db, storeName, blob, key) {
+    return new Promise((resolve, reject) => {
+        let tx;
+        try { tx = db.transaction([storeName], "readwrite"); }
+        catch (e) { reject(e); return; }
+        try {
+            const req = tx.objectStore(storeName).put(blob, key);
+            req.onerror = () => { /* surfaced via tx.onerror */ };
+        } catch (e) {
+            try { tx.abort(); } catch (_) { /* ignore */ }
+            reject(e);
+            return;
+        }
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+        tx.onabort = () => reject(tx.error || new Error("transaction aborted"));
+    });
+}
+
+// crypto.randomUUID is available on secure contexts (https/localhost). The
+// fallback synthesizes a v4 UUID from getRandomValues so dev-over-http
+// scenarios still produce stable, parseable Guids on the .NET side.
+function generateUuid() {
+    if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+        return crypto.randomUUID();
+    }
+    const buf = new Uint8Array(16);
+    crypto.getRandomValues(buf);
+    buf[6] = (buf[6] & 0x0f) | 0x40;
+    buf[8] = (buf[8] & 0x3f) | 0x80;
+    const hex = Array.from(buf, b => b.toString(16).padStart(2, "0"));
+    return `${hex.slice(0,4).join("")}-${hex.slice(4,6).join("")}-${hex.slice(6,8).join("")}-${hex.slice(8,10).join("")}-${hex.slice(10,16).join("")}`;
+}
+
 export function createBlobFromBytes(base64, contentType) {
     try {
         const bytes = decodeBase64(base64);

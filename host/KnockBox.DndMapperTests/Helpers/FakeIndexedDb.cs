@@ -1,5 +1,6 @@
 using KnockBox.Core.Primitives.Returns;
 using KnockBox.Core.Services.Storage.IndexedDb;
+using Microsoft.AspNetCore.Components;
 
 namespace KnockBox.DndMapperTests.Helpers
 {
@@ -174,6 +175,26 @@ namespace KnockBox.DndMapperTests.Helpers
             }
             return ValueTask.FromResult(Result<IndexedDbError>.Success);
         }
+
+        // The upload flow that calls this is exercised by browser-driven E2E
+        // tests, not unit tests; no test currently in this project drives a
+        // simulated file input. If a future test needs it, override by
+        // assigning AdoptInputElementFilesHandler before invocation.
+        public Func<ElementReference, string, AdoptInputFilesOptions, CancellationToken,
+            ValueTask<ValueResult<IReadOnlyList<AdoptedInputFile>, IndexedDbError>>>?
+            AdoptInputElementFilesHandler { get; set; }
+
+        public ValueTask<ValueResult<IReadOnlyList<AdoptedInputFile>, IndexedDbError>>
+            AdoptInputElementFilesAsync(
+                ElementReference inputElement,
+                string storeName,
+                AdoptInputFilesOptions options,
+                CancellationToken ct = default)
+            => AdoptInputElementFilesHandler is not null
+                ? AdoptInputElementFilesHandler(inputElement, storeName, options, ct)
+                : ValueTask.FromResult(ValueResult<IReadOnlyList<AdoptedInputFile>, IndexedDbError>.FromError(
+                    new IndexedDbError(IndexedDbErrorKind.NotSupported,
+                        "FakeIndexedDatabase has no AdoptInputElementFilesHandler set.")));
 
         private static string KeyString(IndexedDbKey key)
         {

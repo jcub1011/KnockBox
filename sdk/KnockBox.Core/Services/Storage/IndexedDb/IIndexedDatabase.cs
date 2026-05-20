@@ -1,4 +1,5 @@
 using KnockBox.Core.Primitives.Returns;
+using Microsoft.AspNetCore.Components;
 
 namespace KnockBox.Core.Services.Storage.IndexedDb
 {
@@ -57,5 +58,24 @@ namespace KnockBox.Core.Services.Storage.IndexedDb
         /// <summary>Clears the named stores in a single atomic readwrite transaction.</summary>
         ValueTask<Result<IndexedDbError>> ClearStoresAsync(
             IReadOnlyList<string> storeNames, CancellationToken ct = default);
+
+        /// <summary>
+        /// Iterates the files inside an <c>&lt;input type="file"&gt;</c>
+        /// element entirely on the JS side and persists each one into
+        /// <paramref name="storeName"/> under a freshly generated GUID key.
+        /// The bytes never cross the SignalR boundary — the .NET side only
+        /// receives metadata plus a JS-side blob handle per file. Returns
+        /// one entry per file in the input's selection order; per-file
+        /// failures (type rejected, decode failed, IDB put failed) are
+        /// reported as <see cref="AdoptedInputFile.Error"/> rather than
+        /// aborting the batch. Successful entries' <see cref="IndexedDbBlob"/>
+        /// handles must be disposed by the caller.
+        /// </summary>
+        ValueTask<ValueResult<IReadOnlyList<AdoptedInputFile>, IndexedDbError>>
+            AdoptInputElementFilesAsync(
+                ElementReference inputElement,
+                string storeName,
+                AdoptInputFilesOptions options,
+                CancellationToken ct = default);
     }
 }

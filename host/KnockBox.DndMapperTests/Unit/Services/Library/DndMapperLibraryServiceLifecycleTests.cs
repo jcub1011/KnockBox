@@ -58,9 +58,7 @@ namespace KnockBox.DndMapperTests.Unit.Services.Library
             var (engine, _, _, _) = EngineTestFactory.Build();
             var indexedDb = new Mock<IIndexedDbService>(MockBehavior.Strict).Object;
             return new DndMapperLibraryService(
-                indexedDb,
-                engine,
-                NullLogger<DndMapperLibraryService>.Instance);
+                indexedDb, engine, NullJsRuntime.Instance, NullLogger<DndMapperLibraryService>.Instance);
         }
     }
 }
