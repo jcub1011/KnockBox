@@ -158,24 +158,19 @@
             </g>
         }
 
-        @* Fog overlay. Rendered between markup and tokens so tokens visually
-           sit on top of fog for the host, and player rendering uses the same
-           geometry with opaque fill so the layers behind it are hidden. *@
-        @if (Map.FogMask.Length > 0)
+        @* Fog overlay. One SVG path per render covers every contiguous fogged
+           cluster (with holes resolved via fill-rule="evenodd") so adjacent
+           cells render gap-free and the whole region can be styled as one
+           element. Rendered between markup and tokens so tokens visually sit
+           on top of fog for the host. *@
+        @{
+            var fogPath = FogPolygonBuilder.BuildSvgPathData(Map);
+        }
+        @if (!string.IsNullOrEmpty(fogPath))
         {
             var fogOpacity = IsHost ? "0.45" : "1";
             <g class="@(IsHost ? "dndm-fog dndm-fog--host" : "dndm-fog dndm-fog--player")" pointer-events="none">
-                @for (int cy = 0; cy < Map.Grid.HeightCells; cy++)
-                {
-                    for (int cx = 0; cx < Map.Grid.WidthCells; cx++)
-                    {
-                        if (Map.IsFogged(cx, cy))
-                        {
-                            <rect x="@cx" y="@cy" width="1" height="1"
-                                  fill="#000" fill-opacity="@fogOpacity" />
-                        }
-                    }
-                }
+                <path d="@fogPath" fill="#000" fill-opacity="@fogOpacity" fill-rule="evenodd" />
             </g>
         }
 

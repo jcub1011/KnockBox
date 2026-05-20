@@ -179,7 +179,7 @@ namespace KnockBox.DndMapperTests.Unit.Helpers
         }
 
         [TestMethod]
-        public void DisplayProjection_FoggedCellsPopulated()
+        public void DisplayProjection_FogPathDataPopulated()
         {
             var state = MakeState();
             var map = Make();
@@ -191,14 +191,12 @@ namespace KnockBox.DndMapperTests.Unit.Helpers
 
             var projection = DisplayProjection.Build(state);
 
-            Assert.HasCount(3, projection.FoggedCells);
-            Assert.IsTrue(projection.FoggedCells.Contains((0, 0)));
-            Assert.IsTrue(projection.FoggedCells.Contains((1, 0)));
-            Assert.IsTrue(projection.FoggedCells.Contains((0, 1)));
+            Assert.AreEqual(FogPolygonBuilder.BuildSvgPathData(map), projection.FogPathData);
+            Assert.IsFalse(string.IsNullOrEmpty(projection.FogPathData));
         }
 
         [TestMethod]
-        public void DisplayProjection_NoFog_FoggedCellsEmpty()
+        public void DisplayProjection_NoFog_FogPathDataEmpty()
         {
             var state = MakeState();
             var map = Make();
@@ -207,7 +205,7 @@ namespace KnockBox.DndMapperTests.Unit.Helpers
 
             var projection = DisplayProjection.Build(state);
 
-            Assert.IsEmpty(projection.FoggedCells);
+            Assert.IsTrue(string.IsNullOrEmpty(projection.FogPathData));
         }
 
         private static DndMapperGameState MakeState()

@@ -82,13 +82,10 @@ else
                         <g class="dndm-display__markup">@((MarkupString)_projection.MarkupSvg)</g>
                     }
 
-                    @if (_projection.FoggedCells.Count > 0)
+                    @if (!string.IsNullOrEmpty(_projection.FogPathData))
                     {
                         <g class="dndm-display__fog">
-                            @foreach (var (cx, cy) in _projection.FoggedCells)
-                            {
-                                <rect x="@cx" y="@cy" width="1" height="1" fill="#000" />
-                            }
+                            <path d="@_projection.FogPathData" fill="#000" fill-rule="evenodd" />
                         </g>
                     }
 
@@ -135,7 +132,7 @@ else
     [Parameter] public string ObfuscatedRoomCode { get; set; } = string.Empty;
 
     private DndMapperGameState? _state;
-    private DisplayProjection _projection = new(null, [], [], null, null, [], []);
+    private DisplayProjection _projection = new(null, [], [], null, null, [], string.Empty);
     private ObserverAttachment? _attachment;
     private IDisposable? _subscription;
 
