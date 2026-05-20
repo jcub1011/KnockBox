@@ -73,15 +73,21 @@
        viewBox (e.g. images placed past the map edge) render past the
        SVG element box; the parent .dndm-canvas-stage clips at the
        visible window with overflow:hidden. *@
+    @* Image drag/resize/rotate is owned by the dndMapperImageDrag JS module
+       (mousedown on a [data-image-id] picker or [data-image-handle] handle,
+       moves on the SVG element, commit at mouseup via OnImageDragEnd).
+       The SVG's @@onmousemove / @@onmouseup are NOT attached — Blazor Server
+       would round-trip each pointer event over SignalR, which is the
+       original lag/artifact source with large images. Focus-box drag has
+       its own conditional overlay below that wires mousemove/up only while
+       a focus rectangle is being drawn. Pan is owned by dndMapperViewport.js
+       on the canvas-stage. *@
     <svg id="@_svgId"
          class="dndm-map-canvas"
          viewBox="@($"0 0 {Map.Grid.WidthCells} {Map.Grid.HeightCells}")"
          preserveAspectRatio="xMidYMid meet"
          overflow="visible"
          @onmousedown="OnSvgMouseDown"
-         @onmousemove="OnSvgMouseMove"
-         @onmouseup="OnSvgMouseUp"
-         @onmouseleave="OnSvgMouseUp"
          xmlns="http://www.w3.org/2000/svg">
 
         <rect x="0" y="0"
@@ -92,21 +98,16 @@
         {
             @foreach (var img in GetVisibleImagesCached())
             {
-                var draft = (IsHost && _drag is { ImageId: var dId } && dId == img.Id) ? _drag : null;
-                var x = draft?.X ?? img.X;
-                var y = draft?.Y ?? img.Y;
-                var w = draft?.W ?? img.Width;
-                var h = draft?.H ?? img.Height;
-                var rot = draft?.Rot ?? img.Rotation;
-                var cx = x + w / 2;
-                var cy = y + h / 2;
+                var cx = img.X + img.Width / 2;
+                var cy = img.Y + img.Height / 2;
                 @if (img.ShareToken is Guid shareToken)
                 {
                     <image @key="img.Id"
+                           data-image-rendered-id="@img.Id"
                            href="@($"/blob-share/{shareToken:D}")"
-                           x="@F(x)" y="@F(y)"
-                           width="@F(w)" height="@F(h)"
-                           transform="@($"rotate({F(rot)} {F(cx)} {F(cy)})")"
+                           x="@F(img.X)" y="@F(img.Y)"
+                           width="@F(img.Width)" height="@F(img.Height)"
+                           transform="@($"rotate({F(img.Rotation)} {F(cx)} {F(cy)})")"
                            opacity="@F(img.Opacity)"
                            preserveAspectRatio="none"
                            pointer-events="none" />
@@ -118,9 +119,10 @@
                     // host's reconnect republish path will broadcast a fresh token
                     // via UpdateImageShareTokenAsync and the <image> swaps back in.
                     <rect @key="img.Id"
-                          x="@F(x)" y="@F(y)"
-                          width="@F(w)" height="@F(h)"
-                          transform="@($"rotate({F(rot)} {F(cx)} {F(cy)})")"
+                          data-image-rendered-id="@img.Id"
+                          x="@F(img.X)" y="@F(img.Y)"
+                          width="@F(img.Width)" height="@F(img.Height)"
+                          transform="@($"rotate({F(img.Rotation)} {F(cx)} {F(cy)})")"
                           fill="#1c2128" stroke="#3d444c" stroke-width="0.04" stroke-dasharray="0.2,0.1"
                           opacity="@F(Math.Min(img.Opacity, 0.6))"
                           pointer-events="none" />
@@ -137,7 +139,15 @@
                         var pickerEvents = (img.Locked || _spaceHeld) ? "none" : "all";
                         var cx = img.X + img.Width / 2;
                         var cy = img.Y + img.Height / 2;
+                        // data-image-id is the hit-test root for dndMapperImageDrag; the
+                        // module reads the picker's x/y/width/height during a body drag.
+                        @* Blazor handles selection (one round-trip per click).
+                           dndMapperImageDrag.js handles the per-frame drag visual.
+                           stopPropagation blocks the SVG's @@onmousedown (focus-box /
+                           fog-paint entry points) from firing under the picker. *@
                         <rect @key="@($"pick-{img.Id}")"
+                              data-image-id="@img.Id"
+                              data-image-picker-id="@img.Id"
                               x="@F(img.X)" y="@F(img.Y)"
                               width="@F(img.Width)" height="@F(img.Height)"
                               transform="@($"rotate({F(img.Rotation)} {F(cx)} {F(cy)})")"
@@ -145,7 +155,7 @@
                               stroke="@(SelectedImageId == img.Id ? "#e8b849" : "transparent")"
                               stroke-width="0.04"
                               pointer-events="@pickerEvents"
-                              @onmousedown="@(e => OnImageMouseDown(e, img))"
+                              @onmousedown="@(e => OnPickerMouseDown(e, img))"
                               @onmousedown:stopPropagation="true" />
                     }
                 </g>
@@ -222,6 +232,16 @@
                   width="@F(fpw)" height="@F(fph)"
                   fill="none" stroke="#e11d48" stroke-width="0.12" stroke-dasharray="0.4,0.25"
                   pointer-events="none" />
+            @* Overlay that captures mousemove/up only while a focus-box drag is in
+               progress. Keeping these handlers on the SVG full-time would fire a
+               SignalR round-trip per mousemove anywhere on the canvas. *@
+            <rect x="0" y="0"
+                  width="@Map.Grid.WidthCells" height="@Map.Grid.HeightCells"
+                  fill="transparent"
+                  pointer-events="all"
+                  @onmousemove="OnSvgMouseMove"
+                  @onmouseup="OnSvgMouseUp"
+                  @onmouseleave="OnSvgMouseUp" />
         }
 
         <TokenLayer State="State"
@@ -232,38 +252,47 @@
 
         @if (IsHost && SelectedImage is { Locked: false, Hidden: false } sel)
         {
-            var s = (_drag is { ImageId: var did } && did == sel.Id) ? _drag : null;
-            var sx = s?.X ?? sel.X;
-            var sy = s?.Y ?? sel.Y;
-            var sw = s?.W ?? sel.Width;
-            var sh = s?.H ?? sel.Height;
-            var sr = s?.Rot ?? sel.Rotation;
+            var sx = sel.X;
+            var sy = sel.Y;
+            var sw = sel.Width;
+            var sh = sel.Height;
+            var sr = sel.Rotation;
             var hSize = 0.25; // cells
+            // dndMapperImageDrag owns handle pointerdown — see the [data-image-handle]
+            // attributes below. The JS module re-paints each handle's x/y per frame
+            // during a resize/rotate and only invokes .NET on mouseup.
+            // @@onmousedown stopPropagation (with a no-op handler so Blazor binds the
+            // modifier) blocks the SVG's @@onmousedown from also firing when a handle
+            // is grabbed — otherwise focus-box / fog-paint modes would steal the click.
             <g class="dndm-image-handles" pointer-events="all">
-                <g transform="@($"rotate({F(sr)} {F(sx + sw / 2)} {F(sy + sh / 2)})")">
-                    <rect x="@F(sx - hSize / 2)" y="@F(sy - hSize / 2)"
+                <g data-image-handles-rotate="@sel.Id"
+                   data-image-id="@sel.Id"
+                   transform="@($"rotate({F(sr)} {F(sx + sw / 2)} {F(sy + sh / 2)})")">
+                    <rect data-image-id="@sel.Id" data-image-handle="nw" data-handle-role="nw"
+                          x="@F(sx - hSize / 2)" y="@F(sy - hSize / 2)"
                           width="@F(hSize)" height="@F(hSize)" class="dndm-image-handle"
-                          @onmousedown="@(e => OnHandleMouseDown(e, sel, HandleKind.NW))"
-                          @onmousedown:stopPropagation="true" />
-                    <rect x="@F(sx + sw - hSize / 2)" y="@F(sy - hSize / 2)"
+                          @onmousedown="OnHandleMouseDown" @onmousedown:stopPropagation="true" />
+                    <rect data-image-id="@sel.Id" data-image-handle="ne" data-handle-role="ne"
+                          x="@F(sx + sw - hSize / 2)" y="@F(sy - hSize / 2)"
                           width="@F(hSize)" height="@F(hSize)" class="dndm-image-handle"
-                          @onmousedown="@(e => OnHandleMouseDown(e, sel, HandleKind.NE))"
-                          @onmousedown:stopPropagation="true" />
-                    <rect x="@F(sx - hSize / 2)" y="@F(sy + sh - hSize / 2)"
+                          @onmousedown="OnHandleMouseDown" @onmousedown:stopPropagation="true" />
+                    <rect data-image-id="@sel.Id" data-image-handle="sw" data-handle-role="sw"
+                          x="@F(sx - hSize / 2)" y="@F(sy + sh - hSize / 2)"
                           width="@F(hSize)" height="@F(hSize)" class="dndm-image-handle"
-                          @onmousedown="@(e => OnHandleMouseDown(e, sel, HandleKind.SW))"
-                          @onmousedown:stopPropagation="true" />
-                    <rect x="@F(sx + sw - hSize / 2)" y="@F(sy + sh - hSize / 2)"
+                          @onmousedown="OnHandleMouseDown" @onmousedown:stopPropagation="true" />
+                    <rect data-image-id="@sel.Id" data-image-handle="se" data-handle-role="se"
+                          x="@F(sx + sw - hSize / 2)" y="@F(sy + sh - hSize / 2)"
                           width="@F(hSize)" height="@F(hSize)" class="dndm-image-handle"
-                          @onmousedown="@(e => OnHandleMouseDown(e, sel, HandleKind.SE))"
-                          @onmousedown:stopPropagation="true" />
-                    <line x1="@F(sx + sw / 2)" y1="@F(sy)"
+                          @onmousedown="OnHandleMouseDown" @onmousedown:stopPropagation="true" />
+                    <line data-handle-role="rotline"
+                          x1="@F(sx + sw / 2)" y1="@F(sy)"
                           x2="@F(sx + sw / 2)" y2="@F(sy - 0.6)"
-                          class="dndm-image-rotline" />
-                    <circle cx="@F(sx + sw / 2)" cy="@F(sy - 0.6)" r="@F(hSize / 1.5)"
+                          class="dndm-image-rotline"
+                          pointer-events="none" />
+                    <circle data-image-id="@sel.Id" data-image-handle="rot" data-handle-role="rotcircle"
+                            cx="@F(sx + sw / 2)" cy="@F(sy - 0.6)" r="@F(hSize / 1.5)"
                             class="dndm-image-handle dndm-image-handle--rot"
-                            @onmousedown="@(e => OnHandleMouseDown(e, sel, HandleKind.Rotate))"
-                            @onmousedown:stopPropagation="true" />
+                            @onmousedown="OnHandleMouseDown" @onmousedown:stopPropagation="true" />
                 </g>
             </g>
         }

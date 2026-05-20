@@ -49,7 +49,16 @@ export function getViewportMetrics(svgId) {
     if (!svg) return null;
     const root = svg.closest('.dnd-mapper-playing');
     if (!root) return null;
+    // Temporarily clear the SVG's CSS transform so getBoundingClientRect
+    // returns the layout box, not the currently-zoomed/panned visual box.
+    // Without this, ResetView reads a shrunk size on each successive press
+    // and computes fitZoom against an already-zoomed-out SVG → it keeps
+    // zooming further out each call. Matches measureBasePxPerCell's
+    // approach in dndMapperViewport.js.
+    const prevTransform = svg.style.transform;
+    if (prevTransform) svg.style.transform = '';
     const svgRect = svg.getBoundingClientRect();
+    if (prevTransform) svg.style.transform = prevTransform;
     const leftEl = root.querySelector('.dndm-rail--left');
     const rightEl = root.querySelector('.dndm-rail--right');
     const leftPx = leftEl ? leftEl.getBoundingClientRect().width : 0;

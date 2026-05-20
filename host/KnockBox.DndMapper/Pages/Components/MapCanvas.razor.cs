@@ -47,8 +47,6 @@ namespace KnockBox.DndMapper.Pages.Components
         private double _zoom = 1.0;
 
         private bool _spaceHeld;
-        private bool _shiftHeld;
-        private bool _ctrlHeld;
 
         private bool LocalShowGridLines { get; set; } = true;
         private bool _gridInitialized;
@@ -62,6 +60,11 @@ namespace KnockBox.DndMapper.Pages.Components
         private DotNetObjectReference<MapCanvas>? _fogPaintRef;
         private IJSObjectReference? _viewportModule;
         private DotNetObjectReference<MapCanvas>? _viewportRef;
+        private IJSObjectReference? _imageDragModule;
+        private DotNetObjectReference<MapCanvas>? _imageDragRef;
+        // Tracks which image set + lock states were last pushed to the JS drag
+        // module so we don't re-marshal on every render. Key = (id, locked).
+        private int _imageDragSnapshotVersion = -1;
         private string _currentJsMode = "none";
         // Tracks (map id, grid dims) so we re-push when the map is swapped
         // or its grid is resized.
@@ -74,20 +77,19 @@ namespace KnockBox.DndMapper.Pages.Components
         private List<MapImage>? _cachedVisibleImages;
         private bool _cachedIsHost;
 
-        // ── Image transform drag state ───────────────────────────────────
+        // ── Image transform drag (commit-side) ──────────────────────────
+        // Per-frame visual updates live in dndMapperImageDrag.js. C# only
+        // sees the start + end of the drag via OnImageDragEnd, builds a
+        // DragState, runs SnapDragToGrid, and calls UpdateImageTransformAsync.
         internal enum HandleKind { Body, NW, NE, SW, SE, Rotate }
 
         internal sealed class DragState
         {
             public Guid ImageId;
             public HandleKind Kind;
-            public double StartClientX;
-            public double StartClientY;
             public double OrigX, OrigY, OrigW, OrigH, OrigRot;
             public double X, Y, W, H, Rot;
         }
-
-        private DragState? _drag;
 
         private MapImage? SelectedImage =>
             SelectedImageId is Guid id ? Map.Images.FirstOrDefault(i => i.Id == id) : null;
@@ -475,6 +477,35 @@ namespace KnockBox.DndMapper.Pages.Components
                 {
                     Logger.LogWarning(ex, "Failed to load viewport JS module.");
                 }
+
+                if (IsHost)
+                {
+                    try
+                    {
+                        _imageDragModule = await JSRuntime.InvokeAsync<IJSObjectReference>(
+                            "import", "./_content/KnockBox.DndMapper/js/dndMapperImageDrag.js");
+                        _imageDragRef = DotNetObjectReference.Create(this);
+                        var payload = Map.Images
+                            .Select(i => new { imageId = i.Id.ToString(), locked = i.Locked })
+                            .ToArray();
+                        await _imageDragModule.InvokeVoidAsync(
+                            "initialize", _svgId, _imageDragRef, payload);
+                        // Seed the snapshot version so PushImagesToJs() skips the
+                        // first redundant marshal.
+                        int v = 17;
+                        foreach (var img in Map.Images)
+                        {
+                            v = v * 31 + img.Id.GetHashCode();
+                            v = v * 31 + (img.Locked ? 1 : 0);
+                        }
+                        _imageDragSnapshotVersion = v;
+                    }
+                    catch (JSDisconnectedException) { /* circuit teardown */ }
+                    catch (Exception ex)
+                    {
+                        Logger.LogWarning(ex, "Failed to load image-drag JS module.");
+                    }
+                }
             }
             else if (_viewportModule is not null && Map is not null)
             {
@@ -488,6 +519,7 @@ namespace KnockBox.DndMapper.Pages.Components
                     _lastBoundsSent = current;
                     await PushJsBounds();
                 }
+                if (IsHost) await PushImagesToJs();
             }
             await base.OnAfterRenderAsync(firstRender);
         }
@@ -540,6 +572,17 @@ namespace KnockBox.DndMapper.Pages.Components
             }
             _viewportRef?.Dispose();
             _viewportRef = null;
+            if (_imageDragModule is not null)
+            {
+                try { await _imageDragModule.InvokeVoidAsync("dispose", _svgId); }
+                catch (JSDisconnectedException) { /* circuit teardown */ }
+                catch (Exception) { /* ignore */ }
+                try { await _imageDragModule.DisposeAsync(); }
+                catch (JSDisconnectedException) { /* circuit teardown */ }
+                _imageDragModule = null;
+            }
+            _imageDragRef?.Dispose();
+            _imageDragRef = null;
             Dispose();
         }
 
@@ -700,15 +743,11 @@ namespace KnockBox.DndMapper.Pages.Components
         private void OnKeyDown(KeyboardEventArgs e)
         {
             if (e.Key == " " || e.Code == "Space") _spaceHeld = true;
-            if (e.Key == "Shift") _shiftHeld = true;
-            if (e.Key == "Control") _ctrlHeld = true;
         }
 
         private void OnKeyUp(KeyboardEventArgs e)
         {
             if (e.Key == " " || e.Code == "Space") _spaceHeld = false;
-            if (e.Key == "Shift") _shiftHeld = false;
-            if (e.Key == "Control") _ctrlHeld = false;
         }
 
         private async ValueTask<(double X, double Y)?> ClientToSvgPointAsync(double clientX, double clientY)
@@ -805,6 +844,9 @@ namespace KnockBox.DndMapper.Pages.Components
 
         private async Task OnSvgMouseMove(MouseEventArgs e)
         {
+            // Only attached to the focus-box overlay rect, which is itself
+            // rendered conditionally on _focusActive + an in-flight focus drag.
+            // Image drag is owned by the dndMapperImageDrag JS module.
             if (_focusDragStart is not null)
             {
                 var pt = await ClientToSvgPointAsync(e.ClientX, e.ClientY);
@@ -813,20 +855,10 @@ namespace KnockBox.DndMapper.Pages.Components
                     _focusDragCurrent = p;
                     StateHasChanged();
                 }
-                return;
             }
-
-            if (_drag is { } d)
-            {
-                var (cdx, cdy) = ClientDeltaToCells(e.ClientX - d.StartClientX, e.ClientY - d.StartClientY);
-                ApplyDragDelta(d, cdx, cdy, _shiftHeld);
-                StateHasChanged();
-            }
-
-            await Task.CompletedTask;
         }
 
-        private async Task OnSvgMouseUp(MouseEventArgs e)
+        private Task OnSvgMouseUp(MouseEventArgs e)
         {
             // Focus-box finalize: commit the drag as a focus rect (or drop if too small).
             if (_focusDragStart is { } start && _focusDragCurrent is { } cur)
@@ -841,178 +873,17 @@ namespace KnockBox.DndMapper.Pages.Components
                         Logger.LogDebug("SetFocusRect rejected: {Error}", err.PublicMessage);
                 }
                 StateHasChanged();
-                return;
             }
-
-            if (_drag is { } d)
-            {
-                if (UserService.CurrentUser is not null)
-                {
-                    SnapDragToGrid(d);
-                    var w = Math.Max(0.1, d.W);
-                    var h = Math.Max(0.1, d.H);
-                    var op = SelectedImage?.Opacity ?? 1.0;
-                    Engine.UpdateImageTransformAsync(
-                        State, UserService.CurrentUser, Map.Id, d.ImageId,
-                        d.X, d.Y, w, h, d.Rot, op);
-                }
-                _drag = null;
-                StateHasChanged();
-            }
-
-            // Invalidate the cached scale so the next gesture re-measures (handles
-            // window resize / layout shifts between gestures).
-            _pxPerCell = 0;
-            await Task.CompletedTask;
+            return Task.CompletedTask;
         }
 
-        private (double dx, double dy) ClientDeltaToCells(double pxDx, double pxDy)
-        {
-            double pxPerCell = ActualPxPerCell();
-            return (pxDx / pxPerCell, pxDy / pxPerCell);
-        }
-
-        // Real on-screen scale captured from getScreenCTM at gesture start; if that
-        // hasn't run yet (or JS interop failed) fall back to the configured CellPixels
-        // adjusted for the current zoom — which matches the old behavior.
-        private double ActualPxPerCell() =>
-            _pxPerCell > 0 ? _pxPerCell : Math.Max(1, Map.Grid.CellPixels * _zoom);
-
-        private async Task OnImageMouseDown(MouseEventArgs e, MapImage img)
-        {
-            // Picker rect stopPropagation swallows mousedown for any button, so the SVG
-            // pan handler never sees a middle-click landing on an image. Start the pan
-            // directly here instead.
-            if (e.Button == MiddleMouseButton)
-            {
-                if (_viewportModule is not null)
-                {
-                    try { await _viewportModule.InvokeVoidAsync("forceBeginPan", _svgId, e.ClientX, e.ClientY, e.Button); }
-                    catch (JSDisconnectedException) { /* circuit teardown */ }
-                    catch (Exception ex) { Logger.LogWarning(ex, "viewport.forceBeginPan failed."); }
-                }
-                return;
-            }
-            if (!IsHost || e.Button != LeftMouseButton) return;
-            // Space-held pan takes precedence — let the SVG handler pan instead.
-            if (_spaceHeld) return;
-            // Locked images do not select or drag; the event bubbles to the SVG which
-            // will start a pan in OnSvgMouseDown.
-            if (img.Locked) return;
-            if (SelectedImageId != img.Id)
-            {
-                await SelectedImageIdChanged.InvokeAsync(img.Id);
-            }
-            _drag = NewDrag(e, img, HandleKind.Body);
-            await CaptureScaleAsync();
-        }
-
-        private async Task OnHandleMouseDown(MouseEventArgs e, MapImage img, HandleKind kind)
-        {
-            if (e.Button == MiddleMouseButton)
-            {
-                if (_viewportModule is not null)
-                {
-                    try { await _viewportModule.InvokeVoidAsync("forceBeginPan", _svgId, e.ClientX, e.ClientY, e.Button); }
-                    catch (JSDisconnectedException) { /* circuit teardown */ }
-                    catch (Exception ex) { Logger.LogWarning(ex, "viewport.forceBeginPan failed."); }
-                }
-                return;
-            }
-            if (!IsHost || e.Button != LeftMouseButton) return;
-            if (img.Locked) return;
-            _drag = NewDrag(e, img, kind);
-            await CaptureScaleAsync();
-        }
-
-        private static DragState NewDrag(MouseEventArgs e, MapImage img, HandleKind kind) => new()
-        {
-            ImageId = img.Id,
-            Kind = kind,
-            StartClientX = e.ClientX,
-            StartClientY = e.ClientY,
-            OrigX = img.X,
-            OrigY = img.Y,
-            OrigW = img.Width,
-            OrigH = img.Height,
-            OrigRot = img.Rotation,
-            X = img.X,
-            Y = img.Y,
-            W = img.Width,
-            H = img.Height,
-            Rot = img.Rotation,
-        };
-
-        private static void ApplyDragDelta(DragState d, double dx, double dy, bool freeAspect)
-        {
-            switch (d.Kind)
-            {
-                case HandleKind.Body:
-                    d.X = d.OrigX + dx;
-                    d.Y = d.OrigY + dy;
-                    break;
-                case HandleKind.NW:
-                case HandleKind.NE:
-                case HandleKind.SW:
-                case HandleKind.SE:
-                    ApplyResize(d, dx, dy, freeAspect);
-                    break;
-                case HandleKind.Rotate:
-                    // Rotate handle starts above the image center; treat the start
-                    // direction as -Y and derive a relative angle from the cursor delta.
-                    double startAngle = Math.Atan2(-1, 0);
-                    double currentAngle = Math.Atan2(-1 + dy, dx);
-                    double deg = (currentAngle - startAngle) * 180.0 / Math.PI;
-                    d.Rot = (d.OrigRot + deg) % 360.0;
-                    break;
-            }
-        }
-
-        internal static void ApplyResize(DragState d, double dx, double dy, bool freeAspect)
-        {
-            // Direction signs: which corner is being dragged relative to the image origin (NW).
-            // east = true for NE/SE (drag column = right edge); south = true for SW/SE.
-            bool east = d.Kind is HandleKind.NE or HandleKind.SE;
-            bool south = d.Kind is HandleKind.SW or HandleKind.SE;
-
-            // Raw new dimensions, free-form.
-            double rawW = east ? d.OrigW + dx : d.OrigW - dx;
-            double rawH = south ? d.OrigH + dy : d.OrigH - dy;
-
-            double minDim = 0.1;
-            rawW = Math.Max(minDim, rawW);
-            rawH = Math.Max(minDim, rawH);
-
-            double newW = rawW;
-            double newH = rawH;
-
-            if (!freeAspect && d.OrigW > 0 && d.OrigH > 0)
-            {
-                // Aspect-locked: drive both axes from whichever scale moved further from 1.0.
-                // Using Math.Max would bias toward growth — if the user shrinks one axis while
-                // the other is near-unchanged, the unchanged axis (scale ≈ 1) would win and
-                // the image would grow instead of shrink.
-                double scaleW = rawW / d.OrigW;
-                double scaleH = rawH / d.OrigH;
-                double scale = Math.Abs(scaleW - 1.0) >= Math.Abs(scaleH - 1.0) ? scaleW : scaleH;
-                newW = Math.Max(minDim, d.OrigW * scale);
-                newH = Math.Max(minDim, d.OrigH * scale);
-            }
-
-            d.W = newW;
-            d.H = newH;
-            // Reposition anchored corner so the opposite corner (the fixed one) stays put.
-            d.X = east ? d.OrigX : d.OrigX + (d.OrigW - newW);
-            d.Y = south ? d.OrigY : d.OrigY + (d.OrigH - newH);
-        }
-
-        private void SnapDragToGrid(DragState d)
+        private void SnapDragToGrid(DragState d, bool snapBypass)
         {
             if (!Map.Grid.SnapToGrid) return;
             if (d.Kind == HandleKind.Rotate) return;
             // Hold Ctrl to bypass grid snap for this single move/resize (acts like
             // Shift for free aspect ratio — a temporary modifier, not persistent state).
-            if (_ctrlHeld) return;
+            if (snapBypass) return;
 
             if (d.Kind == HandleKind.Body)
             {
@@ -1042,6 +913,149 @@ namespace KnockBox.DndMapper.Pages.Components
             d.Y = newY;
             d.W = newW;
             d.H = newH;
+        }
+
+        // ── JS-owned image drag (dndMapperImageDrag.js) ─────────────────────
+        //
+        // The JS module owns per-frame visual updates during body/resize/rotate
+        // drag. It calls back into .NET only at drag-end so the engine can run
+        // snap + UpdateImageTransformAsync inside the state Execute lock.
+        //
+        // The previous Blazor-server pattern (@onmousemove on the SVG with a
+        // _drag draft + StateHasChanged() per move) round-tripped every pointer
+        // event over SignalR and re-rendered the entire SVG, which caused
+        // visible blocky artifacting and lag with large bitmap images.
+
+        // Picker mousedown handles selection (left) and middle-click pan
+        // forwarding. The stopPropagation modifier on the rect keeps the
+        // SVG's @onmousedown (focus-box / fog-paint entry) from firing under
+        // an image click, but it also stops the viewport JS module's pan
+        // listener from seeing middle-click — so we forward to it manually.
+        private async Task OnPickerMouseDown(MouseEventArgs e, MapImage img)
+        {
+            if (e.Button == MiddleMouseButton)
+            {
+                await ForceBeginPanAsync(e);
+                return;
+            }
+            if (!IsHost || e.Button != LeftMouseButton || img.Locked) return;
+            if (SelectedImageId != img.Id)
+                await SelectedImageIdChanged.InvokeAsync(img.Id);
+        }
+
+        // Handles only need to swallow middle-click → pan forwarding and
+        // block the SVG's @onmousedown via the stopPropagation modifier; the
+        // JS module owns the actual resize/rotate drag.
+        private async Task OnHandleMouseDown(MouseEventArgs e)
+        {
+            if (e.Button == MiddleMouseButton) await ForceBeginPanAsync(e);
+        }
+
+        private async Task ForceBeginPanAsync(MouseEventArgs e)
+        {
+            if (_viewportModule is null) return;
+            try { await _viewportModule.InvokeVoidAsync("forceBeginPan", _svgId, e.ClientX, e.ClientY, e.Button); }
+            catch (JSDisconnectedException) { /* circuit teardown */ }
+            catch (Exception ex) { Logger.LogWarning(ex, "viewport.forceBeginPan failed."); }
+        }
+
+        [JSInvokable]
+        public Task OnImageDragEnd(
+            Guid imageId, string kind,
+            double origX, double origY, double origW, double origH, double origRot,
+            double newX, double newY, double newW, double newH, double newRot,
+            bool snapBypass, bool freeAspect)
+        {
+            if (!IsHost || UserService.CurrentUser is null) return Task.CompletedTask;
+            var image = Map.Images.FirstOrDefault(i => i.Id == imageId);
+            if (image is null || image.Locked) return Task.CompletedTask;
+
+            var handleKind = ParseHandleKind(kind);
+            var drag = new DragState
+            {
+                ImageId = imageId,
+                Kind = handleKind,
+                OrigX = origX, OrigY = origY, OrigW = origW, OrigH = origH, OrigRot = origRot,
+                X = newX, Y = newY, W = newW, H = newH, Rot = newRot,
+            };
+
+            SnapDragToGrid(drag, snapBypass);
+
+            var w = Math.Max(0.1, drag.W);
+            var h = Math.Max(0.1, drag.H);
+            var op = image.Opacity;
+
+            var result = Engine.UpdateImageTransformAsync(
+                State, UserService.CurrentUser, Map.Id, imageId,
+                drag.X, drag.Y, w, h, drag.Rot, op);
+
+            if (result.TryGetFailure(out var err))
+            {
+                Logger.LogWarning("UpdateImageTransformAsync rejected: {Error}", err.PublicMessage);
+                // Revert the JS preview to canonical so the user sees the rejected
+                // state instead of a stale drag-end position.
+                _ = ReconcileImageJs(image);
+            }
+            else
+            {
+                // Snap may have landed on canonical-equal values (Blazor diff skips
+                // the DOM write); push the authoritative transform back to JS so
+                // the preview snaps to the snapped position rather than the
+                // unsnapped drag-end position.
+                _ = ReconcileImageJs(imageId, drag.X, drag.Y, w, h, drag.Rot);
+            }
+
+            return Task.CompletedTask;
+        }
+
+        private static HandleKind ParseHandleKind(string kind) => kind switch
+        {
+            "nw" => HandleKind.NW,
+            "ne" => HandleKind.NE,
+            "sw" => HandleKind.SW,
+            "se" => HandleKind.SE,
+            "rot" => HandleKind.Rotate,
+            _ => HandleKind.Body,
+        };
+
+        private async ValueTask PushImagesToJs()
+        {
+            if (_imageDragModule is null) return;
+            // Hash the (id, locked) tuple set so we don't marshal a payload every
+            // render. Membership/lock changes flip the version; pure transform
+            // changes don't (the JS module reads transforms off the DOM).
+            int v = 17;
+            foreach (var img in Map.Images)
+            {
+                v = v * 31 + img.Id.GetHashCode();
+                v = v * 31 + (img.Locked ? 1 : 0);
+            }
+            if (v == _imageDragSnapshotVersion) return;
+            _imageDragSnapshotVersion = v;
+
+            var payload = Map.Images
+                .Select(i => new { imageId = i.Id.ToString(), locked = i.Locked })
+                .ToArray();
+            try { await _imageDragModule.InvokeVoidAsync("setImages", _svgId, payload); }
+            catch (JSDisconnectedException) { /* circuit teardown */ }
+            catch (Exception ex) { Logger.LogWarning(ex, "imageDrag.setImages failed."); }
+        }
+
+        private async ValueTask ReconcileImageJs(MapImage image)
+        {
+            await ReconcileImageJs(image.Id, image.X, image.Y, image.Width, image.Height, image.Rotation);
+        }
+
+        private async ValueTask ReconcileImageJs(Guid imageId, double x, double y, double w, double h, double rot)
+        {
+            if (_imageDragModule is null) return;
+            try
+            {
+                await _imageDragModule.InvokeVoidAsync(
+                    "reconcileImage", _svgId, imageId.ToString(), x, y, w, h, rot);
+            }
+            catch (JSDisconnectedException) { /* circuit teardown */ }
+            catch (Exception ex) { Logger.LogWarning(ex, "imageDrag.reconcileImage failed."); }
         }
     }
 }
