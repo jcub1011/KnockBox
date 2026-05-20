@@ -20,10 +20,10 @@ namespace KnockBox.DndMapper.Services.Logic.Games
 
         // Image caps — bytes never reach the server now; host's IndexedDB owns the blobs
         // and the server only tracks metadata + the published share token. The caps still
-        // enforce a 5 MB-per-file / 10 MB-per-room budget on what's *referenced* by state
+        // enforce a 100 MB-per-file / 1 GB-per-room budget on what's *referenced* by state
         // so a misbehaving caller can't balloon AbstractGameState.
-        private const long PerFileCapBytes = 5L * 1024 * 1024;
-        private const long PerRoomCapBytes = 10L * 1024 * 1024;
+        private const long PerFileCapBytes = 100L * 1024 * 1024;
+        private const long PerRoomCapBytes = 1024L * 1024 * 1024;
 
         private static readonly HashSet<string> AllowedImageContentTypes = new(StringComparer.OrdinalIgnoreCase)
         {
@@ -2104,7 +2104,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
         /// <summary>
         /// Adds a host-uploaded image to a map. Pure-metadata: the bytes live in the
         /// host's IndexedDB and are reachable via <see cref="MapImage.ShareToken"/>.
-        /// Validates content-type, per-file cap, and 10 MB room cap under the same lock
+        /// Validates content-type, per-file cap, and 1 GB room cap under the same lock
         /// that mutates state so two concurrent uploads can't both pass the cap check.
         /// </summary>
         public ValueResult<MapImage> AddImageAsync(DndMapperGameState state, User caller, Guid mapId, MapImage image)
@@ -2114,7 +2114,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             if (image is null) return ValueResult<MapImage>.FromError("Image is required.");
             if (!IsHost(state, caller)) return ValueResult<MapImage>.FromError("Only the host may add images.");
             if (image.ByteSize <= 0) return ValueResult<MapImage>.FromError("Image byte size must be positive.");
-            if (image.ByteSize > PerFileCapBytes) return ValueResult<MapImage>.FromError("Image exceeds 5 MB per-file cap.");
+            if (image.ByteSize > PerFileCapBytes) return ValueResult<MapImage>.FromError("Image exceeds 100 MB per-file cap.");
             if (string.IsNullOrWhiteSpace(image.ContentType)
                 || !AllowedImageContentTypes.Contains(image.ContentType))
                 return ValueResult<MapImage>.FromError("Only PNG, JPEG, and WebP images are accepted.");
@@ -2127,7 +2127,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
 
                 if (state.BytesUsed + image.ByteSize > PerRoomCapBytes)
                 {
-                    error = "Room exceeds 10 MB total image cap.";
+                    error = "Room exceeds 1 GB total image cap.";
                     return;
                 }
 

@@ -43,7 +43,7 @@ namespace KnockBox.DndMapper.Services.State.Games
         public CenterViewportRequest? PendingCenterRequest { get; private set; }
 
         // Running total of bytes consumed by uploaded images on this state. Used to
-        // enforce the per-room 10 MB cap. Mutated only by image verbs inside Execute.
+        // enforce the per-room 1 GB cap. Mutated only by image verbs inside Execute.
         public long BytesUsed { get; private set; }
 
         // Deterministic IDs so library snapshots that reference built-ins by

@@ -64,8 +64,10 @@ namespace KnockBox.DndMapperTests.Unit.Services.Library
                 Assert.IsTrue(listed.TryGetSuccess(out var slots));
                 Assert.Contains(s => s.Id == slotId && s.Name == "Campaign A" && s.Kind == SlotKind.Manual, slots);
 
-                Assert.IsTrue(db.JsonStores[DndMapperLibrarySchema.LibraryStore].ContainsKey(slotId),
-                    "Snapshot must be written under the slot's id.");
+                Assert.IsTrue(db.JsonStores[DndMapperLibrarySchema.LibraryStore].ContainsKey($"{slotId}:core"),
+                    "v4 core shard must be written under {slotId}:core.");
+                Assert.IsFalse(db.JsonStores[DndMapperLibrarySchema.LibraryStore].ContainsKey(slotId),
+                    "Legacy v3 single-record key must not be written by manual save paths.");
             }
             finally { await library.DisposeAsync(); }
         }

@@ -40,6 +40,23 @@ namespace KnockBox.DndMapper.Services.Library
         /// <summary>Per-image blob bytes, keyed by <c>MapImage.Id.ToString()</c>.</summary>
         public const string ImagesStore = "images";
 
+        // ── v4 sharded-slot key layout (inside LibraryStore) ──────────────
+        // Each slot is split into:
+        //   {slotId}:core             → LibraryCoreSnapshot (small spine)
+        //   {slotId}:map:{mapId}      → MapSnapshot (incl. fog mask + tokens)
+        //   {slotId}:sheet:{sheetId}  → SheetSnapshot
+        // The bare {slotId} key is the v3 legacy form, retained only as a
+        // migration source for LoadSlotAsync.
+
+        public static IndexedDbKey CoreKey(string slotId) =>
+            IndexedDbKey.String($"{slotId}:core");
+
+        public static IndexedDbKey MapKey(string slotId, Guid mapId) =>
+            IndexedDbKey.String($"{slotId}:map:{mapId:D}");
+
+        public static IndexedDbKey SheetKey(string slotId, Guid sheetId) =>
+            IndexedDbKey.String($"{slotId}:sheet:{sheetId:D}");
+
         private static readonly IReadOnlyList<DeclaredStore> DeclaredStores =
         [
             new(LibraryStore, DeclaredStoreKind.Json),

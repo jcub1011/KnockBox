@@ -6,7 +6,7 @@
 @if (Compact)
 {
     <label class="dndm-upload-compact @(_disabled ? "dndm-upload-compact--disabled" : null)"
-           title="Upload one or more images (PNG · JPEG · WebP · ≤ 5 MB each)">
+           title="Upload one or more images (PNG · JPEG · WebP · ≤ 100 MB each)">
         @if (_uploading) { <span>@($"{_batchDone}/{_batchTotal}")</span> } else { <span>+ Image</span> }
         <InputFile OnChange="OnFileSelected"
                    accept="image/png,image/jpeg,image/webp"
@@ -27,7 +27,7 @@ else
                 <span>+ Upload Images</span>
             }
         </span>
-        <span class="dndm-upload-hint">PNG · JPEG · WebP · ≤ 5 MB each</span>
+        <span class="dndm-upload-hint">PNG · JPEG · WebP · ≤ 100 MB each</span>
         <InputFile OnChange="OnFileSelected"
                    accept="image/png,image/jpeg,image/webp"
                    multiple

@@ -11,7 +11,7 @@ namespace KnockBox.DndMapper.Pages.Components
 {
     public partial class ImageUploadButton : DisposableComponent
     {
-        private const long MaxImageBytes = 5L * 1024 * 1024;
+        private const long MaxImageBytes = 100L * 1024 * 1024;
         private const int MaxBatchFiles = 20;
         // Mirror of DndMapperGameEngine.SniffHeadLength: large enough to MIME-sniff
         // the magic bytes and locate JPEG SOF markers past EXIF metadata.
@@ -94,7 +94,7 @@ namespace KnockBox.DndMapper.Pages.Components
 
         private async Task<string?> UploadSingleAsync(IBrowserFile file, Guid mapId)
         {
-            if (file.Size > MaxImageBytes) return "exceeds 5 MB";
+            if (file.Size > MaxImageBytes) return "exceeds 100 MB";
             if (UserService.CurrentUser is null) return "no user";
 
             // Lazy-attach so smoke testing works without the parent page wiring

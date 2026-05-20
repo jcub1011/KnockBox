@@ -1,11 +1,11 @@
 .dndm-toast-stack {
     position: fixed;
-    top: 1rem;
+    top: calc(64px + 1rem);
     right: 1rem;
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
-    z-index: 80;
+    z-index: 200;
     pointer-events: none;
     max-width: min(420px, calc(100vw - 2rem));
 }

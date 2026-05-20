@@ -6,8 +6,16 @@
     align-items: center;
     justify-content: space-between;
     padding: 0 24px;
+    width: 100%;
     height: 64px;
-    flex: 1;
+    min-height: 64px;
+    max-height: 64px;
+    /* `flex: none` keeps the explicit 64px lock honored when the header sits
+       inside either a flex-row parent (platform MainLayout `<header>`) or a
+       flex-column parent (DnD Mapper display view). Without this, `flex: 1`
+       in a column context made the header grow to absorb half the canvas
+       space. */
+    flex: none;
     color: var(--dndm-text);
     font-family: var(--font-primary);
     border-bottom: 1px solid var(--dndm-border);

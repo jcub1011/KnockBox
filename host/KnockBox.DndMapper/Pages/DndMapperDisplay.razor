@@ -1,5 +1,6 @@
 @page "/room/dnd-mapper/{ObfuscatedRoomCode}/display"
 @using KnockBox.Core.Services.State.Shared
+@using KnockBox.DndMapper.Components
 @using KnockBox.DndMapper.Helpers
 @using KnockBox.DndMapper.Services.State.Games
 @using KnockBox.DndMapper.Services.State.Games.Data
@@ -9,12 +10,14 @@
 <PageTitle>DnD Mapper — Display</PageTitle>
 
 <HeadContent>
+    <link href="_content/KnockBox.DndMapper/css/panels.css" rel="stylesheet" />
     <link href="_content/KnockBox.DndMapper/KnockBox.DndMapper.styles.css" rel="stylesheet" />
 </HeadContent>
 
 @if (_state is null)
 {
     <div class="dndm-display dndm-display--error">
+        <DndMapperHeader ShowActions="false" />
         <h1>Room not found</h1>
         <p>The room code <code>@ObfuscatedRoomCode</code> is not active.</p>
     </div>
@@ -22,6 +25,7 @@
 else
 {
     <div class="dndm-display">
+        <DndMapperHeader ShowActions="false" />
         @if (_projection.ActiveCombat is not null)
         {
             <div class="dndm-display__banner">

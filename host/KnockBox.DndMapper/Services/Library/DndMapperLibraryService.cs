@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text.Json;
 using KnockBox.Core.Primitives.Returns;
 using KnockBox.Core.Services.State.Users;
 using KnockBox.Core.Services.Storage.IndexedDb;
@@ -52,6 +54,19 @@ namespace KnockBox.DndMapper.Services.Library
         // FlushSnapshotAsync re-arms the debounce timer after release so the
         // last burst of edits doesn't get lost when no further events fire.
         private int _pendingDirty;
+
+        // Per-shard SHA-256 of the last serialized JSON for the Auto Save slot,
+        // keyed by IDB compound key (e.g., "__auto__:core", "__auto__:map:{g}",
+        // "__auto__:sheet:{g}"). FlushSnapshotAsync compares against this and
+        // only writes shards whose hash differs, then refreshes the cache.
+        // Cleared on Attach/Detach; not used for manual-slot ops (those always
+        // write every shard).
+        private readonly Dictionary<string, byte[]> _autoFlushHashes = new();
+
+        // Slot ids whose v3 → v4 single-record migration has been probed in
+        // this attachment. LoadSlotAsync consults this to avoid reissuing the
+        // legacy-key read on every refresh of the saves panel.
+        private readonly HashSet<string> _migratedSlots = new();
 
         public DndMapperLibraryService(
             IIndexedDbService indexedDb,
@@ -487,16 +502,20 @@ namespace KnockBox.DndMapper.Services.Library
             // a half-built snapshot back over the one we're loading.
             _saveTimer?.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
 
-            // 1. Read snapshot from the requested slot.
-            var snapKey = IndexedDbKey.String(slotId);
-            var readResult = await _db.JsonGetSingleAsync<LibrarySnapshot>(
-                DndMapperLibrarySchema.LibraryStore, snapKey, ct);
+            // 1. Try the v4 sharded layout first: read {slotId}:core, then
+            //    fan out map and sheet shards from the spine.
+            var (snapshot, _, shardHashes) = await ReadShardedSlotAsync(_db, slotId, ct);
 
-            if (!readResult.TryGetSuccess(out var snapshot))
+            // 2. v4 miss → fall back to the legacy v3 single-record at key
+            //    `{slotId}`. If found, MigrateV3SlotIfNeededAsync rewrites it
+            //    as shards and deletes the legacy record; we hydrate from the
+            //    returned in-memory snapshot directly (no need to re-read).
+            if (snapshot is null)
             {
-                readResult.TryGetFailure(out var rerr);
-                return Result.FromError($"Failed to read library snapshot: {rerr.Message}");
+                var legacy = await MigrateV3SlotIfNeededAsync(_db, slotId, ct);
+                if (legacy is not null) snapshot = legacy;
             }
+
             if (snapshot is null) return Result.Success; // nothing to hydrate
 
             // 2. Pre-load every image blob and publish a share outside the lock.
@@ -672,6 +691,18 @@ namespace KnockBox.DndMapper.Services.Library
             if (execResult.TryGetFailure(out var execErr)) return Result.FromError(execErr);
 
             HasExistingLibrary = true;
+
+            // Seed the auto-flush hash cache from the just-loaded shard
+            // bytes so the next FlushSnapshotAsync only writes deltas (the
+            // user moves a token; we don't rewrite everything we just read).
+            // Migration-path loads don't carry shard hashes — the next
+            // flush will populate the cache lazily.
+            if (slotId == DndMapperLibrarySchema.AutoSlotId)
+            {
+                _autoFlushHashes.Clear();
+                foreach (var (k, h) in shardHashes) _autoFlushHashes[k] = h;
+            }
+
             return Result.Success;
         }
 
@@ -764,18 +795,38 @@ namespace KnockBox.DndMapper.Services.Library
             await _saveLock.WaitAsync(ct);
             try
             {
-                // Delete ONLY the auto-save record from LibraryStore. Manual
-                // slot snapshots (keyed by their slot GUID in the same store)
-                // and the ImagesStore are preserved — the user clicked
-                // "Start fresh", not "Delete everything".
-                var autoKey = IndexedDbKey.String(DndMapperLibrarySchema.AutoSlotId);
-                var delResult = await _db.DeleteSingleAsync(
-                    DndMapperLibrarySchema.LibraryStore, autoKey, ct);
-                if (!delResult.IsSuccess)
+                // Delete ONLY the auto-save shards from LibraryStore. Manual
+                // slot shards (keyed by their slot GUID prefix in the same
+                // store) and the ImagesStore are preserved — the user clicked
+                // "Start fresh", not "Delete everything". Read the auto core
+                // first to recover the spine; if it's missing fall back to
+                // the in-memory hash cache so we still GC any shards the
+                // current attachment knows about.
+                var autoSlot = DndMapperLibrarySchema.AutoSlotId;
+                var coreRead = await _db.JsonGetSingleAsync<LibraryCoreSnapshot>(
+                    DndMapperLibrarySchema.LibraryStore, DndMapperLibrarySchema.CoreKey(autoSlot), ct);
+                if (coreRead.TryGetSuccess(out var core) && core is not null)
                 {
-                    delResult.TryGetFailure(out var derr);
-                    return Result.FromError($"Failed to clear auto-save: {derr.Message}");
+                    foreach (var mapId in core.MapIds)
+                    {
+                        await _db.DeleteSingleAsync(DndMapperLibrarySchema.LibraryStore,
+                            DndMapperLibrarySchema.MapKey(autoSlot, mapId), ct);
+                    }
+                    foreach (var sheetId in core.SheetIds)
+                    {
+                        await _db.DeleteSingleAsync(DndMapperLibrarySchema.LibraryStore,
+                            DndMapperLibrarySchema.SheetKey(autoSlot, sheetId), ct);
+                    }
                 }
+                await _db.DeleteSingleAsync(DndMapperLibrarySchema.LibraryStore,
+                    DndMapperLibrarySchema.CoreKey(autoSlot), ct);
+
+                // Legacy v3 single-record fallback (covers the case where the
+                // user "Start fresh"-es before any v4 shards were written).
+                await _db.DeleteSingleAsync(DndMapperLibrarySchema.LibraryStore,
+                    IndexedDbKey.String(autoSlot), ct);
+
+                _autoFlushHashes.Clear();
 
                 // Drop the __auto__ entry from the slots index so the Saves
                 // panel doesn't show a stale "Auto Save" row pointing at the
@@ -831,6 +882,10 @@ namespace KnockBox.DndMapper.Services.Library
             _ = FlushSnapshotAsync();
         }
 
+        // Test hook: runs the auto-save flush deterministically. Production
+        // callers never use this — the debounce timer drives FlushSnapshotAsync.
+        internal Task ForTestingFlushAsync() => FlushSnapshotAsync();
+
         private async Task FlushSnapshotAsync()
         {
             if (_disposed) return;
@@ -854,28 +909,125 @@ namespace KnockBox.DndMapper.Services.Library
                 // back to 1 and trigger a re-arm in the finally.
                 Interlocked.Exchange(ref _pendingDirty, 0);
 
-                // Build the snapshot under the state's read lock so we don't
+                // Build the shard set under the state's read lock so we don't
                 // race with a concurrent Execute. The read action is pure-sync
-                // (no I/O) so use the synchronous overload, capturing via
-                // closure. Exit the lock BEFORE doing IndexedDB I/O.
-                LibrarySnapshot? snapshot = null;
-                var readResult = state.WithExclusiveRead(() => { snapshot = LibrarySnapshotMapper.FromState(state); });
-                if (!readResult.IsSuccess || snapshot is null)
+                // (no I/O); IDB writes happen AFTER lock release.
+                var shards = TakeSnapshot();
+                if (shards is null)
                 {
                     _logger.LogWarning("Auto-save read of game state failed; skipping flush.");
                     return;
                 }
 
-                var key = IndexedDbKey.String(DndMapperLibrarySchema.AutoSlotId);
-                var writeResult = await db.JsonPutSingleAsync(
-                    DndMapperLibrarySchema.LibraryStore, snapshot, key, cts.Token);
+                var slotId = DndMapperLibrarySchema.AutoSlotId;
+                var wroteAnything = false;
 
-                if (!writeResult.IsSuccess)
+                // 1. Write new-or-changed map shards.
+                foreach (var (mapId, mapShard) in shards.MapsById)
                 {
-                    writeResult.TryGetFailure(out var werr);
-                    _logger.LogWarning("DnD Mapper auto-save write failed: {Error}", werr.Message);
+                    if (cts.IsCancellationRequested) return;
+                    var cacheKey = $"{slotId}:map:{mapId:D}";
+                    var hash = HashShard(mapShard);
+                    if (HashesEqual(_autoFlushHashes.GetValueOrDefault(cacheKey), hash)) continue;
+
+                    var write = await db.JsonPutSingleAsync(
+                        DndMapperLibrarySchema.LibraryStore,
+                        mapShard,
+                        DndMapperLibrarySchema.MapKey(slotId, mapId),
+                        cts.Token);
+                    if (!write.IsSuccess)
+                    {
+                        write.TryGetFailure(out var werr);
+                        _logger.LogWarning("Auto-save: failed to write map shard {MapId}: {Error}", mapId, werr.Message);
+                        return;
+                    }
+                    _autoFlushHashes[cacheKey] = hash;
+                    wroteAnything = true;
                 }
-                else
+
+                // 2. Write new-or-changed sheet shards.
+                foreach (var (sheetId, sheetShard) in shards.SheetsById)
+                {
+                    if (cts.IsCancellationRequested) return;
+                    var cacheKey = $"{slotId}:sheet:{sheetId:D}";
+                    var hash = HashShard(sheetShard);
+                    if (HashesEqual(_autoFlushHashes.GetValueOrDefault(cacheKey), hash)) continue;
+
+                    var write = await db.JsonPutSingleAsync(
+                        DndMapperLibrarySchema.LibraryStore,
+                        sheetShard,
+                        DndMapperLibrarySchema.SheetKey(slotId, sheetId),
+                        cts.Token);
+                    if (!write.IsSuccess)
+                    {
+                        write.TryGetFailure(out var werr);
+                        _logger.LogWarning("Auto-save: failed to write sheet shard {SheetId}: {Error}", sheetId, werr.Message);
+                        return;
+                    }
+                    _autoFlushHashes[cacheKey] = hash;
+                    wroteAnything = true;
+                }
+
+                // 3. Write core if changed. Core is the commit point — written
+                //    AFTER all map / sheet shards so a crash between (1/2) and
+                //    (3) leaves the old core spine still pointing at the prior
+                //    state. Orphan new shards are silently ignored on load.
+                var coreCacheKey = $"{slotId}:core";
+                var coreHash = HashShard(shards.Core);
+                if (!HashesEqual(_autoFlushHashes.GetValueOrDefault(coreCacheKey), coreHash))
+                {
+                    var coreWrite = await db.JsonPutSingleAsync(
+                        DndMapperLibrarySchema.LibraryStore,
+                        shards.Core,
+                        DndMapperLibrarySchema.CoreKey(slotId),
+                        cts.Token);
+                    if (!coreWrite.IsSuccess)
+                    {
+                        coreWrite.TryGetFailure(out var werr);
+                        _logger.LogWarning("Auto-save: failed to write core shard: {Error}", werr.Message);
+                        return;
+                    }
+                    _autoFlushHashes[coreCacheKey] = coreHash;
+                    wroteAnything = true;
+                }
+
+                // 4. Delete shards for entities that disappeared since the
+                //    previous flush. Runs AFTER core write so the spine
+                //    matches the on-disk layout if a crash occurs here.
+                var staleKeys = new List<string>();
+                foreach (var cached in _autoFlushHashes.Keys)
+                {
+                    if (cached == coreCacheKey) continue;
+                    if (cached.StartsWith($"{slotId}:map:", StringComparison.Ordinal))
+                    {
+                        var idStr = cached[(slotId.Length + 5)..];
+                        if (Guid.TryParseExact(idStr, "D", out var mapId)
+                            && !shards.MapsById.ContainsKey(mapId))
+                            staleKeys.Add(cached);
+                    }
+                    else if (cached.StartsWith($"{slotId}:sheet:", StringComparison.Ordinal))
+                    {
+                        var idStr = cached[(slotId.Length + 7)..];
+                        if (Guid.TryParseExact(idStr, "D", out var sheetId)
+                            && !shards.SheetsById.ContainsKey(sheetId))
+                            staleKeys.Add(cached);
+                    }
+                }
+                foreach (var stale in staleKeys)
+                {
+                    if (cts.IsCancellationRequested) return;
+                    var del = await db.DeleteSingleAsync(
+                        DndMapperLibrarySchema.LibraryStore, IndexedDbKey.String(stale), cts.Token);
+                    if (!del.IsSuccess)
+                    {
+                        del.TryGetFailure(out var derr);
+                        _logger.LogWarning("Auto-save: failed to delete stale shard {Key}: {Error}", stale, derr.Message);
+                        // Don't abort — orphan records are harmless on load.
+                    }
+                    _autoFlushHashes.Remove(stale);
+                }
+
+                if (wroteAnything)
                 {
                     HasExistingLibrary = true;
                     await TouchSlotEntryAsync(db,
@@ -1001,6 +1153,8 @@ namespace KnockBox.DndMapper.Services.Library
                 _host = null;
                 HasExistingLibrary = false;
                 Interlocked.Exchange(ref _pendingDirty, 0);
+                _autoFlushHashes.Clear();
+                _migratedSlots.Clear();
                 _saveCts?.Dispose();
                 _saveCts = null;
             }
@@ -1070,16 +1224,16 @@ namespace KnockBox.DndMapper.Services.Library
                     return ValueResult<string>.FromError("A slot with that name already exists.");
                 }
 
-                var snapshot = TakeSnapshot();
-                if (snapshot is null) return ValueResult<string>.FromError("Failed to read current state for save.");
+                var shards = TakeSnapshot();
+                if (shards is null) return ValueResult<string>.FromError("Failed to read current state for save.");
 
                 var slotId = Guid.NewGuid().ToString("D");
-                var key = IndexedDbKey.String(slotId);
-                var write = await _db.JsonPutSingleAsync(DndMapperLibrarySchema.LibraryStore, snapshot, key, ct);
+                var throwaway = new Dictionary<string, byte[]>();
+                var write = await WriteAllShardsAsync(_db, slotId, shards, throwaway, ct);
                 if (!write.IsSuccess)
                 {
                     write.TryGetFailure(out var werr);
-                    return ValueResult<string>.FromError($"Failed to write slot: {werr.Message}");
+                    return ValueResult<string>.FromError(werr.PublicMessage);
                 }
 
                 idx.Slots.Add(new SlotIndexEntry
@@ -1122,15 +1276,42 @@ namespace KnockBox.DndMapper.Services.Library
                 var entry = idx.Slots.FirstOrDefault(s => s.Id == slotId);
                 if (entry is null) return Result.FromError("Unknown slot id.");
 
-                var snapshot = TakeSnapshot();
-                if (snapshot is null) return Result.FromError("Failed to read current state for save.");
+                var shards = TakeSnapshot();
+                if (shards is null) return Result.FromError("Failed to read current state for save.");
 
-                var key = IndexedDbKey.String(slotId);
-                var write = await _db.JsonPutSingleAsync(DndMapperLibrarySchema.LibraryStore, snapshot, key, ct);
+                // Manual slots don't carry a per-slot hash cache: the user
+                // clicked Overwrite, so just write every shard. Also clean
+                // up any stale shards from a prior larger save under the
+                // same slot id by reading the previous core's spine first.
+                var previousCoreRead = await _db.JsonGetSingleAsync<LibraryCoreSnapshot>(
+                    DndMapperLibrarySchema.LibraryStore,
+                    DndMapperLibrarySchema.CoreKey(slotId), ct);
+                LibraryCoreSnapshot? previousCore = null;
+                if (previousCoreRead.TryGetSuccess(out var pc)) previousCore = pc;
+
+                var throwaway = new Dictionary<string, byte[]>();
+                var write = await WriteAllShardsAsync(_db, slotId, shards, throwaway, ct);
                 if (!write.IsSuccess)
                 {
                     write.TryGetFailure(out var werr);
-                    return Result.FromError($"Failed to write slot: {werr.Message}");
+                    return Result.FromError(werr.PublicMessage);
+                }
+
+                // Delete obsolete shards (entries from previousCore that are
+                // not in the freshly-written shard set). Runs after the new
+                // core is committed so the spine matches on-disk reality.
+                if (previousCore is not null)
+                {
+                    foreach (var staleMapId in previousCore.MapIds.Where(id => !shards.MapsById.ContainsKey(id)))
+                    {
+                        await _db.DeleteSingleAsync(DndMapperLibrarySchema.LibraryStore,
+                            DndMapperLibrarySchema.MapKey(slotId, staleMapId), ct);
+                    }
+                    foreach (var staleSheetId in previousCore.SheetIds.Where(id => !shards.SheetsById.ContainsKey(id)))
+                    {
+                        await _db.DeleteSingleAsync(DndMapperLibrarySchema.LibraryStore,
+                            DndMapperLibrarySchema.SheetKey(slotId, staleSheetId), ct);
+                    }
                 }
 
                 // Replace the entry with one carrying the new timestamp.
@@ -1169,12 +1350,30 @@ namespace KnockBox.DndMapper.Services.Library
                 var entry = idx.Slots.FirstOrDefault(s => s.Id == slotId);
                 if (entry is null) return Result.FromError("Unknown slot id.");
 
-                var del = await _db.DeleteSingleAsync(DndMapperLibrarySchema.LibraryStore, IndexedDbKey.String(slotId), ct);
-                if (!del.IsSuccess)
+                // Read core to recover the spine. If it's missing (the slot
+                // was already orphaned), we just clear the slots-index entry;
+                // any leftover shards are silently ignored on future reads.
+                var coreRead = await _db.JsonGetSingleAsync<LibraryCoreSnapshot>(
+                    DndMapperLibrarySchema.LibraryStore, DndMapperLibrarySchema.CoreKey(slotId), ct);
+                if (coreRead.TryGetSuccess(out var core) && core is not null)
                 {
-                    del.TryGetFailure(out var derr);
-                    return Result.FromError($"Failed to delete slot: {derr.Message}");
+                    foreach (var mapId in core.MapIds)
+                    {
+                        await _db.DeleteSingleAsync(DndMapperLibrarySchema.LibraryStore,
+                            DndMapperLibrarySchema.MapKey(slotId, mapId), ct);
+                    }
+                    foreach (var sheetId in core.SheetIds)
+                    {
+                        await _db.DeleteSingleAsync(DndMapperLibrarySchema.LibraryStore,
+                            DndMapperLibrarySchema.SheetKey(slotId, sheetId), ct);
+                    }
+                    await _db.DeleteSingleAsync(DndMapperLibrarySchema.LibraryStore,
+                        DndMapperLibrarySchema.CoreKey(slotId), ct);
                 }
+
+                // Best-effort cleanup of any leftover v3 legacy record (e.g.,
+                // the slot was deleted before it was migrated this attachment).
+                await _db.DeleteSingleAsync(DndMapperLibrarySchema.LibraryStore, IndexedDbKey.String(slotId), ct);
 
                 idx.Slots.Remove(entry);
                 var idxResult = await WriteSlotsIndexAsync(_db, idx, ct);
@@ -1234,13 +1433,230 @@ namespace KnockBox.DndMapper.Services.Library
             }
         }
 
-        private LibrarySnapshot? TakeSnapshot()
+        // Per-shard view of the current state used by every save path. The
+        // dictionaries are keyed by entity id so FlushSnapshotAsync can diff
+        // against the prior flush by id and SaveToSlotAsync can iterate in
+        // core-declared order.
+        private sealed record ShardSet(
+            LibraryCoreSnapshot Core,
+            Dictionary<Guid, MapSnapshot> MapsById,
+            Dictionary<Guid, SheetSnapshot> SheetsById);
+
+        private ShardSet? TakeSnapshot()
         {
             var state = _state;
             if (state is null) return null;
-            LibrarySnapshot? snapshot = null;
-            var read = state.WithExclusiveRead(() => { snapshot = LibrarySnapshotMapper.FromState(state); });
-            return read.IsSuccess ? snapshot : null;
+            ShardSet? shards = null;
+            var read = state.WithExclusiveRead(() =>
+            {
+                var core = LibrarySnapshotMapper.ToCoreSnapshot(state);
+                var maps = new Dictionary<Guid, MapSnapshot>(state.Maps.Count);
+                foreach (var m in state.Maps) maps[m.Id] = LibrarySnapshotMapper.ToMapSnapshot(m);
+                var sheets = new Dictionary<Guid, SheetSnapshot>(state.Sheets.Count);
+                foreach (var kv in state.Sheets) sheets[kv.Key] = LibrarySnapshotMapper.ToSheetSnapshot(kv.Value);
+                shards = new ShardSet(core, maps, sheets);
+            });
+            return read.IsSuccess ? shards : null;
+        }
+
+        private static byte[] HashShard<T>(T value) =>
+            SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(value));
+
+        private static bool HashesEqual(byte[]? a, byte[]? b)
+        {
+            if (a is null || b is null) return false;
+            if (a.Length != b.Length) return false;
+            return a.AsSpan().SequenceEqual(b);
+        }
+
+        // Writes every shard in the set under the given slot id and refreshes
+        // `hashCache` to match. Caller decides whether `hashCache` is the
+        // auto-save cache or a throwaway dict. Returns the number of writes
+        // issued (for logging). Writes maps first, then sheets, then core LAST
+        // so a crash before core leaves the prior spine intact.
+        private async ValueTask<Result> WriteAllShardsAsync(
+            IIndexedDatabase db,
+            string slotId,
+            ShardSet shards,
+            Dictionary<string, byte[]> hashCache,
+            CancellationToken ct)
+        {
+            foreach (var (mapId, mapShard) in shards.MapsById)
+            {
+                var key = DndMapperLibrarySchema.MapKey(slotId, mapId);
+                var write = await db.JsonPutSingleAsync(DndMapperLibrarySchema.LibraryStore, mapShard, key, ct);
+                if (!write.IsSuccess)
+                {
+                    write.TryGetFailure(out var werr);
+                    return Result.FromError($"Failed to write map shard: {werr.Message}");
+                }
+                hashCache[$"{slotId}:map:{mapId:D}"] = HashShard(mapShard);
+            }
+
+            foreach (var (sheetId, sheetShard) in shards.SheetsById)
+            {
+                var key = DndMapperLibrarySchema.SheetKey(slotId, sheetId);
+                var write = await db.JsonPutSingleAsync(DndMapperLibrarySchema.LibraryStore, sheetShard, key, ct);
+                if (!write.IsSuccess)
+                {
+                    write.TryGetFailure(out var werr);
+                    return Result.FromError($"Failed to write sheet shard: {werr.Message}");
+                }
+                hashCache[$"{slotId}:sheet:{sheetId:D}"] = HashShard(sheetShard);
+            }
+
+            var coreWrite = await db.JsonPutSingleAsync(
+                DndMapperLibrarySchema.LibraryStore, shards.Core, DndMapperLibrarySchema.CoreKey(slotId), ct);
+            if (!coreWrite.IsSuccess)
+            {
+                coreWrite.TryGetFailure(out var werr);
+                return Result.FromError($"Failed to write core shard: {werr.Message}");
+            }
+            hashCache[$"{slotId}:core"] = HashShard(shards.Core);
+
+            return Result.Success;
+        }
+
+        // Reads a slot back into a LibrarySnapshot shape by fanning out shard
+        // reads from the core spine. Returns null if {slotId}:core is missing
+        // (caller decides whether to fall back to v3 migration). Missing map
+        // or sheet shards are logged and skipped — load proceeds with the
+        // remaining entities rather than failing the whole hydrate.
+        private async ValueTask<(LibrarySnapshot? Snapshot, LibraryCoreSnapshot? Core, List<(string Key, byte[] Hash)> ShardHashes)>
+            ReadShardedSlotAsync(IIndexedDatabase db, string slotId, CancellationToken ct)
+        {
+            var coreKey = DndMapperLibrarySchema.CoreKey(slotId);
+            var coreRead = await db.JsonGetSingleAsync<LibraryCoreSnapshot>(
+                DndMapperLibrarySchema.LibraryStore, coreKey, ct);
+
+            if (!coreRead.TryGetSuccess(out var core) || core is null)
+                return (null, null, []);
+
+            var hashes = new List<(string, byte[])>
+            {
+                ($"{slotId}:core", HashShard(core)),
+            };
+
+            // Read all map shards in parallel — they're independent IDB
+            // transactions and the JS side coalesces well under load.
+            var mapTasks = core.MapIds
+                .Select(id => db.JsonGetSingleAsync<MapSnapshot>(
+                    DndMapperLibrarySchema.LibraryStore, DndMapperLibrarySchema.MapKey(slotId, id), ct))
+                .ToArray();
+            var mapResults = await Task.WhenAll(mapTasks.Select(t => t.AsTask()));
+
+            var maps = new List<MapSnapshot>(core.MapIds.Count);
+            for (int i = 0; i < core.MapIds.Count; i++)
+            {
+                if (mapResults[i].TryGetSuccess(out var mapShard) && mapShard is not null)
+                {
+                    maps.Add(mapShard);
+                    hashes.Add(($"{slotId}:map:{core.MapIds[i]:D}", HashShard(mapShard)));
+                }
+                else
+                {
+                    _logger.LogWarning("Map shard {MapId} listed by slot {SlotId} core is missing; skipping.",
+                        core.MapIds[i], slotId);
+                }
+            }
+
+            var sheetTasks = core.SheetIds
+                .Select(id => db.JsonGetSingleAsync<SheetSnapshot>(
+                    DndMapperLibrarySchema.LibraryStore, DndMapperLibrarySchema.SheetKey(slotId, id), ct))
+                .ToArray();
+            var sheetResults = await Task.WhenAll(sheetTasks.Select(t => t.AsTask()));
+
+            var sheets = new List<SheetSnapshot>(core.SheetIds.Count);
+            for (int i = 0; i < core.SheetIds.Count; i++)
+            {
+                if (sheetResults[i].TryGetSuccess(out var sheetShard) && sheetShard is not null)
+                {
+                    sheets.Add(sheetShard);
+                    hashes.Add(($"{slotId}:sheet:{core.SheetIds[i]:D}", HashShard(sheetShard)));
+                }
+                else
+                {
+                    _logger.LogWarning("Sheet shard {SheetId} listed by slot {SlotId} core is missing; skipping.",
+                        core.SheetIds[i], slotId);
+                }
+            }
+
+            // Reassemble the v3-shape LibrarySnapshot so the existing
+            // hydration body in LoadSlotAsync can consume it unchanged.
+            var snapshot = new LibrarySnapshot
+            {
+                SchemaVersion = core.SchemaVersion,
+                Settings = core.Settings,
+                AttributeSchema = core.AttributeSchema,
+                ActiveSchemaTemplateId = core.ActiveSchemaTemplateId,
+                InitiativeAttributeName = core.InitiativeAttributeName,
+                Maps = maps,
+                Sheets = sheets,
+                CustomTemplates = core.CustomTemplates,
+                GlobalRollTemplates = core.GlobalRollTemplates,
+            };
+            return (snapshot, core, hashes);
+        }
+
+        // Reads the legacy {slotId} record (v3 single-blob layout), rewrites
+        // it as v4 shards, then deletes the legacy record. Returns the v3
+        // snapshot if found so the caller can hydrate from it without a
+        // second IDB round-trip. Idempotent within an attachment via
+        // `_migratedSlots`.
+        private async ValueTask<LibrarySnapshot?> MigrateV3SlotIfNeededAsync(
+            IIndexedDatabase db, string slotId, CancellationToken ct)
+        {
+            if (!_migratedSlots.Add(slotId)) return null;
+
+            var legacyKey = IndexedDbKey.String(slotId);
+            var legacyRead = await db.JsonGetSingleAsync<LibrarySnapshot>(
+                DndMapperLibrarySchema.LibraryStore, legacyKey, ct);
+
+            if (!legacyRead.TryGetSuccess(out var legacy) || legacy is null) return null;
+
+            // Build shards directly from the legacy snapshot — no live state
+            // round-trip needed. Maps and sheets are already in the v3 DTO
+            // shape and identical to the v4 per-shard payload.
+            var mapsById = legacy.Maps.ToDictionary(m => m.Id, m => m);
+            var sheetsById = legacy.Sheets.ToDictionary(s => s.Id, s => s);
+            var core = new LibraryCoreSnapshot
+            {
+                SchemaVersion = 4,
+                Settings = legacy.Settings,
+                AttributeSchema = legacy.AttributeSchema,
+                ActiveSchemaTemplateId = legacy.ActiveSchemaTemplateId,
+                InitiativeAttributeName = legacy.InitiativeAttributeName,
+                CustomTemplates = legacy.CustomTemplates,
+                GlobalRollTemplates = legacy.GlobalRollTemplates,
+                MapIds = legacy.Maps.OrderBy(m => m.ListOrder).Select(m => m.Id).ToList(),
+                SheetIds = legacy.Sheets.Select(s => s.Id).ToList(),
+            };
+
+            var migratedShards = new ShardSet(core, mapsById, sheetsById);
+            // Populate the auto-flush hash cache during the migration write
+            // only when migrating the Auto Save slot, so the immediately-
+            // following flush correctly skips the unchanged shards. Manual
+            // slots use a throwaway dict (we don't cache hashes for them).
+            var hashTarget = slotId == DndMapperLibrarySchema.AutoSlotId
+                ? _autoFlushHashes
+                : new Dictionary<string, byte[]>();
+            var write = await WriteAllShardsAsync(db, slotId, migratedShards, hashTarget, ct);
+            if (!write.IsSuccess)
+            {
+                write.TryGetFailure(out var werr);
+                _logger.LogWarning("Failed to migrate v3 slot {SlotId} to sharded layout: {Error}",
+                    slotId, werr.PublicMessage);
+                return legacy; // hydrate from legacy this session; retry migration on next attachment
+            }
+
+            var del = await db.DeleteSingleAsync(DndMapperLibrarySchema.LibraryStore, legacyKey, ct);
+            if (!del.IsSuccess)
+            {
+                del.TryGetFailure(out var derr);
+                _logger.LogWarning("Migrated v3 slot {SlotId} but failed to remove legacy record: {Error}",
+                    slotId, derr.Message);
+            }
+            return legacy;
         }
 
         private async ValueTask<SlotsIndex> ReadSlotsIndexAsync(IIndexedDatabase db, CancellationToken ct)

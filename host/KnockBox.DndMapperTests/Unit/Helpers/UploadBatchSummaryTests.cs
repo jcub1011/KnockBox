@@ -25,8 +25,8 @@ namespace KnockBox.DndMapperTests.Unit.Helpers
         [TestMethod]
         public void AllFail_SingleFile_ReportsFailureVerbatim()
         {
-            var s = UploadBatchSummary.Build(successes: 0, failures: new[] { "map.png: exceeds 5 MB" });
-            Assert.AreEqual("map.png: exceeds 5 MB", s.Message);
+            var s = UploadBatchSummary.Build(successes: 0, failures: new[] { "map.png: exceeds 100 MB" });
+            Assert.AreEqual("map.png: exceeds 100 MB", s.Message);
             Assert.AreEqual(DndMapperToastTone.Danger, s.Tone);
         }
 

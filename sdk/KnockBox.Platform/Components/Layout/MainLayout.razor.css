@@ -45,6 +45,7 @@ header {
     display: flex;
     padding: 0;
     box-shadow: none;
+    flex-shrink: 0;
 }
 
 header a {
