@@ -527,6 +527,9 @@ namespace KnockBox.DndMapper.Services.Library
                         DefaultSpawnPosition = mapSnap.DefaultSpawnX is double sx && mapSnap.DefaultSpawnY is double sy
                             ? (sx, sy)
                             : null,
+                        // Legacy snapshots (pre-fog) deserialize FogMask to [],
+                        // which Map.IsFogged treats as "all revealed".
+                        FogMask = mapSnap.FogMask ?? [],
                     };
                     foreach (var imgSnap in mapSnap.Images.OrderBy(i => i.LayerOrder))
                     {

@@ -300,6 +300,38 @@ namespace KnockBox.DndMapperTests.Unit.Services.Library
                 "After loading, the state-level initiative attribute should be restored verbatim.");
         }
 
+        [TestMethod]
+        public async Task LoadSlotAsync_RoundTripsFogMask()
+        {
+            var (engine, state, host, _) = EngineTestFactory.Build();
+            var db = new FakeIndexedDbService();
+            await using var library = new DndMapperLibraryService(db, engine, NullLogger<DndMapperLibraryService>.Instance);
+            Assert.IsTrue((await library.AttachAsync(state, host)).IsSuccess);
+
+            Assert.IsTrue(engine.CreateMapAsync(state, host, "Catacombs").TryGetSuccess(out var mapId));
+            Assert.IsTrue(engine.PaintFogAsync(state, host, mapId,
+                new[] { (1, 1), (2, 1), (3, 1), (1, 2) }, fogged: true).IsSuccess);
+
+            var create = await library.CreateSlotAsync("Fog-RoundTrip");
+            Assert.IsTrue(create.TryGetSuccess(out var slotId));
+
+            var (engine2, state2, host2, _) = EngineTestFactory.Build();
+            await using var library2 = new DndMapperLibraryService(db, engine2, NullLogger<DndMapperLibraryService>.Instance);
+            Assert.IsTrue((await library2.AttachAsync(state2, host2)).IsSuccess);
+            Assert.IsTrue((await library2.LoadSlotAsync(slotId)).IsSuccess);
+
+            state2.WithExclusiveRead(() =>
+            {
+                var restoredMap = state2.Maps.Single(m => m.Id == mapId);
+                Assert.IsTrue(restoredMap.IsFogged(1, 1));
+                Assert.IsTrue(restoredMap.IsFogged(2, 1));
+                Assert.IsTrue(restoredMap.IsFogged(3, 1));
+                Assert.IsTrue(restoredMap.IsFogged(1, 2));
+                Assert.IsFalse(restoredMap.IsFogged(0, 0));
+                Assert.IsFalse(restoredMap.IsFogged(4, 1));
+            });
+        }
+
         // Builds an attached library against a fresh fake DB. When seedLegacy is
         // true, plants a v2 snapshot so the post-migration Auto Save slot exists
         // (required for ListSlotsAsync ordering tests).

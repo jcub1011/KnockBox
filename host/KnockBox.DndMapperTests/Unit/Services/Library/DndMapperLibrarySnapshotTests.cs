@@ -470,5 +470,68 @@ namespace KnockBox.DndMapperTests.Unit.Services.Library
             Assert.AreEqual(AttributeValueType.Modifier, modValue.Type);
             Assert.AreEqual(3, modValue.IntValue);
         }
+
+        // ── Fog mask ─────────────────────────────────────────────────────────────
+
+        [TestMethod]
+        public void FromState_CapturesFogMask()
+        {
+            var (engine, state, host, _) = EngineTestFactory.Build();
+            Assert.IsTrue(engine.CreateMapAsync(state, host, "Crypt").TryGetSuccess(out var mapId));
+            Assert.IsTrue(engine.PaintFogAsync(state, host, mapId, new[] { (0, 0), (1, 0), (0, 1) }, fogged: true).IsSuccess);
+
+            var snap = LibrarySnapshotMapper.FromState(state);
+
+            var mapSnap = snap.Maps.Single(m => m.Id == mapId);
+            Assert.IsTrue(mapSnap.FogMask.Length > 0);
+            Assert.IsTrue(state.Maps.Single(m => m.Id == mapId).IsFogged(0, 0));
+        }
+
+        [TestMethod]
+        public void Snapshot_FogMask_RoundTripsThroughJsonAsBase64()
+        {
+            var (engine, state, host, _) = EngineTestFactory.Build();
+            Assert.IsTrue(engine.CreateMapAsync(state, host, "M").TryGetSuccess(out var mapId));
+            Assert.IsTrue(engine.FillMapWithFogAsync(state, host, mapId).IsSuccess);
+
+            var original = LibrarySnapshotMapper.FromState(state);
+            var json = JsonSerializer.Serialize(original, JsonOptions);
+            var reread = JsonSerializer.Deserialize<LibrarySnapshot>(json, JsonOptions);
+
+            Assert.IsNotNull(reread);
+            var origMap = original.Maps.Single(m => m.Id == mapId);
+            var rereadMap = reread!.Maps.Single(m => m.Id == mapId);
+            CollectionAssert.AreEqual(origMap.FogMask, rereadMap.FogMask);
+        }
+
+        [TestMethod]
+        public void LegacySnapshot_WithoutFogMask_DeserializesToEmpty()
+        {
+            // Older library payloads predating fog of war don't write a FogMask
+            // property. The init-only default ([]) must take effect on deserialize.
+            const string legacyJson = """
+                {
+                    "SchemaVersion": 3,
+                    "Maps": [
+                        {
+                            "Id": "00000000-0000-0000-0000-000000000001",
+                            "Name": "Legacy",
+                            "ListOrder": 0,
+                            "CreatedUtc": "2025-01-01T00:00:00Z",
+                            "Grid": { "WidthCells": 10, "HeightCells": 10 },
+                            "Images": [],
+                            "Tokens": []
+                        }
+                    ]
+                }
+                """;
+
+            var snap = JsonSerializer.Deserialize<LibrarySnapshot>(legacyJson, JsonOptions);
+
+            Assert.IsNotNull(snap);
+            var mapSnap = snap!.Maps.Single();
+            Assert.IsNotNull(mapSnap.FogMask);
+            Assert.IsEmpty(mapSnap.FogMask);
+        }
     }
 }

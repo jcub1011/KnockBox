@@ -112,6 +112,11 @@ namespace KnockBox.DndMapper.Services.Library
         public double? DefaultSpawnY { get; init; }
         public List<MapImageSnapshot> Images { get; init; } = [];
         public List<TokenSnapshot> Tokens { get; init; } = [];
+        // Per-cell fog mask, packed row-major (cy * Grid.WidthCells + cx).
+        // System.Text.Json serializes byte[] as base64. Older snapshots without
+        // this field deserialize to [], which Map.IsFogged treats as "all
+        // revealed" — no schema bump required.
+        public byte[] FogMask { get; init; } = [];
     }
 
     internal sealed record MapImageSnapshot
@@ -208,6 +213,7 @@ namespace KnockBox.DndMapper.Services.Library
                     Tokens = map.Tokens
                         .Select(ToTokenSnapshot)
                         .ToList(),
+                    FogMask = map.FogMask,
                 });
             }
 

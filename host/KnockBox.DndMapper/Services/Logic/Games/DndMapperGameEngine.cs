@@ -2562,6 +2562,108 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             return error is null ? Result.Success : Result.FromError(error);
         }
 
+        // ── Fog of war ────────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Sets every cell in <paramref name="cells"/> to <paramref name="fogged"/>
+        /// on the named map. Host-only. Out-of-bounds cells are silently dropped
+        /// by <see cref="Map.SetFogged"/>. An empty list is a no-op success so the
+        /// client can flush a stroke that touched no new cells without seeing an error.
+        /// </summary>
+        public Result PaintFogAsync(
+            DndMapperGameState state,
+            User caller,
+            Guid mapId,
+            IReadOnlyList<(int cx, int cy)> cells,
+            bool fogged)
+        {
+            if (state is null) return Result.FromError("State is required.");
+            if (caller is null) return Result.FromError("Caller is required.");
+            if (cells is null) return Result.FromError("Cells list is required.");
+            if (!IsHost(state, caller)) return Result.FromError("Only the host may change fog.");
+            if (cells.Count == 0) return Result.Success;
+
+            string? error = null;
+            var exec = state.Execute(() =>
+            {
+                var map = state.Maps.FirstOrDefault(m => m.Id == mapId);
+                if (map is null) { error = "Unknown map id."; return; }
+                foreach (var (cx, cy) in cells)
+                    map.SetFogged(cx, cy, fogged);
+            });
+
+            if (exec.IsCanceled) return Result.FromCancellation();
+            if (exec.TryGetFailure(out var execErr)) return Result.FromError(execErr);
+            return error is null ? Result.Success : Result.FromError(error);
+        }
+
+        public Result RevealCellsAsync(DndMapperGameState state, User caller, Guid mapId, IReadOnlyList<(int cx, int cy)> cells)
+            => PaintFogAsync(state, caller, mapId, cells, fogged: false);
+
+        public Result HideCellsAsync(DndMapperGameState state, User caller, Guid mapId, IReadOnlyList<(int cx, int cy)> cells)
+            => PaintFogAsync(state, caller, mapId, cells, fogged: true);
+
+        public Result FillMapWithFogAsync(DndMapperGameState state, User caller, Guid mapId)
+        {
+            if (state is null) return Result.FromError("State is required.");
+            if (caller is null) return Result.FromError("Caller is required.");
+            if (!IsHost(state, caller)) return Result.FromError("Only the host may change fog.");
+
+            string? error = null;
+            var exec = state.Execute(() =>
+            {
+                var map = state.Maps.FirstOrDefault(m => m.Id == mapId);
+                if (map is null) { error = "Unknown map id."; return; }
+
+                var totalBits = map.Grid.WidthCells * map.Grid.HeightCells;
+                if (totalBits <= 0)
+                {
+                    map.FogMask = [];
+                    return;
+                }
+
+                var bytes = (totalBits + 7) / 8;
+                var mask = new byte[bytes];
+                for (var i = 0; i < bytes; i++) mask[i] = 0xFF;
+
+                // Zero any trailing bits past WidthCells*HeightCells in the last
+                // byte so the serialized mask stays exact. IsFogged also bounds-
+                // checks, but keeping the storage clean makes save-roundtrip
+                // tests trivial to reason about.
+                var trailing = bytes * 8 - totalBits;
+                if (trailing > 0)
+                {
+                    var keepLow = 8 - trailing;
+                    mask[bytes - 1] = (byte)(mask[bytes - 1] & ((1 << keepLow) - 1));
+                }
+
+                map.FogMask = mask;
+            });
+
+            if (exec.IsCanceled) return Result.FromCancellation();
+            if (exec.TryGetFailure(out var execErr)) return Result.FromError(execErr);
+            return error is null ? Result.Success : Result.FromError(error);
+        }
+
+        public Result ClearAllFogAsync(DndMapperGameState state, User caller, Guid mapId)
+        {
+            if (state is null) return Result.FromError("State is required.");
+            if (caller is null) return Result.FromError("Caller is required.");
+            if (!IsHost(state, caller)) return Result.FromError("Only the host may change fog.");
+
+            string? error = null;
+            var exec = state.Execute(() =>
+            {
+                var map = state.Maps.FirstOrDefault(m => m.Id == mapId);
+                if (map is null) { error = "Unknown map id."; return; }
+                map.FogMask = [];
+            });
+
+            if (exec.IsCanceled) return Result.FromCancellation();
+            if (exec.TryGetFailure(out var execErr)) return Result.FromError(execErr);
+            return error is null ? Result.Success : Result.FromError(error);
+        }
+
         // ── Internal helpers (must be called from inside Execute) ─────────────────
 
         private Guid SpawnPlayerTokenInternal(DndMapperGameState state, Map map, User player)
