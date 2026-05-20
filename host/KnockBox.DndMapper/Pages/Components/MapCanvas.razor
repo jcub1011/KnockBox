@@ -134,6 +134,26 @@
             </g>
         }
 
+        @* Fog overlay. Rendered between markup and tokens so tokens visually
+           sit on top of fog for the host (M03), and so player rendering (M04)
+           can flip the opacity to 1 and still hide the layers behind it. *@
+        @if (IsHost && Map.FogMask.Length > 0)
+        {
+            <g class="dndm-fog dndm-fog--host" pointer-events="none">
+                @for (int cy = 0; cy < Map.Grid.HeightCells; cy++)
+                {
+                    for (int cx = 0; cx < Map.Grid.WidthCells; cx++)
+                    {
+                        if (Map.IsFogged(cx, cy))
+                        {
+                            <rect x="@cx" y="@cy" width="1" height="1"
+                                  fill="#000" fill-opacity="0.45" />
+                        }
+                    }
+                }
+            </g>
+        }
+
         <TokenLayer State="State"
                     Map="Map"
                     IsHost="IsHost"

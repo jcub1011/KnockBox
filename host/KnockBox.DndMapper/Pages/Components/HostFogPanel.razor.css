@@ -1,0 +1,29 @@
+.dndm-fog-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    padding: 0.5rem 0.6rem 0.65rem;
+}
+
+.dndm-fog-modes,
+.dndm-fog-brush,
+.dndm-fog-bulk {
+    display: flex;
+    gap: 0.35rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.dndm-fog-brush .dndm-label {
+    font-size: 0.85rem;
+    color: #c5beb1;
+    margin-right: 0.15rem;
+}
+
+.dndm-fog-brush button {
+    min-width: 2rem;
+}
+
+.dndm-fog-bulk {
+    margin-top: 0.15rem;
+}

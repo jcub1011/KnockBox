@@ -3,6 +3,7 @@ using KnockBox.DndMapper.Components;
 using KnockBox.DndMapper.Services;
 using KnockBox.DndMapper.Services.Library;
 using KnockBox.DndMapper.Services.Logic.Games;
+using KnockBox.DndMapper.Services.Logic.Visibility;
 using Microsoft.AspNetCore.Components;
 
 namespace KnockBox.DndMapper
@@ -17,6 +18,7 @@ namespace KnockBox.DndMapper
             registration.AddGameEngine<DndMapperGameEngine>();
             registration.AddScoped<DndMapperLibraryService, DndMapperLibraryService>();
             registration.AddScoped<TokenFocusService, TokenFocusService>();
+            registration.AddScoped<IFogPaintContext, FogPaintContext>();
         }
 
         public RenderFragment? GetCustomHeader() => builder =>

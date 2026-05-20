@@ -5,6 +5,7 @@ using KnockBox.DndMapper.Helpers;
 using KnockBox.DndMapper.Models;
 using KnockBox.DndMapper.Services;
 using KnockBox.DndMapper.Services.Logic.Games;
+using KnockBox.DndMapper.Services.Logic.Visibility;
 using KnockBox.DndMapper.Services.State.Games;
 using KnockBox.DndMapper.Services.State.Games.Data;
 using Microsoft.AspNetCore.Components;
@@ -29,6 +30,7 @@ namespace KnockBox.DndMapper.Pages.Components
         [Inject] protected IJSRuntime JSRuntime { get; set; } = default!;
         [Inject] protected ILogger<MapCanvas> Logger { get; set; } = default!;
         [Inject] protected TokenFocusService TokenFocus { get; set; } = default!;
+        [Inject] protected IFogPaintContext FogContext { get; set; } = default!;
 
         [CascadingParameter] public DndMapperViewport? Viewport { get; set; }
 
@@ -65,6 +67,8 @@ namespace KnockBox.DndMapper.Pages.Components
         // CellPixels*zoom). Cached for the duration of the gesture and cleared on mouse-up.
         private double _pxPerCell;
         private IJSObjectReference? _metricsModule;
+        private IJSObjectReference? _fogPaintModule;
+        private DotNetObjectReference<MapCanvas>? _fogPaintRef;
 
         // ── Image transform drag state ───────────────────────────────────
         internal enum HandleKind { Body, NW, NE, SW, SE, Rotate }
@@ -134,11 +138,16 @@ namespace KnockBox.DndMapper.Pages.Components
         {
             TokenFocus.Focused += OnTokenFocusRequested;
             _stateSub = State.StateChangedEventManager.Subscribe(OnStateChanged);
+            FogContext.Changed += OnFogContextChanged;
             // Seed the "last seen" nonce so an existing request from before the
             // page loaded doesn't snap the viewport on first render.
             _lastSeenCenterNonce = State.PendingCenterRequest?.Nonce;
             base.OnInitialized();
         }
+
+        private void OnFogContextChanged() => InvokeAsync(StateHasChanged);
+
+        private bool IsFogPaintActive => IsHost && FogContext.Mode != FogPaintMode.Off;
 
         private async ValueTask OnStateChanged()
         {
@@ -221,6 +230,21 @@ namespace KnockBox.DndMapper.Pages.Components
                 {
                     Logger.LogWarning(ex, "Failed to load SVG metrics JS module.");
                 }
+
+                if (IsHost)
+                {
+                    try
+                    {
+                        _fogPaintModule = await JSRuntime.InvokeAsync<IJSObjectReference>(
+                            "import", "./_content/KnockBox.DndMapper/js/dndMapperFogPaint.js");
+                        _fogPaintRef = DotNetObjectReference.Create(this);
+                    }
+                    catch (JSDisconnectedException) { /* circuit teardown */ }
+                    catch (Exception ex)
+                    {
+                        Logger.LogWarning(ex, "Failed to load fog-paint JS module.");
+                    }
+                }
             }
             await base.OnAfterRenderAsync(firstRender);
         }
@@ -243,7 +267,19 @@ namespace KnockBox.DndMapper.Pages.Components
         public async ValueTask DisposeAsync()
         {
             TokenFocus.Focused -= OnTokenFocusRequested;
+            FogContext.Changed -= OnFogContextChanged;
             _stateSub?.Dispose();
+            if (_fogPaintModule is not null)
+            {
+                try { await _fogPaintModule.InvokeVoidAsync("cancelStroke"); }
+                catch (JSDisconnectedException) { /* circuit teardown */ }
+                catch (Exception) { /* ignore */ }
+                try { await _fogPaintModule.DisposeAsync(); }
+                catch (JSDisconnectedException) { /* circuit teardown */ }
+                _fogPaintModule = null;
+            }
+            _fogPaintRef?.Dispose();
+            _fogPaintRef = null;
             if (_metricsModule is not null)
             {
                 try { await _metricsModule.DisposeAsync(); }
@@ -432,8 +468,47 @@ namespace KnockBox.DndMapper.Pages.Components
             // ClickDeadZonePixels (see OnSvgMouseUp). Picker/handle rects stopPropagation,
             // so legitimate image interactions don't reach here.
             if (e.Button != MiddleMouseButton && e.Button != LeftMouseButton) return;
+
+            // Fog paint/erase mode intercepts left-clicks (middle still pans).
+            // The JS module takes over pointermove/pointerup for the duration of
+            // the stroke and flushes cells back via FlushFogStroke.
+            if (e.Button == LeftMouseButton && IsFogPaintActive && _fogPaintModule is not null && _fogPaintRef is not null)
+            {
+                try
+                {
+                    await _fogPaintModule.InvokeVoidAsync(
+                        "beginStroke", _svgId, _fogPaintRef, FogContext.BrushRadius, e.ClientX, e.ClientY);
+                }
+                catch (JSDisconnectedException) { /* circuit teardown */ }
+                catch (Exception ex)
+                {
+                    Logger.LogWarning(ex, "Failed to start fog paint stroke.");
+                }
+                return;
+            }
+
             BeginPan(e);
             await CaptureScaleAsync();
+        }
+
+        [JSInvokable]
+        public Task FlushFogStroke(int[] xs, int[] ys)
+        {
+            if (!IsHost || UserService.CurrentUser is null) return Task.CompletedTask;
+            if (xs is null || ys is null || xs.Length == 0 || xs.Length != ys.Length) return Task.CompletedTask;
+            if (FogContext.Mode == FogPaintMode.Off) return Task.CompletedTask;
+
+            var cells = new (int cx, int cy)[xs.Length];
+            for (var i = 0; i < xs.Length; i++) cells[i] = (xs[i], ys[i]);
+
+            var result = Engine.PaintFogAsync(
+                State, UserService.CurrentUser, Map.Id, cells,
+                fogged: FogContext.Mode == FogPaintMode.Paint);
+
+            if (result.TryGetFailure(out var err))
+                Logger.LogWarning("PaintFogAsync flush failed: {Error}", err.PublicMessage);
+
+            return Task.CompletedTask;
         }
 
         private void BeginPan(MouseEventArgs e)
