@@ -79,6 +79,15 @@
     top: 0;
     transform-origin: 50% 50%;
     will-change: transform;
+    /* preserve-3d is what makes the child <img>'s `backface-visibility:
+       hidden` (below) safe — it stops the default `flat` flattening that
+       would otherwise compute the children's normals AFTER this
+       wrapper's scale, occasionally orienting them away from the camera
+       and producing the "image element present but blank" bug. Keeping
+       children in 3D space lets Chromium promote each <img> to its own
+       composited layer so the wrapper's backing store stays empty and
+       does not balloon with `scale(zoom)`. */
+    transform-style: preserve-3d;
     /* No background — leaving this layer empty of paint commands keeps its
        backing store minimal so it composites the (independently promoted)
        image and SVG child layers cheaply. The void color lives on the
@@ -96,17 +105,24 @@
 }
 
 /* Each <img> needs its OWN GPU layer so its texture lives independently of
-   the wrapper's backing store. Without this, the wrapper (which is
-   layer-promoted via will-change) paints its image children into its own
-   monolithic tile grid — re-creating the SVG <image> problem under a
-   different surface. `will-change: transform` alone is enough to trigger
-   Chromium layer promotion on modern engines — pairing it with
-   `backface-visibility: hidden` here turned out to interact badly with the
-   parent wrapper's `translate3d(...) scale(...)`: at certain zoom levels
-   the composite normal flipped backward and Chromium culled the image
-   despite the element being sized correctly, manifesting as 200 OK on
-   /blob-share/ but a blank slot in the DOM. Keeping backface-visibility
-   at its default. */
+   the wrapper's backing store. Without per-child layers, the wrapper
+   paints its image children into its monolithic tile grid, and the
+   resulting backing store sizes itself by the wrapper's effective
+   rendered area W*cellPx*zoom × H*cellPx*zoom — at zoom = 10 with a
+   10MB image this balloons the GPU texture by ~100× and Chromium
+   recomposites it every frame during pan/zoom (the "smooth zoomed
+   out, laggy + GPU memory spike zoomed in" bug).
+
+   `will-change: transform` alone is supposed to be enough on modern
+   Chromium, but empirically isn't always — the parent's `translate3d`
+   appears to absorb the children into its layer. The canonical pair
+   that does reliably promote is `will-change: transform` +
+   `backface-visibility: hidden`. The earlier hazard of pairing them
+   (Chromium culling the image after flattening the children's normals
+   against the parent's `scale(zoom)`) is removed by the parent's
+   `transform-style: preserve-3d` (above) — children stay in 3D, their
+   normals are computed cleanly relative to the camera, and the
+   backface check correctly always-passes for our z = 0 images. */
 .dndm-image-layer img,
 .dndm-image-layer .dndm-image-placeholder {
     position: absolute;
@@ -114,6 +130,7 @@
     user-select: none;
     -webkit-user-drag: none;
     will-change: transform;
+    backface-visibility: hidden;
 }
 
 .dndm-image-placeholder {
