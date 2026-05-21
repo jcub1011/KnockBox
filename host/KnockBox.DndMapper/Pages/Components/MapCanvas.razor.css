@@ -326,7 +326,7 @@
    (5, 5) lands on the same map cell regardless of container shape. */
 /* Mounted inside .dndm-canvas-transform so the drawing surface rides the
    same pan/zoom as the map SVG. Sized to the wrapper's natural map area;
-   the SvgDrawingCanvas inside uses a viewBox of WidthCells*CellPixels x
+   the drawing surface inside uses a viewBox of WidthCells*CellPixels x
    HeightCells*CellPixels, which equals the wrapper's natural pixel size,
    so a stroke at viewBox (5,5) lands on the same cell regardless of
    pan/zoom state. */

@@ -305,16 +305,40 @@
 
     @if (IsHost && _markupActive)
     {
-        @* Sits inside .dndm-canvas-transform so the drawing surface rides
-           the same pan/zoom as the map SVG. While Space is held we add the
-           --pan modifier so left-click pointer events fall through to the
-           canvas-stage gesture surface and the viewport can pan. *@
+        @* MarkupOverlay sits inside .dndm-canvas-transform so the drawing
+           surface rides the same pan/zoom as the map SVG. The engine + toolbar
+           are rendered OUTSIDE this transform (below, in dndm-floating-markup-toolbar)
+           so the toolbar stays at viewport scale — the engine connects to the
+           overlay's <svg> by id (_markupSvgId).
+           While Space is held we add the --pan modifier so left-click pointer
+           events fall through to the canvas-stage gesture surface and the
+           viewport can pan. *@
         <div class="dndm-markup-overlay-mount @(_spaceHeld ? "dndm-markup-overlay-mount--pan" : null)">
-            <MarkupOverlay State="State" Map="Map" IsActive="true" />
+            <MarkupOverlay State="State" Map="Map" SvgId="@_markupSvgId" IsActive="@(!_spaceHeld)" />
         </div>
     }
     </div>
     </div>
+
+    @if (IsHost && _markupActive)
+    {
+        @* Engine lives OUTSIDE .dndm-canvas-transform — it emits no DOM. JS
+           interop attaches to the overlay's <svg> via _markupSvgId. *@
+        <SvgDrawingEngine @ref="_markupEngine" TargetSvgId="@_markupSvgId"
+                          BackgroundColor="transparent"
+                          StrokeCompleted="OnMarkupStrokeCompleted" />
+
+        @* Toolbar is a sibling of the engine, NOT nested inside its ChildContent.
+           We pass the engine by @ref so the toolbar binds to it directly without
+           going through a cascading value. OnAfterRenderAsync below force-rerenders
+           once _markupEngine binds. *@
+        @if (_markupEngine is not null)
+        {
+            <div class="dndm-floating-markup-toolbar">
+                <SvgDrawingToolbar Engine="@_markupEngine" />
+            </div>
+        }
+    }
 
     @if (IsHost && _contextMenuOpen)
     {

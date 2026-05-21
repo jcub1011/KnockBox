@@ -1,0 +1,468 @@
+@namespace KnockBox.Core.Components.Shared
+@using Microsoft.JSInterop
+@using Microsoft.AspNetCore.Components.Web
+@rendermode @(ToolbarRenderMode)
+@inherits ComponentBase
+@implements IDisposable
+
+@if (ResolvedEngine is null)
+{
+    <div class="toolbar-container">
+        <div class="svg-canvas-toolbar svg-canvas-toolbar-disabled" aria-disabled="true"></div>
+    </div>
+}
+else
+{
+<div class="toolbar-container">
+    <div class="svg-canvas-toolbar">
+
+        @* ── Color ───────────────────────────────────────────────────────────── *@
+        <div class="toolbar-group toolbar-collapsible toolbar-color-collapsible @(_colorPanelOpen ? "open" : "")">
+            <button type="button" class="toolbar-collapse-trigger toolbar-color-trigger"
+                    style="background-color: @ResolvedEngine.CurrentColor;"
+                    aria-label="Select color"
+                    aria-expanded="@(_colorPanelOpen ? "true" : "false")"
+                    @onclick="TogglePanel_Color"></button>
+            <div class="toolbar-collapse-panel toolbar-color-panel">
+                <div class="toolbar-swatches">
+                    @foreach (var swatch in _colorSwatches)
+                    {
+                        var isActive = string.Equals(swatch, ResolvedEngine.CurrentColor, StringComparison.OrdinalIgnoreCase);
+                        var capturedSwatch = swatch;
+                        <button type="button" class="toolbar-swatch @(isActive ? "toolbar-swatch-active" : "")"
+                                style="background-color: @swatch;"
+                                title="@swatch"
+                                aria-label="@($"Color {swatch}{(isActive ? " (selected)" : "")}")"
+                                aria-pressed="@(isActive ? "true" : "false")"
+                                @onclick="() => OnSwatchClick(capturedSwatch)"></button>
+                    }
+                </div>
+                <button type="button" class="toolbar-swatch toolbar-swatch-custom @(IsCustomColorActive() ? "toolbar-swatch-active" : "")"
+                        style="background-color: @_customSwatchColor;"
+                        title="Custom color"
+                        aria-label="@($"Custom color{(IsCustomColorActive() ? " (selected)" : "")}")"
+                        aria-pressed="@(IsCustomColorActive() ? "true" : "false")"
+                        @onclick="OnCustomSwatchClick"></button>
+                <input type="color" class="toolbar-color"
+                       value="@ResolvedEngine.CurrentColor"
+                       title="Custom color"
+                       aria-label="Custom color picker"
+                       @oninput="OnColorInput" />
+            </div>
+        </div>
+
+        <div class="toolbar-separator toolbar-separator-desktop"></div>
+
+        @* ── Size ────────────────────────────────────────────────────────────── *@
+        <div class="toolbar-group toolbar-size-group toolbar-collapsible toolbar-size-collapsible @(_sizePanelOpen ? "open" : "")">
+            <button type="button" class="toolbar-collapse-trigger toolbar-size-trigger"
+                    aria-label="Select brush size"
+                    aria-expanded="@(_sizePanelOpen ? "true" : "false")"
+                    @onclick="TogglePanel_Size">@CurrentSizeLabel</button>
+            <div class="toolbar-collapse-panel toolbar-size-panel">
+                @foreach (var preset in _sizePresets)
+                {
+                    var isActive = (int)ResolvedEngine.CurrentStrokeWidth == preset.Size;
+                    var capturedSize = preset.Size;
+                    <button type="button" class="toolbar-size-btn @(isActive ? "toolbar-size-btn-active" : "")"
+                            title="@preset.Label (@(preset.Size)px)"
+                            aria-label="@preset.Label brush size (@(preset.Size) pixels)"
+                            aria-pressed="@(isActive ? "true" : "false")"
+                            @onclick="() => OnSizePresetClick(capturedSize)">@preset.Label</button>
+                }
+                <input type="number" class="toolbar-size"
+                       min="1" max="30" step="1"
+                       value="@((int)ResolvedEngine.CurrentStrokeWidth)"
+                       title="Custom brush size"
+                       aria-label="Custom brush size"
+                       @onchange="OnSizeInputChange" />
+            </div>
+        </div>
+
+        @* ── Actions ─────────────────────────────────────────────────────────── *@
+        <div class="toolbar-actions">
+            <button type="button" class="toolbar-btn toolbar-btn-undo @(ResolvedEngine.CanUndo ? "" : "toolbar-btn-disabled")"
+                    title="Undo" aria-label="Undo last stroke"
+                    @onclick="OnUndoClick">
+                <svg class="toolbar-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12.5 8c-2.65 0-5.05 1.04-6.83 2.73L2.5 7.5v9h9l-3.19-3.19C9.77 12.07 11.07 11.5 12.5 11.5c2.65 0 4.93 1.64 5.85 3.95l2.94-1.05C20.05 11.1 16.58 8 12.5 8z" /></svg>
+            </button>
+            <button type="button" class="toolbar-btn toolbar-btn-redo @(ResolvedEngine.CanRedo ? "" : "toolbar-btn-disabled")"
+                    title="Redo" aria-label="Redo last undone stroke"
+                    @onclick="OnRedoClick">
+                <svg class="toolbar-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M18.4 10.6C16.55 8.99 14.15 8 11.5 8c-4.65 0-8.58 3.03-9.96 7.22L3.9 16a8.002 8.002 0 0 1 7.6-5.5c1.95 0 3.73.72 5.12 1.88L13 16h9V7l-3.6 3.6z" /></svg>
+            </button>
+
+            <div class="toolbar-collapsible toolbar-overflow-collapsible @(_overflowPanelOpen ? "open" : "")">
+                <button type="button" class="toolbar-collapse-trigger toolbar-overflow-trigger"
+                        aria-label="More tools"
+                        aria-expanded="@(_overflowPanelOpen ? "true" : "false")"
+                        @onclick="TogglePanel_Overflow">
+                    <svg class="toolbar-icon" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="19" cy="12" r="2" /></svg>
+                </button>
+                <div class="toolbar-collapse-panel toolbar-overflow-panel">
+                    <button type="button" class="toolbar-btn toolbar-btn-eraser @(ResolvedEngine.CurrentTool == "eraser" ? "toolbar-btn-active" : "")"
+                            title="Eraser tool"
+                            aria-label="Eraser tool"
+                            aria-pressed="@(ResolvedEngine.CurrentTool == "eraser" ? "true" : "false")"
+                            @onclick="OnEraserClick">
+                        <svg class="toolbar-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M16.24,3.56L21.19,8.5C21.97,9.29 21.97,10.55 21.19,11.34L12,20.53C10.44,22.09 7.91,22.09 6.34,20.53L2.81,17C2.03,16.21 2.03,14.95 2.81,14.16L11.66,5.31L16.24,3.56M15.13,4.96L12.04,6.12L14.88,8.96L17.97,7.8L15.13,4.96Z" /></svg>
+                    </button>
+                    <button type="button" class="toolbar-btn toolbar-btn-clear" title="Clear all" aria-label="Clear all strokes"
+                            @onclick="OnClearClick">
+                        <svg class="toolbar-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M16 9v10H8V9h8m-1.5-6h-5l-1 1H5v2h14V4h-3.5l-1-1zM18 7H6v12c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7z" /></svg>
+                    </button>
+                    <div class="toolbar-separator"></div>
+                    <button type="button" class="toolbar-btn toolbar-btn-fill @(ResolvedEngine.CurrentTool == "fill" ? "toolbar-btn-active" : "")"
+                            title="Paint bucket (flood fill area)"
+                            aria-label="Paint bucket tool"
+                            aria-pressed="@(ResolvedEngine.CurrentTool == "fill" ? "true" : "false")"
+                            @onclick="OnFillClick">
+                        <svg class="toolbar-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M16.56 8.94L7.62 0 6.21 1.41l2.38 2.38-5.15 5.15a1.49 1.49 0 0 0 0 2.12l5.5 5.5c.29.29.68.44 1.06.44s.77-.15 1.06-.44l5.5-5.5c.59-.58.59-1.53 0-2.12zM5.21 10L10 5.21 14.79 10H5.21zM19 11.5s-2 2.17-2 3.5a2 2 0 1 0 4 0c0-1.33-2-3.5-2-3.5z" /></svg>
+                    </button>
+                    <button type="button" class="toolbar-btn toolbar-btn-export" title="Export SVG" aria-label="Export drawing as SVG"
+                            @onclick="OnExportClick">
+                        <svg class="toolbar-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" /></svg>
+                    </button>
+                    @if (EnableSharing)
+                    {
+                        <button type="button" class="toolbar-btn toolbar-btn-copy" title="Copy drawing code to clipboard" aria-label="Copy drawing code to clipboard"
+                                @onclick="OnCopyClick">
+                            <svg class="toolbar-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z" /></svg>
+                        </button>
+                        <button type="button" class="toolbar-btn toolbar-btn-paste" title="Paste drawing from clipboard" aria-label="Paste drawing from clipboard"
+                                @onclick="OnPasteClick">
+                            <svg class="toolbar-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M19 2h-4.18C14.4.84 13.3 0 12 0S9.6.84 9.18 2H5c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-7 0c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm7 18H5V4h2v3h10V4h2v16z" /></svg>
+                        </button>
+                    }
+                    @if (_toastText is not null)
+                    {
+                        <span class="toolbar-copy-toast" @key="_toastKey">@_toastText</span>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (_anyPanelOpen)
+{
+    @* Scrim to capture outside clicks and close popovers on mobile. *@
+    <div class="toolbar-scrim" @onclick="CloseAllPanels"></div>
+}
+}
+
+@code {
+    // Matches the host's Routes render mode (App.razor: `new InteractiveServerRenderMode(prerender: false)`).
+    // The file-level `@rendermode @ToolbarRenderMode` directive uses this so the toolbar's @onclick
+    // handlers wire up to SignalR even when consumed across the RCL boundary — without it, Blazor
+    // renders this component as static SSR and emits @onclick="..." as a literal HTML attribute.
+    private static readonly InteractiveServerRenderMode ToolbarRenderMode = new(prerender: false);
+
+    [Inject] private IJSRuntime JSRuntime { get; set; } = default!;
+    [Inject] private ILogger<SvgDrawingToolbar> Logger { get; set; } = default!;
+
+    /// <summary>
+    /// Explicit engine override. Wins over the cascaded engine when set — useful when
+    /// the toolbar is rendered outside the engine's render tree (e.g. floated on the
+    /// viewport while the engine lives inside a transformed canvas).
+    /// </summary>
+    [Parameter] public SvgDrawingEngine? Engine { get; set; }
+
+    /// <summary>
+    /// Engine pulled from a wrapping <c>&lt;SvgDrawingEngine&gt;</c>'s cascade. Used when
+    /// no explicit <see cref="Engine"/> parameter is supplied.
+    /// </summary>
+    [CascadingParameter] public SvgDrawingEngine? CascadedEngine { get; set; }
+
+    private SvgDrawingEngine? ResolvedEngine => Engine ?? CascadedEngine;
+
+    /// <summary>Shows Copy and Paste buttons when <c>true</c>.</summary>
+    [Parameter] public bool EnableSharing { get; set; }
+
+    private SvgDrawingEngine? _subscribedEngine;
+    private IJSObjectReference? _jsModule;
+
+    private bool _colorPanelOpen;
+    private bool _sizePanelOpen;
+    private bool _overflowPanelOpen;
+    private bool _anyPanelOpen => _colorPanelOpen || _sizePanelOpen || _overflowPanelOpen;
+
+    private string _customSwatchColor = "#808080";
+    private string? _toastText;
+    private int _toastKey;
+    private CancellationTokenSource? _toastCts;
+
+    // Curated palette — bold, complementary colors.
+    private static readonly string[] _colorSwatches =
+    [
+        "#000000", "#ffffff", "#ef4444",
+        "#3b82f6", "#22c55e", "#f59e0b",
+    ];
+
+    // Preset brush sizes: small, medium, large.
+    private static readonly (string Label, int Size)[] _sizePresets =
+    [
+        ("S", 3), ("M", 8), ("L", 16),
+    ];
+
+    private bool IsCustomColorActive()
+    {
+        var eng = ResolvedEngine;
+        if (eng is null) return false;
+        return !_colorSwatches.Any(s =>
+            string.Equals(s, eng.CurrentColor, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private string CurrentSizeLabel
+    {
+        get
+        {
+            var eng = ResolvedEngine;
+            if (eng is null) return "M";
+            var size = (int)eng.CurrentStrokeWidth;
+            return _sizePresets.FirstOrDefault(p => p.Size == size).Label ?? size.ToString();
+        }
+    }
+
+    protected override void OnParametersSet()
+    {
+        var eng = ResolvedEngine;
+        if (!ReferenceEquals(_subscribedEngine, eng))
+        {
+            if (_subscribedEngine is not null)
+                _subscribedEngine.StateChanged -= OnEngineStateChanged;
+            _subscribedEngine = eng;
+            if (_subscribedEngine is not null)
+            {
+                _subscribedEngine.StateChanged += OnEngineStateChanged;
+                if (IsCustomColorActive())
+                    _customSwatchColor = _subscribedEngine.CurrentColor;
+            }
+        }
+    }
+
+    private async ValueTask OnEngineStateChanged()
+    {
+        var eng = ResolvedEngine;
+        if (eng is not null && IsCustomColorActive())
+            _customSwatchColor = eng.CurrentColor;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task<IJSObjectReference> GetJsModuleAsync()
+    {
+        return _jsModule ??= await JSRuntime.InvokeAsync<IJSObjectReference>(
+            "import", "/_content/KnockBox.Core/js/svgDrawingCanvas.js");
+    }
+
+    private void CloseAllPanels()
+    {
+        _colorPanelOpen = false;
+        _sizePanelOpen = false;
+        _overflowPanelOpen = false;
+    }
+
+    private void TogglePanel_Color()
+    {
+        var willOpen = !_colorPanelOpen;
+        CloseAllPanels();
+        _colorPanelOpen = willOpen;
+    }
+
+    private void TogglePanel_Size()
+    {
+        var willOpen = !_sizePanelOpen;
+        CloseAllPanels();
+        _sizePanelOpen = willOpen;
+    }
+
+    private void TogglePanel_Overflow()
+    {
+        var willOpen = !_overflowPanelOpen;
+        CloseAllPanels();
+        _overflowPanelOpen = willOpen;
+    }
+
+    private Task OnSwatchClick(string color)
+        => SetColorAndCloseAsync(color);
+
+    private Task OnCustomSwatchClick()
+        => SetColorAndCloseAsync(_customSwatchColor);
+
+    private async Task OnColorInput(ChangeEventArgs e)
+    {
+        var eng = ResolvedEngine;
+        if (eng is null) return;
+        var color = e.Value?.ToString();
+        if (string.IsNullOrEmpty(color)) return;
+        _customSwatchColor = color;
+        await eng.SetColorAsync(color);
+    }
+
+    private async Task SetColorAndCloseAsync(string color)
+    {
+        Logger.LogInformation("[SVGToolbar] Swatch clicked: {Color}", color);
+        var eng = ResolvedEngine;
+        if (eng is null)
+        {
+            Logger.LogWarning("[SVGToolbar] Swatch click: ResolvedEngine is null — Engine={EngineNull} CascadedEngine={CascadeNull}",
+                Engine is null ? "null" : "set", CascadedEngine is null ? "null" : "set");
+            return;
+        }
+        CloseAllPanels();
+        await eng.SetColorAsync(color);
+    }
+
+    private async Task OnSizePresetClick(int size)
+    {
+        var eng = ResolvedEngine;
+        if (eng is null) return;
+        CloseAllPanels();
+        await eng.SetStrokeWidthAsync(size);
+    }
+
+    private async Task OnSizeInputChange(ChangeEventArgs e)
+    {
+        var eng = ResolvedEngine;
+        if (eng is null) return;
+        if (!int.TryParse(e.Value?.ToString(), out var width)) return;
+        await eng.SetStrokeWidthAsync(width);
+    }
+
+    private Task OnUndoClick() => ResolvedEngine?.UndoAsync() ?? Task.CompletedTask;
+    private Task OnRedoClick() => ResolvedEngine?.RedoAsync() ?? Task.CompletedTask;
+
+    private async Task OnClearClick()
+    {
+        CloseAllPanels();
+        var eng = ResolvedEngine;
+        if (eng is not null) await eng.ClearAsync();
+    }
+
+    private async Task OnEraserClick()
+    {
+        Logger.LogInformation("[SVGToolbar] Eraser clicked.");
+        CloseAllPanels();
+        var eng = ResolvedEngine;
+        if (eng is null)
+        {
+            Logger.LogWarning("[SVGToolbar] Eraser click: ResolvedEngine is null.");
+            return;
+        }
+        await eng.SetToolAsync("eraser");
+    }
+
+    private async Task OnFillClick()
+    {
+        CloseAllPanels();
+        var eng = ResolvedEngine;
+        if (eng is not null) await eng.SetToolAsync("fill");
+    }
+
+    private async Task OnExportClick()
+    {
+        CloseAllPanels();
+        var eng = ResolvedEngine;
+        if (eng is not null) await eng.ExportSvgAsync();
+    }
+
+    private async Task OnCopyClick()
+    {
+        CloseAllPanels();
+        var eng = ResolvedEngine;
+        if (eng is null) return;
+        try
+        {
+            var code = await eng.CopyToShareCodeAsync();
+            if (string.IsNullOrEmpty(code))
+            {
+                await ShowToastAsync("Nothing to copy", 1500);
+                return;
+            }
+            try
+            {
+                var module = await GetJsModuleAsync();
+                await module.InvokeVoidAsync("writeClipboardText", code);
+                await ShowToastAsync("Copied!", 1500);
+            }
+            catch
+            {
+                await ShowToastAsync(code, 3000);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "[SVGToolbar] Copy failed.");
+            await ShowToastAsync("Copy failed", 2000);
+        }
+    }
+
+    private async Task OnPasteClick()
+    {
+        CloseAllPanels();
+        var eng = ResolvedEngine;
+        if (eng is null) return;
+        try
+        {
+            var module = await GetJsModuleAsync();
+            string text;
+            try
+            {
+                text = await module.InvokeAsync<string>("readClipboardText");
+            }
+            catch
+            {
+                await ShowToastAsync("Clipboard unavailable", 2000);
+                return;
+            }
+            var code = (text ?? string.Empty).Trim().ToUpperInvariant();
+            if (string.IsNullOrEmpty(code)) return;
+            var ok = await eng.PasteFromShareCodeAsync(code);
+            if (!ok) await ShowToastAsync("Invalid code", 2000);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "[SVGToolbar] Paste failed.");
+            await ShowToastAsync("Paste failed", 2000);
+        }
+    }
+
+    private async Task ShowToastAsync(string text, int durationMs)
+    {
+        _toastCts?.Cancel();
+        _toastCts?.Dispose();
+        _toastCts = new CancellationTokenSource();
+        _toastText = text;
+        _toastKey++;
+        StateHasChanged();
+        try
+        {
+            await Task.Delay(durationMs, _toastCts.Token);
+            _toastText = null;
+            StateHasChanged();
+        }
+        catch (TaskCanceledException) { }
+    }
+
+    public void Dispose()
+    {
+        _toastCts?.Cancel();
+        _toastCts?.Dispose();
+        if (_subscribedEngine is not null)
+        {
+            _subscribedEngine.StateChanged -= OnEngineStateChanged;
+            _subscribedEngine = null;
+        }
+        if (_jsModule is not null)
+        {
+            _ = DisposeJsModuleAsync();
+        }
+    }
+
+    private async Task DisposeJsModuleAsync()
+    {
+        try { await _jsModule!.DisposeAsync(); }
+        catch (JSDisconnectedException) { }
+        catch (ObjectDisposedException) { }
+    }
+}

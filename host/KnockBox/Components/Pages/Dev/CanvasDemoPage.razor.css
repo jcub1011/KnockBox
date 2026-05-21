@@ -31,3 +31,29 @@
     color: #888;
     text-align: center;
 }
+
+.demo-canvas {
+    display: block;
+    cursor: crosshair;
+    touch-action: none;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    margin-top: 8px;
+}
+
+.demo-custom-toolbar {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    padding: 8px;
+    background: #fafafa;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    margin-bottom: 8px;
+}
+
+.demo-custom-toolbar button,
+.demo-custom-toolbar input {
+    font-size: 0.85rem;
+    padding: 4px 8px;
+}

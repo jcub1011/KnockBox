@@ -39,6 +39,7 @@ namespace KnockBox.DndMapper.Pages.Components
         [Inject] protected DndMapperLibraryService Library { get; set; } = default!;
 
         [CascadingParameter] public DndMapperViewport? Viewport { get; set; }
+        [CascadingParameter] public DndMapperToastService? Toasts { get; set; }
 
         private const double MinZoom = 0.01;
         private const double MaxZoom = 10.0;
@@ -46,6 +47,12 @@ namespace KnockBox.DndMapper.Pages.Components
         private const int MiddleMouseButton = 1;
 
         private readonly string _svgId = $"dndm-svg-{Guid.NewGuid():N}";
+        private readonly string _markupSvgId = $"svg-canvas-{Guid.NewGuid():N}";
+        private SvgDrawingEngine? _markupEngine;
+        // Tracks whether we've already triggered the extra render that follows the
+        // engine's @ref binding. Toggled off when _markupActive flips false so the
+        // re-render fires again on the next activation.
+        private bool _markupToolbarRenderTriggered;
         private ElementReference _frameRef;
 
         private double _panX;
@@ -200,7 +207,7 @@ namespace KnockBox.DndMapper.Pages.Components
         }
 
         // ── Markup overlay (v1.x — §5.6) ─────────────────────────────────
-        // Host-only toggle: when true, an interactive SvgDrawingCanvas covers the
+        // Host-only toggle: when true, an interactive SvgDrawingEngine + Toolbar covers the
         // map. The read-only saved markup is rendered inline on the SVG so pan
         // and zoom apply uniformly for everyone.
         private bool _markupActive;
@@ -382,6 +389,41 @@ namespace KnockBox.DndMapper.Pages.Components
             await PushJsMode();
         }
 
+        /// <summary>
+        /// Fires after every stroke / undo / redo / fill / clear from the markup
+        /// drawing engine. Reads the serialized SVG (in pixel space because the
+        /// surface's viewBox is in pixels) and persists it as cell-space markup by
+        /// wrapping in <c>scale(1 / CellPixels)</c>.
+        /// </summary>
+        private async Task OnMarkupStrokeCompleted(int strokeCount)
+        {
+            if (_markupEngine is null) return;
+            var user = UserService.CurrentUser;
+            if (user is null) return;
+
+            var svg = await _markupEngine.GetSvgContentAsync();
+            if (string.IsNullOrWhiteSpace(svg))
+            {
+                var clearResult = Engine.UpdateMapMarkupAsync(State, user, Map.Id, null);
+                if (clearResult.TryGetFailure(out var clearErr) && Toasts is not null)
+                {
+                    await Toasts.Push(clearErr.PublicMessage, DndMapperToastTone.Danger);
+                }
+                return;
+            }
+
+            var inv = 1.0 / Map.Grid.CellPixels;
+            // Invariant culture so e.g. "0.02" doesn't become "0,02" under locales
+            // where comma is the decimal separator — SVG requires `.`.
+            var scaleStr = inv.ToString("0.######", CultureInfo.InvariantCulture);
+            var wrapped = $"<g transform=\"scale({scaleStr})\">{svg}</g>";
+            var saveResult = Engine.UpdateMapMarkupAsync(State, user, Map.Id, wrapped);
+            if (saveResult.TryGetFailure(out var saveErr) && Toasts is not null)
+            {
+                await Toasts.Push(saveErr.PublicMessage, DndMapperToastTone.Danger);
+            }
+        }
+
         private void ToggleFocusMode()
         {
             _focusActive = !_focusActive;
@@ -535,6 +577,18 @@ namespace KnockBox.DndMapper.Pages.Components
 
         protected override async Task OnAfterRenderAsync(bool firstRender)
         {
+            // The floating markup toolbar is rendered as a sibling of the engine and
+            // takes the engine via @ref. @ref bindings happen during render commit, so
+            // on the first render after _markupActive flips on, _markupEngine is null
+            // and the toolbar block is skipped. Force a re-render once the ref binds
+            // so the toolbar appears.
+            if (_markupActive && _markupEngine is not null && !_markupToolbarRenderTriggered)
+            {
+                _markupToolbarRenderTriggered = true;
+                StateHasChanged();
+            }
+            if (!_markupActive) _markupToolbarRenderTriggered = false;
+
             // Focus the frame on first render so Space/Shift work without the user clicking first.
             if (firstRender)
             {

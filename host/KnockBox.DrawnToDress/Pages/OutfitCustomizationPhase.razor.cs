@@ -30,7 +30,8 @@ namespace KnockBox.DrawnToDress.Pages
 
         [Parameter] public int OutfitRound { get; set; } = 1;
 
-        private SvgDrawingCanvas? _sketchCanvas;
+        private SvgDrawingEngine? _sketchEngine;
+        private readonly string _svgId = $"svg-canvas-{Guid.NewGuid():N}";
         private string _outfitName = string.Empty;
         private bool _submitting;
         private string? _errorMessage;
@@ -231,9 +232,9 @@ namespace KnockBox.DrawnToDress.Pages
             try
             {
                 string? sketchSvg = null;
-                if (_sketchCanvas is not null)
+                if (_sketchEngine is not null)
                 {
-                    var svg = await _sketchCanvas.GetSvgContentAsync();
+                    var svg = await _sketchEngine.GetSvgContentAsync();
                     sketchSvg = string.IsNullOrWhiteSpace(svg) ? null : svg;
                 }
 

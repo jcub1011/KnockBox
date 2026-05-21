@@ -311,12 +311,18 @@ public static class KnockBoxPlatformExtensions
         }
 
         // The Platform assembly contains routable pages (Home, Error, NotFound).
-        // Game plugin assemblies contain game-specific pages. Both must be
-        // registered so ASP.NET Core endpoint routing discovers them alongside
-        // the root component's own assembly.
+        // The Core assembly contains shared Razor components (e.g. SvgDrawingEngine,
+        // SvgDrawingToolbar) whose @onclick handlers require interactive registration
+        // — without listing Core here, components from it render as static SSR even
+        // when their parent is interactive, so click handlers never wire up.
+        // Game plugin assemblies contain game-specific pages. All must be registered
+        // so ASP.NET Core endpoint routing discovers them alongside the root
+        // component's own assembly AND so Blazor wires interactive event handlers
+        // for components defined there.
         var gamePluginAssemblies = app.Services.GetRequiredService<GamePluginAssemblies>();
         var additionalAssemblies = gamePluginAssemblies.Assemblies
-            .Append(typeof(KnockBoxPlatformExtensions).Assembly);
+            .Append(typeof(KnockBoxPlatformExtensions).Assembly)
+            .Append(typeof(KnockBox.Core.Components.Shared.SvgDrawingEngine).Assembly);
 
         // Plugin HTTP dispatcher — `/api/plugins/{routeIdentifier}/{**subPath}`.
         // Inert until a plugin opts in by implementing IGameEngineHttpHandler;

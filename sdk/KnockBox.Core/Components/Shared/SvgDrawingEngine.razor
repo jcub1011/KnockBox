@@ -1,0 +1,12 @@
+@namespace KnockBox.Core.Components.Shared
+@inherits ComponentBase
+@implements IAsyncDisposable
+
+@*  Headless drawing engine. Renders only its ChildContent — the engine itself emits
+    no DOM. Wraps children in a CascadingValue so <SvgDrawingToolbar> (or any custom
+    toolbar) inside it can pull the engine via [CascadingParameter] without the
+    first-render @ref-binding race. *@
+
+<CascadingValue TValue="SvgDrawingEngine" Value="@Self">
+    @ChildContent
+</CascadingValue>
