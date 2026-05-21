@@ -302,18 +302,18 @@
             </g>
         }
     </svg>
-    </div>
 
     @if (IsHost && _markupActive)
     {
-        @* Sits inside .dndm-canvas-stage so its inset:0 covers exactly
-           the visible map area. Both this surface and the underlying
-           MapCanvas SVG use the same preserveAspectRatio rule, so a
-           stroke at viewBox coords (5, 5) lands on the same cell. *@
-        <div class="dndm-markup-overlay-mount">
+        @* Sits inside .dndm-canvas-transform so the drawing surface rides
+           the same pan/zoom as the map SVG. While Space is held we add the
+           --pan modifier so left-click pointer events fall through to the
+           canvas-stage gesture surface and the viewport can pan. *@
+        <div class="dndm-markup-overlay-mount @(_spaceHeld ? "dndm-markup-overlay-mount--pan" : null)">
             <MarkupOverlay State="State" Map="Map" IsActive="true" />
         </div>
     }
+    </div>
     </div>
 
     @if (IsHost && _contextMenuOpen)

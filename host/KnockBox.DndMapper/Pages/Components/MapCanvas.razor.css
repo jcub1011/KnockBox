@@ -167,6 +167,11 @@
    state — that's on the wrapper now. */
 .dndm-map-canvas {
     display: block;
+    /* Positioned so the SVG stacks above the absolutely-positioned
+       .dndm-image-layer sibling; otherwise fog/markup/focus/tokens inside
+       the SVG end up under the bitmaps. */
+    position: relative;
+    z-index: 1;
     cursor: grab;
     touch-action: none;
 }
@@ -302,6 +307,15 @@
     /* The SVG inside applies a CSS transform during pan/zoom; clip it here
        so a scaled-up SVG cannot visually spill over the sibling toolbar. */
     overflow: hidden;
+    /* Block text selection anywhere in the map area. Tokens render SVG
+       <text> for initials/stack counts; without this, dragging across a
+       glyph would highlight it and the next mousedown would start a
+       browser text-drag instead of the active tool's gesture. A scoped
+       .unselectable rule on TokenLayer was not enough because tokens
+       rendered via RenderTreeBuilder in the code-behind don't pick up
+       the scoped-CSS attribute. */
+    user-select: none;
+    -webkit-user-select: none;
 }
 
 /* The drawing surface mounts here when the host enables markup. It
@@ -310,17 +324,24 @@
    the underlying SVG and the drawing surface share preserveAspectRatio
    "xMidYMid meet" with a viewBox in grid-cell units, so a stroke at
    (5, 5) lands on the same map cell regardless of container shape. */
+/* Mounted inside .dndm-canvas-transform so the drawing surface rides the
+   same pan/zoom as the map SVG. Sized to the wrapper's natural map area;
+   the SvgDrawingCanvas inside uses a viewBox of WidthCells*CellPixels x
+   HeightCells*CellPixels, which equals the wrapper's natural pixel size,
+   so a stroke at viewBox (5,5) lands on the same cell regardless of
+   pan/zoom state. */
 .dndm-markup-overlay-mount {
     position: absolute;
-    top: 0;
-    bottom: 0;
-    /* Inset by the live rail widths inherited from .dnd-mapper-playing.
-       Rails overlap the canvas, so the visible map area is the canvas
-       minus those gutters — the drawing surface must match that area. */
-    left: var(--dndm-rail-pad-left, 0px);
-    right: var(--dndm-rail-pad-right, 0px);
-    z-index: 4;
+    inset: 0;
+    z-index: 2;
     display: flex;
+}
+
+/* When the host holds Space we want left-click to fall through to the
+   gesture surface (canvas-stage) so the viewport can start a pan. */
+.dndm-markup-overlay-mount--pan,
+.dndm-markup-overlay-mount--pan * {
+    pointer-events: none;
 }
 
 .dndm-markup-overlay-mount > * {

@@ -413,6 +413,12 @@ namespace KnockBox.DndMapper.Pages.Components
             var result = Engine.ClearFocusRect(State, UserService.CurrentUser);
             if (result.TryGetFailure(out var err))
                 Logger.LogWarning("ClearFocusRect failed: {Error}", err.PublicMessage);
+            if (_focusActive)
+            {
+                _focusActive = false;
+                _ = CancelFocusDragJs();
+                _ = PushJsMode();
+            }
         }
 
         private async ValueTask OnTokenFocusRequested(Guid tokenId)
@@ -447,6 +453,10 @@ namespace KnockBox.DndMapper.Pages.Components
 
         private string CurrentJsMode()
         {
+            // Space-hold defeats the tool gate so the host can left-click pan
+            // while a tool is armed; dndMapperViewport.js's mousedown handler
+            // only blocks left-button pan when mode != 'none'.
+            if (_spaceHeld) return "none";
             if (_markupActive) return "markup";
             if (_focusActive) return "focus";
             if (IsFogPaintActive) return "fog";
@@ -806,12 +816,20 @@ namespace KnockBox.DndMapper.Pages.Components
 
         private void OnKeyDown(KeyboardEventArgs e)
         {
-            if (e.Key == " " || e.Code == "Space") _spaceHeld = true;
+            if ((e.Key == " " || e.Code == "Space") && !_spaceHeld)
+            {
+                _spaceHeld = true;
+                _ = PushJsMode();
+            }
         }
 
         private void OnKeyUp(KeyboardEventArgs e)
         {
-            if (e.Key == " " || e.Code == "Space") _spaceHeld = false;
+            if ((e.Key == " " || e.Code == "Space") && _spaceHeld)
+            {
+                _spaceHeld = false;
+                _ = PushJsMode();
+            }
         }
 
         private async Task OnSvgMouseDown(MouseEventArgs e)
