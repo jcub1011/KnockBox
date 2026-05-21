@@ -17,7 +17,7 @@
 
 const instances = new Map();
 
-const MIN_ZOOM = 0.10;
+const MIN_ZOOM = 0.01;
 const MAX_ZOOM = 10.0;
 const CLICK_DEAD_ZONE_PX = 3;
 const WHEEL_COMMIT_DEBOUNCE_MS = 140;

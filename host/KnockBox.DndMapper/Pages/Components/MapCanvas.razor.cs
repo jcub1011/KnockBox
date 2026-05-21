@@ -40,7 +40,7 @@ namespace KnockBox.DndMapper.Pages.Components
 
         [CascadingParameter] public DndMapperViewport? Viewport { get; set; }
 
-        private const double MinZoom = 0.10;
+        private const double MinZoom = 0.01;
         private const double MaxZoom = 10.0;
         private const int LeftMouseButton = 0;
         private const int MiddleMouseButton = 1;
