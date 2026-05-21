@@ -269,20 +269,22 @@ namespace KnockBox.DndMapperTests.Unit
         [TestMethod]
         public void UpdateGridAsync_WidthBelowMinimum_ReturnsError()
         {
+            // Minimum cell count was relaxed to 1 (was 5); 0 still fails.
             var c = _engine.CreateMapAsync(_state, _host, "A");
             Assert.IsTrue(c.TryGetSuccess(out var mapId));
 
-            var update = _engine.UpdateGridAsync(_state, _host, mapId, new GridConfig { WidthCells = 4 });
+            var update = _engine.UpdateGridAsync(_state, _host, mapId, new GridConfig { WidthCells = 0 });
             Assert.IsTrue(update.IsFailure);
         }
 
         [TestMethod]
         public void UpdateGridAsync_HeightAboveMaximum_ReturnsError()
         {
+            // Maximum cell count was raised to 1000 (was 200); 1001 still fails.
             var c = _engine.CreateMapAsync(_state, _host, "A");
             Assert.IsTrue(c.TryGetSuccess(out var mapId));
 
-            var update = _engine.UpdateGridAsync(_state, _host, mapId, new GridConfig { HeightCells = 201 });
+            var update = _engine.UpdateGridAsync(_state, _host, mapId, new GridConfig { HeightCells = 1001 });
             Assert.IsTrue(update.IsFailure);
         }
 

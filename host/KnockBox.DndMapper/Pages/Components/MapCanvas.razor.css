@@ -104,6 +104,30 @@
     pointer-events: none;
 }
 
+/* GPU-tiled grid replacement for the per-cell SVG <line> elements. Two
+   linear-gradients produce one 1px vertical and one 1px horizontal line
+   per --dndm-cell-px tile; the compositor handles the tiling natively
+   so there's zero DOM count and no per-render markup churn. The box-shadow
+   inset paints the trailing right + bottom edge lines that the tile pattern
+   alone can't place — the gradient draws a line at the LEFT/TOP of each
+   tile (x = 0, cellPx, …, (W-1)·cellPx), giving W vertical lines; the
+   shadow adds the (W+1)th at the right edge to match the SVG version's
+   `x = 0 .. WidthCells inclusive`. Sits between the image-layer and the
+   SVG inside .dndm-canvas-transform so tokens/fog/handles still paint
+   over it. */
+.dndm-grid-background {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-image:
+        linear-gradient(to right, var(--dndm-grid-line) 1px, transparent 1px),
+        linear-gradient(to bottom, var(--dndm-grid-line) 1px, transparent 1px);
+    background-size: var(--dndm-cell-px) var(--dndm-cell-px);
+    box-shadow:
+        inset -1px 0 0 var(--dndm-grid-line),
+        inset 0 -1px 0 var(--dndm-grid-line);
+}
+
 /* Each <img> needs its OWN GPU layer so its texture lives independently of
    the wrapper's backing store. Without per-child layers, the wrapper
    paints its image children into its monolithic tile grid, and the

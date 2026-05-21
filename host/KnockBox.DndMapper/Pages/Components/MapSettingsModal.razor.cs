@@ -48,9 +48,9 @@ namespace KnockBox.DndMapper.Pages.Components
 
         private async Task OnSaveInternal()
         {
-            if (_width < 5 || _width > 200) { _error = "Width must be 5–200 cells."; return; }
-            if (_height < 5 || _height > 200) { _error = "Height must be 5–200 cells."; return; }
-            if (_cellPixels < 8 || _cellPixels > 200) { _error = "Cell size must be 8–200 pixels."; return; }
+            if (_width < 1 || _width > 1000) { _error = "Width must be 1–1000 cells."; return; }
+            if (_height < 1 || _height > 1000) { _error = "Height must be 1–1000 cells."; return; }
+            if (_cellPixels < 1 || _cellPixels > 1000) { _error = "Cell size must be 1–1000 pixels."; return; }
 
             _error = null;
             var grid = new GridConfig

@@ -267,12 +267,12 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             if (caller is null) return Result.FromError("Caller is required.");
             if (newGrid is null) return Result.FromError("Grid is required.");
             if (!IsHost(state, caller)) return Result.FromError("Only the host may update grid configuration.");
-            if (newGrid.WidthCells < 5 || newGrid.WidthCells > 200)
-                return Result.FromError("Grid width must be between 5 and 200 cells.");
-            if (newGrid.HeightCells < 5 || newGrid.HeightCells > 200)
-                return Result.FromError("Grid height must be between 5 and 200 cells.");
-            if (newGrid.CellPixels < 1)
-                return Result.FromError("Cell pixel size must be at least 1.");
+            if (newGrid.WidthCells < 1 || newGrid.WidthCells > 1000)
+                return Result.FromError("Grid width must be between 1 and 1000 cells.");
+            if (newGrid.HeightCells < 1 || newGrid.HeightCells > 1000)
+                return Result.FromError("Grid height must be between 1 and 1000 cells.");
+            if (newGrid.CellPixels < 1 || newGrid.CellPixels > 1000)
+                return Result.FromError("Cell pixel size must be between 1 and 1000.");
 
             string? error = null;
             var exec = state.Execute(() =>

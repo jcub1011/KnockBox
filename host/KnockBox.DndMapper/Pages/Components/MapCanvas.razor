@@ -78,7 +78,7 @@
        property so the `transform` property is exclusively owned by the
        viewport module. *@
     <div class="dndm-canvas-transform"
-         style="width:@(stageNaturalW)px; height:@(stageNaturalH)px;">
+         style="width:@(stageNaturalW)px; height:@(stageNaturalH)px; --dndm-cell-px:@(cellPx)px; --dndm-grid-line:@Map.Grid.LineColor;">
         @* Bitmap layer: HTML <img> per visible image. HTML <img> elements
            live in their own GPU layer (unlike SVG <image>, which paints into
            the SVG raster surface and thrashes the compositor for large
@@ -116,6 +116,17 @@
                 }
             }
         </div>
+
+    @* GPU-tiled grid via .dndm-grid-background's two linear-gradients +
+       inset box-shadow (see MapCanvas.razor.css). Sits between the
+       image-layer and the SVG so tokens/fog/handles still paint on top
+       of the grid, and images sit below — same visual ordering the
+       SVG-based grid had. Omitted from the DOM entirely when the host
+       toggles "Grid" off. *@
+    @if (LocalShowGridLines)
+    {
+        <div class="dndm-grid-background"></div>
+    }
 
     @* viewBox is pinned to the map's base dimensions (in cell units). The
        SVG's own size is locked in CSS px so 1 cell = cellPx in both
@@ -185,21 +196,8 @@
             }
         }
 
-        @if (LocalShowGridLines)
-        {
-            <g class="dndm-grid-layer" pointer-events="none">
-                @for (int x = 0; x <= Map.Grid.WidthCells; x++)
-                {
-                    <line x1="@x" y1="0" x2="@x" y2="@Map.Grid.HeightCells"
-                          stroke="@Map.Grid.LineColor" stroke-width="0.02" />
-                }
-                @for (int y = 0; y <= Map.Grid.HeightCells; y++)
-                {
-                    <line x1="0" y1="@y" x2="@Map.Grid.WidthCells" y2="@y"
-                          stroke="@Map.Grid.LineColor" stroke-width="0.02" />
-                }
-            </g>
-        }
+        @* Grid lines live in .dndm-grid-background (a sibling div) now,
+           not in the SVG. See the @if block above the <svg> opening tag. *@
 
         @* Saved markup renders inline so pan + zoom apply uniformly across all
            viewers (host's interactive overlay below uses a fixed viewBox). *@
