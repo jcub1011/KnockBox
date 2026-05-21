@@ -7,7 +7,7 @@
 @inherits DisposableComponent
 @implements IAsyncDisposable
 
-<g class="dndm-token-layer">
+<g class="dndm-token-layer" pointer-events="@(InteractionsDisabled ? "none" : "auto")">
     @if (Map is not null)
     {
         @foreach (var stack in Stacks)

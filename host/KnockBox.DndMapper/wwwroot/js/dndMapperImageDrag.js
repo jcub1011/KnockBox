@@ -9,6 +9,8 @@
  * that path.
  */
 
+import { clientToSvgPoint } from "./dndMapperSvgMetrics.js";
+
 const instances = new Map();
 
 const MIN_DIM = 0.1;
@@ -17,13 +19,9 @@ const MIN_DIM = 0.1;
 // re-snapped to the original transform when the cursor barely moved).
 const DRAG_THRESHOLD_SQ = 0.0009;
 
-function getSvgCoords(svg, svgPoint, clientX, clientY) {
-    svgPoint.x = clientX;
-    svgPoint.y = clientY;
-    const ctm = svg.getScreenCTM();
-    if (!ctm) return { x: clientX, y: clientY };
-    const transformed = svgPoint.matrixTransform(ctm.inverse());
-    return { x: transformed.x, y: transformed.y };
+function getSvgCoords(svgId, clientX, clientY) {
+    const pt = clientToSvgPoint(svgId, clientX, clientY);
+    return pt ?? { x: clientX, y: clientY };
 }
 
 function findImageId(target) {
@@ -185,10 +183,10 @@ export function initialize(svgId, dotNetRef, images) {
 
     const state = {
         svg,
+        svgId,
         dotNetRef,
         abortController,
         images: new Map(),
-        svgPoint: svg.createSVGPoint(),
         dragging: null,
     };
     instances.set(svgId, state);
@@ -268,7 +266,7 @@ export function initialize(svgId, dotNetRef, images) {
             rot: parseRotation(visuals.rendered.getAttribute('transform')),
         };
 
-        const pt = getSvgCoords(svg, state.svgPoint, clientX, clientY);
+        const pt = getSvgCoords(svgId, clientX, clientY);
 
         state.dragging = {
             imageId,
@@ -289,7 +287,7 @@ export function initialize(svgId, dotNetRef, images) {
     function moveDrag(clientX, clientY, shiftKey, ctrlKey) {
         const d = state.dragging;
         if (!d) return;
-        const pt = getSvgCoords(svg, state.svgPoint, clientX, clientY);
+        const pt = getSvgCoords(svgId, clientX, clientY);
         const dx = pt.x - d.startSvg.x;
         const dy = pt.y - d.startSvg.y;
         d.shiftKey = !!shiftKey;

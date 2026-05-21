@@ -105,7 +105,7 @@ header a {
     height: 300vmax;
     z-index: -1;
     background-color: var(--bg-color);
-    background-image: linear-gradient(rgba(0, 0, 0, 0.05), rgba(0, 0, 0, 0.05)), url("/_content/KnockBox.Platform/content/backgrounds/yellow-vertical_loop_crop_lq.webp");
+    background-image: linear-gradient(rgba(0, 0, 0, 0.05), rgba(0, 0, 0, 0.05)), url("/_content/KnockBox.Platform/content/backgrounds/yellow-vertical_loop_crop.jpg");
     background-repeat: repeat;
     background-size: auto, auto 400px;
     transform: rotate(45deg);

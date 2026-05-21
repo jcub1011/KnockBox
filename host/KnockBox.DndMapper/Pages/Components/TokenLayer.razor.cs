@@ -18,6 +18,13 @@ namespace KnockBox.DndMapper.Pages.Components
         [Parameter] public string CurrentUserId { get; set; } = string.Empty;
         [Parameter, EditorRequired] public string SvgId { get; set; } = string.Empty;
 
+        /// <summary>
+        /// When <c>true</c>, the token layer becomes non-interactive (pointer-events:none on
+        /// its root group) so clicks pass through to the underlying SVG. Used by MapCanvas
+        /// while a host-only canvas tool (fog paint/erase, focus-box) is active.
+        /// </summary>
+        [Parameter] public bool InteractionsDisabled { get; set; }
+
         [Inject] protected IJSRuntime JSRuntime { get; set; } = default!;
         [Inject] protected DndMapperGameEngine GameEngine { get; set; } = default!;
         [Inject] protected IUserService UserService { get; set; } = default!;

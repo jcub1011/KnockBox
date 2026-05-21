@@ -7,6 +7,8 @@
 // SignalR round-trip is slow; the server pushes the authoritative fog state
 // back via the usual state-change render after the verb returns.
 
+import { clientToSvgPoint } from "./dndMapperSvgMetrics.js";
+
 const SVG_NS = "http://www.w3.org/2000/svg";
 
 // Paint preview matches the host's final fog overlay opacity so the host sees
@@ -20,20 +22,11 @@ const ERASE_OPACITY = "0.35";
 
 let active = null;
 
-function svgPointToCell(svg, clientX, clientY) {
-    const pt = svg.createSVGPoint();
-    pt.x = clientX;
-    pt.y = clientY;
-    const ctm = svg.getScreenCTM();
-    if (!ctm) return null;
-    const p = pt.matrixTransform(ctm.inverse());
-    return { cx: Math.floor(p.x), cy: Math.floor(p.y) };
-}
-
 function paintAt(clientX, clientY) {
     if (!active) return;
-    const cell = svgPointToCell(active.svg, clientX, clientY);
-    if (!cell) return;
+    const p = clientToSvgPoint(active.svgId, clientX, clientY);
+    if (!p) return;
+    const cell = { cx: Math.floor(p.x), cy: Math.floor(p.y) };
     const r = active.brushRadius - 1;
     const half = Math.floor(r / 2);
     const fill = active.mode === "paint" ? PAINT_FILL : ERASE_FILL;
@@ -133,6 +126,7 @@ export function beginStroke(svgId, dotnetRef, brushRadius, mode, clientX, client
 
     active = {
         svg,
+        svgId,
         dotnetRef,
         brushRadius: Math.max(1, Math.min(3, brushRadius | 0)),
         mode: mode === "paint" ? "paint" : "erase",

@@ -9,15 +9,13 @@
  * a rejected move).
  */
 
+import { clientToSvgPoint } from "./dndMapperSvgMetrics.js";
+
 const instances = new Map();
 
-function getSvgCoords(svg, svgPoint, clientX, clientY) {
-    svgPoint.x = clientX;
-    svgPoint.y = clientY;
-    const ctm = svg.getScreenCTM();
-    if (!ctm) return { x: clientX, y: clientY };
-    const transformed = svgPoint.matrixTransform(ctm.inverse());
-    return { x: transformed.x, y: transformed.y };
+function getSvgCoords(svgId, clientX, clientY) {
+    const pt = clientToSvgPoint(svgId, clientX, clientY);
+    return pt ?? { x: clientX, y: clientY };
 }
 
 function findTokenGroup(target) {
@@ -51,12 +49,12 @@ export function initialize(svgId, dotNetRef, tokens, widthCells, heightCells) {
 
     const state = {
         svg,
+        svgId,
         dotNetRef,
         abortController,
         tokens: new Map(), // tokenId → { x, y, movable }
         widthCells,
         heightCells,
-        svgPoint: svg.createSVGPoint(),
         dragging: null, // { tokenId, group, offsetX, offsetY, startX, startY, moved }
     };
     instances.set(svgId, state);
@@ -82,7 +80,7 @@ export function initialize(svgId, dotNetRef, tokens, widthCells, heightCells) {
         const startX = m ? parseFloat(m[1]) : info.x;
         const startY = m ? parseFloat(m[2]) : info.y;
 
-        const pt = getSvgCoords(svg, state.svgPoint, clientX, clientY);
+        const pt = getSvgCoords(svgId, clientX, clientY);
         state.dragging = {
             tokenId,
             group,
@@ -105,7 +103,7 @@ export function initialize(svgId, dotNetRef, tokens, widthCells, heightCells) {
 
     function moveDrag(clientX, clientY) {
         if (!state.dragging) return;
-        const pt = getSvgCoords(svg, state.svgPoint, clientX, clientY);
+        const pt = getSvgCoords(svgId, clientX, clientY);
         let nx = pt.x - state.dragging.offsetX;
         let ny = pt.y - state.dragging.offsetY;
         nx = Math.max(0, Math.min(nx, state.widthCells));

@@ -78,10 +78,11 @@
        moves on the SVG element, commit at mouseup via OnImageDragEnd).
        The SVG's @@onmousemove / @@onmouseup are NOT attached — Blazor Server
        would round-trip each pointer event over SignalR, which is the
-       original lag/artifact source with large images. Focus-box drag has
-       its own conditional overlay below that wires mousemove/up only while
-       a focus rectangle is being drawn. Pan is owned by dndMapperViewport.js
-       on the canvas-stage. *@
+       original lag/artifact source with large images. Focus-box drag is
+       owned by dndMapperFocusDrag.js (mousedown enters the gesture from
+       OnSvgMouseDown, preview rects are appended outside the Razor tree,
+       commit at pointer-up via CommitFocusRect). Pan is owned by
+       dndMapperViewport.js on the canvas-stage. *@
     <svg id="@_svgId"
          class="dndm-map-canvas"
          viewBox="@($"0 0 {Map.Grid.WidthCells} {Map.Grid.HeightCells}")"
@@ -134,9 +135,10 @@
                 <g class="dndm-image-pickers">
                     @foreach (var img in Map.Images.Where(i => !i.Hidden).OrderBy(i => i.LayerOrder))
                     {
-                        // Locked images and Space-pan mode disable the picker so the click
-                        // falls through to the SVG and starts a pan.
-                        var pickerEvents = (img.Locked || _spaceHeld) ? "none" : "all";
+                        // Locked images, Space-pan, and any active canvas tool (fog
+                        // paint/erase or focus-box) disable the picker so the click
+                        // falls through to the SVG and reaches OnSvgMouseDown.
+                        var pickerEvents = (img.Locked || _spaceHeld || IsCanvasToolActive) ? "none" : "all";
                         var cx = img.X + img.Width / 2;
                         var cy = img.Y + img.Height / 2;
                         // data-image-id is the hit-test root for dndMapperImageDrag; the
@@ -220,35 +222,17 @@
                   fill="none" stroke="#e11d48" stroke-width="0.12"
                   pointer-events="none" />
         }
-        @if (IsHost && _focusActive && _focusDragStart is { } fs && _focusDragCurrent is { } fc)
-        {
-            var (fpx, fpy, fpw, fph) = NormalizeFocusDrag(fs, fc);
-            <rect x="@F(fpx)" y="@F(fpy)"
-                  width="@F(fpw)" height="@F(fph)"
-                  fill="none" stroke="#000" stroke-width="0.18" stroke-opacity="0.6"
-                  pointer-events="none" />
-            <rect class="dndm-focus-rect-preview"
-                  x="@F(fpx)" y="@F(fpy)"
-                  width="@F(fpw)" height="@F(fph)"
-                  fill="none" stroke="#e11d48" stroke-width="0.12" stroke-dasharray="0.4,0.25"
-                  pointer-events="none" />
-            @* Overlay that captures mousemove/up only while a focus-box drag is in
-               progress. Keeping these handlers on the SVG full-time would fire a
-               SignalR round-trip per mousemove anywhere on the canvas. *@
-            <rect x="0" y="0"
-                  width="@Map.Grid.WidthCells" height="@Map.Grid.HeightCells"
-                  fill="transparent"
-                  pointer-events="all"
-                  @onmousemove="OnSvgMouseMove"
-                  @onmouseup="OnSvgMouseUp"
-                  @onmouseleave="OnSvgMouseUp" />
-        }
+        @* Focus-box in-flight preview is owned by dndMapperFocusDrag.js — it
+           appends a client-only <g> to the SVG so per-frame updates skip the
+           Blazor render path entirely. Razor only renders the committed rect
+           above. *@
 
         <TokenLayer State="State"
                     Map="Map"
                     IsHost="IsHost"
                     CurrentUserId="@CurrentUserId"
-                    SvgId="@_svgId" />
+                    SvgId="@_svgId"
+                    InteractionsDisabled="@IsCanvasToolActive" />
 
         @if (IsHost && SelectedImage is { Locked: false, Hidden: false } sel)
         {
@@ -264,7 +248,9 @@
             // @@onmousedown stopPropagation (with a no-op handler so Blazor binds the
             // modifier) blocks the SVG's @@onmousedown from also firing when a handle
             // is grabbed — otherwise focus-box / fog-paint modes would steal the click.
-            <g class="dndm-image-handles" pointer-events="all">
+            // When a canvas tool is active we flip the whole group to pointer-events:none
+            // so clicks on a handle pass through to the SVG and reach the tool instead.
+            <g class="dndm-image-handles" pointer-events="@(IsCanvasToolActive ? "none" : "all")">
                 <g data-image-handles-rotate="@sel.Id"
                    data-image-id="@sel.Id"
                    transform="@($"rotate({F(sr)} {F(sx + sw / 2)} {F(sy + sh / 2)})")">
