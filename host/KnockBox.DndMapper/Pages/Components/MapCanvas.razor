@@ -65,71 +65,94 @@
     </div>
 
     <div class="dndm-canvas-stage">
-    @* viewBox is pinned to the map's base dimensions. All pan/zoom is
-       realized as a CSS transform applied by dndMapperViewport.js so the
-       SVG layer (with potentially very large embedded images) is
-       rasterized once and GPU-composited per frame, never re-rasterized.
-       overflow="visible" lets content with coordinates outside the
-       viewBox (e.g. images placed past the map edge) render past the
-       SVG element box; the parent .dndm-canvas-stage clips at the
-       visible window with overflow:hidden. *@
+    @{
+        var cellPx = Map.Grid.CellPixels;
+        var stageNaturalW = Map.Grid.WidthCells * cellPx;
+        var stageNaturalH = Map.Grid.HeightCells * cellPx;
+    }
+    @* .dndm-canvas-transform is a naturally-sized box (W*cellPx × H*cellPx in
+       CSS px) that holds the bitmap layer and the SVG vector layer as
+       siblings. dndMapperViewport.js writes its pan/zoom transform onto this
+       wrapper, so both layers ride the same GPU-composited transform and stay
+       pixel-aligned at every zoom. The centering uses the CSS `translate`
+       property so the `transform` property is exclusively owned by the
+       viewport module. *@
+    <div class="dndm-canvas-transform"
+         style="width:@(stageNaturalW)px; height:@(stageNaturalH)px;">
+        @* Bitmap layer: HTML <img> per visible image. HTML <img> elements
+           live in their own GPU layer (unlike SVG <image>, which paints into
+           the SVG raster surface and thrashes the compositor for large
+           bitmaps). Position and rotate via CSS px so the layer stays
+           pixel-aligned with the sibling SVG's cell coordinates
+           (1 cell = cellPx). *@
+        <div class="dndm-image-layer">
+            @if (Map.Images.Count > 0)
+            {
+                @foreach (var img in GetVisibleImagesCached())
+                {
+                    var lpx = img.X * cellPx;
+                    var tpx = img.Y * cellPx;
+                    var wpx = img.Width * cellPx;
+                    var hpx = img.Height * cellPx;
+                    var styleCommon = $"left:{F(lpx)}px; top:{F(tpx)}px; width:{F(wpx)}px; height:{F(hpx)}px; transform:rotate({F(img.Rotation)}deg); opacity:{F(img.Opacity)};";
+                    @if (img.ShareToken is Guid shareToken)
+                    {
+                        <img @key="img.Id"
+                             data-image-rendered-id="@img.Id"
+                             src="@($"/blob-share/{shareToken:D}")"
+                             draggable="false"
+                             decoding="async"
+                             style="@styleCommon" />
+                    }
+                    else
+                    {
+                        @* Host disconnected: blob-share capability is gone. Show a
+                           muted placeholder; the host's reconnect republish path
+                           broadcasts a fresh ShareToken and the <img> returns. *@
+                        var placeholderStyle = $"left:{F(lpx)}px; top:{F(tpx)}px; width:{F(wpx)}px; height:{F(hpx)}px; transform:rotate({F(img.Rotation)}deg); opacity:{F(Math.Min(img.Opacity, 0.6))};";
+                        <div @key="img.Id"
+                             class="dndm-image-placeholder"
+                             data-image-rendered-id="@img.Id"
+                             style="@placeholderStyle"></div>
+                    }
+                }
+            }
+        </div>
+
+    @* viewBox is pinned to the map's base dimensions (in cell units). The
+       SVG's own size is locked in CSS px so 1 cell = cellPx in both
+       coordinate spaces, keeping it pixel-aligned with the bitmap layer.
+       overflow="visible" lets content with coordinates outside the viewBox
+       (e.g. images placed past the map edge) render past the SVG element
+       box; the parent .dndm-canvas-stage clips at the visible window with
+       overflow:hidden. *@
     @* Image drag/resize/rotate is owned by the dndMapperImageDrag JS module
        (mousedown on a [data-image-id] picker or [data-image-handle] handle,
-       moves on the SVG element, commit at mouseup via OnImageDragEnd).
-       The SVG's @@onmousemove / @@onmouseup are NOT attached — Blazor Server
-       would round-trip each pointer event over SignalR, which is the
-       original lag/artifact source with large images. Focus-box drag is
-       owned by dndMapperFocusDrag.js (mousedown enters the gesture from
-       OnSvgMouseDown, preview rects are appended outside the Razor tree,
-       commit at pointer-up via CommitFocusRect). Pan is owned by
+       commit at mouseup via OnImageDragEnd). The picker rect stays in the
+       SVG; the rendered bitmap is the sibling HTML <img> in the image layer
+       above. The JS module paints both per frame so they stay aligned.
+       Focus-box drag is owned by dndMapperFocusDrag.js. Pan is owned by
        dndMapperViewport.js on the canvas-stage. *@
     <svg id="@_svgId"
          class="dndm-map-canvas"
+         width="@stageNaturalW" height="@stageNaturalH"
          viewBox="@($"0 0 {Map.Grid.WidthCells} {Map.Grid.HeightCells}")"
          preserveAspectRatio="xMidYMid meet"
          overflow="visible"
          @onmousedown="OnSvgMouseDown"
          xmlns="http://www.w3.org/2000/svg">
 
+        @* The void background lives on .dndm-canvas-transform now (so the
+           HTML bitmap layer sits over it). Picker rects need an invisible
+           hit-target rect for tool clicks that miss images; an inert
+           transparent rect serves that purpose without obscuring the
+           bitmaps below the SVG. *@
         <rect x="0" y="0"
               width="@Map.Grid.WidthCells" height="@Map.Grid.HeightCells"
-              fill="#0e1117" />
+              fill="transparent" pointer-events="none" />
 
         @if (Map.Images.Count > 0)
         {
-            @foreach (var img in GetVisibleImagesCached())
-            {
-                var cx = img.X + img.Width / 2;
-                var cy = img.Y + img.Height / 2;
-                @if (img.ShareToken is Guid shareToken)
-                {
-                    <image @key="img.Id"
-                           data-image-rendered-id="@img.Id"
-                           href="@($"/blob-share/{shareToken:D}")"
-                           x="@F(img.X)" y="@F(img.Y)"
-                           width="@F(img.Width)" height="@F(img.Height)"
-                           transform="@($"rotate({F(img.Rotation)} {F(cx)} {F(cy)})")"
-                           opacity="@F(img.Opacity)"
-                           preserveAspectRatio="none"
-                           pointer-events="none" />
-                }
-                else
-                {
-                    // Host disconnected: the blob-share capability is gone. Render a
-                    // muted placeholder so the player sees the layer outline; the
-                    // host's reconnect republish path will broadcast a fresh token
-                    // via UpdateImageShareTokenAsync and the <image> swaps back in.
-                    <rect @key="img.Id"
-                          data-image-rendered-id="@img.Id"
-                          x="@F(img.X)" y="@F(img.Y)"
-                          width="@F(img.Width)" height="@F(img.Height)"
-                          transform="@($"rotate({F(img.Rotation)} {F(cx)} {F(cy)})")"
-                          fill="#1c2128" stroke="#3d444c" stroke-width="0.04" stroke-dasharray="0.2,0.1"
-                          opacity="@F(Math.Min(img.Opacity, 0.6))"
-                          pointer-events="none" />
-                }
-            }
-
             @if (IsHost)
             {
                 <g class="dndm-image-pickers">
@@ -283,6 +306,7 @@
             </g>
         }
     </svg>
+    </div>
 
     @if (IsHost && _markupActive)
     {

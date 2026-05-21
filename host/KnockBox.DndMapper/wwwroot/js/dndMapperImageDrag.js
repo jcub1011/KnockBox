@@ -4,9 +4,17 @@
  * Mirrors dndMapperTokenDrag: per-frame visual updates happen in DOM
  * (no Blazor round-trip), and .NET is only invoked at drag end so the
  * engine can run snap + UpdateImageTransformAsync inside the state
- * Execute lock. With large bitmaps a per-mousemove Blazor render
- * round-trip produced visible tearing and lag; this module eliminates
- * that path.
+ * Execute lock.
+ *
+ * The rendered bitmap is an HTML <img> in the .dndm-image-layer sibling
+ * of the SVG (not an SVG <image>) so it lives in its own GPU layer and
+ * doesn't thrash the compositor for large bitmaps. The picker hit-target
+ * stays inside the SVG so interactive selection keeps using Blazor's
+ * event pipeline. This module paints both per frame so they stay aligned:
+ * the HTML <img> via CSS px (left/top/width/height + transform: rotate),
+ * the picker rect via SVG cell-unit attributes (x/y/width/height +
+ * transform="rotate(...)"). The cellPx multiplier converts between the
+ * two coordinate spaces.
  */
 
 import { clientToSvgPoint } from "./dndMapperSvgMetrics.js";
@@ -36,13 +44,15 @@ function findHandleKind(target) {
     return el?.getAttribute('data-image-handle') ?? null;
 }
 
-function findVisuals(svg, imageId) {
-    if (!svg || !imageId) return null;
+function findVisuals(state, imageId) {
+    if (!state || !imageId) return null;
     const esc = cssEscape(imageId);
+    // rendered is the HTML <img> (or <div> placeholder) in the image-layer
+    // sibling; picker + handles are still inside the SVG.
     return {
-        rendered: svg.querySelector(`[data-image-rendered-id="${esc}"]`),
-        picker: svg.querySelector(`[data-image-picker-id="${esc}"]`),
-        handles: collectHandles(svg, esc),
+        rendered: state.wrapper?.querySelector(`[data-image-rendered-id="${esc}"]`) ?? null,
+        picker: state.svg.querySelector(`[data-image-picker-id="${esc}"]`),
+        handles: collectHandles(state.svg, esc),
     };
 }
 
@@ -73,13 +83,25 @@ function setRotateTransform(el, rot, cx, cy) {
     el.setAttribute('transform', `rotate(${rot} ${cx} ${cy})`);
 }
 
-function paintVisuals(visuals, x, y, w, h, rot) {
+// Paint the HTML <img> (or placeholder <div>) using CSS px. The element
+// rotates around its own center (CSS transform-origin: center center, set
+// in MapCanvas.razor.css), so we just apply transform: rotate(deg).
+function setHtmlImagePosition(el, x, y, w, h, rot, cellPx) {
+    if (!el) return;
+    const s = el.style;
+    s.left = (x * cellPx) + 'px';
+    s.top = (y * cellPx) + 'px';
+    s.width = (w * cellPx) + 'px';
+    s.height = (h * cellPx) + 'px';
+    s.transform = `rotate(${rot}deg)`;
+}
+
+function paintVisuals(state, visuals, x, y, w, h, rot) {
     if (!visuals) return;
     const cx = x + w / 2;
     const cy = y + h / 2;
     if (visuals.rendered) {
-        setRectXYWH(visuals.rendered, x, y, w, h);
-        setRotateTransform(visuals.rendered, rot, cx, cy);
+        setHtmlImagePosition(visuals.rendered, x, y, w, h, rot, state.cellPx);
     }
     if (visuals.picker) {
         setRectXYWH(visuals.picker, x, y, w, h);
@@ -168,8 +190,10 @@ function computeDrag(orig, kind, dx, dy, freeAspect) {
  * @param {string} svgId
  * @param {object} dotNetRef
  * @param {Array<{imageId: string, locked: boolean}>} images
+ * @param {number} cellPx Pixels per map cell — used to convert cell-unit
+ *                       drag math into CSS px for the HTML <img> elements.
  */
-export function initialize(svgId, dotNetRef, images) {
+export function initialize(svgId, dotNetRef, images, cellPx) {
     const svg = document.getElementById(svgId);
     if (!svg) {
         console.error(`[DndMapperImageDrag] initialize: element "${svgId}" not found.`);
@@ -178,12 +202,20 @@ export function initialize(svgId, dotNetRef, images) {
 
     dispose(svgId);
 
+    const wrapper = svg.closest('.dndm-canvas-transform');
+    if (!wrapper) {
+        console.error(`[DndMapperImageDrag] initialize: .dndm-canvas-transform ancestor for "${svgId}" not found.`);
+        return;
+    }
+
     const abortController = new AbortController();
     const signal = abortController.signal;
 
     const state = {
         svg,
         svgId,
+        wrapper,
+        cellPx: cellPx > 0 ? cellPx : 1,
         dotNetRef,
         abortController,
         images: new Map(),
@@ -252,18 +284,19 @@ export function initialize(svgId, dotNetRef, images) {
         const handleKind = findHandleKind(target);
         const kind = handleKind || 'body';
 
-        const visuals = findVisuals(svg, imageId);
-        if (!visuals || !visuals.rendered) return false;
+        const visuals = findVisuals(state, imageId);
+        if (!visuals || !visuals.picker) return false;
 
-        // Capture the current rendered values directly off the DOM so we
-        // anchor on whatever the user currently sees (matches token-drag's
-        // approach of reading the live transform instead of canonical state).
+        // Read canonical drag-start values from the picker rect (SVG cell
+        // units). The HTML <img> sibling uses CSS px so reading its style
+        // would require an extra unit conversion; the picker already
+        // mirrors the canonical position and is the source of truth here.
         const orig = {
-            x: parseFloat(visuals.rendered.getAttribute('x') || '0'),
-            y: parseFloat(visuals.rendered.getAttribute('y') || '0'),
-            w: parseFloat(visuals.rendered.getAttribute('width') || '0'),
-            h: parseFloat(visuals.rendered.getAttribute('height') || '0'),
-            rot: parseRotation(visuals.rendered.getAttribute('transform')),
+            x: parseFloat(visuals.picker.getAttribute('x') || '0'),
+            y: parseFloat(visuals.picker.getAttribute('y') || '0'),
+            w: parseFloat(visuals.picker.getAttribute('width') || '0'),
+            h: parseFloat(visuals.picker.getAttribute('height') || '0'),
+            rot: parseRotation(visuals.picker.getAttribute('transform')),
         };
 
         const pt = getSvgCoords(svgId, clientX, clientY);
@@ -294,7 +327,7 @@ export function initialize(svgId, dotNetRef, images) {
         d.ctrlKey = !!ctrlKey;
         const next = computeDrag(d.orig, d.kind, dx, dy, d.shiftKey);
         d.last = next;
-        paintVisuals(d.visuals, next.x, next.y, next.w, next.h, next.rot);
+        paintVisuals(state, d.visuals, next.x, next.y, next.w, next.h, next.rot);
         if (dx * dx + dy * dy >= DRAG_THRESHOLD_SQ) d.moved = true;
     }
 
@@ -308,7 +341,7 @@ export function initialize(svgId, dotNetRef, images) {
         if (!d.moved) {
             // Sub-threshold: revert any preview to canonical (orig) so a
             // simple click doesn't leave the image shifted.
-            paintVisuals(d.visuals, d.orig.x, d.orig.y, d.orig.w, d.orig.h, d.orig.rot);
+            paintVisuals(state, d.visuals, d.orig.x, d.orig.y, d.orig.w, d.orig.h, d.orig.rot);
             return;
         }
 
@@ -369,14 +402,16 @@ function suppressTransitions(visuals, on) {
  * Refresh the list of interactive images. Idempotent.
  * @param {string} svgId
  * @param {Array<{imageId: string, locked: boolean}>} images
+ * @param {number} cellPx Optional updated cellPx (positive to apply).
  */
-export function setImages(svgId, images) {
+export function setImages(svgId, images, cellPx) {
     const state = instances.get(svgId);
     if (!state) return;
     state.images.clear();
     for (const i of images || []) {
         state.images.set(i.imageId, { locked: !!i.locked });
     }
+    if (cellPx > 0) state.cellPx = cellPx;
 }
 
 /**
@@ -393,9 +428,9 @@ export function reconcileImage(svgId, imageId, x, y, w, h, rot) {
     if (!state) return;
     // Don't stomp on the user's in-flight drag preview.
     if (state.dragging?.imageId === imageId) return;
-    const visuals = findVisuals(state.svg, imageId);
+    const visuals = findVisuals(state, imageId);
     suppressTransitions(visuals, false);
-    paintVisuals(visuals, x, y, w, h, rot);
+    paintVisuals(state, visuals, x, y, w, h, rot);
 }
 
 function cssEscape(value) {
@@ -411,6 +446,7 @@ export function dispose(svgId) {
     state.dotNetRef = null;
     state.images.clear();
     state.svg = null;
+    state.wrapper = null;
     state.dragging = null;
     instances.delete(svgId);
 }

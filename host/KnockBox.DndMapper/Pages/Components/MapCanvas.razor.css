@@ -68,12 +68,48 @@
     font-family: var(--font-primary);
 }
 
-/* SVG map keeps the void background so colored tokens pop. */
-.dndm-map-canvas {
-    flex: 1 1 auto;
-    width: 100%;
-    height: 100%;
+/* The transform wrapper holds the bitmap layer and the SVG vector layer as
+   siblings, both naturally sized to W*cellPx × H*cellPx in CSS px. Anchored
+   at the stage's top-left so dndMapperViewport.js's existing pan/zoom math
+   (which expects world (0,0) at the wrapper's natural top-left) works
+   unchanged. ResetView computes the centering pan. */
+.dndm-canvas-transform {
+    position: absolute;
+    left: 0;
+    top: 0;
+    transform-origin: 50% 50%;
+    will-change: transform;
     background: var(--dndm-void);
+}
+
+/* HTML bitmap layer — one <img> per visible image, positioned absolutely in
+   CSS px. Lives in its own GPU layer (unlike SVG <image>) so large bitmaps
+   don't thrash the compositor. Sits behind the SVG (rendered first in the
+   wrapper) so the SVG paints picker rects/grid/fog/tokens/handles on top. */
+.dndm-image-layer {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+}
+
+.dndm-image-layer img,
+.dndm-image-layer .dndm-image-placeholder {
+    position: absolute;
+    transform-origin: center center;
+    user-select: none;
+    -webkit-user-drag: none;
+}
+
+.dndm-image-placeholder {
+    background: #1c2128;
+    border: 1px dashed #3d444c;
+    box-sizing: border-box;
+}
+
+/* SVG map keeps cursor + touch behavior but no longer carries transform
+   state — that's on the wrapper now. */
+.dndm-map-canvas {
+    display: block;
     cursor: grab;
     touch-action: none;
 }
@@ -209,14 +245,6 @@
     /* The SVG inside applies a CSS transform during pan/zoom; clip it here
        so a scaled-up SVG cannot visually spill over the sibling toolbar. */
     overflow: hidden;
-}
-
-.dndm-canvas-stage > svg.dndm-map-canvas {
-    flex: 1 1 auto;
-    min-height: 0;
-    width: 100%;
-    height: 100%;
-    display: block;
 }
 
 /* The drawing surface mounts here when the host enables markup. It

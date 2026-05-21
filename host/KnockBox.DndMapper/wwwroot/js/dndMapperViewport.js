@@ -1,17 +1,18 @@
 /**
- * DnD Mapper Viewport — JS-owned pan and zoom for the MapCanvas SVG.
+ * DnD Mapper Viewport — JS-owned pan and zoom for the MapCanvas.
  *
- * The SVG's viewBox is pinned to "0 0 W H" for the lifetime of a given
- * map. All pan and zoom (canonical state plus any in-flight gesture
- * delta) is realized as a CSS `transform: translate3d(...) scale(...)`
- * on the SVG. Because the viewBox never changes, the browser rasterizes
- * the SVG once and re-projects that cached layer on the GPU per frame,
- * keeping large embedded images smooth.
+ * All pan and zoom (canonical state plus any in-flight gesture delta) is
+ * realized as a CSS `transform: translate3d(...) scale(...)` on the
+ * `.dndm-canvas-transform` wrapper. The wrapper contains two siblings — an
+ * HTML bitmap layer (one <img> per map image) and the SVG vector layer —
+ * both naturally sized to W*cellPx × H*cellPx CSS px. Transforming the
+ * wrapper composites both layers as a single GPU operation, with each
+ * <img> riding on its own GPU texture inside.
  *
- * Off-map content (images placed past the map edge) is rendered correctly
- * via the SVG's `overflow="visible"` attribute, set in the .razor markup.
- * The parent .dndm-canvas-stage clips with CSS overflow:hidden so off-map
- * content can't visually escape into the toolbar or rails.
+ * Off-map content (images placed past the map edge) renders correctly via
+ * the SVG's `overflow="visible"` attribute. The parent .dndm-canvas-stage
+ * clips with CSS overflow:hidden so off-map content can't escape into the
+ * toolbar or rails.
  */
 
 const instances = new Map();
@@ -36,20 +37,11 @@ function targetWantsGesture(target) {
     return target.closest(BAIL_SELECTOR) !== null;
 }
 
-// Pixels-per-cell at the SVG's base scale (viewBox=0..W × 0..H, no CSS
-// transform). Independent of zoom; cached after first layout.
-function measureBasePxPerCell(state) {
-    const prevTransform = state.svg.style.transform;
-    if (prevTransform) state.svg.style.transform = '';
-    const ctm = state.svg.getScreenCTM();
-    if (prevTransform) state.svg.style.transform = prevTransform;
-    return ctm && ctm.a > 0 ? ctm.a : 0;
-}
-
+// Pixels-per-cell is now a static property of the map — the wrapper and SVG
+// are naturally sized to W*cellPx × H*cellPx, so 1 cell = cellPx CSS px
+// regardless of zoom. The pan/zoom transform on the wrapper scales this
+// natural size on the GPU. Kept as a function for callsite parity.
 function ensureBasePxPerCell(state) {
-    if (state.basePxPerCell > 0) return state.basePxPerCell;
-    const v = measureBasePxPerCell(state);
-    if (v > 0) state.basePxPerCell = v;
     return state.basePxPerCell;
 }
 
@@ -82,19 +74,14 @@ function applyTransform(state) {
     const H = state.heightCells;
     const tx = base * (W * (zoom - 1) / 2 - zoom * panX);
     const ty = base * (H * (zoom - 1) / 2 - zoom * panY);
-    state.svg.style.transform = `translate3d(${tx}px, ${ty}px, 0) scale(${zoom})`;
-}
-
-function setupCompositorHints(state) {
-    state.svg.style.transformOrigin = '50% 50%';
-    state.svg.style.willChange = 'transform';
+    state.wrapper.style.transform = `translate3d(${tx}px, ${ty}px, 0) scale(${zoom})`;
 }
 
 function refreshLayer(state) {
-    if (!state.svg) return;
-    state.svg.style.willChange = 'auto';
-    void state.svg.offsetWidth;
-    state.svg.style.willChange = 'transform';
+    if (!state.wrapper) return;
+    state.wrapper.style.willChange = 'auto';
+    void state.wrapper.offsetWidth;
+    state.wrapper.style.willChange = 'transform';
 }
 
 function scheduleLayerRefresh(state) {
@@ -139,7 +126,7 @@ function commitGesture(state, wasClickWithoutDrag) {
     }
 }
 
-export function initialize(svgId, dotNetRef, panX, panY, zoom, widthCells, heightCells, initialMode) {
+export function initialize(svgId, dotNetRef, panX, panY, zoom, widthCells, heightCells, cellPx, initialMode) {
     const svg = document.getElementById(svgId);
     if (!svg) {
         console.error(`[DndMapperViewport] initialize: element "${svgId}" not found.`);
@@ -148,17 +135,27 @@ export function initialize(svgId, dotNetRef, panX, panY, zoom, widthCells, heigh
 
     dispose(svgId);
 
+    // Resolve the transform wrapper that holds the bitmap layer and the SVG.
+    // dndMapperViewport.js writes its pan/zoom transform onto the wrapper so
+    // both layers ride one GPU-composited transform.
+    const wrapper = svg.closest('.dndm-canvas-transform');
+    if (!wrapper) {
+        console.error(`[DndMapperViewport] initialize: .dndm-canvas-transform ancestor for "${svgId}" not found.`);
+        return;
+    }
+
     // Gestures fire on the entire canvas-stage so pan/zoom works anywhere in
-    // the visible viewport — including the preserveAspectRatio padding the
-    // SVG element doesn't paint into. Token-drag still listens on the SVG
-    // and stopPropagation()s its events, so the two coexist.
-    const gestureSurface = svg.closest('.dndm-canvas-stage') || svg.parentNode || svg;
+    // the visible viewport — including the centering padding around the
+    // naturally-sized wrapper. Token-drag still listens on the SVG and
+    // stopPropagation()s its events, so the two coexist.
+    const gestureSurface = svg.closest('.dndm-canvas-stage') || wrapper;
 
     const abortController = new AbortController();
     const signal = abortController.signal;
 
     const state = {
         svg,
+        wrapper,
         gestureSurface,
         dotNetRef,
         abortController,
@@ -170,7 +167,7 @@ export function initialize(svgId, dotNetRef, panX, panY, zoom, widthCells, heigh
         mode: initialMode || 'none',
         gPanPx: { x: 0, y: 0 },
         gZoomFactor: 1.0,
-        basePxPerCell: 0,
+        basePxPerCell: cellPx > 0 ? cellPx : 0,
         pan: null,
         wheelDebounceHandle: 0,
         refreshScheduled: false,
@@ -178,11 +175,7 @@ export function initialize(svgId, dotNetRef, panX, panY, zoom, widthCells, heigh
     };
     instances.set(svgId, state);
 
-    setupCompositorHints(state);
     applyTransform(state);
-    if (state.basePxPerCell === 0) {
-        requestAnimationFrame(() => applyTransform(state));
-    }
 
     function scheduleWheelCommit() {
         if (state.wheelDebounceHandle) clearTimeout(state.wheelDebounceHandle);
@@ -244,14 +237,6 @@ export function initialize(svgId, dotNetRef, panX, panY, zoom, widthCells, heigh
 
     gestureSurface.addEventListener('mouseup', endPan, { signal });
     gestureSurface.addEventListener('mouseleave', endPan, { signal });
-
-    // <image> load events fire when the bitmap has been decoded. Force a
-    // GPU-layer refresh so the cached bitmap picks up the now-complete
-    // pixels (otherwise it stays frozen at its pre-load state). load does
-    // not bubble, hence capture phase.
-    svg.addEventListener('load', (e) => {
-        if (e.target instanceof SVGImageElement) scheduleLayerRefresh(state);
-    }, { capture: true, signal });
 }
 
 export function setMode(svgId, mode) {
@@ -273,12 +258,12 @@ export function setViewBox(svgId, panX, panY, zoom) {
     applyTransform(state);
 }
 
-export function setBounds(svgId, widthCells, heightCells) {
+export function setBounds(svgId, widthCells, heightCells, cellPx) {
     const state = instances.get(svgId);
     if (!state) return;
     state.widthCells = widthCells;
     state.heightCells = heightCells;
-    state.basePxPerCell = 0;
+    if (cellPx > 0) state.basePxPerCell = cellPx;
     applyTransform(state);
 }
 
@@ -306,12 +291,11 @@ export function dispose(svgId) {
         try { clearTimeout(state.wheelDebounceHandle); } catch { /* ignore */ }
         state.wheelDebounceHandle = 0;
     }
-    if (state.svg) {
-        state.svg.style.transform = '';
-        state.svg.style.willChange = '';
-        state.svg.style.transformOrigin = '';
+    if (state.wrapper) {
+        state.wrapper.style.transform = '';
     }
     state.dotNetRef = null;
     state.svg = null;
+    state.wrapper = null;
     instances.delete(svgId);
 }

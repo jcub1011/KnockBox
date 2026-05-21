@@ -391,7 +391,7 @@ namespace KnockBox.DndMapper.Pages.Components
             {
                 await _viewportModule.InvokeVoidAsync(
                     "setBounds", _svgId,
-                    Map.Grid.WidthCells, Map.Grid.HeightCells);
+                    Map.Grid.WidthCells, Map.Grid.HeightCells, Map.Grid.CellPixels);
             }
             catch (JSDisconnectedException) { /* circuit teardown */ }
             catch (Exception ex) { Logger.LogWarning(ex, "viewport.setBounds failed."); }
@@ -489,7 +489,7 @@ namespace KnockBox.DndMapper.Pages.Components
                     _currentJsMode = CurrentJsMode();
                     await _viewportModule.InvokeVoidAsync(
                         "initialize", _svgId, _viewportRef, _panX, _panY, _zoom,
-                        Map.Grid.WidthCells, Map.Grid.HeightCells, _currentJsMode);
+                        Map.Grid.WidthCells, Map.Grid.HeightCells, Map.Grid.CellPixels, _currentJsMode);
                     _lastBoundsSent = (Map.Id, Map.Grid.WidthCells, Map.Grid.HeightCells);
                 }
                 catch (JSDisconnectedException) { /* circuit teardown */ }
@@ -509,7 +509,7 @@ namespace KnockBox.DndMapper.Pages.Components
                             .Select(i => new { imageId = i.Id.ToString(), locked = i.Locked })
                             .ToArray();
                         await _imageDragModule.InvokeVoidAsync(
-                            "initialize", _svgId, _imageDragRef, payload);
+                            "initialize", _svgId, _imageDragRef, payload, Map.Grid.CellPixels);
                         // Seed the snapshot version so PushImagesToJs() skips the
                         // first redundant marshal.
                         int v = 17;
@@ -695,10 +695,16 @@ namespace KnockBox.DndMapper.Pages.Components
 
         private async Task ResetView()
         {
-            // Fit the map into the visible region (full SVG minus the left/right
-            // rail widths). Rails overlay the canvas, so without this offset the
-            // map would center under the rails. JS round-trip is one frame; if
-            // metrics aren't available, fall back to plain pan=0, zoom=1.
+            // Fit the map into the visible region (stage minus left/right rail
+            // widths). Rails overlay the canvas; without compensating, the map
+            // would center behind them. JS round-trip is one frame; if metrics
+            // aren't available, fall back to pan=0, zoom=1.
+            //
+            // New-architecture math: the wrapper's natural pixel size is
+            // W*cellPx × H*cellPx (not stage-sized). fitZoom is the scale that
+            // makes that natural box fit the visible stage area. panX/panY
+            // (world cells at stage top-left) are then chosen to center the
+            // map within the visible area.
             if (_metricsModule is not null)
             {
                 try
@@ -707,30 +713,27 @@ namespace KnockBox.DndMapper.Pages.Components
                     if (m is not null && m.SvgWidth > 0 && m.SvgHeight > 0
                         && Map.Grid.WidthCells > 0 && Map.Grid.HeightCells > 0)
                     {
-                        double pxW = m.SvgWidth, pxH = m.SvgHeight;
+                        double stageW = m.SvgWidth, stageH = m.SvgHeight;
                         double L = m.LeftPx, R = m.RightPx;
-                        double vw = Math.Max(1.0, pxW - L - R);
-                        double vh = Math.Max(1.0, pxH);
+                        double visibleW = Math.Max(1.0, stageW - L - R);
+                        double visibleH = Math.Max(1.0, stageH);
                         double W = Map.Grid.WidthCells, H = Map.Grid.HeightCells;
-                        // Pixels-per-cell at zoom=1 under xMidYMid meet.
-                        double basePxPerCell = Math.Min(pxW / W, pxH / H);
-                        double mapPxW = basePxPerCell * W;
-                        double mapPxH = basePxPerCell * H;
-                        double fitZoom = Math.Min(vw / mapPxW, vh / mapPxH);
+                        double cellPx = Map.Grid.CellPixels;
+                        double mapPxW = W * cellPx;
+                        double mapPxH = H * cellPx;
+                        double fitZoom = Math.Min(visibleW / mapPxW, visibleH / mapPxH);
                         fitZoom = Math.Clamp(fitZoom, MinZoom, MaxZoom);
-                        // viewBox spans (W/fitZoom, H/fitZoom) world units. Under
-                        // xMidYMid meet, the viewBox CENTER (not the map center)
-                        // is what lands at the SVG pixel center. So to put the
-                        // map center at SVG center we need panX = (W - VW)/2;
-                        // then shift further by (R - L)/(2·s) to recenter into
-                        // the visible-area midpoint between the two rails.
-                        double VW = W / fitZoom;
-                        double VH = H / fitZoom;
-                        double scale = fitZoom * basePxPerCell;
-                        double dxPx = (L - R) / 2.0;
+
+                        // Visible window in world cells at fitZoom (uses full stage,
+                        // including behind-rail area). Centering shifts the map so
+                        // its visual center lands at the midpoint of the visible
+                        // (non-rail) area: (L - R) / 2 stage-px away from stage
+                        // center, converted to cells.
+                        double visibleCellsW = stageW / (cellPx * fitZoom);
+                        double visibleCellsH = stageH / (cellPx * fitZoom);
                         _zoom = fitZoom;
-                        _panX = (W - VW) / 2.0 - dxPx / scale;
-                        _panY = (H - VH) / 2.0;
+                        _panX = (W - visibleCellsW) / 2.0 - (L - R) / (2.0 * cellPx * fitZoom);
+                        _panY = (H - visibleCellsH) / 2.0;
                         PublishViewport();
                         await PushJsViewBox();
                         return;
@@ -1023,7 +1026,7 @@ namespace KnockBox.DndMapper.Pages.Components
             var payload = Map.Images
                 .Select(i => new { imageId = i.Id.ToString(), locked = i.Locked })
                 .ToArray();
-            try { await _imageDragModule.InvokeVoidAsync("setImages", _svgId, payload); }
+            try { await _imageDragModule.InvokeVoidAsync("setImages", _svgId, payload, Map.Grid.CellPixels); }
             catch (JSDisconnectedException) { /* circuit teardown */ }
             catch (Exception ex) { Logger.LogWarning(ex, "imageDrag.setImages failed."); }
         }

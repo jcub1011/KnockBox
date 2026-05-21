@@ -49,23 +49,19 @@ export function getViewportMetrics(svgId) {
     if (!svg) return null;
     const root = svg.closest('.dnd-mapper-playing');
     if (!root) return null;
-    // Temporarily clear the SVG's CSS transform so getBoundingClientRect
-    // returns the layout box, not the currently-zoomed/panned visual box.
-    // Without this, ResetView reads a shrunk size on each successive press
-    // and computes fitZoom against an already-zoomed-out SVG → it keeps
-    // zooming further out each call. Matches measureBasePxPerCell's
-    // approach in dndMapperViewport.js.
-    const prevTransform = svg.style.transform;
-    if (prevTransform) svg.style.transform = '';
-    const svgRect = svg.getBoundingClientRect();
-    if (prevTransform) svg.style.transform = prevTransform;
+    // The SVG now has a fixed natural size (W*cellPx × H*cellPx); the
+    // viewport we want to fit the map into is the parent .dndm-canvas-stage.
+    // Read its bounding rect directly — its size is independent of the
+    // wrapper's pan/zoom transform.
+    const stage = svg.closest('.dndm-canvas-stage');
+    const stageRect = stage ? stage.getBoundingClientRect() : svg.getBoundingClientRect();
     const leftEl = root.querySelector('.dndm-rail--left');
     const rightEl = root.querySelector('.dndm-rail--right');
     const leftPx = leftEl ? leftEl.getBoundingClientRect().width : 0;
     const rightPx = rightEl ? rightEl.getBoundingClientRect().width : 0;
     return {
-        svgWidth: svgRect.width,
-        svgHeight: svgRect.height,
+        svgWidth: stageRect.width,
+        svgHeight: stageRect.height,
         leftPx,
         rightPx,
     };
