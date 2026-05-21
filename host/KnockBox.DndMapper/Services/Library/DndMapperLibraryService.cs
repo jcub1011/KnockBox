@@ -625,6 +625,37 @@ namespace KnockBox.DndMapper.Services.Library
         }
 
         /// <summary>
+        /// Returns a <c>blob:</c> URL pointing directly at the host's
+        /// in-browser IndexedDB blob for <paramref name="imageId"/>, or
+        /// <see langword="null"/> if this circuit isn't the owning host
+        /// (cache miss) or the service is shutting down. <c>MapCanvas</c>
+        /// uses this to render the host's own images without an HTTP round-
+        /// trip to <c>/blob-share</c> — the bytes are already in this
+        /// browser, so shipping them up through SignalR just to fetch them
+        /// back via HTTP is the dial-up case we're killing here.
+        /// <para>
+        /// Non-throwing by design: the rendering caller treats <c>null</c>
+        /// as "fall back to the share URL". The underlying
+        /// <see cref="IndexedDbBlob.CreateObjectUrlAsync"/> caches the
+        /// URL on the blob handle, so repeat calls are cheap.
+        /// </para>
+        /// </summary>
+        public async ValueTask<string?> TryGetLocalObjectUrlAsync(Guid imageId, CancellationToken ct = default)
+        {
+            if (_disposed) return null;
+            if (!_blobCache.TryGetValue(imageId, out var blob)) return null;
+            try
+            {
+                return await blob.CreateObjectUrlAsync(ct).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogWarning(ex, "Failed to create local object URL for image {ImageId}; caller will fall back to /blob-share.", imageId);
+                return null;
+            }
+        }
+
+        /// <summary>
         /// Reads the persisted snapshot and replays it into the live state.
         /// Loads every map's image blobs from IndexedDB, publishes fresh
         /// blob-shares, and atomically swaps state.Maps / state.Sheets /

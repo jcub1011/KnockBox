@@ -4,6 +4,7 @@ using KnockBox.Core.Services.State.Users;
 using KnockBox.DndMapper.Helpers;
 using KnockBox.DndMapper.Models;
 using KnockBox.DndMapper.Services;
+using KnockBox.DndMapper.Services.Library;
 using KnockBox.DndMapper.Services.Logic.Games;
 using KnockBox.DndMapper.Services.Logic.Visibility;
 using KnockBox.DndMapper.Services.State.Games;
@@ -31,6 +32,11 @@ namespace KnockBox.DndMapper.Pages.Components
         [Inject] protected ILogger<MapCanvas> Logger { get; set; } = default!;
         [Inject] protected TokenFocusService TokenFocus { get; set; } = default!;
         [Inject] protected IFogPaintContext FogContext { get; set; } = default!;
+        // Host's circuit has a populated blob cache; players' circuits resolve
+        // the service but report a cache miss for every image and we render
+        // the /blob-share/{token} fallback. Always injected — registration is
+        // Scoped, so DI always supplies an instance.
+        [Inject] protected DndMapperLibraryService Library { get; set; } = default!;
 
         [CascadingParameter] public DndMapperViewport? Viewport { get; set; }
 
@@ -77,6 +83,14 @@ namespace KnockBox.DndMapper.Pages.Components
         private List<MapImage>? _cachedVisibleImages;
         private bool _cachedIsHost;
 
+        // Host-only direct-blob URLs keyed by image id. Populated lazily by
+        // RefreshLocalImageUrlsAsync from the library's blob cache; players'
+        // circuits stay empty here and the renderer falls back to the
+        // /blob-share/{token} URL. Lets the host's own browser render its
+        // own bitmaps without the wasteful SignalR roundtrip that the
+        // share endpoint does to fetch bytes from this same browser's IDB.
+        private readonly Dictionary<Guid, string> _localImageUrls = new();
+
         // ── Image transform drag (commit-side) ──────────────────────────
         // Per-frame visual updates live in dndMapperImageDrag.js. C# only
         // sees the start + end of the drag via OnImageDragEnd, builds a
@@ -114,6 +128,75 @@ namespace KnockBox.DndMapper.Pages.Components
             }
             PublishViewport();
             base.OnParametersSet();
+        }
+
+        protected override async Task OnParametersSetAsync()
+        {
+            await RefreshLocalImageUrlsAsync().ConfigureAwait(false);
+            await base.OnParametersSetAsync().ConfigureAwait(false);
+        }
+
+        // Single entry-point the razor template uses to resolve an image's
+        // src. Returns null only if neither path is available (host
+        // disconnected mid-render), in which case the template falls
+        // through to a placeholder div.
+        //
+        // Host: _localImageUrls has the blob: URL — straight-to-IDB,
+        // no SignalR round-trip back to this same browser.
+        // Players or first render on the host (before
+        // RefreshLocalImageUrlsAsync runs): falls through to the
+        // /blob-share/{token} capability URL.
+        //
+        // Kept as a code-behind method so the Razor template stays in
+        // plain markup mode — embedding the lookup + ternary inline
+        // caused Razor to silently emit attribute-less <img> tags.
+        internal string? ResolveImageSrc(MapImage img)
+        {
+            if (_localImageUrls.TryGetValue(img.Id, out var localUrl) && localUrl is not null)
+                return localUrl;
+            if (img.ShareToken is Guid shareToken)
+                return $"/blob-share/{shareToken:D}";
+            return null;
+        }
+
+        /// <summary>
+        /// Reconciles <see cref="_localImageUrls"/> with the current image
+        /// set: drops URLs for removed images and asks the library for a
+        /// <c>blob:</c> URL for any image we don't already know about. The
+        /// library returns <see langword="null"/> for images this circuit
+        /// doesn't own (the common player case) so the share-URL fallback
+        /// stays intact. Triggers a re-render only when the set actually
+        /// changes to avoid render storms during the host's first attach
+        /// (which republishes every image's share token in parallel).
+        /// </summary>
+        private async ValueTask RefreshLocalImageUrlsAsync()
+        {
+            if (Map is null) return;
+            var changed = false;
+
+            if (_localImageUrls.Count > 0)
+            {
+                var currentIds = new HashSet<Guid>(Map.Images.Select(i => i.Id));
+                foreach (var key in _localImageUrls.Keys.ToList())
+                {
+                    if (!currentIds.Contains(key))
+                    {
+                        _localImageUrls.Remove(key);
+                        changed = true;
+                    }
+                }
+            }
+
+            foreach (var img in Map.Images)
+            {
+                if (_localImageUrls.ContainsKey(img.Id)) continue;
+                var url = await Library.TryGetLocalObjectUrlAsync(img.Id).ConfigureAwait(false);
+                if (url is null) continue;
+                _localImageUrls[img.Id] = url;
+                changed = true;
+            }
+
+            if (changed) await InvokeAsync(StateHasChanged).ConfigureAwait(false);
         }
 
         // ── Markup overlay (v1.x — §5.6) ─────────────────────────────────
@@ -266,6 +349,12 @@ namespace KnockBox.DndMapper.Pages.Components
                 PublishViewport();
                 _ = PushJsViewBox();
             }
+            // OnParametersSetAsync only fires on parent-pushed parameter
+            // changes; a self-driven StateHasChanged from a state-change
+            // notification won't re-run it. Refresh blob: URLs here too so
+            // reconnect republish (which mutates state but not parameters)
+            // still backfills the host's local URLs.
+            await RefreshLocalImageUrlsAsync().ConfigureAwait(false);
             await InvokeAsync(StateHasChanged);
         }
 
@@ -526,6 +615,15 @@ namespace KnockBox.DndMapper.Pages.Components
                         Logger.LogWarning(ex, "Failed to load image-drag JS module.");
                     }
                 }
+
+                // Centre the wrapper inside the stage on first mount so the
+                // map doesn't open clinging to the left edge. With the new
+                // cursor-anchored wheel zoom and centre-anchored button zoom,
+                // an off-centre initial pan no longer causes drift on zoom,
+                // but starting centred is still the right first impression.
+                try { await ResetView(); }
+                catch (JSDisconnectedException) { /* circuit teardown */ }
+                catch (Exception ex) { Logger.LogWarning(ex, "Initial ResetView failed."); }
             }
             else if (_viewportModule is not null && Map is not null)
             {
@@ -682,8 +780,22 @@ namespace KnockBox.DndMapper.Pages.Components
         private void OnToggleGrid(ChangeEventArgs e) =>
             LocalShowGridLines = e.Value is bool b && b;
 
-        private void ZoomIn() => SetZoom(_zoom * 1.25);
-        private void ZoomOut() => SetZoom(_zoom / 1.25);
+        // The +/- buttons route through the JS viewport so they use the same
+        // anchor-at-non-rail-centre math as the cursor-anchored wheel zoom.
+        // The pre-existing SetZoom path computed pan via Map.Grid.WidthCells /
+        // _zoom, which assumed the stage equalled the wrapper's natural size —
+        // false once rails take a chunk of the stage — so each button click
+        // shifted the visible centre to the left.
+        private void ZoomIn() => _ = ZoomByFactorJs(1.25);
+        private void ZoomOut() => _ = ZoomByFactorJs(1.0 / 1.25);
+
+        private async ValueTask ZoomByFactorJs(double factor)
+        {
+            if (_viewportModule is null) return;
+            try { await _viewportModule.InvokeVoidAsync("zoomByFactorAtCenter", _svgId, factor); }
+            catch (JSDisconnectedException) { /* circuit teardown */ }
+            catch (Exception ex) { Logger.LogWarning(ex, "zoomByFactorAtCenter failed."); }
+        }
 
         private sealed class ViewportMetrics
         {

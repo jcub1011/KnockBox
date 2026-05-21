@@ -53,6 +53,30 @@ namespace KnockBox.DndMapperTests.Unit.Services.Library
             await library.DisposeAsync();
         }
 
+        [TestMethod]
+        public async Task TryGetLocalObjectUrlAsync_WhenBlobNotCached_ReturnsNull()
+        {
+            // The player-circuit shape: this circuit didn't upload the image,
+            // so the blob cache is empty. MapCanvas relies on null here to
+            // fall through to the /blob-share share URL.
+            var library = BuildLibrary();
+
+            var url = await library.TryGetLocalObjectUrlAsync(Guid.NewGuid());
+
+            Assert.IsNull(url);
+        }
+
+        [TestMethod]
+        public async Task TryGetLocalObjectUrlAsync_AfterDispose_ReturnsNullWithoutThrowing()
+        {
+            var library = BuildLibrary();
+            await library.DisposeAsync();
+
+            var url = await library.TryGetLocalObjectUrlAsync(Guid.NewGuid());
+
+            Assert.IsNull(url);
+        }
+
         private static DndMapperLibraryService BuildLibrary()
         {
             var (engine, _, _, _) = EngineTestFactory.Build();

@@ -95,20 +95,18 @@
                     var wpx = img.Width * cellPx;
                     var hpx = img.Height * cellPx;
                     var styleCommon = $"left:{F(lpx)}px; top:{F(tpx)}px; width:{F(wpx)}px; height:{F(hpx)}px; transform:rotate({F(img.Rotation)}deg); opacity:{F(img.Opacity)};";
-                    @if (img.ShareToken is Guid shareToken)
+                    var imgSrc = ResolveImageSrc(img);
+                    @if (imgSrc is not null)
                     {
                         <img @key="img.Id"
                              data-image-rendered-id="@img.Id"
-                             src="@($"/blob-share/{shareToken:D}")"
+                             src="@imgSrc"
                              draggable="false"
                              decoding="async"
                              style="@styleCommon" />
                     }
                     else
                     {
-                        @* Host disconnected: blob-share capability is gone. Show a
-                           muted placeholder; the host's reconnect republish path
-                           broadcasts a fresh ShareToken and the <img> returns. *@
                         var placeholderStyle = $"left:{F(lpx)}px; top:{F(tpx)}px; width:{F(wpx)}px; height:{F(hpx)}px; transform:rotate({F(img.Rotation)}deg); opacity:{F(Math.Min(img.Opacity, 0.6))};";
                         <div @key="img.Id"
                              class="dndm-image-placeholder"

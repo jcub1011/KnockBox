@@ -120,6 +120,13 @@ public static class KnockBoxPlatformExtensions
         // capturing the originating circuit's blob; the host streams bytes
         // through the closure without ever persisting them.
         builder.Services.AddSingleton<BlobShareRegistry>();
+        // Process-wide RAM cache that fronts the share endpoint so the
+        // second+ fetcher of a token doesn't re-traverse SignalR against
+        // the originating circuit. Bounded by SizeLimitBytes (LRU) and
+        // wired into BlobShareRegistry's removal paths so revoked tokens
+        // don't leave stale copies behind. See BlobShareByteCache for
+        // policy rationale.
+        builder.Services.AddSingleton<BlobShareByteCache>();
 
         // Per-circuit gateway to the browser's IndexedDB. Scoped so the cached
         // JS module reference stays bound to one Blazor circuit; the impl

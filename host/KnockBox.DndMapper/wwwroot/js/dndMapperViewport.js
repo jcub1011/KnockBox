@@ -77,6 +77,43 @@ function applyTransform(state) {
     state.wrapper.style.transform = `translate3d(${tx}px, ${ty}px, 0) scale(${zoom})`;
 }
 
+// Zoom-with-anchor: keep the world coord under `anchorStageX/Y` (CSS px,
+// measured from the gesture-surface's top-left) at the same stage pixel
+// position before and after the zoom. Used by the wheel handler (anchor =
+// cursor) and the toolbar +/- buttons (anchor = visible non-rail centre).
+// Commits any in-flight gesture state into the canonical pan/zoom first,
+// then writes the post-zoom pan back to canonical state and reapplies the
+// transform. Returns true if zoom changed.
+function applyZoomAtAnchor(state, anchorStageX, anchorStageY, factor) {
+    const base = ensureBasePxPerCell(state);
+    if (base <= 0) return false;
+    // Fold any pending gesture into canonical pan/zoom so the anchor math
+    // operates against a clean baseline. After this block the gesture
+    // identity is restored.
+    const combined = combinedViewport(state);
+    state.panX = combined.panX;
+    state.panY = combined.panY;
+    state.zoom = combined.zoom;
+    state.gPanPx = { x: 0, y: 0 };
+    state.gZoomFactor = 1.0;
+
+    const newZoom = clamp(state.zoom * factor, MIN_ZOOM, MAX_ZOOM);
+    if (newZoom === state.zoom) return false;
+
+    // World coord under the anchor at the current zoom: panX is the world
+    // x of the stage's left edge (per the inverse of applyTransform's
+    // tx formula), so the anchor world x is panX + anchorStageX/(cellPx*zoom).
+    const worldX = state.panX + anchorStageX / (base * state.zoom);
+    const worldY = state.panY + anchorStageY / (base * state.zoom);
+    // Pin that world coord back under the anchor after the zoom change.
+    state.panX = worldX - anchorStageX / (base * newZoom);
+    state.panY = worldY - anchorStageY / (base * newZoom);
+    state.zoom = newZoom;
+
+    applyTransform(state);
+    return true;
+}
+
 function refreshLayer(state) {
     if (!state.wrapper) return;
     state.wrapper.style.willChange = 'auto';
@@ -188,12 +225,18 @@ export function initialize(svgId, dotNetRef, panX, panY, zoom, widthCells, heigh
 
     gestureSurface.addEventListener('wheel', (e) => {
         e.preventDefault();
-        ensureBasePxPerCell(state);
+        // Cursor-anchored zoom: keep the world point under the cursor at the
+        // same stage pixel position before and after the zoom. The previous
+        // formula preserved the WORLD coord at the wrapper's geometric centre,
+        // which lives at the stage's top-left (not the visible viewport's
+        // centre) — so as you zoomed, the visible centre drifted left.
         const factor = e.deltaY < 0 ? 1.1 : 1.0 / 1.1;
-        const nextZoom = clamp(state.zoom * state.gZoomFactor * factor, MIN_ZOOM, MAX_ZOOM);
-        state.gZoomFactor = state.zoom > 0 ? nextZoom / state.zoom : state.gZoomFactor;
-        applyTransform(state);
-        scheduleWheelCommit();
+        const stageRect = state.gestureSurface.getBoundingClientRect();
+        const cursorStageX = e.clientX - stageRect.left;
+        const cursorStageY = e.clientY - stageRect.top;
+        if (applyZoomAtAnchor(state, cursorStageX, cursorStageY, factor)) {
+            scheduleWheelCommit();
+        }
     }, { passive: false, signal });
 
     gestureSurface.addEventListener('mousedown', (e) => {
@@ -243,6 +286,26 @@ export function setMode(svgId, mode) {
     const state = instances.get(svgId);
     if (!state) return;
     state.mode = mode || 'none';
+}
+
+// Toolbar +/- zoom path. The anchor is the visible non-rail centre, computed
+// from the gesture-surface rect plus the rail widths so an asymmetric rail
+// (host's wide left rail) doesn't pull the zoom focus off the camera centre.
+export function zoomByFactorAtCenter(svgId, factor) {
+    const state = instances.get(svgId);
+    if (!state) return;
+    const stageRect = state.gestureSurface.getBoundingClientRect();
+    const root = state.svg?.closest('.dnd-mapper-playing');
+    const leftEl = root?.querySelector('.dndm-rail--left') ?? null;
+    const rightEl = root?.querySelector('.dndm-rail--right') ?? null;
+    const leftPx = leftEl ? leftEl.getBoundingClientRect().width : 0;
+    const rightPx = rightEl ? rightEl.getBoundingClientRect().width : 0;
+    const anchorX = (stageRect.width + leftPx - rightPx) / 2;
+    const anchorY = stageRect.height / 2;
+    if (applyZoomAtAnchor(state, anchorX, anchorY, factor)) {
+        // No gesture state to wait on — flush to C# immediately.
+        commitGesture(state, false);
+    }
 }
 
 export function setViewBox(svgId, panX, panY, zoom) {
