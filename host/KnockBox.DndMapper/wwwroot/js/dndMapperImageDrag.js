@@ -110,28 +110,31 @@ function paintVisuals(state, visuals, x, y, w, h, rot) {
     paintHandles(visuals.handles, x, y, w, h, rot);
 }
 
-const HANDLE_SIZE = 0.25; // cells, matches MapCanvas.razor handle size
+// Each handle is a <g> in MapCanvas.razor with transform="translate(ax ay)
+// scale(var(--dndm-inv-zoom, 1))". To move a handle, rewrite that transform
+// keeping the inverse-scale so the handle stays constant on-screen at every
+// zoom. dndMapperViewport.js writes --dndm-inv-zoom onto the wrapper.
+function setAnchoredHandle(el, ax, ay) {
+    if (!el) return;
+    el.setAttribute('transform', `translate(${ax} ${ay}) scale(var(--dndm-inv-zoom, 1))`);
+}
 
 function paintHandles(handles, x, y, w, h, rot) {
     if (!handles) return;
     const cx = x + w / 2;
     const cy = y + h / 2;
     setRotateTransform(handles.rotateGroup, rot, cx, cy);
-    const half = HANDLE_SIZE / 2;
-    if (handles.nw) { handles.nw.setAttribute('x', x - half); handles.nw.setAttribute('y', y - half); }
-    if (handles.ne) { handles.ne.setAttribute('x', x + w - half); handles.ne.setAttribute('y', y - half); }
-    if (handles.sw) { handles.sw.setAttribute('x', x - half); handles.sw.setAttribute('y', y + h - half); }
-    if (handles.se) { handles.se.setAttribute('x', x + w - half); handles.se.setAttribute('y', y + h - half); }
+    setAnchoredHandle(handles.nw, x, y);
+    setAnchoredHandle(handles.ne, x + w, y);
+    setAnchoredHandle(handles.sw, x, y + h);
+    setAnchoredHandle(handles.se, x + w, y + h);
     if (handles.rotline) {
         handles.rotline.setAttribute('x1', cx);
         handles.rotline.setAttribute('y1', y);
         handles.rotline.setAttribute('x2', cx);
         handles.rotline.setAttribute('y2', y - 0.6);
     }
-    if (handles.rotcircle) {
-        handles.rotcircle.setAttribute('cx', cx);
-        handles.rotcircle.setAttribute('cy', y - 0.6);
-    }
+    setAnchoredHandle(handles.rotcircle, cx, y - 0.6);
 }
 
 // ── Drag math (mirrors MapCanvas.razor.cs ApplyDragDelta + ApplyResize) ──

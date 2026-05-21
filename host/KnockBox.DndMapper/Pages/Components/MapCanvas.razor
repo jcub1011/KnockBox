@@ -260,10 +260,18 @@
             var sw = sel.Width;
             var sh = sel.Height;
             var sr = sel.Rotation;
-            var hSize = 0.25; // cells
+            var hSize = 0.25; // cells (size of handle at zoom=1; --dndm-inv-zoom cancels the wrapper scale)
+            var hHalf = hSize / 2;
+            var rotCx = sx + sw / 2;
+            var rotCy = sy - 0.6;
             // dndMapperImageDrag owns handle pointerdown — see the [data-image-handle]
-            // attributes below. The JS module re-paints each handle's x/y per frame
-            // during a resize/rotate and only invokes .NET on mouseup.
+            // attributes below. The JS module re-paints each handle's transform per
+            // frame during a resize/rotate and only invokes .NET on mouseup.
+            // Each handle is a <g> that translates to its anchor and then inverse-
+            // scales by --dndm-inv-zoom (set by dndMapperViewport.js to 1/zoom). The
+            // wrapper's transform: scale(zoom) and this inner scale(1/zoom) cancel,
+            // so handle artwork renders at a constant on-screen pixel size at every
+            // zoom level — important when resizing very large images at low zoom.
             // @@onmousedown stopPropagation (with a no-op handler so Blazor binds the
             // modifier) blocks the SVG's @@onmousedown from also firing when a handle
             // is grabbed — otherwise focus-box / fog-paint modes would steal the click.
@@ -273,31 +281,40 @@
                 <g data-image-handles-rotate="@sel.Id"
                    data-image-id="@sel.Id"
                    transform="@($"rotate({F(sr)} {F(sx + sw / 2)} {F(sy + sh / 2)})")">
-                    <rect data-image-id="@sel.Id" data-image-handle="nw" data-handle-role="nw"
-                          x="@F(sx - hSize / 2)" y="@F(sy - hSize / 2)"
-                          width="@F(hSize)" height="@F(hSize)" class="dndm-image-handle"
-                          @onmousedown="OnHandleMouseDown" @onmousedown:stopPropagation="true" />
-                    <rect data-image-id="@sel.Id" data-image-handle="ne" data-handle-role="ne"
-                          x="@F(sx + sw - hSize / 2)" y="@F(sy - hSize / 2)"
-                          width="@F(hSize)" height="@F(hSize)" class="dndm-image-handle"
-                          @onmousedown="OnHandleMouseDown" @onmousedown:stopPropagation="true" />
-                    <rect data-image-id="@sel.Id" data-image-handle="sw" data-handle-role="sw"
-                          x="@F(sx - hSize / 2)" y="@F(sy + sh - hSize / 2)"
-                          width="@F(hSize)" height="@F(hSize)" class="dndm-image-handle"
-                          @onmousedown="OnHandleMouseDown" @onmousedown:stopPropagation="true" />
-                    <rect data-image-id="@sel.Id" data-image-handle="se" data-handle-role="se"
-                          x="@F(sx + sw - hSize / 2)" y="@F(sy + sh - hSize / 2)"
-                          width="@F(hSize)" height="@F(hSize)" class="dndm-image-handle"
-                          @onmousedown="OnHandleMouseDown" @onmousedown:stopPropagation="true" />
+                    <g data-image-id="@sel.Id" data-image-handle="nw" data-handle-role="nw"
+                       transform="@($"translate({F(sx)} {F(sy)}) scale(var(--dndm-inv-zoom, 1))")"
+                       @onmousedown="OnHandleMouseDown" @onmousedown:stopPropagation="true">
+                        <rect x="@F(-hHalf)" y="@F(-hHalf)" width="@F(hSize)" height="@F(hSize)"
+                              class="dndm-image-handle" />
+                    </g>
+                    <g data-image-id="@sel.Id" data-image-handle="ne" data-handle-role="ne"
+                       transform="@($"translate({F(sx + sw)} {F(sy)}) scale(var(--dndm-inv-zoom, 1))")"
+                       @onmousedown="OnHandleMouseDown" @onmousedown:stopPropagation="true">
+                        <rect x="@F(-hHalf)" y="@F(-hHalf)" width="@F(hSize)" height="@F(hSize)"
+                              class="dndm-image-handle" />
+                    </g>
+                    <g data-image-id="@sel.Id" data-image-handle="sw" data-handle-role="sw"
+                       transform="@($"translate({F(sx)} {F(sy + sh)}) scale(var(--dndm-inv-zoom, 1))")"
+                       @onmousedown="OnHandleMouseDown" @onmousedown:stopPropagation="true">
+                        <rect x="@F(-hHalf)" y="@F(-hHalf)" width="@F(hSize)" height="@F(hSize)"
+                              class="dndm-image-handle" />
+                    </g>
+                    <g data-image-id="@sel.Id" data-image-handle="se" data-handle-role="se"
+                       transform="@($"translate({F(sx + sw)} {F(sy + sh)}) scale(var(--dndm-inv-zoom, 1))")"
+                       @onmousedown="OnHandleMouseDown" @onmousedown:stopPropagation="true">
+                        <rect x="@F(-hHalf)" y="@F(-hHalf)" width="@F(hSize)" height="@F(hSize)"
+                              class="dndm-image-handle" />
+                    </g>
                     <line data-handle-role="rotline"
                           x1="@F(sx + sw / 2)" y1="@F(sy)"
-                          x2="@F(sx + sw / 2)" y2="@F(sy - 0.6)"
+                          x2="@F(rotCx)" y2="@F(rotCy)"
                           class="dndm-image-rotline"
                           pointer-events="none" />
-                    <circle data-image-id="@sel.Id" data-image-handle="rot" data-handle-role="rotcircle"
-                            cx="@F(sx + sw / 2)" cy="@F(sy - 0.6)" r="@F(hSize / 1.5)"
-                            class="dndm-image-handle dndm-image-handle--rot"
-                            @onmousedown="OnHandleMouseDown" @onmousedown:stopPropagation="true" />
+                    <g data-image-id="@sel.Id" data-image-handle="rot" data-handle-role="rotcircle"
+                       transform="@($"translate({F(rotCx)} {F(rotCy)}) scale(var(--dndm-inv-zoom, 1))")"
+                       @onmousedown="OnHandleMouseDown" @onmousedown:stopPropagation="true">
+                        <circle r="@F(hSize / 1.5)" class="dndm-image-handle dndm-image-handle--rot" />
+                    </g>
                 </g>
             </g>
         }

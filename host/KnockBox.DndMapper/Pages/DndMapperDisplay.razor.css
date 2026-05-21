@@ -147,3 +147,11 @@
     margin: 0 0.15em;
     color: #f3eee6;
 }
+
+.dndm-viewer-token {
+    transition: transform 250ms ease-out;
+}
+
+.dndm-viewer-token--instant {
+    transition: none;
+}

@@ -103,10 +103,15 @@ else
 
                     @foreach (var token in _projection.VisibleTokens)
                     {
-                        <g transform="translate(@token.X @token.Y)">
-                            <circle cx="0.5" cy="0.5" r="0.4" fill="@token.Color" stroke="#000" stroke-width="0.04" />
-                            <text x="0.5" y="0.55" text-anchor="middle" font-size="0.4" fill="#fff" font-weight="bold">
-                                @(token.Name.Length > 0 ? token.Name[0].ToString() : "?")
+                        @* Token.X/Y are canonically cell-centered (engine clamps to
+                           [0.5, max-0.5] and snaps to half-integers). Translate to
+                           that center and draw geometry at the origin so this view
+                           matches TokenLayer.razor on the host. *@
+                        <g @key="token.Id" class="@TokenCssClass(token)" transform="translate(@token.X @token.Y)">
+                            <circle r="0.4" fill="@token.Color" stroke="#000" stroke-width="0.04" />
+                            <text text-anchor="middle" dominant-baseline="central"
+                                  font-size="0.4" fill="#fff" font-weight="bold">
+                                @(token.Name.Length > 0 ? token.Name[..1].ToUpperInvariant() : "?")
                             </text>
                         </g>
                     }
@@ -147,6 +152,11 @@ else
     private DisplayProjection _projection = new(null, [], [], null, null, [], string.Empty, null);
     private ObserverAttachment? _attachment;
     private IDisposable? _subscription;
+    private Guid? _lastRenderedMapId;
+    // Set when the active map changes (or first paint). Suppresses the token
+    // transform tween for one render so tokens on a fresh map appear in place
+    // rather than sliding from prior coordinates.
+    private bool _suppressTween = true;
 
     protected override void OnInitialized()
     {
@@ -162,9 +172,30 @@ else
     private async ValueTask OnStateChanged()
     {
         if (_state is not null)
-            _projection = DisplayProjection.Build(_state);
+        {
+            var next = DisplayProjection.Build(_state);
+            if (next.ActiveMap?.Id != _projection.ActiveMap?.Id)
+                _suppressTween = true;
+            _projection = next;
+        }
         await InvokeAsync(StateHasChanged);
     }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        _lastRenderedMapId = _projection.ActiveMap?.Id;
+        if (_suppressTween)
+        {
+            _suppressTween = false;
+            // Re-render once with tweens re-enabled so subsequent token moves
+            // animate. The DOM already shows tokens in their correct positions
+            // from the suppressed pass, so this render is a no-op visually.
+            StateHasChanged();
+        }
+    }
+
+    private string TokenCssClass(Token _) =>
+        _suppressTween ? "dndm-viewer-token dndm-viewer-token--instant" : "dndm-viewer-token";
 
     public void Dispose()
     {

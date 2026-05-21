@@ -75,6 +75,10 @@ function applyTransform(state) {
     const tx = base * (W * (zoom - 1) / 2 - zoom * panX);
     const ty = base * (H * (zoom - 1) / 2 - zoom * panY);
     state.wrapper.style.transform = `translate3d(${tx}px, ${ty}px, 0) scale(${zoom})`;
+    // Image-handle markup inside the wrapper inverse-scales by this var so
+    // handles remain a constant on-screen size regardless of zoom. Stay
+    // synced with the wrapper transform — same frame, same callsite.
+    state.wrapper.style.setProperty('--dndm-inv-zoom', zoom > 0 ? String(1 / zoom) : '1');
 }
 
 // Zoom-with-anchor: keep the world coord under `anchorStageX/Y` (CSS px,
