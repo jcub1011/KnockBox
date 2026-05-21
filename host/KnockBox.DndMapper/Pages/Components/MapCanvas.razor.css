@@ -79,7 +79,10 @@
     top: 0;
     transform-origin: 50% 50%;
     will-change: transform;
-    background: var(--dndm-void);
+    /* No background — leaving this layer empty of paint commands keeps its
+       backing store minimal so it composites the (independently promoted)
+       image and SVG child layers cheaply. The void color lives on the
+       stage below. */
 }
 
 /* HTML bitmap layer — one <img> per visible image, positioned absolutely in
@@ -92,12 +95,22 @@
     pointer-events: none;
 }
 
+/* Each <img> needs its OWN GPU layer so its texture lives independently of
+   the wrapper's backing store. Without this, the wrapper (which is
+   layer-promoted via will-change) paints its image children into its own
+   monolithic tile grid — re-creating the SVG <image> problem under a
+   different surface. 2D transforms (rotate(...)) don't trigger Chromium
+   layer promotion; will-change + backface-visibility is the canonical
+   pair that keeps the layer stable even at rotation = 0 (identity
+   transform). */
 .dndm-image-layer img,
 .dndm-image-layer .dndm-image-placeholder {
     position: absolute;
     transform-origin: center center;
     user-select: none;
     -webkit-user-drag: none;
+    will-change: transform;
+    backface-visibility: hidden;
 }
 
 .dndm-image-placeholder {
