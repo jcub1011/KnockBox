@@ -5,8 +5,11 @@
 <section class="dndm-panel dndm-savesp">
     <header class="dndm-panel-header">
         <span>Saves</span>
-        <button class="dndm-btn dndm-btn--small" type="button" title="Save current state to a new slot"
-                @onclick="OpenCreate">+ New</button>
+        <div class="dndm-savesp-header-actions">
+            <VtfImportButton />
+            <button class="dndm-btn dndm-btn--small" type="button" title="Save current state to a new slot"
+                    @onclick="OpenCreate">+ New</button>
+        </div>
     </header>
     <div class="dndm-panel-body">
         @if (_creating)
@@ -59,6 +62,25 @@
                                 </span>
                             </div>
                             <div class="dndm-saves-actions">
+                                <button class="dndm-btn dndm-btn--small dndm-btn--ghost dndm-btn--icon" type="button"
+                                        title="Export this slot as a .vtf archive"
+                                        disabled="@(_exportingSlotId is not null)"
+                                        @onclick="@(() => ExportSlot(s.Id))">
+                                    @if (_exportingSlotId == s.Id)
+                                    {
+                                        <span class="dndm-saves-export-busy" aria-hidden="true">…</span>
+                                    }
+                                    else
+                                    {
+                                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none"
+                                             stroke="currentColor" stroke-width="2"
+                                             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                            <polyline points="7 10 12 15 17 10" />
+                                            <line x1="12" y1="15" x2="12" y2="3" />
+                                        </svg>
+                                    }
+                                </button>
                                 @if (!isAuto)
                                 {
                                     <button class="dndm-btn dndm-btn--small dndm-btn--icon" type="button"

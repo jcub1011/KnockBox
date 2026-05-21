@@ -1,0 +1,19 @@
+@using KnockBox.Core.Components.Shared
+@inherits DisposableComponent
+
+<label class="dndm-vtf-import @(_importing ? "dndm-vtf-import--busy" : null)"
+       title="Import a .vtf archive as a new save slot">
+    @if (_importing)
+    {
+        <span>Importing…</span>
+    }
+    else
+    {
+        <span>Import .vtf</span>
+    }
+    <input type="file"
+           @ref="_fileInput"
+           @onchange="OnFileSelected"
+           accept=".vtf,application/zip"
+           disabled="@_importing" />
+</label>

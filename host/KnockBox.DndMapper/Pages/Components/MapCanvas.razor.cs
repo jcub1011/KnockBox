@@ -84,8 +84,15 @@ namespace KnockBox.DndMapper.Pages.Components
         private (Guid MapId, int Width, int Height)? _lastBoundsSent;
 
         // Version-keyed memoization (paired with Map.FogVersion / Map.ImagesVersion).
+        // Each Map carries its own version counters starting at 0, so the Map.Id
+        // must be part of the cache key — otherwise switching to a different map
+        // whose counters happen to match keeps serving the previous map's data
+        // (visible as stale layer bitmaps + fog until a per-map edit bumps the
+        // counter past the cached value).
+        private Guid _cachedFogMapId;
         private int _cachedFogVersion = -1;
         private string _cachedFogPath = string.Empty;
+        private Guid _cachedImagesMapId;
         private int _cachedImagesVersion = -1;
         private List<MapImage>? _cachedVisibleImages;
         private bool _cachedIsHost;
@@ -553,23 +560,28 @@ namespace KnockBox.DndMapper.Pages.Components
 
         internal string GetFogPathCached()
         {
-            if (Map.FogVersion != _cachedFogVersion)
+            if (Map.Id != _cachedFogMapId || Map.FogVersion != _cachedFogVersion)
             {
                 _cachedFogPath = FogPolygonBuilder.BuildSvgPathData(Map);
                 _cachedFogVersion = Map.FogVersion;
+                _cachedFogMapId = Map.Id;
             }
             return _cachedFogPath;
         }
 
         internal IEnumerable<MapImage> GetVisibleImagesCached()
         {
-            if (Map.ImagesVersion != _cachedImagesVersion || _cachedVisibleImages is null || _cachedIsHost != IsHost)
+            if (Map.Id != _cachedImagesMapId
+                || Map.ImagesVersion != _cachedImagesVersion
+                || _cachedVisibleImages is null
+                || _cachedIsHost != IsHost)
             {
                 _cachedVisibleImages = ImageVisibilityFilter
                     .VisibleImagesFor(Map.Images, Map, IsHost)
                     .OrderBy(i => i.LayerOrder)
                     .ToList();
                 _cachedImagesVersion = Map.ImagesVersion;
+                _cachedImagesMapId = Map.Id;
                 _cachedIsHost = IsHost;
             }
             return _cachedVisibleImages;

@@ -1,12 +1,16 @@
 using KnockBox.Core.Components.Shared;
 using KnockBox.DndMapper.Services.Library;
 using Microsoft.AspNetCore.Components;
+using Microsoft.JSInterop;
 
 namespace KnockBox.DndMapper.Pages.Components
 {
     public partial class HostSavesPanel : DisposableComponent
     {
+        private const string DownloadModulePath = "/_content/KnockBox.DndMapper/js/dndMapperFileDownload.js";
+
         [Inject] protected DndMapperLibraryService Library { get; set; } = default!;
+        [Inject] protected IJSRuntime JS { get; set; } = default!;
         [Inject] protected ILogger<HostSavesPanel> Logger { get; set; } = default!;
         [CascadingParameter] public DndMapperToastService? Toasts { get; set; }
 
@@ -25,6 +29,9 @@ namespace KnockBox.DndMapper.Pages.Components
         private string _pendingOverwriteName = string.Empty;
         private string? _pendingLoad;
         private string _pendingLoadName = string.Empty;
+
+        private string? _exportingSlotId;
+        private IJSObjectReference? _downloadModule;
 
         protected override async Task OnInitializedAsync()
         {
@@ -150,6 +157,61 @@ namespace KnockBox.DndMapper.Pages.Components
                 await Toasts.Push(err.PublicMessage, DndMapperToastTone.Danger);
         }
 
+        private async Task ExportSlot(string slotId)
+        {
+            if (_exportingSlotId is not null) return;
+            _exportingSlotId = slotId;
+            StateHasChanged();
+            try
+            {
+                var result = await Library.ExportSlotAsync(slotId, ComponentDetached);
+                if (result.IsCanceled) return;
+                if (result.TryGetFailure(out var err))
+                {
+                    if (Toasts is not null) await Toasts.Push(err.PublicMessage, DndMapperToastTone.Danger);
+                    return;
+                }
+                if (!result.TryGetSuccess(out var export)) return;
+
+                // Trigger the download via a hidden anchor click. The blob is
+                // disposed in the finally so its object URL is revoked once
+                // the browser has started the download.
+                try
+                {
+                    var url = await export.Blob.CreateObjectUrlAsync(ComponentDetached);
+                    _downloadModule ??= await JS.InvokeAsync<IJSObjectReference>("import", ComponentDetached, DownloadModulePath);
+                    var fileName = SanitizeForFilename(export.SlotName) + ".vtf";
+                    await _downloadModule.InvokeVoidAsync("downloadObjectUrl", ComponentDetached, url, fileName);
+                }
+                finally
+                {
+                    await export.Blob.DisposeAsync();
+                }
+            }
+            catch (OperationCanceledException) { /* component detached */ }
+            catch (Exception ex)
+            {
+                Logger.LogWarning(ex, "DnD Mapper slot export threw.");
+                if (Toasts is not null) await Toasts.Push("Export failed.", DndMapperToastTone.Danger);
+            }
+            finally
+            {
+                _exportingSlotId = null;
+                StateHasChanged();
+            }
+        }
+
+        private static string SanitizeForFilename(string raw)
+        {
+            if (string.IsNullOrWhiteSpace(raw)) return "slot";
+            var invalid = Path.GetInvalidFileNameChars();
+            var sb = new System.Text.StringBuilder(raw.Length);
+            foreach (var c in raw)
+                sb.Append(Array.IndexOf(invalid, c) >= 0 ? '_' : c);
+            var name = sb.ToString().Trim();
+            return string.IsNullOrEmpty(name) ? "slot" : name;
+        }
+
         private static string FormatRelative(DateTime utc)
         {
             var delta = DateTime.UtcNow - utc;
@@ -164,6 +226,13 @@ namespace KnockBox.DndMapper.Pages.Components
         {
             Library.SlotsChanged -= OnSlotsChanged;
             Library.SavingChanged -= OnSavingChanged;
+            if (_downloadModule is not null)
+            {
+                // Fire-and-forget — the circuit may already be tearing down,
+                // and the module's only purpose was the anchor-click helper.
+                _ = _downloadModule.DisposeAsync().AsTask().ContinueWith(_ => { }, TaskScheduler.Default);
+                _downloadModule = null;
+            }
             base.Dispose();
         }
     }

@@ -4,6 +4,7 @@ using KnockBox.Core.Primitives.Returns;
 using KnockBox.Core.Services.State.Users;
 using KnockBox.Core.Services.Storage.IndexedDb;
 using KnockBox.DndMapper.Models;
+using KnockBox.DndMapper.Services.Library.Vtf;
 using KnockBox.DndMapper.Services.Logic.Games;
 using KnockBox.DndMapper.Services.State.Games;
 using KnockBox.DndMapper.Services.State.Games.Data;
@@ -1643,6 +1644,398 @@ namespace KnockBox.DndMapper.Services.Library
                 if (Interlocked.Decrement(ref _manualOpsInFlight) == 0 && Volatile.Read(ref _pendingDirty) == 0)
                     SetSaving(false);
             }
+        }
+
+        // ── .vtf import / export ──────────────────────────────────────────
+
+        /// <summary>
+        /// Packages a slot — its core spine, every map and sheet shard, and
+        /// every referenced image blob — into a `.vtf` (Virtual Table Format)
+        /// archive. The result is returned as a fresh <see cref="IndexedDbBlob"/>
+        /// the caller owns and must dispose; trigger a download via
+        /// <see cref="IndexedDbBlob.CreateObjectUrlAsync"/> + an &lt;a download&gt;
+        /// click, then dispose to revoke. Reads from IndexedDB only; the live
+        /// state is not touched.
+        /// </summary>
+        public async ValueTask<ValueResult<VtfExportResult>> ExportSlotAsync(
+            string slotId, CancellationToken ct = default)
+        {
+            ThrowIfDisposed();
+            if (_db is null) return ValueResult<VtfExportResult>.FromError("Library is not attached.");
+            if (string.IsNullOrWhiteSpace(slotId)) return ValueResult<VtfExportResult>.FromError("Slot id is required.");
+
+            Interlocked.Increment(ref _manualOpsInFlight);
+            SetSaving(true);
+            try
+            {
+                var idx = await ReadSlotsIndexAsync(_db, ct);
+                var entry = idx.Slots.FirstOrDefault(s => s.Id == slotId);
+                if (entry is null) return ValueResult<VtfExportResult>.FromError("Unknown slot id.");
+
+                var (snapshot, core, _) = await ReadShardedSlotAsync(_db, slotId, ct);
+                if (snapshot is null || core is null)
+                {
+                    // Fall back to v3 single-record + migrate-on-the-fly.
+                    var legacy = await MigrateV3SlotIfNeededAsync(_db, slotId, ct);
+                    if (legacy is null)
+                        return ValueResult<VtfExportResult>.FromError("Slot has no persisted content to export.");
+                    snapshot = legacy;
+                    core = new LibraryCoreSnapshot
+                    {
+                        SchemaVersion = 4,
+                        Settings = legacy.Settings,
+                        AttributeSchema = legacy.AttributeSchema,
+                        ActiveSchemaTemplateId = legacy.ActiveSchemaTemplateId,
+                        InitiativeAttributeName = legacy.InitiativeAttributeName,
+                        CustomTemplates = legacy.CustomTemplates,
+                        GlobalRollTemplates = legacy.GlobalRollTemplates,
+                        MapIds = legacy.Maps.OrderBy(m => m.ListOrder).Select(m => m.Id).ToList(),
+                        SheetIds = legacy.Sheets.Select(s => s.Id).ToList(),
+                    };
+                }
+
+                var maps = snapshot.Maps;
+                var sheets = snapshot.Sheets;
+
+                // Pull every image referenced by the slot's maps. Each
+                // BlobGet returns a live JS handle; we read the bytes into
+                // a managed buffer and dispose the handle immediately so we
+                // don't leak references across the (potentially long) Pack.
+                var imageIds = maps.SelectMany(m => m.Images.Select(i => (i.Id, i.ContentType)))
+                    .Distinct()
+                    .ToList();
+                var images = new Dictionary<Guid, VtfPackager.VtfImageAsset>(imageIds.Count);
+                foreach (var (imageId, declaredType) in imageIds)
+                {
+                    if (ct.IsCancellationRequested) return ValueResult<VtfExportResult>.FromCancellation();
+                    var blobResult = await _db.BlobGetSingleAsync(
+                        DndMapperLibrarySchema.ImagesStore,
+                        IndexedDbKey.String(imageId.ToString("D")),
+                        ct);
+                    if (!blobResult.TryGetSuccess(out var blob) || blob is null)
+                    {
+                        _logger.LogWarning("Export: image {ImageId} missing from IndexedDB; skipping.", imageId);
+                        continue;
+                    }
+                    try
+                    {
+                        var bytes = await blob.ReadAllBytesAsync(ct);
+                        var contentType = !string.IsNullOrWhiteSpace(blob.ContentType)
+                            ? blob.ContentType
+                            : (string.IsNullOrWhiteSpace(declaredType) ? "application/octet-stream" : declaredType);
+                        images[imageId] = new VtfPackager.VtfImageAsset(contentType, bytes);
+                    }
+                    finally
+                    {
+                        await SafeDisposeAsync(blob);
+                    }
+                }
+
+                var extension = new VtfPackager.VtfExtensionPayload(
+                    ActiveCombat: null,
+                    Phase: DndMapperPhase.Lobby);
+
+                var packInput = new VtfPackager.PackInput(
+                    SlotTitle: entry.Name,
+                    Core: core,
+                    Maps: maps,
+                    Sheets: sheets,
+                    Images: images,
+                    Extension: extension);
+
+                // Pack onto a thread-pool thread so the LINQ + JSON + Deflate
+                // work doesn't freeze the circuit on big slots.
+                var ms = new MemoryStream();
+                try
+                {
+                    await Task.Run(() => VtfPackager.Pack(packInput, ms), ct);
+                    ms.Position = 0;
+                }
+                catch
+                {
+                    await ms.DisposeAsync();
+                    throw;
+                }
+
+                // Wrap as an IndexedDbBlob (allocates on the JS side); the
+                // CreateBlobAsync impl disposes ms when leaveOpen is false.
+                IndexedDbBlob blobResultBlob;
+                try
+                {
+                    blobResultBlob = await _indexedDb.CreateBlobAsync(
+                        ms, ms.Length, "application/zip", leaveOpen: false, ct);
+                }
+                catch
+                {
+                    await ms.DisposeAsync();
+                    throw;
+                }
+
+                return ValueResult<VtfExportResult>.FromValue(
+                    new VtfExportResult(entry.Name, blobResultBlob));
+            }
+            catch (OperationCanceledException) { return ValueResult<VtfExportResult>.FromCancellation(); }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "DnD Mapper VTF export failed for slot {SlotId}.", slotId);
+                return ValueResult<VtfExportResult>.FromError("Export failed.");
+            }
+            finally
+            {
+                if (Interlocked.Decrement(ref _manualOpsInFlight) == 0 && Volatile.Read(ref _pendingDirty) == 0)
+                    SetSaving(false);
+            }
+        }
+
+        /// <summary>
+        /// Reads a `.vtf` archive from <paramref name="vtfBlob"/> and writes
+        /// it as a new manual slot. Image GUIDs are minted fresh so importing
+        /// the same archive twice produces two independent slots without
+        /// aliasing image rows in the IndexedDB blob store. The live state is
+        /// not touched — the user must explicitly Load the new slot to swap.
+        /// </summary>
+        public async ValueTask<ValueResult<string>> ImportSlotAsync(
+            IndexedDbBlob vtfBlob, CancellationToken ct = default)
+        {
+            ThrowIfDisposed();
+            if (_db is null) return ValueResult<string>.FromError("Library is not attached.");
+            if (vtfBlob is null) return ValueResult<string>.FromError("Archive is required.");
+
+            Interlocked.Increment(ref _manualOpsInFlight);
+            SetSaving(true);
+            try
+            {
+                // Read the archive into a seekable buffer. ZipArchive.Read
+                // requires seeking back to the central directory at the end
+                // of the stream, which IndexedDbBlob.OpenReadAsync does not
+                // support (forward-only async stream).
+                byte[] archiveBytes;
+                try { archiveBytes = await vtfBlob.ReadAllBytesAsync(ct); }
+                catch (OperationCanceledException) { return ValueResult<string>.FromCancellation(); }
+
+                VtfPackager.UnpackResult unpacked;
+                try
+                {
+                    unpacked = await Task.Run(() =>
+                    {
+                        using var ms = new MemoryStream(archiveBytes, writable: false);
+                        return VtfPackager.Unpack(ms);
+                    }, ct);
+                }
+                catch (OperationCanceledException) { return ValueResult<string>.FromCancellation(); }
+                catch (InvalidDataException ex)
+                {
+                    return ValueResult<string>.FromError(ex.Message);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "DnD Mapper VTF import: archive could not be read.");
+                    return ValueResult<string>.FromError("Archive is not a valid .vtf file.");
+                }
+
+                // Enforce engine caps so a malicious or oversized .vtf can't
+                // immediately blow the room budget once Loaded.
+                long totalBytes = 0;
+                foreach (var asset in unpacked.Images.Values)
+                {
+                    if (asset.Bytes.LongLength > DndMapperGameEngine.PerFileCapBytes)
+                        return ValueResult<string>.FromError(
+                            $"Archive contains an image larger than {DndMapperGameEngine.PerFileCapBytes / (1024 * 1024)} MB.");
+                    totalBytes += asset.Bytes.LongLength;
+                }
+                if (totalBytes > DndMapperGameEngine.PerRoomCapBytes)
+                    return ValueResult<string>.FromError(
+                        $"Archive image total exceeds the {DndMapperGameEngine.PerRoomCapBytes / (1024 * 1024 * 1024)} GB room cap.");
+
+                // Mint fresh GUIDs for every imported image so the same .vtf
+                // imported a second time doesn't overwrite the first import's
+                // rows. Rewrite map shards' MapImageSnapshot.Id with the new
+                // ids; ByteSize is preserved (used for the bytes-used readout).
+                var idRemap = new Dictionary<Guid, Guid>(unpacked.Images.Count);
+                var remappedImages = new Dictionary<Guid, VtfPackager.VtfImageAsset>(unpacked.Images.Count);
+                foreach (var (oldId, asset) in unpacked.Images)
+                {
+                    var newId = Guid.NewGuid();
+                    idRemap[oldId] = newId;
+                    remappedImages[newId] = asset;
+                }
+
+                var remappedMaps = new List<MapSnapshot>(unpacked.Maps.Count);
+                foreach (var map in unpacked.Maps)
+                {
+                    var imagesList = new List<MapImageSnapshot>(map.Images.Count);
+                    foreach (var img in map.Images)
+                    {
+                        if (idRemap.TryGetValue(img.Id, out var newId))
+                            imagesList.Add(img with { Id = newId });
+                        // else: image binary was missing from the archive;
+                        // drop the metadata row to avoid dangling refs.
+                    }
+                    remappedMaps.Add(map with { Images = imagesList });
+                }
+
+                // Write the image blobs to IndexedDB under their fresh GUIDs.
+                foreach (var (newId, asset) in remappedImages)
+                {
+                    if (ct.IsCancellationRequested) return ValueResult<string>.FromCancellation();
+                    IndexedDbBlob? created = null;
+                    try
+                    {
+                        created = await _indexedDb.CreateBlobAsync(asset.Bytes, asset.ContentType, ct);
+                        var put = await _db.BlobPutSingleAsync(
+                            DndMapperLibrarySchema.ImagesStore,
+                            created,
+                            IndexedDbKey.String(newId.ToString("D")),
+                            ct);
+                        if (!put.IsSuccess)
+                        {
+                            put.TryGetFailure(out var perr);
+                            return ValueResult<string>.FromError($"Failed to write image to library: {perr.Message}");
+                        }
+                    }
+                    finally
+                    {
+                        if (created is not null) await SafeDisposeAsync(created);
+                    }
+                }
+
+                // Reconcile the core spine: rewrite MapIds in maps' display
+                // order (every map snapshot just had its image ids remapped;
+                // the maps themselves keep their original ids).
+                var core = unpacked.Core with
+                {
+                    MapIds = remappedMaps.Select(m => m.Id).ToList(),
+                    SheetIds = unpacked.Sheets.Select(s => s.Id).ToList(),
+                };
+
+                var shards = new ShardSet(
+                    core,
+                    remappedMaps.ToDictionary(m => m.Id, m => m),
+                    unpacked.Sheets.ToDictionary(s => s.Id, s => s));
+
+                // Resolve a non-colliding slot name.
+                var idx = await ReadSlotsIndexAsync(_db, ct);
+                var desiredName = unpacked.SlotTitle;
+                if (string.IsNullOrWhiteSpace(desiredName)) desiredName = "Imported slot";
+                if (desiredName.Length > 60) desiredName = desiredName[..60];
+                var finalName = desiredName;
+                for (int n = 1; n < 1000; n++)
+                {
+                    if (!idx.Slots.Any(s => s.Kind == SlotKind.Manual
+                            && string.Equals(s.Name, finalName, StringComparison.OrdinalIgnoreCase)))
+                        break;
+                    finalName = TruncateForSuffix(desiredName, n);
+                }
+
+                var slotId = Guid.NewGuid().ToString("D");
+                var throwawayHashes = new Dictionary<string, byte[]>();
+                var write = await WriteAllShardsAsync(_db, slotId, shards, throwawayHashes, ct);
+                if (!write.IsSuccess)
+                {
+                    write.TryGetFailure(out var werr);
+                    return ValueResult<string>.FromError(werr.PublicMessage);
+                }
+
+                idx.Slots.Add(new SlotIndexEntry
+                {
+                    Id = slotId,
+                    Name = finalName,
+                    Kind = SlotKind.Manual,
+                    UpdatedUtc = DateTime.UtcNow,
+                });
+                var idxResult = await WriteSlotsIndexAsync(_db, idx, ct);
+                if (!idxResult.IsSuccess)
+                {
+                    idxResult.TryGetFailure(out var ierr);
+                    return ValueResult<string>.FromError($"Failed to update slots index: {ierr.PublicMessage}");
+                }
+
+                NotifySlotsChanged();
+                return ValueResult<string>.FromValue(slotId);
+            }
+            catch (OperationCanceledException) { return ValueResult<string>.FromCancellation(); }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "DnD Mapper VTF import failed.");
+                return ValueResult<string>.FromError("Import failed.");
+            }
+            finally
+            {
+                if (Interlocked.Decrement(ref _manualOpsInFlight) == 0 && Volatile.Read(ref _pendingDirty) == 0)
+                    SetSaving(false);
+            }
+        }
+
+        /// <summary>
+        /// Convenience wrapper that adopts a single <c>&lt;input type="file"&gt;</c>
+        /// selection through the existing IndexedDB adoption pipeline (bytes
+        /// never cross SignalR), then hands the resulting blob to
+        /// <see cref="ImportSlotAsync"/>. Caller picks the file; this method
+        /// owns the temp-row lifecycle.
+        /// </summary>
+        public async ValueTask<ValueResult<string>> ImportSlotFromInputElementAsync(
+            ElementReference inputElement, CancellationToken ct = default)
+        {
+            ThrowIfDisposed();
+            if (_db is null) return ValueResult<string>.FromError("Library is not attached.");
+
+            var adoptResult = await _db.AdoptInputElementFilesAsync(
+                inputElement,
+                DndMapperLibrarySchema.ImagesStore,
+                new AdoptInputFilesOptions(
+                    AcceptedTypes: VtfArchiveAcceptedMimeTypes,
+                    MaxBytes: VtfArchiveMaxBytes),
+                ct);
+
+            if (adoptResult.IsCanceled) return ValueResult<string>.FromCancellation();
+            if (!adoptResult.TryGetSuccess(out var adopted))
+            {
+                adoptResult.TryGetFailure(out var aerr);
+                return ValueResult<string>.FromError($"Could not read archive: {aerr.Message}");
+            }
+
+            var file = adopted.FirstOrDefault();
+            if (file is null) return ValueResult<string>.FromError("No file was selected.");
+
+            try
+            {
+                if (file.Error is not null || file.Blob is null || file.Key is null)
+                    return ValueResult<string>.FromError(file.Error ?? "Archive rejected.");
+
+                return await ImportSlotAsync(file.Blob, ct);
+            }
+            finally
+            {
+                if (file.Blob is not null) await SafeDisposeAsync(file.Blob);
+                if (file.Key is { } key) await SafeDeleteAsync(IndexedDbKey.String(key.ToString("D")));
+            }
+        }
+
+        // Caps and MIME allow-list for the .vtf archive itself. 2 GB is well
+        // above the worst-case slot (1 GB image cap + JSON) but still fits in
+        // a managed byte[] for the import path.
+        private const long VtfArchiveMaxBytes = 2L * 1024 * 1024 * 1024;
+        private static readonly IReadOnlyList<string> VtfArchiveAcceptedMimeTypes =
+        [
+            "application/zip",
+            "application/x-zip-compressed",
+            "application/octet-stream",
+            "",
+        ];
+
+        /// <summary>
+        /// Returned by <see cref="ExportSlotAsync"/>. The caller owns
+        /// <see cref="Blob"/> and must dispose it after triggering the
+        /// download (which revokes its object URL).
+        /// </summary>
+        public sealed record VtfExportResult(string SlotName, IndexedDbBlob Blob);
+
+        private static string TruncateForSuffix(string baseName, int n)
+        {
+            var suffix = $" ({n})";
+            if (baseName.Length + suffix.Length <= 60) return baseName + suffix;
+            var head = baseName[..(60 - suffix.Length)];
+            return head + suffix;
         }
 
         // Per-shard view of the current state used by every save path. The
