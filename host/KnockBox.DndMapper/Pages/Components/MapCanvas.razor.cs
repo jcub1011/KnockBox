@@ -61,16 +61,16 @@ namespace KnockBox.DndMapper.Pages.Components
         // getScreenCTM at the start of a drag/pan; 0 = not yet measured (fallback to
         // CellPixels*zoom). Cached for the duration of the gesture and cleared on mouse-up.
         private double _pxPerCell;
-        private IJSObjectReference? _metricsModule;
-        private IJSObjectReference? _fogPaintModule;
-        private DotNetObjectReference<MapCanvas>? _fogPaintRef;
-        private IJSObjectReference? _viewportModule;
-        private DotNetObjectReference<MapCanvas>? _viewportRef;
-        private IJSObjectReference? _imageDragModule;
-        private DotNetObjectReference<MapCanvas>? _imageDragRef;
-        // Tracks which image set + lock states were last pushed to the JS drag
-        // module so we don't re-marshal on every render. Key = (id, locked).
-        private int _imageDragSnapshotVersion = -1;
+        // Assigned in OnInitialized; the individual module slots inside stay
+        // null until OnAfterRenderAsync imports each one. Marked null! so
+        // callers don't trip a CS8602 chain through `_jsModules?.X`.
+        private MapCanvasJsModules _jsModules = null!;
+        // Tracks which (map, ImagesMembershipVersion) was last pushed to the JS
+        // drag module so we don't re-marshal on every render. The membership
+        // counter on Map bumps only when an image is added, removed, or its
+        // Locked flag toggles — which is the exact set the JS module cares
+        // about — so pure transform edits never trigger a marshal.
+        private (Guid MapId, int Version)? _imageDragSnapshot;
         private string _currentJsMode = "none";
         // Tracks (map id, grid dims) so we re-push when the map is swapped
         // or its grid is resized.
@@ -212,8 +212,6 @@ namespace KnockBox.DndMapper.Pages.Components
         // client-side and only calls CommitFocusRect at pointer-up. Mutually
         // exclusive with markup + fog modes (each toggle clears the others).
         private bool _focusActive;
-        private IJSObjectReference? _focusDragModule;
-        private DotNetObjectReference<MapCanvas>? _focusDragRef;
 
         // ── Centre-viewport broadcast (v1.x — §6.4) ──────────────────────
         // Last-seen request Nonce. When the server pushes a new request with a
@@ -234,6 +232,11 @@ namespace KnockBox.DndMapper.Pages.Components
 
         protected override void OnInitialized()
         {
+            // Initialize the JS-module container eagerly so callers don't need
+            // to deal with two layers of null (container + individual module).
+            // The individual module refs stay null until OnAfterRenderAsync
+            // imports each one.
+            _jsModules = new MapCanvasJsModules(JSRuntime, Logger, _svgId);
             TokenFocus.Focused += OnTokenFocusRequested;
             _stateSub = State.StateChangedEventManager.Subscribe(OnStateChanged);
             FogContext.Changed += OnFogContextChanged;
@@ -398,8 +401,8 @@ namespace KnockBox.DndMapper.Pages.Components
 
         private async ValueTask CancelFocusDragJs()
         {
-            if (_focusDragModule is null) return;
-            try { await _focusDragModule.InvokeVoidAsync("cancelDrag"); }
+            if (_jsModules.FocusDrag is null) return;
+            try { await _jsModules.FocusDrag.InvokeVoidAsync("cancelDrag"); }
             catch (JSDisconnectedException) { /* circuit teardown */ }
             catch (Exception) { /* ignore */ }
         }
@@ -412,12 +415,8 @@ namespace KnockBox.DndMapper.Pages.Components
                 Logger.LogWarning("ClearFocusRect failed: {Error}", err.PublicMessage);
         }
 
-        private async void OnTokenFocusRequested(Guid tokenId)
+        private async ValueTask OnTokenFocusRequested(Guid tokenId)
         {
-            // `async void` because the underlying event delegate is
-            // `Action<Guid>` (synchronous); any exception thrown after the
-            // first await would otherwise escape into the sync context and
-            // crash the Blazor circuit. Catch everything here and log.
             try
             {
                 if (Map is null) return;
@@ -456,29 +455,29 @@ namespace KnockBox.DndMapper.Pages.Components
 
         private async ValueTask PushJsMode()
         {
-            if (_viewportModule is null) return;
+            if (_jsModules.Viewport is null) return;
             var next = CurrentJsMode();
             if (next == _currentJsMode) return;
             _currentJsMode = next;
-            try { await _viewportModule.InvokeVoidAsync("setMode", _svgId, next); }
+            try { await _jsModules.Viewport.InvokeVoidAsync("setMode", _svgId, next); }
             catch (JSDisconnectedException) { /* circuit teardown */ }
             catch (Exception ex) { Logger.LogWarning(ex, "viewport.setMode failed."); }
         }
 
         private async ValueTask PushJsViewBox()
         {
-            if (_viewportModule is null) return;
-            try { await _viewportModule.InvokeVoidAsync("setViewBox", _svgId, _panX, _panY, _zoom); }
+            if (_jsModules.Viewport is null) return;
+            try { await _jsModules.Viewport.InvokeVoidAsync("setViewBox", _svgId, _panX, _panY, _zoom); }
             catch (JSDisconnectedException) { /* circuit teardown */ }
             catch (Exception ex) { Logger.LogWarning(ex, "viewport.setViewBox failed."); }
         }
 
         private async ValueTask PushJsBounds()
         {
-            if (_viewportModule is null || Map is null) return;
+            if (_jsModules.Viewport is null || Map is null) return;
             try
             {
-                await _viewportModule.InvokeVoidAsync(
+                await _jsModules.Viewport.InvokeVoidAsync(
                     "setBounds", _svgId,
                     Map.Grid.WidthCells, Map.Grid.HeightCells, Map.Grid.CellPixels);
             }
@@ -532,87 +531,53 @@ namespace KnockBox.DndMapper.Pages.Components
                 try { await _frameRef.FocusAsync(preventScroll: true); }
                 catch { /* element not focusable yet — ignore */ }
 
-                try
-                {
-                    _metricsModule = await JSRuntime.InvokeAsync<IJSObjectReference>(
-                        "import", "./_content/KnockBox.DndMapper/js/dndMapperSvgMetrics.js");
-                }
-                catch (JSDisconnectedException) { /* circuit teardown */ }
-                catch (Exception ex)
-                {
-                    Logger.LogWarning(ex, "Failed to load SVG metrics JS module.");
-                }
+                await _jsModules.LoadMetricsAsync();
 
                 if (IsHost)
                 {
+                    await _jsModules.LoadFogPaintAsync(this);
+                    await _jsModules.LoadFocusDragAsync(this);
+                }
+
+                await _jsModules.LoadViewportAsync(this);
+                if (_jsModules.Viewport is not null && _jsModules.ViewportRef is not null)
+                {
                     try
                     {
-                        _fogPaintModule = await JSRuntime.InvokeAsync<IJSObjectReference>(
-                            "import", "./_content/KnockBox.DndMapper/js/dndMapperFogPaint.js");
-                        _fogPaintRef = DotNetObjectReference.Create(this);
+                        _currentJsMode = CurrentJsMode();
+                        await _jsModules.Viewport.InvokeVoidAsync(
+                            "initialize", _svgId, _jsModules.ViewportRef, _panX, _panY, _zoom,
+                            Map.Grid.WidthCells, Map.Grid.HeightCells, Map.Grid.CellPixels, _currentJsMode);
+                        _lastBoundsSent = (Map.Id, Map.Grid.WidthCells, Map.Grid.HeightCells);
                     }
                     catch (JSDisconnectedException) { /* circuit teardown */ }
                     catch (Exception ex)
                     {
-                        Logger.LogWarning(ex, "Failed to load fog-paint JS module.");
+                        Logger.LogWarning(ex, "Viewport initialize failed.");
                     }
-
-                    try
-                    {
-                        _focusDragModule = await JSRuntime.InvokeAsync<IJSObjectReference>(
-                            "import", "./_content/KnockBox.DndMapper/js/dndMapperFocusDrag.js");
-                        _focusDragRef = DotNetObjectReference.Create(this);
-                    }
-                    catch (JSDisconnectedException) { /* circuit teardown */ }
-                    catch (Exception ex)
-                    {
-                        Logger.LogWarning(ex, "Failed to load focus-drag JS module.");
-                    }
-                }
-
-                try
-                {
-                    _viewportModule = await JSRuntime.InvokeAsync<IJSObjectReference>(
-                        "import", "./_content/KnockBox.DndMapper/js/dndMapperViewport.js");
-                    _viewportRef = DotNetObjectReference.Create(this);
-                    _currentJsMode = CurrentJsMode();
-                    await _viewportModule.InvokeVoidAsync(
-                        "initialize", _svgId, _viewportRef, _panX, _panY, _zoom,
-                        Map.Grid.WidthCells, Map.Grid.HeightCells, Map.Grid.CellPixels, _currentJsMode);
-                    _lastBoundsSent = (Map.Id, Map.Grid.WidthCells, Map.Grid.HeightCells);
-                }
-                catch (JSDisconnectedException) { /* circuit teardown */ }
-                catch (Exception ex)
-                {
-                    Logger.LogWarning(ex, "Failed to load viewport JS module.");
                 }
 
                 if (IsHost)
                 {
-                    try
+                    await _jsModules.LoadImageDragAsync(this);
+                    if (_jsModules.ImageDrag is not null && _jsModules.ImageDragRef is not null)
                     {
-                        _imageDragModule = await JSRuntime.InvokeAsync<IJSObjectReference>(
-                            "import", "./_content/KnockBox.DndMapper/js/dndMapperImageDrag.js");
-                        _imageDragRef = DotNetObjectReference.Create(this);
-                        var payload = Map.Images
-                            .Select(i => new { imageId = i.Id.ToString(), locked = i.Locked })
-                            .ToArray();
-                        await _imageDragModule.InvokeVoidAsync(
-                            "initialize", _svgId, _imageDragRef, payload, Map.Grid.CellPixels);
-                        // Seed the snapshot version so PushImagesToJs() skips the
-                        // first redundant marshal.
-                        int v = 17;
-                        foreach (var img in Map.Images)
+                        try
                         {
-                            v = v * 31 + img.Id.GetHashCode();
-                            v = v * 31 + (img.Locked ? 1 : 0);
+                            var payload = Map.Images
+                                .Select(i => new { imageId = i.Id.ToString(), locked = i.Locked })
+                                .ToArray();
+                            await _jsModules.ImageDrag.InvokeVoidAsync(
+                                "initialize", _svgId, _jsModules.ImageDragRef, payload, Map.Grid.CellPixels);
+                            // Seed snapshot so PushImagesToJs skips the next render's
+                            // redundant marshal — we just pushed exactly this version.
+                            _imageDragSnapshot = (Map.Id, Map.ImagesMembershipVersion);
                         }
-                        _imageDragSnapshotVersion = v;
-                    }
-                    catch (JSDisconnectedException) { /* circuit teardown */ }
-                    catch (Exception ex)
-                    {
-                        Logger.LogWarning(ex, "Failed to load image-drag JS module.");
+                        catch (JSDisconnectedException) { /* circuit teardown */ }
+                        catch (Exception ex)
+                        {
+                            Logger.LogWarning(ex, "Image-drag initialize failed.");
+                        }
                     }
                 }
 
@@ -625,7 +590,7 @@ namespace KnockBox.DndMapper.Pages.Components
                 catch (JSDisconnectedException) { /* circuit teardown */ }
                 catch (Exception ex) { Logger.LogWarning(ex, "Initial ResetView failed."); }
             }
-            else if (_viewportModule is not null && Map is not null)
+            else if (_jsModules.Viewport is not null && Map is not null)
             {
                 // Push new bounds on map swap or grid resize. Off-map content
                 // is handled by the SVG's overflow="visible" attribute, not
@@ -644,10 +609,10 @@ namespace KnockBox.DndMapper.Pages.Components
 
         private async ValueTask CaptureScaleAsync()
         {
-            if (_metricsModule is null) return;
+            if (_jsModules.Metrics is null) return;
             try
             {
-                double scale = await _metricsModule.InvokeAsync<double>("getPixelsPerCell", _svgId);
+                double scale = await _jsModules.Metrics.InvokeAsync<double>("getPixelsPerCell", _svgId);
                 if (scale > 0) _pxPerCell = scale;
             }
             catch (JSDisconnectedException) { /* circuit teardown */ }
@@ -662,56 +627,7 @@ namespace KnockBox.DndMapper.Pages.Components
             TokenFocus.Focused -= OnTokenFocusRequested;
             FogContext.Changed -= OnFogContextChanged;
             _stateSub?.Dispose();
-            if (_fogPaintModule is not null)
-            {
-                try { await _fogPaintModule.InvokeVoidAsync("cancelStroke"); }
-                catch (JSDisconnectedException) { /* circuit teardown */ }
-                catch (Exception) { /* ignore */ }
-                try { await _fogPaintModule.DisposeAsync(); }
-                catch (JSDisconnectedException) { /* circuit teardown */ }
-                _fogPaintModule = null;
-            }
-            _fogPaintRef?.Dispose();
-            _fogPaintRef = null;
-            if (_focusDragModule is not null)
-            {
-                try { await _focusDragModule.InvokeVoidAsync("cancelDrag"); }
-                catch (JSDisconnectedException) { /* circuit teardown */ }
-                catch (Exception) { /* ignore */ }
-                try { await _focusDragModule.DisposeAsync(); }
-                catch (JSDisconnectedException) { /* circuit teardown */ }
-                _focusDragModule = null;
-            }
-            _focusDragRef?.Dispose();
-            _focusDragRef = null;
-            if (_metricsModule is not null)
-            {
-                try { await _metricsModule.DisposeAsync(); }
-                catch (JSDisconnectedException) { /* circuit teardown */ }
-                _metricsModule = null;
-            }
-            if (_viewportModule is not null)
-            {
-                try { await _viewportModule.InvokeVoidAsync("dispose", _svgId); }
-                catch (JSDisconnectedException) { /* circuit teardown */ }
-                catch (Exception) { /* ignore */ }
-                try { await _viewportModule.DisposeAsync(); }
-                catch (JSDisconnectedException) { /* circuit teardown */ }
-                _viewportModule = null;
-            }
-            _viewportRef?.Dispose();
-            _viewportRef = null;
-            if (_imageDragModule is not null)
-            {
-                try { await _imageDragModule.InvokeVoidAsync("dispose", _svgId); }
-                catch (JSDisconnectedException) { /* circuit teardown */ }
-                catch (Exception) { /* ignore */ }
-                try { await _imageDragModule.DisposeAsync(); }
-                catch (JSDisconnectedException) { /* circuit teardown */ }
-                _imageDragModule = null;
-            }
-            _imageDragRef?.Dispose();
-            _imageDragRef = null;
+            await _jsModules.DisposeAsync();
             Dispose();
         }
 
@@ -754,14 +670,16 @@ namespace KnockBox.DndMapper.Pages.Components
             if (_pxPerCell <= 0) return (0, 0);
             try
             {
-                if (_metricsModule is null) return (_panX, _panY);
-                var rect = await _metricsModule.InvokeAsync<ViewportMetrics?>("getViewportMetrics", _svgId);
+                if (_jsModules.Metrics is null) return (_panX, _panY);
+                var rect = await _jsModules.Metrics.InvokeAsync<ViewportMetrics?>("getViewportMetrics", _svgId);
                 if (rect is null || rect.SvgWidth == 0) return (_panX, _panY);
                 // getViewportMetrics returns the SVG box dimensions in client px;
                 // the SVG itself is offset by getBoundingClientRect.left/top, which
                 // we don't have here. Approximate by using the difference between
                 // client position and the metrics' "left" offset (rails width). For
                 // M01 ship this is good enough for the centre-viewport affordance.
+                // TODO M02: extend getViewportMetrics to return the SVG's
+                // getBoundingClientRect.{left,top} so this becomes exact.
                 double localX = clientX - rect.LeftPx;
                 double localY = clientY;
                 double mapX = _panX + localX / _pxPerCell;
@@ -791,8 +709,8 @@ namespace KnockBox.DndMapper.Pages.Components
 
         private async ValueTask ZoomByFactorJs(double factor)
         {
-            if (_viewportModule is null) return;
-            try { await _viewportModule.InvokeVoidAsync("zoomByFactorAtCenter", _svgId, factor); }
+            if (_jsModules.Viewport is null) return;
+            try { await _jsModules.Viewport.InvokeVoidAsync("zoomByFactorAtCenter", _svgId, factor); }
             catch (JSDisconnectedException) { /* circuit teardown */ }
             catch (Exception ex) { Logger.LogWarning(ex, "zoomByFactorAtCenter failed."); }
         }
@@ -817,11 +735,11 @@ namespace KnockBox.DndMapper.Pages.Components
             // makes that natural box fit the visible stage area. panX/panY
             // (world cells at stage top-left) are then chosen to center the
             // map within the visible area.
-            if (_metricsModule is not null)
+            if (_jsModules.Metrics is not null)
             {
                 try
                 {
-                    var m = await _metricsModule.InvokeAsync<ViewportMetrics?>("getViewportMetrics", _svgId);
+                    var m = await _jsModules.Metrics.InvokeAsync<ViewportMetrics?>("getViewportMetrics", _svgId);
                     if (m is not null && m.SvgWidth > 0 && m.SvgHeight > 0
                         && Map.Grid.WidthCells > 0 && Map.Grid.HeightCells > 0)
                     {
@@ -910,12 +828,12 @@ namespace KnockBox.DndMapper.Pages.Components
             // The JS module owns the gesture entirely — preview is appended to the
             // SVG outside the Razor render tree and .NET is only invoked at
             // pointer-up via CommitFocusRect.
-            if (e.Button == LeftMouseButton && IsHost && _focusActive && _focusDragModule is not null && _focusDragRef is not null)
+            if (e.Button == LeftMouseButton && IsHost && _focusActive && _jsModules.FocusDrag is not null && _jsModules.FocusDragRef is not null)
             {
                 try
                 {
-                    await _focusDragModule.InvokeVoidAsync(
-                        "beginDrag", _svgId, _focusDragRef, LocalShowGridLines, e.ClientX, e.ClientY);
+                    await _jsModules.FocusDrag.InvokeVoidAsync(
+                        "beginDrag", _svgId, _jsModules.FocusDragRef, LocalShowGridLines, e.ClientX, e.ClientY);
                 }
                 catch (JSDisconnectedException) { /* circuit teardown */ }
                 catch (Exception ex)
@@ -931,13 +849,13 @@ namespace KnockBox.DndMapper.Pages.Components
             // once the host releases the pointer, with the full cell list.
             // That keeps the stroke snappy even when the SignalR round-trip
             // is slow.
-            if (e.Button == LeftMouseButton && IsFogPaintActive && _fogPaintModule is not null && _fogPaintRef is not null)
+            if (e.Button == LeftMouseButton && IsFogPaintActive && _jsModules.FogPaint is not null && _jsModules.FogPaintRef is not null)
             {
                 var mode = FogContext.Mode == FogPaintMode.Paint ? "paint" : "erase";
                 try
                 {
-                    await _fogPaintModule.InvokeVoidAsync(
-                        "beginStroke", _svgId, _fogPaintRef, FogContext.BrushRadius, mode, e.ClientX, e.ClientY);
+                    await _jsModules.FogPaint.InvokeVoidAsync(
+                        "beginStroke", _svgId, _jsModules.FogPaintRef, FogContext.BrushRadius, mode, e.ClientX, e.ClientY);
                 }
                 catch (JSDisconnectedException) { /* circuit teardown */ }
                 catch (Exception ex)
@@ -1055,8 +973,8 @@ namespace KnockBox.DndMapper.Pages.Components
 
         private async Task ForceBeginPanAsync(MouseEventArgs e)
         {
-            if (_viewportModule is null) return;
-            try { await _viewportModule.InvokeVoidAsync("forceBeginPan", _svgId, e.ClientX, e.ClientY, e.Button); }
+            if (_jsModules.Viewport is null) return;
+            try { await _jsModules.Viewport.InvokeVoidAsync("forceBeginPan", _svgId, e.ClientX, e.ClientY, e.Button); }
             catch (JSDisconnectedException) { /* circuit teardown */ }
             catch (Exception ex) { Logger.LogWarning(ex, "viewport.forceBeginPan failed."); }
         }
@@ -1122,23 +1040,18 @@ namespace KnockBox.DndMapper.Pages.Components
 
         private async ValueTask PushImagesToJs()
         {
-            if (_imageDragModule is null) return;
-            // Hash the (id, locked) tuple set so we don't marshal a payload every
-            // render. Membership/lock changes flip the version; pure transform
-            // changes don't (the JS module reads transforms off the DOM).
-            int v = 17;
-            foreach (var img in Map.Images)
-            {
-                v = v * 31 + img.Id.GetHashCode();
-                v = v * 31 + (img.Locked ? 1 : 0);
-            }
-            if (v == _imageDragSnapshotVersion) return;
-            _imageDragSnapshotVersion = v;
+            if (_jsModules.ImageDrag is null) return;
+            // Engine bumps Map.ImagesMembershipVersion on add/remove/lock only,
+            // so pure transform edits never marshal a payload. Map-swap is
+            // detected by the MapId in the snapshot tuple.
+            var current = (Map.Id, Map.ImagesMembershipVersion);
+            if (_imageDragSnapshot == current) return;
+            _imageDragSnapshot = current;
 
             var payload = Map.Images
                 .Select(i => new { imageId = i.Id.ToString(), locked = i.Locked })
                 .ToArray();
-            try { await _imageDragModule.InvokeVoidAsync("setImages", _svgId, payload, Map.Grid.CellPixels); }
+            try { await _jsModules.ImageDrag.InvokeVoidAsync("setImages", _svgId, payload, Map.Grid.CellPixels); }
             catch (JSDisconnectedException) { /* circuit teardown */ }
             catch (Exception ex) { Logger.LogWarning(ex, "imageDrag.setImages failed."); }
         }
@@ -1150,10 +1063,10 @@ namespace KnockBox.DndMapper.Pages.Components
 
         private async ValueTask ReconcileImageJs(Guid imageId, double x, double y, double w, double h, double rot)
         {
-            if (_imageDragModule is null) return;
+            if (_jsModules.ImageDrag is null) return;
             try
             {
-                await _imageDragModule.InvokeVoidAsync(
+                await _jsModules.ImageDrag.InvokeVoidAsync(
                     "reconcileImage", _svgId, imageId.ToString(), x, y, w, h, rot);
             }
             catch (JSDisconnectedException) { /* circuit teardown */ }

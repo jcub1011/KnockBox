@@ -2200,6 +2200,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                 image.LayerOrder = map.Images.Count;
                 map.Images.Add(image);
                 map.ImagesVersion++;
+                map.ImagesMembershipVersion++;
                 state.AdjustBytesUsed(image.ByteSize);
             });
 
@@ -2585,7 +2586,11 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                 if (image is null) { error = "Unknown map or image id."; return; }
                 if (image.Locked == locked) return;
                 image.Locked = locked;
-                if (imageMap is not null) imageMap.ImagesVersion++;
+                if (imageMap is not null)
+                {
+                    imageMap.ImagesVersion++;
+                    imageMap.ImagesMembershipVersion++;
+                }
             });
 
             if (exec.IsCanceled) return Result.FromCancellation();
@@ -2641,6 +2646,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                 for (int i = 0; i < map.Images.Count; i++)
                     map.Images[i].LayerOrder = i;
                 map.ImagesVersion++;
+                map.ImagesMembershipVersion++;
             });
 
             if (exec.IsCanceled) return Result.FromCancellation();

@@ -1,5 +1,6 @@
 using KnockBox.Core.Components.Shared;
 using KnockBox.Core.Services.State.Users;
+using KnockBox.DndMapper.Services.Library;
 using KnockBox.DndMapper.Services.Logic.Games;
 using KnockBox.DndMapper.Services.State.Games;
 using KnockBox.DndMapper.Services.State.Games.Data;
@@ -13,6 +14,7 @@ namespace KnockBox.DndMapper.Pages.Components
         [Parameter, EditorRequired] public DndMapperGameState State { get; set; } = default!;
 
         [Inject] protected DndMapperGameEngine Engine { get; set; } = default!;
+        [Inject] protected DndMapperLibraryService Library { get; set; } = default!;
         [Inject] protected IUserService UserService { get; set; } = default!;
         [CascadingParameter] public DndMapperToastService? Toasts { get; set; }
 
@@ -141,7 +143,10 @@ namespace KnockBox.DndMapper.Pages.Components
             var pending = _pendingDelete;
             _pendingDelete = null;
             if (pending is null || UserService.CurrentUser is null) return;
-            var result = Engine.DeleteMapAsync(State, UserService.CurrentUser, pending.Id);
+            // Route through the library service so the deleted map's image blob
+            // shares get revoked and IndexedDB rows cleared — the engine verb
+            // only mutates in-memory state.
+            var result = await Library.DeleteMapAsync(State, UserService.CurrentUser, pending.Id);
             if (result.TryGetFailure(out var err))
             {
                 await PushToast(err.PublicMessage, DndMapperToastTone.Danger);

@@ -614,6 +614,50 @@ namespace KnockBox.DndMapper.Services.Library
             return Result.Success;
         }
 
+        /// <summary>
+        /// Deletes a map: snapshots the map's image ids first, forwards to the
+        /// engine, then (on success) deletes each image's IndexedDB row and
+        /// disposes the cached blob + share handles. Disposing an
+        /// <see cref="IBlobShare"/> revokes its token from
+        /// <c>BlobShareRegistry</c>, which in turn evicts the byte cache —
+        /// so the capability URLs for every image on the deleted map stop
+        /// resolving immediately.
+        /// </summary>
+        /// <remarks>
+        /// Map *swap* (<c>SetActiveMapAsync</c>) intentionally does not revoke
+        /// anything: off-screen maps stay in <c>state.Maps</c> with their
+        /// images, and the host can swap back at any time. Only map deletion
+        /// (and explicit per-image removal) reaches this cleanup path.
+        /// </remarks>
+        public async ValueTask<Result> DeleteMapAsync(
+            DndMapperGameState state,
+            User host,
+            Guid mapId,
+            CancellationToken ct = default)
+        {
+            ThrowIfDisposed();
+            if (_db is null) return Result.FromError("Library is not attached.");
+
+            // Snapshot the image ids BEFORE the engine mutates state — once
+            // the verb runs, map.Images is gone.
+            var map = state.Maps.FirstOrDefault(m => m.Id == mapId);
+            var imageIds = map is null
+                ? Array.Empty<Guid>()
+                : map.Images.Select(i => i.Id).ToArray();
+
+            var engineResult = _engine.DeleteMapAsync(state, host, mapId);
+            if (!engineResult.IsSuccess) return engineResult;
+
+            foreach (var imageId in imageIds)
+            {
+                await SafeDeleteAsync(IndexedDbKey.String(imageId.ToString("D")));
+                if (_shareCache.Remove(imageId, out var share)) await SafeDisposeAsync(share);
+                if (_blobCache.Remove(imageId, out var blob)) await SafeDisposeAsync(blob);
+            }
+
+            return Result.Success;
+        }
+
         // Replaces (or inserts) the cached blob + share for an image, disposing
         // any previous handles so we never silently overwrite a live JS resource.
         private async ValueTask ReplaceCacheEntryAsync(Guid imageId, IndexedDbBlob blob, IBlobShare share)

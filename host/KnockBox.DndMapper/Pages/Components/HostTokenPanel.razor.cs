@@ -132,7 +132,7 @@ namespace KnockBox.DndMapper.Pages.Components
 
         private void OnDeleteRequest(Token t) => _pendingDelete = t;
 
-        private void OnRowDoubleClick(Token t) => TokenFocus.Focus(t.Id);
+        private void OnRowDoubleClick(Token t) => _ = TokenFocus.FocusAsync(t.Id);
         private void CancelDelete() => _pendingDelete = null;
 
         private async Task ConfirmDelete()

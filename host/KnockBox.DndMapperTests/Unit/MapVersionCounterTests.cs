@@ -195,5 +195,74 @@ namespace KnockBox.DndMapperTests.Unit
             Assert.IsTrue(result.IsSuccess);
             Assert.IsGreaterThan(before, Map.ImagesVersion);
         }
+
+        // ── ImagesMembershipVersion ───────────────────────────────────────────────
+        // Narrower counter that only tracks (id, locked) set changes — the data
+        // MapCanvas's JS image-drag module actually cares about. Pure transform
+        // edits must NOT bump it.
+
+        [TestMethod]
+        public void AddImageAsync_BumpsImagesMembershipVersion()
+        {
+            var before = Map.ImagesMembershipVersion;
+            var result = _engine.AddImageAsync(_state, _host, _mapId, SeedImage());
+            Assert.IsTrue(result.IsSuccess);
+            Assert.IsGreaterThan(before, Map.ImagesMembershipVersion);
+        }
+
+        [TestMethod]
+        public void RemoveImageAsync_BumpsImagesMembershipVersion()
+        {
+            var img = SeedImage();
+            _engine.AddImageAsync(_state, _host, _mapId, img);
+            var before = Map.ImagesMembershipVersion;
+            var result = _engine.RemoveImageAsync(_state, _host, _mapId, img.Id);
+            Assert.IsTrue(result.IsSuccess);
+            Assert.IsGreaterThan(before, Map.ImagesMembershipVersion);
+        }
+
+        [TestMethod]
+        public void SetImageLockedAsync_BumpsImagesMembershipVersion_OnChange()
+        {
+            var img = SeedImage();
+            _engine.AddImageAsync(_state, _host, _mapId, img);
+            var before = Map.ImagesMembershipVersion;
+            var result = _engine.SetImageLockedAsync(_state, _host, _mapId, img.Id, true);
+            Assert.IsTrue(result.IsSuccess);
+            Assert.IsGreaterThan(before, Map.ImagesMembershipVersion);
+        }
+
+        [TestMethod]
+        public void UpdateImageTransformAsync_DoesNotBumpImagesMembershipVersion()
+        {
+            var img = SeedImage();
+            _engine.AddImageAsync(_state, _host, _mapId, img);
+            var before = Map.ImagesMembershipVersion;
+            var result = _engine.UpdateImageTransformAsync(_state, _host, _mapId, img.Id, 1, 2, 3, 4, 10, 0.5);
+            Assert.IsTrue(result.IsSuccess);
+            Assert.AreEqual(before, Map.ImagesMembershipVersion);
+        }
+
+        [TestMethod]
+        public void SetImageHiddenAsync_DoesNotBumpImagesMembershipVersion()
+        {
+            var img = SeedImage();
+            _engine.AddImageAsync(_state, _host, _mapId, img);
+            var before = Map.ImagesMembershipVersion;
+            var result = _engine.SetImageHiddenAsync(_state, _host, _mapId, img.Id, true);
+            Assert.IsTrue(result.IsSuccess);
+            Assert.AreEqual(before, Map.ImagesMembershipVersion);
+        }
+
+        [TestMethod]
+        public void UpdateImageShareTokenAsync_DoesNotBumpImagesMembershipVersion()
+        {
+            var img = SeedImage();
+            _engine.AddImageAsync(_state, _host, _mapId, img);
+            var before = Map.ImagesMembershipVersion;
+            var result = _engine.UpdateImageShareTokenAsync(_state, _host, _mapId, img.Id, Guid.NewGuid());
+            Assert.IsTrue(result.IsSuccess);
+            Assert.AreEqual(before, Map.ImagesMembershipVersion);
+        }
     }
 }

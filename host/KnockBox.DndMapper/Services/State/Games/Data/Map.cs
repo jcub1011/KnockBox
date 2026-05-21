@@ -32,6 +32,14 @@ namespace KnockBox.DndMapper.Services.State.Games.Data
         public int FogVersion { get; internal set; }
         public int ImagesVersion { get; internal set; }
 
+        // Narrower companion to ImagesVersion that only bumps when an image
+        // is added, removed, or its Locked flag toggles — never on transform,
+        // opacity, hidden, name, or share-token mutations. MapCanvas's
+        // JS-side image-drag module only cares about (id, locked) set
+        // membership, so it uses this counter to skip the marshal when
+        // pure transform edits fire.
+        public int ImagesMembershipVersion { get; internal set; }
+
         public bool IsFogged(int cx, int cy)
         {
             if (FogMask.Length == 0) return false;

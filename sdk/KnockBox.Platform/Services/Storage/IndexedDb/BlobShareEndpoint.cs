@@ -8,12 +8,16 @@ namespace KnockBox.Platform.Services.Storage.IndexedDb;
 
 public static class BlobShareEndpoint
 {
-    // Capability URLs are immutable per registration: a fresh upload mints
-    // a new token (new URL), so URL-keyed browser caching is safe. `public`
-    // is correct because the token IS the capability — anyone with the URL
-    // is meant to fetch. `immutable` skips revalidation entirely on cache
-    // hits in supporting browsers; `max-age` caps the lifetime defensively.
-    internal const string DefaultCacheControl = "public, max-age=86400, immutable";
+    // Capability URLs are token-keyed and the token-to-bytes mapping is
+    // write-once, BUT a token can be revoked (host deletes an image, deletes
+    // a map, or disconnects). With `immutable` + 24h max-age a revoked share
+    // stays reachable from any browser/proxy that already filled its cache.
+    // The 5-min must-revalidate window keeps the perf wins for hot fetches
+    // (the second-tab / refresh case) while letting revocation take effect
+    // soon enough for the host's "I just deleted that" expectation. The
+    // If-None-Match round-trip is cheap — ETag is the token and the 304
+    // path skips both SignalR and the byte cache lookup.
+    internal const string DefaultCacheControl = "public, max-age=300, must-revalidate";
 
     /// <summary>
     /// Maps <c>GET /blob-share/{token:guid}</c>. The endpoint streams the
@@ -43,7 +47,9 @@ public static class BlobShareEndpoint
         // ETag is the token in its canonical hyphenated form, quoted per
         // RFC 7232. Capability URLs are write-once, so the ETag is constant
         // for the life of the token; If-None-Match short-circuits to 304
-        // and the browser serves from its own disk cache.
+        // and the browser serves from its own disk cache. The token IS the
+        // capability and is already visible in the URL, so logging the ETag
+        // to upstream proxies leaks nothing the URL didn't already expose.
         var etag = "\"" + token.ToString("D") + "\"";
         var ifNoneMatch = context.Request.Headers.IfNoneMatch.ToString();
         if (!string.IsNullOrEmpty(ifNoneMatch) && ifNoneMatch.Contains(etag, StringComparison.Ordinal))
@@ -54,12 +60,6 @@ public static class BlobShareEndpoint
             return;
         }
 
-        context.Response.ContentType = entry.ContentType;
-        context.Response.ContentLength = entry.Length;
-        context.Response.Headers.XContentTypeOptions = "nosniff";
-        context.Response.Headers.CacheControl = entry.CacheControl ?? DefaultCacheControl;
-        context.Response.Headers.ETag = etag;
-
         var ct = context.RequestAborted;
 
         // Fast path: cache hit. Skip SignalR entirely; write the cached
@@ -68,6 +68,11 @@ public static class BlobShareEndpoint
         // refreshes, second tabs).
         if (byteCache is not null && byteCache.TryGetBytes(token, out var cached))
         {
+            context.Response.ContentType = entry.ContentType;
+            context.Response.ContentLength = entry.Length;
+            context.Response.Headers.XContentTypeOptions = "nosniff";
+            context.Response.Headers.CacheControl = entry.CacheControl ?? DefaultCacheControl;
+            context.Response.Headers.ETag = etag;
             try
             {
                 await context.Response.Body.WriteAsync(cached, ct).ConfigureAwait(false);
@@ -77,6 +82,44 @@ public static class BlobShareEndpoint
             return;
         }
 
+        // Slow path: cache miss. Open the SignalR-backed stream BEFORE writing
+        // response headers. If the open fails (originating circuit gone,
+        // stream interop error), we still have `!HasStarted` so a clean 410
+        // or 500 can land on the wire. Opening the stream is the only step
+        // here with real failure modes — once it returns, the actual copy
+        // is just bytes-to-bytes.
+        Stream sourceStream;
+        try
+        {
+            sourceStream = await entry.StreamOpener(ct).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            // Client disconnected before we opened the stream.
+            return;
+        }
+        catch (JSDisconnectedException ex)
+        {
+            logger.LogWarning(
+                "Blob share {Token}: originating Blazor circuit disconnected before stream open ({Message}); evicting.",
+                token, ex.Message);
+            registry.Remove(token);
+            context.Response.StatusCode = StatusCodes.Status410Gone;
+            return;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Blob share {Token}: failed to open source stream.", token);
+            context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+            return;
+        }
+
+        context.Response.ContentType = entry.ContentType;
+        context.Response.ContentLength = entry.Length;
+        context.Response.Headers.XContentTypeOptions = "nosniff";
+        context.Response.Headers.CacheControl = entry.CacheControl ?? DefaultCacheControl;
+        context.Response.Headers.ETag = etag;
+
         // Wrap the response body so the catch handlers can tell whether any
         // bytes have already been flushed. `HttpResponse.HasStarted` works
         // in production (Kestrel flips it once headers go out) but stays
@@ -84,12 +127,10 @@ public static class BlobShareEndpoint
         // counter for both cases.
         var body = new CountingStream(context.Response.Body);
 
-        // Slow path: cache miss. Open the SignalR-backed binary stream
-        // against the host's circuit and copy through. If the payload
-        // fits the cache budget, tee the bytes into a MemoryStream as
-        // we go so the next fetcher of this token serves from RAM.
-        // Native binary framing (no base64, no JSON envelope) means we
-        // hold one chunk buffer per request beyond the tee buffer.
+        // Tee the copy into RAM if the payload fits the cache budget so the
+        // next fetcher of this token serves from RAM. Native binary framing
+        // (no base64, no JSON envelope) means we hold one chunk buffer per
+        // request beyond the tee buffer.
         MemoryStream? teeBuffer = null;
         var canCache = byteCache is not null
             && entry.Length > 0
@@ -101,9 +142,11 @@ public static class BlobShareEndpoint
 
         try
         {
-            await using var stream = await entry.StreamOpener(ct).ConfigureAwait(false);
-            Stream sink = teeBuffer is null ? body : new TeeStream(body, teeBuffer);
-            await stream.CopyToAsync(sink, IndexedDbBlobChunking.ChunkSize, ct).ConfigureAwait(false);
+            await using (sourceStream)
+            {
+                Stream sink = teeBuffer is null ? body : new TeeStream(body, teeBuffer);
+                await sourceStream.CopyToAsync(sink, IndexedDbBlobChunking.ChunkSize, ct).ConfigureAwait(false);
+            }
             await body.FlushAsync(ct).ConfigureAwait(false);
 
             // Only cache after the full copy succeeds. A partial buffer

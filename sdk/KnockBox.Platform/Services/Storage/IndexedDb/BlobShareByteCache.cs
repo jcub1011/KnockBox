@@ -138,6 +138,10 @@ public sealed class BlobShareByteCache : IDisposable
         // thrash on a sustained miss stream. TrackStatistics is on so
         // GetCurrentStatistics() gives us hits/misses/count/bytes for the
         // 5-min summary log without rolling our own counters.
+        // SizeLimit and each entry's Size MUST stay in the same unit (bytes
+        // here). Mixing units — e.g., setting Size = 1 on some entries —
+        // would silently turn the byte ceiling into an entry-count ceiling
+        // for those entries and let the cache exceed its memory budget.
         _cache = new MemoryCache(new MemoryCacheOptions
         {
             SizeLimit = sizeLimitBytes,
