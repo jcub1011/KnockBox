@@ -70,52 +70,25 @@
         var stageNaturalW = Map.Grid.WidthCells * cellPx;
         var stageNaturalH = Map.Grid.HeightCells * cellPx;
     }
-    @* .dndm-canvas-transform is a naturally-sized box (W*cellPx × H*cellPx in
-       CSS px) that holds the bitmap layer and the SVG vector layer as
-       siblings. dndMapperViewport.js writes its pan/zoom transform onto this
-       wrapper, so both layers ride the same GPU-composited transform and stay
-       pixel-aligned at every zoom. The centering uses the CSS `translate`
-       property so the `transform` property is exclusively owned by the
-       viewport module. *@
+    @* Bitmap layer: one viewport-sized <canvas> drawn by dndMapperBitmapCanvas.js.
+       Sits OUTSIDE .dndm-canvas-transform — the canvas itself is fixed at the
+       stage's CSS viewport size and the renderer applies the pan/zoom math
+       per-frame to draw each image at its current screen rect. This avoids
+       the prior failure mode where a CSS-scaled <img> layer dwarfed the
+       viewport at high zoom, forcing the compositor to manage huge backing
+       stores and (past GPU max-texture-size) fall back to software raster.
+       pointer-events:none keeps SVG picker rects above hit-testable. *@
+    <canvas id="@_canvasId"
+            class="dndm-bitmap-canvas"></canvas>
+
+    @* .dndm-canvas-transform now holds ONLY the SVG vector layer (tokens,
+       fog, markup, handles, picker rects, grid). Vectors don't have the
+       large-bitmap composite problem, so the CSS transform model stays
+       unchanged for them — pan/zoom on .dndm-canvas-transform translates and
+       scales the SVG cheaply. The DOM order (canvas first, transform wrapper
+       second) keeps the SVG visually on top of the bitmap canvas. *@
     <div class="dndm-canvas-transform"
          style="width:@(stageNaturalW)px; height:@(stageNaturalH)px; --dndm-cell-px:@(cellPx)px; --dndm-grid-line:@Map.Grid.LineColor;">
-        @* Bitmap layer: HTML <img> per visible image. HTML <img> elements
-           live in their own GPU layer (unlike SVG <image>, which paints into
-           the SVG raster surface and thrashes the compositor for large
-           bitmaps). Position and rotate via CSS px so the layer stays
-           pixel-aligned with the sibling SVG's cell coordinates
-           (1 cell = cellPx). *@
-        <div class="dndm-image-layer">
-            @if (Map.Images.Count > 0)
-            {
-                @foreach (var img in GetVisibleImagesCached())
-                {
-                    var lpx = img.X * cellPx;
-                    var tpx = img.Y * cellPx;
-                    var wpx = img.Width * cellPx;
-                    var hpx = img.Height * cellPx;
-                    var styleCommon = $"left:{F(lpx)}px; top:{F(tpx)}px; width:{F(wpx)}px; height:{F(hpx)}px; transform:rotate({F(img.Rotation)}deg); opacity:{F(img.Opacity)};";
-                    var imgSrc = ResolveImageSrc(img);
-                    @if (imgSrc is not null)
-                    {
-                        <img @key="img.Id"
-                             data-image-rendered-id="@img.Id"
-                             src="@imgSrc"
-                             draggable="false"
-                             decoding="async"
-                             style="@styleCommon" />
-                    }
-                    else
-                    {
-                        var placeholderStyle = $"left:{F(lpx)}px; top:{F(tpx)}px; width:{F(wpx)}px; height:{F(hpx)}px; transform:rotate({F(img.Rotation)}deg); opacity:{F(Math.Min(img.Opacity, 0.6))};";
-                        <div @key="img.Id"
-                             class="dndm-image-placeholder"
-                             data-image-rendered-id="@img.Id"
-                             style="@placeholderStyle"></div>
-                    }
-                }
-            }
-        </div>
 
     @* GPU-tiled grid via .dndm-grid-background's two linear-gradients +
        inset box-shadow (see MapCanvas.razor.css). Sits between the

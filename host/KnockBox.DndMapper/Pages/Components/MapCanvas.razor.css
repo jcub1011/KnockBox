@@ -77,6 +77,8 @@
     position: absolute;
     left: 0;
     top: 0;
+    /* Above the sibling bitmap canvas so the SVG inside paints on top. */
+    z-index: 1;
     transform-origin: 50% 50%;
     will-change: transform;
     /* preserve-3d is what makes the child <img>'s `backface-visibility:
@@ -94,14 +96,21 @@
        stage below. */
 }
 
-/* HTML bitmap layer — one <img> per visible image, positioned absolutely in
-   CSS px. Lives in its own GPU layer (unlike SVG <image>) so large bitmaps
-   don't thrash the compositor. Sits behind the SVG (rendered first in the
-   wrapper) so the SVG paints picker rects/grid/fog/tokens/handles on top. */
-.dndm-image-layer {
+/* Viewport-sized bitmap canvas owned by dndMapperBitmapCanvas.js. Sits as a
+   sibling of .dndm-canvas-transform (not inside it) so the canvas itself is
+   never CSS-transformed — the renderer draws each image at its current
+   screen rect every frame. pointer-events:none lets clicks fall through to
+   the SVG picker rects above. */
+.dndm-bitmap-canvas {
     position: absolute;
     inset: 0;
+    width: 100%;
+    height: 100%;
     pointer-events: none;
+    /* Below the SVG-bearing .dndm-canvas-transform sibling in DOM order, but
+       both are positioned absolute — explicit z-index keeps the canvas
+       beneath when other CSS overrides paint order. */
+    z-index: 0;
 }
 
 /* GPU-tiled grid replacement for the per-cell SVG <line> elements. Two
@@ -128,48 +137,12 @@
         inset 0 -1px 0 var(--dndm-grid-line);
 }
 
-/* Each <img> needs its OWN GPU layer so its texture lives independently of
-   the wrapper's backing store. Without per-child layers, the wrapper
-   paints its image children into its monolithic tile grid, and the
-   resulting backing store sizes itself by the wrapper's effective
-   rendered area W*cellPx*zoom × H*cellPx*zoom — at zoom = 10 with a
-   10MB image this balloons the GPU texture by ~100× and Chromium
-   recomposites it every frame during pan/zoom (the "smooth zoomed
-   out, laggy + GPU memory spike zoomed in" bug).
-
-   `will-change: transform` alone is supposed to be enough on modern
-   Chromium, but empirically isn't always — the parent's `translate3d`
-   appears to absorb the children into its layer. The canonical pair
-   that does reliably promote is `will-change: transform` +
-   `backface-visibility: hidden`. The earlier hazard of pairing them
-   (Chromium culling the image after flattening the children's normals
-   against the parent's `scale(zoom)`) is removed by the parent's
-   `transform-style: preserve-3d` (above) — children stay in 3D, their
-   normals are computed cleanly relative to the camera, and the
-   backface check correctly always-passes for our z = 0 images. */
-.dndm-image-layer img,
-.dndm-image-layer .dndm-image-placeholder {
-    position: absolute;
-    transform-origin: center center;
-    user-select: none;
-    -webkit-user-drag: none;
-    will-change: transform;
-    backface-visibility: hidden;
-}
-
-.dndm-image-placeholder {
-    background: #1c2128;
-    border: 1px dashed #3d444c;
-    box-sizing: border-box;
-}
-
-/* SVG map keeps cursor + touch behavior but no longer carries transform
-   state — that's on the wrapper now. */
+/* SVG map keeps cursor + touch behavior. The bitmap layer is now a sibling
+   canvas of .dndm-canvas-transform (see .dndm-bitmap-canvas above), so the
+   stacking order is canvas behind, then .dndm-canvas-transform on top with
+   the SVG inside it. */
 .dndm-map-canvas {
     display: block;
-    /* Positioned so the SVG stacks above the absolutely-positioned
-       .dndm-image-layer sibling; otherwise fog/markup/focus/tokens inside
-       the SVG end up under the bitmaps. */
     position: relative;
     z-index: 1;
     cursor: grab;

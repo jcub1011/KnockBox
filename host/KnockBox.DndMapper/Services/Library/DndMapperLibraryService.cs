@@ -34,12 +34,21 @@ namespace KnockBox.DndMapper.Services.Library
         // scrubbing) into one write per burst.
         private static readonly TimeSpan SaveDebounce = TimeSpan.FromMilliseconds(500);
 
-        // Plugin-owned ES module that decodes natural pixel dimensions from a
-        // blob: URL. Lives in this plugin's wwwroot so the shared adoption API
-        // (IIndexedDatabase.AdoptInputElementFilesAsync) can stay free of
+        // Plugin-owned ES module that decodes a blob: URL and (if the source
+        // exceeds the device's max GPU texture size) downscales it in a Web
+        // Worker via OffscreenCanvas, then overwrites the IDB row with the new
+        // bytes — all without round-tripping bytes through .NET. Lives in this
+        // plugin's wwwroot so the shared adoption API
+        // (IIndexedDatabase.AdoptInputElementFilesAsync) stays free of
         // image-specific concerns.
-        private const string ImageDimensionsModulePath =
-            "/_content/KnockBox.DndMapper/js/dndMapperImageDimensions.js";
+        private const string ImageDownscaleModulePath =
+            "/_content/KnockBox.DndMapper/js/dndMapperImageDownscale.js";
+
+        // Hard cap on the long edge after downscale. The device's reported
+        // MAX_TEXTURE_SIZE is the upper bound; this floor protects against
+        // GPUs that report 16384+ but stall under CSS-transform scaling at
+        // those sizes anyway.
+        private const int MaxImageLongEdgePxCap = 8192;
 
         private readonly IIndexedDbService _indexedDb;
         private readonly DndMapperGameEngine _engine;
@@ -92,7 +101,7 @@ namespace KnockBox.DndMapper.Services.Library
             _jsRuntime = jsRuntime;
             _logger = logger;
             _imageDimsModule = new Lazy<Task<IJSObjectReference>>(() =>
-                _jsRuntime.InvokeAsync<IJSObjectReference>("import", ImageDimensionsModulePath).AsTask());
+                _jsRuntime.InvokeAsync<IJSObjectReference>("import", ImageDownscaleModulePath).AsTask());
         }
 
         /// <summary>
@@ -455,7 +464,7 @@ namespace KnockBox.DndMapper.Services.Library
             try { dimsModule = await _imageDimsModule.Value.WaitAsync(ct); }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                _logger.LogError(ex, "Failed to load dndMapperImageDimensions.js.");
+                _logger.LogError(ex, "Failed to load dndMapperImageDownscale.js.");
                 // Roll back any adopted blobs we won't use.
                 foreach (var item in adopted)
                 {
@@ -464,6 +473,22 @@ namespace KnockBox.DndMapper.Services.Library
                     await SafeDisposeAsync(item.Blob);
                 }
                 return ValueResult<IReadOnlyList<UploadOutcome>>.FromError("Image decoder unavailable.");
+            }
+
+            // Probe once per batch — the value is module-cached on the JS side
+            // anyway, but reading it here lets us clamp to MaxImageLongEdgePxCap
+            // up front and pass a single integer through to each per-file call.
+            int maxLongEdgePx;
+            try
+            {
+                var probed = await dimsModule.InvokeAsync<int>("probeMaxTextureSize", ct);
+                maxLongEdgePx = Math.Min(MaxImageLongEdgePxCap, probed > 0 ? probed : MaxImageLongEdgePxCap);
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "probeMaxTextureSize failed; falling back to {Cap}px.", MaxImageLongEdgePxCap);
+                maxLongEdgePx = MaxImageLongEdgePxCap;
             }
 
             var outcomes = new List<UploadOutcome>(adopted.Count);
@@ -475,30 +500,68 @@ namespace KnockBox.DndMapper.Services.Library
                     continue;
                 }
 
-                int pxW, pxH;
+                var keyString = item.Key.Value.ToString("D");
+                IndexedDbBlob blob = item.Blob;
+                int pxW, pxH, originalPxW, originalPxH;
+                bool wasDownscaled;
                 try
                 {
-                    var url = await item.Blob.CreateObjectUrlAsync(ct);
-                    var dims = await dimsModule.InvokeAsync<ImageDimensionsDto>(
-                        "decodeImageDimensionsFromUrl", ct, url);
-                    pxW = dims.WidthPx;
-                    pxH = dims.HeightPx;
+                    var url = await blob.CreateObjectUrlAsync(ct);
+                    var decode = await dimsModule.InvokeAsync<DecodeOutcomeDto>(
+                        "decodeAndMaybeDownscale", ct,
+                        url,
+                        blob.ContentType,
+                        maxLongEdgePx,
+                        DndMapperLibrarySchema.DatabaseName,
+                        DndMapperLibrarySchema.ImagesStore,
+                        keyString);
+                    pxW = decode.WidthPx;
+                    pxH = decode.HeightPx;
+                    originalPxW = decode.OriginalWidthPx;
+                    originalPxH = decode.OriginalHeightPx;
+                    wasDownscaled = decode.WasDownscaled;
                 }
                 catch (OperationCanceledException) { throw; }
                 catch (Exception ex)
                 {
-                    _logger.LogInformation(ex, "Image dimension decode failed for {File}; rolling back.", item.Filename);
-                    await SafeDeleteAsync(IndexedDbKey.String(item.Key.Value.ToString("D")));
-                    await SafeDisposeAsync(item.Blob);
+                    _logger.LogInformation(ex, "Image decode/downscale failed for {File}; rolling back.", item.Filename);
+                    await SafeDeleteAsync(IndexedDbKey.String(keyString));
+                    await SafeDisposeAsync(blob);
                     outcomes.Add(new UploadOutcome(item.Filename, null, "not a decodable image"));
                     continue;
                 }
 
+                // When the JS module downscaled, it overwrote the IDB row with
+                // the new bytes. Our adopted blob handle still points at the
+                // pre-overwrite JS Blob object (a different handle than what
+                // the row now contains), so we must dispose it and fetch a
+                // fresh handle backed by the new bytes — otherwise the cache
+                // would serve stale bytes via CreateObjectUrlAsync.
+                if (wasDownscaled)
+                {
+                    await SafeDisposeAsync(blob);
+                    var freshResult = await _db.BlobGetSingleAsync(
+                        DndMapperLibrarySchema.ImagesStore,
+                        IndexedDbKey.String(keyString),
+                        ct);
+                    if (!freshResult.TryGetSuccess(out var fresh) || fresh is null)
+                    {
+                        _logger.LogError("Downscaled blob for {File} could not be re-read; rolling back.", item.Filename);
+                        await SafeDeleteAsync(IndexedDbKey.String(keyString));
+                        outcomes.Add(new UploadOutcome(item.Filename, null, "Lost track of downscaled image bytes."));
+                        continue;
+                    }
+                    blob = fresh;
+                }
+
                 var originalW = pxW > 0 ? pxW / (double)cellPixels : 0;
                 var originalH = pxH > 0 ? pxH / (double)cellPixels : 0;
+                var originalLongEdge = Math.Max(originalPxW, originalPxH);
+                var displayLongEdge = Math.Max(pxW, pxH);
 
                 var addResult = await AddAdoptedImageAsync(
-                    state, host, mapId, item.Key.Value, item.Blob, originalW, originalH, ct);
+                    state, host, mapId, item.Key.Value, blob, originalW, originalH,
+                    wasDownscaled, originalLongEdge, displayLongEdge, ct);
                 if (addResult.TryGetSuccess(out var image))
                     outcomes.Add(new UploadOutcome(item.Filename, image, null));
                 else if (addResult.TryGetFailure(out var err))
@@ -510,11 +573,18 @@ namespace KnockBox.DndMapper.Services.Library
             return ValueResult<IReadOnlyList<UploadOutcome>>.FromValue(outcomes);
         }
 
-        // Mirror of the { widthPx, heightPx } shape returned by
-        // dndMapperImageDimensions.js#decodeImageDimensionsFromUrl. Field
-        // names use the JS casing because Blazor's default JSInterop JSON
-        // options are camelCase-preserving.
-        private sealed record ImageDimensionsDto(int WidthPx, int HeightPx);
+        // Mirror of the metadata return shape from
+        // dndMapperImageDownscale.js#decodeAndMaybeDownscale. Field names use
+        // the JS casing because Blazor's default JSInterop JSON options are
+        // camelCase-preserving. When WasDownscaled is true, the new blob has
+        // already been written into IndexedDB by the JS module — there is no
+        // separate blob handle returned.
+        private sealed record DecodeOutcomeDto(
+            int WidthPx,
+            int HeightPx,
+            int OriginalWidthPx,
+            int OriginalHeightPx,
+            bool WasDownscaled);
 
         /// <summary>
         /// Registers an image that the host's browser has already persisted
@@ -534,6 +604,9 @@ namespace KnockBox.DndMapper.Services.Library
             IndexedDbBlob adoptedBlob,
             double originalWidthCells,
             double originalHeightCells,
+            bool wasDownscaled = false,
+            int originalLongEdgePx = 0,
+            int displayLongEdgePx = 0,
             CancellationToken ct = default)
         {
             ThrowIfDisposed();
@@ -574,6 +647,9 @@ namespace KnockBox.DndMapper.Services.Library
                 LayerOrder = 0, // engine overwrites
                 Locked = false,
                 ByteSize = adoptedBlob.Length,
+                WasDownscaled = wasDownscaled,
+                OriginalLongEdgePx = originalLongEdgePx,
+                DisplayLongEdgePx = displayLongEdgePx,
             };
 
             var addResult = _engine.AddImageAsync(state, host, mapId, image);
@@ -960,6 +1036,9 @@ namespace KnockBox.DndMapper.Services.Library
                 Locked = imgSnap.Locked,
                 Hidden = imgSnap.Hidden,
                 ByteSize = imgSnap.ByteSize,
+                WasDownscaled = imgSnap.WasDownscaled,
+                OriginalLongEdgePx = imgSnap.OriginalLongEdgePx,
+                DisplayLongEdgePx = imgSnap.DisplayLongEdgePx,
             };
             return new ImageHydrationResult(imgSnap.Id, blob, share, image);
         }

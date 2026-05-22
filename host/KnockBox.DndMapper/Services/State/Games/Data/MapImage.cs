@@ -31,6 +31,14 @@ namespace KnockBox.DndMapper.Services.State.Games.Data
         public bool Hidden { get; init; }
         public long ByteSize { get; init; }
 
+        // Set when the upload pipeline downscaled the source bitmap (the
+        // original exceeded the device's max GPU texture size). Surfaced in
+        // the Layers panel so the host knows why a huge map looks softer than
+        // its source. Both pixel fields are intrinsic pixels, not cell units.
+        public bool WasDownscaled { get; init; }
+        public int OriginalLongEdgePx { get; init; }
+        public int DisplayLongEdgePx { get; init; }
+
         // Single source of truth for the layer label the host sees. Used by the
         // Layers panel view AND by the inline-rename flow so the rename input
         // opens on the same text that's currently shown — keep view and

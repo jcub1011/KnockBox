@@ -17,29 +17,37 @@ namespace KnockBox.DndMapper.Pages.Components
         private readonly IJSRuntime _js;
         private readonly ILogger _logger;
         private readonly string _svgId;
+        private readonly string _canvasId;
 
         private Entry? _viewport;
         private Entry? _imageDrag;
         private Entry? _focusDrag;
         private Entry? _fogPaint;
         private Entry? _metrics; // metrics has no DotNet ref and no JS-side teardown
+        // BitmapCanvas owns the viewport-sized <canvas> that replaced the
+        // per-image <img> bitmap layer. Keyed by canvasId (not svgId) so the
+        // teardown verb gets the right argument.
+        private Entry? _bitmapCanvas;
 
         public IJSObjectReference? Viewport => _viewport?.Module;
         public IJSObjectReference? ImageDrag => _imageDrag?.Module;
         public IJSObjectReference? FocusDrag => _focusDrag?.Module;
         public IJSObjectReference? FogPaint => _fogPaint?.Module;
         public IJSObjectReference? Metrics => _metrics?.Module;
+        public IJSObjectReference? BitmapCanvas => _bitmapCanvas?.Module;
 
         public DotNetObjectReference<MapCanvas>? ViewportRef => _viewport?.DotNetRef;
         public DotNetObjectReference<MapCanvas>? ImageDragRef => _imageDrag?.DotNetRef;
         public DotNetObjectReference<MapCanvas>? FocusDragRef => _focusDrag?.DotNetRef;
         public DotNetObjectReference<MapCanvas>? FogPaintRef => _fogPaint?.DotNetRef;
+        public DotNetObjectReference<MapCanvas>? BitmapCanvasRef => _bitmapCanvas?.DotNetRef;
 
-        public MapCanvasJsModules(IJSRuntime js, ILogger logger, string svgId)
+        public MapCanvasJsModules(IJSRuntime js, ILogger logger, string svgId, string canvasId)
         {
             _js = js;
             _logger = logger;
             _svgId = svgId;
+            _canvasId = canvasId;
         }
 
         public async ValueTask LoadMetricsAsync()
@@ -56,6 +64,9 @@ namespace KnockBox.DndMapper.Pages.Components
 
         public async ValueTask LoadFogPaintAsync(MapCanvas owner)
             => _fogPaint = await TryLoadAsync("dndMapperFogPaint.js", owner);
+
+        public async ValueTask LoadBitmapCanvasAsync(MapCanvas owner)
+            => _bitmapCanvas = await TryLoadAsync("dndMapperBitmapCanvas.js", owner);
 
         private async ValueTask<Entry?> TryLoadAsync(string fileName, MapCanvas? owner)
         {
@@ -82,27 +93,41 @@ namespace KnockBox.DndMapper.Pages.Components
             // Modules that own per-instance JS state (viewport + image drag are
             // keyed by svgId, fog + focus by gesture state) get a teardown call
             // before module disposal so their windowed listeners detach cleanly.
-            await DisposeWithTeardown(_viewport, teardownVerb: "dispose", passSvgId: true);
+            await DisposeWithTeardown(_viewport, teardownVerb: "dispose", teardownArg: TeardownArg.SvgId);
             _viewport = null;
-            await DisposeWithTeardown(_imageDrag, teardownVerb: "dispose", passSvgId: true);
+            await DisposeWithTeardown(_imageDrag, teardownVerb: "dispose", teardownArg: TeardownArg.SvgId);
             _imageDrag = null;
-            await DisposeWithTeardown(_focusDrag, teardownVerb: "cancelDrag", passSvgId: false);
+            await DisposeWithTeardown(_focusDrag, teardownVerb: "cancelDrag", teardownArg: TeardownArg.None);
             _focusDrag = null;
-            await DisposeWithTeardown(_fogPaint, teardownVerb: "cancelStroke", passSvgId: false);
+            await DisposeWithTeardown(_fogPaint, teardownVerb: "cancelStroke", teardownArg: TeardownArg.None);
             _fogPaint = null;
-            await DisposeWithTeardown(_metrics, teardownVerb: null, passSvgId: false);
+            await DisposeWithTeardown(_metrics, teardownVerb: null, teardownArg: TeardownArg.None);
             _metrics = null;
+            await DisposeWithTeardown(_bitmapCanvas, teardownVerb: "dispose", teardownArg: TeardownArg.CanvasId);
+            _bitmapCanvas = null;
         }
 
-        private async ValueTask DisposeWithTeardown(Entry? entry, string? teardownVerb, bool passSvgId)
+        private enum TeardownArg { None, SvgId, CanvasId }
+
+        private async ValueTask DisposeWithTeardown(Entry? entry, string? teardownVerb, TeardownArg teardownArg)
         {
             if (entry is null) return;
             if (teardownVerb is not null)
             {
                 try
                 {
-                    if (passSvgId) await entry.Module.InvokeVoidAsync(teardownVerb, _svgId);
-                    else await entry.Module.InvokeVoidAsync(teardownVerb);
+                    switch (teardownArg)
+                    {
+                        case TeardownArg.SvgId:
+                            await entry.Module.InvokeVoidAsync(teardownVerb, _svgId);
+                            break;
+                        case TeardownArg.CanvasId:
+                            await entry.Module.InvokeVoidAsync(teardownVerb, _canvasId);
+                            break;
+                        default:
+                            await entry.Module.InvokeVoidAsync(teardownVerb);
+                            break;
+                    }
                 }
                 catch (JSDisconnectedException) { /* circuit teardown */ }
                 catch (Exception) { /* ignore — teardown is best-effort */ }

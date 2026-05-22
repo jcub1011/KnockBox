@@ -161,6 +161,12 @@ namespace KnockBox.DndMapper.Services.Library
         public bool Locked { get; init; }
         public bool Hidden { get; init; }
         public long ByteSize { get; init; }
+        // Downscale provenance. Missing on legacy (pre-2026-05) snapshots:
+        // System.Text.Json fills bool with false and int with 0, which the
+        // Layers panel treats as "not downscaled" — no schema bump needed.
+        public bool WasDownscaled { get; init; }
+        public int OriginalLongEdgePx { get; init; }
+        public int DisplayLongEdgePx { get; init; }
         // Intentionally no ShareToken: the capability is per-circuit and is
         // recomputed on every Attach via PublishForSharingAsync.
     }
@@ -451,6 +457,9 @@ namespace KnockBox.DndMapper.Services.Library
             Locked = image.Locked,
             Hidden = image.Hidden,
             ByteSize = image.ByteSize,
+            WasDownscaled = image.WasDownscaled,
+            OriginalLongEdgePx = image.OriginalLongEdgePx,
+            DisplayLongEdgePx = image.DisplayLongEdgePx,
         };
 
         internal static TokenSnapshot ToTokenSnapshot(Token token) => new()

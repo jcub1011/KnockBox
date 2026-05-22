@@ -48,6 +48,10 @@ namespace KnockBox.DndMapper.Pages.Components
 
         private readonly string _svgId = $"dndm-svg-{Guid.NewGuid():N}";
         private readonly string _markupSvgId = $"svg-canvas-{Guid.NewGuid():N}";
+        // Id for the viewport-sized <canvas> that dndMapperBitmapCanvas.js
+        // initialises against. One per MapCanvas instance, mirrors the _svgId
+        // pattern; the JS module keys its instance map by this id.
+        private readonly string _canvasId = $"dndm-canvas-{Guid.NewGuid():N}";
         private SvgDrawingEngine? _markupEngine;
         // Tracks whether we've already triggered the extra render that follows the
         // engine's @ref binding. Toggled off when _markupActive flips false so the
@@ -78,6 +82,16 @@ namespace KnockBox.DndMapper.Pages.Components
         // Locked flag toggles — which is the exact set the JS module cares
         // about — so pure transform edits never trigger a marshal.
         private (Guid MapId, int Version)? _imageDragSnapshot;
+        // Tracks the (map id, ImagesVersion) last marshaled into the bitmap
+        // canvas module. ImagesVersion bumps on any image change (transform
+        // or membership), which is exactly what the canvas redraw cares
+        // about. The membership-only counter on the image-drag module is
+        // intentionally separate — that module only re-marshals on
+        // add/remove/lock.
+        private (Guid MapId, int Version, int LocalUrlsVersion)? _bitmapCanvasSnapshot;
+        // Bumped whenever _localImageUrls changes (new host-blob URLs land)
+        // so the canvas re-marshal picks up freshly resolved sources.
+        private int _localImageUrlsVersion;
         private string _currentJsMode = "none";
         // Tracks (map id, grid dims) so we re-push when the map is swapped
         // or its grid is resized.
@@ -92,10 +106,6 @@ namespace KnockBox.DndMapper.Pages.Components
         private Guid _cachedFogMapId;
         private int _cachedFogVersion = -1;
         private string _cachedFogPath = string.Empty;
-        private Guid _cachedImagesMapId;
-        private int _cachedImagesVersion = -1;
-        private List<MapImage>? _cachedVisibleImages;
-        private bool _cachedIsHost;
 
         // Host-only direct-blob URLs keyed by image id. Populated lazily by
         // RefreshLocalImageUrlsAsync from the library's blob cache; players'
@@ -210,7 +220,11 @@ namespace KnockBox.DndMapper.Pages.Components
                 changed = true;
             }
 
-            if (changed) await InvokeAsync(StateHasChanged).ConfigureAwait(false);
+            if (changed)
+            {
+                _localImageUrlsVersion++;
+                await InvokeAsync(StateHasChanged).ConfigureAwait(false);
+            }
         }
 
         // ── Markup overlay (v1.x — §5.6) ─────────────────────────────────
@@ -250,7 +264,7 @@ namespace KnockBox.DndMapper.Pages.Components
             // to deal with two layers of null (container + individual module).
             // The individual module refs stay null until OnAfterRenderAsync
             // imports each one.
-            _jsModules = new MapCanvasJsModules(JSRuntime, Logger, _svgId);
+            _jsModules = new MapCanvasJsModules(JSRuntime, Logger, _svgId, _canvasId);
             TokenFocus.Focused += OnTokenFocusRequested;
             _stateSub = State.StateChangedEventManager.Subscribe(OnStateChanged);
             FogContext.Changed += OnFogContextChanged;
@@ -542,6 +556,18 @@ namespace KnockBox.DndMapper.Pages.Components
             }
             catch (JSDisconnectedException) { /* circuit teardown */ }
             catch (Exception ex) { Logger.LogWarning(ex, "viewport.setBounds failed."); }
+
+            if (_jsModules.BitmapCanvas is not null)
+            {
+                try
+                {
+                    await _jsModules.BitmapCanvas.InvokeVoidAsync(
+                        "setBounds", _canvasId,
+                        Map.Grid.WidthCells, Map.Grid.HeightCells, Map.Grid.CellPixels);
+                }
+                catch (JSDisconnectedException) { /* circuit teardown */ }
+                catch (Exception ex) { Logger.LogWarning(ex, "bitmapCanvas.setBounds failed."); }
+            }
         }
 
         [JSInvokable]
@@ -567,24 +593,6 @@ namespace KnockBox.DndMapper.Pages.Components
                 _cachedFogMapId = Map.Id;
             }
             return _cachedFogPath;
-        }
-
-        internal IEnumerable<MapImage> GetVisibleImagesCached()
-        {
-            if (Map.Id != _cachedImagesMapId
-                || Map.ImagesVersion != _cachedImagesVersion
-                || _cachedVisibleImages is null
-                || _cachedIsHost != IsHost)
-            {
-                _cachedVisibleImages = ImageVisibilityFilter
-                    .VisibleImagesFor(Map.Images, Map, IsHost)
-                    .OrderBy(i => i.LayerOrder)
-                    .ToList();
-                _cachedImagesVersion = Map.ImagesVersion;
-                _cachedImagesMapId = Map.Id;
-                _cachedIsHost = IsHost;
-            }
-            return _cachedVisibleImages;
         }
 
         protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -615,6 +623,33 @@ namespace KnockBox.DndMapper.Pages.Components
                     await _jsModules.LoadFocusDragAsync(this);
                 }
 
+                // Load + initialise the bitmap canvas BEFORE the viewport so
+                // viewport.initialize's first applyTransform can fan out a
+                // setViewport call to a canvas that's already alive. (The
+                // wiring between viewport and canvas is set up in task #8 —
+                // viewport reads _jsModules.BitmapCanvas and calls into it.)
+                await _jsModules.LoadBitmapCanvasAsync(this);
+                if (_jsModules.BitmapCanvas is not null)
+                {
+                    try
+                    {
+                        await _jsModules.BitmapCanvas.InvokeVoidAsync(
+                            "initialize", _canvasId, _jsModules.BitmapCanvasRef,
+                            Map.Grid.WidthCells, Map.Grid.HeightCells, Map.Grid.CellPixels);
+                        // Seed initial viewport so the canvas redraws at the
+                        // correct pan/zoom before the viewport JS module
+                        // takes over per-frame updates.
+                        await _jsModules.BitmapCanvas.InvokeVoidAsync(
+                            "setViewport", _canvasId, _panX, _panY, _zoom, Map.Grid.CellPixels);
+                        await PushImagesToBitmapCanvas();
+                    }
+                    catch (JSDisconnectedException) { /* circuit teardown */ }
+                    catch (Exception ex)
+                    {
+                        Logger.LogWarning(ex, "BitmapCanvas initialize failed.");
+                    }
+                }
+
                 await _jsModules.LoadViewportAsync(this);
                 if (_jsModules.Viewport is not null && _jsModules.ViewportRef is not null)
                 {
@@ -623,7 +658,11 @@ namespace KnockBox.DndMapper.Pages.Components
                         _currentJsMode = CurrentJsMode();
                         await _jsModules.Viewport.InvokeVoidAsync(
                             "initialize", _svgId, _jsModules.ViewportRef, _panX, _panY, _zoom,
-                            Map.Grid.WidthCells, Map.Grid.HeightCells, Map.Grid.CellPixels, _currentJsMode);
+                            Map.Grid.WidthCells, Map.Grid.HeightCells, Map.Grid.CellPixels, _currentJsMode,
+                            // Bridge to the bitmap canvas — viewport calls
+                            // setViewport on this module after every applyTransform
+                            // so the canvas redraws synchronously without a .NET hop.
+                            _jsModules.BitmapCanvas, _canvasId);
                         _lastBoundsSent = (Map.Id, Map.Grid.WidthCells, Map.Grid.HeightCells);
                     }
                     catch (JSDisconnectedException) { /* circuit teardown */ }
@@ -644,7 +683,12 @@ namespace KnockBox.DndMapper.Pages.Components
                                 .Select(i => new { imageId = i.Id.ToString(), locked = i.Locked })
                                 .ToArray();
                             await _jsModules.ImageDrag.InvokeVoidAsync(
-                                "initialize", _svgId, _jsModules.ImageDragRef, payload, Map.Grid.CellPixels);
+                                "initialize", _svgId, _jsModules.ImageDragRef, payload, Map.Grid.CellPixels,
+                                // Bridge to the bitmap canvas so the drag module
+                                // calls setInFlightTransform per frame and the
+                                // rendered image follows the gesture without a
+                                // Blazor round-trip. Null-tolerant on the JS side.
+                                _jsModules.BitmapCanvas, _canvasId);
                             // Seed snapshot so PushImagesToJs skips the next render's
                             // redundant marshal — we just pushed exactly this version.
                             _imageDragSnapshot = (Map.Id, Map.ImagesMembershipVersion);
@@ -679,6 +723,7 @@ namespace KnockBox.DndMapper.Pages.Components
                     await PushJsBounds();
                 }
                 if (IsHost) await PushImagesToJs();
+                await PushImagesToBitmapCanvas();
             }
             await base.OnAfterRenderAsync(firstRender);
         }
@@ -1138,6 +1183,40 @@ namespace KnockBox.DndMapper.Pages.Components
             try { await _jsModules.ImageDrag.InvokeVoidAsync("setImages", _svgId, payload, Map.Grid.CellPixels); }
             catch (JSDisconnectedException) { /* circuit teardown */ }
             catch (Exception ex) { Logger.LogWarning(ex, "imageDrag.setImages failed."); }
+        }
+
+        // Marshals the full image set (transforms included) into the bitmap
+        // canvas JS module. Triggered on first render and whenever Map.ImagesVersion
+        // bumps OR when _localImageUrlsVersion changes (a freshly resolved blob
+        // URL needs to land in the canvas as a new src). Membership-only
+        // changes still need this — the canvas redraws lower-z-order images
+        // under newly added ones.
+        private async ValueTask PushImagesToBitmapCanvas()
+        {
+            if (_jsModules.BitmapCanvas is null) return;
+            var current = (Map.Id, Map.ImagesVersion, _localImageUrlsVersion);
+            if (_bitmapCanvasSnapshot == current) return;
+            _bitmapCanvasSnapshot = current;
+
+            var payload = Map.Images
+                .Where(i => !i.Hidden)
+                .Select(i => new
+                {
+                    id = i.Id.ToString(),
+                    src = ResolveImageSrc(i),
+                    x = i.X,
+                    y = i.Y,
+                    width = i.Width,
+                    height = i.Height,
+                    rotation = i.Rotation,
+                    opacity = i.Opacity,
+                    layerOrder = i.LayerOrder,
+                    hidden = i.Hidden,
+                })
+                .ToArray();
+            try { await _jsModules.BitmapCanvas.InvokeVoidAsync("setImages", _canvasId, payload); }
+            catch (JSDisconnectedException) { /* circuit teardown */ }
+            catch (Exception ex) { Logger.LogWarning(ex, "bitmapCanvas.setImages failed."); }
         }
 
         private async ValueTask ReconcileImageJs(MapImage image)

@@ -79,6 +79,20 @@ function applyTransform(state) {
     // handles remain a constant on-screen size regardless of zoom. Stay
     // synced with the wrapper transform — same frame, same callsite.
     state.wrapper.style.setProperty('--dndm-inv-zoom', zoom > 0 ? String(1 / zoom) : '1');
+    // Mirror pan/zoom into the bitmap canvas renderer so its viewport-sized
+    // <canvas> redraws each image at the new screen rect. The canvas module
+    // schedules an RAF redraw internally; this call is cheap (just stores
+    // the values and marks dirty). When .NET passes the IJSObjectReference
+    // for the canvas module into this initialize, JS receives the module's
+    // exports namespace — so we call setViewport on it directly.
+    if (state.bitmapCanvasModule && state.canvasId) {
+        try {
+            state.bitmapCanvasModule.setViewport(state.canvasId, panX, panY, zoom, base);
+        } catch (err) {
+            console.warn('[DndMapperViewport] bitmap canvas setViewport failed; disabling.', err);
+            state.bitmapCanvasModule = null;
+        }
+    }
 }
 
 // Zoom-with-anchor: keep the world coord under `anchorStageX/Y` (CSS px,
@@ -167,7 +181,7 @@ function commitGesture(state, wasClickWithoutDrag) {
     }
 }
 
-export function initialize(svgId, dotNetRef, panX, panY, zoom, widthCells, heightCells, cellPx, initialMode) {
+export function initialize(svgId, dotNetRef, panX, panY, zoom, widthCells, heightCells, cellPx, initialMode, bitmapCanvasModule, canvasId) {
     const svg = document.getElementById(svgId);
     if (!svg) {
         console.error(`[DndMapperViewport] initialize: element "${svgId}" not found.`);
@@ -213,6 +227,8 @@ export function initialize(svgId, dotNetRef, panX, panY, zoom, widthCells, heigh
         wheelDebounceHandle: 0,
         refreshScheduled: false,
         refreshAfterCommit: false,
+        bitmapCanvasModule: bitmapCanvasModule ?? null,
+        canvasId: canvasId ?? null,
     };
     instances.set(svgId, state);
 
@@ -364,5 +380,7 @@ export function dispose(svgId) {
     state.dotNetRef = null;
     state.svg = null;
     state.wrapper = null;
+    state.bitmapCanvasModule = null;
+    state.canvasId = null;
     instances.delete(svgId);
 }

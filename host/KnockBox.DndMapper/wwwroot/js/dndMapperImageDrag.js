@@ -6,15 +6,15 @@
  * engine can run snap + UpdateImageTransformAsync inside the state
  * Execute lock.
  *
- * The rendered bitmap is an HTML <img> in the .dndm-image-layer sibling
- * of the SVG (not an SVG <image>) so it lives in its own GPU layer and
- * doesn't thrash the compositor for large bitmaps. The picker hit-target
- * stays inside the SVG so interactive selection keeps using Blazor's
- * event pipeline. This module paints both per frame so they stay aligned:
- * the HTML <img> via CSS px (left/top/width/height + transform: rotate),
- * the picker rect via SVG cell-unit attributes (x/y/width/height +
- * transform="rotate(...)"). The cellPx multiplier converts between the
- * two coordinate spaces.
+ * Visual elements updated per frame:
+ *   - Picker rect (SVG, inside .dndm-canvas-transform) — owns hit-testing
+ *     for clicks and stays the selection bound.
+ *   - Resize/rotate handles (SVG, inside .dndm-canvas-transform).
+ *   - Bitmap canvas in-flight transform — notified via
+ *     dndMapperBitmapCanvas.setInFlightTransform so the user sees the
+ *     image follow the gesture without a Blazor render round-trip.
+ *
+ * The cellPx multiplier converts SVG-cell-unit math into stage CSS px.
  */
 
 import { clientToSvgPoint } from "./dndMapperSvgMetrics.js";
@@ -47,10 +47,7 @@ function findHandleKind(target) {
 function findVisuals(state, imageId) {
     if (!state || !imageId) return null;
     const esc = cssEscape(imageId);
-    // rendered is the HTML <img> (or <div> placeholder) in the image-layer
-    // sibling; picker + handles are still inside the SVG.
     return {
-        rendered: state.wrapper?.querySelector(`[data-image-rendered-id="${esc}"]`) ?? null,
         picker: state.svg.querySelector(`[data-image-picker-id="${esc}"]`),
         handles: collectHandles(state.svg, esc),
     };
@@ -83,26 +80,10 @@ function setRotateTransform(el, rot, cx, cy) {
     el.setAttribute('transform', `rotate(${rot} ${cx} ${cy})`);
 }
 
-// Paint the HTML <img> (or placeholder <div>) using CSS px. The element
-// rotates around its own center (CSS transform-origin: center center, set
-// in MapCanvas.razor.css), so we just apply transform: rotate(deg).
-function setHtmlImagePosition(el, x, y, w, h, rot, cellPx) {
-    if (!el) return;
-    const s = el.style;
-    s.left = (x * cellPx) + 'px';
-    s.top = (y * cellPx) + 'px';
-    s.width = (w * cellPx) + 'px';
-    s.height = (h * cellPx) + 'px';
-    s.transform = `rotate(${rot}deg)`;
-}
-
 function paintVisuals(state, visuals, x, y, w, h, rot) {
     if (!visuals) return;
     const cx = x + w / 2;
     const cy = y + h / 2;
-    if (visuals.rendered) {
-        setHtmlImagePosition(visuals.rendered, x, y, w, h, rot, state.cellPx);
-    }
     if (visuals.picker) {
         setRectXYWH(visuals.picker, x, y, w, h);
         setRotateTransform(visuals.picker, rot, cx, cy);
@@ -135,6 +116,32 @@ function paintHandles(handles, x, y, w, h, rot) {
         handles.rotline.setAttribute('y2', y - 0.6);
     }
     setAnchoredHandle(handles.rotcircle, cx, y - 0.6);
+}
+
+// Notify the bitmap canvas renderer of the in-flight transform so the
+// rendered image follows the gesture every frame. Cleared on drag end.
+// When .NET passes the IJSObjectReference for dndMapperBitmapCanvas into
+// initialize, the JS side receives the imported module's exports
+// namespace — calling setInFlightTransform on it works directly.
+function pushCanvasInFlight(state, imageId, x, y, w, h, rot) {
+    if (!state.bitmapCanvasModule || !state.canvasId) return;
+    try {
+        state.bitmapCanvasModule.setInFlightTransform(state.canvasId, imageId, {
+            x, y, width: w, height: h, rotation: rot,
+        });
+    } catch (err) {
+        console.warn('[DndMapperImageDrag] bitmap canvas setInFlightTransform failed; disabling.', err);
+        state.bitmapCanvasModule = null;
+    }
+}
+
+function clearCanvasInFlight(state, imageId) {
+    if (!state.bitmapCanvasModule || !state.canvasId) return;
+    try { state.bitmapCanvasModule.clearInFlightTransform(state.canvasId, imageId); }
+    catch (err) {
+        console.warn('[DndMapperImageDrag] bitmap canvas clearInFlightTransform failed; disabling.', err);
+        state.bitmapCanvasModule = null;
+    }
 }
 
 // ── Drag math (mirrors MapCanvas.razor.cs ApplyDragDelta + ApplyResize) ──
@@ -196,7 +203,7 @@ function computeDrag(orig, kind, dx, dy, freeAspect) {
  * @param {number} cellPx Pixels per map cell — used to convert cell-unit
  *                       drag math into CSS px for the HTML <img> elements.
  */
-export function initialize(svgId, dotNetRef, images, cellPx) {
+export function initialize(svgId, dotNetRef, images, cellPx, bitmapCanvasModule, canvasId) {
     const svg = document.getElementById(svgId);
     if (!svg) {
         console.error(`[DndMapperImageDrag] initialize: element "${svgId}" not found.`);
@@ -223,6 +230,8 @@ export function initialize(svgId, dotNetRef, images, cellPx) {
         abortController,
         images: new Map(),
         dragging: null,
+        bitmapCanvasModule: bitmapCanvasModule ?? null,
+        canvasId: canvasId ?? null,
     };
     instances.set(svgId, state);
 
@@ -331,6 +340,7 @@ export function initialize(svgId, dotNetRef, images, cellPx) {
         const next = computeDrag(d.orig, d.kind, dx, dy, d.shiftKey);
         d.last = next;
         paintVisuals(state, d.visuals, next.x, next.y, next.w, next.h, next.rot);
+        pushCanvasInFlight(state, d.imageId, next.x, next.y, next.w, next.h, next.rot);
         if (dx * dx + dy * dy >= DRAG_THRESHOLD_SQ) d.moved = true;
     }
 
@@ -345,8 +355,16 @@ export function initialize(svgId, dotNetRef, images, cellPx) {
             // Sub-threshold: revert any preview to canonical (orig) so a
             // simple click doesn't leave the image shifted.
             paintVisuals(state, d.visuals, d.orig.x, d.orig.y, d.orig.w, d.orig.h, d.orig.rot);
+            clearCanvasInFlight(state, d.imageId);
             return;
         }
+
+        // The canonical state will land via OnImageDragEnd → state.Maps
+        // mutation → PushImagesToBitmapCanvas re-marshal. Clearing the
+        // in-flight override here means a sub-frame stale render is
+        // possible right at drop, but the next RAF picks up the new
+        // canonical position and is indistinguishable in practice.
+        clearCanvasInFlight(state, d.imageId);
 
         if (state.dotNetRef) {
             const k = d.kind;
@@ -396,7 +414,6 @@ function parseRotation(transform) {
 function suppressTransitions(visuals, on) {
     if (!visuals) return;
     const value = on ? 'none' : '';
-    if (visuals.rendered) visuals.rendered.style.transition = value;
     if (visuals.picker) visuals.picker.style.transition = value;
     if (visuals.handles?.rotateGroup) visuals.handles.rotateGroup.style.transition = value;
 }
@@ -446,10 +463,17 @@ export function dispose(svgId) {
     if (!state) return;
     try { state.detachWindowListeners?.(); } catch { /* ignore */ }
     try { state.abortController?.abort(); } catch { /* ignore */ }
+    // If a drag was mid-flight, clear the canvas override so the canvas
+    // doesn't keep painting a stale in-flight position after teardown.
+    if (state.dragging) {
+        clearCanvasInFlight(state, state.dragging.imageId);
+    }
     state.dotNetRef = null;
     state.images.clear();
     state.svg = null;
     state.wrapper = null;
     state.dragging = null;
+    state.bitmapCanvasModule = null;
+    state.canvasId = null;
     instances.delete(svgId);
 }
