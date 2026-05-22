@@ -424,14 +424,14 @@ namespace KnockBox.DndMapper.Services.Library
                 .ToList(),
         };
 
-        private static AttributeValueSnapshot ToValueSnapshot(AttributeValue value) => new()
+        internal static AttributeValueSnapshot ToValueSnapshot(AttributeValue value) => new()
         {
             Type = value.Type,
             IntValue = value.IntValue,
             StringValue = value.StringValue,
         };
 
-        private static MapImageSnapshot ToImageSnapshot(MapImage image) => new()
+        internal static MapImageSnapshot ToImageSnapshot(MapImage image) => new()
         {
             Id = image.Id,
             Name = image.Name,
@@ -450,7 +450,7 @@ namespace KnockBox.DndMapper.Services.Library
             ByteSize = image.ByteSize,
         };
 
-        private static TokenSnapshot ToTokenSnapshot(Token token) => new()
+        internal static TokenSnapshot ToTokenSnapshot(Token token) => new()
         {
             Id = token.Id,
             Name = token.Name,
