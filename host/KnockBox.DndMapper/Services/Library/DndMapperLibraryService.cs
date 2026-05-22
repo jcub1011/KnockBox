@@ -1131,8 +1131,20 @@ namespace KnockBox.DndMapper.Services.Library
 
                 var slotId = DndMapperLibrarySchema.AutoSlotId;
                 var wroteAnything = false;
+                var coreCacheKey = $"{slotId}:core";
 
-                // 1. Write new-or-changed map shards.
+                // Collect dirty shards (changed vs the last flush's hashes)
+                // into one batch + a parallel array of (cacheKey, hash) so
+                // we update _autoFlushHashes only on commit. Core is appended
+                // LAST so within the IDB transaction's request ordering it
+                // is the last record persisted — same crash-recovery
+                // guarantee as the previous serial loop (map/sheet shards
+                // become observable only if the spine pointing at them
+                // also commits), but bounded to one JS-interop round-trip
+                // instead of one per shard.
+                var batch = new List<JsonPutItem>();
+                var cacheUpdates = new List<(string Key, byte[] Hash)>(capacity: shards.MapsById.Count + shards.SheetsById.Count + 1);
+
                 foreach (var (mapId, mapShard) in shards.MapsById)
                 {
                     if (cts.IsCancellationRequested) return;
@@ -1140,22 +1152,13 @@ namespace KnockBox.DndMapper.Services.Library
                     var hash = HashShard(mapShard);
                     if (HashesEqual(_autoFlushHashes.GetValueOrDefault(cacheKey), hash)) continue;
 
-                    var write = await db.JsonPutSingleAsync(
+                    batch.Add(new JsonPutItem(
                         DndMapperLibrarySchema.LibraryStore,
                         mapShard,
-                        DndMapperLibrarySchema.MapKey(slotId, mapId),
-                        cts.Token);
-                    if (!write.IsSuccess)
-                    {
-                        write.TryGetFailure(out var werr);
-                        _logger.LogWarning("Auto-save: failed to write map shard {MapId}: {Error}", mapId, werr.Message);
-                        return;
-                    }
-                    _autoFlushHashes[cacheKey] = hash;
-                    wroteAnything = true;
+                        DndMapperLibrarySchema.MapKey(slotId, mapId)));
+                    cacheUpdates.Add((cacheKey, hash));
                 }
 
-                // 2. Write new-or-changed sheet shards.
                 foreach (var (sheetId, sheetShard) in shards.SheetsById)
                 {
                     if (cts.IsCancellationRequested) return;
@@ -1163,41 +1166,33 @@ namespace KnockBox.DndMapper.Services.Library
                     var hash = HashShard(sheetShard);
                     if (HashesEqual(_autoFlushHashes.GetValueOrDefault(cacheKey), hash)) continue;
 
-                    var write = await db.JsonPutSingleAsync(
+                    batch.Add(new JsonPutItem(
                         DndMapperLibrarySchema.LibraryStore,
                         sheetShard,
-                        DndMapperLibrarySchema.SheetKey(slotId, sheetId),
-                        cts.Token);
-                    if (!write.IsSuccess)
-                    {
-                        write.TryGetFailure(out var werr);
-                        _logger.LogWarning("Auto-save: failed to write sheet shard {SheetId}: {Error}", sheetId, werr.Message);
-                        return;
-                    }
-                    _autoFlushHashes[cacheKey] = hash;
-                    wroteAnything = true;
+                        DndMapperLibrarySchema.SheetKey(slotId, sheetId)));
+                    cacheUpdates.Add((cacheKey, hash));
                 }
 
-                // 3. Write core if changed. Core is the commit point — written
-                //    AFTER all map / sheet shards so a crash between (1/2) and
-                //    (3) leaves the old core spine still pointing at the prior
-                //    state. Orphan new shards are silently ignored on load.
-                var coreCacheKey = $"{slotId}:core";
                 var coreHash = HashShard(shards.Core);
                 if (!HashesEqual(_autoFlushHashes.GetValueOrDefault(coreCacheKey), coreHash))
                 {
-                    var coreWrite = await db.JsonPutSingleAsync(
+                    batch.Add(new JsonPutItem(
                         DndMapperLibrarySchema.LibraryStore,
                         shards.Core,
-                        DndMapperLibrarySchema.CoreKey(slotId),
-                        cts.Token);
-                    if (!coreWrite.IsSuccess)
+                        DndMapperLibrarySchema.CoreKey(slotId)));
+                    cacheUpdates.Add((coreCacheKey, coreHash));
+                }
+
+                if (batch.Count > 0)
+                {
+                    var write = await db.JsonPutBatchAsync(batch, cts.Token);
+                    if (!write.IsSuccess)
                     {
-                        coreWrite.TryGetFailure(out var werr);
-                        _logger.LogWarning("Auto-save: failed to write core shard: {Error}", werr.Message);
+                        write.TryGetFailure(out var werr);
+                        _logger.LogWarning("Auto-save: batch shard write failed: {Error}", werr.Message);
                         return;
                     }
-                    _autoFlushHashes[coreCacheKey] = coreHash;
+                    foreach (var (key, hash) in cacheUpdates) _autoFlushHashes[key] = hash;
                     wroteAnything = true;
                 }
 
@@ -2308,78 +2303,54 @@ namespace KnockBox.DndMapper.Services.Library
             Dictionary<string, byte[]> hashCache,
             CancellationToken ct)
         {
+            // Collect every shard (maps + sheets + core) into one batch IDB
+            // put. One JS interop round-trip + one IDB readwrite transaction.
+            // Cheaper for the host tab's main thread than N parallel
+            // singleOp puts, and atomic — either the whole snapshot commits
+            // or none of it does (so if a crash hits mid-write, the spine
+            // and shards stay mutually consistent).
             return await Task.Run<Result>(async () =>
             {
-                using var gate = new SemaphoreSlim(MaxShardWriteConcurrency, MaxShardWriteConcurrency);
+                var batch = new List<JsonPutItem>(
+                    shards.MapsById.Count + shards.SheetsById.Count + 1);
+                var cacheUpdates = new List<(string Key, byte[] Hash)>(batch.Capacity);
 
-                async Task<Result> WriteShardAsync<T>(string label, IndexedDbKey key, T shard, string cacheKey)
-                {
-                    await gate.WaitAsync(ct).ConfigureAwait(false);
-                    try
-                    {
-                        var write = await db.JsonPutSingleAsync(
-                            DndMapperLibrarySchema.LibraryStore, shard, key, ct).ConfigureAwait(false);
-                        if (!write.IsSuccess)
-                        {
-                            write.TryGetFailure(out var werr);
-                            return Result.FromError($"Failed to write {label} shard: {werr.Message}");
-                        }
-                        var hash = HashShard(shard);
-                        lock (hashCache) { hashCache[cacheKey] = hash; }
-                        return Result.Success;
-                    }
-                    finally
-                    {
-                        gate.Release();
-                    }
-                }
-
-                var pending = new List<Task<Result>>(shards.MapsById.Count + shards.SheetsById.Count);
                 foreach (var (mapId, mapShard) in shards.MapsById)
                 {
-                    pending.Add(WriteShardAsync(
-                        "map",
-                        DndMapperLibrarySchema.MapKey(slotId, mapId),
+                    batch.Add(new JsonPutItem(
+                        DndMapperLibrarySchema.LibraryStore,
                         mapShard,
-                        $"{slotId}:map:{mapId:D}"));
+                        DndMapperLibrarySchema.MapKey(slotId, mapId)));
+                    cacheUpdates.Add(($"{slotId}:map:{mapId:D}", HashShard(mapShard)));
                 }
                 foreach (var (sheetId, sheetShard) in shards.SheetsById)
                 {
-                    pending.Add(WriteShardAsync(
-                        "sheet",
-                        DndMapperLibrarySchema.SheetKey(slotId, sheetId),
+                    batch.Add(new JsonPutItem(
+                        DndMapperLibrarySchema.LibraryStore,
                         sheetShard,
-                        $"{slotId}:sheet:{sheetId:D}"));
+                        DndMapperLibrarySchema.SheetKey(slotId, sheetId)));
+                    cacheUpdates.Add(($"{slotId}:sheet:{sheetId:D}", HashShard(sheetShard)));
                 }
-
-                var results = await Task.WhenAll(pending).ConfigureAwait(false);
-                foreach (var r in results)
-                {
-                    if (!r.IsSuccess) return r;
-                }
-
-                var coreWrite = await db.JsonPutSingleAsync(
+                batch.Add(new JsonPutItem(
                     DndMapperLibrarySchema.LibraryStore,
                     shards.Core,
-                    DndMapperLibrarySchema.CoreKey(slotId),
-                    ct).ConfigureAwait(false);
-                if (!coreWrite.IsSuccess)
-                {
-                    coreWrite.TryGetFailure(out var werr);
-                    return Result.FromError($"Failed to write core shard: {werr.Message}");
-                }
-                var coreHash = HashShard(shards.Core);
-                lock (hashCache) { hashCache[$"{slotId}:core"] = coreHash; }
+                    DndMapperLibrarySchema.CoreKey(slotId)));
+                cacheUpdates.Add(($"{slotId}:core", HashShard(shards.Core)));
 
+                var write = await db.JsonPutBatchAsync(batch, ct).ConfigureAwait(false);
+                if (!write.IsSuccess)
+                {
+                    write.TryGetFailure(out var werr);
+                    return Result.FromError($"Failed to write shard batch: {werr.Message}");
+                }
+
+                lock (hashCache)
+                {
+                    foreach (var (key, hash) in cacheUpdates) hashCache[key] = hash;
+                }
                 return Result.Success;
             }, ct).ConfigureAwait(false);
         }
-
-        // SignalR + IndexedDB pipeline tolerates several concurrent json puts
-        // well, but past ~8 the per-call overhead stops amortizing and the
-        // queue depth just grows. Keeps a 500-shard slot from opening 500
-        // simultaneous JS interop calls.
-        private const int MaxShardWriteConcurrency = 8;
 
         // Reads a slot back into a LibrarySnapshot shape by fanning out shard
         // reads from the core spine. Returns null if {slotId}:core is missing

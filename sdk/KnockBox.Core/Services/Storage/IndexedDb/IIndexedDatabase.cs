@@ -43,6 +43,22 @@ namespace KnockBox.Core.Services.Storage.IndexedDb
         ValueTask<ValueResult<IndexedDbKey, IndexedDbError>> JsonPutSingleAsync<T>(
             string storeName, T value, IndexedDbKey? key = null, CancellationToken ct = default);
 
+        /// <summary>
+        /// Writes every entry in <paramref name="items"/> under a single atomic
+        /// readwrite transaction that spans every distinct
+        /// <see cref="JsonPutItem.StoreName"/> referenced by the batch. One
+        /// JS interop round-trip — preferable when a caller would otherwise
+        /// issue several <see cref="JsonPutSingleAsync"/> calls in a tight
+        /// loop, because each interop call costs a SignalR hop and burns the
+        /// browser tab's main thread (which on a same-origin neighbour tab
+        /// can perceptibly stall its render path). Returns the effective
+        /// keys in input order. An empty <paramref name="items"/> list is a
+        /// no-op success that doesn't issue any JS interop.
+        /// </summary>
+        ValueTask<ValueResult<IReadOnlyList<IndexedDbKey>, IndexedDbError>> JsonPutBatchAsync(
+            IReadOnlyList<JsonPutItem> items,
+            CancellationToken ct = default);
+
         /// <summary>Reads a single blob record by key in a single atomic readonly transaction. Returns <see langword="null"/> on miss.</summary>
         ValueTask<ValueResult<IndexedDbBlob?, IndexedDbError>> BlobGetSingleAsync(
             string storeName, IndexedDbKey key, CancellationToken ct = default);

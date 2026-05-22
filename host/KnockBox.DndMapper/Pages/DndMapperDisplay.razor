@@ -1,11 +1,14 @@
 @page "/room/dnd-mapper/{ObfuscatedRoomCode}/display"
+@using System.Globalization
 @using KnockBox.Core.Services.State.Shared
 @using KnockBox.DndMapper.Components
 @using KnockBox.DndMapper.Helpers
 @using KnockBox.DndMapper.Services.State.Games
 @using KnockBox.DndMapper.Services.State.Games.Data
 @inject IGameRoomObserver Observer
-@implements IDisposable
+@inject IJSRuntime JSRuntime
+@inject ILogger<DndMapperDisplay> Logger
+@implements IAsyncDisposable
 
 <PageTitle>DnD Mapper — Display</PageTitle>
 
@@ -58,10 +61,12 @@ else
                    map. preserveAspectRatio="xMidYMid meet" guarantees the
                    entire rect is visible at maximum zoom. *@
                 var vb = _projection.FocusRect is { } fr
-                    ? string.Create(System.Globalization.CultureInfo.InvariantCulture,
+                    ? string.Create(CultureInfo.InvariantCulture,
                         $"{fr.X} {fr.Y} {fr.Width} {fr.Height}")
-                    : $"0 0 {activeMap.Grid.WidthCells} {activeMap.Grid.HeightCells}";
-                <svg xmlns="http://www.w3.org/2000/svg"
+                    : string.Create(CultureInfo.InvariantCulture,
+                        $"0 0 {activeMap.Grid.WidthCells} {activeMap.Grid.HeightCells}");
+                <svg id="@SvgId"
+                     xmlns="http://www.w3.org/2000/svg"
                      viewBox="@vb"
                      preserveAspectRatio="xMidYMid meet">
 
@@ -84,7 +89,7 @@ else
                                    x="@img.X" y="@img.Y"
                                    width="@img.Width" height="@img.Height"
                                    opacity="@img.Opacity"
-                                   transform="rotate(@img.Rotation @(img.X + img.Width / 2) @(img.Y + img.Height / 2))"
+                                   transform="@ImageTransform(img)"
                                    preserveAspectRatio="none" />
                         }
                     }
@@ -101,13 +106,23 @@ else
                         </g>
                     }
 
+                    @* Tokens render with data-* attributes and NO transform
+                       attribute. dndMapperDisplayTokens.js owns the visual
+                       position via inline `style.transform` set on each
+                       OnAfterRenderAsync; for unchanged tokens it does
+                       nothing, for moved tokens it runs a WAAPI animation,
+                       and the first paint after mount / map-swap seeds the
+                       inline transform without animation. The WAAPI path
+                       runs on the compositor and survives the host tab's
+                       IDB-save main-thread busy window that would otherwise
+                       interrupt a CSS transition. *@
                     @foreach (var token in _projection.VisibleTokens)
                     {
-                        @* Token.X/Y are canonically cell-centered (engine clamps to
-                           [0.5, max-0.5] and snaps to half-integers). Translate to
-                           that center and draw geometry at the origin so this view
-                           matches TokenLayer.razor on the host. *@
-                        <g @key="token.Id" class="@TokenCssClass(token)" transform="translate(@token.X @token.Y)">
+                        <g @key="token.Id"
+                           class="dndm-viewer-token"
+                           data-token-id="@token.Id"
+                           data-tx="@Fmt(token.X)"
+                           data-ty="@Fmt(token.Y)">
                             <circle r="0.4" fill="@token.Color" stroke="#000" stroke-width="0.04" />
                             <text text-anchor="middle" dominant-baseline="central"
                                   font-size="0.4" fill="#fff" font-weight="bold">
@@ -148,15 +163,21 @@ else
 @code {
     [Parameter] public string ObfuscatedRoomCode { get; set; } = string.Empty;
 
+    // Stable per-instance id for the SVG element so the WAAPI animation
+    // module can target it via document.getElementById without colliding
+    // with anything else on the page.
+    private readonly string SvgId = $"dndm-display-svg-{Guid.NewGuid():N}";
+
     private DndMapperGameState? _state;
     private DisplayProjection _projection = new(null, [], [], null, null, [], string.Empty, null);
     private ObserverAttachment? _attachment;
     private IDisposable? _subscription;
-    private Guid? _lastRenderedMapId;
-    // Set when the active map changes (or first paint). Suppresses the token
-    // transform tween for one render so tokens on a fresh map appear in place
-    // rather than sliding from prior coordinates.
-    private bool _suppressTween = true;
+    // Set to true on first paint and again on any map swap so the WAAPI
+    // sync seeds positions instantly rather than sliding from the previous
+    // map's coordinates. Read + reset by OnAfterRenderAsync.
+    private bool _seedNextSync = true;
+
+    private IJSObjectReference? _tokenAnimModule;
 
     protected override void OnInitialized()
     {
@@ -175,31 +196,66 @@ else
         {
             var next = DisplayProjection.Build(_state);
             if (next.ActiveMap?.Id != _projection.ActiveMap?.Id)
-                _suppressTween = true;
+                _seedNextSync = true;
             _projection = next;
         }
         await InvokeAsync(StateHasChanged);
     }
 
-    protected override void OnAfterRender(bool firstRender)
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        _lastRenderedMapId = _projection.ActiveMap?.Id;
-        if (_suppressTween)
+        if (_tokenAnimModule is null)
         {
-            _suppressTween = false;
-            // Re-render once with tweens re-enabled so subsequent token moves
-            // animate. The DOM already shows tokens in their correct positions
-            // from the suppressed pass, so this render is a no-op visually.
-            StateHasChanged();
+            if (_state is null) return;
+            try
+            {
+                _tokenAnimModule = await JSRuntime.InvokeAsync<IJSObjectReference>(
+                    "import",
+                    "./_content/KnockBox.DndMapper/js/dndMapperDisplayTokens.js");
+            }
+            catch (JSDisconnectedException) { return; /* circuit teardown */ }
+            catch (Exception ex)
+            {
+                Logger.LogWarning(ex, "Failed to load display token animation module.");
+                return;
+            }
+        }
+
+        // Sync the new positions through the WAAPI module. firstRender and
+        // map-swap renders are seeded without animation; everything else
+        // runs an element.animate() per moved token (250 ms ease-out).
+        bool seed = firstRender || _seedNextSync;
+        _seedNextSync = false;
+        try
+        {
+            await _tokenAnimModule.InvokeVoidAsync("syncTokens", SvgId, seed);
+        }
+        catch (JSDisconnectedException) { /* circuit teardown */ }
+        catch (Exception ex)
+        {
+            Logger.LogDebug(ex, "syncTokens invocation failed.");
         }
     }
 
-    private string TokenCssClass(Token _) =>
-        _suppressTween ? "dndm-viewer-token dndm-viewer-token--instant" : "dndm-viewer-token";
+    private static string Fmt(double value) =>
+        value.ToString("0.######", CultureInfo.InvariantCulture);
 
-    public void Dispose()
+    private static string ImageTransform(MapImage img) =>
+        string.Create(CultureInfo.InvariantCulture,
+            $"rotate({img.Rotation} {img.X + img.Width / 2} {img.Y + img.Height / 2})");
+
+    public async ValueTask DisposeAsync()
     {
         _subscription?.Dispose();
         _attachment?.Lifetime.Dispose();
+        if (_tokenAnimModule is not null)
+        {
+            try { await _tokenAnimModule.InvokeVoidAsync("reset", SvgId); }
+            catch (JSDisconnectedException) { /* circuit teardown */ }
+            catch (Exception) { /* best-effort */ }
+            try { await _tokenAnimModule.DisposeAsync(); }
+            catch (JSDisconnectedException) { /* circuit teardown */ }
+            catch (Exception) { /* best-effort */ }
+        }
     }
 }

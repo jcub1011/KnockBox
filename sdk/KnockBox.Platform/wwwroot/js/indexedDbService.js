@@ -354,6 +354,48 @@ export function singleOpJsonPut(dbId, storeName, value, keyEnv) {
     });
 }
 
+/**
+ * Writes every item in `items` inside a single readwrite transaction that
+ * spans every distinct `item.storeName` referenced. Equivalent to N
+ * back-to-back singleOpJsonPut calls in terms of effect, but only one JS
+ * interop round-trip from .NET → JS → IDB → JS → .NET. The latter matters
+ * because each round-trip ties up the browser tab's main thread briefly;
+ * on a same-origin sibling tab (e.g. /display) that shared main-thread
+ * contention can interrupt compositor work running independently.
+ *
+ * items: [{ storeName, value, keyEnv }] — storeName is the destination
+ * object store, value is the JSON payload from .NET, keyEnv is the
+ * IndexedDbKey envelope (or null to use the store's out-of-line auto-key).
+ *
+ * Result: array of effective keys (wrapKey'd) in the same order as items.
+ */
+export function batchOpJsonPut(dbId, items) {
+    const count = items?.length ?? 0;
+    // Compute the unique set of stores the transaction needs to touch;
+    // IDB requires every store to be named up-front when opening the tx.
+    const storeNames = count === 0
+        ? []
+        : [...new Set(items.map(i => i.storeName))];
+    return singleOpTx(dbId, storeNames, "readwrite", (tx, record) => {
+        if (count === 0) { record([]); return; }
+        const results = new Array(count);
+        let outstanding = count;
+        for (let i = 0; i < count; i++) {
+            const item = items[i];
+            const store = tx.objectStore(item.storeName);
+            const key = unwrapKey(item.keyEnv);
+            const req = key !== undefined ? store.put(item.value, key) : store.put(item.value);
+            const idx = i;
+            req.onsuccess = () => {
+                results[idx] = wrapKey(req.result);
+                if (--outstanding === 0) record(results);
+            };
+            // onerror left to bubble to tx.onerror (singleOpTx handles it).
+            req.onerror = () => { /* surfaced via tx.onerror */ };
+        }
+    });
+}
+
 export function singleOpBlobGet(dbId, storeName, keyEnv) {
     return singleOpTx(dbId, [storeName], "readonly", (tx, record) => {
         const store = tx.objectStore(storeName);

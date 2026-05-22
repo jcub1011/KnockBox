@@ -95,6 +95,57 @@ internal sealed class IndexedDatabase : IIndexedDatabase
         }
     }
 
+    public async ValueTask<ValueResult<IReadOnlyList<IndexedDbKey>, IndexedDbError>> JsonPutBatchAsync(
+        IReadOnlyList<JsonPutItem> items,
+        CancellationToken ct = default)
+    {
+        if (items is null || items.Count == 0)
+            return ValueResult<IReadOnlyList<IndexedDbKey>, IndexedDbError>.FromValue(Array.Empty<IndexedDbKey>());
+
+        // Build the JS-side envelope array. Each item carries its own
+        // storeName so the JS module's transaction spans every distinct
+        // store in the batch. Values serialize via the database's
+        // configured JsonSerializerOptions (same code path as
+        // JsonPutSingleAsync), so callers don't need to pre-serialize.
+        var payload = new object?[items.Count];
+        for (var i = 0; i < items.Count; i++)
+        {
+            var item = items[i];
+            var json = JsonSerializer.SerializeToElement(item.Value, item.Value?.GetType() ?? typeof(object), _jsonOptions);
+            payload[i] = new
+            {
+                storeName = item.StoreName,
+                value = json,
+                keyEnv = IndexedDbWireFormat.ToKeyEnvelope(item.Key),
+            };
+        }
+
+        var raw = await _interop.InvokeRawAsync(
+            "batchOpJsonPut", ct, _dbId, payload)
+            .ConfigureAwait(false);
+        if (raw.IsCanceled) return ValueResult<IReadOnlyList<IndexedDbKey>, IndexedDbError>.Canceled;
+        if (!raw.TryGetSuccess(out var element)) return raw.Error.Error;
+        try
+        {
+            if (element.ValueKind != JsonValueKind.Array)
+                return new IndexedDbError(IndexedDbErrorKind.Data,
+                    $"Expected JSON array from batchOpJsonPut, got {element.ValueKind}.");
+
+            var keys = new IndexedDbKey[element.GetArrayLength()];
+            var i = 0;
+            foreach (var keyElement in element.EnumerateArray())
+            {
+                keys[i++] = IndexedDbWireFormat.FromKeyEnvelope(keyElement);
+            }
+            return ValueResult<IReadOnlyList<IndexedDbKey>, IndexedDbError>.FromValue(keys);
+        }
+        catch (Exception ex)
+        {
+            return new IndexedDbError(IndexedDbErrorKind.Data,
+                $"Failed to parse effective keys from batchOpJsonPut: {ex.Message}");
+        }
+    }
+
     public async ValueTask<ValueResult<IndexedDbBlob?, IndexedDbError>> BlobGetSingleAsync(
         string storeName, IndexedDbKey key, CancellationToken ct = default)
     {

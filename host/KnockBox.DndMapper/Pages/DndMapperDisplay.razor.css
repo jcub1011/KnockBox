@@ -148,10 +148,9 @@
     color: #f3eee6;
 }
 
-.dndm-viewer-token {
-    transition: transform 250ms ease-out;
-}
-
-.dndm-viewer-token--instant {
-    transition: none;
-}
+/* Token position animation is driven by Web Animations API from
+   dndMapperDisplayTokens.js — see DndMapperDisplay.razor's
+   OnAfterRenderAsync. CSS transitions on the SVG `transform` attribute
+   stutter when the host tab's main thread is busy with IDB save interop,
+   so the transform comes from inline style set by JS instead. */
+.dndm-viewer-token { /* layout-only hook for any future styling */ }
