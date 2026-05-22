@@ -130,21 +130,19 @@ function openDb(name) {
     });
 }
 
-function writeBlobToStore(databaseName, storeName, idbKey, blob) {
-    return new Promise(async (resolve, reject) => {
-        let db = null;
-        try {
-            db = await openDb(databaseName);
+async function writeBlobToStore(databaseName, storeName, idbKey, blob) {
+    const db = await openDb(databaseName);
+    try {
+        await new Promise((resolve, reject) => {
             const tx = db.transaction(storeName, 'readwrite');
-            tx.oncomplete = () => { try { db.close(); } catch { /* ignore */ } resolve(); };
-            tx.onerror = () => { try { db.close(); } catch { /* ignore */ } reject(tx.error ?? new Error('IDB put failed')); };
-            tx.onabort = () => { try { db.close(); } catch { /* ignore */ } reject(tx.error ?? new Error('IDB tx aborted')); };
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error ?? new Error('IDB put failed'));
+            tx.onabort = () => reject(tx.error ?? new Error('IDB tx aborted'));
             tx.objectStore(storeName).put(blob, idbKey);
-        } catch (err) {
-            try { db?.close(); } catch { /* ignore */ }
-            reject(err);
-        }
-    });
+        });
+    } finally {
+        try { db.close(); } catch { /* ignore */ }
+    }
 }
 
 // Back-compat shim so callers migrating from dndMapperImageDimensions.js can

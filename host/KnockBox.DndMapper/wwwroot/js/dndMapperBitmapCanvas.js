@@ -59,7 +59,13 @@ export function initialize(canvasId, dotNetRef, widthCells, heightCells, cellPx)
         panY: 0,
         zoom: 1,
         images: [],
-        bitmaps: new Map(),       // id -> ImageBitmap | 'loading' | 'failed'
+        // id -> { bitmap, src } where `bitmap` is an ImageBitmap | 'loading' |
+        // 'failed' and `src` is the source URL we kicked the load for. Both
+        // pieces of state share one Map entry so the eviction sweep in
+        // setImages can't accidentally wipe the src-tracking half while
+        // preserving the bitmap (which was the prior bug that caused every
+        // setImages call to re-fetch and re-decode every bitmap).
+        bitmaps: new Map(),
         inFlight: new Map(),      // id -> partial transform overrides
         dirty: true,
         rafHandle: 0,
@@ -82,11 +88,9 @@ export function setImages(canvasId, images) {
     // Evict bitmaps for images that are no longer present.
     const liveIds = new Set();
     for (const img of state.images) liveIds.add(img.id);
-    for (const [id, bm] of state.bitmaps) {
+    for (const [id, entry] of state.bitmaps) {
         if (!liveIds.has(id)) {
-            if (bm && bm !== 'loading' && bm !== 'failed') {
-                try { bm.close?.(); } catch { /* ignore */ }
-            }
+            closeBitmap(entry);
             state.bitmaps.delete(id);
         }
     }
@@ -94,26 +98,30 @@ export function setImages(canvasId, images) {
     // Kick off bitmap decode for any image whose src changed or is new.
     for (const img of state.images) {
         if (!img.src) {
-            // No src => placeholder; ensure no stale bitmap stays cached under this id.
+            // No src => placeholder; ensure no stale bitmap stays cached
+            // under this id. Preserve a 'failed' marker so redraw knows to
+            // paint the placeholder rather than skipping.
             const prev = state.bitmaps.get(img.id);
-            if (prev && prev !== 'loading' && prev !== 'failed') {
-                try { prev.close?.(); } catch { /* ignore */ }
-                state.bitmaps.set(img.id, 'failed');
-            } else if (!prev) {
-                state.bitmaps.set(img.id, 'failed');
-            }
+            closeBitmap(prev);
+            state.bitmaps.set(img.id, { bitmap: 'failed', src: null });
             continue;
         }
         const existing = state.bitmaps.get(img.id);
-        const existingSrc = state.bitmaps.get(img.id + '#src');
-        if (existing && existingSrc === img.src) continue;
-        if (existing && existing !== 'loading' && existing !== 'failed') {
-            try { existing.close?.(); } catch { /* ignore */ }
-        }
-        state.bitmaps.set(img.id + '#src', img.src);
+        // Real cache hit: same id, same src. Bitmap state — 'loading',
+        // 'failed', or a live ImageBitmap — is all valid to leave alone.
+        if (existing && existing.src === img.src) continue;
+        closeBitmap(existing);
         loadBitmap(state, img.id, img.src);
     }
     markDirty(state);
+}
+
+function closeBitmap(entry) {
+    if (!entry) return;
+    const bm = entry.bitmap;
+    if (bm && bm !== 'loading' && bm !== 'failed') {
+        try { bm.close?.(); } catch { /* ignore */ }
+    }
 }
 
 export function setViewport(canvasId, panX, panY, zoom, cellPx) {
@@ -158,11 +166,7 @@ export function dispose(canvasId) {
     if (state.rafHandle) {
         try { cancelAnimationFrame(state.rafHandle); } catch { /* ignore */ }
     }
-    for (const [, bm] of state.bitmaps) {
-        if (bm && bm !== 'loading' && bm !== 'failed') {
-            try { bm.close?.(); } catch { /* ignore */ }
-        }
-    }
+    for (const [, entry] of state.bitmaps) closeBitmap(entry);
     state.bitmaps.clear();
     state.inFlight.clear();
     state.dotNetRef = null;
@@ -186,23 +190,27 @@ function scheduleRedraw(state) {
 }
 
 async function loadBitmap(state, id, src) {
-    state.bitmaps.set(id, 'loading');
+    state.bitmaps.set(id, { bitmap: 'loading', src });
     try {
         const response = await fetch(src);
         if (!response.ok) throw new Error(`fetch ${response.status}`);
         const blob = await response.blob();
         const bm = await createImageBitmap(blob);
-        if (state.disposed || state.bitmaps.get(id + '#src') !== src) {
-            // Either disposed or the image's src changed while we were
-            // decoding — drop this bitmap on the floor.
+        // Re-read the slot — the src may have been replaced by a later
+        // setImages while we were decoding. If so, drop this bitmap on
+        // the floor.
+        const slot = state.bitmaps.get(id);
+        if (state.disposed || !slot || slot.src !== src) {
             try { bm.close?.(); } catch { /* ignore */ }
             return;
         }
-        state.bitmaps.set(id, bm);
+        state.bitmaps.set(id, { bitmap: bm, src });
         markDirty(state);
     } catch (err) {
         if (state.disposed) return;
-        state.bitmaps.set(id, 'failed');
+        const slot = state.bitmaps.get(id);
+        if (slot && slot.src !== src) return; // src changed mid-flight, ignore
+        state.bitmaps.set(id, { bitmap: 'failed', src });
         markDirty(state);
     }
 }
@@ -269,7 +277,8 @@ function redraw(state) {
         const radius = 0.5 * Math.hypot(screenW, screenH);
         if (cx + radius < 0 || cy + radius < 0 || cx - radius > cssW || cy - radius > cssH) continue;
 
-        const bm = state.bitmaps.get(img.id);
+        const entry = state.bitmaps.get(img.id);
+        const bm = entry ? entry.bitmap : null;
         const haveBitmap = bm && bm !== 'loading' && bm !== 'failed';
 
         ctx.save();

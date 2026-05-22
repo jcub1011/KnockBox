@@ -27,10 +27,13 @@
                     <li @key="img.Id" class="@cls">
                         <div class="dndm-layer-clickarea"
                              @onclick="@(() => OnRowClick(img))">
-                            @if (img.ShareToken is Guid shareToken)
+                            @{
+                                var thumbSrc = ResolveImageSrc(img);
+                            }
+                            @if (thumbSrc is not null)
                             {
                                 <img class="dndm-layer-thumb"
-                                     src="@($"/blob-share/{shareToken:D}")"
+                                     src="@thumbSrc"
                                      alt="layer @img.LayerOrder" />
                             }
                             else

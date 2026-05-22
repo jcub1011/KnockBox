@@ -166,6 +166,14 @@ namespace KnockBox.DndMapper.Pages.Components
         {
             if (_localImageUrls.TryGetValue(img.Id, out var localUrl) && localUrl is not null)
                 return localUrl;
+            // Host-but-URL-pending guard: we own the blob locally, but the
+            // async CreateObjectUrlAsync round-trip hasn't finished yet.
+            // Returning null lets the bitmap canvas paint its loading
+            // placeholder for one frame instead of pushing a /blob-share/
+            // URL that would trigger a SignalR-backed fetch from the host's
+            // browser to itself — that contention is what timed out and
+            // killed the circuit on session attach.
+            if (Library.HasLocalBlob(img.Id)) return null;
             if (img.ShareToken is Guid shareToken)
                 return $"/blob-share/{shareToken:D}";
             return null;

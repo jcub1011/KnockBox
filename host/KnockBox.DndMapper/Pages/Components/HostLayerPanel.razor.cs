@@ -1,5 +1,6 @@
 using KnockBox.Core.Components.Shared;
 using KnockBox.Core.Services.State.Users;
+using KnockBox.DndMapper.Services.Library;
 using KnockBox.DndMapper.Services.Logic.Games;
 using KnockBox.DndMapper.Services.State.Games;
 using KnockBox.DndMapper.Services.State.Games.Data;
@@ -19,9 +20,18 @@ namespace KnockBox.DndMapper.Pages.Components
 
         [Inject] protected DndMapperGameEngine Engine { get; set; } = default!;
         [Inject] protected IUserService UserService { get; set; } = default!;
+        [Inject] protected DndMapperLibraryService Library { get; set; } = default!;
         [CascadingParameter] public DndMapperToastService? Toasts { get; set; }
 
         private IDisposable? _stateSub;
+
+        // Host-only direct-blob URLs keyed by image id. Same pattern as
+        // MapCanvas._localImageUrls — populated lazily from the library's
+        // blob cache so the host's own thumbnails render via a same-browser
+        // blob: URL instead of round-tripping bytes through SignalR via
+        // /blob-share/{token}. Empty on player circuits (their blob cache is
+        // empty); ResolveImageSrc falls back to the share URL there.
+        private readonly Dictionary<Guid, string> _localImageUrls = new();
 
         // Inline-rename state for layer rows. Dbl-clicking a layer's name swaps
         // the label for an input bound to _renameLayerDraft; Enter / blur
@@ -33,8 +43,80 @@ namespace KnockBox.DndMapper.Pages.Components
 
         protected override void OnInitialized()
         {
-            _stateSub = State.StateChangedEventManager.Subscribe(async () => await InvokeAsync(StateHasChanged));
+            _stateSub = State.StateChangedEventManager.Subscribe(OnStateChanged);
             base.OnInitialized();
+        }
+
+        protected override async Task OnParametersSetAsync()
+        {
+            await RefreshLocalImageUrlsAsync().ConfigureAwait(false);
+            await base.OnParametersSetAsync().ConfigureAwait(false);
+        }
+
+        // Mirror of MapCanvas.OnStateChanged's local-URL refresh path:
+        // OnParametersSetAsync only fires on parent-pushed parameter changes,
+        // so a state-driven re-render (new upload, reconnect republish) won't
+        // pick up freshly-cached blob URLs without this hook.
+        private async ValueTask OnStateChanged()
+        {
+            await RefreshLocalImageUrlsAsync().ConfigureAwait(false);
+            await InvokeAsync(StateHasChanged);
+        }
+
+        // Shape mirrors MapCanvas.ResolveImageSrc. Host: hits _localImageUrls
+        // → same-browser blob: URL. Player: _localImageUrls is empty so falls
+        // through to the /blob-share/{token} capability URL.
+        //
+        // The Library.HasLocalBlob check is the crucial first-render guard:
+        // if we own the blob but RefreshLocalImageUrlsAsync hasn't finished
+        // its JS round-trip yet, return null instead of the share URL.
+        // Falling through to /blob-share/ here would fire a SignalR-backed
+        // fetch from the host's own browser to itself, contending with
+        // session-attach traffic — the exact race that previously timed
+        // out and tore the circuit down on session load.
+        private string? ResolveImageSrc(MapImage img)
+        {
+            if (_localImageUrls.TryGetValue(img.Id, out var localUrl) && localUrl is not null)
+                return localUrl;
+            if (Library.HasLocalBlob(img.Id)) return null;
+            if (img.ShareToken is Guid shareToken)
+                return $"/blob-share/{shareToken:D}";
+            return null;
+        }
+
+        // Same shape as MapCanvas.RefreshLocalImageUrlsAsync. Re-renders only
+        // when the set actually changes — avoids a render storm during the
+        // host's first attach (which republishes every image's share token in
+        // parallel and would otherwise fire one render per image).
+        private async ValueTask RefreshLocalImageUrlsAsync()
+        {
+            var map = ActiveMap;
+            if (map is null) return;
+            var changed = false;
+
+            if (_localImageUrls.Count > 0)
+            {
+                var currentIds = new HashSet<Guid>(map.Images.Select(i => i.Id));
+                foreach (var key in _localImageUrls.Keys.ToList())
+                {
+                    if (!currentIds.Contains(key))
+                    {
+                        _localImageUrls.Remove(key);
+                        changed = true;
+                    }
+                }
+            }
+
+            foreach (var img in map.Images)
+            {
+                if (_localImageUrls.ContainsKey(img.Id)) continue;
+                var url = await Library.TryGetLocalObjectUrlAsync(img.Id).ConfigureAwait(false);
+                if (url is null) continue;
+                _localImageUrls[img.Id] = url;
+                changed = true;
+            }
+
+            if (changed) await InvokeAsync(StateHasChanged).ConfigureAwait(false);
         }
 
         protected override async Task OnAfterRenderAsync(bool firstRender)

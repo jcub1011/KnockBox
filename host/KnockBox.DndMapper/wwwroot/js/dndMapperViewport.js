@@ -13,7 +13,14 @@
  * the SVG's `overflow="visible"` attribute. The parent .dndm-canvas-stage
  * clips with CSS overflow:hidden so off-map content can't escape into the
  * toolbar or rails.
+ *
+ * Pan is intentionally unbounded — hosts frequently scroll past the map
+ * edges to access off-map sticky notes and secondary scenes. Do not
+ * reintroduce a ClampPan/setBounds-based limit without consulting that
+ * workflow.
  */
+
+import { getStageAnchor } from "./dndMapperSvgMetrics.js";
 
 const instances = new Map();
 
@@ -66,25 +73,26 @@ function combinedViewport(state) {
     return { panX: combinedPanX, panY: combinedPanY, zoom: combinedZoom };
 }
 
-// Rail-aware visible center in world cell coordinates. Mirrors the anchor
-// math in zoomByFactorAtCenter so spawn anchor, double-click focus, and
-// button zoom all snap to the same reference point — the midpoint of the
-// portion of the stage that isn't covered by the left/right rails.
+// Rail-aware visible center in world cell coordinates. Uses the centralized
+// getStageAnchor so spawn anchor, double-click focus, and button zoom all
+// snap to the same reference point — the midpoint of the portion of the
+// stage that isn't covered by the left/right rails.
 function computeVisibleCenter(state) {
     const base = state.basePxPerCell;
-    if (base <= 0 || !state.gestureSurface) {
-        return { centerX: state.panX, centerY: state.panY };
+    const anchor = getStageAnchor(state.svgId);
+    if (base <= 0 || !anchor) {
+        // Fallback: middle of the map in world cells. Reachable only when
+        // the playing-phase DOM hasn't materialised yet (which can't happen
+        // from commitGesture in normal flow). Crucially this is a true
+        // *centre*, not the top-left, so any spawn anchor that reads this
+        // lands somewhere sensible instead of at (panX, panY).
+        return {
+            centerX: state.panX + state.widthCells / 2,
+            centerY: state.panY + state.heightCells / 2,
+        };
     }
-    const stageRect = state.gestureSurface.getBoundingClientRect();
-    const root = state.svg?.closest('.dnd-mapper-playing');
-    const leftEl = root?.querySelector('.dndm-rail--left') ?? null;
-    const rightEl = root?.querySelector('.dndm-rail--right') ?? null;
-    const leftPx = leftEl ? leftEl.getBoundingClientRect().width : 0;
-    const rightPx = rightEl ? rightEl.getBoundingClientRect().width : 0;
-    const anchorX = (stageRect.width + leftPx - rightPx) / 2;
-    const anchorY = stageRect.height / 2;
-    const centerX = state.panX + anchorX / (base * state.zoom);
-    const centerY = state.panY + anchorY / (base * state.zoom);
+    const centerX = state.panX + anchor.anchorX / (base * state.zoom);
+    const centerY = state.panY + anchor.anchorY / (base * state.zoom);
     return { centerX, centerY };
 }
 
@@ -232,6 +240,7 @@ export function initialize(svgId, dotNetRef, panX, panY, zoom, widthCells, heigh
     const signal = abortController.signal;
 
     const state = {
+        svgId,
         svg,
         wrapper,
         gestureSurface,
@@ -337,21 +346,15 @@ export function setMode(svgId, mode) {
     state.mode = mode || 'none';
 }
 
-// Toolbar +/- zoom path. The anchor is the visible non-rail centre, computed
-// from the gesture-surface rect plus the rail widths so an asymmetric rail
-// (host's wide left rail) doesn't pull the zoom focus off the camera centre.
+// Toolbar +/- zoom path. The anchor is the visible non-rail centre, resolved
+// via the shared getStageAnchor so an asymmetric rail (host's wide left rail)
+// doesn't pull the zoom focus off the camera centre.
 export function zoomByFactorAtCenter(svgId, factor) {
     const state = instances.get(svgId);
     if (!state) return;
-    const stageRect = state.gestureSurface.getBoundingClientRect();
-    const root = state.svg?.closest('.dnd-mapper-playing');
-    const leftEl = root?.querySelector('.dndm-rail--left') ?? null;
-    const rightEl = root?.querySelector('.dndm-rail--right') ?? null;
-    const leftPx = leftEl ? leftEl.getBoundingClientRect().width : 0;
-    const rightPx = rightEl ? rightEl.getBoundingClientRect().width : 0;
-    const anchorX = (stageRect.width + leftPx - rightPx) / 2;
-    const anchorY = stageRect.height / 2;
-    if (applyZoomAtAnchor(state, anchorX, anchorY, factor)) {
+    const anchor = getStageAnchor(state.svgId);
+    if (!anchor) return;
+    if (applyZoomAtAnchor(state, anchor.anchorX, anchor.anchorY, factor)) {
         // No gesture state to wait on — flush to C# immediately.
         commitGesture(state, false);
     }
@@ -378,6 +381,8 @@ export function centerOnWorld(svgId, worldX, worldY) {
     if (!state) return;
     const base = ensureBasePxPerCell(state);
     if (base <= 0) return;
+    const anchor = getStageAnchor(state.svgId);
+    if (!anchor) return;
     // Discard any in-flight gesture so the anchor math operates against a
     // clean baseline — commitGesture would otherwise fold the partial
     // gesture into the canonical state before applying.
@@ -386,17 +391,8 @@ export function centerOnWorld(svgId, worldX, worldY) {
     state.gPanPx = { x: 0, y: 0 };
     state.gZoomFactor = 1.0;
 
-    const stageRect = state.gestureSurface.getBoundingClientRect();
-    const root = state.svg?.closest('.dnd-mapper-playing');
-    const leftEl = root?.querySelector('.dndm-rail--left') ?? null;
-    const rightEl = root?.querySelector('.dndm-rail--right') ?? null;
-    const leftPx = leftEl ? leftEl.getBoundingClientRect().width : 0;
-    const rightPx = rightEl ? rightEl.getBoundingClientRect().width : 0;
-    const anchorX = (stageRect.width + leftPx - rightPx) / 2;
-    const anchorY = stageRect.height / 2;
-
-    state.panX = worldX - anchorX / (base * state.zoom);
-    state.panY = worldY - anchorY / (base * state.zoom);
+    state.panX = worldX - anchor.anchorX / (base * state.zoom);
+    state.panY = worldY - anchor.anchorY / (base * state.zoom);
     commitGesture(state, false);
 }
 

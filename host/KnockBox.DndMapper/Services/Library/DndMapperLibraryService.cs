@@ -762,6 +762,20 @@ namespace KnockBox.DndMapper.Services.Library
         /// URL on the blob handle, so repeat calls are cheap.
         /// </para>
         /// </summary>
+        /// <summary>
+        /// Synchronous companion to <see cref="TryGetLocalObjectUrlAsync"/>.
+        /// Returns <see langword="true"/> only when this circuit owns the
+        /// blob (i.e. it's the host who uploaded it). Callers use this to
+        /// distinguish "host but URL not yet cached" from "player, always
+        /// needs the share URL" during the brief window between first
+        /// render and the async URL fetch completing — rendering a
+        /// placeholder in the first case avoids firing a wasteful
+        /// SignalR-backed <c>/blob-share/</c> fetch from the host's own
+        /// browser back to itself.
+        /// </summary>
+        public bool HasLocalBlob(Guid imageId)
+            => !_disposed && _blobCache.ContainsKey(imageId);
+
         public async ValueTask<string?> TryGetLocalObjectUrlAsync(Guid imageId, CancellationToken ct = default)
         {
             if (_disposed) return null;

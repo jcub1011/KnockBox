@@ -85,8 +85,10 @@
        fog, markup, handles, picker rects, grid). Vectors don't have the
        large-bitmap composite problem, so the CSS transform model stays
        unchanged for them — pan/zoom on .dndm-canvas-transform translates and
-       scales the SVG cheaply. The DOM order (canvas first, transform wrapper
-       second) keeps the SVG visually on top of the bitmap canvas. *@
+       scales the SVG cheaply. Both siblings are position:absolute on the
+       stage, so stacking is driven by the explicit z-index in
+       MapCanvas.razor.css (canvas z-index:0, transform wrapper z-index:1)
+       rather than by DOM source order. *@
     <div class="dndm-canvas-transform"
          style="width:@(stageNaturalW)px; height:@(stageNaturalH)px; --dndm-cell-px:@(cellPx)px; --dndm-grid-line:@Map.Grid.LineColor;">
 
