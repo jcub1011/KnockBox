@@ -66,6 +66,28 @@ function combinedViewport(state) {
     return { panX: combinedPanX, panY: combinedPanY, zoom: combinedZoom };
 }
 
+// Rail-aware visible center in world cell coordinates. Mirrors the anchor
+// math in zoomByFactorAtCenter so spawn anchor, double-click focus, and
+// button zoom all snap to the same reference point — the midpoint of the
+// portion of the stage that isn't covered by the left/right rails.
+function computeVisibleCenter(state) {
+    const base = state.basePxPerCell;
+    if (base <= 0 || !state.gestureSurface) {
+        return { centerX: state.panX, centerY: state.panY };
+    }
+    const stageRect = state.gestureSurface.getBoundingClientRect();
+    const root = state.svg?.closest('.dnd-mapper-playing');
+    const leftEl = root?.querySelector('.dndm-rail--left') ?? null;
+    const rightEl = root?.querySelector('.dndm-rail--right') ?? null;
+    const leftPx = leftEl ? leftEl.getBoundingClientRect().width : 0;
+    const rightPx = rightEl ? rightEl.getBoundingClientRect().width : 0;
+    const anchorX = (stageRect.width + leftPx - rightPx) / 2;
+    const anchorY = stageRect.height / 2;
+    const centerX = state.panX + anchorX / (base * state.zoom);
+    const centerY = state.panY + anchorY / (base * state.zoom);
+    return { centerX, centerY };
+}
+
 function applyTransform(state) {
     const base = ensureBasePxPerCell(state);
     if (base <= 0) return;
@@ -175,8 +197,9 @@ function commitGesture(state, wasClickWithoutDrag) {
         });
     }
     if (state.dotNetRef) {
+        const { centerX, centerY } = computeVisibleCenter(state);
         state.dotNetRef.invokeMethodAsync(
-            'OnViewportChanged', state.panX, state.panY, state.zoom, wasClickWithoutDrag)
+            'OnViewportChanged', state.panX, state.panY, state.zoom, centerX, centerY, wasClickWithoutDrag)
             .catch(err => console.error('[DndMapperViewport] OnViewportChanged failed.', err));
     }
 }
@@ -300,6 +323,12 @@ export function initialize(svgId, dotNetRef, panX, panY, zoom, widthCells, heigh
 
     gestureSurface.addEventListener('mouseup', endPan, { signal });
     gestureSurface.addEventListener('mouseleave', endPan, { signal });
+
+    // Publish the initial viewport (including the rail-aware visible center)
+    // so .NET has a valid center cached before the user interacts. Without
+    // this, the first "Add NPC" spawn before any pan/zoom falls back to the
+    // map's default spawn position instead of where the host is looking.
+    commitGesture(state, false);
 }
 
 export function setMode(svgId, mode) {
@@ -331,14 +360,44 @@ export function zoomByFactorAtCenter(svgId, factor) {
 export function setViewBox(svgId, panX, panY, zoom) {
     const state = instances.get(svgId);
     if (!state) return;
+    state.panX = panX;
+    state.panY = panY;
+    state.zoom = clamp(zoom, MIN_ZOOM, MAX_ZOOM);
+    // commitGesture clears the in-flight gesture state, calls applyTransform,
+    // and fires OnViewportChanged back to .NET (including the rail-aware
+    // visible center) so the published viewport in .NET stays in sync.
+    commitGesture(state, false);
+}
+
+// Pan so that the given world cell coord lands at the rail-aware visible
+// center of the stage. Same anchor math as zoomByFactorAtCenter and the
+// commit-time center used in OnViewportChanged. Commits via commitGesture
+// so .NET sees the new viewport (and the new center).
+export function centerOnWorld(svgId, worldX, worldY) {
+    const state = instances.get(svgId);
+    if (!state) return;
+    const base = ensureBasePxPerCell(state);
+    if (base <= 0) return;
+    // Discard any in-flight gesture so the anchor math operates against a
+    // clean baseline — commitGesture would otherwise fold the partial
+    // gesture into the canonical state before applying.
     if (state.wheelDebounceHandle) { clearTimeout(state.wheelDebounceHandle); state.wheelDebounceHandle = 0; }
     state.pan = null;
     state.gPanPx = { x: 0, y: 0 };
     state.gZoomFactor = 1.0;
-    state.panX = panX;
-    state.panY = panY;
-    state.zoom = clamp(zoom, MIN_ZOOM, MAX_ZOOM);
-    applyTransform(state);
+
+    const stageRect = state.gestureSurface.getBoundingClientRect();
+    const root = state.svg?.closest('.dnd-mapper-playing');
+    const leftEl = root?.querySelector('.dndm-rail--left') ?? null;
+    const rightEl = root?.querySelector('.dndm-rail--right') ?? null;
+    const leftPx = leftEl ? leftEl.getBoundingClientRect().width : 0;
+    const rightPx = rightEl ? rightEl.getBoundingClientRect().width : 0;
+    const anchorX = (stageRect.width + leftPx - rightPx) / 2;
+    const anchorY = stageRect.height / 2;
+
+    state.panX = worldX - anchorX / (base * state.zoom);
+    state.panY = worldY - anchorY / (base * state.zoom);
+    commitGesture(state, false);
 }
 
 export function setBounds(svgId, widthCells, heightCells, cellPx) {

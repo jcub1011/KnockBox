@@ -132,17 +132,6 @@ namespace KnockBox.DndMapper.Pages.Components
         private MapImage? SelectedImage =>
             SelectedImageId is Guid id ? Map.Images.FirstOrDefault(i => i.Id == id) : null;
 
-        private string ViewBoxString
-        {
-            get
-            {
-                double w = Map.Grid.WidthCells / _zoom;
-                double h = Map.Grid.HeightCells / _zoom;
-                return string.Create(CultureInfo.InvariantCulture,
-                    $"{_panX} {_panY} {w} {h}");
-            }
-        }
-
         protected override void OnParametersSet()
         {
             if (!_gridInitialized && Map is not null)
@@ -150,7 +139,6 @@ namespace KnockBox.DndMapper.Pages.Components
                 LocalShowGridLines = Map.Grid.ShowGridLines;
                 _gridInitialized = true;
             }
-            PublishViewport();
             base.OnParametersSet();
         }
 
@@ -373,12 +361,13 @@ namespace KnockBox.DndMapper.Pages.Components
             if (req is not null && req.Nonce != _lastSeenCenterNonce && req.MapId == Map.Id)
             {
                 _lastSeenCenterNonce = req.Nonce;
-                double viewW = Map.Grid.WidthCells / _zoom;
-                double viewH = Map.Grid.HeightCells / _zoom;
-                _panX = req.X - viewW / 2.0;
-                _panY = req.Y - viewH / 2.0;
-                PublishViewport();
-                _ = PushJsViewBox();
+                if (_jsModules.Viewport is not null)
+                {
+                    // JS handles the rail-aware centering and commits back via
+                    // OnViewportChanged. Fire-and-forget — the broadcast handler
+                    // is not awaited by the state-change pipeline.
+                    _ = _jsModules.Viewport.InvokeVoidAsync("centerOnWorld", _svgId, req.X, req.Y);
+                }
             }
             // OnParametersSetAsync only fires on parent-pushed parameter
             // changes; a self-driven StateHasChanged from a state-change
@@ -491,27 +480,18 @@ namespace KnockBox.DndMapper.Pages.Components
                 if (Map is null) return;
                 var token = Map.Tokens.FirstOrDefault(t => t.Id == tokenId);
                 if (token is null) return;
-                double viewW = Map.Grid.WidthCells / _zoom;
-                double viewH = Map.Grid.HeightCells / _zoom;
-                _panX = token.X - viewW / 2.0;
-                _panY = token.Y - viewH / 2.0;
-                PublishViewport();
-                await PushJsViewBox();
-                await InvokeAsync(StateHasChanged);
+                if (_jsModules.Viewport is null) return;
+                // JS owns the centering math — it has the live stage rect and
+                // rail widths and will commit back via OnViewportChanged so
+                // _panX/_panY/_zoom and the published center stay in sync.
+                await _jsModules.Viewport.InvokeVoidAsync("centerOnWorld", _svgId, token.X, token.Y);
             }
             catch (ObjectDisposedException) { /* component disposed */ }
+            catch (JSDisconnectedException) { /* circuit teardown */ }
             catch (Exception ex)
             {
                 Logger.LogWarning(ex, "Failed to focus token {TokenId}.", tokenId);
             }
-        }
-
-        private void PublishViewport()
-        {
-            if (Viewport is null || Map is null) return;
-            double viewW = Map.Grid.WidthCells / _zoom;
-            double viewH = Map.Grid.HeightCells / _zoom;
-            Viewport.Set(Map.Id, _panX + viewW / 2.0, _panY + viewH / 2.0);
         }
 
         private string CurrentJsMode()
@@ -571,12 +551,20 @@ namespace KnockBox.DndMapper.Pages.Components
         }
 
         [JSInvokable]
-        public async Task OnViewportChanged(double panX, double panY, double zoom, bool wasClickWithoutDrag)
+        public async Task OnViewportChanged(double panX, double panY, double zoom, double centerX, double centerY, bool wasClickWithoutDrag)
         {
             _panX = panX;
             _panY = panY;
             _zoom = Math.Clamp(zoom, MinZoom, MaxZoom);
-            PublishViewport();
+            // JS owns the rail-aware center computation (it has direct access
+            // to the stage rect + rail widths). Trust the value it sent and
+            // publish it straight into the per-circuit viewport cache so
+            // HostTokenPanel.SpawnAnchor reads the same world point the user
+            // is actually looking at.
+            if (Viewport is not null && Map is not null)
+            {
+                Viewport.Set(Map.Id, centerX, centerY);
+            }
             if (wasClickWithoutDrag && IsHost && SelectedImageId is not null)
             {
                 await SelectedImageIdChanged.InvokeAsync(null);
@@ -821,10 +809,6 @@ namespace KnockBox.DndMapper.Pages.Components
 
         // The +/- buttons route through the JS viewport so they use the same
         // anchor-at-non-rail-centre math as the cursor-anchored wheel zoom.
-        // The pre-existing SetZoom path computed pan via Map.Grid.WidthCells /
-        // _zoom, which assumed the stage equalled the wrapper's natural size —
-        // false once rails take a chunk of the stage — so each button click
-        // shifted the visible centre to the left.
         private void ZoomIn() => _ = ZoomByFactorJs(1.25);
         private void ZoomOut() => _ = ZoomByFactorJs(1.0 / 1.25);
 
@@ -885,7 +869,8 @@ namespace KnockBox.DndMapper.Pages.Components
                         _zoom = fitZoom;
                         _panX = (W - visibleCellsW) / 2.0 - (L - R) / (2.0 * cellPx * fitZoom);
                         _panY = (H - visibleCellsH) / 2.0;
-                        PublishViewport();
+                        // setViewBox commits via JS, which fires OnViewportChanged
+                        // back to .NET with the new rail-aware center.
                         await PushJsViewBox();
                         return;
                     }
@@ -899,30 +884,7 @@ namespace KnockBox.DndMapper.Pages.Components
             _panX = 0;
             _panY = 0;
             _zoom = 1.0;
-            PublishViewport();
             await PushJsViewBox();
-        }
-
-        private void SetZoom(double next)
-        {
-            next = Math.Clamp(next, MinZoom, MaxZoom);
-            double oldW = Map.Grid.WidthCells / _zoom;
-            double oldH = Map.Grid.HeightCells / _zoom;
-            double newW = Map.Grid.WidthCells / next;
-            double newH = Map.Grid.HeightCells / next;
-            _panX += (oldW - newW) / 2.0;
-            _panY += (oldH - newH) / 2.0;
-            _zoom = next;
-            ClampPan();
-            PublishViewport();
-            _ = PushJsViewBox();
-        }
-
-        private void ClampPan()
-        {
-            // Pan is unbounded by design — the host frequently needs to scroll past
-            // grid edges (off-map sticky notes, secondary scenes). ResetView still
-            // re-centers on (0, 0).
         }
 
         private void OnKeyDown(KeyboardEventArgs e)
