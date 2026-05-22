@@ -1,3 +1,4 @@
+@using System.Collections.Immutable
 @using KnockBox.Core.Components.Shared
 @using KnockBox.DndMapper.Models
 @using KnockBox.DndMapper.Services.State.Games
@@ -22,7 +23,7 @@
 
             @{
                 var activeSchema = State.GetActiveSchemaTemplate();
-                var templates = activeSchema?.StatusEffectTemplates ?? new List<StatusEffectTemplate>();
+                var templates = activeSchema?.StatusEffectTemplates ?? ImmutableList<StatusEffectTemplate>.Empty;
             }
 
             @if (activeSchema is null)

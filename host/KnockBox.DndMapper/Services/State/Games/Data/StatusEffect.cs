@@ -1,13 +1,15 @@
+using System.Collections.Immutable;
+
 namespace KnockBox.DndMapper.Services.State.Games.Data
 {
-    public sealed class StatusEffect
+    public sealed record StatusEffect
     {
-        public Guid Id { get; set; }
-        public string Name { get; set; } = string.Empty;
-        public List<AttributeDelta> AttributeDeltas { get; set; } = [];
-        public int? MaxHpDelta { get; set; }
-        public int? OnApplyHpDelta { get; set; }
-        public string Notes { get; set; } = string.Empty;
-        public DateTime AppliedUtc { get; set; }
+        public Guid Id { get; init; }
+        public string Name { get; init; } = string.Empty;
+        public ImmutableList<AttributeDelta> AttributeDeltas { get; init; } = ImmutableList<AttributeDelta>.Empty;
+        public int? MaxHpDelta { get; init; }
+        public int? OnApplyHpDelta { get; init; }
+        public string Notes { get; init; } = string.Empty;
+        public DateTime AppliedUtc { get; init; }
     }
 }

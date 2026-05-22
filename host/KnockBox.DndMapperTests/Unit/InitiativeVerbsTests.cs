@@ -89,9 +89,10 @@ namespace KnockBox.DndMapperTests.Unit
             var npcId = SeedNpcToken();
             _engine.StartInitiativeAsync(_state, _host, [npcId]);
 
-            var playerEntry = _state.ActiveCombat!.TurnOrder.First(e => e.OwnerUserId == player.Id);
-            var r = _engine.ForceInitiativeRollAsync(_state, _host, playerEntry.Id);
+            var playerEntryId = _state.ActiveCombat!.TurnOrder.First(e => e.OwnerUserId == player.Id).Id;
+            var r = _engine.ForceInitiativeRollAsync(_state, _host, playerEntryId);
             Assert.IsTrue(r.IsSuccess);
+            var playerEntry = _state.ActiveCombat!.TurnOrder.First(e => e.Id == playerEntryId);
             Assert.IsTrue(playerEntry.IsForceRolled);
             var forced = _state.RollLog.First(rr => rr.RollerUserId == player.Id);
             Assert.AreEqual(_host.Id, forced.ForcedByUserId);

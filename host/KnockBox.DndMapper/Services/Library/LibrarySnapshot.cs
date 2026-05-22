@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using KnockBox.DndMapper.Models;
 using KnockBox.DndMapper.Services.State.Games.Data;
 
@@ -291,14 +292,16 @@ namespace KnockBox.DndMapper.Services.Library
             };
         }
 
-        /// <summary>Builds a single map shard (no I/O). Caller must hold the state read lock.</summary>
+        /// <summary>Builds a single map shard (no I/O). Safe to call concurrently
+        /// with engine writes because Map is immutable — the engine swaps whole
+        /// Map records in state.Maps rather than mutating fields in place.</summary>
         public static MapSnapshot ToMapSnapshot(Map map) => new()
         {
             Id = map.Id,
             Name = map.Name,
             ListOrder = map.ListOrder,
             CreatedUtc = map.CreatedUtc,
-            Grid = map.Grid.Clone(),
+            Grid = map.Grid,
             DefaultSpawnX = map.DefaultSpawnPosition?.X,
             DefaultSpawnY = map.DefaultSpawnPosition?.Y,
             Images = map.Images
@@ -308,7 +311,7 @@ namespace KnockBox.DndMapper.Services.Library
             Tokens = map.Tokens
                 .Select(ToTokenSnapshot)
                 .ToList(),
-            FogMask = map.FogMask,
+            FogMask = map.FogMask.IsDefaultOrEmpty ? [] : map.FogMask.ToArray(),
         };
 
         public static RollTemplateSnapshot ToRollTemplateSnapshot(RollTemplate t) => new()
@@ -368,7 +371,7 @@ namespace KnockBox.DndMapper.Services.Library
             Name = s.Name,
             AttributeDeltas = s.AttributeDeltas
                 .Select(d => new AttributeDelta(d.AttributeName, d.Delta))
-                .ToList(),
+                .ToImmutableList(),
             MaxHpDelta = s.MaxHpDelta,
             OnApplyHpDelta = s.OnApplyHpDelta,
             Notes = s.Notes,
@@ -380,7 +383,7 @@ namespace KnockBox.DndMapper.Services.Library
             Name = s.Name,
             AttributeDeltas = s.AttributeDeltas
                 .Select(d => new AttributeDelta(d.AttributeName, d.Delta))
-                .ToList(),
+                .ToImmutableList(),
             MaxHpDelta = s.MaxHpDelta,
             OnApplyHpDelta = s.OnApplyHpDelta,
             Notes = s.Notes,

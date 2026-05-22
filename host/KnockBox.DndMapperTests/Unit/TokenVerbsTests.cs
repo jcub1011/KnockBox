@@ -154,12 +154,13 @@ namespace KnockBox.DndMapperTests.Unit
         public void MoveTokenAsync_OwnerOrHost_OwnerCanMoveOwnToken()
         {
             var (mapId, players) = CreateMapWithPlayers("Alice");
-            var token = _state.Maps.Single(m => m.Id == mapId).Tokens.Single();
+            var tokenId = _state.Maps.Single(m => m.Id == mapId).Tokens.Single().Id;
 
             // Engine snaps to cell center (x.5, y.5) when SnapToGrid is on, even
             // if a stale client sent an intersection-aligned coordinate.
-            var move = _engine.MoveTokenAsync(_state, players[0], token.Id, 5, 5);
+            var move = _engine.MoveTokenAsync(_state, players[0], tokenId, 5, 5);
             Assert.IsTrue(move.IsSuccess);
+            var token = _state.Maps.Single(m => m.Id == mapId).Tokens.Single(t => t.Id == tokenId);
             Assert.AreEqual(4.5, token.X);
             Assert.AreEqual(4.5, token.Y);
         }
@@ -168,13 +169,14 @@ namespace KnockBox.DndMapperTests.Unit
         public void MoveTokenAsync_SnapEnabled_SnapsToCellCenter_EvenForOffCenterInput()
         {
             var (mapId, players) = CreateMapWithPlayers("Alice");
-            var token = _state.Maps.Single(m => m.Id == mapId).Tokens.Single();
+            var tokenId = _state.Maps.Single(m => m.Id == mapId).Tokens.Single().Id;
 
             // Off-center input (3.2, 7.8) should land at the nearest cell center.
             // SnapToGridHelper.Snap rounds (x - 0.5) and adds 0.5 back, so the
             // result is the cell whose center is closest.
-            var move = _engine.MoveTokenAsync(_state, players[0], token.Id, 3.2, 7.8);
+            var move = _engine.MoveTokenAsync(_state, players[0], tokenId, 3.2, 7.8);
             Assert.IsTrue(move.IsSuccess);
+            var token = _state.Maps.Single(m => m.Id == mapId).Tokens.Single(t => t.Id == tokenId);
             Assert.AreEqual(3.5, token.X);
             Assert.AreEqual(7.5, token.Y);
         }
@@ -243,10 +245,11 @@ namespace KnockBox.DndMapperTests.Unit
         public void UpdateTokenAsync_HostCanUpdateAnyToken()
         {
             var (mapId, _) = CreateMapWithPlayers("Alice");
-            var token = _state.Maps.Single(m => m.Id == mapId).Tokens.Single();
+            var tokenId = _state.Maps.Single(m => m.Id == mapId).Tokens.Single().Id;
 
-            var update = _engine.UpdateTokenAsync(_state, _host, token.Id, "NewName", "#aabbcc", TokenIconKind.Solid);
+            var update = _engine.UpdateTokenAsync(_state, _host, tokenId, "NewName", "#aabbcc", TokenIconKind.Solid);
             Assert.IsTrue(update.IsSuccess);
+            var token = _state.Maps.Single(m => m.Id == mapId).Tokens.Single(t => t.Id == tokenId);
             Assert.AreEqual("NewName", token.Name);
             Assert.AreEqual("#aabbcc", token.Color);
             Assert.AreEqual(TokenIconKind.Solid, token.IconKind);
@@ -315,10 +318,11 @@ namespace KnockBox.DndMapperTests.Unit
         public void SetTokenHiddenAsync_HostCaller_FlipsHidden()
         {
             var (mapId, _) = CreateMapWithPlayers("Alice");
-            var token = _state.Maps.Single(m => m.Id == mapId).Tokens.Single();
+            var tokenId = _state.Maps.Single(m => m.Id == mapId).Tokens.Single().Id;
 
-            var hide = _engine.SetTokenHiddenAsync(_state, _host, token.Id, true);
+            var hide = _engine.SetTokenHiddenAsync(_state, _host, tokenId, true);
             Assert.IsTrue(hide.IsSuccess);
+            var token = _state.Maps.Single(m => m.Id == mapId).Tokens.Single(t => t.Id == tokenId);
             Assert.IsTrue(token.Hidden);
         }
 
@@ -382,12 +386,13 @@ namespace KnockBox.DndMapperTests.Unit
             // SetActiveMap is what triggers per-map spawn pre-start; pump it once
             // more so Alice has a token (and therefore a session-scoped sheet).
             _engine.SetActiveMapAsync(_state, _host, _state.Maps.Single().Id);
-            var sheet = _state.Sheets.Values.Single(s => s.OwnerUserId == player.Id);
+            var sheetId = _state.Sheets.Values.Single(s => s.OwnerUserId == player.Id).Id;
 
             token.Dispose();
 
-            Assert.IsNull(sheet.OwnerUserId, "Sheet should be released to NPC ownership.");
-            Assert.AreEqual(player.Id, sheet.RepresentsUserId, "Sheet should retain audit trail of original player.");
+            var orphaned = _state.Sheets[sheetId];
+            Assert.IsNull(orphaned.OwnerUserId, "Sheet should be released to NPC ownership.");
+            Assert.AreEqual(player.Id, orphaned.RepresentsUserId, "Sheet should retain audit trail of original player.");
             Assert.DoesNotContain(s => s.OwnerUserId == player.Id, _state.Sheets.Values);
         }
 

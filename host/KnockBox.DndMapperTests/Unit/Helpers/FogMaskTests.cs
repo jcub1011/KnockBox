@@ -28,7 +28,7 @@ namespace KnockBox.DndMapperTests.Unit.Helpers
             var map = Make();
             Assert.IsEmpty(map.FogMask);
 
-            map.SetFogged(0, 0, true);
+            map = map.WithCellFogged(0, 0, true);
 
             Assert.IsTrue(map.FogMask.Length > 0);
             Assert.IsTrue(map.IsFogged(0, 0));
@@ -38,10 +38,10 @@ namespace KnockBox.DndMapperTests.Unit.Helpers
         public void SetFogged_OutOfBounds_NoOp()
         {
             var map = Make(10, 10);
-            map.SetFogged(-1, 0, true);
-            map.SetFogged(0, -1, true);
-            map.SetFogged(10, 0, true);
-            map.SetFogged(0, 10, true);
+            map = map.WithCellFogged(-1, 0, true);
+            map = map.WithCellFogged(0, -1, true);
+            map = map.WithCellFogged(10, 0, true);
+            map = map.WithCellFogged(0, 10, true);
 
             Assert.IsEmpty(map.FogMask);
         }
@@ -50,10 +50,10 @@ namespace KnockBox.DndMapperTests.Unit.Helpers
         public void SetFogged_Roundtrip()
         {
             var map = Make();
-            map.SetFogged(3, 4, true);
+            map = map.WithCellFogged(3, 4, true);
             Assert.IsTrue(map.IsFogged(3, 4));
 
-            map.SetFogged(3, 4, false);
+            map = map.WithCellFogged(3, 4, false);
             Assert.IsFalse(map.IsFogged(3, 4));
         }
 
@@ -61,8 +61,8 @@ namespace KnockBox.DndMapperTests.Unit.Helpers
         public void SetFogged_MultipleCells_NoCrosstalk()
         {
             var map = Make(100, 100);
-            map.SetFogged(0, 0, true);
-            map.SetFogged(99, 99, true);
+            map = map.WithCellFogged(0, 0, true);
+            map = map.WithCellFogged(99, 99, true);
 
             Assert.IsTrue(map.IsFogged(0, 0));
             Assert.IsTrue(map.IsFogged(99, 99));

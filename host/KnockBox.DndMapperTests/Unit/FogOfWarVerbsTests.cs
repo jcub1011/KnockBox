@@ -40,14 +40,13 @@ namespace KnockBox.DndMapperTests.Unit
         public void PaintFog_Host_ClearsCellsWhenFoggedFalse()
         {
             var mapId = CreateMap();
-            var map = _state.Maps.Single(m => m.Id == mapId);
-            map.SetFogged(5, 5, true);
-            map.SetFogged(6, 5, true);
-            Assert.IsTrue(map.IsFogged(5, 5));
+            Assert.IsTrue(_engine.HideCellsAsync(_state, _host, mapId, new[] { (5, 5), (6, 5) }).IsSuccess);
+            Assert.IsTrue(_state.Maps.Single(m => m.Id == mapId).IsFogged(5, 5));
 
             var result = _engine.PaintFogAsync(_state, _host, mapId, new[] { (5, 5), (6, 5) }, fogged: false);
 
             Assert.IsTrue(result.IsSuccess);
+            var map = _state.Maps.Single(m => m.Id == mapId);
             Assert.IsFalse(map.IsFogged(5, 5));
             Assert.IsFalse(map.IsFogged(6, 5));
         }
@@ -124,13 +123,14 @@ namespace KnockBox.DndMapperTests.Unit
             // (where bounds-check would otherwise hide a bit leak) still returns
             // false for cells inside the byte but past the grid.
             var mapId = CreateMap();
-            var map = _state.Maps.Single(m => m.Id == mapId);
-            map.Grid.WidthCells = 3;
-            map.Grid.HeightCells = 3;
+            Assert.IsTrue(_engine.UpdateGridAsync(
+                _state, _host, mapId,
+                new GridConfig { WidthCells = 3, HeightCells = 3 }).IsSuccess);
 
             var result = _engine.FillMapWithFogAsync(_state, _host, mapId);
             Assert.IsTrue(result.IsSuccess);
 
+            var map = _state.Maps.Single(m => m.Id == mapId);
             // 9 bits set → byte 0 = 0xFF (8 cells), byte 1 = 0b00000001 (1 cell).
             Assert.AreEqual(2, map.FogMask.Length);
             Assert.AreEqual(0xFF, map.FogMask[0]);
@@ -147,12 +147,12 @@ namespace KnockBox.DndMapperTests.Unit
             var mapId = CreateMap();
             var fill = _engine.FillMapWithFogAsync(_state, _host, mapId);
             Assert.IsTrue(fill.IsSuccess);
-            var map = _state.Maps.Single(m => m.Id == mapId);
-            Assert.IsTrue(map.FogMask.Length > 0);
+            Assert.IsTrue(_state.Maps.Single(m => m.Id == mapId).FogMask.Length > 0);
 
             var result = _engine.ClearAllFogAsync(_state, _host, mapId);
 
             Assert.IsTrue(result.IsSuccess);
+            var map = _state.Maps.Single(m => m.Id == mapId);
             Assert.IsEmpty(map.FogMask);
             Assert.IsFalse(map.IsFogged(0, 0));
         }
@@ -161,13 +161,12 @@ namespace KnockBox.DndMapperTests.Unit
         public void RevealCells_DelegatesToPaintFogFalse()
         {
             var mapId = CreateMap();
-            var map = _state.Maps.Single(m => m.Id == mapId);
-            map.SetFogged(2, 2, true);
-            map.SetFogged(3, 3, true);
+            Assert.IsTrue(_engine.HideCellsAsync(_state, _host, mapId, new[] { (2, 2), (3, 3) }).IsSuccess);
 
             var result = _engine.RevealCellsAsync(_state, _host, mapId, new[] { (2, 2), (3, 3) });
 
             Assert.IsTrue(result.IsSuccess);
+            var map = _state.Maps.Single(m => m.Id == mapId);
             Assert.IsFalse(map.IsFogged(2, 2));
             Assert.IsFalse(map.IsFogged(3, 3));
         }

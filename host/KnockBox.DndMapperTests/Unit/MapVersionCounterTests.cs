@@ -42,28 +42,28 @@ namespace KnockBox.DndMapperTests.Unit
         // ── FogVersion ────────────────────────────────────────────────────────────
 
         [TestMethod]
-        public void SetFogged_ActualMutation_BumpsFogVersion()
+        public void PaintFogAsync_SingleCell_BumpsFogVersion()
         {
             var before = Map.FogVersion;
-            Map.SetFogged(0, 0, true);
+            Assert.IsTrue(_engine.PaintFogAsync(_state, _host, _mapId, new[] { (0, 0) }, fogged: true).IsSuccess);
             Assert.AreEqual(before + 1, Map.FogVersion);
         }
 
         [TestMethod]
-        public void SetFogged_NoOp_DoesNotBumpFogVersion()
+        public void PaintFogAsync_NoOp_DoesNotBumpFogVersion()
         {
-            Map.SetFogged(0, 0, true);
+            _engine.PaintFogAsync(_state, _host, _mapId, new[] { (0, 0) }, fogged: true);
             var before = Map.FogVersion;
             // Same value: must be a no-op for versioning.
-            Map.SetFogged(0, 0, true);
+            Assert.IsTrue(_engine.PaintFogAsync(_state, _host, _mapId, new[] { (0, 0) }, fogged: true).IsSuccess);
             Assert.AreEqual(before, Map.FogVersion);
         }
 
         [TestMethod]
-        public void SetFogged_OutOfBounds_DoesNotBumpFogVersion()
+        public void PaintFogAsync_OutOfBounds_DoesNotBumpFogVersion()
         {
             var before = Map.FogVersion;
-            Map.SetFogged(-1, -1, true);
+            Assert.IsTrue(_engine.PaintFogAsync(_state, _host, _mapId, new[] { (-1, -1) }, fogged: true).IsSuccess);
             Assert.AreEqual(before, Map.FogVersion);
         }
 

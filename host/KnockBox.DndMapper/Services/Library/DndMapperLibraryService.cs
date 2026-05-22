@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Security.Cryptography;
 using System.Text.Json;
 using KnockBox.Core.Primitives.Returns;
@@ -763,22 +764,17 @@ namespace KnockBox.DndMapper.Services.Library
                 state.SetSettings(snapshot.Settings.Clone());
                 state.SetAttributeSchema(hydration.AttrSchema);
 
-                state.Maps.Clear();
-                state.Maps.AddRange(hydration.NewMaps);
+                state.Maps = hydration.NewMaps;
                 state.SetBytesUsed(hydration.TotalBytes);
 
-                state.Sheets.Clear();
-                foreach (var (id, sheet) in hydration.NewSheets)
-                    state.Sheets[id] = sheet;
-
-                state.GlobalRollTemplates.Clear();
-                state.GlobalRollTemplates.AddRange(hydration.NewGlobalRollTemplates);
+                state.Sheets = hydration.NewSheets;
+                state.GlobalRollTemplates = hydration.NewGlobalRollTemplates;
 
                 // Re-seed built-ins before user templates so their Rows are
                 // re-derived from the in-code preset definitions (which can
                 // evolve across releases); the snapshot's persisted Rows are
                 // ignored for built-ins.
-                state.CustomTemplates.Clear();
+                state.CustomTemplates = ImmutableDictionary<Guid, NamedTemplate>.Empty;
                 state.SeedBuiltInTemplates();
                 foreach (var t in hydration.TemplateSnapshots)
                 {
@@ -786,32 +782,37 @@ namespace KnockBox.DndMapper.Services.Library
                     if (existing is { IsBuiltIn: true })
                     {
                         // Built-in: keep seeded Rows, overlay persisted effects.
-                        existing.StatusEffectTemplates.Clear();
-                        foreach (var s in t.StatusEffectTemplates)
-                            existing.StatusEffectTemplates.Add(LibrarySnapshotMapper.FromStatusEffectTemplateSnapshot(s));
                         // V3+ trusts the persisted value verbatim (including
                         // null/empty — the host can pick "— none (bare d20) —"
                         // and that choice survives reload). V1 snapshots
                         // predate the field entirely; the seeded default
                         // ("DEX" for presets containing DEX) wins.
-                        if (snapshot.SchemaVersion >= 3)
-                            existing.InitiativeAttributeName = t.InitiativeAttributeName;
+                        var overlaid = existing with
+                        {
+                            StatusEffectTemplates = t.StatusEffectTemplates
+                                .Select(LibrarySnapshotMapper.FromStatusEffectTemplateSnapshot)
+                                .ToImmutableList(),
+                            InitiativeAttributeName = snapshot.SchemaVersion >= 3
+                                ? t.InitiativeAttributeName
+                                : existing.InitiativeAttributeName,
+                        };
+                        state.CustomTemplates = state.CustomTemplates.SetItem(t.Id, overlaid);
                     }
                     else
                     {
-                        state.CustomTemplates[t.Id] = new NamedTemplate
+                        state.CustomTemplates = state.CustomTemplates.SetItem(t.Id, new NamedTemplate
                         {
                             Id = t.Id,
                             Name = t.Name,
                             IsBuiltIn = false,
                             Rows = t.Rows
                                 .Select(r => new AttributeRow(r.Name, r.Type, LibrarySnapshotMapper.ToAttributeValue(r.Default)))
-                                .ToList(),
+                                .ToImmutableList(),
                             StatusEffectTemplates = t.StatusEffectTemplates
                                 .Select(LibrarySnapshotMapper.FromStatusEffectTemplateSnapshot)
-                                .ToList(),
+                                .ToImmutableList(),
                             InitiativeAttributeName = t.InitiativeAttributeName,
-                        };
+                        });
                     }
                 }
 
@@ -2061,9 +2062,9 @@ namespace KnockBox.DndMapper.Services.Library
         // that must run inside Execute.
         private sealed record PreBuiltHydration(
             AttributeSchema AttrSchema,
-            List<Map> NewMaps,
-            Dictionary<Guid, CharacterSheet> NewSheets,
-            List<RollTemplate> NewGlobalRollTemplates,
+            ImmutableList<Map> NewMaps,
+            ImmutableDictionary<Guid, CharacterSheet> NewSheets,
+            ImmutableList<RollTemplate> NewGlobalRollTemplates,
             List<NamedTemplateSnapshot> TemplateSnapshots,
             long TotalBytes,
             Guid? PreliminaryActiveSchemaId);
@@ -2074,38 +2075,27 @@ namespace KnockBox.DndMapper.Services.Library
         {
             var attrSchema = LibrarySnapshotMapper.ToAttributeSchema(snapshot.AttributeSchema);
 
-            var newMaps = new List<Map>(snapshot.Maps.Count);
+            var newMapsBuilder = ImmutableList.CreateBuilder<Map>();
             long totalBytes = 0;
             foreach (var mapSnap in snapshot.Maps.OrderBy(m => m.ListOrder))
             {
-                var map = new Map
-                {
-                    Id = mapSnap.Id,
-                    Name = mapSnap.Name,
-                    ListOrder = mapSnap.ListOrder,
-                    CreatedUtc = mapSnap.CreatedUtc,
-                    Grid = mapSnap.Grid.Clone(),
-                    DefaultSpawnPosition = mapSnap.DefaultSpawnX is double sx && mapSnap.DefaultSpawnY is double sy
-                        ? (sx, sy)
-                        : null,
-                    // Legacy snapshots (pre-fog) deserialize FogMask to [],
-                    // which Map.IsFogged treats as "all revealed".
-                    FogMask = mapSnap.FogMask ?? [],
-                };
+                var imagesBuilder = ImmutableList.CreateBuilder<MapImage>();
                 foreach (var imgSnap in mapSnap.Images.OrderBy(i => i.LayerOrder))
                 {
                     if (hydratedImages.TryGetValue(imgSnap.Id, out var image))
                     {
-                        map.Images.Add(image);
+                        imagesBuilder.Add(image);
                         totalBytes += image.ByteSize;
                     }
                 }
+
+                var tokensBuilder = ImmutableList.CreateBuilder<Token>();
                 foreach (var tokSnap in mapSnap.Tokens)
                 {
                     // All persisted tokens hydrate as NPCs with no owner.
                     // The host promotes any of them to PlayerToken via
                     // ReassignTokenOwnerAsync after players join.
-                    map.Tokens.Add(new Token
+                    tokensBuilder.Add(new Token
                     {
                         Id = tokSnap.Id,
                         Type = TokenType.NPCToken,
@@ -2121,12 +2111,42 @@ namespace KnockBox.DndMapper.Services.Library
                         Hidden = tokSnap.Hidden,
                     });
                 }
-                newMaps.Add(map);
+
+                newMapsBuilder.Add(new Map
+                {
+                    Id = mapSnap.Id,
+                    Name = mapSnap.Name,
+                    ListOrder = mapSnap.ListOrder,
+                    CreatedUtc = mapSnap.CreatedUtc,
+                    Grid = mapSnap.Grid,
+                    DefaultSpawnPosition = mapSnap.DefaultSpawnX is double sx && mapSnap.DefaultSpawnY is double sy
+                        ? (sx, sy)
+                        : null,
+                    // Legacy snapshots (pre-fog) deserialize FogMask to [],
+                    // which Map.IsFogged treats as "all revealed".
+                    FogMask = mapSnap.FogMask is null
+                        ? ImmutableArray<byte>.Empty
+                        : ImmutableArray.Create(mapSnap.FogMask),
+                    Images = imagesBuilder.ToImmutable(),
+                    Tokens = tokensBuilder.ToImmutable(),
+                });
             }
 
-            var newSheets = new Dictionary<Guid, CharacterSheet>(snapshot.Sheets.Count);
+            var newSheetsBuilder = ImmutableDictionary.CreateBuilder<Guid, CharacterSheet>();
             foreach (var sheetSnap in snapshot.Sheets)
             {
+                var valuesBuilder = ImmutableDictionary.CreateBuilder<string, AttributeValue>();
+                foreach (var kv in sheetSnap.Values)
+                    valuesBuilder[kv.Key] = LibrarySnapshotMapper.ToAttributeValue(kv.Value);
+
+                var statusBuilder = ImmutableList.CreateBuilder<StatusEffect>();
+                foreach (var effectSnap in sheetSnap.StatusEffects)
+                    statusBuilder.Add(LibrarySnapshotMapper.FromStatusEffectSnapshot(effectSnap));
+
+                var rollsBuilder = ImmutableList.CreateBuilder<RollTemplate>();
+                foreach (var rtSnap in sheetSnap.RollTemplates)
+                    rollsBuilder.Add(LibrarySnapshotMapper.FromRollTemplateSnapshot(rtSnap, RollTemplateScope.Sheet));
+
                 var sheet = new CharacterSheet
                 {
                     Id = sheetSnap.Id,
@@ -2135,19 +2155,16 @@ namespace KnockBox.DndMapper.Services.Library
                     Notes = sheetSnap.Notes,
                     Hp = sheetSnap.Hp,
                     MaxHp = sheetSnap.MaxHp,
+                    Values = valuesBuilder.ToImmutable(),
+                    StatusEffects = statusBuilder.ToImmutable(),
+                    RollTemplates = rollsBuilder.ToImmutable(),
                 };
-                foreach (var kv in sheetSnap.Values)
-                    sheet.Values[kv.Key] = LibrarySnapshotMapper.ToAttributeValue(kv.Value);
-                foreach (var effectSnap in sheetSnap.StatusEffects)
-                    sheet.StatusEffects.Add(LibrarySnapshotMapper.FromStatusEffectSnapshot(effectSnap));
-                foreach (var rtSnap in sheetSnap.RollTemplates)
-                    sheet.RollTemplates.Add(LibrarySnapshotMapper.FromRollTemplateSnapshot(rtSnap, RollTemplateScope.Sheet));
-                newSheets[sheet.Id] = sheet;
+                newSheetsBuilder[sheet.Id] = sheet;
             }
 
             var newGlobalRollTemplates = snapshot.GlobalRollTemplates
                 .Select(rt => LibrarySnapshotMapper.FromRollTemplateSnapshot(rt, RollTemplateScope.Global))
-                .ToList();
+                .ToImmutableList();
 
             // Default V1 snapshots have no id stored; fall back to the
             // deterministic id for the persisted preset so the library lands
@@ -2158,196 +2175,89 @@ namespace KnockBox.DndMapper.Services.Library
 
             return new PreBuiltHydration(
                 attrSchema,
-                newMaps,
-                newSheets,
+                newMapsBuilder.ToImmutable(),
+                newSheetsBuilder.ToImmutable(),
                 newGlobalRollTemplates,
                 snapshot.CustomTemplates,
                 totalBytes,
                 preliminaryActiveId);
         }
 
-        // Two-phase snapshot. The read lock is held only long enough to
-        // shallow-copy every mutable collection we'll iterate later
-        // (Maps, Sheets, CustomTemplates and their inner Tokens / Images /
-        // Values / StatusEffects / RollTemplates / Rows / StatusEffectTemplates
-        // lists). The actual LINQ projection and per-entity allocation runs
-        // OUTSIDE the lock, so a concurrent Execute (e.g. a host drag-end)
-        // doesn't queue behind the save. Individual mutable objects
-        // (Token / MapImage / etc.) keep their refs across the lock boundary
-        // — projected fields may reflect a state slightly newer than the
-        // capture, which is acceptable for auto-save (the next state
-        // change refires the flush).
+        // Atomic-ref snapshot. The read lock just grabs immutable refs to
+        // each top-level collection on state — no defensive copies of inner
+        // lists are needed because every runtime entity (Map / Token /
+        // MapImage / CharacterSheet / …) is now an immutable record, and the
+        // collections themselves are ImmutableList / ImmutableDictionary.
+        // DTO projection runs entirely off the lock; concurrent engine
+        // mutations create new state.Maps refs but never touch the ones we
+        // captured here.
         private ShardSet? TakeSnapshot()
         {
             var state = _state;
             if (state is null) return null;
 
-            // Phase 1: brief read-lock to capture stable refs to every
-            // collection the projection will iterate.
-            StateCapture capture = default;
-            var read = state.WithExclusiveRead(() => capture = CaptureState(state));
-            if (!read.IsSuccess || capture.Maps is null) return null;
+            ImmutableList<Map>? maps = null;
+            ImmutableDictionary<Guid, CharacterSheet>? sheets = null;
+            ImmutableDictionary<Guid, NamedTemplate>? templates = null;
+            ImmutableList<RollTemplate>? globalRolls = null;
+            DndMapperSettings? settings = null;
+            AttributeSchema? schema = null;
+            Guid? activeSchemaTemplateId = null;
+            string? initiativeAttributeName = null;
 
-            // Phase 2: full projection runs off the lock.
-            return BuildShardSet(capture);
-        }
-
-        // ── Capture (held under state's read lock) ────────────────────────
-
-        private readonly record struct MapCapture(
-            Map Map,
-            Token[] Tokens,
-            MapImage[] Images);
-
-        private readonly record struct SheetCapture(
-            CharacterSheet Sheet,
-            KeyValuePair<string, AttributeValue>[] Values,
-            StatusEffect[] StatusEffects,
-            RollTemplate[] RollTemplates);
-
-        private readonly record struct TemplateCapture(
-            NamedTemplate Template,
-            AttributeRow[] Rows,
-            StatusEffectTemplate[] StatusEffectTemplates);
-
-        private readonly record struct StateCapture(
-            MapCapture[] Maps,
-            SheetCapture[] Sheets,
-            TemplateCapture[] CustomTemplates,
-            RollTemplate[] GlobalRollTemplates,
-            DndMapperSettings Settings,
-            AttributePreset SchemaPreset,
-            AttributeRow[] SchemaRows,
-            Guid? ActiveSchemaTemplateId,
-            string? InitiativeAttributeName);
-
-        private static StateCapture CaptureState(DndMapperGameState state)
-        {
-            var maps = new MapCapture[state.Maps.Count];
-            for (int i = 0; i < state.Maps.Count; i++)
+            var read = state.WithExclusiveRead(() =>
             {
-                var m = state.Maps[i];
-                maps[i] = new MapCapture(m, m.Tokens.ToArray(), m.Images.ToArray());
+                maps = state.Maps;
+                sheets = state.Sheets;
+                templates = state.CustomTemplates;
+                globalRolls = state.GlobalRollTemplates;
+                settings = state.Settings.Clone();
+                schema = state.AttributeSchema;
+                activeSchemaTemplateId = state.ActiveSchemaTemplateId;
+                initiativeAttributeName = state.InitiativeAttributeName;
+            });
+            if (!read.IsSuccess || maps is null || sheets is null
+                || templates is null || globalRolls is null
+                || settings is null || schema is null) return null;
+
+            // Project DTOs off-lock. Each immutable collection is frozen
+            // relative to this snapshot; engine mutations would create a
+            // new top-level ref but cannot mutate the ones captured above.
+            var mapsById = new Dictionary<Guid, MapSnapshot>(maps.Count);
+            var orderedMapIds = new List<Guid>(maps.Count);
+            foreach (var m in maps.OrderBy(m => m.ListOrder))
+            {
+                mapsById[m.Id] = LibrarySnapshotMapper.ToMapSnapshot(m);
+                orderedMapIds.Add(m.Id);
             }
 
-            var sheetKvps = state.Sheets.ToArray();
-            var sheets = new SheetCapture[sheetKvps.Length];
-            for (int i = 0; i < sheetKvps.Length; i++)
-            {
-                var s = sheetKvps[i].Value;
-                sheets[i] = new SheetCapture(
-                    s,
-                    s.Values.ToArray(),
-                    s.StatusEffects.ToArray(),
-                    s.RollTemplates.ToArray());
-            }
+            var sheetsById = new Dictionary<Guid, SheetSnapshot>(sheets.Count);
+            foreach (var (id, sheet) in sheets)
+                sheetsById[id] = LibrarySnapshotMapper.ToSheetSnapshot(sheet);
 
-            var templates = state.CustomTemplates.Values.ToArray();
-            var templateCaps = new TemplateCapture[templates.Length];
-            for (int i = 0; i < templates.Length; i++)
-            {
-                var t = templates[i];
-                templateCaps[i] = new TemplateCapture(
-                    t,
-                    t.Rows.ToArray(),
-                    t.StatusEffectTemplates.ToArray());
-            }
-
-            return new StateCapture(
-                Maps: maps,
-                Sheets: sheets,
-                CustomTemplates: templateCaps,
-                GlobalRollTemplates: state.GlobalRollTemplates.ToArray(),
-                Settings: state.Settings.Clone(),
-                SchemaPreset: state.AttributeSchema.Preset,
-                SchemaRows: state.AttributeSchema.Rows.ToArray(),
-                ActiveSchemaTemplateId: state.ActiveSchemaTemplateId,
-                InitiativeAttributeName: state.InitiativeAttributeName);
-        }
-
-        // ── Project (off-lock) ────────────────────────────────────────────
-
-        private static ShardSet BuildShardSet(StateCapture c)
-        {
-            var maps = new Dictionary<Guid, MapSnapshot>(c.Maps.Length);
-            foreach (var mc in c.Maps)
-                maps[mc.Map.Id] = BuildMapSnapshot(mc);
-
-            var sheets = new Dictionary<Guid, SheetSnapshot>(c.Sheets.Length);
-            foreach (var sc in c.Sheets)
-                sheets[sc.Sheet.Id] = BuildSheetSnapshot(sc);
-
-            var core = BuildCoreSnapshot(c, maps, sheets);
-            return new ShardSet(core, maps, sheets);
-        }
-
-        private static MapSnapshot BuildMapSnapshot(MapCapture c)
-        {
-            var m = c.Map;
-            return new MapSnapshot
-            {
-                Id = m.Id,
-                Name = m.Name,
-                ListOrder = m.ListOrder,
-                CreatedUtc = m.CreatedUtc,
-                Grid = m.Grid.Clone(),
-                DefaultSpawnX = m.DefaultSpawnPosition?.X,
-                DefaultSpawnY = m.DefaultSpawnPosition?.Y,
-                Images = c.Images
-                    .OrderBy(i => i.LayerOrder)
-                    .Select(LibrarySnapshotMapper.ToImageSnapshot)
-                    .ToList(),
-                Tokens = c.Tokens
-                    .Select(LibrarySnapshotMapper.ToTokenSnapshot)
-                    .ToList(),
-                FogMask = m.FogMask,
-            };
-        }
-
-        private static SheetSnapshot BuildSheetSnapshot(SheetCapture c)
-        {
-            var s = c.Sheet;
-            return new SheetSnapshot
-            {
-                Id = s.Id,
-                CharacterName = s.CharacterName,
-                Values = c.Values.ToDictionary(kv => kv.Key, kv => LibrarySnapshotMapper.ToValueSnapshot(kv.Value)),
-                Notes = s.Notes,
-                Hp = s.Hp,
-                MaxHp = s.MaxHp,
-                StatusEffects = c.StatusEffects.Select(LibrarySnapshotMapper.ToStatusEffectSnapshot).ToList(),
-                RollTemplates = c.RollTemplates.Select(LibrarySnapshotMapper.ToRollTemplateSnapshot).ToList(),
-            };
-        }
-
-        private static LibraryCoreSnapshot BuildCoreSnapshot(
-            StateCapture c,
-            Dictionary<Guid, MapSnapshot> maps,
-            Dictionary<Guid, SheetSnapshot> sheets)
-        {
-            var templates = c.CustomTemplates
-                .Select(tc => new NamedTemplateSnapshot
+            var templateSnapshots = templates.Values
+                .Select(t => new NamedTemplateSnapshot
                 {
-                    Id = tc.Template.Id,
-                    Name = tc.Template.Name,
-                    IsBuiltIn = tc.Template.IsBuiltIn,
-                    Rows = tc.Rows.Select(r => new AttributeRowSnapshot
+                    Id = t.Id,
+                    Name = t.Name,
+                    IsBuiltIn = t.IsBuiltIn,
+                    Rows = t.Rows.Select(r => new AttributeRowSnapshot
                     {
                         Name = r.Name,
                         Type = r.Type,
                         Default = LibrarySnapshotMapper.ToValueSnapshot(r.Default),
                     }).ToList(),
-                    StatusEffectTemplates = tc.StatusEffectTemplates
+                    StatusEffectTemplates = t.StatusEffectTemplates
                         .Select(LibrarySnapshotMapper.ToStatusEffectTemplateSnapshot)
                         .ToList(),
-                    InitiativeAttributeName = tc.Template.InitiativeAttributeName,
+                    InitiativeAttributeName = t.InitiativeAttributeName,
                 })
                 .ToList();
 
             var schemaSnapshot = new AttributeSchemaSnapshot
             {
-                Preset = c.SchemaPreset,
-                Rows = c.SchemaRows.Select(r => new AttributeRowSnapshot
+                Preset = schema.Preset,
+                Rows = schema.Rows.Select(r => new AttributeRowSnapshot
                 {
                     Name = r.Name,
                     Type = r.Type,
@@ -2355,20 +2265,22 @@ namespace KnockBox.DndMapper.Services.Library
                 }).ToList(),
             };
 
-            return new LibraryCoreSnapshot
+            var core = new LibraryCoreSnapshot
             {
                 SchemaVersion = 4,
-                Settings = c.Settings,
+                Settings = settings,
                 AttributeSchema = schemaSnapshot,
-                ActiveSchemaTemplateId = c.ActiveSchemaTemplateId,
-                InitiativeAttributeName = c.InitiativeAttributeName,
-                CustomTemplates = templates,
-                GlobalRollTemplates = c.GlobalRollTemplates
+                ActiveSchemaTemplateId = activeSchemaTemplateId,
+                InitiativeAttributeName = initiativeAttributeName,
+                CustomTemplates = templateSnapshots,
+                GlobalRollTemplates = globalRolls
                     .Select(LibrarySnapshotMapper.ToRollTemplateSnapshot)
                     .ToList(),
-                MapIds = c.Maps.OrderBy(mc => mc.Map.ListOrder).Select(mc => mc.Map.Id).ToList(),
-                SheetIds = c.Sheets.Select(sc => sc.Sheet.Id).ToList(),
+                MapIds = orderedMapIds,
+                SheetIds = sheets.Keys.ToList(),
             };
+
+            return new ShardSet(core, mapsById, sheetsById);
         }
 
         private static byte[] HashShard<T>(T value) =>

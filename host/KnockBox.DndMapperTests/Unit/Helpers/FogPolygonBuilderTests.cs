@@ -15,7 +15,7 @@ namespace KnockBox.DndMapperTests.Unit.Helpers
         private static Map Make(int width, int height, params (int cx, int cy)[] fogged)
         {
             var m = Make(width, height);
-            foreach (var (cx, cy) in fogged) m.SetFogged(cx, cy, true);
+            foreach (var (cx, cy) in fogged) m = m.WithCellFogged(cx, cy, true);
             return m;
         }
 
@@ -98,8 +98,8 @@ namespace KnockBox.DndMapperTests.Unit.Helpers
             var map = Make(10, 10);
             for (var cy = 1; cy <= 3; cy++)
                 for (var cx = 1; cx <= 3; cx++)
-                    map.SetFogged(cx, cy, true);
-            map.SetFogged(2, 2, false);
+                    map = map.WithCellFogged(cx, cy, true);
+            map = map.WithCellFogged(2, 2, false);
 
             var rings = FogPolygonBuilder.Build(map);
 
@@ -159,7 +159,7 @@ namespace KnockBox.DndMapperTests.Unit.Helpers
             var map = Make(4, 3);
             for (var cy = 0; cy < 3; cy++)
                 for (var cx = 0; cx < 4; cx++)
-                    map.SetFogged(cx, cy, true);
+                    map = map.WithCellFogged(cx, cy, true);
 
             var d = FogPolygonBuilder.BuildSvgPathData(map);
 

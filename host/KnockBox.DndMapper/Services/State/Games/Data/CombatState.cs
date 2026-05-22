@@ -1,3 +1,5 @@
+using System.Collections.Immutable;
+
 namespace KnockBox.DndMapper.Services.State.Games.Data
 {
     public enum CombatPhase
@@ -6,11 +8,11 @@ namespace KnockBox.DndMapper.Services.State.Games.Data
         Active = 1,
     }
 
-    public sealed class CombatState
+    public sealed record CombatState
     {
-        public CombatPhase Phase { get; set; }
-        public int RoundNumber { get; set; } = 1;
-        public int CurrentTurnIndex { get; set; }
-        public List<CombatantEntry> TurnOrder { get; set; } = [];
+        public CombatPhase Phase { get; init; }
+        public int RoundNumber { get; init; } = 1;
+        public int CurrentTurnIndex { get; init; }
+        public ImmutableList<CombatantEntry> TurnOrder { get; init; } = ImmutableList<CombatantEntry>.Empty;
     }
 }

@@ -34,11 +34,10 @@ namespace KnockBox.DndMapperTests.Unit.Helpers
         [TestMethod]
         public void Build_FiltersHiddenTokens()
         {
-            var map = AddMap();
-            var visible = new Token { Id = Guid.NewGuid(), Name = "V", MapId = map.Id, Hidden = false };
-            var hidden = new Token { Id = Guid.NewGuid(), Name = "H", MapId = map.Id, Hidden = true };
-            map.Tokens.Add(visible);
-            map.Tokens.Add(hidden);
+            var mapId = AddMap();
+            var visible = new Token { Id = Guid.NewGuid(), Name = "V", MapId = mapId, Hidden = false };
+            var hidden = new Token { Id = Guid.NewGuid(), Name = "H", MapId = mapId, Hidden = true };
+            ReplaceMap(mapId, m => m with { Tokens = m.Tokens.AddRange([visible, hidden]) });
 
             var projection = DisplayProjection.Build(_state);
 
@@ -48,11 +47,10 @@ namespace KnockBox.DndMapperTests.Unit.Helpers
         [TestMethod]
         public void Build_FiltersHiddenImages()
         {
-            var map = AddMap();
+            var mapId = AddMap();
             var visible = new MapImage { Id = Guid.NewGuid(), LayerOrder = 0, Hidden = false };
             var hidden = new MapImage { Id = Guid.NewGuid(), LayerOrder = 1, Hidden = true };
-            map.Images.Add(visible);
-            map.Images.Add(hidden);
+            ReplaceMap(mapId, m => m with { Images = m.Images.AddRange([visible, hidden]) });
 
             var projection = DisplayProjection.Build(_state);
 
@@ -62,13 +60,11 @@ namespace KnockBox.DndMapperTests.Unit.Helpers
         [TestMethod]
         public void Build_OrdersImagesByLayerOrder()
         {
-            var map = AddMap();
+            var mapId = AddMap();
             var i2 = new MapImage { Id = Guid.NewGuid(), LayerOrder = 2 };
             var i0 = new MapImage { Id = Guid.NewGuid(), LayerOrder = 0 };
             var i1 = new MapImage { Id = Guid.NewGuid(), LayerOrder = 1 };
-            map.Images.Add(i2);
-            map.Images.Add(i0);
-            map.Images.Add(i1);
+            ReplaceMap(mapId, m => m with { Images = m.Images.AddRange([i2, i0, i1]) });
 
             var projection = DisplayProjection.Build(_state);
 
@@ -81,7 +77,7 @@ namespace KnockBox.DndMapperTests.Unit.Helpers
             AddMap();
             _state.Settings.RollsVisibleToPlayers = false;
             for (var i = 0; i < 5; i++)
-                _state.RollLog.Add(MakeRoll($"r{i}"));
+                _state.RollLog = _state.RollLog.Add(MakeRoll($"r{i}"));
 
             var projection = DisplayProjection.Build(_state);
 
@@ -98,7 +94,7 @@ namespace KnockBox.DndMapperTests.Unit.Helpers
             {
                 var r = MakeRoll($"r{i}");
                 rolls.Add(r);
-                _state.RollLog.Add(r);
+                _state.RollLog = _state.RollLog.Add(r);
             }
 
             var projection = DisplayProjection.Build(_state);
@@ -108,7 +104,7 @@ namespace KnockBox.DndMapperTests.Unit.Helpers
             CollectionAssert.AreEqual(expected, projection.VisibleRollLog.ToArray());
         }
 
-        private Map AddMap()
+        private Guid AddMap()
         {
             var map = new Map
             {
@@ -117,9 +113,15 @@ namespace KnockBox.DndMapperTests.Unit.Helpers
                 CreatedUtc = DateTime.UtcNow,
                 ListOrder = 0,
             };
-            _state.Maps.Add(map);
+            _state.Maps = _state.Maps.Add(map);
             _state.SetActiveMapId(map.Id);
-            return map;
+            return map.Id;
+        }
+
+        private void ReplaceMap(Guid mapId, Func<Map, Map> update)
+        {
+            var idx = _state.IndexOfMap(mapId);
+            _state.Maps = _state.Maps.SetItem(idx, update(_state.Maps[idx]));
         }
 
         private static RollResult MakeRoll(string label) => new(
