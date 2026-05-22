@@ -722,8 +722,12 @@ namespace KnockBox.DndMapper.Services.Library
             _saveTimer?.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
 
             // 1. Try the v4 sharded layout first: read {slotId}:core, then
-            //    fan out map and sheet shards from the spine.
-            var (snapshot, _, shardHashes) = await ReadShardedSlotAsync(_db, slotId, ct);
+            //    fan out map and sheet shards from the spine. ConfigureAwait(false)
+            //    on every await so the post-yield continuations (and the
+            //    state.Execute lambda below) run on the thread pool, not on
+            //    the Blazor circuit context that the caller's event handler
+            //    captured.
+            var (snapshot, _, shardHashes) = await ReadShardedSlotAsync(_db, slotId, ct).ConfigureAwait(false);
 
             // 2. v4 miss → fall back to the legacy v3 single-record at key
             //    `{slotId}`. If found, MigrateV3SlotIfNeededAsync rewrites it
@@ -731,7 +735,7 @@ namespace KnockBox.DndMapper.Services.Library
             //    returned in-memory snapshot directly (no need to re-read).
             if (snapshot is null)
             {
-                var legacy = await MigrateV3SlotIfNeededAsync(_db, slotId, ct);
+                var legacy = await MigrateV3SlotIfNeededAsync(_db, slotId, ct).ConfigureAwait(false);
                 if (legacy is not null) snapshot = legacy;
             }
 
@@ -739,7 +743,7 @@ namespace KnockBox.DndMapper.Services.Library
 
             // 2. Pre-load every image blob and publish a share outside the lock.
             //    Build a parallel structure mapping imageId -> fresh MapImage.
-            var hydratedImages = await HydrateImagesFromSnapshotAsync(_db, snapshot, ct);
+            var hydratedImages = await HydrateImagesFromSnapshotAsync(_db, snapshot, ct).ConfigureAwait(false);
             if (ct.IsCancellationRequested) return Result.FromCancellation();
 
             // 3. Pre-build the new state collections OFF the circuit thread.
@@ -748,7 +752,7 @@ namespace KnockBox.DndMapper.Services.Library
             //    lambda then only does bulk swaps, dropping lock-hold time
             //    from 5-50 ms to sub-ms and freeing the circuit to paint
             //    during the rebuild.
-            var hydration = await Task.Run(() => BuildHydration(snapshot, hydratedImages), ct);
+            var hydration = await Task.Run(() => BuildHydration(snapshot, hydratedImages), ct).ConfigureAwait(false);
             if (ct.IsCancellationRequested) return Result.FromCancellation();
 
             // 4. Apply atomically inside one Execute. Subscribers see one
@@ -889,13 +893,13 @@ namespace KnockBox.DndMapper.Services.Library
             var fetchTasks = imgSnaps
                 .Select(imgSnap => FetchAndPublishAsync(db, imgSnap, ct).AsTask())
                 .ToArray();
-            var results = await Task.WhenAll(fetchTasks);
+            var results = await Task.WhenAll(fetchTasks).ConfigureAwait(false);
 
             var hydrated = new Dictionary<Guid, MapImage>(imgSnaps.Length);
             foreach (var result in results)
             {
                 if (result.Blob is null || result.Share is null || result.Image is null) continue;
-                await ReplaceCacheEntryAsync(result.ImageId, result.Blob, result.Share);
+                await ReplaceCacheEntryAsync(result.ImageId, result.Blob, result.Share).ConfigureAwait(false);
                 hydrated[result.ImageId] = result.Image;
             }
             return hydrated;
@@ -920,7 +924,7 @@ namespace KnockBox.DndMapper.Services.Library
             var blobResult = await db.BlobGetSingleAsync(
                 DndMapperLibrarySchema.ImagesStore,
                 IndexedDbKey.String(imgSnap.Id.ToString("D")),
-                ct);
+                ct).ConfigureAwait(false);
 
             if (!blobResult.TryGetSuccess(out var blob) || blob is null)
             {
@@ -929,11 +933,11 @@ namespace KnockBox.DndMapper.Services.Library
             }
 
             IBlobShare share;
-            try { share = await blob.PublishForSharingAsync(options: null, ct); }
+            try { share = await blob.PublishForSharingAsync(options: null, ct).ConfigureAwait(false); }
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "Failed to republish share for hydrated image {ImageId}.", imgSnap.Id);
-                await SafeDisposeAsync(blob);
+                await SafeDisposeAsync(blob).ConfigureAwait(false);
                 return new ImageHydrationResult(imgSnap.Id, null, null, null);
             }
 
@@ -1400,7 +1404,7 @@ namespace KnockBox.DndMapper.Services.Library
             ThrowIfDisposed();
             if (_db is null) return ValueResult<IReadOnlyList<SlotInfo>>.FromError("Library is not attached.");
 
-            var idx = await ReadSlotsIndexAsync(_db, ct);
+            var idx = await ReadSlotsIndexAsync(_db, ct).ConfigureAwait(false);
             // Auto Save pinned to the top, then manual slots by most-recent-first.
             var ordered = idx.Slots
                 .OrderBy(s => s.Kind == SlotKind.Auto ? 0 : 1)
@@ -1422,7 +1426,7 @@ namespace KnockBox.DndMapper.Services.Library
             SetSaving(true);
             try
             {
-                var idx = await ReadSlotsIndexAsync(_db, ct);
+                var idx = await ReadSlotsIndexAsync(_db, ct).ConfigureAwait(false);
                 if (idx.Slots.Any(s => s.Kind == SlotKind.Manual
                         && string.Equals(s.Name, trimmed, StringComparison.OrdinalIgnoreCase)))
                 {
@@ -1434,12 +1438,12 @@ namespace KnockBox.DndMapper.Services.Library
                 // takes the lock synchronously, but on the pool thread instead
                 // of the circuit, so Blazor can keep painting while the
                 // snapshot is built.
-                var shards = await Task.Run(TakeSnapshot, ct);
+                var shards = await Task.Run(TakeSnapshot, ct).ConfigureAwait(false);
                 if (shards is null) return ValueResult<string>.FromError("Failed to read current state for save.");
 
                 var slotId = Guid.NewGuid().ToString("D");
                 var throwaway = new Dictionary<string, byte[]>();
-                var write = await WriteAllShardsAsync(_db, slotId, shards, throwaway, ct);
+                var write = await WriteAllShardsAsync(_db, slotId, shards, throwaway, ct).ConfigureAwait(false);
                 if (!write.IsSuccess)
                 {
                     write.TryGetFailure(out var werr);
@@ -1453,7 +1457,7 @@ namespace KnockBox.DndMapper.Services.Library
                     Kind = SlotKind.Manual,
                     UpdatedUtc = DateTime.UtcNow,
                 });
-                var idxResult = await WriteSlotsIndexAsync(_db, idx, ct);
+                var idxResult = await WriteSlotsIndexAsync(_db, idx, ct).ConfigureAwait(false);
                 if (!idxResult.IsSuccess)
                 {
                     idxResult.TryGetFailure(out var ierr);
@@ -1482,14 +1486,14 @@ namespace KnockBox.DndMapper.Services.Library
             SetSaving(true);
             try
             {
-                var idx = await ReadSlotsIndexAsync(_db, ct);
+                var idx = await ReadSlotsIndexAsync(_db, ct).ConfigureAwait(false);
                 var entry = idx.Slots.FirstOrDefault(s => s.Id == slotId);
                 if (entry is null) return Result.FromError("Unknown slot id.");
 
                 // See CreateSlotAsync for the rationale: snapshot work goes
                 // to a pool thread so the host's "Overwrite" click doesn't
                 // freeze the circuit while the LINQ projection runs.
-                var shards = await Task.Run(TakeSnapshot, ct);
+                var shards = await Task.Run(TakeSnapshot, ct).ConfigureAwait(false);
                 if (shards is null) return Result.FromError("Failed to read current state for save.");
 
                 // Manual slots don't carry a per-slot hash cache: the user
@@ -1498,12 +1502,12 @@ namespace KnockBox.DndMapper.Services.Library
                 // same slot id by reading the previous core's spine first.
                 var previousCoreRead = await _db.JsonGetSingleAsync<LibraryCoreSnapshot>(
                     DndMapperLibrarySchema.LibraryStore,
-                    DndMapperLibrarySchema.CoreKey(slotId), ct);
+                    DndMapperLibrarySchema.CoreKey(slotId), ct).ConfigureAwait(false);
                 LibraryCoreSnapshot? previousCore = null;
                 if (previousCoreRead.TryGetSuccess(out var pc)) previousCore = pc;
 
                 var throwaway = new Dictionary<string, byte[]>();
-                var write = await WriteAllShardsAsync(_db, slotId, shards, throwaway, ct);
+                var write = await WriteAllShardsAsync(_db, slotId, shards, throwaway, ct).ConfigureAwait(false);
                 if (!write.IsSuccess)
                 {
                     write.TryGetFailure(out var werr);
@@ -1518,19 +1522,19 @@ namespace KnockBox.DndMapper.Services.Library
                     foreach (var staleMapId in previousCore.MapIds.Where(id => !shards.MapsById.ContainsKey(id)))
                     {
                         await _db.DeleteSingleAsync(DndMapperLibrarySchema.LibraryStore,
-                            DndMapperLibrarySchema.MapKey(slotId, staleMapId), ct);
+                            DndMapperLibrarySchema.MapKey(slotId, staleMapId), ct).ConfigureAwait(false);
                     }
                     foreach (var staleSheetId in previousCore.SheetIds.Where(id => !shards.SheetsById.ContainsKey(id)))
                     {
                         await _db.DeleteSingleAsync(DndMapperLibrarySchema.LibraryStore,
-                            DndMapperLibrarySchema.SheetKey(slotId, staleSheetId), ct);
+                            DndMapperLibrarySchema.SheetKey(slotId, staleSheetId), ct).ConfigureAwait(false);
                     }
                 }
 
                 // Replace the entry with one carrying the new timestamp.
                 idx.Slots.Remove(entry);
                 idx.Slots.Add(entry with { UpdatedUtc = DateTime.UtcNow });
-                var idxResult = await WriteSlotsIndexAsync(_db, idx, ct);
+                var idxResult = await WriteSlotsIndexAsync(_db, idx, ct).ConfigureAwait(false);
                 if (!idxResult.IsSuccess)
                 {
                     idxResult.TryGetFailure(out var ierr);
@@ -1559,7 +1563,7 @@ namespace KnockBox.DndMapper.Services.Library
             SetSaving(true);
             try
             {
-                var idx = await ReadSlotsIndexAsync(_db, ct);
+                var idx = await ReadSlotsIndexAsync(_db, ct).ConfigureAwait(false);
                 var entry = idx.Slots.FirstOrDefault(s => s.Id == slotId);
                 if (entry is null) return Result.FromError("Unknown slot id.");
 
@@ -1567,29 +1571,29 @@ namespace KnockBox.DndMapper.Services.Library
                 // was already orphaned), we just clear the slots-index entry;
                 // any leftover shards are silently ignored on future reads.
                 var coreRead = await _db.JsonGetSingleAsync<LibraryCoreSnapshot>(
-                    DndMapperLibrarySchema.LibraryStore, DndMapperLibrarySchema.CoreKey(slotId), ct);
+                    DndMapperLibrarySchema.LibraryStore, DndMapperLibrarySchema.CoreKey(slotId), ct).ConfigureAwait(false);
                 if (coreRead.TryGetSuccess(out var core) && core is not null)
                 {
                     foreach (var mapId in core.MapIds)
                     {
                         await _db.DeleteSingleAsync(DndMapperLibrarySchema.LibraryStore,
-                            DndMapperLibrarySchema.MapKey(slotId, mapId), ct);
+                            DndMapperLibrarySchema.MapKey(slotId, mapId), ct).ConfigureAwait(false);
                     }
                     foreach (var sheetId in core.SheetIds)
                     {
                         await _db.DeleteSingleAsync(DndMapperLibrarySchema.LibraryStore,
-                            DndMapperLibrarySchema.SheetKey(slotId, sheetId), ct);
+                            DndMapperLibrarySchema.SheetKey(slotId, sheetId), ct).ConfigureAwait(false);
                     }
                     await _db.DeleteSingleAsync(DndMapperLibrarySchema.LibraryStore,
-                        DndMapperLibrarySchema.CoreKey(slotId), ct);
+                        DndMapperLibrarySchema.CoreKey(slotId), ct).ConfigureAwait(false);
                 }
 
                 // Best-effort cleanup of any leftover v3 legacy record (e.g.,
                 // the slot was deleted before it was migrated this attachment).
-                await _db.DeleteSingleAsync(DndMapperLibrarySchema.LibraryStore, IndexedDbKey.String(slotId), ct);
+                await _db.DeleteSingleAsync(DndMapperLibrarySchema.LibraryStore, IndexedDbKey.String(slotId), ct).ConfigureAwait(false);
 
                 idx.Slots.Remove(entry);
-                var idxResult = await WriteSlotsIndexAsync(_db, idx, ct);
+                var idxResult = await WriteSlotsIndexAsync(_db, idx, ct).ConfigureAwait(false);
                 if (!idxResult.IsSuccess)
                 {
                     idxResult.TryGetFailure(out var ierr);
@@ -1620,7 +1624,7 @@ namespace KnockBox.DndMapper.Services.Library
             SetSaving(true);
             try
             {
-                var idx = await ReadSlotsIndexAsync(_db, ct);
+                var idx = await ReadSlotsIndexAsync(_db, ct).ConfigureAwait(false);
                 var entry = idx.Slots.FirstOrDefault(s => s.Id == slotId);
                 if (entry is null) return Result.FromError("Unknown slot id.");
                 if (idx.Slots.Any(s => s.Id != slotId
@@ -1630,7 +1634,7 @@ namespace KnockBox.DndMapper.Services.Library
 
                 idx.Slots.Remove(entry);
                 idx.Slots.Add(entry with { Name = trimmed });
-                var idxResult = await WriteSlotsIndexAsync(_db, idx, ct);
+                var idxResult = await WriteSlotsIndexAsync(_db, idx, ct).ConfigureAwait(false);
                 if (!idxResult.IsSuccess)
                 {
                     idxResult.TryGetFailure(out var ierr);
@@ -2191,9 +2195,12 @@ namespace KnockBox.DndMapper.Services.Library
 
         // Writes every shard in the set under the given slot id and refreshes
         // `hashCache` to match. Caller decides whether `hashCache` is the
-        // auto-save cache or a throwaway dict. Returns the number of writes
-        // issued (for logging). Writes maps first, then sheets, then core LAST
-        // so a crash before core leaves the prior spine intact.
+        // auto-save cache or a throwaway dict. Map and sheet shards write
+        // concurrently (capped at MaxShardWriteConcurrency); core is written
+        // LAST as the commit point so a crash before core leaves the prior
+        // spine intact. The whole batch runs inside Task.Run so the per-shard
+        // JsonSerializer + SHA256 CPU happens off the Blazor circuit even
+        // when the caller awaits from a Razor event handler.
         private async ValueTask<Result> WriteAllShardsAsync(
             IIndexedDatabase db,
             string slotId,
@@ -2201,41 +2208,78 @@ namespace KnockBox.DndMapper.Services.Library
             Dictionary<string, byte[]> hashCache,
             CancellationToken ct)
         {
-            foreach (var (mapId, mapShard) in shards.MapsById)
+            return await Task.Run<Result>(async () =>
             {
-                var key = DndMapperLibrarySchema.MapKey(slotId, mapId);
-                var write = await db.JsonPutSingleAsync(DndMapperLibrarySchema.LibraryStore, mapShard, key, ct);
-                if (!write.IsSuccess)
+                using var gate = new SemaphoreSlim(MaxShardWriteConcurrency, MaxShardWriteConcurrency);
+
+                async Task<Result> WriteShardAsync<T>(string label, IndexedDbKey key, T shard, string cacheKey)
                 {
-                    write.TryGetFailure(out var werr);
-                    return Result.FromError($"Failed to write map shard: {werr.Message}");
+                    await gate.WaitAsync(ct).ConfigureAwait(false);
+                    try
+                    {
+                        var write = await db.JsonPutSingleAsync(
+                            DndMapperLibrarySchema.LibraryStore, shard, key, ct).ConfigureAwait(false);
+                        if (!write.IsSuccess)
+                        {
+                            write.TryGetFailure(out var werr);
+                            return Result.FromError($"Failed to write {label} shard: {werr.Message}");
+                        }
+                        var hash = HashShard(shard);
+                        lock (hashCache) { hashCache[cacheKey] = hash; }
+                        return Result.Success;
+                    }
+                    finally
+                    {
+                        gate.Release();
+                    }
                 }
-                hashCache[$"{slotId}:map:{mapId:D}"] = HashShard(mapShard);
-            }
 
-            foreach (var (sheetId, sheetShard) in shards.SheetsById)
-            {
-                var key = DndMapperLibrarySchema.SheetKey(slotId, sheetId);
-                var write = await db.JsonPutSingleAsync(DndMapperLibrarySchema.LibraryStore, sheetShard, key, ct);
-                if (!write.IsSuccess)
+                var pending = new List<Task<Result>>(shards.MapsById.Count + shards.SheetsById.Count);
+                foreach (var (mapId, mapShard) in shards.MapsById)
                 {
-                    write.TryGetFailure(out var werr);
-                    return Result.FromError($"Failed to write sheet shard: {werr.Message}");
+                    pending.Add(WriteShardAsync(
+                        "map",
+                        DndMapperLibrarySchema.MapKey(slotId, mapId),
+                        mapShard,
+                        $"{slotId}:map:{mapId:D}"));
                 }
-                hashCache[$"{slotId}:sheet:{sheetId:D}"] = HashShard(sheetShard);
-            }
+                foreach (var (sheetId, sheetShard) in shards.SheetsById)
+                {
+                    pending.Add(WriteShardAsync(
+                        "sheet",
+                        DndMapperLibrarySchema.SheetKey(slotId, sheetId),
+                        sheetShard,
+                        $"{slotId}:sheet:{sheetId:D}"));
+                }
 
-            var coreWrite = await db.JsonPutSingleAsync(
-                DndMapperLibrarySchema.LibraryStore, shards.Core, DndMapperLibrarySchema.CoreKey(slotId), ct);
-            if (!coreWrite.IsSuccess)
-            {
-                coreWrite.TryGetFailure(out var werr);
-                return Result.FromError($"Failed to write core shard: {werr.Message}");
-            }
-            hashCache[$"{slotId}:core"] = HashShard(shards.Core);
+                var results = await Task.WhenAll(pending).ConfigureAwait(false);
+                foreach (var r in results)
+                {
+                    if (!r.IsSuccess) return r;
+                }
 
-            return Result.Success;
+                var coreWrite = await db.JsonPutSingleAsync(
+                    DndMapperLibrarySchema.LibraryStore,
+                    shards.Core,
+                    DndMapperLibrarySchema.CoreKey(slotId),
+                    ct).ConfigureAwait(false);
+                if (!coreWrite.IsSuccess)
+                {
+                    coreWrite.TryGetFailure(out var werr);
+                    return Result.FromError($"Failed to write core shard: {werr.Message}");
+                }
+                var coreHash = HashShard(shards.Core);
+                lock (hashCache) { hashCache[$"{slotId}:core"] = coreHash; }
+
+                return Result.Success;
+            }, ct).ConfigureAwait(false);
         }
+
+        // SignalR + IndexedDB pipeline tolerates several concurrent json puts
+        // well, but past ~8 the per-call overhead stops amortizing and the
+        // queue depth just grows. Keeps a 500-shard slot from opening 500
+        // simultaneous JS interop calls.
+        private const int MaxShardWriteConcurrency = 8;
 
         // Reads a slot back into a LibrarySnapshot shape by fanning out shard
         // reads from the core spine. Returns null if {slotId}:core is missing
@@ -2247,7 +2291,7 @@ namespace KnockBox.DndMapper.Services.Library
         {
             var coreKey = DndMapperLibrarySchema.CoreKey(slotId);
             var coreRead = await db.JsonGetSingleAsync<LibraryCoreSnapshot>(
-                DndMapperLibrarySchema.LibraryStore, coreKey, ct);
+                DndMapperLibrarySchema.LibraryStore, coreKey, ct).ConfigureAwait(false);
 
             if (!coreRead.TryGetSuccess(out var core) || core is null)
                 return (null, null, []);
@@ -2263,7 +2307,7 @@ namespace KnockBox.DndMapper.Services.Library
                 .Select(id => db.JsonGetSingleAsync<MapSnapshot>(
                     DndMapperLibrarySchema.LibraryStore, DndMapperLibrarySchema.MapKey(slotId, id), ct))
                 .ToArray();
-            var mapResults = await Task.WhenAll(mapTasks.Select(t => t.AsTask()));
+            var mapResults = await Task.WhenAll(mapTasks.Select(t => t.AsTask())).ConfigureAwait(false);
 
             var maps = new List<MapSnapshot>(core.MapIds.Count);
             for (int i = 0; i < core.MapIds.Count; i++)
@@ -2284,7 +2328,7 @@ namespace KnockBox.DndMapper.Services.Library
                 .Select(id => db.JsonGetSingleAsync<SheetSnapshot>(
                     DndMapperLibrarySchema.LibraryStore, DndMapperLibrarySchema.SheetKey(slotId, id), ct))
                 .ToArray();
-            var sheetResults = await Task.WhenAll(sheetTasks.Select(t => t.AsTask()));
+            var sheetResults = await Task.WhenAll(sheetTasks.Select(t => t.AsTask())).ConfigureAwait(false);
 
             var sheets = new List<SheetSnapshot>(core.SheetIds.Count);
             for (int i = 0; i < core.SheetIds.Count; i++)
@@ -2330,7 +2374,7 @@ namespace KnockBox.DndMapper.Services.Library
 
             var legacyKey = IndexedDbKey.String(slotId);
             var legacyRead = await db.JsonGetSingleAsync<LibrarySnapshot>(
-                DndMapperLibrarySchema.LibraryStore, legacyKey, ct);
+                DndMapperLibrarySchema.LibraryStore, legacyKey, ct).ConfigureAwait(false);
 
             if (!legacyRead.TryGetSuccess(out var legacy) || legacy is null) return null;
 
@@ -2360,7 +2404,7 @@ namespace KnockBox.DndMapper.Services.Library
             var hashTarget = slotId == DndMapperLibrarySchema.AutoSlotId
                 ? _autoFlushHashes
                 : new Dictionary<string, byte[]>();
-            var write = await WriteAllShardsAsync(db, slotId, migratedShards, hashTarget, ct);
+            var write = await WriteAllShardsAsync(db, slotId, migratedShards, hashTarget, ct).ConfigureAwait(false);
             if (!write.IsSuccess)
             {
                 write.TryGetFailure(out var werr);
@@ -2369,7 +2413,7 @@ namespace KnockBox.DndMapper.Services.Library
                 return legacy; // hydrate from legacy this session; retry migration on next attachment
             }
 
-            var del = await db.DeleteSingleAsync(DndMapperLibrarySchema.LibraryStore, legacyKey, ct);
+            var del = await db.DeleteSingleAsync(DndMapperLibrarySchema.LibraryStore, legacyKey, ct).ConfigureAwait(false);
             if (!del.IsSuccess)
             {
                 del.TryGetFailure(out var derr);
@@ -2383,7 +2427,7 @@ namespace KnockBox.DndMapper.Services.Library
         {
             var res = await db.JsonGetSingleAsync<SlotsIndex>(
                 DndMapperLibrarySchema.SlotsIndexStore,
-                IndexedDbKey.String(DndMapperLibrarySchema.SlotsIndexKey), ct);
+                IndexedDbKey.String(DndMapperLibrarySchema.SlotsIndexKey), ct).ConfigureAwait(false);
             if (res.TryGetSuccess(out var idx) && idx is not null) return idx;
             return new SlotsIndex();
         }
@@ -2392,7 +2436,7 @@ namespace KnockBox.DndMapper.Services.Library
         {
             var res = await db.JsonPutSingleAsync(
                 DndMapperLibrarySchema.SlotsIndexStore, idx,
-                IndexedDbKey.String(DndMapperLibrarySchema.SlotsIndexKey), ct);
+                IndexedDbKey.String(DndMapperLibrarySchema.SlotsIndexKey), ct).ConfigureAwait(false);
             if (res.IsSuccess) return Result.Success;
             res.TryGetFailure(out var err);
             return Result.FromError(err.Message);
@@ -2400,7 +2444,7 @@ namespace KnockBox.DndMapper.Services.Library
 
         private async ValueTask TouchSlotEntryAsync(IIndexedDatabase db, string slotId, string name, SlotKind kind, CancellationToken ct)
         {
-            var idx = await ReadSlotsIndexAsync(db, ct);
+            var idx = await ReadSlotsIndexAsync(db, ct).ConfigureAwait(false);
             var existing = idx.Slots.FirstOrDefault(s => s.Id == slotId);
             if (existing is not null) idx.Slots.Remove(existing);
             idx.Slots.Add(new SlotIndexEntry
@@ -2410,7 +2454,7 @@ namespace KnockBox.DndMapper.Services.Library
                 Kind = kind,
                 UpdatedUtc = DateTime.UtcNow,
             });
-            var write = await WriteSlotsIndexAsync(db, idx, ct);
+            var write = await WriteSlotsIndexAsync(db, idx, ct).ConfigureAwait(false);
             if (!write.IsSuccess)
             {
                 write.TryGetFailure(out var werr);
