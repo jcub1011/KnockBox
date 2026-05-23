@@ -260,16 +260,66 @@
 }
 
 .dndm-display__roll {
-    display: grid;
-    grid-template-columns: 3.25rem 1fr;
-    align-items: center;
-    gap: 0.7rem;
-    padding: 0.55rem 0.65rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    padding: 0.55rem 0.7rem;
     background: rgba(34, 27, 22, 0.45);
     border: 1px solid var(--dndm-border, #3a2d23);
     border-left: 3px solid var(--dndm-ember, #c4743a);
     border-radius: 3px;
     color: var(--dndm-text, #ece0cc);
+}
+
+.dndm-display__roll-meta {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 0.35rem 0.55rem;
+    font-size: 0.78rem;
+    color: var(--dndm-text-muted, #b8a98e);
+}
+
+.dndm-display__roll-roller {
+    font-family: var(--dndm-display, "Cormorant Garamond", serif);
+    font-style: italic;
+    font-size: 0.95rem;
+    color: var(--dndm-ember-hi, #e89055);
+    letter-spacing: 0.01em;
+}
+
+.dndm-display__roll-formula {
+    font-family: "JetBrains Mono", "Fira Code", Consolas, monospace;
+    font-size: 0.78rem;
+    color: var(--dndm-text-muted, #b8a98e);
+    opacity: 0.85;
+}
+
+.dndm-display__roll-mode {
+    font-family: var(--font-primary);
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: #1a1a2e;
+    background: var(--dndm-ember-hi, #e89055);
+    padding: 0.05rem 0.4rem;
+    border-radius: 999px;
+}
+
+.dndm-display__roll-time {
+    margin-left: auto;
+    font-family: "JetBrains Mono", "Fira Code", Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 0.78rem;
+    color: var(--dndm-text-muted, #8e8170);
+}
+
+.dndm-display__roll-body {
+    display: grid;
+    grid-template-columns: 3.25rem 1fr;
+    align-items: center;
+    gap: 0.7rem;
 }
 
 .dndm-display__roll-total {
@@ -283,23 +333,66 @@
     text-shadow: 0 0 12px rgba(232, 144, 85, 0.25);
 }
 
+.dndm-display__roll-detail {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    min-width: 0;
+}
+
 .dndm-display__roll-label {
     font-family: var(--dndm-display, "Cormorant Garamond", serif);
-    font-size: 1.15rem;
+    font-size: 1.05rem;
     line-height: 1.2;
     color: var(--dndm-text, #ece0cc);
     overflow-wrap: anywhere;
 }
 
+.dndm-display__roll-dice {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.dndm-display__roll-die {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.4rem;
+    padding: 0.05rem 0.32rem;
+    font-family: "JetBrains Mono", "Fira Code", Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 0.85rem;
+    color: var(--dndm-text, #ece0cc);
+    background: rgba(232, 144, 85, 0.12);
+    border: 1px solid rgba(232, 144, 85, 0.4);
+    border-radius: 3px;
+}
+
+.dndm-display__roll-die--discarded {
+    color: var(--dndm-text-muted, #7a6852);
+    background: rgba(60, 50, 40, 0.35);
+    border-color: rgba(120, 100, 80, 0.4);
+    text-decoration: line-through;
+    opacity: 0.72;
+}
+
+.dndm-display__roll-mod {
+    font-family: "JetBrains Mono", "Fira Code", Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 0.85rem;
+    color: var(--dndm-text, #ece0cc);
+    margin-left: 0.15rem;
+}
+
 .dndm-display__roll-forced {
-    display: block;
     font-family: var(--font-primary);
     font-style: normal;
-    font-size: 0.7rem;
+    font-size: 0.68rem;
     text-transform: uppercase;
     letter-spacing: 0.16em;
     color: var(--dndm-text-muted, #7a6852);
-    margin-top: 0.15rem;
 }
 
 /* ── Narrow layout: roll log collapses to a bottom strip ─────── */
@@ -323,8 +416,8 @@
     }
     .dndm-display__roll {
         flex: 0 0 auto;
-        min-width: 12rem;
-        max-width: 18rem;
+        min-width: 15rem;
+        max-width: 22rem;
     }
 }
 

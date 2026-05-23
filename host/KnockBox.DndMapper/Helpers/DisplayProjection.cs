@@ -1,3 +1,5 @@
+using KnockBox.DndMapper.Services.Logic;
+using KnockBox.DndMapper.Services.Logic.Visibility;
 using KnockBox.DndMapper.Services.State.Games;
 using KnockBox.DndMapper.Services.State.Games.Data;
 
@@ -20,7 +22,7 @@ namespace KnockBox.DndMapper.Helpers
         FocusRect? FocusRect,
         Guid? ActiveTurnTokenId)
     {
-        public static DisplayProjection Build(DndMapperGameState state)
+        public static DisplayProjection Build(DndMapperGameState state, IDiceAnimationTracker? animationTracker = null)
         {
             ArgumentNullException.ThrowIfNull(state);
 
@@ -40,9 +42,20 @@ namespace KnockBox.DndMapper.Helpers
             var tokens = TokenVisibilityFilter.VisibleTokensFor(map.Tokens, map, isHost: false)
                 .ToArray();
 
-            var rolls = state.Settings.RollsVisibleToPlayers
-                ? state.RollLog.TakeLast(10).Reverse().ToArray()
-                : Array.Empty<RollResult>();
+            // Treat the display as a player without an owner so the same
+            // canonical filter the host/player views go through (with the
+            // "rolls visible to players" toggle off, players only see their
+            // own rolls — empty viewer id matches none). When a per-circuit
+            // dice-animation tracker is supplied, also hide rolls whose 3D
+            // dice are still tumbling on this circuit, mirroring RollLogPanel.
+            IEnumerable<RollResult> rollSource = RollLogVisibilityFilter.VisibleTo(
+                state.RollLog, viewerUserId: string.Empty, viewerIsHost: false,
+                state.Settings.RollsVisibleToPlayers);
+            if (animationTracker is not null)
+            {
+                rollSource = rollSource.Where(r => !animationTracker.IsAnimating(r.Id));
+            }
+            var rolls = rollSource.TakeLast(10).Reverse().ToArray();
 
             var fogPath = FogPolygonBuilder.BuildSvgPathData(map);
 

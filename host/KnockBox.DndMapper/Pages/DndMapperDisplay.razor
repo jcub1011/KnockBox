@@ -3,10 +3,14 @@
 @using KnockBox.Core.Services.State.Shared
 @using KnockBox.DndMapper.Components
 @using KnockBox.DndMapper.Helpers
+@using KnockBox.DndMapper.Models
+@using KnockBox.DndMapper.Pages.Components
+@using KnockBox.DndMapper.Services.Logic
 @using KnockBox.DndMapper.Services.State.Games
 @using KnockBox.DndMapper.Services.State.Games.Data
 @inject IGameRoomObserver Observer
 @inject IJSRuntime JSRuntime
+@inject IDiceAnimationTracker Tracker
 @inject ILogger<DndMapperDisplay> Logger
 @implements IAsyncDisposable
 
@@ -202,21 +206,56 @@ else
                     <ol class="dndm-display__rolls-list">
                         @foreach (var roll in _projection.VisibleRollLog)
                         {
-                            <li class="dndm-display__roll">
-                                <span class="dndm-display__roll-total">@roll.Total</span>
-                                <span class="dndm-display__roll-label">
-                                    @(string.IsNullOrEmpty(roll.Label) ? "Roll" : roll.Label)
-                                    @if (roll.ForcedByUserId is not null)
+                            <li @key="roll.Id" class="dndm-display__roll">
+                                <header class="dndm-display__roll-meta">
+                                    <span class="dndm-display__roll-roller">@RollerName(roll.RollerUserId)</span>
+                                    <span class="dndm-display__roll-formula" title="Dice formula">@roll.Formula</span>
+                                    @if (roll.Mode != RollMode.Normal)
                                     {
-                                        <em class="dndm-display__roll-forced">forced by GM</em>
+                                        <span class="dndm-display__roll-mode">@(roll.Mode == RollMode.Advantage ? "ADV" : "DIS")</span>
                                     }
-                                </span>
+                                    <time class="dndm-display__roll-time"
+                                          datetime="@roll.TimestampUtc.ToString("o")"
+                                          title="@roll.TimestampUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")">@FormatTimestamp(roll.TimestampUtc)</time>
+                                </header>
+                                <div class="dndm-display__roll-body">
+                                    <span class="dndm-display__roll-total">@roll.Total</span>
+                                    <div class="dndm-display__roll-detail">
+                                        <span class="dndm-display__roll-label">@(string.IsNullOrEmpty(roll.Label) ? "Roll" : roll.Label)</span>
+                                        <span class="dndm-display__roll-dice">
+                                            @foreach (var die in roll.Rolls)
+                                            {
+                                                <span class="@($"dndm-display__roll-die{(die.Discarded ? " dndm-display__roll-die--discarded" : "")}")"
+                                                      title="@DieTooltip(die)">@die.Result</span>
+                                            }
+                                            @if (roll.FlatModifier != 0 || roll.AttributeModifier is not null)
+                                            {
+                                                var mods = roll.FlatModifier + (roll.AttributeModifier ?? 0);
+                                                <span class="dndm-display__roll-mod">@(mods >= 0 ? "+" : "")@mods</span>
+                                            }
+                                        </span>
+                                        @if (roll.ForcedByUserId is not null)
+                                        {
+                                            <em class="dndm-display__roll-forced">forced by GM</em>
+                                        }
+                                    </div>
+                                </div>
                             </li>
                         }
                     </ol>
                 </aside>
             }
         </div>
+
+        @* 3D dice overlay. Mirrors the host/player DiceCanvas: when a new
+           roll arrives, dndMapperDiceBox.js tumbles dice on the projector;
+           the local IDiceAnimationTracker hides the roll-log entry until
+           the dice settle, matching the spoiler rule the other two views
+           already follow. CurrentUserId="" makes RollLogVisibilityFilter
+           treat the display as a player without an owner — same as the
+           projection — so the canvas animates exactly the rolls the log
+           will reveal. *@
+        <DiceCanvas State="_state!" CurrentUserId="" IsHost="false" />
     </div>
 }
 
@@ -236,6 +275,7 @@ else
     private DisplayProjection _projection = new(null, [], [], null, null, [], string.Empty, null, null);
     private ObserverAttachment? _attachment;
     private IDisposable? _subscription;
+    private Action? _trackerSub;
     // Set to true on first paint and again on any map swap so the WAAPI
     // sync seeds positions instantly rather than sliding from the previous
     // map's coordinates. Read + reset by OnAfterRenderAsync.
@@ -251,14 +291,28 @@ else
         if (attachment.State is not DndMapperGameState dndState) return;
         _state = dndState;
         _subscription = dndState.StateChangedEventManager.Subscribe(OnStateChanged);
-        _projection = DisplayProjection.Build(dndState);
+        // A roll's 3D animation settling on this circuit doesn't mutate
+        // game state, so we also have to rebuild the projection when the
+        // tracker fires Changed — that's the moment the log-entry filter
+        // flips from "animating, hide it" to "settled, reveal it."
+        _trackerSub = () => _ = InvokeAsync(() =>
+        {
+            if (_state is not null)
+            {
+                _projection = DisplayProjection.Build(_state, Tracker);
+                StateHasChanged();
+            }
+            return Task.CompletedTask;
+        });
+        Tracker.Changed += _trackerSub;
+        _projection = DisplayProjection.Build(dndState, Tracker);
     }
 
     private async ValueTask OnStateChanged()
     {
         if (_state is not null)
         {
-            var next = DisplayProjection.Build(_state);
+            var next = DisplayProjection.Build(_state, Tracker);
             if (next.ActiveMap?.Id != _projection.ActiveMap?.Id)
                 _seedNextSync = true;
             _projection = next;
@@ -308,8 +362,44 @@ else
         string.Create(CultureInfo.InvariantCulture,
             $"rotate({img.Rotation} {img.X + img.Width / 2} {img.Y + img.Height / 2})");
 
+    // Resolves the human-readable name for a roller id by checking the host
+    // first, then the player roster. Falls back to "?" for ids that no
+    // longer correspond to anyone in the room (e.g., a player left after
+    // their roll was logged) so the display still surfaces the entry
+    // rather than dropping it.
+    private string RollerName(string rollerUserId)
+    {
+        if (_state is null) return "?";
+        if (_state.Host.Id == rollerUserId) return _state.Host.Name;
+        var entry = _state.Players.FirstOrDefault(p => p.User.Id == rollerUserId);
+        return entry.User is null ? "?" : entry.DisplayName;
+    }
+
+    private static string FormatTimestamp(DateTime utc) =>
+        utc.ToLocalTime().ToString("HH:mm:ss");
+
+    // d100 is rolled visually as a percentile pair (tens 00-90 + units 0-9)
+    // because dice-box-threejs has no 100-face geometry. The chip shows the
+    // single 1-100 result; the tooltip explains the pair. Mirrors the
+    // host/player RollLogPanel.DieTooltip helper.
+    private static string DieTooltip(DieRoll d)
+    {
+        if (d.Sides == 100)
+        {
+            int tens = (d.Result == 100) ? 0 : (d.Result / 10) * 10;
+            int units = (d.Result == 100) ? 0 : (d.Result % 10);
+            return $"d100 (percentile dice: {tens:D2} + {units} = {d.Result})";
+        }
+        return $"d{d.Sides}";
+    }
+
     public async ValueTask DisposeAsync()
     {
+        if (_trackerSub is not null)
+        {
+            Tracker.Changed -= _trackerSub;
+            _trackerSub = null;
+        }
         _subscription?.Dispose();
         _attachment?.Lifetime.Dispose();
         if (_tokenAnimModule is not null)
