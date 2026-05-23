@@ -41,6 +41,13 @@
 
             <span class="dndm-toolbar-sep" aria-hidden="true"></span>
 
+            <button class="dndm-zoom-btn dndm-ruler-toggle @(_rulerActive ? "dndm-ruler-toggle--active" : null)"
+                    type="button"
+                    title="@(_rulerActive ? "Stop measuring (left-click points, right-click to clear)" : "Ruler — click two points to measure distance; right-click clears")"
+                    @onclick="ToggleRulerMode">📐</button>
+
+            <span class="dndm-toolbar-sep" aria-hidden="true"></span>
+
             <button class="dndm-zoom-btn dndm-fog-btn @(FogContext.Mode == FogPaintMode.Paint ? "dndm-fog-btn--active" : null)"
                     type="button"
                     title="Paint fog — drag on the map to hide cells"
@@ -220,6 +227,51 @@
            appends a client-only <g> to the SVG so per-frame updates skip the
            Blazor render path entirely. Razor only renders the committed rect
            above. *@
+
+        @if (IsHost && _rulerActive && _rulerA is { } ra)
+        {
+            @* Ruler overlay — host-only, between fog and tokens so tokens
+               sit on top. Dots and label inverse-scale via --dndm-inv-zoom so
+               they stay constant on-screen size at every zoom. *@
+            <g class="dndm-ruler" pointer-events="none">
+                @if (_rulerB is { } rb)
+                {
+                    @* Dark underlay + ember stroke so the line stays
+                       visible on bright and dark backgrounds. *@
+                    <line x1="@F(ra.X)" y1="@F(ra.Y)" x2="@F(rb.X)" y2="@F(rb.Y)"
+                          stroke="#000" stroke-width="0.18" stroke-opacity="0.55" />
+                    <line x1="@F(ra.X)" y1="@F(ra.Y)" x2="@F(rb.X)" y2="@F(rb.Y)"
+                          stroke="#e89055" stroke-width="0.08" />
+                }
+
+                <g transform="@($"translate({F(ra.X)} {F(ra.Y)}) scale(var(--dndm-inv-zoom, 1))")">
+                    <circle r="6" fill="#000" fill-opacity="0.55" />
+                    <circle r="5" fill="#e89055" stroke="#1a1208" stroke-width="1" />
+                </g>
+
+                @if (_rulerB is { } rb2)
+                {
+                    var label = RulerLabel(ra, rb2);
+                    var midX = (ra.X + rb2.X) / 2.0;
+                    var midY = (ra.Y + rb2.Y) / 2.0;
+                    var pillHalf = EstimatePillHalfWidth(label);
+                    <g transform="@($"translate({F(rb2.X)} {F(rb2.Y)}) scale(var(--dndm-inv-zoom, 1))")">
+                        <circle r="6" fill="#000" fill-opacity="0.55" />
+                        <circle r="5" fill="#e89055" stroke="#1a1208" stroke-width="1" />
+                    </g>
+                    <g transform="@($"translate({F(midX)} {F(midY)}) scale(var(--dndm-inv-zoom, 1))")">
+                        <rect class="dndm-ruler-pill"
+                              x="@F(-pillHalf)" y="-13"
+                              width="@F(pillHalf * 2)" height="22"
+                              rx="11" ry="11" />
+                        <text class="dndm-ruler-pill-text"
+                              text-anchor="middle" dominant-baseline="central"
+                              x="0" y="-2"
+                              font-size="12">@label</text>
+                    </g>
+                }
+            </g>
+        }
 
         <TokenLayer State="State"
                     Map="Map"

@@ -75,8 +75,9 @@
                     var tok = expandedStack.Tokens[i];
                     var chipX = rowCx + (i - (n - 1) / 2.0) * spacing;
                     var chipY = rowCy;
+                    var chipActive = ActiveTurnTokenId is { } activeId && activeId == tok.Id ? " dndm-token--active" : string.Empty;
                     <g @key="@($"chip-{tok.Id}")"
-                       class="@($"dndm-token dndm-token--chip{(tok.Hidden ? " dndm-token--hidden" : "")}")"
+                       class="@($"dndm-token dndm-token--chip{(tok.Hidden ? " dndm-token--hidden" : "")}{chipActive}")"
                        data-token-id="@tok.Id"
                        transform="@($"translate({Fmt(chipX)} {Fmt(chipY)})")">
                         @if (!string.IsNullOrEmpty(tok.Name))

@@ -17,7 +17,8 @@ namespace KnockBox.DndMapper.Helpers
         CombatState? ActiveCombat,
         IReadOnlyList<RollResult> VisibleRollLog,
         string FogPathData,
-        FocusRect? FocusRect)
+        FocusRect? FocusRect,
+        Guid? ActiveTurnTokenId)
     {
         public static DisplayProjection Build(DndMapperGameState state)
         {
@@ -27,8 +28,10 @@ namespace KnockBox.DndMapper.Helpers
                 ? state.Maps.FirstOrDefault(m => m.Id == id)
                 : null;
 
+            var activeTokenId = ResolveActiveTurnTokenId(state.ActiveCombat);
+
             if (map is null)
-                return new DisplayProjection(null, [], [], null, state.ActiveCombat, [], string.Empty, null);
+                return new DisplayProjection(null, [], [], null, state.ActiveCombat, [], string.Empty, null, activeTokenId);
 
             var images = ImageVisibilityFilter.VisibleImagesFor(map.Images, map, isHost: false)
                 .OrderBy(i => i.LayerOrder)
@@ -48,7 +51,21 @@ namespace KnockBox.DndMapper.Helpers
             // crop the new map to a stale rectangle.
             var focus = state.FocusRect is { } fr && fr.MapId == map.Id ? fr : null;
 
-            return new DisplayProjection(map, images, tokens, map.MarkupSvg, state.ActiveCombat, rolls, fogPath, focus);
+            return new DisplayProjection(map, images, tokens, map.MarkupSvg, state.ActiveCombat, rolls, fogPath, focus, activeTokenId);
+        }
+
+        // Active token id for the "whose turn is it" glow. Returns null unless
+        // combat is in the Active phase and the current turn index points at a
+        // combatant carrying a non-empty TokenId.
+        private static Guid? ResolveActiveTurnTokenId(CombatState? combat)
+        {
+            if (combat is null || combat.Phase != CombatPhase.Active) return null;
+            var turn = combat.TurnOrder;
+            if (turn.Count == 0) return null;
+            var idx = combat.CurrentTurnIndex;
+            if (idx < 0 || idx >= turn.Count) return null;
+            var tokenId = turn[idx].TokenId;
+            return tokenId == Guid.Empty ? null : tokenId;
         }
     }
 }

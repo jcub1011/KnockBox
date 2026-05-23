@@ -237,6 +237,16 @@ namespace KnockBox.DndMapper.Pages.Components
         // exclusive with markup + fog modes (each toggle clears the others).
         private bool _focusActive;
 
+        // ── Ruler tool (host-only, fully client-side) ───────────────────
+        // Left-click picks the two endpoints; third+ clicks replace point B.
+        // Right-click clears both. Deactivating the tool also clears both.
+        // Pure C#/SVG — no JS module needed; clicks are infrequent enough
+        // that ClientToMapAsync per mousedown is acceptable.
+        private bool _rulerActive;
+        private (double X, double Y)? _rulerA;
+        private (double X, double Y)? _rulerB;
+        private const double FeetPerSquare = 5.0;
+
         // ── Centre-viewport broadcast (v1.x — §6.4) ──────────────────────
         // Last-seen request Nonce. When the server pushes a new request with a
         // fresh nonce, every client (including the host who sent it) recentres.
@@ -278,12 +288,12 @@ namespace KnockBox.DndMapper.Pages.Components
 
         private bool IsFogPaintActive => IsHost && FogContext.Mode != FogPaintMode.Off;
 
-        // True while a host-only canvas tool (fog paint/erase or focus-box) is
-        // active. Images/tokens become non-interactive in this mode so clicks
-        // fall through to the SVG's OnSvgMouseDown and reach the tool's entry
-        // path. (Markup mode covers the canvas with its own overlay, so it
-        // doesn't need to flip image/token pointer-events.)
-        private bool IsCanvasToolActive => IsFogPaintActive || _focusActive;
+        // True while a host-only canvas tool (fog paint/erase or focus-box or
+        // ruler) is active. Images/tokens become non-interactive in this mode
+        // so clicks fall through to the SVG's OnSvgMouseDown and reach the
+        // tool's entry path. (Markup mode covers the canvas with its own
+        // overlay, so it doesn't need to flip image/token pointer-events.)
+        private bool IsCanvasToolActive => IsFogPaintActive || _focusActive || _rulerActive;
 
         // ── Fog toolbar handlers ─────────────────────────────────────────
         private bool _confirmFillFog;
@@ -303,9 +313,10 @@ namespace KnockBox.DndMapper.Pages.Components
             FogContext.Set(next, FogContext.BrushRadius);
         }
 
-        // Focus-box and markup are mutually exclusive with fog paint/erase. The
-        // focus/markup toggles already disable fog when entering their mode;
-        // this is the mirror path for when fog is being entered.
+        // Focus-box, markup, and ruler are mutually exclusive with fog
+        // paint/erase. The focus/markup/ruler toggles already disable fog
+        // when entering their mode; this is the mirror path for when fog
+        // is being entered.
         private void ExitOtherCanvasTools()
         {
             if (_focusActive)
@@ -314,6 +325,12 @@ namespace KnockBox.DndMapper.Pages.Components
                 _ = CancelFocusDragJs();
             }
             _markupActive = false;
+            if (_rulerActive)
+            {
+                _rulerActive = false;
+                _rulerA = null;
+                _rulerB = null;
+            }
         }
 
         private void OnCycleBrush()
@@ -450,11 +467,44 @@ namespace KnockBox.DndMapper.Pages.Components
                 _markupActive = false;
                 if (FogContext.Mode != FogPaintMode.Off)
                     FogContext.Set(FogPaintMode.Off, FogContext.BrushRadius);
+                if (_rulerActive)
+                {
+                    _rulerActive = false;
+                    _rulerA = null;
+                    _rulerB = null;
+                }
             }
             else
             {
                 // Cancel any in-flight drag preview in the JS module.
                 _ = CancelFocusDragJs();
+            }
+            _ = PushJsMode();
+        }
+
+        // Ruler is the simplest tool of the family: pure client-side, two
+        // map-coord points plus a derived label. Activating it follows the
+        // same mutual-exclusion handshake as ToggleFocusMode and the fog
+        // toggles, and deactivating clears the measurement so the next
+        // activation starts fresh.
+        private void ToggleRulerMode()
+        {
+            _rulerActive = !_rulerActive;
+            if (_rulerActive)
+            {
+                _markupActive = false;
+                if (_focusActive)
+                {
+                    _focusActive = false;
+                    _ = CancelFocusDragJs();
+                }
+                if (FogContext.Mode != FogPaintMode.Off)
+                    FogContext.Set(FogPaintMode.Off, FogContext.BrushRadius);
+            }
+            else
+            {
+                _rulerA = null;
+                _rulerB = null;
             }
             _ = PushJsMode();
         }
@@ -511,6 +561,7 @@ namespace KnockBox.DndMapper.Pages.Components
             if (_markupActive) return "markup";
             if (_focusActive) return "focus";
             if (IsFogPaintActive) return "fog";
+            if (_rulerActive) return "ruler";
             return "none";
         }
 
@@ -753,6 +804,21 @@ namespace KnockBox.DndMapper.Pages.Components
         {
             if (!IsHost) return;
 
+            // Ruler-tool override: right-click clears both points instead of
+            // opening the context menu. The frame's
+            // @oncontextmenu:preventDefault attribute already suppresses the
+            // browser menu; returning here skips opening ours too.
+            if (_rulerActive)
+            {
+                if (_rulerA is not null || _rulerB is not null)
+                {
+                    _rulerA = null;
+                    _rulerB = null;
+                    StateHasChanged();
+                }
+                return;
+            }
+
             // Resolve the click into map-space coordinates so menu actions
             // (e.g. "centre everyone here") can use the targeted cell.
             var (mx, my) = await ClientToMapAsync(e.ClientX, e.ClientY);
@@ -811,6 +877,31 @@ namespace KnockBox.DndMapper.Pages.Components
 
         private static string F(double value) =>
             value.ToString("0.######", CultureInfo.InvariantCulture);
+
+        // Three-figure ruler label: Chebyshev cells (D&D 5e default rule),
+        // true Euclidean cells (helps players reason about diagonals), and
+        // feet (Chebyshev × 5, the rulebook unit). Format keeps each piece
+        // aligned with the existing toolbar/typography conventions.
+        internal static string RulerLabel((double X, double Y) a, (double X, double Y) b)
+        {
+            var dx = Math.Abs(b.X - a.X);
+            var dy = Math.Abs(b.Y - a.Y);
+            var cheb = (int)Math.Round(Math.Max(dx, dy), MidpointRounding.AwayFromZero);
+            var euc = Math.Sqrt(dx * dx + dy * dy);
+            var ft = (int)(cheb * FeetPerSquare);
+            return string.Create(CultureInfo.InvariantCulture,
+                $"{cheb} sq · {euc:0.0} actual · {ft} ft");
+        }
+
+        // Cheap monospace-ish width estimate at the pill's 12px font size.
+        // Returns half the pill width in user-space units (pixels because
+        // the parent <g> inverse-scales by --dndm-inv-zoom). Doesn't need
+        // to be exact — the rounded pill absorbs a few pixels of slop.
+        internal static double EstimatePillHalfWidth(string label)
+        {
+            // ~6.5px per character at 12px Inter-ish + 12px side padding.
+            return (label.Length * 6.5) / 2.0 + 12.0;
+        }
 
         private void OnToggleGrid(ChangeEventArgs e) =>
             LocalShowGridLines = e.Value is bool b && b;
@@ -939,6 +1030,31 @@ namespace KnockBox.DndMapper.Pages.Components
                 {
                     Logger.LogWarning(ex, "Failed to start focus-box drag.");
                 }
+                return;
+            }
+
+            // Ruler mode intercepts left-clicks (middle still pans). Two
+            // map-coord points fully describe the measurement; subsequent
+            // clicks only move B (until right-click clears both).
+            if (e.Button == LeftMouseButton && IsHost && _rulerActive)
+            {
+                var (mx, my) = await ClientToMapAsync(e.ClientX, e.ClientY);
+                if (Map.Grid.SnapToGrid)
+                {
+                    mx = Math.Floor(mx) + 0.5;
+                    my = Math.Floor(my) + 0.5;
+                }
+                if (_rulerA is null)
+                {
+                    _rulerA = (mx, my);
+                }
+                else
+                {
+                    // Once A is set, every further click replaces B until a
+                    // right-click clears both.
+                    _rulerB = (mx, my);
+                }
+                StateHasChanged();
                 return;
             }
 

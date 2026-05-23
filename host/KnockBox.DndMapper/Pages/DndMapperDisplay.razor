@@ -27,136 +27,196 @@
 }
 else
 {
+    var hasRolls = _projection.VisibleRollLog.Count > 0;
+    var hasCombat = _projection.ActiveCombat is not null;
+    var stageClass = hasRolls ? "dndm-display__stage dndm-display__stage--with-rolls" : "dndm-display__stage";
     <div class="dndm-display">
         <DndMapperHeader ShowActions="false" />
-        @if (_projection.ActiveCombat is not null)
+
+        @if (hasCombat)
         {
-            <div class="dndm-display__banner">
-                @if (_projection.ActiveCombat.Phase == CombatPhase.Active)
+            var combat = _projection.ActiveCombat!;
+            <header class="dndm-display__combat" role="status" aria-live="polite">
+                @if (combat.Phase == CombatPhase.Active)
                 {
-                    <strong>Round @_projection.ActiveCombat.RoundNumber</strong>
-                    @foreach (var (entry, idx) in _projection.ActiveCombat.TurnOrder.Select((e, i) => (e, i)))
-                    {
-                        <span class="@(idx == _projection.ActiveCombat.CurrentTurnIndex ? "dndm-display__turn dndm-display__turn--current" : "dndm-display__turn")">
-                            @entry.Name (@entry.InitiativeRoll)
-                        </span>
-                    }
+                    <div class="dndm-display__combat-head">
+                        <span class="dndm-display__round-label">Round</span>
+                        <span class="dndm-display__round-num">@combat.RoundNumber</span>
+                    </div>
+                    <ol class="dndm-display__queue">
+                        @foreach (var (entry, idx) in combat.TurnOrder.Select((e, i) => (e, i)))
+                        {
+                            var classes = idx == combat.CurrentTurnIndex
+                                ? "dndm-display__chip dndm-display__chip--current"
+                                : (idx < combat.CurrentTurnIndex ? "dndm-display__chip dndm-display__chip--done" : "dndm-display__chip");
+                            <li class="@classes">
+                                <span class="dndm-display__chip-init">@(entry.InitiativeRoll?.ToString() ?? "—")</span>
+                                <span class="dndm-display__chip-name">@entry.Name</span>
+                                @if (idx == combat.CurrentTurnIndex)
+                                {
+                                    <span class="dndm-display__chip-flag" aria-hidden="true">acting</span>
+                                }
+                            </li>
+                        }
+                    </ol>
                 }
                 else
                 {
-                    <strong>Waiting for initiative rolls…</strong>
-                    @foreach (var entry in _projection.ActiveCombat.TurnOrder)
-                    {
-                        <span class="dndm-display__turn">@entry.Name @(entry.InitiativeRoll is null ? "—" : "✓")</span>
-                    }
+                    <div class="dndm-display__combat-head">
+                        <span class="dndm-display__round-label">Initiative</span>
+                        <span class="dndm-display__round-status">waiting</span>
+                    </div>
+                    <ol class="dndm-display__queue">
+                        @foreach (var entry in combat.TurnOrder)
+                        {
+                            var ready = entry.InitiativeRoll is not null;
+                            <li class="@("dndm-display__chip " + (ready ? "dndm-display__chip--ready" : "dndm-display__chip--pending"))">
+                                <span class="dndm-display__chip-init" aria-hidden="true">@(ready ? "✓" : "—")</span>
+                                <span class="dndm-display__chip-name">@entry.Name</span>
+                            </li>
+                        }
+                    </ol>
+                }
+            </header>
+        }
+
+        <div class="@stageClass">
+            <div class="dndm-display__canvas">
+                @if (_projection.ActiveMap is { } activeMap)
+                {
+                    @* Focus box (if set) becomes the SVG viewBox so the chosen
+                       region fills the projector; otherwise default to the full
+                       map. preserveAspectRatio="xMidYMid meet" guarantees the
+                       entire rect is visible at maximum zoom. *@
+                    var vb = _projection.FocusRect is { } fr
+                        ? string.Create(CultureInfo.InvariantCulture,
+                            $"{fr.X} {fr.Y} {fr.Width} {fr.Height}")
+                        : string.Create(CultureInfo.InvariantCulture,
+                            $"0 0 {activeMap.Grid.WidthCells} {activeMap.Grid.HeightCells}");
+                    <svg id="@SvgId"
+                         xmlns="http://www.w3.org/2000/svg"
+                         viewBox="@vb"
+                         preserveAspectRatio="xMidYMid meet">
+
+                        @* Match the host/player MapCanvas background so empty
+                           cells look identical across all three views. *@
+                        <rect x="0" y="0"
+                              width="@activeMap.Grid.WidthCells" height="@activeMap.Grid.HeightCells"
+                              fill="#0e1117" />
+
+                        @foreach (var img in _projection.VisibleImages)
+                        {
+                            // ShareToken is null while the host's circuit is between
+                            // publishes (e.g. just before reconnect republishes). The
+                            // display is read-only so we silently drop those images
+                            // instead of rendering a placeholder; they reappear within
+                            // one SignalR round-trip once the token is republished.
+                            if (img.ShareToken is Guid shareToken)
+                            {
+                                <image href="@($"/blob-share/{shareToken:D}")"
+                                       x="@img.X" y="@img.Y"
+                                       width="@img.Width" height="@img.Height"
+                                       opacity="@img.Opacity"
+                                       transform="@ImageTransform(img)"
+                                       preserveAspectRatio="none" />
+                            }
+                        }
+
+                        @if (activeMap.Grid.ShowGridLines)
+                        {
+                            // Grid is drawn as a single rect filled with a 1-cell
+                            // <pattern>. SVG renders the pattern in viewBox units,
+                            // so stroke-width is in cell units — 0.025 is roughly
+                            // 1 CSS pixel at typical projector zoom and stays crisp
+                            // even when the focus rect zooms in tight.
+                            var gridColor = string.IsNullOrWhiteSpace(activeMap.Grid.LineColor)
+                                ? "#222" : activeMap.Grid.LineColor;
+                            <defs>
+                                <pattern id="@GridPatternId" x="0" y="0" width="1" height="1" patternUnits="userSpaceOnUse">
+                                    <path d="M 1 0 L 0 0 0 1" fill="none"
+                                          stroke="@gridColor" stroke-width="0.025" />
+                                </pattern>
+                            </defs>
+                            <rect class="dndm-display__grid"
+                                  x="0" y="0"
+                                  width="@activeMap.Grid.WidthCells" height="@activeMap.Grid.HeightCells"
+                                  fill="@($"url(#{GridPatternId})")"
+                                  pointer-events="none" />
+                        }
+
+                        @if (!string.IsNullOrWhiteSpace(_projection.MarkupSvg))
+                        {
+                            <g class="dndm-display__markup">@((MarkupString)_projection.MarkupSvg)</g>
+                        }
+
+                        @if (!string.IsNullOrEmpty(_projection.FogPathData))
+                        {
+                            <g class="dndm-display__fog">
+                                <path d="@_projection.FogPathData" fill="#000" fill-rule="evenodd" />
+                            </g>
+                        }
+
+                        @* Tokens render with data-* attributes and NO transform
+                           attribute. dndMapperDisplayTokens.js owns the visual
+                           position via inline `style.transform` set on each
+                           OnAfterRenderAsync; for unchanged tokens it does
+                           nothing, for moved tokens it runs a WAAPI animation,
+                           and the first paint after mount / map-swap seeds the
+                           inline transform without animation. The WAAPI path
+                           runs on the compositor and survives the host tab's
+                           IDB-save main-thread busy window that would otherwise
+                           interrupt a CSS transition. *@
+                        @foreach (var token in _projection.VisibleTokens)
+                        {
+                            var isActive = _projection.ActiveTurnTokenId is { } activeId && activeId == token.Id;
+                            var tokenClass = isActive
+                                ? "dndm-viewer-token dndm-viewer-token--active"
+                                : "dndm-viewer-token";
+                            <g @key="token.Id"
+                               class="@tokenClass"
+                               data-token-id="@token.Id"
+                               data-tx="@Fmt(token.X)"
+                               data-ty="@Fmt(token.Y)">
+                                <circle r="0.4" fill="@token.Color" stroke="#000" stroke-width="0.04" />
+                                <text text-anchor="middle" dominant-baseline="central"
+                                      font-size="0.4" fill="#fff" font-weight="bold">
+                                    @(token.Name.Length > 0 ? token.Name[..1].ToUpperInvariant() : "?")
+                                </text>
+                            </g>
+                        }
+                    </svg>
+                }
+                else
+                {
+                    <div class="dndm-display__empty">No active map.</div>
                 }
             </div>
-        }
 
-        <div class="dndm-display__canvas">
-            @if (_projection.ActiveMap is { } activeMap)
+            @if (hasRolls)
             {
-                @* Focus box (if set) becomes the SVG viewBox so the chosen
-                   region fills the projector; otherwise default to the full
-                   map. preserveAspectRatio="xMidYMid meet" guarantees the
-                   entire rect is visible at maximum zoom. *@
-                var vb = _projection.FocusRect is { } fr
-                    ? string.Create(CultureInfo.InvariantCulture,
-                        $"{fr.X} {fr.Y} {fr.Width} {fr.Height}")
-                    : string.Create(CultureInfo.InvariantCulture,
-                        $"0 0 {activeMap.Grid.WidthCells} {activeMap.Grid.HeightCells}");
-                <svg id="@SvgId"
-                     xmlns="http://www.w3.org/2000/svg"
-                     viewBox="@vb"
-                     preserveAspectRatio="xMidYMid meet">
-
-                    @* Match the host/player MapCanvas background so empty
-                       cells look identical across all three views. *@
-                    <rect x="0" y="0"
-                          width="@activeMap.Grid.WidthCells" height="@activeMap.Grid.HeightCells"
-                          fill="#0e1117" />
-
-                    @foreach (var img in _projection.VisibleImages)
-                    {
-                        // ShareToken is null while the host's circuit is between
-                        // publishes (e.g. just before reconnect republishes). The
-                        // display is read-only so we silently drop those images
-                        // instead of rendering a placeholder; they reappear within
-                        // one SignalR round-trip once the token is republished.
-                        if (img.ShareToken is Guid shareToken)
+                <aside class="dndm-display__rolls" aria-label="Recent rolls">
+                    <header class="dndm-display__rolls-head">
+                        <span class="dndm-display__rolls-title">Rolls</span>
+                        <span class="dndm-display__rolls-count">@_projection.VisibleRollLog.Count</span>
+                    </header>
+                    <ol class="dndm-display__rolls-list">
+                        @foreach (var roll in _projection.VisibleRollLog)
                         {
-                            <image href="@($"/blob-share/{shareToken:D}")"
-                                   x="@img.X" y="@img.Y"
-                                   width="@img.Width" height="@img.Height"
-                                   opacity="@img.Opacity"
-                                   transform="@ImageTransform(img)"
-                                   preserveAspectRatio="none" />
+                            <li class="dndm-display__roll">
+                                <span class="dndm-display__roll-total">@roll.Total</span>
+                                <span class="dndm-display__roll-label">
+                                    @(string.IsNullOrEmpty(roll.Label) ? "Roll" : roll.Label)
+                                    @if (roll.ForcedByUserId is not null)
+                                    {
+                                        <em class="dndm-display__roll-forced">forced by GM</em>
+                                    }
+                                </span>
+                            </li>
                         }
-                    }
-
-                    @if (!string.IsNullOrWhiteSpace(_projection.MarkupSvg))
-                    {
-                        <g class="dndm-display__markup">@((MarkupString)_projection.MarkupSvg)</g>
-                    }
-
-                    @if (!string.IsNullOrEmpty(_projection.FogPathData))
-                    {
-                        <g class="dndm-display__fog">
-                            <path d="@_projection.FogPathData" fill="#000" fill-rule="evenodd" />
-                        </g>
-                    }
-
-                    @* Tokens render with data-* attributes and NO transform
-                       attribute. dndMapperDisplayTokens.js owns the visual
-                       position via inline `style.transform` set on each
-                       OnAfterRenderAsync; for unchanged tokens it does
-                       nothing, for moved tokens it runs a WAAPI animation,
-                       and the first paint after mount / map-swap seeds the
-                       inline transform without animation. The WAAPI path
-                       runs on the compositor and survives the host tab's
-                       IDB-save main-thread busy window that would otherwise
-                       interrupt a CSS transition. *@
-                    @foreach (var token in _projection.VisibleTokens)
-                    {
-                        <g @key="token.Id"
-                           class="dndm-viewer-token"
-                           data-token-id="@token.Id"
-                           data-tx="@Fmt(token.X)"
-                           data-ty="@Fmt(token.Y)">
-                            <circle r="0.4" fill="@token.Color" stroke="#000" stroke-width="0.04" />
-                            <text text-anchor="middle" dominant-baseline="central"
-                                  font-size="0.4" fill="#fff" font-weight="bold">
-                                @(token.Name.Length > 0 ? token.Name[..1].ToUpperInvariant() : "?")
-                            </text>
-                        </g>
-                    }
-                </svg>
-            }
-            else
-            {
-                <div class="dndm-display__empty">No active map.</div>
+                    </ol>
+                </aside>
             }
         </div>
-
-        @if (_projection.VisibleRollLog.Count > 0)
-        {
-            <aside class="dndm-display__rolls">
-                <h2>Rolls</h2>
-                <ul>
-                    @foreach (var roll in _projection.VisibleRollLog)
-                    {
-                        <li>
-                            <strong>@(string.IsNullOrEmpty(roll.Label) ? "Roll" : roll.Label)</strong>
-                            — @roll.Total
-                            @if (roll.ForcedByUserId is not null)
-                            {
-                                <em>(forced by GM)</em>
-                            }
-                        </li>
-                    }
-                </ul>
-            </aside>
-        }
     </div>
 }
 
@@ -167,9 +227,13 @@ else
     // module can target it via document.getElementById without colliding
     // with anything else on the page.
     private readonly string SvgId = $"dndm-display-svg-{Guid.NewGuid():N}";
+    // Per-instance id for the grid <pattern> so multiple displays on the
+    // same page (unlikely, but cheap to guard) can't collide on the
+    // url(#...) reference inside the SVG.
+    private readonly string GridPatternId = $"dndm-display-grid-{Guid.NewGuid():N}";
 
     private DndMapperGameState? _state;
-    private DisplayProjection _projection = new(null, [], [], null, null, [], string.Empty, null);
+    private DisplayProjection _projection = new(null, [], [], null, null, [], string.Empty, null, null);
     private ObserverAttachment? _attachment;
     private IDisposable? _subscription;
     // Set to true on first paint and again on any map swap so the WAAPI
