@@ -85,6 +85,36 @@ namespace KnockBox.DndMapper.Services.Library
         // write every shard).
         private readonly Dictionary<string, byte[]> _autoFlushHashes = new();
 
+        // Reference snapshot of every persisted state field captured at the
+        // last successful auto-flush (and at Attach). OnStateChangedAsync
+        // compares this against the live refs and short-circuits if nothing
+        // persisted has changed — e.g. a dice roll appends to RollLog, which
+        // isn't persisted, so the saving indicator and IDB write are skipped
+        // entirely. Every immutable collection / wholesale-replaced settings
+        // ref change is caught; in-place field mutation isn't possible
+        // because the state model uses immutable shapes for persisted data.
+        private PersistedFingerprint _lastFlushedFingerprint;
+
+        private readonly record struct PersistedFingerprint(
+            object? Maps,
+            object? Sheets,
+            object? CustomTemplates,
+            object? GlobalRollTemplates,
+            object? Settings,
+            object? AttributeSchema,
+            Guid? ActiveSchemaTemplateId,
+            string? InitiativeAttributeName);
+
+        private static PersistedFingerprint CaptureFingerprint(DndMapperGameState s) => new(
+            s.Maps,
+            s.Sheets,
+            s.CustomTemplates,
+            s.GlobalRollTemplates,
+            s.Settings,
+            s.AttributeSchema,
+            s.ActiveSchemaTemplateId,
+            s.InitiativeAttributeName);
+
         // Slot ids whose v3 → v4 single-record migration has been probed in
         // this attachment. LoadSlotAsync consults this to avoid reissuing the
         // legacy-key read on every refresh of the saves panel.
@@ -182,6 +212,7 @@ namespace KnockBox.DndMapper.Services.Library
 
             // Stand up the debounce timer in a stopped state and subscribe.
             _saveTimer = new Timer(OnSaveTimerTick, state: null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+            _lastFlushedFingerprint = CaptureFingerprint(state);
             _stateSub = state.StateChangedEventManager.Subscribe(OnStateChangedAsync);
 
             // Reconnect path: if the state already carries images from a prior
@@ -1163,11 +1194,22 @@ namespace KnockBox.DndMapper.Services.Library
 
         private ValueTask OnStateChangedAsync()
         {
-            // Subscribers are invoked OUTSIDE the state's Execute lock; restart
-            // the debounce timer cheaply on every event. _pendingDirty=1
-            // signals to any concurrent flush that more changes arrived; on
-            // that flush's release it re-arms us if the timer didn't already
-            // fire from this Change() call.
+            // Subscribers are invoked OUTSIDE the state's Execute lock. Before
+            // marking work pending, check whether anything *persisted* changed
+            // — if a dice roll appended to RollLog (not in the persisted set),
+            // every persisted-field reference still matches the last flush
+            // and we can skip the indicator + debounce entirely. Reference
+            // reads on immutable collections / wholesale-replaced objects
+            // are atomic in .NET, so no lock is required.
+            var state = _state;
+            if (state is not null && CaptureFingerprint(state).Equals(_lastFlushedFingerprint))
+            {
+                return ValueTask.CompletedTask;
+            }
+
+            // _pendingDirty=1 signals to any concurrent flush that more
+            // changes arrived; on that flush's release it re-arms us if the
+            // timer didn't already fire from this Change() call.
             Interlocked.Exchange(ref _pendingDirty, 1);
             // Flip the indicator now — the user has unsaved work, even if the
             // write itself is still 500 ms away. FlushSnapshotAsync clears it
@@ -1215,7 +1257,7 @@ namespace KnockBox.DndMapper.Services.Library
                 // Build the shard set under the state's read lock so we don't
                 // race with a concurrent Execute. The read action is pure-sync
                 // (no I/O); IDB writes happen AFTER lock release.
-                var shards = TakeSnapshot();
+                var shards = TakeSnapshot(out var flushedFingerprint);
                 if (shards is null)
                 {
                     _logger.LogWarning("Auto-save read of game state failed; skipping flush.");
@@ -1333,6 +1375,12 @@ namespace KnockBox.DndMapper.Services.Library
                         DndMapperLibrarySchema.AutoSlotName,
                         SlotKind.Auto, cts.Token);
                 }
+
+                // Whether we wrote or not, the snapshot we evaluated reflected
+                // the live persisted refs at lock-acquire time. Recording them
+                // lets the next OnStateChangedAsync short-circuit when only
+                // non-persisted fields (RollLog) change.
+                _lastFlushedFingerprint = flushedFingerprint;
             }
             catch (OperationCanceledException) { /* shutting down */ }
             catch (Exception ex)
@@ -2279,8 +2327,11 @@ namespace KnockBox.DndMapper.Services.Library
         // DTO projection runs entirely off the lock; concurrent engine
         // mutations create new state.Maps refs but never touch the ones we
         // captured here.
-        private ShardSet? TakeSnapshot()
+        private ShardSet? TakeSnapshot() => TakeSnapshot(out _);
+
+        private ShardSet? TakeSnapshot(out PersistedFingerprint fingerprint)
         {
+            fingerprint = default;
             var state = _state;
             if (state is null) return null;
 
@@ -2289,6 +2340,7 @@ namespace KnockBox.DndMapper.Services.Library
             ImmutableDictionary<Guid, NamedTemplate>? templates = null;
             ImmutableList<RollTemplate>? globalRolls = null;
             DndMapperSettings? settings = null;
+            DndMapperSettings? settingsRef = null;
             AttributeSchema? schema = null;
             Guid? activeSchemaTemplateId = null;
             string? initiativeAttributeName = null;
@@ -2299,6 +2351,7 @@ namespace KnockBox.DndMapper.Services.Library
                 sheets = state.Sheets;
                 templates = state.CustomTemplates;
                 globalRolls = state.GlobalRollTemplates;
+                settingsRef = state.Settings;
                 settings = state.Settings.Clone();
                 schema = state.AttributeSchema;
                 activeSchemaTemplateId = state.ActiveSchemaTemplateId;
@@ -2307,6 +2360,14 @@ namespace KnockBox.DndMapper.Services.Library
             if (!read.IsSuccess || maps is null || sheets is null
                 || templates is null || globalRolls is null
                 || settings is null || schema is null) return null;
+
+            // Capture references to the persisted fields exactly as the read
+            // lock saw them. The auto-flush stores this on success so a later
+            // OnStateChangedAsync can short-circuit if no persisted refs have
+            // changed (e.g. RollLog-only mutations from dice rolls).
+            fingerprint = new PersistedFingerprint(
+                maps, sheets, templates, globalRolls, settingsRef, schema,
+                activeSchemaTemplateId, initiativeAttributeName);
 
             // Project DTOs off-lock. Each immutable collection is frozen
             // relative to this snapshot; engine mutations would create a

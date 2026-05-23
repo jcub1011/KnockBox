@@ -18,57 +18,70 @@ namespace KnockBox.DndMapper.Helpers
         {
             if (roll.Rolls is null || roll.Rolls.Count == 0) return string.Empty;
 
-            // Group by sides, preserving first-appearance order so the visual
-            // grouping mirrors the roll order (1d20+1d6 != 1d6+1d20).
-            // d100 is special-cased: dice-box-threejs renders a single d100 as
-            // a tens-only die (faces 00, 10, … 90 interpreted as 100), so a
-            // raw result like 47 can't appear on one die. To show all 1–100
-            // values we expand each d100 into a percentile pair: a tens die
-            // (d100, face = floor(N/10)*10) and a units die (d10, face = N%10).
-            // For N=100, both faces are 0 (visually "00" + "0", read as 100).
-            var order = new List<int>();
-            var groups = new Dictionary<int, List<int>>();
+            // dice-box-threejs has no 100-face geometry — d100 renders as a
+            // tens-only die. Expand each d100 result into a percentile pair
+            // (tens die + d10 units die) so all 1–100 values are visible. For
+            // N=100, both faces are 0 (visually "00" + "0", read as 100).
+            //
+            // Critical: the library's parseNotation only honors ONE "@" suffix
+            // — everything after the first "@" is regex-scanned for *all*
+            // forced result values across *all* dice groups, in dice-creation
+            // order. So per-group "@..." breaks (the second group never gets
+            // added to the dice set). We emit all dice groups first, joined
+            // by "+", then a single "@" followed by results in dice order.
+            var diceOrder = new List<int>();              // sides per spawned die, in order
+            var sidesGroups = new List<(int sides, int count)>();
+            var results = new List<int>();
+            int? lastSides = null;
+            int runCount = 0;
+
+            void FlushRun()
+            {
+                if (lastSides is int s && runCount > 0)
+                {
+                    sidesGroups.Add((s, runCount));
+                }
+                runCount = 0;
+                lastSides = null;
+            }
+
+            void AddDie(int sides, int result)
+            {
+                diceOrder.Add(sides);
+                results.Add(result);
+                if (lastSides == sides) runCount++;
+                else { FlushRun(); lastSides = sides; runCount = 1; }
+            }
+
             foreach (var die in roll.Rolls)
             {
                 if (die.Sides == 100)
                 {
-                    int tens = (die.Result / 10) * 10;
-                    int units = die.Result % 10;
-                    if (die.Result == 100) { tens = 0; units = 0; } // pair shows 00 + 0.
-                    AddResult(order, groups, 100, tens);
-                    AddResult(order, groups, 10, units);
+                    int tens = (die.Result == 100) ? 0 : (die.Result / 10) * 10;
+                    int units = (die.Result == 100) ? 0 : (die.Result % 10);
+                    AddDie(100, tens);
+                    AddDie(10, units);
                 }
                 else
                 {
-                    AddResult(order, groups, die.Sides, die.Result);
+                    AddDie(die.Sides, die.Result);
                 }
             }
+            FlushRun();
 
             var sb = new StringBuilder();
-            for (int i = 0; i < order.Count; i++)
+            for (int i = 0; i < sidesGroups.Count; i++)
             {
-                var sides = order[i];
-                var results = groups[sides];
                 if (i > 0) sb.Append('+');
-                sb.Append(results.Count).Append('d').Append(sides).Append('@');
-                for (int j = 0; j < results.Count; j++)
-                {
-                    if (j > 0) sb.Append(',');
-                    sb.Append(results[j]);
-                }
+                sb.Append(sidesGroups[i].count).Append('d').Append(sidesGroups[i].sides);
+            }
+            sb.Append('@');
+            for (int j = 0; j < results.Count; j++)
+            {
+                if (j > 0) sb.Append(',');
+                sb.Append(results[j]);
             }
             return sb.ToString();
-        }
-
-        private static void AddResult(List<int> order, Dictionary<int, List<int>> groups, int sides, int result)
-        {
-            if (!groups.TryGetValue(sides, out var list))
-            {
-                list = new List<int>();
-                groups[sides] = list;
-                order.Add(sides);
-            }
-            list.Add(result);
         }
     }
 }

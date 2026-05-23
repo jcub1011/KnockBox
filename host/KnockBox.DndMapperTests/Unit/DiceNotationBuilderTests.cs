@@ -18,20 +18,21 @@ namespace KnockBox.DndMapperTests.Unit
         }
 
         [TestMethod]
-        public void Build_GroupsSameSidedDice()
+        public void Build_GroupsSameSidedDice_AndUsesSingleAt()
         {
             var r = MakeRoll(
                 new DieRoll(6, 4, false),
                 new DieRoll(6, 3, false),
                 new DieRoll(8, 6, false));
-            Assert.AreEqual("2d6@4,3+1d8@6", DiceNotationBuilder.Build(r));
+            // Single trailing "@" — the library's parseNotation only honors
+            // one and treats anything after the first "@" as the global
+            // forced-result list across every dice group.
+            Assert.AreEqual("2d6+1d8@4,3,6", DiceNotationBuilder.Build(r));
         }
 
         [TestMethod]
         public void Build_AdvantageIncludesDiscardedDie()
         {
-            // Engine rolls 2d20 for advantage, keeps the higher. Discarded flag is
-            // metadata — the visual roll still needs to show BOTH dice.
             var r = MakeRoll(
                 new DieRoll(20, 18, false),
                 new DieRoll(20, 4, true));
@@ -39,14 +40,16 @@ namespace KnockBox.DndMapperTests.Unit
         }
 
         [TestMethod]
-        public void Build_PreservesOrderAcrossGroups()
+        public void Build_PreservesOrderAcrossDifferentSides()
         {
             var r = MakeRoll(
                 new DieRoll(20, 11, false),
                 new DieRoll(6, 5, false),
                 new DieRoll(20, 7, false));
-            // d20 group appears first (its first occurrence), then d6.
-            Assert.AreEqual("2d20@11,7+1d6@5", DiceNotationBuilder.Build(r));
+            // Source order is honored when sides change between adjacent
+            // dice — d20 then d6 then d20 stays as three separate groups so
+            // results map onto the right die.
+            Assert.AreEqual("1d20+1d6+1d20@11,5,7", DiceNotationBuilder.Build(r));
         }
 
         [TestMethod]
@@ -59,41 +62,41 @@ namespace KnockBox.DndMapperTests.Unit
         [TestMethod]
         public void Build_D100_47_ExpandsToPercentilePair()
         {
-            // dice-box-threejs renders d100 as a tens-only die; pair it with a
-            // d10 units die so any 1–100 value can be shown.
             var r = MakeRoll(new DieRoll(100, 47, false));
-            Assert.AreEqual("1d100@40+1d10@7", DiceNotationBuilder.Build(r));
+            Assert.AreEqual("1d100+1d10@40,7", DiceNotationBuilder.Build(r));
         }
 
         [TestMethod]
         public void Build_D100_50_ShowsTensFiftyUnitsZero()
         {
             var r = MakeRoll(new DieRoll(100, 50, false));
-            Assert.AreEqual("1d100@50+1d10@0", DiceNotationBuilder.Build(r));
+            Assert.AreEqual("1d100+1d10@50,0", DiceNotationBuilder.Build(r));
         }
 
         [TestMethod]
         public void Build_D100_5_ShowsTensZeroUnitsFive()
         {
             var r = MakeRoll(new DieRoll(100, 5, false));
-            Assert.AreEqual("1d100@0+1d10@5", DiceNotationBuilder.Build(r));
+            Assert.AreEqual("1d100+1d10@0,5", DiceNotationBuilder.Build(r));
         }
 
         [TestMethod]
         public void Build_D100_100_ShowsBothZeros()
         {
-            // "00" + "0" is the conventional percentile read for 100.
             var r = MakeRoll(new DieRoll(100, 100, false));
-            Assert.AreEqual("1d100@0+1d10@0", DiceNotationBuilder.Build(r));
+            Assert.AreEqual("1d100+1d10@0,0", DiceNotationBuilder.Build(r));
         }
 
         [TestMethod]
-        public void Build_MultipleD100_GroupsTensAndUnitsTogether()
+        public void Build_MultipleD100_InterleavesTensAndUnitsInOrder()
         {
+            // Two d100 rolls -> tens, units, tens, units. Adjacent same-sided
+            // dice are merged into runs ("1d100+1d10+1d100+1d10"), so the
+            // results [40,7,10,2] map onto the dice in spawn order.
             var r = MakeRoll(
                 new DieRoll(100, 47, false),
                 new DieRoll(100, 12, false));
-            Assert.AreEqual("2d100@40,10+2d10@7,2", DiceNotationBuilder.Build(r));
+            Assert.AreEqual("1d100+1d10+1d100+1d10@40,7,10,2", DiceNotationBuilder.Build(r));
         }
     }
 }

@@ -80,6 +80,20 @@ namespace KnockBox.DndMapper.Pages.Components
         private static string FormatTimestamp(DateTime utc) =>
             utc.ToLocalTime().ToString("HH:mm:ss");
 
+        // d100 is rolled visually as a percentile pair (tens die 00-90 + units
+        // die 0-9) because dice-box-threejs has no 100-face geometry. The chip
+        // still shows the single 1-100 result; the tooltip explains the pair.
+        private static string DieTooltip(DieRoll d)
+        {
+            if (d.Sides == 100)
+            {
+                int tens = (d.Result == 100) ? 0 : (d.Result / 10) * 10;
+                int units = (d.Result == 100) ? 0 : (d.Result % 10);
+                return $"d100 (percentile dice: {tens:D2} + {units} = {d.Result})";
+            }
+            return $"d{d.Sides}";
+        }
+
         private bool CanQuickRoll
         {
             get
