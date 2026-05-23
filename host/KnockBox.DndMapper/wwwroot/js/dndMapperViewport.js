@@ -109,6 +109,26 @@ function applyTransform(state) {
     // handles remain a constant on-screen size regardless of zoom. Stay
     // synced with the wrapper transform — same frame, same callsite.
     state.wrapper.style.setProperty('--dndm-inv-zoom', zoom > 0 ? String(1 / zoom) : '1');
+    // Also report zoom to ruler-overlay groups so they can update their
+    // literal scale attribute. The SVG `transform` attribute does not
+    // honor CSS var() — we'd write var(--dndm-inv-zoom) into it and the
+    // browser would silently ignore the variable. So instead the viewport
+    // walks every [data-dndm-screenpx] node and rewrites its `transform`
+    // with a literal `scale(1 / (base * zoom))` value, plus the world-
+    // anchor stored on data-anchor-x / data-anchor-y. This keeps the dots
+    // and tooltip a constant on-screen size during live wheel-zoom too
+    // (Blazor's StateHasChanged only fires after the gesture commits).
+    if (base > 0 && zoom > 0) {
+        const cellsPerPx = 1 / (base * zoom);
+        const scaledNodes = state.wrapper.querySelectorAll('[data-dndm-screenpx]');
+        for (const node of scaledNodes) {
+            const ax = node.getAttribute('data-anchor-x');
+            const ay = node.getAttribute('data-anchor-y');
+            if (ax !== null && ay !== null) {
+                node.setAttribute('transform', `translate(${ax} ${ay}) scale(${cellsPerPx})`);
+            }
+        }
+    }
     // Mirror pan/zoom into the bitmap canvas renderer so its viewport-sized
     // <canvas> redraws each image at the new screen rect. The canvas module
     // schedules an RAF redraw internally; this call is cheap (just stores

@@ -68,10 +68,6 @@ namespace KnockBox.DndMapper.Pages.Components
         private bool LocalShowGridLines { get; set; } = true;
         private bool _gridInitialized;
 
-        // Real on-screen scale (CSS pixels per cell). Captured from the SVG's
-        // getScreenCTM at the start of a drag/pan; 0 = not yet measured (fallback to
-        // CellPixels*zoom). Cached for the duration of the gesture and cleared on mouse-up.
-        private double _pxPerCell;
         // Assigned in OnInitialized; the individual module slots inside stay
         // null until OnAfterRenderAsync imports each one. Marked null! so
         // callers don't trip a CS8602 chain through `_jsModules?.X`.
@@ -775,21 +771,6 @@ namespace KnockBox.DndMapper.Pages.Components
             await base.OnAfterRenderAsync(firstRender);
         }
 
-        private async ValueTask CaptureScaleAsync()
-        {
-            if (_jsModules.Metrics is null) return;
-            try
-            {
-                double scale = await _jsModules.Metrics.InvokeAsync<double>("getPixelsPerCell", _svgId);
-                if (scale > 0) _pxPerCell = scale;
-            }
-            catch (JSDisconnectedException) { /* circuit teardown */ }
-            catch (Exception ex)
-            {
-                Logger.LogWarning(ex, "Failed to read SVG screen scale; falling back to CellPixels*zoom.");
-            }
-        }
-
         public async ValueTask DisposeAsync()
         {
             TokenFocus.Focused -= OnTokenFocusRequested;
@@ -850,32 +831,35 @@ namespace KnockBox.DndMapper.Pages.Components
 
         private async Task<(double X, double Y)> ClientToMapAsync(double clientX, double clientY)
         {
-            // The SVG viewBox already maps screen pixels into grid-cell units;
-            // recover the cell coords from the cached pixel scale + current pan.
-            await CaptureScaleAsync();
-            if (_pxPerCell <= 0) return (0, 0);
+            // Delegate to clientToSvgPoint (createSVGPoint + getScreenCTM().inverse()),
+            // the same exact conversion path used by token-drag, image-drag, fog-paint,
+            // and focus-drag. getScreenCTM walks every ancestor transform — including
+            // the wrapper's pan/zoom and the rails' layout offset — so the result is
+            // in SVG user-space (= grid cells, since the viewBox is denominated in
+            // cells) with no further pan/rail adjustment needed.
+            if (_jsModules.Metrics is null) return (_panX, _panY);
             try
             {
-                if (_jsModules.Metrics is null) return (_panX, _panY);
-                var rect = await _jsModules.Metrics.InvokeAsync<ViewportMetrics?>("getViewportMetrics", _svgId);
-                if (rect is null || rect.SvgWidth == 0) return (_panX, _panY);
-                // getViewportMetrics returns the SVG box dimensions in client px;
-                // the SVG itself is offset by getBoundingClientRect.left/top, which
-                // we don't have here. Approximate by using the difference between
-                // client position and the metrics' "left" offset (rails width). For
-                // M01 ship this is good enough for the centre-viewport affordance.
-                // TODO M02: extend getViewportMetrics to return the SVG's
-                // getBoundingClientRect.{left,top} so this becomes exact.
-                double localX = clientX - rect.LeftPx;
-                double localY = clientY;
-                double mapX = _panX + localX / _pxPerCell;
-                double mapY = _panY + localY / _pxPerCell;
-                return (mapX, mapY);
+                var pt = await _jsModules.Metrics.InvokeAsync<SvgPoint?>(
+                    "clientToSvgPoint", _svgId, clientX, clientY);
+                if (pt is null) return (_panX, _panY);
+                return (pt.X, pt.Y);
             }
-            catch
+            catch (JSDisconnectedException)
             {
                 return (_panX, _panY);
             }
+            catch (Exception ex)
+            {
+                Logger.LogWarning(ex, "clientToSvgPoint failed; falling back to pan origin.");
+                return (_panX, _panY);
+            }
+        }
+
+        private sealed class SvgPoint
+        {
+            public double X { get; set; }
+            public double Y { get; set; }
         }
 
         private static string F(double value) =>

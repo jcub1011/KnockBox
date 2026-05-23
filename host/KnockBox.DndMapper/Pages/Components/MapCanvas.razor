@@ -231,8 +231,17 @@
         @if (IsHost && _rulerActive && _rulerA is { } ra)
         {
             @* Ruler overlay — host-only, between fog and tokens so tokens
-               sit on top. Dots and label inverse-scale via --dndm-inv-zoom so
-               they stay constant on-screen size at every zoom. *@
+               sit on top. Endpoint dots and the midpoint pill render their
+               inner geometry in screen-pixel units; the wrapping <g> scales
+               by 1/(CellPixels * zoom) so those pixel-numeric values land
+               at a constant on-screen size at every zoom level and any
+               grid cell pitch. The literal scale is also rewritten by
+               dndMapperViewport.js on every gesture frame (data-dndm-
+               screenpx + data-anchor-x/y) so the dots track live wheel-
+               zoom without waiting for Blazor's StateHasChanged. *@
+            var rulerInv = Map.Grid.CellPixels > 0 && _zoom > 0
+                ? 1.0 / (Map.Grid.CellPixels * _zoom)
+                : 1.0 / 64.0;
             <g class="dndm-ruler" pointer-events="none">
                 @if (_rulerB is { } rb)
                 {
@@ -244,7 +253,9 @@
                           stroke="#e89055" stroke-width="0.08" />
                 }
 
-                <g transform="@($"translate({F(ra.X)} {F(ra.Y)}) scale(var(--dndm-inv-zoom, 1))")">
+                <g data-dndm-screenpx="ruler-a"
+                   data-anchor-x="@F(ra.X)" data-anchor-y="@F(ra.Y)"
+                   transform="@($"translate({F(ra.X)} {F(ra.Y)}) scale({F(rulerInv)})")">
                     <circle r="6" fill="#000" fill-opacity="0.55" />
                     <circle r="5" fill="#e89055" stroke="#1a1208" stroke-width="1" />
                 </g>
@@ -255,11 +266,15 @@
                     var midX = (ra.X + rb2.X) / 2.0;
                     var midY = (ra.Y + rb2.Y) / 2.0;
                     var pillHalf = EstimatePillHalfWidth(label);
-                    <g transform="@($"translate({F(rb2.X)} {F(rb2.Y)}) scale(var(--dndm-inv-zoom, 1))")">
+                    <g data-dndm-screenpx="ruler-b"
+                       data-anchor-x="@F(rb2.X)" data-anchor-y="@F(rb2.Y)"
+                       transform="@($"translate({F(rb2.X)} {F(rb2.Y)}) scale({F(rulerInv)})")">
                         <circle r="6" fill="#000" fill-opacity="0.55" />
                         <circle r="5" fill="#e89055" stroke="#1a1208" stroke-width="1" />
                     </g>
-                    <g transform="@($"translate({F(midX)} {F(midY)}) scale(var(--dndm-inv-zoom, 1))")">
+                    <g data-dndm-screenpx="ruler-pill"
+                       data-anchor-x="@F(midX)" data-anchor-y="@F(midY)"
+                       transform="@($"translate({F(midX)} {F(midY)}) scale({F(rulerInv)})")">
                         <rect class="dndm-ruler-pill"
                               x="@F(-pillHalf)" y="-13"
                               width="@F(pillHalf * 2)" height="22"
