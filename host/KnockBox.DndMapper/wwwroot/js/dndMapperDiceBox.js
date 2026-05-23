@@ -50,7 +50,12 @@ async function ensureBox(overlay, userId, color, fontColor) {
         theme_material: "plastic",
         baseScale: 100,
         gravity_multiplier: 600,
-        strength: 1,
+        // Dice-box throw velocity is randomized as (Math.random() + 3) * n *
+        // strength (see dice-box.es.js ~L17110), so strength scales both ends
+        // of the random range. Doubling it from 1→2 lifts the minimum throw
+        // velocity to 2× its baseline so dice actually travel across the
+        // tray instead of barely tipping off the spawn point.
+        strength: 2,
         shadows: true,
         sounds: false,
         onRollComplete: null, // assigned per-roll below so we can capture rollId.
@@ -116,9 +121,15 @@ export async function rollFor(overlay, userId, color, fontColor, notation, dotne
 
 export function disposeAll() {
     for (const [, e] of boxes) {
+        // Null the per-roll callback first so any in-flight physics tick
+        // that fires onRollComplete after dispose can't reach the now-
+        // disposed DotNetObjectReference (ObjectDisposedException noise).
+        try { if (e.box) e.box.onRollComplete = null; } catch (_) { /* ignore */ }
         try { e.box.clearDice(); } catch (_) { /* ignore */ }
         if (e.fadeTimer) clearTimeout(e.fadeTimer);
         if (e.container && e.container.parentNode) e.container.parentNode.removeChild(e.container);
+        e.dotnet = null;
+        e.currentRollId = null;
     }
     boxes.clear();
 }

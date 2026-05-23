@@ -1,5 +1,6 @@
 using System;
 using System.Globalization;
+using System.Text.RegularExpressions;
 using KnockBox.DndMapper.Services.State.Games;
 
 namespace KnockBox.DndMapper.Helpers
@@ -38,8 +39,12 @@ namespace KnockBox.DndMapper.Helpers
             return HslToHex(hue, 0.55, 0.55);
         }
 
+        private static readonly Regex HexPattern = new(
+            @"^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{4}|[0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})$",
+            RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
         private static bool IsValidHex(string? value)
-            => !string.IsNullOrEmpty(value) && value.Length >= 4 && value[0] == '#';
+            => !string.IsNullOrEmpty(value) && HexPattern.IsMatch(value);
 
         internal static string HslToHex(double h, double s, double l)
         {

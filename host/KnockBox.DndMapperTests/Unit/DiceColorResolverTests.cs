@@ -79,5 +79,60 @@ namespace KnockBox.DndMapperTests.Unit
             var resolved = DiceColorResolver.Resolve(state, player.Id);
             StringAssert.Matches(resolved, new System.Text.RegularExpressions.Regex("^#[0-9a-f]{6}$"));
         }
+
+        [TestMethod]
+        [DataRow("#zzz")]
+        [DataRow("#linkedin")]
+        [DataRow("#FFGG00")]
+        [DataRow("#1234567")]
+        [DataRow("FFFFFF")]
+        [DataRow("#")]
+        public void Resolve_PlayerWithInvalidHexTokenColor_FallsBackToHash(string badColor)
+        {
+            var (_, state, _, _) = EngineTestFactory.Build();
+            var player = EngineTestFactory.RegisterPlayer(state);
+
+            var map = new Map
+            {
+                Id = Guid.NewGuid(),
+                Tokens = ImmutableList.Create(new Token
+                {
+                    Id = Guid.NewGuid(),
+                    OwnerUserId = player.Id,
+                    Color = badColor,
+                }),
+            };
+            state.Maps = ImmutableList.Create(map);
+
+            var resolved = DiceColorResolver.Resolve(state, player.Id);
+            Assert.AreNotEqual(badColor, resolved);
+            StringAssert.Matches(resolved, new System.Text.RegularExpressions.Regex("^#[0-9a-f]{6}$"));
+        }
+
+        [TestMethod]
+        [DataRow("#fff")]
+        [DataRow("#ffff")]
+        [DataRow("#ffffff")]
+        [DataRow("#FFFFFFFF")]
+        [DataRow("#aBcDeF")]
+        public void Resolve_PlayerWithValidHexTokenColor_ReturnsTokenColor(string goodColor)
+        {
+            var (_, state, _, _) = EngineTestFactory.Build();
+            var player = EngineTestFactory.RegisterPlayer(state);
+
+            var map = new Map
+            {
+                Id = Guid.NewGuid(),
+                Tokens = ImmutableList.Create(new Token
+                {
+                    Id = Guid.NewGuid(),
+                    OwnerUserId = player.Id,
+                    Color = goodColor,
+                }),
+            };
+            state.Maps = ImmutableList.Create(map);
+
+            Assert.AreEqual(goodColor, DiceColorResolver.Resolve(state, player.Id));
+        }
     }
 }

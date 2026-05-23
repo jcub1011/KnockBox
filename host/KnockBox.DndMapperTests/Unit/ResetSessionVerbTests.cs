@@ -45,8 +45,7 @@ namespace KnockBox.DndMapperTests.Unit
             Assert.IsTrue(_engine.SpawnNpcTokenAsync(_state, _host, mapId, "Goblin").IsSuccess);
             Assert.IsTrue(_engine.CreateSheetAsync(_state, _host, ownerUserId: null, "Goblin").IsSuccess);
 
-            var settings = _state.Settings.Clone();
-            settings.HpTrackingEnabled = !settings.HpTrackingEnabled;
+            var settings = _state.Settings with { HpTrackingEnabled = !_state.Settings.HpTrackingEnabled };
             Assert.IsTrue(_engine.UpdateSettingsAsync(_state, _host, settings).IsSuccess);
 
             // Mutate schema away from the DnD5eCore preset so we can observe the reset.

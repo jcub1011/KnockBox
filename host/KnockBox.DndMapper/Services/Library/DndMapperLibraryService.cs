@@ -882,7 +882,7 @@ namespace KnockBox.DndMapper.Services.Library
             var state = _state;
             var execResult = state.Execute(() =>
             {
-                state.SetSettings(snapshot.Settings.Clone());
+                state.SetSettings(snapshot.Settings with { });
                 state.SetAttributeSchema(hydration.AttrSchema);
 
                 state.Maps = hydration.NewMaps;
@@ -2352,7 +2352,7 @@ namespace KnockBox.DndMapper.Services.Library
                 templates = state.CustomTemplates;
                 globalRolls = state.GlobalRollTemplates;
                 settingsRef = state.Settings;
-                settings = state.Settings.Clone();
+                settings = state.Settings with { };
                 schema = state.AttributeSchema;
                 activeSchemaTemplateId = state.ActiveSchemaTemplateId;
                 initiativeAttributeName = state.InitiativeAttributeName;

@@ -68,6 +68,15 @@ namespace KnockBox.DndMapper.Pages.Components
 
         private async ValueTask OnStateChangedAsync()
         {
+            // Mark new rolls as animating in the synchronous prelude so any
+            // sibling subscriber (RollLogPanel, DndMapperDisplay) sees
+            // IsAnimating=true the first time it paints them. Without this,
+            // subscriber-order races let the panel render the result before
+            // the 3D dice are even kicked off.
+            foreach (var roll in VisibleNewRolls())
+            {
+                Tracker.MarkAnimating(roll.Id);
+            }
             await InvokeAsync(ProcessNewRollsAsync);
         }
 
@@ -142,6 +151,7 @@ namespace KnockBox.DndMapper.Pages.Components
         public override void Dispose()
         {
             _stateSub?.Dispose();
+            _selfRef?.Dispose();
             base.Dispose();
         }
 
@@ -154,8 +164,8 @@ namespace KnockBox.DndMapper.Pages.Components
                 catch (Exception) { /* best-effort */ }
                 try { await _module.DisposeAsync(); }
                 catch (JSDisconnectedException) { }
+                _module = null;
             }
-            _selfRef?.Dispose();
             Dispose();
         }
     }

@@ -820,7 +820,10 @@ namespace KnockBox.DndMapper.Pages.Components
             }
 
             // Resolve the click into map-space coordinates so menu actions
-            // (e.g. "centre everyone here") can use the targeted cell.
+            // (e.g. "centre everyone here") can use the targeted cell. Guard
+            // Map because the active map can be cleared while ClientToMapAsync
+            // awaits a JS round-trip.
+            if (Map is null) return;
             var (mx, my) = await ClientToMapAsync(e.ClientX, e.ClientY);
             if (Map.Grid.SnapToGrid)
             {

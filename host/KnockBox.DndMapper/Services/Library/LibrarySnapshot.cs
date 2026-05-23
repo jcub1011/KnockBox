@@ -282,7 +282,7 @@ namespace KnockBox.DndMapper.Services.Library
             return new LibraryCoreSnapshot
             {
                 SchemaVersion = 4,
-                Settings = state.Settings.Clone(),
+                Settings = state.Settings with { },
                 AttributeSchema = ToSchemaSnapshot(state.AttributeSchema),
                 ActiveSchemaTemplateId = state.ActiveSchemaTemplateId,
                 InitiativeAttributeName = state.InitiativeAttributeName,

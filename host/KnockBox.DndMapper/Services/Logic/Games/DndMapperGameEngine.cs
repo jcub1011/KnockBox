@@ -1104,7 +1104,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             if (newSettings is null) return Result.FromError("Settings are required.");
             if (!IsHost(state, caller)) return Result.FromError("Only the host may update session settings.");
 
-            var exec = state.Execute(() => state.SetSettings(newSettings.Clone()));
+            var exec = state.Execute(() => state.SetSettings(newSettings with { }));
 
             if (exec.IsCanceled) return Result.FromCancellation();
             if (exec.TryGetFailure(out var err)) return Result.FromError(err);
