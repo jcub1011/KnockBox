@@ -3,6 +3,7 @@ using KnockBox.Core.Components.Shared;
 using KnockBox.Core.Services.State.Users;
 using KnockBox.DndMapper.Helpers;
 using KnockBox.DndMapper.Models;
+using KnockBox.DndMapper.Services.Logic;
 using KnockBox.DndMapper.Services.Logic.Games;
 using KnockBox.DndMapper.Services.Logic.Visibility;
 using KnockBox.DndMapper.Services.State.Games;
@@ -24,12 +25,18 @@ namespace KnockBox.DndMapper.Pages.Components
         [Parameter, EditorRequired] public DiceRollerConfig Config { get; set; } = default!;
         [Parameter] public string CurrentUserId { get; set; } = string.Empty;
         [Parameter] public bool IsHost { get; set; }
+        [Parameter] public EventCallback OnHeaderClick { get; set; }
+
+        private Task OnHeaderClickHandler() =>
+            OnHeaderClick.HasDelegate ? OnHeaderClick.InvokeAsync() : Task.CompletedTask;
 
         [Inject] protected DndMapperGameEngine Engine { get; set; } = default!;
         [Inject] protected IUserService UserService { get; set; } = default!;
+        [Inject] protected IDiceAnimationTracker Tracker { get; set; } = default!;
         [CascadingParameter] public DndMapperToastService? Toasts { get; set; }
 
         private IDisposable? _stateSub;
+        private Action? _trackerSub;
 
         private bool _historyOpen;
         private List<RollResult> _historySnapshot = [];
@@ -42,6 +49,8 @@ namespace KnockBox.DndMapper.Pages.Components
         protected override void OnInitialized()
         {
             _stateSub = State.StateChangedEventManager.Subscribe(async () => await InvokeAsync(StateHasChanged));
+            _trackerSub = () => _ = InvokeAsync(StateHasChanged);
+            Tracker.Changed += _trackerSub;
             ResolvePickableSheets();
             base.OnInitialized();
         }
@@ -58,7 +67,7 @@ namespace KnockBox.DndMapper.Pages.Components
             {
                 var filtered = RollLogVisibilityFilter.VisibleTo(
                     State.RollLog, CurrentUserId, IsHost, State.Settings.RollsVisibleToPlayers);
-                var list = filtered.ToList();
+                var list = filtered.Where(r => !Tracker.IsAnimating(r.Id)).ToList();
                 if (list.Count > MaxEntries)
                 {
                     list = list.GetRange(list.Count - MaxEntries, MaxEntries);
@@ -121,7 +130,7 @@ namespace KnockBox.DndMapper.Pages.Components
         {
             var filtered = RollLogVisibilityFilter.VisibleTo(
                 State.RollLog, CurrentUserId, IsHost, State.Settings.RollsVisibleToPlayers);
-            var list = filtered.ToList();
+            var list = filtered.Where(r => !Tracker.IsAnimating(r.Id)).ToList();
             list.Reverse();
             _historySnapshot = list;
             _historyCapturedAt = DateTime.Now;
@@ -291,6 +300,7 @@ namespace KnockBox.DndMapper.Pages.Components
         public override void Dispose()
         {
             _stateSub?.Dispose();
+            if (_trackerSub is not null) Tracker.Changed -= _trackerSub;
             base.Dispose();
         }
     }

@@ -7,7 +7,9 @@
 @inherits DisposableComponent
 
 <section class="dndm-panel dndm-rolllog">
-    <header class="dndm-panel-header">
+    <header class="dndm-panel-header @(OnHeaderClick.HasDelegate ? "dndm-rolllog-header--clickable" : null)"
+            @onclick="OnHeaderClickHandler"
+            title="@(OnHeaderClick.HasDelegate ? "Click to minimize" : null)">
         <span>Roll</span>
     </header>
     <div class="dndm-panel-body dndm-rolllog-body">
