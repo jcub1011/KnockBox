@@ -264,8 +264,7 @@ namespace KnockBox.DndMapper.Pages.Components
         {
             if (UserService.CurrentUser is null) return;
             if (State.Settings.HpTrackingEnabled == enabled) return;
-            var next = State.Settings.Clone();
-            next.HpTrackingEnabled = enabled;
+            var next = State.Settings with { HpTrackingEnabled = enabled };
             var result = Engine.UpdateSettingsAsync(State, UserService.CurrentUser, next);
             if (result.TryGetFailure(out var err) && Toasts is not null)
                 await Toasts.Push(err.PublicMessage, DndMapperToastTone.Danger);

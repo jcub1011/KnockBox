@@ -751,6 +751,42 @@ public sealed class AbstractGameStateTests
         Assert.AreSame(tcs.Task, completed, "StateChanged was not fired after Execute.");
     }
 
+    // ── Reader concurrency ────────────────────────────────────────────────────
+
+    [TestMethod]
+    public async Task WithExclusiveReadAsync_TwoReaders_RunConcurrently()
+    {
+        // Regression: WithExclusiveRead* used to share the write mutex, so two
+        // reads serialized one-for-one even though they don't mutate. Now
+        // they should run in parallel — i.e. the second reader's lambda
+        // must be admitted while the first reader's lambda is still inside.
+        using var state = MakeState();
+
+        var bothInside = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        int inside = 0;
+
+        async ValueTask Reader()
+        {
+            await state.WithExclusiveReadAsync(async () =>
+            {
+                if (Interlocked.Increment(ref inside) == 2)
+                    bothInside.TrySetResult();
+                await release.Task;
+            });
+        }
+
+        var a = Reader().AsTask();
+        var b = Reader().AsTask();
+
+        var both = await Task.WhenAny(bothInside.Task, Task.Delay(TimeSpan.FromSeconds(5)));
+        Assert.AreSame(bothInside.Task, both,
+            "Both readers must be admitted concurrently; the second one was blocked behind the first.");
+
+        release.SetResult();
+        await Task.WhenAll(a, b);
+    }
+
     // ── ScheduleCallback ──────────────────────────────────────────────────────
 
     [TestMethod]

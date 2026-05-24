@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using KnockBox.Core.Services.State.Games.Shared;
 using KnockBox.Core.Services.State.Users;
 using KnockBox.DndMapper.Models;
@@ -14,16 +15,19 @@ namespace KnockBox.DndMapper.Services.State.Games
         public AttributeSchema AttributeSchema { get; private set; }
             = AttributeSchema.FromPreset(AttributePreset.DnD5eCore);
 
-        public List<Map> Maps { get; } = [];
+        public ImmutableList<Map> Maps { get; internal set; } = ImmutableList<Map>.Empty;
         public Guid? ActiveMapId { get; private set; }
 
-        public Dictionary<Guid, CharacterSheet> Sheets { get; } = [];
-        public Dictionary<Guid, NamedTemplate> CustomTemplates { get; } = [];
-        public List<RollResult> RollLog { get; } = [];
+        public ImmutableDictionary<Guid, CharacterSheet> Sheets { get; internal set; }
+            = ImmutableDictionary<Guid, CharacterSheet>.Empty;
+        public ImmutableDictionary<Guid, NamedTemplate> CustomTemplates { get; internal set; }
+            = ImmutableDictionary<Guid, NamedTemplate>.Empty;
+        public ImmutableList<RollResult> RollLog { get; internal set; } = ImmutableList<RollResult>.Empty;
 
         // Host-managed roll templates that ride with the save slot and are
         // visible to every sheet. Players can't author or edit these.
-        public List<RollTemplate> GlobalRollTemplates { get; } = [];
+        public ImmutableList<RollTemplate> GlobalRollTemplates { get; internal set; }
+            = ImmutableList<RollTemplate>.Empty;
 
         // Status-effect templates live as children of NamedTemplate
         // (attribute schemas). This id pins which schema the Effect Library
@@ -42,8 +46,13 @@ namespace KnockBox.DndMapper.Services.State.Games
         public CombatState? ActiveCombat { get; private set; }
         public CenterViewportRequest? PendingCenterRequest { get; private set; }
 
+        // Host-drawn focus rectangle that drives the display view's SVG viewBox.
+        // Lives on state (so the display circuit can observe it), but is not
+        // serialized — a process restart clears it.
+        public FocusRect? FocusRect { get; private set; }
+
         // Running total of bytes consumed by uploaded images on this state. Used to
-        // enforce the per-room 10 MB cap. Mutated only by image verbs inside Execute.
+        // enforce the per-room 1 GB cap. Mutated only by image verbs inside Execute.
         public long BytesUsed { get; private set; }
 
         // Deterministic IDs so library snapshots that reference built-ins by
@@ -125,14 +134,18 @@ namespace KnockBox.DndMapper.Services.State.Games
             // without the host having to configure one. User-saved Custom
             // schemas still start unset and fall back to the legacy
             // case-insensitive DEX lookup until the host picks one.
-            AddBuiltIn(BuiltInDnD5eCoreId, "D&D 5e core", AttributePreset.DnD5eCore, initiativeAttribute: "DEX");
-            AddBuiltIn(BuiltInDnD5ePlusSkillsId, "D&D 5e + skills", AttributePreset.DnD5ePlusCommonSkills, initiativeAttribute: "DEX");
-            AddBuiltIn(BuiltInSimpleD20Id, "Simple d20", AttributePreset.SimpleD20, initiativeAttribute: "Modifier");
+            var builder = CustomTemplates.ToBuilder();
+            AddBuiltIn(builder, BuiltInDnD5eCoreId, "D&D 5e core", AttributePreset.DnD5eCore, initiativeAttribute: "DEX");
+            AddBuiltIn(builder, BuiltInDnD5ePlusSkillsId, "D&D 5e + skills", AttributePreset.DnD5ePlusCommonSkills, initiativeAttribute: "DEX");
+            AddBuiltIn(builder, BuiltInSimpleD20Id, "Simple d20", AttributePreset.SimpleD20, initiativeAttribute: "Modifier");
+            CustomTemplates = builder.ToImmutable();
 
-            void AddBuiltIn(Guid id, string name, AttributePreset preset, string initiativeAttribute)
+            static void AddBuiltIn(
+                ImmutableDictionary<Guid, NamedTemplate>.Builder b,
+                Guid id, string name, AttributePreset preset, string initiativeAttribute)
             {
                 var rows = AttributeSchema.FromPreset(preset).Rows;
-                CustomTemplates[id] = new NamedTemplate
+                b[id] = new NamedTemplate
                 {
                     Id = id,
                     Name = name,
@@ -151,14 +164,85 @@ namespace KnockBox.DndMapper.Services.State.Games
         internal void SetActiveMapId(Guid? mapId) => ActiveMapId = mapId;
         internal void SetActiveCombat(CombatState? combat) => ActiveCombat = combat;
         internal void SetPendingCenterRequest(CenterViewportRequest? request) => PendingCenterRequest = request;
+        internal void SetFocusRect(FocusRect? rect) => FocusRect = rect;
         internal void SetBytesUsed(long value) => BytesUsed = value < 0 ? 0 : value;
         internal void AdjustBytesUsed(long delta) => BytesUsed = Math.Max(0, BytesUsed + delta);
 
         internal void AppendRoll(RollResult result)
         {
-            RollLog.Add(result);
-            if (RollLog.Count > RollLogCap)
-                RollLog.RemoveRange(0, RollLog.Count - RollLogCap);
+            var next = RollLog.Add(result);
+            if (next.Count > RollLogCap)
+                next = next.RemoveRange(0, next.Count - RollLogCap);
+            RollLog = next;
+        }
+
+        // ── Update helpers ────────────────────────────────────────────────────
+        //
+        // Each helper finds the entity by id and replaces it in the appropriate
+        // immutable collection via the update lambda. Callers express mutations
+        // as `state.UpdateToken(mapId, tokenId, t => t with { X = newX })`.
+        // Must be called from inside state.Execute.
+
+        // Returns true when the map exists and the update lambda was applied;
+        // false when the map id is unknown. Mirrors the existing engine pattern
+        // of guarding with FirstOrDefault checks.
+        internal bool UpdateMap(Guid mapId, Func<Map, Map> update)
+        {
+            var idx = IndexOfMap(mapId);
+            if (idx < 0) return false;
+            var current = Maps[idx];
+            var next = update(current);
+            if (!ReferenceEquals(next, current))
+                Maps = Maps.SetItem(idx, next);
+            return true;
+        }
+
+        internal bool UpdateToken(Guid mapId, Guid tokenId, Func<Token, Token> update)
+        {
+            var mapIdx = IndexOfMap(mapId);
+            if (mapIdx < 0) return false;
+            var map = Maps[mapIdx];
+            var tokenIdx = IndexOfToken(map, tokenId);
+            if (tokenIdx < 0) return false;
+            var current = map.Tokens[tokenIdx];
+            var next = update(current);
+            if (ReferenceEquals(next, current)) return true;
+            var nextMap = map with { Tokens = map.Tokens.SetItem(tokenIdx, next) };
+            Maps = Maps.SetItem(mapIdx, nextMap);
+            return true;
+        }
+
+        internal bool UpdateSheet(Guid sheetId, Func<CharacterSheet, CharacterSheet> update)
+        {
+            if (!Sheets.TryGetValue(sheetId, out var current)) return false;
+            var next = update(current);
+            if (!ReferenceEquals(next, current))
+                Sheets = Sheets.SetItem(sheetId, next);
+            return true;
+        }
+
+        // Linear scans; map/sheet counts are small and the existing engine
+        // code uses FirstOrDefault on the same collections, so we match the
+        // existing scaling rather than over-engineering with hash indexes.
+        internal int IndexOfMap(Guid mapId)
+        {
+            for (var i = 0; i < Maps.Count; i++)
+                if (Maps[i].Id == mapId) return i;
+            return -1;
+        }
+
+        internal static int IndexOfToken(Map map, Guid tokenId)
+        {
+            for (var i = 0; i < map.Tokens.Count; i++)
+                if (map.Tokens[i].Id == tokenId) return i;
+            return -1;
+        }
+
+        internal static int IndexOfImage(Map map, Guid imageId)
+        {
+            for (var i = 0; i < map.Images.Count; i++)
+                if (map.Images[i].Id == imageId) return i;
+            return -1;
         }
     }
 }

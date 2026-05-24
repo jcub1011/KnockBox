@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "name": "Word Service",
+  "description": "Shared word-existence and dictionary lookup service for word games.",
+  "routeIdentifier": "word-service",
+  "version": "1.0.0",
+  "entryAssembly": "KnockBox.WordService",
+  "kind": "library",
+  "exportedContracts": ["KnockBox.WordService.Contracts"],
+  "capabilities": []
+}

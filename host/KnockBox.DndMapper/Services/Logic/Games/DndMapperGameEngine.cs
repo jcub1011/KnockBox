@@ -1,3 +1,5 @@
+using System.Collections.Immutable;
+using System.Runtime.InteropServices;
 using KnockBox.Core.Primitives.Returns;
 using KnockBox.Core.Services.Logic.Games.Engines.Shared;
 using KnockBox.Core.Services.Logic.RandomGeneration;
@@ -20,17 +22,14 @@ namespace KnockBox.DndMapper.Services.Logic.Games
 
         // Image caps — bytes never reach the server now; host's IndexedDB owns the blobs
         // and the server only tracks metadata + the published share token. The caps still
-        // enforce a 5 MB-per-file / 10 MB-per-room budget on what's *referenced* by state
+        // enforce a 100 MB-per-file / 1 GB-per-room budget on what's *referenced* by state
         // so a misbehaving caller can't balloon AbstractGameState.
-        private const long PerFileCapBytes = 5L * 1024 * 1024;
-        private const long PerRoomCapBytes = 10L * 1024 * 1024;
+        internal const long PerFileCapBytes = 100L * 1024 * 1024;
+        internal const long PerRoomCapBytes = 1024L * 1024 * 1024;
 
-        private static readonly HashSet<string> AllowedImageContentTypes = new(StringComparer.OrdinalIgnoreCase)
-        {
-            "image/png",
-            "image/jpeg",
-            "image/webp",
-        };
+        internal static readonly IReadOnlyList<string> AllowedImageContentTypeList =
+            ["image/png", "image/jpeg", "image/webp"];
+        private static readonly HashSet<string> AllowedImageContentTypes = new(AllowedImageContentTypeList, StringComparer.OrdinalIgnoreCase);
 
         private readonly ILogger<DndMapperGameEngine> _logger;
         private readonly ILogger<DndMapperGameState> _stateLogger;
@@ -81,7 +80,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                 {
                     foreach (var entry in state.Players)
                     {
-                        SpawnPlayerTokenInternal(state, activeMap, entry.User);
+                        SpawnPlayerTokenInternal(state, activeMap.Id, entry.User);
                     }
                 }
             });
@@ -110,7 +109,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             var newId = Guid.NewGuid();
             var exec = state.Execute(() =>
             {
-                state.Maps.Add(new Map
+                state.Maps = state.Maps.Add(new Map
                 {
                     Id = newId,
                     Name = name,
@@ -135,9 +134,8 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             string? error = null;
             var exec = state.Execute(() =>
             {
-                var map = state.Maps.FirstOrDefault(m => m.Id == mapId);
-                if (map is null) { error = "Unknown map id."; return; }
-                map.Name = newName;
+                if (!state.UpdateMap(mapId, m => m with { Name = newName }))
+                    error = "Unknown map id.";
             });
 
             if (exec.IsCanceled) return Result.FromCancellation();
@@ -154,15 +152,16 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             string? error = null;
             var exec = state.Execute(() =>
             {
-                var map = state.Maps.FirstOrDefault(m => m.Id == mapId);
-                if (map is null) { error = "Unknown map id."; return; }
+                var idx = state.IndexOfMap(mapId);
+                if (idx < 0) { error = "Unknown map id."; return; }
+                var map = state.Maps[idx];
 
                 long deltaBytes = 0;
                 foreach (var image in map.Images)
                     deltaBytes += image.ByteSize;
                 if (deltaBytes > 0) state.AdjustBytesUsed(-deltaBytes);
 
-                state.Maps.Remove(map);
+                state.Maps = state.Maps.RemoveAt(idx);
 
                 if (state.ActiveMapId == mapId)
                 {
@@ -194,12 +193,12 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                 {
                     Id = newId,
                     Name = $"{source.Name} (copy)",
-                    Grid = source.Grid.Clone(),
+                    Grid = source.Grid,
                     ListOrder = state.Maps.Count,
                     CreatedUtc = DateTime.UtcNow,
                     DefaultSpawnPosition = source.DefaultSpawnPosition,
                 };
-                state.Maps.Add(clone);
+                state.Maps = state.Maps.Add(clone);
             });
 
             if (exec.IsCanceled) return ValueResult<Guid>.FromCancellation();
@@ -226,11 +225,11 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                     return;
                 }
 
-                for (int i = 0; i < orderedIds.Count; i++)
-                {
-                    var map = state.Maps.First(m => m.Id == orderedIds[i]);
-                    map.ListOrder = i;
-                }
+                var orderByIndex = new Dictionary<Guid, int>(orderedIds.Count);
+                for (int i = 0; i < orderedIds.Count; i++) orderByIndex[orderedIds[i]] = i;
+                state.Maps = state.Maps
+                    .Select(m => m with { ListOrder = orderByIndex[m.Id] })
+                    .ToImmutableList();
             });
 
             if (exec.IsCanceled) return Result.FromCancellation();
@@ -254,8 +253,11 @@ namespace KnockBox.DndMapper.Services.Logic.Games
 
                 foreach (var entry in state.Players)
                 {
-                    if (!map.Tokens.Any(t => t.Type == TokenType.PlayerToken && t.OwnerUserId == entry.User.Id))
-                        SpawnPlayerTokenInternal(state, map, entry.User);
+                    // Re-fetch in case a prior spawn this loop replaced the map.
+                    var liveMap = state.Maps.FirstOrDefault(m => m.Id == mapId);
+                    if (liveMap is null) break;
+                    if (!liveMap.Tokens.Any(t => t.Type == TokenType.PlayerToken && t.OwnerUserId == entry.User.Id))
+                        SpawnPlayerTokenInternal(state, mapId, entry.User);
                 }
             });
 
@@ -270,29 +272,52 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             if (caller is null) return Result.FromError("Caller is required.");
             if (newGrid is null) return Result.FromError("Grid is required.");
             if (!IsHost(state, caller)) return Result.FromError("Only the host may update grid configuration.");
-            if (newGrid.WidthCells < 5 || newGrid.WidthCells > 200)
-                return Result.FromError("Grid width must be between 5 and 200 cells.");
-            if (newGrid.HeightCells < 5 || newGrid.HeightCells > 200)
-                return Result.FromError("Grid height must be between 5 and 200 cells.");
-            if (newGrid.CellPixels < 1)
-                return Result.FromError("Cell pixel size must be at least 1.");
+            if (newGrid.WidthCells < 1 || newGrid.WidthCells > 1000)
+                return Result.FromError("Grid width must be between 1 and 1000 cells.");
+            if (newGrid.HeightCells < 1 || newGrid.HeightCells > 1000)
+                return Result.FromError("Grid height must be between 1 and 1000 cells.");
+            if (newGrid.CellPixels < 1 || newGrid.CellPixels > 1000)
+                return Result.FromError("Cell pixel size must be between 1 and 1000.");
 
             string? error = null;
             var exec = state.Execute(() =>
             {
-                var map = state.Maps.FirstOrDefault(m => m.Id == mapId);
-                if (map is null) { error = "Unknown map id."; return; }
-                map.Grid = newGrid.Clone();
-
-                // Tokens are stored at cell-center coordinates; clamp any that fall
-                // outside the new bounds to the nearest in-bounds cell center.
-                // Images are intentionally left as-is so the host can reposition them.
-                double maxX = Math.Max(0.5, map.Grid.WidthCells - 0.5);
-                double maxY = Math.Max(0.5, map.Grid.HeightCells - 0.5);
-                foreach (var token in map.Tokens)
+                if (!state.UpdateMap(mapId, m =>
                 {
-                    token.X = Math.Clamp(token.X, 0.5, maxX);
-                    token.Y = Math.Clamp(token.Y, 0.5, maxY);
+                    bool gridDimsChanged = m.Grid.WidthCells != newGrid.WidthCells
+                        || m.Grid.HeightCells != newGrid.HeightCells;
+                    // Mask bit layout is keyed off WidthCells; treat any dim change as a
+                    // fog mutation so canvas memoization rebuilds the polygon.
+                    var nextFogVersion = (gridDimsChanged && !m.FogMask.IsDefaultOrEmpty)
+                        ? m.FogVersion + 1
+                        : m.FogVersion;
+
+                    // Tokens are stored at cell-center coordinates; clamp any that fall
+                    // outside the new bounds to the nearest in-bounds cell center.
+                    // Images are intentionally left as-is so the host can reposition them.
+                    double maxX = Math.Max(0.5, newGrid.WidthCells - 0.5);
+                    double maxY = Math.Max(0.5, newGrid.HeightCells - 0.5);
+                    var newTokens = m.Tokens;
+                    if (m.Tokens.Count > 0)
+                    {
+                        newTokens = m.Tokens
+                            .Select(t => t with
+                            {
+                                X = Math.Clamp(t.X, 0.5, maxX),
+                                Y = Math.Clamp(t.Y, 0.5, maxY),
+                            })
+                            .ToImmutableList();
+                    }
+
+                    return m with
+                    {
+                        Grid = newGrid,
+                        FogVersion = nextFogVersion,
+                        Tokens = newTokens,
+                    };
+                }))
+                {
+                    error = "Unknown map id.";
                 }
             });
 
@@ -318,7 +343,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             var exec = state.Execute(() =>
             {
                 if (state.ActiveMapId is not Guid mapId ||
-                    state.Maps.FirstOrDefault(m => m.Id == mapId) is not Map map)
+                    state.Maps.FirstOrDefault(m => m.Id == mapId) is null)
                 {
                     error = "No active map.";
                     return;
@@ -332,7 +357,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                     return;
                 }
 
-                newTokenId = SpawnPlayerTokenInternal(state, map, targetUser);
+                newTokenId = SpawnPlayerTokenInternal(state, mapId, targetUser);
             });
 
             if (exec.IsCanceled) return ValueResult<Guid>.FromCancellation();
@@ -374,14 +399,15 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             string? error = null;
             var exec = state.Execute(() =>
             {
-                var map = state.Maps.FirstOrDefault(m => m.Id == mapId);
-                if (map is null) { error = "Unknown map id."; return; }
+                var mapIdx = state.IndexOfMap(mapId);
+                if (mapIdx < 0) { error = "Unknown map id."; return; }
+                var map = state.Maps[mapIdx];
 
                 string color = DefaultColorPalette.FromName(name);
 
                 newId = Guid.NewGuid();
                 var (cx, cy) = ResolveSpawn(map, atX, atY);
-                map.Tokens.Add(new Token
+                var newToken = new Token
                 {
                     Id = newId,
                     Type = TokenType.NPCToken,
@@ -393,7 +419,8 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                     MapId = mapId,
                     X = cx,
                     Y = cy,
-                });
+                };
+                state.Maps = state.Maps.SetItem(mapIdx, map with { Tokens = map.Tokens.Add(newToken) });
             });
 
             if (exec.IsCanceled) return ValueResult<Guid>.FromCancellation();
@@ -426,8 +453,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                 // Re-applying server-side guarantees tokens come to rest on cell
                 // centers whenever the map's grid has SnapToGrid enabled.
                 var (sx, sy) = SnapToGridHelper.Snap(newX, newY, map.Grid);
-                token.X = sx;
-                token.Y = sy;
+                state.UpdateToken(map.Id, tokenId, t => t with { X = sx, Y = sy });
             });
 
             if (exec.IsCanceled) return Result.FromCancellation();
@@ -445,16 +471,19 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             string? error = null;
             var exec = state.Execute(() =>
             {
-                var (token, _) = FindTokenAndMap(state, tokenId);
-                if (token is null) { error = "Unknown token id."; return; }
+                var (token, map) = FindTokenAndMap(state, tokenId);
+                if (token is null || map is null) { error = "Unknown token id."; return; }
 
                 bool isHost = IsHost(state, caller);
                 bool isOwner = token.OwnerUserId is not null && token.OwnerUserId == caller.Id;
                 if (!isHost && !isOwner) { error = "You are not permitted to update this token."; return; }
 
-                token.Name = name;
-                token.Color = color;
-                token.IconKind = iconKind;
+                state.UpdateToken(map.Id, tokenId, t => t with
+                {
+                    Name = name,
+                    Color = color,
+                    IconKind = iconKind,
+                });
 
                 // Propagate to a linked sheet so the two stay in sync. Guarded
                 // by value-compare to avoid pointless StateChanged churn.
@@ -462,7 +491,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                     && state.Sheets.TryGetValue(linkedSheetId, out var linkedSheet)
                     && linkedSheet.CharacterName != name)
                 {
-                    linkedSheet.CharacterName = name;
+                    state.UpdateSheet(linkedSheetId, s => s with { CharacterName = name });
                 }
             });
 
@@ -498,7 +527,9 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                     return;
                 }
 
-                map.Tokens.Remove(token);
+                var mapIdx = state.IndexOfMap(map.Id);
+                var tokenIdx = DndMapperGameState.IndexOfToken(map, tokenId);
+                state.Maps = state.Maps.SetItem(mapIdx, map with { Tokens = map.Tokens.RemoveAt(tokenIdx) });
             });
 
             if (exec.IsCanceled) return Result.FromCancellation();
@@ -522,8 +553,8 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             string? error = null;
             var exec = state.Execute(() =>
             {
-                var (token, _) = FindTokenAndMap(state, tokenId);
-                if (token is null) { error = "Unknown token id."; return; }
+                var (token, map) = FindTokenAndMap(state, tokenId);
+                if (token is null || map is null) { error = "Unknown token id."; return; }
                 if (sheetId is Guid sid)
                 {
                     if (!state.Sheets.TryGetValue(sid, out var sheet))
@@ -548,17 +579,21 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                     // Name inheritance on link: prefer the sheet name when it has one
                     // (resolves the "both already named" case in the sheet's favor);
                     // otherwise fall back to copying the token name onto the sheet.
+                    string nextTokenName = token.Name;
+                    string nextSheetCharacterName = sheet.CharacterName;
                     if (!string.IsNullOrWhiteSpace(sheet.CharacterName)
                         && token.Name != sheet.CharacterName)
                     {
-                        token.Name = sheet.CharacterName;
+                        nextTokenName = sheet.CharacterName;
                     }
                     else if (!string.IsNullOrWhiteSpace(token.Name)
                         && sheet.CharacterName != token.Name)
                     {
-                        sheet.CharacterName = token.Name;
+                        nextSheetCharacterName = token.Name;
                     }
 
+                    string? nextSheetOwner = sheet.OwnerUserId;
+                    string? nextSheetRepresents = sheet.RepresentsUserId;
                     // Attaching a sheet to a player-owned token transfers
                     // sheet ownership to that player so the sheet shows up in
                     // their character-sheet panel. Reject if the target player
@@ -570,11 +605,25 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                             error = "Target player already owns a character sheet.";
                             return;
                         }
-                        sheet.OwnerUserId = ownerId;
-                        sheet.RepresentsUserId = null;
+                        nextSheetOwner = ownerId;
+                        nextSheetRepresents = null;
+                    }
+
+                    if (!ReferenceEquals(nextTokenName, token.Name))
+                        state.UpdateToken(map.Id, tokenId, t => t with { Name = nextTokenName });
+                    if (nextSheetCharacterName != sheet.CharacterName
+                        || nextSheetOwner != sheet.OwnerUserId
+                        || nextSheetRepresents != sheet.RepresentsUserId)
+                    {
+                        state.UpdateSheet(sid, s => s with
+                        {
+                            CharacterName = nextSheetCharacterName,
+                            OwnerUserId = nextSheetOwner,
+                            RepresentsUserId = nextSheetRepresents,
+                        });
                     }
                 }
-                token.SheetId = sheetId;
+                state.UpdateToken(map.Id, tokenId, t => t with { SheetId = sheetId });
             });
 
             if (exec.IsCanceled) return Result.FromCancellation();
@@ -596,8 +645,8 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             string? error = null;
             var exec = state.Execute(() =>
             {
-                var (token, _) = FindTokenAndMap(state, tokenId);
-                if (token is null) { error = "Unknown token id."; return; }
+                var (token, map) = FindTokenAndMap(state, tokenId);
+                if (token is null || map is null) { error = "Unknown token id."; return; }
                 if (token.Type == TokenType.PlayerToken)
                 {
                     error = "Player tokens cannot represent another player.";
@@ -609,7 +658,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                     error = "Unknown player id.";
                     return;
                 }
-                token.RepresentsUserId = representsUserId;
+                state.UpdateToken(map.Id, tokenId, t => t with { RepresentsUserId = representsUserId });
             });
 
             if (exec.IsCanceled) return Result.FromCancellation();
@@ -626,9 +675,9 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             string? error = null;
             var exec = state.Execute(() =>
             {
-                var (token, _) = FindTokenAndMap(state, tokenId);
-                if (token is null) { error = "Unknown token id."; return; }
-                token.Hidden = hidden;
+                var (token, map) = FindTokenAndMap(state, tokenId);
+                if (token is null || map is null) { error = "Unknown token id."; return; }
+                state.UpdateToken(map.Id, tokenId, t => t with { Hidden = hidden });
             });
 
             if (exec.IsCanceled) return Result.FromCancellation();
@@ -667,9 +716,9 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                     Id = newId,
                     OwnerUserId = ownerUserId,
                     CharacterName = characterName,
+                    Values = SeedSheetValues(state.AttributeSchema),
                 };
-                SeedSheetValues(sheet, state.AttributeSchema);
-                state.Sheets[newId] = sheet;
+                state.Sheets = state.Sheets.SetItem(newId, sheet);
             });
 
             if (exec.IsCanceled) return ValueResult<Guid>.FromCancellation();
@@ -695,7 +744,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                 if (row is null) { error = "Unknown attribute."; return; }
                 if (row.Type != value.Type) { error = "Attribute value type does not match the schema."; return; }
 
-                sheet.Values[attributeName] = value;
+                state.UpdateSheet(sheetId, s => s with { Values = s.Values.SetItem(attributeName, value) });
             });
 
             if (exec.IsCanceled) return Result.FromCancellation();
@@ -715,21 +764,33 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                 if (!state.Sheets.TryGetValue(sheetId, out var sheet)) { error = "Unknown sheet id."; return; }
                 if (!CanEditSheet(state, caller, sheet)) { error = "You are not permitted to edit this sheet."; return; }
 
-                sheet.CharacterName = characterName;
-                sheet.Notes = notes ?? string.Empty;
-                sheet.Hp = hp;
-                sheet.MaxHp = maxHp;
+                state.UpdateSheet(sheetId, s => s with
+                {
+                    CharacterName = characterName,
+                    Notes = notes ?? string.Empty,
+                    Hp = hp,
+                    MaxHp = maxHp,
+                });
 
                 // Propagate rename to every linked token so the token roster
                 // and SVG label stay in sync with the sheet.
-                foreach (var map in state.Maps)
-                {
-                    foreach (var token in map.Tokens)
+                state.Maps = state.Maps
+                    .Select(m =>
                     {
-                        if (token.SheetId == sheetId && token.Name != characterName)
-                            token.Name = characterName;
-                    }
-                }
+                        var anyChange = false;
+                        var newTokens = m.Tokens;
+                        for (int i = 0; i < newTokens.Count; i++)
+                        {
+                            var token = newTokens[i];
+                            if (token.SheetId == sheetId && token.Name != characterName)
+                            {
+                                newTokens = newTokens.SetItem(i, token with { Name = characterName });
+                                anyChange = true;
+                            }
+                        }
+                        return anyChange ? m with { Tokens = newTokens } : m;
+                    })
+                    .ToImmutableList();
             });
 
             if (exec.IsCanceled) return Result.FromCancellation();
@@ -746,16 +807,26 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             string? error = null;
             var exec = state.Execute(() =>
             {
-                if (!state.Sheets.Remove(sheetId)) { error = "Unknown sheet id."; return; }
+                if (!state.Sheets.ContainsKey(sheetId)) { error = "Unknown sheet id."; return; }
+                state.Sheets = state.Sheets.Remove(sheetId);
 
-                foreach (var map in state.Maps)
-                {
-                    foreach (var token in map.Tokens)
+                state.Maps = state.Maps
+                    .Select(m =>
                     {
-                        if (token.SheetId == sheetId)
-                            token.SheetId = null;
-                    }
-                }
+                        var anyChange = false;
+                        var newTokens = m.Tokens;
+                        for (int i = 0; i < newTokens.Count; i++)
+                        {
+                            var token = newTokens[i];
+                            if (token.SheetId == sheetId)
+                            {
+                                newTokens = newTokens.SetItem(i, token with { SheetId = null });
+                                anyChange = true;
+                            }
+                        }
+                        return anyChange ? m with { Tokens = newTokens } : m;
+                    })
+                    .ToImmutableList();
             });
 
             if (exec.IsCanceled) return Result.FromCancellation();
@@ -802,23 +873,27 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                     nextInitiative = null;
                 state.SetInitiativeAttributeName(nextInitiative);
 
-                foreach (var sheet in state.Sheets.Values)
-                {
-                    var oldValues = new Dictionary<string, AttributeValue>(sheet.Values);
-                    sheet.Values.Clear();
-                    foreach (var row in newSchema.Rows)
-                    {
-                        if (oldValues.TryGetValue(row.Name, out var existing) && existing.Type == row.Type)
-                            sheet.Values[row.Name] = existing;
-                        else
-                            sheet.Values[row.Name] = row.Default;
-                    }
-                }
+                state.Sheets = state.Sheets.ToImmutableDictionary(
+                    kv => kv.Key,
+                    kv => RemapSheetValues(kv.Value, newSchema));
             });
 
             if (exec.IsCanceled) return Result.FromCancellation();
             if (exec.TryGetFailure(out var err)) return Result.FromError(err);
             return Result.Success;
+        }
+
+        private static CharacterSheet RemapSheetValues(CharacterSheet sheet, AttributeSchema newSchema)
+        {
+            var builder = ImmutableDictionary.CreateBuilder<string, AttributeValue>();
+            foreach (var row in newSchema.Rows)
+            {
+                if (sheet.Values.TryGetValue(row.Name, out var existing) && existing.Type == row.Type)
+                    builder[row.Name] = existing;
+                else
+                    builder[row.Name] = row.Default;
+            }
+            return sheet with { Values = builder.ToImmutable() };
         }
 
         // ── Named-template verbs ─────────────────────────────────────────────────
@@ -843,12 +918,12 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                     return;
                 }
 
-                state.CustomTemplates[newId] = new NamedTemplate
+                state.CustomTemplates = state.CustomTemplates.SetItem(newId, new NamedTemplate
                 {
                     Id = newId,
                     Name = trimmed,
                     Rows = [.. state.AttributeSchema.Rows],
-                };
+                });
             });
 
             if (exec.IsCanceled) return ValueResult<Guid>.FromCancellation();
@@ -885,12 +960,12 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                     return;
                 }
 
-                state.CustomTemplates[newId] = new NamedTemplate
+                state.CustomTemplates = state.CustomTemplates.SetItem(newId, new NamedTemplate
                 {
                     Id = newId,
                     Name = trimmed,
                     Rows = [.. rows],
-                };
+                });
             });
 
             if (exec.IsCanceled) return ValueResult<Guid>.FromCancellation();
@@ -913,7 +988,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
 
                 // Effect templates ride along on the NamedTemplate, so removing
                 // it from the dictionary cascade-removes its library.
-                state.CustomTemplates.Remove(templateId);
+                state.CustomTemplates = state.CustomTemplates.Remove(templateId);
 
                 // If the host just deleted the schema they were standing on,
                 // snap the session back to DnD 5e core (a built-in, so always
@@ -925,18 +1000,9 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                     state.SetActiveSchemaTemplateId(DndMapperGameState.BuiltInDnD5eCoreId);
                     state.SetInitiativeAttributeName(
                         state.CustomTemplates[DndMapperGameState.BuiltInDnD5eCoreId].InitiativeAttributeName);
-                    foreach (var sheet in state.Sheets.Values)
-                    {
-                        var oldValues = new Dictionary<string, AttributeValue>(sheet.Values);
-                        sheet.Values.Clear();
-                        foreach (var row in fallback.Rows)
-                        {
-                            if (oldValues.TryGetValue(row.Name, out var keep) && keep.Type == row.Type)
-                                sheet.Values[row.Name] = keep;
-                            else
-                                sheet.Values[row.Name] = row.Default;
-                        }
-                    }
+                    state.Sheets = state.Sheets.ToImmutableDictionary(
+                        kv => kv.Key,
+                        kv => RemapSheetValues(kv.Value, fallback));
                 }
             });
 
@@ -964,7 +1030,9 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             {
                 if (!state.CustomTemplates.TryGetValue(templateId, out var existing)) { error = "Unknown template id."; return; }
                 if (existing.IsBuiltIn) { error = "Built-in templates cannot be edited."; return; }
-                existing.Rows = [.. rows];
+                state.CustomTemplates = state.CustomTemplates.SetItem(
+                    templateId,
+                    existing with { Rows = [.. rows] });
             });
 
             if (exec.IsCanceled) return Result.FromCancellation();
@@ -992,7 +1060,9 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                     error = "A template with that name already exists.";
                     return;
                 }
-                existing.Name = trimmed;
+                state.CustomTemplates = state.CustomTemplates.SetItem(
+                    templateId,
+                    existing with { Name = trimmed });
             });
 
             if (exec.IsCanceled) return Result.FromCancellation();
@@ -1034,7 +1104,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             if (newSettings is null) return Result.FromError("Settings are required.");
             if (!IsHost(state, caller)) return Result.FromError("Only the host may update session settings.");
 
-            var exec = state.Execute(() => state.SetSettings(newSettings.Clone()));
+            var exec = state.Execute(() => state.SetSettings(newSettings with { }));
 
             if (exec.IsCanceled) return Result.FromCancellation();
             if (exec.TryGetFailure(out var err)) return Result.FromError(err);
@@ -1061,6 +1131,70 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             return error is null ? Result.Success : Result.FromError(error);
         }
 
+        // ── Focus-box viewport (display zoom-to-region) ───────────────────────────
+
+        // Minimum rect dimension after clamping. Below this the display would
+        // be zoomed in so far that any tiny coordinate jitter would scroll the
+        // view wildly; also acts as the "zero-area" guard.
+        private const double MinFocusRectSize = 0.25;
+
+        public Result SetFocusRect(DndMapperGameState state, User caller, Guid mapId, double x, double y, double width, double height)
+        {
+            if (state is null) return Result.FromError("State is required.");
+            if (caller is null) return Result.FromError("Caller is required.");
+            if (!IsHost(state, caller)) return Result.FromError("Only the host may set the focus box.");
+            if (!double.IsFinite(x) || !double.IsFinite(y) || !double.IsFinite(width) || !double.IsFinite(height))
+                return Result.FromError("Focus box coordinates must be finite numbers.");
+            if (width <= 0 || height <= 0)
+                return Result.FromError("Focus box must have positive width and height.");
+
+            string? error = null;
+            var exec = state.Execute(() =>
+            {
+                var map = state.Maps.FirstOrDefault(m => m.Id == mapId);
+                if (map is null) { error = "Unknown map id."; return; }
+
+                // Clamp the rectangle into the map's cell bounds. A rect drawn
+                // partly off-canvas gets cropped to the on-canvas portion; a
+                // rect entirely outside collapses below MinFocusRectSize and
+                // is rejected below.
+                double mapW = map.Grid.WidthCells;
+                double mapH = map.Grid.HeightCells;
+
+                double x0 = Math.Clamp(x, 0, mapW);
+                double y0 = Math.Clamp(y, 0, mapH);
+                double x1 = Math.Clamp(x + width, 0, mapW);
+                double y1 = Math.Clamp(y + height, 0, mapH);
+
+                double w = x1 - x0;
+                double h = y1 - y0;
+                if (w < MinFocusRectSize || h < MinFocusRectSize)
+                {
+                    error = "Focus box is too small or outside the map.";
+                    return;
+                }
+
+                state.SetFocusRect(new FocusRect(mapId, x0, y0, w, h));
+            });
+
+            if (exec.IsCanceled) return Result.FromCancellation();
+            if (exec.TryGetFailure(out var execErr)) return Result.FromError(execErr);
+            return error is null ? Result.Success : Result.FromError(error);
+        }
+
+        public Result ClearFocusRect(DndMapperGameState state, User caller)
+        {
+            if (state is null) return Result.FromError("State is required.");
+            if (caller is null) return Result.FromError("Caller is required.");
+            if (!IsHost(state, caller)) return Result.FromError("Only the host may clear the focus box.");
+
+            var exec = state.Execute(() => state.SetFocusRect(null));
+
+            if (exec.IsCanceled) return Result.FromCancellation();
+            if (exec.TryGetFailure(out var err)) return Result.FromError(err);
+            return Result.Success;
+        }
+
         // ── Initiative tracker (v1.x — §9.5) ──────────────────────────────────────
 
         public Result StartInitiativeAsync(DndMapperGameState state, User caller, IReadOnlyList<Guid>? npcTokenIds)
@@ -1074,7 +1208,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             {
                 if (state.ActiveCombat is not null) { error = "Combat is already active."; return; }
 
-                var combat = new CombatState { Phase = CombatPhase.WaitingForRolls, RoundNumber = 1 };
+                var turnBuilder = ImmutableList.CreateBuilder<CombatantEntry>();
                 var seenTokenIds = new HashSet<Guid>();
 
                 if (npcTokenIds is not null)
@@ -1085,7 +1219,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                         if (token is null) { error = $"Unknown token id {tokenId}."; return; }
                         if (token.Type != TokenType.NPCToken) { error = "Only NPC tokens can be added to combat selection."; return; }
                         if (!seenTokenIds.Add(tokenId)) continue;
-                        combat.TurnOrder.Add(new CombatantEntry
+                        turnBuilder.Add(new CombatantEntry
                         {
                             Id = Guid.NewGuid(),
                             TokenId = tokenId,
@@ -1100,7 +1234,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                     var token = state.Maps
                         .SelectMany(m => m.Tokens)
                         .FirstOrDefault(t => t.Type == TokenType.PlayerToken && t.OwnerUserId == entry.User.Id);
-                    combat.TurnOrder.Add(new CombatantEntry
+                    turnBuilder.Add(new CombatantEntry
                     {
                         Id = Guid.NewGuid(),
                         TokenId = token?.Id ?? Guid.Empty,
@@ -1109,9 +1243,14 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                     });
                 }
 
-                if (combat.TurnOrder.Count == 0) { error = "Cannot start initiative with no combatants."; return; }
+                if (turnBuilder.Count == 0) { error = "Cannot start initiative with no combatants."; return; }
 
-                state.SetActiveCombat(combat);
+                state.SetActiveCombat(new CombatState
+                {
+                    Phase = CombatPhase.WaitingForRolls,
+                    RoundNumber = 1,
+                    TurnOrder = turnBuilder.ToImmutable(),
+                });
             });
 
             if (exec.IsCanceled) return Result.FromCancellation();
@@ -1133,11 +1272,15 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             {
                 if (state.ActiveCombat is null) { error = "No active combat."; return; }
                 if (state.ActiveCombat.Phase != CombatPhase.WaitingForRolls) { error = "Initiative phase has ended."; return; }
-                var entry = state.ActiveCombat.TurnOrder.FirstOrDefault(e => e.OwnerUserId == caller.Id);
-                if (entry is null) { error = "You are not a combatant in this initiative."; return; }
-                if (entry.InitiativeRoll is not null) return; // no-op
+                var combat = state.ActiveCombat;
+                var idx = IndexOfCombatantByOwner(combat, caller.Id);
+                if (idx < 0) { error = "You are not a combatant in this initiative."; return; }
+                if (combat.TurnOrder[idx].InitiativeRoll is not null) return; // no-op
 
-                entry.InitiativeRoll = total;
+                state.SetActiveCombat(combat with
+                {
+                    TurnOrder = combat.TurnOrder.SetItem(idx, combat.TurnOrder[idx] with { InitiativeRoll = total }),
+                });
                 state.AppendRoll(BuildInitiativeRollResult(caller.Id, null, d20, modifier, total));
                 TryTransitionToActive(state);
             });
@@ -1158,11 +1301,16 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             {
                 if (state.ActiveCombat is null) { error = "No active combat."; return; }
                 if (state.ActiveCombat.Phase != CombatPhase.WaitingForRolls) { error = "Initiative phase has ended."; return; }
-                var entry = state.ActiveCombat.TurnOrder.FirstOrDefault(e => e.Id == combatantId);
-                if (entry is null) { error = "Unknown combatant id."; return; }
+                var combat = state.ActiveCombat;
+                var idx = IndexOfCombatantById(combat, combatantId);
+                if (idx < 0) { error = "Unknown combatant id."; return; }
+                var entry = combat.TurnOrder[idx];
                 if (entry.OwnerUserId is not null) { error = "Use ForceInitiativeRollAsync for player combatants."; return; }
 
-                entry.InitiativeRoll = roll;
+                state.SetActiveCombat(combat with
+                {
+                    TurnOrder = combat.TurnOrder.SetItem(idx, entry with { InitiativeRoll = roll }),
+                });
                 TryTransitionToActive(state);
             });
 
@@ -1184,15 +1332,23 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             {
                 if (state.ActiveCombat is null) { error = "No active combat."; return; }
                 if (state.ActiveCombat.Phase != CombatPhase.WaitingForRolls) { error = "Initiative phase has ended."; return; }
-                var entry = state.ActiveCombat.TurnOrder.FirstOrDefault(e => e.Id == combatantId);
-                if (entry is null) { error = "Unknown combatant id."; return; }
+                var combat = state.ActiveCombat;
+                var idx = IndexOfCombatantById(combat, combatantId);
+                if (idx < 0) { error = "Unknown combatant id."; return; }
+                var entry = combat.TurnOrder[idx];
                 if (entry.OwnerUserId is null) { error = "Force-roll is only valid for player combatants."; return; }
                 if (entry.InitiativeRoll is not null) { error = "Player has already rolled."; return; }
 
                 int modifier = ResolveInitiativeModifier(state, entry.OwnerUserId);
                 int total = d20 + modifier;
-                entry.InitiativeRoll = total;
-                entry.IsForceRolled = true;
+                state.SetActiveCombat(combat with
+                {
+                    TurnOrder = combat.TurnOrder.SetItem(idx, entry with
+                    {
+                        InitiativeRoll = total,
+                        IsForceRolled = true,
+                    }),
+                });
                 state.AppendRoll(BuildInitiativeRollResult(entry.OwnerUserId, caller.Id, d20, modifier, total));
                 TryTransitionToActive(state);
             });
@@ -1221,8 +1377,11 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                 if (state.ActiveCombat is null) { error = "No active combat."; return; }
                 if (state.ActiveCombat.Phase != CombatPhase.WaitingForRolls) { error = "Initiative phase has ended."; return; }
 
-                foreach (var entry in state.ActiveCombat.TurnOrder)
+                var combat = state.ActiveCombat;
+                var newTurnOrder = combat.TurnOrder;
+                for (int i = 0; i < newTurnOrder.Count; i++)
                 {
+                    var entry = newTurnOrder[i];
                     if (entry.OwnerUserId is not null) continue;       // players
                     if (entry.InitiativeRoll is not null) continue;    // already rolled or manually set
 
@@ -1231,7 +1390,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                     int d20 = _rng.GetRandomInt(1, 21, RandomType.Fast);
                     int total = d20 + modifier;
 
-                    entry.InitiativeRoll = total;
+                    newTurnOrder = newTurnOrder.SetItem(i, entry with { InitiativeRoll = total });
                     // The loop above skips player entries, so NPCs are the
                     // only thing here; the host is recorded as both roller
                     // and forcing party so the audit log attributes the
@@ -1244,6 +1403,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                         total: total));
                 }
 
+                state.SetActiveCombat(combat with { TurnOrder = newTurnOrder });
                 TryTransitionToActive(state);
             });
             if (exec.IsCanceled) return Result.FromCancellation();
@@ -1279,12 +1439,19 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                 if (state.ActiveCombat.Phase != CombatPhase.Active) { error = "Combat is not in the active phase."; return; }
                 if (state.ActiveCombat.TurnOrder.Count == 0) { error = "Turn order is empty."; return; }
 
-                state.ActiveCombat.CurrentTurnIndex++;
-                if (state.ActiveCombat.CurrentTurnIndex >= state.ActiveCombat.TurnOrder.Count)
+                var combat = state.ActiveCombat;
+                var nextIdx = combat.CurrentTurnIndex + 1;
+                var nextRound = combat.RoundNumber;
+                if (nextIdx >= combat.TurnOrder.Count)
                 {
-                    state.ActiveCombat.CurrentTurnIndex = 0;
-                    state.ActiveCombat.RoundNumber++;
+                    nextIdx = 0;
+                    nextRound = combat.RoundNumber + 1;
                 }
+                state.SetActiveCombat(combat with
+                {
+                    CurrentTurnIndex = nextIdx,
+                    RoundNumber = nextRound,
+                });
             });
 
             if (exec.IsCanceled) return Result.FromCancellation();
@@ -1305,7 +1472,8 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                 if (state.ActiveCombat is null) { error = "No active combat."; return; }
                 var (token, _) = FindTokenAndMap(state, tokenId);
                 if (token is null) { error = "Unknown token id."; return; }
-                if (state.ActiveCombat.TurnOrder.Any(e => e.TokenId == tokenId))
+                var combat = state.ActiveCombat;
+                if (combat.TurnOrder.Any(e => e.TokenId == tokenId))
                 {
                     error = "Token is already a combatant.";
                     return;
@@ -1319,14 +1487,20 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                     OwnerUserId = token.Type == TokenType.PlayerToken ? token.OwnerUserId : null,
                     InitiativeRoll = initiativeRoll,
                 };
-                int insertIdx = TurnOrderSorter.FindInsertionIndex(state.ActiveCombat.TurnOrder, entry);
-                state.ActiveCombat.TurnOrder.Insert(insertIdx, entry);
+                int insertIdx = TurnOrderSorter.FindInsertionIndex(combat.TurnOrder, entry);
+                var newTurnOrder = combat.TurnOrder.Insert(insertIdx, entry);
 
-                if (state.ActiveCombat.Phase == CombatPhase.Active
-                    && insertIdx <= state.ActiveCombat.CurrentTurnIndex)
+                var nextCurrent = combat.CurrentTurnIndex;
+                if (combat.Phase == CombatPhase.Active && insertIdx <= combat.CurrentTurnIndex)
                 {
-                    state.ActiveCombat.CurrentTurnIndex++;
+                    nextCurrent = combat.CurrentTurnIndex + 1;
                 }
+
+                state.SetActiveCombat(combat with
+                {
+                    TurnOrder = newTurnOrder,
+                    CurrentTurnIndex = nextCurrent,
+                });
             });
 
             if (exec.IsCanceled) return ValueResult<Guid>.FromCancellation();
@@ -1345,34 +1519,44 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             var exec = state.Execute(() =>
             {
                 if (state.ActiveCombat is null) { error = "No active combat."; return; }
-                var idx = state.ActiveCombat.TurnOrder.FindIndex(e => e.Id == combatantId);
+                var combat = state.ActiveCombat;
+                var idx = IndexOfCombatantById(combat, combatantId);
                 if (idx < 0) { error = "Unknown combatant id."; return; }
 
-                bool removingCurrent = state.ActiveCombat.Phase == CombatPhase.Active && idx == state.ActiveCombat.CurrentTurnIndex;
-                state.ActiveCombat.TurnOrder.RemoveAt(idx);
+                bool removingCurrent = combat.Phase == CombatPhase.Active && idx == combat.CurrentTurnIndex;
+                var newTurnOrder = combat.TurnOrder.RemoveAt(idx);
 
-                if (state.ActiveCombat.TurnOrder.Count == 0)
+                if (newTurnOrder.Count == 0)
                 {
                     state.SetActiveCombat(null);
                     return;
                 }
 
-                if (state.ActiveCombat.Phase == CombatPhase.Active)
+                var nextCurrent = combat.CurrentTurnIndex;
+                var nextRound = combat.RoundNumber;
+                if (combat.Phase == CombatPhase.Active)
                 {
-                    if (idx < state.ActiveCombat.CurrentTurnIndex)
+                    if (idx < combat.CurrentTurnIndex)
                     {
-                        state.ActiveCombat.CurrentTurnIndex--;
+                        nextCurrent = combat.CurrentTurnIndex - 1;
                     }
                     else if (removingCurrent)
                     {
                         // Stay at idx (which now points to the next combatant), wrap if past end.
-                        if (state.ActiveCombat.CurrentTurnIndex >= state.ActiveCombat.TurnOrder.Count)
+                        if (nextCurrent >= newTurnOrder.Count)
                         {
-                            state.ActiveCombat.CurrentTurnIndex = 0;
-                            state.ActiveCombat.RoundNumber++;
+                            nextCurrent = 0;
+                            nextRound = combat.RoundNumber + 1;
                         }
                     }
                 }
+
+                state.SetActiveCombat(combat with
+                {
+                    TurnOrder = newTurnOrder,
+                    CurrentTurnIndex = nextCurrent,
+                    RoundNumber = nextRound,
+                });
             });
 
             if (exec.IsCanceled) return Result.FromCancellation();
@@ -1399,10 +1583,26 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             if (state.ActiveCombat.TurnOrder.Any(e => e.InitiativeRoll is null)) return;
 
             var sorted = TurnOrderSorter.Sort(state.ActiveCombat.TurnOrder);
-            state.ActiveCombat.TurnOrder.Clear();
-            state.ActiveCombat.TurnOrder.AddRange(sorted);
-            state.ActiveCombat.Phase = CombatPhase.Active;
-            state.ActiveCombat.CurrentTurnIndex = 0;
+            state.SetActiveCombat(state.ActiveCombat with
+            {
+                TurnOrder = sorted.ToImmutableList(),
+                Phase = CombatPhase.Active,
+                CurrentTurnIndex = 0,
+            });
+        }
+
+        private static int IndexOfCombatantById(CombatState combat, Guid combatantId)
+        {
+            for (int i = 0; i < combat.TurnOrder.Count; i++)
+                if (combat.TurnOrder[i].Id == combatantId) return i;
+            return -1;
+        }
+
+        private static int IndexOfCombatantByOwner(CombatState combat, string ownerUserId)
+        {
+            for (int i = 0; i < combat.TurnOrder.Count; i++)
+                if (combat.TurnOrder[i].OwnerUserId == ownerUserId) return i;
+            return -1;
         }
 
         // Resolves the initiative modifier for the owner of a sheet. Reads
@@ -1452,9 +1652,13 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                 state.SetInitiativeAttributeName(attributeName);
                 // Mirror onto the active template (if any) so re-applying the
                 // template later restores the host's choice.
-                var template = state.GetActiveSchemaTemplate();
-                if (template is not null)
-                    template.InitiativeAttributeName = string.IsNullOrEmpty(attributeName) ? null : attributeName;
+                if (state.ActiveSchemaTemplateId is { } activeId
+                    && state.CustomTemplates.TryGetValue(activeId, out var template))
+                {
+                    state.CustomTemplates = state.CustomTemplates.SetItem(
+                        activeId,
+                        template with { InitiativeAttributeName = string.IsNullOrEmpty(attributeName) ? null : attributeName });
+                }
             });
             if (exec.IsCanceled) return Result.FromCancellation();
             if (exec.TryGetFailure(out var execErr)) return Result.FromError(execErr);
@@ -1496,9 +1700,8 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             string? error = null;
             var exec = state.Execute(() =>
             {
-                var map = state.Maps.FirstOrDefault(m => m.Id == mapId);
-                if (map is null) { error = "Unknown map id."; return; }
-                map.MarkupSvg = sanitized;
+                if (!state.UpdateMap(mapId, m => m with { MarkupSvg = sanitized }))
+                    error = "Unknown map id.";
             });
 
             if (exec.IsCanceled) return Result.FromCancellation();
@@ -1537,18 +1740,19 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                 {
                     Id = newId,
                     Name = name,
-                    AttributeDeltas = attributeDeltas is null ? [] : [.. attributeDeltas],
+                    AttributeDeltas = attributeDeltas is null ? ImmutableList<AttributeDelta>.Empty : [.. attributeDeltas],
                     MaxHpDelta = maxHpDelta,
                     OnApplyHpDelta = onApplyHpDelta,
                     Notes = notes ?? string.Empty,
                     AppliedUtc = DateTime.UtcNow,
                 };
-                sheet.StatusEffects.Add(effect);
-
-                if (sheet.Hp is int hp && onApplyHpDelta is int delta)
-                    sheet.Hp = hp + delta;
-
-                ClampHpToEffectiveMax(sheet);
+                state.UpdateSheet(sheetId, s =>
+                {
+                    var updated = s with { StatusEffects = s.StatusEffects.Add(effect) };
+                    if (updated.Hp is int hp && onApplyHpDelta is int delta)
+                        updated = updated with { Hp = hp + delta };
+                    return ClampHpToEffectiveMax(updated);
+                });
             });
 
             if (exec.IsCanceled) return ValueResult<Guid>.FromCancellation();
@@ -1578,16 +1782,21 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             {
                 if (!state.Sheets.TryGetValue(sheetId, out var sheet)) { error = "Unknown sheet id."; return; }
                 if (!CanEditSheet(state, caller, sheet)) { error = "You are not permitted to edit this sheet."; return; }
-                var effect = sheet.StatusEffects.FirstOrDefault(e => e.Id == effectId);
-                if (effect is null) { error = "Unknown status effect id."; return; }
+                var idx = IndexOf(sheet.StatusEffects, effectId);
+                if (idx < 0) { error = "Unknown status effect id."; return; }
 
-                effect.Name = name;
-                effect.AttributeDeltas = attributeDeltas is null ? [] : [.. attributeDeltas];
-                effect.MaxHpDelta = maxHpDelta;
-                effect.OnApplyHpDelta = onApplyHpDelta;
-                effect.Notes = notes ?? string.Empty;
-
-                ClampHpToEffectiveMax(sheet);
+                state.UpdateSheet(sheetId, s =>
+                {
+                    var newList = s.StatusEffects.SetItem(idx, s.StatusEffects[idx] with
+                    {
+                        Name = name,
+                        AttributeDeltas = attributeDeltas is null ? ImmutableList<AttributeDelta>.Empty : [.. attributeDeltas],
+                        MaxHpDelta = maxHpDelta,
+                        OnApplyHpDelta = onApplyHpDelta,
+                        Notes = notes ?? string.Empty,
+                    });
+                    return ClampHpToEffectiveMax(s with { StatusEffects = newList });
+                });
             });
 
             if (exec.IsCanceled) return Result.FromCancellation();
@@ -1605,10 +1814,9 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             {
                 if (!state.Sheets.TryGetValue(sheetId, out var sheet)) { error = "Unknown sheet id."; return; }
                 if (!CanEditSheet(state, caller, sheet)) { error = "You are not permitted to edit this sheet."; return; }
-                var idx = sheet.StatusEffects.FindIndex(e => e.Id == effectId);
+                var idx = IndexOf(sheet.StatusEffects, effectId);
                 if (idx < 0) { error = "Unknown status effect id."; return; }
-                sheet.StatusEffects.RemoveAt(idx);
-                ClampHpToEffectiveMax(sheet);
+                state.UpdateSheet(sheetId, s => ClampHpToEffectiveMax(s with { StatusEffects = s.StatusEffects.RemoveAt(idx) }));
             });
 
             if (exec.IsCanceled) return Result.FromCancellation();
@@ -1641,15 +1849,20 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                     error = "Save the current schema as a template before authoring status effects.";
                     return;
                 }
-                schema.StatusEffectTemplates.Add(new StatusEffectTemplate
-                {
-                    Id = newId,
-                    Name = name,
-                    AttributeDeltas = attributeDeltas is null ? [] : [.. attributeDeltas],
-                    MaxHpDelta = maxHpDelta,
-                    OnApplyHpDelta = onApplyHpDelta,
-                    Notes = notes ?? string.Empty,
-                });
+                state.CustomTemplates = state.CustomTemplates.SetItem(
+                    schema.Id,
+                    schema with
+                    {
+                        StatusEffectTemplates = schema.StatusEffectTemplates.Add(new StatusEffectTemplate
+                        {
+                            Id = newId,
+                            Name = name,
+                            AttributeDeltas = attributeDeltas is null ? ImmutableList<AttributeDelta>.Empty : [.. attributeDeltas],
+                            MaxHpDelta = maxHpDelta,
+                            OnApplyHpDelta = onApplyHpDelta,
+                            Notes = notes ?? string.Empty,
+                        }),
+                    });
             });
 
             if (exec.IsCanceled) return ValueResult<Guid>.FromCancellation();
@@ -1679,14 +1892,22 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             {
                 var schema = state.GetActiveSchemaTemplate();
                 if (schema is null) { error = "No active schema."; return; }
-                var template = schema.StatusEffectTemplates.FirstOrDefault(t => t.Id == templateId);
-                if (template is null) { error = "Unknown template id."; return; }
+                var idx = IndexOf(schema.StatusEffectTemplates, templateId);
+                if (idx < 0) { error = "Unknown template id."; return; }
 
-                template.Name = name;
-                template.AttributeDeltas = attributeDeltas is null ? [] : [.. attributeDeltas];
-                template.MaxHpDelta = maxHpDelta;
-                template.OnApplyHpDelta = onApplyHpDelta;
-                template.Notes = notes ?? string.Empty;
+                state.CustomTemplates = state.CustomTemplates.SetItem(
+                    schema.Id,
+                    schema with
+                    {
+                        StatusEffectTemplates = schema.StatusEffectTemplates.SetItem(idx, schema.StatusEffectTemplates[idx] with
+                        {
+                            Name = name,
+                            AttributeDeltas = attributeDeltas is null ? ImmutableList<AttributeDelta>.Empty : [.. attributeDeltas],
+                            MaxHpDelta = maxHpDelta,
+                            OnApplyHpDelta = onApplyHpDelta,
+                            Notes = notes ?? string.Empty,
+                        }),
+                    });
             });
 
             if (exec.IsCanceled) return Result.FromCancellation();
@@ -1705,9 +1926,11 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             {
                 var schema = state.GetActiveSchemaTemplate();
                 if (schema is null) { error = "No active schema."; return; }
-                var idx = schema.StatusEffectTemplates.FindIndex(t => t.Id == templateId);
+                var idx = IndexOf(schema.StatusEffectTemplates, templateId);
                 if (idx < 0) { error = "Unknown template id."; return; }
-                schema.StatusEffectTemplates.RemoveAt(idx);
+                state.CustomTemplates = state.CustomTemplates.SetItem(
+                    schema.Id,
+                    schema with { StatusEffectTemplates = schema.StatusEffectTemplates.RemoveAt(idx) });
             });
 
             if (exec.IsCanceled) return Result.FromCancellation();
@@ -1715,11 +1938,33 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             return error is null ? Result.Success : Result.FromError(error);
         }
 
-        private static void ClampHpToEffectiveMax(CharacterSheet sheet)
+        private static CharacterSheet ClampHpToEffectiveMax(CharacterSheet sheet)
         {
             var effectiveMax = EffectiveMaxHpResolver.ResolveEffectiveMaxHp(sheet);
             if (effectiveMax is int max && sheet.Hp is int hp && hp > max)
-                sheet.Hp = max;
+                return sheet with { Hp = max };
+            return sheet;
+        }
+
+        private static int IndexOf(ImmutableList<StatusEffect> list, Guid id)
+        {
+            for (int i = 0; i < list.Count; i++)
+                if (list[i].Id == id) return i;
+            return -1;
+        }
+
+        private static int IndexOf(ImmutableList<StatusEffectTemplate> list, Guid id)
+        {
+            for (int i = 0; i < list.Count; i++)
+                if (list[i].Id == id) return i;
+            return -1;
+        }
+
+        private static int IndexOf(ImmutableList<RollTemplate> list, Guid id)
+        {
+            for (int i = 0; i < list.Count; i++)
+                if (list[i].Id == id) return i;
+            return -1;
         }
 
         // ── Roll template verbs ───────────────────────────────────────────────────
@@ -1773,7 +2018,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                 string.IsNullOrWhiteSpace(attributeName) ? null : attributeName,
                 label ?? string.Empty, RollTemplateScope.Global);
 
-            var exec = state.Execute(() => state.GlobalRollTemplates.Add(template));
+            var exec = state.Execute(() => state.GlobalRollTemplates = state.GlobalRollTemplates.Add(template));
             if (exec.IsCanceled) return ValueResult<Guid>.FromCancellation();
             if (exec.TryGetFailure(out var err)) return ValueResult<Guid>.FromError(err);
             return ValueResult<Guid>.FromValue(newId);
@@ -1796,12 +2041,12 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             string? error = null;
             var exec = state.Execute(() =>
             {
-                int idx = state.GlobalRollTemplates.FindIndex(t => t.Id == templateId);
+                int idx = IndexOf(state.GlobalRollTemplates, templateId);
                 if (idx < 0) { error = "Unknown template id."; return; }
-                state.GlobalRollTemplates[idx] = new RollTemplate(
+                state.GlobalRollTemplates = state.GlobalRollTemplates.SetItem(idx, new RollTemplate(
                     templateId, name, [.. dice], flatModifier, mode,
                     string.IsNullOrWhiteSpace(attributeName) ? null : attributeName,
-                    label ?? string.Empty, RollTemplateScope.Global);
+                    label ?? string.Empty, RollTemplateScope.Global));
             });
             if (exec.IsCanceled) return Result.FromCancellation();
             if (exec.TryGetFailure(out var execErr)) return Result.FromError(execErr);
@@ -1819,9 +2064,9 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             string? error = null;
             var exec = state.Execute(() =>
             {
-                int idx = state.GlobalRollTemplates.FindIndex(t => t.Id == templateId);
+                int idx = IndexOf(state.GlobalRollTemplates, templateId);
                 if (idx < 0) { error = "Unknown template id."; return; }
-                state.GlobalRollTemplates.RemoveAt(idx);
+                state.GlobalRollTemplates = state.GlobalRollTemplates.RemoveAt(idx);
             });
             if (exec.IsCanceled) return Result.FromCancellation();
             if (exec.TryGetFailure(out var execErr)) return Result.FromError(execErr);
@@ -1850,7 +2095,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                 string.IsNullOrWhiteSpace(attributeName) ? null : attributeName,
                 label ?? string.Empty, RollTemplateScope.Sheet);
 
-            var exec = state.Execute(() => sheet.RollTemplates.Add(template));
+            var exec = state.Execute(() => state.UpdateSheet(sheetId, s => s with { RollTemplates = s.RollTemplates.Add(template) }));
             if (exec.IsCanceled) return ValueResult<Guid>.FromCancellation();
             if (exec.TryGetFailure(out var err)) return ValueResult<Guid>.FromError(err);
             return ValueResult<Guid>.FromValue(newId);
@@ -1877,12 +2122,16 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             string? error = null;
             var exec = state.Execute(() =>
             {
-                int idx = sheet.RollTemplates.FindIndex(t => t.Id == templateId);
+                if (!state.Sheets.TryGetValue(sheetId, out var s)) { error = "Unknown sheet id."; return; }
+                int idx = IndexOf(s.RollTemplates, templateId);
                 if (idx < 0) { error = "Unknown template id."; return; }
-                sheet.RollTemplates[idx] = new RollTemplate(
-                    templateId, name, [.. dice], flatModifier, mode,
-                    string.IsNullOrWhiteSpace(attributeName) ? null : attributeName,
-                    label ?? string.Empty, RollTemplateScope.Sheet);
+                state.UpdateSheet(sheetId, x => x with
+                {
+                    RollTemplates = x.RollTemplates.SetItem(idx, new RollTemplate(
+                        templateId, name, [.. dice], flatModifier, mode,
+                        string.IsNullOrWhiteSpace(attributeName) ? null : attributeName,
+                        label ?? string.Empty, RollTemplateScope.Sheet)),
+                });
             });
             if (exec.IsCanceled) return Result.FromCancellation();
             if (exec.TryGetFailure(out var execErr)) return Result.FromError(execErr);
@@ -1905,9 +2154,10 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             string? error = null;
             var exec = state.Execute(() =>
             {
-                int idx = sheet.RollTemplates.FindIndex(t => t.Id == templateId);
+                if (!state.Sheets.TryGetValue(sheetId, out var s)) { error = "Unknown sheet id."; return; }
+                int idx = IndexOf(s.RollTemplates, templateId);
                 if (idx < 0) { error = "Unknown template id."; return; }
-                sheet.RollTemplates.RemoveAt(idx);
+                state.UpdateSheet(sheetId, x => x with { RollTemplates = x.RollTemplates.RemoveAt(idx) });
             });
             if (exec.IsCanceled) return Result.FromCancellation();
             if (exec.TryGetFailure(out var execErr)) return Result.FromError(execErr);
@@ -2082,10 +2332,10 @@ namespace KnockBox.DndMapper.Services.Logic.Games
 
             var exec = state.Execute(() =>
             {
-                state.Maps.Clear();
+                state.Maps = ImmutableList<Map>.Empty;
                 state.SetActiveMapId(null);
-                state.Sheets.Clear();
-                state.RollLog.Clear();
+                state.Sheets = ImmutableDictionary<Guid, CharacterSheet>.Empty;
+                state.RollLog = ImmutableList<RollResult>.Empty;
                 state.SetSettings(new DndMapperSettings());
                 state.SetAttributeSchema(AttributeSchema.FromPreset(AttributePreset.DnD5eCore));
                 state.SetActiveSchemaTemplateId(DndMapperGameState.BuiltInDnD5eCoreId);
@@ -2104,7 +2354,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
         /// <summary>
         /// Adds a host-uploaded image to a map. Pure-metadata: the bytes live in the
         /// host's IndexedDB and are reachable via <see cref="MapImage.ShareToken"/>.
-        /// Validates content-type, per-file cap, and 10 MB room cap under the same lock
+        /// Validates content-type, per-file cap, and 1 GB room cap under the same lock
         /// that mutates state so two concurrent uploads can't both pass the cap check.
         /// </summary>
         public ValueResult<MapImage> AddImageAsync(DndMapperGameState state, User caller, Guid mapId, MapImage image)
@@ -2114,32 +2364,39 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             if (image is null) return ValueResult<MapImage>.FromError("Image is required.");
             if (!IsHost(state, caller)) return ValueResult<MapImage>.FromError("Only the host may add images.");
             if (image.ByteSize <= 0) return ValueResult<MapImage>.FromError("Image byte size must be positive.");
-            if (image.ByteSize > PerFileCapBytes) return ValueResult<MapImage>.FromError("Image exceeds 5 MB per-file cap.");
+            if (image.ByteSize > PerFileCapBytes) return ValueResult<MapImage>.FromError("Image exceeds 100 MB per-file cap.");
             if (string.IsNullOrWhiteSpace(image.ContentType)
                 || !AllowedImageContentTypes.Contains(image.ContentType))
                 return ValueResult<MapImage>.FromError("Only PNG, JPEG, and WebP images are accepted.");
 
             string? error = null;
+            MapImage? sealedImage = null;
             var exec = state.Execute(() =>
             {
-                var map = state.Maps.FirstOrDefault(m => m.Id == mapId);
-                if (map is null) { error = "Unknown map id."; return; }
+                var mapIdx = state.IndexOfMap(mapId);
+                if (mapIdx < 0) { error = "Unknown map id."; return; }
+                var map = state.Maps[mapIdx];
 
                 if (state.BytesUsed + image.ByteSize > PerRoomCapBytes)
                 {
-                    error = "Room exceeds 10 MB total image cap.";
+                    error = "Room exceeds 1 GB total image cap.";
                     return;
                 }
 
-                image.LayerOrder = map.Images.Count;
-                map.Images.Add(image);
-                state.AdjustBytesUsed(image.ByteSize);
+                sealedImage = image with { LayerOrder = map.Images.Count };
+                state.Maps = state.Maps.SetItem(mapIdx, map with
+                {
+                    Images = map.Images.Add(sealedImage),
+                    ImagesVersion = map.ImagesVersion + 1,
+                    ImagesMembershipVersion = map.ImagesMembershipVersion + 1,
+                });
+                state.AdjustBytesUsed(sealedImage.ByteSize);
             });
 
             if (exec.IsCanceled) return ValueResult<MapImage>.FromCancellation();
             if (exec.TryGetFailure(out var execErr)) return ValueResult<MapImage>.FromError(execErr);
             if (error is not null) return ValueResult<MapImage>.FromError(error);
-            return ValueResult<MapImage>.FromValue(image);
+            return ValueResult<MapImage>.FromValue(sealedImage!);
         }
 
         /// <summary>
@@ -2156,9 +2413,10 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             string? error = null;
             var exec = state.Execute(() =>
             {
-                var (image, _) = FindImageAndMap(state, mapId, imageId);
-                if (image is null) { error = "Unknown map or image id."; return; }
-                image.ShareToken = newToken;
+                if (!TryUpdateImage(state, mapId, imageId, (img, _) => img.ShareToken == newToken ? img : img with { ShareToken = newToken }, bumpImagesVersion: true))
+                {
+                    error = "Unknown map or image id.";
+                }
             });
 
             if (exec.IsCanceled) return Result.FromCancellation();
@@ -2179,9 +2437,29 @@ namespace KnockBox.DndMapper.Services.Logic.Games
 
             var exec = state.Execute(() =>
             {
-                foreach (var map in state.Maps)
-                    foreach (var image in map.Images)
-                        image.ShareToken = null;
+                var newMaps = state.Maps;
+                for (int mapIdx = 0; mapIdx < newMaps.Count; mapIdx++)
+                {
+                    var m = newMaps[mapIdx];
+                    bool changed = false;
+                    var newImages = m.Images;
+                    for (int i = 0; i < newImages.Count; i++)
+                    {
+                        var image = newImages[i];
+                        if (image.ShareToken is null) continue;
+                        newImages = newImages.SetItem(i, image with { ShareToken = null });
+                        changed = true;
+                    }
+                    if (changed)
+                    {
+                        newMaps = newMaps.SetItem(mapIdx, m with
+                        {
+                            Images = newImages,
+                            ImagesVersion = m.ImagesVersion + 1,
+                        });
+                    }
+                }
+                state.Maps = newMaps;
             });
 
             if (exec.IsCanceled) return Result.FromCancellation();
@@ -2227,9 +2505,12 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                         return;
                     }
 
-                    token.Type = TokenType.PlayerToken;
-                    token.OwnerUserId = newOwnerUserId;
-                    token.RepresentsUserId = null;
+                    state.UpdateToken(map.Id, tokenId, t => t with
+                    {
+                        Type = TokenType.PlayerToken,
+                        OwnerUserId = newOwnerUserId,
+                        RepresentsUserId = null,
+                    });
                 }
                 else if (newType == TokenType.NPCToken)
                 {
@@ -2239,9 +2520,12 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                         error = "Owner user id is not a registered player.";
                         return;
                     }
-                    token.Type = TokenType.NPCToken;
-                    token.OwnerUserId = newOwnerUserId; // null = host-owned NPC, non-null = player-owned NPC
-                    token.RepresentsUserId = null;
+                    state.UpdateToken(map.Id, tokenId, t => t with
+                    {
+                        Type = TokenType.NPCToken,
+                        OwnerUserId = newOwnerUserId, // null = host-owned NPC, non-null = player-owned NPC
+                        RepresentsUserId = null,
+                    });
                 }
                 else
                 {
@@ -2347,18 +2631,23 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                     s.OwnerUserId == newOwnerUserId && (sheet is null || s.Id != sheet.Id)))
                 return "Target player already owns a character sheet.";
 
-            // Collect every token that should be promoted: the anchor (if supplied)
+            // Collect every (mapId, tokenId) we'd promote: the anchor (if supplied)
             // plus every token across every map that references this sheet.
-            var tokensToPromote = new List<Token>();
+            var promoteIds = new HashSet<Guid>();
+            if (anchorToken is not null) promoteIds.Add(anchorToken.Id);
             if (sheet is not null)
             {
                 foreach (var map in state.Maps)
                     foreach (var t in map.Tokens)
                         if (t.SheetId == sheet.Id)
-                            tokensToPromote.Add(t);
+                            promoteIds.Add(t.Id);
             }
-            if (anchorToken is not null && !tokensToPromote.Contains(anchorToken))
-                tokensToPromote.Add(anchorToken);
+
+            var tokensToPromote = new List<Token>();
+            foreach (var map in state.Maps)
+                foreach (var t in map.Tokens)
+                    if (promoteIds.Contains(t.Id))
+                        tokensToPromote.Add(t);
 
             // PlayerTokens are allowed as sources — that's a transfer from one
             // player to another. Reject only the genuine no-op: every token is
@@ -2383,16 +2672,34 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             }
 
             // All validation passed — mutate.
-            foreach (var t in tokensToPromote)
-            {
-                t.Type = TokenType.PlayerToken;
-                t.OwnerUserId = newOwnerUserId;
-                t.RepresentsUserId = null;
-            }
+            state.Maps = state.Maps
+                .Select(m =>
+                {
+                    var changed = false;
+                    var newTokens = m.Tokens;
+                    for (int i = 0; i < newTokens.Count; i++)
+                    {
+                        var t = newTokens[i];
+                        if (!promoteIds.Contains(t.Id)) continue;
+                        newTokens = newTokens.SetItem(i, t with
+                        {
+                            Type = TokenType.PlayerToken,
+                            OwnerUserId = newOwnerUserId,
+                            RepresentsUserId = null,
+                        });
+                        changed = true;
+                    }
+                    return changed ? m with { Tokens = newTokens } : m;
+                })
+                .ToImmutableList();
+
             if (sheet is not null)
             {
-                sheet.OwnerUserId = newOwnerUserId;
-                sheet.RepresentsUserId = null;
+                state.UpdateSheet(sheet.Id, s => s with
+                {
+                    OwnerUserId = newOwnerUserId,
+                    RepresentsUserId = null,
+                });
             }
 
             return null;
@@ -2411,16 +2718,22 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             string? error = null;
             var exec = state.Execute(() =>
             {
-                var (image, _) = FindImageAndMap(state, mapId, imageId);
-                if (image is null) { error = "Unknown map or image id."; return; }
-                if (image.Locked) { error = "Image is locked."; return; }
-
-                image.X = x;
-                image.Y = y;
-                image.Width = width;
-                image.Height = height;
-                image.Rotation = rotation;
-                image.Opacity = opacity;
+                if (!TryUpdateImage(state, mapId, imageId, (img, _) =>
+                {
+                    if (img.Locked) return null;
+                    return img with
+                    {
+                        X = x,
+                        Y = y,
+                        Width = width,
+                        Height = height,
+                        Rotation = rotation,
+                        Opacity = opacity,
+                    };
+                }, bumpImagesVersion: true, out var rejection))
+                {
+                    error = rejection ?? "Unknown map or image id.";
+                }
             });
 
             if (exec.IsCanceled) return Result.FromCancellation();
@@ -2437,10 +2750,11 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             string? error = null;
             var exec = state.Execute(() =>
             {
-                var map = state.Maps.FirstOrDefault(m => m.Id == mapId);
-                if (map is null) { error = "Unknown map id."; return; }
+                var mapIdx = state.IndexOfMap(mapId);
+                if (mapIdx < 0) { error = "Unknown map id."; return; }
+                var map = state.Maps[mapIdx];
 
-                int currentIndex = map.Images.FindIndex(i => i.Id == imageId);
+                int currentIndex = DndMapperGameState.IndexOfImage(map, imageId);
                 if (currentIndex < 0) { error = "Unknown image id."; return; }
                 if (map.Images[currentIndex].Locked) { error = "Image is locked."; return; }
                 if (newLayerOrder < 0 || newLayerOrder >= map.Images.Count)
@@ -2450,11 +2764,16 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                 }
 
                 var image = map.Images[currentIndex];
-                map.Images.RemoveAt(currentIndex);
-                map.Images.Insert(newLayerOrder, image);
+                var reordered = map.Images.RemoveAt(currentIndex).Insert(newLayerOrder, image);
+                var withLayerOrders = ImmutableList.CreateBuilder<MapImage>();
+                for (int i = 0; i < reordered.Count; i++)
+                    withLayerOrders.Add(reordered[i] with { LayerOrder = i });
 
-                for (int i = 0; i < map.Images.Count; i++)
-                    map.Images[i].LayerOrder = i;
+                state.Maps = state.Maps.SetItem(mapIdx, map with
+                {
+                    Images = withLayerOrders.ToImmutable(),
+                    ImagesVersion = map.ImagesVersion + 1,
+                });
             });
 
             if (exec.IsCanceled) return Result.FromCancellation();
@@ -2477,9 +2796,10 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             string? error = null;
             var exec = state.Execute(() =>
             {
-                var (image, _) = FindImageAndMap(state, mapId, imageId);
-                if (image is null) { error = "Unknown map or image id."; return; }
-                image.Name = trimmed;
+                if (!TryUpdateImage(state, mapId, imageId, (img, _) => img.Name == trimmed ? img : img with { Name = trimmed }, bumpImagesVersion: true))
+                {
+                    error = "Unknown map or image id.";
+                }
             });
 
             if (exec.IsCanceled) return Result.FromCancellation();
@@ -2500,9 +2820,20 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             string? error = null;
             var exec = state.Execute(() =>
             {
-                var (image, _) = FindImageAndMap(state, mapId, imageId);
-                if (image is null) { error = "Unknown map or image id."; return; }
-                image.Locked = locked;
+                var mapIdx = state.IndexOfMap(mapId);
+                if (mapIdx < 0) { error = "Unknown map or image id."; return; }
+                var map = state.Maps[mapIdx];
+                var imgIdx = DndMapperGameState.IndexOfImage(map, imageId);
+                if (imgIdx < 0) { error = "Unknown map or image id."; return; }
+                var image = map.Images[imgIdx];
+                if (image.Locked == locked) return;
+
+                state.Maps = state.Maps.SetItem(mapIdx, map with
+                {
+                    Images = map.Images.SetItem(imgIdx, image with { Locked = locked }),
+                    ImagesVersion = map.ImagesVersion + 1,
+                    ImagesMembershipVersion = map.ImagesMembershipVersion + 1,
+                });
             });
 
             if (exec.IsCanceled) return Result.FromCancellation();
@@ -2523,9 +2854,10 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             string? error = null;
             var exec = state.Execute(() =>
             {
-                var (image, _) = FindImageAndMap(state, mapId, imageId);
-                if (image is null) { error = "Unknown map or image id."; return; }
-                image.Hidden = hidden;
+                if (!TryUpdateImage(state, mapId, imageId, (img, _) => img.Hidden == hidden ? img : img with { Hidden = hidden }, bumpImagesVersion: true))
+                {
+                    error = "Unknown map or image id.";
+                }
             });
 
             if (exec.IsCanceled) return Result.FromCancellation();
@@ -2542,19 +2874,217 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             string? error = null;
             var exec = state.Execute(() =>
             {
-                var map = state.Maps.FirstOrDefault(m => m.Id == mapId);
-                if (map is null) { error = "Unknown map id."; return; }
-
-                int idx = map.Images.FindIndex(i => i.Id == imageId);
+                var mapIdx = state.IndexOfMap(mapId);
+                if (mapIdx < 0) { error = "Unknown map id."; return; }
+                var map = state.Maps[mapIdx];
+                int idx = DndMapperGameState.IndexOfImage(map, imageId);
                 if (idx < 0) { error = "Unknown image id."; return; }
 
                 var image = map.Images[idx];
-                image.ShareToken = null;
-                map.Images.RemoveAt(idx);
-                state.AdjustBytesUsed(-image.ByteSize);
+                var withoutImage = map.Images.RemoveAt(idx);
+                var withLayerOrders = ImmutableList.CreateBuilder<MapImage>();
+                for (int i = 0; i < withoutImage.Count; i++)
+                    withLayerOrders.Add(withoutImage[i] with { LayerOrder = i });
 
-                for (int i = 0; i < map.Images.Count; i++)
-                    map.Images[i].LayerOrder = i;
+                state.Maps = state.Maps.SetItem(mapIdx, map with
+                {
+                    Images = withLayerOrders.ToImmutable(),
+                    ImagesVersion = map.ImagesVersion + 1,
+                    ImagesMembershipVersion = map.ImagesMembershipVersion + 1,
+                });
+                state.AdjustBytesUsed(-image.ByteSize);
+            });
+
+            if (exec.IsCanceled) return Result.FromCancellation();
+            if (exec.TryGetFailure(out var execErr)) return Result.FromError(execErr);
+            return error is null ? Result.Success : Result.FromError(error);
+        }
+
+        // Image-update common path: locates the image, applies the update lambda
+        // (which may return null to signal "rejected — caller decides why"), and
+        // optionally bumps ImagesVersion when the lambda returned a changed
+        // image. Returns true when the lookup succeeded (even on a no-op or
+        // rejection) so callers distinguish "image not found" from policy
+        // rejections.
+        private static bool TryUpdateImage(
+            DndMapperGameState state,
+            Guid mapId, Guid imageId,
+            Func<MapImage, Map, MapImage?> update,
+            bool bumpImagesVersion)
+            => TryUpdateImage(state, mapId, imageId, update, bumpImagesVersion, out _);
+
+        private static bool TryUpdateImage(
+            DndMapperGameState state,
+            Guid mapId, Guid imageId,
+            Func<MapImage, Map, MapImage?> update,
+            bool bumpImagesVersion,
+            out string? rejection)
+        {
+            rejection = null;
+            var mapIdx = state.IndexOfMap(mapId);
+            if (mapIdx < 0) return false;
+            var map = state.Maps[mapIdx];
+            var imgIdx = DndMapperGameState.IndexOfImage(map, imageId);
+            if (imgIdx < 0) return false;
+            var current = map.Images[imgIdx];
+            var next = update(current, map);
+            if (next is null)
+            {
+                // Lookup succeeded but the update lambda rejected (e.g. image
+                // is locked). Treated as a failure path so callers surface the
+                // rejection rather than silently succeeding.
+                rejection = "Image is locked.";
+                return false;
+            }
+            if (ReferenceEquals(next, current)) return true;
+            state.Maps = state.Maps.SetItem(mapIdx, map with
+            {
+                Images = map.Images.SetItem(imgIdx, next),
+                ImagesVersion = bumpImagesVersion ? map.ImagesVersion + 1 : map.ImagesVersion,
+            });
+            return true;
+        }
+
+        // ── Fog of war ────────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Sets every cell in <paramref name="cells"/> to <paramref name="fogged"/>
+        /// on the named map. Host-only. Out-of-bounds cells are silently dropped.
+        /// An empty list is a no-op success so the client can flush a stroke that
+        /// touched no new cells without seeing an error.
+        ///
+        /// Batched rebuild: the whole stroke produces one new ImmutableArray for
+        /// FogMask and one FogVersion bump, instead of one allocation per cell.
+        /// </summary>
+        public Result PaintFogAsync(
+            DndMapperGameState state,
+            User caller,
+            Guid mapId,
+            IReadOnlyList<(int cx, int cy)> cells,
+            bool fogged)
+        {
+            if (state is null) return Result.FromError("State is required.");
+            if (caller is null) return Result.FromError("Caller is required.");
+            if (cells is null) return Result.FromError("Cells list is required.");
+            if (!IsHost(state, caller)) return Result.FromError("Only the host may change fog.");
+            if (cells.Count == 0) return Result.Success;
+
+            string? error = null;
+            var exec = state.Execute(() =>
+            {
+                if (!state.UpdateMap(mapId, m =>
+                {
+                    var totalBits = (long)m.Grid.WidthCells * m.Grid.HeightCells;
+                    if (totalBits <= 0) return m;
+                    var byteCount = (int)((totalBits + 7) / 8);
+                    var workingMask = m.FogMask.IsDefaultOrEmpty
+                        ? new byte[byteCount]
+                        : m.FogMask.ToArray();
+                    bool changed = false;
+                    foreach (var (cx, cy) in cells)
+                    {
+                        if (cx < 0 || cy < 0 || cx >= m.Grid.WidthCells || cy >= m.Grid.HeightCells) continue;
+                        var bit = cy * m.Grid.WidthCells + cx;
+                        var idx = bit >> 3;
+                        var bitMask = (byte)(1 << (bit & 7));
+                        var before = workingMask[idx];
+                        byte after = fogged ? (byte)(before | bitMask) : (byte)(before & ~bitMask);
+                        if (after != before)
+                        {
+                            workingMask[idx] = after;
+                            changed = true;
+                        }
+                    }
+                    if (!changed) return m;
+                    return m with
+                    {
+                        FogMask = ImmutableCollectionsMarshal.AsImmutableArray(workingMask),
+                        FogVersion = m.FogVersion + 1,
+                    };
+                }))
+                {
+                    error = "Unknown map id.";
+                }
+            });
+
+            if (exec.IsCanceled) return Result.FromCancellation();
+            if (exec.TryGetFailure(out var execErr)) return Result.FromError(execErr);
+            return error is null ? Result.Success : Result.FromError(error);
+        }
+
+        public Result RevealCellsAsync(DndMapperGameState state, User caller, Guid mapId, IReadOnlyList<(int cx, int cy)> cells)
+            => PaintFogAsync(state, caller, mapId, cells, fogged: false);
+
+        public Result HideCellsAsync(DndMapperGameState state, User caller, Guid mapId, IReadOnlyList<(int cx, int cy)> cells)
+            => PaintFogAsync(state, caller, mapId, cells, fogged: true);
+
+        public Result FillMapWithFogAsync(DndMapperGameState state, User caller, Guid mapId)
+        {
+            if (state is null) return Result.FromError("State is required.");
+            if (caller is null) return Result.FromError("Caller is required.");
+            if (!IsHost(state, caller)) return Result.FromError("Only the host may change fog.");
+
+            string? error = null;
+            var exec = state.Execute(() =>
+            {
+                if (!state.UpdateMap(mapId, m =>
+                {
+                    var totalBits = m.Grid.WidthCells * m.Grid.HeightCells;
+                    if (totalBits <= 0)
+                    {
+                        return m.FogMask.IsDefaultOrEmpty
+                            ? m
+                            : m with { FogMask = ImmutableArray<byte>.Empty, FogVersion = m.FogVersion + 1 };
+                    }
+
+                    var bytes = (totalBits + 7) / 8;
+                    var mask = new byte[bytes];
+                    for (var i = 0; i < bytes; i++) mask[i] = 0xFF;
+
+                    // Zero any trailing bits past WidthCells*HeightCells in the last
+                    // byte so the serialized mask stays exact. IsFogged also bounds-
+                    // checks, but keeping the storage clean makes save-roundtrip
+                    // tests trivial to reason about.
+                    var trailing = bytes * 8 - totalBits;
+                    if (trailing > 0)
+                    {
+                        var keepLow = 8 - trailing;
+                        mask[bytes - 1] = (byte)(mask[bytes - 1] & ((1 << keepLow) - 1));
+                    }
+
+                    return m with
+                    {
+                        FogMask = ImmutableCollectionsMarshal.AsImmutableArray(mask),
+                        FogVersion = m.FogVersion + 1,
+                    };
+                }))
+                {
+                    error = "Unknown map id.";
+                }
+            });
+
+            if (exec.IsCanceled) return Result.FromCancellation();
+            if (exec.TryGetFailure(out var execErr)) return Result.FromError(execErr);
+            return error is null ? Result.Success : Result.FromError(error);
+        }
+
+        public Result ClearAllFogAsync(DndMapperGameState state, User caller, Guid mapId)
+        {
+            if (state is null) return Result.FromError("State is required.");
+            if (caller is null) return Result.FromError("Caller is required.");
+            if (!IsHost(state, caller)) return Result.FromError("Only the host may change fog.");
+
+            string? error = null;
+            var exec = state.Execute(() =>
+            {
+                if (!state.UpdateMap(mapId, m =>
+                {
+                    if (m.FogMask.IsDefaultOrEmpty) return m;
+                    return m with { FogMask = ImmutableArray<byte>.Empty, FogVersion = m.FogVersion + 1 };
+                }))
+                {
+                    error = "Unknown map id.";
+                }
             });
 
             if (exec.IsCanceled) return Result.FromCancellation();
@@ -2564,7 +3094,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
 
         // ── Internal helpers (must be called from inside Execute) ─────────────────
 
-        private Guid SpawnPlayerTokenInternal(DndMapperGameState state, Map map, User player)
+        private Guid SpawnPlayerTokenInternal(DndMapperGameState state, Guid mapId, User player)
         {
             // Reuse existing session-scoped sheet if the player already has one.
             var existingSheet = state.Sheets.Values.FirstOrDefault(s => s.OwnerUserId == player.Id);
@@ -2581,14 +3111,17 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                     Id = sheetId,
                     OwnerUserId = player.Id,
                     CharacterName = player.Name,
+                    Values = SeedSheetValues(state.AttributeSchema),
                 };
-                SeedSheetValues(sheet, state.AttributeSchema);
-                state.Sheets[sheetId] = sheet;
+                state.Sheets = state.Sheets.SetItem(sheetId, sheet);
             }
 
+            var mapIdx = state.IndexOfMap(mapId);
+            if (mapIdx < 0) return Guid.Empty;
+            var map = state.Maps[mapIdx];
             var (sx, sy) = SpawnPosition(map);
             var tokenId = Guid.NewGuid();
-            map.Tokens.Add(new Token
+            var token = new Token
             {
                 Id = tokenId,
                 Type = TokenType.PlayerToken,
@@ -2597,44 +3130,60 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                 Name = player.Name,
                 Color = DefaultColorPalette.FromName(player.Name),
                 IconKind = TokenIconKind.Initial,
-                MapId = map.Id,
+                MapId = mapId,
                 X = sx,
                 Y = sy,
                 SheetId = sheetId,
-            });
+            };
+            state.Maps = state.Maps.SetItem(mapIdx, map with { Tokens = map.Tokens.Add(token) });
             return tokenId;
         }
 
         private static void ConvertAbandonedPlayerCharacterInternal(DndMapperGameState state, User departingPlayer)
         {
-            foreach (var map in state.Maps)
-            {
-                foreach (var token in map.Tokens)
+            state.Maps = state.Maps
+                .Select(m =>
                 {
-                    if (token.Type == TokenType.PlayerToken && token.OwnerUserId == departingPlayer.Id)
+                    var changed = false;
+                    var newTokens = m.Tokens;
+                    for (int i = 0; i < newTokens.Count; i++)
                     {
-                        token.Type = TokenType.NPCToken;
-                        token.OwnerUserId = null;
-                        token.RepresentsUserId = departingPlayer.Id;
+                        var token = newTokens[i];
+                        if (token.Type == TokenType.PlayerToken && token.OwnerUserId == departingPlayer.Id)
+                        {
+                            newTokens = newTokens.SetItem(i, token with
+                            {
+                                Type = TokenType.NPCToken,
+                                OwnerUserId = null,
+                                RepresentsUserId = departingPlayer.Id,
+                            });
+                            changed = true;
+                        }
                     }
-                }
-            }
+                    return changed ? m with { Tokens = newTokens } : m;
+                })
+                .ToImmutableList();
 
-            foreach (var sheet in state.Sheets.Values)
+            // Orphan the player's sheet so the host can reassign it later.
+            foreach (var (sheetId, sheet) in state.Sheets)
             {
                 if (sheet.OwnerUserId == departingPlayer.Id)
                 {
-                    sheet.OwnerUserId = null;
-                    sheet.RepresentsUserId = departingPlayer.Id;
+                    state.Sheets = state.Sheets.SetItem(sheetId, sheet with
+                    {
+                        OwnerUserId = null,
+                        RepresentsUserId = departingPlayer.Id,
+                    });
                 }
             }
         }
 
-        private static void SeedSheetValues(CharacterSheet sheet, AttributeSchema schema)
+        private static ImmutableDictionary<string, AttributeValue> SeedSheetValues(AttributeSchema schema)
         {
-            sheet.Values.Clear();
+            var builder = ImmutableDictionary.CreateBuilder<string, AttributeValue>();
             foreach (var row in schema.Rows)
-                sheet.Values[row.Name] = row.Default;
+                builder[row.Name] = row.Default;
+            return builder.ToImmutable();
         }
 
         // ── Permission / lookup helpers ───────────────────────────────────────────
@@ -2664,14 +3213,6 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                 SheetEditPolicy.Anyone => state.Players.Any(p => p.User.Id == caller.Id),
                 _ => false,
             };
-        }
-
-        private static (MapImage? Image, Map? Map) FindImageAndMap(DndMapperGameState state, Guid mapId, Guid imageId)
-        {
-            var map = state.Maps.FirstOrDefault(m => m.Id == mapId);
-            if (map is null) return (null, null);
-            var image = map.Images.FirstOrDefault(i => i.Id == imageId);
-            return (image, image is null ? null : map);
         }
 
         private static (Token? Token, Map? Map) FindTokenAndMap(DndMapperGameState state, Guid tokenId)

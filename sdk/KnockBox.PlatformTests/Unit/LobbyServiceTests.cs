@@ -124,7 +124,6 @@ public sealed class LobbyServiceTests
             EntryAssembly: "Fixture.Assembly",
             Capabilities: new HashSet<PluginCapability>());
         public void RegisterServices(IPluginRegistration registration) { }
-        public RenderFragment GetButtonContent() => _ => { };
     }
 
     private sealed class StubEngine : AbstractGameEngine

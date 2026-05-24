@@ -9,11 +9,18 @@
 
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
-    <Content Include="Data\*.csv" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\sdk\KnockBox.Core\KnockBox.Core.csproj" />
+    <!--
+      Reference the word-service contracts assembly so Spardle can inject
+      IWordListService at compile time. The runtime resolves the interface
+      via the host's DI container; the IWordListService implementation lives
+      in the sibling KnockBox.WordService library plugin, which the host
+      loads before any game plugin.
+    -->
+    <ProjectReference Include="..\KnockBox.WordService.Contracts\KnockBox.WordService.Contracts.csproj" />
   </ItemGroup>
 
   <ItemGroup>

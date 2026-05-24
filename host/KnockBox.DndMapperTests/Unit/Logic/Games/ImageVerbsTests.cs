@@ -80,16 +80,17 @@ namespace KnockBox.DndMapperTests.Unit.Logic.Games
             _engine.AddImageAsync(_state, _host, _mapId, b);
             _engine.AddImageAsync(_state, _host, _mapId, c);
 
-            Assert.AreEqual(0, a.LayerOrder);
-            Assert.AreEqual(1, b.LayerOrder);
-            Assert.AreEqual(2, c.LayerOrder);
+            var images = _state.Maps[0].Images;
+            Assert.AreEqual(0, images.Single(i => i.Id == a.Id).LayerOrder);
+            Assert.AreEqual(1, images.Single(i => i.Id == b.Id).LayerOrder);
+            Assert.AreEqual(2, images.Single(i => i.Id == c.Id).LayerOrder);
             Assert.AreEqual(150, _state.BytesUsed);
         }
 
         [TestMethod]
         public void AddImageAsync_PerFileCapExceeded_ReturnsError()
         {
-            var img = SeedImage(bytes: (5L * 1024 * 1024) + 1);
+            var img = SeedImage(bytes: (100L * 1024 * 1024) + 1);
             var result = _engine.AddImageAsync(_state, _host, _mapId, img);
             Assert.IsTrue(result.IsFailure);
             Assert.AreEqual(0, _state.BytesUsed);
@@ -98,18 +99,20 @@ namespace KnockBox.DndMapperTests.Unit.Logic.Games
         [TestMethod]
         public void AddImageAsync_RoomCapExceeded_ReturnsError()
         {
-            // Each image is under the 5 MB per-file cap; combined they're under
-            // the 10 MB room cap; the third pushes past 10 MB and must be rejected.
-            var a = SeedImage(bytes: 4L * 1024 * 1024);
-            var b = SeedImage(bytes: 4L * 1024 * 1024);
-            Assert.IsTrue(_engine.AddImageAsync(_state, _host, _mapId, a).IsSuccess);
-            Assert.IsTrue(_engine.AddImageAsync(_state, _host, _mapId, b).IsSuccess);
+            // Ten 100 MB images consume 1000 MB total — still under the 1 GB
+            // (1024 MB) per-room cap. An eleventh 100 MB image pushes past 1024 MB
+            // and must be rejected.
+            const long oneHundredMb = 100L * 1024 * 1024;
+            for (int i = 0; i < 10; i++)
+            {
+                Assert.IsTrue(_engine.AddImageAsync(_state, _host, _mapId, SeedImage(bytes: oneHundredMb)).IsSuccess);
+            }
 
-            var tooBig = SeedImage(bytes: 3L * 1024 * 1024);
+            var tooBig = SeedImage(bytes: oneHundredMb);
             var result = _engine.AddImageAsync(_state, _host, _mapId, tooBig);
 
             Assert.IsTrue(result.IsFailure);
-            Assert.AreEqual(8L * 1024 * 1024, _state.BytesUsed);
+            Assert.AreEqual(10 * oneHundredMb, _state.BytesUsed);
         }
 
         [TestMethod]
@@ -132,10 +135,11 @@ namespace KnockBox.DndMapperTests.Unit.Logic.Games
                 x: 1, y: 2, width: 30, height: 40, rotation: 90, opacity: 0.5);
 
             Assert.IsTrue(result.IsSuccess);
-            Assert.AreEqual(30, img.Width);
-            Assert.AreEqual(40, img.Height);
-            Assert.AreEqual(0.5, img.Opacity);
-            Assert.AreEqual(90, img.Rotation);
+            var stored = _state.Maps[0].Images.Single(i => i.Id == img.Id);
+            Assert.AreEqual(30, stored.Width);
+            Assert.AreEqual(40, stored.Height);
+            Assert.AreEqual(0.5, stored.Opacity);
+            Assert.AreEqual(90, stored.Rotation);
         }
 
         [TestMethod]
@@ -230,19 +234,19 @@ namespace KnockBox.DndMapperTests.Unit.Logic.Games
         }
 
         [TestMethod]
-        public void RemoveImageAsync_NullsShareTokenOnRemovedImage()
+        public void RemoveImageAsync_RemovesImageFromMap()
         {
-            // The host's library disposes the cached IBlobShare on remove, but
-            // the MapImage instance can outlive removal (UI alias, snapshot
-            // mid-write). Nulling the ShareToken in the same Execute prevents
-            // a dangling capability token from leaking into any later read.
+            // MapImage is now an immutable record, so the engine no longer
+            // needs to (and can't) zero the ShareToken on a caller-held
+            // reference. Removing the image from state.Maps[..].Images is the
+            // operation that prevents future reads from seeing a dangling
+            // capability — that's verified by checking the image is gone.
             var img = SeedImage();
             Assert.IsTrue(_engine.AddImageAsync(_state, _host, _mapId, img).IsSuccess);
-            Assert.IsNotNull(img.ShareToken);
 
             Assert.IsTrue(_engine.RemoveImageAsync(_state, _host, _mapId, img.Id).IsSuccess);
 
-            Assert.IsNull(img.ShareToken);
+            Assert.IsEmpty(_state.Maps[0].Images);
         }
 
         // ── DeleteMapAsync image cascade ──────────────────────────────────────────

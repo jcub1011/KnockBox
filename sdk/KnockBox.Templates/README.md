@@ -33,10 +33,10 @@ MyGame/
 │   ├── MyGameModule.cs          # IGameModule entry point
 │   ├── MyGameGameState.cs       # per-room state : AbstractGameState
 │   ├── MyGameGameEngine.cs      # stateless singleton : AbstractGameEngine
-│   ├── Components/
-│   │   └── MyGameTile.razor     # home-page tile content
 │   ├── Pages/
 │   │   └── MyGameLobby.razor    # @page "/room/my-game/{ObfuscatedRoomCode}"
+│   ├── wwwroot/
+│   │   └── tile.svg             # home-page tile (referenced from plugin.json)
 │   └── _Imports.razor
 ├── MyGame.DevHost/              # local F5 harness (ASP.NET Core Web)
 │   ├── MyGame.DevHost.csproj    # references KnockBox.Platform + the plugin

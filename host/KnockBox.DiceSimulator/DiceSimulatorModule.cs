@@ -13,12 +13,6 @@ namespace KnockBox.DiceSimulator
         public void RegisterServices(IPluginRegistration registration)
             => registration.AddGameEngine<DiceSimulatorGameEngine>();
 
-        public RenderFragment GetButtonContent() => builder =>
-        {
-            builder.OpenComponent<DiceSimulatorTile>(0);
-            builder.CloseComponent();
-        };
-
         public RenderFragment? GetCustomHeader() => builder =>
         {
             builder.OpenComponent<DiceSimulatorHeader>(0);

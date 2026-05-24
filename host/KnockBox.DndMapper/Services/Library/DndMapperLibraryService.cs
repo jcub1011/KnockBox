@@ -1,10 +1,16 @@
+using System.Collections.Immutable;
+using System.Security.Cryptography;
+using System.Text.Json;
 using KnockBox.Core.Primitives.Returns;
 using KnockBox.Core.Services.State.Users;
 using KnockBox.Core.Services.Storage.IndexedDb;
 using KnockBox.DndMapper.Models;
+using KnockBox.DndMapper.Services.Library.Vtf;
 using KnockBox.DndMapper.Services.Logic.Games;
 using KnockBox.DndMapper.Services.State.Games;
 using KnockBox.DndMapper.Services.State.Games.Data;
+using Microsoft.AspNetCore.Components;
+using Microsoft.JSInterop;
 
 namespace KnockBox.DndMapper.Services.Library
 {
@@ -28,8 +34,26 @@ namespace KnockBox.DndMapper.Services.Library
         // scrubbing) into one write per burst.
         private static readonly TimeSpan SaveDebounce = TimeSpan.FromMilliseconds(500);
 
+        // Plugin-owned ES module that decodes a blob: URL and (if the source
+        // exceeds the device's max GPU texture size) downscales it in a Web
+        // Worker via OffscreenCanvas, then overwrites the IDB row with the new
+        // bytes — all without round-tripping bytes through .NET. Lives in this
+        // plugin's wwwroot so the shared adoption API
+        // (IIndexedDatabase.AdoptInputElementFilesAsync) stays free of
+        // image-specific concerns.
+        private const string ImageDownscaleModulePath =
+            "/_content/KnockBox.DndMapper/js/dndMapperImageDownscale.js";
+
+        // Hard cap on the long edge after downscale. The device's reported
+        // MAX_TEXTURE_SIZE is the upper bound; this floor protects against
+        // GPUs that report 16384+ but stall under CSS-transform scaling at
+        // those sizes anyway.
+        private const int MaxImageLongEdgePxCap = 8192;
+
         private readonly IIndexedDbService _indexedDb;
         private readonly DndMapperGameEngine _engine;
+        private readonly IJSRuntime _jsRuntime;
+        private readonly Lazy<Task<IJSObjectReference>> _imageDimsModule;
         private readonly ILogger<DndMapperLibraryService> _logger;
 
         private readonly Dictionary<Guid, IndexedDbBlob> _blobCache = new();
@@ -53,14 +77,61 @@ namespace KnockBox.DndMapper.Services.Library
         // last burst of edits doesn't get lost when no further events fire.
         private int _pendingDirty;
 
+        // Per-shard SHA-256 of the last serialized JSON for the Auto Save slot,
+        // keyed by IDB compound key (e.g., "__auto__:core", "__auto__:map:{g}",
+        // "__auto__:sheet:{g}"). FlushSnapshotAsync compares against this and
+        // only writes shards whose hash differs, then refreshes the cache.
+        // Cleared on Attach/Detach; not used for manual-slot ops (those always
+        // write every shard).
+        private readonly Dictionary<string, byte[]> _autoFlushHashes = new();
+
+        // Reference snapshot of every persisted state field captured at the
+        // last successful auto-flush (and at Attach). OnStateChangedAsync
+        // compares this against the live refs and short-circuits if nothing
+        // persisted has changed — e.g. a dice roll appends to RollLog, which
+        // isn't persisted, so the saving indicator and IDB write are skipped
+        // entirely. Every immutable collection / wholesale-replaced settings
+        // ref change is caught; in-place field mutation isn't possible
+        // because the state model uses immutable shapes for persisted data.
+        private PersistedFingerprint _lastFlushedFingerprint;
+
+        private readonly record struct PersistedFingerprint(
+            object? Maps,
+            object? Sheets,
+            object? CustomTemplates,
+            object? GlobalRollTemplates,
+            object? Settings,
+            object? AttributeSchema,
+            Guid? ActiveSchemaTemplateId,
+            string? InitiativeAttributeName);
+
+        private static PersistedFingerprint CaptureFingerprint(DndMapperGameState s) => new(
+            s.Maps,
+            s.Sheets,
+            s.CustomTemplates,
+            s.GlobalRollTemplates,
+            s.Settings,
+            s.AttributeSchema,
+            s.ActiveSchemaTemplateId,
+            s.InitiativeAttributeName);
+
+        // Slot ids whose v3 → v4 single-record migration has been probed in
+        // this attachment. LoadSlotAsync consults this to avoid reissuing the
+        // legacy-key read on every refresh of the saves panel.
+        private readonly HashSet<string> _migratedSlots = new();
+
         public DndMapperLibraryService(
             IIndexedDbService indexedDb,
             DndMapperGameEngine engine,
+            IJSRuntime jsRuntime,
             ILogger<DndMapperLibraryService> logger)
         {
             _indexedDb = indexedDb;
             _engine = engine;
+            _jsRuntime = jsRuntime;
             _logger = logger;
+            _imageDimsModule = new Lazy<Task<IJSObjectReference>>(() =>
+                _jsRuntime.InvokeAsync<IJSObjectReference>("import", ImageDownscaleModulePath).AsTask());
         }
 
         /// <summary>
@@ -141,6 +212,7 @@ namespace KnockBox.DndMapper.Services.Library
 
             // Stand up the debounce timer in a stopped state and subscribe.
             _saveTimer = new Timer(OnSaveTimerTick, state: null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+            _lastFlushedFingerprint = CaptureFingerprint(state);
             _stateSub = state.StateChangedEventManager.Subscribe(OnStateChangedAsync);
 
             // Reconnect path: if the state already carries images from a prior
@@ -294,30 +366,27 @@ namespace KnockBox.DndMapper.Services.Library
                         imageIds.Add((map.Id, image.Id));
             });
 
-            foreach (var (mapId, imageId) in imageIds)
+            // Skip images already wired up by an earlier attach in this circuit.
+            var pending = imageIds.Where(p => !_shareCache.ContainsKey(p.ImageId)).ToArray();
+            if (pending.Length == 0) return;
+
+            // Run blob fetch + share publish in parallel for every pending
+            // image. Each pair is independent at the IDB level; the JS side
+            // can process them concurrently and SignalR streams the round-
+            // trips in parallel. This collapses a sequential 50× ~50 ms walk
+            // into a single parallel batch for the reconnect path.
+            var fetchTasks = pending
+                .Select(p => RepublishOneAsync(p.MapId, p.ImageId, ct).AsTask())
+                .ToArray();
+            var results = await Task.WhenAll(fetchTasks);
+
+            // Cache mutation + engine notify run serially since both touch
+            // shared state (the cache dictionaries are non-concurrent and
+            // engine.UpdateImageShareTokenAsync takes the state lock).
+            foreach (var (mapId, imageId, blob, share) in results)
             {
                 if (ct.IsCancellationRequested) return;
-                if (_shareCache.ContainsKey(imageId)) continue; // already wired
-
-                var blobResult = await _db.BlobGetSingleAsync(
-                    DndMapperLibrarySchema.ImagesStore,
-                    IndexedDbKey.String(imageId.ToString("D")),
-                    ct);
-
-                if (!blobResult.TryGetSuccess(out var blob) || blob is null)
-                {
-                    _logger.LogWarning("Reconnect: image {ImageId} no longer in IndexedDB; leaving placeholder.", imageId);
-                    continue;
-                }
-
-                IBlobShare share;
-                try { share = await blob.PublishForSharingAsync(options: null, ct); }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Reconnect: failed to republish image {ImageId}.", imageId);
-                    await SafeDisposeAsync(blob);
-                    continue;
-                }
+                if (blob is null || share is null) continue;
 
                 await ReplaceCacheEntryAsync(imageId, blob, share);
 
@@ -329,79 +398,274 @@ namespace KnockBox.DndMapper.Services.Library
             }
         }
 
+        private async ValueTask<(Guid MapId, Guid ImageId, IndexedDbBlob? Blob, IBlobShare? Share)>
+            RepublishOneAsync(Guid mapId, Guid imageId, CancellationToken ct)
+        {
+            if (_db is null || ct.IsCancellationRequested) return (mapId, imageId, null, null);
+
+            var blobResult = await _db.BlobGetSingleAsync(
+                DndMapperLibrarySchema.ImagesStore,
+                IndexedDbKey.String(imageId.ToString("D")),
+                ct);
+
+            if (!blobResult.TryGetSuccess(out var blob) || blob is null)
+            {
+                _logger.LogWarning("Reconnect: image {ImageId} no longer in IndexedDB; leaving placeholder.", imageId);
+                return (mapId, imageId, null, null);
+            }
+
+            IBlobShare share;
+            try { share = await blob.PublishForSharingAsync(options: null, ct); }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Reconnect: failed to republish image {ImageId}.", imageId);
+                await SafeDisposeAsync(blob);
+                return (mapId, imageId, null, null);
+            }
+
+            return (mapId, imageId, blob, share);
+        }
+
         /// <summary>
-        /// Uploads a new image. Stores the bytes in IndexedDB on the host's
-        /// browser, publishes a blob-share so other players can fetch it
-        /// through the host's circuit, then asks the engine to record the
-        /// metadata. The blob and the share are cached for the lifetime of
-        /// the circuit so subsequent re-publishes (after reconnect) can reuse
-        /// them without re-reading the bytes.
+        /// One file's outcome from
+        /// <see cref="UploadImagesFromInputElementAsync"/>. Successful
+        /// entries include the assigned <see cref="MapImage"/>; failed
+        /// entries carry a human-readable <see cref="Error"/> describing
+        /// which stage rejected the file (JS type/size filter, image decode,
+        /// IndexedDB put, engine cap, …).
         /// </summary>
-        public async ValueTask<ValueResult<MapImage>> AddImageAsync(
+        public sealed record UploadOutcome(
+            string Filename,
+            MapImage? Image,
+            string? Error);
+
+        /// <summary>
+        /// Pulls every file from the host's <c>&lt;input type="file"&gt;</c>
+        /// element straight into the host's IndexedDB on the JS side (bytes
+        /// never cross the SignalR boundary), then registers each image with
+        /// the engine. Returns one <see cref="UploadOutcome"/> per file in
+        /// selection order; per-file failures are reported on the outcome
+        /// rather than aborting the whole batch.
+        /// </summary>
+        public async ValueTask<ValueResult<IReadOnlyList<UploadOutcome>>>
+            UploadImagesFromInputElementAsync(
+                DndMapperGameState state,
+                User host,
+                Guid mapId,
+                ElementReference inputElement,
+                CancellationToken ct = default)
+        {
+            ThrowIfDisposed();
+            if (_db is null) return ValueResult<IReadOnlyList<UploadOutcome>>.FromError("Library is not attached.");
+            if (state is null) return ValueResult<IReadOnlyList<UploadOutcome>>.FromError("State is required.");
+            if (host is null) return ValueResult<IReadOnlyList<UploadOutcome>>.FromError("Host is required.");
+
+            // Convert pixel dimensions from the JS-side image decode into
+            // cell units. Falls back to 1 if the map has been removed
+            // between the user picking files and this call.
+            int cellPixels = 1;
+            bool mapMissing = false;
+            state.WithExclusiveRead(() =>
+            {
+                var map = state.Maps.FirstOrDefault(m => m.Id == mapId);
+                if (map is null) { mapMissing = true; return; }
+                cellPixels = Math.Max(1, map.Grid.CellPixels);
+            });
+            if (mapMissing) return ValueResult<IReadOnlyList<UploadOutcome>>.FromError("Map not found.");
+
+            var adoptResult = await _db.AdoptInputElementFilesAsync(
+                inputElement,
+                DndMapperLibrarySchema.ImagesStore,
+                new AdoptInputFilesOptions(
+                    AcceptedTypes: DndMapperGameEngine.AllowedImageContentTypeList,
+                    MaxBytes: DndMapperGameEngine.PerFileCapBytes),
+                ct);
+
+            if (adoptResult.IsCanceled) return ValueResult<IReadOnlyList<UploadOutcome>>.FromCancellation();
+            if (!adoptResult.TryGetSuccess(out var adopted))
+            {
+                adoptResult.TryGetFailure(out var aerr);
+                return ValueResult<IReadOnlyList<UploadOutcome>>.FromError(aerr.Message);
+            }
+
+            // Load the plugin-owned dimension decoder once for the batch. If
+            // the module import itself fails, surface that as a batch error
+            // (rather than mis-attributing it to per-file decode failures).
+            IJSObjectReference dimsModule;
+            try { dimsModule = await _imageDimsModule.Value.WaitAsync(ct); }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogError(ex, "Failed to load dndMapperImageDownscale.js.");
+                // Roll back any adopted blobs we won't use.
+                foreach (var item in adopted)
+                {
+                    if (item.Blob is null || item.Key is null) continue;
+                    await SafeDeleteAsync(IndexedDbKey.String(item.Key.Value.ToString("D")));
+                    await SafeDisposeAsync(item.Blob);
+                }
+                return ValueResult<IReadOnlyList<UploadOutcome>>.FromError("Image decoder unavailable.");
+            }
+
+            // Probe once per batch — the value is module-cached on the JS side
+            // anyway, but reading it here lets us clamp to MaxImageLongEdgePxCap
+            // up front and pass a single integer through to each per-file call.
+            int maxLongEdgePx;
+            try
+            {
+                var probed = await dimsModule.InvokeAsync<int>("probeMaxTextureSize", ct);
+                maxLongEdgePx = Math.Min(MaxImageLongEdgePxCap, probed > 0 ? probed : MaxImageLongEdgePxCap);
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "probeMaxTextureSize failed; falling back to {Cap}px.", MaxImageLongEdgePxCap);
+                maxLongEdgePx = MaxImageLongEdgePxCap;
+            }
+
+            var outcomes = new List<UploadOutcome>(adopted.Count);
+            foreach (var item in adopted)
+            {
+                if (item.Error is not null || item.Blob is null || item.Key is null)
+                {
+                    outcomes.Add(new UploadOutcome(item.Filename, null, item.Error ?? "adoption failed"));
+                    continue;
+                }
+
+                var keyString = item.Key.Value.ToString("D");
+                IndexedDbBlob blob = item.Blob;
+                int pxW, pxH, originalPxW, originalPxH;
+                bool wasDownscaled;
+                try
+                {
+                    var url = await blob.CreateObjectUrlAsync(ct);
+                    var decode = await dimsModule.InvokeAsync<DecodeOutcomeDto>(
+                        "decodeAndMaybeDownscale", ct,
+                        url,
+                        blob.ContentType,
+                        maxLongEdgePx,
+                        DndMapperLibrarySchema.DatabaseName,
+                        DndMapperLibrarySchema.ImagesStore,
+                        keyString);
+                    pxW = decode.WidthPx;
+                    pxH = decode.HeightPx;
+                    originalPxW = decode.OriginalWidthPx;
+                    originalPxH = decode.OriginalHeightPx;
+                    wasDownscaled = decode.WasDownscaled;
+                }
+                catch (OperationCanceledException) { throw; }
+                catch (Exception ex)
+                {
+                    _logger.LogInformation(ex, "Image decode/downscale failed for {File}; rolling back.", item.Filename);
+                    await SafeDeleteAsync(IndexedDbKey.String(keyString));
+                    await SafeDisposeAsync(blob);
+                    outcomes.Add(new UploadOutcome(item.Filename, null, "not a decodable image"));
+                    continue;
+                }
+
+                // When the JS module downscaled, it overwrote the IDB row with
+                // the new bytes. Our adopted blob handle still points at the
+                // pre-overwrite JS Blob object (a different handle than what
+                // the row now contains), so we must dispose it and fetch a
+                // fresh handle backed by the new bytes — otherwise the cache
+                // would serve stale bytes via CreateObjectUrlAsync.
+                if (wasDownscaled)
+                {
+                    await SafeDisposeAsync(blob);
+                    var freshResult = await _db.BlobGetSingleAsync(
+                        DndMapperLibrarySchema.ImagesStore,
+                        IndexedDbKey.String(keyString),
+                        ct);
+                    if (!freshResult.TryGetSuccess(out var fresh) || fresh is null)
+                    {
+                        _logger.LogError("Downscaled blob for {File} could not be re-read; rolling back.", item.Filename);
+                        await SafeDeleteAsync(IndexedDbKey.String(keyString));
+                        outcomes.Add(new UploadOutcome(item.Filename, null, "Lost track of downscaled image bytes."));
+                        continue;
+                    }
+                    blob = fresh;
+                }
+
+                var originalW = pxW > 0 ? pxW / (double)cellPixels : 0;
+                var originalH = pxH > 0 ? pxH / (double)cellPixels : 0;
+                var originalLongEdge = Math.Max(originalPxW, originalPxH);
+                var displayLongEdge = Math.Max(pxW, pxH);
+
+                var addResult = await AddAdoptedImageAsync(
+                    state, host, mapId, item.Key.Value, blob, originalW, originalH,
+                    wasDownscaled, originalLongEdge, displayLongEdge, ct);
+                if (addResult.TryGetSuccess(out var image))
+                    outcomes.Add(new UploadOutcome(item.Filename, image, null));
+                else if (addResult.TryGetFailure(out var err))
+                    outcomes.Add(new UploadOutcome(item.Filename, null, err.PublicMessage));
+                else
+                    outcomes.Add(new UploadOutcome(item.Filename, null, "engine registration failed"));
+            }
+
+            return ValueResult<IReadOnlyList<UploadOutcome>>.FromValue(outcomes);
+        }
+
+        // Mirror of the metadata return shape from
+        // dndMapperImageDownscale.js#decodeAndMaybeDownscale. Field names use
+        // the JS casing because Blazor's default JSInterop JSON options are
+        // camelCase-preserving. When WasDownscaled is true, the new blob has
+        // already been written into IndexedDB by the JS module — there is no
+        // separate blob handle returned.
+        private sealed record DecodeOutcomeDto(
+            int WidthPx,
+            int HeightPx,
+            int OriginalWidthPx,
+            int OriginalHeightPx,
+            bool WasDownscaled);
+
+        /// <summary>
+        /// Registers an image that the host's browser has already persisted
+        /// into the IndexedDB images store via
+        /// <see cref="IIndexedDatabase.AdoptInputElementFilesAsync"/>. The
+        /// bytes never crossed to the .NET side; this method publishes a
+        /// share, builds the <see cref="MapImage"/> from
+        /// <paramref name="adoptedBlob"/>'s metadata, and registers with the
+        /// engine. On engine rejection the IDB row and the JS-side blob
+        /// handle are rolled back so the slot is clean for retry.
+        /// </summary>
+        public async ValueTask<ValueResult<MapImage>> AddAdoptedImageAsync(
             DndMapperGameState state,
             User host,
             Guid mapId,
-            string contentType,
-            long byteSize,
+            Guid imageId,
+            IndexedDbBlob adoptedBlob,
             double originalWidthCells,
             double originalHeightCells,
-            Stream content,
+            bool wasDownscaled = false,
+            int originalLongEdgePx = 0,
+            int displayLongEdgePx = 0,
             CancellationToken ct = default)
         {
             ThrowIfDisposed();
             if (_db is null) return ValueResult<MapImage>.FromError("Library is not attached. Call AttachAsync first.");
             if (state is null) return ValueResult<MapImage>.FromError("State is required.");
             if (host is null) return ValueResult<MapImage>.FromError("Host is required.");
-            if (content is null) return ValueResult<MapImage>.FromError("Image content stream is required.");
-            if (byteSize <= 0) return ValueResult<MapImage>.FromError("Byte size must be positive.");
+            if (adoptedBlob is null) return ValueResult<MapImage>.FromError("Blob handle is required.");
+            if (adoptedBlob.Length <= 0) return ValueResult<MapImage>.FromError("Adopted blob has non-positive length.");
 
-            var imageId = Guid.NewGuid();
-
-            // Step 1: hand the stream to the IndexedDB SDK, which chunks bytes
-            // across SignalR and constructs the JS-side Blob. The SDK takes
-            // ownership of the stream (we pass leaveOpen=false by default).
-            IndexedDbBlob blob;
-            try
-            {
-                blob = await _indexedDb.CreateBlobAsync(content, byteSize, contentType, leaveOpen: false, ct);
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                _logger.LogError(ex, "Failed to create IndexedDB blob for image {ImageId}.", imageId);
-                return ValueResult<MapImage>.FromError("Failed to buffer image into IndexedDB.");
-            }
-
-            // Step 2: persist the blob into the images store.
             var key = IndexedDbKey.String(imageId.ToString("D"));
-            var putResult = await _db.BlobPutSingleAsync(DndMapperLibrarySchema.ImagesStore, blob, key, ct);
-            if (!putResult.IsSuccess)
-            {
-                putResult.TryGetFailure(out var perr);
-                _logger.LogError("Failed to persist image {ImageId} to IndexedDB: {Error}", imageId, perr.Message);
-                await SafeDisposeAsync(blob);
-                return ValueResult<MapImage>.FromError($"Failed to persist image: {perr.Message}");
-            }
 
-            // Step 3: publish a blob-share so player circuits can fetch the bytes.
             IBlobShare share;
             try
             {
-                share = await blob.PublishForSharingAsync(options: null, ct);
+                share = await adoptedBlob.PublishForSharingAsync(options: null, ct);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 _logger.LogError(ex, "Failed to publish blob share for image {ImageId}.", imageId);
                 await SafeDeleteAsync(key);
-                await SafeDisposeAsync(blob);
+                await SafeDisposeAsync(adoptedBlob);
                 return ValueResult<MapImage>.FromError("Failed to publish image share.");
             }
 
-            // Step 4: register with the engine. If the engine rejects (cap race,
-            // unknown map id), roll back the blob, share, and stored row.
             var image = new MapImage
             {
                 Id = imageId,
-                ContentType = contentType,
+                ContentType = adoptedBlob.ContentType,
                 ShareToken = share.Token,
                 X = 0,
                 Y = 0,
@@ -413,7 +677,10 @@ namespace KnockBox.DndMapper.Services.Library
                 Opacity = 1.0,
                 LayerOrder = 0, // engine overwrites
                 Locked = false,
-                ByteSize = byteSize,
+                ByteSize = adoptedBlob.Length,
+                WasDownscaled = wasDownscaled,
+                OriginalLongEdgePx = originalLongEdgePx,
+                DisplayLongEdgePx = displayLongEdgePx,
             };
 
             var addResult = _engine.AddImageAsync(state, host, mapId, image);
@@ -422,11 +689,11 @@ namespace KnockBox.DndMapper.Services.Library
                 _logger.LogInformation("Engine rejected image {ImageId}; rolling back blob.", imageId);
                 await SafeDisposeAsync(share);
                 await SafeDeleteAsync(key);
-                await SafeDisposeAsync(blob);
+                await SafeDisposeAsync(adoptedBlob);
                 return addResult;
             }
 
-            await ReplaceCacheEntryAsync(imageId, blob, share);
+            await ReplaceCacheEntryAsync(imageId, adoptedBlob, share);
             return ValueResult<MapImage>.FromValue(added);
         }
 
@@ -456,6 +723,50 @@ namespace KnockBox.DndMapper.Services.Library
             return Result.Success;
         }
 
+        /// <summary>
+        /// Deletes a map: snapshots the map's image ids first, forwards to the
+        /// engine, then (on success) deletes each image's IndexedDB row and
+        /// disposes the cached blob + share handles. Disposing an
+        /// <see cref="IBlobShare"/> revokes its token from
+        /// <c>BlobShareRegistry</c>, which in turn evicts the byte cache —
+        /// so the capability URLs for every image on the deleted map stop
+        /// resolving immediately.
+        /// </summary>
+        /// <remarks>
+        /// Map *swap* (<c>SetActiveMapAsync</c>) intentionally does not revoke
+        /// anything: off-screen maps stay in <c>state.Maps</c> with their
+        /// images, and the host can swap back at any time. Only map deletion
+        /// (and explicit per-image removal) reaches this cleanup path.
+        /// </remarks>
+        public async ValueTask<Result> DeleteMapAsync(
+            DndMapperGameState state,
+            User host,
+            Guid mapId,
+            CancellationToken ct = default)
+        {
+            ThrowIfDisposed();
+            if (_db is null) return Result.FromError("Library is not attached.");
+
+            // Snapshot the image ids BEFORE the engine mutates state — once
+            // the verb runs, map.Images is gone.
+            var map = state.Maps.FirstOrDefault(m => m.Id == mapId);
+            var imageIds = map is null
+                ? Array.Empty<Guid>()
+                : map.Images.Select(i => i.Id).ToArray();
+
+            var engineResult = _engine.DeleteMapAsync(state, host, mapId);
+            if (!engineResult.IsSuccess) return engineResult;
+
+            foreach (var imageId in imageIds)
+            {
+                await SafeDeleteAsync(IndexedDbKey.String(imageId.ToString("D")));
+                if (_shareCache.Remove(imageId, out var share)) await SafeDisposeAsync(share);
+                if (_blobCache.Remove(imageId, out var blob)) await SafeDisposeAsync(blob);
+            }
+
+            return Result.Success;
+        }
+
         // Replaces (or inserts) the cached blob + share for an image, disposing
         // any previous handles so we never silently overwrite a live JS resource.
         private async ValueTask ReplaceCacheEntryAsync(Guid imageId, IndexedDbBlob blob, IBlobShare share)
@@ -464,6 +775,51 @@ namespace KnockBox.DndMapper.Services.Library
             if (_blobCache.Remove(imageId, out var oldBlob)) await SafeDisposeAsync(oldBlob);
             _blobCache[imageId] = blob;
             _shareCache[imageId] = share;
+        }
+
+        /// <summary>
+        /// Returns a <c>blob:</c> URL pointing directly at the host's
+        /// in-browser IndexedDB blob for <paramref name="imageId"/>, or
+        /// <see langword="null"/> if this circuit isn't the owning host
+        /// (cache miss) or the service is shutting down. <c>MapCanvas</c>
+        /// uses this to render the host's own images without an HTTP round-
+        /// trip to <c>/blob-share</c> — the bytes are already in this
+        /// browser, so shipping them up through SignalR just to fetch them
+        /// back via HTTP is the dial-up case we're killing here.
+        /// <para>
+        /// Non-throwing by design: the rendering caller treats <c>null</c>
+        /// as "fall back to the share URL". The underlying
+        /// <see cref="IndexedDbBlob.CreateObjectUrlAsync"/> caches the
+        /// URL on the blob handle, so repeat calls are cheap.
+        /// </para>
+        /// </summary>
+        /// <summary>
+        /// Synchronous companion to <see cref="TryGetLocalObjectUrlAsync"/>.
+        /// Returns <see langword="true"/> only when this circuit owns the
+        /// blob (i.e. it's the host who uploaded it). Callers use this to
+        /// distinguish "host but URL not yet cached" from "player, always
+        /// needs the share URL" during the brief window between first
+        /// render and the async URL fetch completing — rendering a
+        /// placeholder in the first case avoids firing a wasteful
+        /// SignalR-backed <c>/blob-share/</c> fetch from the host's own
+        /// browser back to itself.
+        /// </summary>
+        public bool HasLocalBlob(Guid imageId)
+            => !_disposed && _blobCache.ContainsKey(imageId);
+
+        public async ValueTask<string?> TryGetLocalObjectUrlAsync(Guid imageId, CancellationToken ct = default)
+        {
+            if (_disposed) return null;
+            if (!_blobCache.TryGetValue(imageId, out var blob)) return null;
+            try
+            {
+                return await blob.CreateObjectUrlAsync(ct).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogWarning(ex, "Failed to create local object URL for image {ImageId}; caller will fall back to /blob-share.", imageId);
+                return null;
+            }
         }
 
         /// <summary>
@@ -487,151 +843,104 @@ namespace KnockBox.DndMapper.Services.Library
             // a half-built snapshot back over the one we're loading.
             _saveTimer?.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
 
-            // 1. Read snapshot from the requested slot.
-            var snapKey = IndexedDbKey.String(slotId);
-            var readResult = await _db.JsonGetSingleAsync<LibrarySnapshot>(
-                DndMapperLibrarySchema.LibraryStore, snapKey, ct);
+            // 1. Try the v4 sharded layout first: read {slotId}:core, then
+            //    fan out map and sheet shards from the spine. ConfigureAwait(false)
+            //    on every await so the post-yield continuations (and the
+            //    state.Execute lambda below) run on the thread pool, not on
+            //    the Blazor circuit context that the caller's event handler
+            //    captured.
+            var (snapshot, _, shardHashes) = await ReadShardedSlotAsync(_db, slotId, ct).ConfigureAwait(false);
 
-            if (!readResult.TryGetSuccess(out var snapshot))
+            // 2. v4 miss → fall back to the legacy v3 single-record at key
+            //    `{slotId}`. If found, MigrateV3SlotIfNeededAsync rewrites it
+            //    as shards and deletes the legacy record; we hydrate from the
+            //    returned in-memory snapshot directly (no need to re-read).
+            if (snapshot is null)
             {
-                readResult.TryGetFailure(out var rerr);
-                return Result.FromError($"Failed to read library snapshot: {rerr.Message}");
+                var legacy = await MigrateV3SlotIfNeededAsync(_db, slotId, ct).ConfigureAwait(false);
+                if (legacy is not null) snapshot = legacy;
             }
+
             if (snapshot is null) return Result.Success; // nothing to hydrate
 
             // 2. Pre-load every image blob and publish a share outside the lock.
             //    Build a parallel structure mapping imageId -> fresh MapImage.
-            var hydratedImages = await HydrateImagesFromSnapshotAsync(_db, snapshot, ct);
+            var hydratedImages = await HydrateImagesFromSnapshotAsync(_db, snapshot, ct).ConfigureAwait(false);
             if (ct.IsCancellationRequested) return Result.FromCancellation();
 
-            // 3. Apply atomically inside one Execute. Subscribers see one
+            // 3. Pre-build the new state collections OFF the circuit thread.
+            //    All the LINQ/projection work (maps + tokens + sheets + roll
+            //    templates) happens here without the state lock; the Execute
+            //    lambda then only does bulk swaps, dropping lock-hold time
+            //    from 5-50 ms to sub-ms and freeing the circuit to paint
+            //    during the rebuild.
+            var hydration = await Task.Run(() => BuildHydration(snapshot, hydratedImages), ct).ConfigureAwait(false);
+            if (ct.IsCancellationRequested) return Result.FromCancellation();
+
+            // 4. Apply atomically inside one Execute. Subscribers see one
             //    StateChanged notification covering the entire hydration.
             var state = _state;
-            var attrSchema = LibrarySnapshotMapper.ToAttributeSchema(snapshot.AttributeSchema);
             var execResult = state.Execute(() =>
             {
-                state.SetSettings(snapshot.Settings.Clone());
-                state.SetAttributeSchema(attrSchema);
+                state.SetSettings(snapshot.Settings with { });
+                state.SetAttributeSchema(hydration.AttrSchema);
 
-                state.Maps.Clear();
-                long totalBytes = 0;
-                foreach (var mapSnap in snapshot.Maps.OrderBy(m => m.ListOrder))
-                {
-                    var map = new Map
-                    {
-                        Id = mapSnap.Id,
-                        Name = mapSnap.Name,
-                        ListOrder = mapSnap.ListOrder,
-                        CreatedUtc = mapSnap.CreatedUtc,
-                        Grid = mapSnap.Grid.Clone(),
-                        DefaultSpawnPosition = mapSnap.DefaultSpawnX is double sx && mapSnap.DefaultSpawnY is double sy
-                            ? (sx, sy)
-                            : null,
-                    };
-                    foreach (var imgSnap in mapSnap.Images.OrderBy(i => i.LayerOrder))
-                    {
-                        if (hydratedImages.TryGetValue(imgSnap.Id, out var image))
-                        {
-                            map.Images.Add(image);
-                            totalBytes += image.ByteSize;
-                        }
-                    }
-                    foreach (var tokSnap in mapSnap.Tokens)
-                    {
-                        // All persisted tokens hydrate as NPCs with no owner.
-                        // The host promotes any of them to PlayerToken via
-                        // ReassignTokenOwnerAsync after players join.
-                        map.Tokens.Add(new Token
-                        {
-                            Id = tokSnap.Id,
-                            Type = TokenType.NPCToken,
-                            OwnerUserId = null,
-                            RepresentsUserId = null,
-                            Name = tokSnap.Name,
-                            Color = tokSnap.Color,
-                            IconKind = tokSnap.IconKind,
-                            MapId = tokSnap.MapId,
-                            X = tokSnap.X,
-                            Y = tokSnap.Y,
-                            SheetId = tokSnap.SheetId,
-                            Hidden = tokSnap.Hidden,
-                        });
-                    }
-                    state.Maps.Add(map);
-                }
-                state.SetBytesUsed(totalBytes);
+                state.Maps = hydration.NewMaps;
+                state.SetBytesUsed(hydration.TotalBytes);
 
-                state.Sheets.Clear();
-                foreach (var sheetSnap in snapshot.Sheets)
-                {
-                    var sheet = new CharacterSheet
-                    {
-                        Id = sheetSnap.Id,
-                        OwnerUserId = null,
-                        CharacterName = sheetSnap.CharacterName,
-                        Notes = sheetSnap.Notes,
-                        Hp = sheetSnap.Hp,
-                        MaxHp = sheetSnap.MaxHp,
-                    };
-                    foreach (var kv in sheetSnap.Values)
-                        sheet.Values[kv.Key] = LibrarySnapshotMapper.ToAttributeValue(kv.Value);
-                    foreach (var effectSnap in sheetSnap.StatusEffects)
-                        sheet.StatusEffects.Add(LibrarySnapshotMapper.FromStatusEffectSnapshot(effectSnap));
-                    foreach (var rtSnap in sheetSnap.RollTemplates)
-                        sheet.RollTemplates.Add(LibrarySnapshotMapper.FromRollTemplateSnapshot(rtSnap, RollTemplateScope.Sheet));
-                    state.Sheets[sheet.Id] = sheet;
-                }
+                state.Sheets = hydration.NewSheets;
+                state.GlobalRollTemplates = hydration.NewGlobalRollTemplates;
 
-                state.GlobalRollTemplates.Clear();
-                foreach (var rtSnap in snapshot.GlobalRollTemplates)
-                    state.GlobalRollTemplates.Add(LibrarySnapshotMapper.FromRollTemplateSnapshot(rtSnap, RollTemplateScope.Global));
-
-                state.CustomTemplates.Clear();
                 // Re-seed built-ins before user templates so their Rows are
                 // re-derived from the in-code preset definitions (which can
                 // evolve across releases); the snapshot's persisted Rows are
                 // ignored for built-ins.
+                state.CustomTemplates = ImmutableDictionary<Guid, NamedTemplate>.Empty;
                 state.SeedBuiltInTemplates();
-                foreach (var t in snapshot.CustomTemplates)
+                foreach (var t in hydration.TemplateSnapshots)
                 {
                     var existing = state.CustomTemplates.TryGetValue(t.Id, out var seeded) ? seeded : null;
                     if (existing is { IsBuiltIn: true })
                     {
                         // Built-in: keep seeded Rows, overlay persisted effects.
-                        existing.StatusEffectTemplates.Clear();
-                        foreach (var s in t.StatusEffectTemplates)
-                            existing.StatusEffectTemplates.Add(LibrarySnapshotMapper.FromStatusEffectTemplateSnapshot(s));
                         // V3+ trusts the persisted value verbatim (including
                         // null/empty — the host can pick "— none (bare d20) —"
                         // and that choice survives reload). V1 snapshots
                         // predate the field entirely; the seeded default
                         // ("DEX" for presets containing DEX) wins.
-                        if (snapshot.SchemaVersion >= 3)
-                            existing.InitiativeAttributeName = t.InitiativeAttributeName;
+                        var overlaid = existing with
+                        {
+                            StatusEffectTemplates = t.StatusEffectTemplates
+                                .Select(LibrarySnapshotMapper.FromStatusEffectTemplateSnapshot)
+                                .ToImmutableList(),
+                            InitiativeAttributeName = snapshot.SchemaVersion >= 3
+                                ? t.InitiativeAttributeName
+                                : existing.InitiativeAttributeName,
+                        };
+                        state.CustomTemplates = state.CustomTemplates.SetItem(t.Id, overlaid);
                     }
                     else
                     {
-                        state.CustomTemplates[t.Id] = new NamedTemplate
+                        state.CustomTemplates = state.CustomTemplates.SetItem(t.Id, new NamedTemplate
                         {
                             Id = t.Id,
                             Name = t.Name,
                             IsBuiltIn = false,
                             Rows = t.Rows
                                 .Select(r => new AttributeRow(r.Name, r.Type, LibrarySnapshotMapper.ToAttributeValue(r.Default)))
-                                .ToList(),
+                                .ToImmutableList(),
                             StatusEffectTemplates = t.StatusEffectTemplates
                                 .Select(LibrarySnapshotMapper.FromStatusEffectTemplateSnapshot)
-                                .ToList(),
+                                .ToImmutableList(),
                             InitiativeAttributeName = t.InitiativeAttributeName,
-                        };
+                        });
                     }
                 }
 
-                // Restore the active schema pointer. Default V1 snapshots have
-                // no id stored; fall back to the deterministic id for the
-                // persisted preset so the library lands on the right schema.
-                var resolvedActiveId = snapshot.ActiveSchemaTemplateId
-                    ?? DndMapperGameState.BuiltInTemplateIdFor(snapshot.AttributeSchema.Preset);
+                // Restore the active schema pointer. The lookup id was computed
+                // off-circuit (preset → deterministic id); only the existence
+                // check needs the post-Seed CustomTemplates dictionary.
+                var resolvedActiveId = hydration.PreliminaryActiveSchemaId;
                 if (resolvedActiveId is { } rid && !state.CustomTemplates.ContainsKey(rid))
                     resolvedActiveId = null;
                 state.SetActiveSchemaTemplateId(resolvedActiveId);
@@ -659,16 +968,28 @@ namespace KnockBox.DndMapper.Services.Library
                 }
                 state.SetInitiativeAttributeName(restoredInitiative);
 
-                // Activate the first map if any exist so the host doesn't
-                // land on an empty canvas after hydration.
-                var first = state.Maps.OrderBy(m => m.ListOrder).FirstOrDefault();
-                state.SetActiveMapId(first?.Id);
+                // Activate the first map if any exist (NewMaps is already
+                // ordered by ListOrder by BuildHydration).
+                var firstId = hydration.NewMaps.Count > 0 ? hydration.NewMaps[0].Id : (Guid?)null;
+                state.SetActiveMapId(firstId);
             });
 
             if (execResult.IsCanceled) return Result.FromCancellation();
             if (execResult.TryGetFailure(out var execErr)) return Result.FromError(execErr);
 
             HasExistingLibrary = true;
+
+            // Seed the auto-flush hash cache from the just-loaded shard
+            // bytes so the next FlushSnapshotAsync only writes deltas (the
+            // user moves a token; we don't rewrite everything we just read).
+            // Migration-path loads don't carry shard hashes — the next
+            // flush will populate the cache lazily.
+            if (slotId == DndMapperLibrarySchema.AutoSlotId)
+            {
+                _autoFlushHashes.Clear();
+                foreach (var (k, h) in shardHashes) _autoFlushHashes[k] = h;
+            }
+
             return Result.Success;
         }
 
@@ -676,63 +997,95 @@ namespace KnockBox.DndMapper.Services.Library
         // share for each, and returns a parallel map of imageId -> hydrated
         // MapImage. Missing blobs and republish failures are logged and skipped
         // — callers see fewer images than the snapshot references, never an
-        // exception. The cache is updated in lock-step so the new share is
-        // owned by this service for the rest of the circuit.
+        // exception.
+        //
+        // Each image's (BlobGet → PublishForSharing) round-trip pair runs in
+        // parallel via Task.WhenAll; cache mutation (_blobCache / _shareCache)
+        // is serialized afterward since those dictionaries aren't thread-safe.
+        // For a 10-map / 5-image-per-map session this drops hydrate from ~50
+        // sequential round-trips on the circuit thread to one parallel batch.
         private async ValueTask<Dictionary<Guid, MapImage>> HydrateImagesFromSnapshotAsync(
             IIndexedDatabase db,
             LibrarySnapshot snapshot,
             CancellationToken ct)
         {
-            var hydrated = new Dictionary<Guid, MapImage>();
-            foreach (var mapSnap in snapshot.Maps)
+            var imgSnaps = snapshot.Maps.SelectMany(m => m.Images).ToArray();
+            if (imgSnaps.Length == 0) return new Dictionary<Guid, MapImage>();
+
+            var fetchTasks = imgSnaps
+                .Select(imgSnap => FetchAndPublishAsync(db, imgSnap, ct).AsTask())
+                .ToArray();
+            var results = await Task.WhenAll(fetchTasks).ConfigureAwait(false);
+
+            var hydrated = new Dictionary<Guid, MapImage>(imgSnaps.Length);
+            foreach (var result in results)
             {
-                foreach (var imgSnap in mapSnap.Images)
-                {
-                    if (ct.IsCancellationRequested) return hydrated;
-
-                    var blobResult = await db.BlobGetSingleAsync(
-                        DndMapperLibrarySchema.ImagesStore,
-                        IndexedDbKey.String(imgSnap.Id.ToString("D")),
-                        ct);
-
-                    if (!blobResult.TryGetSuccess(out var blob) || blob is null)
-                    {
-                        _logger.LogWarning("Image {ImageId} referenced by snapshot is missing from IndexedDB; skipping.", imgSnap.Id);
-                        continue;
-                    }
-
-                    IBlobShare share;
-                    try { share = await blob.PublishForSharingAsync(options: null, ct); }
-                    catch (Exception ex)
-                    {
-                        _logger.LogWarning(ex, "Failed to republish share for hydrated image {ImageId}.", imgSnap.Id);
-                        await SafeDisposeAsync(blob);
-                        continue;
-                    }
-
-                    await ReplaceCacheEntryAsync(imgSnap.Id, blob, share);
-                    hydrated[imgSnap.Id] = new MapImage
-                    {
-                        Id = imgSnap.Id,
-                        Name = imgSnap.Name,
-                        ContentType = imgSnap.ContentType,
-                        ShareToken = share.Token,
-                        X = imgSnap.X,
-                        Y = imgSnap.Y,
-                        Width = imgSnap.Width,
-                        Height = imgSnap.Height,
-                        OriginalWidth = imgSnap.OriginalWidth,
-                        OriginalHeight = imgSnap.OriginalHeight,
-                        Rotation = imgSnap.Rotation,
-                        Opacity = imgSnap.Opacity,
-                        LayerOrder = imgSnap.LayerOrder,
-                        Locked = imgSnap.Locked,
-                        Hidden = imgSnap.Hidden,
-                        ByteSize = imgSnap.ByteSize,
-                    };
-                }
+                if (result.Blob is null || result.Share is null || result.Image is null) continue;
+                await ReplaceCacheEntryAsync(result.ImageId, result.Blob, result.Share).ConfigureAwait(false);
+                hydrated[result.ImageId] = result.Image;
             }
             return hydrated;
+        }
+
+        // One-image fetch + publish step. Returns a tuple so the caller can
+        // dispatch the cache update serially against the (non-thread-safe)
+        // _blobCache / _shareCache dictionaries.
+        private readonly record struct ImageHydrationResult(
+            Guid ImageId,
+            IndexedDbBlob? Blob,
+            IBlobShare? Share,
+            MapImage? Image);
+
+        private async ValueTask<ImageHydrationResult> FetchAndPublishAsync(
+            IIndexedDatabase db,
+            MapImageSnapshot imgSnap,
+            CancellationToken ct)
+        {
+            if (ct.IsCancellationRequested) return new ImageHydrationResult(imgSnap.Id, null, null, null);
+
+            var blobResult = await db.BlobGetSingleAsync(
+                DndMapperLibrarySchema.ImagesStore,
+                IndexedDbKey.String(imgSnap.Id.ToString("D")),
+                ct).ConfigureAwait(false);
+
+            if (!blobResult.TryGetSuccess(out var blob) || blob is null)
+            {
+                _logger.LogWarning("Image {ImageId} referenced by snapshot is missing from IndexedDB; skipping.", imgSnap.Id);
+                return new ImageHydrationResult(imgSnap.Id, null, null, null);
+            }
+
+            IBlobShare share;
+            try { share = await blob.PublishForSharingAsync(options: null, ct).ConfigureAwait(false); }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to republish share for hydrated image {ImageId}.", imgSnap.Id);
+                await SafeDisposeAsync(blob).ConfigureAwait(false);
+                return new ImageHydrationResult(imgSnap.Id, null, null, null);
+            }
+
+            var image = new MapImage
+            {
+                Id = imgSnap.Id,
+                Name = imgSnap.Name,
+                ContentType = imgSnap.ContentType,
+                ShareToken = share.Token,
+                X = imgSnap.X,
+                Y = imgSnap.Y,
+                Width = imgSnap.Width,
+                Height = imgSnap.Height,
+                OriginalWidth = imgSnap.OriginalWidth,
+                OriginalHeight = imgSnap.OriginalHeight,
+                Rotation = imgSnap.Rotation,
+                Opacity = imgSnap.Opacity,
+                LayerOrder = imgSnap.LayerOrder,
+                Locked = imgSnap.Locked,
+                Hidden = imgSnap.Hidden,
+                ByteSize = imgSnap.ByteSize,
+                WasDownscaled = imgSnap.WasDownscaled,
+                OriginalLongEdgePx = imgSnap.OriginalLongEdgePx,
+                DisplayLongEdgePx = imgSnap.DisplayLongEdgePx,
+            };
+            return new ImageHydrationResult(imgSnap.Id, blob, share, image);
         }
 
         /// <summary>
@@ -761,18 +1114,53 @@ namespace KnockBox.DndMapper.Services.Library
             await _saveLock.WaitAsync(ct);
             try
             {
-                // Delete ONLY the auto-save record from LibraryStore. Manual
-                // slot snapshots (keyed by their slot GUID in the same store)
-                // and the ImagesStore are preserved — the user clicked
-                // "Start fresh", not "Delete everything".
-                var autoKey = IndexedDbKey.String(DndMapperLibrarySchema.AutoSlotId);
-                var delResult = await _db.DeleteSingleAsync(
-                    DndMapperLibrarySchema.LibraryStore, autoKey, ct);
-                if (!delResult.IsSuccess)
+                // Delete ONLY the auto-save shards from LibraryStore. Manual
+                // slot shards (keyed by their slot GUID prefix in the same
+                // store) and the ImagesStore are preserved — the user clicked
+                // "Start fresh", not "Delete everything". Read the auto core
+                // first to recover the spine; if it's missing fall back to
+                // the in-memory hash cache so we still GC any shards the
+                // current attachment knows about.
+                var autoSlot = DndMapperLibrarySchema.AutoSlotId;
+                var coreRead = await _db.JsonGetSingleAsync<LibraryCoreSnapshot>(
+                    DndMapperLibrarySchema.LibraryStore, DndMapperLibrarySchema.CoreKey(autoSlot), ct);
+                if (coreRead.TryGetSuccess(out var core) && core is not null)
                 {
-                    delResult.TryGetFailure(out var derr);
-                    return Result.FromError($"Failed to clear auto-save: {derr.Message}");
+                    foreach (var mapId in core.MapIds)
+                    {
+                        await _db.DeleteSingleAsync(DndMapperLibrarySchema.LibraryStore,
+                            DndMapperLibrarySchema.MapKey(autoSlot, mapId), ct);
+                    }
+                    foreach (var sheetId in core.SheetIds)
+                    {
+                        await _db.DeleteSingleAsync(DndMapperLibrarySchema.LibraryStore,
+                            DndMapperLibrarySchema.SheetKey(autoSlot, sheetId), ct);
+                    }
                 }
+                await _db.DeleteSingleAsync(DndMapperLibrarySchema.LibraryStore,
+                    DndMapperLibrarySchema.CoreKey(autoSlot), ct);
+
+                // Legacy v3 single-record fallback (covers the case where the
+                // user "Start fresh"-es before any v4 shards were written).
+                await _db.DeleteSingleAsync(DndMapperLibrarySchema.LibraryStore,
+                    IndexedDbKey.String(autoSlot), ct);
+
+                _autoFlushHashes.Clear();
+
+                // Tear down the in-memory blob + share caches. The on-disk
+                // ImagesStore is left intact (the user clicked "Start fresh",
+                // not "Delete everything"), but the cached JS handles and
+                // their registered share tokens point at content that's no
+                // longer in the live state. Holding them would surface as:
+                //   • A subsequent load creating a fresh handle for the same
+                //     image and racing the dispose of the stale handle.
+                //   • Stale share tokens lingering in BlobShareRegistry that
+                //     resolve to disposed-by-the-next-load blobs.
+                // Disposing here gives the next load a clean slate.
+                foreach (var share in _shareCache.Values) await SafeDisposeAsync(share);
+                _shareCache.Clear();
+                foreach (var blob in _blobCache.Values) await SafeDisposeAsync(blob);
+                _blobCache.Clear();
 
                 // Drop the __auto__ entry from the slots index so the Saves
                 // panel doesn't show a stale "Auto Save" row pointing at the
@@ -806,11 +1194,22 @@ namespace KnockBox.DndMapper.Services.Library
 
         private ValueTask OnStateChangedAsync()
         {
-            // Subscribers are invoked OUTSIDE the state's Execute lock; restart
-            // the debounce timer cheaply on every event. _pendingDirty=1
-            // signals to any concurrent flush that more changes arrived; on
-            // that flush's release it re-arms us if the timer didn't already
-            // fire from this Change() call.
+            // Subscribers are invoked OUTSIDE the state's Execute lock. Before
+            // marking work pending, check whether anything *persisted* changed
+            // — if a dice roll appended to RollLog (not in the persisted set),
+            // every persisted-field reference still matches the last flush
+            // and we can skip the indicator + debounce entirely. Reference
+            // reads on immutable collections / wholesale-replaced objects
+            // are atomic in .NET, so no lock is required.
+            var state = _state;
+            if (state is not null && CaptureFingerprint(state).Equals(_lastFlushedFingerprint))
+            {
+                return ValueTask.CompletedTask;
+            }
+
+            // _pendingDirty=1 signals to any concurrent flush that more
+            // changes arrived; on that flush's release it re-arms us if the
+            // timer didn't already fire from this Change() call.
             Interlocked.Exchange(ref _pendingDirty, 1);
             // Flip the indicator now — the user has unsaved work, even if the
             // write itself is still 500 ms away. FlushSnapshotAsync clears it
@@ -827,6 +1226,10 @@ namespace KnockBox.DndMapper.Services.Library
             // reschedule us.
             _ = FlushSnapshotAsync();
         }
+
+        // Test hook: runs the auto-save flush deterministically. Production
+        // callers never use this — the debounce timer drives FlushSnapshotAsync.
+        internal Task ForTestingFlushAsync() => FlushSnapshotAsync();
 
         private async Task FlushSnapshotAsync()
         {
@@ -851,28 +1254,120 @@ namespace KnockBox.DndMapper.Services.Library
                 // back to 1 and trigger a re-arm in the finally.
                 Interlocked.Exchange(ref _pendingDirty, 0);
 
-                // Build the snapshot under the state's read lock so we don't
+                // Build the shard set under the state's read lock so we don't
                 // race with a concurrent Execute. The read action is pure-sync
-                // (no I/O) so use the synchronous overload, capturing via
-                // closure. Exit the lock BEFORE doing IndexedDB I/O.
-                LibrarySnapshot? snapshot = null;
-                var readResult = state.WithExclusiveRead(() => { snapshot = LibrarySnapshotMapper.FromState(state); });
-                if (!readResult.IsSuccess || snapshot is null)
+                // (no I/O); IDB writes happen AFTER lock release.
+                var shards = TakeSnapshot(out var flushedFingerprint);
+                if (shards is null)
                 {
                     _logger.LogWarning("Auto-save read of game state failed; skipping flush.");
                     return;
                 }
 
-                var key = IndexedDbKey.String(DndMapperLibrarySchema.AutoSlotId);
-                var writeResult = await db.JsonPutSingleAsync(
-                    DndMapperLibrarySchema.LibraryStore, snapshot, key, cts.Token);
+                var slotId = DndMapperLibrarySchema.AutoSlotId;
+                var wroteAnything = false;
+                var coreCacheKey = $"{slotId}:core";
 
-                if (!writeResult.IsSuccess)
+                // Collect dirty shards (changed vs the last flush's hashes)
+                // into one batch + a parallel array of (cacheKey, hash) so
+                // we update _autoFlushHashes only on commit. Core is appended
+                // LAST so within the IDB transaction's request ordering it
+                // is the last record persisted — same crash-recovery
+                // guarantee as the previous serial loop (map/sheet shards
+                // become observable only if the spine pointing at them
+                // also commits), but bounded to one JS-interop round-trip
+                // instead of one per shard.
+                var batch = new List<JsonPutItem>();
+                var cacheUpdates = new List<(string Key, byte[] Hash)>(capacity: shards.MapsById.Count + shards.SheetsById.Count + 1);
+
+                foreach (var (mapId, mapShard) in shards.MapsById)
                 {
-                    writeResult.TryGetFailure(out var werr);
-                    _logger.LogWarning("DnD Mapper auto-save write failed: {Error}", werr.Message);
+                    if (cts.IsCancellationRequested) return;
+                    var cacheKey = $"{slotId}:map:{mapId:D}";
+                    var hash = HashShard(mapShard);
+                    if (HashesEqual(_autoFlushHashes.GetValueOrDefault(cacheKey), hash)) continue;
+
+                    batch.Add(new JsonPutItem(
+                        DndMapperLibrarySchema.LibraryStore,
+                        mapShard,
+                        DndMapperLibrarySchema.MapKey(slotId, mapId)));
+                    cacheUpdates.Add((cacheKey, hash));
                 }
-                else
+
+                foreach (var (sheetId, sheetShard) in shards.SheetsById)
+                {
+                    if (cts.IsCancellationRequested) return;
+                    var cacheKey = $"{slotId}:sheet:{sheetId:D}";
+                    var hash = HashShard(sheetShard);
+                    if (HashesEqual(_autoFlushHashes.GetValueOrDefault(cacheKey), hash)) continue;
+
+                    batch.Add(new JsonPutItem(
+                        DndMapperLibrarySchema.LibraryStore,
+                        sheetShard,
+                        DndMapperLibrarySchema.SheetKey(slotId, sheetId)));
+                    cacheUpdates.Add((cacheKey, hash));
+                }
+
+                var coreHash = HashShard(shards.Core);
+                if (!HashesEqual(_autoFlushHashes.GetValueOrDefault(coreCacheKey), coreHash))
+                {
+                    batch.Add(new JsonPutItem(
+                        DndMapperLibrarySchema.LibraryStore,
+                        shards.Core,
+                        DndMapperLibrarySchema.CoreKey(slotId)));
+                    cacheUpdates.Add((coreCacheKey, coreHash));
+                }
+
+                if (batch.Count > 0)
+                {
+                    var write = await db.JsonPutBatchAsync(batch, cts.Token);
+                    if (!write.IsSuccess)
+                    {
+                        write.TryGetFailure(out var werr);
+                        _logger.LogWarning("Auto-save: batch shard write failed: {Error}", werr.Message);
+                        return;
+                    }
+                    foreach (var (key, hash) in cacheUpdates) _autoFlushHashes[key] = hash;
+                    wroteAnything = true;
+                }
+
+                // 4. Delete shards for entities that disappeared since the
+                //    previous flush. Runs AFTER core write so the spine
+                //    matches the on-disk layout if a crash occurs here.
+                var staleKeys = new List<string>();
+                foreach (var cached in _autoFlushHashes.Keys)
+                {
+                    if (cached == coreCacheKey) continue;
+                    if (cached.StartsWith($"{slotId}:map:", StringComparison.Ordinal))
+                    {
+                        var idStr = cached[(slotId.Length + 5)..];
+                        if (Guid.TryParseExact(idStr, "D", out var mapId)
+                            && !shards.MapsById.ContainsKey(mapId))
+                            staleKeys.Add(cached);
+                    }
+                    else if (cached.StartsWith($"{slotId}:sheet:", StringComparison.Ordinal))
+                    {
+                        var idStr = cached[(slotId.Length + 7)..];
+                        if (Guid.TryParseExact(idStr, "D", out var sheetId)
+                            && !shards.SheetsById.ContainsKey(sheetId))
+                            staleKeys.Add(cached);
+                    }
+                }
+                foreach (var stale in staleKeys)
+                {
+                    if (cts.IsCancellationRequested) return;
+                    var del = await db.DeleteSingleAsync(
+                        DndMapperLibrarySchema.LibraryStore, IndexedDbKey.String(stale), cts.Token);
+                    if (!del.IsSuccess)
+                    {
+                        del.TryGetFailure(out var derr);
+                        _logger.LogWarning("Auto-save: failed to delete stale shard {Key}: {Error}", stale, derr.Message);
+                        // Don't abort — orphan records are harmless on load.
+                    }
+                    _autoFlushHashes.Remove(stale);
+                }
+
+                if (wroteAnything)
                 {
                     HasExistingLibrary = true;
                     await TouchSlotEntryAsync(db,
@@ -880,6 +1375,12 @@ namespace KnockBox.DndMapper.Services.Library
                         DndMapperLibrarySchema.AutoSlotName,
                         SlotKind.Auto, cts.Token);
                 }
+
+                // Whether we wrote or not, the snapshot we evaluated reflected
+                // the live persisted refs at lock-acquire time. Recording them
+                // lets the next OnStateChangedAsync short-circuit when only
+                // non-persisted fields (RollLog) change.
+                _lastFlushedFingerprint = flushedFingerprint;
             }
             catch (OperationCanceledException) { /* shutting down */ }
             catch (Exception ex)
@@ -998,6 +1499,8 @@ namespace KnockBox.DndMapper.Services.Library
                 _host = null;
                 HasExistingLibrary = false;
                 Interlocked.Exchange(ref _pendingDirty, 0);
+                _autoFlushHashes.Clear();
+                _migratedSlots.Clear();
                 _saveCts?.Dispose();
                 _saveCts = null;
             }
@@ -1038,7 +1541,7 @@ namespace KnockBox.DndMapper.Services.Library
             ThrowIfDisposed();
             if (_db is null) return ValueResult<IReadOnlyList<SlotInfo>>.FromError("Library is not attached.");
 
-            var idx = await ReadSlotsIndexAsync(_db, ct);
+            var idx = await ReadSlotsIndexAsync(_db, ct).ConfigureAwait(false);
             // Auto Save pinned to the top, then manual slots by most-recent-first.
             var ordered = idx.Slots
                 .OrderBy(s => s.Kind == SlotKind.Auto ? 0 : 1)
@@ -1060,23 +1563,28 @@ namespace KnockBox.DndMapper.Services.Library
             SetSaving(true);
             try
             {
-                var idx = await ReadSlotsIndexAsync(_db, ct);
+                var idx = await ReadSlotsIndexAsync(_db, ct).ConfigureAwait(false);
                 if (idx.Slots.Any(s => s.Kind == SlotKind.Manual
                         && string.Equals(s.Name, trimmed, StringComparison.OrdinalIgnoreCase)))
                 {
                     return ValueResult<string>.FromError("A slot with that name already exists.");
                 }
 
-                var snapshot = TakeSnapshot();
-                if (snapshot is null) return ValueResult<string>.FromError("Failed to read current state for save.");
+                // Offload the snapshot read + LINQ projection to a thread-pool
+                // thread. TakeSnapshot's internal state.WithExclusiveRead still
+                // takes the lock synchronously, but on the pool thread instead
+                // of the circuit, so Blazor can keep painting while the
+                // snapshot is built.
+                var shards = await Task.Run(TakeSnapshot, ct).ConfigureAwait(false);
+                if (shards is null) return ValueResult<string>.FromError("Failed to read current state for save.");
 
                 var slotId = Guid.NewGuid().ToString("D");
-                var key = IndexedDbKey.String(slotId);
-                var write = await _db.JsonPutSingleAsync(DndMapperLibrarySchema.LibraryStore, snapshot, key, ct);
+                var throwaway = new Dictionary<string, byte[]>();
+                var write = await WriteAllShardsAsync(_db, slotId, shards, throwaway, ct).ConfigureAwait(false);
                 if (!write.IsSuccess)
                 {
                     write.TryGetFailure(out var werr);
-                    return ValueResult<string>.FromError($"Failed to write slot: {werr.Message}");
+                    return ValueResult<string>.FromError(werr.PublicMessage);
                 }
 
                 idx.Slots.Add(new SlotIndexEntry
@@ -1086,7 +1594,7 @@ namespace KnockBox.DndMapper.Services.Library
                     Kind = SlotKind.Manual,
                     UpdatedUtc = DateTime.UtcNow,
                 });
-                var idxResult = await WriteSlotsIndexAsync(_db, idx, ct);
+                var idxResult = await WriteSlotsIndexAsync(_db, idx, ct).ConfigureAwait(false);
                 if (!idxResult.IsSuccess)
                 {
                     idxResult.TryGetFailure(out var ierr);
@@ -1115,25 +1623,55 @@ namespace KnockBox.DndMapper.Services.Library
             SetSaving(true);
             try
             {
-                var idx = await ReadSlotsIndexAsync(_db, ct);
+                var idx = await ReadSlotsIndexAsync(_db, ct).ConfigureAwait(false);
                 var entry = idx.Slots.FirstOrDefault(s => s.Id == slotId);
                 if (entry is null) return Result.FromError("Unknown slot id.");
 
-                var snapshot = TakeSnapshot();
-                if (snapshot is null) return Result.FromError("Failed to read current state for save.");
+                // See CreateSlotAsync for the rationale: snapshot work goes
+                // to a pool thread so the host's "Overwrite" click doesn't
+                // freeze the circuit while the LINQ projection runs.
+                var shards = await Task.Run(TakeSnapshot, ct).ConfigureAwait(false);
+                if (shards is null) return Result.FromError("Failed to read current state for save.");
 
-                var key = IndexedDbKey.String(slotId);
-                var write = await _db.JsonPutSingleAsync(DndMapperLibrarySchema.LibraryStore, snapshot, key, ct);
+                // Manual slots don't carry a per-slot hash cache: the user
+                // clicked Overwrite, so just write every shard. Also clean
+                // up any stale shards from a prior larger save under the
+                // same slot id by reading the previous core's spine first.
+                var previousCoreRead = await _db.JsonGetSingleAsync<LibraryCoreSnapshot>(
+                    DndMapperLibrarySchema.LibraryStore,
+                    DndMapperLibrarySchema.CoreKey(slotId), ct).ConfigureAwait(false);
+                LibraryCoreSnapshot? previousCore = null;
+                if (previousCoreRead.TryGetSuccess(out var pc)) previousCore = pc;
+
+                var throwaway = new Dictionary<string, byte[]>();
+                var write = await WriteAllShardsAsync(_db, slotId, shards, throwaway, ct).ConfigureAwait(false);
                 if (!write.IsSuccess)
                 {
                     write.TryGetFailure(out var werr);
-                    return Result.FromError($"Failed to write slot: {werr.Message}");
+                    return Result.FromError(werr.PublicMessage);
+                }
+
+                // Delete obsolete shards (entries from previousCore that are
+                // not in the freshly-written shard set). Runs after the new
+                // core is committed so the spine matches on-disk reality.
+                if (previousCore is not null)
+                {
+                    foreach (var staleMapId in previousCore.MapIds.Where(id => !shards.MapsById.ContainsKey(id)))
+                    {
+                        await _db.DeleteSingleAsync(DndMapperLibrarySchema.LibraryStore,
+                            DndMapperLibrarySchema.MapKey(slotId, staleMapId), ct).ConfigureAwait(false);
+                    }
+                    foreach (var staleSheetId in previousCore.SheetIds.Where(id => !shards.SheetsById.ContainsKey(id)))
+                    {
+                        await _db.DeleteSingleAsync(DndMapperLibrarySchema.LibraryStore,
+                            DndMapperLibrarySchema.SheetKey(slotId, staleSheetId), ct).ConfigureAwait(false);
+                    }
                 }
 
                 // Replace the entry with one carrying the new timestamp.
                 idx.Slots.Remove(entry);
                 idx.Slots.Add(entry with { UpdatedUtc = DateTime.UtcNow });
-                var idxResult = await WriteSlotsIndexAsync(_db, idx, ct);
+                var idxResult = await WriteSlotsIndexAsync(_db, idx, ct).ConfigureAwait(false);
                 if (!idxResult.IsSuccess)
                 {
                     idxResult.TryGetFailure(out var ierr);
@@ -1162,19 +1700,37 @@ namespace KnockBox.DndMapper.Services.Library
             SetSaving(true);
             try
             {
-                var idx = await ReadSlotsIndexAsync(_db, ct);
+                var idx = await ReadSlotsIndexAsync(_db, ct).ConfigureAwait(false);
                 var entry = idx.Slots.FirstOrDefault(s => s.Id == slotId);
                 if (entry is null) return Result.FromError("Unknown slot id.");
 
-                var del = await _db.DeleteSingleAsync(DndMapperLibrarySchema.LibraryStore, IndexedDbKey.String(slotId), ct);
-                if (!del.IsSuccess)
+                // Read core to recover the spine. If it's missing (the slot
+                // was already orphaned), we just clear the slots-index entry;
+                // any leftover shards are silently ignored on future reads.
+                var coreRead = await _db.JsonGetSingleAsync<LibraryCoreSnapshot>(
+                    DndMapperLibrarySchema.LibraryStore, DndMapperLibrarySchema.CoreKey(slotId), ct).ConfigureAwait(false);
+                if (coreRead.TryGetSuccess(out var core) && core is not null)
                 {
-                    del.TryGetFailure(out var derr);
-                    return Result.FromError($"Failed to delete slot: {derr.Message}");
+                    foreach (var mapId in core.MapIds)
+                    {
+                        await _db.DeleteSingleAsync(DndMapperLibrarySchema.LibraryStore,
+                            DndMapperLibrarySchema.MapKey(slotId, mapId), ct).ConfigureAwait(false);
+                    }
+                    foreach (var sheetId in core.SheetIds)
+                    {
+                        await _db.DeleteSingleAsync(DndMapperLibrarySchema.LibraryStore,
+                            DndMapperLibrarySchema.SheetKey(slotId, sheetId), ct).ConfigureAwait(false);
+                    }
+                    await _db.DeleteSingleAsync(DndMapperLibrarySchema.LibraryStore,
+                        DndMapperLibrarySchema.CoreKey(slotId), ct).ConfigureAwait(false);
                 }
 
+                // Best-effort cleanup of any leftover v3 legacy record (e.g.,
+                // the slot was deleted before it was migrated this attachment).
+                await _db.DeleteSingleAsync(DndMapperLibrarySchema.LibraryStore, IndexedDbKey.String(slotId), ct).ConfigureAwait(false);
+
                 idx.Slots.Remove(entry);
-                var idxResult = await WriteSlotsIndexAsync(_db, idx, ct);
+                var idxResult = await WriteSlotsIndexAsync(_db, idx, ct).ConfigureAwait(false);
                 if (!idxResult.IsSuccess)
                 {
                     idxResult.TryGetFailure(out var ierr);
@@ -1205,7 +1761,7 @@ namespace KnockBox.DndMapper.Services.Library
             SetSaving(true);
             try
             {
-                var idx = await ReadSlotsIndexAsync(_db, ct);
+                var idx = await ReadSlotsIndexAsync(_db, ct).ConfigureAwait(false);
                 var entry = idx.Slots.FirstOrDefault(s => s.Id == slotId);
                 if (entry is null) return Result.FromError("Unknown slot id.");
                 if (idx.Slots.Any(s => s.Id != slotId
@@ -1215,7 +1771,7 @@ namespace KnockBox.DndMapper.Services.Library
 
                 idx.Slots.Remove(entry);
                 idx.Slots.Add(entry with { Name = trimmed });
-                var idxResult = await WriteSlotsIndexAsync(_db, idx, ct);
+                var idxResult = await WriteSlotsIndexAsync(_db, idx, ct).ConfigureAwait(false);
                 if (!idxResult.IsSuccess)
                 {
                     idxResult.TryGetFailure(out var ierr);
@@ -1231,20 +1787,872 @@ namespace KnockBox.DndMapper.Services.Library
             }
         }
 
-        private LibrarySnapshot? TakeSnapshot()
+        // ── .vtf import / export ──────────────────────────────────────────
+
+        /// <summary>
+        /// Packages a slot — its core spine, every map and sheet shard, and
+        /// every referenced image blob — into a `.vtf` (Virtual Table Format)
+        /// archive. The result is returned as a fresh <see cref="IndexedDbBlob"/>
+        /// the caller owns and must dispose; trigger a download via
+        /// <see cref="IndexedDbBlob.CreateObjectUrlAsync"/> + an &lt;a download&gt;
+        /// click, then dispose to revoke. Reads from IndexedDB only; the live
+        /// state is not touched.
+        /// </summary>
+        public async ValueTask<ValueResult<VtfExportResult>> ExportSlotAsync(
+            string slotId, CancellationToken ct = default)
         {
+            ThrowIfDisposed();
+            if (_db is null) return ValueResult<VtfExportResult>.FromError("Library is not attached.");
+            if (string.IsNullOrWhiteSpace(slotId)) return ValueResult<VtfExportResult>.FromError("Slot id is required.");
+
+            Interlocked.Increment(ref _manualOpsInFlight);
+            SetSaving(true);
+            try
+            {
+                var idx = await ReadSlotsIndexAsync(_db, ct);
+                var entry = idx.Slots.FirstOrDefault(s => s.Id == slotId);
+                if (entry is null) return ValueResult<VtfExportResult>.FromError("Unknown slot id.");
+
+                var (snapshot, core, _) = await ReadShardedSlotAsync(_db, slotId, ct);
+                if (snapshot is null || core is null)
+                {
+                    // Fall back to v3 single-record + migrate-on-the-fly.
+                    var legacy = await MigrateV3SlotIfNeededAsync(_db, slotId, ct);
+                    if (legacy is null)
+                        return ValueResult<VtfExportResult>.FromError("Slot has no persisted content to export.");
+                    snapshot = legacy;
+                    core = new LibraryCoreSnapshot
+                    {
+                        SchemaVersion = 4,
+                        Settings = legacy.Settings,
+                        AttributeSchema = legacy.AttributeSchema,
+                        ActiveSchemaTemplateId = legacy.ActiveSchemaTemplateId,
+                        InitiativeAttributeName = legacy.InitiativeAttributeName,
+                        CustomTemplates = legacy.CustomTemplates,
+                        GlobalRollTemplates = legacy.GlobalRollTemplates,
+                        MapIds = legacy.Maps.OrderBy(m => m.ListOrder).Select(m => m.Id).ToList(),
+                        SheetIds = legacy.Sheets.Select(s => s.Id).ToList(),
+                    };
+                }
+
+                var maps = snapshot.Maps;
+                var sheets = snapshot.Sheets;
+
+                // Pull every image referenced by the slot's maps. Each
+                // BlobGet returns a live JS handle; we read the bytes into
+                // a managed buffer and dispose the handle immediately so we
+                // don't leak references across the (potentially long) Pack.
+                var imageIds = maps.SelectMany(m => m.Images.Select(i => (i.Id, i.ContentType)))
+                    .Distinct()
+                    .ToList();
+                var images = new Dictionary<Guid, VtfPackager.VtfImageAsset>(imageIds.Count);
+                foreach (var (imageId, declaredType) in imageIds)
+                {
+                    if (ct.IsCancellationRequested) return ValueResult<VtfExportResult>.FromCancellation();
+                    var blobResult = await _db.BlobGetSingleAsync(
+                        DndMapperLibrarySchema.ImagesStore,
+                        IndexedDbKey.String(imageId.ToString("D")),
+                        ct);
+                    if (!blobResult.TryGetSuccess(out var blob) || blob is null)
+                    {
+                        _logger.LogWarning("Export: image {ImageId} missing from IndexedDB; skipping.", imageId);
+                        continue;
+                    }
+                    try
+                    {
+                        var bytes = await blob.ReadAllBytesAsync(ct);
+                        var contentType = !string.IsNullOrWhiteSpace(blob.ContentType)
+                            ? blob.ContentType
+                            : (string.IsNullOrWhiteSpace(declaredType) ? "application/octet-stream" : declaredType);
+                        images[imageId] = new VtfPackager.VtfImageAsset(contentType, bytes);
+                    }
+                    finally
+                    {
+                        await SafeDisposeAsync(blob);
+                    }
+                }
+
+                var extension = new VtfPackager.VtfExtensionPayload(
+                    ActiveCombat: null,
+                    Phase: DndMapperPhase.Lobby);
+
+                var packInput = new VtfPackager.PackInput(
+                    SlotTitle: entry.Name,
+                    Core: core,
+                    Maps: maps,
+                    Sheets: sheets,
+                    Images: images,
+                    Extension: extension);
+
+                // Pack onto a thread-pool thread so the LINQ + JSON + Deflate
+                // work doesn't freeze the circuit on big slots.
+                var ms = new MemoryStream();
+                try
+                {
+                    await Task.Run(() => VtfPackager.Pack(packInput, ms), ct);
+                    ms.Position = 0;
+                }
+                catch
+                {
+                    await ms.DisposeAsync();
+                    throw;
+                }
+
+                // Wrap as an IndexedDbBlob (allocates on the JS side); the
+                // CreateBlobAsync impl disposes ms when leaveOpen is false.
+                IndexedDbBlob blobResultBlob;
+                try
+                {
+                    blobResultBlob = await _indexedDb.CreateBlobAsync(
+                        ms, ms.Length, "application/zip", leaveOpen: false, ct);
+                }
+                catch
+                {
+                    await ms.DisposeAsync();
+                    throw;
+                }
+
+                return ValueResult<VtfExportResult>.FromValue(
+                    new VtfExportResult(entry.Name, blobResultBlob));
+            }
+            catch (OperationCanceledException) { return ValueResult<VtfExportResult>.FromCancellation(); }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "DnD Mapper VTF export failed for slot {SlotId}.", slotId);
+                return ValueResult<VtfExportResult>.FromError("Export failed.");
+            }
+            finally
+            {
+                if (Interlocked.Decrement(ref _manualOpsInFlight) == 0 && Volatile.Read(ref _pendingDirty) == 0)
+                    SetSaving(false);
+            }
+        }
+
+        /// <summary>
+        /// Reads a `.vtf` archive from <paramref name="vtfBlob"/> and writes
+        /// it as a new manual slot. Image GUIDs are minted fresh so importing
+        /// the same archive twice produces two independent slots without
+        /// aliasing image rows in the IndexedDB blob store. The live state is
+        /// not touched — the user must explicitly Load the new slot to swap.
+        /// </summary>
+        public async ValueTask<ValueResult<string>> ImportSlotAsync(
+            IndexedDbBlob vtfBlob, CancellationToken ct = default)
+        {
+            ThrowIfDisposed();
+            if (_db is null) return ValueResult<string>.FromError("Library is not attached.");
+            if (vtfBlob is null) return ValueResult<string>.FromError("Archive is required.");
+
+            Interlocked.Increment(ref _manualOpsInFlight);
+            SetSaving(true);
+            try
+            {
+                // Read the archive into a seekable buffer. ZipArchive.Read
+                // requires seeking back to the central directory at the end
+                // of the stream, which IndexedDbBlob.OpenReadAsync does not
+                // support (forward-only async stream).
+                byte[] archiveBytes;
+                try { archiveBytes = await vtfBlob.ReadAllBytesAsync(ct); }
+                catch (OperationCanceledException) { return ValueResult<string>.FromCancellation(); }
+
+                VtfPackager.UnpackResult unpacked;
+                try
+                {
+                    unpacked = await Task.Run(() =>
+                    {
+                        using var ms = new MemoryStream(archiveBytes, writable: false);
+                        return VtfPackager.Unpack(ms);
+                    }, ct);
+                }
+                catch (OperationCanceledException) { return ValueResult<string>.FromCancellation(); }
+                catch (InvalidDataException ex)
+                {
+                    return ValueResult<string>.FromError(ex.Message);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "DnD Mapper VTF import: archive could not be read.");
+                    return ValueResult<string>.FromError("Archive is not a valid .vtf file.");
+                }
+
+                // Enforce engine caps so a malicious or oversized .vtf can't
+                // immediately blow the room budget once Loaded.
+                long totalBytes = 0;
+                foreach (var asset in unpacked.Images.Values)
+                {
+                    if (asset.Bytes.LongLength > DndMapperGameEngine.PerFileCapBytes)
+                        return ValueResult<string>.FromError(
+                            $"Archive contains an image larger than {DndMapperGameEngine.PerFileCapBytes / (1024 * 1024)} MB.");
+                    totalBytes += asset.Bytes.LongLength;
+                }
+                if (totalBytes > DndMapperGameEngine.PerRoomCapBytes)
+                    return ValueResult<string>.FromError(
+                        $"Archive image total exceeds the {DndMapperGameEngine.PerRoomCapBytes / (1024 * 1024 * 1024)} GB room cap.");
+
+                // Mint fresh GUIDs for every imported image so the same .vtf
+                // imported a second time doesn't overwrite the first import's
+                // rows. Rewrite map shards' MapImageSnapshot.Id with the new
+                // ids; ByteSize is preserved (used for the bytes-used readout).
+                var idRemap = new Dictionary<Guid, Guid>(unpacked.Images.Count);
+                var remappedImages = new Dictionary<Guid, VtfPackager.VtfImageAsset>(unpacked.Images.Count);
+                foreach (var (oldId, asset) in unpacked.Images)
+                {
+                    var newId = Guid.NewGuid();
+                    idRemap[oldId] = newId;
+                    remappedImages[newId] = asset;
+                }
+
+                var remappedMaps = new List<MapSnapshot>(unpacked.Maps.Count);
+                foreach (var map in unpacked.Maps)
+                {
+                    var imagesList = new List<MapImageSnapshot>(map.Images.Count);
+                    foreach (var img in map.Images)
+                    {
+                        if (idRemap.TryGetValue(img.Id, out var newId))
+                            imagesList.Add(img with { Id = newId });
+                        // else: image binary was missing from the archive;
+                        // drop the metadata row to avoid dangling refs.
+                    }
+                    remappedMaps.Add(map with { Images = imagesList });
+                }
+
+                // Write the image blobs to IndexedDB under their fresh GUIDs.
+                foreach (var (newId, asset) in remappedImages)
+                {
+                    if (ct.IsCancellationRequested) return ValueResult<string>.FromCancellation();
+                    IndexedDbBlob? created = null;
+                    try
+                    {
+                        created = await _indexedDb.CreateBlobAsync(asset.Bytes, asset.ContentType, ct);
+                        var put = await _db.BlobPutSingleAsync(
+                            DndMapperLibrarySchema.ImagesStore,
+                            created,
+                            IndexedDbKey.String(newId.ToString("D")),
+                            ct);
+                        if (!put.IsSuccess)
+                        {
+                            put.TryGetFailure(out var perr);
+                            return ValueResult<string>.FromError($"Failed to write image to library: {perr.Message}");
+                        }
+                    }
+                    finally
+                    {
+                        if (created is not null) await SafeDisposeAsync(created);
+                    }
+                }
+
+                // Reconcile the core spine: rewrite MapIds in maps' display
+                // order (every map snapshot just had its image ids remapped;
+                // the maps themselves keep their original ids).
+                var core = unpacked.Core with
+                {
+                    MapIds = remappedMaps.Select(m => m.Id).ToList(),
+                    SheetIds = unpacked.Sheets.Select(s => s.Id).ToList(),
+                };
+
+                var shards = new ShardSet(
+                    core,
+                    remappedMaps.ToDictionary(m => m.Id, m => m),
+                    unpacked.Sheets.ToDictionary(s => s.Id, s => s));
+
+                // Resolve a non-colliding slot name.
+                var idx = await ReadSlotsIndexAsync(_db, ct);
+                var desiredName = unpacked.SlotTitle;
+                if (string.IsNullOrWhiteSpace(desiredName)) desiredName = "Imported slot";
+                if (desiredName.Length > 60) desiredName = desiredName[..60];
+                var finalName = desiredName;
+                for (int n = 1; n < 1000; n++)
+                {
+                    if (!idx.Slots.Any(s => s.Kind == SlotKind.Manual
+                            && string.Equals(s.Name, finalName, StringComparison.OrdinalIgnoreCase)))
+                        break;
+                    finalName = TruncateForSuffix(desiredName, n);
+                }
+
+                var slotId = Guid.NewGuid().ToString("D");
+                var throwawayHashes = new Dictionary<string, byte[]>();
+                var write = await WriteAllShardsAsync(_db, slotId, shards, throwawayHashes, ct);
+                if (!write.IsSuccess)
+                {
+                    write.TryGetFailure(out var werr);
+                    return ValueResult<string>.FromError(werr.PublicMessage);
+                }
+
+                idx.Slots.Add(new SlotIndexEntry
+                {
+                    Id = slotId,
+                    Name = finalName,
+                    Kind = SlotKind.Manual,
+                    UpdatedUtc = DateTime.UtcNow,
+                });
+                var idxResult = await WriteSlotsIndexAsync(_db, idx, ct);
+                if (!idxResult.IsSuccess)
+                {
+                    idxResult.TryGetFailure(out var ierr);
+                    return ValueResult<string>.FromError($"Failed to update slots index: {ierr.PublicMessage}");
+                }
+
+                NotifySlotsChanged();
+                return ValueResult<string>.FromValue(slotId);
+            }
+            catch (OperationCanceledException) { return ValueResult<string>.FromCancellation(); }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "DnD Mapper VTF import failed.");
+                return ValueResult<string>.FromError("Import failed.");
+            }
+            finally
+            {
+                if (Interlocked.Decrement(ref _manualOpsInFlight) == 0 && Volatile.Read(ref _pendingDirty) == 0)
+                    SetSaving(false);
+            }
+        }
+
+        /// <summary>
+        /// Convenience wrapper that adopts a single <c>&lt;input type="file"&gt;</c>
+        /// selection through the existing IndexedDB adoption pipeline (bytes
+        /// never cross SignalR), then hands the resulting blob to
+        /// <see cref="ImportSlotAsync"/>. Caller picks the file; this method
+        /// owns the temp-row lifecycle.
+        /// </summary>
+        public async ValueTask<ValueResult<string>> ImportSlotFromInputElementAsync(
+            ElementReference inputElement, CancellationToken ct = default)
+        {
+            ThrowIfDisposed();
+            if (_db is null) return ValueResult<string>.FromError("Library is not attached.");
+
+            var adoptResult = await _db.AdoptInputElementFilesAsync(
+                inputElement,
+                DndMapperLibrarySchema.ImagesStore,
+                new AdoptInputFilesOptions(
+                    AcceptedTypes: VtfArchiveAcceptedMimeTypes,
+                    MaxBytes: VtfArchiveMaxBytes),
+                ct);
+
+            if (adoptResult.IsCanceled) return ValueResult<string>.FromCancellation();
+            if (!adoptResult.TryGetSuccess(out var adopted))
+            {
+                adoptResult.TryGetFailure(out var aerr);
+                return ValueResult<string>.FromError($"Could not read archive: {aerr.Message}");
+            }
+
+            var file = adopted.FirstOrDefault();
+            if (file is null) return ValueResult<string>.FromError("No file was selected.");
+
+            try
+            {
+                if (file.Error is not null || file.Blob is null || file.Key is null)
+                    return ValueResult<string>.FromError(file.Error ?? "Archive rejected.");
+
+                return await ImportSlotAsync(file.Blob, ct);
+            }
+            finally
+            {
+                if (file.Blob is not null) await SafeDisposeAsync(file.Blob);
+                if (file.Key is { } key) await SafeDeleteAsync(IndexedDbKey.String(key.ToString("D")));
+            }
+        }
+
+        // Caps and MIME allow-list for the .vtf archive itself. 2 GB is well
+        // above the worst-case slot (1 GB image cap + JSON) but still fits in
+        // a managed byte[] for the import path.
+        private const long VtfArchiveMaxBytes = 2L * 1024 * 1024 * 1024;
+        private static readonly IReadOnlyList<string> VtfArchiveAcceptedMimeTypes =
+        [
+            "application/zip",
+            "application/x-zip-compressed",
+            "application/octet-stream",
+            "",
+        ];
+
+        /// <summary>
+        /// Returned by <see cref="ExportSlotAsync"/>. The caller owns
+        /// <see cref="Blob"/> and must dispose it after triggering the
+        /// download (which revokes its object URL).
+        /// </summary>
+        public sealed record VtfExportResult(string SlotName, IndexedDbBlob Blob);
+
+        private static string TruncateForSuffix(string baseName, int n)
+        {
+            var suffix = $" ({n})";
+            if (baseName.Length + suffix.Length <= 60) return baseName + suffix;
+            var head = baseName[..(60 - suffix.Length)];
+            return head + suffix;
+        }
+
+        // Per-shard view of the current state used by every save path. The
+        // dictionaries are keyed by entity id so FlushSnapshotAsync can diff
+        // against the prior flush by id and SaveToSlotAsync can iterate in
+        // core-declared order.
+        private sealed record ShardSet(
+            LibraryCoreSnapshot Core,
+            Dictionary<Guid, MapSnapshot> MapsById,
+            Dictionary<Guid, SheetSnapshot> SheetsById);
+
+        // Pre-built artifacts of a hydrate pass assembled OUTSIDE the state
+        // lock (and off the circuit thread). The Execute lambda in
+        // LoadSlotAsync only does bulk swaps against these collections, so
+        // lock-hold time stays sub-ms regardless of map / token / sheet count.
+        //
+        // TemplateSnapshots stay in raw v3-snapshot form because their final
+        // shape depends on SeedBuiltInTemplates() — a state-mutating call
+        // that must run inside Execute.
+        private sealed record PreBuiltHydration(
+            AttributeSchema AttrSchema,
+            ImmutableList<Map> NewMaps,
+            ImmutableDictionary<Guid, CharacterSheet> NewSheets,
+            ImmutableList<RollTemplate> NewGlobalRollTemplates,
+            List<NamedTemplateSnapshot> TemplateSnapshots,
+            long TotalBytes,
+            Guid? PreliminaryActiveSchemaId);
+
+        private static PreBuiltHydration BuildHydration(
+            LibrarySnapshot snapshot,
+            Dictionary<Guid, MapImage> hydratedImages)
+        {
+            var attrSchema = LibrarySnapshotMapper.ToAttributeSchema(snapshot.AttributeSchema);
+
+            var newMapsBuilder = ImmutableList.CreateBuilder<Map>();
+            long totalBytes = 0;
+            foreach (var mapSnap in snapshot.Maps.OrderBy(m => m.ListOrder))
+            {
+                var imagesBuilder = ImmutableList.CreateBuilder<MapImage>();
+                foreach (var imgSnap in mapSnap.Images.OrderBy(i => i.LayerOrder))
+                {
+                    if (hydratedImages.TryGetValue(imgSnap.Id, out var image))
+                    {
+                        imagesBuilder.Add(image);
+                        totalBytes += image.ByteSize;
+                    }
+                }
+
+                var tokensBuilder = ImmutableList.CreateBuilder<Token>();
+                foreach (var tokSnap in mapSnap.Tokens)
+                {
+                    // All persisted tokens hydrate as NPCs with no owner.
+                    // The host promotes any of them to PlayerToken via
+                    // ReassignTokenOwnerAsync after players join.
+                    tokensBuilder.Add(new Token
+                    {
+                        Id = tokSnap.Id,
+                        Type = TokenType.NPCToken,
+                        OwnerUserId = null,
+                        RepresentsUserId = null,
+                        Name = tokSnap.Name,
+                        Color = tokSnap.Color,
+                        IconKind = tokSnap.IconKind,
+                        MapId = tokSnap.MapId,
+                        X = tokSnap.X,
+                        Y = tokSnap.Y,
+                        SheetId = tokSnap.SheetId,
+                        Hidden = tokSnap.Hidden,
+                    });
+                }
+
+                newMapsBuilder.Add(new Map
+                {
+                    Id = mapSnap.Id,
+                    Name = mapSnap.Name,
+                    ListOrder = mapSnap.ListOrder,
+                    CreatedUtc = mapSnap.CreatedUtc,
+                    Grid = mapSnap.Grid,
+                    DefaultSpawnPosition = mapSnap.DefaultSpawnX is double sx && mapSnap.DefaultSpawnY is double sy
+                        ? (sx, sy)
+                        : null,
+                    // Legacy snapshots (pre-fog) deserialize FogMask to [],
+                    // which Map.IsFogged treats as "all revealed".
+                    FogMask = mapSnap.FogMask is null
+                        ? ImmutableArray<byte>.Empty
+                        : ImmutableArray.Create(mapSnap.FogMask),
+                    Images = imagesBuilder.ToImmutable(),
+                    Tokens = tokensBuilder.ToImmutable(),
+                });
+            }
+
+            var newSheetsBuilder = ImmutableDictionary.CreateBuilder<Guid, CharacterSheet>();
+            foreach (var sheetSnap in snapshot.Sheets)
+            {
+                var valuesBuilder = ImmutableDictionary.CreateBuilder<string, AttributeValue>();
+                foreach (var kv in sheetSnap.Values)
+                    valuesBuilder[kv.Key] = LibrarySnapshotMapper.ToAttributeValue(kv.Value);
+
+                var statusBuilder = ImmutableList.CreateBuilder<StatusEffect>();
+                foreach (var effectSnap in sheetSnap.StatusEffects)
+                    statusBuilder.Add(LibrarySnapshotMapper.FromStatusEffectSnapshot(effectSnap));
+
+                var rollsBuilder = ImmutableList.CreateBuilder<RollTemplate>();
+                foreach (var rtSnap in sheetSnap.RollTemplates)
+                    rollsBuilder.Add(LibrarySnapshotMapper.FromRollTemplateSnapshot(rtSnap, RollTemplateScope.Sheet));
+
+                var sheet = new CharacterSheet
+                {
+                    Id = sheetSnap.Id,
+                    OwnerUserId = null,
+                    CharacterName = sheetSnap.CharacterName,
+                    Notes = sheetSnap.Notes,
+                    Hp = sheetSnap.Hp,
+                    MaxHp = sheetSnap.MaxHp,
+                    Values = valuesBuilder.ToImmutable(),
+                    StatusEffects = statusBuilder.ToImmutable(),
+                    RollTemplates = rollsBuilder.ToImmutable(),
+                };
+                newSheetsBuilder[sheet.Id] = sheet;
+            }
+
+            var newGlobalRollTemplates = snapshot.GlobalRollTemplates
+                .Select(rt => LibrarySnapshotMapper.FromRollTemplateSnapshot(rt, RollTemplateScope.Global))
+                .ToImmutableList();
+
+            // Default V1 snapshots have no id stored; fall back to the
+            // deterministic id for the persisted preset so the library lands
+            // on the right schema. The existence check against state.CustomTemplates
+            // is deferred to inside Execute (it needs the post-Seed dict).
+            var preliminaryActiveId = snapshot.ActiveSchemaTemplateId
+                ?? DndMapperGameState.BuiltInTemplateIdFor(snapshot.AttributeSchema.Preset);
+
+            return new PreBuiltHydration(
+                attrSchema,
+                newMapsBuilder.ToImmutable(),
+                newSheetsBuilder.ToImmutable(),
+                newGlobalRollTemplates,
+                snapshot.CustomTemplates,
+                totalBytes,
+                preliminaryActiveId);
+        }
+
+        // Atomic-ref snapshot. The read lock just grabs immutable refs to
+        // each top-level collection on state — no defensive copies of inner
+        // lists are needed because every runtime entity (Map / Token /
+        // MapImage / CharacterSheet / …) is now an immutable record, and the
+        // collections themselves are ImmutableList / ImmutableDictionary.
+        // DTO projection runs entirely off the lock; concurrent engine
+        // mutations create new state.Maps refs but never touch the ones we
+        // captured here.
+        private ShardSet? TakeSnapshot() => TakeSnapshot(out _);
+
+        private ShardSet? TakeSnapshot(out PersistedFingerprint fingerprint)
+        {
+            fingerprint = default;
             var state = _state;
             if (state is null) return null;
-            LibrarySnapshot? snapshot = null;
-            var read = state.WithExclusiveRead(() => { snapshot = LibrarySnapshotMapper.FromState(state); });
-            return read.IsSuccess ? snapshot : null;
+
+            ImmutableList<Map>? maps = null;
+            ImmutableDictionary<Guid, CharacterSheet>? sheets = null;
+            ImmutableDictionary<Guid, NamedTemplate>? templates = null;
+            ImmutableList<RollTemplate>? globalRolls = null;
+            DndMapperSettings? settings = null;
+            DndMapperSettings? settingsRef = null;
+            AttributeSchema? schema = null;
+            Guid? activeSchemaTemplateId = null;
+            string? initiativeAttributeName = null;
+
+            var read = state.WithExclusiveRead(() =>
+            {
+                maps = state.Maps;
+                sheets = state.Sheets;
+                templates = state.CustomTemplates;
+                globalRolls = state.GlobalRollTemplates;
+                settingsRef = state.Settings;
+                settings = state.Settings with { };
+                schema = state.AttributeSchema;
+                activeSchemaTemplateId = state.ActiveSchemaTemplateId;
+                initiativeAttributeName = state.InitiativeAttributeName;
+            });
+            if (!read.IsSuccess || maps is null || sheets is null
+                || templates is null || globalRolls is null
+                || settings is null || schema is null) return null;
+
+            // Capture references to the persisted fields exactly as the read
+            // lock saw them. The auto-flush stores this on success so a later
+            // OnStateChangedAsync can short-circuit if no persisted refs have
+            // changed (e.g. RollLog-only mutations from dice rolls).
+            fingerprint = new PersistedFingerprint(
+                maps, sheets, templates, globalRolls, settingsRef, schema,
+                activeSchemaTemplateId, initiativeAttributeName);
+
+            // Project DTOs off-lock. Each immutable collection is frozen
+            // relative to this snapshot; engine mutations would create a
+            // new top-level ref but cannot mutate the ones captured above.
+            var mapsById = new Dictionary<Guid, MapSnapshot>(maps.Count);
+            var orderedMapIds = new List<Guid>(maps.Count);
+            foreach (var m in maps.OrderBy(m => m.ListOrder))
+            {
+                mapsById[m.Id] = LibrarySnapshotMapper.ToMapSnapshot(m);
+                orderedMapIds.Add(m.Id);
+            }
+
+            var sheetsById = new Dictionary<Guid, SheetSnapshot>(sheets.Count);
+            foreach (var (id, sheet) in sheets)
+                sheetsById[id] = LibrarySnapshotMapper.ToSheetSnapshot(sheet);
+
+            var templateSnapshots = templates.Values
+                .Select(t => new NamedTemplateSnapshot
+                {
+                    Id = t.Id,
+                    Name = t.Name,
+                    IsBuiltIn = t.IsBuiltIn,
+                    Rows = t.Rows.Select(r => new AttributeRowSnapshot
+                    {
+                        Name = r.Name,
+                        Type = r.Type,
+                        Default = LibrarySnapshotMapper.ToValueSnapshot(r.Default),
+                    }).ToList(),
+                    StatusEffectTemplates = t.StatusEffectTemplates
+                        .Select(LibrarySnapshotMapper.ToStatusEffectTemplateSnapshot)
+                        .ToList(),
+                    InitiativeAttributeName = t.InitiativeAttributeName,
+                })
+                .ToList();
+
+            var schemaSnapshot = new AttributeSchemaSnapshot
+            {
+                Preset = schema.Preset,
+                Rows = schema.Rows.Select(r => new AttributeRowSnapshot
+                {
+                    Name = r.Name,
+                    Type = r.Type,
+                    Default = LibrarySnapshotMapper.ToValueSnapshot(r.Default),
+                }).ToList(),
+            };
+
+            var core = new LibraryCoreSnapshot
+            {
+                SchemaVersion = 4,
+                Settings = settings,
+                AttributeSchema = schemaSnapshot,
+                ActiveSchemaTemplateId = activeSchemaTemplateId,
+                InitiativeAttributeName = initiativeAttributeName,
+                CustomTemplates = templateSnapshots,
+                GlobalRollTemplates = globalRolls
+                    .Select(LibrarySnapshotMapper.ToRollTemplateSnapshot)
+                    .ToList(),
+                MapIds = orderedMapIds,
+                SheetIds = sheets.Keys.ToList(),
+            };
+
+            return new ShardSet(core, mapsById, sheetsById);
+        }
+
+        private static byte[] HashShard<T>(T value) =>
+            SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(value));
+
+        private static bool HashesEqual(byte[]? a, byte[]? b)
+        {
+            if (a is null || b is null) return false;
+            if (a.Length != b.Length) return false;
+            return a.AsSpan().SequenceEqual(b);
+        }
+
+        // Writes every shard in the set under the given slot id and refreshes
+        // `hashCache` to match. Caller decides whether `hashCache` is the
+        // auto-save cache or a throwaway dict. Map and sheet shards write
+        // concurrently (capped at MaxShardWriteConcurrency); core is written
+        // LAST as the commit point so a crash before core leaves the prior
+        // spine intact. The whole batch runs inside Task.Run so the per-shard
+        // JsonSerializer + SHA256 CPU happens off the Blazor circuit even
+        // when the caller awaits from a Razor event handler.
+        private async ValueTask<Result> WriteAllShardsAsync(
+            IIndexedDatabase db,
+            string slotId,
+            ShardSet shards,
+            Dictionary<string, byte[]> hashCache,
+            CancellationToken ct)
+        {
+            // Collect every shard (maps + sheets + core) into one batch IDB
+            // put. One JS interop round-trip + one IDB readwrite transaction.
+            // Cheaper for the host tab's main thread than N parallel
+            // singleOp puts, and atomic — either the whole snapshot commits
+            // or none of it does (so if a crash hits mid-write, the spine
+            // and shards stay mutually consistent).
+            return await Task.Run<Result>(async () =>
+            {
+                var batch = new List<JsonPutItem>(
+                    shards.MapsById.Count + shards.SheetsById.Count + 1);
+                var cacheUpdates = new List<(string Key, byte[] Hash)>(batch.Capacity);
+
+                foreach (var (mapId, mapShard) in shards.MapsById)
+                {
+                    batch.Add(new JsonPutItem(
+                        DndMapperLibrarySchema.LibraryStore,
+                        mapShard,
+                        DndMapperLibrarySchema.MapKey(slotId, mapId)));
+                    cacheUpdates.Add(($"{slotId}:map:{mapId:D}", HashShard(mapShard)));
+                }
+                foreach (var (sheetId, sheetShard) in shards.SheetsById)
+                {
+                    batch.Add(new JsonPutItem(
+                        DndMapperLibrarySchema.LibraryStore,
+                        sheetShard,
+                        DndMapperLibrarySchema.SheetKey(slotId, sheetId)));
+                    cacheUpdates.Add(($"{slotId}:sheet:{sheetId:D}", HashShard(sheetShard)));
+                }
+                batch.Add(new JsonPutItem(
+                    DndMapperLibrarySchema.LibraryStore,
+                    shards.Core,
+                    DndMapperLibrarySchema.CoreKey(slotId)));
+                cacheUpdates.Add(($"{slotId}:core", HashShard(shards.Core)));
+
+                var write = await db.JsonPutBatchAsync(batch, ct).ConfigureAwait(false);
+                if (!write.IsSuccess)
+                {
+                    write.TryGetFailure(out var werr);
+                    return Result.FromError($"Failed to write shard batch: {werr.Message}");
+                }
+
+                lock (hashCache)
+                {
+                    foreach (var (key, hash) in cacheUpdates) hashCache[key] = hash;
+                }
+                return Result.Success;
+            }, ct).ConfigureAwait(false);
+        }
+
+        // Reads a slot back into a LibrarySnapshot shape by fanning out shard
+        // reads from the core spine. Returns null if {slotId}:core is missing
+        // (caller decides whether to fall back to v3 migration). Missing map
+        // or sheet shards are logged and skipped — load proceeds with the
+        // remaining entities rather than failing the whole hydrate.
+        private async ValueTask<(LibrarySnapshot? Snapshot, LibraryCoreSnapshot? Core, List<(string Key, byte[] Hash)> ShardHashes)>
+            ReadShardedSlotAsync(IIndexedDatabase db, string slotId, CancellationToken ct)
+        {
+            var coreKey = DndMapperLibrarySchema.CoreKey(slotId);
+            var coreRead = await db.JsonGetSingleAsync<LibraryCoreSnapshot>(
+                DndMapperLibrarySchema.LibraryStore, coreKey, ct).ConfigureAwait(false);
+
+            if (!coreRead.TryGetSuccess(out var core) || core is null)
+                return (null, null, []);
+
+            var hashes = new List<(string, byte[])>
+            {
+                ($"{slotId}:core", HashShard(core)),
+            };
+
+            // Read all map shards in parallel — they're independent IDB
+            // transactions and the JS side coalesces well under load.
+            var mapTasks = core.MapIds
+                .Select(id => db.JsonGetSingleAsync<MapSnapshot>(
+                    DndMapperLibrarySchema.LibraryStore, DndMapperLibrarySchema.MapKey(slotId, id), ct))
+                .ToArray();
+            var mapResults = await Task.WhenAll(mapTasks.Select(t => t.AsTask())).ConfigureAwait(false);
+
+            var maps = new List<MapSnapshot>(core.MapIds.Count);
+            for (int i = 0; i < core.MapIds.Count; i++)
+            {
+                if (mapResults[i].TryGetSuccess(out var mapShard) && mapShard is not null)
+                {
+                    maps.Add(mapShard);
+                    hashes.Add(($"{slotId}:map:{core.MapIds[i]:D}", HashShard(mapShard)));
+                }
+                else
+                {
+                    _logger.LogWarning("Map shard {MapId} listed by slot {SlotId} core is missing; skipping.",
+                        core.MapIds[i], slotId);
+                }
+            }
+
+            var sheetTasks = core.SheetIds
+                .Select(id => db.JsonGetSingleAsync<SheetSnapshot>(
+                    DndMapperLibrarySchema.LibraryStore, DndMapperLibrarySchema.SheetKey(slotId, id), ct))
+                .ToArray();
+            var sheetResults = await Task.WhenAll(sheetTasks.Select(t => t.AsTask())).ConfigureAwait(false);
+
+            var sheets = new List<SheetSnapshot>(core.SheetIds.Count);
+            for (int i = 0; i < core.SheetIds.Count; i++)
+            {
+                if (sheetResults[i].TryGetSuccess(out var sheetShard) && sheetShard is not null)
+                {
+                    sheets.Add(sheetShard);
+                    hashes.Add(($"{slotId}:sheet:{core.SheetIds[i]:D}", HashShard(sheetShard)));
+                }
+                else
+                {
+                    _logger.LogWarning("Sheet shard {SheetId} listed by slot {SlotId} core is missing; skipping.",
+                        core.SheetIds[i], slotId);
+                }
+            }
+
+            // Reassemble the v3-shape LibrarySnapshot so the existing
+            // hydration body in LoadSlotAsync can consume it unchanged.
+            var snapshot = new LibrarySnapshot
+            {
+                SchemaVersion = core.SchemaVersion,
+                Settings = core.Settings,
+                AttributeSchema = core.AttributeSchema,
+                ActiveSchemaTemplateId = core.ActiveSchemaTemplateId,
+                InitiativeAttributeName = core.InitiativeAttributeName,
+                Maps = maps,
+                Sheets = sheets,
+                CustomTemplates = core.CustomTemplates,
+                GlobalRollTemplates = core.GlobalRollTemplates,
+            };
+            return (snapshot, core, hashes);
+        }
+
+        // Reads the legacy {slotId} record (v3 single-blob layout), rewrites
+        // it as v4 shards, then deletes the legacy record. Returns the v3
+        // snapshot if found so the caller can hydrate from it without a
+        // second IDB round-trip. Idempotent within an attachment via
+        // `_migratedSlots`.
+        private async ValueTask<LibrarySnapshot?> MigrateV3SlotIfNeededAsync(
+            IIndexedDatabase db, string slotId, CancellationToken ct)
+        {
+            if (!_migratedSlots.Add(slotId)) return null;
+
+            var legacyKey = IndexedDbKey.String(slotId);
+            var legacyRead = await db.JsonGetSingleAsync<LibrarySnapshot>(
+                DndMapperLibrarySchema.LibraryStore, legacyKey, ct).ConfigureAwait(false);
+
+            if (!legacyRead.TryGetSuccess(out var legacy) || legacy is null) return null;
+
+            // Build shards directly from the legacy snapshot — no live state
+            // round-trip needed. Maps and sheets are already in the v3 DTO
+            // shape and identical to the v4 per-shard payload.
+            var mapsById = legacy.Maps.ToDictionary(m => m.Id, m => m);
+            var sheetsById = legacy.Sheets.ToDictionary(s => s.Id, s => s);
+            var core = new LibraryCoreSnapshot
+            {
+                SchemaVersion = 4,
+                Settings = legacy.Settings,
+                AttributeSchema = legacy.AttributeSchema,
+                ActiveSchemaTemplateId = legacy.ActiveSchemaTemplateId,
+                InitiativeAttributeName = legacy.InitiativeAttributeName,
+                CustomTemplates = legacy.CustomTemplates,
+                GlobalRollTemplates = legacy.GlobalRollTemplates,
+                MapIds = legacy.Maps.OrderBy(m => m.ListOrder).Select(m => m.Id).ToList(),
+                SheetIds = legacy.Sheets.Select(s => s.Id).ToList(),
+            };
+
+            var migratedShards = new ShardSet(core, mapsById, sheetsById);
+            // Populate the auto-flush hash cache during the migration write
+            // only when migrating the Auto Save slot, so the immediately-
+            // following flush correctly skips the unchanged shards. Manual
+            // slots use a throwaway dict (we don't cache hashes for them).
+            var hashTarget = slotId == DndMapperLibrarySchema.AutoSlotId
+                ? _autoFlushHashes
+                : new Dictionary<string, byte[]>();
+            var write = await WriteAllShardsAsync(db, slotId, migratedShards, hashTarget, ct).ConfigureAwait(false);
+            if (!write.IsSuccess)
+            {
+                write.TryGetFailure(out var werr);
+                _logger.LogWarning("Failed to migrate v3 slot {SlotId} to sharded layout: {Error}",
+                    slotId, werr.PublicMessage);
+                return legacy; // hydrate from legacy this session; retry migration on next attachment
+            }
+
+            var del = await db.DeleteSingleAsync(DndMapperLibrarySchema.LibraryStore, legacyKey, ct).ConfigureAwait(false);
+            if (!del.IsSuccess)
+            {
+                del.TryGetFailure(out var derr);
+                _logger.LogWarning("Migrated v3 slot {SlotId} but failed to remove legacy record: {Error}",
+                    slotId, derr.Message);
+            }
+            return legacy;
         }
 
         private async ValueTask<SlotsIndex> ReadSlotsIndexAsync(IIndexedDatabase db, CancellationToken ct)
         {
             var res = await db.JsonGetSingleAsync<SlotsIndex>(
                 DndMapperLibrarySchema.SlotsIndexStore,
-                IndexedDbKey.String(DndMapperLibrarySchema.SlotsIndexKey), ct);
+                IndexedDbKey.String(DndMapperLibrarySchema.SlotsIndexKey), ct).ConfigureAwait(false);
             if (res.TryGetSuccess(out var idx) && idx is not null) return idx;
             return new SlotsIndex();
         }
@@ -1253,7 +2661,7 @@ namespace KnockBox.DndMapper.Services.Library
         {
             var res = await db.JsonPutSingleAsync(
                 DndMapperLibrarySchema.SlotsIndexStore, idx,
-                IndexedDbKey.String(DndMapperLibrarySchema.SlotsIndexKey), ct);
+                IndexedDbKey.String(DndMapperLibrarySchema.SlotsIndexKey), ct).ConfigureAwait(false);
             if (res.IsSuccess) return Result.Success;
             res.TryGetFailure(out var err);
             return Result.FromError(err.Message);
@@ -1261,7 +2669,7 @@ namespace KnockBox.DndMapper.Services.Library
 
         private async ValueTask TouchSlotEntryAsync(IIndexedDatabase db, string slotId, string name, SlotKind kind, CancellationToken ct)
         {
-            var idx = await ReadSlotsIndexAsync(db, ct);
+            var idx = await ReadSlotsIndexAsync(db, ct).ConfigureAwait(false);
             var existing = idx.Slots.FirstOrDefault(s => s.Id == slotId);
             if (existing is not null) idx.Slots.Remove(existing);
             idx.Slots.Add(new SlotIndexEntry
@@ -1271,7 +2679,7 @@ namespace KnockBox.DndMapper.Services.Library
                 Kind = kind,
                 UpdatedUtc = DateTime.UtcNow,
             });
-            var write = await WriteSlotsIndexAsync(db, idx, ct);
+            var write = await WriteSlotsIndexAsync(db, idx, ct).ConfigureAwait(false);
             if (!write.IsSuccess)
             {
                 write.TryGetFailure(out var werr);

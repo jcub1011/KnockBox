@@ -16,7 +16,7 @@ public sealed class BlobShareTests
             Token = token,
             ContentType = "application/octet-stream",
             Length = 4,
-            Fetcher = (o, c, ct) => ValueTask.FromResult(new byte[c]),
+            StreamOpener = _ => ValueTask.FromResult<Stream>(new MemoryStream(new byte[4], writable: false)),
         });
         var share = new BlobShare(registry, token, $"/blob-share/{token:D}", "application/octet-stream", 4);
 
@@ -35,7 +35,7 @@ public sealed class BlobShareTests
             Token = token,
             ContentType = "application/octet-stream",
             Length = 0,
-            Fetcher = (o, c, ct) => ValueTask.FromResult(Array.Empty<byte>()),
+            StreamOpener = _ => ValueTask.FromResult<Stream>(Stream.Null),
         });
         var called = false;
         var share = new BlobShare(registry, token, "/blob-share/x", "application/octet-stream", 0, onDispose: () => called = true);
@@ -54,7 +54,7 @@ public sealed class BlobShareTests
             Token = token,
             ContentType = "application/octet-stream",
             Length = 0,
-            Fetcher = (o, c, ct) => ValueTask.FromResult(Array.Empty<byte>()),
+            StreamOpener = _ => ValueTask.FromResult<Stream>(Stream.Null),
         });
         var callCount = 0;
         var share = new BlobShare(registry, token, "/blob-share/x", "application/octet-stream", 0, onDispose: () => callCount++);

@@ -1,5 +1,4 @@
 using KnockBox.Core.Plugins;
-using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Logging;
 using Moq;
 
@@ -24,7 +23,27 @@ public sealed class TestPluginModuleA : IGameModule
 
     public IPluginManifest Manifest => FixtureManifest;
     public void RegisterServices(IPluginRegistration registration) { }
-    public RenderFragment GetButtonContent() => _ => { };
+}
+
+/// <summary>
+/// Library-plugin fixture parallel to <see cref="TestPluginModuleA"/>. Exports
+/// no contracts so the library-first ordering test can run without staging
+/// contract DLLs. Tests that want to exercise contract promotion write their
+/// own one-off manifest pointing at fabricated or host-shipped contract names.
+/// </summary>
+public sealed class TestLibraryModuleA : ILibraryModule
+{
+    public static readonly IPluginManifest FixtureManifest = new PluginManifest(
+        Name: "Test Library A",
+        Description: "A test library plugin module.",
+        RouteIdentifier: "pluginloader-tests-route-library-a",
+        Version: new Version(1, 0, 0),
+        EntryAssembly: "KnockBox.CoreTests",
+        Capabilities: new HashSet<PluginCapability>(),
+        Kind: PluginKind.Library);
+
+    public IPluginManifest Manifest => FixtureManifest;
+    public void RegisterServices(IPluginRegistration registration) { }
 }
 
 /// <summary>
@@ -41,7 +60,6 @@ public sealed class TestPluginModuleThrowingCtor : IGameModule
 
     public IPluginManifest Manifest => throw new InvalidOperationException("unreachable");
     public void RegisterServices(IPluginRegistration registration) { }
-    public RenderFragment GetButtonContent() => _ => { };
 }
 
 [TestClass]
@@ -352,15 +370,140 @@ public sealed class PluginLoaderTests
         finally { SafeDelete(tempDir); }
     }
 
+    // ─── Library plugin coverage ────────────────────────────────────────────
+
+    [TestMethod]
+    public void LoadModules_LibraryAndGameDiscoveredTogether_LibraryAppearsBeforeGame()
+    {
+        // The on-disk folder name for the game starts with "a-" so directory
+        // enumeration returns it before the library folder; the loader must
+        // still reorder so libraries come first in PluginLoadResult.Plugins.
+        AssertFixtureIsolation();
+
+        var logger = MakeLogger();
+        var loader = new PluginLoader(logger.Object);
+        var tempDir = MakeTempDir();
+
+        try
+        {
+            var testAssemblyPath = typeof(PluginLoaderTests).Assembly.Location;
+            var assemblyFileName = Path.GetFileNameWithoutExtension(testAssemblyPath);
+
+            var gameSubdir = Path.Combine(tempDir, "a-" + assemblyFileName + "-game");
+            Directory.CreateDirectory(gameSubdir);
+            File.Copy(testAssemblyPath, Path.Combine(gameSubdir, assemblyFileName + ".dll"), overwrite: true);
+            WriteManifest(gameSubdir, TestPluginModuleA.FixtureManifest);
+
+            var librarySubdir = Path.Combine(tempDir, "z-" + assemblyFileName + "-lib");
+            Directory.CreateDirectory(librarySubdir);
+            File.Copy(testAssemblyPath, Path.Combine(librarySubdir, assemblyFileName + ".dll"), overwrite: true);
+            WriteLibraryManifest(librarySubdir, TestLibraryModuleA.FixtureManifest);
+
+            var result = loader.LoadModules(tempDir);
+
+            var libraryIndex = -1;
+            var gameIndex = -1;
+            for (int i = 0; i < result.Plugins.Count; i++)
+            {
+                if (result.Plugins[i].Manifest.RouteIdentifier == TestLibraryModuleA.FixtureManifest.RouteIdentifier)
+                    libraryIndex = i;
+                else if (result.Plugins[i].Manifest.RouteIdentifier == TestPluginModuleA.FixtureManifest.RouteIdentifier)
+                    gameIndex = i;
+            }
+
+            Assert.AreNotEqual(-1, libraryIndex, "Library plugin must appear in PluginLoadResult.Plugins.");
+            Assert.AreNotEqual(-1, gameIndex, "Game plugin must appear in PluginLoadResult.Plugins.");
+            Assert.IsLessThan(gameIndex, libraryIndex,
+                "Library plugins must precede game plugins in PluginLoadResult.Plugins so the registration " +
+                "pipeline can rely on library services being DI-resolvable when games register.");
+        }
+        finally { SafeDelete(tempDir); }
+    }
+
+    [TestMethod]
+    public void LoadModules_LibraryWithMissingContractDll_LibraryIsRejected()
+    {
+        AssertFixtureIsolation();
+
+        var logger = MakeLogger();
+        var loader = new PluginLoader(logger.Object);
+        var tempDir = MakeTempDir();
+
+        try
+        {
+            var testAssemblyPath = typeof(PluginLoaderTests).Assembly.Location;
+            var assemblyFileName = Path.GetFileNameWithoutExtension(testAssemblyPath);
+            var pluginSubdir = Path.Combine(tempDir, assemblyFileName);
+            Directory.CreateDirectory(pluginSubdir);
+            File.Copy(testAssemblyPath, Path.Combine(pluginSubdir, assemblyFileName + ".dll"), overwrite: true);
+
+            // Manifest declares a contract DLL that doesn't exist on disk —
+            // contract promotion must reject the library before activation.
+            WriteLibraryManifest(
+                pluginSubdir,
+                TestLibraryModuleA.FixtureManifest,
+                exportedContracts: ["DoesNotExist.Contracts"]);
+
+            var result = loader.LoadModules(tempDir);
+
+            Assert.IsFalse(
+                result.Plugins.Any(p => p.Manifest.RouteIdentifier == TestLibraryModuleA.FixtureManifest.RouteIdentifier),
+                "Library declaring a missing contract DLL must be dropped from the load result.");
+            VerifyLogged(logger, LogLevel.Error, Times.AtLeastOnce());
+        }
+        finally { SafeDelete(tempDir); }
+    }
+
+    [TestMethod]
+    public void LoadModules_LibraryExportingHostShippedContract_LibraryIsRejected()
+    {
+        // The host already ships KnockBox.Core (the test runtime references it).
+        // A library plugin that tries to export a contract named "KnockBox.Core"
+        // is hijacking a host-owned identity and must be rejected before its
+        // module is activated.
+        AssertFixtureIsolation();
+
+        var logger = MakeLogger();
+        var loader = new PluginLoader(logger.Object);
+        var tempDir = MakeTempDir();
+
+        try
+        {
+            var testAssemblyPath = typeof(PluginLoaderTests).Assembly.Location;
+            var assemblyFileName = Path.GetFileNameWithoutExtension(testAssemblyPath);
+            var pluginSubdir = Path.Combine(tempDir, assemblyFileName);
+            Directory.CreateDirectory(pluginSubdir);
+            File.Copy(testAssemblyPath, Path.Combine(pluginSubdir, assemblyFileName + ".dll"), overwrite: true);
+
+            // Plant a stub file at KnockBox.Core.dll so the File.Exists check passes
+            // and the host-identity collision check is the one that rejects the library.
+            File.WriteAllBytes(Path.Combine(pluginSubdir, "KnockBox.Core.dll"), [0x00]);
+
+            WriteLibraryManifest(
+                pluginSubdir,
+                TestLibraryModuleA.FixtureManifest,
+                exportedContracts: ["KnockBox.Core"]);
+
+            var result = loader.LoadModules(tempDir);
+
+            Assert.IsFalse(
+                result.Plugins.Any(p => p.Manifest.RouteIdentifier == TestLibraryModuleA.FixtureManifest.RouteIdentifier),
+                "Library that tries to export a host-shipped assembly identity must be dropped from the load result.");
+            VerifyLogged(logger, LogLevel.Error, Times.AtLeastOnce());
+        }
+        finally { SafeDelete(tempDir); }
+    }
+
     /// <summary>
-    /// Guard: if a future change adds another IGameModule to this assembly,
-    /// these tests' fixture is no longer isolated and assertions about counts
-    /// by RouteIdentifier may silently over- or under-count. Fail fast with a
-    /// clear remediation hint instead.
+    /// Guard: if a future change adds another <see cref="IGameModule"/> or
+    /// <see cref="ILibraryModule"/> to this assembly, these tests' fixture is no
+    /// longer isolated and assertions about counts by RouteIdentifier may
+    /// silently over- or under-count. Fail fast with a clear remediation hint
+    /// instead.
     /// </summary>
     private static void AssertFixtureIsolation()
     {
-        var moduleTypesInAssembly = typeof(PluginLoaderTests).Assembly.GetTypes()
+        var gameModuleTypes = typeof(PluginLoaderTests).Assembly.GetTypes()
             .Where(t => !t.IsAbstract && !t.IsInterface && typeof(IGameModule).IsAssignableFrom(t))
             .ToArray();
         CollectionAssert.AreEquivalent(
@@ -369,11 +512,49 @@ public sealed class PluginLoaderTests
                 typeof(TestPluginModuleA),
                 typeof(TestPluginModuleThrowingCtor),
             },
-            moduleTypesInAssembly,
+            gameModuleTypes,
             "PluginLoaderTests fixture is no longer isolated -- the test assembly declares " +
             "IGameModule types beyond the known fixtures. Move new IGameModule test types into " +
             "a dedicated fixture assembly, or scope their RouteIdentifier to a nested-class " +
             "fixture, before relying on these tests.");
+
+        var libraryModuleTypes = typeof(PluginLoaderTests).Assembly.GetTypes()
+            .Where(t => !t.IsAbstract && !t.IsInterface && typeof(ILibraryModule).IsAssignableFrom(t))
+            .ToArray();
+        CollectionAssert.AreEquivalent(
+            new[] { typeof(TestLibraryModuleA) },
+            libraryModuleTypes,
+            "PluginLoaderTests fixture is no longer isolated -- the test assembly declares " +
+            "ILibraryModule types beyond the known fixtures.");
+    }
+
+    /// <summary>
+    /// Writes a library manifest with explicit <c>kind</c> and
+    /// <c>exportedContracts</c>. The base <see cref="WriteManifest"/> only knows
+    /// about game manifests; the library-specific tests need a different shape.
+    /// </summary>
+    private static void WriteLibraryManifest(
+        string pluginSubdir,
+        IPluginManifest manifest,
+        IReadOnlyList<string>? exportedContracts = null)
+    {
+        var contracts = exportedContracts is { Count: > 0 }
+            ? "[" + string.Join(", ", exportedContracts.Select(c => $"\"{c}\"")) + "]"
+            : "[]";
+        var path = Path.Combine(pluginSubdir, "plugin.json");
+        File.WriteAllText(path, $$"""
+            {
+                "schemaVersion": 1,
+                "name": "{{manifest.Name}}",
+                "description": "{{manifest.Description}}",
+                "routeIdentifier": "{{manifest.RouteIdentifier}}",
+                "version": "{{manifest.Version}}",
+                "entryAssembly": "{{manifest.EntryAssembly}}",
+                "kind": "library",
+                "exportedContracts": {{contracts}},
+                "capabilities": []
+            }
+            """);
     }
 
     [System.Diagnostics.CodeAnalysis.SuppressMessage(

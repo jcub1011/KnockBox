@@ -130,8 +130,6 @@ public sealed class KnockBoxPlatformExtensionsTests
 
         public void RegisterServices(IPluginRegistration registration)
             => registration.AddGameEngine<FakeEngine>();
-
-        public RenderFragment GetButtonContent() => _ => { };
     }
 
     private sealed class FakeEngine : AbstractGameEngine

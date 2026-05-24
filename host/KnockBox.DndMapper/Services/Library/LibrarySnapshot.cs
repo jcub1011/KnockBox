@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using KnockBox.DndMapper.Models;
 using KnockBox.DndMapper.Services.State.Games.Data;
 
@@ -40,6 +41,30 @@ namespace KnockBox.DndMapper.Services.Library
         // Host-managed roll templates that ride with the save slot. Built-ins
         // are never serialized; sheet-scoped templates ride on SheetSnapshot.
         public List<RollTemplateSnapshot> GlobalRollTemplates { get; init; } = [];
+    }
+
+    /// <summary>
+    /// v4 (per-slot sharded) "spine" record. Replaces the single
+    /// <see cref="LibrarySnapshot"/> blob at key <c>{slotId}</c> with one
+    /// small record at <c>{slotId}:core</c> plus one record per map at
+    /// <c>{slotId}:map:{mapId}</c> and per sheet at <c>{slotId}:sheet:{sheetId}</c>.
+    /// Token moves on Map A then only rewrite Map A's shard + the core spine,
+    /// instead of re-base64-ing every map's fog mask in one fat record.
+    /// </summary>
+    internal sealed record LibraryCoreSnapshot
+    {
+        public int SchemaVersion { get; init; } = 4;
+        public DndMapperSettings Settings { get; init; } = new();
+        public AttributeSchemaSnapshot AttributeSchema { get; init; } = new();
+        public Guid? ActiveSchemaTemplateId { get; init; }
+        public string? InitiativeAttributeName { get; init; }
+        public List<NamedTemplateSnapshot> CustomTemplates { get; init; } = [];
+        public List<RollTemplateSnapshot> GlobalRollTemplates { get; init; } = [];
+        // Ordered list of map ids. Mirrors Map.ListOrder so LoadSlotAsync can
+        // fan out shard reads in display order without a second sort.
+        public List<Guid> MapIds { get; init; } = [];
+        // Ordered list of sheet ids (insertion order in state.Sheets).
+        public List<Guid> SheetIds { get; init; } = [];
     }
 
     internal sealed record RollTemplateSnapshot
@@ -112,6 +137,11 @@ namespace KnockBox.DndMapper.Services.Library
         public double? DefaultSpawnY { get; init; }
         public List<MapImageSnapshot> Images { get; init; } = [];
         public List<TokenSnapshot> Tokens { get; init; } = [];
+        // Per-cell fog mask, packed row-major (cy * Grid.WidthCells + cx).
+        // System.Text.Json serializes byte[] as base64. Older snapshots without
+        // this field deserialize to [], which Map.IsFogged treats as "all
+        // revealed" — no schema bump required.
+        public byte[] FogMask { get; init; } = [];
     }
 
     internal sealed record MapImageSnapshot
@@ -131,6 +161,12 @@ namespace KnockBox.DndMapper.Services.Library
         public bool Locked { get; init; }
         public bool Hidden { get; init; }
         public long ByteSize { get; init; }
+        // Downscale provenance. Missing on legacy (pre-2026-05) snapshots:
+        // System.Text.Json fills bool with false and int with 0, which the
+        // Layers panel treats as "not downscaled" — no schema bump needed.
+        public bool WasDownscaled { get; init; }
+        public int OriginalLongEdgePx { get; init; }
+        public int DisplayLongEdgePx { get; init; }
         // Intentionally no ShareToken: the capability is per-circuit and is
         // recomputed on every Attach via PublishForSharingAsync.
     }
@@ -189,32 +225,36 @@ namespace KnockBox.DndMapper.Services.Library
     {
         public static LibrarySnapshot FromState(KnockBox.DndMapper.Services.State.Games.DndMapperGameState state)
         {
-            var maps = new List<MapSnapshot>(state.Maps.Count);
-            foreach (var map in state.Maps.OrderBy(m => m.ListOrder))
-            {
-                maps.Add(new MapSnapshot
-                {
-                    Id = map.Id,
-                    Name = map.Name,
-                    ListOrder = map.ListOrder,
-                    CreatedUtc = map.CreatedUtc,
-                    Grid = map.Grid.Clone(),
-                    DefaultSpawnX = map.DefaultSpawnPosition?.X,
-                    DefaultSpawnY = map.DefaultSpawnPosition?.Y,
-                    Images = map.Images
-                        .OrderBy(i => i.LayerOrder)
-                        .Select(ToImageSnapshot)
-                        .ToList(),
-                    Tokens = map.Tokens
-                        .Select(ToTokenSnapshot)
-                        .ToList(),
-                });
-            }
-
+            // Retained as the in-memory composition used by (a) the v3 read
+            // path during migration and (b) the LoadSlotAsync hydration body
+            // after fanning out shard reads. Saves themselves now go through
+            // ToCoreSnapshot + ToMapSnapshot + ToSheetSnapshot.
+            var core = ToCoreSnapshot(state);
+            var maps = state.Maps
+                .OrderBy(m => m.ListOrder)
+                .Select(ToMapSnapshot)
+                .ToList();
             var sheets = state.Sheets.Values
                 .Select(ToSheetSnapshot)
                 .ToList();
 
+            return new LibrarySnapshot
+            {
+                SchemaVersion = 3,
+                Settings = core.Settings,
+                AttributeSchema = core.AttributeSchema,
+                ActiveSchemaTemplateId = core.ActiveSchemaTemplateId,
+                InitiativeAttributeName = core.InitiativeAttributeName,
+                Maps = maps,
+                Sheets = sheets,
+                CustomTemplates = core.CustomTemplates,
+                GlobalRollTemplates = core.GlobalRollTemplates,
+            };
+        }
+
+        /// <summary>Builds the v4 core "spine" — small per-slot record without map / sheet payloads.</summary>
+        public static LibraryCoreSnapshot ToCoreSnapshot(KnockBox.DndMapper.Services.State.Games.DndMapperGameState state)
+        {
             // Persist every NamedTemplate (built-in or user). For built-ins we
             // still write Rows so older hosts can read it, but on load the
             // seeded Rows are authoritative — only the StatusEffectTemplates
@@ -239,21 +279,46 @@ namespace KnockBox.DndMapper.Services.Library
                 })
                 .ToList();
 
-            return new LibrarySnapshot
+            return new LibraryCoreSnapshot
             {
-                SchemaVersion = 3,
-                Settings = state.Settings.Clone(),
+                SchemaVersion = 4,
+                Settings = state.Settings with { },
                 AttributeSchema = ToSchemaSnapshot(state.AttributeSchema),
                 ActiveSchemaTemplateId = state.ActiveSchemaTemplateId,
                 InitiativeAttributeName = state.InitiativeAttributeName,
-                Maps = maps,
-                Sheets = sheets,
                 CustomTemplates = templates,
                 GlobalRollTemplates = state.GlobalRollTemplates
                     .Select(ToRollTemplateSnapshot)
                     .ToList(),
+                MapIds = state.Maps
+                    .OrderBy(m => m.ListOrder)
+                    .Select(m => m.Id)
+                    .ToList(),
+                SheetIds = state.Sheets.Keys.ToList(),
             };
         }
+
+        /// <summary>Builds a single map shard (no I/O). Safe to call concurrently
+        /// with engine writes because Map is immutable — the engine swaps whole
+        /// Map records in state.Maps rather than mutating fields in place.</summary>
+        public static MapSnapshot ToMapSnapshot(Map map) => new()
+        {
+            Id = map.Id,
+            Name = map.Name,
+            ListOrder = map.ListOrder,
+            CreatedUtc = map.CreatedUtc,
+            Grid = map.Grid,
+            DefaultSpawnX = map.DefaultSpawnPosition?.X,
+            DefaultSpawnY = map.DefaultSpawnPosition?.Y,
+            Images = map.Images
+                .OrderBy(i => i.LayerOrder)
+                .Select(ToImageSnapshot)
+                .ToList(),
+            Tokens = map.Tokens
+                .Select(ToTokenSnapshot)
+                .ToList(),
+            FogMask = map.FogMask.IsDefaultOrEmpty ? [] : map.FogMask.ToArray(),
+        };
 
         public static RollTemplateSnapshot ToRollTemplateSnapshot(RollTemplate t) => new()
         {
@@ -312,7 +377,7 @@ namespace KnockBox.DndMapper.Services.Library
             Name = s.Name,
             AttributeDeltas = s.AttributeDeltas
                 .Select(d => new AttributeDelta(d.AttributeName, d.Delta))
-                .ToList(),
+                .ToImmutableList(),
             MaxHpDelta = s.MaxHpDelta,
             OnApplyHpDelta = s.OnApplyHpDelta,
             Notes = s.Notes,
@@ -324,7 +389,7 @@ namespace KnockBox.DndMapper.Services.Library
             Name = s.Name,
             AttributeDeltas = s.AttributeDeltas
                 .Select(d => new AttributeDelta(d.AttributeName, d.Delta))
-                .ToList(),
+                .ToImmutableList(),
             MaxHpDelta = s.MaxHpDelta,
             OnApplyHpDelta = s.OnApplyHpDelta,
             Notes = s.Notes,
@@ -368,14 +433,14 @@ namespace KnockBox.DndMapper.Services.Library
                 .ToList(),
         };
 
-        private static AttributeValueSnapshot ToValueSnapshot(AttributeValue value) => new()
+        internal static AttributeValueSnapshot ToValueSnapshot(AttributeValue value) => new()
         {
             Type = value.Type,
             IntValue = value.IntValue,
             StringValue = value.StringValue,
         };
 
-        private static MapImageSnapshot ToImageSnapshot(MapImage image) => new()
+        internal static MapImageSnapshot ToImageSnapshot(MapImage image) => new()
         {
             Id = image.Id,
             Name = image.Name,
@@ -392,9 +457,12 @@ namespace KnockBox.DndMapper.Services.Library
             Locked = image.Locked,
             Hidden = image.Hidden,
             ByteSize = image.ByteSize,
+            WasDownscaled = image.WasDownscaled,
+            OriginalLongEdgePx = image.OriginalLongEdgePx,
+            DisplayLongEdgePx = image.DisplayLongEdgePx,
         };
 
-        private static TokenSnapshot ToTokenSnapshot(Token token) => new()
+        internal static TokenSnapshot ToTokenSnapshot(Token token) => new()
         {
             Id = token.Id,
             Name = token.Name,
@@ -407,7 +475,7 @@ namespace KnockBox.DndMapper.Services.Library
             Hidden = token.Hidden,
         };
 
-        private static SheetSnapshot ToSheetSnapshot(CharacterSheet sheet) => new()
+        public static SheetSnapshot ToSheetSnapshot(CharacterSheet sheet) => new()
         {
             Id = sheet.Id,
             CharacterName = sheet.CharacterName,

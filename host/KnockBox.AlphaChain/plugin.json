@@ -5,5 +5,6 @@
   "routeIdentifier": "alpha-chain",
   "version": "1.0.0",
   "entryAssembly": "KnockBox.AlphaChain",
-  "capabilities": []
+  "capabilities": [],
+  "workInProgress": true
 }

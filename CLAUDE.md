@@ -13,7 +13,7 @@ Target framework is `net10.0`.
 - Build the SDK: `dotnet build sdk/KnockBox.Sdk.slnx`
 - Build the host (also transitively builds + stages every plugin into `games/`): `dotnet build host/KnockBox.Host.slnx` (or the project directly: `dotnet build host/KnockBox/KnockBox.csproj`)
 - Run the host locally: `dotnet run --project host/KnockBox/KnockBox.csproj`
-- Publish the host (plugins staged into `publish/games/` via `CopyPluginsToPublish`): `dotnet publish host/KnockBox/KnockBox.csproj -c Release`
+- Publish the host (game plugins staged into `publish/games/` via `CopyPluginsToPublish`, library plugins into `publish/libraries/` via `CopyLibrariesToPublish`): `dotnet publish host/KnockBox/KnockBox.csproj -c Release`
 - Run SDK tests: `dotnet test sdk/KnockBox.Sdk.slnx`
 - Run host tests: `dotnet test host/KnockBox.Host.slnx`
 - Run tests for one project: `dotnet test sdk/KnockBox.CoreTests/KnockBox.CoreTests.csproj`
@@ -30,10 +30,19 @@ KnockBox is a Blazor Server host (`KnockBox`) that loads each party game as a **
 
 - `KnockBox.csproj` references `KnockBox.Core` and `KnockBox.Platform` directly (both from `sdk/`), and each game plugin via `<ProjectReference>` with `ReferenceOutputAssembly="false" Private="false"` — those plugin refs exist *only* to force plugins to build transitively. Do not drop those attributes and do not `using` any game-project type from the host.
 - Each game project is a Razor Class Library that imports `..\Directory.Plugin.targets` (the shared targets file lives at `host/Directory.Plugin.targets`). The target copies the plugin's primary DLL, `.deps.json`, scoped-CSS bundle, and `wwwroot/` into `host/KnockBox/bin/{Config}/{TFM}/games/{PluginName}/` after `Build`.
-- At startup, `Program.cs` calls `PluginLoader.LoadModules(AppContext.BaseDirectory/games)`. Each plugin is loaded into its own `PluginLoadContext` (ALC) rooted at `games/{PluginName}/`; shared contracts (`KnockBox.Core`, BCL, logging/DI abstractions) are deferred to the default ALC so type identity is preserved across the host/plugin boundary.
-- Each plugin exposes exactly one `IGameModule` (public parameterless ctor) in `sdk/KnockBox.Core/Plugins/IGameModule.cs`. Its `RegisterServices` typically calls `registration.AddGameEngine<TEngine>()` on the supplied `IPluginRegistration`, which registers the engine as a singleton *and* as a keyed `AbstractGameEngine` under the manifest's `RouteIdentifier`. Razor pages inject the concrete engine; `LobbyService.CreateLobbyAsync` resolves the engine generically via `GetKeyedService<AbstractGameEngine>(routeIdentifier)`.
+- At startup, `AddKnockBoxPlatform` calls `PluginLoader.LoadModules(...)` with the contents of `options.LibrariesPaths` (default `["libraries"]`) and `options.PluginsPaths` (default `["games"]`). Each plugin is loaded into its own `PluginLoadContext` (ALC) rooted at the plugin folder; shared contracts (`KnockBox.Core`, BCL, logging/DI abstractions) are deferred to the default ALC so type identity is preserved across the host/plugin boundary.
+- Each plugin exposes exactly one `IPluginModule` (public parameterless ctor) — `IGameModule` for games (`sdk/KnockBox.Core/Plugins/IGameModule.cs`) or `ILibraryModule` for libraries (`sdk/KnockBox.Core/Plugins/ILibraryModule.cs`). A game module's `RegisterServices` typically calls `registration.AddGameEngine<TEngine>()` on the supplied `IPluginRegistration`, which registers the engine as a singleton *and* as a keyed `AbstractGameEngine` under the manifest's `RouteIdentifier`. Razor pages inject the concrete engine; `LobbyService.CreateLobbyAsync` resolves the engine generically via `GetKeyedService<AbstractGameEngine>(routeIdentifier)`.
 - Plugin `wwwroot/` folders are mounted at `/_content/{PluginName}` by `Program.MapPluginStaticAssets`, matching Blazor's RCL convention. Reference plugin assets as `_content/KnockBox.{GameName}/...`.
 - The `RouteIdentifier` on `IGameModule` **must** match the route segment in the plugin's `@page` directive (e.g., `"card-counter"` ↔ `@page "/room/card-counter/{ObfuscatedRoomCode}"`). Mismatch = 404 at navigation time.
+
+### Library plugins
+
+- Library plugins live in `host/{LibraryName}/` and stage to `libraries/{LibraryName}/` (parallel to `games/`) via `host/Directory.Library.targets`. Their manifest declares `"kind": "library"` and an `"exportedContracts": [...]` list of contract assembly simple names.
+- A library plugin pairs with a sibling **contracts assembly** (`host/{LibraryName}.Contracts/`) that holds public interfaces consumer plugins reference at compile time. The contracts project has zero `KnockBox.*` references and no plugin-targets import.
+- The loader **promotes every listed contracts DLL into the default ALC at startup, before any plugin ALC is constructed**, so consumer plugins in different ALCs resolve identical CLR types for the contract interfaces.
+- The loader enforces **all libraries finish before any game starts** across three phases: contract promotion → module activation → service registration. A game plugin whose required library failed to load fails loudly at lobby-creation with a DI resolution error.
+- Library plugins use **strict Major.Minor.Patch SemVer**. Same `Major.Minor` with different `Patch` → highest Patch wins (loser is logged as superseded). Different Major or Minor → both load side-by-side; consumer plugins bind to a specific version via compiled metadata reference. Folder convention for side-by-side: `libraries/{entryAssembly}.v{Major}.{Minor}/`.
+- Library plugins' `IPluginRegistration` is the same surface games use; the host-owned-service denylist drops plugin registrations that would shadow built-ins, library-exported services (game→library shadow), or earlier libraries' registrations (library→library shadow via per-library snapshot rebuild). The "two games shadow each other" behavior is unchanged.
 
 ### State, engines, and concurrency
 
@@ -58,11 +67,15 @@ KnockBox is a Blazor Server host (`KnockBox`) that loads each party game as a **
 
 ### DI registration order (inside `AddKnockBoxPlatform`)
 
-The orchestration lives inside the `AddKnockBoxPlatform` extension method (`sdk/KnockBox.Platform/KnockBoxPlatformExtensions.cs`), which `Program.cs` calls during host setup. The order is `RegisterRepositories` → `RegisterValidators` → `RegisterStateServices` → `PluginLoader.LoadModules` → `RegisterLogic(pluginLoadResult)` → navigation + drawing services. `RegisterLogic` iterates `pluginLoadResult.Modules`, invokes each module's `RegisterServices`, registers the module as an `IGameModule` singleton (the home page enumerates these to build the game list), and finally registers `GamePluginAssemblies` so `Routes.razor` can bind `AdditionalAssemblies`.
+The orchestration lives inside the `AddKnockBoxPlatform` extension method (`sdk/KnockBox.Platform/KnockBoxPlatformExtensions.cs`), which `Program.cs` calls during host setup. The order is `RegisterRepositories` → `RegisterValidators` → `RegisterStateServices` → `PluginLoader.LoadModules` → `RegisterLogic(pluginLoadResult)` → navigation + drawing services. `RegisterLogic` runs in **two passes**: pass 1 registers every library plugin (`ILibraryModule` instance) with a per-library snapshot rebuild between iterations so libraries can't shadow each other's services; pass 2 registers every game plugin (`IGameModule` instance) using a post-library snapshot so games can't shadow library-exported services. Game modules are registered as `IGameModule` singletons (the home page enumerates these to build the game list); library modules as `ILibraryModule` singletons (not shown on the home page). Finally `GamePluginAssemblies` is registered so `Routes.razor` can bind `AdditionalAssemblies`.
 
 ### Adding a new game
 
 Full steps are in `host/KnockBox/Specs/knockbox-platform-architecture.md` under "Adding a New Game". Short version: new Razor Class Library under `host/` referencing only `KnockBox.Core` (`..\..\sdk\KnockBox.Core\KnockBox.Core.csproj`), `<Import Project="..\Directory.Plugin.targets" />`, subclass `AbstractGameState` + `AbstractGameEngine`, add Razor pages under `/room/{route-identifier}/{ObfuscatedRoomCode}` inheriting `DisposableComponent`, implement `IGameModule` calling `AddGameEngine<TEngine>(RouteIdentifier)`. **Do not** add a reference from `KnockBox` to the new project.
+
+### Adding a library plugin
+
+Full steps in the "Adding a New Library Plugin" section of the architecture doc. Short version: create TWO projects under `host/` — a contracts project `host/{LibraryName}.Contracts/` (pure interfaces/POCOs, NO `KnockBox.*` refs) and the library plugin `host/{LibraryName}/` (references `KnockBox.Core` + the contracts project, imports `..\Directory.Library.targets`, declares the contracts DLL via a `<PluginExportedContract>` MSBuild item, implements `ILibraryModule`, has a `plugin.json` with `"kind": "library"` and `"exportedContracts": ["{LibraryName}.Contracts"]`, uses strict Major.Minor.Patch SemVer). Add a transitive `<ProjectReference ... ReferenceOutputAssembly="false" Private="false" />` to `host/KnockBox/KnockBox.csproj` for the library (the contracts assembly builds transitively as a dep). Add both projects to `host/KnockBox.Host.slnx`. Consumer game plugins reference the contracts project via `ProjectReference` (first-party) or `PackageReference` (third-party). The first instance of this pattern in the repo is `host/KnockBox.WordService` + `host/KnockBox.WordService.Contracts`.
 
 ## Testing
 

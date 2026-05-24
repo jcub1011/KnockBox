@@ -1,12 +1,12 @@
 namespace KnockBox.DndMapper.Services.State.Games.Data
 {
-    public sealed class CombatantEntry
+    public sealed record CombatantEntry
     {
-        public Guid Id { get; set; }
-        public Guid TokenId { get; set; }
-        public string Name { get; set; } = string.Empty;
-        public string? OwnerUserId { get; set; }
-        public int? InitiativeRoll { get; set; }
-        public bool IsForceRolled { get; set; }
+        public Guid Id { get; init; }
+        public Guid TokenId { get; init; }
+        public string Name { get; init; } = string.Empty;
+        public string? OwnerUserId { get; init; }
+        public int? InitiativeRoll { get; init; }
+        public bool IsForceRolled { get; init; }
     }
 }

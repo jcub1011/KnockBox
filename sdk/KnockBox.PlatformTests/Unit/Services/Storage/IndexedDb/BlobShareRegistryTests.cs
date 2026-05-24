@@ -18,7 +18,7 @@ public sealed class BlobShareRegistryTests
             Token = Guid.NewGuid(),
             ContentType = "application/octet-stream",
             Length = length,
-            Fetcher = (offset, count, ct) => ValueTask.FromResult(new byte[count]),
+            StreamOpener = _ => ValueTask.FromResult<Stream>(new MemoryStream(new byte[length], writable: false)),
             AbsoluteExpiresAt = absoluteExpiresAt,
             SlidingExpiry = slidingExpiry,
         };

@@ -116,15 +116,34 @@
             @if (!isDone)
             {
                 <div class="dtd-drawing-canvas-container">
-                    <div class="dtd-drawing-canvas-wrapper" role="img" aria-label="Drawing canvas for @CurrentTypeName">
-                        <SvgDrawingCanvas @ref="_canvas"
-                                          Width="100%"
-                                          Height="100%"
-                                          ViewBoxWidth="@CurrentTypeCanvasWidth"
-                                          ViewBoxHeight="@CurrentTypeCanvasHeight"
-                                          BackgroundColor="#ffffff"
-                                          TrustedBackgroundSvgContent="@MannequinSvg" />
-                    </div>
+                    <SvgDrawingEngine @ref="_engine" TargetSvgId="@_svgId" BackgroundColor="#ffffff">
+                        <SvgDrawingToolbar />
+                        <div class="dtd-drawing-canvas-wrapper" role="img" aria-label="Drawing canvas for @CurrentTypeName">
+                            <div class="dtd-canvas-stack">
+                                <svg class="dtd-canvas-layer dtd-canvas-base"
+                                     width="@CurrentTypeCanvasWidth" height="@CurrentTypeCanvasHeight"
+                                     viewBox="0 0 @CurrentTypeCanvasWidth @CurrentTypeCanvasHeight"
+                                     preserveAspectRatio="xMidYMid meet"
+                                     style="background-color: #ffffff;">
+                                    <rect width="100%" height="100%" fill="none" stroke="#64748b"
+                                          stroke-width="2" stroke-dasharray="8 8" vector-effect="non-scaling-stroke" />
+                                </svg>
+                                @if (MannequinSvg is not null)
+                                {
+                                    <svg class="dtd-canvas-layer dtd-canvas-bg" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"
+                                         width="@CurrentTypeCanvasWidth" height="@CurrentTypeCanvasHeight"
+                                         viewBox="0 0 @CurrentTypeCanvasWidth @CurrentTypeCanvasHeight"
+                                         preserveAspectRatio="xMidYMid meet">
+                                        @((MarkupString)MannequinSvg)
+                                    </svg>
+                                }
+                                <svg id="@_svgId" class="dtd-canvas-layer dtd-canvas-surface"
+                                     width="@CurrentTypeCanvasWidth" height="@CurrentTypeCanvasHeight"
+                                     viewBox="0 0 @CurrentTypeCanvasWidth @CurrentTypeCanvasHeight"
+                                     preserveAspectRatio="xMidYMid meet"></svg>
+                            </div>
+                        </div>
+                    </SvgDrawingEngine>
                 </div>
 
                 <div class="dtd-drawing-footer">

@@ -1,0 +1,143 @@
+<Project>
+
+  <!--
+    Shared MSBuild target for library-plugin projects.
+
+    Imported by each library plugin .csproj to publish its build output into the
+    host app's libraries/{TargetName}/ folder so the host can discover and load
+    it at runtime. The pattern mirrors Directory.Plugin.targets (which stages
+    game plugins into games/{TargetName}/), with two additions:
+
+      1. Library plugins ship a sibling "contracts" assembly that the library's
+         RegisterServices implements. The library's plugin.json declares the
+         contracts assembly's simple name(s) in exportedContracts. At runtime
+         the loader promotes those DLLs into the default ALC before any plugin
+         loads, so every consumer (game or library) resolves an identical CLR
+         type for the contract interfaces. To make that promotion work, the
+         contract DLLs must be staged into libraries/{TargetName}/ alongside the
+         library's primary DLL — the library csproj declares them via:
+
+           <ItemGroup>
+             <PluginExportedContract Include="$(TargetDir)Foo.Contracts.dll" />
+           </ItemGroup>
+
+         and this targets file picks them up.
+
+      2. Staging destination is libraries/, not games/, because the host
+         partitions plugins by folder for first-party staging tidiness (and the
+         third-party admin toggle controls both libraries/ and games/ under
+         {KNOCKBOX_DATA_ROOT}/). The plugin.json's kind field still authoritatively
+         decides game vs library; the folder name is convention.
+  -->
+
+  <PropertyGroup Condition="'$(Configuration)' == 'Release' AND '$(RuntimeIdentifier)' != ''">
+    <PublishReadyToRun>true</PublishReadyToRun>
+    <PublishReadyToRunComposite>false</PublishReadyToRunComposite>
+    <PublishReadyToRunShowWarnings>false</PublishReadyToRunShowWarnings>
+  </PropertyGroup>
+
+  <!--
+    plugin.json is mandatory for every library plugin. Fail fast at build time
+    if it's missing so the author sees the error before publish, not at host
+    startup.
+  -->
+  <Target Name="ValidateLibraryManifest" BeforeTargets="BeforeBuild;PrepareForBuild">
+    <Error Condition="!Exists('$(MSBuildProjectDirectory)\plugin.json')"
+           Text="Library plugin project '$(MSBuildProjectName)' is missing required [plugin.json] in its project root. Every plugin must declare its identity, kind, and (for libraries) exportedContracts in plugin.json; see docs for the schema." />
+  </Target>
+
+  <!--
+    Embed plugin.json into the assembly as a resource (so PluginManifest.FromEmbeddedResource
+    can find it at runtime for cross-check against the on-disk copy) and stage
+    a disk copy next to the DLL so the loader can read it before activating
+    the assembly.
+  -->
+  <ItemGroup Condition="Exists('$(MSBuildProjectDirectory)\plugin.json')">
+    <EmbeddedResource Include="plugin.json">
+      <LogicalName>plugin.json</LogicalName>
+    </EmbeddedResource>
+    <None Include="plugin.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <!--
+    Wire the KnockBox sandbox-escape analyzer into every first-party library
+    plugin. Libraries can hit File/HttpClient/Process/Environment APIs just as
+    easily as games, so the same KB1001–KB1004 checks apply.
+  -->
+  <ItemGroup>
+    <ProjectReference Include="$(MSBuildThisFileDirectory)..\sdk\KnockBox.Plugins.Analyzer\KnockBox.Plugins.Analyzer.csproj"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+  <Target Name="PublishLibraryPlugin" AfterTargets="Build">
+    <Message Text="Publishing library plugin $(TargetName) to KnockBox app..." Importance="high" />
+    <PropertyGroup>
+      <LibraryPluginDestDir>$(MSBuildThisFileDirectory)KnockBox\bin\$(Configuration)\$(TargetFramework)\libraries\$(TargetName)\</LibraryPluginDestDir>
+    </PropertyGroup>
+    <ItemGroup>
+      <LibraryPluginPrimary Include="$(TargetDir)$(TargetName).dll" />
+      <LibraryPluginPrimary Include="$(TargetDir)$(TargetName).pdb" Condition="Exists('$(TargetDir)$(TargetName).pdb')" />
+      <LibraryPluginPrimary Include="$(TargetDir)$(TargetName).deps.json" Condition="Exists('$(TargetDir)$(TargetName).deps.json')" />
+      <LibraryPluginPrimary Include="$(TargetDir)plugin.json" Condition="Exists('$(TargetDir)plugin.json')" />
+      <LibraryPluginPrimary Include="$(TargetDir)$(TargetName).staticwebassets.endpoints.json"
+                            Condition="Exists('$(TargetDir)$(TargetName).staticwebassets.endpoints.json')" />
+      <LibraryPluginPrimary Include="$(TargetDir)$(TargetName).staticwebassets.runtime.json"
+                            Condition="Exists('$(TargetDir)$(TargetName).staticwebassets.runtime.json')" />
+      <LibraryPluginPrimary Include="$(TargetDir)KnockBox.Tooling.dll" Condition="Exists('$(TargetDir)KnockBox.Tooling.dll')" />
+      <LibraryPluginPrimary Include="$(TargetDir)KnockBox.Tooling.pdb" Condition="Exists('$(TargetDir)KnockBox.Tooling.pdb')" />
+      <LibraryScopedCss Include="$(IntermediateOutputPath)scopedcss\projectbundle\$(TargetName).bundle.scp.css" />
+      <LibraryWwwRootFiles Include="wwwroot\**\*.*" />
+      <LibraryContentFiles Include="$(TargetDir)**\*.csv" />
+
+      <!--
+        Library exported-contract DLLs. The library csproj populates this item
+        group; the loader's contract-promotion pass reads the contracts DLL from
+        the same libraries/{TargetName}/ folder we copy it into here. Also stage
+        the contract's .pdb (for debugging) and .xml (for IDE doc tooltips) if
+        present alongside the DLL.
+      -->
+      <LibraryContractFiles Include="%(PluginExportedContract.Identity)" />
+      <LibraryContractFiles Include="$([System.IO.Path]::ChangeExtension('%(PluginExportedContract.Identity)', '.pdb'))"
+                            Condition="Exists($([System.IO.Path]::ChangeExtension('%(PluginExportedContract.Identity)', '.pdb')))" />
+      <LibraryContractFiles Include="$([System.IO.Path]::ChangeExtension('%(PluginExportedContract.Identity)', '.xml'))"
+                            Condition="Exists($([System.IO.Path]::ChangeExtension('%(PluginExportedContract.Identity)', '.xml')))" />
+    </ItemGroup>
+    <Copy SourceFiles="@(LibraryPluginPrimary)"
+          DestinationFolder="$(LibraryPluginDestDir)" />
+    <Copy SourceFiles="@(LibraryContentFiles)"
+          DestinationFolder="$(LibraryPluginDestDir)%(RecursiveDir)"
+          Condition="'@(LibraryContentFiles)' != ''" />
+    <Copy SourceFiles="@(LibraryContractFiles)"
+          DestinationFolder="$(LibraryPluginDestDir)"
+          Condition="'@(LibraryContractFiles)' != ''" />
+    <Copy SourceFiles="@(LibraryScopedCss)"
+          DestinationFiles="$(LibraryPluginDestDir)wwwroot\$(TargetName).styles.css"
+          Condition="Exists('@(LibraryScopedCss)')" />
+    <Copy SourceFiles="@(LibraryWwwRootFiles)"
+          DestinationFolder="$(LibraryPluginDestDir)wwwroot\%(RecursiveDir)"
+          Condition="'@(LibraryWwwRootFiles)' != ''" />
+  </Target>
+
+  <!--
+    Re-stage the R2R-compiled DLL and (RID-qualified) deps.json over the IL
+    versions that PublishLibraryPlugin (AfterTargets="Build") wrote earlier.
+    Only the DLL and deps.json change between Build and Publish under R2R.
+  -->
+  <Target Name="PublishLibraryPluginAfterPublish" AfterTargets="Publish">
+    <PropertyGroup>
+      <LibraryPluginDestDir>$(MSBuildThisFileDirectory)KnockBox\bin\$(Configuration)\$(TargetFramework)\libraries\$(TargetName)\</LibraryPluginDestDir>
+    </PropertyGroup>
+    <ItemGroup>
+      <LibraryPluginPublishedPrimary Include="$(PublishDir)$(TargetName).dll" />
+      <LibraryPluginPublishedPrimary Include="$(PublishDir)$(TargetName).deps.json"
+                                     Condition="Exists('$(PublishDir)$(TargetName).deps.json')" />
+    </ItemGroup>
+    <Copy SourceFiles="@(LibraryPluginPublishedPrimary)"
+          DestinationFolder="$(LibraryPluginDestDir)"
+          OverwriteReadOnlyFiles="true" />
+  </Target>
+
+</Project>

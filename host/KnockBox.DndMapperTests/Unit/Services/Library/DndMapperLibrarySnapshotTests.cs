@@ -74,6 +74,75 @@ namespace KnockBox.DndMapperTests.Unit.Services.Library
                 "Snapshot JSON should not contain a ShareToken — it leaked via property naming.");
         }
 
+        [TestMethod]
+        public void FromState_CapturesDownscaleProvenanceOnImage()
+        {
+            // The upload pipeline sets WasDownscaled + OriginalLongEdgePx +
+            // DisplayLongEdgePx when the source bitmap exceeded the device's max
+            // GPU texture size. Those three fields must round-trip through the
+            // snapshot so the Layers panel can still surface the badge on reload.
+            var (engine, state, host, _) = EngineTestFactory.Build();
+            Assert.IsTrue(engine.CreateMapAsync(state, host, "M").TryGetSuccess(out var mapId));
+            var img = new MapImage
+            {
+                Id = Guid.NewGuid(),
+                ContentType = "image/webp",
+                ShareToken = Guid.NewGuid(),
+                Width = 60, Height = 40,
+                ByteSize = 5_000_000,
+                WasDownscaled = true,
+                OriginalLongEdgePx = 14_336,
+                DisplayLongEdgePx = 8_192,
+            };
+            Assert.IsTrue(engine.AddImageAsync(state, host, mapId, img).IsSuccess);
+
+            var json = JsonSerializer.Serialize(LibrarySnapshotMapper.FromState(state), JsonOptions);
+            var reread = JsonSerializer.Deserialize<LibrarySnapshot>(json, JsonOptions);
+
+            Assert.IsNotNull(reread);
+            var snapImg = reread!.Maps.Single().Images.Single();
+            Assert.IsTrue(snapImg.WasDownscaled);
+            Assert.AreEqual(14_336, snapImg.OriginalLongEdgePx);
+            Assert.AreEqual(8_192, snapImg.DisplayLongEdgePx);
+        }
+
+        [TestMethod]
+        public void LegacySnapshot_WithoutDownscaleFields_DeserializesAsNotDownscaled()
+        {
+            // Pre-2026-05 snapshots have no WasDownscaled / OriginalLongEdgePx /
+            // DisplayLongEdgePx — System.Text.Json fills bool=false and int=0,
+            // which the Layers panel treats as "not downscaled" so no badge
+            // appears for legacy images.
+            const string legacyJson = """
+            {
+                "SchemaVersion": 3,
+                "Maps": [{
+                    "Id": "11111111-1111-1111-1111-111111111111",
+                    "Name": "Legacy",
+                    "Grid": { "WidthCells": 20, "HeightCells": 20, "CellPixels": 32 },
+                    "Images": [{
+                        "Id": "22222222-2222-2222-2222-222222222222",
+                        "ContentType": "image/png",
+                        "X": 0, "Y": 0, "Width": 10, "Height": 10,
+                        "OriginalWidth": 10, "OriginalHeight": 10,
+                        "Rotation": 0, "Opacity": 1.0,
+                        "LayerOrder": 0, "Locked": false, "Hidden": false,
+                        "ByteSize": 1024
+                    }],
+                    "Tokens": []
+                }],
+                "Sheets": []
+            }
+            """;
+            var reread = JsonSerializer.Deserialize<LibrarySnapshot>(legacyJson, JsonOptions);
+
+            Assert.IsNotNull(reread);
+            var img = reread!.Maps.Single().Images.Single();
+            Assert.IsFalse(img.WasDownscaled);
+            Assert.AreEqual(0, img.OriginalLongEdgePx);
+            Assert.AreEqual(0, img.DisplayLongEdgePx);
+        }
+
         // ── JSON round-trip ──────────────────────────────────────────────────────
 
         [TestMethod]
@@ -469,6 +538,69 @@ namespace KnockBox.DndMapperTests.Unit.Services.Library
             Assert.AreEqual("Curious", textValue.StringValue);
             Assert.AreEqual(AttributeValueType.Modifier, modValue.Type);
             Assert.AreEqual(3, modValue.IntValue);
+        }
+
+        // ── Fog mask ─────────────────────────────────────────────────────────────
+
+        [TestMethod]
+        public void FromState_CapturesFogMask()
+        {
+            var (engine, state, host, _) = EngineTestFactory.Build();
+            Assert.IsTrue(engine.CreateMapAsync(state, host, "Crypt").TryGetSuccess(out var mapId));
+            Assert.IsTrue(engine.PaintFogAsync(state, host, mapId, new[] { (0, 0), (1, 0), (0, 1) }, fogged: true).IsSuccess);
+
+            var snap = LibrarySnapshotMapper.FromState(state);
+
+            var mapSnap = snap.Maps.Single(m => m.Id == mapId);
+            Assert.IsTrue(mapSnap.FogMask.Length > 0);
+            Assert.IsTrue(state.Maps.Single(m => m.Id == mapId).IsFogged(0, 0));
+        }
+
+        [TestMethod]
+        public void Snapshot_FogMask_RoundTripsThroughJsonAsBase64()
+        {
+            var (engine, state, host, _) = EngineTestFactory.Build();
+            Assert.IsTrue(engine.CreateMapAsync(state, host, "M").TryGetSuccess(out var mapId));
+            Assert.IsTrue(engine.FillMapWithFogAsync(state, host, mapId).IsSuccess);
+
+            var original = LibrarySnapshotMapper.FromState(state);
+            var json = JsonSerializer.Serialize(original, JsonOptions);
+            var reread = JsonSerializer.Deserialize<LibrarySnapshot>(json, JsonOptions);
+
+            Assert.IsNotNull(reread);
+            var origMap = original.Maps.Single(m => m.Id == mapId);
+            var rereadMap = reread!.Maps.Single(m => m.Id == mapId);
+            CollectionAssert.AreEqual(origMap.FogMask, rereadMap.FogMask);
+        }
+
+        [TestMethod]
+        public void LegacySnapshot_WithoutFogMask_DeserializesToEmpty()
+        {
+            // Older library payloads predating fog of war don't write a FogMask
+            // property. The init-only default ([]) must take effect on deserialize.
+            const string legacyJson = """
+                {
+                    "SchemaVersion": 3,
+                    "Maps": [
+                        {
+                            "Id": "00000000-0000-0000-0000-000000000001",
+                            "Name": "Legacy",
+                            "ListOrder": 0,
+                            "CreatedUtc": "2025-01-01T00:00:00Z",
+                            "Grid": { "WidthCells": 10, "HeightCells": 10 },
+                            "Images": [],
+                            "Tokens": []
+                        }
+                    ]
+                }
+                """;
+
+            var snap = JsonSerializer.Deserialize<LibrarySnapshot>(legacyJson, JsonOptions);
+
+            Assert.IsNotNull(snap);
+            var mapSnap = snap!.Maps.Single();
+            Assert.IsNotNull(mapSnap.FogMask);
+            Assert.IsEmpty(mapSnap.FogMask);
         }
     }
 }

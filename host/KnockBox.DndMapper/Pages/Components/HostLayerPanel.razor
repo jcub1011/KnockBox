@@ -27,10 +27,13 @@
                     <li @key="img.Id" class="@cls">
                         <div class="dndm-layer-clickarea"
                              @onclick="@(() => OnRowClick(img))">
-                            @if (img.ShareToken is Guid shareToken)
+                            @{
+                                var thumbSrc = ResolveImageSrc(img);
+                            }
+                            @if (thumbSrc is not null)
                             {
                                 <img class="dndm-layer-thumb"
-                                     src="@($"/blob-share/{shareToken:D}")"
+                                     src="@thumbSrc"
                                      alt="layer @img.LayerOrder" />
                             }
                             else
@@ -57,6 +60,13 @@
                                       @ondblclick:stopPropagation="true">
                                     @img.DisplayName
                                 </span>
+                                @if (img.WasDownscaled && img.OriginalLongEdgePx > 0 && img.DisplayLongEdgePx > 0)
+                                {
+                                    var tip = $"Downscaled for performance: {img.OriginalLongEdgePx:N0}px → {img.DisplayLongEdgePx:N0}px on the long edge.";
+                                    <span class="dndm-layer-downscale-badge"
+                                          title="@tip"
+                                          aria-label="@tip">⤓</span>
+                                }
                             }
                         </div>
                         <button class="dndm-btn dndm-btn--small dndm-btn--icon dndm-layer-eyebtn"

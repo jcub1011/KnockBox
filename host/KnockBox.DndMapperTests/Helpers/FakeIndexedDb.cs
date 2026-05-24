@@ -1,5 +1,6 @@
 using KnockBox.Core.Primitives.Returns;
 using KnockBox.Core.Services.Storage.IndexedDb;
+using Microsoft.AspNetCore.Components;
 
 namespace KnockBox.DndMapperTests.Helpers
 {
@@ -136,6 +137,35 @@ namespace KnockBox.DndMapperTests.Helpers
             return ValueTask.FromResult(ValueResult<IndexedDbKey, IndexedDbError>.FromValue(key.Value));
         }
 
+        public ValueTask<ValueResult<IReadOnlyList<IndexedDbKey>, IndexedDbError>> JsonPutBatchAsync(
+            IReadOnlyList<JsonPutItem> items, CancellationToken ct = default)
+        {
+            if (items is null || items.Count == 0)
+                return ValueTask.FromResult(ValueResult<IReadOnlyList<IndexedDbKey>, IndexedDbError>.FromValue(Array.Empty<IndexedDbKey>()));
+
+            // Validate up-front so partial writes don't happen on bad input.
+            for (var i = 0; i < items.Count; i++)
+            {
+                if (items[i].Key is null)
+                    return ValueTask.FromResult(ValueResult<IReadOnlyList<IndexedDbKey>, IndexedDbError>.FromError(
+                        new IndexedDbError(IndexedDbErrorKind.Unknown, "Fake requires explicit keys.")));
+            }
+
+            var keys = new IndexedDbKey[items.Count];
+            for (var i = 0; i < items.Count; i++)
+            {
+                var item = items[i];
+                if (!_service.JsonStores.TryGetValue(item.StoreName, out var store))
+                {
+                    store = new();
+                    _service.JsonStores[item.StoreName] = store;
+                }
+                store[KeyString(item.Key!.Value)] = item.Value;
+                keys[i] = item.Key.Value;
+            }
+            return ValueTask.FromResult(ValueResult<IReadOnlyList<IndexedDbKey>, IndexedDbError>.FromValue((IReadOnlyList<IndexedDbKey>)keys));
+        }
+
         public ValueTask<ValueResult<IndexedDbBlob?, IndexedDbError>> BlobGetSingleAsync(string storeName, IndexedDbKey key, CancellationToken ct = default)
         {
             var k = KeyString(key);
@@ -174,6 +204,26 @@ namespace KnockBox.DndMapperTests.Helpers
             }
             return ValueTask.FromResult(Result<IndexedDbError>.Success);
         }
+
+        // The upload flow that calls this is exercised by browser-driven E2E
+        // tests, not unit tests; no test currently in this project drives a
+        // simulated file input. If a future test needs it, override by
+        // assigning AdoptInputElementFilesHandler before invocation.
+        public Func<ElementReference, string, AdoptInputFilesOptions, CancellationToken,
+            ValueTask<ValueResult<IReadOnlyList<AdoptedInputFile>, IndexedDbError>>>?
+            AdoptInputElementFilesHandler { get; set; }
+
+        public ValueTask<ValueResult<IReadOnlyList<AdoptedInputFile>, IndexedDbError>>
+            AdoptInputElementFilesAsync(
+                ElementReference inputElement,
+                string storeName,
+                AdoptInputFilesOptions options,
+                CancellationToken ct = default)
+            => AdoptInputElementFilesHandler is not null
+                ? AdoptInputElementFilesHandler(inputElement, storeName, options, ct)
+                : ValueTask.FromResult(ValueResult<IReadOnlyList<AdoptedInputFile>, IndexedDbError>.FromError(
+                    new IndexedDbError(IndexedDbErrorKind.NotSupported,
+                        "FakeIndexedDatabase has no AdoptInputElementFilesHandler set.")));
 
         private static string KeyString(IndexedDbKey key)
         {

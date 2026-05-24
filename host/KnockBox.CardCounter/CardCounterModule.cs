@@ -13,12 +13,6 @@ namespace KnockBox.CardCounter
         public void RegisterServices(IPluginRegistration registration)
             => registration.AddGameEngine<CardCounterGameEngine>();
 
-        public RenderFragment GetButtonContent() => builder =>
-        {
-            builder.OpenComponent<CardCounterTile>(0);
-            builder.CloseComponent();
-        };
-
         public RenderFragment? GetCustomHeader() => builder =>
         {
             builder.OpenComponent<CardCounterHeader>(0);

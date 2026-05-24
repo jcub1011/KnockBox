@@ -7,7 +7,9 @@
 @inherits DisposableComponent
 
 <section class="dndm-panel dndm-rolllog">
-    <header class="dndm-panel-header">
+    <header class="dndm-panel-header @(OnHeaderClick.HasDelegate ? "dndm-rolllog-header--clickable" : null)"
+            @onclick="OnHeaderClickHandler"
+            title="@(OnHeaderClick.HasDelegate ? "Click to minimize" : null)">
         <span>Roll</span>
     </header>
     <div class="dndm-panel-body dndm-rolllog-body">
@@ -50,10 +52,11 @@
                                    @onchange="@(e => UpdateTermCount(idx, ParseInt(e.Value, term.Count)))" />
                             <span class="dndm-dice-term-d">d</span>
                             <select class="dndm-select dndm-dice-term-sides"
-                                    @onchange="@(e => UpdateTermSides(idx, ParseInt(e.Value, term.Sides)))">
+                                    @onchange="@(e => UpdateTermSides(idx, ParseInt(e.Value, term.Sides)))"
+                                    title="@(term.Sides == 100 ? "d100 rolls as percentile dice: a tens die (00-90) plus a units die (0-9)." : null)">
                                 @foreach (var s in DieSizes)
                                 {
-                                    <option value="@s" selected="@(s == term.Sides)">@s</option>
+                                    <option value="@s" selected="@(s == term.Sides)">@(s == 100 ? "100 (d%)" : s.ToString())</option>
                                 }
                             </select>
                             @if (Config.Terms.Count > 1)
@@ -215,7 +218,7 @@
                     @foreach (var d in r.Rolls)
                     {
                         <span class="@($"dndm-die{(d.Discarded ? " dndm-die--discarded" : "")}")"
-                              title="@($"d{d.Sides}")">@d.Result</span>
+                              title="@DieTooltip(d)">@d.Result</span>
                     }
                     @if (r.FlatModifier != 0 || r.AttributeModifier is not null)
                     {

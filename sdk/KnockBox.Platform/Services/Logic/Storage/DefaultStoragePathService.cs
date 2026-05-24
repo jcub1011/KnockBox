@@ -19,6 +19,8 @@ public sealed class DefaultStoragePathService : IStoragePathService
         _dataRoot = ResolveDataRoot(Environment.GetEnvironmentVariable("KNOCKBOX_DATA_ROOT"));
     }
 
+    public string GetDataRoot() => _dataRoot;
+
     public string GetAdminDirectory() =>
         Path.Combine(_dataRoot, "admin");
 

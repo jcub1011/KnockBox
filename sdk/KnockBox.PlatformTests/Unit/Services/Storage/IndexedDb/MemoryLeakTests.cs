@@ -124,7 +124,6 @@ public sealed class MemoryLeakTests
     public async Task BlobDispose_RevokesAllPublishedShares_EvenIfReleaseFails()
     {
         var interop = Mock();
-        interop.SetupTypedSuccess("blobPrepareRead", new BlobPrepareReadResponse(4, "application/octet-stream"));
         interop.SetupVoidFailure("releaseHandle", new IndexedDbError(IndexedDbErrorKind.Aborted, "disconnected"));
 
         using var registry = IndexedDbTestHelpers.NewRegistry();
@@ -150,7 +149,6 @@ public sealed class MemoryLeakTests
     public async Task ShareLifecycle_BlobDisposeRevokes_NoLingeringEntries()
     {
         var interop = Mock();
-        interop.SetupTypedSuccess("blobPrepareRead", new BlobPrepareReadResponse(4, "application/octet-stream"));
         interop.SetupVoidSuccess("releaseHandle");
 
         using var registry = IndexedDbTestHelpers.NewRegistry();

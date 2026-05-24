@@ -8,21 +8,21 @@
             <div class="dndm-modal-body dndm-mapsettings">
                 <label class="dndm-label">
                     Width (cells)
-                    <input type="number" min="5" max="200"
+                    <input type="number" min="1" max="1000"
                            class="dndm-input dndm-input--num"
                            value="@_width"
                            @onchange="@(e => _width = ParseInt(e.Value, _width))" />
                 </label>
                 <label class="dndm-label">
                     Height (cells)
-                    <input type="number" min="5" max="200"
+                    <input type="number" min="1" max="1000"
                            class="dndm-input dndm-input--num"
                            value="@_height"
                            @onchange="@(e => _height = ParseInt(e.Value, _height))" />
                 </label>
                 <label class="dndm-label">
                     Cell size (pixels)
-                    <input type="number" min="8" max="200"
+                    <input type="number" min="1" max="1000"
                            class="dndm-input dndm-input--num"
                            value="@_cellPixels"
                            @onchange="@(e => _cellPixels = ParseInt(e.Value, _cellPixels))" />

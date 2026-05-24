@@ -5,7 +5,7 @@ using KnockBox.Core.Services.Logic.RandomGeneration;
 using KnockBox.Core.Services.State.Games.Shared;
 using KnockBox.Core.Services.State.Users;
 using KnockBox.Spardle.Models;
-using KnockBox.Spardle.Services;
+using KnockBox.WordService.Contracts;
 using Microsoft.Extensions.Logging;
 
 namespace KnockBox.Spardle;

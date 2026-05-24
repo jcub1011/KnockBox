@@ -93,3 +93,20 @@
 .dndm-layer-lock {
     font-size: 0.95rem;
 }
+
+/* Surfaces the fact that the upload pipeline downscaled this image because
+   the source exceeded the device's max GPU texture size — explains why a
+   huge source map looks softer than its native resolution. Hover reveals
+   the original vs display long-edge pixel counts. */
+.dndm-layer-downscale-badge {
+    flex: 0 0 auto;
+    font-size: 0.85rem;
+    line-height: 1;
+    padding: 0.1rem 0.3rem;
+    border-radius: 3px;
+    color: var(--dndm-text-dim);
+    background: rgba(196, 116, 56, 0.18);
+    border: 1px solid var(--dndm-border);
+    cursor: help;
+    user-select: none;
+}

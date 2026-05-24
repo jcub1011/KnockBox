@@ -1,0 +1,354 @@
+.toolbar-container {
+    container-type: inline-size;
+    flex-shrink: 0;
+    position: relative;
+}
+
+.svg-canvas-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    background: #f5f5f5;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    flex-wrap: wrap;
+    min-height: 40px;
+}
+
+.svg-canvas-toolbar-disabled {
+    opacity: 0.4;
+    pointer-events: none;
+}
+
+.toolbar-group {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+
+.toolbar-separator {
+    width: 1px;
+    height: 22px;
+    background: #d1d5db;
+    flex-shrink: 0;
+}
+
+.toolbar-swatches {
+    display: flex;
+    gap: 3px;
+    flex-wrap: wrap;
+}
+
+.toolbar-swatch {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 2px solid rgba(0, 0, 0, 0.15);
+    cursor: pointer;
+    padding: 0;
+    flex-shrink: 0;
+    transition: transform 0.1s, border-color 0.1s;
+}
+
+    .toolbar-swatch:hover {
+        transform: scale(1.15);
+        border-color: rgba(0, 0, 0, 0.4);
+    }
+
+    .toolbar-swatch.toolbar-swatch-active {
+        border: 2px solid #333;
+        box-shadow: 0 0 0 1px #fff, 0 0 0 3px #333;
+        transform: scale(1.1);
+    }
+
+.toolbar-swatch-custom {
+    border-style: dashed;
+}
+
+    .toolbar-swatch-custom.toolbar-swatch-active {
+        border-style: solid;
+    }
+
+.toolbar-color {
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border: 1px solid #bbb;
+    border-radius: 8px;
+    cursor: pointer;
+    background: none;
+    flex-shrink: 0;
+}
+
+/* ── Size presets ──────────────────────────────────────────────────────────── */
+
+.toolbar-size-group {
+    gap: 3px;
+}
+
+.toolbar-size-btn {
+    width: 36px;
+    height: 36px;
+    border: 1px solid #ccc;
+    border-radius: 10px;
+    background: #fff;
+    cursor: pointer;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #555;
+    padding: 0;
+    transition: background 0.1s, border-color 0.1s;
+}
+
+    .toolbar-size-btn:hover {
+        background: #e8e8e8;
+        border-color: #aaa;
+    }
+
+    .toolbar-size-btn.toolbar-size-btn-active {
+        background: #333;
+        color: #fff;
+        border-color: #333;
+    }
+
+.toolbar-size {
+    width: 36px;
+    height: 36px;
+    padding: 0 4px;
+    border: 1px solid #ccc;
+    border-radius: 10px;
+    font-size: 1rem;
+    text-align: center;
+    appearance: textfield;
+    -moz-appearance: textfield;
+}
+
+    .toolbar-size::-webkit-inner-spin-button,
+    .toolbar-size::-webkit-outer-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+    }
+
+/* ── Action buttons ───────────────────────────────────────────────────────── */
+
+.toolbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: auto;
+    position: relative;
+    flex-wrap: wrap;
+}
+
+.toolbar-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px;
+    width: 36px;
+    height: 36px;
+    background: #fff;
+    border: 1px solid #ccc;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+    line-height: 1;
+}
+
+.toolbar-icon {
+    width: 24px;
+    height: 24px;
+    flex-shrink: 0;
+}
+
+    .toolbar-btn:hover:not(:disabled) {
+        background: #e8e8e8;
+        border-color: #aaa;
+    }
+
+    .toolbar-btn.toolbar-btn-active {
+        background: #333;
+        color: #fff;
+        border-color: #333;
+        transform: scale(1.05);
+    }
+
+    .toolbar-btn:disabled,
+    .toolbar-btn.toolbar-btn-disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+        pointer-events: none;
+    }
+
+/* ── Collapsible toolbar dropdowns ────────────────────────────────────────── */
+
+.toolbar-collapsible {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+
+.toolbar-collapse-trigger {
+    display: none;
+    width: 36px;
+    height: 36px;
+    border: 1px solid #ccc;
+    border-radius: 10px;
+    background: #fff;
+    cursor: pointer;
+    padding: 0;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s, border-color 0.15s;
+}
+
+    .toolbar-collapse-trigger:hover {
+        background: #e8e8e8;
+        border-color: #aaa;
+    }
+
+.toolbar-color-trigger {
+    border-radius: 50%;
+    border: 2px solid #333;
+    box-shadow: 0 0 0 1px #fff, 0 0 0 3px #333;
+}
+
+.toolbar-size-trigger {
+    font-size: 1rem;
+    font-weight: 600;
+    background: #333;
+    color: #fff;
+    border-color: #333;
+}
+
+.toolbar-overflow-trigger {
+    line-height: 1;
+}
+
+.toolbar-collapse-panel {
+    display: contents;
+}
+
+/* ── Copy/paste toast ────────────────────────────────────────────────────── */
+
+.toolbar-copy-toast {
+    position: absolute;
+    right: 100%;
+    top: 50%;
+    transform: translateY(-50%);
+    margin-right: 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #15803d;
+    white-space: nowrap;
+    pointer-events: none;
+    animation: toolbar-toast-fade 1.5s ease-out forwards;
+}
+
+@keyframes toolbar-toast-fade {
+    0% { opacity: 1; }
+    70% { opacity: 1; }
+    100% { opacity: 0; }
+}
+
+/* ── Outside-click scrim (mobile collapsed dropdowns) ─────────────────────── */
+
+.toolbar-scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 90;
+    background: transparent;
+}
+
+/* ── Responsive ────────────────────────────────────────────────────────────── */
+
+@container (max-width: 540px) {
+    .svg-canvas-toolbar {
+        gap: 6px;
+        flex-wrap: nowrap;
+        overflow: visible;
+    }
+
+    .toolbar-actions {
+        margin-left: auto;
+    }
+
+    .toolbar-separator-desktop {
+        display: none;
+    }
+
+    .toolbar-collapse-trigger {
+        display: inline-flex;
+    }
+
+    .toolbar-collapse-panel {
+        display: none;
+        position: absolute;
+        top: calc(100% + 6px);
+        left: 0;
+        z-index: 100;
+        background: #f5f5f5;
+        border: 1px solid #ddd;
+        border-radius: 10px;
+        padding: 8px;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+        flex-wrap: wrap;
+        gap: 4px;
+        min-width: max-content;
+    }
+
+    .toolbar-collapsible.open > .toolbar-collapse-panel {
+        display: flex;
+    }
+
+    .toolbar-collapsible.open > .toolbar-collapse-trigger {
+        background: #e0e0e0;
+        border-color: #999;
+    }
+
+    .toolbar-color-collapsible.open > .toolbar-color-trigger {
+        background: inherit;
+    }
+
+    .toolbar-size-collapsible.open > .toolbar-size-trigger {
+        background: #222;
+    }
+
+    /* Color panel: swatches in a grid */
+    .toolbar-color-panel {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 6px;
+    }
+
+        .toolbar-color-panel .toolbar-swatches {
+            display: grid;
+            grid-template-columns: repeat(3, 36px);
+            gap: 4px;
+        }
+
+    /* Size panel: horizontal row */
+    .toolbar-size-panel {
+        flex-direction: row;
+        align-items: center;
+    }
+
+    /* Overflow panel: right-aligned */
+    .toolbar-overflow-panel {
+        right: 0;
+        left: auto;
+        flex-direction: row;
+        flex-wrap: wrap;
+        max-width: 180px;
+    }
+
+        .toolbar-overflow-panel .toolbar-separator {
+            width: 100%;
+            height: 1px;
+        }
+}

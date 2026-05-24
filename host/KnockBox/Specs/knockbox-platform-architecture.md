@@ -72,12 +72,11 @@ public interface IGameModule
 {
     IPluginManifest Manifest { get; }
     void RegisterServices(IPluginRegistration registration);
-    RenderFragment GetButtonContent();
     RenderFragment? GetCustomHeader() => null;
 }
 ```
 
-Identity — name, description, `RouteIdentifier`, `Version`, `EntryAssembly`, declared capabilities — lives on the `IPluginManifest` returned by `Manifest`. The manifest is typically read from an embedded `plugin.json` resource so the in-code copy and the on-disk copy come from the same source file:
+Identity — name, description, `RouteIdentifier`, `Version`, `EntryAssembly`, declared capabilities, and the home-page `TileAsset` SVG path — all live on the `IPluginManifest` returned by `Manifest`. The manifest is typically read from an embedded `plugin.json` resource so the in-code copy and the on-disk copy come from the same source file:
 
 ```csharp
 public class CardCounterModule : IGameModule
@@ -87,14 +86,10 @@ public class CardCounterModule : IGameModule
 
     public void RegisterServices(IPluginRegistration registration)
         => registration.AddGameEngine<CardCounterGameEngine>();
-
-    public RenderFragment GetButtonContent() => builder =>
-    {
-        builder.OpenComponent<CardCounterTile>(0);
-        builder.CloseComponent();
-    };
 }
 ```
+
+The home-page tile is rendered by the host from `Manifest.TileAsset` — a plugin-relative path to an SVG in the plugin's `wwwroot/` (e.g. `"tile.svg"`). If the manifest has no `tileAsset`, the host shows a hot-pink fallback labeled with `Manifest.Name`. Plugins flagged `workInProgress: true` get a shared "Work In Progress" hazard-tape overlay rendered on top.
 
 ### `plugin.json` + `IPluginManifest`
 
@@ -183,6 +178,144 @@ Deployment consequences:
 - **Do not bind-mount `games/`** from a user-writable volume in Docker. Bake plugins into the image at build time so the running container's `games/` is read-only from the host's perspective.
 - Treat `games/` in the published artifact the same way you treat `KnockBox.dll` itself — changes require a full release review, not a hot-patch drop.
 - Third-party plugins are opt-in via the admin toggle (off by default) and are loaded from `data/games/` (volume-mounted). The trust model does **not** change for third-party plugins — they run with the same full-host privileges as first-party code. Operators enabling the toggle accept the same trust posture as shipping the plugin in the first-party release artifact. See [`../../../README.md#installing-third-party-plugins`](../../../README.md) for the operator-facing warnings and [`../../../docs/making-a-game-plugin.md#trust-model`](../../../docs/making-a-game-plugin.md) for the plugin-author guidance.
+
+---
+
+---
+
+## Plugin Kinds — Games and Libraries
+
+The plugin system supports two **kinds** of plugin, distinguished by the manifest's `kind` field:
+
+- **`game`** (the default): a user-facing plugin that exposes a route, a tile on the home page, and exactly one `AbstractGameEngine`. The `IGameModule` interface above represents this kind.
+- **`library`**: a non-user-facing plugin that registers shared services other plugins consume — e.g. `KnockBox.WordService` exposing `IWordListService`. Library plugins have no home-page tile, no game engine, and ship in a separate `libraries/` folder.
+
+Library plugins were added so games sharing infrastructure (the obvious example: a 100k-line word dictionary used by Spar-dle and other future word games) can load that infrastructure once instead of once per game.
+
+### `ILibraryModule` and `IPluginModule`
+
+The module-type hierarchy is rooted at `IPluginModule` (`sdk/KnockBox.Core/Plugins/IPluginModule.cs`), which carries the two universal members:
+
+```csharp
+public interface IPluginModule
+{
+    IPluginManifest Manifest { get; }
+    void RegisterServices(IPluginRegistration registration);
+}
+```
+
+The two specializations live in the same folder:
+
+- `IGameModule : IPluginModule` adds `RenderFragment? GetCustomHeader()`.
+- `ILibraryModule : IPluginModule` is a marker interface — no additional members.
+
+`PluginLoader` reflects for `IPluginModule` inside each plugin assembly and enforces that the discovered type matches the manifest's `kind` (game manifest → must be `IGameModule`; library manifest → must be `ILibraryModule`). Mismatches reject the plugin with a clear log entry.
+
+### Contracts sidecar pattern
+
+A library plugin pairs with a **sibling contracts assembly** that holds the public interfaces and POCOs consumer plugins reference at compile time. The library and contracts are separate csproj projects so the contracts assembly has zero `KnockBox.*` references and no plugin-targets import — it's a pure interface-only sidecar.
+
+The library's `plugin.json` declares its contracts assembly's simple name(s):
+
+```json
+{
+  "schemaVersion": 1,
+  "name": "Word Service",
+  "description": "Shared word-existence and dictionary lookup service for word games.",
+  "routeIdentifier": "word-service",
+  "version": "1.0.0",
+  "entryAssembly": "KnockBox.WordService",
+  "kind": "library",
+  "exportedContracts": ["KnockBox.WordService.Contracts"],
+  "capabilities": []
+}
+```
+
+At host startup, `PluginLoader` promotes every listed contracts DLL into the default `AssemblyLoadContext` *before* any plugin ALC is constructed. As a result:
+
+- Every consumer plugin (game or library), regardless of which ALC it lives in, resolves the contract interfaces from the same promoted assembly.
+- The CLR sees one `IWordListService` type, not one per consumer ALC.
+- DI registration of `IWordListService` against `WordListService` (in the library's own ALC) is resolvable by a game plugin in a different ALC because the *interface* type identity matches.
+
+The contracts assembly is staged into the library plugin's folder via `Directory.Library.targets` reading a `PluginExportedContract` MSBuild item group in the library csproj. Consumer plugins reference the contracts via `ProjectReference` (first-party) or `PackageReference` (third-party, once the contracts are published as a NuGet package).
+
+### Library Plugin Loading and Ordering
+
+Loading runs in three sequenced phases. The invariant — **all libraries finish before any game starts** — is enforced at each phase:
+
+1. **Contract promotion** (`PluginLoader.PromoteExportedContracts`). Reads every library manifest's `exportedContracts`, validates each DLL exists and isn't colliding with a host-shipped identity, and calls `AssemblyLoadContext.Default.LoadFromAssemblyPath` on it. If a library's contracts can't be promoted, the entire library is skipped — without its contracts, consumer plugins can't share types, so loading the impl would be worse than skipping.
+
+2. **Assembly load + module activation** (`PluginLoader.LoadModules`). Libraries are activated first, then games. The resulting `PluginLoadResult.Plugins` collection preserves library-first order so downstream callers don't need to re-sort. A library plugin that fails to load is skipped *before* any game plugin is touched.
+
+3. **Service registration** (`LogicRegistrations.RegisterLogic`). Two passes: pass 1 registers every library plugin's services; pass 2 registers every game plugin's services and engines. A game plugin that depends on a library service whose library failed to load will fail loudly at lobby-creation time with a clear DI resolution error — games are never "partially loaded" against a missing library.
+
+Note on interaction with `PromoteShareableDependencies`: `PluginLoader` runs two distinct promotion passes against `AssemblyLoadContext.Default`. **Contract promotion** (per-contract, identity-dedup on `name + AssemblyName.Version + token`) runs first and only sees library plugins. **Shareable-dependency promotion** (per-dep, first-wins by Major.Minor) runs *after* contract promotion and operates on the union of every surviving library + game subdir. The simple names contract promotion adds to the promoted-assemblies set are visible to shareable-dep promotion, so a contract that's also a shareable dep never gets double-promoted. The two passes use different dedup keys by design: contracts require exact-identity sharing across ALCs, whereas multi-shipper deps tolerate compatible-version variance.
+
+`exportedContracts` is allowed to be empty for a library. A library that exports zero contracts can still register services keyed by types defined in `KnockBox.Core` (e.g. internal infrastructure shared across the host's own subsystems); contract promotion skips it and the activation phase treats it like any other library.
+
+### Service Shadowing Rules
+
+`DefaultPluginRegistration` (`sdk/KnockBox.Platform/Plugins/DefaultPluginRegistration.cs`) silently drops registrations targeting service types in its host-owned denylist and logs an error naming the plugin and the offending service type. The denylist is a union of:
+
+- `AlwaysProtectedTypes`: plugin-system primitives (`IPluginContext`, `IPluginRegistration`, `IPluginManifest`, `IPluginStorage`, `IPluginModule`, `IGameModule`, `ILibraryModule`, `AbstractGameEngine`, `AbstractGameState`) plus Microsoft.Extensions fundamentals.
+- A *snapshot* of the host's `IServiceCollection` captured at a specific moment.
+
+The snapshot moment differs per phase to give the right shadowing protection:
+
+| Attempt | Result | Mechanism |
+| --- | --- | --- |
+| Library plugin → built-in/platform service (e.g., `IRandomNumberService`) | Dropped + logged | Pre-pass-1 snapshot |
+| Library plugin → `AlwaysProtectedTypes` member | Dropped + logged | Static set |
+| Library plugin → service registered by an *earlier-loaded* library plugin | Dropped + logged | Per-library snapshot rebuild between iterations of pass 1 |
+| Game plugin → built-in/platform service | Dropped + logged | Post-library snapshot |
+| Game plugin → library-exported service (e.g., `IWordListService`) | Dropped + logged | Post-library snapshot |
+| Game plugin → service registered by an earlier-loaded game plugin | Permitted (last-wins) | By design; matches today's behavior |
+
+The "two games can shadow each other" behavior is unchanged from before library plugins existed and is pinned by a regression test so a future refactor doesn't silently break it.
+
+### Library Versioning and Coexistence
+
+Library manifests must use strict `Major.Minor.Patch` SemVer. The parser rejects 2-component or 4-component-with-revision versions for libraries; game manifests keep the permissive version validation they had before.
+
+Coexistence policy:
+
+- **Same Major.Minor, different Patch**: the highest Patch wins. The lower patch's folder is logged as superseded at Information level and dropped.
+- **Different Major or different Minor**: both versions load side-by-side. Each library's contracts assembly is promoted to the default ALC as a distinct assembly identity (`Name + Version + PublicKeyToken`). The CLR treats `IWordListService` from v1.2 contracts as a *different* type from `IWordListService` from v1.3 contracts; a game plugin's compiled metadata reference pins which version it gets at runtime, and DI resolves correctly because the registered service types differ.
+
+Identity-equal contracts shared across two side-by-side library versions (e.g. v1.2 and v1.3 of the same library both shipping `Contracts v1.0.0.0` because the contract surface didn't change) are promoted once and reused. A library trying to export a contract whose simple name collides with a host-shipped assembly is rejected — the host owns that identity.
+
+Folder convention: `libraries/{entryAssembly}.v{Major}.{Minor}/` when multiple versions ship; single-version libraries may use `libraries/{entryAssembly}/`. The folder name is convention only; the manifest authoritatively decides identity.
+
+Constraints:
+
+- A single library csproj produces one version. Side-by-side versions require separate csproj/NuGet packages.
+- The contracts csproj `<Version>` and the library csproj `<Version>` should be pinned to the same MSBuild variable in `Directory.Library.targets` so they can't drift.
+
+### Adding a New Library Plugin
+
+Mirror of the "Adding a New Game" section below, but with library-specific conventions.
+
+1. **Create the contracts project** at `host/{LibraryName}.Contracts/` containing only interfaces and POCOs the contracts assembly exposes. No `KnockBox.*` references. No `Directory.*.targets` import.
+
+2. **Create the library plugin project** at `host/{LibraryName}/`:
+   - csproj references both `KnockBox.Core` and the sibling `*.Contracts` project.
+   - `<Import Project="..\Directory.Library.targets" />`
+   - Declare the contracts DLL in a `PluginExportedContract` MSBuild item group:
+     ```xml
+     <ItemGroup>
+       <PluginExportedContract Include="$(TargetDir){LibraryName}.Contracts.dll" />
+     </ItemGroup>
+     ```
+   - Add a `plugin.json` with `"kind": "library"` and `"exportedContracts": ["{LibraryName}.Contracts"]`. Use strict `Major.Minor.Patch` SemVer. The manifest's `routeIdentifier` must still be present and match `^[a-z0-9-]+$`, but for a library it's only a per-plugin DI key — it never appears in navigation, so any unique kebab-case slug is fine (use the library's own name).
+   - Implement `ILibraryModule` in a class with a public parameterless constructor. Its `RegisterServices` calls only `AddSingleton/AddScoped/AddTransient` for the contracts types — do **not** call `AddGameEngine`.
+
+3. **Wire into the host build graph**: add a `<ProjectReference ... ReferenceOutputAssembly="false" Private="false" />` to `host/KnockBox/KnockBox.csproj` so building the host transitively builds the library. The contracts assembly is built as a transitive dependency of the library plugin and consumers; no explicit host reference needed.
+
+4. **Add to the solution**: add both projects to `host/KnockBox.Host.slnx`.
+
+5. **Consumers reference the contracts**: a game plugin csproj adds `<ProjectReference Include="..\{LibraryName}.Contracts\{LibraryName}.Contracts.csproj" />` for first-party, or `<PackageReference Include="{LibraryName}.Contracts" Version="1.2.*" />` for third-party.
+
+The library plugin's `KnockBox.Plugins.Analyzer` still fires (libraries can hit `File`/`HttpClient`/`Process`/`Environment` just as easily as games) — the same KB1001–KB1004 rules apply.
 
 ---
 
@@ -712,9 +845,11 @@ Adding a game requires these steps:
 
 5. **Create Razor page(s)** — add one or more pages inheriting `DisposableComponent` with `@page "/room/{route-identifier}/{ObfuscatedRoomCode}"`. Inject the concrete engine via DI, subscribe to `state.StateChangedEventManager`, validate the session in `OnInitializedAsync`, enforce host-only `StartAsync` at the page layer, and dispose the subscription in `Dispose()`. Any `wwwroot/` assets are served automatically from `/_content/KnockBox.{GameName}`.
 
-6. **Author `plugin.json`** — create a `plugin.json` at the plugin project root with `schemaVersion`, `name`, `description`, `routeIdentifier`, `version`, `entryAssembly`, and `capabilities`. Mark it as an `<EmbeddedResource>` in the csproj so `PluginManifest.FromEmbeddedResourceOrThrow` can read it, and `Directory.Plugin.targets` will also copy it alongside the DLL into `games/`. The `routeIdentifier` must match the route segment used in the game's `@page` directives.
+6. **Author `plugin.json`** — create a `plugin.json` at the plugin project root with `schemaVersion`, `name`, `description`, `routeIdentifier`, `version`, `entryAssembly`, and `capabilities`. Optionally add `tileAsset` (path to an SVG in your plugin's `wwwroot/` — rendered as the home-page tile) and `workInProgress: true` (overlays a shared "Work In Progress" band). Mark `plugin.json` as an `<EmbeddedResource>` in the csproj so `PluginManifest.FromEmbeddedResourceOrThrow` can read it, and `Directory.Plugin.targets` will also copy it alongside the DLL into `games/`. The `routeIdentifier` must match the route segment used in the game's `@page` directives.
 
-7. **Implement `IGameModule`** — add a class to the game project with a public parameterless constructor (returning within 5 seconds). Expose the manifest via `PluginManifest.FromEmbeddedResourceOrThrow(typeof(MyModule).Assembly)`, implement `GetButtonContent()` to render the home-page tile, and in `RegisterServices(IPluginRegistration registration)` call `registration.AddGameEngine<YourEngine>()` (plus any other game-specific DI). Optionally override `GetCustomHeader()` to replace the host's default in-room header.
+7. **Author the tile SVG** — drop a `tile.svg` (300×200 viewBox recommended; the host enforces a 3:2 aspect ratio on the rendered tile) into `wwwroot/` and reference it from `plugin.json`'s `tileAsset`. The plugin's `wwwroot/` is staged into `games/{PluginName}/wwwroot/` and mounted at `/_content/{PluginName}/`. If you skip this, the home page renders a hot-pink fallback with the plugin's name.
+
+8. **Implement `IGameModule`** — add a class to the game project with a public parameterless constructor (returning within 5 seconds). Expose the manifest via `PluginManifest.FromEmbeddedResourceOrThrow(typeof(MyModule).Assembly)`, and in `RegisterServices(IPluginRegistration registration)` call `registration.AddGameEngine<YourEngine>()` (plus any other game-specific DI). Optionally override `GetCustomHeader()` to replace the host's default in-room header.
 
 No changes to `KnockBox`, `KnockBox.Core`, or any other game project are required. After a rebuild the platform discovers the new plugin, registers its engine, mounts its static assets, and the game appears on the home page automatically.
 

@@ -5,6 +5,17 @@
     padding: 0.4rem 0.5rem;
 }
 
+.dndm-savesp-header-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.dndm-saves-export-busy {
+    font-size: 0.85rem;
+    line-height: 1;
+}
+
 .dndm-saves-create {
     display: flex;
     gap: 0.3rem;

@@ -1,4 +1,5 @@
 @using KnockBox.Core.Components.Shared
+@using KnockBox.Core.Services.Drawing
 @using KnockBox.DrawnToDress.Services.Logic.Games
 @using KnockBox.DrawnToDress.Services.State.Games
 @using KnockBox.DrawnToDress.Services.State.Games.Data
@@ -275,21 +276,52 @@
                 </section>
 
                 <section class="dtd-customization-canvas-panel">
+                    @{
+                        // Outfit background is built from user-supplied svg content; sanitize before injection.
+                        var safeOutfitBackground = SvgContentSanitizer.Sanitize(outfitBackground);
+                    }
                     <div class="dtd-customization-canvas-container @(_mode == InteractionMode.MoveItems ? "dtd-canvas-move-mode" : "")">
-                        <SvgDrawingCanvas @ref="_sketchCanvas"
-                                          Width="100%"
-                                          Height="100%"
-                                          ViewBoxWidth="@canvasWidth"
-                                          ViewBoxHeight="@totalOutfitHeight"
-                                          BackgroundColor="#ffffff"
-                                          TrustedBackgroundSvgContent="@mannequinSvg"
-                                          BackgroundSvgContent="@outfitBackground"
-                                          ShowToolbar="@(_mode == InteractionMode.Draw)">
-                            <OverlayContent>
+                        <SvgDrawingEngine @ref="_sketchEngine" TargetSvgId="@_svgId" BackgroundColor="#ffffff">
+                            @if (_mode == InteractionMode.Draw)
+                            {
+                                <SvgDrawingToolbar />
+                            }
+                            <div class="dtd-canvas-stack">
+                                <svg class="dtd-canvas-layer dtd-canvas-base"
+                                     width="@canvasWidth" height="@totalOutfitHeight"
+                                     viewBox="0 0 @canvasWidth @totalOutfitHeight"
+                                     preserveAspectRatio="xMidYMid meet"
+                                     style="background-color: #ffffff;">
+                                    <rect width="100%" height="100%" fill="none" stroke="#64748b"
+                                          stroke-width="2" stroke-dasharray="8 8" vector-effect="non-scaling-stroke" />
+                                </svg>
+                                @if (mannequinSvg is not null)
+                                {
+                                    <svg class="dtd-canvas-layer dtd-canvas-bg" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"
+                                         width="@canvasWidth" height="@totalOutfitHeight"
+                                         viewBox="0 0 @canvasWidth @totalOutfitHeight"
+                                         preserveAspectRatio="xMidYMid meet">
+                                        @((MarkupString)mannequinSvg)
+                                    </svg>
+                                }
+                                @if (safeOutfitBackground is not null)
+                                {
+                                    <svg class="dtd-canvas-layer dtd-canvas-bg" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"
+                                         width="@canvasWidth" height="@totalOutfitHeight"
+                                         viewBox="0 0 @canvasWidth @totalOutfitHeight"
+                                         preserveAspectRatio="xMidYMid meet">
+                                        @((MarkupString)safeOutfitBackground)
+                                    </svg>
+                                }
+                                <svg id="@_svgId" class="dtd-canvas-layer dtd-canvas-surface"
+                                     style="@(_mode == InteractionMode.MoveItems ? "pointer-events: none;" : "")"
+                                     width="@canvasWidth" height="@totalOutfitHeight"
+                                     viewBox="0 0 @canvasWidth @totalOutfitHeight"
+                                     preserveAspectRatio="xMidYMid meet"></svg>
                                 @if (_mode == InteractionMode.MoveItems)
                                 {
                                     <svg id="@_dragSvgId"
-                                         class="dtd-customization-drag-layer"
+                                         class="dtd-canvas-layer dtd-customization-drag-layer"
                                          style="z-index: 3;"
                                          width="@canvasWidth" height="@totalOutfitHeight"
                                          viewBox="0 0 @canvasWidth @totalOutfitHeight"
@@ -301,8 +333,8 @@
                                         }
                                     </svg>
                                 }
-                            </OverlayContent>
-                        </SvgDrawingCanvas>
+                            </div>
+                        </SvgDrawingEngine>
                     </div>
 
                 </section>

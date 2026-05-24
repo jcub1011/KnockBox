@@ -17,7 +17,7 @@ namespace KnockBox.DndMapperTests.Unit.Services.Library
         {
             var (engine, state, host, _) = EngineTestFactory.Build();
             var db = new FakeIndexedDbService();
-            await using var library = new DndMapperLibraryService(db, engine, NullLogger<DndMapperLibraryService>.Instance);
+            await using var library = new DndMapperLibraryService(db, engine, NullJsRuntime.Instance, NullLogger<DndMapperLibraryService>.Instance);
 
             var attach = await library.AttachAsync(state, host);
 
@@ -43,7 +43,7 @@ namespace KnockBox.DndMapperTests.Unit.Services.Library
                 [DndMapperLibrarySchema.LegacySingletonKey] = new LibrarySnapshot(),
             };
 
-            await using var library = new DndMapperLibraryService(db, engine, NullLogger<DndMapperLibraryService>.Instance);
+            await using var library = new DndMapperLibraryService(db, engine, NullJsRuntime.Instance, NullLogger<DndMapperLibraryService>.Instance);
             var attach = await library.AttachAsync(state, host);
 
             Assert.IsTrue(attach.IsSuccess);
@@ -72,14 +72,14 @@ namespace KnockBox.DndMapperTests.Unit.Services.Library
                 [DndMapperLibrarySchema.LegacySingletonKey] = new LibrarySnapshot(),
             };
 
-            var library1 = new DndMapperLibraryService(db, engine1, NullLogger<DndMapperLibraryService>.Instance);
+            var library1 = new DndMapperLibraryService(db, engine1, NullJsRuntime.Instance, NullLogger<DndMapperLibraryService>.Instance);
             Assert.IsTrue((await library1.AttachAsync(state1, host)).IsSuccess);
             await library1.DisposeAsync();
 
             Assert.AreEqual(1, ReadSlotCount(db));
 
             var (engine2, state2, _, _) = EngineTestFactory.Build();
-            await using var library2 = new DndMapperLibraryService(db, engine2, NullLogger<DndMapperLibraryService>.Instance);
+            await using var library2 = new DndMapperLibraryService(db, engine2, NullJsRuntime.Instance, NullLogger<DndMapperLibraryService>.Instance);
             Assert.IsTrue((await library2.AttachAsync(state2, host)).IsSuccess);
 
             Assert.AreEqual(1, ReadSlotCount(db), "Re-attach must not duplicate the Auto Save entry.");
@@ -91,7 +91,7 @@ namespace KnockBox.DndMapperTests.Unit.Services.Library
             var (engine, state, host, _) = EngineTestFactory.Build();
             var db = new FakeIndexedDbService { MissingStoresOnNextOpen = true };
 
-            await using var library = new DndMapperLibraryService(db, engine, NullLogger<DndMapperLibraryService>.Instance);
+            await using var library = new DndMapperLibraryService(db, engine, NullJsRuntime.Instance, NullLogger<DndMapperLibraryService>.Instance);
 
             var attach = await library.AttachAsync(state, host);
 

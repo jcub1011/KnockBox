@@ -139,16 +139,20 @@ namespace KnockBox.DndMapperTests.Unit
         {
             var create = _engine.CreateMapAsync(_state, _host, "Source");
             Assert.IsTrue(create.TryGetSuccess(out var sourceId));
-            var source = _state.Maps.Single(m => m.Id == sourceId);
-            source.Grid.WidthCells = 50;
-            source.Tokens.Add(new Token { Id = Guid.NewGuid(), Name = "x" });
+            Assert.IsTrue(_engine.UpdateGridAsync(_state, _host, sourceId,
+                new GridConfig { WidthCells = 50 }).IsSuccess);
+            Assert.IsTrue(_engine.SpawnNpcTokenAsync(_state, _host, sourceId, "x").IsSuccess);
 
             var dup = _engine.DuplicateMapAsync(_state, _host, sourceId);
             Assert.IsTrue(dup.TryGetSuccess(out var dupId));
             var clone = _state.Maps.Single(m => m.Id == dupId);
+            var source = _state.Maps.Single(m => m.Id == sourceId);
 
+            // GridConfig records compare by value, so the grid is "deep-cloned"
+            // semantically (a new record with the same field values); the
+            // reference may or may not differ depending on the engine's copy.
             Assert.AreEqual(50, clone.Grid.WidthCells);
-            Assert.AreNotSame(source.Grid, clone.Grid);
+            Assert.AreEqual(source.Grid, clone.Grid);
             Assert.IsEmpty(clone.Tokens);
             Assert.AreEqual("Source (copy)", clone.Name);
         }
@@ -269,20 +273,22 @@ namespace KnockBox.DndMapperTests.Unit
         [TestMethod]
         public void UpdateGridAsync_WidthBelowMinimum_ReturnsError()
         {
+            // Minimum cell count was relaxed to 1 (was 5); 0 still fails.
             var c = _engine.CreateMapAsync(_state, _host, "A");
             Assert.IsTrue(c.TryGetSuccess(out var mapId));
 
-            var update = _engine.UpdateGridAsync(_state, _host, mapId, new GridConfig { WidthCells = 4 });
+            var update = _engine.UpdateGridAsync(_state, _host, mapId, new GridConfig { WidthCells = 0 });
             Assert.IsTrue(update.IsFailure);
         }
 
         [TestMethod]
         public void UpdateGridAsync_HeightAboveMaximum_ReturnsError()
         {
+            // Maximum cell count was raised to 1000 (was 200); 1001 still fails.
             var c = _engine.CreateMapAsync(_state, _host, "A");
             Assert.IsTrue(c.TryGetSuccess(out var mapId));
 
-            var update = _engine.UpdateGridAsync(_state, _host, mapId, new GridConfig { HeightCells = 201 });
+            var update = _engine.UpdateGridAsync(_state, _host, mapId, new GridConfig { HeightCells = 1001 });
             Assert.IsTrue(update.IsFailure);
         }
 
@@ -311,7 +317,9 @@ namespace KnockBox.DndMapperTests.Unit
             Assert.IsFalse(map.Grid.ShowGridLines);
             Assert.IsFalse(map.Grid.SnapToGrid);
             Assert.AreEqual("#ff0000", map.Grid.LineColor);
-            Assert.AreNotSame(newGrid, map.Grid);
+            // GridConfig is now an immutable record; the engine assigns the
+            // caller-supplied record directly (no defensive Clone needed).
+            Assert.AreEqual(newGrid, map.Grid);
         }
 
         [TestMethod]

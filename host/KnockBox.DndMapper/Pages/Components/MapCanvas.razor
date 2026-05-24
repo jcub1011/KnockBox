@@ -1,3 +1,4 @@
+@using KnockBox.DndMapper.Services.Logic.Visibility
 @using KnockBox.DndMapper.Services.State.Games
 @using KnockBox.DndMapper.Services.State.Games.Data
 @using KnockBox.Core.Components.Shared
@@ -25,76 +26,144 @@
                     type="button"
                     title="@(_markupActive ? "Stop drawing (markup stays on the map)" : "Draw markup over the map")"
                     @onclick="ToggleMarkup">✎</button>
+
+            <button class="dndm-zoom-btn dndm-focus-toggle @(_focusActive ? "dndm-focus-toggle--active" : null)"
+                    type="button"
+                    title="@(_focusActive ? "Stop drawing focus box (drag on the map to set it)" : "Focus box — drag on the map to zoom the display to a region")"
+                    @onclick="ToggleFocusMode">▭</button>
+            @if (State.FocusRect is not null)
+            {
+                <button class="dndm-zoom-btn dndm-focus-clear"
+                        type="button"
+                        title="Clear focus box (return display to full map)"
+                        @onclick="OnClearFocusClicked">✕</button>
+            }
+
+            <span class="dndm-toolbar-sep" aria-hidden="true"></span>
+
+            <button class="dndm-zoom-btn dndm-ruler-toggle @(_rulerActive ? "dndm-ruler-toggle--active" : null)"
+                    type="button"
+                    title="@(_rulerActive ? "Stop measuring (left-click points, right-click to clear)" : "Ruler — click two points to measure distance; right-click clears")"
+                    @onclick="ToggleRulerMode">📐</button>
+
+            <span class="dndm-toolbar-sep" aria-hidden="true"></span>
+
+            <button class="dndm-zoom-btn dndm-fog-btn @(FogContext.Mode == FogPaintMode.Paint ? "dndm-fog-btn--active" : null)"
+                    type="button"
+                    title="Paint fog — drag on the map to hide cells"
+                    @onclick="OnTogglePaintMode">▒</button>
+            <button class="dndm-zoom-btn dndm-fog-btn @(FogContext.Mode == FogPaintMode.Erase ? "dndm-fog-btn--active" : null)"
+                    type="button"
+                    title="Erase fog — drag on the map to reveal cells"
+                    @onclick="OnToggleEraseMode">◌</button>
+            <button class="dndm-zoom-btn dndm-fog-brush"
+                    type="button"
+                    title="Brush size (click to cycle 1 → 2 → 3)"
+                    @onclick="OnCycleBrush">@FogContext.BrushRadius</button>
+            <button class="dndm-zoom-btn"
+                    type="button"
+                    title="Fill the entire map with fog"
+                    @onclick="OnFillFogClicked">▣</button>
+            <button class="dndm-zoom-btn"
+                    type="button"
+                    title="Clear all fog"
+                    @onclick="OnClearFogClicked">◻</button>
         }
     </div>
 
     <div class="dndm-canvas-stage">
+    @{
+        var cellPx = Map.Grid.CellPixels;
+        var stageNaturalW = Map.Grid.WidthCells * cellPx;
+        var stageNaturalH = Map.Grid.HeightCells * cellPx;
+    }
+    @* Bitmap layer: one viewport-sized <canvas> drawn by dndMapperBitmapCanvas.js.
+       Sits OUTSIDE .dndm-canvas-transform — the canvas itself is fixed at the
+       stage's CSS viewport size and the renderer applies the pan/zoom math
+       per-frame to draw each image at its current screen rect. This avoids
+       the prior failure mode where a CSS-scaled <img> layer dwarfed the
+       viewport at high zoom, forcing the compositor to manage huge backing
+       stores and (past GPU max-texture-size) fall back to software raster.
+       pointer-events:none keeps SVG picker rects above hit-testable. *@
+    <canvas id="@_canvasId"
+            class="dndm-bitmap-canvas"></canvas>
+
+    @* .dndm-canvas-transform now holds ONLY the SVG vector layer (tokens,
+       fog, markup, handles, picker rects, grid). Vectors don't have the
+       large-bitmap composite problem, so the CSS transform model stays
+       unchanged for them — pan/zoom on .dndm-canvas-transform translates and
+       scales the SVG cheaply. Both siblings are position:absolute on the
+       stage, so stacking is driven by the explicit z-index in
+       MapCanvas.razor.css (canvas z-index:0, transform wrapper z-index:1)
+       rather than by DOM source order. *@
+    <div class="dndm-canvas-transform"
+         style="width:@(stageNaturalW)px; height:@(stageNaturalH)px; --dndm-cell-px:@(cellPx)px; --dndm-grid-line:@Map.Grid.LineColor;">
+
+    @* GPU-tiled grid via .dndm-grid-background's two linear-gradients +
+       inset box-shadow (see MapCanvas.razor.css). Sits between the
+       image-layer and the SVG so tokens/fog/handles still paint on top
+       of the grid, and images sit below — same visual ordering the
+       SVG-based grid had. Omitted from the DOM entirely when the host
+       toggles "Grid" off. *@
+    @if (LocalShowGridLines)
+    {
+        <div class="dndm-grid-background"></div>
+    }
+
+    @* viewBox is pinned to the map's base dimensions (in cell units). The
+       SVG's own size is locked in CSS px so 1 cell = cellPx in both
+       coordinate spaces, keeping it pixel-aligned with the bitmap layer.
+       overflow="visible" lets content with coordinates outside the viewBox
+       (e.g. images placed past the map edge) render past the SVG element
+       box; the parent .dndm-canvas-stage clips at the visible window with
+       overflow:hidden. *@
+    @* Image drag/resize/rotate is owned by the dndMapperImageDrag JS module
+       (mousedown on a [data-image-id] picker or [data-image-handle] handle,
+       commit at mouseup via OnImageDragEnd). The picker rect stays in the
+       SVG; the rendered bitmap is the sibling HTML <img> in the image layer
+       above. The JS module paints both per frame so they stay aligned.
+       Focus-box drag is owned by dndMapperFocusDrag.js. Pan is owned by
+       dndMapperViewport.js on the canvas-stage. *@
     <svg id="@_svgId"
          class="dndm-map-canvas"
-         viewBox="@ViewBoxString"
+         width="@stageNaturalW" height="@stageNaturalH"
+         viewBox="@($"0 0 {Map.Grid.WidthCells} {Map.Grid.HeightCells}")"
          preserveAspectRatio="xMidYMid meet"
-         @onwheel="OnWheel"
-         @onwheel:preventDefault="true"
+         overflow="visible"
          @onmousedown="OnSvgMouseDown"
-         @onmousemove="OnSvgMouseMove"
-         @onmouseup="OnSvgMouseUp"
-         @onmouseleave="OnSvgMouseUp"
          xmlns="http://www.w3.org/2000/svg">
 
+        @* The void background lives on .dndm-canvas-transform now (so the
+           HTML bitmap layer sits over it). Picker rects need an invisible
+           hit-target rect for tool clicks that miss images; an inert
+           transparent rect serves that purpose without obscuring the
+           bitmaps below the SVG. *@
         <rect x="0" y="0"
               width="@Map.Grid.WidthCells" height="@Map.Grid.HeightCells"
-              fill="#0e1117" />
+              fill="transparent" pointer-events="none" />
 
         @if (Map.Images.Count > 0)
         {
-            @foreach (var img in Map.Images.Where(i => !i.Hidden).OrderBy(i => i.LayerOrder))
-            {
-                var draft = (IsHost && _drag is { ImageId: var dId } && dId == img.Id) ? _drag : null;
-                var x = draft?.X ?? img.X;
-                var y = draft?.Y ?? img.Y;
-                var w = draft?.W ?? img.Width;
-                var h = draft?.H ?? img.Height;
-                var rot = draft?.Rot ?? img.Rotation;
-                var cx = x + w / 2;
-                var cy = y + h / 2;
-                @if (img.ShareToken is Guid shareToken)
-                {
-                    <image @key="img.Id"
-                           href="@($"/blob-share/{shareToken:D}")"
-                           x="@F(x)" y="@F(y)"
-                           width="@F(w)" height="@F(h)"
-                           transform="@($"rotate({F(rot)} {F(cx)} {F(cy)})")"
-                           opacity="@F(img.Opacity)"
-                           preserveAspectRatio="none"
-                           pointer-events="none" />
-                }
-                else
-                {
-                    // Host disconnected: the blob-share capability is gone. Render a
-                    // muted placeholder so the player sees the layer outline; the
-                    // host's reconnect republish path will broadcast a fresh token
-                    // via UpdateImageShareTokenAsync and the <image> swaps back in.
-                    <rect @key="img.Id"
-                          x="@F(x)" y="@F(y)"
-                          width="@F(w)" height="@F(h)"
-                          transform="@($"rotate({F(rot)} {F(cx)} {F(cy)})")"
-                          fill="#1c2128" stroke="#3d444c" stroke-width="0.04" stroke-dasharray="0.2,0.1"
-                          opacity="@F(Math.Min(img.Opacity, 0.6))"
-                          pointer-events="none" />
-                }
-            }
-
             @if (IsHost)
             {
                 <g class="dndm-image-pickers">
                     @foreach (var img in Map.Images.Where(i => !i.Hidden).OrderBy(i => i.LayerOrder))
                     {
-                        // Locked images and Space-pan mode disable the picker so the click
-                        // falls through to the SVG and starts a pan.
-                        var pickerEvents = (img.Locked || _spaceHeld) ? "none" : "all";
+                        // Locked images, Space-pan, and any active canvas tool (fog
+                        // paint/erase or focus-box) disable the picker so the click
+                        // falls through to the SVG and reaches OnSvgMouseDown.
+                        var pickerEvents = (img.Locked || _spaceHeld || IsCanvasToolActive) ? "none" : "all";
                         var cx = img.X + img.Width / 2;
                         var cy = img.Y + img.Height / 2;
+                        // data-image-id is the hit-test root for dndMapperImageDrag; the
+                        // module reads the picker's x/y/width/height during a body drag.
+                        @* Blazor handles selection (one round-trip per click).
+                           dndMapperImageDrag.js handles the per-frame drag visual.
+                           stopPropagation blocks the SVG's @@onmousedown (focus-box /
+                           fog-paint entry points) from firing under the picker. *@
                         <rect @key="@($"pick-{img.Id}")"
+                              data-image-id="@img.Id"
+                              data-image-picker-id="@img.Id"
                               x="@F(img.X)" y="@F(img.Y)"
                               width="@F(img.Width)" height="@F(img.Height)"
                               transform="@($"rotate({F(img.Rotation)} {F(cx)} {F(cy)})")"
@@ -102,28 +171,15 @@
                               stroke="@(SelectedImageId == img.Id ? "#e8b849" : "transparent")"
                               stroke-width="0.04"
                               pointer-events="@pickerEvents"
-                              @onmousedown="@(e => OnImageMouseDown(e, img))"
+                              @onmousedown="@(e => OnPickerMouseDown(e, img))"
                               @onmousedown:stopPropagation="true" />
                     }
                 </g>
             }
         }
 
-        @if (LocalShowGridLines)
-        {
-            <g class="dndm-grid-layer" pointer-events="none">
-                @for (int x = 0; x <= Map.Grid.WidthCells; x++)
-                {
-                    <line x1="@x" y1="0" x2="@x" y2="@Map.Grid.HeightCells"
-                          stroke="@Map.Grid.LineColor" stroke-width="0.02" />
-                }
-                @for (int y = 0; y <= Map.Grid.HeightCells; y++)
-                {
-                    <line x1="0" y1="@y" x2="@Map.Grid.WidthCells" y2="@y"
-                          stroke="@Map.Grid.LineColor" stroke-width="0.02" />
-                }
-            </g>
-        }
+        @* Grid lines live in .dndm-grid-background (a sibling div) now,
+           not in the SVG. See the @if block above the <svg> opening tag. *@
 
         @* Saved markup renders inline so pan + zoom apply uniformly across all
            viewers (host's interactive overlay below uses a fixed viewBox). *@
@@ -134,46 +190,173 @@
             </g>
         }
 
+        @* Fog overlay. One SVG path per render covers every contiguous fogged
+           cluster (with holes resolved via fill-rule="evenodd") so adjacent
+           cells render gap-free and the whole region can be styled as one
+           element. Rendered between markup and tokens so tokens visually sit
+           on top of fog for the host. *@
+        @{
+            var fogPath = GetFogPathCached();
+        }
+        @if (!string.IsNullOrEmpty(fogPath))
+        {
+            var fogOpacity = IsHost ? "0.45" : "1";
+            <g class="@(IsHost ? "dndm-fog dndm-fog--host" : "dndm-fog dndm-fog--player")" pointer-events="none">
+                <path d="@fogPath" fill="#000" fill-opacity="@fogOpacity" fill-rule="evenodd" />
+            </g>
+        }
+
+        @* Focus box — host-only red outline. Drives the display view's
+           viewBox; the display view doesn't render the outline itself. *@
+        @if (IsHost && State.FocusRect is { } fr && fr.MapId == Map.Id)
+        {
+            @* Dark halo + red stroke. The 0.18-cell black underlay stays
+               visible against bright/red backgrounds where the red alone
+               would disappear. *@
+            <rect x="@F(fr.X)" y="@F(fr.Y)"
+                  width="@F(fr.Width)" height="@F(fr.Height)"
+                  fill="none" stroke="#000" stroke-width="0.18" stroke-opacity="0.6"
+                  pointer-events="none" />
+            <rect class="dndm-focus-rect"
+                  x="@F(fr.X)" y="@F(fr.Y)"
+                  width="@F(fr.Width)" height="@F(fr.Height)"
+                  fill="none" stroke="#e11d48" stroke-width="0.12"
+                  pointer-events="none" />
+        }
+        @* Focus-box in-flight preview is owned by dndMapperFocusDrag.js — it
+           appends a client-only <g> to the SVG so per-frame updates skip the
+           Blazor render path entirely. Razor only renders the committed rect
+           above. *@
+
+        @if (IsHost && _rulerActive && _rulerA is { } ra)
+        {
+            @* Ruler overlay — host-only, between fog and tokens so tokens
+               sit on top. Endpoint dots and the midpoint pill render their
+               inner geometry in screen-pixel units; the wrapping <g> scales
+               by 1/(CellPixels * zoom) so those pixel-numeric values land
+               at a constant on-screen size at every zoom level and any
+               grid cell pitch. The literal scale is also rewritten by
+               dndMapperViewport.js on every gesture frame (data-dndm-
+               screenpx + data-anchor-x/y) so the dots track live wheel-
+               zoom without waiting for Blazor's StateHasChanged. *@
+            var rulerInv = Map.Grid.CellPixels > 0 && _zoom > 0
+                ? 1.0 / (Map.Grid.CellPixels * _zoom)
+                : 1.0 / 64.0;
+            <g class="dndm-ruler" pointer-events="none">
+                @if (_rulerB is { } rb)
+                {
+                    @* Dark underlay + ember stroke so the line stays
+                       visible on bright and dark backgrounds. *@
+                    <line x1="@F(ra.X)" y1="@F(ra.Y)" x2="@F(rb.X)" y2="@F(rb.Y)"
+                          stroke="#000" stroke-width="0.18" stroke-opacity="0.55" />
+                    <line x1="@F(ra.X)" y1="@F(ra.Y)" x2="@F(rb.X)" y2="@F(rb.Y)"
+                          stroke="#e89055" stroke-width="0.08" />
+                }
+
+                <g data-dndm-screenpx="ruler-a"
+                   data-anchor-x="@F(ra.X)" data-anchor-y="@F(ra.Y)"
+                   transform="@($"translate({F(ra.X)} {F(ra.Y)}) scale({F(rulerInv)})")">
+                    <circle r="6" fill="#000" fill-opacity="0.55" />
+                    <circle r="5" fill="#e89055" stroke="#1a1208" stroke-width="1" />
+                </g>
+
+                @if (_rulerB is { } rb2)
+                {
+                    var label = RulerLabel(ra, rb2);
+                    var midX = (ra.X + rb2.X) / 2.0;
+                    var midY = (ra.Y + rb2.Y) / 2.0;
+                    var pillHalf = EstimatePillHalfWidth(label);
+                    <g data-dndm-screenpx="ruler-b"
+                       data-anchor-x="@F(rb2.X)" data-anchor-y="@F(rb2.Y)"
+                       transform="@($"translate({F(rb2.X)} {F(rb2.Y)}) scale({F(rulerInv)})")">
+                        <circle r="6" fill="#000" fill-opacity="0.55" />
+                        <circle r="5" fill="#e89055" stroke="#1a1208" stroke-width="1" />
+                    </g>
+                    <g data-dndm-screenpx="ruler-pill"
+                       data-anchor-x="@F(midX)" data-anchor-y="@F(midY)"
+                       transform="@($"translate({F(midX)} {F(midY)}) scale({F(rulerInv)})")">
+                        <rect class="dndm-ruler-pill"
+                              x="@F(-pillHalf)" y="-13"
+                              width="@F(pillHalf * 2)" height="22"
+                              rx="11" ry="11" />
+                        <text class="dndm-ruler-pill-text"
+                              text-anchor="middle" dominant-baseline="central"
+                              x="0" y="-2"
+                              font-size="12">@label</text>
+                    </g>
+                }
+            </g>
+        }
+
         <TokenLayer State="State"
                     Map="Map"
                     IsHost="IsHost"
                     CurrentUserId="@CurrentUserId"
-                    SvgId="@_svgId" />
+                    SvgId="@_svgId"
+                    InteractionsDisabled="@IsCanvasToolActive" />
 
         @if (IsHost && SelectedImage is { Locked: false, Hidden: false } sel)
         {
-            var s = (_drag is { ImageId: var did } && did == sel.Id) ? _drag : null;
-            var sx = s?.X ?? sel.X;
-            var sy = s?.Y ?? sel.Y;
-            var sw = s?.W ?? sel.Width;
-            var sh = s?.H ?? sel.Height;
-            var sr = s?.Rot ?? sel.Rotation;
-            var hSize = 0.25; // cells
-            <g class="dndm-image-handles" pointer-events="all">
-                <g transform="@($"rotate({F(sr)} {F(sx + sw / 2)} {F(sy + sh / 2)})")">
-                    <rect x="@F(sx - hSize / 2)" y="@F(sy - hSize / 2)"
-                          width="@F(hSize)" height="@F(hSize)" class="dndm-image-handle"
-                          @onmousedown="@(e => OnHandleMouseDown(e, sel, HandleKind.NW))"
-                          @onmousedown:stopPropagation="true" />
-                    <rect x="@F(sx + sw - hSize / 2)" y="@F(sy - hSize / 2)"
-                          width="@F(hSize)" height="@F(hSize)" class="dndm-image-handle"
-                          @onmousedown="@(e => OnHandleMouseDown(e, sel, HandleKind.NE))"
-                          @onmousedown:stopPropagation="true" />
-                    <rect x="@F(sx - hSize / 2)" y="@F(sy + sh - hSize / 2)"
-                          width="@F(hSize)" height="@F(hSize)" class="dndm-image-handle"
-                          @onmousedown="@(e => OnHandleMouseDown(e, sel, HandleKind.SW))"
-                          @onmousedown:stopPropagation="true" />
-                    <rect x="@F(sx + sw - hSize / 2)" y="@F(sy + sh - hSize / 2)"
-                          width="@F(hSize)" height="@F(hSize)" class="dndm-image-handle"
-                          @onmousedown="@(e => OnHandleMouseDown(e, sel, HandleKind.SE))"
-                          @onmousedown:stopPropagation="true" />
-                    <line x1="@F(sx + sw / 2)" y1="@F(sy)"
-                          x2="@F(sx + sw / 2)" y2="@F(sy - 0.6)"
-                          class="dndm-image-rotline" />
-                    <circle cx="@F(sx + sw / 2)" cy="@F(sy - 0.6)" r="@F(hSize / 1.5)"
-                            class="dndm-image-handle dndm-image-handle--rot"
-                            @onmousedown="@(e => OnHandleMouseDown(e, sel, HandleKind.Rotate))"
-                            @onmousedown:stopPropagation="true" />
+            var sx = sel.X;
+            var sy = sel.Y;
+            var sw = sel.Width;
+            var sh = sel.Height;
+            var sr = sel.Rotation;
+            var hSize = 0.25; // cells (size of handle at zoom=1; --dndm-inv-zoom cancels the wrapper scale)
+            var hHalf = hSize / 2;
+            var rotCx = sx + sw / 2;
+            var rotCy = sy - 0.6;
+            // dndMapperImageDrag owns handle pointerdown — see the [data-image-handle]
+            // attributes below. The JS module re-paints each handle's transform per
+            // frame during a resize/rotate and only invokes .NET on mouseup.
+            // Each handle is a <g> that translates to its anchor and then inverse-
+            // scales by --dndm-inv-zoom (set by dndMapperViewport.js to 1/zoom). The
+            // wrapper's transform: scale(zoom) and this inner scale(1/zoom) cancel,
+            // so handle artwork renders at a constant on-screen pixel size at every
+            // zoom level — important when resizing very large images at low zoom.
+            // @@onmousedown stopPropagation (with a no-op handler so Blazor binds the
+            // modifier) blocks the SVG's @@onmousedown from also firing when a handle
+            // is grabbed — otherwise focus-box / fog-paint modes would steal the click.
+            // When a canvas tool is active we flip the whole group to pointer-events:none
+            // so clicks on a handle pass through to the SVG and reach the tool instead.
+            <g class="dndm-image-handles" pointer-events="@(IsCanvasToolActive ? "none" : "all")">
+                <g data-image-handles-rotate="@sel.Id"
+                   data-image-id="@sel.Id"
+                   transform="@($"rotate({F(sr)} {F(sx + sw / 2)} {F(sy + sh / 2)})")">
+                    <g data-image-id="@sel.Id" data-image-handle="nw" data-handle-role="nw"
+                       transform="@($"translate({F(sx)} {F(sy)}) scale(var(--dndm-inv-zoom, 1))")"
+                       @onmousedown="OnHandleMouseDown" @onmousedown:stopPropagation="true">
+                        <rect x="@F(-hHalf)" y="@F(-hHalf)" width="@F(hSize)" height="@F(hSize)"
+                              class="dndm-image-handle" />
+                    </g>
+                    <g data-image-id="@sel.Id" data-image-handle="ne" data-handle-role="ne"
+                       transform="@($"translate({F(sx + sw)} {F(sy)}) scale(var(--dndm-inv-zoom, 1))")"
+                       @onmousedown="OnHandleMouseDown" @onmousedown:stopPropagation="true">
+                        <rect x="@F(-hHalf)" y="@F(-hHalf)" width="@F(hSize)" height="@F(hSize)"
+                              class="dndm-image-handle" />
+                    </g>
+                    <g data-image-id="@sel.Id" data-image-handle="sw" data-handle-role="sw"
+                       transform="@($"translate({F(sx)} {F(sy + sh)}) scale(var(--dndm-inv-zoom, 1))")"
+                       @onmousedown="OnHandleMouseDown" @onmousedown:stopPropagation="true">
+                        <rect x="@F(-hHalf)" y="@F(-hHalf)" width="@F(hSize)" height="@F(hSize)"
+                              class="dndm-image-handle" />
+                    </g>
+                    <g data-image-id="@sel.Id" data-image-handle="se" data-handle-role="se"
+                       transform="@($"translate({F(sx + sw)} {F(sy + sh)}) scale(var(--dndm-inv-zoom, 1))")"
+                       @onmousedown="OnHandleMouseDown" @onmousedown:stopPropagation="true">
+                        <rect x="@F(-hHalf)" y="@F(-hHalf)" width="@F(hSize)" height="@F(hSize)"
+                              class="dndm-image-handle" />
+                    </g>
+                    <line data-handle-role="rotline"
+                          x1="@F(sx + sw / 2)" y1="@F(sy)"
+                          x2="@F(rotCx)" y2="@F(rotCy)"
+                          class="dndm-image-rotline"
+                          pointer-events="none" />
+                    <g data-image-id="@sel.Id" data-image-handle="rot" data-handle-role="rotcircle"
+                       transform="@($"translate({F(rotCx)} {F(rotCy)}) scale(var(--dndm-inv-zoom, 1))")"
+                       @onmousedown="OnHandleMouseDown" @onmousedown:stopPropagation="true">
+                        <circle r="@F(hSize / 1.5)" class="dndm-image-handle dndm-image-handle--rot" />
+                    </g>
                 </g>
             </g>
         }
@@ -181,15 +364,40 @@
 
     @if (IsHost && _markupActive)
     {
-        @* Sits inside .dndm-canvas-stage so its inset:0 covers exactly
-           the visible map area. Both this surface and the underlying
-           MapCanvas SVG use the same preserveAspectRatio rule, so a
-           stroke at viewBox coords (5, 5) lands on the same cell. *@
-        <div class="dndm-markup-overlay-mount">
-            <MarkupOverlay State="State" Map="Map" IsActive="true" />
+        @* MarkupOverlay sits inside .dndm-canvas-transform so the drawing
+           surface rides the same pan/zoom as the map SVG. The engine + toolbar
+           are rendered OUTSIDE this transform (below, in dndm-floating-markup-toolbar)
+           so the toolbar stays at viewport scale — the engine connects to the
+           overlay's <svg> by id (_markupSvgId).
+           While Space is held we add the --pan modifier so left-click pointer
+           events fall through to the canvas-stage gesture surface and the
+           viewport can pan. *@
+        <div class="dndm-markup-overlay-mount @(_spaceHeld ? "dndm-markup-overlay-mount--pan" : null)">
+            <MarkupOverlay State="State" Map="Map" SvgId="@_markupSvgId" IsActive="@(!_spaceHeld)" />
         </div>
     }
     </div>
+    </div>
+
+    @if (IsHost && _markupActive)
+    {
+        @* Engine lives OUTSIDE .dndm-canvas-transform — it emits no DOM. JS
+           interop attaches to the overlay's <svg> via _markupSvgId. *@
+        <SvgDrawingEngine @ref="_markupEngine" TargetSvgId="@_markupSvgId"
+                          BackgroundColor="transparent"
+                          StrokeCompleted="OnMarkupStrokeCompleted" />
+
+        @* Toolbar is a sibling of the engine, NOT nested inside its ChildContent.
+           We pass the engine by @ref so the toolbar binds to it directly without
+           going through a cascading value. OnAfterRenderAsync below force-rerenders
+           once _markupEngine binds. *@
+        @if (_markupEngine is not null)
+        {
+            <div class="dndm-floating-markup-toolbar">
+                <SvgDrawingToolbar Engine="@_markupEngine" />
+            </div>
+        }
+    }
 
     @if (IsHost && _contextMenuOpen)
     {
@@ -208,5 +416,23 @@
                 <span>Centre everyone here</span>
             </button>
         </div>
+    }
+
+    @if (IsHost)
+    {
+        <ConfirmModal IsOpen="_confirmFillFog"
+                      Title="Fog the entire map?"
+                      Message="Every cell will be hidden from players. You can erase areas afterward."
+                      ConfirmText="Fill with fog"
+                      CancelText="Cancel"
+                      OnConfirm="OnConfirmFillFog"
+                      OnCancel="OnCancelFillFog" />
+        <ConfirmModal IsOpen="_confirmClearFog"
+                      Title="Reveal the entire map?"
+                      Message="All fogged cells will be cleared. This can't be undone."
+                      ConfirmText="Clear all fog"
+                      CancelText="Cancel"
+                      OnConfirm="OnConfirmClearFog"
+                      OnCancel="OnCancelClearFog" />
     }
 </div>

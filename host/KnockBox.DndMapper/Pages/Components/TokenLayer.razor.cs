@@ -18,6 +18,13 @@ namespace KnockBox.DndMapper.Pages.Components
         [Parameter] public string CurrentUserId { get; set; } = string.Empty;
         [Parameter, EditorRequired] public string SvgId { get; set; } = string.Empty;
 
+        /// <summary>
+        /// When <c>true</c>, the token layer becomes non-interactive (pointer-events:none on
+        /// its root group) so clicks pass through to the underlying SVG. Used by MapCanvas
+        /// while a host-only canvas tool (fog paint/erase, focus-box) is active.
+        /// </summary>
+        [Parameter] public bool InteractionsDisabled { get; set; }
+
         [Inject] protected IJSRuntime JSRuntime { get; set; } = default!;
         [Inject] protected DndMapperGameEngine GameEngine { get; set; } = default!;
         [Inject] protected IUserService UserService { get; set; } = default!;
@@ -34,9 +41,28 @@ namespace KnockBox.DndMapper.Pages.Components
         private IEnumerable<Token> VisibleTokens =>
             Map is null
                 ? []
-                : TokenVisibilityFilter.VisibleTokensFor(Map.Tokens, IsHost);
+                : TokenVisibilityFilter.VisibleTokensFor(Map.Tokens, Map, IsHost);
 
         private List<TokenStack> Stacks => TokenStackGrouper.Group(VisibleTokens);
+
+        // Token id of the combatant whose turn is currently active. Returns
+        // null unless combat is in the Active phase and the current turn
+        // index points at a combatant carrying a non-empty TokenId. Drives
+        // the .dndm-token--active glow class on the matching token's root <g>.
+        private Guid? ActiveTurnTokenId
+        {
+            get
+            {
+                var combat = State.ActiveCombat;
+                if (combat is null || combat.Phase != CombatPhase.Active) return null;
+                var turn = combat.TurnOrder;
+                if (turn.Count == 0) return null;
+                var idx = combat.CurrentTurnIndex;
+                if (idx < 0 || idx >= turn.Count) return null;
+                var tokenId = turn[idx].TokenId;
+                return tokenId == Guid.Empty ? null : tokenId;
+            }
+        }
 
         protected override void OnInitialized()
         {
@@ -170,7 +196,12 @@ namespace KnockBox.DndMapper.Pages.Components
             value.ToString("0.######", CultureInfo.InvariantCulture);
 
         private string TokenCssClass(Token token)
-            => token.Hidden ? "dndm-token dndm-token--hidden" : "dndm-token";
+        {
+            var classes = token.Hidden ? "dndm-token dndm-token--hidden" : "dndm-token";
+            if (ActiveTurnTokenId is { } id && id == token.Id)
+                classes += " dndm-token--active";
+            return classes;
+        }
 
         private static string FillFor(Token token)
         {

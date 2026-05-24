@@ -1,0 +1,513 @@
+/* Display view — projector-grade layout for Discord screen share.
+   Header (auto) / optional combat strip (auto) / stage (fills). The
+   stage is a 2-col grid when there are rolls (map + side rail) and a
+   single column otherwise, so an empty roll log doesn't reserve space.
+   Under 900px the side rail collapses to a bottom strip so the map
+   keeps its native aspect at small widths. */
+
+.dndm-display {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    background: #0e1117;
+    color: var(--dndm-text, #f3eee6);
+    overflow: hidden;
+    display: grid;
+    grid-template-rows: auto auto 1fr;
+    grid-template-columns: 1fr;
+    font-family: var(--font-primary);
+}
+
+/* ── Combat strip ─────────────────────────────────────────────────
+   Full-width band below the header. Round badge anchors the left, the
+   queue scrolls horizontally on overflow. Sized for legibility from
+   ~3m away on a Discord share. */
+.dndm-display__combat {
+    grid-row: 2;
+    display: flex;
+    align-items: stretch;
+    gap: 1.25rem;
+    padding: 0.85rem 1.5rem;
+    background:
+        linear-gradient(180deg, rgba(20, 17, 14, 0.92), rgba(15, 12, 10, 0.92)),
+        var(--dndm-noise, none);
+    background-size: 100% 100%, 240px 80px;
+    background-repeat: no-repeat, repeat;
+    border-bottom: 1px solid var(--dndm-border-accent, rgba(232, 144, 85, 0.32));
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.45);
+    min-width: 0;
+}
+
+.dndm-display__combat-head {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 0.15rem 1.1rem 0.15rem 0;
+    border-right: 1px solid var(--dndm-border-accent, rgba(232, 144, 85, 0.25));
+    min-width: 6.5rem;
+    line-height: 1;
+}
+
+.dndm-display__round-label {
+    font-family: var(--dndm-display, "Cormorant Garamond", serif);
+    font-style: italic;
+    font-size: 1.05rem;
+    color: var(--dndm-text-dim, #b29a7e);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+}
+
+.dndm-display__round-num {
+    font-family: var(--dndm-display, "Cormorant Garamond", serif);
+    font-size: 3rem;
+    font-weight: 500;
+    color: var(--dndm-ember-hi, #e89055);
+    font-variant-numeric: tabular-nums;
+    text-shadow: 0 0 18px rgba(232, 144, 85, 0.4);
+    margin-top: 0.1rem;
+}
+
+.dndm-display__round-status {
+    font-family: var(--dndm-display, "Cormorant Garamond", serif);
+    font-style: italic;
+    font-size: 1.6rem;
+    color: var(--dndm-text, #ece0cc);
+    margin-top: 0.2rem;
+}
+
+.dndm-display__queue {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: thin;
+    scrollbar-color: var(--dndm-ember, #c4743a) transparent;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.dndm-display__queue::-webkit-scrollbar { height: 6px; }
+.dndm-display__queue::-webkit-scrollbar-thumb {
+    background: var(--dndm-ember, #c4743a);
+    border-radius: 3px;
+}
+
+.dndm-display__chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0.45rem 0.85rem;
+    border: 1px solid var(--dndm-border, #3a2d23);
+    border-radius: 999px;
+    background: rgba(20, 17, 14, 0.6);
+    color: var(--dndm-text-dim, #b29a7e);
+    font-size: 1.05rem;
+    line-height: 1;
+    white-space: nowrap;
+    transition: color 140ms ease, border-color 140ms ease, background 140ms ease;
+}
+
+.dndm-display__chip-init {
+    font-family: "JetBrains Mono", "Fira Code", Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 0.85rem;
+    color: var(--dndm-text-muted, #7a6852);
+    padding: 0.1rem 0.4rem;
+    background: rgba(0, 0, 0, 0.32);
+    border-radius: 4px;
+    min-width: 1.6em;
+    text-align: center;
+}
+
+.dndm-display__chip-name {
+    font-family: var(--dndm-display, "Cormorant Garamond", serif);
+    font-size: 1.25rem;
+    font-weight: 500;
+    letter-spacing: 0.2px;
+}
+
+.dndm-display__chip-flag {
+    font-family: var(--font-primary);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    padding: 0.18rem 0.5rem;
+    border-radius: 3px;
+    background: rgba(232, 144, 85, 0.18);
+    color: #1a1208;
+    background-image: linear-gradient(180deg, #f0a86c, #d97f3a 70%, #a85a26 100%);
+    box-shadow: inset 0 1px 0 rgba(255, 220, 180, 0.45);
+}
+
+.dndm-display__chip--current {
+    color: #fff8ec;
+    border-color: rgba(232, 144, 85, 0.7);
+    background: rgba(40, 24, 14, 0.85);
+    box-shadow:
+        inset 0 0 0 1px rgba(232, 144, 85, 0.45),
+        0 0 24px rgba(232, 144, 85, 0.35);
+}
+.dndm-display__chip--current .dndm-display__chip-init {
+    color: #fff;
+    background: rgba(232, 144, 85, 0.25);
+}
+.dndm-display__chip--current .dndm-display__chip-name {
+    color: #fff8ec;
+}
+
+.dndm-display__chip--done {
+    opacity: 0.45;
+    text-decoration: line-through;
+    text-decoration-color: rgba(178, 154, 126, 0.4);
+    text-decoration-thickness: 1px;
+}
+.dndm-display__chip--done .dndm-display__chip-init { opacity: 0.6; }
+
+.dndm-display__chip--ready .dndm-display__chip-init {
+    color: var(--dndm-success, #6a8a52);
+}
+.dndm-display__chip--pending .dndm-display__chip-init {
+    color: var(--dndm-text-muted, #7a6852);
+}
+
+/* ── Stage: map + optional roll sidebar ───────────────────────── */
+.dndm-display__stage {
+    grid-row: 3;
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr;
+    min-height: 0;
+    min-width: 0;
+}
+
+.dndm-display__stage--with-rolls {
+    grid-template-columns: 1fr minmax(20rem, 22vw);
+}
+
+.dndm-display__canvas {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    background: #0e1117;
+    min-height: 0;
+    min-width: 0;
+}
+
+.dndm-display__canvas svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+/* ── Roll sidebar / strip ─────────────────────────────────────── */
+.dndm-display__rolls {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    min-width: 0;
+    background:
+        linear-gradient(180deg, rgba(20, 17, 14, 0.96), rgba(15, 12, 10, 0.96)),
+        var(--dndm-noise, none);
+    background-size: 100% 100%, 240px 240px;
+    background-repeat: no-repeat, repeat;
+    border-left: 1px solid var(--dndm-border-accent, rgba(232, 144, 85, 0.32));
+    box-shadow: -8px 0 24px rgba(0, 0, 0, 0.4);
+}
+
+.dndm-display__rolls-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    padding: 0.85rem 1.1rem 0.7rem;
+    border-bottom: 1px solid var(--dndm-border-accent, rgba(232, 144, 85, 0.25));
+}
+
+.dndm-display__rolls-title {
+    font-family: var(--dndm-display, "Cormorant Garamond", serif);
+    font-style: italic;
+    font-size: 1.55rem;
+    color: var(--dndm-ember-hi, #e89055);
+    letter-spacing: 0.4px;
+}
+
+.dndm-display__rolls-count {
+    font-family: "JetBrains Mono", "Fira Code", Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 0.9rem;
+    color: var(--dndm-text-muted, #7a6852);
+    padding: 0.1rem 0.5rem;
+    border: 1px solid var(--dndm-border, #3a2d23);
+    border-radius: 999px;
+}
+
+.dndm-display__rolls-list {
+    list-style: none;
+    margin: 0;
+    padding: 0.4rem 0.7rem 0.85rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    overflow-y: auto;
+    overflow-x: hidden;
+    min-height: 0;
+}
+
+.dndm-display__roll {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    padding: 0.55rem 0.7rem;
+    background: rgba(34, 27, 22, 0.45);
+    border: 1px solid var(--dndm-border, #3a2d23);
+    border-left: 3px solid var(--dndm-ember, #c4743a);
+    border-radius: 3px;
+    color: var(--dndm-text, #ece0cc);
+}
+
+.dndm-display__roll-meta {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 0.35rem 0.55rem;
+    font-size: 0.78rem;
+    color: var(--dndm-text-muted, #b8a98e);
+}
+
+.dndm-display__roll-roller {
+    font-family: var(--dndm-display, "Cormorant Garamond", serif);
+    font-style: italic;
+    font-size: 0.95rem;
+    color: var(--dndm-ember-hi, #e89055);
+    letter-spacing: 0.01em;
+}
+
+.dndm-display__roll-formula {
+    font-family: "JetBrains Mono", "Fira Code", Consolas, monospace;
+    font-size: 0.78rem;
+    color: var(--dndm-text-muted, #b8a98e);
+    opacity: 0.85;
+}
+
+.dndm-display__roll-mode {
+    font-family: var(--font-primary);
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: #1a1a2e;
+    background: var(--dndm-ember-hi, #e89055);
+    padding: 0.05rem 0.4rem;
+    border-radius: 999px;
+}
+
+.dndm-display__roll-time {
+    margin-left: auto;
+    font-family: "JetBrains Mono", "Fira Code", Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 0.78rem;
+    color: var(--dndm-text-muted, #8e8170);
+}
+
+.dndm-display__roll-body {
+    display: grid;
+    grid-template-columns: 3.25rem 1fr;
+    align-items: center;
+    gap: 0.7rem;
+}
+
+.dndm-display__roll-total {
+    font-family: "JetBrains Mono", "Fira Code", Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 1.8rem;
+    font-weight: 600;
+    line-height: 1;
+    color: var(--dndm-ember-hi, #e89055);
+    text-align: center;
+    text-shadow: 0 0 12px rgba(232, 144, 85, 0.25);
+}
+
+.dndm-display__roll-detail {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    min-width: 0;
+}
+
+.dndm-display__roll-label {
+    font-family: var(--dndm-display, "Cormorant Garamond", serif);
+    font-size: 1.05rem;
+    line-height: 1.2;
+    color: var(--dndm-text, #ece0cc);
+    overflow-wrap: anywhere;
+}
+
+.dndm-display__roll-dice {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.dndm-display__roll-die {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.4rem;
+    padding: 0.05rem 0.32rem;
+    font-family: "JetBrains Mono", "Fira Code", Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 0.85rem;
+    color: var(--dndm-text, #ece0cc);
+    background: rgba(232, 144, 85, 0.12);
+    border: 1px solid rgba(232, 144, 85, 0.4);
+    border-radius: 3px;
+}
+
+.dndm-display__roll-die--discarded {
+    color: var(--dndm-text-muted, #7a6852);
+    background: rgba(60, 50, 40, 0.35);
+    border-color: rgba(120, 100, 80, 0.4);
+    text-decoration: line-through;
+    opacity: 0.72;
+}
+
+.dndm-display__roll-mod {
+    font-family: "JetBrains Mono", "Fira Code", Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 0.85rem;
+    color: var(--dndm-text, #ece0cc);
+    margin-left: 0.15rem;
+}
+
+.dndm-display__roll-forced {
+    font-family: var(--font-primary);
+    font-style: normal;
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    color: var(--dndm-text-muted, #7a6852);
+}
+
+/* ── Narrow layout: roll log collapses to a bottom strip ─────── */
+@media (max-width: 900px) {
+    .dndm-display__stage--with-rolls {
+        grid-template-columns: 1fr;
+        grid-template-rows: 1fr auto;
+    }
+    .dndm-display__rolls {
+        border-left: 0;
+        border-top: 1px solid var(--dndm-border-accent, rgba(232, 144, 85, 0.32));
+        box-shadow: 0 -6px 18px rgba(0, 0, 0, 0.4);
+        max-height: 38vh;
+    }
+    .dndm-display__rolls-list {
+        flex-direction: row;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        overflow-y: hidden;
+        padding: 0.6rem 0.85rem;
+    }
+    .dndm-display__roll {
+        flex: 0 0 auto;
+        min-width: 15rem;
+        max-width: 22rem;
+    }
+}
+
+/* ── Tighter scaling for combat strip on very small widths ───── */
+@media (max-width: 640px) {
+    .dndm-display__combat { padding: 0.55rem 0.85rem; gap: 0.7rem; }
+    .dndm-display__combat-head { min-width: 4.5rem; padding-right: 0.7rem; }
+    .dndm-display__round-num { font-size: 2.1rem; }
+    .dndm-display__round-label { font-size: 0.85rem; }
+    .dndm-display__chip { padding: 0.32rem 0.6rem; font-size: 0.9rem; }
+    .dndm-display__chip-name { font-size: 1rem; }
+}
+
+/* ── Empty / error states ───────────────────────────────────── */
+.dndm-display__empty {
+    color: #8a8175;
+    font-family: var(--dndm-display, "Cormorant Garamond", serif);
+    font-size: 2rem;
+    font-style: italic;
+    text-align: center;
+    width: 100%;
+}
+
+.dndm-display--error {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 2rem;
+}
+
+.dndm-display--error h1 {
+    font-family: "Cormorant Garamond", "EB Garamond", Georgia, serif;
+    font-style: italic;
+    font-weight: 500;
+    color: #e89055;
+    font-size: 4rem;
+    margin: 0 0 1rem;
+    letter-spacing: 0.4px;
+}
+
+.dndm-display--error p {
+    font-family: var(--dndm-display);
+    font-size: 1.5rem;
+    color: #d6cec3;
+    max-width: 60ch;
+}
+
+.dndm-display--error code {
+    font-family: "JetBrains Mono", "Fira Code", Consolas, monospace;
+    background: rgba(232, 144, 85, 0.1);
+    border: 1px solid rgba(232, 144, 85, 0.3);
+    border-radius: 4px;
+    padding: 0.1em 0.45em;
+    margin: 0 0.15em;
+    color: #f3eee6;
+}
+
+/* Token position animation is driven by Web Animations API from
+   dndMapperDisplayTokens.js — see DndMapperDisplay.razor's
+   OnAfterRenderAsync. CSS transitions on the SVG `transform` attribute
+   stutter when the host tab's main thread is busy with IDB save interop,
+   so the transform comes from inline style set by JS instead. */
+.dndm-viewer-token { /* layout-only hook for any future styling */ }
+
+/* Active-combatant glow. The pulse lives on the <g> as a CSS filter,
+   not as an extra SVG element, so the JS-owned transform on the same
+   <g> is untouched. Keyframes animate the drop-shadow strength only.
+   The `will-change` hint plus filter on the root <g> means the GPU
+   keeps a single offscreen layer for the token while pulsing. */
+.dndm-viewer-token--active {
+    filter: drop-shadow(0 0 0.18px rgba(232, 144, 85, 0.95))
+            drop-shadow(0 0 0.45px rgba(232, 144, 85, 0.65));
+    animation: dndm-display-token-pulse 1.6s ease-in-out infinite;
+    will-change: filter;
+}
+
+@keyframes dndm-display-token-pulse {
+    0%, 100% {
+        filter: drop-shadow(0 0 0.18px rgba(232, 144, 85, 0.95))
+                drop-shadow(0 0 0.45px rgba(232, 144, 85, 0.45));
+    }
+    50% {
+        filter: drop-shadow(0 0 0.25px rgba(255, 200, 140, 1))
+                drop-shadow(0 0 0.85px rgba(232, 144, 85, 0.8))
+                drop-shadow(0 0 1.4px rgba(232, 144, 85, 0.45));
+    }
+}
+
+/* Grid pattern is filled via url(#...) on a <rect> — nothing to style
+   beyond that. Comment kept as a discoverability hook in scoped CSS. */
+.dndm-display__grid { /* see <pattern id="@GridPatternId"> in markup */ }

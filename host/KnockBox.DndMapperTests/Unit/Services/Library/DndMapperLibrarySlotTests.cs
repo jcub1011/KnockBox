@@ -64,8 +64,10 @@ namespace KnockBox.DndMapperTests.Unit.Services.Library
                 Assert.IsTrue(listed.TryGetSuccess(out var slots));
                 Assert.Contains(s => s.Id == slotId && s.Name == "Campaign A" && s.Kind == SlotKind.Manual, slots);
 
-                Assert.IsTrue(db.JsonStores[DndMapperLibrarySchema.LibraryStore].ContainsKey(slotId),
-                    "Snapshot must be written under the slot's id.");
+                Assert.IsTrue(db.JsonStores[DndMapperLibrarySchema.LibraryStore].ContainsKey($"{slotId}:core"),
+                    "v4 core shard must be written under {slotId}:core.");
+                Assert.IsFalse(db.JsonStores[DndMapperLibrarySchema.LibraryStore].ContainsKey(slotId),
+                    "Legacy v3 single-record key must not be written by manual save paths.");
             }
             finally { await library.DisposeAsync(); }
         }
@@ -209,7 +211,7 @@ namespace KnockBox.DndMapperTests.Unit.Services.Library
             var (engine, state, host, _) = EngineTestFactory.Build();
             var db = new FakeIndexedDbService();
             var logger = new CapturingLogger<DndMapperLibraryService>();
-            await using var library = new DndMapperLibraryService(db, engine, logger);
+            await using var library = new DndMapperLibraryService(db, engine, NullJsRuntime.Instance, logger);
             Assert.IsTrue((await library.AttachAsync(state, host)).IsSuccess);
 
             // Build a snapshot with one map and two images; only image #1 has a backing blob.
@@ -268,7 +270,7 @@ namespace KnockBox.DndMapperTests.Unit.Services.Library
         {
             var (engine, state, host, _) = EngineTestFactory.Build();
             var db = new FakeIndexedDbService();
-            await using var library = new DndMapperLibraryService(db, engine, NullLogger<DndMapperLibraryService>.Instance);
+            await using var library = new DndMapperLibraryService(db, engine, NullJsRuntime.Instance, NullLogger<DndMapperLibraryService>.Instance);
             Assert.IsTrue((await library.AttachAsync(state, host)).IsSuccess);
 
             var customSchema = new KnockBox.DndMapper.Services.State.Games.Data.AttributeSchema(
@@ -292,12 +294,44 @@ namespace KnockBox.DndMapperTests.Unit.Services.Library
             Assert.IsTrue(create.TryGetSuccess(out var slotId));
 
             var (engine2, state2, host2, _) = EngineTestFactory.Build();
-            await using var library2 = new DndMapperLibraryService(db, engine2, NullLogger<DndMapperLibraryService>.Instance);
+            await using var library2 = new DndMapperLibraryService(db, engine2, NullJsRuntime.Instance, NullLogger<DndMapperLibraryService>.Instance);
             Assert.IsTrue((await library2.AttachAsync(state2, host2)).IsSuccess);
             Assert.IsTrue((await library2.LoadSlotAsync(slotId)).IsSuccess);
 
             Assert.AreEqual("Grace", state2.InitiativeAttributeName,
                 "After loading, the state-level initiative attribute should be restored verbatim.");
+        }
+
+        [TestMethod]
+        public async Task LoadSlotAsync_RoundTripsFogMask()
+        {
+            var (engine, state, host, _) = EngineTestFactory.Build();
+            var db = new FakeIndexedDbService();
+            await using var library = new DndMapperLibraryService(db, engine, NullJsRuntime.Instance, NullLogger<DndMapperLibraryService>.Instance);
+            Assert.IsTrue((await library.AttachAsync(state, host)).IsSuccess);
+
+            Assert.IsTrue(engine.CreateMapAsync(state, host, "Catacombs").TryGetSuccess(out var mapId));
+            Assert.IsTrue(engine.PaintFogAsync(state, host, mapId,
+                new[] { (1, 1), (2, 1), (3, 1), (1, 2) }, fogged: true).IsSuccess);
+
+            var create = await library.CreateSlotAsync("Fog-RoundTrip");
+            Assert.IsTrue(create.TryGetSuccess(out var slotId));
+
+            var (engine2, state2, host2, _) = EngineTestFactory.Build();
+            await using var library2 = new DndMapperLibraryService(db, engine2, NullJsRuntime.Instance, NullLogger<DndMapperLibraryService>.Instance);
+            Assert.IsTrue((await library2.AttachAsync(state2, host2)).IsSuccess);
+            Assert.IsTrue((await library2.LoadSlotAsync(slotId)).IsSuccess);
+
+            state2.WithExclusiveRead(() =>
+            {
+                var restoredMap = state2.Maps.Single(m => m.Id == mapId);
+                Assert.IsTrue(restoredMap.IsFogged(1, 1));
+                Assert.IsTrue(restoredMap.IsFogged(2, 1));
+                Assert.IsTrue(restoredMap.IsFogged(3, 1));
+                Assert.IsTrue(restoredMap.IsFogged(1, 2));
+                Assert.IsFalse(restoredMap.IsFogged(0, 0));
+                Assert.IsFalse(restoredMap.IsFogged(4, 1));
+            });
         }
 
         // Builds an attached library against a fresh fake DB. When seedLegacy is
@@ -314,7 +348,7 @@ namespace KnockBox.DndMapperTests.Unit.Services.Library
                     [DndMapperLibrarySchema.LegacySingletonKey] = new LibrarySnapshot(),
                 };
             }
-            var library = new DndMapperLibraryService(db, engine, NullLogger<DndMapperLibraryService>.Instance);
+            var library = new DndMapperLibraryService(db, engine, NullJsRuntime.Instance, NullLogger<DndMapperLibraryService>.Instance);
             var attach = await library.AttachAsync(state, host);
             Assert.IsTrue(attach.IsSuccess, "AttachAsync failed in test setup.");
             return (db, library);

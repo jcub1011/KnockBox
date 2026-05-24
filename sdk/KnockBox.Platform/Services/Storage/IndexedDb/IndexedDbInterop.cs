@@ -87,6 +87,20 @@ internal class IndexedDbInterop : IAsyncDisposable
         return raw.Error.Error;
     }
 
+    /// <summary>
+    /// Calls a JS export that returns a binary value (Blob / Uint8Array /
+    /// ArrayBuffer) and surfaces it as <see cref="IJSStreamReference"/>.
+    /// Blazor frames the bytes natively over SignalR — no base64, no
+    /// envelope unwrapping. Caller is responsible for disposing the
+    /// returned reference.
+    /// </summary>
+    public virtual async ValueTask<IJSStreamReference> InvokeStreamRefAsync(
+        string method, CancellationToken ct, params object?[] args)
+    {
+        var module = await _moduleTask.Value.WaitAsync(ct).ConfigureAwait(false);
+        return await module.InvokeAsync<IJSStreamReference>(method, ct, args).ConfigureAwait(false);
+    }
+
     private static ValueResult<JsonElement, IndexedDbError> UnpackEnvelope(JsonElement envelope)
     {
         if (envelope.ValueKind != JsonValueKind.Object

@@ -105,7 +105,14 @@ public static class KnockBoxPlatformExtensions
                 // 4 batches is enough headroom for normal tick-to-render lag
                 // without retaining 10 batches per circuit.
                 o.MaxBufferedUnacknowledgedRenderBatches = 4;
-            });
+            })
+            // MaximumReceiveMessageSize is modestly bumped from the 32 KB
+            // Blazor default so the IndexedDb blob transport
+            // (IJSStreamReference / DotNetStreamReference) can frame 64 KB
+            // binary chunks with envelope headroom. Kept conservative so
+            // per-message memory exposure stays bounded if anything else
+            // pumps large payloads through the hub.
+            .AddHubOptions(o => o.MaximumReceiveMessageSize = 64 * 1024);
 
         // Cross-circuit registry for IIndexedDbBlob.PublishForSharingAsync —
         // singleton so the /blob-share/{token} HTTP endpoint can resolve a
@@ -113,6 +120,13 @@ public static class KnockBoxPlatformExtensions
         // capturing the originating circuit's blob; the host streams bytes
         // through the closure without ever persisting them.
         builder.Services.AddSingleton<BlobShareRegistry>();
+        // Process-wide RAM cache that fronts the share endpoint so the
+        // second+ fetcher of a token doesn't re-traverse SignalR against
+        // the originating circuit. Bounded by SizeLimitBytes (LRU) and
+        // wired into BlobShareRegistry's removal paths so revoked tokens
+        // don't leave stale copies behind. See BlobShareByteCache for
+        // policy rationale.
+        builder.Services.AddSingleton<BlobShareByteCache>();
 
         // Per-circuit gateway to the browser's IndexedDB. Scoped so the cached
         // JS module reference stays bound to one Blazor circuit; the impl
@@ -186,22 +200,19 @@ public static class KnockBoxPlatformExtensions
             var pluginLogger = bootstrapLoggerFactory.CreateLogger<PluginLoader>();
             var loader = new PluginLoader(pluginLogger);
 
-            var plugins = new List<LoadedPlugin>();
-            var assemblies = new List<Assembly>();
-
-            // The caller (or the default `["games"]`) owns path selection. The
-            // platform no longer resolves host services via a throwaway
-            // BuildServiceProvider — hosts with admin-style gating should
-            // populate PluginsPaths directly inside their configure callback.
+            // Combine library and game roots into a single LoadModules call so the
+            // loader's library-first ordering applies across roots. Each plugin's
+            // manifest still authoritatively decides whether it's a game or library —
+            // the root folder is only a convention to keep first-party staging tidy.
+            // Library paths are listed first to make the ordering visible to a reader
+            // skimming logs, even though the loader re-sorts internally.
+            var allRoots = new List<string>(options.LibrariesPaths.Count + options.PluginsPaths.Count);
+            foreach (var rawPath in options.LibrariesPaths)
+                allRoots.Add(ResolvePluginsPath(rawPath));
             foreach (var rawPath in options.PluginsPaths)
-            {
-                var pluginsPath = ResolvePluginsPath(rawPath);
-                var result = loader.LoadModules(pluginsPath);
-                plugins.AddRange(result.Plugins);
-                assemblies.AddRange(result.Assemblies);
-            }
+                allRoots.Add(ResolvePluginsPath(rawPath));
 
-            pluginLoadResult = new PluginLoadResult(plugins, assemblies.Distinct().ToList());
+            pluginLoadResult = loader.LoadModules(allRoots);
         }
 
         // Navigation + drawing services. Registered BEFORE RegisterLogic so that
@@ -300,12 +311,18 @@ public static class KnockBoxPlatformExtensions
         }
 
         // The Platform assembly contains routable pages (Home, Error, NotFound).
-        // Game plugin assemblies contain game-specific pages. Both must be
-        // registered so ASP.NET Core endpoint routing discovers them alongside
-        // the root component's own assembly.
+        // The Core assembly contains shared Razor components (e.g. SvgDrawingEngine,
+        // SvgDrawingToolbar) whose @onclick handlers require interactive registration
+        // — without listing Core here, components from it render as static SSR even
+        // when their parent is interactive, so click handlers never wire up.
+        // Game plugin assemblies contain game-specific pages. All must be registered
+        // so ASP.NET Core endpoint routing discovers them alongside the root
+        // component's own assembly AND so Blazor wires interactive event handlers
+        // for components defined there.
         var gamePluginAssemblies = app.Services.GetRequiredService<GamePluginAssemblies>();
         var additionalAssemblies = gamePluginAssemblies.Assemblies
-            .Append(typeof(KnockBoxPlatformExtensions).Assembly);
+            .Append(typeof(KnockBoxPlatformExtensions).Assembly)
+            .Append(typeof(KnockBox.Core.Components.Shared.SvgDrawingEngine).Assembly);
 
         // Plugin HTTP dispatcher — `/api/plugins/{routeIdentifier}/{**subPath}`.
         // Inert until a plugin opts in by implementing IGameEngineHttpHandler;

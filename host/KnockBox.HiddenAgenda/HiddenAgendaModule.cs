@@ -13,12 +13,6 @@ namespace KnockBox.HiddenAgenda
         public void RegisterServices(IPluginRegistration registration)
             => registration.AddGameEngine<HiddenAgendaGameEngine>();
 
-        public RenderFragment GetButtonContent() => builder =>
-        {
-            builder.OpenComponent<HiddenAgendaTile>(0);
-            builder.CloseComponent();
-        };
-
         public RenderFragment? GetCustomHeader() => builder =>
         {
             builder.OpenComponent<HiddenAgendaHeader>(0);

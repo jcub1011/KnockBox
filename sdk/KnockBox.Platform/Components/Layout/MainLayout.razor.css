@@ -45,6 +45,7 @@ header {
     display: flex;
     padding: 0;
     box-shadow: none;
+    flex-shrink: 0;
 }
 
 header a {
@@ -104,12 +105,13 @@ header a {
     height: 300vmax;
     z-index: -1;
     background-color: var(--bg-color);
-    background-image: linear-gradient(rgba(0, 0, 0, 0.05), rgba(0, 0, 0, 0.05)), url("/_content/KnockBox.Platform/content/backgrounds/yellow-vertical_loop_crop_lq.webp");
+    background-image: linear-gradient(rgba(0, 0, 0, 0.05), rgba(0, 0, 0, 0.05)), url("/_content/KnockBox.Platform/content/backgrounds/yellow-vertical_loop_crop.jpg");
     background-repeat: repeat;
-    filter: blur(2px);
     background-size: auto, auto 400px;
     transform: rotate(45deg);
     animation: partyGradient 12s linear infinite;
+    opacity: 1;
+    transition: opacity 0.25s ease-in-out;
 }
 
 @keyframes partyGradient {
@@ -122,14 +124,9 @@ header a {
     }
 }
 
-/* Suppress the animated diagonal background when a game-room is mounted.
-   At 4K the rotated 300vmax × 300vmax layer creates a multi-hundred-MB GPU
-   texture; the compositor intermittently drops it, which shows through any
-   layer on top (with backdrop-filter etc.) as diagonal transparency. Game
-   rooms tag themselves with data-game-room so this rule scopes per-plugin. */
-.main:has([data-game-room])::before {
-    animation: none;
-    background-image: none;
+.main.in-game::before {
+    opacity: 0;
+    transition: opacity 0.5s ease-in-out;
 }
 
 article {
@@ -257,6 +254,11 @@ header.exiting-to-home {
 }
 
 @media (prefers-reduced-motion: reduce) {
+    .main::before {
+        animation: none;
+        transition: none;
+    }
+
     article.entering-from-home,
     header.entering-from-home,
     article.exiting-to-home,

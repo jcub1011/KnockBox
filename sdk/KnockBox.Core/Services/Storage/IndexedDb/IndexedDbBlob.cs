@@ -4,7 +4,7 @@ namespace KnockBox.Core.Services.Storage.IndexedDb
     /// A binary payload that round-trips between .NET and a JS-side
     /// <c>Blob</c> stored in IndexedDB. Bytes cross the SignalR boundary in
     /// bounded chunks (same pattern as
-    /// <see cref="Components.Shared.SvgDrawingCanvas"/>) so no single message
+    /// <see cref="Components.Shared.SvgDrawingEngine"/>) so no single message
     /// approaches the server's <c>MaximumReceiveMessageSize</c> limit.
     /// <para>
     /// A blob retrieved from a store holds a live JS reference and, once

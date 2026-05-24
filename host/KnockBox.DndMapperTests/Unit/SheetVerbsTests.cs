@@ -182,13 +182,13 @@ namespace KnockBox.DndMapperTests.Unit
             EngineTestFactory.RegisterPlayer(_state);
             _engine.SetActiveMapAsync(_state, _host, mapId);
 
-            var token = _state.Maps.Single(m => m.Id == mapId).Tokens.Single();
-            var sheetId = token.SheetId!.Value;
+            var tokenId = _state.Maps.Single(m => m.Id == mapId).Tokens.Single().Id;
+            var sheetId = _state.Maps.Single(m => m.Id == mapId).Tokens.Single().SheetId!.Value;
 
             var del = _engine.DeleteSheetAsync(_state, _host, sheetId);
             Assert.IsTrue(del.IsSuccess);
             Assert.IsFalse(_state.Sheets.ContainsKey(sheetId));
-            Assert.IsNull(token.SheetId);
+            Assert.IsNull(_state.Maps.Single(m => m.Id == mapId).Tokens.Single(t => t.Id == tokenId).SheetId);
         }
 
         [TestMethod]

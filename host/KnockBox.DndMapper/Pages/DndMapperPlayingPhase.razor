@@ -28,7 +28,6 @@
                                     RoomCode="@RoomCode"
                                     SelectedImageId="_selectedImageId"
                                     SelectedImageIdChanged="OnSelectedImageIdChanged" />
-                    <HostInitiativePanel State="State" />
                     <HostSavesPanel />
                 </div>
                 @* Always render the resize handle so its JS bindings stay
@@ -95,6 +94,12 @@
                                             OnClose="@(() => _selectedImageId = null)" />
                     </div>
                 }
+
+                <DiceCanvas State="State" CurrentUserId="@CurrentUserId" IsHost="IsHost" />
+                <FloatingRollPanel State="State"
+                                   Config="_diceConfig"
+                                   CurrentUserId="@CurrentUserId"
+                                   IsHost="IsHost" />
             }
         </main>
 
@@ -109,11 +114,11 @@
                     <MyTokenPanel State="State" />
                     <InitiativeBanner State="State" CurrentUserId="@CurrentUserId" />
                 }
+                @if (IsHost)
+                {
+                    <HostInitiativePanel State="State" />
+                }
                 <CharacterSheetPanel State="State" CurrentUserId="@CurrentUserId" IsHost="IsHost" />
-                <RollLogPanel State="State"
-                              Config="_diceConfig"
-                              CurrentUserId="@CurrentUserId"
-                              IsHost="IsHost" />
             </div>
         </aside>
 
@@ -127,6 +132,10 @@
                         Saving…
                     </span>
                 }
+                <button class="dndm-btn" type="button" @onclick="OnOpenDisplayClicked"
+                        title="Open the read-only display view in a new tab and copy its URL.">
+                    Open display view
+                </button>
                 <button class="dndm-btn" type="button" @onclick="TogglePerms">Settings</button>
                 <EndSessionButton State="State" />
             </div>

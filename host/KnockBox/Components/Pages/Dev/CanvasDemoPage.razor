@@ -1,7 +1,9 @@
+@using KnockBox.Core.Components.Shared
+
 <PageTitle>Canvas Demo</PageTitle>
 
 <div class="demo-container">
-    <h2>SVG Drawing Canvas — Demo</h2>
+    <h2>SVG Drawing Engine — Demo</h2>
     <p class="demo-hint">
         Draw freely using mouse or touch. Use the color swatches or the custom color picker to change colors.
         Strokes already on the canvas keep their original color when you switch colors.
@@ -13,16 +15,23 @@
     <div class="demo-canvases">
         <section>
             <h3>White background (default)</h3>
-            <SvgDrawingCanvas Height="420px" EnableSharing="true" />
+            <SvgDrawingEngine TargetSvgId="@_id1" BackgroundColor="#ffffff">
+                <SvgDrawingToolbar EnableSharing="true" />
+                <svg id="@_id1" class="demo-canvas demo-canvas-white"
+                     width="100%" height="420"
+                     style="background:#ffffff;"></svg>
+            </SvgDrawingEngine>
         </section>
 
         <section>
             <h3>Dark background</h3>
-            <SvgDrawingCanvas Height="420px"
-                              BackgroundColor="#1e1e2e"
-                              StrokeColor="#ffffff"
-                              StrokeWidth="2"
-                              EnableSharing="true" />
+            <SvgDrawingEngine TargetSvgId="@_id2" BackgroundColor="#1e1e2e"
+                              InitialColor="#ffffff" InitialStrokeWidth="2">
+                <SvgDrawingToolbar EnableSharing="true" />
+                <svg id="@_id2" class="demo-canvas"
+                     width="100%" height="420"
+                     style="background:#1e1e2e;"></svg>
+            </SvgDrawingEngine>
         </section>
     </div>
 
@@ -36,28 +45,99 @@
     <div class="demo-canvases">
         <section>
             <h3>600&times;600 viewBox at full size (600px)</h3>
-            <SvgDrawingCanvas Width="600px" Height="660px"
-                              ViewBoxWidth="600" ViewBoxHeight="600" />
+            <SvgDrawingEngine TargetSvgId="@_id3" BackgroundColor="#ffffff">
+                <SvgDrawingToolbar />
+                <svg id="@_id3" class="demo-canvas"
+                     width="600" height="600"
+                     viewBox="0 0 600 600" preserveAspectRatio="xMidYMid meet"
+                     style="background:#ffffff;max-width:100%;"></svg>
+            </SvgDrawingEngine>
         </section>
 
         <section>
             <h3>600&times;600 viewBox at half size (300px)</h3>
-            <SvgDrawingCanvas Width="300px" Height="360px"
-                              ViewBoxWidth="600" ViewBoxHeight="600" />
+            <SvgDrawingEngine TargetSvgId="@_id4" BackgroundColor="#ffffff">
+                <SvgDrawingToolbar />
+                <svg id="@_id4" class="demo-canvas"
+                     width="300" height="300"
+                     viewBox="0 0 600 600" preserveAspectRatio="xMidYMid meet"
+                     style="background:#ffffff;max-width:100%;"></svg>
+            </SvgDrawingEngine>
         </section>
 
         <section>
             <h3>600&times;400 viewBox in a wide container</h3>
-            <SvgDrawingCanvas Width="600px" Height="500px"
-                              ViewBoxWidth="600" ViewBoxHeight="400" />
+            <SvgDrawingEngine TargetSvgId="@_id5" BackgroundColor="#ffffff">
+                <SvgDrawingToolbar />
+                <svg id="@_id5" class="demo-canvas"
+                     width="600" height="400"
+                     viewBox="0 0 600 400" preserveAspectRatio="xMidYMid meet"
+                     style="background:#ffffff;max-width:100%;"></svg>
+            </SvgDrawingEngine>
         </section>
 
         <section>
             <h3>400&times;600 viewBox in a narrow container</h3>
-            <SvgDrawingCanvas Width="300px" Height="520px"
-                              ViewBoxWidth="400" ViewBoxHeight="600" />
+            <SvgDrawingEngine TargetSvgId="@_id6" BackgroundColor="#ffffff">
+                <SvgDrawingToolbar />
+                <svg id="@_id6" class="demo-canvas"
+                     width="300" height="450"
+                     viewBox="0 0 400 600" preserveAspectRatio="xMidYMid meet"
+                     style="background:#ffffff;max-width:100%;"></svg>
+            </SvgDrawingEngine>
         </section>
     </div>
 
+    <h2 style="margin-top: 48px;">Custom Toolbar (engine standalone)</h2>
+    <p class="demo-hint">
+        This canvas drives the engine with plain Razor buttons — no <code>SvgDrawingToolbar</code>. Proves the
+        engine works headlessly and consumers can build any UI they like against the public API.
+    </p>
+
+    <SvgDrawingEngine @ref="_customEngine" TargetSvgId="@_id7" BackgroundColor="#fff8e1">
+        <div class="demo-custom-toolbar">
+            <button @onclick="() => _customEngine!.UndoAsync()">↩ Undo</button>
+            <button @onclick="() => _customEngine!.RedoAsync()">↪ Redo</button>
+            <button @onclick="() => _customEngine!.ClearAsync()">🗑 Clear</button>
+            <button @onclick="UseEraser">Eraser</button>
+            <button @onclick="UseBrush">Brush</button>
+            <input type="color" @oninput="OnCustomColorInput" />
+            <input type="number" min="1" max="30" value="3" @onchange="OnCustomSizeChange" />
+            <button @onclick="() => _customEngine!.ExportSvgAsync()">⬇ Export</button>
+        </div>
+        <svg id="@_id7" class="demo-canvas"
+             width="100%" height="300"
+             style="background:#fff8e1;"></svg>
+    </SvgDrawingEngine>
+
     <p class="demo-debug-badge">⚠ DEBUG build only — this page is excluded from release builds.</p>
 </div>
+
+@code {
+    private readonly string _id1 = $"svg-canvas-{Guid.NewGuid():N}";
+    private readonly string _id2 = $"svg-canvas-{Guid.NewGuid():N}";
+    private readonly string _id3 = $"svg-canvas-{Guid.NewGuid():N}";
+    private readonly string _id4 = $"svg-canvas-{Guid.NewGuid():N}";
+    private readonly string _id5 = $"svg-canvas-{Guid.NewGuid():N}";
+    private readonly string _id6 = $"svg-canvas-{Guid.NewGuid():N}";
+    private readonly string _id7 = $"svg-canvas-{Guid.NewGuid():N}";
+
+    private SvgDrawingEngine? _customEngine;
+
+    private Task UseEraser() => _customEngine?.SetToolAsync("eraser") ?? Task.CompletedTask;
+    private Task UseBrush() => _customEngine?.SetToolAsync("brush") ?? Task.CompletedTask;
+
+    private Task OnCustomColorInput(Microsoft.AspNetCore.Components.ChangeEventArgs e)
+    {
+        var color = e.Value?.ToString();
+        if (_customEngine is null || string.IsNullOrEmpty(color)) return Task.CompletedTask;
+        return _customEngine.SetColorAsync(color);
+    }
+
+    private Task OnCustomSizeChange(Microsoft.AspNetCore.Components.ChangeEventArgs e)
+    {
+        if (_customEngine is null) return Task.CompletedTask;
+        if (!int.TryParse(e.Value?.ToString(), out var w)) return Task.CompletedTask;
+        return _customEngine.SetStrokeWidthAsync(w);
+    }
+}

@@ -1,3 +1,4 @@
+@using System.Collections.Immutable
 @using KnockBox.Core.Components.Shared
 @using KnockBox.DndMapper.Models
 @using KnockBox.DndMapper.Services.State.Games
@@ -63,7 +64,7 @@
 
             @{
                 var quickTemplates = State.GetActiveSchemaTemplate()?.StatusEffectTemplates
-                    ?? new List<StatusEffectTemplate>();
+                    ?? (IReadOnlyList<StatusEffectTemplate>)ImmutableList<StatusEffectTemplate>.Empty;
             }
             @if (quickTemplates.Count > 0)
             {

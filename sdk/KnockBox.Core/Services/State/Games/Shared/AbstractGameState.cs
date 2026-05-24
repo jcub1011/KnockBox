@@ -39,13 +39,19 @@ namespace KnockBox.Core.Services.State.Games.Shared
     /// </summary>
     /// <remarks>
     /// <para><b>Concurrency contract:</b> mutations must flow through
-    /// <see cref="Execute(Action)"/> / <c>ExecuteAsync</c>, which acquire a
-    /// per-state <c>SemaphoreSlim(1,1)</c>, run the caller's lambda, release
-    /// the lock, and <i>then</i> fire state-change notifications via
-    /// <see cref="StateChangedEventManager"/>. Non-mutating serialized reads use
-    /// <c>WithExclusiveRead</c> / <c>WithExclusiveReadAsync</c> — those do not
-    /// notify subscribers. Direct field writes from outside these helpers
-    /// bypass both the lock and the notification and should be avoided.</para>
+    /// <see cref="Execute(Action)"/> / <c>ExecuteAsync</c>, which acquire
+    /// the per-state lock in <i>write</i> mode (exclusive against all other
+    /// writers and readers), run the caller's lambda, release the lock,
+    /// and <i>then</i> fire state-change notifications via
+    /// <see cref="StateChangedEventManager"/>. Non-mutating reads use
+    /// <c>WithExclusiveRead</c> / <c>WithExclusiveReadAsync</c>, which
+    /// acquire the lock in <i>read</i> mode — multiple readers run
+    /// concurrently with each other, but a writer waits for all active
+    /// readers to release before acquiring (and new readers queue behind
+    /// any waiting writer, so writers do not starve under continuous read
+    /// load). Read mode does not fire subscriber notifications. Direct
+    /// field writes from outside these helpers bypass both the lock and
+    /// the notification and should be avoided.</para>
     /// <para><b>Why notification fires outside the lock:</b> to keep lock-hold
     /// time minimal and to let subscribers (e.g., disconnect handlers) call
     /// <c>Execute</c> reentrantly without deadlocking. The
@@ -84,10 +90,11 @@ namespace KnockBox.Core.Services.State.Games.Shared
         // and lazy-init/mutation of _scheduledCallbacks. Player and kicked-set
         // mutations are serialized by _executeLock instead.
         private readonly Lock _syncRoot = new();
-        // Custom binary async mutex — ~half the per-instance footprint of
-        // SemaphoreSlim(1, 1) and zero allocations on the uncontended fast
-        // path. Same API surface (Wait / WaitAsync / Release / Dispose).
-        private readonly AsyncMutex _executeLock = new();
+        // Async reader/writer lock — Execute/ExecuteAsync take the write
+        // side, WithExclusiveRead/WithExclusiveReadAsync take the read side.
+        // Multiple reads run concurrently; writers are exclusive and
+        // preferred over later readers to avoid writer starvation.
+        private readonly AsyncReaderWriterLock _executeLock = new();
         private readonly User _host;
         private readonly ILogger _logger;
 
@@ -535,7 +542,7 @@ namespace KnockBox.Core.Services.State.Games.Shared
             try
             {
                 ct.ThrowIfCancellationRequested();
-                await _executeLock.WaitAsync(ct);
+                await _executeLock.WaitWriteAsync(ct);
                 var previous = s_executingState.Value;
                 s_executingState.Value = this;
 
@@ -548,7 +555,7 @@ namespace KnockBox.Core.Services.State.Games.Shared
                 finally
                 {
                     s_executingState.Value = previous;
-                    _executeLock.Release();
+                    _executeLock.ReleaseWrite();
                 }
             }
             catch (OperationCanceledException)
@@ -579,7 +586,7 @@ namespace KnockBox.Core.Services.State.Games.Shared
             bool notify = false;
             try
             {
-                _executeLock.Wait();
+                _executeLock.WaitWrite();
                 var previous = s_executingState.Value;
                 s_executingState.Value = this;
 
@@ -592,7 +599,7 @@ namespace KnockBox.Core.Services.State.Games.Shared
                 finally
                 {
                     s_executingState.Value = previous;
-                    _executeLock.Release();
+                    _executeLock.ReleaseWrite();
                 }
             }
             catch (OperationCanceledException)
@@ -623,7 +630,7 @@ namespace KnockBox.Core.Services.State.Games.Shared
             bool notify = false;
             try
             {
-                _executeLock.Wait();
+                _executeLock.WaitWrite();
                 var previous = s_executingState.Value;
                 s_executingState.Value = this;
 
@@ -636,7 +643,7 @@ namespace KnockBox.Core.Services.State.Games.Shared
                 finally
                 {
                     s_executingState.Value = previous;
-                    _executeLock.Release();
+                    _executeLock.ReleaseWrite();
                 }
             }
             catch (OperationCanceledException)
@@ -658,7 +665,11 @@ namespace KnockBox.Core.Services.State.Games.Shared
         }
 
         /// <summary>
-        /// Executes the action with exclusive read access to the game state.
+        /// Runs <paramref name="action"/> with a shared read lock held on
+        /// the state — concurrent with any other readers, exclusive against
+        /// writers. The lambda must not mutate state (use
+        /// <see cref="ExecuteAsync(Func{ValueTask}, CancellationToken)"/>
+        /// for that). Does not fire <see cref="StateChangedEventManager"/>.
         /// </summary>
         public async ValueTask<Result> WithExclusiveReadAsync(Func<ValueTask> action, CancellationToken ct = default)
         {
@@ -667,7 +678,7 @@ namespace KnockBox.Core.Services.State.Games.Shared
             try
             {
                 ct.ThrowIfCancellationRequested();
-                await _executeLock.WaitAsync(ct);
+                await _executeLock.WaitReadAsync(ct);
                 var previous = s_executingState.Value;
                 s_executingState.Value = this;
 
@@ -679,7 +690,7 @@ namespace KnockBox.Core.Services.State.Games.Shared
                 finally
                 {
                     s_executingState.Value = previous;
-                    _executeLock.Release();
+                    _executeLock.ReleaseRead();
                 }
             }
             catch (OperationCanceledException)
@@ -697,7 +708,11 @@ namespace KnockBox.Core.Services.State.Games.Shared
         }
 
         /// <summary>
-        /// Executes the action with exclusive read access to the game state.
+        /// Runs <paramref name="action"/> with a shared read lock held on
+        /// the state — concurrent with any other readers, exclusive against
+        /// writers. The lambda must not mutate state (use
+        /// <see cref="Execute(Action)"/> for that). Does not fire
+        /// <see cref="StateChangedEventManager"/>.
         /// </summary>
         public Result WithExclusiveRead(Action action)
         {
@@ -705,7 +720,7 @@ namespace KnockBox.Core.Services.State.Games.Shared
 
             try
             {
-                _executeLock.Wait();
+                _executeLock.WaitRead();
                 var previous = s_executingState.Value;
                 s_executingState.Value = this;
 
@@ -717,7 +732,7 @@ namespace KnockBox.Core.Services.State.Games.Shared
                 finally
                 {
                     s_executingState.Value = previous;
-                    _executeLock.Release();
+                    _executeLock.ReleaseRead();
                 }
             }
             catch (OperationCanceledException)

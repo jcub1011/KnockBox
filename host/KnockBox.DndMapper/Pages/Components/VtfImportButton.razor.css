@@ -1,0 +1,41 @@
+.dndm-vtf-import {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.2rem 0.55rem;
+    background: var(--dndm-bg-elev);
+    border: 1px solid var(--dndm-border);
+    border-radius: 3px;
+    color: var(--dndm-text);
+    cursor: pointer;
+    font-family: var(--font-primary);
+    letter-spacing: 0.3px;
+    font-size: 0.92rem;
+    transition: border-color 120ms, background 120ms;
+    position: relative;
+    box-shadow: inset 0 1px 0 var(--dndm-highlight);
+}
+
+.dndm-vtf-import:hover {
+    border-color: var(--dndm-ember);
+    background: var(--dndm-bg-elev-hover);
+}
+
+.dndm-vtf-import--busy {
+    opacity: 0.6;
+    cursor: progress;
+    pointer-events: none;
+}
+
+.dndm-vtf-import ::deep input[type="file"] {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+    opacity: 0;
+}

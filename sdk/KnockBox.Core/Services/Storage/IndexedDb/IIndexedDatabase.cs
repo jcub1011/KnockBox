@@ -1,4 +1,5 @@
 using KnockBox.Core.Primitives.Returns;
+using Microsoft.AspNetCore.Components;
 
 namespace KnockBox.Core.Services.Storage.IndexedDb
 {
@@ -42,6 +43,22 @@ namespace KnockBox.Core.Services.Storage.IndexedDb
         ValueTask<ValueResult<IndexedDbKey, IndexedDbError>> JsonPutSingleAsync<T>(
             string storeName, T value, IndexedDbKey? key = null, CancellationToken ct = default);
 
+        /// <summary>
+        /// Writes every entry in <paramref name="items"/> under a single atomic
+        /// readwrite transaction that spans every distinct
+        /// <see cref="JsonPutItem.StoreName"/> referenced by the batch. One
+        /// JS interop round-trip — preferable when a caller would otherwise
+        /// issue several <see cref="JsonPutSingleAsync"/> calls in a tight
+        /// loop, because each interop call costs a SignalR hop and burns the
+        /// browser tab's main thread (which on a same-origin neighbour tab
+        /// can perceptibly stall its render path). Returns the effective
+        /// keys in input order. An empty <paramref name="items"/> list is a
+        /// no-op success that doesn't issue any JS interop.
+        /// </summary>
+        ValueTask<ValueResult<IReadOnlyList<IndexedDbKey>, IndexedDbError>> JsonPutBatchAsync(
+            IReadOnlyList<JsonPutItem> items,
+            CancellationToken ct = default);
+
         /// <summary>Reads a single blob record by key in a single atomic readonly transaction. Returns <see langword="null"/> on miss.</summary>
         ValueTask<ValueResult<IndexedDbBlob?, IndexedDbError>> BlobGetSingleAsync(
             string storeName, IndexedDbKey key, CancellationToken ct = default);
@@ -57,5 +74,24 @@ namespace KnockBox.Core.Services.Storage.IndexedDb
         /// <summary>Clears the named stores in a single atomic readwrite transaction.</summary>
         ValueTask<Result<IndexedDbError>> ClearStoresAsync(
             IReadOnlyList<string> storeNames, CancellationToken ct = default);
+
+        /// <summary>
+        /// Iterates the files inside an <c>&lt;input type="file"&gt;</c>
+        /// element entirely on the JS side and persists each one into
+        /// <paramref name="storeName"/> under a freshly generated GUID key.
+        /// The bytes never cross the SignalR boundary — the .NET side only
+        /// receives metadata plus a JS-side blob handle per file. Returns
+        /// one entry per file in the input's selection order; per-file
+        /// failures (type rejected, decode failed, IDB put failed) are
+        /// reported as <see cref="AdoptedInputFile.Error"/> rather than
+        /// aborting the batch. Successful entries' <see cref="IndexedDbBlob"/>
+        /// handles must be disposed by the caller.
+        /// </summary>
+        ValueTask<ValueResult<IReadOnlyList<AdoptedInputFile>, IndexedDbError>>
+            AdoptInputElementFilesAsync(
+                ElementReference inputElement,
+                string storeName,
+                AdoptInputFilesOptions options,
+                CancellationToken ct = default);
     }
 }

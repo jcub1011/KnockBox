@@ -3,6 +3,7 @@ using System.Collections.Immutable;
 using KnockBox.Core.Services.State.Games.Shared;
 using KnockBox.Core.Services.State.Users;
 using KnockBox.Spardle.Models;
+using KnockBox.WordService.Contracts;
 using Microsoft.Extensions.Logging;
 
 namespace KnockBox.Spardle;
@@ -19,14 +20,14 @@ public class SpardleState(User host, ILogger logger) : AbstractGameState(host, l
     /// <see cref="TargetWordLength"/>. When false, words are sampled across
     /// <see cref="MinWordLength"/>–<see cref="MaxWordLength"/> inclusive.
     /// Only consulted when <see cref="WordPoolMode"/> is
-    /// <see cref="Models.WordPoolMode.FullDictionary"/>.
+    /// <see cref="WordPoolMode.FullDictionary"/>.
     /// </summary>
     public bool ConstantWordLength { get; set; } = true;
 
     /// <summary>
     /// Target word length when <see cref="ConstantWordLength"/> is true.
     /// Forced to 5 by the engine when <see cref="WordPoolMode"/> is
-    /// <see cref="Models.WordPoolMode.NytStandard"/>. Ignored when
+    /// <see cref="WordPoolMode.NytStandard"/>. Ignored when
     /// <see cref="CustomWordPool"/> is non-empty.
     /// </summary>
     public int TargetWordLength { get; set; } = 5;

@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg"
+     viewBox="0 0 300 200"
+     preserveAspectRatio="xMidYMid slice"
+     aria-hidden="true">
+    <style>
+/* EMBEDDED FONTS BEGIN */
+@font-face {
+    font-family: 'Lexend';
+    font-style: normal;
+    font-weight: 900;
+    src: url('data:font/woff2;base64,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') format('woff2');
+}
+/* EMBEDDED FONTS END */
+    </style>
+    <defs>
+        <pattern id="wip-hazard" width="40" height="40"
+                 patternUnits="userSpaceOnUse" patternTransform="rotate(-45)">
+            <rect width="20" height="40" fill="#FFCC00"/>
+            <rect x="20" width="20" height="40" fill="#000"/>
+        </pattern>
+        <filter id="wip-shadow" x="-10%" y="-50%" width="120%" height="200%">
+            <feDropShadow dx="0" dy="4" stdDeviation="3" flood-color="#000" flood-opacity="0.5"/>
+        </filter>
+    </defs>
+    <g transform="rotate(-15 150 100)" filter="url(#wip-shadow)">
+        <rect x="-40" y="75" width="380" height="50"
+              fill="url(#wip-hazard)" stroke="#000" stroke-width="2"/>
+        <rect x="45" y="82" width="210" height="36"
+              fill="#000" stroke="#FFCC00" stroke-width="2"/>
+        <text x="150" y="106" text-anchor="middle" fill="#FFCC00"
+              font-family="'Lexend', system-ui, sans-serif"
+              font-size="17" font-weight="900" letter-spacing="1.5">
+            WORK IN PROGRESS
+        </text>
+    </g>
+</svg>

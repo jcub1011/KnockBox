@@ -29,16 +29,15 @@ using KnockBox.Core.Services.State.Users;
 using Microsoft.Extensions.DependencyInjection;
 
 // 1. The module — plugin entry point. Must have a public parameterless ctor.
+//    Identity (name, description, route, version, tileAsset) lives in
+//    plugin.json; the module just exposes it and registers an engine.
 public sealed class MyGameModule : IGameModule
 {
-    public string Name => "My Game";
-    public string Description => "A tiny example game.";
-    public string RouteIdentifier => "my-game";  // must match your @page route
+    public IPluginManifest Manifest { get; } =
+        PluginManifest.FromEmbeddedResourceOrThrow(typeof(MyGameModule).Assembly);
 
     public void RegisterServices(IPluginRegistration registration)
         => registration.AddGameEngine<MyGameEngine>();
-
-    public RenderFragment GetButtonContent() => b => { /* home-page tile */ };
 }
 
 // 2. The state — one instance per lobby.

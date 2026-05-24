@@ -467,90 +467,85 @@
     font-style: italic;
 }
 
-/* ─── Markup overlay (v1.x §5.6) — SvgDrawingCanvas overrides ─────
-   The platform's SvgDrawingCanvas paints its drawing area with an
-   opaque slate-grey background and outlines the viewBox with a dashed
-   stroke. When we mount it over the live map, the host needs to see
-   the map underneath — so these rules force every internal background
-   transparent inside the markup mount. Lives here (unscoped) because
-   the SvgDrawingCanvas elements belong to a different Blazor scope and
-   `::deep` selectors in the wrapper component's scoped CSS don't reach
-   across that boundary reliably. */
-.dndm-markup-overlay-mount .svg-drawing-canvas,
-.dndm-markup-overlay-mount .svg-canvas-drawing-area,
-.dndm-markup-overlay-mount .svg-canvas-base {
-    background: transparent !important;
-    background-color: transparent !important;
+/* ─── Markup overlay (v1.x §5.6) — drawing surface ─────────────────
+   MarkupOverlay renders the read-only existing markup plus the
+   interactive drawing surface, both inside .dndm-canvas-transform so the
+   surface rides the same pan/zoom as the map. The SvgDrawingEngine and the
+   floating SvgDrawingToolbar live OUTSIDE the transform (see
+   .dndm-floating-markup-toolbar below) so the toolbar stays at viewport
+   scale; the engine binds to the surface by id.
+
+   Lives here (unscoped) because Blazor's CSS isolation can't reach across
+   component boundaries reliably. */
+.dndm-markup-overlay-mount .dndm-markup-stack {
+    width: 100%;
+    height: 100%;
+    display: grid;
 }
 
-.dndm-markup-overlay-mount .svg-drawing-canvas {
-    border: 0 !important;
-    border-radius: 0 !important;
-    box-shadow: none !important;
+.dndm-markup-overlay-mount .dndm-markup-layer {
+    grid-area: 1 / 1;
+    width: 100%;
+    height: 100%;
+    background: transparent;
 }
 
-/* The dashed outline rect inside .svg-canvas-base marks the drawable
-   viewBox. The map's own grid already communicates that boundary, so
-   hide the rect — it just adds visual noise on top of the map. */
-.dndm-markup-overlay-mount .svg-canvas-base > rect {
-    display: none;
+.dndm-markup-overlay-mount .dndm-markup-bg {
+    z-index: 1;
+    pointer-events: none;
 }
 
-/* ── viewBox cell-unit fix ──
-   SvgDrawingCanvas was designed for pixel-unit viewBoxes (e.g. 800×600
-   for a drawing pad). It sets the SVG element's `width` and `height`
-   attributes to the viewBox dimensions, so passing cell-unit dimensions
-   (e.g. 30×20) makes the SVG intrinsically 30×20 CSS pixels. The
-   platform's `.has-viewbox > svg` rule then pins it at `width:auto;
-   max-width:100%` — which means the SVG never grows past 30×20 px
-   inside our overlay. Force every SVG inside the markup mount to fill
-   its parent; preserveAspectRatio="xMidYMid meet" still keeps strokes
-   aligned with map cells. */
-.dndm-markup-overlay-mount .svg-canvas-drawing-area > svg,
-.dndm-markup-overlay-mount .svg-canvas-drawing-area.has-viewbox > svg {
-    width: 100% !important;
-    height: 100% !important;
-    max-width: 100% !important;
-    max-height: 100% !important;
+.dndm-markup-overlay-mount .dndm-markup-surface {
+    z-index: 2;
+    display: block;
+    touch-action: none;
+    cursor: crosshair;
 }
 
-.dndm-markup-overlay-mount .svg-canvas-drawing-area {
-    place-items: stretch !important;
-}
-
-/* Float the drawing canvas's built-in toolbar absolutely over the
-   drawing area instead of letting it take a flex slice at the top.
-   Why: both the drawing surface and the underlying map SVG use
-   `preserveAspectRatio="xMidYMid meet"` to letterbox content. If the
-   toolbar consumed real vertical space, the drawing area would be
-   shorter than the map SVG, the letterboxed content would center in a
-   smaller box, and strokes would land shifted-up on the map by half
-   the toolbar height. Floating the toolbar keeps both surfaces the
-   exact same size and origin, so a stroke at screen (x, y) lands on
-   the map cell directly below it. */
-.dndm-markup-overlay-mount .svg-drawing-canvas {
-    position: relative;
-}
-
-.dndm-markup-overlay-mount .toolbar-container {
+/* Floating markup toolbar — lives outside .dndm-canvas-transform so it stays
+   at viewport scale (the engine connects to the drawing surface inside the
+   transform via the shared svgId). Positioned absolutely against the
+   .dndm-canvas-frame, centred at the top of the map area. Z-index above the
+   map content but below modals. */
+.dndm-floating-markup-toolbar {
     position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    z-index: 10;
+    top: 56px;        /* clears the .dndm-canvas-toolbar zoom row */
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 50;
+    pointer-events: auto;
+    display: block;
+    /* Whatever the toolbar's natural content width is — never wider than the
+       map area. Without this, an absolutely-positioned wrapper would shrink
+       to content; combined with the toolbar's @container query at 540px it
+       would lock into the collapsed mobile layout. */
+    width: max-content;
+    max-width: calc(100% - 32px);
+}
+
+/* Opt the floating instance OUT of being a container-query container, so the
+   SvgDrawingToolbar's `@container (max-width: 540px)` mobile-collapse rules
+   don't match. Without this, an `position: absolute` wrapper sizes to its
+   content; in collapsed mode the content is tiny, locking the toolbar into
+   mobile mode permanently and hiding most of its buttons. */
+.dndm-floating-markup-toolbar .toolbar-container {
+    container-type: normal !important;
+}
+
+/* Force interactive cursor on every toolbar control inside the floating
+   mount; if any ancestor disables interaction, hovering would still show
+   the default arrow — useful as a visual sanity check. */
+.dndm-floating-markup-toolbar button,
+.dndm-floating-markup-toolbar input {
+    cursor: pointer;
     pointer-events: auto;
 }
 
-.dndm-markup-overlay-mount .svg-canvas-drawing-area {
-    flex: 1 1 100% !important;
-    height: 100% !important;
-}
-
-/* Restyle the drawing canvas's built-in toolbar to fit the Forge &
-   Ember palette so it doesn't fight the panel chrome underneath. */
-.dndm-markup-overlay-mount .svg-canvas-toolbar {
+/* Restyle the toolbar to fit the Forge & Ember palette so it doesn't fight
+   the panel chrome underneath. */
+.dndm-floating-markup-toolbar .svg-canvas-toolbar {
     background: rgba(20, 17, 14, 0.86) !important;
-    border-bottom: 1px solid var(--dndm-border-accent) !important;
+    border: 1px solid var(--dndm-border-accent) !important;
     color: var(--dndm-text);
     backdrop-filter: blur(6px);
     -webkit-backdrop-filter: blur(6px);

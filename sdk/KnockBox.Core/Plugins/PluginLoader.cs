@@ -6,12 +6,15 @@ using System.Text.Json;
 namespace KnockBox.Core.Plugins
 {
     /// <summary>
-    /// Result of discovering game plugins from a directory. Returned by
-    /// <see cref="PluginLoader.LoadModules(string)"/> and consumed by the
-    /// platform's DI registration code to wire every plugin's services and to
-    /// expose the set of plugin assemblies to Blazor's router.
+    /// Result of discovering game and library plugins from one or more root
+    /// directories. Returned by
+    /// <see cref="PluginLoader.LoadModules(IReadOnlyList{string})"/> and consumed
+    /// by the platform's DI registration code to wire every plugin's services
+    /// and to expose the set of plugin assemblies to Blazor's router. Plugins
+    /// are ordered library-first so the registration pipeline can register
+    /// library services before any game tries to inject them.
     /// </summary>
-    /// <param name="Plugins">Every discovered plugin, in discovery order.</param>
+    /// <param name="Plugins">Every discovered plugin, library-first.</param>
     /// <param name="Assemblies">The distinct plugin assemblies that contributed at least one module.</param>
     public sealed record PluginLoadResult(
         IReadOnlyList<LoadedPlugin> Plugins,
@@ -25,8 +28,11 @@ namespace KnockBox.Core.Plugins
     /// Discovers plugin folders, validates each one's <c>plugin.json</c>,
     /// loads the plugin assembly into its own
     /// <see cref="AssemblyLoadContext"/>, activates the single
-    /// <see cref="IGameModule"/> implementation inside, and returns the
-    /// successfully loaded plugins.
+    /// <see cref="IPluginModule"/> implementation inside, and returns the
+    /// successfully loaded plugins. Handles both <see cref="IGameModule"/> and
+    /// <see cref="ILibraryModule"/> plugins; the manifest's
+    /// <see cref="IPluginManifest.Kind"/> decides which type the loader expects
+    /// to find inside the plugin assembly.
     /// </summary>
     [System.Diagnostics.CodeAnalysis.SuppressMessage(
         "Performance",
@@ -45,21 +51,83 @@ namespace KnockBox.Core.Plugins
             FrozenSet.ToFrozenSet(["KnockBox.Platform"], StringComparer.OrdinalIgnoreCase);
 
         /// <summary>
-        /// Scans <paramref name="pluginsDirectory"/> for plugin folders. For
-        /// each subdirectory, reads <c>plugin.json</c>, locates
-        /// <c>{EntryAssembly}.dll</c>, loads it into a per-plugin ALC, reflects
-        /// for an <see cref="IGameModule"/>, cross-checks the module's reported
-        /// manifest against the on-disk one, and accumulates the results.
-        /// Duplicate route identifiers (first wins) and any validation failure
-        /// skip the offending plugin with a logged error.
+        /// Single-root convenience overload. Equivalent to calling
+        /// <see cref="LoadModules(IReadOnlyList{string})"/> with a one-element list.
+        /// Used by tests and by hosts that only have one plugin root.
         /// </summary>
-        public PluginLoadResult LoadModules(string pluginsDirectory)
+        public PluginLoadResult LoadModules(string pluginsDirectory) =>
+            LoadModules(new[] { pluginsDirectory });
+
+        /// <summary>
+        /// Scans every directory in <paramref name="rootPaths"/> for plugin folders.
+        /// Each subdirectory must contain a <c>plugin.json</c>; the manifest's
+        /// <see cref="IPluginManifest.Kind"/> determines whether the folder is loaded
+        /// as a game or library plugin (the root folder is only a convention).
+        /// </summary>
+        /// <remarks>
+        /// <para>The pipeline runs in three phases and enforces the
+        /// "all libraries finish before any game starts" invariant:</para>
+        /// <list type="number">
+        ///   <item><b>Discovery + manifest read:</b> every subdir's <c>plugin.json</c>
+        ///   is parsed; folders with missing or invalid manifests are skipped.</item>
+        ///   <item><b>Library patch dedup + contract promotion:</b> library plugins
+        ///   are partitioned by <c>(entryAssembly, Major, Minor)</c>; within each
+        ///   group only the highest Patch survives. Each surviving library's
+        ///   <see cref="IPluginManifest.ExportedContracts"/> DLLs are loaded into
+        ///   the default <see cref="AssemblyLoadContext"/> before any plugin ALC is
+        ///   constructed, so consumer plugins see identical CLR types for the
+        ///   contract interfaces.</item>
+        ///   <item><b>Shareable-dep promotion + module activation:</b> deps shipped
+        ///   by 2+ plugins at compatible versions are promoted, then libraries are
+        ///   activated first and games second. Game plugins consuming library
+        ///   services are guaranteed those services are already DI-resolvable when
+        ///   the host's registration pipeline reaches them.</item>
+        /// </list>
+        /// <para>Duplicate route identifiers across loaded plugins are first-wins;
+        /// the duplicate is logged and skipped.</para>
+        /// </remarks>
+        public PluginLoadResult LoadModules(IReadOnlyList<string> rootPaths)
         {
-            if (!Directory.Exists(pluginsDirectory))
+            if (rootPaths.Count == 0)
+                return PluginLoadResult.Empty;
+
+            // Dedup subdirs by canonical full path so a misconfigured host whose
+            // LibrariesPaths and PluginsPaths overlap (or whose roots are aliases
+            // of the same directory) doesn't discover the same plugin twice and
+            // promote its contracts twice. The first occurrence wins; later
+            // duplicates are logged so the misconfig is visible.
+            var allSubdirs = new List<string>();
+            var seenSubdirs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var root in rootPaths)
             {
-                logger.LogWarning(
-                    "Plugins directory [{PluginsDirectory}] does not exist; no game plugins will be loaded.",
-                    pluginsDirectory);
+                if (!Directory.Exists(root))
+                {
+                    logger.LogWarning(
+                        "Plugin root [{Root}] does not exist; no plugins will be loaded from it.",
+                        root);
+                    continue;
+                }
+                foreach (var subdir in Directory.GetDirectories(root))
+                {
+                    var canonical = Path.GetFullPath(subdir);
+                    if (seenSubdirs.Add(canonical))
+                    {
+                        allSubdirs.Add(subdir);
+                    }
+                    else
+                    {
+                        logger.LogInformation(
+                            "Plugin subdirectory [{Subdir}] is reachable from multiple roots; only the first occurrence is loaded.",
+                            canonical);
+                    }
+                }
+            }
+
+            if (allSubdirs.Count == 0)
+            {
+                logger.LogInformation(
+                    "No plugin subfolders discovered across {Count} root path(s); returning empty load result.",
+                    rootPaths.Count);
                 return PluginLoadResult.Empty;
             }
 
@@ -76,71 +144,365 @@ namespace KnockBox.Core.Plugins
                     .Where(n => n is not null)!,
                 StringComparer.OrdinalIgnoreCase);
 
-            // Pre-scan every plugin's .deps.json to find dependencies that two-or-more
-            // plugins ship at semver-compatible (same Major.Minor) versions. Winners
-            // are promoted into the default ALC so each plugin's PluginLoadContext
-            // shares a single Assembly instance instead of loading its own copy.
-            var pluginSubdirs = Directory.GetDirectories(pluginsDirectory);
-            PromoteShareableDependencies(pluginSubdirs, hostAssemblyNames);
+            // Frozen copy of the original snapshot. Distinguishes "the host shipped
+            // this assembly" from "we promoted this assembly during contract promotion".
+            // A library plugin attempting to export a contract whose simple name is in
+            // originalHostAssemblies is hijacking a host-owned identity and is rejected.
+            var originalHostAssemblies = new HashSet<string>(hostAssemblyNames, StringComparer.OrdinalIgnoreCase);
 
+            // Read every manifest once. Folders with missing/invalid manifests are
+            // dropped here; everything downstream operates on parsed manifests only.
+            var discovered = new List<DiscoveredPlugin>();
+            foreach (var subdir in allSubdirs)
+            {
+                var manifestPath = Path.Combine(subdir, "plugin.json");
+                if (!File.Exists(manifestPath))
+                {
+                    logger.LogError(
+                        "Plugin folder [{Subdirectory}] is missing required [plugin.json]; skipping.",
+                        subdir);
+                    continue;
+                }
+
+                var manifestResult = PluginManifest.TryReadFromFile(manifestPath);
+                if (!manifestResult.TryGetSuccess(out var manifest))
+                {
+                    manifestResult.TryGetFailure(out var error);
+                    logger.LogError(
+                        "Plugin folder [{Subdirectory}] has an invalid plugin.json: {Error}; skipping.",
+                        subdir,
+                        error.PublicMessage);
+                    continue;
+                }
+
+                discovered.Add(new DiscoveredPlugin(subdir, manifest));
+            }
+
+            // Partition by kind. Libraries are processed first, then games.
+            var libraries = discovered.Where(d => d.Manifest.Kind == PluginKind.Library).ToList();
+            var games = discovered.Where(d => d.Manifest.Kind == PluginKind.Game).ToList();
+
+            // Library patch dedup: within each (entryAssembly, Major, Minor) group,
+            // keep the highest Patch.
+            var dedupedLibraries = DedupLibrariesByPatch(libraries);
+
+            // Promote each surviving library's exportedContracts DLLs into the default
+            // ALC. Libraries whose contracts are missing or collide with host-owned
+            // identities are dropped here.
+            var promotedLibraries = PromoteExportedContracts(
+                dedupedLibraries,
+                originalHostAssemblies,
+                hostAssemblyNames);
+
+            // Existing multi-shipper shareable-dep promotion. Operates on the subdirs
+            // of every plugin (library + game) that survived prior validation.
+            var allSurvivingSubdirs = promotedLibraries
+                .Concat(games)
+                .Select(d => d.Subdir)
+                .ToArray();
+            PromoteShareableDependencies(allSurvivingSubdirs, hostAssemblyNames);
+
+            // Library-first activation. The two passes share their state so that a
+            // game with a duplicate route to a library (vanishingly unlikely but
+            // possible if someone misconfigures kind/route) gets flagged.
             var plugins = new List<LoadedPlugin>();
             var assemblies = new HashSet<Assembly>();
             var routeIdentifiers = new Dictionary<string, LoadedPlugin>(StringComparer.OrdinalIgnoreCase);
 
-            foreach (var subdir in pluginSubdirs)
-            {
-                var loaded = TryLoadPluginFolder(subdir, hostAssemblyNames);
-                if (loaded is null)
-                    continue;
+            foreach (var discovered_ in promotedLibraries)
+                TryAcceptPlugin(discovered_, hostAssemblyNames, plugins, assemblies, routeIdentifiers);
 
-                if (routeIdentifiers.TryGetValue(loaded.Manifest.RouteIdentifier, out var existing))
-                {
-                    logger.LogError(
-                        "Duplicate plugin route identifier [{RouteIdentifier}]. " +
-                        "Keeping [{ExistingAssembly}]; skipping [{SkippedAssembly}].",
-                        loaded.Manifest.RouteIdentifier,
-                        existing.Assembly.GetName().Name,
-                        loaded.Assembly.GetName().Name);
-                    continue;
-                }
-
-                routeIdentifiers.Add(loaded.Manifest.RouteIdentifier, loaded);
-                plugins.Add(loaded);
-                assemblies.Add(loaded.Assembly);
-
-                logger.LogInformation(
-                    "Loaded game plugin [{Name}] with route identifier [{RouteIdentifier}] from [{Assembly}] v{Version}.",
-                    loaded.Manifest.Name,
-                    loaded.Manifest.RouteIdentifier,
-                    loaded.Assembly.GetName().Name,
-                    loaded.Manifest.Version);
-            }
+            foreach (var discovered_ in games)
+                TryAcceptPlugin(discovered_, hostAssemblyNames, plugins, assemblies, routeIdentifiers);
 
             return new PluginLoadResult(plugins, [.. assemblies]);
         }
 
-        private LoadedPlugin? TryLoadPluginFolder(string subdir, HashSet<string> hostAssemblyNames)
+        /// <summary>
+        /// One step of the inner load loop: load the assembly for a pre-validated
+        /// manifest, find the matching module, and append to <paramref name="plugins"/>
+        /// (skipping duplicates by route identifier). Extracted from the loop to keep
+        /// <see cref="LoadModules(IReadOnlyList{string})"/> readable.
+        /// </summary>
+        private void TryAcceptPlugin(
+            DiscoveredPlugin discovered,
+            HashSet<string> hostAssemblyNames,
+            List<LoadedPlugin> plugins,
+            HashSet<Assembly> assemblies,
+            Dictionary<string, LoadedPlugin> routeIdentifiers)
         {
-            var manifestPath = Path.Combine(subdir, "plugin.json");
-            if (!File.Exists(manifestPath))
+            var loaded = TryLoadPluginFolder(discovered.Subdir, discovered.Manifest, hostAssemblyNames);
+            if (loaded is null)
+                return;
+
+            if (routeIdentifiers.TryGetValue(loaded.Manifest.RouteIdentifier, out var existing))
             {
                 logger.LogError(
-                    "Plugin folder [{Subdirectory}] is missing required [plugin.json]; skipping.",
-                    subdir);
-                return null;
+                    "Duplicate plugin route identifier [{RouteIdentifier}]. " +
+                    "Keeping [{ExistingAssembly}]; skipping [{SkippedAssembly}].",
+                    loaded.Manifest.RouteIdentifier,
+                    existing.Assembly.GetName().Name,
+                    loaded.Assembly.GetName().Name);
+                return;
             }
 
-            var manifestResult = PluginManifest.TryReadFromFile(manifestPath);
-            if (!manifestResult.TryGetSuccess(out var manifest))
+            routeIdentifiers.Add(loaded.Manifest.RouteIdentifier, loaded);
+            plugins.Add(loaded);
+            assemblies.Add(loaded.Assembly);
+
+            logger.LogInformation(
+                "Loaded {Kind} plugin [{Name}] with route identifier [{RouteIdentifier}] from [{Assembly}] v{Version}.",
+                loaded.Manifest.Kind.ToString().ToLowerInvariant(),
+                loaded.Manifest.Name,
+                loaded.Manifest.RouteIdentifier,
+                loaded.Assembly.GetName().Name,
+                loaded.Manifest.Version);
+        }
+
+        /// <summary>
+        /// A plugin folder whose <c>plugin.json</c> has been successfully parsed.
+        /// Pairs the subdir path with the parsed manifest so downstream phases
+        /// (dedup, contract promotion, activation) don't re-parse the same file.
+        /// </summary>
+        internal readonly record struct DiscoveredPlugin(string Subdir, IPluginManifest Manifest);
+
+        /// <summary>
+        /// Partitions library plugins by <c>(entryAssembly, Major, Minor)</c> and
+        /// returns the highest-<c>Patch</c> survivor per group. Different Major or
+        /// Minor lands in different groups, so both side-by-side versions survive.
+        /// Drops are logged at Information level — they're not errors, just an
+        /// older patch being superseded by a newer one.
+        /// </summary>
+        internal IReadOnlyList<DiscoveredPlugin> DedupLibrariesByPatch(
+            IReadOnlyList<DiscoveredPlugin> libraries)
+        {
+            // Group by (entryAssembly OrdinalIgnoreCase, Major, Minor). Within each
+            // group, keep the entry whose manifest version has the highest Build (Patch).
+            var groups = new Dictionary<(string Entry, int Major, int Minor),
+                List<DiscoveredPlugin>>(
+                comparer: new LibraryGroupKeyComparer());
+
+            foreach (var library in libraries)
             {
-                manifestResult.TryGetFailure(out var error);
-                logger.LogError(
-                    "Plugin folder [{Subdirectory}] has an invalid plugin.json: {Error}; skipping.",
-                    subdir,
-                    error.PublicMessage);
-                return null;
+                var v = library.Manifest.Version;
+                var key = (library.Manifest.EntryAssembly, v.Major, v.Minor);
+                if (!groups.TryGetValue(key, out var list))
+                    groups[key] = list = new List<DiscoveredPlugin>();
+                list.Add(library);
             }
 
+            var survivors = new List<DiscoveredPlugin>(libraries.Count);
+            foreach (var (_, group) in groups)
+            {
+                if (group.Count == 1)
+                {
+                    survivors.Add(group[0]);
+                    continue;
+                }
+
+                var winner = group[0];
+                for (int i = 1; i < group.Count; i++)
+                {
+                    if (group[i].Manifest.Version > winner.Manifest.Version)
+                        winner = group[i];
+                }
+
+                foreach (var entry in group)
+                {
+                    if (ReferenceEquals(entry.Subdir, winner.Subdir))
+                        continue;
+                    logger.LogInformation(
+                        "Library plugin [{Loser}] v{LoserVersion} at [{LoserPath}] superseded by [{Winner}] v{WinnerVersion} at [{WinnerPath}] " +
+                        "(same Major.Minor, lower Patch).",
+                        entry.Manifest.EntryAssembly,
+                        entry.Manifest.Version,
+                        entry.Subdir,
+                        winner.Manifest.EntryAssembly,
+                        winner.Manifest.Version,
+                        winner.Subdir);
+                }
+
+                survivors.Add(winner);
+            }
+
+            return survivors;
+        }
+
+        private sealed class LibraryGroupKeyComparer
+            : IEqualityComparer<(string Entry, int Major, int Minor)>
+        {
+            public bool Equals(
+                (string Entry, int Major, int Minor) x,
+                (string Entry, int Major, int Minor) y) =>
+                string.Equals(x.Entry, y.Entry, StringComparison.OrdinalIgnoreCase)
+                && x.Major == y.Major
+                && x.Minor == y.Minor;
+
+            public int GetHashCode((string Entry, int Major, int Minor) obj) =>
+                HashCode.Combine(
+                    StringComparer.OrdinalIgnoreCase.GetHashCode(obj.Entry),
+                    obj.Major,
+                    obj.Minor);
+        }
+
+        /// <summary>
+        /// Loads every surviving library's exportedContracts DLLs into the default
+        /// <see cref="AssemblyLoadContext"/>, in the order libraries appear in
+        /// <paramref name="libraries"/>. Maintains the load-time invariant that
+        /// every consumer plugin sees an identical CLR type for the exported
+        /// contract interfaces, regardless of which ALC the consumer lives in.
+        /// </summary>
+        /// <remarks>
+        /// Drops a library plugin entirely (returns it omitted from the result)
+        /// when any of:
+        /// <list type="bullet">
+        ///   <item>A declared contract DLL is missing from the plugin folder.</item>
+        ///   <item>A declared contract's simple name collides with a host-shipped
+        ///   assembly — the host owns that identity and a plugin must not redefine it.</item>
+        ///   <item>The contract assembly's full identity (name + version + token)
+        ///   differs from a previously-promoted assembly with the same simple name
+        ///   but a different full identity that the host considers a conflict.
+        ///   (Same simple name with different version IS allowed — that's the
+        ///   side-by-side coexistence case.)</item>
+        /// </list>
+        /// <para>If two libraries declare contracts whose full identities are
+        /// exactly equal, the contract is promoted once and both libraries reuse
+        /// it (e.g. v1.2 and v1.3 of the same library shipping the same contracts
+        /// because the contract surface didn't change between minors).</para>
+        /// <para><b>Side effect:</b> <paramref name="promotedAssemblyNames"/> is
+        /// mutated — every successfully-promoted contract's simple name is added
+        /// so downstream phases (shareable-dep promotion, ALC isolation) treat
+        /// it as host-loaded. Pass a set you're prepared to see grow.</para>
+        /// </remarks>
+        internal IReadOnlyList<DiscoveredPlugin> PromoteExportedContracts(
+            IReadOnlyList<DiscoveredPlugin> libraries,
+            HashSet<string> originalHostAssemblies,
+            HashSet<string> promotedAssemblyNames)
+        {
+            var survivors = new List<DiscoveredPlugin>(libraries.Count);
+
+            // Track every contract identity we have promoted. Key = full identity
+            // (simpleName + version + token). Map value is just a marker.
+            var promotedByIdentity = new HashSet<(string Name, string Version, string Token)>(
+                new ContractIdentityComparer());
+
+            foreach (var library in libraries)
+            {
+                if (library.Manifest.ExportedContracts.Count == 0)
+                {
+                    // Library that exports no contracts is fine — it can still register
+                    // services keyed by types defined in KnockBox.Core. Just accept it.
+                    survivors.Add(library);
+                    continue;
+                }
+
+                bool libraryRejected = false;
+
+                foreach (var simpleName in library.Manifest.ExportedContracts)
+                {
+                    var dllPath = Path.Combine(library.Subdir, simpleName + ".dll");
+                    if (!File.Exists(dllPath))
+                    {
+                        logger.LogError(
+                            "Library plugin [{Library}] declares exportedContract [{Contract}] but [{Path}] does not exist; skipping the library.",
+                            library.Manifest.EntryAssembly,
+                            simpleName,
+                            dllPath);
+                        libraryRejected = true;
+                        break;
+                    }
+
+                    if (originalHostAssemblies.Contains(simpleName))
+                    {
+                        logger.LogError(
+                            "Library plugin [{Library}] tries to export contract [{Contract}] but the host already ships an assembly by that simple name; " +
+                            "promoting it would shadow the host. Skipping the library.",
+                            library.Manifest.EntryAssembly,
+                            simpleName);
+                        libraryRejected = true;
+                        break;
+                    }
+
+                    AssemblyName contractIdentity;
+                    try
+                    {
+                        contractIdentity = AssemblyName.GetAssemblyName(dllPath);
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogError(
+                            ex,
+                            "Library plugin [{Library}]: failed to read AssemblyName from contract [{Path}]; skipping the library.",
+                            library.Manifest.EntryAssembly,
+                            dllPath);
+                        libraryRejected = true;
+                        break;
+                    }
+
+                    var version = contractIdentity.Version?.ToString() ?? "0.0.0.0";
+                    var token = contractIdentity.GetPublicKeyToken() is { Length: > 0 } t
+                        ? Convert.ToHexString(t)
+                        : string.Empty;
+                    var identity = (simpleName, version, token);
+
+                    if (promotedByIdentity.Contains(identity))
+                    {
+                        // Same simple name + version + token: a sibling library has
+                        // already promoted this exact assembly. Reuse it; no-op.
+                        continue;
+                    }
+
+                    try
+                    {
+                        AssemblyLoadContext.Default.LoadFromAssemblyPath(dllPath);
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogError(
+                            ex,
+                            "Library plugin [{Library}]: failed to promote contract [{Path}] into the default ALC; skipping the library.",
+                            library.Manifest.EntryAssembly,
+                            dllPath);
+                        libraryRejected = true;
+                        break;
+                    }
+
+                    promotedByIdentity.Add(identity);
+                    promotedAssemblyNames.Add(simpleName);
+
+                    logger.LogInformation(
+                        "Promoted library contract [{Contract}] v{Version} into the default ALC for library plugin [{Library}].",
+                        simpleName,
+                        version,
+                        library.Manifest.EntryAssembly);
+                }
+
+                if (!libraryRejected)
+                    survivors.Add(library);
+            }
+
+            return survivors;
+        }
+
+        private sealed class ContractIdentityComparer
+            : IEqualityComparer<(string Name, string Version, string Token)>
+        {
+            public bool Equals(
+                (string Name, string Version, string Token) x,
+                (string Name, string Version, string Token) y) =>
+                string.Equals(x.Name, y.Name, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(x.Version, y.Version, StringComparison.Ordinal)
+                && string.Equals(x.Token, y.Token, StringComparison.Ordinal);
+
+            public int GetHashCode((string Name, string Version, string Token) obj) =>
+                HashCode.Combine(
+                    StringComparer.OrdinalIgnoreCase.GetHashCode(obj.Name),
+                    obj.Version,
+                    obj.Token);
+        }
+
+        private LoadedPlugin? TryLoadPluginFolder(string subdir, IPluginManifest manifest, HashSet<string> hostAssemblyNames)
+        {
             var dllPath = Path.Combine(subdir, manifest.EntryAssembly + ".dll");
             if (!File.Exists(dllPath))
             {
@@ -220,13 +582,23 @@ namespace KnockBox.Core.Plugins
         }
 
         /// <summary>
-        /// Activates every <see cref="IGameModule"/> in <paramref name="assembly"/>
+        /// Activates every <see cref="IPluginModule"/> in <paramref name="assembly"/>
         /// and returns the single one whose
         /// <see cref="IPluginManifest.RouteIdentifier"/> matches the on-disk
-        /// manifest. Modules whose ctors throw are logged and skipped; having a
-        /// broken sibling module does not prevent the matching one from loading.
+        /// manifest and whose runtime type matches
+        /// <see cref="IPluginManifest.Kind"/>. Modules whose ctors throw are
+        /// logged and skipped; having a broken sibling module does not prevent
+        /// the matching one from loading.
         /// </summary>
-        private IGameModule? FindMatchingModule(Assembly assembly, IPluginManifest manifest)
+        /// <remarks>
+        /// The kind/type cross-check is the second of two enforcement layers:
+        /// the parser already rejects e.g. a manifest with
+        /// <c>kind: library</c> + <c>exportedContracts: []</c> as ambiguous, but
+        /// the parser cannot know what interface the module type implements.
+        /// This method catches the case where a manifest says "library" but the
+        /// type implements <see cref="IGameModule"/> (or vice-versa).
+        /// </remarks>
+        private IPluginModule? FindMatchingModule(Assembly assembly, IPluginManifest manifest)
         {
             Type?[] types;
             try
@@ -239,7 +611,7 @@ namespace KnockBox.Core.Plugins
                 {
                     logger.LogError(
                         loaderException,
-                        "Loader exception while scanning [{Assembly}] for game modules; skipping the entire assembly.",
+                        "Loader exception while scanning [{Assembly}] for plugin modules; skipping the entire assembly.",
                         assembly.GetName().Name);
                 }
                 return null;
@@ -248,19 +620,31 @@ namespace KnockBox.Core.Plugins
             {
                 logger.LogError(
                     ex,
-                    "Failed to scan [{Assembly}] for game modules.",
+                    "Failed to scan [{Assembly}] for plugin modules.",
                     assembly.GetName().Name);
                 return null;
             }
 
-            IGameModule? match = null;
+            // The required runtime interface depends on the manifest's kind.
+            // Game manifests must resolve to IGameModule; library manifests must
+            // resolve to ILibraryModule. We scan for the broader IPluginModule
+            // surface and then enforce the exact-kind rule below so we can emit
+            // a precise error if e.g. a "library" manifest's type implements
+            // IGameModule instead.
+            var requiredType = manifest.Kind switch
+            {
+                PluginKind.Library => typeof(ILibraryModule),
+                _ => typeof(IGameModule),
+            };
+
+            IPluginModule? match = null;
             foreach (var type in types)
             {
                 if (type is null)
                     continue;
                 if (type.IsInterface || type.IsAbstract)
                     continue;
-                if (!typeof(IGameModule).IsAssignableFrom(type))
+                if (!typeof(IPluginModule).IsAssignableFrom(type))
                     continue;
 
                 var module = TryActivate(type);
@@ -270,11 +654,23 @@ namespace KnockBox.Core.Plugins
                 if (!string.Equals(module.Manifest.RouteIdentifier, manifest.RouteIdentifier, StringComparison.Ordinal))
                     continue;
 
+                if (!requiredType.IsInstanceOfType(module))
+                {
+                    logger.LogError(
+                        "Plugin assembly [{Assembly}] declares kind [{Kind}] in its manifest but module type [{Type}] does not implement [{Required}]; skipping.",
+                        assembly.GetName().Name,
+                        manifest.Kind,
+                        type.FullName,
+                        requiredType.Name);
+                    return null;
+                }
+
                 if (match is not null)
                 {
                     logger.LogError(
-                        "Plugin assembly [{Assembly}] has multiple IGameModule types claiming route [{Route}] ([{First}], [{Second}]); skipping.",
+                        "Plugin assembly [{Assembly}] has multiple {Required} types claiming route [{Route}] ([{First}], [{Second}]); skipping.",
                         assembly.GetName().Name,
+                        requiredType.Name,
                         manifest.RouteIdentifier,
                         match.GetType().FullName,
                         type.FullName);
@@ -287,8 +683,9 @@ namespace KnockBox.Core.Plugins
             if (match is null)
             {
                 logger.LogError(
-                    "Plugin assembly [{Assembly}] has no IGameModule implementation whose Manifest.RouteIdentifier matches the on-disk plugin.json route [{Route}]; skipping.",
+                    "Plugin assembly [{Assembly}] has no {Required} implementation whose Manifest.RouteIdentifier matches the on-disk plugin.json route [{Route}]; skipping.",
                     assembly.GetName().Name,
+                    requiredType.Name,
                     manifest.RouteIdentifier);
             }
 
@@ -342,7 +739,7 @@ namespace KnockBox.Core.Plugins
         {
             var depsJsonPath = Path.ChangeExtension(pluginDllPath, ".deps.json");
             if (!File.Exists(depsJsonPath))
-                return default;
+                return new DepsInspection(null, null);
 
             try
             {
@@ -351,7 +748,7 @@ namespace KnockBox.Core.Plugins
 
                 if (!doc.RootElement.TryGetProperty("libraries", out var libraries) ||
                     libraries.ValueKind != JsonValueKind.Object)
-                    return default;
+                    return new DepsInspection(null, null);
 
                 string? forbidden = null;
                 Version? coreVersion = null;
@@ -402,7 +799,7 @@ namespace KnockBox.Core.Plugins
                     ex,
                     "Failed to parse .deps.json for plugin [{Dll}]; forbidden-dependency and Core-version checks will be skipped.",
                     pluginDllPath);
-                return default;
+                return new DepsInspection(null, null);
             }
         }
 
@@ -625,7 +1022,7 @@ namespace KnockBox.Core.Plugins
         /// </summary>
         internal static Version? ResolveHostCoreVersion()
         {
-            var assembly = typeof(IGameModule).Assembly;
+            var assembly = typeof(IPluginModule).Assembly;
             var infoVersion = assembly
                 .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
                 .InformationalVersion;
@@ -646,7 +1043,7 @@ namespace KnockBox.Core.Plugins
         /// </summary>
         internal static readonly TimeSpan ModuleActivationTimeout = TimeSpan.FromSeconds(5);
 
-        private IGameModule? TryActivate(Type moduleType)
+        private IPluginModule? TryActivate(Type moduleType)
         {
             try
             {
@@ -657,18 +1054,18 @@ namespace KnockBox.Core.Plugins
                 if (!activation.Wait(ModuleActivationTimeout))
                 {
                     logger.LogError(
-                        "Game module [{Type}] from [{Assembly}] exceeded the {Timeout:g} activation timeout; skipping.",
+                        "Plugin module [{Type}] from [{Assembly}] exceeded the {Timeout:g} activation timeout; skipping.",
                         moduleType.FullName,
                         moduleType.Assembly.GetName().Name,
                         ModuleActivationTimeout);
                     return null;
                 }
 
-                if (activation.Result is IGameModule module)
+                if (activation.Result is IPluginModule module)
                     return module;
 
                 logger.LogError(
-                    "Type [{Type}] implements IGameModule but could not be activated as one.",
+                    "Type [{Type}] implements IPluginModule but could not be activated as one.",
                     moduleType.FullName);
                 return null;
             }
@@ -676,7 +1073,7 @@ namespace KnockBox.Core.Plugins
             {
                 logger.LogError(
                     agg.InnerException,
-                    "Failed to activate game module [{Type}] from [{Assembly}]. " +
+                    "Failed to activate plugin module [{Type}] from [{Assembly}]. " +
                     "Ensure it has a public parameterless constructor.",
                     moduleType.FullName,
                     moduleType.Assembly.GetName().Name);
@@ -686,7 +1083,7 @@ namespace KnockBox.Core.Plugins
             {
                 logger.LogError(
                     ex,
-                    "Failed to activate game module [{Type}] from [{Assembly}]. " +
+                    "Failed to activate plugin module [{Type}] from [{Assembly}]. " +
                     "Ensure it has a public parameterless constructor.",
                     moduleType.FullName,
                     moduleType.Assembly.GetName().Name);
@@ -719,6 +1116,17 @@ namespace KnockBox.Core.Plugins
                 disagreement =
                     $"Capabilities disk=[{string.Join(',', onDisk.Capabilities)}] " +
                     $"code=[{string.Join(',', fromModule.Capabilities)}]";
+                return false;
+            }
+            if (onDisk.Kind != fromModule.Kind)
+            { disagreement = $"Kind disk=[{onDisk.Kind}] code=[{fromModule.Kind}]"; return false; }
+            if (!onDisk.ExportedContracts
+                .ToHashSet(StringComparer.OrdinalIgnoreCase)
+                .SetEquals(fromModule.ExportedContracts))
+            {
+                disagreement =
+                    $"ExportedContracts disk=[{string.Join(',', onDisk.ExportedContracts)}] " +
+                    $"code=[{string.Join(',', fromModule.ExportedContracts)}]";
                 return false;
             }
 

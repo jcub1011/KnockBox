@@ -5,8 +5,16 @@ namespace KnockBox.DndMapper.Services
     // unsubscribe in Dispose.
     public sealed class TokenFocusService
     {
-        public event Action<Guid>? Focused;
+        public event Func<Guid, ValueTask>? Focused;
 
-        public void Focus(Guid tokenId) => Focused?.Invoke(tokenId);
+        public async ValueTask FocusAsync(Guid tokenId)
+        {
+            var handler = Focused;
+            if (handler is null) return;
+            foreach (Func<Guid, ValueTask> sub in handler.GetInvocationList())
+            {
+                await sub(tokenId).ConfigureAwait(false);
+            }
+        }
     }
 }

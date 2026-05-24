@@ -13,12 +13,6 @@ namespace KnockBox.AlphaChain
         public void RegisterServices(IPluginRegistration registration)
             => registration.AddGameEngine<AlphaChainGameEngine>();
 
-        public RenderFragment GetButtonContent() => builder =>
-        {
-            builder.OpenComponent<AlphaChainTile>(0);
-            builder.CloseComponent();
-        };
-
         public RenderFragment? GetCustomHeader() => builder =>
         {
             builder.OpenComponent<AlphaChainHeader>(0);

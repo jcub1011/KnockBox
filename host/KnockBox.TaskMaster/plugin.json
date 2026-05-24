@@ -5,5 +5,7 @@
   "routeIdentifier": "task-master",
   "version": "1.0.0",
   "entryAssembly": "KnockBox.TaskMaster",
-  "capabilities": []
+  "capabilities": [],
+  "tileAsset": "tile.svg",
+  "workInProgress": true
 }

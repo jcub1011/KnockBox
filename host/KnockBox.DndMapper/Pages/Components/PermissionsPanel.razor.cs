@@ -27,40 +27,20 @@ namespace KnockBox.DndMapper.Pages.Components
 
         private static string PillCls(bool active) => active ? "active" : string.Empty;
 
-        private async Task SetTokenMovement(TokenMovementPolicy v)
-        {
-            var next = State.Settings.Clone();
-            next.TokenMovement = v;
-            await Apply(next);
-        }
+        private Task SetTokenMovement(TokenMovementPolicy v)
+            => Apply(State.Settings with { TokenMovement = v });
 
-        private async Task SetSheetEdit(SheetEditPolicy v)
-        {
-            var next = State.Settings.Clone();
-            next.SheetEditByOthers = v;
-            await Apply(next);
-        }
+        private Task SetSheetEdit(SheetEditPolicy v)
+            => Apply(State.Settings with { SheetEditByOthers = v });
 
-        private async Task SetRollsVisible(bool v)
-        {
-            var next = State.Settings.Clone();
-            next.RollsVisibleToPlayers = v;
-            await Apply(next);
-        }
+        private Task SetRollsVisible(bool v)
+            => Apply(State.Settings with { RollsVisibleToPlayers = v });
 
-        private async Task SetPlayersCanCreateNpcs(bool v)
-        {
-            var next = State.Settings.Clone();
-            next.PlayersCanCreateNPCs = v;
-            await Apply(next);
-        }
+        private Task SetPlayersCanCreateNpcs(bool v)
+            => Apply(State.Settings with { PlayersCanCreateNPCs = v });
 
-        private async Task SetPlayersCanSeeOtherSheets(bool v)
-        {
-            var next = State.Settings.Clone();
-            next.PlayersCanSeeOtherSheets = v;
-            await Apply(next);
-        }
+        private Task SetPlayersCanSeeOtherSheets(bool v)
+            => Apply(State.Settings with { PlayersCanSeeOtherSheets = v });
 
         private async Task Apply(Services.State.Games.Data.DndMapperSettings next)
         {

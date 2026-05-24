@@ -1,19 +1,22 @@
+using System.Collections.Immutable;
+
 namespace KnockBox.DndMapper.Services.State.Games.Data
 {
-    public sealed class CharacterSheet
+    public sealed record CharacterSheet
     {
-        public Guid Id { get; set; }
-        public string? OwnerUserId { get; set; }
+        public Guid Id { get; init; }
+        public string? OwnerUserId { get; init; }
         // Set when a player leaves mid-session and their sheet is orphaned —
         // mirrors Token.RepresentsUserId so the UI can show "originally played by …"
         // until the host reassigns the character to another player.
-        public string? RepresentsUserId { get; set; }
-        public string CharacterName { get; set; } = string.Empty;
-        public Dictionary<string, AttributeValue> Values { get; } = [];
-        public string Notes { get; set; } = string.Empty;
-        public int? Hp { get; set; }
-        public int? MaxHp { get; set; }
-        public List<StatusEffect> StatusEffects { get; } = [];
-        public List<RollTemplate> RollTemplates { get; } = [];
+        public string? RepresentsUserId { get; init; }
+        public string CharacterName { get; init; } = string.Empty;
+        public ImmutableDictionary<string, AttributeValue> Values { get; init; }
+            = ImmutableDictionary<string, AttributeValue>.Empty;
+        public string Notes { get; init; } = string.Empty;
+        public int? Hp { get; init; }
+        public int? MaxHp { get; init; }
+        public ImmutableList<StatusEffect> StatusEffects { get; init; } = ImmutableList<StatusEffect>.Empty;
+        public ImmutableList<RollTemplate> RollTemplates { get; init; } = ImmutableList<RollTemplate>.Empty;
     }
 }

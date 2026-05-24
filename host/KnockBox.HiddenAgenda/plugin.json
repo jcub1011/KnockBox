@@ -5,5 +5,7 @@
   "routeIdentifier": "hidden-agenda",
   "version": "1.0.0",
   "entryAssembly": "KnockBox.HiddenAgenda",
-  "capabilities": []
+  "capabilities": [],
+  "tileAsset": "tile.svg",
+  "workInProgress": true
 }

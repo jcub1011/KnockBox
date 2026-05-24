@@ -68,12 +68,83 @@
     font-family: var(--font-primary);
 }
 
-/* SVG map keeps the void background so colored tokens pop. */
-.dndm-map-canvas {
-    flex: 1 1 auto;
+/* The transform wrapper holds the bitmap layer and the SVG vector layer as
+   siblings, both naturally sized to W*cellPx × H*cellPx in CSS px. Anchored
+   at the stage's top-left so dndMapperViewport.js's existing pan/zoom math
+   (which expects world (0,0) at the wrapper's natural top-left) works
+   unchanged. ResetView computes the centering pan. */
+.dndm-canvas-transform {
+    position: absolute;
+    left: 0;
+    top: 0;
+    /* Above the sibling bitmap canvas so the SVG inside paints on top. */
+    z-index: 1;
+    transform-origin: 50% 50%;
+    will-change: transform;
+    /* preserve-3d is what makes the child <img>'s `backface-visibility:
+       hidden` (below) safe — it stops the default `flat` flattening that
+       would otherwise compute the children's normals AFTER this
+       wrapper's scale, occasionally orienting them away from the camera
+       and producing the "image element present but blank" bug. Keeping
+       children in 3D space lets Chromium promote each <img> to its own
+       composited layer so the wrapper's backing store stays empty and
+       does not balloon with `scale(zoom)`. */
+    transform-style: preserve-3d;
+    /* No background — leaving this layer empty of paint commands keeps its
+       backing store minimal so it composites the (independently promoted)
+       image and SVG child layers cheaply. The void color lives on the
+       stage below. */
+}
+
+/* Viewport-sized bitmap canvas owned by dndMapperBitmapCanvas.js. Sits as a
+   sibling of .dndm-canvas-transform (not inside it) so the canvas itself is
+   never CSS-transformed — the renderer draws each image at its current
+   screen rect every frame. pointer-events:none lets clicks fall through to
+   the SVG picker rects above. */
+.dndm-bitmap-canvas {
+    position: absolute;
+    inset: 0;
     width: 100%;
     height: 100%;
-    background: var(--dndm-void);
+    pointer-events: none;
+    /* Below the SVG-bearing .dndm-canvas-transform sibling in DOM order, but
+       both are positioned absolute — explicit z-index keeps the canvas
+       beneath when other CSS overrides paint order. */
+    z-index: 0;
+}
+
+/* GPU-tiled grid replacement for the per-cell SVG <line> elements. Two
+   linear-gradients produce one 1px vertical and one 1px horizontal line
+   per --dndm-cell-px tile; the compositor handles the tiling natively
+   so there's zero DOM count and no per-render markup churn. The box-shadow
+   inset paints the trailing right + bottom edge lines that the tile pattern
+   alone can't place — the gradient draws a line at the LEFT/TOP of each
+   tile (x = 0, cellPx, …, (W-1)·cellPx), giving W vertical lines; the
+   shadow adds the (W+1)th at the right edge to match the SVG version's
+   `x = 0 .. WidthCells inclusive`. Sits between the image-layer and the
+   SVG inside .dndm-canvas-transform so tokens/fog/handles still paint
+   over it. */
+.dndm-grid-background {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-image:
+        linear-gradient(to right, var(--dndm-grid-line) 1px, transparent 1px),
+        linear-gradient(to bottom, var(--dndm-grid-line) 1px, transparent 1px);
+    background-size: var(--dndm-cell-px) var(--dndm-cell-px);
+    box-shadow:
+        inset -1px 0 0 var(--dndm-grid-line),
+        inset 0 -1px 0 var(--dndm-grid-line);
+}
+
+/* SVG map keeps cursor + touch behavior. The bitmap layer is now a sibling
+   canvas of .dndm-canvas-transform (see .dndm-bitmap-canvas above), so the
+   stacking order is canvas behind, then .dndm-canvas-transform on top with
+   the SVG inside it. */
+.dndm-map-canvas {
+    display: block;
+    position: relative;
+    z-index: 1;
     cursor: grab;
     touch-action: none;
 }
@@ -126,6 +197,102 @@
         0 0 8px rgba(232, 144, 85, 0.5);
 }
 
+/* ─── Fog toolbar group ─────────────────────────────────────────────
+   Vertical hairline separator so the host can distinguish the fog
+   cluster (paint / erase / brush / fill / clear) from the markup
+   toggle that precedes it. */
+.dndm-toolbar-sep {
+    width: 1px;
+    height: 1.1rem;
+    background: var(--dndm-divider, rgba(255, 255, 255, 0.12));
+    margin: 0 0.15rem;
+    display: inline-block;
+    vertical-align: middle;
+}
+
+.dndm-fog-btn {
+    font-size: 1.05rem;
+    line-height: 1;
+}
+
+/* Active paint/erase mode shares the markup toggle's ember-glow so
+   the host sees a single visual language for "this verb is armed". */
+.dndm-fog-btn--active {
+    background: linear-gradient(180deg, var(--dndm-ember-hi), var(--dndm-ember) 55%, #8a4a22 100%);
+    border-color: #5a2e14;
+    color: #1a1208;
+    text-shadow: 0 1px 0 rgba(255, 220, 180, 0.35);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 220, 180, 0.4),
+        inset 0 -1px 2px rgba(0, 0, 0, 0.45),
+        0 0 8px rgba(232, 144, 85, 0.5);
+}
+
+.dndm-fog-brush {
+    font-weight: 600;
+    min-width: 1.75rem;
+}
+
+/* Focus-box tool sits next to the markup toggle in the toolbar. Active state
+   shares the same ember glow as markup/fog so the "this verb is armed" visual
+   language is consistent across host tools. */
+.dndm-focus-toggle {
+    font-size: 1.05rem;
+    line-height: 1;
+}
+
+.dndm-focus-toggle--active {
+    background: linear-gradient(180deg, var(--dndm-ember-hi), var(--dndm-ember) 55%, #8a4a22 100%);
+    border-color: #5a2e14;
+    color: #1a1208;
+    text-shadow: 0 1px 0 rgba(255, 220, 180, 0.35);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 220, 180, 0.4),
+        inset 0 -1px 2px rgba(0, 0, 0, 0.45),
+        0 0 8px rgba(232, 144, 85, 0.5);
+}
+
+.dndm-focus-clear {
+    font-size: 1rem;
+    line-height: 1;
+}
+
+/* Ruler toggle shares the ember "this verb is armed" visual language. */
+.dndm-ruler-toggle {
+    font-size: 1.05rem;
+    line-height: 1;
+}
+
+.dndm-ruler-toggle--active {
+    background: linear-gradient(180deg, var(--dndm-ember-hi), var(--dndm-ember) 55%, #8a4a22 100%);
+    border-color: #5a2e14;
+    color: #1a1208;
+    text-shadow: 0 1px 0 rgba(255, 220, 180, 0.35);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 220, 180, 0.4),
+        inset 0 -1px 2px rgba(0, 0, 0, 0.45),
+        0 0 8px rgba(232, 144, 85, 0.5);
+}
+
+/* Ruler measurement label pill — sits at the midpoint of the two
+   selected points, inverse-scaled by --dndm-inv-zoom so it stays a
+   constant on-screen size at every zoom level. */
+.dndm-ruler-pill {
+    fill: rgba(15, 10, 7, 0.92);
+    stroke: #e89055;
+    stroke-width: 1;
+}
+
+.dndm-ruler-pill-text {
+    fill: #fff8ec;
+    font-family: "JetBrains Mono", "Fira Code", Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+    font-weight: 500;
+    letter-spacing: 0.2px;
+    pointer-events: none;
+    user-select: none;
+}
+
 /* Saved markup re-renders as a plain SVG group — let strokes paint
    freely; the host-supplied `stroke` and `fill` attributes already
    carry the colors they were drawn with. */
@@ -146,14 +313,18 @@
     min-height: 0;
     display: flex;
     flex-direction: column;
-}
-
-.dndm-canvas-stage > svg.dndm-map-canvas {
-    flex: 1 1 auto;
-    min-height: 0;
-    width: 100%;
-    height: 100%;
-    display: block;
+    /* The SVG inside applies a CSS transform during pan/zoom; clip it here
+       so a scaled-up SVG cannot visually spill over the sibling toolbar. */
+    overflow: hidden;
+    /* Block text selection anywhere in the map area. Tokens render SVG
+       <text> for initials/stack counts; without this, dragging across a
+       glyph would highlight it and the next mousedown would start a
+       browser text-drag instead of the active tool's gesture. A scoped
+       .unselectable rule on TokenLayer was not enough because tokens
+       rendered via RenderTreeBuilder in the code-behind don't pick up
+       the scoped-CSS attribute. */
+    user-select: none;
+    -webkit-user-select: none;
 }
 
 /* The drawing surface mounts here when the host enables markup. It
@@ -162,17 +333,24 @@
    the underlying SVG and the drawing surface share preserveAspectRatio
    "xMidYMid meet" with a viewBox in grid-cell units, so a stroke at
    (5, 5) lands on the same map cell regardless of container shape. */
+/* Mounted inside .dndm-canvas-transform so the drawing surface rides the
+   same pan/zoom as the map SVG. Sized to the wrapper's natural map area;
+   the drawing surface inside uses a viewBox of WidthCells*CellPixels x
+   HeightCells*CellPixels, which equals the wrapper's natural pixel size,
+   so a stroke at viewBox (5,5) lands on the same cell regardless of
+   pan/zoom state. */
 .dndm-markup-overlay-mount {
     position: absolute;
-    top: 0;
-    bottom: 0;
-    /* Inset by the live rail widths inherited from .dnd-mapper-playing.
-       Rails overlap the canvas, so the visible map area is the canvas
-       minus those gutters — the drawing surface must match that area. */
-    left: var(--dndm-rail-pad-left, 0px);
-    right: var(--dndm-rail-pad-right, 0px);
-    z-index: 4;
+    inset: 0;
+    z-index: 2;
     display: flex;
+}
+
+/* When the host holds Space we want left-click to fall through to the
+   gesture surface (canvas-stage) so the viewport can start a pan. */
+.dndm-markup-overlay-mount--pan,
+.dndm-markup-overlay-mount--pan * {
+    pointer-events: none;
 }
 
 .dndm-markup-overlay-mount > * {

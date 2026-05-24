@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Contract assembly for the KnockBox.WordService library plugin. Holds only
+    public interfaces and POCO types (IWordListService, WordPoolMode) that
+    consuming game plugins reference at compile time.
+
+    Deliberately has NO ProjectReferences to KnockBox.Core or any other
+    KnockBox.* project, and does NOT import Directory.Plugin.targets or
+    Directory.Library.targets. It is a pure interface-only sidecar that:
+      - is built and staged INTO the library plugin's libraries/{Name}/ folder
+        by Directory.Library.targets when the library csproj declares it via
+        <PluginExportedContract>;
+      - is referenced by consuming game plugins (via ProjectReference today,
+        via NuGet PackageReference if/when this assembly is published);
+      - is promoted into the default ALC by PluginLoader at host startup so
+        every consumer sees the same CLR type for the interfaces declared here.
+
+    Versioning rule: <Version>, <AssemblyVersion>, and <FileVersion> below
+    MUST all stay in sync — and the contracts' <Version> MUST match the
+    sibling library plugin's <Version>. The loader's contract-promotion
+    identity key is (simpleName, AssemblyName.Version, PublicKeyToken); pinning
+    <AssemblyVersion> explicitly here makes that key stable regardless of
+    publish format (single-file vs framework-dependent, etc.) and prevents the
+    implicit '1.0.0.0' from drifting if MSBuild's defaults ever change.
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <Version>1.0.0</Version>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
+    <Description>Public contract interfaces for the KnockBox.WordService library plugin.</Description>
+  </PropertyGroup>
+
+</Project>

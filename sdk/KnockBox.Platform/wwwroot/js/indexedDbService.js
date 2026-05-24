@@ -354,6 +354,48 @@ export function singleOpJsonPut(dbId, storeName, value, keyEnv) {
     });
 }
 
+/**
+ * Writes every item in `items` inside a single readwrite transaction that
+ * spans every distinct `item.storeName` referenced. Equivalent to N
+ * back-to-back singleOpJsonPut calls in terms of effect, but only one JS
+ * interop round-trip from .NET → JS → IDB → JS → .NET. The latter matters
+ * because each round-trip ties up the browser tab's main thread briefly;
+ * on a same-origin sibling tab (e.g. /display) that shared main-thread
+ * contention can interrupt compositor work running independently.
+ *
+ * items: [{ storeName, value, keyEnv }] — storeName is the destination
+ * object store, value is the JSON payload from .NET, keyEnv is the
+ * IndexedDbKey envelope (or null to use the store's out-of-line auto-key).
+ *
+ * Result: array of effective keys (wrapKey'd) in the same order as items.
+ */
+export function batchOpJsonPut(dbId, items) {
+    const count = items?.length ?? 0;
+    // Compute the unique set of stores the transaction needs to touch;
+    // IDB requires every store to be named up-front when opening the tx.
+    const storeNames = count === 0
+        ? []
+        : [...new Set(items.map(i => i.storeName))];
+    return singleOpTx(dbId, storeNames, "readwrite", (tx, record) => {
+        if (count === 0) { record([]); return; }
+        const results = new Array(count);
+        let outstanding = count;
+        for (let i = 0; i < count; i++) {
+            const item = items[i];
+            const store = tx.objectStore(item.storeName);
+            const key = unwrapKey(item.keyEnv);
+            const req = key !== undefined ? store.put(item.value, key) : store.put(item.value);
+            const idx = i;
+            req.onsuccess = () => {
+                results[idx] = wrapKey(req.result);
+                if (--outstanding === 0) record(results);
+            };
+            // onerror left to bubble to tx.onerror (singleOpTx handles it).
+            req.onerror = () => { /* surfaced via tx.onerror */ };
+        }
+    });
+}
+
 export function singleOpBlobGet(dbId, storeName, keyEnv) {
     return singleOpTx(dbId, [storeName], "readonly", (tx, record) => {
         const store = tx.objectStore(storeName);
@@ -401,8 +443,9 @@ export function clearStoresAtomic(dbId, storeNames) {
 // Blob lifecycle (create / read / object URL)
 // ---------------------------------------------------------------------------
 
-const blobUploads = new Map();
-
+// Used by the small-payload createBlobFromBytes path for sub-ChunkSize
+// blobs; larger uploads go through createBlobFromDotNetStream which uses
+// native binary framing and skips base64 entirely.
 function decodeBase64(b64) {
     const bin = atob(b64);
     const bytes = new Uint8Array(bin.length);
@@ -410,20 +453,130 @@ function decodeBase64(b64) {
     return bytes;
 }
 
-function encodeBase64(bytes) {
-    let bin = "";
-    for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
-    return btoa(bin);
-}
-
 function registerBlob(blob) {
     const blobId = nextHandleId++;
     handles.set(blobId, {
         obj: blob,
         kind: "blob",
-        extras: { contentType: blob.type, length: blob.size, objectUrl: null, readSnapshot: null },
+        // readBuffer is the materialized in-memory Uint8Array, populated
+        // lazily by openBlobReadStream on first share fetch. Chromium keeps
+        // large IDB-stored Blobs file-backed, so the implicit arrayBuffer()
+        // Blazor would otherwise issue mid-stream can stall on the disk
+        // read — pre-materializing here lets every share fetch read from
+        // RAM and the IJSStreamReference handshake completes immediately.
+        extras: { contentType: blob.type, length: blob.size, objectUrl: null, readBuffer: null },
     });
     return blobId;
+}
+
+// Iterates the File entries inside an <input type="file"> element, persists
+// each one into IndexedDB under a freshly generated UUID key, and registers
+// a JS-side blob handle pointing to that File. The bytes NEVER cross the
+// SignalR boundary — the .NET side only sees the metadata in the returned
+// envelope. Per-file failures (type/size rejected, IDB put failed) are
+// reported as an `error` string on that entry rather than aborting the
+// whole batch, so the caller can summarize them per file.
+//
+// Strictly storage-layer: this function does not decode the bytes (image
+// dimensions, audio duration, page count, …). Callers that need format-
+// specific metadata should compose against the returned blob handle via
+// IndexedDbBlob.CreateObjectUrlAsync / OpenReadAsync in their own JS.
+//
+// options: { acceptedTypes?: string[], maxBytes?: number }
+export async function adoptInputElementFiles(inputElement, dbId, storeName, options) {
+    if (!inputElement || !inputElement.files) {
+        return fail({
+            kind: "Data",
+            jsName: null,
+            message: "inputElement is not an <input type=file> with a files collection.",
+        });
+    }
+
+    let db;
+    try { db = getHandle(dbId, "db").obj; }
+    catch (e) { return fail(mapDomError(e)); }
+
+    const acceptedTypes = options?.acceptedTypes || null;
+    const maxBytes = options?.maxBytes ?? Number.MAX_SAFE_INTEGER;
+
+    const files = Array.from(inputElement.files);
+    const items = [];
+    for (const file of files) {
+        const entry = { filename: file.name, contentType: file.type, length: file.size };
+
+        if (acceptedTypes && !acceptedTypes.includes(file.type)) {
+            entry.error = "type rejected";
+            items.push(entry);
+            continue;
+        }
+        if (file.size <= 0) {
+            entry.error = "empty file";
+            items.push(entry);
+            continue;
+        }
+        if (file.size > maxBytes) {
+            entry.error = `exceeds ${maxBytes} bytes`;
+            items.push(entry);
+            continue;
+        }
+
+        const key = generateUuid();
+        try {
+            await putBlobUnderKey(db, storeName, file, key);
+        } catch (e) {
+            entry.error = `indexeddb put failed: ${e?.message || e}`;
+            items.push(entry);
+            continue;
+        }
+
+        entry.key = key;
+        entry.blobId = registerBlob(file);
+        items.push(entry);
+    }
+
+    // Clear the input so the user can re-pick the same file later. Some user
+    // agents make .value read-only outside a user gesture; swallow that.
+    try { inputElement.value = ""; } catch (_) { /* ignore */ }
+
+    return ok({ items });
+}
+
+// One IDB transaction per file — mirrors singleOpBlobPut's contract so the
+// transaction's active-flag stays inside the synchronous request handler
+// (the IDB v3 reset rule that the comment at the top of this file calls
+// out applies here too).
+function putBlobUnderKey(db, storeName, blob, key) {
+    return new Promise((resolve, reject) => {
+        let tx;
+        try { tx = db.transaction([storeName], "readwrite"); }
+        catch (e) { reject(e); return; }
+        try {
+            const req = tx.objectStore(storeName).put(blob, key);
+            req.onerror = () => { /* surfaced via tx.onerror */ };
+        } catch (e) {
+            try { tx.abort(); } catch (_) { /* ignore */ }
+            reject(e);
+            return;
+        }
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+        tx.onabort = () => reject(tx.error || new Error("transaction aborted"));
+    });
+}
+
+// crypto.randomUUID is available on secure contexts (https/localhost). The
+// fallback synthesizes a v4 UUID from getRandomValues so dev-over-http
+// scenarios still produce stable, parseable Guids on the .NET side.
+function generateUuid() {
+    if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+        return crypto.randomUUID();
+    }
+    const buf = new Uint8Array(16);
+    crypto.getRandomValues(buf);
+    buf[6] = (buf[6] & 0x0f) | 0x40;
+    buf[8] = (buf[8] & 0x3f) | 0x80;
+    const hex = Array.from(buf, b => b.toString(16).padStart(2, "0"));
+    return `${hex.slice(0,4).join("")}-${hex.slice(4,6).join("")}-${hex.slice(6,8).join("")}-${hex.slice(8,10).join("")}-${hex.slice(10,16).join("")}`;
 }
 
 export function createBlobFromBytes(base64, contentType) {
@@ -436,73 +589,58 @@ export function createBlobFromBytes(base64, contentType) {
     }
 }
 
-export function createBlobStreamBegin(contentType, length) {
-    const uploadId = nextHandleId++;
-    blobUploads.set(uploadId, { chunks: [], contentType, expectedLength: length, received: 0 });
-    return ok({ uploadId });
-}
-
-export function createBlobStreamAppend(uploadId, base64) {
-    const upload = blobUploads.get(uploadId);
-    if (!upload) {
-        return fail({ kind: "Data", jsName: null, message: `Blob upload ${uploadId} not found.` });
-    }
+// Upload (C# → JS via DotNetStreamReference). Blazor frames the C#-side
+// stream's bytes natively over SignalR; the JS side reads the entire
+// stream into one ArrayBuffer and constructs a Blob — no base64, no per-
+// chunk InvokeAsync loop. Returns the standard {ok, value} envelope so
+// IndexedDbService.CreateBlobAsync's unwrap path still applies.
+//
+// MEMORY: streamRef.arrayBuffer() materializes the full upload payload in
+// the JS heap before the Blob is constructed (the Blob then frees the
+// ArrayBuffer once IDB takes ownership). Peak JS-side memory is ~2x the
+// upload size during the handshake. With the per-file cap at 100 MB
+// (ImageUploadButton) this peaks near ~200 MB transiently — fine for
+// desktop browsers but worth keeping in mind if the cap rises.
+export async function createBlobFromDotNetStream(streamRef, contentType, _length) {
     try {
-        const bytes = decodeBase64(base64);
-        upload.chunks.push(bytes);
-        upload.received += bytes.length;
-        return ok();
-    } catch (e) {
-        return fail(mapDomError(e));
-    }
-}
-
-export function createBlobStreamFinish(uploadId) {
-    const upload = blobUploads.get(uploadId);
-    if (!upload) {
-        return fail({ kind: "Data", jsName: null, message: `Blob upload ${uploadId} not found.` });
-    }
-    blobUploads.delete(uploadId);
-    try {
-        const blob = new Blob(upload.chunks, { type: upload.contentType });
+        const buffer = await streamRef.arrayBuffer();
+        const blob = new Blob([buffer], { type: contentType || "application/octet-stream" });
         return ok({ blobId: registerBlob(blob), length: blob.size });
     } catch (e) {
         return fail(mapDomError(e));
     }
 }
 
-export async function blobPrepareRead(blobId) {
-    try {
-        const entry = getHandle(blobId, "blob");
-        if (!entry.extras.readSnapshot) {
-            const buf = await entry.obj.arrayBuffer();
-            entry.extras.readSnapshot = new Uint8Array(buf);
-        }
-        return ok({
-            length: entry.extras.readSnapshot.length,
-            contentType: entry.extras.contentType,
-        });
-    } catch (e) {
-        return fail(mapDomError(e));
+// Download (JS → C# via IJSStreamReference). Returns the blob's bytes as
+// a Uint8Array; Blazor accepts Uint8Array as an IJSStreamReference source
+// and reads from it synchronously over native SignalR binary frames.
+//
+// IMPORTANT: this materialization is eager. Chromium keeps IDB-retrieved
+// Blobs larger than ~64 KB file-backed (the bytes live on disk in the
+// browser's blob storage and only become RAM-resident when .arrayBuffer()
+// is called). If we returned the raw Blob instead, Blazor's stream
+// protocol would issue a .arrayBuffer() AFTER the IJSStreamReference
+// handshake on the C# side, racing the disk read against the
+// `RemoteJSDataStream` "no data received in N seconds" timeout. The
+// observed symptom (large image fetch hangs 60 s on first attempt while
+// a small image fetch in the same load succeeds) is that exact race.
+// Materializing here, BEFORE we return to Blazor's wrapping logic,
+// guarantees the handshake completes and the first chunk leaves
+// immediately.
+//
+// The cached buffer survives until the blob handle is released — so
+// subsequent fetches of the same share token re-read from RAM.
+//
+// NOTE: this export intentionally does NOT use the {ok, value} envelope —
+// Blazor's stream-reference handshake reads the return value as the
+// streamable object itself.
+export async function openBlobReadStream(blobId) {
+    const entry = getHandle(blobId, "blob");
+    if (!entry.extras.readBuffer) {
+        const buf = await entry.obj.arrayBuffer();
+        entry.extras.readBuffer = new Uint8Array(buf);
     }
-}
-
-export function blobReadChunk(blobId, offset, count) {
-    try {
-        const entry = getHandle(blobId, "blob");
-        const snap = entry.extras.readSnapshot;
-        if (!snap) {
-            return fail({
-                kind: "Data", jsName: null,
-                message: "blobPrepareRead must be called before blobReadChunk.",
-            });
-        }
-        const end = Math.min(offset + count, snap.length);
-        const slice = end > offset ? snap.subarray(offset, end) : new Uint8Array(0);
-        return ok({ base64: encodeBase64(slice) });
-    } catch (e) {
-        return fail(mapDomError(e));
-    }
+    return entry.extras.readBuffer;
 }
 
 export function blobCreateObjectUrl(blobId) {

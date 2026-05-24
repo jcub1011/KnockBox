@@ -13,12 +13,6 @@ namespace KnockBox.TaskMaster
         public void RegisterServices(IPluginRegistration registration)
             => registration.AddGameEngine<TaskMasterGameEngine>();
 
-        public RenderFragment GetButtonContent() => builder =>
-        {
-            builder.OpenComponent<TaskMasterTile>(0);
-            builder.CloseComponent();
-        };
-
         public RenderFragment? GetCustomHeader() => builder =>
         {
             builder.OpenComponent<TaskMasterHeader>(0);

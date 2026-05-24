@@ -20,7 +20,8 @@ namespace KnockBox.DrawnToDress.Pages
 
         [Parameter] public DrawnToDressGameState GameState { get; set; } = default!;
 
-        private SvgDrawingCanvas? _canvas;
+        private SvgDrawingEngine? _engine;
+        private readonly string _svgId = $"svg-canvas-{Guid.NewGuid():N}";
         private bool _submitting;
         private string? _errorMessage;
         private bool _showMannequin;
@@ -134,7 +135,7 @@ namespace KnockBox.DrawnToDress.Pages
         /// </summary>
         protected async Task SubmitDrawingAsync()
         {
-            if (_canvas is null || UserService.CurrentUser is null || GameState.Context is null)
+            if (_engine is null || UserService.CurrentUser is null || GameState.Context is null)
                 return;
 
             _errorMessage = null;
@@ -146,7 +147,7 @@ namespace KnockBox.DrawnToDress.Pages
                 string? svgContent;
                 try
                 {
-                    svgContent = await _canvas.GetSvgContentAsync();
+                    svgContent = await _engine.GetSvgContentAsync();
                 }
                 // TaskCanceledException (the specific exception from the bug report) inherits
                 // from OperationCanceledException, so this catch covers both.
@@ -176,7 +177,7 @@ namespace KnockBox.DrawnToDress.Pages
                 }
 
                 // Clear the canvas so the player can draw a new item.
-                await _canvas.ClearAsync();
+                await _engine.ClearAsync();
 
                 // Auto-ready when the player has hit the drawing limit.
                 int myMax = CurrentTypeMaxItems;
@@ -221,11 +222,11 @@ namespace KnockBox.DrawnToDress.Pages
                 // Auto-submit any in-progress drawing before marking done.
                 // Isolated in its own try/catch so that a canvas retrieval failure
                 // (e.g. a transient circuit interruption) does not block the ready signal.
-                if (_canvas is not null)
+                if (_engine is not null)
                 {
                     try
                     {
-                        var svgContent = await _canvas.GetSvgContentAsync();
+                        var svgContent = await _engine.GetSvgContentAsync();
                         if (!string.IsNullOrWhiteSpace(svgContent))
                         {
                             int myMax = CurrentTypeMaxItems;
@@ -272,11 +273,11 @@ namespace KnockBox.DrawnToDress.Pages
 
         public async ValueTask DisposeAsync()
         {
-            if (_canvas is not null)
+            if (_engine is not null)
             {
                 try
                 {
-                    await _canvas.DisposeAsync();
+                    await _engine.DisposeAsync();
                 }
                 catch (JSDisconnectedException) { }
             }

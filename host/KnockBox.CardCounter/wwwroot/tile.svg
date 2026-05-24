@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg"
+     viewBox="0 0 300 200"
+     preserveAspectRatio="xMidYMid slice"
+     aria-hidden="true">
+    <style>
+/* EMBEDDED FONTS BEGIN */
+@font-face {
+    font-family: 'Lexend';
+    font-style: normal;
+    font-weight: 900;
+    src: url('data:font/woff2;base64,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') format('woff2');
+}
+@font-face {
+    font-family: 'Lexend';
+    font-style: normal;
+    font-weight: 700;
+    src: url('data:font/woff2;base64,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') format('woff2');
+}
+/* EMBEDDED FONTS END */
+        .cc-card-body { fill: url(#cc-card-fill); stroke: #000; stroke-width: 2; }
+        .cc-card-trim { fill: none; stroke: rgba(247, 213, 71, 0.65); stroke-width: 1; }
+        .cc-card-trim-stripes { fill: url(#cc-card-stripes); }
+        .cc-felt-border { fill: none; stroke: rgba(247, 213, 71, 0.35); stroke-width: 1; }
+        .cc-chip-outer { fill: #c49a30; stroke: #000; stroke-width: 2; }
+        .cc-chip-mid-gold { fill: #f7d547; }
+        .cc-chip-ring { fill: #000; }
+        .cc-chip-core { fill: #f7d547; }
+        .cc-name {
+            fill: #f7d547;
+            font-family: 'Lexend', system-ui, sans-serif;
+            font-size: 22px;
+            font-weight: 900;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+        .cc-tag {
+            fill: rgba(247, 213, 71, 0.72);
+            font-family: 'Lexend', system-ui, sans-serif;
+            font-size: 9.5px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+    </style>
+
+    <defs>
+        <radialGradient id="cc-felt" cx="0.5" cy="0.35" r="0.7">
+            <stop offset="0%" stop-color="#128a55"/>
+            <stop offset="55%" stop-color="#0a5c3b"/>
+            <stop offset="100%" stop-color="#053a25"/>
+        </radialGradient>
+        <linearGradient id="cc-card-fill" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#162447"/>
+            <stop offset="100%" stop-color="#1f4068"/>
+        </linearGradient>
+        <pattern id="cc-weave" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+            <rect width="3" height="8" fill="rgba(0,0,0,0.05)"/>
+            <rect x="4" width="3" height="8" fill="rgba(255,255,255,0.02)"/>
+        </pattern>
+        <pattern id="cc-card-stripes" width="4" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+            <rect width="1" height="4" fill="rgba(247, 213, 71, 0.12)"/>
+        </pattern>
+        <filter id="cc-name-shadow" x="-10%" y="-30%" width="120%" height="160%">
+            <feDropShadow dx="2" dy="2" stdDeviation="0" flood-color="#000" flood-opacity="1"/>
+            <feDropShadow dx="0" dy="0" stdDeviation="6" flood-color="#f7d547" flood-opacity="0.3"/>
+        </filter>
+    </defs>
+
+    <!-- Felt background -->
+    <rect width="300" height="200" fill="url(#cc-felt)"/>
+    <rect width="300" height="200" fill="url(#cc-weave)"/>
+
+    <!-- Inner gold border / glow -->
+    <rect x="6" y="6" width="288" height="188" rx="10" class="cc-felt-border"/>
+
+    <!-- Three-card fan, centered around (150, 50), card 36x52 -->
+    <!-- Left card: rotated -12deg, shifted -14px from center, origin at bottom center -->
+    <g transform="rotate(-12 150 76) translate(-14 0)">
+        <rect x="132" y="24" width="36" height="52" rx="5" class="cc-card-body"/>
+        <rect x="135" y="27" width="30" height="46" rx="3" class="cc-card-trim-stripes"/>
+        <rect x="135" y="27" width="30" height="46" rx="3" class="cc-card-trim"/>
+    </g>
+    <!-- Right card: rotated +12deg, shifted +14px from center -->
+    <g transform="rotate(12 150 76) translate(14 0)">
+        <rect x="132" y="24" width="36" height="52" rx="5" class="cc-card-body"/>
+        <rect x="135" y="27" width="30" height="46" rx="3" class="cc-card-trim-stripes"/>
+        <rect x="135" y="27" width="30" height="46" rx="3" class="cc-card-trim"/>
+    </g>
+    <!-- Middle card: lifted -3px -->
+    <g transform="translate(0 -3)">
+        <rect x="132" y="24" width="36" height="52" rx="5" class="cc-card-body"/>
+        <rect x="135" y="27" width="30" height="46" rx="3" class="cc-card-trim-stripes"/>
+        <rect x="135" y="27" width="30" height="46" rx="3" class="cc-card-trim"/>
+    </g>
+
+    <!-- Chip stack bottom-left (x=22-44, y=140-170). Three chips, stacked rising. -->
+    <g>
+        <!-- Chip 3 (top of stack) -->
+        <g transform="translate(26 142)">
+            <circle cx="11" cy="11" r="11" class="cc-chip-outer"/>
+            <circle cx="11" cy="11" r="6.6" class="cc-chip-mid-gold"/>
+            <circle cx="11" cy="11" r="4.2" class="cc-chip-ring"/>
+            <circle cx="11" cy="11" r="3.8" class="cc-chip-core"/>
+        </g>
+        <!-- Chip 2 -->
+        <g transform="translate(24 152)">
+            <circle cx="11" cy="11" r="11" class="cc-chip-outer"/>
+            <circle cx="11" cy="11" r="6.6" class="cc-chip-mid-gold"/>
+            <circle cx="11" cy="11" r="4.2" class="cc-chip-ring"/>
+            <circle cx="11" cy="11" r="3.8" class="cc-chip-core"/>
+        </g>
+        <!-- Chip 1 (bottom of stack) -->
+        <g transform="translate(22 162)">
+            <circle cx="11" cy="11" r="11" class="cc-chip-outer"/>
+            <circle cx="11" cy="11" r="6.6" class="cc-chip-mid-gold"/>
+            <circle cx="11" cy="11" r="4.2" class="cc-chip-ring"/>
+            <circle cx="11" cy="11" r="3.8" class="cc-chip-core"/>
+        </g>
+    </g>
+
+    <!-- Title + Tagline -->
+    <text x="150" y="138" text-anchor="middle" class="cc-name" filter="url(#cc-name-shadow)">CARD COUNTER</text>
+    <text x="150" y="160" text-anchor="middle" class="cc-tag">Bluff, count cards, bust the table.</text>
+</svg>
