@@ -86,7 +86,7 @@
                                            checked="@picked"
                                            @onchange="@(e => TogglePick(token.Id, (bool)(e.Value ?? false)))" />
                                     <span class="dndm-initiative-picker-swatch"
-                                          style="@($"background:{token.Color};")"></span>
+                                          style="@($"background:{token.ResolveColor(State.Sheets)};")"></span>
                                     <span class="dndm-initiative-picker-name">@token.Name</span>
                                 </label>
                             </li>

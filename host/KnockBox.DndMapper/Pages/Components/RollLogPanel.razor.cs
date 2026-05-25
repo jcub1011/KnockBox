@@ -232,11 +232,17 @@ namespace KnockBox.DndMapper.Pages.Components
         }
 
         // Applies a template's configured dice / flat / mode / label / attribute
-        // into the shared Config. Missing-attribute resolution: if the active
-        // schema doesn't carry the template's AttributeName, leave the field
-        // unselected so the next roll uses no attribute mod. Restoring the
-        // schema later re-binds without data loss because the template's
-        // stored name is never mutated by a schema swap.
+        // into the shared Config.
+        //
+        // Attribute resolution rules:
+        // - Template carries a name AND the schema has it → bind it.
+        // - Template carries a name but the schema doesn't have it → leave the
+        //   user's current selection in place. (Earlier this branch silently
+        //   nulled, which produced a "looks selected but isn't" bug where the
+        //   dropdown displayed an attribute the engine had no way to bind to.)
+        // - Template carries no name (baseline d20 / 2d6 / etc.) → leave the
+        //   user's current selection in place. A bare die-roll preset
+        //   shouldn't clobber an attribute the user already picked.
         private void ApplyTemplate(RollTemplate t)
         {
             Config.Terms = [.. t.Dice];
@@ -249,10 +255,7 @@ namespace KnockBox.DndMapper.Pages.Components
             {
                 Config.AttributeName = t.AttributeName;
             }
-            else
-            {
-                Config.AttributeName = null;
-            }
+            // Both fallthrough branches intentionally leave Config.AttributeName.
         }
 
         private void OpenTemplateLibrary() => _libraryOpen = true;

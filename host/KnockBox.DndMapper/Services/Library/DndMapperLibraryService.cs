@@ -1790,6 +1790,96 @@ namespace KnockBox.DndMapper.Services.Library
         // ── .vtf import / export ──────────────────────────────────────────
 
         /// <summary>
+        /// Builds the JSON shards a VTF archive needs for the slot, plus the
+        /// list of image refs the client packer should fetch from IndexedDB.
+        /// This is the preferred export path: image bytes never cross the
+        /// SignalR boundary because the client-side packer reads them out of
+        /// IndexedDB directly and assembles the ZIP locally.
+        /// <para>
+        /// <see cref="ExportSlotAsync"/> is retained for tests and as a fallback
+        /// when the client-side path is unavailable (e.g. browsers without
+        /// CompressionStream support).
+        /// </para>
+        /// </summary>
+        internal async ValueTask<ValueResult<VtfPackager.ClientPayload>> BuildExportPayloadAsync(
+            string slotId, CancellationToken ct = default)
+        {
+            ThrowIfDisposed();
+            if (_db is null) return ValueResult<VtfPackager.ClientPayload>.FromError("Library is not attached.");
+            if (string.IsNullOrWhiteSpace(slotId)) return ValueResult<VtfPackager.ClientPayload>.FromError("Slot id is required.");
+
+            try
+            {
+                var idx = await ReadSlotsIndexAsync(_db, ct);
+                var entry = idx.Slots.FirstOrDefault(s => s.Id == slotId);
+                if (entry is null) return ValueResult<VtfPackager.ClientPayload>.FromError("Unknown slot id.");
+
+                var (snapshot, core, _) = await ReadShardedSlotAsync(_db, slotId, ct);
+                if (snapshot is null || core is null)
+                {
+                    var legacy = await MigrateV3SlotIfNeededAsync(_db, slotId, ct);
+                    if (legacy is null)
+                        return ValueResult<VtfPackager.ClientPayload>.FromError("Slot has no persisted content to export.");
+                    snapshot = legacy;
+                    core = new LibraryCoreSnapshot
+                    {
+                        SchemaVersion = 4,
+                        Settings = legacy.Settings,
+                        AttributeSchema = legacy.AttributeSchema,
+                        ActiveSchemaTemplateId = legacy.ActiveSchemaTemplateId,
+                        InitiativeAttributeName = legacy.InitiativeAttributeName,
+                        CustomTemplates = legacy.CustomTemplates,
+                        GlobalRollTemplates = legacy.GlobalRollTemplates,
+                        MapIds = legacy.Maps.OrderBy(m => m.ListOrder).Select(m => m.Id).ToList(),
+                        SheetIds = legacy.Sheets.Select(s => s.Id).ToList(),
+                    };
+                }
+
+                // Content-type table only — no bytes. Distinct() because the
+                // same image id can be referenced by multiple maps (e.g.
+                // duplicate-map flow); we only need one entry per id.
+                var imageContentTypes = snapshot.Maps
+                    .SelectMany(m => m.Images.Select(i => (i.Id, i.ContentType)))
+                    .GroupBy(p => p.Id)
+                    .ToDictionary(g => g.Key, g => g.First().ContentType);
+
+                var extension = new VtfPackager.VtfExtensionPayload(
+                    ActiveCombat: null,
+                    Phase: DndMapperPhase.Lobby);
+
+                var fileName = SanitizeForFilename(entry.Name) + ".vtf";
+
+                var payload = VtfPackager.BuildClientPayload(
+                    slotTitle: entry.Name,
+                    fileName: fileName,
+                    core: core,
+                    maps: snapshot.Maps,
+                    sheets: snapshot.Sheets,
+                    imageContentTypes: imageContentTypes,
+                    extension: extension);
+
+                return ValueResult<VtfPackager.ClientPayload>.FromValue(payload);
+            }
+            catch (OperationCanceledException) { return ValueResult<VtfPackager.ClientPayload>.FromCancellation(); }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "DnD Mapper VTF client-payload build failed for slot {SlotId}.", slotId);
+                return ValueResult<VtfPackager.ClientPayload>.FromError("Export failed.");
+            }
+        }
+
+        private static string SanitizeForFilename(string raw)
+        {
+            if (string.IsNullOrWhiteSpace(raw)) return "slot";
+            var invalid = Path.GetInvalidFileNameChars();
+            var sb = new System.Text.StringBuilder(raw.Length);
+            foreach (var c in raw)
+                sb.Append(Array.IndexOf(invalid, c) >= 0 ? '_' : c);
+            var name = sb.ToString().Trim();
+            return string.IsNullOrEmpty(name) ? "slot" : name;
+        }
+
+        /// <summary>
         /// Packages a slot — its core spine, every map and sheet shard, and
         /// every referenced image blob — into a `.vtf` (Virtual Table Format)
         /// archive. The result is returned as a fresh <see cref="IndexedDbBlob"/>
@@ -1797,6 +1887,11 @@ namespace KnockBox.DndMapper.Services.Library
         /// <see cref="IndexedDbBlob.CreateObjectUrlAsync"/> + an &lt;a download&gt;
         /// click, then dispose to revoke. Reads from IndexedDB only; the live
         /// state is not touched.
+        /// <para>
+        /// Retained as a fallback for browsers without CompressionStream support
+        /// and for unit testing the on-disk archive layout. New callers should
+        /// prefer <see cref="BuildExportPayloadAsync"/> + the client-side packer.
+        /// </para>
         /// </summary>
         public async ValueTask<ValueResult<VtfExportResult>> ExportSlotAsync(
             string slotId, CancellationToken ct = default)
@@ -2291,6 +2386,9 @@ namespace KnockBox.DndMapper.Services.Library
                     Notes = sheetSnap.Notes,
                     Hp = sheetSnap.Hp,
                     MaxHp = sheetSnap.MaxHp,
+                    ArmorClass = sheetSnap.ArmorClass,
+                    Color = sheetSnap.Color ?? string.Empty,
+                    ScopedMapId = sheetSnap.ScopedMapId,
                     Values = valuesBuilder.ToImmutable(),
                     StatusEffects = statusBuilder.ToImmutable(),
                     RollTemplates = rollsBuilder.ToImmutable(),

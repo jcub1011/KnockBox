@@ -195,6 +195,13 @@ namespace KnockBox.DndMapper.Services.Library
         public string Notes { get; init; } = string.Empty;
         public int? Hp { get; init; }
         public int? MaxHp { get; init; }
+        // New 2026-05: nullable AC, persisted color, map scoping. Older
+        // snapshots without these keys deserialize to null / empty / null
+        // respectively — no schema bump needed because the runtime defaults
+        // match (AC unset, color falls back to token color, sheet is global).
+        public int? ArmorClass { get; init; }
+        public string Color { get; init; } = string.Empty;
+        public Guid? ScopedMapId { get; init; }
         public List<StatusEffectSnapshot> StatusEffects { get; init; } = [];
         public List<RollTemplateSnapshot> RollTemplates { get; init; } = [];
         // OwnerUserId not persisted (see TokenSnapshot rationale).
@@ -483,6 +490,9 @@ namespace KnockBox.DndMapper.Services.Library
             Notes = sheet.Notes,
             Hp = sheet.Hp,
             MaxHp = sheet.MaxHp,
+            ArmorClass = sheet.ArmorClass,
+            Color = sheet.Color,
+            ScopedMapId = sheet.ScopedMapId,
             StatusEffects = sheet.StatusEffects.Select(ToStatusEffectSnapshot).ToList(),
             RollTemplates = sheet.RollTemplates.Select(ToRollTemplateSnapshot).ToList(),
         };

@@ -62,6 +62,91 @@ namespace KnockBox.DndMapper.Services.Library.Vtf
             VtfExtensionPayload Extension,
             IReadOnlyList<string> Warnings);
 
+        /// <summary>One JSON entry destined for a VTF archive entry path.</summary>
+        public sealed record ClientPayloadEntry(string Path, string Content);
+
+        /// <summary>Per-image reference for the client packer to fetch from IndexedDB.</summary>
+        public sealed record ClientImageRef(string Id, string Path);
+
+        /// <summary>
+        /// JSON-only export payload. Same JSON entries as <see cref="Pack"/>
+        /// would write into the archive, plus a list of image refs the client
+        /// is expected to read out of IndexedDB and embed (uncompressed) at
+        /// the listed paths. Image bytes intentionally never cross the SignalR
+        /// boundary — this is the whole point of the client-side packer.
+        /// </summary>
+        public sealed record ClientPayload(
+            string SlotName,
+            string FileName,
+            IReadOnlyList<ClientPayloadEntry> Entries,
+            IReadOnlyList<ClientImageRef> Images);
+
+        /// <summary>
+        /// Builds the JSON shards a VTF archive needs. The caller (typically
+        /// a JS-side packer) is responsible for assembling the ZIP and
+        /// attaching the binary image entries — this method intentionally
+        /// returns NO image bytes so a slot with hundreds of MB of map art
+        /// produces only a small JSON payload at the boundary.
+        /// </summary>
+        public static ClientPayload BuildClientPayload(
+            string slotTitle,
+            string fileName,
+            LibraryCoreSnapshot core,
+            IReadOnlyList<MapSnapshot> maps,
+            IReadOnlyList<SheetSnapshot> sheets,
+            IReadOnlyDictionary<Guid, string> imageContentTypes,
+            VtfExtensionPayload extension)
+        {
+            ArgumentNullException.ThrowIfNull(core);
+            ArgumentNullException.ThrowIfNull(maps);
+            ArgumentNullException.ThrowIfNull(sheets);
+            ArgumentNullException.ThrowIfNull(imageContentTypes);
+
+            var imageExtById = new Dictionary<Guid, string>(imageContentTypes.Count);
+            foreach (var (id, contentType) in imageContentTypes)
+                imageExtById[id] = ExtensionForContentType(contentType);
+
+            // Mirrors Pack's iteration order — manifest → global → scenes →
+            // entities → extension. The extension is intentionally written
+            // last for symmetry with the server-side archive; ZIP entry
+            // order doesn't affect VTF correctness but keeps the on-disk
+            // bytes recognizable across both code paths.
+            var entries = new List<ClientPayloadEntry>(2 + maps.Count + sheets.Count + 1);
+
+            var packInput = new PackInput(slotTitle, core, maps, sheets,
+                ImageEnumerableAsEmptyDictionary(), extension);
+            entries.Add(new ClientPayloadEntry(ManifestEntryName, SerializeIndented(BuildManifest(packInput))));
+            entries.Add(new ClientPayloadEntry(GlobalStateEntryName, SerializeIndented(BuildGlobalState(core))));
+
+            foreach (var map in maps)
+                entries.Add(new ClientPayloadEntry(
+                    $"{ScenesPrefix}{map.Id:D}.json",
+                    SerializeIndented(BuildScene(map, imageExtById))));
+
+            foreach (var sheet in sheets)
+                entries.Add(new ClientPayloadEntry(
+                    $"{EntitiesPrefix}{SheetEntityPrefix}{sheet.Id:D}.json",
+                    SerializeIndented(BuildEntity(sheet))));
+
+            entries.Add(new ClientPayloadEntry(ExtensionEntryName, SerializeIndented(extension)));
+
+            var imageRefs = new List<ClientImageRef>(imageExtById.Count);
+            foreach (var (id, ext) in imageExtById)
+                imageRefs.Add(new ClientImageRef(id.ToString("D"), $"{ImagesPrefix}{id:D}{ext}"));
+
+            return new ClientPayload(slotTitle, fileName, entries, imageRefs);
+        }
+
+        // Pack's PackInput requires an Images dict purely for ExtensionForContentType
+        // resolution; BuildClientPayload supplies the content-type map directly so
+        // it doesn't need image bytes. This helper hands BuildManifest an empty
+        // dictionary it never reads.
+        private static IReadOnlyDictionary<Guid, VtfImageAsset> ImageEnumerableAsEmptyDictionary()
+            => new Dictionary<Guid, VtfImageAsset>();
+
+        private static string SerializeIndented<T>(T value) =>
+            JsonSerializer.Serialize(value, JsonIndented);
+
         public static void Pack(PackInput input, Stream destination)
         {
             ArgumentNullException.ThrowIfNull(input);

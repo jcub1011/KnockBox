@@ -258,6 +258,152 @@ namespace KnockBox.DndMapperTests.Unit
             Assert.IsTrue(change.IsFailure);
         }
 
+        // ── DuplicateSheetAsync ───────────────────────────────────────────────
+
+        [TestMethod]
+        public void DuplicateSheetAsync_HostCaller_ClonesEveryFieldAndClearsOwner()
+        {
+            var sheetId = SeedSheetForPlayer(null);
+            _engine.UpdateSheetAttributeAsync(_state, _host, sheetId, "STR", AttributeValue.Score(18));
+            _engine.UpdateSheetFreeFieldsAsync(_state, _host, sheetId, "Wizard", "lonely", 5, 9);
+            _engine.UpdateSheetArmorClassAsync(_state, _host, sheetId, 17);
+            _engine.UpdateSheetColorAsync(_state, _host, sheetId, "#abcdef");
+
+            var dup = _engine.DuplicateSheetAsync(_state, _host, sheetId);
+            Assert.IsTrue(dup.TryGetSuccess(out var newId));
+            Assert.AreNotEqual(sheetId, newId);
+
+            var clone = _state.Sheets[newId];
+            Assert.AreEqual("Wizard (copy)", clone.CharacterName);
+            Assert.AreEqual("lonely", clone.Notes);
+            Assert.AreEqual(5, clone.Hp);
+            Assert.AreEqual(9, clone.MaxHp);
+            Assert.AreEqual(17, clone.ArmorClass);
+            Assert.AreEqual("#abcdef", clone.Color);
+            Assert.AreEqual(18, clone.Values["STR"].IntValue);
+            Assert.IsNull(clone.OwnerUserId);
+            Assert.IsNull(clone.RepresentsUserId);
+        }
+
+        [TestMethod]
+        public void DuplicateSheetAsync_NonHostCaller_ReturnsError()
+        {
+            var sheetId = SeedSheetForPlayer(null);
+            var player = EngineTestFactory.RegisterPlayer(_state);
+            var dup = _engine.DuplicateSheetAsync(_state, player, sheetId);
+            Assert.IsTrue(dup.IsFailure);
+        }
+
+        [TestMethod]
+        public void DuplicateSheetAsync_UnknownSheetId_ReturnsError()
+        {
+            var dup = _engine.DuplicateSheetAsync(_state, _host, Guid.NewGuid());
+            Assert.IsTrue(dup.IsFailure);
+        }
+
+        // ── UpdateSheetArmorClassAsync ────────────────────────────────────────
+
+        [TestMethod]
+        public void UpdateSheetArmorClassAsync_HostCaller_SetsAndClears()
+        {
+            var sheetId = SeedSheetForPlayer(null);
+            Assert.IsTrue(_engine.UpdateSheetArmorClassAsync(_state, _host, sheetId, 14).IsSuccess);
+            Assert.AreEqual(14, _state.Sheets[sheetId].ArmorClass);
+
+            Assert.IsTrue(_engine.UpdateSheetArmorClassAsync(_state, _host, sheetId, null).IsSuccess);
+            Assert.IsNull(_state.Sheets[sheetId].ArmorClass);
+        }
+
+        // ── UpdateSheetColorAsync ─────────────────────────────────────────────
+
+        [TestMethod]
+        public void UpdateSheetColorAsync_PropagatesViaResolveColor()
+        {
+            // Create a map with a token linked to the sheet; sheet color should
+            // win over token color in the resolver.
+            var c = _engine.CreateMapAsync(_state, _host, "Arena");
+            Assert.IsTrue(c.TryGetSuccess(out var mapId));
+            _engine.SetActiveMapAsync(_state, _host, mapId);
+            var sheetId = SeedSheetForPlayer(null);
+            var tcr = _engine.CreateTokenForSheetOnMapAsync(_state, _host, sheetId, mapId);
+            Assert.IsTrue(tcr.TryGetSuccess(out var tokenId));
+
+            Assert.IsTrue(_engine.UpdateSheetColorAsync(_state, _host, sheetId, "#ff00ff").IsSuccess);
+            var token = _state.Maps.Single(m => m.Id == mapId).Tokens.Single(t => t.Id == tokenId);
+            Assert.AreEqual("#ff00ff", token.ResolveColor(_state.Sheets));
+        }
+
+        // ── UpdateSheetScopeAsync ─────────────────────────────────────────────
+
+        [TestMethod]
+        public void UpdateSheetScopeAsync_HostCaller_PinsAndClears()
+        {
+            var c = _engine.CreateMapAsync(_state, _host, "Arena");
+            Assert.IsTrue(c.TryGetSuccess(out var mapId));
+            var sheetId = SeedSheetForPlayer(null);
+
+            Assert.IsTrue(_engine.UpdateSheetScopeAsync(_state, _host, sheetId, mapId).IsSuccess);
+            Assert.AreEqual(mapId, _state.Sheets[sheetId].ScopedMapId);
+
+            Assert.IsTrue(_engine.UpdateSheetScopeAsync(_state, _host, sheetId, null).IsSuccess);
+            Assert.IsNull(_state.Sheets[sheetId].ScopedMapId);
+        }
+
+        [TestMethod]
+        public void UpdateSheetScopeAsync_NonHostCaller_ReturnsError()
+        {
+            var sheetId = SeedSheetForPlayer(null);
+            var player = EngineTestFactory.RegisterPlayer(_state);
+            var result = _engine.UpdateSheetScopeAsync(_state, player, sheetId, null);
+            Assert.IsTrue(result.IsFailure);
+        }
+
+        [TestMethod]
+        public void UpdateSheetScopeAsync_UnknownMapId_ReturnsError()
+        {
+            var sheetId = SeedSheetForPlayer(null);
+            var result = _engine.UpdateSheetScopeAsync(_state, _host, sheetId, Guid.NewGuid());
+            Assert.IsTrue(result.IsFailure);
+        }
+
+        // ── CreateTokenForSheetOnMapAsync ─────────────────────────────────────
+
+        [TestMethod]
+        public void CreateTokenForSheetOnMapAsync_HostCaller_SpawnsLinkedToken()
+        {
+            var c = _engine.CreateMapAsync(_state, _host, "Arena");
+            Assert.IsTrue(c.TryGetSuccess(out var mapId));
+            _engine.SetActiveMapAsync(_state, _host, mapId);
+            var sheetId = SeedSheetForPlayer(null);
+
+            var tcr = _engine.CreateTokenForSheetOnMapAsync(_state, _host, sheetId, mapId);
+            Assert.IsTrue(tcr.TryGetSuccess(out var tokenId));
+
+            var token = _state.Maps.Single(m => m.Id == mapId).Tokens.Single(t => t.Id == tokenId);
+            Assert.AreEqual(sheetId, token.SheetId);
+            Assert.AreEqual("Sheet", token.Name);
+            Assert.AreEqual(TokenType.NPCToken, token.Type);
+        }
+
+        [TestMethod]
+        public void CreateTokenForSheetOnMapAsync_UnknownMap_ReturnsError()
+        {
+            var sheetId = SeedSheetForPlayer(null);
+            var tcr = _engine.CreateTokenForSheetOnMapAsync(_state, _host, sheetId, Guid.NewGuid());
+            Assert.IsTrue(tcr.IsFailure);
+        }
+
+        [TestMethod]
+        public void CreateTokenForSheetOnMapAsync_NonHostCaller_ReturnsError()
+        {
+            var c = _engine.CreateMapAsync(_state, _host, "Arena");
+            Assert.IsTrue(c.TryGetSuccess(out var mapId));
+            var sheetId = SeedSheetForPlayer(null);
+            var player = EngineTestFactory.RegisterPlayer(_state);
+            var tcr = _engine.CreateTokenForSheetOnMapAsync(_state, player, sheetId, mapId);
+            Assert.IsTrue(tcr.IsFailure);
+        }
+
         private Guid SeedSheetForPlayer(string? ownerUserId)
         {
             var result = _engine.CreateSheetAsync(_state, _host, ownerUserId, "Sheet");

@@ -203,17 +203,27 @@ namespace KnockBox.DndMapper.Pages.Components
             return classes;
         }
 
-        private static string FillFor(Token token)
+        private string FillFor(Token token)
         {
-            if (string.IsNullOrEmpty(token.Color)) return "#444";
-            // Use the token's color directly as the fill — distinct from the
+            var color = token.ResolveColor(State.Sheets);
+            if (string.IsNullOrEmpty(color)) return "#444";
+            // Use the resolved color directly as the fill — distinct from the
             // border because we render the border at the same color but with
             // a slight opacity bump in CSS.
-            return token.Color;
+            return color;
         }
 
-        private static string TextFillFor(Token token)
-            => TokenTextContrast.TextFillFor(token.Color);
+        private string TextFillFor(Token token)
+            => TokenTextContrast.TextFillFor(token.ResolveColor(State.Sheets));
+
+        // The token's effective stroke/border color — used inline in the
+        // SVG render tree. Sheet color wins when the token is linked to a
+        // colored sheet; falls back to Token.Color then to the neutral gray.
+        private string StrokeFor(Token token)
+        {
+            var color = token.ResolveColor(State.Sheets);
+            return string.IsNullOrEmpty(color) ? "#888" : color;
+        }
 
         public async ValueTask DisposeAsync()
         {

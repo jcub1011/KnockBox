@@ -8,6 +8,7 @@ namespace KnockBox.DndMapper.Pages.Components
     public partial class HostSavesPanel : DisposableComponent
     {
         private const string DownloadModulePath = "/_content/KnockBox.DndMapper/js/dndMapperFileDownload.js";
+        private const string VtfPackagerModulePath = "/_content/KnockBox.DndMapper/js/dndMapperVtfPackager.js";
 
         [Inject] protected DndMapperLibraryService Library { get; set; } = default!;
         [Inject] protected IJSRuntime JS { get; set; } = default!;
@@ -32,6 +33,7 @@ namespace KnockBox.DndMapper.Pages.Components
 
         private string? _exportingSlotId;
         private IJSObjectReference? _downloadModule;
+        private IJSObjectReference? _vtfPackagerModule;
 
         protected override async Task OnInitializedAsync()
         {
@@ -164,29 +166,23 @@ namespace KnockBox.DndMapper.Pages.Components
             StateHasChanged();
             try
             {
-                var result = await Library.ExportSlotAsync(slotId, ComponentDetached);
+                // Build JSON-only payload server-side (small, fast over the
+                // circuit). The JS module reads image blobs from IndexedDB
+                // directly and assembles the ZIP locally, so image bytes
+                // never round-trip — the slow leg of the old export.
+                var result = await Library.BuildExportPayloadAsync(slotId, ComponentDetached);
                 if (result.IsCanceled) return;
                 if (result.TryGetFailure(out var err))
                 {
                     if (Toasts is not null) await Toasts.Push(err.PublicMessage, DndMapperToastTone.Danger);
                     return;
                 }
-                if (!result.TryGetSuccess(out var export)) return;
+                if (!result.TryGetSuccess(out var payload)) return;
 
-                // Trigger the download via a hidden anchor click. The blob is
-                // disposed in the finally so its object URL is revoked once
-                // the browser has started the download.
-                try
-                {
-                    var url = await export.Blob.CreateObjectUrlAsync(ComponentDetached);
-                    _downloadModule ??= await JS.InvokeAsync<IJSObjectReference>("import", ComponentDetached, DownloadModulePath);
-                    var fileName = SanitizeForFilename(export.SlotName) + ".vtf";
-                    await _downloadModule.InvokeVoidAsync("downloadObjectUrl", ComponentDetached, url, fileName);
-                }
-                finally
-                {
-                    await export.Blob.DisposeAsync();
-                }
+                _vtfPackagerModule ??= await JS.InvokeAsync<IJSObjectReference>(
+                    "import", ComponentDetached, VtfPackagerModulePath);
+                var json = System.Text.Json.JsonSerializer.Serialize(payload, ExportJsonOptions);
+                await _vtfPackagerModule.InvokeVoidAsync("exportSlot", ComponentDetached, json);
             }
             catch (OperationCanceledException) { /* component detached */ }
             catch (Exception ex)
@@ -200,6 +196,14 @@ namespace KnockBox.DndMapper.Pages.Components
                 StateHasChanged();
             }
         }
+
+        // CamelCase so the JS side reads "slotName" / "fileName" / "entries" /
+        // "images" / "path" / "content" / "id" — matches what the packager
+        // module's exportSlot() expects.
+        private static readonly System.Text.Json.JsonSerializerOptions ExportJsonOptions = new()
+        {
+            PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase,
+        };
 
         private static string SanitizeForFilename(string raw)
         {
@@ -232,6 +236,11 @@ namespace KnockBox.DndMapper.Pages.Components
                 // and the module's only purpose was the anchor-click helper.
                 _ = _downloadModule.DisposeAsync().AsTask().ContinueWith(_ => { }, TaskScheduler.Default);
                 _downloadModule = null;
+            }
+            if (_vtfPackagerModule is not null)
+            {
+                _ = _vtfPackagerModule.DisposeAsync().AsTask().ContinueWith(_ => { }, TaskScheduler.Default);
+                _vtfPackagerModule = null;
             }
             base.Dispose();
         }

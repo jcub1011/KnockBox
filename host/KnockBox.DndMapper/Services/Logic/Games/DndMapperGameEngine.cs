@@ -716,6 +716,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                     Id = newId,
                     OwnerUserId = ownerUserId,
                     CharacterName = characterName,
+                    Color = DefaultColorPalette.FromName(characterName),
                     Values = SeedSheetValues(state.AttributeSchema),
                 };
                 state.Sheets = state.Sheets.SetItem(newId, sheet);
@@ -796,6 +797,150 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             if (exec.IsCanceled) return Result.FromCancellation();
             if (exec.TryGetFailure(out var execErr)) return Result.FromError(execErr);
             return error is null ? Result.Success : Result.FromError(error);
+        }
+
+        public Result UpdateSheetArmorClassAsync(DndMapperGameState state, User caller, Guid sheetId, int? armorClass)
+        {
+            if (state is null) return Result.FromError("State is required.");
+            if (caller is null) return Result.FromError("Caller is required.");
+
+            string? error = null;
+            var exec = state.Execute(() =>
+            {
+                if (!state.Sheets.TryGetValue(sheetId, out var sheet)) { error = "Unknown sheet id."; return; }
+                if (!CanEditSheet(state, caller, sheet)) { error = "You are not permitted to edit this sheet."; return; }
+
+                state.UpdateSheet(sheetId, s => s with { ArmorClass = armorClass });
+            });
+
+            if (exec.IsCanceled) return Result.FromCancellation();
+            if (exec.TryGetFailure(out var execErr)) return Result.FromError(execErr);
+            return error is null ? Result.Success : Result.FromError(error);
+        }
+
+        public Result UpdateSheetColorAsync(DndMapperGameState state, User caller, Guid sheetId, string color)
+        {
+            if (state is null) return Result.FromError("State is required.");
+            if (caller is null) return Result.FromError("Caller is required.");
+
+            string? error = null;
+            var exec = state.Execute(() =>
+            {
+                if (!state.Sheets.TryGetValue(sheetId, out var sheet)) { error = "Unknown sheet id."; return; }
+                if (!CanEditSheet(state, caller, sheet)) { error = "You are not permitted to edit this sheet."; return; }
+
+                state.UpdateSheet(sheetId, s => s with { Color = color ?? string.Empty });
+            });
+
+            if (exec.IsCanceled) return Result.FromCancellation();
+            if (exec.TryGetFailure(out var execErr)) return Result.FromError(execErr);
+            return error is null ? Result.Success : Result.FromError(error);
+        }
+
+        public Result UpdateSheetScopeAsync(DndMapperGameState state, User caller, Guid sheetId, Guid? scopedMapId)
+        {
+            if (state is null) return Result.FromError("State is required.");
+            if (caller is null) return Result.FromError("Caller is required.");
+            if (!IsHost(state, caller)) return Result.FromError("Only the host may change sheet scope.");
+
+            string? error = null;
+            var exec = state.Execute(() =>
+            {
+                if (!state.Sheets.ContainsKey(sheetId)) { error = "Unknown sheet id."; return; }
+                if (scopedMapId is Guid mid && state.Maps.All(m => m.Id != mid))
+                {
+                    error = "Unknown map id.";
+                    return;
+                }
+                state.UpdateSheet(sheetId, s => s with { ScopedMapId = scopedMapId });
+            });
+
+            if (exec.IsCanceled) return Result.FromCancellation();
+            if (exec.TryGetFailure(out var execErr)) return Result.FromError(execErr);
+            return error is null ? Result.Success : Result.FromError(error);
+        }
+
+        public ValueResult<Guid> DuplicateSheetAsync(DndMapperGameState state, User caller, Guid sourceSheetId)
+        {
+            if (state is null) return ValueResult<Guid>.FromError("State is required.");
+            if (caller is null) return ValueResult<Guid>.FromError("Caller is required.");
+            if (!IsHost(state, caller)) return ValueResult<Guid>.FromError("Only the host may duplicate sheets.");
+
+            Guid newId = default;
+            string? error = null;
+            var exec = state.Execute(() =>
+            {
+                if (!state.Sheets.TryGetValue(sourceSheetId, out var source)) { error = "Unknown sheet id."; return; }
+
+                newId = Guid.NewGuid();
+                // Status effects and roll templates are immutable lists carrying
+                // ids that are fine to share — they're keyed independently of the
+                // sheet. Owner / Represents intentionally clear so the duplicate
+                // starts as a host-owned NPC the host can reassign.
+                var clone = source with
+                {
+                    Id = newId,
+                    CharacterName = $"{source.CharacterName} (copy)",
+                    OwnerUserId = null,
+                    RepresentsUserId = null,
+                };
+                state.Sheets = state.Sheets.SetItem(newId, clone);
+            });
+
+            if (exec.IsCanceled) return ValueResult<Guid>.FromCancellation();
+            if (exec.TryGetFailure(out var execErr)) return ValueResult<Guid>.FromError(execErr);
+            if (error is not null) return ValueResult<Guid>.FromError(error);
+            return ValueResult<Guid>.FromValue(newId);
+        }
+
+        public ValueResult<Guid> CreateTokenForSheetOnMapAsync(DndMapperGameState state, User caller, Guid sheetId, Guid mapId)
+        {
+            if (state is null) return ValueResult<Guid>.FromError("State is required.");
+            if (caller is null) return ValueResult<Guid>.FromError("Caller is required.");
+            if (!IsHost(state, caller)) return ValueResult<Guid>.FromError("Only the host may create tokens for a sheet.");
+
+            Guid tokenId = Guid.Empty;
+            string? error = null;
+            var exec = state.Execute(() =>
+            {
+                if (!state.Sheets.TryGetValue(sheetId, out var sheet)) { error = "Unknown sheet id."; return; }
+
+                var mapIdx = state.IndexOfMap(mapId);
+                if (mapIdx < 0) { error = "Unknown map id."; return; }
+                var map = state.Maps[mapIdx];
+                var (sx, sy) = SpawnPosition(map);
+
+                tokenId = Guid.NewGuid();
+                // PlayerToken when the sheet has a live owner, NPCToken otherwise.
+                // RepresentsUserId mirrors the sheet so the "represents …" label
+                // round-trips into the new token without a separate engine call.
+                var hasLiveOwner = sheet.OwnerUserId is { } ouid
+                    && state.Players.Any(p => p.User.Id == ouid);
+                var token = new Token
+                {
+                    Id = tokenId,
+                    Type = hasLiveOwner ? TokenType.PlayerToken : TokenType.NPCToken,
+                    OwnerUserId = hasLiveOwner ? sheet.OwnerUserId : null,
+                    RepresentsUserId = sheet.RepresentsUserId,
+                    Name = sheet.CharacterName,
+                    // Token.Color is the fallback when sheet color isn't set.
+                    // Render sites prefer sheet.Color via Token.ResolveColor.
+                    Color = string.IsNullOrEmpty(sheet.Color)
+                        ? DefaultColorPalette.FromName(sheet.CharacterName)
+                        : sheet.Color,
+                    IconKind = TokenIconKind.Initial,
+                    MapId = mapId,
+                    X = sx,
+                    Y = sy,
+                    SheetId = sheetId,
+                };
+                state.Maps = state.Maps.SetItem(mapIdx, map with { Tokens = map.Tokens.Add(token) });
+            });
+
+            if (exec.IsCanceled) return ValueResult<Guid>.FromCancellation();
+            if (exec.TryGetFailure(out var execErr)) return ValueResult<Guid>.FromError(execErr);
+            if (error is not null) return ValueResult<Guid>.FromError(error);
+            return ValueResult<Guid>.FromValue(tokenId);
         }
 
         public Result DeleteSheetAsync(DndMapperGameState state, User caller, Guid sheetId)
@@ -3111,6 +3256,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                     Id = sheetId,
                     OwnerUserId = player.Id,
                     CharacterName = player.Name,
+                    Color = DefaultColorPalette.FromName(player.Name),
                     Values = SeedSheetValues(state.AttributeSchema),
                 };
                 state.Sheets = state.Sheets.SetItem(sheetId, sheet);

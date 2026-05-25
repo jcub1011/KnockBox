@@ -16,6 +16,13 @@
                         type="button"
                         title="Create a host-only NPC/monster sheet"
                         @onclick="OpenNpcModal">+</button>
+                @if (ActiveSheet is { } activeForDup)
+                {
+                    <button class="dndm-btn dndm-btn--small dndm-btn--icon"
+                            type="button"
+                            title="Duplicate current sheet"
+                            @onclick="@(() => OnDuplicateSheet(activeForDup))">⎘</button>
+                }
                 <button class="dndm-btn dndm-btn--small dndm-btn--icon"
                         type="button"
                         title="Sheet settings"
@@ -84,8 +91,6 @@
             {
                 <div class="dndm-sheet-tabs" role="tablist">
                     @{
-                        // When _activeSheetId is null (first render), fall back to ActiveSheet
-                        // so the auto-selected first sheet shows as the active tab.
                         var effectiveActiveId = _activeSheetId ?? ActiveSheet?.Id;
                     }
                     @foreach (var s in VisibleSheets)
@@ -139,6 +144,7 @@
         {
             var canEdit = SheetVisibilityHelper.CanEdit(sheet, CurrentUserId, IsHost, State.Settings.SheetEditByOthers);
             var canSeePrivate = SheetVisibilityHelper.CanSeeNotesAndHp(sheet, CurrentUserId, IsHost);
+            var activeMap = State.ActiveMapId is { } amid ? State.Maps.FirstOrDefault(m => m.Id == amid) : null;
 
             <div class="dndm-panel-body dndm-sheet-body">
                 @if (sheet.OwnerUserId is null && sheet.RepresentsUserId is not null)
@@ -190,6 +196,44 @@
                     }
                 }
 
+                @* Color + scope row — host-only. Color cascades to every token
+                   linked to this sheet via Token.ResolveColor. Scope null = global,
+                   non-null = visible only when that map is active. *@
+                @if (IsHost)
+                {
+                    <div class="dndm-sheet-meta-row">
+                        <label class="dndm-label dndm-sheet-meta-color">
+                            <span>Color</span>
+                            <input type="color"
+                                   class="dndm-color"
+                                   value="@(string.IsNullOrEmpty(sheet.Color) ? "#888888" : sheet.Color)"
+                                   @onchange="@(e => OnColorChange(sheet, (string?)e.Value))" />
+                        </label>
+                        <label class="dndm-label dndm-sheet-meta-scope">
+                            <span>Scope</span>
+                            <select class="dndm-select"
+                                    @onchange="@(e => OnScopeChange(sheet, (string?)e.Value))">
+                                <option value="" selected="@(sheet.ScopedMapId is null)">All maps</option>
+                                @if (activeMap is not null)
+                                {
+                                    <option value="@activeMap.Id" selected="@(sheet.ScopedMapId == activeMap.Id)">
+                                        Only "@activeMap.Name"
+                                    </option>
+                                }
+                                @* If the sheet is scoped to a map other than the active map,
+                                   show that as a disabled option so the user can see the binding. *@
+                                @if (sheet.ScopedMapId is { } sid && sid != activeMap?.Id)
+                                {
+                                    var scopedMap = State.Maps.FirstOrDefault(m => m.Id == sid);
+                                    <option value="@sid" selected="true">
+                                        Only "@(scopedMap?.Name ?? "(unknown map)")"
+                                    </option>
+                                }
+                            </select>
+                        </label>
+                    </div>
+                }
+
                 <table class="dndm-sheet-attr-table">
                     <colgroup>
                         <col span="1" style="width: 100%;"/>
@@ -209,6 +253,11 @@
                         @foreach (var row in State.AttributeSchema.Rows)
                         {
                             var current = sheet.Values.TryGetValue(row.Name, out var v) ? v : row.Default;
+                            // Prefer the local draft value (per-keystroke editing) over
+                            // the committed state so typing feels responsive. When no
+                            // draft exists for this attribute, fall back to the current
+                            // sheet value rendered as its native string.
+                            var draftRaw = _attrDrafts.TryGetValue(row.Name, out var dv) ? dv : null;
                             var contrib = AttributeContributionResolver.Resolve(sheet, row.Name, current);
                             var effectDelta = (contrib.EffectiveValue.IntValue ?? 0) - (current.IntValue ?? 0);
                             var effectsCls = effectDelta == 0 ? "" : effectDelta < 0 ? "is-neg" : "is-pos";
@@ -220,22 +269,25 @@
                                         case AttributeValueType.Score:
                                             <input type="number"
                                                    class="dndm-input dndm-input--num"
-                                                   value="@(current.IntValue ?? 10)"
+                                                   value="@(draftRaw ?? (current.IntValue ?? 10).ToString(System.Globalization.CultureInfo.InvariantCulture))"
                                                    disabled="@(!canEdit)"
-                                                   @onchange="@(e => CommitAttribute(sheet, row, AttributeValue.Score(ParseInt(e.Value, 10))))" />
+                                                   @oninput="@(e => OnAttributeInput(sheet, row, (string?)e.Value))"
+                                                   @onblur="@(() => FlushPendingCommitAsync())" />
                                             break;
                                         case AttributeValueType.Modifier:
                                             <input type="number"
                                                    class="dndm-input dndm-input--num"
-                                                   value="@(current.IntValue ?? 0)"
+                                                   value="@(draftRaw ?? (current.IntValue ?? 0).ToString(System.Globalization.CultureInfo.InvariantCulture))"
                                                    disabled="@(!canEdit)"
-                                                   @onchange="@(e => CommitAttribute(sheet, row, AttributeValue.Modifier(ParseInt(e.Value, 0))))" />
+                                                   @oninput="@(e => OnAttributeInput(sheet, row, (string?)e.Value))"
+                                                   @onblur="@(() => FlushPendingCommitAsync())" />
                                             break;
                                         case AttributeValueType.Text:
                                             <input class="dndm-input"
-                                                   value="@(current.StringValue ?? string.Empty)"
+                                                   value="@(draftRaw ?? (current.StringValue ?? string.Empty))"
                                                    disabled="@(!canEdit)"
-                                                   @onchange="@(e => CommitAttribute(sheet, row, AttributeValue.Text(((string?)e.Value) ?? string.Empty)))" />
+                                                   @oninput="@(e => OnAttributeInput(sheet, row, (string?)e.Value))"
+                                                   @onblur="@(() => FlushPendingCommitAsync())" />
                                             break;
                                     }
                                 </td>
@@ -277,7 +329,7 @@
                 @if (canSeePrivate && State.Settings.HpTrackingEnabled)
                 {
                     <div class="dndm-sheet-section">
-                        <span class="dndm-label">HP</span>
+                        <span class="dndm-label">HP / AC</span>
                         @if (sheet.Hp is null || sheet.MaxHp is null)
                         {
                             <button class="dndm-btn dndm-btn--small"
@@ -291,15 +343,17 @@
                                 <span class="dndm-sheet-hp-sep">Cur.</span>
                                 <input type="number"
                                        class="dndm-input dndm-input--num"
-                                       value="@sheet.Hp"
+                                       value="@_hpDraft"
                                        disabled="@(!canEdit)"
-                                       @onchange="@(e => OnHpDirect(sheet, (string?)e.Value))" />
+                                       @oninput="@(e => OnHpInput((string?)e.Value))"
+                                       @onblur="@(() => FlushPendingCommitAsync())" />
                                 <span class="dndm-sheet-hp-sep">/ Max</span>
                                 <input type="number"
                                        class="dndm-input dndm-input--num"
-                                       value="@sheet.MaxHp"
+                                       value="@_maxHpDraft"
                                        disabled="@(!canEdit)"
-                                       @onchange="@(e => OnMaxHpDirect(sheet, (string?)e.Value))" />
+                                       @oninput="@(e => OnMaxHpInput((string?)e.Value))"
+                                       @onblur="@(() => FlushPendingCommitAsync())" />
                                 @{ var effMax = EffectiveMaxHpResolver.ResolveEffectiveMaxHp(sheet); }
                                 @if (effMax is int em && em != sheet.MaxHp)
                                 {
@@ -308,6 +362,55 @@
                                 }
                             </div>
                         }
+                        <div class="dndm-sheet-ac">
+                            <span class="dndm-sheet-hp-sep">AC</span>
+                            <input type="number"
+                                   class="dndm-input dndm-input--num"
+                                   value="@_acDraft"
+                                   placeholder="—"
+                                   disabled="@(!canEdit)"
+                                   @oninput="@(e => OnAcInput((string?)e.Value))"
+                                   @onblur="@(() => FlushPendingCommitAsync())" />
+                        </div>
+                    </div>
+                }
+
+                @if (IsHost)
+                {
+                    var assignedTokens = TokensForSheet(sheet.Id);
+                    var hasTokenOnActiveMap = activeMap is not null
+                        && assignedTokens.Any(p => p.Map.Id == activeMap.Id);
+                    <div class="dndm-sheet-section">
+                        <span class="dndm-label">Assigned tokens</span>
+                        @if (assignedTokens.Count == 0)
+                        {
+                            <div class="dndm-sheet-empty-hint">No tokens linked to this sheet.</div>
+                        }
+                        else
+                        {
+                            <ul class="dndm-sheet-tokenlist">
+                                @foreach (var (token, map) in assignedTokens)
+                                {
+                                    <li @key="token.Id" class="dndm-sheet-tokenlist-row">
+                                        <span class="dndm-sheet-tokenlist-swatch"
+                                              style="@($"background:{token.ResolveColor(State.Sheets)};")"></span>
+                                        <span class="dndm-sheet-tokenlist-name">
+                                            @(string.IsNullOrEmpty(token.Name) ? "(unnamed)" : token.Name)
+                                        </span>
+                                        <span class="dndm-sheet-tokenlist-map">on @map.Name</span>
+                                    </li>
+                                }
+                            </ul>
+                        }
+                        @if (activeMap is not null && !hasTokenOnActiveMap)
+                        {
+                            <button class="dndm-btn dndm-btn--small"
+                                    type="button"
+                                    title="Spawn a token on the active map linked to this sheet"
+                                    @onclick="@(() => OnCreateTokenForSheet(sheet))">
+                                + Create token on "@activeMap.Name"
+                            </button>
+                        }
                     </div>
                 }
 
@@ -315,12 +418,12 @@
                 {
                     <div class="dndm-sheet-section">
                         <span class="dndm-label">Notes</span>
-                        <textarea class="dndm-textarea"
-                                  rows="4"
+                        <textarea class="dndm-textarea dndm-textarea--notes"
+                                  rows="6"
                                   value="@_notesDraft"
                                   disabled="@(!canEdit)"
                                   @oninput="@(e => OnNotesInput((string?)e.Value))"
-                                  @onblur="@(() => CommitFreeFields(sheet))"></textarea>
+                                  @onblur="@(() => FlushPendingCommitAsync())"></textarea>
                     </div>
                 }
             </div>

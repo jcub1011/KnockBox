@@ -145,7 +145,7 @@
         builder.OpenElement(13, "circle");
         builder.AddAttribute(14, "r", "0.45");
         builder.AddAttribute(15, "fill", FillFor(token));
-        builder.AddAttribute(16, "stroke", string.IsNullOrEmpty(token.Color) ? "#888" : token.Color);
+        builder.AddAttribute(16, "stroke", StrokeFor(token));
         builder.AddAttribute(17, "stroke-width", "0.06");
         builder.CloseElement();
 

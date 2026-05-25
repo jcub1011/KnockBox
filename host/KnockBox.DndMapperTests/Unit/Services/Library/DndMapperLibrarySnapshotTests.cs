@@ -243,6 +243,61 @@ namespace KnockBox.DndMapperTests.Unit.Services.Library
             Assert.AreEqual("#123456", roundTripped.Color);
         }
 
+        [TestMethod]
+        public void Snapshot_PreservesSheetArmorClassColorAndScopedMapId()
+        {
+            // The 2026-05 sheet fields (ArmorClass, Color, ScopedMapId) ride
+            // through SheetSnapshot. A null/empty/null tuple stays the runtime
+            // default; populated values round-trip verbatim.
+            var (engine, state, host, _) = EngineTestFactory.Build();
+            Assert.IsTrue(engine.CreateMapAsync(state, host, "Arena").TryGetSuccess(out var mapId));
+            Assert.IsTrue(engine.CreateSheetAsync(state, host, ownerUserId: null, "Ogre")
+                .TryGetSuccess(out var sheetId));
+            Assert.IsTrue(engine.UpdateSheetArmorClassAsync(state, host, sheetId, 15).IsSuccess);
+            Assert.IsTrue(engine.UpdateSheetColorAsync(state, host, sheetId, "#deadbe").IsSuccess);
+            Assert.IsTrue(engine.UpdateSheetScopeAsync(state, host, sheetId, mapId).IsSuccess);
+
+            var json = JsonSerializer.Serialize(LibrarySnapshotMapper.FromState(state), JsonOptions);
+            var reread = JsonSerializer.Deserialize<LibrarySnapshot>(json, JsonOptions);
+
+            Assert.IsNotNull(reread);
+            var sheet = reread!.Sheets.Single(s => s.Id == sheetId);
+            Assert.AreEqual(15, sheet.ArmorClass);
+            Assert.AreEqual("#deadbe", sheet.Color);
+            Assert.AreEqual(mapId, sheet.ScopedMapId);
+        }
+
+        [TestMethod]
+        public void Snapshot_LegacySheetWithoutNewFields_DeserializesToDefaults()
+        {
+            // Older snapshots persisted before the ArmorClass/Color/ScopedMapId
+            // fields were added must still deserialize — the missing keys land
+            // as null/empty/null, which matches the runtime "unset" semantics.
+            var legacyJson = """
+                {
+                  "SchemaVersion": 3,
+                  "Sheets": [
+                    {
+                      "Id": "11111111-1111-1111-1111-111111111111",
+                      "CharacterName": "Legacy",
+                      "Values": {},
+                      "Notes": "",
+                      "Hp": null,
+                      "MaxHp": null,
+                      "StatusEffects": [],
+                      "RollTemplates": []
+                    }
+                  ]
+                }
+                """;
+            var snap = JsonSerializer.Deserialize<LibrarySnapshot>(legacyJson, JsonOptions);
+            Assert.IsNotNull(snap);
+            var sheet = snap!.Sheets.Single();
+            Assert.IsNull(sheet.ArmorClass);
+            Assert.AreEqual(string.Empty, sheet.Color);
+            Assert.IsNull(sheet.ScopedMapId);
+        }
+
         // ── AttributeSchema mapping ──────────────────────────────────────────────
 
         [TestMethod]
