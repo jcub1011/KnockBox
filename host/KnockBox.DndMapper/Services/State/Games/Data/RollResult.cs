@@ -37,8 +37,8 @@ namespace KnockBox.DndMapper.Services.State.Games.Data
         // the master toggle was off or no rule matched. The list is what the
         // roll log uses to render the "Loaded" badge — historical rolls keep
         // their stamps even if the underlying rule is later edited or deleted.
-        public ImmutableList<LoadedDiceRuleStamp> AppliedRules { get; init; }
-            = ImmutableList<LoadedDiceRuleStamp>.Empty;
+        public ImmutableArray<LoadedDiceRuleStamp> AppliedRules { get; init; }
+            = ImmutableArray<LoadedDiceRuleStamp>.Empty;
 
         // Original dice composition from the inbound RollRequest, captured so
         // the roll log's re-roll affordance can faithfully repeat the roll.
@@ -46,7 +46,7 @@ namespace KnockBox.DndMapper.Services.State.Games.Data
         // twin that would have to be filtered back out. Empty list ⇒ the
         // record was deserialized from a pre-feature save and re-roll is
         // unavailable (button is rendered disabled).
-        public ImmutableList<DiceTerm> OriginalDice { get; init; } = ImmutableList<DiceTerm>.Empty;
+        public ImmutableArray<DiceTerm> OriginalDice { get; init; } = ImmutableArray<DiceTerm>.Empty;
 
         // Sheet + attribute the request bound to, for the re-roll path. The
         // resolved AttributeModifier above is enough for display but loses the

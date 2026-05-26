@@ -394,7 +394,7 @@ namespace KnockBox.DndMapper.Services.Library
             Name = s.Name,
             AttributeDeltas = s.AttributeDeltas
                 .Select(d => new AttributeDelta(d.AttributeName, d.Delta))
-                .ToImmutableList(),
+                .ToImmutableArray(),
             MaxHpDelta = s.MaxHpDelta,
             OnApplyHpDelta = s.OnApplyHpDelta,
             Notes = s.Notes,
@@ -406,7 +406,7 @@ namespace KnockBox.DndMapper.Services.Library
             Name = s.Name,
             AttributeDeltas = s.AttributeDeltas
                 .Select(d => new AttributeDelta(d.AttributeName, d.Delta))
-                .ToImmutableList(),
+                .ToImmutableArray(),
             MaxHpDelta = s.MaxHpDelta,
             OnApplyHpDelta = s.OnApplyHpDelta,
             Notes = s.Notes,

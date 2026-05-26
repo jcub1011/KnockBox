@@ -892,7 +892,7 @@ namespace KnockBox.DndMapper.Services.Library
 
                 state.Sheets = hydration.NewSheets;
                 state.GlobalRollTemplates = hydration.NewGlobalRollTemplates;
-                state.SetLoadedDiceRules(snapshot.LoadedDiceRules.ToImmutableList());
+                state.SetLoadedDiceRules(snapshot.LoadedDiceRules.ToImmutableArray());
 
                 // Re-seed built-ins before user templates so their Rows are
                 // re-derived from the in-code preset definitions (which can
@@ -915,7 +915,7 @@ namespace KnockBox.DndMapper.Services.Library
                         {
                             StatusEffectTemplates = t.StatusEffectTemplates
                                 .Select(LibrarySnapshotMapper.FromStatusEffectTemplateSnapshot)
-                                .ToImmutableList(),
+                                .ToImmutableArray(),
                             InitiativeAttributeName = snapshot.SchemaVersion >= 3
                                 ? t.InitiativeAttributeName
                                 : existing.InitiativeAttributeName,
@@ -931,10 +931,10 @@ namespace KnockBox.DndMapper.Services.Library
                             IsBuiltIn = false,
                             Rows = t.Rows
                                 .Select(r => new AttributeRow(r.Name, r.Type, LibrarySnapshotMapper.ToAttributeValue(r.Default)))
-                                .ToImmutableList(),
+                                .ToImmutableArray(),
                             StatusEffectTemplates = t.StatusEffectTemplates
                                 .Select(LibrarySnapshotMapper.FromStatusEffectTemplateSnapshot)
-                                .ToImmutableList(),
+                                .ToImmutableArray(),
                             InitiativeAttributeName = t.InitiativeAttributeName,
                         });
                     }
@@ -973,7 +973,7 @@ namespace KnockBox.DndMapper.Services.Library
 
                 // Activate the first map if any exist (NewMaps is already
                 // ordered by ListOrder by BuildHydration).
-                var firstId = hydration.NewMaps.Count > 0 ? hydration.NewMaps[0].Id : (Guid?)null;
+                var firstId = hydration.NewMaps.Length > 0 ? hydration.NewMaps[0].Id : (Guid?)null;
                 state.SetActiveMapId(firstId);
             });
 
@@ -2298,9 +2298,9 @@ namespace KnockBox.DndMapper.Services.Library
         // that must run inside Execute.
         private sealed record PreBuiltHydration(
             AttributeSchema AttrSchema,
-            ImmutableList<Map> NewMaps,
+            ImmutableArray<Map> NewMaps,
             ImmutableDictionary<Guid, CharacterSheet> NewSheets,
-            ImmutableList<RollTemplate> NewGlobalRollTemplates,
+            ImmutableArray<RollTemplate> NewGlobalRollTemplates,
             List<NamedTemplateSnapshot> TemplateSnapshots,
             long TotalBytes,
             Guid? PreliminaryActiveSchemaId);
@@ -2311,11 +2311,11 @@ namespace KnockBox.DndMapper.Services.Library
         {
             var attrSchema = LibrarySnapshotMapper.ToAttributeSchema(snapshot.AttributeSchema);
 
-            var newMapsBuilder = ImmutableList.CreateBuilder<Map>();
+            var newMapsBuilder = ImmutableArray.CreateBuilder<Map>();
             long totalBytes = 0;
             foreach (var mapSnap in snapshot.Maps.OrderBy(m => m.ListOrder))
             {
-                var imagesBuilder = ImmutableList.CreateBuilder<MapImage>();
+                var imagesBuilder = ImmutableArray.CreateBuilder<MapImage>();
                 foreach (var imgSnap in mapSnap.Images.OrderBy(i => i.LayerOrder))
                 {
                     if (hydratedImages.TryGetValue(imgSnap.Id, out var image))
@@ -2325,7 +2325,7 @@ namespace KnockBox.DndMapper.Services.Library
                     }
                 }
 
-                var tokensBuilder = ImmutableList.CreateBuilder<Token>();
+                var tokensBuilder = ImmutableArray.CreateBuilder<Token>();
                 foreach (var tokSnap in mapSnap.Tokens)
                 {
                     // All persisted tokens hydrate as NPCs with no owner.
@@ -2375,11 +2375,11 @@ namespace KnockBox.DndMapper.Services.Library
                 foreach (var kv in sheetSnap.Values)
                     valuesBuilder[kv.Key] = LibrarySnapshotMapper.ToAttributeValue(kv.Value);
 
-                var statusBuilder = ImmutableList.CreateBuilder<StatusEffect>();
+                var statusBuilder = ImmutableArray.CreateBuilder<StatusEffect>();
                 foreach (var effectSnap in sheetSnap.StatusEffects)
                     statusBuilder.Add(LibrarySnapshotMapper.FromStatusEffectSnapshot(effectSnap));
 
-                var rollsBuilder = ImmutableList.CreateBuilder<RollTemplate>();
+                var rollsBuilder = ImmutableArray.CreateBuilder<RollTemplate>();
                 foreach (var rtSnap in sheetSnap.RollTemplates)
                     rollsBuilder.Add(LibrarySnapshotMapper.FromRollTemplateSnapshot(rtSnap, RollTemplateScope.Sheet));
 
@@ -2403,7 +2403,7 @@ namespace KnockBox.DndMapper.Services.Library
 
             var newGlobalRollTemplates = snapshot.GlobalRollTemplates
                 .Select(rt => LibrarySnapshotMapper.FromRollTemplateSnapshot(rt, RollTemplateScope.Global))
-                .ToImmutableList();
+                .ToImmutableArray();
 
             // Default V1 snapshots have no id stored; fall back to the
             // deterministic id for the persisted preset so the library lands
@@ -2426,7 +2426,7 @@ namespace KnockBox.DndMapper.Services.Library
         // each top-level collection on state — no defensive copies of inner
         // lists are needed because every runtime entity (Map / Token /
         // MapImage / CharacterSheet / …) is now an immutable record, and the
-        // collections themselves are ImmutableList / ImmutableDictionary.
+        // collections themselves are ImmutableArray / ImmutableDictionary.
         // DTO projection runs entirely off the lock; concurrent engine
         // mutations create new state.Maps refs but never touch the ones we
         // captured here.
@@ -2438,11 +2438,11 @@ namespace KnockBox.DndMapper.Services.Library
             var state = _state;
             if (state is null) return null;
 
-            ImmutableList<Map>? maps = null;
+            ImmutableArray<Map> maps = default;
             ImmutableDictionary<Guid, CharacterSheet>? sheets = null;
             ImmutableDictionary<Guid, NamedTemplate>? templates = null;
-            ImmutableList<RollTemplate>? globalRolls = null;
-            ImmutableList<KnockBox.DndMapper.Services.State.Games.Data.LoadedDice.LoadedDiceRule>? loadedDiceRules = null;
+            ImmutableArray<RollTemplate> globalRolls = default;
+            ImmutableArray<KnockBox.DndMapper.Services.State.Games.Data.LoadedDice.LoadedDiceRule> loadedDiceRules = default;
             DndMapperSettings? settings = null;
             DndMapperSettings? settingsRef = null;
             AttributeSchema? schema = null;
@@ -2462,9 +2462,9 @@ namespace KnockBox.DndMapper.Services.Library
                 activeSchemaTemplateId = state.ActiveSchemaTemplateId;
                 initiativeAttributeName = state.InitiativeAttributeName;
             });
-            if (!read.IsSuccess || maps is null || sheets is null
-                || templates is null || globalRolls is null
-                || loadedDiceRules is null
+            if (!read.IsSuccess || maps.IsDefault || sheets is null
+                || templates is null || globalRolls.IsDefault
+                || loadedDiceRules.IsDefault
                 || settings is null || schema is null) return null;
 
             // Capture references to the persisted fields exactly as the read
@@ -2478,8 +2478,8 @@ namespace KnockBox.DndMapper.Services.Library
             // Project DTOs off-lock. Each immutable collection is frozen
             // relative to this snapshot; engine mutations would create a
             // new top-level ref but cannot mutate the ones captured above.
-            var mapsById = new Dictionary<Guid, MapSnapshot>(maps.Count);
-            var orderedMapIds = new List<Guid>(maps.Count);
+            var mapsById = new Dictionary<Guid, MapSnapshot>(maps.Length);
+            var orderedMapIds = new List<Guid>(maps.Length);
             foreach (var m in maps.OrderBy(m => m.ListOrder))
             {
                 mapsById[m.Id] = LibrarySnapshotMapper.ToMapSnapshot(m);

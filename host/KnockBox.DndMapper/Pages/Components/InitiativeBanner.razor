@@ -34,7 +34,7 @@
                        Set, even though the dice (and the revealed value) are
                        deferred until the whole batch fires. *@
                     <span class="dndm-initiative-progress">
-                        @combat.TurnOrder.Count(e => e.InitiativeRoll is not null || e.PendingInitiative is not null) / @combat.TurnOrder.Count rolled
+                        @combat.TurnOrder.Count(e => e.InitiativeRoll is not null || e.PendingInitiative is not null) / @combat.TurnOrder.Length rolled
                     </span>
                 </span>
             }

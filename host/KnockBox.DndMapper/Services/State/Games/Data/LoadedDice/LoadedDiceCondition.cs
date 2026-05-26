@@ -81,7 +81,7 @@ namespace KnockBox.DndMapper.Services.State.Games.Data.LoadedDice
     // Vacuous AND ⇒ true. Matches the outer Conditions list's existing
     // "empty list = fires on every roll" convention so an empty group reads
     // the same as no group at all.
-    public sealed record AllOfCondition(ImmutableList<LoadedDiceCondition> Children) : LoadedDiceCondition
+    public sealed record AllOfCondition(ImmutableArray<LoadedDiceCondition> Children) : LoadedDiceCondition
     {
         public override bool Matches(LoadedDiceContext ctx)
         {
@@ -93,7 +93,7 @@ namespace KnockBox.DndMapper.Services.State.Games.Data.LoadedDice
 
     // Vacuous OR ⇒ false. An empty ANY-OF group reads as "never", which is
     // useful as a hard off-switch when authoring a rule incrementally.
-    public sealed record AnyOfCondition(ImmutableList<LoadedDiceCondition> Children) : LoadedDiceCondition
+    public sealed record AnyOfCondition(ImmutableArray<LoadedDiceCondition> Children) : LoadedDiceCondition
     {
         public override bool Matches(LoadedDiceContext ctx)
         {

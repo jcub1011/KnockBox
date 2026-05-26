@@ -25,14 +25,14 @@ namespace KnockBox.DndMapperTests.Unit
             var map = new Map
             {
                 Id = Guid.NewGuid(),
-                Tokens = ImmutableList.Create(new Token
+                Tokens = ImmutableArray.Create(new Token
                 {
                     Id = Guid.NewGuid(),
                     OwnerUserId = player.Id,
                     Color = "#abcdef",
                 }),
             };
-            state.Maps = ImmutableList.Create(map);
+            state.Maps = ImmutableArray.Create(map);
 
             Assert.AreEqual("#abcdef", DiceColorResolver.Resolve(state, player.Id));
         }
@@ -67,14 +67,14 @@ namespace KnockBox.DndMapperTests.Unit
             var map = new Map
             {
                 Id = Guid.NewGuid(),
-                Tokens = ImmutableList.Create(new Token
+                Tokens = ImmutableArray.Create(new Token
                 {
                     Id = Guid.NewGuid(),
                     OwnerUserId = player.Id,
                     Color = "",
                 }),
             };
-            state.Maps = ImmutableList.Create(map);
+            state.Maps = ImmutableArray.Create(map);
 
             var resolved = DiceColorResolver.Resolve(state, player.Id);
             StringAssert.Matches(resolved, new System.Text.RegularExpressions.Regex("^#[0-9a-f]{6}$"));
@@ -95,14 +95,14 @@ namespace KnockBox.DndMapperTests.Unit
             var map = new Map
             {
                 Id = Guid.NewGuid(),
-                Tokens = ImmutableList.Create(new Token
+                Tokens = ImmutableArray.Create(new Token
                 {
                     Id = Guid.NewGuid(),
                     OwnerUserId = player.Id,
                     Color = badColor,
                 }),
             };
-            state.Maps = ImmutableList.Create(map);
+            state.Maps = ImmutableArray.Create(map);
 
             var resolved = DiceColorResolver.Resolve(state, player.Id);
             Assert.AreNotEqual(badColor, resolved);
@@ -123,14 +123,14 @@ namespace KnockBox.DndMapperTests.Unit
             var map = new Map
             {
                 Id = Guid.NewGuid(),
-                Tokens = ImmutableList.Create(new Token
+                Tokens = ImmutableArray.Create(new Token
                 {
                     Id = Guid.NewGuid(),
                     OwnerUserId = player.Id,
                     Color = goodColor,
                 }),
             };
-            state.Maps = ImmutableList.Create(map);
+            state.Maps = ImmutableArray.Create(map);
 
             Assert.AreEqual(goodColor, DiceColorResolver.Resolve(state, player.Id));
         }
@@ -150,10 +150,10 @@ namespace KnockBox.DndMapperTests.Unit
                 CharacterName = "Sheet color wins",
                 Color = "#abcdef",
             });
-            state.Maps = ImmutableList.Create(new Map
+            state.Maps = ImmutableArray.Create(new Map
             {
                 Id = Guid.NewGuid(),
-                Tokens = ImmutableList.Create(new Token
+                Tokens = ImmutableArray.Create(new Token
                 {
                     Id = tokenId,
                     SheetId = sheetId,
@@ -177,10 +177,10 @@ namespace KnockBox.DndMapperTests.Unit
                 CharacterName = "Legacy sheet",
                 Color = "", // empty = "fall back to token color"
             });
-            state.Maps = ImmutableList.Create(new Map
+            state.Maps = ImmutableArray.Create(new Map
             {
                 Id = Guid.NewGuid(),
-                Tokens = ImmutableList.Create(new Token
+                Tokens = ImmutableArray.Create(new Token
                 {
                     Id = tokenId,
                     SheetId = sheetId,
@@ -197,10 +197,10 @@ namespace KnockBox.DndMapperTests.Unit
             var (_, state, _, _) = EngineTestFactory.Build();
             var tokenId = Guid.NewGuid();
 
-            state.Maps = ImmutableList.Create(new Map
+            state.Maps = ImmutableArray.Create(new Map
             {
                 Id = Guid.NewGuid(),
-                Tokens = ImmutableList.Create(new Token
+                Tokens = ImmutableArray.Create(new Token
                 {
                     Id = tokenId,
                     SheetId = null,
@@ -217,10 +217,10 @@ namespace KnockBox.DndMapperTests.Unit
             var (_, state, _, _) = EngineTestFactory.Build();
             var tokenId = Guid.NewGuid();
 
-            state.Maps = ImmutableList.Create(new Map
+            state.Maps = ImmutableArray.Create(new Map
             {
                 Id = Guid.NewGuid(),
-                Tokens = ImmutableList.Create(new Token
+                Tokens = ImmutableArray.Create(new Token
                 {
                     Id = tokenId,
                     Color = "",

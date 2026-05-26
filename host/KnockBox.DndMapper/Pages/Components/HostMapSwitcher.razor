@@ -32,9 +32,9 @@
                      @ondrop="@(() => OnDrop(idx))"
                      @onclick="@(() => OnRowClick(m.Id))">
                     <div class="dndm-mapsw-thumb">
-                        @if (m.Images.Count > 0)
+                        @if (m.Images.Length > 0)
                         {
-                            <span class="dndm-mapsw-thumb-tag">@m.Images.Count</span>
+                            <span class="dndm-mapsw-thumb-tag">@m.Images.Length</span>
                         }
                         else
                         {

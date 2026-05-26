@@ -25,8 +25,8 @@ namespace KnockBox.DndMapper.Services.State.Games.Data.LoadedDice
         // ONLY when the set contains <see cref="GmTarget"/>.
         public ImmutableHashSet<Guid> TargetSheetIds { get; init; } = ImmutableHashSet<Guid>.Empty;
         // AND-combined; empty list ⇒ matches every roll.
-        public ImmutableList<LoadedDiceCondition> Conditions { get; init; } = ImmutableList<LoadedDiceCondition>.Empty;
+        public ImmutableArray<LoadedDiceCondition> Conditions { get; init; } = ImmutableArray<LoadedDiceCondition>.Empty;
         // Applied in list order to each die that the rule matches.
-        public ImmutableList<LoadedDiceModification> Modifications { get; init; } = ImmutableList<LoadedDiceModification>.Empty;
+        public ImmutableArray<LoadedDiceModification> Modifications { get; init; } = ImmutableArray<LoadedDiceModification>.Empty;
     }
 }

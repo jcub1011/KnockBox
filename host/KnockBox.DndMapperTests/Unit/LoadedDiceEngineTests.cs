@@ -52,7 +52,7 @@ namespace KnockBox.DndMapperTests.Unit
             var result = _engine.AddLoadedDiceRuleAsync(_state, _host, new LoadedDiceRule { Name = "x" });
             Assert.IsTrue(result.TryGetSuccess(out var id));
             Assert.AreNotEqual(Guid.Empty, id);
-            Assert.AreEqual(1, _state.LoadedDiceRules.Count);
+            Assert.AreEqual(1, _state.LoadedDiceRules.Length);
         }
 
         [TestMethod]
@@ -66,7 +66,7 @@ namespace KnockBox.DndMapperTests.Unit
             var result = _engine.RollAsync(_state, _host, req);
             Assert.IsTrue(result.TryGetSuccess(out var roll));
             Assert.AreEqual(7, roll.Total);
-            Assert.AreEqual(0, roll.AppliedRules.Count);
+            Assert.AreEqual(0, roll.AppliedRules.Length);
         }
 
         [TestMethod]
@@ -80,7 +80,7 @@ namespace KnockBox.DndMapperTests.Unit
             var result = _engine.RollAsync(_state, _host, req);
             Assert.IsTrue(result.TryGetSuccess(out var roll));
             Assert.AreEqual(20, roll.Total);
-            Assert.AreEqual(1, roll.AppliedRules.Count);
+            Assert.AreEqual(1, roll.AppliedRules.Length);
             Assert.AreEqual("Crit", roll.AppliedRules[0].RuleName);
         }
 
@@ -95,7 +95,7 @@ namespace KnockBox.DndMapperTests.Unit
             var result = _engine.RollAsync(_state, _host, req);
             Assert.IsTrue(result.TryGetSuccess(out var roll));
             Assert.AreEqual(11, roll.Total);
-            Assert.AreEqual(0, roll.AppliedRules.Count);
+            Assert.AreEqual(0, roll.AppliedRules.Length);
         }
 
         [TestMethod]
@@ -152,7 +152,7 @@ namespace KnockBox.DndMapperTests.Unit
             Assert.IsTrue(added.TryGetSuccess(out var id));
             var removed = _engine.RemoveLoadedDiceRuleAsync(_state, _host, id);
             Assert.IsTrue(removed.IsSuccess);
-            Assert.AreEqual(0, _state.LoadedDiceRules.Count);
+            Assert.AreEqual(0, _state.LoadedDiceRules.Length);
         }
 
         [TestMethod]
@@ -199,7 +199,7 @@ namespace KnockBox.DndMapperTests.Unit
             Assert.IsTrue(result.TryGetSuccess(out var roll));
             Assert.AreEqual(20, roll.Total);
             Assert.IsNull(roll.AttributeModifier);
-            Assert.AreEqual(1, roll.AppliedRules.Count);
+            Assert.AreEqual(1, roll.AppliedRules.Length);
         }
 
         [TestMethod]
@@ -267,11 +267,11 @@ namespace KnockBox.DndMapperTests.Unit
 
             Assert.AreEqual(rule.Id, roundtrip.Id);
             Assert.AreEqual(rule.Name, roundtrip.Name);
-            Assert.AreEqual(4, roundtrip.Conditions.Count);
+            Assert.AreEqual(4, roundtrip.Conditions.Length);
             Assert.IsInstanceOfType(roundtrip.Conditions[0], typeof(DiceTypeRolledCondition));
             Assert.IsInstanceOfType(roundtrip.Conditions[2], typeof(HostKeyHeldCondition));
             Assert.AreEqual("Space", ((HostKeyHeldCondition)roundtrip.Conditions[2]).Key);
-            Assert.AreEqual(4, roundtrip.Modifications.Count);
+            Assert.AreEqual(4, roundtrip.Modifications.Length);
             Assert.IsInstanceOfType(roundtrip.Modifications[3], typeof(RerollOnModification));
             CollectionAssert.AreEquivalent(
                 new[] { 1, 2 },

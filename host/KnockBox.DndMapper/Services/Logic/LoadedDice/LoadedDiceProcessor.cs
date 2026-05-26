@@ -13,17 +13,17 @@ namespace KnockBox.DndMapper.Services.Logic.LoadedDice
         // Result changed). Returns the ordered list of rules that actually
         // fired, deduplicated by id so a rule that matches multiple dice in
         // the same roll still produces one stamp.
-        public static ImmutableList<LoadedDiceRuleStamp> Apply(
+        public static ImmutableArray<LoadedDiceRuleStamp> Apply(
             IList<DieRoll> rolls,
             IReadOnlyList<LoadedDiceRule> rules,
             Guid? rollerSheetId,
             Func<int, LoadedDiceContext> contextForSides)
         {
             if (rolls.Count == 0 || rules.Count == 0)
-                return ImmutableList<LoadedDiceRuleStamp>.Empty;
+                return ImmutableArray<LoadedDiceRuleStamp>.Empty;
 
             var matchedIds = new HashSet<Guid>();
-            var stamps = ImmutableList.CreateBuilder<LoadedDiceRuleStamp>();
+            var stamps = ImmutableArray.CreateBuilder<LoadedDiceRuleStamp>();
 
             for (int i = 0; i < rolls.Count; i++)
             {

@@ -48,7 +48,7 @@ namespace KnockBox.DndMapperTests.Unit
         {
             var rolls = new List<DieRoll> { new(20, 11, false) };
             var stamps = LoadedDiceProcessor.Apply(rolls, Array.Empty<LoadedDiceRule>(), null, _ => ContextFor(20));
-            Assert.AreEqual(0, stamps.Count);
+            Assert.AreEqual(0, stamps.Length);
             Assert.AreEqual(11, rolls[0].Result);
         }
 
@@ -64,7 +64,7 @@ namespace KnockBox.DndMapperTests.Unit
             var rolls = new List<DieRoll> { new(20, 3, false) };
             var stamps = LoadedDiceProcessor.Apply(rolls, new[] { rule }, null, _ => ContextFor(20));
             Assert.AreEqual(20, rolls[0].Result);
-            Assert.AreEqual(1, stamps.Count);
+            Assert.AreEqual(1, stamps.Length);
             Assert.AreEqual("Crit", stamps[0].RuleName);
         }
 
@@ -83,7 +83,7 @@ namespace KnockBox.DndMapperTests.Unit
             // Roll comes from a different (or null) sheet — rule must skip.
             var stamps = LoadedDiceProcessor.Apply(rolls, new[] { rule }, null, _ => ContextFor(20));
             Assert.AreEqual(3, rolls[0].Result);
-            Assert.AreEqual(0, stamps.Count);
+            Assert.AreEqual(0, stamps.Length);
         }
 
         [TestMethod]
@@ -99,7 +99,7 @@ namespace KnockBox.DndMapperTests.Unit
             var rolls = new List<DieRoll> { new(20, 17, false) };
             var stamps = LoadedDiceProcessor.Apply(rolls, new[] { rule }, null, sides => ContextFor(sides));
             Assert.AreEqual(17, rolls[0].Result);
-            Assert.AreEqual(0, stamps.Count);
+            Assert.AreEqual(0, stamps.Length);
         }
 
         [TestMethod]
@@ -115,7 +115,7 @@ namespace KnockBox.DndMapperTests.Unit
             var rolls = new List<DieRoll> { new(20, 3, false) };
             var stamps = LoadedDiceProcessor.Apply(rolls, new[] { rule }, null, _ => ContextFor(20));
             Assert.AreEqual(3, rolls[0].Result);
-            Assert.AreEqual(0, stamps.Count);
+            Assert.AreEqual(0, stamps.Length);
         }
 
         [TestMethod]
@@ -137,7 +137,7 @@ namespace KnockBox.DndMapperTests.Unit
             var rolls = new List<DieRoll> { new(20, 17, false) };
             var stamps = LoadedDiceProcessor.Apply(rolls, new[] { ruleA, ruleB }, null, _ => ContextFor(20));
             Assert.AreEqual(18, rolls[0].Result);
-            Assert.AreEqual(2, stamps.Count);
+            Assert.AreEqual(2, stamps.Length);
             Assert.AreEqual("Cap10", stamps[0].RuleName);
             Assert.AreEqual("Set18", stamps[1].RuleName);
         }
@@ -174,7 +174,7 @@ namespace KnockBox.DndMapperTests.Unit
                 new(6, 6, false),
             };
             var stamps = LoadedDiceProcessor.Apply(rolls, new[] { rule }, null, _ => ContextFor(6));
-            Assert.AreEqual(1, stamps.Count);
+            Assert.AreEqual(1, stamps.Length);
             CollectionAssert.AreEqual(new[] { 1, 1, 1 }, rolls.Select(r => r.Result).ToArray());
         }
 
@@ -193,7 +193,7 @@ namespace KnockBox.DndMapperTests.Unit
             var rolls = new List<DieRoll> { new(20, 15, false) };
             var stamps = LoadedDiceProcessor.Apply(rolls, new[] { rule }, rollerSheetId: null, _ => ContextFor(20));
             Assert.AreEqual(1, rolls[0].Result);
-            Assert.AreEqual(1, stamps.Count);
+            Assert.AreEqual(1, stamps.Length);
         }
 
         [TestMethod]
@@ -210,7 +210,7 @@ namespace KnockBox.DndMapperTests.Unit
             var rolls = new List<DieRoll> { new(20, 15, false) };
             var stamps = LoadedDiceProcessor.Apply(rolls, new[] { rule }, rollerSheetId: Guid.NewGuid(), _ => ContextFor(20));
             Assert.AreEqual(15, rolls[0].Result);
-            Assert.AreEqual(0, stamps.Count);
+            Assert.AreEqual(0, stamps.Length);
         }
 
         [TestMethod]
@@ -281,7 +281,7 @@ namespace KnockBox.DndMapperTests.Unit
                 Name = "AllOf",
                 Conditions =
                 [
-                    new AllOfCondition(ImmutableList.Create<LoadedDiceCondition>(
+                    new AllOfCondition(ImmutableArray.Create<LoadedDiceCondition>(
                         new DiceTypeRolledCondition(20),
                         new RollModeIsCondition(RollMode.Normal))),
                 ],
@@ -301,7 +301,7 @@ namespace KnockBox.DndMapperTests.Unit
                 Name = "AllOf",
                 Conditions =
                 [
-                    new AllOfCondition(ImmutableList.Create<LoadedDiceCondition>(
+                    new AllOfCondition(ImmutableArray.Create<LoadedDiceCondition>(
                         new DiceTypeRolledCondition(20),
                         new DiceTypeRolledCondition(6))),
                 ],
@@ -321,7 +321,7 @@ namespace KnockBox.DndMapperTests.Unit
                 Name = "AnyOf",
                 Conditions =
                 [
-                    new AnyOfCondition(ImmutableList.Create<LoadedDiceCondition>(
+                    new AnyOfCondition(ImmutableArray.Create<LoadedDiceCondition>(
                         new DiceTypeRolledCondition(6),  // false against a d20 roll
                         new DiceTypeRolledCondition(20))), // true
                 ],
@@ -339,7 +339,7 @@ namespace KnockBox.DndMapperTests.Unit
             {
                 Id = Guid.NewGuid(),
                 Name = "Empty OR",
-                Conditions = [new AnyOfCondition(ImmutableList<LoadedDiceCondition>.Empty)],
+                Conditions = [new AnyOfCondition(ImmutableArray<LoadedDiceCondition>.Empty)],
                 Modifications = [new SetResultModification(20)],
             };
             var rolls = new List<DieRoll> { new(20, 3, false) };
@@ -354,7 +354,7 @@ namespace KnockBox.DndMapperTests.Unit
             {
                 Id = Guid.NewGuid(),
                 Name = "Empty AND",
-                Conditions = [new AllOfCondition(ImmutableList<LoadedDiceCondition>.Empty)],
+                Conditions = [new AllOfCondition(ImmutableArray<LoadedDiceCondition>.Empty)],
                 Modifications = [new SetResultModification(20)],
             };
             var rolls = new List<DieRoll> { new(20, 3, false) };
@@ -408,8 +408,8 @@ namespace KnockBox.DndMapperTests.Unit
                 Name = "Nested",
                 Conditions =
                 [
-                    new AllOfCondition(ImmutableList.Create<LoadedDiceCondition>(
-                        new AnyOfCondition(ImmutableList.Create<LoadedDiceCondition>(
+                    new AllOfCondition(ImmutableArray.Create<LoadedDiceCondition>(
+                        new AnyOfCondition(ImmutableArray.Create<LoadedDiceCondition>(
                             new DiceTypeRolledCondition(6),
                             new DiceTypeRolledCondition(20))),
                         new NotCondition(new DiceTypeRolledCondition(6)))),

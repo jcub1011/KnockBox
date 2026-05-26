@@ -25,7 +25,7 @@ namespace KnockBox.DndMapper.Services.State.Games.Data
         // that map is the active map. Used by the sheet panel to filter the
         // sheet roster per-map.
         public Guid? ScopedMapId { get; init; }
-        public ImmutableList<StatusEffect> StatusEffects { get; init; } = ImmutableList<StatusEffect>.Empty;
-        public ImmutableList<RollTemplate> RollTemplates { get; init; } = ImmutableList<RollTemplate>.Empty;
+        public ImmutableArray<StatusEffect> StatusEffects { get; init; } = ImmutableArray<StatusEffect>.Empty;
+        public ImmutableArray<RollTemplate> RollTemplates { get; init; } = ImmutableArray<RollTemplate>.Empty;
     }
 }

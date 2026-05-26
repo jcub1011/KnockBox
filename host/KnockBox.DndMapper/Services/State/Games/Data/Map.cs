@@ -8,8 +8,8 @@ namespace KnockBox.DndMapper.Services.State.Games.Data
         public Guid Id { get; init; }
         public string Name { get; init; } = string.Empty;
         public GridConfig Grid { get; init; } = new();
-        public ImmutableList<MapImage> Images { get; init; } = ImmutableList<MapImage>.Empty;
-        public ImmutableList<Token> Tokens { get; init; } = ImmutableList<Token>.Empty;
+        public ImmutableArray<MapImage> Images { get; init; } = ImmutableArray<MapImage>.Empty;
+        public ImmutableArray<Token> Tokens { get; init; } = ImmutableArray<Token>.Empty;
         public DateTime CreatedUtc { get; init; }
         public int ListOrder { get; init; }
         public (double X, double Y)? DefaultSpawnPosition { get; init; }

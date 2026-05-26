@@ -113,7 +113,7 @@ namespace KnockBox.DndMapper.Pages.Components.LoadedDice
             var rule = new LoadedDiceRule
             {
                 Id = Guid.NewGuid(),
-                Name = $"Rule {State.LoadedDiceRules.Count + 1}",
+                Name = $"Rule {State.LoadedDiceRules.Length + 1}",
                 Enabled = true,
             };
             var result = Engine.AddLoadedDiceRuleAsync(State, UserService.CurrentUser, rule);
@@ -196,8 +196,8 @@ namespace KnockBox.DndMapper.Pages.Components.LoadedDice
             "hostKeyHeld" => new HostKeyHeldCondition(""),
             "combatActive" => new CombatActiveCondition(),
             "rollLabelContains" => new RollLabelContainsCondition(""),
-            "allOf" => new AllOfCondition(ImmutableList<LoadedDiceCondition>.Empty),
-            "anyOf" => new AnyOfCondition(ImmutableList<LoadedDiceCondition>.Empty),
+            "allOf" => new AllOfCondition(ImmutableArray<LoadedDiceCondition>.Empty),
+            "anyOf" => new AnyOfCondition(ImmutableArray<LoadedDiceCondition>.Empty),
             "not" => new NotCondition(null),
             _ => null,
         };
@@ -208,14 +208,14 @@ namespace KnockBox.DndMapper.Pages.Components.LoadedDice
         // Removing a NotCondition's single inner slot (path ending in [0])
         // sets Inner=null rather than deleting the NOT itself — the empty
         // NOT placeholder is a deliberate editor state.
-        private static ImmutableList<LoadedDiceCondition> MutateOuter(
-            ImmutableList<LoadedDiceCondition> list,
+        private static ImmutableArray<LoadedDiceCondition> MutateOuter(
+            ImmutableArray<LoadedDiceCondition> list,
             ReadOnlySpan<int> path,
             LoadedDiceCondition? next)
         {
             if (path.Length == 0) return list; // outer list itself isn't a node
             int idx = path[0];
-            if (idx < 0 || idx >= list.Count) return list;
+            if (idx < 0 || idx >= list.Length) return list;
             var rest = path[1..];
             if (rest.Length == 0)
                 return next is null ? list.RemoveAt(idx) : list.SetItem(idx, next);
@@ -243,14 +243,14 @@ namespace KnockBox.DndMapper.Pages.Components.LoadedDice
         // Empty path ⇒ append to the outer list. Otherwise descend to the
         // composite at `path` and append `child` to its children (or, for a
         // NotCondition, set its Inner slot).
-        private static ImmutableList<LoadedDiceCondition> AddChildToOuter(
-            ImmutableList<LoadedDiceCondition> list,
+        private static ImmutableArray<LoadedDiceCondition> AddChildToOuter(
+            ImmutableArray<LoadedDiceCondition> list,
             ReadOnlySpan<int> path,
             LoadedDiceCondition child)
         {
             if (path.Length == 0) return list.Add(child);
             int idx = path[0];
-            if (idx < 0 || idx >= list.Count) return list;
+            if (idx < 0 || idx >= list.Length) return list;
             var rest = path[1..];
             var newChild = AddChildToInside(list[idx], rest, child);
             return list.SetItem(idx, newChild);
@@ -275,9 +275,9 @@ namespace KnockBox.DndMapper.Pages.Components.LoadedDice
             var rest = path[1..];
             return node switch
             {
-                AllOfCondition all when idx >= 0 && idx < all.Children.Count
+                AllOfCondition all when idx >= 0 && idx < all.Children.Length
                     => all with { Children = all.Children.SetItem(idx, AddChildToInside(all.Children[idx], rest, child)) },
-                AnyOfCondition any when idx >= 0 && idx < any.Children.Count
+                AnyOfCondition any when idx >= 0 && idx < any.Children.Length
                     => any with { Children = any.Children.SetItem(idx, AddChildToInside(any.Children[idx], rest, child)) },
                 NotCondition not when idx == 0 && not.Inner is not null
                     => not with { Inner = AddChildToInside(not.Inner, rest, child) },
@@ -286,20 +286,20 @@ namespace KnockBox.DndMapper.Pages.Components.LoadedDice
         }
 
         private static LoadedDiceCondition? ReadAt(
-            ImmutableList<LoadedDiceCondition> outer,
+            ImmutableArray<LoadedDiceCondition> outer,
             ReadOnlySpan<int> path)
         {
             if (path.Length == 0) return null;
             int idx = path[0];
-            if (idx < 0 || idx >= outer.Count) return null;
+            if (idx < 0 || idx >= outer.Length) return null;
             LoadedDiceCondition? node = outer[idx];
             for (int p = 1; p < path.Length && node is not null; p++)
             {
                 int i = path[p];
                 node = node switch
                 {
-                    AllOfCondition all => i >= 0 && i < all.Children.Count ? all.Children[i] : null,
-                    AnyOfCondition any => i >= 0 && i < any.Children.Count ? any.Children[i] : null,
+                    AllOfCondition all => i >= 0 && i < all.Children.Length ? all.Children[i] : null,
+                    AnyOfCondition any => i >= 0 && i < any.Children.Length ? any.Children[i] : null,
                     NotCondition not => i == 0 ? not.Inner : null,
                     _ => null,
                 };

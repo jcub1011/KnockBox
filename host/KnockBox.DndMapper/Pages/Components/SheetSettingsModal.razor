@@ -27,7 +27,7 @@
                                     <span class="dndm-template-chevron">@(isExpanded ? "▾" : "▸")</span>
                                     <span class="dndm-template-name">@t.Name</span>
                                 </button>
-                                <span class="dndm-template-count">@t.Rows.Count rows</span>
+                                <span class="dndm-template-count">@t.Rows.Length rows</span>
                                 @if (t.IsBuiltIn)
                                 {
                                     <span class="dndm-template-badge">Built-in</span>

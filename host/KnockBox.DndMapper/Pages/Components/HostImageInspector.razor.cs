@@ -78,7 +78,7 @@ namespace KnockBox.DndMapper.Pages.Components
             if (_image is null || UserService.CurrentUser is null) return;
 
             var map = State.Maps.FirstOrDefault(m => m.Id == MapId);
-            if (LayerOrderResolver.Resolve(delta, _image.LayerOrder, map?.Images.Count ?? 0) is not int target) return;
+            if (LayerOrderResolver.Resolve(delta, _image.LayerOrder, map?.Images.Length ?? 0) is not int target) return;
 
             var result = Engine.ReorderImageLayerAsync(State, UserService.CurrentUser, MapId, ImageId, target);
             if (result.TryGetFailure(out var err))

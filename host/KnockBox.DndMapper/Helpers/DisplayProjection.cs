@@ -81,9 +81,9 @@ namespace KnockBox.DndMapper.Helpers
         {
             if (combat is null || combat.Phase != CombatPhase.Active) return null;
             var turn = combat.TurnOrder;
-            if (turn.Count == 0) return null;
+            if (turn.Length == 0) return null;
             var idx = combat.CurrentTurnIndex;
-            if (idx < 0 || idx >= turn.Count) return null;
+            if (idx < 0 || idx >= turn.Length) return null;
             var tokenId = turn[idx].TokenId;
             return tokenId == Guid.Empty ? null : tokenId;
         }

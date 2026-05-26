@@ -65,9 +65,9 @@ namespace KnockBox.DndMapper.Pages.Components
                 var combat = State.ActiveCombat;
                 if (combat is null || combat.Phase != CombatPhase.Active) return null;
                 var turn = combat.TurnOrder;
-                if (turn.Count == 0) return null;
+                if (turn.Length == 0) return null;
                 var idx = combat.CurrentTurnIndex;
-                if (idx < 0 || idx >= turn.Count) return null;
+                if (idx < 0 || idx >= turn.Length) return null;
                 var tokenId = turn[idx].TokenId;
                 return tokenId == Guid.Empty ? null : tokenId;
             }
@@ -134,7 +134,7 @@ namespace KnockBox.DndMapper.Pages.Components
         private object[] BuildTokenJsList()
         {
             if (Map is null) return [];
-            var list = new List<object>(Map.Tokens.Count);
+            var list = new List<object>(Map.Tokens.Length);
             foreach (var t in VisibleTokens)
             {
                 bool isOwner = t.OwnerUserId is not null && t.OwnerUserId == CurrentUserId;

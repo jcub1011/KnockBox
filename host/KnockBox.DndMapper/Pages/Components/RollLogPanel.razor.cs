@@ -48,7 +48,7 @@ namespace KnockBox.DndMapper.Pages.Components
         // off ⇒ never shown (and AppliedRules will be empty anyway).
         private bool ShouldShowLoadedIndicator(RollResult r)
         {
-            if (r.AppliedRules.Count == 0) return false;
+            if (r.AppliedRules.Length == 0) return false;
             if (IsHost) return true;
             return State.Settings.LoadedDicePlayerIndicator == LoadedDicePlayerIndicator.RedDotInLog;
         }
@@ -60,8 +60,8 @@ namespace KnockBox.DndMapper.Pages.Components
             const int max = 4;
             var names = r.AppliedRules.Select(x => string.IsNullOrEmpty(x.RuleName) ? "(unnamed)" : x.RuleName).Take(max);
             var joined = string.Join(", ", names);
-            return r.AppliedRules.Count > max
-                ? $"Loaded dice: {joined}, +{r.AppliedRules.Count - max} more"
+            return r.AppliedRules.Length > max
+                ? $"Loaded dice: {joined}, +{r.AppliedRules.Length - max} more"
                 : $"Loaded dice: {joined}";
         }
 
@@ -168,7 +168,7 @@ namespace KnockBox.DndMapper.Pages.Components
         {
             if (!CanReRoll(r)) return Task.CompletedTask;
 
-            bool singleDie = r.OriginalDice.Count == 1 && r.OriginalDice[0].Count == 1;
+            bool singleDie = r.OriginalDice.Length == 1 && r.OriginalDice[0].Count == 1;
             RollMode mode = r.Mode;
             if (singleDie)
             {
@@ -194,7 +194,7 @@ namespace KnockBox.DndMapper.Pages.Components
             r.TokenId is null
             && !string.IsNullOrEmpty(CurrentUserId)
             && r.RollerUserId == CurrentUserId
-            && r.OriginalDice.Count > 0;
+            && r.OriginalDice.Length > 0;
 
         private static string ReRollTitle(RollResult r) =>
             $"Re-roll {r.Formula}{(string.IsNullOrEmpty(r.Label) ? "" : $" — {r.Label}")}. "

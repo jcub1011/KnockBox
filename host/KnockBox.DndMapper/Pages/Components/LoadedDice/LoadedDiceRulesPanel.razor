@@ -15,7 +15,7 @@
         }
     </header>
     <div class="dndm-panel-body">
-        @if (State.LoadedDiceRules.Count == 0)
+        @if (State.LoadedDiceRules.Length == 0)
         {
             <div class="dndm-panel-empty">
                 @if (Editable)
@@ -145,24 +145,24 @@
     private RenderFragment RenderConditionList(
         LoadedDiceRule rule,
         ImmutableArray<int> parentPath,
-        ImmutableList<LoadedDiceCondition> list,
+        ImmutableArray<LoadedDiceCondition> list,
         string joiner,
         string emptyLabel) => __builder =>
     {
         <div class="dndm-loaded-args">
-            @if (list.Count == 0)
+            @if (list.Length == 0)
             {
                 <span class="dndm-loaded-allchip">@emptyLabel</span>
             }
             else
             {
-                @for (int i = 0; i < list.Count; i++)
+                @for (int i = 0; i < list.Length; i++)
                 {
                     var childPath = parentPath.Add(i);
                     <span @key="@PathKey(rule, childPath)" class="dndm-loaded-arg">
                         @RenderNode(rule, childPath, list[i])
                     </span>
-                    @if (i < list.Count - 1)
+                    @if (i < list.Length - 1)
                     {
                         <span class="dndm-loaded-and">@joiner</span>
                     }
@@ -206,7 +206,7 @@
         LoadedDiceRule rule,
         ImmutableArray<int> path,
         string op,
-        ImmutableList<LoadedDiceCondition> children,
+        ImmutableArray<LoadedDiceCondition> children,
         string joiner) => __builder =>
     {
         <div class="dndm-loaded-group dndm-loaded-group--@op">
@@ -430,12 +430,12 @@
     // select resets to its placeholder after a successful add.
     private int NodeCountAt(LoadedDiceRule rule, ImmutableArray<int> path)
     {
-        if (path.IsEmpty) return rule.Conditions.Count;
+        if (path.IsEmpty) return rule.Conditions.Length;
         var node = ReadAt(rule.Conditions, path.AsSpan());
         return node switch
         {
-            AllOfCondition all => all.Children.Count,
-            AnyOfCondition any => any.Children.Count,
+            AllOfCondition all => all.Children.Length,
+            AnyOfCondition any => any.Children.Length,
             NotCondition not => not.Inner is null ? 0 : 1,
             _ => 0,
         };
@@ -550,13 +550,13 @@
     private RenderFragment RenderModifications(LoadedDiceRule rule) => __builder =>
     {
         <div class="dndm-loaded-args">
-            @if (rule.Modifications.Count == 0)
+            @if (rule.Modifications.Length == 0)
             {
                 <span class="dndm-loaded-warn">no modifications — rule does nothing</span>
             }
             else
             {
-                @for (int i = 0; i < rule.Modifications.Count; i++)
+                @for (int i = 0; i < rule.Modifications.Length; i++)
                 {
                     var idx = i;
                     var mod = rule.Modifications[idx];
@@ -574,7 +574,7 @@
             {
                 <select class="dndm-select dndm-loaded-select"
                         value=""
-                        @key="@($"mod-{rule.Id}-{rule.Modifications.Count}")"
+                        @key="@($"mod-{rule.Id}-{rule.Modifications.Length}")"
                         @onchange="@(e => AddModification(rule, (string?)e.Value))">
                     <option value="">+ Add modification…</option>
                     <option value="setResult">Set die result to…</option>

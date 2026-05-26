@@ -350,7 +350,7 @@ namespace KnockBox.DndMapperTests.Unit
             Assert.AreEqual(CombatPhase.Active, _state.ActiveCombat!.Phase);
 
             var current = _state.ActiveCombat.TurnOrder[_state.ActiveCombat.CurrentTurnIndex];
-            int beforeCount = _state.ActiveCombat.TurnOrder.Count;
+            int beforeCount = _state.ActiveCombat.TurnOrder.Length;
             _engine.RemoveCombatantAsync(_state, _host, current.Id);
             Assert.HasCount(beforeCount - 1, _state.ActiveCombat.TurnOrder);
         }
