@@ -2737,7 +2737,11 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                 TimestampUtc: DateTime.UtcNow,
                 Formula: formula,
                 ModifierBreakdown: modifierBreakdown)
-            { AppliedRules = appliedRules };
+            {
+                AppliedRules = appliedRules,
+                OriginalDice = request.Dice.ToImmutableList(),
+                OriginalAttributeRef = request.AttributeRef,
+            };
 
             var exec = state.Execute(() => state.AppendRoll(result));
             if (exec.IsCanceled) return ValueResult<RollResult>.FromCancellation();

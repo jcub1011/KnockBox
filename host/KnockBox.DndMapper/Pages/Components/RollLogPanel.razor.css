@@ -268,3 +268,22 @@
     transform: translateY(-1px);
     cursor: help;
 }
+
+/* ↻ re-roll button sits between the timestamp and the right edge of the
+   entry header. Compact so it doesn't disrupt the meta row's baseline, and
+   tucked next to the time so the eye finds it where it expects an "action
+   for this entry". Disabled state is for pre-feature rolls whose original
+   request fields weren't captured. */
+.dndm-rolllog-reroll {
+    margin-left: 0.3rem;
+    padding: 0.05rem 0.4rem;
+    font-size: 0.85rem;
+    line-height: 1;
+    min-height: 0;
+    align-self: center;
+}
+
+.dndm-rolllog-reroll:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}

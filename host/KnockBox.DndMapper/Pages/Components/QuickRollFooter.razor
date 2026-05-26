@@ -1,0 +1,78 @@
+@using KnockBox.Core.Components.Shared
+@using KnockBox.DndMapper.Models
+@using KnockBox.DndMapper.Services.State.Games
+@using KnockBox.DndMapper.Services.State.Games.Data
+@inherits DisposableComponent
+
+<div class="dndm-rollfooter">
+    <div class="dndm-rollfooter__left">
+        <button class="dndm-rollfooter__rollbtn"
+                type="button"
+                title="@QuickRollTitle"
+                disabled="@(!CanQuickRoll)"
+                @onclick="QuickRoll">🎲 @QuickRollLabel</button>
+
+        @if (ShowAttrArrow)
+        {
+            <button class="dndm-rollfooter__arrow"
+                    type="button"
+                    aria-expanded="@_attrsExpanded"
+                    title="@(_attrsExpanded ? "Hide attribute rolls" : "Show a quick-roll button for each attribute")"
+                    @onclick="ToggleAttrs">@(_attrsExpanded ? "▾" : "▸")</button>
+        }
+
+        <div class="dndm-rollfooter__attrs @(_attrsExpanded ? "dndm-rollfooter__attrs--open" : null)">
+            @foreach (var row in NumericRows)
+            {
+                var mod = AttrModifier(row);
+                <button @key="row.Name"
+                        class="dndm-rollfooter__attr"
+                        type="button"
+                        tabindex="@(_attrsExpanded ? 0 : -1)"
+                        title="@AttrTitle(row, mod)"
+                        @onclick="@(e => RollAttribute(row, e))">
+                    <span class="dndm-rollfooter__attr-name">@row.Name</span>
+                    <span class="dndm-rollfooter__attr-mod">@FormatSigned(mod)</span>
+                </button>
+            }
+        </div>
+    </div>
+
+    <div class="dndm-rollfooter__right">
+        <span class="dndm-rollfooter__hint" aria-hidden="true">Shift = Adv · Ctrl = Dis</span>
+        <button class="dndm-rollfooter__gear"
+                type="button"
+                aria-label="Roll settings"
+                title="Dice, attribute, modifiers, templates, mode, and roll log"
+                @onclick="OpenSettings">⚙</button>
+    </div>
+</div>
+
+@if (_settingsOpen)
+{
+    <div class="dndm-modal-overlay" @onclick="CloseSettings">
+        <div class="dndm-modal-card dndm-rollsettings-modal"
+             role="dialog"
+             aria-modal="true"
+             @onclick:stopPropagation="true">
+            <header class="dndm-rollsettings-modal__header">
+                <div class="dndm-rollsettings-modal__titleblock">
+                    <h3 class="dndm-modal-title">Roll settings</h3>
+                    <span class="dndm-rollsettings-modal__caption">
+                        Dice, attribute, flat modifier, templates, mode, label, and the roll log.
+                        Mode and attribute selections here drive the footer too.
+                    </span>
+                </div>
+                <button class="dndm-btn dndm-btn--icon"
+                        type="button"
+                        aria-label="Close roll settings"
+                        title="Close"
+                        @onclick="CloseSettings">×</button>
+            </header>
+            <RollLogPanel State="State"
+                          Config="Config"
+                          CurrentUserId="@CurrentUserId"
+                          IsHost="IsHost" />
+        </div>
+    </div>
+}

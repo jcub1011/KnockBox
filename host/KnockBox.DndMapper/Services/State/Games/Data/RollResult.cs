@@ -39,5 +39,18 @@ namespace KnockBox.DndMapper.Services.State.Games.Data
         // their stamps even if the underlying rule is later edited or deleted.
         public ImmutableList<LoadedDiceRuleStamp> AppliedRules { get; init; }
             = ImmutableList<LoadedDiceRuleStamp>.Empty;
+
+        // Original dice composition from the inbound RollRequest, captured so
+        // the roll log's re-roll affordance can faithfully repeat the roll.
+        // Reconstructing this from Rolls is brittle: Adv/Dis adds a discarded
+        // twin that would have to be filtered back out. Empty list ⇒ the
+        // record was deserialized from a pre-feature save and re-roll is
+        // unavailable (button is rendered disabled).
+        public ImmutableList<DiceTerm> OriginalDice { get; init; } = ImmutableList<DiceTerm>.Empty;
+
+        // Sheet + attribute the request bound to, for the re-roll path. The
+        // resolved AttributeModifier above is enough for display but loses the
+        // sheet identity (needed by loaded-dice context and "rolling as X" UX).
+        public AttributeRef? OriginalAttributeRef { get; init; }
     }
 }

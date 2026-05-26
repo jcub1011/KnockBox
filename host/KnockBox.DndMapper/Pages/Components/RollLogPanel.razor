@@ -7,9 +7,7 @@
 @inherits DisposableComponent
 
 <section class="dndm-panel dndm-rolllog">
-    <header class="dndm-panel-header @(OnHeaderClick.HasDelegate ? "dndm-rolllog-header--clickable" : null)"
-            @onclick="OnHeaderClickHandler"
-            title="@(OnHeaderClick.HasDelegate ? "Click to minimize" : null)">
+    <header class="dndm-panel-header">
         <span>Roll</span>
     </header>
     <div class="dndm-panel-body dndm-rolllog-body">
@@ -21,8 +19,8 @@
                     @onclick="QuickRoll">🎲 @QuickRollLabel</button>
         </div>
 
-        <details class="dndm-rolllog-config">
-            <summary class="dndm-rolllog-config-summary">Configuration</summary>
+        <details class="dndm-rolllog-config" open>
+            <summary class="dndm-rolllog-config-summary" title="Templates, custom dice, flat modifier, attribute binding, and label.">Configuration</summary>
             <div class="dndm-rolllog-config-body">
                 <section class="dndm-dice-quick">
                     <span class="dndm-label">Templates</span>
@@ -216,6 +214,16 @@
                 <time class="dndm-rolllog-time"
                       datetime="@r.TimestampUtc.ToString("o")"
                       title="@r.TimestampUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")">@FormatTimestamp(r.TimestampUtc)</time>
+                @if (r.RollerUserId == CurrentUserId && r.TokenId is null)
+                {
+                    var enabled = CanReRoll(r);
+                    <button class="dndm-btn dndm-btn--small dndm-btn--icon dndm-rolllog-reroll"
+                            type="button"
+                            disabled="@(!enabled)"
+                            aria-label="Re-roll"
+                            title="@(enabled ? ReRollTitle(r) : "Re-roll isn't available for rolls saved before this feature shipped.")"
+                            @onclick="@(e => ReRoll(r, e))">↻</button>
+                }
             </header>
             <div class="dndm-rolllog-dice">
                 <span class="dndm-rolllog-total"><strong>@r.Total</strong></span>

@@ -9,6 +9,7 @@ using KnockBox.DndMapper.Services.Logic.Visibility;
 using KnockBox.DndMapper.Services.State.Games;
 using KnockBox.DndMapper.Services.State.Games.Data;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Web;
 
 namespace KnockBox.DndMapper.Pages.Components
 {
@@ -25,10 +26,6 @@ namespace KnockBox.DndMapper.Pages.Components
         [Parameter, EditorRequired] public DiceRollerConfig Config { get; set; } = default!;
         [Parameter] public string CurrentUserId { get; set; } = string.Empty;
         [Parameter] public bool IsHost { get; set; }
-        [Parameter] public EventCallback OnHeaderClick { get; set; }
-
-        private Task OnHeaderClickHandler() =>
-            OnHeaderClick.HasDelegate ? OnHeaderClick.InvokeAsync() : Task.CompletedTask;
 
         [Inject] protected DndMapperGameEngine Engine { get; set; } = default!;
         [Inject] protected IUserService UserService { get; set; } = default!;
@@ -161,6 +158,47 @@ namespace KnockBox.DndMapper.Pages.Components
 
         private Task QuickRoll() =>
             DiceRollSubmitter.SubmitAsync(Engine, State, UserService.CurrentUser, Config, Toasts);
+
+        // Repeat a past roll with the same dice, attribute binding, flat
+        // modifier and label. Shift/Ctrl held while clicking overrides the
+        // mode for the new roll (Adv/Dis only takes effect when the request
+        // is a single die; otherwise the engine would reject it and the
+        // submitter coerces back to Normal anyway).
+        private Task ReRoll(RollResult r, MouseEventArgs e)
+        {
+            if (!CanReRoll(r)) return Task.CompletedTask;
+
+            bool singleDie = r.OriginalDice.Count == 1 && r.OriginalDice[0].Count == 1;
+            RollMode mode = r.Mode;
+            if (singleDie)
+            {
+                if (e.ShiftKey && !e.CtrlKey) mode = RollMode.Advantage;
+                else if (e.CtrlKey && !e.ShiftKey) mode = RollMode.Disadvantage;
+            }
+
+            var request = new RollRequest(
+                Dice: [.. r.OriginalDice],
+                AttributeRef: r.OriginalAttributeRef,
+                FlatModifier: r.FlatModifier,
+                Mode: mode,
+                Label: string.IsNullOrWhiteSpace(r.Label) ? "Roll" : r.Label);
+
+            return DiceRollSubmitter.SubmitRequestAsync(Engine, State, UserService.CurrentUser, request, Toasts);
+        }
+
+        // Visible only on rolls the current user authored. NPC rolls (TokenId
+        // set) are deferred — the host's "re-roll NPC X" path is a follow-up.
+        // OriginalDice == empty means the record was persisted before the
+        // re-roll feature shipped, so we can't faithfully repeat it.
+        private bool CanReRoll(RollResult r) =>
+            r.TokenId is null
+            && !string.IsNullOrEmpty(CurrentUserId)
+            && r.RollerUserId == CurrentUserId
+            && r.OriginalDice.Count > 0;
+
+        private static string ReRollTitle(RollResult r) =>
+            $"Re-roll {r.Formula}{(string.IsNullOrEmpty(r.Label) ? "" : $" — {r.Label}")}. "
+            + "Hold Shift for Advantage · Ctrl for Disadvantage.";
 
         private void OpenHistory()
         {
@@ -307,24 +345,28 @@ namespace KnockBox.DndMapper.Pages.Components
 
         private void AddTerm() => Config.Terms.Add(new DiceTerm(1, 20));
 
+        // The Adv/Dis pills are visually disabled when !CanAdvDis (see the
+        // razor), but Config.Mode is intentionally preserved across temporary
+        // invalid configurations: a user who set Adv then bumps to 2d6 and
+        // back to 1d20 should keep their Adv selection. Submission paths
+        // coerce Mode → Normal when the dice config can't support Adv/Dis
+        // (see DiceRollSubmitter), so the engine never sees an inconsistent
+        // request.
         private void RemoveTerm(int idx)
         {
             if (idx >= 0 && idx < Config.Terms.Count) Config.Terms.RemoveAt(idx);
             if (Config.Terms.Count == 0) Config.Terms.Add(new DiceTerm(1, 20));
-            if (!CanAdvDis) Config.Mode = RollMode.Normal;
         }
 
         private void UpdateTermCount(int idx, int count)
         {
             count = Math.Clamp(count, 0, 20);
             Config.Terms[idx] = Config.Terms[idx] with { Count = count };
-            if (!CanAdvDis) Config.Mode = RollMode.Normal;
         }
 
         private void UpdateTermSides(int idx, int sides)
         {
             Config.Terms[idx] = Config.Terms[idx] with { Sides = sides };
-            if (!CanAdvDis) Config.Mode = RollMode.Normal;
         }
 
         private void OnAttributeChange(string? raw)

@@ -3,6 +3,10 @@
     --dndm-rail-w-right: 320px;
     --dndm-rail-collapsed: 28px;
 
+    /* Height reserved for the QuickRollFooter bar pinned to the bottom of the
+       canvas area, so other bottom-anchored overlays can clear it. */
+    --dndm-rollfooter-h: 2.75rem;
+
     /* Effective rail-occupied widths, accounting for collapsed state and
        (for the left rail) host-only rendering. UI overlays use these so
        they don't tuck behind a rail. */
@@ -175,7 +179,8 @@
 
 .dndm-floating-actions {
     position: absolute;
-    bottom: 1rem;
+    /* Clear the QuickRollFooter bar pinned to the bottom of the canvas area. */
+    bottom: calc(1rem + var(--dndm-rollfooter-h));
     right: calc(1rem + var(--dndm-rail-pad-right));
     display: flex;
     gap: 0.5rem;
