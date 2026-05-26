@@ -32,11 +32,16 @@ namespace KnockBox.DndMapper.Pages.Components
         // tick.
         private readonly HashSet<Guid> _seen = new();
 
-        // Most recent rollId we kicked off per user. Used to detect interrupts:
-        // when a new roll arrives for the same user while a previous one is
-        // still animating, settle the previous one immediately so the log
-        // doesn't permanently hide it.
-        private readonly Dictionary<string, Guid> _activeByUser = new();
+        // Most recent rollId we kicked off per dice-box-key. Used to detect
+        // interrupts: when a new roll arrives for the same key while a
+        // previous one is still animating, settle the previous one
+        // immediately so the log doesn't permanently hide it. The key is
+        // composite: "user:{id}" for user-attributed rolls and "token:{id}"
+        // for token-bound rolls (e.g. NPC initiative). Distinct keys mean
+        // distinct DiceBox instances in JS, which is what enables several
+        // NPC rolls to animate concurrently instead of clobbering each
+        // other under the host's user id.
+        private readonly Dictionary<string, Guid> _activeByKey = new();
 
         protected override void OnInitialized()
         {
@@ -87,20 +92,37 @@ namespace KnockBox.DndMapper.Pages.Components
             foreach (var roll in VisibleNewRolls())
             {
                 _seen.Add(roll.Id);
-                var color = DiceColorResolver.Resolve(State, roll.RollerUserId);
+
+                // Token-bound rolls (NPC initiative bulk-roll) get their own
+                // dice-box keyed by the token id, so several NPC rolls can
+                // animate side-by-side rather than the host's single box
+                // clobbering itself. Color comes from the token's resolved
+                // (sheet-aware) color instead of the host's gold.
+                string boxKey;
+                string color;
+                if (roll.TokenId is Guid tokenId)
+                {
+                    boxKey = "token:" + tokenId.ToString("N");
+                    color = DiceColorResolver.ResolveForToken(State, tokenId);
+                }
+                else
+                {
+                    boxKey = "user:" + roll.RollerUserId;
+                    color = DiceColorResolver.Resolve(State, roll.RollerUserId);
+                }
                 var fontColor = TokenTextContrast.TextFillFor(color);
                 var notation = DiceNotationBuilder.Build(roll);
                 if (string.IsNullOrEmpty(notation)) continue;
 
-                // Interrupt: if this user already had a roll animating, settle
-                // the previous one immediately so the log reveals it.
-                if (_activeByUser.TryGetValue(roll.RollerUserId, out var previousRollId)
+                // Interrupt: if this dice-box already has a roll animating,
+                // settle the previous one immediately so the log reveals it.
+                if (_activeByKey.TryGetValue(boxKey, out var previousRollId)
                     && previousRollId != roll.Id)
                 {
                     Tracker.MarkSettled(previousRollId);
                 }
 
-                _activeByUser[roll.RollerUserId] = roll.Id;
+                _activeByKey[boxKey] = roll.Id;
                 Tracker.MarkAnimating(roll.Id);
 
                 try
@@ -108,7 +130,7 @@ namespace KnockBox.DndMapper.Pages.Components
                     await _module.InvokeVoidAsync(
                         "rollFor",
                         _overlayRef,
-                        roll.RollerUserId,
+                        boxKey,
                         color,
                         fontColor,
                         notation,
@@ -137,13 +159,16 @@ namespace KnockBox.DndMapper.Pages.Components
             }
         }
 
+        // JS calls back with the same composite key we passed to rollFor —
+        // see boxKey construction above. The argument name "userId" is kept
+        // for backwards compat with the JS module's existing call shape.
         [JSInvokable]
         public Task OnRollSettled(string userId, Guid rollId)
         {
             Tracker.MarkSettled(rollId);
-            if (_activeByUser.TryGetValue(userId, out var current) && current == rollId)
+            if (_activeByKey.TryGetValue(userId, out var current) && current == rollId)
             {
-                _activeByUser.Remove(userId);
+                _activeByKey.Remove(userId);
             }
             return Task.CompletedTask;
         }

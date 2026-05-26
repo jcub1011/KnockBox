@@ -76,9 +76,14 @@
     flex-direction: column;
     gap: 0.6rem;
     padding: 0.5rem;
+    padding-bottom: 25rem;
     overflow: auto;
     flex: 1 1 auto;
     min-height: 0;
+    /* Anchor for the RailActionsMenu container queries (panels.css). At <=300px
+       the per-row action button strips collapse behind a ⋯ trigger + popover.
+       Each rail's content scrolls independently, so each gets its own container. */
+    container-type: inline-size;
 }
 
 .dnd-mapper-playing--left-collapsed .dndm-rail--left .dndm-rail-content,

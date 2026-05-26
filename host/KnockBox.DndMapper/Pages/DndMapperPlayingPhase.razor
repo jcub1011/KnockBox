@@ -83,7 +83,8 @@
                            IsHost="IsHost"
                            CurrentUserId="@CurrentUserId"
                            SelectedImageId="_selectedImageId"
-                           SelectedImageIdChanged="OnSelectedImageIdChanged" />
+                           SelectedImageIdChanged="OnSelectedImageIdChanged"
+                           OnTokenDoubleClick="OnTokenDoubleClick" />
 
                 @if (IsHost && _selectedImageId is Guid imgId && State.ActiveMapId is Guid mapId)
                 {
@@ -118,7 +119,7 @@
                 {
                     <HostInitiativePanel State="State" />
                 }
-                <CharacterSheetPanel State="State" CurrentUserId="@CurrentUserId" IsHost="IsHost" />
+                <CharacterSheetPanel @ref="_sheetPanel" State="State" CurrentUserId="@CurrentUserId" IsHost="IsHost" />
             </div>
         </aside>
 

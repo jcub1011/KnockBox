@@ -1,0 +1,44 @@
+@*
+    Renders a row's action buttons inline when the surrounding rail-content
+    container is wider than 300px, and collapses them behind a single ⋯ trigger
+    + click-open popover when narrower. The wide/narrow swap is driven entirely
+    by CSS container queries against `.dndm-rail-content` (which declares
+    `container-type: inline-size`), so the JS-driven rail-resize and the panel
+    layout stay decoupled — no width listeners required here.
+
+    ChildContent is rendered twice (inline copy + popover copy); container
+    queries hide whichever one is inactive. Both copies are functional, so
+    consumers don't need to thread state through.
+*@
+
+<span class="dndm-railactions" @onclick:stopPropagation="true">
+    <span class="dndm-railactions__inline">@ChildContent</span>
+    <button class="dndm-btn dndm-btn--icon dndm-btn--small dndm-railactions__trigger"
+            type="button"
+            title="@(string.IsNullOrEmpty(Title) ? "More actions" : Title)"
+            @onclick="Toggle"
+            aria-label="More actions">
+        @* Vertical three-dot "kebab" glyph. SVG instead of U+22EE so the
+           three dots are sized + spaced consistently across fonts. *@
+        <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false">
+            <circle cx="8" cy="3" r="1.4" fill="currentColor" />
+            <circle cx="8" cy="8" r="1.4" fill="currentColor" />
+            <circle cx="8" cy="13" r="1.4" fill="currentColor" />
+        </svg>
+    </button>
+    @if (_open)
+    {
+        <div class="dndm-railactions__backdrop" @onclick="Close"></div>
+        <div class="dndm-railactions__pop" role="menu">@ChildContent</div>
+    }
+</span>
+
+@code {
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public string? Title { get; set; }
+
+    private bool _open;
+
+    private void Toggle() => _open = !_open;
+    private void Close() => _open = false;
+}

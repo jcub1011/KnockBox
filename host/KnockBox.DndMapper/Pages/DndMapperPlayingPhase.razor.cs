@@ -49,6 +49,10 @@ namespace KnockBox.DndMapper.Pages
         private ElementReference _rightHandleRef;
         private ElementReference _rootRef;
 
+        // Captured so the dblclick-token handler can switch the panel's active
+        // sheet. Bound via @ref on the right-rail CharacterSheetPanel render.
+        private CharacterSheetPanel? _sheetPanel;
+
         private IJSObjectReference? _resizeModule;
         private IJSObjectReference? _unloadGuardModule;
         private IJSObjectReference? _collapseModule;
@@ -70,6 +74,19 @@ namespace KnockBox.DndMapper.Pages
         private string Role => IsHost ? "host" : "player";
 
         private void OnSelectedImageIdChanged(Guid? id) => _selectedImageId = id;
+
+        // Resolve the double-clicked token's linked sheet and ask the right-rail
+        // sheet panel to switch to it. Falls through silently for legacy tokens
+        // with no sheet — the user just sees no panel change. The panel ref is
+        // null until first render, so we no-op until both ends are wired.
+        private void OnTokenDoubleClick(Guid tokenId)
+        {
+            if (_sheetPanel is null) return;
+            var token = State.Maps.SelectMany(m => m.Tokens).FirstOrDefault(t => t.Id == tokenId);
+            if (token?.SheetId is not Guid sheetId) return;
+            if (!State.Sheets.ContainsKey(sheetId)) return;
+            _sheetPanel.SelectSheet(sheetId);
+        }
 
         private void TogglePerms() => _permsOpen = !_permsOpen;
 

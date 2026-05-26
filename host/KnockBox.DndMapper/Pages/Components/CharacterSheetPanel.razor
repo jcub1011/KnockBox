@@ -418,12 +418,43 @@
                 {
                     <div class="dndm-sheet-section">
                         <span class="dndm-label">Notes</span>
-                        <textarea class="dndm-textarea dndm-textarea--notes"
-                                  rows="6"
-                                  value="@_notesDraft"
-                                  disabled="@(!canEdit)"
-                                  @oninput="@(e => OnNotesInput((string?)e.Value))"
-                                  @onblur="@(() => FlushPendingCommitAsync())"></textarea>
+                        @if (canEdit && _notesEditing)
+                        {
+                            <textarea class="dndm-textarea dndm-textarea--notes"
+                                      rows="6"
+                                      value="@_notesDraft"
+                                      @ref="_notesTextareaRef"
+                                      @oninput="@(e => OnNotesInput((string?)e.Value))"
+                                      @onblur="OnNotesBlur"></textarea>
+                        }
+                        else if (canEdit)
+                        {
+                            <div class="dndm-notes-rendered dndm-notes-rendered--editable"
+                                 title="Click to edit"
+                                 @onclick="EnterNotesEdit">
+                                @if (string.IsNullOrWhiteSpace(_notesDraft))
+                                {
+                                    <em class="dndm-notes-empty">No notes — click to add.</em>
+                                }
+                                else
+                                {
+                                    @((MarkupString)Markdig.Markdown.ToHtml(_notesDraft, _markdownPipeline))
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="dndm-notes-rendered">
+                                @if (string.IsNullOrWhiteSpace(_notesDraft))
+                                {
+                                    <em class="dndm-notes-empty">No notes.</em>
+                                }
+                                else
+                                {
+                                    @((MarkupString)Markdig.Markdown.ToHtml(_notesDraft, _markdownPipeline))
+                                }
+                            </div>
+                        }
                     </div>
                 }
             </div>

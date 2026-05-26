@@ -23,5 +23,11 @@ namespace KnockBox.DndMapper.Services.State.Games.Data
         // Human-readable breakdown when status effects contributed to the
         // attribute modifier — e.g. "12 + 2 (INT) − 5 (Brain Fog) = 9". Null
         // when no effects contributed; rendering falls back to the plain total.
-        string? ModifierBreakdown = null);
+        string? ModifierBreakdown = null,
+        // Token whose dice these are when the roll is *for* a specific
+        // token rather than a user — used by NPC initiative rolls so each
+        // NPC gets its own concurrent 3D-dice instance (keyed by token id)
+        // and its dice render in the token's resolved color. Null for
+        // player rolls; the existing RollerUserId path handles those.
+        Guid? TokenId = null);
 }

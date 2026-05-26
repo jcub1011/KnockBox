@@ -1539,13 +1539,17 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                     // The loop above skips player entries, so NPCs are the
                     // only thing here; the host is recorded as both roller
                     // and forcing party so the audit log attributes the
-                    // bulk roll to the host that triggered it.
+                    // bulk roll to the host that triggered it. TokenId is
+                    // attached so the 3D dice renderer keys each NPC's
+                    // dice on its token (concurrent + token-colored)
+                    // instead of collapsing them under the host's id.
                     state.AppendRoll(BuildInitiativeRollResult(
                         rollerUserId: caller.Id,
                         forcedByUserId: caller.Id,
                         d20: d20,
                         dexModifier: modifier,
-                        total: total));
+                        total: total,
+                        tokenId: entry.TokenId));
                 }
 
                 state.SetActiveCombat(combat with { TurnOrder = newTurnOrder });
@@ -1813,7 +1817,13 @@ namespace KnockBox.DndMapper.Services.Logic.Games
         private static string FormatSigned(int value)
             => value >= 0 ? $"+{value}" : $"−{Math.Abs(value)}";
 
-        private static RollResult BuildInitiativeRollResult(string rollerUserId, string? forcedByUserId, int d20, int dexModifier, int total)
+        private static RollResult BuildInitiativeRollResult(
+            string rollerUserId,
+            string? forcedByUserId,
+            int d20,
+            int dexModifier,
+            int total,
+            Guid? tokenId = null)
         {
             return new RollResult(
                 Id: Guid.NewGuid(),
@@ -1827,7 +1837,8 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                 Label: "Initiative",
                 TimestampUtc: DateTime.UtcNow,
                 Formula: "1d20",
-                ModifierBreakdown: null);
+                ModifierBreakdown: null,
+                TokenId: tokenId);
         }
 
         // ── Markup overlay (v1.x — §5.6) ──────────────────────────────────────────

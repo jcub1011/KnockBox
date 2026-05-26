@@ -79,7 +79,8 @@
                     <g @key="@($"chip-{tok.Id}")"
                        class="@($"dndm-token dndm-token--chip{(tok.Hidden ? " dndm-token--hidden" : "")}{chipActive}")"
                        data-token-id="@tok.Id"
-                       transform="@($"translate({Fmt(chipX)} {Fmt(chipY)})")">
+                       transform="@($"translate({Fmt(chipX)} {Fmt(chipY)})")"
+                       @ondblclick="@(() => OnTokenDoubleClick.InvokeAsync(tok.Id))">
                         @if (!string.IsNullOrEmpty(tok.Name))
                         {
                             <svg:title>@tok.Name</svg:title>
@@ -116,6 +117,16 @@
         if (onClick is not null)
         {
             builder.AddAttribute(3, "onclick", Microsoft.AspNetCore.Components.EventCallback.Factory.Create(this, onClick));
+        }
+        else
+        {
+            // Only single-token renders (the common case) get dblclick → open
+            // sheet. Collapsed-stack-top has onClick="OpenStack" which makes
+            // dblclick semantics ambiguous (which token's sheet?), so we skip
+            // it there — users expand the stack and dblclick a chip instead.
+            var tokenId = token.Id;
+            builder.AddAttribute(3, "ondblclick", Microsoft.AspNetCore.Components.EventCallback.Factory.Create<Microsoft.AspNetCore.Components.Web.MouseEventArgs>(
+                this, _ => OnTokenDoubleClick.InvokeAsync(tokenId)));
         }
         double tx = overrideX ?? token.X;
         double ty = overrideY ?? token.Y;

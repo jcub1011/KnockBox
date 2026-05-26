@@ -107,16 +107,18 @@ export async function rollFor(overlay, userId, color, fontColor, notation, dotne
         } catch (_) { /* circuit gone — fine */ }
     };
 
-    try {
-        await entry.box.roll(notation);
-    } catch (e) {
-        // If parsing or rolling threw, immediately settle so the log isn't
-        // permanently stuck hiding this roll.
+    // Fire-and-forget: dice-box's roll() promise resolves only when the
+    // physics simulation finishes, but settle is already wired through the
+    // onRollComplete callback above. Awaiting here would serialize sibling
+    // rollFor() calls (each at a *different* DiceBox instance) inside the
+    // caller's loop, defeating the per-NPC concurrent rendering that the
+    // per-token box keys are designed to enable.
+    entry.box.roll(notation).catch(async (e) => {
         if (entry.currentRollId === rollId) entry.currentRollId = null;
         try { await dotnet.invokeMethodAsync("OnRollSettled", userId, rollId); } catch (_) { /* ignore */ }
         // eslint-disable-next-line no-console
         console.warn("dndMapperDiceBox.roll failed", e);
-    }
+    });
 }
 
 export function disposeAll() {

@@ -2,6 +2,7 @@ using System;
 using System.Globalization;
 using System.Text.RegularExpressions;
 using KnockBox.DndMapper.Services.State.Games;
+using KnockBox.DndMapper.Services.State.Games.Data;
 
 namespace KnockBox.DndMapper.Helpers
 {
@@ -31,6 +32,30 @@ namespace KnockBox.DndMapper.Helpers
 
             var hash = (uint)StringComparer.Ordinal.GetHashCode(userId);
             return FallbackForHash(hash);
+        }
+
+        /// <summary>
+        /// Resolves the color for a roll that's *for* a specific token (e.g. an
+        /// NPC initiative roll). Walks the token's sheet color first (so all
+        /// tokens sharing a sheet share dice color), falls back to the token's
+        /// own color, then to a deterministic hash of the token id so the color
+        /// is stable across re-rolls. Used by the 3D dice canvas to render each
+        /// NPC's dice in its own color rather than the host's gold.
+        /// </summary>
+        public static string ResolveForToken(DndMapperGameState state, Guid tokenId)
+        {
+            foreach (var map in state.Maps)
+            {
+                foreach (var token in map.Tokens)
+                {
+                    if (token.Id != tokenId) continue;
+                    var resolved = token.ResolveColor(state.Sheets);
+                    if (IsValidHex(resolved)) return resolved;
+                    var hash = (uint)tokenId.GetHashCode();
+                    return FallbackForHash(hash);
+                }
+            }
+            return FallbackForHash((uint)tokenId.GetHashCode());
         }
 
         internal static string FallbackForHash(uint hash)

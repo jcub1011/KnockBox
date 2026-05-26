@@ -25,6 +25,15 @@ namespace KnockBox.DndMapper.Pages.Components
         /// </summary>
         [Parameter] public bool InteractionsDisabled { get; set; }
 
+        /// <summary>
+        /// Fires when the user double-clicks a token on the map. The parent (the
+        /// playing-phase page) uses this to switch the right-rail character-sheet
+        /// panel to the token's linked sheet. Skipped on the collapsed top of a
+        /// multi-token stack because single-click on that already means "expand"
+        /// — users dblclick the expanded chip instead.
+        /// </summary>
+        [Parameter] public EventCallback<Guid> OnTokenDoubleClick { get; set; }
+
         [Inject] protected IJSRuntime JSRuntime { get; set; } = default!;
         [Inject] protected DndMapperGameEngine GameEngine { get; set; } = default!;
         [Inject] protected IUserService UserService { get; set; } = default!;

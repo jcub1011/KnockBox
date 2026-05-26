@@ -293,7 +293,8 @@
                     IsHost="IsHost"
                     CurrentUserId="@CurrentUserId"
                     SvgId="@_svgId"
-                    InteractionsDisabled="@IsCanvasToolActive" />
+                    InteractionsDisabled="@IsCanvasToolActive"
+                    OnTokenDoubleClick="OnTokenDoubleClick" />
 
         @if (IsHost && SelectedImage is { Locked: false, Hidden: false } sel)
         {

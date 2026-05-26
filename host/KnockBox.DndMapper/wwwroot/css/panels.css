@@ -566,3 +566,64 @@
     margin-left: 2px;
     flex: 0 0 auto;
 }
+
+/* ─── RailActionsMenu (per-row action collapse for narrow rails) ──
+   Used by HostMapSwitcher, HostSavesPanel, HostTokenPanel. The widget
+   renders ChildContent twice (inline + popover) and lets container queries
+   swap which copy is visible. The container is .dndm-rail-content, which
+   carries `container-type: inline-size` (see DndMapperPlayingPhase.razor.css). */
+.dndm-railactions {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+}
+
+.dndm-railactions__inline {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.15rem;
+}
+
+.dndm-railactions__trigger {
+    display: none;
+    padding: 0.2rem 0.35rem;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.dndm-railactions__backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    background: transparent;
+}
+
+.dndm-railactions__pop {
+    position: absolute;
+    /* Open to the LEFT of the trigger, vertically centered on it. The maps /
+       saves / tokens lists are scrollable (overflow-y: auto, which the CSS
+       spec promotes to auto on the unset x-axis too), so a popover anchored
+       above or below the trigger gets clipped by the scroll container's
+       top/bottom edge whenever the row is near that edge. Sliding it left
+       keeps the popover inside the trigger's *row* — the row is taller than
+       the popover, so it never clips vertically — and the row's full width
+       across the panel gives plenty of horizontal room for the icon strip. */
+    top: 50%;
+    right: calc(100% + 4px);
+    transform: translateY(-50%);
+    z-index: 51;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.35rem;
+    background: var(--dndm-bg-elev);
+    border: 1px solid var(--dndm-border-strong);
+    border-radius: 3px;
+    box-shadow: -4px 0 12px rgba(0, 0, 0, 0.55);
+    white-space: nowrap;
+}
+
+@container (max-width: 300px) {
+    .dndm-railactions__inline { display: none; }
+    .dndm-railactions__trigger { display: inline-flex; }
+}

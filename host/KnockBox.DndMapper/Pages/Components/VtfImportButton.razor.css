@@ -27,6 +27,22 @@
     pointer-events: none;
 }
 
+/* Icon-only variant — matches sibling icon buttons in the Saves header. */
+.dndm-vtf-import--icon {
+    padding: 0.25rem 0.4rem;
+    line-height: 1;
+    color: var(--dndm-ember);
+}
+
+.dndm-vtf-import--icon svg {
+    display: block;
+}
+
+.dndm-vtf-import-busy {
+    font-size: 0.85rem;
+    line-height: 1;
+}
+
 .dndm-vtf-import ::deep input[type="file"] {
     position: absolute;
     width: 1px;

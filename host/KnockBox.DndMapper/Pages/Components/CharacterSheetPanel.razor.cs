@@ -7,6 +7,7 @@ using KnockBox.DndMapper.Services.Logic.Games;
 using KnockBox.DndMapper.Services.Logic.Visibility;
 using KnockBox.DndMapper.Services.State.Games;
 using KnockBox.DndMapper.Services.State.Games.Data;
+using Markdig;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 
@@ -46,6 +47,23 @@ namespace KnockBox.DndMapper.Pages.Components
         private const int DebounceMs = 300;
         private System.Threading.Timer? _commitTimer;
         private bool _dirty;
+
+        // Click-to-edit toggle for the markdown Notes field. Default is the
+        // rendered Markdown; clicking the rendered area flips to the textarea,
+        // blur flips back (after committing the draft).
+        private bool _notesEditing;
+        private ElementReference _notesTextareaRef;
+        private bool _notesFocusPending;
+
+        // Markdown → HTML pipeline. Built once per process. UseAdvancedExtensions
+        // gives tables/strikethrough/etc.; DisableHtml strips raw HTML before
+        // rendering so user notes can't inject scripts into the host panel via
+        // the MarkupString in the Razor.
+        private static readonly MarkdownPipeline _markdownPipeline =
+            new MarkdownPipelineBuilder()
+                .UseAdvancedExtensions()
+                .DisableHtml()
+                .Build();
 
         private bool _npcModalOpen;
         private string _npcNameDraft = string.Empty;
@@ -106,6 +124,12 @@ namespace KnockBox.DndMapper.Pages.Components
             {
                 _renameFocusPending = false;
                 try { await _renameInputRef.FocusAsync(preventScroll: true); }
+                catch { /* element not yet attached / circuit teardown */ }
+            }
+            if (_notesFocusPending && _notesEditing)
+            {
+                _notesFocusPending = false;
+                try { await _notesTextareaRef.FocusAsync(preventScroll: true); }
                 catch { /* element not yet attached / circuit teardown */ }
             }
             await base.OnAfterRenderAsync(firstRender);
@@ -243,10 +267,29 @@ namespace KnockBox.DndMapper.Pages.Components
             };
         }
 
-        private void SelectSheet(Guid id)
+        // Public so sibling components (the map canvas via the playing-phase
+        // page) can switch which sheet this panel is showing — e.g. when the
+        // user double-clicks a token on the map.
+        public void SelectSheet(Guid id)
         {
             _activeSheetId = id;
             EnsureDraftSynced();
+            // Drop edit mode if we're switching sheets — otherwise the textarea
+            // would briefly show the new sheet's notes in edit state.
+            _notesEditing = false;
+            StateHasChanged();
+        }
+
+        private void EnterNotesEdit()
+        {
+            _notesEditing = true;
+            _notesFocusPending = true;
+        }
+
+        private async Task OnNotesBlur()
+        {
+            _notesEditing = false;
+            await FlushPendingCommitAsync();
         }
 
         private void OnSheetDropdownChanged(string? raw)
