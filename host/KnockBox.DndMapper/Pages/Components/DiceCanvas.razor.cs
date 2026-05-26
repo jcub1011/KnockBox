@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using KnockBox.Core.Components.Shared;
 using KnockBox.DndMapper.Helpers;
 using KnockBox.DndMapper.Services.Logic;
@@ -43,6 +44,15 @@ namespace KnockBox.DndMapper.Pages.Components
         // other under the host's user id.
         private readonly Dictionary<string, Guid> _activeByKey = new();
 
+        // Token ids whose 3D dice scene has already been prewarmed for this
+        // circuit. The bulk NPC initiative roll appends N RollResults in one
+        // notification; without prewarming, each one's first ensureBox()
+        // call does a heavy Three.js initialize() and the burst saturates
+        // the main thread. We instead fire prewarmBox() per NPC as soon as
+        // we observe combat in WaitingForRolls, so by the time the host
+        // clicks "roll all" every box is a warm cache hit.
+        private readonly HashSet<Guid> _prewarmed = new();
+
         protected override void OnInitialized()
         {
             _stateSub = State.StateChangedEventManager.Subscribe(OnStateChangedAsync);
@@ -62,6 +72,7 @@ namespace KnockBox.DndMapper.Pages.Components
                 foreach (var roll in State.RollLog) _seen.Add(roll.Id);
                 // Then try to animate any rolls that arrived between the first
                 // notification and the JS module being loaded.
+                await PrewarmNpcBoxesAsync();
                 await ProcessNewRollsAsync();
             }
             catch (JSDisconnectedException) { }
@@ -82,8 +93,64 @@ namespace KnockBox.DndMapper.Pages.Components
             {
                 Tracker.MarkAnimating(roll.Id);
             }
-            await InvokeAsync(ProcessNewRollsAsync);
+            await InvokeAsync(async () =>
+            {
+                await PrewarmNpcBoxesAsync();
+                await ProcessNewRollsAsync();
+            });
         }
+
+        // Queue prewarm for every unrolled NPC combatant whenever combat
+        // sits in WaitingForRolls. We send the full batch in a single JS
+        // round-trip; JS then serializes the heavy Three.js init through
+        // its internal initChain in the background. Awaiting each token's
+        // init from C# would block this circuit handler for the full warm
+        // duration — long enough for the host to click "Roll All" mid-warm
+        // and still hit the cold-init burst. The batch path returns to C#
+        // immediately. Idempotent via _prewarmed.
+        private async Task PrewarmNpcBoxesAsync()
+        {
+            if (_module is null) return;
+            var combat = State.ActiveCombat;
+            if (combat is null || combat.Phase != CombatPhase.WaitingForRolls) return;
+
+            var batch = new List<PrewarmConfig>();
+            var added = new List<Guid>();
+            foreach (var entry in combat.TurnOrder)
+            {
+                if (entry.OwnerUserId is not null) continue;     // players
+                if (entry.InitiativeRoll is not null) continue;  // already rolled
+                if (!_prewarmed.Add(entry.TokenId)) continue;    // already warmed this circuit
+
+                var color = DiceColorResolver.ResolveForToken(State, entry.TokenId);
+                batch.Add(new PrewarmConfig(
+                    BoxKey: "token:" + entry.TokenId.ToString("N"),
+                    Color: color,
+                    FontColor: TokenTextContrast.TextFillFor(color)));
+                added.Add(entry.TokenId);
+            }
+
+            if (batch.Count == 0) return;
+
+            try
+            {
+                await _module.InvokeVoidAsync("prewarmBoxes", _overlayRef, batch);
+            }
+            catch (JSDisconnectedException)
+            {
+                // Circuit gone — the lazy ensureBox path on the next roll
+                // will rebuild as needed. Drop the guards so a fresh
+                // circuit can retry.
+                foreach (var id in added) _prewarmed.Remove(id);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning(ex, "Dice prewarmBoxes batch failed ({Count} tokens)", batch.Count);
+                foreach (var id in added) _prewarmed.Remove(id);
+            }
+        }
+
+        private sealed record PrewarmConfig(string BoxKey, string Color, string FontColor);
 
         private async Task ProcessNewRollsAsync()
         {

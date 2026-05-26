@@ -15,6 +15,14 @@ import DiceBox from "/_content/KnockBox.DndMapper/lib/dice-box-threejs/dice-box.
 const FADE_MS = 3000;
 const boxes = new Map(); // boxKey -> { box, container, color, fontColor, fadeTimer, currentRollId, dotnet, ready }
 
+// Three.js scene construction + asset load inside DiceBox.initialize() is
+// heavy. Running several in parallel (e.g. the host's "roll all NPC
+// initiative" burst, which fires N rolls in one notification) saturates the
+// main thread. Serialize the init phase through this promise chain so only
+// one box initializes at a time; rolls themselves still run concurrently
+// across boxes because roll() is fire-and-forget further down.
+let initChain = Promise.resolve();
+
 function safeId(boxKey) {
     return boxKey.replace(/[^a-zA-Z0-9_-]/g, "_");
 }
@@ -29,7 +37,24 @@ function customColorset(boxKey, color, fontColor) {
     };
 }
 
-async function ensureBox(overlay, boxKey, color, fontColor) {
+function ensureBox(overlay, boxKey, color, fontColor) {
+    // Cache-hit fast path: a warm box (matching colors) returns immediately
+    // without waiting its turn on initChain. Without this, a rollFor on an
+    // already-prewarmed token would still queue behind any in-flight cold
+    // prewarms of *other* tokens, which defeats the whole point.
+    const existing = boxes.get(boxKey);
+    if (existing && existing.color === color && existing.fontColor === fontColor) {
+        return Promise.resolve(existing);
+    }
+    const next = initChain.then(() => ensureBoxInternal(overlay, boxKey, color, fontColor));
+    // Swallow rejections on the chain itself so one failed init doesn't
+    // poison every subsequent prewarm/roll. Individual callers still see
+    // the rejection via the returned promise.
+    initChain = next.catch(() => { });
+    return next;
+}
+
+async function ensureBoxInternal(overlay, boxKey, color, fontColor) {
     let entry = boxes.get(boxKey);
     if (entry && entry.color === color && entry.fontColor === fontColor) {
         return entry;
@@ -79,6 +104,27 @@ async function ensureBox(overlay, boxKey, color, fontColor) {
     };
     boxes.set(boxKey, entry);
     return entry;
+}
+
+// Queue (or reuse) DiceBox scenes for a batch of token keys without rolling.
+// Lets the host prewarm every NPC combatant the moment combat enters
+// WaitingForRolls so the later bulk-roll burst hits warm caches. We fire
+// ensureBox per config but don't await — each one threads through initChain
+// internally, and returning immediately means C# only pays one round-trip
+// regardless of how many NPCs are in the turn order. Cold prewarms keep
+// initializing in the background while the host reads the panel.
+//
+// configs: [{ boxKey, color, fontColor }, ...]
+export function prewarmBoxes(overlay, configs) {
+    if (!overlay || !Array.isArray(configs)) return;
+    for (const c of configs) {
+        if (!c || !c.boxKey) continue;
+        // Discard the promise — initChain inside ensureBox guarantees
+        // sequential init, and a per-prewarm failure shouldn't poison the
+        // batch. The next rollFor for the same key will surface any real
+        // failure to the caller.
+        ensureBox(overlay, c.boxKey, c.color, c.fontColor).catch(() => { });
+    }
 }
 
 export async function rollFor(overlay, boxKey, color, fontColor, notation, dotnet, rollId) {
