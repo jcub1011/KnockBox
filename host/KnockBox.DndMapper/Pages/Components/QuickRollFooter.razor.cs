@@ -2,7 +2,9 @@ using KnockBox.Core.Components.Shared;
 using KnockBox.Core.Services.State.Users;
 using KnockBox.DndMapper.Helpers;
 using KnockBox.DndMapper.Models;
+using KnockBox.DndMapper.Services.Logic;
 using KnockBox.DndMapper.Services.Logic.Games;
+using KnockBox.DndMapper.Services.Logic.Visibility;
 using KnockBox.DndMapper.Services.State.Games;
 using KnockBox.DndMapper.Services.State.Games.Data;
 using Microsoft.AspNetCore.Components;
@@ -27,19 +29,53 @@ namespace KnockBox.DndMapper.Pages.Components
 
         [Inject] protected DndMapperGameEngine Engine { get; set; } = default!;
         [Inject] protected IUserService UserService { get; set; } = default!;
+        [Inject] protected IDiceAnimationTracker Tracker { get; set; } = default!;
         [CascadingParameter] public DndMapperToastService? Toasts { get; set; }
 
         private IDisposable? _stateSub;
+        private Action? _trackerSub;
         private bool _attrsExpanded;
         private bool _settingsOpen;
+        private bool _logOpen;
+        private bool _historyOpen;
 
         protected override void OnInitialized()
         {
             // Sheet values / status effects change the attribute modifiers we
             // render — re-render so the button numbers stay live.
             _stateSub = State.StateChangedEventManager.Subscribe(async () => await InvokeAsync(StateHasChanged));
+            // Animations settling move rolls into the visible window — re-render
+            // the recent-rolls panel as they finish.
+            _trackerSub = () => _ = InvokeAsync(StateHasChanged);
+            Tracker.Changed += _trackerSub;
             base.OnInitialized();
         }
+
+        // ── Recent-rolls quick panel ─────────────────────────────────────────
+        // Mirrors RollLogPanel.Visible (same visibility gate + animation gate)
+        // but capped at 5 and ordered newest-first for the floating peek.
+        private const int RecentCap = 5;
+
+        private List<RollResult> RecentRolls
+        {
+            get
+            {
+                var filtered = RollLogVisibilityFilter.VisibleTo(
+                    State.RollLog, CurrentUserId, IsHost, State.Settings.RollsVisibleToPlayers);
+                var list = filtered.Where(r => !Tracker.IsAnimating(r.Id)).ToList();
+                if (list.Count > RecentCap)
+                {
+                    list = list.GetRange(list.Count - RecentCap, RecentCap);
+                }
+                list.Reverse();
+                return list;
+            }
+        }
+
+        private void ToggleLog() => _logOpen = !_logOpen;
+
+        private void OpenHistory() => _historyOpen = true;
+        private void CloseHistory() => _historyOpen = false;
 
         // ── Active sheet ─────────────────────────────────────────────────────
         // Player: their assigned sheet. Host: the "roll as" selection made in
@@ -166,6 +202,7 @@ namespace KnockBox.DndMapper.Pages.Components
         public override void Dispose()
         {
             _stateSub?.Dispose();
+            if (_trackerSub is not null) Tracker.Changed -= _trackerSub;
             base.Dispose();
         }
     }

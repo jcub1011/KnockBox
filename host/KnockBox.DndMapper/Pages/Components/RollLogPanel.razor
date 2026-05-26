@@ -147,7 +147,7 @@
             {
                 @foreach (var r in Visible)
                 {
-                    @RenderEntry(r)
+                    <RollLogEntry Roll="r" State="State" CurrentUserId="@CurrentUserId" IsHost="IsHost" />
                 }
             }
             <button class="dndm-btn dndm-btn--small dndm-btn--ghost dndm-rolllog-seeall"
@@ -168,78 +168,8 @@
 
 @if (_historyOpen)
 {
-    <div class="dndm-modal-overlay" @onclick="CloseHistory">
-        <div class="dndm-modal-card dndm-rolllog-history" role="dialog" aria-modal="true" @onclick:stopPropagation="true">
-            <header class="dndm-rolllog-history-header">
-                <h3 class="dndm-modal-title">Roll History</h3>
-                <button class="dndm-btn dndm-btn--icon dndm-btn--small" type="button" @onclick="CloseHistory">×</button>
-            </header>
-            <div class="dndm-rolllog-history-body">
-                @if (_historySnapshot.Count == 0)
-                {
-                    <div class="dndm-panel-empty">No rolls yet.</div>
-                }
-                else
-                {
-                    @foreach (var r in _historySnapshot)
-                    {
-                        @RenderEntry(r)
-                    }
-                }
-            </div>
-            <footer class="dndm-rolllog-history-footer">
-                <span class="dndm-rolllog-history-hint">Showing @_historySnapshot.Count snapshotted at @_historyCapturedAt.ToString("HH:mm:ss") — reopen to refresh.</span>
-                <button class="dndm-btn dndm-btn--ghost" type="button" @onclick="CloseHistory">Close</button>
-            </footer>
-        </div>
-    </div>
-}
-
-@code {
-    private RenderFragment RenderEntry(RollResult r) => __builder =>
-    {
-        <article @key="r.Id" class="dndm-rolllog-entry">
-            <header class="dndm-rolllog-meta">
-                <span class="dndm-rolllog-roller">@RollerName(r.RollerUserId)</span>
-                <span class="dndm-rolllog-formula" title="Dice formula">@r.Formula</span>
-                <span class="dndm-rolllog-label">@r.Label</span>
-                @if (r.Mode != RollMode.Normal)
-                {
-                    <span class="dndm-rolllog-mode">@(r.Mode == RollMode.Advantage ? "ADV" : "DIS")</span>
-                }
-                @if (ShouldShowLoadedIndicator(r))
-                {
-                    <span class="dndm-rolllog-loaded" title="@LoadedTooltip(r)" aria-label="Modified by loaded-dice rule">●</span>
-                }
-                <time class="dndm-rolllog-time"
-                      datetime="@r.TimestampUtc.ToString("o")"
-                      title="@r.TimestampUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")">@FormatTimestamp(r.TimestampUtc)</time>
-                @if (r.RollerUserId == CurrentUserId && r.TokenId is null)
-                {
-                    var enabled = CanReRoll(r);
-                    <button class="dndm-btn dndm-btn--small dndm-btn--icon dndm-rolllog-reroll"
-                            type="button"
-                            disabled="@(!enabled)"
-                            aria-label="Re-roll"
-                            title="@(enabled ? ReRollTitle(r) : "Re-roll isn't available for rolls saved before this feature shipped.")"
-                            @onclick="@(e => ReRoll(r, e))">↻</button>
-                }
-            </header>
-            <div class="dndm-rolllog-dice">
-                <span class="dndm-rolllog-total"><strong>@r.Total</strong></span>
-                <span class="dndm-rolllog-dice-detail">
-                    @foreach (var d in r.Rolls)
-                    {
-                        <span class="@($"dndm-die{(d.Discarded ? " dndm-die--discarded" : "")}")"
-                              title="@DieTooltip(d)">@d.Result</span>
-                    }
-                    @if (r.FlatModifier != 0 || r.AttributeModifier is not null)
-                    {
-                        var mods = (r.FlatModifier) + (r.AttributeModifier ?? 0);
-                        <span class="dndm-rolllog-mod">@(mods >= 0 ? "+" : "")@mods</span>
-                    }
-                </span>
-            </div>
-        </article>
-    };
+    <RollHistoryModal State="State"
+                      CurrentUserId="@CurrentUserId"
+                      IsHost="IsHost"
+                      OnClose="CloseHistory" />
 }

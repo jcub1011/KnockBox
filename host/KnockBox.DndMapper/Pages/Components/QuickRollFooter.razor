@@ -6,6 +6,43 @@
 
 <div class="dndm-rollfooter">
     <div class="dndm-rollfooter__left">
+        <button class="dndm-rollfooter__log"
+                type="button"
+                aria-expanded="@_logOpen"
+                title="@(_logOpen ? "Hide recent rolls" : "Show the 5 most recent rolls")"
+                @onclick="ToggleLog">🗒</button>
+
+        @if (_logOpen)
+        {
+            <div class="dndm-rollfooter__recent" role="dialog" aria-label="Recent rolls">
+                <header class="dndm-rollfooter__recent-head">
+                    <span class="dndm-label">Recent rolls</span>
+                    <div class="dndm-rollfooter__recent-actions">
+                        <button class="dndm-btn dndm-btn--small dndm-btn--ghost"
+                                type="button"
+                                title="Open the full roll log"
+                                @onclick="OpenHistory">See all rolls</button>
+                        <button class="dndm-btn dndm-btn--icon dndm-btn--small"
+                                type="button"
+                                aria-label="Close recent rolls"
+                                title="Close"
+                                @onclick="ToggleLog">×</button>
+                    </div>
+                </header>
+                @if (RecentRolls.Count == 0)
+                {
+                    <div class="dndm-panel-empty">No rolls yet.</div>
+                }
+                else
+                {
+                    @foreach (var r in RecentRolls)
+                    {
+                        <RollLogEntry Roll="r" State="State" CurrentUserId="@CurrentUserId" IsHost="IsHost" />
+                    }
+                }
+            </div>
+        }
+
         <button class="dndm-rollfooter__rollbtn"
                 type="button"
                 title="@QuickRollTitle"
@@ -75,4 +112,12 @@
                           IsHost="IsHost" />
         </div>
     </div>
+}
+
+@if (_historyOpen)
+{
+    <RollHistoryModal State="State"
+                      CurrentUserId="@CurrentUserId"
+                      IsHost="IsHost"
+                      OnClose="CloseHistory" />
 }

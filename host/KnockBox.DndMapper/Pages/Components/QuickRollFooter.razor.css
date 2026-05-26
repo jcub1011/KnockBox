@@ -78,7 +78,8 @@
    .dndm-zoom-btn look. */
 .dndm-rollfooter__arrow,
 .dndm-rollfooter__attr,
-.dndm-rollfooter__gear {
+.dndm-rollfooter__gear,
+.dndm-rollfooter__log {
     background: var(--dndm-bg-elev);
     color: var(--dndm-text);
     border: 1px solid var(--dndm-border);
@@ -91,7 +92,8 @@
 
 .dndm-rollfooter__arrow:hover,
 .dndm-rollfooter__attr:hover,
-.dndm-rollfooter__gear:hover {
+.dndm-rollfooter__gear:hover,
+.dndm-rollfooter__log:hover {
     background: var(--dndm-bg-elev-hover);
     border-color: var(--dndm-border-accent);
 }
@@ -101,9 +103,65 @@
     font-size: 0.85rem;
 }
 
+.dndm-rollfooter__log {
+    padding: 0.3rem 0.5rem;
+    font-size: 1.05rem;
+}
+
 .dndm-rollfooter__gear {
     padding: 0.3rem 0.5rem;
     font-size: 1.05rem;
+}
+
+/* Floating recent-rolls peek, anchored above the footer's left edge. Card
+   chrome mirrors the rails/panels (noise + gradient + border + shadow).
+   Newest-first ordering comes from RecentRolls, not CSS. */
+.dndm-rollfooter__recent {
+    position: absolute;
+    bottom: 100%;
+    left: calc(0.85rem + var(--dndm-rail-pad-left, 0px));
+    margin-bottom: 0.4rem;
+    z-index: 6;
+    width: min(360px, calc(100vw - 2rem));
+    max-height: 60vh;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    padding: 0 0.6rem 0.5rem 0.6rem;
+    background:
+        var(--dndm-noise),
+        linear-gradient(180deg, rgba(29, 24, 20, 0.98) 0%, rgba(22, 18, 16, 0.98) 100%);
+    background-size: 240px 240px, 100% 100%;
+    background-repeat: repeat, no-repeat;
+    border: 1px solid var(--dndm-border-accent);
+    border-radius: 4px;
+    box-shadow:
+        inset 0 1px 0 var(--dndm-highlight),
+        0 6px 18px rgba(0, 0, 0, 0.6);
+}
+
+/* Sticky so the title + actions stay pinned while the entries scroll. The
+   negative margins pull the header over the card's top + side padding so its
+   background covers the full width and nothing peeks above it. */
+.dndm-rollfooter__recent-head {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem;
+    margin: 0 -0.6rem;
+    padding: 0.5rem 0.6rem;
+    background: linear-gradient(180deg, rgba(29, 24, 20, 0.99) 0%, rgba(24, 20, 17, 0.99) 100%);
+    border-bottom: 1px solid var(--dndm-border);
+}
+
+.dndm-rollfooter__recent-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
 }
 
 /* Slide-out attribute row. Always in the DOM (so the width transition has
@@ -115,6 +173,7 @@
     gap: 0.3rem;
     max-width: 0;
     opacity: 0;
+    /* Closed (and while collapsing): clip immediately so nothing peeks. */
     overflow-x: hidden;
     pointer-events: none;
     transition: max-width 0.25s ease, opacity 0.2s ease;
@@ -125,6 +184,11 @@
     opacity: 1;
     overflow-x: auto;
     pointer-events: auto;
+    /* Hold the clip until the 0.25s width grow finishes (overflow animates
+       discretely), then flip to auto — otherwise a horizontal scrollbar
+       flashes under the buttons while the box is still narrower than its
+       content. */
+    transition: max-width 0.25s ease, opacity 0.2s ease, overflow-x 0s 0.25s;
 }
 
 .dndm-rollfooter__attr {
