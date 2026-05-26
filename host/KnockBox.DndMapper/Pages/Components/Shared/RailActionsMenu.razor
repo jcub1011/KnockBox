@@ -8,16 +8,20 @@
 
     ChildContent is rendered twice (inline copy + popover copy); container
     queries hide whichever one is inactive. Both copies are functional, so
-    consumers don't need to thread state through.
+    consumers don't need to thread state through. Avoid putting components
+    with internal state inside ChildContent — both copies will materialize
+    independently. Plain <button>s are the intended payload.
 *@
 
-<span class="dndm-railactions" @onclick:stopPropagation="true">
+<span class="dndm-railactions" @onclick:stopPropagation="true" @onkeydown="OnKeyDown">
     <span class="dndm-railactions__inline">@ChildContent</span>
     <button class="dndm-btn dndm-btn--icon dndm-btn--small dndm-railactions__trigger"
             type="button"
             title="@(string.IsNullOrEmpty(Title) ? "More actions" : Title)"
             @onclick="Toggle"
-            aria-label="More actions">
+            aria-label="More actions"
+            aria-haspopup="menu"
+            aria-expanded="@(_open ? "true" : "false")">
         @* Vertical three-dot "kebab" glyph. SVG instead of U+22EE so the
            three dots are sized + spaced consistently across fonts. *@
         <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false">
@@ -41,4 +45,11 @@
 
     private void Toggle() => _open = !_open;
     private void Close() => _open = false;
+
+    // Escape closes the popover when focus is anywhere inside the menu's
+    // subtree. Backdrop click handles outside-pointer dismiss separately.
+    private void OnKeyDown(KeyboardEventArgs e)
+    {
+        if (_open && e.Key == "Escape") _open = false;
+    }
 }

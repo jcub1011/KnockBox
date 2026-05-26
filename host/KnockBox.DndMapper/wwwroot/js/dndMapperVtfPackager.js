@@ -78,7 +78,12 @@ const ZIP_VERSION_MADE_BY = 20;
 // MS-DOS date for an arbitrary fixed timestamp (2024-01-01 00:00). VTF
 // readers don't check this; using a fixed value keeps output byte-stable
 // across runs of the same input.
-const ZIP_FIXED_DOS_DATE = 0x21 << 9; // year=44 (1980+44=2024), month=1, day=1
+//
+// DOS date layout: bits 9-15 = year-1980, bits 5-8 = month, bits 0-4 = day.
+// Month and day must be >=1 or some unzippers reject the entry; a bare
+// `year << 9` (which was the previous value) left month=day=0 and pointed
+// at year 2013 because the old constant was 0x21 (33), not 44.
+const ZIP_FIXED_DOS_DATE = ((2024 - 1980) << 9) | (1 << 5) | 1; // 0x5821
 const ZIP_FIXED_DOS_TIME = 0;
 
 function utf8(s) { return new TextEncoder().encode(s); }

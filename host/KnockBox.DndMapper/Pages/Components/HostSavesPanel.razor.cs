@@ -7,7 +7,6 @@ namespace KnockBox.DndMapper.Pages.Components
 {
     public partial class HostSavesPanel : DisposableComponent
     {
-        private const string DownloadModulePath = "/_content/KnockBox.DndMapper/js/dndMapperFileDownload.js";
         private const string VtfPackagerModulePath = "/_content/KnockBox.DndMapper/js/dndMapperVtfPackager.js";
 
         [Inject] protected DndMapperLibraryService Library { get; set; } = default!;
@@ -32,7 +31,6 @@ namespace KnockBox.DndMapper.Pages.Components
         private string _pendingLoadName = string.Empty;
 
         private string? _exportingSlotId;
-        private IJSObjectReference? _downloadModule;
         private IJSObjectReference? _vtfPackagerModule;
 
         protected override async Task OnInitializedAsync()
@@ -205,17 +203,6 @@ namespace KnockBox.DndMapper.Pages.Components
             PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase,
         };
 
-        private static string SanitizeForFilename(string raw)
-        {
-            if (string.IsNullOrWhiteSpace(raw)) return "slot";
-            var invalid = Path.GetInvalidFileNameChars();
-            var sb = new System.Text.StringBuilder(raw.Length);
-            foreach (var c in raw)
-                sb.Append(Array.IndexOf(invalid, c) >= 0 ? '_' : c);
-            var name = sb.ToString().Trim();
-            return string.IsNullOrEmpty(name) ? "slot" : name;
-        }
-
         private static string FormatRelative(DateTime utc)
         {
             var delta = DateTime.UtcNow - utc;
@@ -230,15 +217,9 @@ namespace KnockBox.DndMapper.Pages.Components
         {
             Library.SlotsChanged -= OnSlotsChanged;
             Library.SavingChanged -= OnSavingChanged;
-            if (_downloadModule is not null)
-            {
-                // Fire-and-forget — the circuit may already be tearing down,
-                // and the module's only purpose was the anchor-click helper.
-                _ = _downloadModule.DisposeAsync().AsTask().ContinueWith(_ => { }, TaskScheduler.Default);
-                _downloadModule = null;
-            }
             if (_vtfPackagerModule is not null)
             {
+                // Fire-and-forget — the circuit may already be tearing down.
                 _ = _vtfPackagerModule.DisposeAsync().AsTask().ContinueWith(_ => { }, TaskScheduler.Default);
                 _vtfPackagerModule = null;
             }

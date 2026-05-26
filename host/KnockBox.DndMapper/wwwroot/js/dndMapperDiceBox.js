@@ -1,23 +1,27 @@
 // dndMapperDiceBox.js
 // Thin wrapper around @3d-dice/dice-box-threejs. One DiceBox instance per
-// rolling user so concurrent rolls can carry different colors. Each box's
+// dice-box-key so concurrent rolls can carry different colors. Each box's
 // container <div> is appended to the supplied overlay element; the dice-box
 // library mounts its own canvas inside. Physics is independent per client —
 // the authoritative outcome is forced via the library's "@N" notation so the
 // rolled face matches the server result regardless of local simulation.
+//
+// boxKey is the composite key from DiceCanvas: "user:{id}" for user-attributed
+// rolls and "token:{id}" for token-bound rolls (NPC initiative). Distinct
+// keys mean distinct DiceBox instances side-by-side.
 
 import DiceBox from "/_content/KnockBox.DndMapper/lib/dice-box-threejs/dice-box.es.js";
 
 const FADE_MS = 3000;
-const boxes = new Map(); // userId -> { box, container, color, fontColor, fadeTimer, currentRollId, dotnet, ready }
+const boxes = new Map(); // boxKey -> { box, container, color, fontColor, fadeTimer, currentRollId, dotnet, ready }
 
-function safeId(userId) {
-    return userId.replace(/[^a-zA-Z0-9_-]/g, "_");
+function safeId(boxKey) {
+    return boxKey.replace(/[^a-zA-Z0-9_-]/g, "_");
 }
 
-function customColorset(userId, color, fontColor) {
+function customColorset(boxKey, color, fontColor) {
     return {
-        name: `kb-${safeId(userId)}`,
+        name: `kb-${safeId(boxKey)}`,
         background: color,
         foreground: fontColor,
         texture: "none",
@@ -25,8 +29,8 @@ function customColorset(userId, color, fontColor) {
     };
 }
 
-async function ensureBox(overlay, userId, color, fontColor) {
-    let entry = boxes.get(userId);
+async function ensureBox(overlay, boxKey, color, fontColor) {
+    let entry = boxes.get(boxKey);
     if (entry && entry.color === color && entry.fontColor === fontColor) {
         return entry;
     }
@@ -35,17 +39,17 @@ async function ensureBox(overlay, userId, color, fontColor) {
         try { entry.box.clearDice(); } catch (_) { /* ignore */ }
         if (entry.fadeTimer) clearTimeout(entry.fadeTimer);
         if (entry.container && entry.container.parentNode) entry.container.parentNode.removeChild(entry.container);
-        boxes.delete(userId);
+        boxes.delete(boxKey);
     }
 
     const container = document.createElement("div");
-    container.id = `dndm-dice-${safeId(userId)}`;
+    container.id = `dndm-dice-${safeId(boxKey)}`;
     container.style.cssText = "position:absolute;inset:0;pointer-events:none;";
     overlay.appendChild(container);
 
     const box = new DiceBox(`#${container.id}`, {
         assetPath: "/_content/KnockBox.DndMapper/dice/",
-        theme_customColorset: customColorset(userId, color, fontColor),
+        theme_customColorset: customColorset(boxKey, color, fontColor),
         theme_surface: "green-felt",
         theme_material: "plastic",
         baseScale: 100,
@@ -73,13 +77,13 @@ async function ensureBox(overlay, userId, color, fontColor) {
         dotnet: null,
         ready: true,
     };
-    boxes.set(userId, entry);
+    boxes.set(boxKey, entry);
     return entry;
 }
 
-export async function rollFor(overlay, userId, color, fontColor, notation, dotnet, rollId) {
+export async function rollFor(overlay, boxKey, color, fontColor, notation, dotnet, rollId) {
     if (!overlay || !notation) return;
-    const entry = await ensureBox(overlay, userId, color, fontColor);
+    const entry = await ensureBox(overlay, boxKey, color, fontColor);
     entry.dotnet = dotnet;
 
     // Interrupt any in-flight roll for this user: clear the pending fade and
@@ -103,7 +107,7 @@ export async function rollFor(overlay, userId, color, fontColor, notation, dotne
             if (entry.currentRollId === rollId) entry.currentRollId = null;
         }, FADE_MS);
         try {
-            await dotnet.invokeMethodAsync("OnRollSettled", userId, settledRollId);
+            await dotnet.invokeMethodAsync("OnRollSettled", boxKey, settledRollId);
         } catch (_) { /* circuit gone — fine */ }
     };
 
@@ -113,12 +117,23 @@ export async function rollFor(overlay, userId, color, fontColor, notation, dotne
     // rollFor() calls (each at a *different* DiceBox instance) inside the
     // caller's loop, defeating the per-NPC concurrent rendering that the
     // per-token box keys are designed to enable.
-    entry.box.roll(notation).catch(async (e) => {
+    //
+    // Outer try/catch covers a *synchronous* throw from roll() (e.g. a
+    // notation-parser exception before the promise is created); the inner
+    // .catch covers async rejection. Both routes land on the same settle
+    // call so a malformed roll can't strand the log indefinitely.
+    const onRollFailed = async (e) => {
         if (entry.currentRollId === rollId) entry.currentRollId = null;
-        try { await dotnet.invokeMethodAsync("OnRollSettled", userId, rollId); } catch (_) { /* ignore */ }
+        try { await dotnet.invokeMethodAsync("OnRollSettled", boxKey, rollId); } catch (_) { /* ignore */ }
         // eslint-disable-next-line no-console
         console.warn("dndMapperDiceBox.roll failed", e);
-    });
+    };
+    try {
+        const p = entry.box.roll(notation);
+        if (p && typeof p.catch === "function") p.catch(onRollFailed);
+    } catch (e) {
+        await onRollFailed(e);
+    }
 }
 
 export function disposeAll() {

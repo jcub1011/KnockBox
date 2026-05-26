@@ -160,15 +160,15 @@ namespace KnockBox.DndMapper.Pages.Components
         }
 
         // JS calls back with the same composite key we passed to rollFor —
-        // see boxKey construction above. The argument name "userId" is kept
-        // for backwards compat with the JS module's existing call shape.
+        // see boxKey construction above. JSInvokable binds positionally, so
+        // the parameter name can be whatever's most readable here.
         [JSInvokable]
-        public Task OnRollSettled(string userId, Guid rollId)
+        public Task OnRollSettled(string boxKey, Guid rollId)
         {
             Tracker.MarkSettled(rollId);
-            if (_activeByKey.TryGetValue(userId, out var current) && current == rollId)
+            if (_activeByKey.TryGetValue(boxKey, out var current) && current == rollId)
             {
-                _activeByKey.Remove(userId);
+                _activeByKey.Remove(boxKey);
             }
             return Task.CompletedTask;
         }
