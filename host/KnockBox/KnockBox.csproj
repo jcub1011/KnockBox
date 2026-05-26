@@ -5,7 +5,24 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
+    <!-- DATAS: keep Server GC but let it shrink heap count/size under low load.
+         Best fit for the containerized host where idle footprint matters but
+         peak throughput across concurrent lobbies is still wanted. -->
+    <GarbageCollectionAdaptationMode>1</GarbageCollectionAdaptationMode>
+    <!-- Drop ICU globalization data. Safe only while user-visible strings stay
+         English-only and we don't culture-parse user input; revert if either
+         changes. -->
+    <InvariantGlobalization>true</InvariantGlobalization>
   </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Cap managed heap at 75% of the cgroup memory limit so a GC growth spike
+         can't push the process past the container ceiling and trigger an
+         OOMKill. Pairs with mem_limit in docker-compose.yml. There is no
+         MSBuild property shortcut for this one, so we set it via the generic
+         RuntimeHostConfigurationOption item. -->
+    <RuntimeHostConfigurationOption Include="System.GC.HeapHardLimitPercent" Value="75" />
+  </ItemGroup>
 
   <!--
     ReadyToRun (R2R) ahead-of-time compilation for the host. Only activates on
