@@ -1452,10 +1452,23 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                 var entry = combat.TurnOrder[idx];
                 if (entry.OwnerUserId is not null) { error = "Use ForceInitiativeRollAsync for player combatants."; return; }
 
-                state.SetActiveCombat(combat with
+                // Park the host's typed value on PendingInitiative — InitiativeRoll
+                // stays null so the displays continue to read "—" and no
+                // RollResult is appended (no dice animate yet). This is the
+                // beat the user wants preserved: the manual set should feel
+                // like cocking the trigger, not pulling it.
+                var staged = combat.TurnOrder.SetItem(idx, entry with { PendingInitiative = roll });
+
+                // Trigger to fire all dice: every NPC has a value (pending or
+                // final). At that point we commit every pending NPC in one
+                // sweep so each token's dice spin up together — same batch
+                // path the bulk "Roll All Unset NPCs" verb uses.
+                if (!HasUnsetNpc(staged))
                 {
-                    TurnOrder = combat.TurnOrder.SetItem(idx, entry with { InitiativeRoll = roll }),
-                });
+                    staged = CommitPendingNpcInitiatives(state, staged, caller);
+                }
+
+                state.SetActiveCombat(combat with { TurnOrder = staged });
                 TryTransitionToActive(state);
             });
 
@@ -1503,13 +1516,14 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             return error is null ? Result.Success : Result.FromError(error);
         }
 
-        // Rolls initiative for every NPC combatant that hasn't yet rolled, in
-        // a single Execute. Each NPC gets its own d20 + modifier (resolved
-        // from its attached character sheet, if any — NPCs without a sheet
-        // roll bare d20). Already-rolled NPCs are skipped so a host who
-        // entered a number manually keeps it. Each roll is logged as
-        // ForcedByUserId = caller so the audit trail attributes the bulk roll
-        // to the host.
+        // Rolls initiative for every NPC combatant that hasn't yet been
+        // committed, in a single Execute. NPCs split into two buckets:
+        //   • PendingInitiative is set → host already typed a value via
+        //     SetNpcInitiativeAsync; honor that value and back-solve the
+        //     visible d20 face so the dice "happen to land" on it.
+        //   • Truly unset → roll a real d20 + the sheet-resolved modifier.
+        // Both paths append a RollResult keyed on the NPC's TokenId so the
+        // per-token DiceBox instances animate side-by-side.
         public Result RollAllNpcInitiativeAsync(DndMapperGameState state, User caller)
         {
             if (state is null) return Result.FromError("State is required.");
@@ -1528,27 +1542,38 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                 {
                     var entry = newTurnOrder[i];
                     if (entry.OwnerUserId is not null) continue;       // players
-                    if (entry.InitiativeRoll is not null) continue;    // already rolled or manually set
+                    if (entry.InitiativeRoll is not null) continue;    // already committed
 
                     var sheet = FindSheetForToken(state, entry.TokenId);
                     int modifier = ResolveInitiativeModifierForSheet(state, sheet);
-                    int d20 = _rng.GetRandomInt(1, 21, RandomType.Fast);
-                    int total = d20 + modifier;
 
-                    newTurnOrder = newTurnOrder.SetItem(i, entry with { InitiativeRoll = total });
-                    // The loop above skips player entries, so NPCs are the
-                    // only thing here; the host is recorded as both roller
-                    // and forcing party so the audit log attributes the
-                    // bulk roll to the host that triggered it. TokenId is
-                    // attached so the 3D dice renderer keys each NPC's
-                    // dice on its token (concurrent + token-colored)
-                    // instead of collapsing them under the host's id.
+                    int face;
+                    int initiativeValue;
+                    if (entry.PendingInitiative is int pending)
+                    {
+                        // Manual override: the host's typed value wins the
+                        // turn order; the visible die is back-solved from it.
+                        face = Math.Clamp(pending - modifier, 1, 20);
+                        initiativeValue = pending;
+                    }
+                    else
+                    {
+                        // Truly unset — fresh d20.
+                        face = _rng.GetRandomInt(1, 21, RandomType.Fast);
+                        initiativeValue = face + modifier;
+                    }
+
+                    newTurnOrder = newTurnOrder.SetItem(i, entry with
+                    {
+                        InitiativeRoll = initiativeValue,
+                        PendingInitiative = null,
+                    });
                     state.AppendRoll(BuildInitiativeRollResult(
                         rollerUserId: caller.Id,
                         forcedByUserId: caller.Id,
-                        d20: d20,
+                        d20: face,
                         dexModifier: modifier,
-                        total: total,
+                        total: face + modifier,
                         tokenId: entry.TokenId));
                 }
 
@@ -1558,6 +1583,61 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             if (exec.IsCanceled) return Result.FromCancellation();
             if (exec.TryGetFailure(out var execErr)) return Result.FromError(execErr);
             return error is null ? Result.Success : Result.FromError(error);
+        }
+
+        // True when at least one NPC combatant has neither been rolled nor
+        // had a value parked in PendingInitiative. The SetNpcInitiativeAsync
+        // commit trigger keys off the negation: no NPC truly unset → flush
+        // every pending value as one RollResult batch.
+        private static bool HasUnsetNpc(System.Collections.Immutable.ImmutableList<CombatantEntry> turnOrder)
+        {
+            for (int i = 0; i < turnOrder.Count; i++)
+            {
+                var entry = turnOrder[i];
+                if (entry.OwnerUserId is not null) continue;
+                if (entry.InitiativeRoll is not null) continue;
+                if (entry.PendingInitiative is not null) continue;
+                return true;
+            }
+            return false;
+        }
+
+        // Walks the turn order and commits every NPC that has a
+        // PendingInitiative: writes the value into InitiativeRoll, clears
+        // PendingInitiative, and appends a RollResult whose d20 face is the
+        // back-solved value (clamped to [1, 20]) so dice-box can animate it.
+        // Caller stays as both roller and forcedBy so the audit log says
+        // "host pressed Set" rather than "an NPC rolled itself."
+        private System.Collections.Immutable.ImmutableList<CombatantEntry> CommitPendingNpcInitiatives(
+            DndMapperGameState state,
+            System.Collections.Immutable.ImmutableList<CombatantEntry> turnOrder,
+            User caller)
+        {
+            for (int i = 0; i < turnOrder.Count; i++)
+            {
+                var entry = turnOrder[i];
+                if (entry.OwnerUserId is not null) continue;
+                if (entry.InitiativeRoll is not null) continue;
+                if (entry.PendingInitiative is not int pending) continue;
+
+                var sheet = FindSheetForToken(state, entry.TokenId);
+                int modifier = ResolveInitiativeModifierForSheet(state, sheet);
+                int face = Math.Clamp(pending - modifier, 1, 20);
+
+                turnOrder = turnOrder.SetItem(i, entry with
+                {
+                    InitiativeRoll = pending,
+                    PendingInitiative = null,
+                });
+                state.AppendRoll(BuildInitiativeRollResult(
+                    rollerUserId: caller.Id,
+                    forcedByUserId: caller.Id,
+                    d20: face,
+                    dexModifier: modifier,
+                    total: face + modifier,
+                    tokenId: entry.TokenId));
+            }
+            return turnOrder;
         }
 
         private static CharacterSheet? FindSheetForToken(DndMapperGameState state, Guid tokenId)

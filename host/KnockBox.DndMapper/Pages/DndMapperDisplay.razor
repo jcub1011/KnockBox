@@ -53,8 +53,12 @@ else
                             var classes = idx == combat.CurrentTurnIndex
                                 ? "dndm-display__chip dndm-display__chip--current"
                                 : (idx < combat.CurrentTurnIndex ? "dndm-display__chip dndm-display__chip--done" : "dndm-display__chip");
+                            var animating = IsInitiativeAnimating(entry);
                             <li class="@classes">
-                                <span class="dndm-display__chip-init">@(entry.InitiativeRoll?.ToString() ?? "—")</span>
+                                @* Hide the numeric initiative while DiceCanvas is still
+                                   tumbling dice for this token, so the projector doesn't
+                                   spoil the result before the 3D dice land. *@
+                                <span class="dndm-display__chip-init">@(animating ? "—" : (entry.InitiativeRoll?.ToString() ?? "—"))</span>
                                 <span class="dndm-display__chip-name">@entry.Name</span>
                                 @if (idx == combat.CurrentTurnIndex)
                                 {
@@ -73,7 +77,8 @@ else
                     <ol class="dndm-display__queue">
                         @foreach (var entry in combat.TurnOrder)
                         {
-                            var ready = entry.InitiativeRoll is not null;
+                            var animating = IsInitiativeAnimating(entry);
+                            var ready = entry.InitiativeRoll is not null && !animating;
                             <li class="@("dndm-display__chip " + (ready ? "dndm-display__chip--ready" : "dndm-display__chip--pending"))">
                                 <span class="dndm-display__chip-init" aria-hidden="true">@(ready ? "✓" : "—")</span>
                                 <span class="dndm-display__chip-name">@entry.Name</span>
@@ -377,6 +382,18 @@ else
 
     private static string FormatTimestamp(DateTime utc) =>
         utc.ToLocalTime().ToString("HH:mm:ss");
+
+    // Hide the projector's initiative chip while either the dice are still
+    // tumbling for this combatant's token or the host has staged a value
+    // (PendingInitiative) that hasn't fired its dice yet. Reads the raw
+    // RollLog (not the projection's visible window, which already strips
+    // animating rolls) so the gate sees the in-flight roll.
+    private bool IsInitiativeAnimating(CombatantEntry entry)
+    {
+        if (_state is null) return false;
+        if (entry.PendingInitiative is not null) return true;
+        return InitiativeAnimationGate.IsAnimatingFor(_state.RollLog, Tracker, entry);
+    }
 
     // d100 is rolled visually as a percentile pair (tens 00-90 + units 0-9)
     // because dice-box-threejs has no 100-face geometry. The chip shows the

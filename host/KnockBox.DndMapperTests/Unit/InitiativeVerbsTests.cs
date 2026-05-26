@@ -110,6 +110,155 @@ namespace KnockBox.DndMapperTests.Unit
             Assert.IsTrue(r.IsFailure);
         }
 
+        // The manual-set verb appends a RollResult so DiceCanvas animates a
+        // die that "happens to land" on the host-entered value. Sheetless
+        // NPC → modifier 0 → d20 face equals the entered value.
+        [TestMethod]
+        public void SetNpcInitiative_NoSheet_AppendsForcedRollMatchingEnteredValue()
+        {
+            var npcId = SeedNpcToken();
+            _engine.StartInitiativeAsync(_state, _host, [npcId]);
+            var npcEntry = _state.ActiveCombat!.TurnOrder.First();
+
+            Assert.IsTrue(_engine.SetNpcInitiativeAsync(_state, _host, npcEntry.Id, 15).IsSuccess);
+
+            Assert.AreEqual(15, _state.ActiveCombat!.TurnOrder.First(e => e.Id == npcEntry.Id).InitiativeRoll);
+            var logged = _state.RollLog.Single(rr => rr.TokenId == npcId && rr.Label == "Initiative");
+            Assert.AreEqual(_host.Id, logged.RollerUserId);
+            Assert.AreEqual(_host.Id, logged.ForcedByUserId);
+            Assert.AreEqual(15, logged.Total);
+            Assert.HasCount(1, logged.Rolls);
+            Assert.AreEqual(20, logged.Rolls[0].Sides);
+            Assert.AreEqual(15, logged.Rolls[0].Result);
+            Assert.AreEqual(0, logged.AttributeModifier);
+        }
+
+        // With a positive modifier attached via the NPC's sheet, the d20 face
+        // is back-solved so face + modifier == entered.
+        [TestMethod]
+        public void SetNpcInitiative_WithSheetModifier_BackSolvesD20Face()
+        {
+            // DEX 14 → +2 (default initiative attribute on the built-in 5e schema).
+            Assert.IsTrue(_engine.CreateSheetAsync(_state, _host, ownerUserId: null, "Goblin")
+                .TryGetSuccess(out var sheetId));
+            Assert.IsTrue(_engine.UpdateSheetAttributeAsync(_state, _host, sheetId, "DEX", AttributeValue.Score(14)).IsSuccess);
+
+            var npcId = SeedNpcToken();
+            Assert.IsTrue(_engine.SetTokenSheetAsync(_state, _host, npcId, sheetId).IsSuccess);
+            _engine.StartInitiativeAsync(_state, _host, [npcId]);
+            var npcEntry = _state.ActiveCombat!.TurnOrder.First();
+
+            Assert.IsTrue(_engine.SetNpcInitiativeAsync(_state, _host, npcEntry.Id, 17).IsSuccess);
+
+            var logged = _state.RollLog.Single(rr => rr.TokenId == npcId && rr.Label == "Initiative");
+            Assert.AreEqual(15, logged.Rolls[0].Result); // 17 - 2 = 15
+            Assert.AreEqual(2, logged.AttributeModifier);
+            Assert.AreEqual(17, logged.Total);
+            // CombatantEntry keeps the host's entered value.
+            Assert.AreEqual(17, _state.ActiveCombat.TurnOrder.First(e => e.Id == npcEntry.Id).InitiativeRoll);
+        }
+
+        // Entered value above the reachable face+modifier ceiling clamps the
+        // visible die to 20; the CombatantEntry still holds the typed value
+        // so the host's override wins in the sorted turn order.
+        [TestMethod]
+        public void SetNpcInitiative_AboveReachable_ClampsFaceToTwenty_KeepsEnteredOnEntry()
+        {
+            Assert.IsTrue(_engine.CreateSheetAsync(_state, _host, ownerUserId: null, "Goblin")
+                .TryGetSuccess(out var sheetId));
+            Assert.IsTrue(_engine.UpdateSheetAttributeAsync(_state, _host, sheetId, "DEX", AttributeValue.Score(14)).IsSuccess);
+            var npcId = SeedNpcToken();
+            Assert.IsTrue(_engine.SetTokenSheetAsync(_state, _host, npcId, sheetId).IsSuccess);
+            _engine.StartInitiativeAsync(_state, _host, [npcId]);
+            var npcEntry = _state.ActiveCombat!.TurnOrder.First();
+
+            Assert.IsTrue(_engine.SetNpcInitiativeAsync(_state, _host, npcEntry.Id, 30).IsSuccess);
+
+            var logged = _state.RollLog.Single(rr => rr.TokenId == npcId && rr.Label == "Initiative");
+            Assert.AreEqual(20, logged.Rolls[0].Result); // clamped to natural-20
+            Assert.AreEqual(22, logged.Total);           // 20 + 2 (mod)
+            // The host's typed value wins the turn order despite the unreachable maths.
+            Assert.AreEqual(30, _state.ActiveCombat!.TurnOrder.First(e => e.Id == npcEntry.Id).InitiativeRoll);
+        }
+
+        // Multi-NPC: setting one of two does NOT yet append a RollResult or
+        // commit InitiativeRoll — the value parks on PendingInitiative until
+        // every NPC has a value, so all the dice can fire together.
+        [TestMethod]
+        public void SetNpcInitiative_MultipleNpcs_DefersUntilEveryNpcIsSet()
+        {
+            var npc1 = SeedNpcToken("Orc1");
+            var npc2 = SeedNpcToken("Orc2");
+            _engine.StartInitiativeAsync(_state, _host, [npc1, npc2]);
+            var e1 = _state.ActiveCombat!.TurnOrder.First(e => e.TokenId == npc1);
+            var e2 = _state.ActiveCombat!.TurnOrder.First(e => e.TokenId == npc2);
+
+            // First Set: value lives on PendingInitiative; no roll logged yet.
+            Assert.IsTrue(_engine.SetNpcInitiativeAsync(_state, _host, e1.Id, 17).IsSuccess);
+            var after1 = _state.ActiveCombat!.TurnOrder.First(e => e.Id == e1.Id);
+            Assert.IsNull(after1.InitiativeRoll);
+            Assert.AreEqual(17, after1.PendingInitiative);
+            Assert.IsFalse(_state.RollLog.Any(rr => rr.TokenId == npc1));
+
+            // Second (and last) Set: both pending values commit in one batch,
+            // both RollResults appear together so DiceCanvas animates them
+            // concurrently.
+            Assert.IsTrue(_engine.SetNpcInitiativeAsync(_state, _host, e2.Id, 13).IsSuccess);
+            var committed1 = _state.ActiveCombat!.TurnOrder.First(e => e.Id == e1.Id);
+            var committed2 = _state.ActiveCombat!.TurnOrder.First(e => e.Id == e2.Id);
+            Assert.AreEqual(17, committed1.InitiativeRoll);
+            Assert.IsNull(committed1.PendingInitiative);
+            Assert.AreEqual(13, committed2.InitiativeRoll);
+            Assert.IsNull(committed2.PendingInitiative);
+            Assert.HasCount(2, _state.RollLog.Where(rr => rr.Label == "Initiative").ToList());
+        }
+
+        // The host can press Roll All Unset NPCs while some NPCs have pending
+        // values from earlier manual Sets. Those pending NPCs commit at their
+        // typed values; the truly-unset NPCs roll a real d20.
+        [TestMethod]
+        public void RollAllNpc_CommitsPendingManualSets_AndRollsTheRest()
+        {
+            var npc1 = SeedNpcToken("Orc1");
+            var npc2 = SeedNpcToken("Orc2");
+            _engine.StartInitiativeAsync(_state, _host, [npc1, npc2]);
+            var e1 = _state.ActiveCombat!.TurnOrder.First(e => e.TokenId == npc1);
+
+            // Stage npc1 but leave npc2 unset — npc1's roll deferred.
+            Assert.IsTrue(_engine.SetNpcInitiativeAsync(_state, _host, e1.Id, 17).IsSuccess);
+            Assert.IsFalse(_state.RollLog.Any(rr => rr.TokenId == npc1));
+
+            // Bulk roll flushes pending + rolls the rest.
+            Assert.IsTrue(_engine.RollAllNpcInitiativeAsync(_state, _host).IsSuccess);
+            var n1 = _state.ActiveCombat!.TurnOrder.First(e => e.TokenId == npc1);
+            var n2 = _state.ActiveCombat!.TurnOrder.First(e => e.TokenId == npc2);
+            Assert.AreEqual(17, n1.InitiativeRoll);   // honored host's typed value
+            Assert.IsNull(n1.PendingInitiative);
+            Assert.AreEqual(10, n2.InitiativeRoll);   // sequential RNG → 10
+            Assert.HasCount(2, _state.RollLog.Where(rr => rr.Label == "Initiative").ToList());
+        }
+
+        // Symmetric clamp on the low end — entered total below face+modifier
+        // floor pins the displayed die to a natural-1.
+        [TestMethod]
+        public void SetNpcInitiative_BelowReachable_ClampsFaceToOne()
+        {
+            Assert.IsTrue(_engine.CreateSheetAsync(_state, _host, ownerUserId: null, "Goblin")
+                .TryGetSuccess(out var sheetId));
+            Assert.IsTrue(_engine.UpdateSheetAttributeAsync(_state, _host, sheetId, "DEX", AttributeValue.Score(14)).IsSuccess);
+            var npcId = SeedNpcToken();
+            Assert.IsTrue(_engine.SetTokenSheetAsync(_state, _host, npcId, sheetId).IsSuccess);
+            _engine.StartInitiativeAsync(_state, _host, [npcId]);
+            var npcEntry = _state.ActiveCombat!.TurnOrder.First();
+
+            Assert.IsTrue(_engine.SetNpcInitiativeAsync(_state, _host, npcEntry.Id, -5).IsSuccess);
+
+            var logged = _state.RollLog.Single(rr => rr.TokenId == npcId && rr.Label == "Initiative");
+            Assert.AreEqual(1, logged.Rolls[0].Result);
+            Assert.AreEqual(3, logged.Total); // 1 + 2 mod
+            Assert.AreEqual(-5, _state.ActiveCombat!.TurnOrder.First(e => e.Id == npcEntry.Id).InitiativeRoll);
+        }
+
         [TestMethod]
         public void AutoTransition_OnLastRoll_SortsAndActivates()
         {
