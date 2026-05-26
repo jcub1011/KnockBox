@@ -269,7 +269,7 @@
     /* Closed (and while collapsing): clip immediately so nothing peeks. */
     overflow-x: hidden;
     pointer-events: none;
-    transition: max-width 0.25s ease, opacity 0.2s ease;
+    transition: opacity 0.2s ease;
 }
 
 .dndm-rollfooter__attrs--open {
@@ -281,7 +281,7 @@
        discretely), then flip to auto — otherwise a horizontal scrollbar
        flashes under the buttons while the box is still narrower than its
        content. */
-    transition: max-width 0.25s ease, opacity 0.2s ease, overflow-x 0s 0.25s;
+    transition: opacity 0.2s ease;
 }
 
 .dndm-rollfooter__attr {
