@@ -19,6 +19,10 @@
 <HeadContent>
     <link href="_content/KnockBox.DndMapper/css/panels.css" rel="stylesheet" />
     <link href="_content/KnockBox.DndMapper/KnockBox.DndMapper.styles.css" rel="stylesheet" />
+    @* Defines window.__dndDisplayImageError before the first SVG <image>
+       onerror could fire. Loaded synchronously (no `defer`) so the
+       handler exists by the time the first paint runs. *@
+    <script src="_content/KnockBox.DndMapper/js/dndMapperDisplayImageFallback.js"></script>
 </HeadContent>
 
 @if (_state is null)
@@ -122,12 +126,20 @@ else
                             // one SignalR round-trip once the token is republished.
                             if (img.ShareToken is Guid shareToken)
                             {
+                                @* onerror swaps the href to a local placeholder if the
+                                   blob-share endpoint returns 4xx/5xx (e.g. the host
+                                   circuit briefly stalled and our watchdog tripped).
+                                   Without it the browser would render the SVG broken-
+                                   image glyph and the display would look broken.
+                                   __dndDisplayImageError is defined in
+                                   `js/displayImageFallback.js`. *@
                                 <image href="@($"/blob-share/{shareToken:D}")"
                                        x="@img.X" y="@img.Y"
                                        width="@img.Width" height="@img.Height"
                                        opacity="@img.Opacity"
                                        transform="@ImageTransform(img)"
-                                       preserveAspectRatio="none" />
+                                       preserveAspectRatio="none"
+                                       onerror="window.__dndDisplayImageError && window.__dndDisplayImageError(this, '@shareToken')" />
                             }
                         }
 

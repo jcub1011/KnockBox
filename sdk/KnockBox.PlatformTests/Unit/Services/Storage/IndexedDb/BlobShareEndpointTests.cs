@@ -43,17 +43,22 @@ public sealed class BlobShareEndpointTests
     // The new BlobShareEntry exposes a StreamOpener: one call yields a single
     // Stream that the endpoint copies into the response. Tests inject a
     // backing byte[] (wrapped in MemoryStream) or a throwing opener.
+    // CircuitScopeId defaults to a fresh Guid so independent tests don't
+    // accidentally serialize on a shared per-scope gate; the new concurrency
+    // tests override this to force same-scope serialization where intended.
     private static BlobShareEntry MakeEntry(
         byte[] payload,
         string contentType = "application/octet-stream",
         Func<CancellationToken, ValueTask<Stream>>? streamOpener = null,
-        string? cacheControl = null)
+        string? cacheControl = null,
+        Guid? circuitScopeId = null)
         => new()
         {
             Token = Guid.NewGuid(),
             ContentType = contentType,
             Length = payload.LongLength,
             CacheControl = cacheControl,
+            CircuitScopeId = circuitScopeId ?? Guid.NewGuid(),
             StreamOpener = streamOpener
                 ?? (_ => ValueTask.FromResult<Stream>(new MemoryStream(payload, writable: false))),
         };
@@ -154,12 +159,16 @@ public sealed class BlobShareEndpointTests
     }
 
     [TestMethod]
-    public async Task MidStream_Disconnect_AbortsWithoutChangingStatus()
+    public async Task MidStream_Disconnect_Returns_410_WithEmptyBody()
     {
         var (ctx, body, registry, _) = MakeContext();
         // A stream that yields one full ChunkSize block then throws on the
-        // next ReadAsync. CopyToAsync will surface the JSDisconnectedException
-        // mid-copy after the first chunk lands in the response body.
+        // next ReadAsync. The endpoint now drains the JS stream fully into a
+        // RAM buffer before writing the response, so a mid-stream failure
+        // surfaces as 410 with an empty body rather than 200 with a partial
+        // body. This is the better contract — clients never see truncated
+        // payloads — and matches what the display view's onerror handler
+        // expects for a placeholder swap.
         var entry = MakeEntry(
             new byte[IndexedDbBlobChunking.ChunkSize * 3],
             streamOpener: _ => ValueTask.FromResult<Stream>(
@@ -168,10 +177,8 @@ public sealed class BlobShareEndpointTests
 
         await BlobShareEndpoint.HandleAsync(ctx, entry.Token);
 
-        // First chunk made it through, so the 200 status is already on the
-        // wire — the endpoint can't flip to 410. The share is still evicted.
-        Assert.AreEqual(StatusCodes.Status200OK, ctx.Response.StatusCode);
-        Assert.AreEqual(IndexedDbBlobChunking.ChunkSize, body.Length);
+        Assert.AreEqual(StatusCodes.Status410Gone, ctx.Response.StatusCode);
+        Assert.AreEqual(0, body.Length);
         Assert.IsNull(registry.TryGetAndTouch(entry.Token));
     }
 
@@ -389,6 +396,191 @@ public sealed class BlobShareEndpointTests
             await Task.Delay(25);
             Assert.IsTrue(cache.TryGetBytes(token, out _),
                 $"Touch #{i + 1} should refresh the sliding window and find the entry.");
+        }
+    }
+
+    [TestMethod]
+    public async Task ConcurrentSameToken_CollapsesToOneStreamOpenerCall()
+    {
+        // Single-flight: ten parallel requests for the same token coalesce
+        // onto one underlying stream-and-store task. StreamOpener fires
+        // exactly once and every response carries the full payload.
+        var cache = CreateTestCache();
+        var registry = new BlobShareRegistry(NullLogger<BlobShareRegistry>.Instance, cache);
+        var payload = new byte[IndexedDbBlobChunking.ChunkSize + 11];
+        for (var i = 0; i < payload.Length; i++) payload[i] = (byte)((i * 5) & 0xff);
+
+        var openerCalls = 0;
+        var gate = new TaskCompletionSource();
+        var entry = MakeEntry(payload, streamOpener: async _ =>
+        {
+            Interlocked.Increment(ref openerCalls);
+            // Block briefly so all ten requests definitely race the
+            // single-flight insertion before the first one completes.
+            await gate.Task.ConfigureAwait(false);
+            return new MemoryStream(payload, writable: false);
+        });
+        registry.Register(entry);
+
+        var ctxs = new (HttpContext ctx, MemoryStream body)[10];
+        var tasks = new Task[10];
+        for (var i = 0; i < tasks.Length; i++)
+        {
+            var (ctx, body, _, _) = MakeContext(registry, cache);
+            ctxs[i] = (ctx, body);
+            tasks[i] = BlobShareEndpoint.HandleAsync(ctx, entry.Token);
+        }
+
+        // Give the parallel waves a tick to all reach the gate.
+        await Task.Delay(50);
+        gate.SetResult();
+        await Task.WhenAll(tasks);
+
+        Assert.AreEqual(1, openerCalls,
+            "Single-flight must collapse concurrent same-token requests onto one StreamOpener call.");
+        foreach (var (ctx, body) in ctxs)
+        {
+            Assert.AreEqual(StatusCodes.Status200OK, ctx.Response.StatusCode);
+            CollectionAssert.AreEqual(payload, body.ToArray());
+        }
+    }
+
+    [TestMethod]
+    public async Task ConcurrentSameScopeDifferentTokens_SerializeAtTheGate()
+    {
+        // Per-circuit gate: five parallel requests with distinct tokens but
+        // the same CircuitScopeId run their StreamOpener bodies one at a
+        // time. Without the gate they'd open five concurrent IJSStreamReferences
+        // against the same circuit and starve Blazor's data-stream pipe.
+        var cache = CreateTestCache();
+        var registry = new BlobShareRegistry(NullLogger<BlobShareRegistry>.Instance, cache);
+        var scopeId = Guid.NewGuid();
+        var peakConcurrency = 0;
+        var current = 0;
+
+        var entries = new BlobShareEntry[5];
+        for (var i = 0; i < entries.Length; i++)
+        {
+            entries[i] = MakeEntry(
+                new byte[64],
+                circuitScopeId: scopeId,
+                streamOpener: async _ =>
+                {
+                    var now = Interlocked.Increment(ref current);
+                    // Track peak via a CAS loop — interlocked.max isn't on
+                    // int directly so we spin until we set a new high.
+                    int snapshot;
+                    do
+                    {
+                        snapshot = peakConcurrency;
+                        if (now <= snapshot) break;
+                    } while (Interlocked.CompareExchange(ref peakConcurrency, now, snapshot) != snapshot);
+                    await Task.Delay(20).ConfigureAwait(false);
+                    Interlocked.Decrement(ref current);
+                    return new MemoryStream(new byte[64], writable: false);
+                });
+            registry.Register(entries[i]);
+        }
+
+        var tasks = new Task[entries.Length];
+        for (var i = 0; i < entries.Length; i++)
+        {
+            var (ctx, _, _, _) = MakeContext(registry, cache);
+            tasks[i] = BlobShareEndpoint.HandleAsync(ctx, entries[i].Token);
+        }
+        await Task.WhenAll(tasks);
+
+        Assert.AreEqual(1, peakConcurrency,
+            "Per-circuit gate must cap concurrent StreamOpener invocations to 1 within a scope.");
+    }
+
+    [TestMethod]
+    public async Task DifferentScopes_DoNotSerialize()
+    {
+        // Sanity check the gate's keying: two scopes, the slow stream on
+        // scope A doesn't block the fast stream on scope B from completing.
+        var cache = CreateTestCache();
+        var registry = new BlobShareRegistry(NullLogger<BlobShareRegistry>.Instance, cache);
+        var scopeA = Guid.NewGuid();
+        var scopeB = Guid.NewGuid();
+
+        var slowGate = new TaskCompletionSource();
+        var slow = MakeEntry(
+            new byte[16],
+            circuitScopeId: scopeA,
+            streamOpener: async _ =>
+            {
+                await slowGate.Task.ConfigureAwait(false);
+                return new MemoryStream(new byte[16], writable: false);
+            });
+        var fast = MakeEntry(new byte[16], circuitScopeId: scopeB);
+        registry.Register(slow);
+        registry.Register(fast);
+
+        var (slowCtx, _, _, _) = MakeContext(registry, cache);
+        var (fastCtx, _, _, _) = MakeContext(registry, cache);
+
+        var slowTask = BlobShareEndpoint.HandleAsync(slowCtx, slow.Token);
+        var fastTask = BlobShareEndpoint.HandleAsync(fastCtx, fast.Token);
+
+        // The fast request must complete despite the slow one still holding
+        // its (separate) scope's gate.
+        var completed = await Task.WhenAny(fastTask, Task.Delay(2000));
+        Assert.AreSame(fastTask, completed, "Fast request on a different scope must not be blocked by the slow one.");
+        Assert.AreEqual(StatusCodes.Status200OK, fastCtx.Response.StatusCode);
+
+        slowGate.SetResult();
+        await slowTask;
+    }
+
+    [TestMethod]
+    public async Task WatchdogElapses_Returns_503_WithoutPropagatingTimeout()
+    {
+        // Critical: when the upstream JS stream never yields, OUR watchdog
+        // must cancel the read before Blazor's internal pipe timeout would
+        // escalate to a fatal circuit exception. The handler returns 503
+        // and the cancellation surfaces to the StreamOpener as an
+        // OperationCanceledException via its CT.
+        //
+        // Uses a tiny watchdog wouldn't be possible without test-only
+        // surface; instead we rely on the production PerStreamTimeout and
+        // assert observable behaviour with a fake stream that never reads
+        // until cancelled. The test takes ~PerStreamTimeout (45 s by
+        // default) — we shorten it for the test run by setting a low value
+        // through a test-only override. See ResetForTests below.
+        BlobShareEndpoint.OverrideTimeoutForTesting(TimeSpan.FromMilliseconds(150));
+        try
+        {
+            var cache = CreateTestCache();
+            var registry = new BlobShareRegistry(NullLogger<BlobShareRegistry>.Instance, cache);
+            var observedCancellation = false;
+            var entry = MakeEntry(new byte[16], streamOpener: async opCt =>
+            {
+                try
+                {
+                    await Task.Delay(Timeout.Infinite, opCt).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                {
+                    observedCancellation = true;
+                    throw;
+                }
+                return new MemoryStream();
+            });
+            registry.Register(entry);
+
+            var (ctx, body, _, _) = MakeContext(registry, cache);
+            await BlobShareEndpoint.HandleAsync(ctx, entry.Token);
+
+            Assert.AreEqual(StatusCodes.Status503ServiceUnavailable, ctx.Response.StatusCode,
+                "Watchdog timeout must return 503 so the display view's onerror swaps in a placeholder.");
+            Assert.AreEqual(0, body.Length);
+            Assert.IsTrue(observedCancellation,
+                "Watchdog CT must propagate cancellation to the StreamOpener so the JS stream actually unwinds.");
+        }
+        finally
+        {
+            BlobShareEndpoint.OverrideTimeoutForTesting(null);
         }
     }
 

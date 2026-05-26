@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+    <!-- Muted placeholder used when /blob-share returns an error. Tuned for
+         the projector's dark stage (#0e1117) so it reads as "image unavailable"
+         without drawing the eye. -->
+    <rect x="2" y="2" width="60" height="60" rx="4" ry="4"
+          fill="#1a1f29" stroke="#3a4252" stroke-width="1" stroke-dasharray="3 3" />
+    <path d="M14 44 L26 32 L34 40 L44 28 L50 34 L50 50 L14 50 Z"
+          fill="#3a4252" />
+    <circle cx="22" cy="22" r="3.5" fill="#3a4252" />
+    <line x1="18" y1="14" x2="46" y2="50" stroke="#5a6478" stroke-width="2" stroke-linecap="round" />
+</svg>

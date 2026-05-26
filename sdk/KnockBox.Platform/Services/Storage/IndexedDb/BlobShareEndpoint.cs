@@ -19,6 +19,25 @@ public static class BlobShareEndpoint
     // path skips both SignalR and the byte cache lookup.
     internal const string DefaultCacheControl = "public, max-age=300, must-revalidate";
 
+    // Watchdog window for opening + draining one IJSStreamReference. Sized
+    // comfortably below Blazor's internal RemoteJSDataStream pipe timeout
+    // (observed in production logs at ~60 s) so OUR linked CT cancels the
+    // read first. Cancellation via our CT surfaces as
+    // OperationCanceledException — the endpoint already handles it cleanly
+    // and, crucially, Blazor does NOT report it to CircuitHost as a fatal
+    // unhandled exception. Letting Blazor's own timeout fire first DID
+    // tear the host circuit down (see the BlobShare timeout incident).
+    internal static readonly TimeSpan DefaultPerStreamTimeout = TimeSpan.FromSeconds(45);
+
+    // Test-only override; null means use Default. Production never touches
+    // this — it's exposed so unit tests can assert the watchdog path
+    // without waiting the full 45 s real-time.
+    private static TimeSpan? _timeoutOverride;
+
+    internal static TimeSpan PerStreamTimeout => _timeoutOverride ?? DefaultPerStreamTimeout;
+
+    internal static void OverrideTimeoutForTesting(TimeSpan? value) => _timeoutOverride = value;
+
     /// <summary>
     /// Maps <c>GET /blob-share/{token:guid}</c>. The endpoint streams the
     /// originating circuit's blob bytes straight into the HTTP response in
@@ -82,83 +101,140 @@ public static class BlobShareEndpoint
             return;
         }
 
-        // Slow path: cache miss. Open the SignalR-backed stream BEFORE writing
-        // response headers. If the open fails (originating circuit gone,
-        // stream interop error), we still have `!HasStarted` so a clean 410
-        // or 500 can land on the wire. Opening the stream is the only step
-        // here with real failure modes — once it returns, the actual copy
-        // is just bytes-to-bytes.
-        Stream sourceStream;
-        try
+        // Slow path: cache miss. We have to open a SignalR-backed stream
+        // against the originating circuit. Three protections layered here:
+        //
+        //  (1) Watchdog CTS — a linked CT that cancels at PerStreamTimeout
+        //      (45 s), comfortably below Blazor's internal pipe-read timeout
+        //      (~60 s). When OUR CT fires first, the in-flight ReadAsync
+        //      throws OperationCanceledException; Blazor does not escalate
+        //      that to CircuitHost.UnhandledException, so the host circuit
+        //      stays alive. Letting Blazor's own timeout fire first DID
+        //      kill the host (the original incident).
+        //
+        //  (2) Per-circuit-scope semaphore — only one JS data stream open
+        //      at a time per originating circuit. Without it, a display
+        //      view opening with N images fans out N parallel JS streams
+        //      against one circuit, starving the JS dispatcher and making
+        //      one of them miss the timeout window. With the byte cache
+        //      fronting all subsequent fetches, the serial drain only
+        //      pays the stream cost once per distinct blob.
+        //
+        //  (3) Per-token single-flight — concurrent requests for the same
+        //      token coalesce onto one stream-and-cache task and all serve
+        //      from the resulting byte buffer. No duplicate streams; no
+        //      duplicate cache writes.
+        //
+        // On any failure we fall through to placeholder-friendly status
+        // codes: 503 for transient/timeout (display view should retry on
+        // next render), 410 for revoked circuit, 500 for unexpected.
+
+        using var watchdog = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        watchdog.CancelAfter(PerStreamTimeout);
+        var watchdogCt = watchdog.Token;
+
+        var gate = registry.TryGetScopeGate(entry.CircuitScopeId);
+        if (gate is null)
         {
-            sourceStream = await entry.StreamOpener(ct).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested)
-        {
-            // Client disconnected before we opened the stream.
-            return;
-        }
-        catch (JSDisconnectedException ex)
-        {
-            logger.LogWarning(
-                "Blob share {Token}: originating Blazor circuit disconnected before stream open ({Message}); evicting.",
-                token, ex.Message);
-            registry.Remove(token);
+            // Entry was evicted between TryGetAndTouch and here — treat as
+            // gone rather than racing further.
             context.Response.StatusCode = StatusCodes.Status410Gone;
             return;
         }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Blob share {Token}: failed to open source stream.", token);
-            context.Response.StatusCode = StatusCodes.Status500InternalServerError;
-            return;
-        }
-
-        context.Response.ContentType = entry.ContentType;
-        context.Response.ContentLength = entry.Length;
-        context.Response.Headers.XContentTypeOptions = "nosniff";
-        context.Response.Headers.CacheControl = entry.CacheControl ?? DefaultCacheControl;
-        context.Response.Headers.ETag = etag;
-
-        // Wrap the response body so the catch handlers can tell whether any
-        // bytes have already been flushed. `HttpResponse.HasStarted` works
-        // in production (Kestrel flips it once headers go out) but stays
-        // false under DefaultHttpContext in unit tests, so we track a
-        // counter for both cases.
-        var body = new CountingStream(context.Response.Body);
-
-        // Tee the copy into RAM if the payload fits the cache budget so the
-        // next fetcher of this token serves from RAM. Native binary framing
-        // (no base64, no JSON envelope) means we hold one chunk buffer per
-        // request beyond the tee buffer.
-        MemoryStream? teeBuffer = null;
-        var canCache = byteCache is not null
-            && entry.Length > 0
-            && entry.Length <= byteCache.SizeLimitBytes;
-        if (canCache)
-        {
-            teeBuffer = new MemoryStream(capacity: (int)Math.Min(entry.Length, int.MaxValue));
-        }
 
         try
         {
-            await using (sourceStream)
-            {
-                Stream sink = teeBuffer is null ? body : new TeeStream(body, teeBuffer);
-                await sourceStream.CopyToAsync(sink, IndexedDbBlobChunking.ChunkSize, ct).ConfigureAwait(false);
-            }
-            await body.FlushAsync(ct).ConfigureAwait(false);
+            await gate.WaitAsync(watchdogCt).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            return; // client disconnected while queued
+        }
+        catch (OperationCanceledException)
+        {
+            logger.LogWarning(
+                "Blob share {Token}: timed out waiting for per-circuit gate ({Scope}).",
+                token, entry.CircuitScopeId);
+            context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+            return;
+        }
+        catch (ObjectDisposedException)
+        {
+            // Gate disposed mid-wait (last entry for this scope was removed).
+            context.Response.StatusCode = StatusCodes.Status410Gone;
+            return;
+        }
 
-            // Only cache after the full copy succeeds. A partial buffer
-            // would serve a truncated response to the next fetcher.
-            if (teeBuffer is not null && byteCache is not null)
+        byte[]? payload;
+        try
+        {
+            // Re-check cache after acquiring — a peer may have just populated
+            // it while we waited at the gate.
+            if (byteCache is not null && byteCache.TryGetBytes(token, out var fresh))
             {
-                byteCache.Store(token, teeBuffer.ToArray());
+                payload = fresh.ToArray();
+            }
+            else
+            {
+                payload = await registry.RunSingleFlight(token, async () =>
+                {
+                    // Inside the gate: open the JS stream, drain into RAM,
+                    // store in the byte cache (if it fits), and return the
+                    // bytes so the response can be written from them.
+                    Stream sourceStream;
+                    try
+                    {
+                        sourceStream = await entry.StreamOpener(watchdogCt).ConfigureAwait(false);
+                    }
+                    catch (JSDisconnectedException ex)
+                    {
+                        logger.LogWarning(
+                            "Blob share {Token}: originating Blazor circuit disconnected before stream open ({Message}); evicting.",
+                            token, ex.Message);
+                        registry.Remove(token);
+                        throw;
+                    }
+
+                    await using (sourceStream)
+                    {
+                        using var buffer = new MemoryStream(
+                            capacity: (int)Math.Min(Math.Max(entry.Length, 0), int.MaxValue));
+                        await sourceStream.CopyToAsync(
+                            buffer, IndexedDbBlobChunking.ChunkSize, watchdogCt).ConfigureAwait(false);
+                        var bytes = buffer.ToArray();
+
+                        // Only cache after the full copy succeeds. A partial
+                        // buffer would serve a truncated response to the next
+                        // fetcher. byteCache.Store itself rejects oversize
+                        // payloads (>SizeLimitBytes), so the size check is
+                        // delegated.
+                        if (byteCache is not null && bytes.Length > 0)
+                        {
+                            byteCache.Store(token, bytes);
+                        }
+                        return bytes;
+                    }
+                }).ConfigureAwait(false);
             }
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
-            // Client disconnected — do not abort the originating circuit.
+            // Client disconnected — do not change status, do not blame the
+            // originating circuit.
+            return;
+        }
+        catch (OperationCanceledException)
+        {
+            // Watchdog fired — Blazor's internal pipe timeout would have
+            // followed within ~15 s and escalated to a circuit-fatal
+            // exception. By cancelling first we keep the host circuit alive.
+            logger.LogError(
+                "Blob share {Token}: source stream watchdog elapsed after {Timeout}; returning 503.",
+                token, PerStreamTimeout);
+            if (!context.Response.HasStarted)
+            {
+                context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+            }
             return;
         }
         catch (JSDisconnectedException ex)
@@ -167,106 +243,56 @@ public static class BlobShareEndpoint
                 "Blob share {Token}: originating Blazor circuit disconnected mid-stream ({Message}); evicting.",
                 token, ex.Message);
             registry.Remove(token);
-            if (!context.Response.HasStarted && body.BytesWritten == 0)
+            if (!context.Response.HasStarted)
             {
                 context.Response.StatusCode = StatusCodes.Status410Gone;
             }
+            return;
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Blob share {Token}: streaming failed.", token);
-            if (!context.Response.HasStarted && body.BytesWritten == 0)
+            if (!context.Response.HasStarted)
             {
                 context.Response.StatusCode = StatusCodes.Status500InternalServerError;
             }
+            return;
+        }
+        finally
+        {
+            try { gate.Release(); }
+            catch (ObjectDisposedException) { /* registry tore down the gate; benign */ }
+            catch (SemaphoreFullException) { /* defensive — should not happen */ }
+        }
+
+        if (payload is null)
+        {
+            // Single-flight returned null — treat as transient miss.
+            if (!context.Response.HasStarted)
+            {
+                context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+            }
+            return;
+        }
+
+        // Write response from the materialized buffer. Headers are set here
+        // (not before stream open) so any failure path above can land a
+        // clean status code without HasStarted blocking it.
+        context.Response.ContentType = entry.ContentType;
+        context.Response.ContentLength = payload.Length;
+        context.Response.Headers.XContentTypeOptions = "nosniff";
+        context.Response.Headers.CacheControl = entry.CacheControl ?? DefaultCacheControl;
+        context.Response.Headers.ETag = etag;
+        try
+        {
+            await context.Response.Body.WriteAsync(payload, ct).ConfigureAwait(false);
+            await context.Response.Body.FlushAsync(ct).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            // Client gone after we already buffered the bytes. The cache
+            // is already populated, so the next fetcher is fast.
         }
     }
 
-    // Pass-through Stream that tallies bytes written so the catch handlers
-    // can distinguish "stream failed before any data went out" (safe to set
-    // an error status) from "stream failed mid-flow" (status line already on
-    // the wire, leave it alone).
-    private sealed class CountingStream : Stream
-    {
-        private readonly Stream _inner;
-        public long BytesWritten { get; private set; }
-
-        public CountingStream(Stream inner) { _inner = inner; }
-
-        public override bool CanRead => false;
-        public override bool CanSeek => false;
-        public override bool CanWrite => _inner.CanWrite;
-        public override long Length => throw new NotSupportedException();
-        public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
-
-        public override void Flush() => _inner.Flush();
-        public override Task FlushAsync(CancellationToken ct) => _inner.FlushAsync(ct);
-        public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
-        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
-        public override void SetLength(long value) => throw new NotSupportedException();
-
-        public override void Write(byte[] buffer, int offset, int count)
-        {
-            _inner.Write(buffer, offset, count);
-            BytesWritten += count;
-        }
-
-        public override async Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken ct)
-        {
-            await _inner.WriteAsync(buffer.AsMemory(offset, count), ct).ConfigureAwait(false);
-            BytesWritten += count;
-        }
-
-        public override async ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken ct = default)
-        {
-            await _inner.WriteAsync(buffer, ct).ConfigureAwait(false);
-            BytesWritten += buffer.Length;
-        }
-    }
-
-    // Writes every chunk to two sinks (the HTTP response and an in-memory
-    // tee buffer destined for the byte cache). The primary write is awaited
-    // first so any response-side failure surfaces immediately; the tee
-    // write goes to a MemoryStream and never throws under normal use.
-    private sealed class TeeStream : Stream
-    {
-        private readonly Stream _primary;
-        private readonly Stream _tee;
-
-        public TeeStream(Stream primary, Stream tee)
-        {
-            _primary = primary;
-            _tee = tee;
-        }
-
-        public override bool CanRead => false;
-        public override bool CanSeek => false;
-        public override bool CanWrite => _primary.CanWrite;
-        public override long Length => throw new NotSupportedException();
-        public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
-
-        public override void Flush() => _primary.Flush();
-        public override Task FlushAsync(CancellationToken ct) => _primary.FlushAsync(ct);
-        public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
-        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
-        public override void SetLength(long value) => throw new NotSupportedException();
-
-        public override void Write(byte[] buffer, int offset, int count)
-        {
-            _primary.Write(buffer, offset, count);
-            _tee.Write(buffer, offset, count);
-        }
-
-        public override async Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken ct)
-        {
-            await _primary.WriteAsync(buffer.AsMemory(offset, count), ct).ConfigureAwait(false);
-            await _tee.WriteAsync(buffer.AsMemory(offset, count), ct).ConfigureAwait(false);
-        }
-
-        public override async ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken ct = default)
-        {
-            await _primary.WriteAsync(buffer, ct).ConfigureAwait(false);
-            await _tee.WriteAsync(buffer, ct).ConfigureAwait(false);
-        }
-    }
 }
