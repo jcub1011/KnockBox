@@ -29,6 +29,14 @@
         0 -2px 6px rgba(0, 0, 0, 0.55);
 }
 
+/* While a popover (recent rolls / dice presets) is open, lift the footer's
+   stacking context above the canvas's floating action cluster (z-index 6) and
+   library banner (z-index 7) so the popover isn't hidden behind them. The
+   footer otherwise sits below the rails so their ends overlay the bar. */
+.dndm-rollfooter--popover {
+    z-index: 8;
+}
+
 .dndm-rollfooter__left {
     display: flex;
     align-items: center;
@@ -162,6 +170,91 @@
     display: flex;
     align-items: center;
     gap: 0.4rem;
+}
+
+/* Dice-preset picker, the gear's popup. Same card chrome as the recent-rolls
+   peek, but anchored above the footer's right edge (over the gear). */
+.dndm-rollfooter__presets {
+    position: absolute;
+    bottom: 100%;
+    right: calc(0.85rem + var(--dndm-rail-pad-right, 0px));
+    margin-bottom: 0.4rem;
+    z-index: 6;
+    width: min(320px, calc(100vw - 2rem));
+    max-height: 60vh;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0 0.6rem 0.6rem 0.6rem;
+    background:
+        var(--dndm-noise),
+        linear-gradient(180deg, rgba(29, 24, 20, 0.98) 0%, rgba(22, 18, 16, 0.98) 100%);
+    background-size: 240px 240px, 100% 100%;
+    background-repeat: repeat, no-repeat;
+    border: 1px solid var(--dndm-border-accent);
+    border-radius: 4px;
+    box-shadow:
+        inset 0 1px 0 var(--dndm-highlight),
+        0 6px 18px rgba(0, 0, 0, 0.6);
+}
+
+/* The sticky header reuses .dndm-rollfooter__recent-head's negative side
+   margins, so it spans the card's padded width here too. */
+.dndm-rollfooter__presets .dndm-rollfooter__recent-head {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+
+.dndm-rollfooter__preset-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+
+.dndm-rollfooter__preset {
+    text-align: left;
+    padding: 0.35rem 0.55rem;
+    background: var(--dndm-bg-elev);
+    color: var(--dndm-text);
+    border: 1px solid var(--dndm-border);
+    border-radius: 3px;
+    cursor: pointer;
+    font-family: var(--font-primary);
+    line-height: 1.2;
+    box-shadow: inset 0 1px 0 var(--dndm-highlight);
+}
+
+.dndm-rollfooter__preset:hover {
+    background: var(--dndm-bg-elev-hover);
+    border-color: var(--dndm-border-accent);
+}
+
+.dndm-rollfooter__custom {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    border-top: 1px solid var(--dndm-border);
+    padding-top: 0.5rem;
+}
+
+.dndm-rollfooter__custom-row {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.dndm-rollfooter__custom-d {
+    color: var(--dndm-text-muted);
+}
+
+.dndm-rollfooter__preset-setting {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    border-top: 1px solid var(--dndm-border);
+    padding-top: 0.5rem;
 }
 
 /* Slide-out attribute row. Always in the DOM (so the width transition has

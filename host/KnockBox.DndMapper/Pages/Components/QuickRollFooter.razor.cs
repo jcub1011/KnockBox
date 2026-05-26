@@ -1,3 +1,4 @@
+using System.Globalization;
 using KnockBox.Core.Components.Shared;
 using KnockBox.Core.Services.State.Users;
 using KnockBox.DndMapper.Helpers;
@@ -36,8 +37,15 @@ namespace KnockBox.DndMapper.Pages.Components
         private Action? _trackerSub;
         private bool _attrsExpanded;
         private bool _settingsOpen;
+        private bool _presetsOpen;
         private bool _logOpen;
         private bool _historyOpen;
+
+        // Sticky inline custom-dice selection for the preset popup. Not a saved
+        // template — just the last [qty][sides] the player picked this circuit.
+        private static readonly int[] DieSizes = [4, 6, 8, 10, 12, 20, 100];
+        private int _customCount = 1;
+        private int _customSides = 20;
 
         protected override void OnInitialized()
         {
@@ -76,6 +84,95 @@ namespace KnockBox.DndMapper.Pages.Components
 
         private void OpenHistory() => _historyOpen = true;
         private void CloseHistory() => _historyOpen = false;
+
+        // ── Dice-preset quick picker (gear popup) ────────────────────────────
+        // The gear opens this lightweight picker rather than the full settings
+        // modal. Selecting a template or the custom row applies *only* the dice
+        // (quantity + sides) to the shared Config — attribute / flat / mode /
+        // label are deliberately left untouched — so the main roll button just
+        // changes which dice it throws. The Library button opens the full modal.
+        private void TogglePresets() => _presetsOpen = !_presetsOpen;
+
+        // Same cascade RollLogPanel.VisibleRollTemplates uses (built-in →
+        // global → active sheet), keyed off this footer's ActiveSheet.
+        private IEnumerable<RollTemplate> VisibleTemplates
+        {
+            get
+            {
+                foreach (var t in DndMapperGameState.BuiltInRollTemplates) yield return t;
+                foreach (var t in State.GlobalRollTemplates) yield return t;
+                var sheet = ActiveSheet;
+                if (sheet is not null)
+                {
+                    foreach (var t in sheet.RollTemplates) yield return t;
+                }
+            }
+        }
+
+        private void ApplyDice(IReadOnlyList<DiceTerm> dice)
+        {
+            Config.Terms = [.. dice];
+            _presetsOpen = false;
+        }
+
+        private void ApplyCustom()
+        {
+            Config.Terms = [new DiceTerm(_customCount, _customSides)];
+            _presetsOpen = false;
+        }
+
+        private void OnCustomCount(object? raw) => _customCount = Math.Clamp(ParseInt(raw, _customCount), 0, 20);
+        private void OnCustomSides(object? raw) => _customSides = ParseInt(raw, _customSides);
+
+        // Flat modifier and source-sheet are live Config edits (they don't
+        // close the popup): the popup mirrors the same two settings the full
+        // settings modal exposes. Source-sheet is host-only (players are
+        // pinned to their assigned sheet).
+        private void OnFlatModChange(object? raw) => Config.FlatModifier = ParseInt(raw, Config.FlatModifier);
+
+        private IEnumerable<CharacterSheet> PickableSheets =>
+            State.Sheets.Values.OrderBy(s => s.CharacterName);
+
+        private void OnSheetChange(string? raw)
+        {
+            // Empty value ⇒ "No sheet (GM)". Clear any picked attribute too so
+            // a stale AttributeName doesn't dangle without a sheet to bind to.
+            if (string.IsNullOrEmpty(raw))
+            {
+                Config.PickerSheetId = null;
+                Config.AttributeName = null;
+                return;
+            }
+            if (Guid.TryParse(raw, out var id) && State.Sheets.ContainsKey(id))
+            {
+                Config.PickerSheetId = id;
+            }
+        }
+
+        // Mirrors RollLogPanel.TemplateTooltip: render the template's configured
+        // dice + attribute + flat + mode as a compact formula for the row title.
+        private static string TemplateTooltip(RollTemplate t)
+        {
+            var dice = string.Join("+", t.Dice.Select(d => $"{d.Count}d{d.Sides}"));
+            var attr = string.IsNullOrEmpty(t.AttributeName) ? string.Empty : $" +{t.AttributeName}";
+            var flat = t.FlatModifier == 0
+                ? string.Empty
+                : (t.FlatModifier > 0 ? $" +{t.FlatModifier}" : $" {t.FlatModifier}");
+            var mode = t.Mode switch
+            {
+                RollMode.Advantage => " (ADV)",
+                RollMode.Disadvantage => " (DIS)",
+                _ => string.Empty,
+            };
+            return $"{dice}{attr}{flat}{mode}";
+        }
+
+        private static int ParseInt(object? raw, int fallback)
+        {
+            if (raw is null) return fallback;
+            return int.TryParse(raw.ToString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var i)
+                ? i : fallback;
+        }
 
         // ── Active sheet ─────────────────────────────────────────────────────
         // Player: their assigned sheet. Host: the "roll as" selection made in
@@ -188,7 +285,11 @@ namespace KnockBox.DndMapper.Pages.Components
         }
 
         // ── Settings modal ───────────────────────────────────────────────────
-        private void OpenSettings() => _settingsOpen = true;
+        private void OpenSettings()
+        {
+            _presetsOpen = false;
+            _settingsOpen = true;
+        }
         private void CloseSettings() => _settingsOpen = false;
 
         // ── Helpers ──────────────────────────────────────────────────────────
