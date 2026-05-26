@@ -148,12 +148,20 @@ public sealed class BlobShareRegistry : IDisposable
         var now = DateTimeOffset.UtcNow;
         if (entry.AbsoluteExpiresAt is { } abs && now >= abs)
         {
-            if (_entries.TryRemove(token, out _)) _byteCache?.Remove(token);
+            if (_entries.TryRemove(token, out _))
+            {
+                _byteCache?.Remove(token);
+                ReleaseScopeRef(entry.CircuitScopeId);
+            }
             return null;
         }
         if (entry.SlidingExpiry is { } sliding && now - entry.LastAccessedUtc > sliding)
         {
-            if (_entries.TryRemove(token, out _)) _byteCache?.Remove(token);
+            if (_entries.TryRemove(token, out _))
+            {
+                _byteCache?.Remove(token);
+                ReleaseScopeRef(entry.CircuitScopeId);
+            }
             return null;
         }
         entry.LastAccessedUtc = now;
@@ -201,6 +209,11 @@ public sealed class BlobShareRegistry : IDisposable
             _logger.LogDebug("BlobShareRegistry swept {Count} expired share(s).", removed);
         }
     }
+
+    // Test hook: runs the periodic sweep synchronously so unit tests can
+    // exercise the expiry path without waiting for the 1-minute Timer.
+    // Production code MUST NOT call this — the Timer drives it.
+    internal void SweepForTesting() => Sweep();
 
     public void Dispose()
     {

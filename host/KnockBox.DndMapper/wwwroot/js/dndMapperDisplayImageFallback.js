@@ -21,6 +21,11 @@
         if (el.dataset.fallbackApplied === "1") return;
         el.dataset.fallbackApplied = "1";
 
+        // Snapshot the failing href BEFORE the swap so the diagnostic log
+        // shows what we actually tried to fetch, not the placeholder URL
+        // we're about to install.
+        const originalHref = el.getAttribute("href");
+
         try {
             el.setAttribute("href", PLACEHOLDER);
         } catch (e) {
@@ -32,6 +37,6 @@
 
         console.warn(
             "DnD Mapper: blob-share image failed to load; showing placeholder.",
-            { token, href: el.getAttribute("href") });
+            { token, originalHref, placeholder: PLACEHOLDER });
     };
 })();

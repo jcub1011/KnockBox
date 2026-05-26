@@ -972,6 +972,37 @@ _stateSubscription?.Dispose();
 
 ---
 
+## Blob Sharing
+
+The platform exposes a cross-circuit binary-blob delivery channel — a stable `/blob-share/{token}` URL backed by an IndexedDb blob held in the originating Blazor circuit. Used by DnD Mapper's display view to render player-uploaded map images on a separate browser without the host pushing the bytes through SignalR per-frame, and available to any plugin that needs the same shape via `IndexedDbBlob.PublishShare(...)`.
+
+### Path
+
+`GET /blob-share/{token:guid}` lives in `KnockBox.Platform` (`sdk/KnockBox.Platform/Services/Storage/IndexedDb/BlobShareEndpoint.cs`) and is mapped from `Program.cs` via `MapBlobShareEndpoint()`. The endpoint resolves the token against the singleton `BlobShareRegistry`, opens a one-shot `IJSStreamReference` against the originating circuit, drains the bytes to RAM, populates a process-wide LRU `BlobShareByteCache`, and writes the response.
+
+### Invariants (do not regress)
+
+These are the protections that keep one slow JS-stream open from killing the host circuit. The cluster was added after a production incident where a multi-image display view fanned out N concurrent stream opens, starved Blazor's JS dispatcher past its internal pipe timeout (~60 s), and the `TimeoutException` escalated to `CircuitHost.UnhandledException` — tearing the host down even though the endpoint caught it.
+
+- **Per-circuit serialization gate.** `BlobShareEntry.CircuitScopeId` (sourced from the originating `IndexedDbInterop.ScopeId`) keys a refcounted `SemaphoreSlim` in `BlobShareRegistry`. The endpoint holds it while opening a stream so only one `IJSStreamReference` is in flight per circuit at a time.
+- **Per-token single-flight.** `BlobShareRegistry.RunSingleFlight` coalesces concurrent same-token cache-miss requests onto one underlying stream-and-store task. Cache populated as a side effect; followers serve from the cache.
+- **45 s watchdog.** A linked `CancellationTokenSource` cancels the read at `BlobShareEndpoint.PerStreamTimeout`, comfortably below Blazor's internal pipe timeout. Cancellation via our CT surfaces as `OperationCanceledException` — Blazor does NOT escalate that to a fatal circuit exception. The watchdog is reset after the gate-wait so the full window applies to the actual drain, not to queueing.
+- **Full-buffer-then-write.** The endpoint reads the JS stream into a pre-sized `byte[entry.Length]` before touching the response. Failure paths land 503/410/500 with empty body rather than a truncated 200; on EOF short of advertised length, the endpoint surfaces an error rather than serving truncated bytes.
+
+### Authoring rule
+
+Any new code constructing a `BlobShareEntry` must populate `CircuitScopeId` from the originating circuit's `IndexedDbInterop.ScopeId`. Without it the entry shares a gate with everything else under `Guid.Empty` and the per-circuit serialization invariant collapses. The `IndexedDbBlobImpl.PublishShare` path already wires this; new producers should follow it.
+
+### Pointers
+
+- Endpoint and watchdog: `sdk/KnockBox.Platform/Services/Storage/IndexedDb/BlobShareEndpoint.cs`
+- Registry, scope gate, single-flight: `sdk/KnockBox.Platform/Services/Storage/IndexedDb/BlobShareRegistry.cs`
+- Process-wide LRU cache: `sdk/KnockBox.Platform/Services/Storage/IndexedDb/BlobShareByteCache.cs`
+- Circuit scope id: `sdk/KnockBox.Platform/Services/Storage/IndexedDb/IndexedDbInterop.cs` (`ScopeId`)
+- Display-side `onerror` fallback: `host/KnockBox.DndMapper/wwwroot/js/dndMapperDisplayImageFallback.js`
+
+---
+
 ## Constraints & Trade-offs
 
 **Single server only.** All state is in-memory within one process. This is appropriate for a party game platform with moderate concurrent usage. Scaling to multiple servers would require replacing the in-memory `ConcurrentDictionary` with a distributed store and reintroducing external pub/sub.

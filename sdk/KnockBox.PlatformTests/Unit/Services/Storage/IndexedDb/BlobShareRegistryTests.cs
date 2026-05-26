@@ -148,4 +148,50 @@ public sealed class BlobShareRegistryTests
         Assert.AreNotSame(gateBefore, gateAfter,
             "Re-registering under the same scope must mint a fresh gate, not reuse the disposed one.");
     }
+
+    [TestMethod]
+    public void ScopeGate_DroppedByTryGetAndTouch_WhenEntryExpired()
+    {
+        // The lookup path also evicts expired entries inline — every such
+        // eviction MUST release the scope refcount. Without this, a scope
+        // whose entries all happen to expire via lookup (rather than via
+        // Remove or Sweep) would leak the semaphore until registry dispose.
+        using var registry = CreateRegistry();
+        var scope = Guid.NewGuid();
+        var past = DateTimeOffset.UtcNow.AddSeconds(-1);
+        var entry = MakeEntry(circuitScopeId: scope, absoluteExpiresAt: past);
+        registry.Register(entry);
+        Assert.IsNotNull(registry.TryGetScopeGate(scope),
+            "Pre-lookup: gate exists while the entry is registered.");
+
+        var found = registry.TryGetAndTouch(entry.Token);
+
+        Assert.IsNull(found, "Expired entry must not be returned.");
+        Assert.IsNull(registry.TryGetScopeGate(scope),
+            "Lookup-path eviction must release the scope refcount; the gate must be gone once the last entry drops.");
+    }
+
+    [TestMethod]
+    public void ScopeGate_DroppedBySweep_WhenLastEntryExpires()
+    {
+        // The periodic sweep is the other path that drops entries (besides
+        // Remove and TryGetAndTouch's expiry branch). It must release the
+        // scope refcount on every expired entry — otherwise long-running
+        // hosts would leak a semaphore per ever-seen circuit even if no
+        // explicit Remove ever fires.
+        using var registry = CreateRegistry();
+        var scope = Guid.NewGuid();
+        var past = DateTimeOffset.UtcNow.AddSeconds(-1);
+        var a = MakeEntry(circuitScopeId: scope, absoluteExpiresAt: past);
+        var b = MakeEntry(circuitScopeId: scope, absoluteExpiresAt: past);
+        registry.Register(a);
+        registry.Register(b);
+        Assert.IsNotNull(registry.TryGetScopeGate(scope),
+            "Pre-sweep: gate should exist while entries are registered.");
+
+        registry.SweepForTesting();
+
+        Assert.IsNull(registry.TryGetScopeGate(scope),
+            "Sweep must release the scope refcount for every expired entry; gate must be gone once the last one drops.");
+    }
 }

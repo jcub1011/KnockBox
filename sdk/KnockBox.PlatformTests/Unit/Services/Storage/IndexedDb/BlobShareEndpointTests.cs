@@ -534,6 +534,7 @@ public sealed class BlobShareEndpointTests
     }
 
     [TestMethod]
+    [DoNotParallelize]
     public async Task WatchdogElapses_Returns_503_WithoutPropagatingTimeout()
     {
         // Critical: when the upstream JS stream never yields, OUR watchdog
@@ -582,6 +583,34 @@ public sealed class BlobShareEndpointTests
         {
             BlobShareEndpoint.OverrideTimeoutForTesting(null);
         }
+    }
+
+    [TestMethod]
+    public async Task SlowPath_AdvertisedLengthGreaterThanActual_Returns500()
+    {
+        // The slow path now reads directly into a pre-sized byte[entry.Length].
+        // If the upstream JS stream EOFs short of the advertised length, the
+        // endpoint must surface that as an error rather than serve a truncated
+        // 200. The fixed-buffer read raises IOException on short EOF; the outer
+        // Exception catch lands a clean 500 with no body bytes written.
+        var (ctx, body, registry, _) = MakeContext();
+        var entry = new BlobShareEntry
+        {
+            Token = Guid.NewGuid(),
+            ContentType = "application/octet-stream",
+            Length = 64, // claim 64 bytes...
+            CircuitScopeId = Guid.NewGuid(),
+            // ...but the stream only carries 32. Without the length-mismatch
+            // guard this would silently serve a 32-byte 200 and cache it.
+            StreamOpener = _ => ValueTask.FromResult<Stream>(
+                new MemoryStream(new byte[32], writable: false)),
+        };
+        registry.Register(entry);
+
+        await BlobShareEndpoint.HandleAsync(ctx, entry.Token);
+
+        Assert.AreEqual(StatusCodes.Status500InternalServerError, ctx.Response.StatusCode);
+        Assert.AreEqual(0, body.Length);
     }
 
     // Yields exactly one chunk-sized block, then throws JSDisconnectedException

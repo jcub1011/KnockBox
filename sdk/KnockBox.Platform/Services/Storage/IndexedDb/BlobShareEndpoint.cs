@@ -165,6 +165,12 @@ public static class BlobShareEndpoint
             return;
         }
 
+        // Reset the watchdog now that we're past the gate-wait queue. The
+        // full PerStreamTimeout now applies to the drain itself, so a
+        // request that sat behind a slow peer doesn't inherit a starved
+        // budget and 503 purely from contention.
+        watchdog.CancelAfter(PerStreamTimeout);
+
         byte[]? payload;
         try
         {
@@ -197,11 +203,44 @@ public static class BlobShareEndpoint
 
                     await using (sourceStream)
                     {
-                        using var buffer = new MemoryStream(
-                            capacity: (int)Math.Min(Math.Max(entry.Length, 0), int.MaxValue));
-                        await sourceStream.CopyToAsync(
-                            buffer, IndexedDbBlobChunking.ChunkSize, watchdogCt).ConfigureAwait(false);
-                        var bytes = buffer.ToArray();
+                        byte[] bytes;
+                        // Fast path: advertised length is known and fits int.
+                        // Read directly into one pre-sized byte[] — skips the
+                        // MemoryStream growth + ToArray() copy and shaves one
+                        // full-payload allocation per cache miss.
+                        if (entry.Length > 0 && entry.Length <= int.MaxValue)
+                        {
+                            var length = (int)entry.Length;
+                            bytes = new byte[length];
+                            var written = 0;
+                            while (written < length)
+                            {
+                                var n = await sourceStream.ReadAsync(
+                                    bytes.AsMemory(written, length - written),
+                                    watchdogCt).ConfigureAwait(false);
+                                if (n == 0)
+                                {
+                                    // Upstream returned EOF before delivering the
+                                    // advertised byte count. We'd rather surface
+                                    // this loudly (500 via the outer catch) than
+                                    // serve a truncated 200 to the client.
+                                    throw new IOException(
+                                        $"Blob share {token}: upstream returned {written} byte(s); advertised {length}.");
+                                }
+                                written += n;
+                            }
+                        }
+                        else
+                        {
+                            // Fallback for unknown / oversize length. Practically
+                            // unused at runtime (IndexedDb knows blob size) but
+                            // keeps the endpoint robust against a future caller
+                            // that publishes with Length<=0.
+                            using var buffer = new MemoryStream();
+                            await sourceStream.CopyToAsync(
+                                buffer, IndexedDbBlobChunking.ChunkSize, watchdogCt).ConfigureAwait(false);
+                            bytes = buffer.ToArray();
+                        }
 
                         // Only cache after the full copy succeeds. A partial
                         // buffer would serve a truncated response to the next
@@ -265,27 +304,24 @@ public static class BlobShareEndpoint
             catch (SemaphoreFullException) { /* defensive — should not happen */ }
         }
 
-        if (payload is null)
-        {
-            // Single-flight returned null — treat as transient miss.
-            if (!context.Response.HasStarted)
-            {
-                context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
-            }
-            return;
-        }
+        // payload is non-null here: the cache-hit branch returns fresh.ToArray()
+        // (never null), and RunSingleFlight's factory either returns a non-null
+        // byte[] or throws (every throw path is handled by one of the catches
+        // above and returns early). The compiler can't see that through the
+        // Task<byte[]?> contract, hence the `!`.
+        var bytes = payload!;
 
         // Write response from the materialized buffer. Headers are set here
         // (not before stream open) so any failure path above can land a
         // clean status code without HasStarted blocking it.
         context.Response.ContentType = entry.ContentType;
-        context.Response.ContentLength = payload.Length;
+        context.Response.ContentLength = bytes.Length;
         context.Response.Headers.XContentTypeOptions = "nosniff";
         context.Response.Headers.CacheControl = entry.CacheControl ?? DefaultCacheControl;
         context.Response.Headers.ETag = etag;
         try
         {
-            await context.Response.Body.WriteAsync(payload, ct).ConfigureAwait(false);
+            await context.Response.Body.WriteAsync(bytes, ct).ConfigureAwait(false);
             await context.Response.Body.FlushAsync(ct).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
@@ -294,5 +330,4 @@ public static class BlobShareEndpoint
             // is already populated, so the next fetcher is fast.
         }
     }
-
 }
