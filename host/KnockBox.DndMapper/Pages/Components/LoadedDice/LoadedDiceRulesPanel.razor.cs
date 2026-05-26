@@ -8,6 +8,7 @@ using KnockBox.DndMapper.Services.State.Games;
 using KnockBox.DndMapper.Services.State.Games.Data;
 using KnockBox.DndMapper.Services.State.Games.Data.LoadedDice;
 using Microsoft.AspNetCore.Components;
+using Microsoft.JSInterop;
 
 namespace KnockBox.DndMapper.Pages.Components.LoadedDice
 {
@@ -18,9 +19,19 @@ namespace KnockBox.DndMapper.Pages.Components.LoadedDice
 
         [Inject] protected DndMapperGameEngine Engine { get; set; } = default!;
         [Inject] protected IUserService UserService { get; set; } = default!;
+        [Inject] protected IJSRuntime JSRuntime { get; set; } = default!;
         [CascadingParameter] public DndMapperToastService? Toasts { get; set; }
 
         private IDisposable? _stateSub;
+        private IJSObjectReference? _hostInputModule;
+
+        // Identifies which HostKeyHeldCondition slot is currently listening
+        // for a key, so the button can render its "Press a key…" state. Only
+        // one slot listens at a time — the JS module's captureResolver is
+        // also single-shot, so multi-listen would race anyway.
+        private Guid _listeningRuleId;
+        private ImmutableArray<int> _listeningPath;
+        private bool _isListening;
 
         protected override void OnInitialized()
         {
@@ -31,7 +42,67 @@ namespace KnockBox.DndMapper.Pages.Components.LoadedDice
         public override void Dispose()
         {
             _stateSub?.Dispose();
+            // Best-effort: tell JS to drop any in-flight capture so its
+            // promise resolves to null instead of leaking the listener
+            // past circuit teardown. Fire-and-forget — Dispose can't await.
+            if (_hostInputModule is not null)
+            {
+                if (_isListening)
+                {
+                    try { _ = _hostInputModule.InvokeVoidAsync("cancelCapture"); }
+                    catch { /* circuit teardown */ }
+                }
+                try { _ = _hostInputModule.DisposeAsync(); }
+                catch { /* circuit teardown */ }
+            }
             base.Dispose();
+        }
+
+        // Click handler for the "Set key…" / "<key>" button on a
+        // HostKeyHeldCondition slot. Imports the host-input module on
+        // first use (the parent page imports the same module separately
+        // for the held-keys stream — JS module caching makes the second
+        // import free).
+        private async Task BeginHostKeyCapture(LoadedDiceRule rule, ImmutableArray<int> path)
+        {
+            if (!Editable || _isListening) return;
+            _listeningRuleId = rule.Id;
+            _listeningPath = path;
+            _isListening = true;
+            StateHasChanged();
+            try
+            {
+                _hostInputModule ??= await JSRuntime.InvokeAsync<IJSObjectReference>(
+                    "import", "./_content/KnockBox.DndMapper/js/dndMapperHostInput.js");
+                var key = await _hostInputModule.InvokeAsync<string?>("captureNext");
+                if (string.IsNullOrEmpty(key)) return; // Esc/cancelled
+                // Re-read the rule from state in case the host edited it
+                // (or deleted it) while listening — UpdateAtPath builds the
+                // new outer list from `rule.Conditions`, so a stale rule
+                // would clobber concurrent edits.
+                var current = State.LoadedDiceRules.FirstOrDefault(r => r.Id == rule.Id);
+                if (current is null) return;
+                await UpdateAtPath(current, path, new HostKeyHeldCondition(key));
+            }
+            catch (JSDisconnectedException) { /* circuit teardown */ }
+            catch (Exception)
+            {
+                // Capture failure is non-fatal — host can click again.
+            }
+            finally
+            {
+                _isListening = false;
+                StateHasChanged();
+            }
+        }
+
+        private bool IsListeningAt(LoadedDiceRule rule, ImmutableArray<int> path)
+        {
+            if (!_isListening || rule.Id != _listeningRuleId) return false;
+            if (_listeningPath.Length != path.Length) return false;
+            for (int i = 0; i < path.Length; i++)
+                if (_listeningPath[i] != path[i]) return false;
+            return true;
         }
 
         // ── Rule CRUD ──────────────────────────────────────────────────────
@@ -74,31 +145,173 @@ namespace KnockBox.DndMapper.Pages.Components.LoadedDice
         private Task RemoveTarget(LoadedDiceRule rule, Guid sheetId)
             => UpdateRule(rule with { TargetSheetIds = rule.TargetSheetIds.Remove(sheetId) });
 
-        // ── Condition list ─────────────────────────────────────────────────
+        // ── Condition tree ─────────────────────────────────────────────────
+        //
+        // The rule's outer Conditions list is an implicit AND. Composite
+        // conditions (AllOf/AnyOf/Not) can nest inside it to form arbitrary
+        // boolean trees. The editor addresses tree nodes by *path* — a
+        // sequence of child indices walked from the outer list — so
+        // siblings can be replaced/removed without re-indexing on each edit.
+        //
+        // Path conventions:
+        //   []           — the outer Conditions list itself (only valid as
+        //                  an AddChildAtPath target, meaning "append to root").
+        //   [i]          — outer Conditions[i].
+        //   [i, j]       — Children[j] of the composite at outer[i].
+        //   [..., 0]     — for a NotCondition, addresses its single Inner slot.
 
-        private Task AddCondition(LoadedDiceRule rule, string? kind)
+        private Task AddConditionAtPath(LoadedDiceRule rule, ImmutableArray<int> path, string? kind)
         {
-            if (string.IsNullOrEmpty(kind)) return Task.CompletedTask;
-            LoadedDiceCondition? created = kind switch
-            {
-                "currentMap" => new CurrentMapCondition(State.ActiveMapId ?? State.Maps.FirstOrDefault()?.Id ?? Guid.Empty),
-                "diceTypeRolled" => new DiceTypeRolledCondition(20),
-                "rollerIs" => new RollerIsCondition(State.Sheets.Keys.FirstOrDefault()),
-                "rollModeIs" => new RollModeIsCondition(RollMode.Normal),
-                "hostKeyHeld" => new HostKeyHeldCondition(""),
-                "combatActive" => new CombatActiveCondition(),
-                "rollLabelContains" => new RollLabelContainsCondition(""),
-                _ => null,
-            };
-            return created is null ? Task.CompletedTask
-                : UpdateRule(rule with { Conditions = rule.Conditions.Add(created) });
+            var created = CreateConditionByKind(kind);
+            return created is null
+                ? Task.CompletedTask
+                : UpdateRule(rule with { Conditions = AddChildToOuter(rule.Conditions, path.AsSpan(), created) });
         }
 
-        private Task RemoveCondition(LoadedDiceRule rule, int index)
-            => UpdateRule(rule with { Conditions = rule.Conditions.RemoveAt(index) });
+        private Task UpdateAtPath(LoadedDiceRule rule, ImmutableArray<int> path, LoadedDiceCondition next)
+            => UpdateRule(rule with { Conditions = MutateOuter(rule.Conditions, path.AsSpan(), next) });
 
-        private Task UpdateCondition(LoadedDiceRule rule, int index, LoadedDiceCondition next)
-            => UpdateRule(rule with { Conditions = rule.Conditions.SetItem(index, next) });
+        private Task RemoveAtPath(LoadedDiceRule rule, ImmutableArray<int> path)
+            => UpdateRule(rule with { Conditions = MutateOuter(rule.Conditions, path.AsSpan(), null) });
+
+        private Task ChangeCompositeOpAtPath(LoadedDiceRule rule, ImmutableArray<int> path, string? newOp)
+        {
+            if (path.IsEmpty || string.IsNullOrEmpty(newOp)) return Task.CompletedTask;
+            var current = ReadAt(rule.Conditions, path.AsSpan());
+            LoadedDiceCondition? swapped = (current, newOp) switch
+            {
+                (AllOfCondition all, "anyOf") => new AnyOfCondition(all.Children),
+                (AnyOfCondition any, "allOf") => new AllOfCondition(any.Children),
+                _ => null,
+            };
+            return swapped is null ? Task.CompletedTask : UpdateAtPath(rule, path, swapped);
+        }
+
+        private LoadedDiceCondition? CreateConditionByKind(string? kind) => kind switch
+        {
+            "currentMap" => new CurrentMapCondition(State.ActiveMapId ?? State.Maps.FirstOrDefault()?.Id ?? Guid.Empty),
+            "diceTypeRolled" => new DiceTypeRolledCondition(20),
+            "rollerIs" => new RollerIsCondition(State.Sheets.Keys.FirstOrDefault()),
+            "rollModeIs" => new RollModeIsCondition(RollMode.Normal),
+            "hostKeyHeld" => new HostKeyHeldCondition(""),
+            "combatActive" => new CombatActiveCondition(),
+            "rollLabelContains" => new RollLabelContainsCondition(""),
+            "allOf" => new AllOfCondition(ImmutableList<LoadedDiceCondition>.Empty),
+            "anyOf" => new AnyOfCondition(ImmutableList<LoadedDiceCondition>.Empty),
+            "not" => new NotCondition(null),
+            _ => null,
+        };
+
+        // ── Path-based tree mutation ───────────────────────────────────────
+
+        // `next == null` removes the entry at `path`; otherwise replaces it.
+        // Removing a NotCondition's single inner slot (path ending in [0])
+        // sets Inner=null rather than deleting the NOT itself — the empty
+        // NOT placeholder is a deliberate editor state.
+        private static ImmutableList<LoadedDiceCondition> MutateOuter(
+            ImmutableList<LoadedDiceCondition> list,
+            ReadOnlySpan<int> path,
+            LoadedDiceCondition? next)
+        {
+            if (path.Length == 0) return list; // outer list itself isn't a node
+            int idx = path[0];
+            if (idx < 0 || idx >= list.Count) return list;
+            var rest = path[1..];
+            if (rest.Length == 0)
+                return next is null ? list.RemoveAt(idx) : list.SetItem(idx, next);
+            var newChild = MutateInside(list[idx], rest, next);
+            return list.SetItem(idx, newChild);
+        }
+
+        private static LoadedDiceCondition MutateInside(
+            LoadedDiceCondition node,
+            ReadOnlySpan<int> path,
+            LoadedDiceCondition? next)
+        {
+            return node switch
+            {
+                AllOfCondition all => all with { Children = MutateOuter(all.Children, path, next) },
+                AnyOfCondition any => any with { Children = MutateOuter(any.Children, path, next) },
+                NotCondition not when path[0] == 0 && path.Length == 1
+                    => not with { Inner = next },
+                NotCondition not when path[0] == 0 && not.Inner is not null
+                    => not with { Inner = MutateInside(not.Inner, path[1..], next) },
+                _ => node,
+            };
+        }
+
+        // Empty path ⇒ append to the outer list. Otherwise descend to the
+        // composite at `path` and append `child` to its children (or, for a
+        // NotCondition, set its Inner slot).
+        private static ImmutableList<LoadedDiceCondition> AddChildToOuter(
+            ImmutableList<LoadedDiceCondition> list,
+            ReadOnlySpan<int> path,
+            LoadedDiceCondition child)
+        {
+            if (path.Length == 0) return list.Add(child);
+            int idx = path[0];
+            if (idx < 0 || idx >= list.Count) return list;
+            var rest = path[1..];
+            var newChild = AddChildToInside(list[idx], rest, child);
+            return list.SetItem(idx, newChild);
+        }
+
+        private static LoadedDiceCondition AddChildToInside(
+            LoadedDiceCondition node,
+            ReadOnlySpan<int> path,
+            LoadedDiceCondition child)
+        {
+            if (path.Length == 0)
+            {
+                return node switch
+                {
+                    AllOfCondition all => all with { Children = all.Children.Add(child) },
+                    AnyOfCondition any => any with { Children = any.Children.Add(child) },
+                    NotCondition not => not with { Inner = child },
+                    _ => node, // leaf — can't add a child
+                };
+            }
+            int idx = path[0];
+            var rest = path[1..];
+            return node switch
+            {
+                AllOfCondition all when idx >= 0 && idx < all.Children.Count
+                    => all with { Children = all.Children.SetItem(idx, AddChildToInside(all.Children[idx], rest, child)) },
+                AnyOfCondition any when idx >= 0 && idx < any.Children.Count
+                    => any with { Children = any.Children.SetItem(idx, AddChildToInside(any.Children[idx], rest, child)) },
+                NotCondition not when idx == 0 && not.Inner is not null
+                    => not with { Inner = AddChildToInside(not.Inner, rest, child) },
+                _ => node,
+            };
+        }
+
+        private static LoadedDiceCondition? ReadAt(
+            ImmutableList<LoadedDiceCondition> outer,
+            ReadOnlySpan<int> path)
+        {
+            if (path.Length == 0) return null;
+            int idx = path[0];
+            if (idx < 0 || idx >= outer.Count) return null;
+            LoadedDiceCondition? node = outer[idx];
+            for (int p = 1; p < path.Length && node is not null; p++)
+            {
+                int i = path[p];
+                node = node switch
+                {
+                    AllOfCondition all => i >= 0 && i < all.Children.Count ? all.Children[i] : null,
+                    AnyOfCondition any => i >= 0 && i < any.Children.Count ? any.Children[i] : null,
+                    NotCondition not => i == 0 ? not.Inner : null,
+                    _ => null,
+                };
+            }
+            return node;
+        }
+
+        // Stable key for Razor's @key on path-addressed nodes. Independent
+        // of the node's value, so editing a leaf's data doesn't trigger
+        // a subtree rebuild (which would steal focus from text inputs).
+        private static string PathKey(LoadedDiceRule rule, ImmutableArray<int> path)
+            => path.IsEmpty ? rule.Id.ToString() : $"{rule.Id}/{string.Join(",", path)}";
 
         // ── Modification list ──────────────────────────────────────────────
 

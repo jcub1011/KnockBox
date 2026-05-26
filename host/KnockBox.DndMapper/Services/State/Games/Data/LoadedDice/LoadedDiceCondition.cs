@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text.Json.Serialization;
 using KnockBox.DndMapper.Models;
 
@@ -8,6 +9,10 @@ namespace KnockBox.DndMapper.Services.State.Games.Data.LoadedDice
     // through LibrarySnapshot without a custom converter. Adding a new
     // condition: declare the record, register it on this attribute list, and
     // add its editor component to LoadedDiceUiRegistry.
+    //
+    // Discriminator strings ("$kind" values) are stable persistence keys —
+    // renaming a record is fine, but never change its existing string here
+    // or every saved rule referencing it breaks at load time.
     [JsonPolymorphic(TypeDiscriminatorPropertyName = "$kind")]
     [JsonDerivedType(typeof(CurrentMapCondition), "currentMap")]
     [JsonDerivedType(typeof(DiceTypeRolledCondition), "diceTypeRolled")]
@@ -16,6 +21,9 @@ namespace KnockBox.DndMapper.Services.State.Games.Data.LoadedDice
     [JsonDerivedType(typeof(HostKeyHeldCondition), "hostKeyHeld")]
     [JsonDerivedType(typeof(CombatActiveCondition), "combatActive")]
     [JsonDerivedType(typeof(RollLabelContainsCondition), "rollLabelContains")]
+    [JsonDerivedType(typeof(AllOfCondition), "allOf")]
+    [JsonDerivedType(typeof(AnyOfCondition), "anyOf")]
+    [JsonDerivedType(typeof(NotCondition), "not")]
     public abstract record LoadedDiceCondition
     {
         public abstract bool Matches(LoadedDiceContext ctx);
@@ -68,5 +76,39 @@ namespace KnockBox.DndMapper.Services.State.Games.Data.LoadedDice
             => !string.IsNullOrEmpty(Substring)
                && (ctx.Request.Label ?? string.Empty)
                    .Contains(Substring, StringComparison.OrdinalIgnoreCase);
+    }
+
+    // Vacuous AND ⇒ true. Matches the outer Conditions list's existing
+    // "empty list = fires on every roll" convention so an empty group reads
+    // the same as no group at all.
+    public sealed record AllOfCondition(ImmutableList<LoadedDiceCondition> Children) : LoadedDiceCondition
+    {
+        public override bool Matches(LoadedDiceContext ctx)
+        {
+            foreach (var child in Children)
+                if (!child.Matches(ctx)) return false;
+            return true;
+        }
+    }
+
+    // Vacuous OR ⇒ false. An empty ANY-OF group reads as "never", which is
+    // useful as a hard off-switch when authoring a rule incrementally.
+    public sealed record AnyOfCondition(ImmutableList<LoadedDiceCondition> Children) : LoadedDiceCondition
+    {
+        public override bool Matches(LoadedDiceContext ctx)
+        {
+            foreach (var child in Children)
+                if (child.Matches(ctx)) return true;
+            return false;
+        }
+    }
+
+    // Null inner ⇒ matches. Lets the editor surface a placeholder NOT node
+    // (freshly added, no child yet) without it accidentally firing the
+    // rule until the host fills it in.
+    public sealed record NotCondition(LoadedDiceCondition? Inner) : LoadedDiceCondition
+    {
+        public override bool Matches(LoadedDiceContext ctx)
+            => Inner is null || !Inner.Matches(ctx);
     }
 }

@@ -17,18 +17,28 @@ const held = new Set();
 let pending = false;
 let lastSentJson = "[]";
 
+// Normalize browser e.key quirks so the stored Key and the streamed held
+// set use identical labels — otherwise a "Space"-named rule never matches
+// the live set which contains " ". Capture and onKeyDown MUST agree, so
+// both go through this. Add new aliases here as you encounter them.
+function normalizeKey(key) {
+    if (key === " ") return "Space";
+    return key;
+}
+
 function onKeyDown(e) {
     // Use e.key (logical) rather than e.code (physical) so rules say
     // "Space" / "Shift" not "ShiftLeft". Browsers normalize this.
     if (!e.key) return;
-    if (held.has(e.key)) return;
-    held.add(e.key);
+    const key = normalizeKey(e.key);
+    if (held.has(key)) return;
+    held.add(key);
     scheduleFlush();
 }
 
 function onKeyUp(e) {
     if (!e.key) return;
-    if (!held.delete(e.key)) return;
+    if (!held.delete(normalizeKey(e.key))) return;
     scheduleFlush();
 }
 
@@ -86,4 +96,43 @@ export function detach() {
     dotNetRef = null;
     callbackName = null;
     held.clear();
+}
+
+// One-shot key capture for the loaded-dice "set key" button. Returns a
+// promise resolving to the next key the host presses (e.key, logical
+// form — same shape HostKeyHeldCondition stores). Esc resolves to null
+// so the caller can treat it as a cancel. Uses the capture phase + stop-
+// Propagation so the streaming onKeyDown above doesn't ALSO record the
+// pressed key in the held set — the binding press is transient.
+let captureResolver = null;
+
+function onCaptureKey(e) {
+    if (!e.key) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const key = e.key === "Escape" ? null : normalizeKey(e.key);
+    finalizeCapture(key);
+}
+
+function finalizeCapture(key) {
+    if (captureResolver === null) return;
+    const resolve = captureResolver;
+    captureResolver = null;
+    window.removeEventListener("keydown", onCaptureKey, true);
+    resolve(key);
+}
+
+export function captureNext() {
+    // A second captureNext call before the first resolved cancels the
+    // first — the UI only exposes one listening button at a time, but
+    // be defensive about navigation races.
+    if (captureResolver !== null) finalizeCapture(null);
+    return new Promise((resolve) => {
+        captureResolver = resolve;
+        window.addEventListener("keydown", onCaptureKey, true);
+    });
+}
+
+export function cancelCapture() {
+    finalizeCapture(null);
 }

@@ -269,5 +269,156 @@ namespace KnockBox.DndMapperTests.Unit
             LoadedDiceProcessor.Apply(rolls, new[] { rule }, null, ctxFor);
             Assert.AreEqual(2, rolls[0].Result);
         }
+
+        // ── Composite conditions (AllOf / AnyOf / Not) ───────────────────────
+
+        [TestMethod]
+        public void AllOf_AllChildrenTrue_Fires()
+        {
+            var rule = new LoadedDiceRule
+            {
+                Id = Guid.NewGuid(),
+                Name = "AllOf",
+                Conditions =
+                [
+                    new AllOfCondition(ImmutableList.Create<LoadedDiceCondition>(
+                        new DiceTypeRolledCondition(20),
+                        new RollModeIsCondition(RollMode.Normal))),
+                ],
+                Modifications = [new SetResultModification(20)],
+            };
+            var rolls = new List<DieRoll> { new(20, 3, false) };
+            LoadedDiceProcessor.Apply(rolls, new[] { rule }, null, _ => ContextFor(20));
+            Assert.AreEqual(20, rolls[0].Result);
+        }
+
+        [TestMethod]
+        public void AllOf_OneChildFalse_DoesNotFire()
+        {
+            var rule = new LoadedDiceRule
+            {
+                Id = Guid.NewGuid(),
+                Name = "AllOf",
+                Conditions =
+                [
+                    new AllOfCondition(ImmutableList.Create<LoadedDiceCondition>(
+                        new DiceTypeRolledCondition(20),
+                        new DiceTypeRolledCondition(6))),
+                ],
+                Modifications = [new SetResultModification(20)],
+            };
+            var rolls = new List<DieRoll> { new(20, 3, false) };
+            LoadedDiceProcessor.Apply(rolls, new[] { rule }, null, _ => ContextFor(20));
+            Assert.AreEqual(3, rolls[0].Result);
+        }
+
+        [TestMethod]
+        public void AnyOf_OneChildTrue_Fires()
+        {
+            var rule = new LoadedDiceRule
+            {
+                Id = Guid.NewGuid(),
+                Name = "AnyOf",
+                Conditions =
+                [
+                    new AnyOfCondition(ImmutableList.Create<LoadedDiceCondition>(
+                        new DiceTypeRolledCondition(6),  // false against a d20 roll
+                        new DiceTypeRolledCondition(20))), // true
+                ],
+                Modifications = [new SetResultModification(20)],
+            };
+            var rolls = new List<DieRoll> { new(20, 3, false) };
+            LoadedDiceProcessor.Apply(rolls, new[] { rule }, null, _ => ContextFor(20));
+            Assert.AreEqual(20, rolls[0].Result);
+        }
+
+        [TestMethod]
+        public void AnyOf_EmptyChildren_NeverFires()
+        {
+            var rule = new LoadedDiceRule
+            {
+                Id = Guid.NewGuid(),
+                Name = "Empty OR",
+                Conditions = [new AnyOfCondition(ImmutableList<LoadedDiceCondition>.Empty)],
+                Modifications = [new SetResultModification(20)],
+            };
+            var rolls = new List<DieRoll> { new(20, 3, false) };
+            LoadedDiceProcessor.Apply(rolls, new[] { rule }, null, _ => ContextFor(20));
+            Assert.AreEqual(3, rolls[0].Result);
+        }
+
+        [TestMethod]
+        public void AllOf_EmptyChildren_AlwaysFires()
+        {
+            var rule = new LoadedDiceRule
+            {
+                Id = Guid.NewGuid(),
+                Name = "Empty AND",
+                Conditions = [new AllOfCondition(ImmutableList<LoadedDiceCondition>.Empty)],
+                Modifications = [new SetResultModification(20)],
+            };
+            var rolls = new List<DieRoll> { new(20, 3, false) };
+            LoadedDiceProcessor.Apply(rolls, new[] { rule }, null, _ => ContextFor(20));
+            Assert.AreEqual(20, rolls[0].Result);
+        }
+
+        [TestMethod]
+        public void Not_InvertsInner()
+        {
+            var rule = new LoadedDiceRule
+            {
+                Id = Guid.NewGuid(),
+                Name = "NOT d6",
+                Conditions = [new NotCondition(new DiceTypeRolledCondition(6))],
+                Modifications = [new SetResultModification(20)],
+            };
+            // d20 roll: NOT(diceIs6) ⇒ true ⇒ fires.
+            var rolls = new List<DieRoll> { new(20, 3, false) };
+            LoadedDiceProcessor.Apply(rolls, new[] { rule }, null, _ => ContextFor(20));
+            Assert.AreEqual(20, rolls[0].Result);
+        }
+
+        [TestMethod]
+        public void Not_NullInner_Matches()
+        {
+            // Placeholder state — freshly-added NOT with no child yet must
+            // not block the rule from firing if it's the only condition.
+            var rule = new LoadedDiceRule
+            {
+                Id = Guid.NewGuid(),
+                Name = "NOT placeholder",
+                Conditions = [new NotCondition(null)],
+                Modifications = [new SetResultModification(20)],
+            };
+            var rolls = new List<DieRoll> { new(20, 3, false) };
+            LoadedDiceProcessor.Apply(rolls, new[] { rule }, null, _ => ContextFor(20));
+            Assert.AreEqual(20, rolls[0].Result);
+        }
+
+        [TestMethod]
+        public void Nested_AllOfContainsAnyOfContainsNot_Evaluates()
+        {
+            // AllOf(
+            //   AnyOf(diceIs6, diceIs20),   ⇒ true on a d20
+            //   Not(diceIs6))               ⇒ true on a d20
+            // ⇒ true overall
+            var rule = new LoadedDiceRule
+            {
+                Id = Guid.NewGuid(),
+                Name = "Nested",
+                Conditions =
+                [
+                    new AllOfCondition(ImmutableList.Create<LoadedDiceCondition>(
+                        new AnyOfCondition(ImmutableList.Create<LoadedDiceCondition>(
+                            new DiceTypeRolledCondition(6),
+                            new DiceTypeRolledCondition(20))),
+                        new NotCondition(new DiceTypeRolledCondition(6)))),
+                ],
+                Modifications = [new SetResultModification(20)],
+            };
+            var rolls = new List<DieRoll> { new(20, 3, false) };
+            LoadedDiceProcessor.Apply(rolls, new[] { rule }, null, _ => ContextFor(20));
+            Assert.AreEqual(20, rolls[0].Result);
+        }
     }
 }
