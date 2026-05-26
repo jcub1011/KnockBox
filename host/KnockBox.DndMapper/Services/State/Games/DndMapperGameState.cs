@@ -3,6 +3,7 @@ using KnockBox.Core.Services.State.Games.Shared;
 using KnockBox.Core.Services.State.Users;
 using KnockBox.DndMapper.Models;
 using KnockBox.DndMapper.Services.State.Games.Data;
+using KnockBox.DndMapper.Services.State.Games.Data.LoadedDice;
 
 namespace KnockBox.DndMapper.Services.State.Games
 {
@@ -54,6 +55,19 @@ namespace KnockBox.DndMapper.Services.State.Games
         // Running total of bytes consumed by uploaded images on this state. Used to
         // enforce the per-room 1 GB cap. Mutated only by image verbs inside Execute.
         public long BytesUsed { get; private set; }
+
+        // Host-authored loaded-dice rules. Persisted with the library
+        // snapshot when Settings.LoadedDiceEnabled has ever been true; safe
+        // to keep populated even while the master toggle is off — the engine
+        // checks the toggle before evaluating.
+        public ImmutableList<LoadedDiceRule> LoadedDiceRules { get; internal set; }
+            = ImmutableList<LoadedDiceRule>.Empty;
+
+        // Live snapshot of keys the host's client reports as currently held.
+        // Ephemeral — process restarts clear it. Consumed only by
+        // HostKeyHeldCondition; updated via UpdateHostInputStateAsync.
+        public ImmutableHashSet<string> HostHeldKeys { get; internal set; }
+            = ImmutableHashSet<string>.Empty;
 
         // Deterministic IDs so library snapshots that reference built-ins by
         // name don't accidentally collide with user-saved templates.
@@ -167,6 +181,8 @@ namespace KnockBox.DndMapper.Services.State.Games
         internal void SetFocusRect(FocusRect? rect) => FocusRect = rect;
         internal void SetBytesUsed(long value) => BytesUsed = value < 0 ? 0 : value;
         internal void AdjustBytesUsed(long delta) => BytesUsed = Math.Max(0, BytesUsed + delta);
+        internal void SetLoadedDiceRules(ImmutableList<LoadedDiceRule> rules) => LoadedDiceRules = rules;
+        internal void SetHostHeldKeys(ImmutableHashSet<string> keys) => HostHeldKeys = keys;
 
         internal void AppendRoll(RollResult result)
         {

@@ -286,6 +286,7 @@ namespace KnockBox.DndMapper.Services.Library.Vtf
                 InitiativeAttributeName = globalVendor.InitiativeAttributeName,
                 CustomTemplates = globalVendor.CustomTemplates,
                 GlobalRollTemplates = globalVendor.GlobalRollTemplates,
+                LoadedDiceRules = globalVendor.LoadedDiceRules,
                 MapIds = maps.Select(m => m.Id).ToList(),
                 SheetIds = sheets.Select(s => s.Id).ToList(),
             };
@@ -344,6 +345,7 @@ namespace KnockBox.DndMapper.Services.Library.Vtf
                 InitiativeAttributeName = core.InitiativeAttributeName,
                 CustomTemplates = core.CustomTemplates,
                 GlobalRollTemplates = core.GlobalRollTemplates,
+                LoadedDiceRules = core.LoadedDiceRules,
                 MapOrder = core.MapIds,
                 SheetOrder = core.SheetIds,
             }),
@@ -578,6 +580,7 @@ namespace KnockBox.DndMapper.Services.Library.Vtf
         public string? InitiativeAttributeName { get; init; }
         public List<NamedTemplateSnapshot> CustomTemplates { get; init; } = [];
         public List<RollTemplateSnapshot> GlobalRollTemplates { get; init; } = [];
+        public List<State.Games.Data.LoadedDice.LoadedDiceRule> LoadedDiceRules { get; init; } = [];
         public List<Guid> MapOrder { get; init; } = [];
         public List<Guid> SheetOrder { get; init; } = [];
     }

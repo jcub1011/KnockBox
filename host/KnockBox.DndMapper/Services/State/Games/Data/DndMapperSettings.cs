@@ -15,5 +15,13 @@ namespace KnockBox.DndMapper.Services.State.Games.Data
         public bool PlayersCanCreateNPCs { get; init; } = false;
         public bool HpTrackingEnabled { get; init; } = true;
         public bool PlayersCanSeeOtherSheets { get; init; } = false;
+
+        // Loaded-dice rigging — opt-in transparency feature. When the master
+        // toggle is off, the rule list isn't evaluated and the rules panel is
+        // hidden for everyone. The visibility/indicator settings only matter
+        // while the master toggle is on.
+        public bool LoadedDiceEnabled { get; init; } = false;
+        public LoadedDiceRuleVisibility LoadedDiceRuleVisibility { get; init; } = LoadedDiceRuleVisibility.HostOnly;
+        public LoadedDicePlayerIndicator LoadedDicePlayerIndicator { get; init; } = LoadedDicePlayerIndicator.Hidden;
     }
 }

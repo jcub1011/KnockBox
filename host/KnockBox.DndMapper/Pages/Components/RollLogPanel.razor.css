@@ -259,3 +259,12 @@
     gap: 0.25rem;
     flex-wrap: wrap;
 }
+
+.dndm-rolllog-loaded {
+    display: inline-block;
+    color: #d05050;
+    font-size: 0.7rem;
+    line-height: 1;
+    transform: translateY(-1px);
+    cursor: help;
+}

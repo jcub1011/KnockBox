@@ -46,6 +46,28 @@ namespace KnockBox.DndMapper.Pages.Components
 
         private bool _libraryOpen;
 
+        // Host always sees the indicator when a rule fired; players see it
+        // only when LoadedDicePlayerIndicator is RedDotInLog. Master toggle
+        // off ⇒ never shown (and AppliedRules will be empty anyway).
+        private bool ShouldShowLoadedIndicator(RollResult r)
+        {
+            if (r.AppliedRules.Count == 0) return false;
+            if (IsHost) return true;
+            return State.Settings.LoadedDicePlayerIndicator == LoadedDicePlayerIndicator.RedDotInLog;
+        }
+
+        // Lists fired rules so the host's hover tooltip can call out which
+        // ones bent this roll. Truncated to 4 names for layout safety.
+        private static string LoadedTooltip(RollResult r)
+        {
+            const int max = 4;
+            var names = r.AppliedRules.Select(x => string.IsNullOrEmpty(x.RuleName) ? "(unnamed)" : x.RuleName).Take(max);
+            var joined = string.Join(", ", names);
+            return r.AppliedRules.Count > max
+                ? $"Loaded dice: {joined}, +{r.AppliedRules.Count - max} more"
+                : $"Loaded dice: {joined}";
+        }
+
         protected override void OnInitialized()
         {
             _stateSub = State.StateChangedEventManager.Subscribe(async () => await InvokeAsync(StateHasChanged));
@@ -174,7 +196,17 @@ namespace KnockBox.DndMapper.Pages.Components
                 ? [.. State.Sheets.Values.OrderBy(s => s.CharacterName)]
                 : [.. State.Sheets.Values.Where(s => s.OwnerUserId == CurrentUserId).OrderBy(s => s.CharacterName)];
 
-            if (Config.PickerSheetId is null || !_pickableSheets.Any(s => s.Id == Config.PickerSheetId))
+            // Host can intentionally pick "No sheet (GM)" — keep it null
+            // unless a previously-picked sheet has been deleted, in which
+            // case fall back to null (GM) rather than silently switching
+            // to an unrelated sheet. Players don't have the No-sheet
+            // option, so we auto-lock them to their assigned sheet.
+            if (IsHost)
+            {
+                if (Config.PickerSheetId is Guid id && !_pickableSheets.Any(s => s.Id == id))
+                    Config.PickerSheetId = null;
+            }
+            else if (Config.PickerSheetId is null || !_pickableSheets.Any(s => s.Id == Config.PickerSheetId))
             {
                 var fallback = _pickableSheets.FirstOrDefault(s => s.OwnerUserId == CurrentUserId)
                             ?? _pickableSheets.FirstOrDefault();
@@ -302,6 +334,16 @@ namespace KnockBox.DndMapper.Pages.Components
 
         private void OnSheetChange(string? raw)
         {
+            // Empty value ⇒ the "No sheet (GM)" option. Clear any picked
+            // attribute too — the attribute dropdown only lists rows from
+            // the picker sheet, so a stale AttributeName would dangle
+            // without a sheet to resolve it against.
+            if (string.IsNullOrEmpty(raw))
+            {
+                Config.PickerSheetId = null;
+                Config.AttributeName = null;
+                return;
+            }
             if (Guid.TryParse(raw, out var id) && _pickableSheets.Any(s => s.Id == id))
             {
                 Config.PickerSheetId = id;

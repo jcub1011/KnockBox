@@ -4,6 +4,7 @@ using KnockBox.Core.Services.State.Users;
 using KnockBox.DndMapper.Models;
 using KnockBox.DndMapper.Pages.Components;
 using KnockBox.DndMapper.Services.Library;
+using KnockBox.DndMapper.Services.Logic.Games;
 using KnockBox.DndMapper.Services.State.Games;
 using KnockBox.DndMapper.Services.State.Games.Data;
 using Microsoft.AspNetCore.Components;
@@ -26,6 +27,7 @@ namespace KnockBox.DndMapper.Pages
         [Inject] protected IJSRuntime JSRuntime { get; set; } = default!;
         [Inject] protected ILogger<DndMapperPlayingPhase> Logger { get; set; } = default!;
         [Inject] protected DndMapperLibraryService Library { get; set; } = default!;
+        [Inject] protected DndMapperGameEngine Engine { get; set; } = default!;
         [Inject] protected IUserService UserService { get; set; } = default!;
         [Inject] protected NavigationManager NavigationManager { get; set; } = default!;
 
@@ -57,6 +59,7 @@ namespace KnockBox.DndMapper.Pages
         private IJSObjectReference? _unloadGuardModule;
         private IJSObjectReference? _collapseModule;
         private IJSObjectReference? _clipboardModule;
+        private IJSObjectReference? _hostInputModule;
         private DotNetObjectReference<DndMapperPlayingPhase>? _dotNetRef;
         private bool _resizeAttached;
         private bool _isSaving;
@@ -89,6 +92,17 @@ namespace KnockBox.DndMapper.Pages
         }
 
         private void TogglePerms() => _permsOpen = !_permsOpen;
+
+        // Host's panel lives in the left rail (rendered inline in the .razor).
+        // The right-rail mount is for non-host players when the visibility
+        // setting is AllPlayers — players have no left rail, so the right
+        // rail is the only place they can see the rule list.
+        private bool ShouldShowPlayerLoadedDicePanel()
+        {
+            if (IsHost) return false;
+            if (!State.Settings.LoadedDiceEnabled) return false;
+            return State.Settings.LoadedDiceRuleVisibility == LoadedDiceRuleVisibility.AllPlayers;
+        }
 
         private async Task OnOpenDisplayClicked()
         {
@@ -259,6 +273,22 @@ namespace KnockBox.DndMapper.Pages
                         _leftRailPx = await _resizeModule.InvokeAsync<int>("load", "left", "host", DefaultLeftPx);
                     }
                     _dotNetRef = DotNetObjectReference.Create(this);
+
+                    // Host-only: stream keyboard state to the engine for
+                    // loaded-dice HostKeyHeldCondition. Kept attached for the
+                    // life of the page; engine no-ops when loaded dice is
+                    // disabled, so toggling at runtime needs no extra wiring.
+                    if (IsHost)
+                    {
+                        try
+                        {
+                            _hostInputModule = await JSRuntime.InvokeAsync<IJSObjectReference>(
+                                "import", "./_content/KnockBox.DndMapper/js/dndMapperHostInput.js");
+                            await _hostInputModule.InvokeVoidAsync("attach", _dotNetRef, nameof(OnHostKeysChanged));
+                        }
+                        catch (JSDisconnectedException) { /* circuit teardown */ }
+                        catch (Exception ex) { Logger.LogWarning(ex, "Failed to attach host-input JS module."); }
+                    }
                     StateHasChanged();
                 }
                 catch (JSDisconnectedException) { /* circuit teardown */ }
@@ -286,6 +316,14 @@ namespace KnockBox.DndMapper.Pages
             }
 
             await base.OnAfterRenderAsync(firstRender);
+        }
+
+        [JSInvokable]
+        public Task OnHostKeysChanged(string[] keys)
+        {
+            if (!IsHost || UserService.CurrentUser is null) return Task.CompletedTask;
+            Engine.UpdateHostInputStateAsync(State, UserService.CurrentUser, keys ?? Array.Empty<string>());
+            return Task.CompletedTask;
         }
 
         [JSInvokable]
@@ -379,6 +417,15 @@ namespace KnockBox.DndMapper.Pages
             if (_clipboardModule is not null)
             {
                 try { await _clipboardModule.DisposeAsync(); }
+                catch (JSDisconnectedException) { /* circuit teardown */ }
+                catch (Exception) { /* ignore */ }
+            }
+            if (_hostInputModule is not null)
+            {
+                try { await _hostInputModule.InvokeVoidAsync("detach"); }
+                catch (JSDisconnectedException) { /* circuit teardown */ }
+                catch (Exception) { /* ignore */ }
+                try { await _hostInputModule.DisposeAsync(); }
                 catch (JSDisconnectedException) { /* circuit teardown */ }
                 catch (Exception) { /* ignore */ }
             }

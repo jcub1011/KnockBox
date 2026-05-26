@@ -1,6 +1,7 @@
 @using KnockBox.Core.Components.Shared
 @using KnockBox.DndMapper.Models
 @using KnockBox.DndMapper.Pages.Components
+@using KnockBox.DndMapper.Pages.Components.LoadedDice
 @using KnockBox.DndMapper.Services.State.Games
 @using KnockBox.DndMapper.Services.State.Games.Data
 @inherits DisposableComponent
@@ -28,6 +29,10 @@
                                     RoomCode="@RoomCode"
                                     SelectedImageId="_selectedImageId"
                                     SelectedImageIdChanged="OnSelectedImageIdChanged" />
+                    @if (State.Settings.LoadedDiceEnabled)
+                    {
+                        <LoadedDiceRulesPanel State="State" Editable="true" />
+                    }
                     <HostSavesPanel />
                 </div>
                 @* Always render the resize handle so its JS bindings stay
@@ -120,6 +125,10 @@
                     <HostInitiativePanel State="State" />
                 }
                 <CharacterSheetPanel @ref="_sheetPanel" State="State" CurrentUserId="@CurrentUserId" IsHost="IsHost" />
+                @if (ShouldShowPlayerLoadedDicePanel())
+                {
+                    <LoadedDiceRulesPanel State="State" Editable="false" />
+                }
             </div>
         </aside>
 

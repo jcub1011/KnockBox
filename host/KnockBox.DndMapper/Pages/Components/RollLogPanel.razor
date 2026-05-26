@@ -93,6 +93,7 @@
                         {
                             <span class="dndm-label" style="margin-top:0.4rem">From sheet</span>
                             <select class="dndm-select" @onchange="@(e => OnSheetChange((string?)e.Value))">
+                                <option value="" selected="@(Config.PickerSheetId is null)">— No sheet (GM) —</option>
                                 @foreach (var s in _pickableSheets)
                                 {
                                     <option value="@s.Id" selected="@(Config.PickerSheetId == s.Id)">@(string.IsNullOrEmpty(s.CharacterName) ? "(unnamed)" : s.CharacterName)</option>
@@ -207,6 +208,10 @@
                 @if (r.Mode != RollMode.Normal)
                 {
                     <span class="dndm-rolllog-mode">@(r.Mode == RollMode.Advantage ? "ADV" : "DIS")</span>
+                }
+                @if (ShouldShowLoadedIndicator(r))
+                {
+                    <span class="dndm-rolllog-loaded" title="@LoadedTooltip(r)" aria-label="Modified by loaded-dice rule">●</span>
                 }
                 <time class="dndm-rolllog-time"
                       datetime="@r.TimestampUtc.ToString("o")"

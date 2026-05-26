@@ -1,4 +1,6 @@
+using System.Collections.Immutable;
 using KnockBox.DndMapper.Models;
+using KnockBox.DndMapper.Services.State.Games.Data.LoadedDice;
 
 namespace KnockBox.DndMapper.Services.State.Games.Data
 {
@@ -29,5 +31,13 @@ namespace KnockBox.DndMapper.Services.State.Games.Data
         // NPC gets its own concurrent 3D-dice instance (keyed by token id)
         // and its dice render in the token's resolved color. Null for
         // player rolls; the existing RollerUserId path handles those.
-        Guid? TokenId = null);
+        Guid? TokenId = null)
+    {
+        // Loaded-dice audit: rules that fired during this roll. Empty when
+        // the master toggle was off or no rule matched. The list is what the
+        // roll log uses to render the "Loaded" badge — historical rolls keep
+        // their stamps even if the underlying rule is later edited or deleted.
+        public ImmutableList<LoadedDiceRuleStamp> AppliedRules { get; init; }
+            = ImmutableList<LoadedDiceRuleStamp>.Empty;
+    }
 }

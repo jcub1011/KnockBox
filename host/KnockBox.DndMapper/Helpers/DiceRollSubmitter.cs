@@ -28,11 +28,15 @@ namespace KnockBox.DndMapper.Helpers
                 return false;
             }
 
-            AttributeRef? attrRef = null;
-            if (config.PickerSheetId is Guid sheetId && !string.IsNullOrEmpty(config.AttributeName))
-            {
-                attrRef = new AttributeRef(sheetId, config.AttributeName!);
-            }
+            // AttributeRef carries the picker sheet whether or not an
+            // attribute is selected — so a host "rolling as Alice" with no
+            // attribute still counts as Alice's roll for loaded-dice
+            // matching. AttributeName is null when no attribute is picked;
+            // the engine's modifier-resolution path skips on null name.
+            // Players' pickers are auto-locked to their assigned sheet.
+            AttributeRef? attrRef = config.PickerSheetId is Guid sheetId
+                ? new AttributeRef(sheetId, string.IsNullOrEmpty(config.AttributeName) ? null : config.AttributeName)
+                : null;
 
             var request = new RollRequest(
                 Dice: [.. config.Terms.Where(t => t.Count > 0)],

@@ -103,7 +103,8 @@ namespace KnockBox.DndMapper.Services.Library
             object? Settings,
             object? AttributeSchema,
             Guid? ActiveSchemaTemplateId,
-            string? InitiativeAttributeName);
+            string? InitiativeAttributeName,
+            object? LoadedDiceRules);
 
         private static PersistedFingerprint CaptureFingerprint(DndMapperGameState s) => new(
             s.Maps,
@@ -113,7 +114,8 @@ namespace KnockBox.DndMapper.Services.Library
             s.Settings,
             s.AttributeSchema,
             s.ActiveSchemaTemplateId,
-            s.InitiativeAttributeName);
+            s.InitiativeAttributeName,
+            s.LoadedDiceRules);
 
         // Slot ids whose v3 → v4 single-record migration has been probed in
         // this attachment. LoadSlotAsync consults this to avoid reissuing the
@@ -890,6 +892,7 @@ namespace KnockBox.DndMapper.Services.Library
 
                 state.Sheets = hydration.NewSheets;
                 state.GlobalRollTemplates = hydration.NewGlobalRollTemplates;
+                state.SetLoadedDiceRules(snapshot.LoadedDiceRules.ToImmutableList());
 
                 // Re-seed built-ins before user templates so their Rows are
                 // re-derived from the in-code preset definitions (which can
@@ -1830,6 +1833,7 @@ namespace KnockBox.DndMapper.Services.Library
                         InitiativeAttributeName = legacy.InitiativeAttributeName,
                         CustomTemplates = legacy.CustomTemplates,
                         GlobalRollTemplates = legacy.GlobalRollTemplates,
+                        LoadedDiceRules = legacy.LoadedDiceRules,
                         MapIds = legacy.Maps.OrderBy(m => m.ListOrder).Select(m => m.Id).ToList(),
                         SheetIds = legacy.Sheets.Select(s => s.Id).ToList(),
                     };
@@ -1925,6 +1929,7 @@ namespace KnockBox.DndMapper.Services.Library
                         InitiativeAttributeName = legacy.InitiativeAttributeName,
                         CustomTemplates = legacy.CustomTemplates,
                         GlobalRollTemplates = legacy.GlobalRollTemplates,
+                        LoadedDiceRules = legacy.LoadedDiceRules,
                         MapIds = legacy.Maps.OrderBy(m => m.ListOrder).Select(m => m.Id).ToList(),
                         SheetIds = legacy.Sheets.Select(s => s.Id).ToList(),
                     };
@@ -2437,6 +2442,7 @@ namespace KnockBox.DndMapper.Services.Library
             ImmutableDictionary<Guid, CharacterSheet>? sheets = null;
             ImmutableDictionary<Guid, NamedTemplate>? templates = null;
             ImmutableList<RollTemplate>? globalRolls = null;
+            ImmutableList<KnockBox.DndMapper.Services.State.Games.Data.LoadedDice.LoadedDiceRule>? loadedDiceRules = null;
             DndMapperSettings? settings = null;
             DndMapperSettings? settingsRef = null;
             AttributeSchema? schema = null;
@@ -2449,6 +2455,7 @@ namespace KnockBox.DndMapper.Services.Library
                 sheets = state.Sheets;
                 templates = state.CustomTemplates;
                 globalRolls = state.GlobalRollTemplates;
+                loadedDiceRules = state.LoadedDiceRules;
                 settingsRef = state.Settings;
                 settings = state.Settings with { };
                 schema = state.AttributeSchema;
@@ -2457,6 +2464,7 @@ namespace KnockBox.DndMapper.Services.Library
             });
             if (!read.IsSuccess || maps is null || sheets is null
                 || templates is null || globalRolls is null
+                || loadedDiceRules is null
                 || settings is null || schema is null) return null;
 
             // Capture references to the persisted fields exactly as the read
@@ -2465,7 +2473,7 @@ namespace KnockBox.DndMapper.Services.Library
             // changed (e.g. RollLog-only mutations from dice rolls).
             fingerprint = new PersistedFingerprint(
                 maps, sheets, templates, globalRolls, settingsRef, schema,
-                activeSchemaTemplateId, initiativeAttributeName);
+                activeSchemaTemplateId, initiativeAttributeName, loadedDiceRules);
 
             // Project DTOs off-lock. Each immutable collection is frozen
             // relative to this snapshot; engine mutations would create a
@@ -2523,6 +2531,7 @@ namespace KnockBox.DndMapper.Services.Library
                 GlobalRollTemplates = globalRolls
                     .Select(LibrarySnapshotMapper.ToRollTemplateSnapshot)
                     .ToList(),
+                LoadedDiceRules = loadedDiceRules.ToList(),
                 MapIds = orderedMapIds,
                 SheetIds = sheets.Keys.ToList(),
             };
@@ -2681,6 +2690,7 @@ namespace KnockBox.DndMapper.Services.Library
                 Sheets = sheets,
                 CustomTemplates = core.CustomTemplates,
                 GlobalRollTemplates = core.GlobalRollTemplates,
+                LoadedDiceRules = core.LoadedDiceRules,
             };
             return (snapshot, core, hashes);
         }

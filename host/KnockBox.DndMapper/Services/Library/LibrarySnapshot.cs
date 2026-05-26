@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using KnockBox.DndMapper.Models;
 using KnockBox.DndMapper.Services.State.Games.Data;
+using KnockBox.DndMapper.Services.State.Games.Data.LoadedDice;
 
 namespace KnockBox.DndMapper.Services.Library
 {
@@ -41,6 +42,11 @@ namespace KnockBox.DndMapper.Services.Library
         // Host-managed roll templates that ride with the save slot. Built-ins
         // are never serialized; sheet-scoped templates ride on SheetSnapshot.
         public List<RollTemplateSnapshot> GlobalRollTemplates { get; init; } = [];
+        // Host-authored loaded-dice rules. Polymorphic Condition/Modification
+        // subtypes round-trip via System.Text.Json's $kind discriminator.
+        // Older snapshots without this field deserialize to [] — no schema
+        // bump needed.
+        public List<LoadedDiceRule> LoadedDiceRules { get; init; } = [];
     }
 
     /// <summary>
@@ -60,6 +66,8 @@ namespace KnockBox.DndMapper.Services.Library
         public string? InitiativeAttributeName { get; init; }
         public List<NamedTemplateSnapshot> CustomTemplates { get; init; } = [];
         public List<RollTemplateSnapshot> GlobalRollTemplates { get; init; } = [];
+        // See LibrarySnapshot.LoadedDiceRules.
+        public List<LoadedDiceRule> LoadedDiceRules { get; init; } = [];
         // Ordered list of map ids. Mirrors Map.ListOrder so LoadSlotAsync can
         // fan out shard reads in display order without a second sort.
         public List<Guid> MapIds { get; init; } = [];
@@ -256,6 +264,7 @@ namespace KnockBox.DndMapper.Services.Library
                 Sheets = sheets,
                 CustomTemplates = core.CustomTemplates,
                 GlobalRollTemplates = core.GlobalRollTemplates,
+                LoadedDiceRules = core.LoadedDiceRules,
             };
         }
 
@@ -297,6 +306,7 @@ namespace KnockBox.DndMapper.Services.Library
                 GlobalRollTemplates = state.GlobalRollTemplates
                     .Select(ToRollTemplateSnapshot)
                     .ToList(),
+                LoadedDiceRules = state.LoadedDiceRules.ToList(),
                 MapIds = state.Maps
                     .OrderBy(m => m.ListOrder)
                     .Select(m => m.Id)
