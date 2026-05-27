@@ -16,10 +16,9 @@
             }
             else
             {
-                @foreach (var r in _snapshot)
-                {
+                <Virtualize Items="_snapshot" Context="r" ItemSize="72">
                     <RollLogEntry Roll="r" State="State" CurrentUserId="@CurrentUserId" IsHost="IsHost" />
-                }
+                </Virtualize>
             }
         </div>
         <footer class="dndm-rolllog-history-footer">
