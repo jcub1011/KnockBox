@@ -406,6 +406,15 @@
 
     public async ValueTask DisposeAsync()
     {
+        // Flush the last pending save before tearing down so a change made right before
+        // navigating away isn't lost. A dead circuit makes SetAsync throw
+        // JSDisconnectedException, which SaveSettingsAsync swallows, so this returns
+        // promptly rather than hanging.
+        if (_saveTask is not null)
+        {
+            try { await _saveTask; } catch { /* best-effort flush */ }
+        }
+
         _cts.Cancel();
         _cts.Dispose();
         try
@@ -467,13 +476,25 @@
         }
     }
 
-    private void PersistSettings() => _saveTask = SaveSettingsAsync(_cts.Token);
-
-    private async Task SaveSettingsAsync(CancellationToken ct)
+    // Snapshot the current settings and chain this save off the previous one. Chaining
+    // serializes the localStorage writes so rapid edits can't complete out of order and
+    // leave a stale snapshot as the last writer; the snapshot makes the final edit the
+    // final write.
+    private void PersistSettings()
     {
+        var snapshot = State.Settings;
+        _saveTask = SaveSettingsAsync(snapshot, _saveTask, _cts.Token);
+    }
+
+    private async Task SaveSettingsAsync(SpardleSettings settings, Task? prior, CancellationToken ct)
+    {
+        if (prior is not null)
+        {
+            try { await prior; } catch { /* prior failure already logged */ }
+        }
         try
         {
-            await LocalStorage.SetAsync("spardle", "settings", State.Settings, ct);
+            await LocalStorage.SetAsync("spardle", "settings", settings, ct);
         }
         catch (OperationCanceledException) { /* component disposed */ }
         catch (ObjectDisposedException) { /* circuit gone */ }

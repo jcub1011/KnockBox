@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using KnockBox.Spardle.Models;
 using KnockBox.WordService.Contracts;
 
@@ -14,8 +15,16 @@ namespace KnockBox.Spardle;
 /// </summary>
 public sealed record SpardleSettings
 {
+    // Persist enums by name, not the Web-default numeric ordinal, so reordering or
+    // inserting an enum member can't silently remap a host's saved settings. Scoped to
+    // this record — the shared WordPoolMode contract enum is unchanged.
+    [JsonConverter(typeof(JsonStringEnumConverter))]
     public WordPoolMode WordPoolMode { get; init; } = WordPoolMode.NytStandard;
+
+    [JsonConverter(typeof(JsonStringEnumConverter))]
     public WordOrderMode WordOrderMode { get; init; } = WordOrderMode.RandomNoRepeats;
+
+    [JsonConverter(typeof(JsonStringEnumConverter))]
     public WinConditionMode WinCondition { get; init; } = WinConditionMode.Sprinter;
 
     /// <summary>
