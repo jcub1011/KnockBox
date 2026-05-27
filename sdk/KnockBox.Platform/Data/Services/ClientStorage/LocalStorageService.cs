@@ -1,4 +1,4 @@
-using KnockBox.Platform.ClientStorage;
+using KnockBox.Core.Services.Storage.ClientStorage;
 using Microsoft.JSInterop;
 
 namespace KnockBox.Data.Services.ClientStorage

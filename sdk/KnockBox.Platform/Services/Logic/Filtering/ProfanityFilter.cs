@@ -1,6 +1,6 @@
 namespace KnockBox.Services.Logic.Filtering
 {
-    using KnockBox.Platform.Filtering;
+    using KnockBox.Core.Services.Logic.Filtering;
 
     internal sealed class ProfanityFilter : IProfanityFilter
     {
