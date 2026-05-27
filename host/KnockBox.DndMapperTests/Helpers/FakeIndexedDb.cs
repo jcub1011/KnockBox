@@ -25,6 +25,11 @@ namespace KnockBox.DndMapperTests.Helpers
         public int OpenCallCount { get; private set; }
         public int DeleteDatabaseCallCount { get; private set; }
 
+        // Counts how many times BlobGetSingleAsync was invoked. Used by export
+        // tests to assert the server-side path never reads image blobs (the
+        // JS-side packer fetches them directly from IndexedDB instead).
+        public int BlobReadCalls { get; internal set; }
+
         public ValueTask<ValueResult<IIndexedDatabase, IndexedDbError>> OpenAsync(
             IndexedDbSchema schema,
             CancellationToken ct = default)
@@ -168,6 +173,7 @@ namespace KnockBox.DndMapperTests.Helpers
 
         public ValueTask<ValueResult<IndexedDbBlob?, IndexedDbError>> BlobGetSingleAsync(string storeName, IndexedDbKey key, CancellationToken ct = default)
         {
+            _service.BlobReadCalls++;
             var k = KeyString(key);
             if (_service.BlobStores.TryGetValue(storeName, out var store) && store.TryGetValue(k, out var blob))
                 return ValueTask.FromResult(ValueResult<IndexedDbBlob?, IndexedDbError>.FromValue(blob));

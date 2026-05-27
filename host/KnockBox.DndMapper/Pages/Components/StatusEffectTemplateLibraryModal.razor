@@ -23,7 +23,7 @@
 
             @{
                 var activeSchema = State.GetActiveSchemaTemplate();
-                var templates = activeSchema?.StatusEffectTemplates ?? ImmutableList<StatusEffectTemplate>.Empty;
+                var templates = activeSchema?.StatusEffectTemplates ?? ImmutableArray<StatusEffectTemplate>.Empty;
             }
 
             @if (activeSchema is null)
@@ -42,7 +42,7 @@
             }
 
             <div class="dndm-effect-library-list">
-                @if (templates.Count == 0)
+                @if (templates.Length == 0)
                 {
                     <div class="dndm-panel-empty">@(activeSchema is null ? "No active schema." : "No templates yet. Forge one below.")</div>
                 }

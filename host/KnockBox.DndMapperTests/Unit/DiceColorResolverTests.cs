@@ -25,14 +25,14 @@ namespace KnockBox.DndMapperTests.Unit
             var map = new Map
             {
                 Id = Guid.NewGuid(),
-                Tokens = ImmutableList.Create(new Token
+                Tokens = ImmutableArray.Create(new Token
                 {
                     Id = Guid.NewGuid(),
                     OwnerUserId = player.Id,
                     Color = "#abcdef",
                 }),
             };
-            state.Maps = ImmutableList.Create(map);
+            state.Maps = ImmutableArray.Create(map);
 
             Assert.AreEqual("#abcdef", DiceColorResolver.Resolve(state, player.Id));
         }
@@ -67,14 +67,14 @@ namespace KnockBox.DndMapperTests.Unit
             var map = new Map
             {
                 Id = Guid.NewGuid(),
-                Tokens = ImmutableList.Create(new Token
+                Tokens = ImmutableArray.Create(new Token
                 {
                     Id = Guid.NewGuid(),
                     OwnerUserId = player.Id,
                     Color = "",
                 }),
             };
-            state.Maps = ImmutableList.Create(map);
+            state.Maps = ImmutableArray.Create(map);
 
             var resolved = DiceColorResolver.Resolve(state, player.Id);
             StringAssert.Matches(resolved, new System.Text.RegularExpressions.Regex("^#[0-9a-f]{6}$"));
@@ -95,14 +95,14 @@ namespace KnockBox.DndMapperTests.Unit
             var map = new Map
             {
                 Id = Guid.NewGuid(),
-                Tokens = ImmutableList.Create(new Token
+                Tokens = ImmutableArray.Create(new Token
                 {
                     Id = Guid.NewGuid(),
                     OwnerUserId = player.Id,
                     Color = badColor,
                 }),
             };
-            state.Maps = ImmutableList.Create(map);
+            state.Maps = ImmutableArray.Create(map);
 
             var resolved = DiceColorResolver.Resolve(state, player.Id);
             Assert.AreNotEqual(badColor, resolved);
@@ -123,16 +123,127 @@ namespace KnockBox.DndMapperTests.Unit
             var map = new Map
             {
                 Id = Guid.NewGuid(),
-                Tokens = ImmutableList.Create(new Token
+                Tokens = ImmutableArray.Create(new Token
                 {
                     Id = Guid.NewGuid(),
                     OwnerUserId = player.Id,
                     Color = goodColor,
                 }),
             };
-            state.Maps = ImmutableList.Create(map);
+            state.Maps = ImmutableArray.Create(map);
 
             Assert.AreEqual(goodColor, DiceColorResolver.Resolve(state, player.Id));
+        }
+
+        // ── ResolveForToken ─────────────────────────────────────────────
+
+        [TestMethod]
+        public void ResolveForToken_LinkedSheetWithColor_ReturnsSheetColor()
+        {
+            var (_, state, _, _) = EngineTestFactory.Build();
+            var sheetId = Guid.NewGuid();
+            var tokenId = Guid.NewGuid();
+
+            state.Sheets = state.Sheets.SetItem(sheetId, new CharacterSheet
+            {
+                Id = sheetId,
+                CharacterName = "Sheet color wins",
+                Color = "#abcdef",
+            });
+            state.Maps = ImmutableArray.Create(new Map
+            {
+                Id = Guid.NewGuid(),
+                Tokens = ImmutableArray.Create(new Token
+                {
+                    Id = tokenId,
+                    SheetId = sheetId,
+                    Color = "#111111", // token's own color shouldn't win
+                }),
+            });
+
+            Assert.AreEqual("#abcdef", DiceColorResolver.ResolveForToken(state, tokenId));
+        }
+
+        [TestMethod]
+        public void ResolveForToken_LinkedSheetWithoutColor_FallsBackToTokenColor()
+        {
+            var (_, state, _, _) = EngineTestFactory.Build();
+            var sheetId = Guid.NewGuid();
+            var tokenId = Guid.NewGuid();
+
+            state.Sheets = state.Sheets.SetItem(sheetId, new CharacterSheet
+            {
+                Id = sheetId,
+                CharacterName = "Legacy sheet",
+                Color = "", // empty = "fall back to token color"
+            });
+            state.Maps = ImmutableArray.Create(new Map
+            {
+                Id = Guid.NewGuid(),
+                Tokens = ImmutableArray.Create(new Token
+                {
+                    Id = tokenId,
+                    SheetId = sheetId,
+                    Color = "#abcdef",
+                }),
+            });
+
+            Assert.AreEqual("#abcdef", DiceColorResolver.ResolveForToken(state, tokenId));
+        }
+
+        [TestMethod]
+        public void ResolveForToken_NoLinkedSheet_FallsBackToTokenColor()
+        {
+            var (_, state, _, _) = EngineTestFactory.Build();
+            var tokenId = Guid.NewGuid();
+
+            state.Maps = ImmutableArray.Create(new Map
+            {
+                Id = Guid.NewGuid(),
+                Tokens = ImmutableArray.Create(new Token
+                {
+                    Id = tokenId,
+                    SheetId = null,
+                    Color = "#abcdef",
+                }),
+            });
+
+            Assert.AreEqual("#abcdef", DiceColorResolver.ResolveForToken(state, tokenId));
+        }
+
+        [TestMethod]
+        public void ResolveForToken_TokenWithEmptyColor_FallsBackToDeterministicHash()
+        {
+            var (_, state, _, _) = EngineTestFactory.Build();
+            var tokenId = Guid.NewGuid();
+
+            state.Maps = ImmutableArray.Create(new Map
+            {
+                Id = Guid.NewGuid(),
+                Tokens = ImmutableArray.Create(new Token
+                {
+                    Id = tokenId,
+                    Color = "",
+                }),
+            });
+
+            var first = DiceColorResolver.ResolveForToken(state, tokenId);
+            var second = DiceColorResolver.ResolveForToken(state, tokenId);
+            Assert.AreEqual(first, second);
+            StringAssert.Matches(first, new System.Text.RegularExpressions.Regex("^#[0-9a-f]{6}$"));
+        }
+
+        [TestMethod]
+        public void ResolveForToken_UnknownTokenId_FallsBackToDeterministicHashOnId()
+        {
+            var (_, state, _, _) = EngineTestFactory.Build();
+            var unknown = Guid.NewGuid();
+
+            // No maps, no tokens — must still produce a stable color from the id.
+            var first = DiceColorResolver.ResolveForToken(state, unknown);
+            var second = DiceColorResolver.ResolveForToken(state, unknown);
+            Assert.AreEqual(first, second);
+            StringAssert.Matches(first, new System.Text.RegularExpressions.Regex("^#[0-9a-f]{6}$"));
         }
     }
 }

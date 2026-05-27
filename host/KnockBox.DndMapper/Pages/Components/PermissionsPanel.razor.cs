@@ -42,6 +42,15 @@ namespace KnockBox.DndMapper.Pages.Components
         private Task SetPlayersCanSeeOtherSheets(bool v)
             => Apply(State.Settings with { PlayersCanSeeOtherSheets = v });
 
+        private Task SetLoadedDiceEnabled(bool v)
+            => Apply(State.Settings with { LoadedDiceEnabled = v });
+
+        private Task SetLoadedDiceVisibility(LoadedDiceRuleVisibility v)
+            => Apply(State.Settings with { LoadedDiceRuleVisibility = v });
+
+        private Task SetLoadedDicePlayerIndicator(LoadedDicePlayerIndicator v)
+            => Apply(State.Settings with { LoadedDicePlayerIndicator = v });
+
         private async Task Apply(Services.State.Games.Data.DndMapperSettings next)
         {
             if (UserService.CurrentUser is null) return;

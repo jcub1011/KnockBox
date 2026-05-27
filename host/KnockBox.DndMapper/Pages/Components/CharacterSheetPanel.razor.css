@@ -41,8 +41,10 @@
 .dndm-sheet-tabs--dropdown .dndm-select { flex: 1 1 auto; }
 
 .dndm-sheet-tab {
-    flex: 0 0 auto;
-    white-space: nowrap;
+    max-width: 125px;
+    min-width: 50px;
+    text-overflow: ellipsis;
+    overflow: hidden;
     background: transparent;
     color: var(--dndm-text-dim);
     border: 1px solid transparent;
@@ -214,6 +216,90 @@
 .dndm-sheet-hp-effective.is-neg { color: var(--dndm-danger, #d57878); }
 .dndm-sheet-hp-effective.is-pos { color: #6ed27e; }
 
+.dndm-sheet-ac {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    margin-top: 0.3rem;
+}
+
+.dndm-sheet-meta-row {
+    display: flex;
+    align-items: flex-end;
+    gap: 0.75rem;
+    margin: 0 0 0.65rem;
+}
+
+.dndm-sheet-meta-color,
+.dndm-sheet-meta-scope {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.dndm-sheet-meta-color .dndm-color {
+    width: 2.4rem;
+    height: 1.8rem;
+    padding: 0;
+    border: 1px solid var(--dndm-border);
+    background: var(--dndm-bg-deep);
+    cursor: pointer;
+}
+
+.dndm-sheet-meta-scope { flex: 1 1 auto; min-width: 0; }
+.dndm-sheet-meta-scope .dndm-select { width: 100%; }
+
+.dndm-sheet-tokenlist {
+    list-style: none;
+    margin: 0 0 0.35rem;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.dndm-sheet-tokenlist-row {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-size: 0.9rem;
+}
+
+.dndm-sheet-tokenlist-swatch {
+    width: 0.9rem;
+    height: 0.9rem;
+    border-radius: 50%;
+    border: 1px solid var(--dndm-border-accent);
+    flex: 0 0 auto;
+}
+
+.dndm-sheet-tokenlist-name {
+    color: var(--dndm-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dndm-sheet-tokenlist-map {
+    color: var(--dndm-text-muted);
+    font-size: 0.82rem;
+    margin-left: auto;
+}
+
+.dndm-sheet-empty-hint {
+    color: var(--dndm-text-muted);
+    font-size: 0.85rem;
+    margin: 0.1rem 0 0.35rem;
+}
+
+/* Make the notes textarea visibly resizable. The base style in panels.css
+   already sets resize:vertical, but the notes area gets a more generous
+   default min-height so the drag handle is comfortably reachable. */
+.dndm-textarea--notes {
+    resize: vertical;
+    min-height: 120px;
+}
+
 /* The legacy `.dndm-modal` chrome below predates the shared
    `.dndm-modal-card` (panels.css) and is rendered by sub-dialogs that still
    use the older class names. Mirroring the parchment treatment keeps them
@@ -277,4 +363,129 @@
     display: flex;
     justify-content: flex-end;
     gap: 0.5rem;
+}
+
+/* ─── Markdown-rendered notes ─────────────────────────────────────
+   Compact typography for the sidebar. ::deep pierces scope so the
+   server-rendered HTML coming from Markdig picks up these rules. */
+.dndm-notes-rendered {
+    min-height: 3.5rem;
+    padding: 0.4rem 0.55rem;
+    background: var(--dndm-bg-deep);
+    border: 1px solid var(--dndm-border);
+    border-radius: 3px;
+    color: var(--dndm-text);
+    font-family: var(--font-primary);
+    font-size: 0.95rem;
+    line-height: 1.4;
+    word-break: break-word;
+}
+
+.dndm-notes-rendered--editable {
+    cursor: text;
+}
+
+.dndm-notes-rendered--editable:hover {
+    border-color: var(--dndm-border-accent);
+}
+
+.dndm-notes-empty {
+    color: var(--dndm-text-muted);
+    font-style: italic;
+}
+
+.dndm-notes-rendered ::deep p {
+    margin: 0 0 0.5rem 0;
+}
+
+.dndm-notes-rendered ::deep p:last-child {
+    margin-bottom: 0;
+}
+
+.dndm-notes-rendered ::deep h1,
+.dndm-notes-rendered ::deep h2,
+.dndm-notes-rendered ::deep h3,
+.dndm-notes-rendered ::deep h4 {
+    margin: 0.5rem 0 0.25rem 0;
+    color: var(--dndm-ember);
+    font-family: var(--dndm-display);
+    font-weight: 600;
+    line-height: 1.2;
+}
+
+.dndm-notes-rendered ::deep h1 { font-size: 1.2rem; }
+.dndm-notes-rendered ::deep h2 { font-size: 1.1rem; }
+.dndm-notes-rendered ::deep h3,
+.dndm-notes-rendered ::deep h4 { font-size: 1rem; }
+
+.dndm-notes-rendered ::deep ul,
+.dndm-notes-rendered ::deep ol {
+    margin: 0 0 0.5rem 0;
+    padding-left: 1.25rem;
+}
+
+.dndm-notes-rendered ::deep li {
+    margin: 0.1rem 0;
+}
+
+.dndm-notes-rendered ::deep code {
+    background: var(--dndm-bg-panel-2);
+    border: 1px solid var(--dndm-border);
+    border-radius: 2px;
+    padding: 0 0.25rem;
+    font-size: 0.88rem;
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+}
+
+.dndm-notes-rendered ::deep pre {
+    margin: 0 0 0.5rem 0;
+    padding: 0.4rem 0.55rem;
+    background: var(--dndm-bg-panel-2);
+    border: 1px solid var(--dndm-border);
+    border-radius: 2px;
+    overflow-x: auto;
+    font-size: 0.88rem;
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+}
+
+.dndm-notes-rendered ::deep pre code {
+    background: none;
+    border: none;
+    padding: 0;
+}
+
+.dndm-notes-rendered ::deep blockquote {
+    margin: 0 0 0.5rem 0;
+    padding: 0.15rem 0.6rem;
+    border-left: 3px solid var(--dndm-ember);
+    color: var(--dndm-text-dim);
+    background: rgba(196, 116, 56, 0.06);
+}
+
+.dndm-notes-rendered ::deep a {
+    color: var(--dndm-ember-hi);
+    text-decoration: underline;
+}
+
+.dndm-notes-rendered ::deep hr {
+    border: 0;
+    border-top: 1px solid var(--dndm-border);
+    margin: 0.5rem 0;
+}
+
+.dndm-notes-rendered ::deep table {
+    border-collapse: collapse;
+    margin: 0 0 0.5rem 0;
+}
+
+.dndm-notes-rendered ::deep th,
+.dndm-notes-rendered ::deep td {
+    padding: 0.2rem 0.5rem;
+    border: 1px solid var(--dndm-border);
+}
+
+.dndm-sheet-header-actions {
+    gap: 0.35rem;
+    display: flex;
+    flex-direction: row;
 }

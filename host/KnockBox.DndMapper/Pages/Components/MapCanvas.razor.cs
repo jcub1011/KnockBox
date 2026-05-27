@@ -26,6 +26,13 @@ namespace KnockBox.DndMapper.Pages.Components
         [Parameter] public Guid? SelectedImageId { get; set; }
         [Parameter] public EventCallback<Guid?> SelectedImageIdChanged { get; set; }
 
+        /// <summary>
+        /// Forwarded from <see cref="TokenLayer"/>. The playing-phase page wires
+        /// this to its right-rail character-sheet panel so dblclick-on-token
+        /// activates the token's linked sheet.
+        /// </summary>
+        [Parameter] public EventCallback<Guid> OnTokenDoubleClick { get; set; }
+
         [Inject] protected DndMapperGameEngine Engine { get; set; } = default!;
         [Inject] protected IUserService UserService { get; set; } = default!;
         [Inject] protected IJSRuntime JSRuntime { get; set; } = default!;

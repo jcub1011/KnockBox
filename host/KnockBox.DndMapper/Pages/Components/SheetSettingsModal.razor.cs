@@ -67,7 +67,7 @@ namespace KnockBox.DndMapper.Pages.Components
         private bool IsActiveTemplate(NamedTemplate template)
         {
             var liveRows = State.AttributeSchema.Rows;
-            if (liveRows.Count != template.Rows.Count) return false;
+            if (liveRows.Count != template.Rows.Length) return false;
             for (int i = 0; i < liveRows.Count; i++)
             {
                 var a = liveRows[i];

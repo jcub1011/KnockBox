@@ -54,7 +54,7 @@ namespace KnockBox.DndMapper.Pages.Components
         private async Task OnNewMap()
         {
             if (UserService.CurrentUser is null) return;
-            var name = $"Map {State.Maps.Count + 1}";
+            var name = $"Map {State.Maps.Length + 1}";
             var result = Engine.CreateMapAsync(State, UserService.CurrentUser, name);
             if (result.TryGetSuccess(out var newId))
             {

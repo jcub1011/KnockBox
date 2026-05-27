@@ -142,7 +142,7 @@
               width="@Map.Grid.WidthCells" height="@Map.Grid.HeightCells"
               fill="transparent" pointer-events="none" />
 
-        @if (Map.Images.Count > 0)
+        @if (Map.Images.Length > 0)
         {
             @if (IsHost)
             {
@@ -293,7 +293,8 @@
                     IsHost="IsHost"
                     CurrentUserId="@CurrentUserId"
                     SvgId="@_svgId"
-                    InteractionsDisabled="@IsCanvasToolActive" />
+                    InteractionsDisabled="@IsCanvasToolActive"
+                    OnTokenDoubleClick="OnTokenDoubleClick" />
 
         @if (IsHost && SelectedImage is { Locked: false, Hidden: false } sel)
         {
@@ -302,18 +303,23 @@
             var sw = sel.Width;
             var sh = sel.Height;
             var sr = sel.Rotation;
-            var hSize = 0.25; // cells (size of handle at zoom=1; --dndm-inv-zoom cancels the wrapper scale)
+            var hSize = 0.25; // cells (size of handle at zoom=1; inverse-scaled below to cancel the wrapper scale)
             var hHalf = hSize / 2;
             var rotCx = sx + sw / 2;
             var rotCy = sy - 0.6;
+            // Inverse of the current zoom written as a literal value. SVG's
+            // `transform` attribute does NOT parse `var(--dndm-inv-zoom)` —
+            // unlike the CSS `transform` property — so we substitute the
+            // literal here. Without this, the handles either disappear or
+            // render at wildly wrong sizes at any zoom level other than 1.0,
+            // which is the regression the user reported (4 corner handles
+            // missing, rotate handle appearing offset).
+            var inv = _zoom > 0 ? 1.0 / _zoom : 1.0;
             // dndMapperImageDrag owns handle pointerdown — see the [data-image-handle]
             // attributes below. The JS module re-paints each handle's transform per
-            // frame during a resize/rotate and only invokes .NET on mouseup.
-            // Each handle is a <g> that translates to its anchor and then inverse-
-            // scales by --dndm-inv-zoom (set by dndMapperViewport.js to 1/zoom). The
-            // wrapper's transform: scale(zoom) and this inner scale(1/zoom) cancel,
-            // so handle artwork renders at a constant on-screen pixel size at every
-            // zoom level — important when resizing very large images at low zoom.
+            // frame during a resize/rotate and only invokes .NET on mouseup. It reads
+            // --dndm-inv-zoom from the wrapper at paint time to substitute the literal
+            // for the same reason.
             // @@onmousedown stopPropagation (with a no-op handler so Blazor binds the
             // modifier) blocks the SVG's @@onmousedown from also firing when a handle
             // is grabbed — otherwise focus-box / fog-paint modes would steal the click.
@@ -324,25 +330,25 @@
                    data-image-id="@sel.Id"
                    transform="@($"rotate({F(sr)} {F(sx + sw / 2)} {F(sy + sh / 2)})")">
                     <g data-image-id="@sel.Id" data-image-handle="nw" data-handle-role="nw"
-                       transform="@($"translate({F(sx)} {F(sy)}) scale(var(--dndm-inv-zoom, 1))")"
+                       transform="@($"translate({F(sx)} {F(sy)}) scale({F(inv)})")"
                        @onmousedown="OnHandleMouseDown" @onmousedown:stopPropagation="true">
                         <rect x="@F(-hHalf)" y="@F(-hHalf)" width="@F(hSize)" height="@F(hSize)"
                               class="dndm-image-handle" />
                     </g>
                     <g data-image-id="@sel.Id" data-image-handle="ne" data-handle-role="ne"
-                       transform="@($"translate({F(sx + sw)} {F(sy)}) scale(var(--dndm-inv-zoom, 1))")"
+                       transform="@($"translate({F(sx + sw)} {F(sy)}) scale({F(inv)})")"
                        @onmousedown="OnHandleMouseDown" @onmousedown:stopPropagation="true">
                         <rect x="@F(-hHalf)" y="@F(-hHalf)" width="@F(hSize)" height="@F(hSize)"
                               class="dndm-image-handle" />
                     </g>
                     <g data-image-id="@sel.Id" data-image-handle="sw" data-handle-role="sw"
-                       transform="@($"translate({F(sx)} {F(sy + sh)}) scale(var(--dndm-inv-zoom, 1))")"
+                       transform="@($"translate({F(sx)} {F(sy + sh)}) scale({F(inv)})")"
                        @onmousedown="OnHandleMouseDown" @onmousedown:stopPropagation="true">
                         <rect x="@F(-hHalf)" y="@F(-hHalf)" width="@F(hSize)" height="@F(hSize)"
                               class="dndm-image-handle" />
                     </g>
                     <g data-image-id="@sel.Id" data-image-handle="se" data-handle-role="se"
-                       transform="@($"translate({F(sx + sw)} {F(sy + sh)}) scale(var(--dndm-inv-zoom, 1))")"
+                       transform="@($"translate({F(sx + sw)} {F(sy + sh)}) scale({F(inv)})")"
                        @onmousedown="OnHandleMouseDown" @onmousedown:stopPropagation="true">
                         <rect x="@F(-hHalf)" y="@F(-hHalf)" width="@F(hSize)" height="@F(hSize)"
                               class="dndm-image-handle" />
@@ -353,7 +359,7 @@
                           class="dndm-image-rotline"
                           pointer-events="none" />
                     <g data-image-id="@sel.Id" data-image-handle="rot" data-handle-role="rotcircle"
-                       transform="@($"translate({F(rotCx)} {F(rotCy)}) scale(var(--dndm-inv-zoom, 1))")"
+                       transform="@($"translate({F(rotCx)} {F(rotCy)}) scale({F(inv)})")"
                        @onmousedown="OnHandleMouseDown" @onmousedown:stopPropagation="true">
                         <circle r="@F(hSize / 1.5)" class="dndm-image-handle dndm-image-handle--rot" />
                     </g>

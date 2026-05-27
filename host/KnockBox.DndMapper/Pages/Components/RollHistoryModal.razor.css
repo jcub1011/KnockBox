@@ -1,0 +1,41 @@
+/* History modal: a wider card with its own scroll region for the entry list. */
+.dndm-rolllog-history {
+    width: min(640px, calc(100vw - 2rem));
+}
+
+.dndm-rolllog-history-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+}
+
+.dndm-rolllog-history-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    padding-right: 0.25rem;
+}
+
+/* Entries are rendered through <Virtualize>, which sizes its scroll spacers
+   from a fixed ItemSize and does NOT measure rendered items. A flex `gap`
+   would add spacing the spacer math can't see and drift the scrollbar, so
+   inter-entry spacing lives on the entry margin instead and is folded into
+   the ItemSize estimate. */
+.dndm-rolllog-history-body ::deep .dndm-rolllog-entry {
+    margin-bottom: 0.4rem;
+}
+
+.dndm-rolllog-history-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem;
+    margin-top: 0.75rem;
+}
+
+.dndm-rolllog-history-hint {
+    color: var(--dndm-text-muted);
+    font-size: 0.95rem;
+    font-style: italic;
+}

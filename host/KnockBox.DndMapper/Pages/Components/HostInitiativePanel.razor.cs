@@ -1,7 +1,9 @@
 using System.Globalization;
 using KnockBox.Core.Components.Shared;
 using KnockBox.Core.Services.State.Users;
+using KnockBox.DndMapper.Helpers;
 using KnockBox.DndMapper.Models;
+using KnockBox.DndMapper.Services.Logic;
 using KnockBox.DndMapper.Services.Logic.Games;
 using KnockBox.DndMapper.Services.State.Games;
 using KnockBox.DndMapper.Services.State.Games.Data;
@@ -16,8 +18,10 @@ namespace KnockBox.DndMapper.Pages.Components
 
         [Inject] protected DndMapperGameEngine Engine { get; set; } = default!;
         [Inject] protected IUserService UserService { get; set; } = default!;
+        [Inject] protected IDiceAnimationTracker Tracker { get; set; } = default!;
 
         private IDisposable? _stateSub;
+        private Action? _trackerSub;
 
         private bool _npcPickerOpen;
         private readonly HashSet<Guid> _picked = new();
@@ -32,14 +36,29 @@ namespace KnockBox.DndMapper.Pages.Components
         protected override void OnInitialized()
         {
             _stateSub = State.StateChangedEventManager.Subscribe(async () => await InvokeAsync(StateHasChanged));
+            // Tracker flips when DiceCanvas marks/settles a roll. Re-render so
+            // the gated initiative cell reveals once the 3D dice land.
+            _trackerSub = () => _ = InvokeAsync(StateHasChanged);
+            Tracker.Changed += _trackerSub;
             base.OnInitialized();
         }
 
         public override void Dispose()
         {
             _stateSub?.Dispose();
+            if (_trackerSub is not null) Tracker.Changed -= _trackerSub;
             base.Dispose();
         }
+
+        // True whenever the value should stay hidden behind a placeholder:
+        // (a) DiceCanvas still has a roll animating for this token, or
+        // (b) the host typed a value via SetNpc but the engine hasn't fired
+        // the dice yet (PendingInitiative is staged, waiting for every NPC
+        // to be set or for "Roll All Unset NPCs" to flush the batch).
+        // Either way the panel renders "—" so the result isn't spoiled.
+        private bool IsInitiativeAnimating(CombatantEntry entry) =>
+            entry.PendingInitiative is not null
+            || InitiativeAnimationGate.IsAnimatingFor(State.RollLog, Tracker, entry);
 
         private void OpenNpcPicker()
         {

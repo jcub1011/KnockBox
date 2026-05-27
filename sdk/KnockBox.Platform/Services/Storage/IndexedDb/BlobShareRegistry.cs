@@ -17,10 +17,33 @@ internal sealed class BlobShareEntry
     public required string ContentType { get; init; }
     public required long Length { get; init; }
     public required Func<CancellationToken, ValueTask<Stream>> StreamOpener { get; init; }
+    /// <summary>
+    /// Opaque identifier for the originating Blazor circuit (sourced from
+    /// <c>IndexedDbInterop.ScopeId</c>). BlobShareEndpoint uses it to gate
+    /// concurrent <see cref="IJSStreamReference"/> opens per circuit so
+    /// the display view's parallel SVG image fetches don't fan out N
+    /// simultaneous JS data streams against one circuit and starve
+    /// Blazor's pipe past its internal timeout.
+    /// </summary>
+    public required Guid CircuitScopeId { get; init; }
     public string? CacheControl { get; init; }
     public DateTimeOffset? AbsoluteExpiresAt { get; init; }
     public TimeSpan? SlidingExpiry { get; init; }
     public DateTimeOffset LastAccessedUtc { get; set; } = DateTimeOffset.UtcNow;
+}
+
+/// <summary>
+/// Per-circuit-scope gate used by <see cref="BlobShareEndpoint"/> to
+/// serialize concurrent stream opens against one originating circuit.
+/// Refcounted by the number of <see cref="BlobShareEntry"/> instances
+/// currently registered under the same <see cref="BlobShareEntry.CircuitScopeId"/>
+/// — the registry disposes the semaphore when the last entry for that
+/// scope is removed.
+/// </summary>
+internal sealed class BlobShareScopeGate
+{
+    public SemaphoreSlim Semaphore { get; } = new(initialCount: 1, maxCount: 1);
+    public int RefCount;
 }
 
 /// <summary>
@@ -41,6 +64,19 @@ public sealed class BlobShareRegistry : IDisposable
     // cached payload too so a stale capability URL doesn't keep serving
     // bytes after its token is gone.
     private readonly BlobShareByteCache? _byteCache;
+    // Per-circuit-scope gate (refcounted by registered entries). The
+    // endpoint acquires this gate before opening an IJSStreamReference
+    // so we never hold more than one concurrent JS data stream against
+    // the same originating circuit. Mutating Register/Remove is rare
+    // (only on share lifecycle), so we use a small lock to keep refcount
+    // and dictionary slot in sync.
+    private readonly ConcurrentDictionary<Guid, BlobShareScopeGate> _scopeGates = new();
+    private readonly object _scopeGateSync = new();
+    // Per-token single-flight: concurrent cache-miss requests for the
+    // same token coalesce onto one underlying stream-and-store task.
+    // The first thread inserts; followers await the same Task and serve
+    // from the materialized byte buffer the factory returns.
+    private readonly ConcurrentDictionary<Guid, Task<byte[]?>> _inflight = new();
     private bool _disposed;
 
     public BlobShareRegistry(ILogger<BlobShareRegistry> logger)
@@ -59,6 +95,51 @@ public sealed class BlobShareRegistry : IDisposable
     internal void Register(BlobShareEntry entry)
     {
         _entries[entry.Token] = entry;
+        lock (_scopeGateSync)
+        {
+            if (!_scopeGates.TryGetValue(entry.CircuitScopeId, out var gate))
+            {
+                gate = new BlobShareScopeGate();
+                _scopeGates[entry.CircuitScopeId] = gate;
+            }
+            gate.RefCount++;
+        }
+    }
+
+    /// <summary>
+    /// Returns the per-scope semaphore for the originating circuit. The
+    /// endpoint MUST hold this while opening the JS stream and copying
+    /// bytes, so only one stream is in flight per circuit at a time.
+    /// Returns <see langword="null"/> only if the scope is unknown (entry
+    /// was already evicted) — caller should treat that as "share gone".
+    /// </summary>
+    internal SemaphoreSlim? TryGetScopeGate(Guid scopeId)
+    {
+        return _scopeGates.TryGetValue(scopeId, out var gate) ? gate.Semaphore : null;
+    }
+
+    /// <summary>
+    /// Single-flight coordinator for a token's stream-and-store. The
+    /// first call inserts the task into the in-flight table; concurrent
+    /// callers receive the same Task. The entry is removed after the
+    /// task settles so a future fetch (post-cache-eviction) can mint a
+    /// fresh stream.
+    /// </summary>
+    internal Task<byte[]?> RunSingleFlight(Guid token, Func<Task<byte[]?>> factory)
+    {
+        return _inflight.GetOrAdd(token, _ => RunAndCleanup(token, factory));
+    }
+
+    private async Task<byte[]?> RunAndCleanup(Guid token, Func<Task<byte[]?>> factory)
+    {
+        try
+        {
+            return await factory().ConfigureAwait(false);
+        }
+        finally
+        {
+            _inflight.TryRemove(token, out _);
+        }
     }
 
     internal BlobShareEntry? TryGetAndTouch(Guid token)
@@ -67,12 +148,20 @@ public sealed class BlobShareRegistry : IDisposable
         var now = DateTimeOffset.UtcNow;
         if (entry.AbsoluteExpiresAt is { } abs && now >= abs)
         {
-            if (_entries.TryRemove(token, out _)) _byteCache?.Remove(token);
+            if (_entries.TryRemove(token, out _))
+            {
+                _byteCache?.Remove(token);
+                ReleaseScopeRef(entry.CircuitScopeId);
+            }
             return null;
         }
         if (entry.SlidingExpiry is { } sliding && now - entry.LastAccessedUtc > sliding)
         {
-            if (_entries.TryRemove(token, out _)) _byteCache?.Remove(token);
+            if (_entries.TryRemove(token, out _))
+            {
+                _byteCache?.Remove(token);
+                ReleaseScopeRef(entry.CircuitScopeId);
+            }
             return null;
         }
         entry.LastAccessedUtc = now;
@@ -81,7 +170,20 @@ public sealed class BlobShareRegistry : IDisposable
 
     internal void Remove(Guid token)
     {
-        if (_entries.TryRemove(token, out _)) _byteCache?.Remove(token);
+        if (!_entries.TryRemove(token, out var entry)) return;
+        _byteCache?.Remove(token);
+        ReleaseScopeRef(entry.CircuitScopeId);
+    }
+
+    private void ReleaseScopeRef(Guid scopeId)
+    {
+        lock (_scopeGateSync)
+        {
+            if (!_scopeGates.TryGetValue(scopeId, out var gate)) return;
+            if (--gate.RefCount > 0) return;
+            _scopeGates.TryRemove(scopeId, out _);
+            gate.Semaphore.Dispose();
+        }
     }
 
     private void Sweep()
@@ -98,6 +200,7 @@ public sealed class BlobShareRegistry : IDisposable
             if (expired && _entries.TryRemove(kv.Key, out _))
             {
                 _byteCache?.Remove(kv.Key);
+                ReleaseScopeRef(entry.CircuitScopeId);
                 removed++;
             }
         }
@@ -107,11 +210,24 @@ public sealed class BlobShareRegistry : IDisposable
         }
     }
 
+    // Test hook: runs the periodic sweep synchronously so unit tests can
+    // exercise the expiry path without waiting for the 1-minute Timer.
+    // Production code MUST NOT call this — the Timer drives it.
+    internal void SweepForTesting() => Sweep();
+
     public void Dispose()
     {
         if (_disposed) return;
         _disposed = true;
         _sweepTimer.Dispose();
         _entries.Clear();
+        lock (_scopeGateSync)
+        {
+            foreach (var gate in _scopeGates.Values)
+            {
+                gate.Semaphore.Dispose();
+            }
+            _scopeGates.Clear();
+        }
     }
 }

@@ -11,9 +11,7 @@
         {
             @if (UserService.CurrentUser?.Id == State.Host.Id)
             {
-                <div class="card">
-                    <PermissionsPanel State="@State" Embedded="true" />
-                </div>
+                <PermissionsPanel State="@State" Embedded="true" />
             }
 
             <div class="card">

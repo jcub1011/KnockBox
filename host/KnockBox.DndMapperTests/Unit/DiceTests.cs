@@ -257,5 +257,59 @@ namespace KnockBox.DndMapperTests.Unit
             var result = _engine.RollAsync(_state, _host, req);
             Assert.IsTrue(result.IsFailure);
         }
+
+        // The re-roll affordance on the log entry rebuilds a fresh RollRequest
+        // from these fields. Reconstructing them from Rolls is brittle (Adv/Dis
+        // adds a discarded twin) and AttributeRef.SheetId is lost altogether
+        // once AttributeModifier is resolved — so the engine captures both at
+        // roll time.
+        [TestMethod]
+        public void RollAsync_PopulatesOriginalDice_FromRequest()
+        {
+            SetupRng(3, 5, 7);
+            var dice = new[] { new DiceTerm(2, 6), new DiceTerm(1, 8) };
+            var req = new RollRequest(dice, null, 0, RollMode.Normal, "");
+            var result = _engine.RollAsync(_state, _host, req);
+            Assert.IsTrue(result.TryGetSuccess(out var roll));
+            CollectionAssert.AreEqual(dice, roll.OriginalDice.ToArray());
+        }
+
+        [TestMethod]
+        public void RollAsync_OriginalDice_DoesNotIncludeAdvantageTwin()
+        {
+            SetupRng(5, 17);
+            var req = new RollRequest(new[] { new DiceTerm(1, 20) }, null, 0, RollMode.Advantage, "");
+            var result = _engine.RollAsync(_state, _host, req);
+            Assert.IsTrue(result.TryGetSuccess(out var roll));
+            // Adv rolls two dice internally but OriginalDice reflects the
+            // *request* (one die); the Mode field carries the ADV info.
+            Assert.HasCount(1, roll.OriginalDice);
+            Assert.AreEqual(new DiceTerm(1, 20), roll.OriginalDice[0]);
+        }
+
+        [TestMethod]
+        public void RollAsync_PopulatesOriginalAttributeRef()
+        {
+            SetupRng(10);
+            var sheetResult = _engine.CreateSheetAsync(_state, _host, _host.Id, "Hero");
+            Assert.IsTrue(sheetResult.TryGetSuccess(out var sheetId));
+            _engine.UpdateSheetAttributeAsync(_state, _host, sheetId, "STR", AttributeValue.Score(14));
+
+            var attrRef = new AttributeRef(sheetId, "STR");
+            var req = new RollRequest(new[] { new DiceTerm(1, 20) }, attrRef, 0, RollMode.Normal, "STR check");
+            var result = _engine.RollAsync(_state, _host, req);
+            Assert.IsTrue(result.TryGetSuccess(out var roll));
+            Assert.AreEqual(attrRef, roll.OriginalAttributeRef);
+        }
+
+        [TestMethod]
+        public void RollAsync_OriginalAttributeRef_NullWhenAbsent()
+        {
+            SetupRng(10);
+            var req = new RollRequest(new[] { new DiceTerm(1, 20) }, null, 0, RollMode.Normal, "");
+            var result = _engine.RollAsync(_state, _host, req);
+            Assert.IsTrue(result.TryGetSuccess(out var roll));
+            Assert.IsNull(roll.OriginalAttributeRef);
+        }
     }
 }

@@ -20,6 +20,17 @@ internal class IndexedDbInterop : IAsyncDisposable
     private readonly Lazy<Task<IJSObjectReference>> _moduleTask;
     private bool _disposed;
 
+    /// <summary>
+    /// Per-instance opaque identifier for the originating Blazor circuit.
+    /// IndexedDbInterop is scoped per circuit, so this Guid uniquely tags
+    /// blob-share entries published from this circuit. BlobShareEndpoint
+    /// uses it to gate concurrent <see cref="IJSStreamReference"/> opens
+    /// against the same circuit — one runaway parallel fan-out from a
+    /// display view used to starve Blazor's JS data-stream pipe and
+    /// trigger a fatal circuit timeout.
+    /// </summary>
+    public Guid ScopeId { get; } = Guid.NewGuid();
+
     public IndexedDbInterop(IJSRuntime jsRuntime, ILogger<IndexedDbInterop> logger)
     {
         _jsRuntime = jsRuntime;

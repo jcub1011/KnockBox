@@ -1,0 +1,29 @@
+@using KnockBox.Core.Components.Shared
+@using KnockBox.DndMapper.Services.State.Games
+@using KnockBox.DndMapper.Services.State.Games.Data
+@inherits DisposableComponent
+
+<div class="dndm-modal-overlay" @onclick="Close">
+    <div class="dndm-modal-card dndm-rolllog-history" role="dialog" aria-modal="true" @onclick:stopPropagation="true">
+        <header class="dndm-rolllog-history-header">
+            <h3 class="dndm-modal-title">Roll History</h3>
+            <button class="dndm-btn dndm-btn--icon dndm-btn--small" type="button" @onclick="Close">×</button>
+        </header>
+        <div class="dndm-rolllog-history-body">
+            @if (_snapshot.Count == 0)
+            {
+                <div class="dndm-panel-empty">No rolls yet.</div>
+            }
+            else
+            {
+                <Virtualize Items="_snapshot" Context="r" ItemSize="72">
+                    <RollLogEntry Roll="r" State="State" CurrentUserId="@CurrentUserId" IsHost="IsHost" />
+                </Virtualize>
+            }
+        </div>
+        <footer class="dndm-rolllog-history-footer">
+            <span class="dndm-rolllog-history-hint">Showing @_snapshot.Count snapshotted at @_capturedAt.ToString("HH:mm:ss") — reopen to refresh.</span>
+            <button class="dndm-btn dndm-btn--ghost" type="button" @onclick="Close">Close</button>
+        </footer>
+    </div>
+</div>

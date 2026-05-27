@@ -1,3 +1,14 @@
 .dndm-permp .dndm-panel-section { padding: 0.6rem 0; }
 .dndm-permp .dndm-panel-section .dndm-label { margin-bottom: 0.4rem; }
 .dndm-permp .dndm-pillgroup { display: flex; }
+
+/* Hint text under a toggle (e.g. the Loaded Dice explainer). Blazor's
+   scoped CSS means each component needs its own copy of this rule —
+   keep parity with the same selector in RollLogPanel.razor.css. */
+.dndm-dice-hint {
+    display: block;
+    margin-top: 0.3rem;
+    font-size: 0.8rem;
+    color: var(--dndm-text-muted);
+    font-style: italic;
+}

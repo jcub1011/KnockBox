@@ -26,7 +26,7 @@ namespace KnockBox.DndMapper.Pages.Components
         {
             if (State is null || PendingSchema is null) return BaseMessage;
 
-            var hiddenTemplates = State.GetActiveSchemaTemplate()?.StatusEffectTemplates.Count ?? 0;
+            var hiddenTemplates = State.GetActiveSchemaTemplate()?.StatusEffectTemplates.Length ?? 0;
 
             var incoming = new HashSet<string>(PendingSchema.Rows.Select(r => r.Name), StringComparer.Ordinal);
             int orphanDeltas = 0;

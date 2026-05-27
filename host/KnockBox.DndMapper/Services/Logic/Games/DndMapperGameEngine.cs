@@ -7,8 +7,10 @@ using KnockBox.Core.Services.State.Games.Shared;
 using KnockBox.Core.Services.State.Users;
 using KnockBox.DndMapper.Helpers;
 using KnockBox.DndMapper.Models;
+using KnockBox.DndMapper.Services.Logic.LoadedDice;
 using KnockBox.DndMapper.Services.State.Games;
 using KnockBox.DndMapper.Services.State.Games.Data;
+using KnockBox.DndMapper.Services.State.Games.Data.LoadedDice;
 
 namespace KnockBox.DndMapper.Services.Logic.Games
 {
@@ -72,7 +74,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                 state.SetPhase(DndMapperPhase.Playing);
                 state.SetJoinable(false);
 
-                if (state.ActiveMapId is null && state.Maps.Count > 0)
+                if (state.ActiveMapId is null && state.Maps.Length > 0)
                     state.SetActiveMapId(state.Maps.OrderBy(m => m.ListOrder).First().Id);
 
                 if (state.ActiveMapId is Guid mapId &&
@@ -113,7 +115,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                 {
                     Id = newId,
                     Name = name,
-                    ListOrder = state.Maps.Count,
+                    ListOrder = state.Maps.Length,
                     CreatedUtc = DateTime.UtcNow,
                 });
             });
@@ -194,7 +196,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                     Id = newId,
                     Name = $"{source.Name} (copy)",
                     Grid = source.Grid,
-                    ListOrder = state.Maps.Count,
+                    ListOrder = state.Maps.Length,
                     CreatedUtc = DateTime.UtcNow,
                     DefaultSpawnPosition = source.DefaultSpawnPosition,
                 };
@@ -229,7 +231,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                 for (int i = 0; i < orderedIds.Count; i++) orderByIndex[orderedIds[i]] = i;
                 state.Maps = state.Maps
                     .Select(m => m with { ListOrder = orderByIndex[m.Id] })
-                    .ToImmutableList();
+                    .ToImmutableArray();
             });
 
             if (exec.IsCanceled) return Result.FromCancellation();
@@ -298,7 +300,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                     double maxX = Math.Max(0.5, newGrid.WidthCells - 0.5);
                     double maxY = Math.Max(0.5, newGrid.HeightCells - 0.5);
                     var newTokens = m.Tokens;
-                    if (m.Tokens.Count > 0)
+                    if (m.Tokens.Length > 0)
                     {
                         newTokens = m.Tokens
                             .Select(t => t with
@@ -306,7 +308,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                                 X = Math.Clamp(t.X, 0.5, maxX),
                                 Y = Math.Clamp(t.Y, 0.5, maxY),
                             })
-                            .ToImmutableList();
+                            .ToImmutableArray();
                     }
 
                     return m with
@@ -716,6 +718,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                     Id = newId,
                     OwnerUserId = ownerUserId,
                     CharacterName = characterName,
+                    Color = DefaultColorPalette.FromName(characterName),
                     Values = SeedSheetValues(state.AttributeSchema),
                 };
                 state.Sheets = state.Sheets.SetItem(newId, sheet);
@@ -779,7 +782,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                     {
                         var anyChange = false;
                         var newTokens = m.Tokens;
-                        for (int i = 0; i < newTokens.Count; i++)
+                        for (int i = 0; i < newTokens.Length; i++)
                         {
                             var token = newTokens[i];
                             if (token.SheetId == sheetId && token.Name != characterName)
@@ -790,12 +793,156 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                         }
                         return anyChange ? m with { Tokens = newTokens } : m;
                     })
-                    .ToImmutableList();
+                    .ToImmutableArray();
             });
 
             if (exec.IsCanceled) return Result.FromCancellation();
             if (exec.TryGetFailure(out var execErr)) return Result.FromError(execErr);
             return error is null ? Result.Success : Result.FromError(error);
+        }
+
+        public Result UpdateSheetArmorClassAsync(DndMapperGameState state, User caller, Guid sheetId, int? armorClass)
+        {
+            if (state is null) return Result.FromError("State is required.");
+            if (caller is null) return Result.FromError("Caller is required.");
+
+            string? error = null;
+            var exec = state.Execute(() =>
+            {
+                if (!state.Sheets.TryGetValue(sheetId, out var sheet)) { error = "Unknown sheet id."; return; }
+                if (!CanEditSheet(state, caller, sheet)) { error = "You are not permitted to edit this sheet."; return; }
+
+                state.UpdateSheet(sheetId, s => s with { ArmorClass = armorClass });
+            });
+
+            if (exec.IsCanceled) return Result.FromCancellation();
+            if (exec.TryGetFailure(out var execErr)) return Result.FromError(execErr);
+            return error is null ? Result.Success : Result.FromError(error);
+        }
+
+        public Result UpdateSheetColorAsync(DndMapperGameState state, User caller, Guid sheetId, string color)
+        {
+            if (state is null) return Result.FromError("State is required.");
+            if (caller is null) return Result.FromError("Caller is required.");
+
+            string? error = null;
+            var exec = state.Execute(() =>
+            {
+                if (!state.Sheets.TryGetValue(sheetId, out var sheet)) { error = "Unknown sheet id."; return; }
+                if (!CanEditSheet(state, caller, sheet)) { error = "You are not permitted to edit this sheet."; return; }
+
+                state.UpdateSheet(sheetId, s => s with { Color = color ?? string.Empty });
+            });
+
+            if (exec.IsCanceled) return Result.FromCancellation();
+            if (exec.TryGetFailure(out var execErr)) return Result.FromError(execErr);
+            return error is null ? Result.Success : Result.FromError(error);
+        }
+
+        public Result UpdateSheetScopeAsync(DndMapperGameState state, User caller, Guid sheetId, Guid? scopedMapId)
+        {
+            if (state is null) return Result.FromError("State is required.");
+            if (caller is null) return Result.FromError("Caller is required.");
+            if (!IsHost(state, caller)) return Result.FromError("Only the host may change sheet scope.");
+
+            string? error = null;
+            var exec = state.Execute(() =>
+            {
+                if (!state.Sheets.ContainsKey(sheetId)) { error = "Unknown sheet id."; return; }
+                if (scopedMapId is Guid mid && state.Maps.All(m => m.Id != mid))
+                {
+                    error = "Unknown map id.";
+                    return;
+                }
+                state.UpdateSheet(sheetId, s => s with { ScopedMapId = scopedMapId });
+            });
+
+            if (exec.IsCanceled) return Result.FromCancellation();
+            if (exec.TryGetFailure(out var execErr)) return Result.FromError(execErr);
+            return error is null ? Result.Success : Result.FromError(error);
+        }
+
+        public ValueResult<Guid> DuplicateSheetAsync(DndMapperGameState state, User caller, Guid sourceSheetId)
+        {
+            if (state is null) return ValueResult<Guid>.FromError("State is required.");
+            if (caller is null) return ValueResult<Guid>.FromError("Caller is required.");
+            if (!IsHost(state, caller)) return ValueResult<Guid>.FromError("Only the host may duplicate sheets.");
+
+            Guid newId = default;
+            string? error = null;
+            var exec = state.Execute(() =>
+            {
+                if (!state.Sheets.TryGetValue(sourceSheetId, out var source)) { error = "Unknown sheet id."; return; }
+
+                newId = Guid.NewGuid();
+                // Status effects and roll templates are immutable lists carrying
+                // ids that are fine to share — they're keyed independently of the
+                // sheet. Owner / Represents intentionally clear so the duplicate
+                // starts as a host-owned NPC the host can reassign.
+                var clone = source with
+                {
+                    Id = newId,
+                    CharacterName = $"{source.CharacterName} (copy)",
+                    OwnerUserId = null,
+                    RepresentsUserId = null,
+                };
+                state.Sheets = state.Sheets.SetItem(newId, clone);
+            });
+
+            if (exec.IsCanceled) return ValueResult<Guid>.FromCancellation();
+            if (exec.TryGetFailure(out var execErr)) return ValueResult<Guid>.FromError(execErr);
+            if (error is not null) return ValueResult<Guid>.FromError(error);
+            return ValueResult<Guid>.FromValue(newId);
+        }
+
+        public ValueResult<Guid> CreateTokenForSheetOnMapAsync(DndMapperGameState state, User caller, Guid sheetId, Guid mapId)
+        {
+            if (state is null) return ValueResult<Guid>.FromError("State is required.");
+            if (caller is null) return ValueResult<Guid>.FromError("Caller is required.");
+            if (!IsHost(state, caller)) return ValueResult<Guid>.FromError("Only the host may create tokens for a sheet.");
+
+            Guid tokenId = Guid.Empty;
+            string? error = null;
+            var exec = state.Execute(() =>
+            {
+                if (!state.Sheets.TryGetValue(sheetId, out var sheet)) { error = "Unknown sheet id."; return; }
+
+                var mapIdx = state.IndexOfMap(mapId);
+                if (mapIdx < 0) { error = "Unknown map id."; return; }
+                var map = state.Maps[mapIdx];
+                var (sx, sy) = SpawnPosition(map);
+
+                tokenId = Guid.NewGuid();
+                // PlayerToken when the sheet has a live owner, NPCToken otherwise.
+                // RepresentsUserId mirrors the sheet so the "represents …" label
+                // round-trips into the new token without a separate engine call.
+                var hasLiveOwner = sheet.OwnerUserId is { } ouid
+                    && state.Players.Any(p => p.User.Id == ouid);
+                var token = new Token
+                {
+                    Id = tokenId,
+                    Type = hasLiveOwner ? TokenType.PlayerToken : TokenType.NPCToken,
+                    OwnerUserId = hasLiveOwner ? sheet.OwnerUserId : null,
+                    RepresentsUserId = sheet.RepresentsUserId,
+                    Name = sheet.CharacterName,
+                    // Token.Color is the fallback when sheet color isn't set.
+                    // Render sites prefer sheet.Color via Token.ResolveColor.
+                    Color = string.IsNullOrEmpty(sheet.Color)
+                        ? DefaultColorPalette.FromName(sheet.CharacterName)
+                        : sheet.Color,
+                    IconKind = TokenIconKind.Initial,
+                    MapId = mapId,
+                    X = sx,
+                    Y = sy,
+                    SheetId = sheetId,
+                };
+                state.Maps = state.Maps.SetItem(mapIdx, map with { Tokens = map.Tokens.Add(token) });
+            });
+
+            if (exec.IsCanceled) return ValueResult<Guid>.FromCancellation();
+            if (exec.TryGetFailure(out var execErr)) return ValueResult<Guid>.FromError(execErr);
+            if (error is not null) return ValueResult<Guid>.FromError(error);
+            return ValueResult<Guid>.FromValue(tokenId);
         }
 
         public Result DeleteSheetAsync(DndMapperGameState state, User caller, Guid sheetId)
@@ -815,7 +962,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                     {
                         var anyChange = false;
                         var newTokens = m.Tokens;
-                        for (int i = 0; i < newTokens.Count; i++)
+                        for (int i = 0; i < newTokens.Length; i++)
                         {
                             var token = newTokens[i];
                             if (token.SheetId == sheetId)
@@ -826,7 +973,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                         }
                         return anyChange ? m with { Tokens = newTokens } : m;
                     })
-                    .ToImmutableList();
+                    .ToImmutableArray();
             });
 
             if (exec.IsCanceled) return Result.FromCancellation();
@@ -1111,6 +1258,139 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             return Result.Success;
         }
 
+        // ── Loaded-dice verbs ─────────────────────────────────────────────────────
+
+        public ValueResult<Guid> AddLoadedDiceRuleAsync(DndMapperGameState state, User caller, LoadedDiceRule rule)
+        {
+            if (state is null) return ValueResult<Guid>.FromError("State is required.");
+            if (caller is null) return ValueResult<Guid>.FromError("Caller is required.");
+            if (rule is null) return ValueResult<Guid>.FromError("Rule is required.");
+            if (!IsHost(state, caller)) return ValueResult<Guid>.FromError("Only the host may edit loaded-dice rules.");
+
+            var newId = rule.Id == Guid.Empty ? Guid.NewGuid() : rule.Id;
+            var inserted = rule with { Id = newId };
+            var exec = state.Execute(() =>
+                state.SetLoadedDiceRules(state.LoadedDiceRules.Add(inserted)));
+
+            if (exec.IsCanceled) return ValueResult<Guid>.FromCancellation();
+            if (exec.TryGetFailure(out var err)) return ValueResult<Guid>.FromError(err);
+            return ValueResult<Guid>.FromValue(newId);
+        }
+
+        public Result UpdateLoadedDiceRuleAsync(DndMapperGameState state, User caller, LoadedDiceRule rule)
+        {
+            if (state is null) return Result.FromError("State is required.");
+            if (caller is null) return Result.FromError("Caller is required.");
+            if (rule is null) return Result.FromError("Rule is required.");
+            if (!IsHost(state, caller)) return Result.FromError("Only the host may edit loaded-dice rules.");
+
+            string? error = null;
+            var exec = state.Execute(() =>
+            {
+                int idx = IndexOfRule(state, rule.Id);
+                if (idx < 0) { error = "Unknown rule id."; return; }
+                state.SetLoadedDiceRules(state.LoadedDiceRules.SetItem(idx, rule));
+            });
+            if (exec.IsCanceled) return Result.FromCancellation();
+            if (exec.TryGetFailure(out var execErr)) return Result.FromError(execErr);
+            return error is null ? Result.Success : Result.FromError(error);
+        }
+
+        public Result RemoveLoadedDiceRuleAsync(DndMapperGameState state, User caller, Guid ruleId)
+        {
+            if (state is null) return Result.FromError("State is required.");
+            if (caller is null) return Result.FromError("Caller is required.");
+            if (!IsHost(state, caller)) return Result.FromError("Only the host may edit loaded-dice rules.");
+
+            string? error = null;
+            var exec = state.Execute(() =>
+            {
+                int idx = IndexOfRule(state, ruleId);
+                if (idx < 0) { error = "Unknown rule id."; return; }
+                state.SetLoadedDiceRules(state.LoadedDiceRules.RemoveAt(idx));
+            });
+            if (exec.IsCanceled) return Result.FromCancellation();
+            if (exec.TryGetFailure(out var execErr)) return Result.FromError(execErr);
+            return error is null ? Result.Success : Result.FromError(error);
+        }
+
+        public Result MoveLoadedDiceRuleAsync(DndMapperGameState state, User caller, Guid ruleId, int newIndex)
+        {
+            if (state is null) return Result.FromError("State is required.");
+            if (caller is null) return Result.FromError("Caller is required.");
+            if (!IsHost(state, caller)) return Result.FromError("Only the host may reorder loaded-dice rules.");
+
+            string? error = null;
+            var exec = state.Execute(() =>
+            {
+                var rules = state.LoadedDiceRules;
+                int idx = IndexOfRule(state, ruleId);
+                if (idx < 0) { error = "Unknown rule id."; return; }
+                int clamped = Math.Clamp(newIndex, 0, rules.Length - 1);
+                if (clamped == idx) return;
+                var rule = rules[idx];
+                state.SetLoadedDiceRules(rules.RemoveAt(idx).Insert(clamped, rule));
+            });
+            if (exec.IsCanceled) return Result.FromCancellation();
+            if (exec.TryGetFailure(out var execErr)) return Result.FromError(execErr);
+            return error is null ? Result.Success : Result.FromError(error);
+        }
+
+        // Host's client streams its held-key set so HostKeyHeldCondition can
+        // see it at roll time. Silently ignores non-host callers (the client
+        // attaches the listener only on the host page, but a malicious
+        // caller could still craft the verb directly).
+        public Result UpdateHostInputStateAsync(DndMapperGameState state, User caller, IReadOnlyCollection<string> heldKeys)
+        {
+            if (state is null) return Result.FromError("State is required.");
+            if (caller is null) return Result.FromError("Caller is required.");
+            if (!IsHost(state, caller)) return Result.Success;
+            heldKeys ??= Array.Empty<string>();
+            var set = ImmutableHashSet.CreateRange(StringComparer.Ordinal, heldKeys);
+            var exec = state.Execute(() => state.SetHostHeldKeys(set));
+            if (exec.IsCanceled) return Result.FromCancellation();
+            if (exec.TryGetFailure(out var err)) return Result.FromError(err);
+            return Result.Success;
+        }
+
+        private static int IndexOfRule(DndMapperGameState state, Guid ruleId)
+        {
+            for (int i = 0; i < state.LoadedDiceRules.Length; i++)
+                if (state.LoadedDiceRules[i].Id == ruleId) return i;
+            return -1;
+        }
+
+        // Shared helper used by RollAsync, ForceInitiativeRollAsync, and the
+        // NPC initiative back-solve so every dice-producing path applies the
+        // same loaded-dice pipeline. Returns the (deduplicated) list of
+        // rules that actually fired, or an empty list when the master toggle
+        // is off — letting the caller stamp the result without branching.
+        private ImmutableArray<LoadedDiceRuleStamp> ApplyLoadedDiceToRolls(
+            DndMapperGameState state,
+            User caller,
+            RollRequest request,
+            Guid? rollerSheetId,
+            IList<DieRoll> rolls)
+        {
+            if (!state.Settings.LoadedDiceEnabled) return ImmutableArray<LoadedDiceRuleStamp>.Empty;
+            if (state.LoadedDiceRules.Length == 0) return ImmutableArray<LoadedDiceRuleStamp>.Empty;
+
+            return LoadedDiceProcessor.Apply(
+                rolls,
+                state.LoadedDiceRules,
+                rollerSheetId,
+                sides => new LoadedDiceContext
+                {
+                    Caller = caller,
+                    State = state,
+                    Request = request,
+                    RollerSheetId = rollerSheetId,
+                    DiceTermSides = sides,
+                    HostHeldKeys = state.HostHeldKeys,
+                    RollNewDie = s => _rng.GetRandomInt(1, s + 1, RandomType.Fast),
+                });
+        }
+
         // ── Centre-viewport broadcast (v1.x — §6.4) ───────────────────────────────
 
         public Result RequestCenterViewportAsync(DndMapperGameState state, User caller, Guid mapId, double x, double y)
@@ -1208,7 +1488,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             {
                 if (state.ActiveCombat is not null) { error = "Combat is already active."; return; }
 
-                var turnBuilder = ImmutableList.CreateBuilder<CombatantEntry>();
+                var turnBuilder = ImmutableArray.CreateBuilder<CombatantEntry>();
                 var seenTokenIds = new HashSet<Guid>();
 
                 if (npcTokenIds is not null)
@@ -1265,7 +1545,6 @@ namespace KnockBox.DndMapper.Services.Logic.Games
 
             int modifier = ResolveInitiativeModifier(state, caller.Id);
             int d20 = _rng.GetRandomInt(1, 21, RandomType.Fast);
-            int total = d20 + modifier;
 
             string? error = null;
             var exec = state.Execute(() =>
@@ -1277,11 +1556,13 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                 if (idx < 0) { error = "You are not a combatant in this initiative."; return; }
                 if (combat.TurnOrder[idx].InitiativeRoll is not null) return; // no-op
 
+                var (modifiedFace, stamps) = ApplyLoadedDiceToInitiative(state, caller, FindPlayerSheetId(state, caller.Id), d20);
+                int total = modifiedFace + modifier;
                 state.SetActiveCombat(combat with
                 {
                     TurnOrder = combat.TurnOrder.SetItem(idx, combat.TurnOrder[idx] with { InitiativeRoll = total }),
                 });
-                state.AppendRoll(BuildInitiativeRollResult(caller.Id, null, d20, modifier, total));
+                state.AppendRoll(BuildInitiativeRollResult(caller.Id, null, modifiedFace, modifier, total, appliedRules: stamps));
                 TryTransitionToActive(state);
             });
 
@@ -1307,10 +1588,23 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                 var entry = combat.TurnOrder[idx];
                 if (entry.OwnerUserId is not null) { error = "Use ForceInitiativeRollAsync for player combatants."; return; }
 
-                state.SetActiveCombat(combat with
+                // Park the host's typed value on PendingInitiative — InitiativeRoll
+                // stays null so the displays continue to read "—" and no
+                // RollResult is appended (no dice animate yet). This is the
+                // beat the user wants preserved: the manual set should feel
+                // like cocking the trigger, not pulling it.
+                var staged = combat.TurnOrder.SetItem(idx, entry with { PendingInitiative = roll });
+
+                // Trigger to fire all dice: every NPC has a value (pending or
+                // final). At that point we commit every pending NPC in one
+                // sweep so each token's dice spin up together — same batch
+                // path the bulk "Roll All Unset NPCs" verb uses.
+                if (!HasUnsetNpc(staged))
                 {
-                    TurnOrder = combat.TurnOrder.SetItem(idx, entry with { InitiativeRoll = roll }),
-                });
+                    staged = CommitPendingNpcInitiatives(state, staged, caller);
+                }
+
+                state.SetActiveCombat(combat with { TurnOrder = staged });
                 TryTransitionToActive(state);
             });
 
@@ -1340,7 +1634,8 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                 if (entry.InitiativeRoll is not null) { error = "Player has already rolled."; return; }
 
                 int modifier = ResolveInitiativeModifier(state, entry.OwnerUserId);
-                int total = d20 + modifier;
+                var (modifiedFace, stamps) = ApplyLoadedDiceToInitiative(state, caller, FindPlayerSheetId(state, entry.OwnerUserId), d20);
+                int total = modifiedFace + modifier;
                 state.SetActiveCombat(combat with
                 {
                     TurnOrder = combat.TurnOrder.SetItem(idx, entry with
@@ -1349,7 +1644,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                         IsForceRolled = true,
                     }),
                 });
-                state.AppendRoll(BuildInitiativeRollResult(entry.OwnerUserId, caller.Id, d20, modifier, total));
+                state.AppendRoll(BuildInitiativeRollResult(entry.OwnerUserId, caller.Id, modifiedFace, modifier, total, appliedRules: stamps));
                 TryTransitionToActive(state);
             });
 
@@ -1358,13 +1653,14 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             return error is null ? Result.Success : Result.FromError(error);
         }
 
-        // Rolls initiative for every NPC combatant that hasn't yet rolled, in
-        // a single Execute. Each NPC gets its own d20 + modifier (resolved
-        // from its attached character sheet, if any — NPCs without a sheet
-        // roll bare d20). Already-rolled NPCs are skipped so a host who
-        // entered a number manually keeps it. Each roll is logged as
-        // ForcedByUserId = caller so the audit trail attributes the bulk roll
-        // to the host.
+        // Rolls initiative for every NPC combatant that hasn't yet been
+        // committed, in a single Execute. NPCs split into two buckets:
+        //   • PendingInitiative is set → host already typed a value via
+        //     SetNpcInitiativeAsync; honor that value and back-solve the
+        //     visible d20 face so the dice "happen to land" on it.
+        //   • Truly unset → roll a real d20 + the sheet-resolved modifier.
+        // Both paths append a RollResult keyed on the NPC's TokenId so the
+        // per-token DiceBox instances animate side-by-side.
         public Result RollAllNpcInitiativeAsync(DndMapperGameState state, User caller)
         {
             if (state is null) return Result.FromError("State is required.");
@@ -1379,28 +1675,48 @@ namespace KnockBox.DndMapper.Services.Logic.Games
 
                 var combat = state.ActiveCombat;
                 var newTurnOrder = combat.TurnOrder;
-                for (int i = 0; i < newTurnOrder.Count; i++)
+                for (int i = 0; i < newTurnOrder.Length; i++)
                 {
                     var entry = newTurnOrder[i];
                     if (entry.OwnerUserId is not null) continue;       // players
-                    if (entry.InitiativeRoll is not null) continue;    // already rolled or manually set
+                    if (entry.InitiativeRoll is not null) continue;    // already committed
 
                     var sheet = FindSheetForToken(state, entry.TokenId);
                     int modifier = ResolveInitiativeModifierForSheet(state, sheet);
-                    int d20 = _rng.GetRandomInt(1, 21, RandomType.Fast);
-                    int total = d20 + modifier;
 
-                    newTurnOrder = newTurnOrder.SetItem(i, entry with { InitiativeRoll = total });
-                    // The loop above skips player entries, so NPCs are the
-                    // only thing here; the host is recorded as both roller
-                    // and forcing party so the audit log attributes the
-                    // bulk roll to the host that triggered it.
+                    int face;
+                    int initiativeValue;
+                    ImmutableArray<LoadedDiceRuleStamp> stamps = ImmutableArray<LoadedDiceRuleStamp>.Empty;
+                    if (entry.PendingInitiative is int pending)
+                    {
+                        // Manual override: the host's typed value wins the
+                        // turn order; the visible die is back-solved from it.
+                        // Loaded-dice rules do not fire here — the host
+                        // already chose the value explicitly.
+                        face = Math.Clamp(pending - modifier, 1, 20);
+                        initiativeValue = pending;
+                    }
+                    else
+                    {
+                        // Truly unset — fresh d20, subject to loaded-dice rules.
+                        int rawFace = _rng.GetRandomInt(1, 21, RandomType.Fast);
+                        (face, stamps) = ApplyLoadedDiceToInitiative(state, caller, sheet?.Id, rawFace);
+                        initiativeValue = face + modifier;
+                    }
+
+                    newTurnOrder = newTurnOrder.SetItem(i, entry with
+                    {
+                        InitiativeRoll = initiativeValue,
+                        PendingInitiative = null,
+                    });
                     state.AppendRoll(BuildInitiativeRollResult(
                         rollerUserId: caller.Id,
                         forcedByUserId: caller.Id,
-                        d20: d20,
+                        d20: face,
                         dexModifier: modifier,
-                        total: total));
+                        total: face + modifier,
+                        tokenId: entry.TokenId,
+                        appliedRules: stamps));
                 }
 
                 state.SetActiveCombat(combat with { TurnOrder = newTurnOrder });
@@ -1409,6 +1725,61 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             if (exec.IsCanceled) return Result.FromCancellation();
             if (exec.TryGetFailure(out var execErr)) return Result.FromError(execErr);
             return error is null ? Result.Success : Result.FromError(error);
+        }
+
+        // True when at least one NPC combatant has neither been rolled nor
+        // had a value parked in PendingInitiative. The SetNpcInitiativeAsync
+        // commit trigger keys off the negation: no NPC truly unset → flush
+        // every pending value as one RollResult batch.
+        private static bool HasUnsetNpc(System.Collections.Immutable.ImmutableArray<CombatantEntry> turnOrder)
+        {
+            for (int i = 0; i < turnOrder.Length; i++)
+            {
+                var entry = turnOrder[i];
+                if (entry.OwnerUserId is not null) continue;
+                if (entry.InitiativeRoll is not null) continue;
+                if (entry.PendingInitiative is not null) continue;
+                return true;
+            }
+            return false;
+        }
+
+        // Walks the turn order and commits every NPC that has a
+        // PendingInitiative: writes the value into InitiativeRoll, clears
+        // PendingInitiative, and appends a RollResult whose d20 face is the
+        // back-solved value (clamped to [1, 20]) so dice-box can animate it.
+        // Caller stays as both roller and forcedBy so the audit log says
+        // "host pressed Set" rather than "an NPC rolled itself."
+        private System.Collections.Immutable.ImmutableArray<CombatantEntry> CommitPendingNpcInitiatives(
+            DndMapperGameState state,
+            System.Collections.Immutable.ImmutableArray<CombatantEntry> turnOrder,
+            User caller)
+        {
+            for (int i = 0; i < turnOrder.Length; i++)
+            {
+                var entry = turnOrder[i];
+                if (entry.OwnerUserId is not null) continue;
+                if (entry.InitiativeRoll is not null) continue;
+                if (entry.PendingInitiative is not int pending) continue;
+
+                var sheet = FindSheetForToken(state, entry.TokenId);
+                int modifier = ResolveInitiativeModifierForSheet(state, sheet);
+                int face = Math.Clamp(pending - modifier, 1, 20);
+
+                turnOrder = turnOrder.SetItem(i, entry with
+                {
+                    InitiativeRoll = pending,
+                    PendingInitiative = null,
+                });
+                state.AppendRoll(BuildInitiativeRollResult(
+                    rollerUserId: caller.Id,
+                    forcedByUserId: caller.Id,
+                    d20: face,
+                    dexModifier: modifier,
+                    total: face + modifier,
+                    tokenId: entry.TokenId));
+            }
+            return turnOrder;
         }
 
         private static CharacterSheet? FindSheetForToken(DndMapperGameState state, Guid tokenId)
@@ -1437,12 +1808,12 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             {
                 if (state.ActiveCombat is null) { error = "No active combat."; return; }
                 if (state.ActiveCombat.Phase != CombatPhase.Active) { error = "Combat is not in the active phase."; return; }
-                if (state.ActiveCombat.TurnOrder.Count == 0) { error = "Turn order is empty."; return; }
+                if (state.ActiveCombat.TurnOrder.Length == 0) { error = "Turn order is empty."; return; }
 
                 var combat = state.ActiveCombat;
                 var nextIdx = combat.CurrentTurnIndex + 1;
                 var nextRound = combat.RoundNumber;
-                if (nextIdx >= combat.TurnOrder.Count)
+                if (nextIdx >= combat.TurnOrder.Length)
                 {
                     nextIdx = 0;
                     nextRound = combat.RoundNumber + 1;
@@ -1526,7 +1897,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                 bool removingCurrent = combat.Phase == CombatPhase.Active && idx == combat.CurrentTurnIndex;
                 var newTurnOrder = combat.TurnOrder.RemoveAt(idx);
 
-                if (newTurnOrder.Count == 0)
+                if (newTurnOrder.Length == 0)
                 {
                     state.SetActiveCombat(null);
                     return;
@@ -1543,7 +1914,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                     else if (removingCurrent)
                     {
                         // Stay at idx (which now points to the next combatant), wrap if past end.
-                        if (nextCurrent >= newTurnOrder.Count)
+                        if (nextCurrent >= newTurnOrder.Length)
                         {
                             nextCurrent = 0;
                             nextRound = combat.RoundNumber + 1;
@@ -1585,7 +1956,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             var sorted = TurnOrderSorter.Sort(state.ActiveCombat.TurnOrder);
             state.SetActiveCombat(state.ActiveCombat with
             {
-                TurnOrder = sorted.ToImmutableList(),
+                TurnOrder = sorted.ToImmutableArray(),
                 Phase = CombatPhase.Active,
                 CurrentTurnIndex = 0,
             });
@@ -1593,14 +1964,14 @@ namespace KnockBox.DndMapper.Services.Logic.Games
 
         private static int IndexOfCombatantById(CombatState combat, Guid combatantId)
         {
-            for (int i = 0; i < combat.TurnOrder.Count; i++)
+            for (int i = 0; i < combat.TurnOrder.Length; i++)
                 if (combat.TurnOrder[i].Id == combatantId) return i;
             return -1;
         }
 
         private static int IndexOfCombatantByOwner(CombatState combat, string ownerUserId)
         {
-            for (int i = 0; i < combat.TurnOrder.Count; i++)
+            for (int i = 0; i < combat.TurnOrder.Length; i++)
                 if (combat.TurnOrder[i].OwnerUserId == ownerUserId) return i;
             return -1;
         }
@@ -1668,7 +2039,14 @@ namespace KnockBox.DndMapper.Services.Logic.Games
         private static string FormatSigned(int value)
             => value >= 0 ? $"+{value}" : $"−{Math.Abs(value)}";
 
-        private static RollResult BuildInitiativeRollResult(string rollerUserId, string? forcedByUserId, int d20, int dexModifier, int total)
+        private static RollResult BuildInitiativeRollResult(
+            string rollerUserId,
+            string? forcedByUserId,
+            int d20,
+            int dexModifier,
+            int total,
+            Guid? tokenId = null,
+            ImmutableArray<LoadedDiceRuleStamp>? appliedRules = null)
         {
             return new RollResult(
                 Id: Guid.NewGuid(),
@@ -1679,10 +2057,47 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                 Mode: RollMode.Normal,
                 FlatModifier: 0,
                 AttributeModifier: dexModifier,
-                Label: "Initiative",
+                Label: RollResult.InitiativeLabel,
                 TimestampUtc: DateTime.UtcNow,
                 Formula: "1d20",
-                ModifierBreakdown: null);
+                ModifierBreakdown: null,
+                TokenId: tokenId)
+            { AppliedRules = appliedRules ?? ImmutableArray<LoadedDiceRuleStamp>.Empty };
+        }
+
+        // Initiative rolls don't carry a RollRequest; build a synthetic one
+        // so DiceTypeRolledCondition, RollLabelContainsCondition, etc. can
+        // still match. Returns the modified d20 face and the stamps for the
+        // log. Called inside Execute so the state snapshot is stable.
+        private (int Face, ImmutableArray<LoadedDiceRuleStamp> Stamps) ApplyLoadedDiceToInitiative(
+            DndMapperGameState state,
+            User caller,
+            Guid? rollerSheetId,
+            int rawD20)
+        {
+            if (!state.Settings.LoadedDiceEnabled || state.LoadedDiceRules.Length == 0)
+                return (rawD20, ImmutableArray<LoadedDiceRuleStamp>.Empty);
+
+            var rolls = new List<DieRoll> { new(20, rawD20, false) };
+            var request = new RollRequest(
+                Dice: [new DiceTerm(1, 20)],
+                AttributeRef: null,
+                FlatModifier: 0,
+                Mode: RollMode.Normal,
+                Label: RollResult.InitiativeLabel);
+
+            var stamps = ApplyLoadedDiceToRolls(state, caller, request, rollerSheetId, rolls);
+            return (rolls[0].Result, stamps);
+        }
+
+        // Player's primary character sheet — first sheet they own. Returns
+        // null when the player has no sheet attached (e.g. host has not yet
+        // generated one). Used to feed RollerSheetId for target-list matches.
+        private static Guid? FindPlayerSheetId(DndMapperGameState state, string userId)
+        {
+            foreach (var sheet in state.Sheets.Values)
+                if (sheet.OwnerUserId == userId) return sheet.Id;
+            return null;
         }
 
         // ── Markup overlay (v1.x — §5.6) ──────────────────────────────────────────
@@ -1740,7 +2155,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                 {
                     Id = newId,
                     Name = name,
-                    AttributeDeltas = attributeDeltas is null ? ImmutableList<AttributeDelta>.Empty : [.. attributeDeltas],
+                    AttributeDeltas = attributeDeltas is null ? ImmutableArray<AttributeDelta>.Empty : [.. attributeDeltas],
                     MaxHpDelta = maxHpDelta,
                     OnApplyHpDelta = onApplyHpDelta,
                     Notes = notes ?? string.Empty,
@@ -1790,7 +2205,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                     var newList = s.StatusEffects.SetItem(idx, s.StatusEffects[idx] with
                     {
                         Name = name,
-                        AttributeDeltas = attributeDeltas is null ? ImmutableList<AttributeDelta>.Empty : [.. attributeDeltas],
+                        AttributeDeltas = attributeDeltas is null ? ImmutableArray<AttributeDelta>.Empty : [.. attributeDeltas],
                         MaxHpDelta = maxHpDelta,
                         OnApplyHpDelta = onApplyHpDelta,
                         Notes = notes ?? string.Empty,
@@ -1857,7 +2272,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                         {
                             Id = newId,
                             Name = name,
-                            AttributeDeltas = attributeDeltas is null ? ImmutableList<AttributeDelta>.Empty : [.. attributeDeltas],
+                            AttributeDeltas = attributeDeltas is null ? ImmutableArray<AttributeDelta>.Empty : [.. attributeDeltas],
                             MaxHpDelta = maxHpDelta,
                             OnApplyHpDelta = onApplyHpDelta,
                             Notes = notes ?? string.Empty,
@@ -1902,7 +2317,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                         StatusEffectTemplates = schema.StatusEffectTemplates.SetItem(idx, schema.StatusEffectTemplates[idx] with
                         {
                             Name = name,
-                            AttributeDeltas = attributeDeltas is null ? ImmutableList<AttributeDelta>.Empty : [.. attributeDeltas],
+                            AttributeDeltas = attributeDeltas is null ? ImmutableArray<AttributeDelta>.Empty : [.. attributeDeltas],
                             MaxHpDelta = maxHpDelta,
                             OnApplyHpDelta = onApplyHpDelta,
                             Notes = notes ?? string.Empty,
@@ -1946,23 +2361,23 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             return sheet;
         }
 
-        private static int IndexOf(ImmutableList<StatusEffect> list, Guid id)
+        private static int IndexOf(ImmutableArray<StatusEffect> list, Guid id)
         {
-            for (int i = 0; i < list.Count; i++)
+            for (int i = 0; i < list.Length; i++)
                 if (list[i].Id == id) return i;
             return -1;
         }
 
-        private static int IndexOf(ImmutableList<StatusEffectTemplate> list, Guid id)
+        private static int IndexOf(ImmutableArray<StatusEffectTemplate> list, Guid id)
         {
-            for (int i = 0; i < list.Count; i++)
+            for (int i = 0; i < list.Length; i++)
                 if (list[i].Id == id) return i;
             return -1;
         }
 
-        private static int IndexOf(ImmutableList<RollTemplate> list, Guid id)
+        private static int IndexOf(ImmutableArray<RollTemplate> list, Guid id)
         {
-            for (int i = 0; i < list.Count; i++)
+            for (int i = 0; i < list.Length; i++)
                 if (list[i].Id == id) return i;
             return -1;
         }
@@ -2197,27 +2612,40 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             AttributeContribution? contribution = null;
             AttributeValue? baseAttrValue = null;
             string? attrName = null;
-            if (request.AttributeRef is AttributeRef attrRef)
+            // AttributeRef with a null/empty AttributeName means "rolling as
+            // this sheet, no attribute mod applied" — used by the host's
+            // picker when they don't pick an attribute. The sheet identity is
+            // still consumed by loaded-dice rule matching below, so ownership
+            // MUST be validated whenever a SheetId is present (not only when
+            // an attribute name is supplied) — otherwise a crafted verb could
+            // claim another player's sheet to spoof loaded-dice attribution.
+            if (request.AttributeRef is { } attrRef)
             {
                 if (!state.Sheets.TryGetValue(attrRef.SheetId, out var sheet))
                     return ValueResult<RollResult>.FromError("Unknown sheet id for attribute reference.");
-                if (!sheet.Values.TryGetValue(attrRef.AttributeName, out var attrValue))
-                    return ValueResult<RollResult>.FromError("Unknown attribute name on the referenced sheet.");
                 if (sheet.OwnerUserId is not null && sheet.OwnerUserId != caller.Id && !IsHost(state, caller))
                     return ValueResult<RollResult>.FromError("You may only reference your own attributes (or be host).");
 
-                if (attrValue.GetModifier() is null)
-                    return ValueResult<RollResult>.FromError("Referenced attribute does not produce a numeric modifier.");
+                // Attribute modifier only resolves when a name is supplied;
+                // a name-less ref is "rolling as this sheet" with no mod.
+                if (!string.IsNullOrEmpty(attrRef.AttributeName))
+                {
+                    if (!sheet.Values.TryGetValue(attrRef.AttributeName, out var attrValue))
+                        return ValueResult<RollResult>.FromError("Unknown attribute name on the referenced sheet.");
 
-                // §8.5 semantics: deltas apply to the attribute *value*; the
-                // scoring mode then converts the modified value to a roll
-                // modifier. The resolver handles both Score (re-floor after
-                // delta) and Modifier (straight pass-through) types.
-                var resolved = AttributeContributionResolver.Resolve(sheet, attrRef.AttributeName, attrValue);
-                attributeModifier = resolved.EffectiveModifier;
-                baseAttrValue = attrValue;
-                attrName = attrRef.AttributeName;
-                if (resolved.ValueBreakdown.Count > 1) contribution = resolved;
+                    if (attrValue.GetModifier() is null)
+                        return ValueResult<RollResult>.FromError("Referenced attribute does not produce a numeric modifier.");
+
+                    // §8.5 semantics: deltas apply to the attribute *value*; the
+                    // scoring mode then converts the modified value to a roll
+                    // modifier. The resolver handles both Score (re-floor after
+                    // delta) and Modifier (straight pass-through) types.
+                    var resolved = AttributeContributionResolver.Resolve(sheet, attrRef.AttributeName, attrValue);
+                    attributeModifier = resolved.EffectiveModifier;
+                    baseAttrValue = attrValue;
+                    attrName = attrRef.AttributeName;
+                    if (resolved.ValueBreakdown.Count > 1) contribution = resolved;
+                }
             }
 
             var rolls = new List<DieRoll>(totalDice + (request.Mode == RollMode.Normal ? 0 : 1));
@@ -2237,7 +2665,35 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                 int sides = request.Dice[0].Sides;
                 int second = _rng.GetRandomInt(1, sides + 1, RandomType.Fast);
                 rolls.Add(new DieRoll(sides, second, false));
+            }
 
+            // Loaded-dice rules fire AFTER all RNG (including the advantage
+            // twin) but BEFORE the discard step, so a rule that says
+            // "make d20 = 20" turns both Advantage candidates into 20 and
+            // the keep-highest logic still produces a 20 — symmetric with
+            // disadvantage producing a 1 under "make d20 = 1".
+            //
+            // AttributeRef.SheetId is the sole sheet-identity source: the
+            // submitter sets it from the host's "From sheet" picker (or a
+            // player's assigned sheet) whether or not an attribute is
+            // also selected, so a DM rolling AS a sheet with no attribute
+            // still matches that sheet's rules.
+            //
+            // This reads state.LoadedDiceRules / state.HostHeldKeys outside the
+            // Execute lock — intentional, and consistent with the RNG above
+            // also running lock-free. Both are immutable snapshots mutated only
+            // by rare host actions, so the worst case is evaluating against a
+            // just-superseded rule set; the AppendRoll below is the only step
+            // that needs the lock for state consistency.
+            var appliedRules = ApplyLoadedDiceToRolls(
+                state,
+                caller,
+                request,
+                request.AttributeRef?.SheetId,
+                rolls);
+
+            if (request.Mode != RollMode.Normal)
+            {
                 int firstResult = rolls[0].Result;
                 int secondResult = rolls[1].Result;
                 bool firstIsKept = request.Mode == RollMode.Advantage
@@ -2296,7 +2752,12 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                 Label: request.Label ?? string.Empty,
                 TimestampUtc: DateTime.UtcNow,
                 Formula: formula,
-                ModifierBreakdown: modifierBreakdown);
+                ModifierBreakdown: modifierBreakdown)
+            {
+                AppliedRules = appliedRules,
+                OriginalDice = request.Dice.ToImmutableArray(),
+                OriginalAttributeRef = request.AttributeRef,
+            };
 
             var exec = state.Execute(() => state.AppendRoll(result));
             if (exec.IsCanceled) return ValueResult<RollResult>.FromCancellation();
@@ -2332,7 +2793,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
 
             var exec = state.Execute(() =>
             {
-                state.Maps = ImmutableList<Map>.Empty;
+                state.Maps = ImmutableArray<Map>.Empty;
                 state.SetActiveMapId(null);
                 state.Sheets = ImmutableDictionary<Guid, CharacterSheet>.Empty;
                 state.RollLog = ImmutableList<RollResult>.Empty;
@@ -2383,7 +2844,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                     return;
                 }
 
-                sealedImage = image with { LayerOrder = map.Images.Count };
+                sealedImage = image with { LayerOrder = map.Images.Length };
                 state.Maps = state.Maps.SetItem(mapIdx, map with
                 {
                     Images = map.Images.Add(sealedImage),
@@ -2438,12 +2899,12 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             var exec = state.Execute(() =>
             {
                 var newMaps = state.Maps;
-                for (int mapIdx = 0; mapIdx < newMaps.Count; mapIdx++)
+                for (int mapIdx = 0; mapIdx < newMaps.Length; mapIdx++)
                 {
                     var m = newMaps[mapIdx];
                     bool changed = false;
                     var newImages = m.Images;
-                    for (int i = 0; i < newImages.Count; i++)
+                    for (int i = 0; i < newImages.Length; i++)
                     {
                         var image = newImages[i];
                         if (image.ShareToken is null) continue;
@@ -2677,7 +3138,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                 {
                     var changed = false;
                     var newTokens = m.Tokens;
-                    for (int i = 0; i < newTokens.Count; i++)
+                    for (int i = 0; i < newTokens.Length; i++)
                     {
                         var t = newTokens[i];
                         if (!promoteIds.Contains(t.Id)) continue;
@@ -2691,7 +3152,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                     }
                     return changed ? m with { Tokens = newTokens } : m;
                 })
-                .ToImmutableList();
+                .ToImmutableArray();
 
             if (sheet is not null)
             {
@@ -2757,7 +3218,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                 int currentIndex = DndMapperGameState.IndexOfImage(map, imageId);
                 if (currentIndex < 0) { error = "Unknown image id."; return; }
                 if (map.Images[currentIndex].Locked) { error = "Image is locked."; return; }
-                if (newLayerOrder < 0 || newLayerOrder >= map.Images.Count)
+                if (newLayerOrder < 0 || newLayerOrder >= map.Images.Length)
                 {
                     error = "New layer order is out of range.";
                     return;
@@ -2765,8 +3226,8 @@ namespace KnockBox.DndMapper.Services.Logic.Games
 
                 var image = map.Images[currentIndex];
                 var reordered = map.Images.RemoveAt(currentIndex).Insert(newLayerOrder, image);
-                var withLayerOrders = ImmutableList.CreateBuilder<MapImage>();
-                for (int i = 0; i < reordered.Count; i++)
+                var withLayerOrders = ImmutableArray.CreateBuilder<MapImage>();
+                for (int i = 0; i < reordered.Length; i++)
                     withLayerOrders.Add(reordered[i] with { LayerOrder = i });
 
                 state.Maps = state.Maps.SetItem(mapIdx, map with
@@ -2882,8 +3343,8 @@ namespace KnockBox.DndMapper.Services.Logic.Games
 
                 var image = map.Images[idx];
                 var withoutImage = map.Images.RemoveAt(idx);
-                var withLayerOrders = ImmutableList.CreateBuilder<MapImage>();
-                for (int i = 0; i < withoutImage.Count; i++)
+                var withLayerOrders = ImmutableArray.CreateBuilder<MapImage>();
+                for (int i = 0; i < withoutImage.Length; i++)
                     withLayerOrders.Add(withoutImage[i] with { LayerOrder = i });
 
                 state.Maps = state.Maps.SetItem(mapIdx, map with
@@ -3111,6 +3572,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                     Id = sheetId,
                     OwnerUserId = player.Id,
                     CharacterName = player.Name,
+                    Color = DefaultColorPalette.FromName(player.Name),
                     Values = SeedSheetValues(state.AttributeSchema),
                 };
                 state.Sheets = state.Sheets.SetItem(sheetId, sheet);
@@ -3146,7 +3608,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                 {
                     var changed = false;
                     var newTokens = m.Tokens;
-                    for (int i = 0; i < newTokens.Count; i++)
+                    for (int i = 0; i < newTokens.Length; i++)
                     {
                         var token = newTokens[i];
                         if (token.Type == TokenType.PlayerToken && token.OwnerUserId == departingPlayer.Id)
@@ -3162,7 +3624,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                     }
                     return changed ? m with { Tokens = newTokens } : m;
                 })
-                .ToImmutableList();
+                .ToImmutableArray();
 
             // Orphan the player's sheet so the host can reassign it later.
             foreach (var (sheetId, sheet) in state.Sheets)

@@ -7,9 +7,7 @@
 @inherits DisposableComponent
 
 <section class="dndm-panel dndm-rolllog">
-    <header class="dndm-panel-header @(OnHeaderClick.HasDelegate ? "dndm-rolllog-header--clickable" : null)"
-            @onclick="OnHeaderClickHandler"
-            title="@(OnHeaderClick.HasDelegate ? "Click to minimize" : null)">
+    <header class="dndm-panel-header">
         <span>Roll</span>
     </header>
     <div class="dndm-panel-body dndm-rolllog-body">
@@ -21,8 +19,8 @@
                     @onclick="QuickRoll">🎲 @QuickRollLabel</button>
         </div>
 
-        <details class="dndm-rolllog-config">
-            <summary class="dndm-rolllog-config-summary">Configuration</summary>
+        <details class="dndm-rolllog-config" open>
+            <summary class="dndm-rolllog-config-summary" title="Templates, custom dice, flat modifier, attribute binding, and label.">Configuration</summary>
             <div class="dndm-rolllog-config-body">
                 <section class="dndm-dice-quick">
                     <span class="dndm-label">Templates</span>
@@ -93,6 +91,7 @@
                         {
                             <span class="dndm-label" style="margin-top:0.4rem">From sheet</span>
                             <select class="dndm-select" @onchange="@(e => OnSheetChange((string?)e.Value))">
+                                <option value="" selected="@(Config.PickerSheetId is null)">— No sheet (GM) —</option>
                                 @foreach (var s in _pickableSheets)
                                 {
                                     <option value="@s.Id" selected="@(Config.PickerSheetId == s.Id)">@(string.IsNullOrEmpty(s.CharacterName) ? "(unnamed)" : s.CharacterName)</option>
@@ -148,7 +147,7 @@
             {
                 @foreach (var r in Visible)
                 {
-                    @RenderEntry(r)
+                    <RollLogEntry Roll="r" State="State" CurrentUserId="@CurrentUserId" IsHost="IsHost" />
                 }
             }
             <button class="dndm-btn dndm-btn--small dndm-btn--ghost dndm-rolllog-seeall"
@@ -169,64 +168,8 @@
 
 @if (_historyOpen)
 {
-    <div class="dndm-modal-overlay" @onclick="CloseHistory">
-        <div class="dndm-modal-card dndm-rolllog-history" role="dialog" aria-modal="true" @onclick:stopPropagation="true">
-            <header class="dndm-rolllog-history-header">
-                <h3 class="dndm-modal-title">Roll History</h3>
-                <button class="dndm-btn dndm-btn--icon dndm-btn--small" type="button" @onclick="CloseHistory">×</button>
-            </header>
-            <div class="dndm-rolllog-history-body">
-                @if (_historySnapshot.Count == 0)
-                {
-                    <div class="dndm-panel-empty">No rolls yet.</div>
-                }
-                else
-                {
-                    @foreach (var r in _historySnapshot)
-                    {
-                        @RenderEntry(r)
-                    }
-                }
-            </div>
-            <footer class="dndm-rolllog-history-footer">
-                <span class="dndm-rolllog-history-hint">Showing @_historySnapshot.Count snapshotted at @_historyCapturedAt.ToString("HH:mm:ss") — reopen to refresh.</span>
-                <button class="dndm-btn dndm-btn--ghost" type="button" @onclick="CloseHistory">Close</button>
-            </footer>
-        </div>
-    </div>
-}
-
-@code {
-    private RenderFragment RenderEntry(RollResult r) => __builder =>
-    {
-        <article @key="r.Id" class="dndm-rolllog-entry">
-            <header class="dndm-rolllog-meta">
-                <span class="dndm-rolllog-roller">@RollerName(r.RollerUserId)</span>
-                <span class="dndm-rolllog-formula" title="Dice formula">@r.Formula</span>
-                <span class="dndm-rolllog-label">@r.Label</span>
-                @if (r.Mode != RollMode.Normal)
-                {
-                    <span class="dndm-rolllog-mode">@(r.Mode == RollMode.Advantage ? "ADV" : "DIS")</span>
-                }
-                <time class="dndm-rolllog-time"
-                      datetime="@r.TimestampUtc.ToString("o")"
-                      title="@r.TimestampUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")">@FormatTimestamp(r.TimestampUtc)</time>
-            </header>
-            <div class="dndm-rolllog-dice">
-                <span class="dndm-rolllog-total"><strong>@r.Total</strong></span>
-                <span class="dndm-rolllog-dice-detail">
-                    @foreach (var d in r.Rolls)
-                    {
-                        <span class="@($"dndm-die{(d.Discarded ? " dndm-die--discarded" : "")}")"
-                              title="@DieTooltip(d)">@d.Result</span>
-                    }
-                    @if (r.FlatModifier != 0 || r.AttributeModifier is not null)
-                    {
-                        var mods = (r.FlatModifier) + (r.AttributeModifier ?? 0);
-                        <span class="dndm-rolllog-mod">@(mods >= 0 ? "+" : "")@mods</span>
-                    }
-                </span>
-            </div>
-        </article>
-    };
+    <RollHistoryModal State="State"
+                      CurrentUserId="@CurrentUserId"
+                      IsHost="IsHost"
+                      OnClose="CloseHistory" />
 }

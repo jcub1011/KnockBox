@@ -1,15 +1,24 @@
 @using KnockBox.Core.Components.Shared
 @inherits DisposableComponent
 
-<label class="dndm-vtf-import @(_importing ? "dndm-vtf-import--busy" : null)"
-       title="Import a .vtf archive as a new save slot">
+<label class="dndm-vtf-import dndm-vtf-import--icon @(_importing ? "dndm-vtf-import--busy" : null)"
+       title="Import a .vtf archive as a new save slot"
+       aria-label="Import .vtf archive">
     @if (_importing)
     {
-        <span>Importing…</span>
+        <span class="dndm-vtf-import-busy" aria-hidden="true">…</span>
     }
     else
     {
-        <span>Import .vtf</span>
+        @* Upload / import glyph: arrow pointing UP into a tray.
+           Visually inverse of the per-row Export icon (which is download). *@
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none"
+             stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="17 8 12 3 7 8" />
+            <line x1="12" y1="3" x2="12" y2="15" />
+        </svg>
     }
     <input type="file"
            @ref="_fileInput"

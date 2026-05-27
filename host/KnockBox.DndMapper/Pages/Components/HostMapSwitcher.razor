@@ -1,4 +1,5 @@
 @using KnockBox.Core.Components.Shared
+@using KnockBox.DndMapper.Pages.Components.Shared
 @using KnockBox.DndMapper.Services.State.Games
 @using KnockBox.DndMapper.Services.State.Games.Data
 @inherits DisposableComponent
@@ -31,9 +32,9 @@
                      @ondrop="@(() => OnDrop(idx))"
                      @onclick="@(() => OnRowClick(m.Id))">
                     <div class="dndm-mapsw-thumb">
-                        @if (m.Images.Count > 0)
+                        @if (m.Images.Length > 0)
                         {
-                            <span class="dndm-mapsw-thumb-tag">@m.Images.Count</span>
+                            <span class="dndm-mapsw-thumb-tag">@m.Images.Length</span>
                         }
                         else
                         {
@@ -57,26 +58,38 @@
                         <span class="dndm-mapsw-meta">@m.Grid.WidthCells×@m.Grid.HeightCells</span>
                     </div>
                     <div class="dndm-mapsw-actions">
-                        <button class="dndm-btn dndm-btn--icon dndm-btn--small"
-                                type="button"
-                                title="Rename"
-                                @onclick:stopPropagation="true"
-                                @onclick="@(() => StartRename(m))">✎</button>
-                        <button class="dndm-btn dndm-btn--icon dndm-btn--small"
-                                type="button"
-                                title="Map settings"
-                                @onclick:stopPropagation="true"
-                                @onclick="@(() => OpenSettings(m))">⚙</button>
-                        <button class="dndm-btn dndm-btn--icon dndm-btn--small"
-                                type="button"
-                                title="Duplicate"
-                                @onclick:stopPropagation="true"
-                                @onclick="@(() => OnDuplicate(m.Id))">⎘</button>
-                        <button class="dndm-btn dndm-btn--icon dndm-btn--small"
-                                type="button"
-                                title="Delete"
-                                @onclick:stopPropagation="true"
-                                @onclick="@(() => OnDeleteRequest(m))">×</button>
+                        <RailActionsMenu Title="Map actions">
+                            <button class="dndm-btn dndm-btn--icon dndm-btn--small"
+                                    type="button"
+                                    title="Rename"
+                                    @onclick:stopPropagation="true"
+                                    @onclick="@(() => StartRename(m))">✎</button>
+                            <button class="dndm-btn dndm-btn--icon dndm-btn--small"
+                                    type="button"
+                                    title="Map settings"
+                                    @onclick:stopPropagation="true"
+                                    @onclick="@(() => OpenSettings(m))">⚙</button>
+                            <button class="dndm-btn dndm-btn--icon dndm-btn--small"
+                                    type="button"
+                                    title="Duplicate"
+                                    @onclick:stopPropagation="true"
+                                    @onclick="@(() => OnDuplicate(m.Id))">⎘</button>
+                            <button class="dndm-btn dndm-btn--icon dndm-btn--small dndm-btn--danger"
+                                    type="button"
+                                    title="Delete"
+                                    @onclick:stopPropagation="true"
+                                    @onclick="@(() => OnDeleteRequest(m))">
+                                <svg viewBox="0 0 24 24" width="14" height="14" fill="none"
+                                     stroke="currentColor" stroke-width="2"
+                                     stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <polyline points="3 6 5 6 21 6" />
+                                    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                                    <line x1="10" y1="11" x2="10" y2="17" />
+                                    <line x1="14" y1="11" x2="14" y2="17" />
+                                    <path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" />
+                                </svg>
+                            </button>
+                        </RailActionsMenu>
                     </div>
                 </div>
             }

@@ -1,4 +1,5 @@
 @using KnockBox.Core.Components.Shared
+@using KnockBox.DndMapper.Pages.Components.Shared
 @using KnockBox.DndMapper.Services.Library
 @inherits DisposableComponent
 
@@ -7,8 +8,22 @@
         <span>Saves</span>
         <div class="dndm-savesp-header-actions">
             <VtfImportButton />
-            <button class="dndm-btn dndm-btn--small" type="button" title="Save current state to a new slot"
-                    @onclick="OpenCreate">+ New</button>
+            <button class="dndm-btn dndm-btn--small dndm-btn--icon" type="button"
+                    title="Save current state to a new slot"
+                    aria-label="Save as new slot"
+                    @onclick="OpenCreate">
+                @* Floppy-disk + plus glyph: "Save as new" — distinct from the per-row
+                   overwrite icon which is the plain floppy disk. *@
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none"
+                     stroke="currentColor" stroke-width="2"
+                     stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M15 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9l5 5v6" />
+                    <polyline points="14 21 14 13 7 13 7 21" />
+                    <polyline points="7 3 7 8 13 8" />
+                    <line x1="19" y1="15" x2="19" y2="21" />
+                    <line x1="16" y1="18" x2="22" y2="18" />
+                </svg>
+            </button>
         </div>
     </header>
     <div class="dndm-panel-body">
@@ -62,63 +77,65 @@
                                 </span>
                             </div>
                             <div class="dndm-saves-actions">
-                                <button class="dndm-btn dndm-btn--small dndm-btn--ghost dndm-btn--icon" type="button"
-                                        title="Export this slot as a .vtf archive"
-                                        disabled="@(_exportingSlotId is not null)"
-                                        @onclick="@(() => ExportSlot(s.Id))">
-                                    @if (_exportingSlotId == s.Id)
-                                    {
-                                        <span class="dndm-saves-export-busy" aria-hidden="true">…</span>
-                                    }
-                                    else
-                                    {
-                                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none"
-                                             stroke="currentColor" stroke-width="2"
-                                             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                                            <polyline points="7 10 12 15 17 10" />
-                                            <line x1="12" y1="15" x2="12" y2="3" />
-                                        </svg>
-                                    }
-                                </button>
-                                @if (!isAuto)
-                                {
-                                    <button class="dndm-btn dndm-btn--small dndm-btn--icon" type="button"
-                                            title="Overwrite this slot with current state"
-                                            @onclick="@(() => RequestOverwrite(s.Id))">
-                                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none"
-                                             stroke="currentColor" stroke-width="2"
-                                             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
-                                            <polyline points="17 21 17 13 7 13 7 21" />
-                                            <polyline points="7 3 7 8 15 8" />
-                                        </svg>
-                                    </button>
+                                <RailActionsMenu Title="Save actions">
                                     <button class="dndm-btn dndm-btn--small dndm-btn--ghost dndm-btn--icon" type="button"
-                                            title="Rename"
-                                            @onclick="@(() => BeginRename(s))">
-                                        <span class="dndm-rename-icon" aria-hidden="true">R<svg viewBox="0 0 6 14" width="6" height="14"
-                                                 fill="none" stroke="currentColor" stroke-width="1.2"
-                                                 stroke-linecap="round">
-                                                <line x1="3" y1="2" x2="3" y2="12" />
-                                                <line x1="1" y1="2" x2="5" y2="2" />
-                                                <line x1="1" y1="12" x2="5" y2="12" />
-                                            </svg></span>
+                                            title="Export this slot as a .vtf archive"
+                                            disabled="@(_exportingSlotId is not null)"
+                                            @onclick="@(() => ExportSlot(s.Id))">
+                                        @if (_exportingSlotId == s.Id)
+                                        {
+                                            <span class="dndm-saves-export-busy" aria-hidden="true">…</span>
+                                        }
+                                        else
+                                        {
+                                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none"
+                                                 stroke="currentColor" stroke-width="2"
+                                                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                                <polyline points="7 10 12 15 17 10" />
+                                                <line x1="12" y1="15" x2="12" y2="3" />
+                                            </svg>
+                                        }
                                     </button>
-                                    <button class="dndm-btn dndm-btn--small dndm-btn--danger dndm-btn--icon" type="button"
-                                            title="Delete"
-                                            @onclick="@(() => RequestDelete(s.Id))">
-                                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none"
-                                             stroke="currentColor" stroke-width="2"
-                                             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                            <polyline points="3 6 5 6 21 6" />
-                                            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-                                            <line x1="10" y1="11" x2="10" y2="17" />
-                                            <line x1="14" y1="11" x2="14" y2="17" />
-                                            <path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" />
-                                        </svg>
-                                    </button>
-                                }
+                                    @if (!isAuto)
+                                    {
+                                        <button class="dndm-btn dndm-btn--small dndm-btn--icon" type="button"
+                                                title="Overwrite this slot with current state"
+                                                @onclick="@(() => RequestOverwrite(s.Id))">
+                                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none"
+                                                 stroke="currentColor" stroke-width="2"
+                                                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                                                <polyline points="17 21 17 13 7 13 7 21" />
+                                                <polyline points="7 3 7 8 15 8" />
+                                            </svg>
+                                        </button>
+                                        <button class="dndm-btn dndm-btn--small dndm-btn--ghost dndm-btn--icon" type="button"
+                                                title="Rename"
+                                                @onclick="@(() => BeginRename(s))">
+                                            <span class="dndm-rename-icon" aria-hidden="true">R<svg viewBox="0 0 6 14" width="6" height="14"
+                                                     fill="none" stroke="currentColor" stroke-width="1.2"
+                                                     stroke-linecap="round">
+                                                    <line x1="3" y1="2" x2="3" y2="12" />
+                                                    <line x1="1" y1="2" x2="5" y2="2" />
+                                                    <line x1="1" y1="12" x2="5" y2="12" />
+                                                </svg></span>
+                                        </button>
+                                        <button class="dndm-btn dndm-btn--small dndm-btn--danger dndm-btn--icon" type="button"
+                                                title="Delete"
+                                                @onclick="@(() => RequestDelete(s.Id))">
+                                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none"
+                                                 stroke="currentColor" stroke-width="2"
+                                                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                                <polyline points="3 6 5 6 21 6" />
+                                                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                                                <line x1="10" y1="11" x2="10" y2="17" />
+                                                <line x1="14" y1="11" x2="14" y2="17" />
+                                                <path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" />
+                                            </svg>
+                                        </button>
+                                    }
+                                </RailActionsMenu>
                             </div>
                         }
                     </li>

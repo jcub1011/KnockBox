@@ -7,6 +7,11 @@ services:
     ports:
       - "8080:8080"
       - "8081:8081"
+    # Gives DATAS + GCHeapHardLimitPercent (set in KnockBox.csproj) a real
+    # cgroup ceiling to size against. Without a limit the GC sizes for host
+    # RAM, which defeats the point of the heap cap. Adjust after measuring.
+    mem_limit: 512m
+    mem_reservation: 256m
     volumes:
       - knockbox-data:/app/data
 

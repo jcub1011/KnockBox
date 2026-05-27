@@ -72,5 +72,44 @@
                 <span>Players can see other players' sheets</span>
             </label>
         </div>
+
+        <div class="dndm-panel-section">
+            <label class="dndm-toggle">
+                <input type="checkbox"
+                       checked="@State.Settings.LoadedDiceEnabled"
+                       @onchange="@(e => SetLoadedDiceEnabled(e.Value is bool b && b))" />
+                <span class="dndm-toggle-track"></span>
+                <span>Loaded dice</span>
+            </label>
+            <span class="dndm-dice-hint">When on, rules under the Loaded Dice panel rewrite dice results.</span>
+        </div>
+
+        <div class="dndm-panel-section">
+            <span class="dndm-label">Rule visibility</span>
+            <div class="dndm-pillgroup">
+                <button class="@PillCls(State.Settings.LoadedDiceRuleVisibility == LoadedDiceRuleVisibility.HostOnly)"
+                        type="button"
+                        disabled="@(!State.Settings.LoadedDiceEnabled)"
+                        @onclick="@(() => SetLoadedDiceVisibility(LoadedDiceRuleVisibility.HostOnly))">Host only</button>
+                <button class="@PillCls(State.Settings.LoadedDiceRuleVisibility == LoadedDiceRuleVisibility.AllPlayers)"
+                        type="button"
+                        disabled="@(!State.Settings.LoadedDiceEnabled)"
+                        @onclick="@(() => SetLoadedDiceVisibility(LoadedDiceRuleVisibility.AllPlayers))">All players</button>
+            </div>
+        </div>
+
+        <div class="dndm-panel-section">
+            <span class="dndm-label">Player indicator on modified rolls</span>
+            <div class="dndm-pillgroup">
+                <button class="@PillCls(State.Settings.LoadedDicePlayerIndicator == LoadedDicePlayerIndicator.Hidden)"
+                        type="button"
+                        disabled="@(!State.Settings.LoadedDiceEnabled)"
+                        @onclick="@(() => SetLoadedDicePlayerIndicator(LoadedDicePlayerIndicator.Hidden))">Hidden</button>
+                <button class="@PillCls(State.Settings.LoadedDicePlayerIndicator == LoadedDicePlayerIndicator.RedDotInLog)"
+                        type="button"
+                        disabled="@(!State.Settings.LoadedDiceEnabled)"
+                        @onclick="@(() => SetLoadedDicePlayerIndicator(LoadedDicePlayerIndicator.RedDotInLog))">Red dot in log</button>
+            </div>
+        </div>
     </div>
 </section>

@@ -1,23 +1,35 @@
 // dndMapperDiceBox.js
 // Thin wrapper around @3d-dice/dice-box-threejs. One DiceBox instance per
-// rolling user so concurrent rolls can carry different colors. Each box's
+// dice-box-key so concurrent rolls can carry different colors. Each box's
 // container <div> is appended to the supplied overlay element; the dice-box
 // library mounts its own canvas inside. Physics is independent per client —
 // the authoritative outcome is forced via the library's "@N" notation so the
 // rolled face matches the server result regardless of local simulation.
+//
+// boxKey is the composite key from DiceCanvas: "user:{id}" for user-attributed
+// rolls and "token:{id}" for token-bound rolls (NPC initiative). Distinct
+// keys mean distinct DiceBox instances side-by-side.
 
 import DiceBox from "/_content/KnockBox.DndMapper/lib/dice-box-threejs/dice-box.es.js";
 
 const FADE_MS = 3000;
-const boxes = new Map(); // userId -> { box, container, color, fontColor, fadeTimer, currentRollId, dotnet, ready }
+const boxes = new Map(); // boxKey -> { box, container, color, fontColor, fadeTimer, currentRollId, dotnet, ready }
 
-function safeId(userId) {
-    return userId.replace(/[^a-zA-Z0-9_-]/g, "_");
+// Three.js scene construction + asset load inside DiceBox.initialize() is
+// heavy. Running several in parallel (e.g. the host's "roll all NPC
+// initiative" burst, which fires N rolls in one notification) saturates the
+// main thread. Serialize the init phase through this promise chain so only
+// one box initializes at a time; rolls themselves still run concurrently
+// across boxes because roll() is fire-and-forget further down.
+let initChain = Promise.resolve();
+
+function safeId(boxKey) {
+    return boxKey.replace(/[^a-zA-Z0-9_-]/g, "_");
 }
 
-function customColorset(userId, color, fontColor) {
+function customColorset(boxKey, color, fontColor) {
     return {
-        name: `kb-${safeId(userId)}`,
+        name: `kb-${safeId(boxKey)}`,
         background: color,
         foreground: fontColor,
         texture: "none",
@@ -25,8 +37,25 @@ function customColorset(userId, color, fontColor) {
     };
 }
 
-async function ensureBox(overlay, userId, color, fontColor) {
-    let entry = boxes.get(userId);
+function ensureBox(overlay, boxKey, color, fontColor) {
+    // Cache-hit fast path: a warm box (matching colors) returns immediately
+    // without waiting its turn on initChain. Without this, a rollFor on an
+    // already-prewarmed token would still queue behind any in-flight cold
+    // prewarms of *other* tokens, which defeats the whole point.
+    const existing = boxes.get(boxKey);
+    if (existing && existing.color === color && existing.fontColor === fontColor) {
+        return Promise.resolve(existing);
+    }
+    const next = initChain.then(() => ensureBoxInternal(overlay, boxKey, color, fontColor));
+    // Swallow rejections on the chain itself so one failed init doesn't
+    // poison every subsequent prewarm/roll. Individual callers still see
+    // the rejection via the returned promise.
+    initChain = next.catch(() => { });
+    return next;
+}
+
+async function ensureBoxInternal(overlay, boxKey, color, fontColor) {
+    let entry = boxes.get(boxKey);
     if (entry && entry.color === color && entry.fontColor === fontColor) {
         return entry;
     }
@@ -35,17 +64,17 @@ async function ensureBox(overlay, userId, color, fontColor) {
         try { entry.box.clearDice(); } catch (_) { /* ignore */ }
         if (entry.fadeTimer) clearTimeout(entry.fadeTimer);
         if (entry.container && entry.container.parentNode) entry.container.parentNode.removeChild(entry.container);
-        boxes.delete(userId);
+        boxes.delete(boxKey);
     }
 
     const container = document.createElement("div");
-    container.id = `dndm-dice-${safeId(userId)}`;
+    container.id = `dndm-dice-${safeId(boxKey)}`;
     container.style.cssText = "position:absolute;inset:0;pointer-events:none;";
     overlay.appendChild(container);
 
     const box = new DiceBox(`#${container.id}`, {
         assetPath: "/_content/KnockBox.DndMapper/dice/",
-        theme_customColorset: customColorset(userId, color, fontColor),
+        theme_customColorset: customColorset(boxKey, color, fontColor),
         theme_surface: "green-felt",
         theme_material: "plastic",
         baseScale: 100,
@@ -73,13 +102,34 @@ async function ensureBox(overlay, userId, color, fontColor) {
         dotnet: null,
         ready: true,
     };
-    boxes.set(userId, entry);
+    boxes.set(boxKey, entry);
     return entry;
 }
 
-export async function rollFor(overlay, userId, color, fontColor, notation, dotnet, rollId) {
+// Queue (or reuse) DiceBox scenes for a batch of token keys without rolling.
+// Lets the host prewarm every NPC combatant the moment combat enters
+// WaitingForRolls so the later bulk-roll burst hits warm caches. We fire
+// ensureBox per config but don't await — each one threads through initChain
+// internally, and returning immediately means C# only pays one round-trip
+// regardless of how many NPCs are in the turn order. Cold prewarms keep
+// initializing in the background while the host reads the panel.
+//
+// configs: [{ boxKey, color, fontColor }, ...]
+export function prewarmBoxes(overlay, configs) {
+    if (!overlay || !Array.isArray(configs)) return;
+    for (const c of configs) {
+        if (!c || !c.boxKey) continue;
+        // Discard the promise — initChain inside ensureBox guarantees
+        // sequential init, and a per-prewarm failure shouldn't poison the
+        // batch. The next rollFor for the same key will surface any real
+        // failure to the caller.
+        ensureBox(overlay, c.boxKey, c.color, c.fontColor).catch(() => { });
+    }
+}
+
+export async function rollFor(overlay, boxKey, color, fontColor, notation, dotnet, rollId) {
     if (!overlay || !notation) return;
-    const entry = await ensureBox(overlay, userId, color, fontColor);
+    const entry = await ensureBox(overlay, boxKey, color, fontColor);
     entry.dotnet = dotnet;
 
     // Interrupt any in-flight roll for this user: clear the pending fade and
@@ -103,19 +153,32 @@ export async function rollFor(overlay, userId, color, fontColor, notation, dotne
             if (entry.currentRollId === rollId) entry.currentRollId = null;
         }, FADE_MS);
         try {
-            await dotnet.invokeMethodAsync("OnRollSettled", userId, settledRollId);
+            await dotnet.invokeMethodAsync("OnRollSettled", boxKey, settledRollId);
         } catch (_) { /* circuit gone — fine */ }
     };
 
-    try {
-        await entry.box.roll(notation);
-    } catch (e) {
-        // If parsing or rolling threw, immediately settle so the log isn't
-        // permanently stuck hiding this roll.
+    // Fire-and-forget: dice-box's roll() promise resolves only when the
+    // physics simulation finishes, but settle is already wired through the
+    // onRollComplete callback above. Awaiting here would serialize sibling
+    // rollFor() calls (each at a *different* DiceBox instance) inside the
+    // caller's loop, defeating the per-NPC concurrent rendering that the
+    // per-token box keys are designed to enable.
+    //
+    // Outer try/catch covers a *synchronous* throw from roll() (e.g. a
+    // notation-parser exception before the promise is created); the inner
+    // .catch covers async rejection. Both routes land on the same settle
+    // call so a malformed roll can't strand the log indefinitely.
+    const onRollFailed = async (e) => {
         if (entry.currentRollId === rollId) entry.currentRollId = null;
-        try { await dotnet.invokeMethodAsync("OnRollSettled", userId, rollId); } catch (_) { /* ignore */ }
+        try { await dotnet.invokeMethodAsync("OnRollSettled", boxKey, rollId); } catch (_) { /* ignore */ }
         // eslint-disable-next-line no-console
         console.warn("dndMapperDiceBox.roll failed", e);
+    };
+    try {
+        const p = entry.box.roll(notation);
+        if (p && typeof p.catch === "function") p.catch(onRollFailed);
+    } catch (e) {
+        await onRollFailed(e);
     }
 }
 
