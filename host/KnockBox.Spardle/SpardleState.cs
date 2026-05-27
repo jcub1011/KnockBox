@@ -103,6 +103,19 @@ public class SpardleState(User host, ILogger logger) : AbstractGameState(host, l
 
     internal void SetHostIsParticipant(bool value) => HostIsParticipant = value;
 
+    // The participant roster captured at game start, frozen for the match. Used by
+    // the final standings screen so players who disconnect (and are dropped from the
+    // live Players roster) still appear on the end-screen leaderboard. PlayerStates
+    // already persists their TotalScore, so leavers keep their final score.
+    public ImmutableArray<PlayerEntry> Participants { get; private set; } = [];
+
+    internal void SetParticipants(IEnumerable<PlayerEntry> participants) =>
+        // Drop the unsubscriber token so the long-lived snapshot doesn't retain
+        // registration handles; only User + DisplayName are needed for display.
+        Participants = participants
+            .Select(e => new PlayerEntry(e.User, e.DisplayName, null))
+            .ToImmutableArray();
+
     /// <summary>
     /// Creates (or returns the existing) <see cref="PlayerState"/> for <paramref name="userId"/>.
     /// Mutates <see cref="PlayerStates"/>; callers MUST be inside <c>Execute</c>/<c>ExecuteAsync</c>.

@@ -309,6 +309,68 @@ public class SpardleEngineTests
     }
 
     [TestMethod]
+    public async Task StartAsync_CapturesParticipantsSnapshot_SurvivesPlayerLeaving()
+    {
+        var (state, host) = await CreateStateAsync();
+        var p1 = UserFactory.Create("P1", Guid.NewGuid().ToString());
+        var p2 = UserFactory.Create("P2", Guid.NewGuid().ToString());
+        var reg1 = state.RegisterPlayer(p1);
+        var reg2 = state.RegisterPlayer(p2);
+        Assert.IsTrue(reg1.TryGetSuccess(out var token1));
+        Assert.IsTrue(reg2.IsSuccess);
+        state.TotalRounds = 1;
+        state.CustomWordPool = ["apple"];
+
+        await _engine.StartAsync(host, state);
+
+        // Host observes (others present), so the snapshot is the two players.
+        CollectionAssert.AreEquivalent(
+            new[] { p1.Id, p2.Id },
+            state.Participants.Select(e => e.User.Id).ToList());
+
+        // P1 leaves: disposing the registration token drops them from the live roster.
+        token1!.Dispose();
+
+        // The live roster shrinks, but the frozen snapshot is unchanged — the end
+        // screen still lists P1.
+        Assert.IsFalse(state.Players.Any(e => e.User.Id == p1.Id));
+        CollectionAssert.AreEquivalent(
+            new[] { p1.Id, p2.Id },
+            state.Participants.Select(e => e.User.Id).ToList());
+        Assert.IsTrue(state.PlayerStates.ContainsKey(p1.Id));
+    }
+
+    [TestMethod]
+    public async Task PlayerLeaving_DoesNotBlockRoundEnd_WhenRemainingPlayersFinished()
+    {
+        var (state, host) = await CreateStateAsync();
+        var p1 = UserFactory.Create("P1", Guid.NewGuid().ToString());
+        var p2 = UserFactory.Create("P2", Guid.NewGuid().ToString());
+        Assert.IsTrue(state.RegisterPlayer(p1).IsSuccess);
+        Assert.IsTrue(state.RegisterPlayer(p2).TryGetSuccess(out var token2));
+
+        state.TotalRounds = 2;
+        state.TransitionDuration = TimeSpan.FromMilliseconds(80);
+        state.RoundTimer = TimeSpan.FromSeconds(30);
+        state.WaitForAll = true;
+        state.CustomWordPool = ImmutableList.Create("apple", "brave");
+        state.WordOrderMode = WordOrderMode.ListOrder;
+
+        await _engine.StartAsync(host, state);
+        await WaitForPhaseAsync(state, GamePhase.Playing, timeoutMs: 1500);
+
+        // P1 solves; with WaitForAll the round must wait on the still-playing P2.
+        Assert.IsTrue(_engine.SubmitGuess(state, p1, "apple").IsSuccess);
+        Assert.AreEqual(GamePhase.Playing, state.Phase);
+
+        // P2 leaves without finishing — the round should now complete instead of
+        // hanging on a player who is gone.
+        token2!.Dispose();
+
+        Assert.AreEqual(GamePhase.RoundResults, state.Phase);
+    }
+
+    [TestMethod]
     public async Task SubmitGuess_ObserverHost_ReturnsError()
     {
         var (state, host, _) = await CreateStateWithPlayersAsync(1);

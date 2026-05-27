@@ -21,7 +21,20 @@ public class SpardleEngine(
     {
         var state = new SpardleState(host, _logger);
         state.Execute(() => state.SetJoinable(true));
+        // A mid-round departure removes the player from the live roster but leaves no
+        // guess to trigger CheckRoundEnd, so re-check here or the round hangs until the
+        // timer (or forever, when unlimited) waiting on someone who already left.
+        state.SubscribePlayerUnregistered(player => HandlePlayerLeft(state, player));
         return Task.FromResult<ValueResult<AbstractGameState>>(state);
+    }
+
+    private void HandlePlayerLeft(SpardleState state, User player)
+    {
+        state.Execute(() =>
+        {
+            if (state.Phase == GamePhase.Playing && state.IsRoundActive)
+                CheckRoundEnd(state);
+        });
     }
 
     protected override Task<Result> StartAsyncCore(AbstractGameState state, CancellationToken ct = default)
@@ -34,6 +47,9 @@ public class SpardleEngine(
             // once the lobby is non-joinable, RegisterPlayer rejects new joins.
             s.SetJoinable(false);
             s.SetHostIsParticipant(s.Players.Count == 0 || s.HostPlaysAlong);
+            // Freeze the participant roster now so the final standings screen can show
+            // everyone even after disconnects prune them from the live Players roster.
+            s.SetParticipants(s.HostIsParticipant ? s.RosterIncludingHost : s.Players);
             s.CurrentRound = 0;
             s.IsGameOver = false;
             s.RoundHistory = s.RoundHistory.Clear();
@@ -696,21 +712,37 @@ public class SpardleEngine(
 
     private void CheckRoundEnd(SpardleState state)
     {
+        // Only consider players who are still present. PlayerStates retains entries for
+        // players who have left (so the final standings keep them), but an unfinished
+        // leaver must not hold the round open. An empty set ends the round immediately.
+        var active = ActiveParticipantStates(state).ToList();
+
         bool shouldEnd;
         if (state.WaitForAll)
         {
-            shouldEnd = state.PlayerStates.Values.All(p => p.HasFinishedRound);
+            shouldEnd = active.All(p => p.HasFinishedRound);
         }
         else if (state.WinCondition == WinConditionMode.Sprinter)
         {
-            shouldEnd = state.PlayerStates.Values.Any(p => p.HasFinishedRound && !p.Dnf)
-                        || state.PlayerStates.Values.All(p => p.HasFinishedRound);
+            shouldEnd = active.Any(p => p.HasFinishedRound && !p.Dnf)
+                        || active.All(p => p.HasFinishedRound);
         }
         else // Tactician
         {
-            shouldEnd = state.PlayerStates.Values.All(p => p.HasFinishedRound);
+            shouldEnd = active.All(p => p.HasFinishedRound);
         }
 
         if (shouldEnd) CompleteRound(state);
+    }
+
+    // The PlayerStates for players currently in the live roster (host included when
+    // participating). Used by round-end checks so departed players don't block the round.
+    // Caller must hold the execute lock (TryGetPlayerState is a read-only lookup).
+    private static IEnumerable<PlayerState> ActiveParticipantStates(SpardleState state)
+    {
+        var roster = state.HostIsParticipant ? state.RosterIncludingHost : state.Players;
+        foreach (var entry in roster)
+            if (state.TryGetPlayerState(entry.User.Id, out var ps))
+                yield return ps;
     }
 }
