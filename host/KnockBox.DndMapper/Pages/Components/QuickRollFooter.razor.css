@@ -50,6 +50,10 @@
     align-items: center;
     gap: 0.6rem;
     flex: 0 0 auto;
+    position: absolute;
+    bottom: 3rem;
+    left: calc(0.5rem + var(--dndm-rail-pad-left, 0px));
+    text-shadow: 0 0 5px rgba(0, 0, 0, 0.8);
 }
 
 /* Main roll button — the dominant action, so it carries the ember-primary
@@ -303,7 +307,7 @@
 }
 
 .dndm-rollfooter__hint {
-    color: var(--dndm-text-muted);
+    color: white;
     font-size: 0.78rem;
     font-style: italic;
     white-space: nowrap;

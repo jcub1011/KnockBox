@@ -5,6 +5,9 @@
 @inherits DisposableComponent
 
 <div class="dndm-rollfooter @((_logOpen || _presetsOpen) ? "dndm-rollfooter--popover" : null)">
+    <div class="dndm-rollfooter__right">
+        <span class="dndm-rollfooter__hint" aria-hidden="true">Shift = Adv · Ctrl = Dis</span>
+    </div>
     <div class="dndm-rollfooter__left">
         <button class="dndm-rollfooter__log"
                 type="button"
@@ -161,10 +164,6 @@
                 </button>
             }
         </div>
-    </div>
-
-    <div class="dndm-rollfooter__right">
-        <span class="dndm-rollfooter__hint" aria-hidden="true">Shift = Adv · Ctrl = Dis</span>
     </div>
 </div>
 

@@ -80,7 +80,11 @@ namespace KnockBox.DndMapper.Pages.Components
             }
         }
 
-        private void ToggleLog() => _logOpen = !_logOpen;
+        private void ToggleLog()
+        {
+            _logOpen = !_logOpen;
+            if (_logOpen) _presetsOpen = false;
+        }
 
         private void OpenHistory() => _historyOpen = true;
         private void CloseHistory() => _historyOpen = false;
@@ -91,7 +95,11 @@ namespace KnockBox.DndMapper.Pages.Components
         // (quantity + sides) to the shared Config — attribute / flat / mode /
         // label are deliberately left untouched — so the main roll button just
         // changes which dice it throws. The Library button opens the full modal.
-        private void TogglePresets() => _presetsOpen = !_presetsOpen;
+        private void TogglePresets()
+        {
+            _presetsOpen = !_presetsOpen;
+            if (_presetsOpen) _logOpen = false;
+        }
 
         // Same cascade RollLogPanel.VisibleRollTemplates uses (built-in →
         // global → active sheet), keyed off this footer's ActiveSheet.
