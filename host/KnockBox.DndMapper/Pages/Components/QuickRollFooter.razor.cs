@@ -229,7 +229,7 @@ namespace KnockBox.DndMapper.Pages.Components
         private string QuickRollLabel => BuildFormula();
 
         private string QuickRollTitle => CanQuickRoll
-            ? $"{BuildFormula()} — click to roll. Hold Shift / Ctrl to override mode."
+            ? $"{BuildFormula()} — click to roll. Hold Shift for Advantage / Ctrl for Disadvantage"
             : "Open settings (⚙) to configure dice first.";
 
         private string BuildFormula()

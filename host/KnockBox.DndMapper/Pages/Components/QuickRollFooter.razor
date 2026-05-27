@@ -5,165 +5,183 @@
 @inherits DisposableComponent
 
 <div class="dndm-rollfooter @((_logOpen || _presetsOpen) ? "dndm-rollfooter--popover" : null)">
-    <div class="dndm-rollfooter__right">
+    @* <div class="dndm-rollfooter__right">
         <span class="dndm-rollfooter__hint" aria-hidden="true">Shift = Adv · Ctrl = Dis</span>
-    </div>
-    <div class="dndm-rollfooter__left">
-        <button class="dndm-rollfooter__log"
-                type="button"
-                aria-expanded="@_logOpen"
-                title="@(_logOpen ? "Hide recent rolls" : "Show the 5 most recent rolls")"
-                @onclick="ToggleLog">🗒</button>
+    </div> *@
+    <button class="dndm-rollfooter__log"
+            type="button"
+            aria-expanded="@_logOpen"
+            title="@(_logOpen ? "Hide recent rolls" : "Show the 5 most recent rolls")"
+            @onclick="ToggleLog">
+        🗒
+    </button>
 
-        @if (_logOpen)
-        {
-            <div class="dndm-rollfooter__recent" role="dialog" aria-label="Recent rolls">
-                <header class="dndm-rollfooter__recent-head">
-                    <span class="dndm-label">Recent rolls</span>
-                    <div class="dndm-rollfooter__recent-actions">
-                        <button class="dndm-btn dndm-btn--small dndm-btn--ghost"
-                                type="button"
-                                title="Open the full roll log"
-                                @onclick="OpenHistory">See all rolls</button>
-                        <button class="dndm-btn dndm-btn--icon dndm-btn--small"
-                                type="button"
-                                aria-label="Close recent rolls"
-                                title="Close"
-                                @onclick="ToggleLog">×</button>
-                    </div>
-                </header>
-                @if (RecentRolls.Count == 0)
-                {
-                    <div class="dndm-panel-empty">No rolls yet.</div>
-                }
-                else
-                {
-                    @foreach (var r in RecentRolls)
-                    {
-                        <RollLogEntry Roll="r" State="State" CurrentUserId="@CurrentUserId" IsHost="IsHost" />
-                    }
-                }
-            </div>
-        }
-        
-        <button class="dndm-rollfooter__gear"
-                type="button"
-                aria-label="Dice presets"
-                aria-expanded="@_presetsOpen"
-                title="@(_presetsOpen ? "Hide dice presets" : "Pick dice: templates, a custom die, or the full library")"
-                @onclick="TogglePresets">⚙</button>
-
-        @if (_presetsOpen)
-        {
-            <div class="dndm-rollfooter__presets" role="dialog" aria-label="Dice presets">
-                <header class="dndm-rollfooter__recent-head">
-                    <span class="dndm-label">Dice presets</span>
-                    <div class="dndm-rollfooter__recent-actions">
-                        <button class="dndm-btn dndm-btn--small dndm-btn--ghost"
-                                type="button"
-                                title="Open the full roll settings"
-                                @onclick="OpenSettings">Library</button>
-                        <button class="dndm-btn dndm-btn--icon dndm-btn--small"
-                                type="button"
-                                aria-label="Close dice presets"
-                                title="Close"
-                                @onclick="TogglePresets">×</button>
-                    </div>
-                </header>
-
-                <div class="dndm-rollfooter__preset-setting">
-                    <span class="dndm-label">Presets</span>
-                    <div class="dndm-rollfooter__preset-list">
-                        @foreach (var t in VisibleTemplates)
-                        {
-                            <button @key="t.Id"
-                                    class="dndm-rollfooter__preset"
-                                    type="button"
-                                    title="@TemplateTooltip(t)"
-                                    @onclick="@(() => ApplyDice(t.Dice))">@t.Name</button>
-                        }
-                    </div>
+    @if (_logOpen)
+    {
+        <div class="dndm-rollfooter__recent" role="dialog" aria-label="Recent rolls">
+            <header class="dndm-rollfooter__recent-head">
+                <span class="dndm-label">Recent rolls</span>
+                <div class="dndm-rollfooter__recent-actions">
+                    <button class="dndm-btn dndm-btn--small dndm-btn--ghost"
+                            type="button"
+                            title="Open the full roll log"
+                            @onclick="OpenHistory">
+                        See all rolls
+                    </button>
+                    <button class="dndm-btn dndm-btn--icon dndm-btn--small"
+                            type="button"
+                            aria-label="Close recent rolls"
+                            title="Close"
+                            @onclick="ToggleLog">
+                        ×
+                    </button>
                 </div>
-
-                <div style="display: flex; flex-direction: row; flex-wrap: wrap; gap: 1rem;">
-                    <div class="dndm-rollfooter__preset-setting">
-                        <span class="dndm-label">Modifier</span>
-                        <input type="number"
-                               class="dndm-input dndm-input--num"
-                               value="@Config.FlatModifier"
-                               @onchange="@(e => OnFlatModChange(e.Value))" />
-                    </div>
-
-                    <div class="dndm-rollfooter__custom">
-                        <span class="dndm-label">Custom</span>
-                        <div class="dndm-rollfooter__custom-row">
-                            <input type="number" min="0" max="20"
-                                   class="dndm-input dndm-input--num"
-                                   value="@_customCount"
-                                   @onchange="@(e => OnCustomCount(e.Value))" />
-                            <span class="dndm-rollfooter__custom-d">d</span>
-                            <select class="dndm-select"
-                                    @onchange="@(e => OnCustomSides(e.Value))"
-                                    title="@(_customSides == 100 ? "d100 rolls as percentile dice: a tens die (00-90) plus a units die (0-9)." : null)">
-                                @foreach (var s in DieSizes)
-                                {
-                                    <option value="@s" selected="@(s == _customSides)">@(s == 100 ? "100 (d%)" : s.ToString())</option>
-                                }
-                            </select>
-                            <button class="dndm-btn dndm-btn--small dndm-btn--primary"
-                                    type="button"
-                                    title="Use these dice"
-                                    @onclick="ApplyCustom">Use</button>
-                        </div>
-                    </div>
-                </div>
-
-                @if (IsHost)
-                {
-                    <div class="dndm-rollfooter__preset-setting">
-                        <span class="dndm-label">From Sheet</span>
-                        <select class="dndm-select" @onchange="@(e => OnSheetChange((string?)e.Value))">
-                            <option value="" selected="@(Config.PickerSheetId is null)">— No sheet (GM) —</option>
-                            @foreach (var s in PickableSheets)
-                            {
-                                <option value="@s.Id" selected="@(Config.PickerSheetId == s.Id)">@(string.IsNullOrEmpty(s.CharacterName) ? "(unnamed)" : s.CharacterName)</option>
-                            }
-                        </select>
-                    </div>
-                }
-            </div>
-        }
-
-        <button class="dndm-rollfooter__rollbtn"
-                type="button"
-                title="@QuickRollTitle"
-                disabled="@(!CanQuickRoll)"
-                @onclick="QuickRoll">🎲 @QuickRollLabel</button>
-
-        @if (ShowAttrArrow)
-        {
-            <button class="dndm-rollfooter__arrow"
-                    type="button"
-                    aria-expanded="@_attrsExpanded"
-                    title="@(_attrsExpanded ? "Hide attribute rolls" : "Show a quick-roll button for each attribute")"
-                    @onclick="ToggleAttrs">@(_attrsExpanded ? "▾" : "▸")</button>
-        }
-
-        <div class="dndm-rollfooter__attrs @(_attrsExpanded ? "dndm-rollfooter__attrs--open" : null)">
-            @foreach (var row in NumericRows)
+            </header>
+            @if (RecentRolls.Count == 0)
             {
-                var mod = AttrModifier(row);
-                <button @key="row.Name"
-                        class="dndm-rollfooter__attr"
-                        type="button"
-                        tabindex="@(_attrsExpanded ? 0 : -1)"
-                        title="@AttrTitle(row, mod)"
-                        @onclick="@(e => RollAttribute(row, e))">
-                    <span class="dndm-rollfooter__attr-name">@row.Name</span>
-                    <span class="dndm-rollfooter__attr-mod">@FormatSigned(mod)</span>
-                </button>
+                <div class="dndm-panel-empty">No rolls yet.</div>
+            }
+            else
+            {
+                @foreach (var r in RecentRolls)
+                {
+                    <RollLogEntry Roll="r" State="State" CurrentUserId="@CurrentUserId" IsHost="IsHost" />
+                }
             }
         </div>
+    }
+
+    <button class="dndm-rollfooter__gear"
+            type="button"
+            aria-label="Dice presets"
+            aria-expanded="@_presetsOpen"
+            title="@(_presetsOpen ? "Hide dice presets" : "Pick dice: templates, a custom die, or the full library")"
+            @onclick="TogglePresets">
+        ⚙
+    </button>
+
+    @if (_presetsOpen)
+    {
+        <div class="dndm-rollfooter__presets" role="dialog" aria-label="Dice presets">
+            <header class="dndm-rollfooter__recent-head">
+                <span class="dndm-label">Dice presets</span>
+                <div class="dndm-rollfooter__recent-actions">
+                    <button class="dndm-btn dndm-btn--small dndm-btn--ghost"
+                            type="button"
+                            title="Open the full roll settings"
+                            @onclick="OpenSettings">
+                        Library
+                    </button>
+                    <button class="dndm-btn dndm-btn--icon dndm-btn--small"
+                            type="button"
+                            aria-label="Close dice presets"
+                            title="Close"
+                            @onclick="TogglePresets">
+                        ×
+                    </button>
+                </div>
+            </header>
+
+            <div class="dndm-rollfooter__preset-setting">
+                <span class="dndm-label">Presets</span>
+                <div class="dndm-rollfooter__preset-list">
+                    @foreach (var t in VisibleTemplates)
+                    {
+                        <button @key="t.Id"
+                                class="dndm-rollfooter__preset"
+                                type="button"
+                                title="@TemplateTooltip(t)"
+                                @onclick="@(() => ApplyDice(t.Dice))">
+                            @t.Name
+                        </button>
+                    }
+                </div>
+            </div>
+
+            <div style="display: flex; flex-direction: row; flex-wrap: wrap; gap: 1rem;">
+                <div class="dndm-rollfooter__preset-setting">
+                    <span class="dndm-label">Modifier</span>
+                    <input type="number"
+                           class="dndm-input dndm-input--num"
+                           value="@Config.FlatModifier"
+                           @onchange="@(e => OnFlatModChange(e.Value))" />
+                </div>
+
+                <div class="dndm-rollfooter__custom">
+                    <span class="dndm-label">Custom</span>
+                    <div class="dndm-rollfooter__custom-row">
+                        <input type="number" min="0" max="20"
+                               class="dndm-input dndm-input--num"
+                               value="@_customCount"
+                               @onchange="@(e => OnCustomCount(e.Value))" />
+                        <span class="dndm-rollfooter__custom-d">d</span>
+                        <select class="dndm-select"
+                                @onchange="@(e => OnCustomSides(e.Value))"
+                                title="@(_customSides == 100 ? "d100 rolls as percentile dice: a tens die (00-90) plus a units die (0-9)." : null)">
+                            @foreach (var s in DieSizes)
+                            {
+                                <option value="@s" selected="@(s == _customSides)">@(s == 100 ? "100 (d%)" : s.ToString())</option>
+                            }
+                        </select>
+                        <button class="dndm-btn dndm-btn--small dndm-btn--primary"
+                                type="button"
+                                title="Use these dice"
+                                @onclick="ApplyCustom">
+                            Use
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            @if (IsHost)
+            {
+                <div class="dndm-rollfooter__preset-setting">
+                    <span class="dndm-label">From Sheet</span>
+                    <select class="dndm-select" @onchange="@(e => OnSheetChange((string?)e.Value))">
+                        <option value="" selected="@(Config.PickerSheetId is null)">— No sheet (GM) —</option>
+                        @foreach (var s in PickableSheets)
+                        {
+                            <option value="@s.Id" selected="@(Config.PickerSheetId == s.Id)">@(string.IsNullOrEmpty(s.CharacterName) ? "(unnamed)" : s.CharacterName)</option>
+                        }
+                    </select>
+                </div>
+            }
+        </div>
+    }
+
+    <button class="dndm-rollfooter__rollbtn"
+            type="button"
+            title="@QuickRollTitle"
+            disabled="@(!CanQuickRoll)"
+            @onclick="QuickRoll">
+        🎲 @QuickRollLabel
+    </button>
+
+    @if (ShowAttrArrow)
+    {
+        <button class="dndm-rollfooter__arrow"
+                type="button"
+                aria-expanded="@_attrsExpanded"
+                title="@(_attrsExpanded ? "Hide attribute rolls" : "Show a quick-roll button for each attribute")"
+                @onclick="ToggleAttrs">
+            @(_attrsExpanded ? "▾" : "▸")
+        </button>
+    }
+
+    <div class="dndm-rollfooter__attrs @(_attrsExpanded ? "dndm-rollfooter__attrs--open" : null)">
+        @foreach (var row in NumericRows)
+        {
+            var mod = AttrModifier(row);
+            <button @key="row.Name"
+                    class="dndm-rollfooter__attr"
+                    type="button"
+                    tabindex="@(_attrsExpanded ? 0 : -1)"
+                    title="@AttrTitle(row, mod)"
+                    @onclick="@(e => RollAttribute(row, e))">
+                <span class="dndm-rollfooter__attr-name">@row.Name</span>
+                <span class="dndm-rollfooter__attr-mod">@FormatSigned(mod)</span>
+            </button>
+        }
     </div>
 </div>
 
