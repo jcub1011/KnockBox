@@ -33,7 +33,7 @@ public class SpardleEngine(
             // SetJoinable(false) closes the join race before we read Players.Count;
             // once the lobby is non-joinable, RegisterPlayer rejects new joins.
             s.SetJoinable(false);
-            s.SetHostIsParticipant(s.Players.Count == 0);
+            s.SetHostIsParticipant(s.Players.Count == 0 || s.HostPlaysAlong);
             s.CurrentRound = 0;
             s.IsGameOver = false;
             s.RoundHistory = s.RoundHistory.Clear();

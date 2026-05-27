@@ -224,6 +224,10 @@
                             <input type="checkbox" @bind:get="State.HardModeEnabled" @bind:set="SetHardModeEnabled" />
                         </label>
                         <label class="spd-lobby-field spd-lobby-field-row">
+                            <span>Host Plays Along</span>
+                            <input type="checkbox" @bind:get="State.HostPlaysAlong" @bind:set="SetHostPlaysAlong" />
+                        </label>
+                        <label class="spd-lobby-field spd-lobby-field-row">
                             <span>Wait For All Players</span>
                             <input type="checkbox" @bind:get="State.WaitForAll" @bind:set="SetWaitForAll" />
                         </label>
@@ -308,6 +312,7 @@
     private void SetWinCondition(WinConditionMode value) => State.Execute(() => State.WinCondition = value);
     private void SetDifficultyMultiplier(double value) => State.Execute(() => State.DifficultyMultiplier = value);
     private void SetHardModeEnabled(bool value) => State.Execute(() => State.HardModeEnabled = value);
+    private void SetHostPlaysAlong(bool value) => State.Execute(() => State.HostPlaysAlong = value);
     private void SetWaitForAll(bool value) => State.Execute(() => State.WaitForAll = value);
     private void SetRevealAnswer(bool value) => State.Execute(() => State.RevealAnswer = value);
     private void SetAllowDictionaryFallback(bool value) => State.Execute(() => State.AllowDictionaryFallback = value);

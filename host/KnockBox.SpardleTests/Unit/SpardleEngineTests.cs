@@ -294,6 +294,21 @@ public class SpardleEngineTests
     }
 
     [TestMethod]
+    public async Task StartAsync_WithOtherPlayersAndHostPlaysAlong_HostParticipates()
+    {
+        var (state, host, players) = await CreateStateWithPlayersAsync(1);
+        state.TotalRounds = 1;
+        state.CustomWordPool = ["apple"];
+        state.HostPlaysAlong = true;
+
+        await _engine.StartAsync(host, state);
+
+        Assert.IsTrue(state.HostIsParticipant);
+        Assert.IsTrue(state.PlayerStates.ContainsKey(host.Id));
+        Assert.IsTrue(state.PlayerStates.ContainsKey(players[0].Id));
+    }
+
+    [TestMethod]
     public async Task SubmitGuess_ObserverHost_ReturnsError()
     {
         var (state, host, _) = await CreateStateWithPlayersAsync(1);

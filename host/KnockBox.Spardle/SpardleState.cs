@@ -52,6 +52,13 @@ public class SpardleState(User host, ILogger logger) : AbstractGameState(host, l
     public bool WaitForAll { get; set; } = true;
     public bool RevealAnswer { get; set; } = true;
 
+    /// <summary>
+    /// When true and other players are present, the host plays as a normal
+    /// participant instead of becoming the display-only observer. Off by default,
+    /// preserving the "host is the shared display once others join" behavior.
+    /// </summary>
+    public bool HostPlaysAlong { get; set; } = false;
+
     // Game state
     public int TotalRounds { get; set; } = 5;
     public int CurrentRound { get; set; } = 0;
