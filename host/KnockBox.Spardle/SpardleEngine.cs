@@ -24,6 +24,8 @@ public class SpardleEngine(
         // A mid-round departure removes the player from the live roster but leaves no
         // guess to trigger CheckRoundEnd, so re-check here or the round hangs until the
         // timer (or forever, when unlimited) waiting on someone who already left.
+        // The returned token is intentionally not stored: the subscription is scoped to
+        // this state's lifetime and released when the state is disposed.
         state.SubscribePlayerUnregistered(player => HandlePlayerLeft(state, player));
         return Task.FromResult<ValueResult<AbstractGameState>>(state);
     }

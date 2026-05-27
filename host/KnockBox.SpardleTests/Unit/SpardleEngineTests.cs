@@ -371,6 +371,39 @@ public class SpardleEngineTests
     }
 
     [TestMethod]
+    public async Task PlayerLeaving_DoesNotEndRoundPrematurely_WhenRemainingPlayerStillPlaying()
+    {
+        var (state, host) = await CreateStateAsync();
+        var p1 = UserFactory.Create("P1", Guid.NewGuid().ToString());
+        var p2 = UserFactory.Create("P2", Guid.NewGuid().ToString());
+        Assert.IsTrue(state.RegisterPlayer(p1).IsSuccess);
+        Assert.IsTrue(state.RegisterPlayer(p2).TryGetSuccess(out var token2));
+
+        state.TotalRounds = 2;
+        state.TransitionDuration = TimeSpan.FromMilliseconds(80);
+        state.RoundTimer = TimeSpan.FromSeconds(30);
+        state.WaitForAll = false;
+        state.WinCondition = WinConditionMode.Sprinter;
+        state.CustomWordPool = ImmutableList.Create("apple", "brave");
+        state.WordOrderMode = WordOrderMode.ListOrder;
+
+        await _engine.StartAsync(host, state);
+        await WaitForPhaseAsync(state, GamePhase.Playing, timeoutMs: 1500);
+
+        // P2 leaves without finishing. With Sprinter + no WaitForAll, the round ends
+        // the moment anyone solves — but nobody has, and the still-playing P1 must keep
+        // the round open. A leaver must not be treated as a finish that ends it early.
+        token2!.Dispose();
+
+        Assert.IsFalse(state.Players.Any(e => e.User.Id == p2.Id));
+        Assert.AreEqual(GamePhase.Playing, state.Phase);
+
+        // The remaining player solving still ends the round normally.
+        Assert.IsTrue(_engine.SubmitGuess(state, p1, "apple").IsSuccess);
+        Assert.AreEqual(GamePhase.RoundResults, state.Phase);
+    }
+
+    [TestMethod]
     public async Task SubmitGuess_ObserverHost_ReturnsError()
     {
         var (state, host, _) = await CreateStateWithPlayersAsync(1);
