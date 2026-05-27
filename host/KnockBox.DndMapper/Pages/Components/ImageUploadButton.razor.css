@@ -85,3 +85,19 @@
     cursor: not-allowed;
     pointer-events: none;
 }
+
+/* Icon-only variant for tight headers (Map Layers). Matches the .dndm-btn--icon
+   shape used elsewhere so the visual weight lines up with sibling icon buttons. */
+.dndm-upload-compact--icon {
+    padding: 0.25rem 0.4rem;
+    line-height: 1;
+}
+
+.dndm-upload-compact--icon svg {
+    display: block;
+}
+
+.dndm-upload-compact-busy {
+    font-size: 0.85rem;
+    line-height: 1;
+}

@@ -1,0 +1,590 @@
+@using System.Collections.Immutable
+@using KnockBox.Core.Components.Shared
+@using KnockBox.DndMapper.Models
+@using KnockBox.DndMapper.Services.State.Games
+@using KnockBox.DndMapper.Services.State.Games.Data
+@using KnockBox.DndMapper.Services.State.Games.Data.LoadedDice
+@inherits DisposableComponent
+
+<section class="dndm-panel dndm-loaded-dice">
+    <header class="dndm-panel-header">
+        <span>Loaded dice</span>
+        @if (Editable)
+        {
+            <button class="dndm-btn dndm-btn--small" type="button" @onclick="AddRule">+ Add rule</button>
+        }
+    </header>
+    <div class="dndm-panel-body">
+        @if (State.LoadedDiceRules.Length == 0)
+        {
+            <div class="dndm-panel-empty">
+                @if (Editable)
+                {
+                    <span>No rules yet. Press <strong>+ Add rule</strong> to create one.</span>
+                }
+                else
+                {
+                    <span>The host has not configured any rules.</span>
+                }
+            </div>
+        }
+        else
+        {
+            @foreach (var rule in State.LoadedDiceRules)
+            {
+                @RenderRule(rule)
+            }
+        }
+    </div>
+</section>
+
+@code {
+    private RenderFragment RenderRule(LoadedDiceRule rule) => __builder =>
+    {
+        <article @key="rule.Id" class="dndm-loaded-rule">
+            <header class="dndm-loaded-rule-header">
+                @if (Editable)
+                {
+                    <label class="dndm-toggle dndm-toggle--inline">
+                        <input type="checkbox"
+                               checked="@rule.Enabled"
+                               @onchange="@(e => SetEnabled(rule, e.Value is bool b && b))" />
+                        <span class="dndm-toggle-track"></span>
+                    </label>
+                    <input class="dndm-input dndm-loaded-rule-name"
+                           value="@rule.Name"
+                           placeholder="Rule name"
+                           @onchange="@(e => SetName(rule, (string?)e.Value ?? string.Empty))" />
+                    <button class="dndm-btn dndm-btn--small dndm-btn--ghost"
+                            type="button"
+                            title="Delete rule"
+                            @onclick="@(() => RemoveRule(rule))">×</button>
+                }
+                else
+                {
+                    <span class="dndm-loaded-rule-name">@(string.IsNullOrEmpty(rule.Name) ? "(unnamed)" : rule.Name)</span>
+                    @if (!rule.Enabled)
+                    {
+                        <span class="dndm-loaded-rule-disabled">disabled</span>
+                    }
+                }
+            </header>
+
+            <div class="dndm-loaded-rule-body">
+                <div class="dndm-loaded-clause">
+                    <span class="dndm-loaded-keyword">For</span>
+                    @RenderTargets(rule)
+                </div>
+                <div class="dndm-loaded-clause">
+                    <span class="dndm-loaded-keyword">When</span>
+                    @RenderConditions(rule)
+                </div>
+                <div class="dndm-loaded-clause">
+                    <span class="dndm-loaded-keyword">Then</span>
+                    @RenderModifications(rule)
+                </div>
+            </div>
+        </article>
+    };
+
+    private RenderFragment RenderTargets(LoadedDiceRule rule) => __builder =>
+    {
+        <div class="dndm-loaded-args">
+            @if (rule.TargetSheetIds.Count == 0)
+            {
+                <span class="dndm-loaded-allchip">all sheets</span>
+            }
+            else
+            {
+                @foreach (var sid in rule.TargetSheetIds)
+                {
+                    <span class="dndm-loaded-chip">
+                        @SheetName(sid)
+                        @if (Editable)
+                        {
+                            <button class="dndm-loaded-chip-x" type="button" title="Remove target"
+                                    @onclick="@(() => RemoveTarget(rule, sid))">×</button>
+                        }
+                    </span>
+                }
+            }
+            @if (Editable)
+            {
+                @* value="" + key-on-rule forces the placeholder back after each
+                   pick, so the dropdown stays usable for repeated additions. *@
+                <select class="dndm-select dndm-loaded-select"
+                        value=""
+                        @key="@($"target-{rule.Id}-{rule.TargetSheetIds.Count}")"
+                        @onchange="@(e => AddTarget(rule, ParseGuid((string?)e.Value)))">
+                    <option value="">+ Add target…</option>
+                    @if (!rule.TargetSheetIds.Contains(LoadedDiceRule.GmTarget))
+                    {
+                        <option value="@LoadedDiceRule.GmTarget">GM (rolls without a sheet)</option>
+                    }
+                    @foreach (var s in State.Sheets.Values)
+                    {
+                        if (!rule.TargetSheetIds.Contains(s.Id))
+                        {
+                            <option value="@s.Id">@SheetDisplayName(s)</option>
+                        }
+                    }
+                </select>
+            }
+        </div>
+    };
+
+    // Renders the rule's outer condition list as an implicit-AND tree.
+    // Each node is addressed by an ImmutableArray<int> path (see the
+    // path-mutation helpers in the code-behind). Composite and NOT nodes
+    // recurse through RenderNode → RenderConditionList.
+    private RenderFragment RenderConditions(LoadedDiceRule rule) => __builder =>
+    {
+        @RenderConditionList(rule, ImmutableArray<int>.Empty, rule.Conditions, joiner: "AND", emptyLabel: "always")
+    };
+
+    private RenderFragment RenderConditionList(
+        LoadedDiceRule rule,
+        ImmutableArray<int> parentPath,
+        ImmutableArray<LoadedDiceCondition> list,
+        string joiner,
+        string emptyLabel) => __builder =>
+    {
+        <div class="dndm-loaded-args">
+            @if (list.Length == 0)
+            {
+                <span class="dndm-loaded-allchip">@emptyLabel</span>
+            }
+            else
+            {
+                @for (int i = 0; i < list.Length; i++)
+                {
+                    var childPath = parentPath.Add(i);
+                    <span @key="@PathKey(rule, childPath)" class="dndm-loaded-arg">
+                        @RenderNode(rule, childPath, list[i])
+                    </span>
+                    @if (i < list.Length - 1)
+                    {
+                        <span class="dndm-loaded-and">@joiner</span>
+                    }
+                }
+            }
+            @if (Editable)
+            {
+                @RenderAddMenu(rule, parentPath)
+            }
+        </div>
+    };
+
+    private RenderFragment RenderNode(
+        LoadedDiceRule rule,
+        ImmutableArray<int> path,
+        LoadedDiceCondition cond) => __builder =>
+    {
+        switch (cond)
+        {
+            case AllOfCondition all:
+                @RenderCompositeGroup(rule, path, op: "allOf", all.Children, joiner: "AND")
+                break;
+            case AnyOfCondition any:
+                @RenderCompositeGroup(rule, path, op: "anyOf", any.Children, joiner: "OR")
+                break;
+            case NotCondition not:
+                @RenderNotGroup(rule, path, not)
+                break;
+            default:
+                @RenderLeafEditor(rule, path, cond)
+                if (Editable)
+                {
+                    <button class="dndm-loaded-chip-x" type="button" title="Remove condition"
+                            @onclick="@(() => RemoveAtPath(rule, path))">×</button>
+                }
+                break;
+        }
+    };
+
+    private RenderFragment RenderCompositeGroup(
+        LoadedDiceRule rule,
+        ImmutableArray<int> path,
+        string op,
+        ImmutableArray<LoadedDiceCondition> children,
+        string joiner) => __builder =>
+    {
+        <div class="dndm-loaded-group dndm-loaded-group--@op">
+            <div class="dndm-loaded-group-header">
+                @if (Editable)
+                {
+                    <select class="dndm-select dndm-loaded-select dndm-loaded-group-op"
+                            @onchange="@(e => ChangeCompositeOpAtPath(rule, path, (string?)e.Value))">
+                        <option value="allOf" selected="@(op == "allOf")">ALL of</option>
+                        <option value="anyOf" selected="@(op == "anyOf")">ANY of</option>
+                    </select>
+                    <button class="dndm-loaded-chip-x" type="button" title="Remove group"
+                            @onclick="@(() => RemoveAtPath(rule, path))">×</button>
+                }
+                else
+                {
+                    <span class="dndm-loaded-group-op-readonly">@(op == "allOf" ? "ALL OF" : "ANY OF")</span>
+                }
+            </div>
+            <div class="dndm-loaded-group-body">
+                @* Empty-AND ⇒ always true, empty-OR ⇒ never true. Show that
+                   plainly so an in-progress group reads correctly. *@
+                @RenderConditionList(rule, path, children, joiner: joiner,
+                    emptyLabel: op == "allOf" ? "(empty — always)" : "(empty — never)")
+            </div>
+        </div>
+    };
+
+    private RenderFragment RenderNotGroup(
+        LoadedDiceRule rule,
+        ImmutableArray<int> path,
+        NotCondition not) => __builder =>
+    {
+        var innerPath = path.Add(0);
+        <div class="dndm-loaded-group dndm-loaded-group--not">
+            <div class="dndm-loaded-group-header">
+                <span class="dndm-loaded-group-op-readonly">NOT</span>
+                @if (Editable)
+                {
+                    <button class="dndm-loaded-chip-x" type="button" title="Remove NOT"
+                            @onclick="@(() => RemoveAtPath(rule, path))">×</button>
+                }
+            </div>
+            <div class="dndm-loaded-group-body">
+                <div class="dndm-loaded-args">
+                    @if (not.Inner is null)
+                    {
+                        @* Placeholder: empty NOT matches by convention. Host
+                           uses the add menu to fill the slot. *@
+                        <span class="dndm-loaded-allchip">(empty — matches)</span>
+                        @if (Editable)
+                        {
+                            @RenderAddMenu(rule, path)
+                        }
+                    }
+                    else
+                    {
+                        <span @key="@PathKey(rule, innerPath)" class="dndm-loaded-arg">
+                            @RenderNode(rule, innerPath, not.Inner)
+                        </span>
+                    }
+                </div>
+            </div>
+        </div>
+    };
+
+    private RenderFragment RenderLeafEditor(
+        LoadedDiceRule rule,
+        ImmutableArray<int> path,
+        LoadedDiceCondition cond) => __builder =>
+    {
+        switch (cond)
+        {
+            case CurrentMapCondition cm:
+                <span class="dndm-loaded-arg-label">map is</span>
+                if (Editable)
+                {
+                    <select class="dndm-select dndm-loaded-select"
+                            @onchange="@(e => UpdateAtPath(rule, path, new CurrentMapCondition(ParseGuid((string?)e.Value) ?? Guid.Empty)))">
+                        @foreach (var m in State.Maps)
+                        {
+                            <option value="@m.Id" selected="@(m.Id == cm.MapId)">@(string.IsNullOrEmpty(m.Name) ? "(unnamed)" : m.Name)</option>
+                        }
+                    </select>
+                }
+                else
+                {
+                    var mapName = State.Maps.FirstOrDefault(m => m.Id == cm.MapId)?.Name ?? "(deleted map)";
+                    <span class="dndm-loaded-arg-val">@mapName</span>
+                }
+                break;
+
+            case DiceTypeRolledCondition dt:
+                <span class="dndm-loaded-arg-label">dice is</span>
+                if (Editable)
+                {
+                    <select class="dndm-select dndm-loaded-select"
+                            @onchange="@(e => UpdateAtPath(rule, path, new DiceTypeRolledCondition(ParseInt(e.Value, dt.Sides))))">
+                        @foreach (var s in new[] { 4, 6, 8, 10, 12, 20, 100 })
+                        {
+                            <option value="@s" selected="@(s == dt.Sides)">d@(s)</option>
+                        }
+                    </select>
+                }
+                else
+                {
+                    <span class="dndm-loaded-arg-val">d@(dt.Sides)</span>
+                }
+                break;
+
+            case RollerIsCondition rc:
+                <span class="dndm-loaded-arg-label">roller is</span>
+                if (Editable)
+                {
+                    <select class="dndm-select dndm-loaded-select"
+                            @onchange="@(e => UpdateAtPath(rule, path, new RollerIsCondition(ParseGuid((string?)e.Value) ?? LoadedDiceRule.GmTarget)))">
+                        <option value="@LoadedDiceRule.GmTarget" selected="@(rc.SheetId == LoadedDiceRule.GmTarget)">GM (no sheet)</option>
+                        @foreach (var s in State.Sheets.Values)
+                        {
+                            <option value="@s.Id" selected="@(s.Id == rc.SheetId)">@SheetDisplayName(s)</option>
+                        }
+                    </select>
+                }
+                else
+                {
+                    <span class="dndm-loaded-arg-val">@SheetName(rc.SheetId)</span>
+                }
+                break;
+
+            case RollModeIsCondition rm:
+                <span class="dndm-loaded-arg-label">mode is</span>
+                if (Editable)
+                {
+                    <select class="dndm-select dndm-loaded-select"
+                            @onchange="@(e => UpdateAtPath(rule, path, new RollModeIsCondition(ParseMode((string?)e.Value, rm.Mode))))">
+                        <option value="Normal" selected="@(rm.Mode == RollMode.Normal)">Normal</option>
+                        <option value="Advantage" selected="@(rm.Mode == RollMode.Advantage)">Advantage</option>
+                        <option value="Disadvantage" selected="@(rm.Mode == RollMode.Disadvantage)">Disadvantage</option>
+                    </select>
+                }
+                else
+                {
+                    <span class="dndm-loaded-arg-val">@rm.Mode</span>
+                }
+                break;
+
+            case HostKeyHeldCondition hk:
+                <span class="dndm-loaded-arg-label">host holds</span>
+                if (Editable)
+                {
+                    var listening = IsListeningAt(rule, path);
+                    <button type="button"
+                            class="dndm-btn dndm-btn--small dndm-loaded-keybtn @(listening ? "dndm-loaded-keybtn--listening" : "")"
+                            disabled="@listening"
+                            @onclick="@(() => BeginHostKeyCapture(rule, path))">
+                        @if (listening)
+                        {
+                            <span>Press a key… (Esc to cancel)</span>
+                        }
+                        else if (string.IsNullOrEmpty(hk.Key))
+                        {
+                            <span>Set key…</span>
+                        }
+                        else
+                        {
+                            <span>@hk.Key</span>
+                        }
+                    </button>
+                }
+                else
+                {
+                    <span class="dndm-loaded-arg-val">@(string.IsNullOrEmpty(hk.Key) ? "(unset)" : hk.Key)</span>
+                }
+                break;
+
+            case CombatActiveCondition:
+                <span class="dndm-loaded-arg-label">combat is active</span>
+                break;
+
+            case RollLabelContainsCondition rl:
+                <span class="dndm-loaded-arg-label">label contains</span>
+                if (Editable)
+                {
+                    <input class="dndm-input dndm-loaded-input"
+                           value="@rl.Substring"
+                           placeholder="attack"
+                           @onchange="@(e => UpdateAtPath(rule, path, new RollLabelContainsCondition((string?)e.Value ?? string.Empty)))" />
+                }
+                else
+                {
+                    <span class="dndm-loaded-arg-val">"@rl.Substring"</span>
+                }
+                break;
+        }
+    };
+
+    @* Shared "+ Add condition…" dropdown used at the root level and inside
+       every composite/NOT placeholder. Always resets to the placeholder
+       after a pick via the value="" + count-based @key trick. *@
+    private RenderFragment RenderAddMenu(LoadedDiceRule rule, ImmutableArray<int> path) => __builder =>
+    {
+        <select class="dndm-select dndm-loaded-select"
+                value=""
+                @key="@($"add-{PathKey(rule, path)}-{NodeCountAt(rule, path)}")"
+                @onchange="@(e => AddConditionAtPath(rule, path, (string?)e.Value))">
+            <option value="">+ Add condition…</option>
+            <option value="currentMap">Current map is…</option>
+            <option value="diceTypeRolled">Dice type rolled is…</option>
+            <option value="rollerIs">Roller is…</option>
+            <option value="rollModeIs">Roll mode is…</option>
+            <option value="hostKeyHeld">Host is holding key…</option>
+            <option value="combatActive">Combat is active</option>
+            <option value="rollLabelContains">Roll label contains…</option>
+            <option value="allOf">+ Group (ALL of…)</option>
+            <option value="anyOf">+ Group (ANY of…)</option>
+            <option value="not">+ NOT…</option>
+        </select>
+    };
+
+    // Used purely as a stable component of the add-menu's @key so the
+    // select resets to its placeholder after a successful add.
+    private int NodeCountAt(LoadedDiceRule rule, ImmutableArray<int> path)
+    {
+        if (path.IsEmpty) return rule.Conditions.Length;
+        var node = ReadAt(rule.Conditions, path.AsSpan());
+        return node switch
+        {
+            AllOfCondition all => all.Children.Length,
+            AnyOfCondition any => any.Children.Length,
+            NotCondition not => not.Inner is null ? 0 : 1,
+            _ => 0,
+        };
+    }
+
+    private static RollMode ParseMode(string? s, RollMode fallback)
+        => Enum.TryParse<RollMode>(s, out var m) ? m : fallback;
+
+    private RenderFragment RenderModificationEditor(LoadedDiceRule rule, int idx, LoadedDiceModification mod) => __builder =>
+    {
+        switch (mod)
+        {
+            case SetResultModification sr:
+                <span class="dndm-loaded-arg-label">set result to</span>
+                if (Editable)
+                {
+                    <input type="number" class="dndm-input dndm-input--num dndm-loaded-input"
+                           value="@sr.Value"
+                           @onchange="@(e => UpdateModification(rule, idx, new SetResultModification(ParseInt(e.Value, sr.Value))))" />
+                }
+                else
+                {
+                    <span class="dndm-loaded-arg-val">@sr.Value</span>
+                }
+                break;
+
+            case ClampMaxModification cmax:
+                <span class="dndm-loaded-arg-label">clamp ≤</span>
+                if (Editable)
+                {
+                    <input type="number" class="dndm-input dndm-input--num dndm-loaded-input"
+                           value="@cmax.Max"
+                           @onchange="@(e => UpdateModification(rule, idx, new ClampMaxModification(ParseInt(e.Value, cmax.Max))))" />
+                }
+                else
+                {
+                    <span class="dndm-loaded-arg-val">@cmax.Max</span>
+                }
+                break;
+
+            case ClampMinModification cmin:
+                <span class="dndm-loaded-arg-label">clamp ≥</span>
+                if (Editable)
+                {
+                    <input type="number" class="dndm-input dndm-input--num dndm-loaded-input"
+                           value="@cmin.Min"
+                           @onchange="@(e => UpdateModification(rule, idx, new ClampMinModification(ParseInt(e.Value, cmin.Min))))" />
+                }
+                else
+                {
+                    <span class="dndm-loaded-arg-val">@cmin.Min</span>
+                }
+                break;
+
+            case BiasLowerModification bl:
+                <span class="dndm-loaded-arg-label">bias lower, extra rolls</span>
+                if (Editable)
+                {
+                    <input type="number" min="1" max="5" class="dndm-input dndm-input--num dndm-loaded-input"
+                           value="@bl.RerollCount"
+                           @onchange="@(e => UpdateModification(rule, idx, new BiasLowerModification(ParseInt(e.Value, bl.RerollCount))))" />
+                }
+                else
+                {
+                    <span class="dndm-loaded-arg-val">@bl.RerollCount</span>
+                }
+                break;
+
+            case BiasHigherModification bh:
+                <span class="dndm-loaded-arg-label">bias higher, extra rolls</span>
+                if (Editable)
+                {
+                    <input type="number" min="1" max="5" class="dndm-input dndm-input--num dndm-loaded-input"
+                           value="@bh.RerollCount"
+                           @onchange="@(e => UpdateModification(rule, idx, new BiasHigherModification(ParseInt(e.Value, bh.RerollCount))))" />
+                }
+                else
+                {
+                    <span class="dndm-loaded-arg-val">@bh.RerollCount</span>
+                }
+                break;
+
+            case RerollOnModification ron:
+                <span class="dndm-loaded-arg-label">reroll once on</span>
+                if (Editable)
+                {
+                    <input class="dndm-input dndm-loaded-input"
+                           value="@string.Join(",", ron.Values)"
+                           placeholder="1,2"
+                           @onchange="@(e => UpdateModification(rule, idx, new RerollOnModification(ParseIntSet((string?)e.Value))))" />
+                }
+                else
+                {
+                    <span class="dndm-loaded-arg-val">@string.Join(", ", ron.Values)</span>
+                }
+                break;
+        }
+    };
+
+    private static ImmutableHashSet<int> ParseIntSet(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return ImmutableHashSet<int>.Empty;
+        var builder = ImmutableHashSet.CreateBuilder<int>();
+        foreach (var part in raw.Split(','))
+        {
+            if (int.TryParse(part.Trim(), System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var v))
+                builder.Add(v);
+        }
+        return builder.ToImmutable();
+    }
+
+    private RenderFragment RenderModifications(LoadedDiceRule rule) => __builder =>
+    {
+        <div class="dndm-loaded-args">
+            @if (rule.Modifications.Length == 0)
+            {
+                <span class="dndm-loaded-warn">no modifications — rule does nothing</span>
+            }
+            else
+            {
+                @for (int i = 0; i < rule.Modifications.Length; i++)
+                {
+                    var idx = i;
+                    var mod = rule.Modifications[idx];
+                    <span class="dndm-loaded-arg" @key="mod">
+                        @RenderModificationEditor(rule, idx, mod)
+                        @if (Editable)
+                        {
+                            <button class="dndm-loaded-chip-x" type="button" title="Remove modification"
+                                    @onclick="@(() => RemoveModification(rule, idx))">×</button>
+                        }
+                    </span>
+                }
+            }
+            @if (Editable)
+            {
+                <select class="dndm-select dndm-loaded-select"
+                        value=""
+                        @key="@($"mod-{rule.Id}-{rule.Modifications.Length}")"
+                        @onchange="@(e => AddModification(rule, (string?)e.Value))">
+                    <option value="">+ Add modification…</option>
+                    <option value="setResult">Set die result to…</option>
+                    <option value="clampMax">Clamp result ≤ …</option>
+                    <option value="clampMin">Clamp result ≥ …</option>
+                    <option value="biasLower">Bias lower (extra rolls)…</option>
+                    <option value="biasHigher">Bias higher (extra rolls)…</option>
+                    <option value="rerollOn">Reroll once on values…</option>
+                </select>
+            }
+        </div>
+    };
+}

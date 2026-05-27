@@ -37,7 +37,7 @@ namespace KnockBox.DndMapperTests.Unit.Helpers
             var mapId = AddMap();
             var visible = new Token { Id = Guid.NewGuid(), Name = "V", MapId = mapId, Hidden = false };
             var hidden = new Token { Id = Guid.NewGuid(), Name = "H", MapId = mapId, Hidden = true };
-            ReplaceMap(mapId, m => m with { Tokens = m.Tokens.AddRange([visible, hidden]) });
+            ReplaceMap(mapId, m => m with { Tokens = [.. m.Tokens, visible, hidden] });
 
             var projection = DisplayProjection.Build(_state);
 
@@ -50,7 +50,7 @@ namespace KnockBox.DndMapperTests.Unit.Helpers
             var mapId = AddMap();
             var visible = new MapImage { Id = Guid.NewGuid(), LayerOrder = 0, Hidden = false };
             var hidden = new MapImage { Id = Guid.NewGuid(), LayerOrder = 1, Hidden = true };
-            ReplaceMap(mapId, m => m with { Images = m.Images.AddRange([visible, hidden]) });
+            ReplaceMap(mapId, m => m with { Images = [.. m.Images, visible, hidden] });
 
             var projection = DisplayProjection.Build(_state);
 
@@ -64,7 +64,7 @@ namespace KnockBox.DndMapperTests.Unit.Helpers
             var i2 = new MapImage { Id = Guid.NewGuid(), LayerOrder = 2 };
             var i0 = new MapImage { Id = Guid.NewGuid(), LayerOrder = 0 };
             var i1 = new MapImage { Id = Guid.NewGuid(), LayerOrder = 1 };
-            ReplaceMap(mapId, m => m with { Images = m.Images.AddRange([i2, i0, i1]) });
+            ReplaceMap(mapId, m => m with { Images = [.. m.Images, i2, i0, i1] });
 
             var projection = DisplayProjection.Build(_state);
 

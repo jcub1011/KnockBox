@@ -92,12 +92,26 @@ function paintVisuals(state, visuals, x, y, w, h, rot) {
 }
 
 // Each handle is a <g> in MapCanvas.razor with transform="translate(ax ay)
-// scale(var(--dndm-inv-zoom, 1))". To move a handle, rewrite that transform
-// keeping the inverse-scale so the handle stays constant on-screen at every
-// zoom. dndMapperViewport.js writes --dndm-inv-zoom onto the wrapper.
+// scale(inv)" where inv = 1/zoom. To move a handle during drag, rewrite that
+// transform keeping the inverse-scale so the handle stays constant on-screen
+// at every zoom. The SVG `transform` attribute does not parse var() — unlike
+// the CSS `transform` property — so we read the wrapper's --dndm-inv-zoom CSS
+// variable (kept current by dndMapperViewport.applyTransform) and substitute
+// the literal value.
+function readInvZoom(el) {
+    const wrapper = el && el.closest && el.closest('.dndm-canvas-transform');
+    if (!wrapper) return 1;
+    const raw = (wrapper.style.getPropertyValue('--dndm-inv-zoom')
+        || getComputedStyle(wrapper).getPropertyValue('--dndm-inv-zoom') || '').trim();
+    if (!raw) return 1;
+    const n = parseFloat(raw);
+    return Number.isFinite(n) && n > 0 ? n : 1;
+}
+
 function setAnchoredHandle(el, ax, ay) {
     if (!el) return;
-    el.setAttribute('transform', `translate(${ax} ${ay}) scale(var(--dndm-inv-zoom, 1))`);
+    const inv = readInvZoom(el);
+    el.setAttribute('transform', `translate(${ax} ${ay}) scale(${inv})`);
 }
 
 function paintHandles(handles, x, y, w, h, rot) {

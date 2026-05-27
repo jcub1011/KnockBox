@@ -13,6 +13,6 @@ namespace KnockBox.DndMapper.Services.State.Games.Data
         public CombatPhase Phase { get; init; }
         public int RoundNumber { get; init; } = 1;
         public int CurrentTurnIndex { get; init; }
-        public ImmutableList<CombatantEntry> TurnOrder { get; init; } = ImmutableList<CombatantEntry>.Empty;
+        public ImmutableArray<CombatantEntry> TurnOrder { get; init; } = ImmutableArray<CombatantEntry>.Empty;
     }
 }

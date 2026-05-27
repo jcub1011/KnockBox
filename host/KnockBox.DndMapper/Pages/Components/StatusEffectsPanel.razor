@@ -26,7 +26,7 @@
         </div>
     </div>
 
-    @if (Sheet.StatusEffects.Count == 0 && !_adderOpen)
+    @if (Sheet.StatusEffects.Length == 0 && !_adderOpen)
     {
         <div class="dndm-effects-empty">No active effects.</div>
     }
@@ -64,7 +64,7 @@
 
             @{
                 var quickTemplates = State.GetActiveSchemaTemplate()?.StatusEffectTemplates
-                    ?? (IReadOnlyList<StatusEffectTemplate>)ImmutableList<StatusEffectTemplate>.Empty;
+                    ?? (IReadOnlyList<StatusEffectTemplate>)ImmutableArray<StatusEffectTemplate>.Empty;
             }
             @if (quickTemplates.Count > 0)
             {

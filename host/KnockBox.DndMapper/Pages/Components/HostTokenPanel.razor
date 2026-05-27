@@ -1,5 +1,6 @@
 @using KnockBox.Core.Components.Shared
 @using KnockBox.DndMapper.Models
+@using KnockBox.DndMapper.Pages.Components.Shared
 @using KnockBox.DndMapper.Services.State.Games
 @using KnockBox.DndMapper.Services.State.Games.Data
 @inherits DisposableComponent
@@ -7,13 +8,6 @@
 <section class="dndm-panel dndm-tokenp">
     <header class="dndm-panel-header">
         <span>Tokens</span>
-        <div class="dndm-tokenp-add">
-            <button class="dndm-btn dndm-btn--small"
-                    type="button"
-                    title="Add NPC token"
-                    disabled="@(_activeMap is null)"
-                    @onclick="OnAddNpc">+ NPC</button>
-        </div>
     </header>
     <div class="dndm-panel-body">
         @if (_activeMap is null)
@@ -22,130 +16,54 @@
         }
         else if (Tokens.Count == 0)
         {
-            <div class="dndm-panel-empty">No NPC tokens on this map.</div>
+            <div class="dndm-panel-empty">No tokens on this map. Add one from a character sheet.</div>
         }
         else
         {
             @foreach (var t in Tokens)
             {
+                var isPlayer = ResolveIsPlayer(t);
+                var dotColor = t.ResolveColor(State.Sheets);
                 <div @key="t.Id" class="dndm-tokenp-row" title="Double-click to center the canvas on this token"
                      @ondblclick="@(() => OnRowDoubleClick(t))">
-                    <input type="color"
-                           value="@t.Color"
-                           class="dndm-tokenp-color"
-                           @onchange="@(e => OnColorChanged(t, (string?)e.Value))" />
-                    <div class="dndm-tokenp-name-wrap">
-                        <input class="dndm-input dndm-tokenp-name"
-                               value="@t.Name"
-                               @onchange="@(e => OnNameChanged(t, (string?)e.Value))" />
-                        <button class="dndm-btn dndm-btn--small dndm-btn--icon dndm-tokenp-initialbtn"
+                    <span class="dndm-tokenp-dot" style="@($"background:{dotColor};")" aria-hidden="true"></span>
+                    <span class="dndm-tokenp-name">@t.Name</span>
+                    <span class="dndm-tokenp-tag">@(isPlayer ? "Player" : "NPC")</span>
+                    <RailActionsMenu Title="Token actions">
+                        <button class="dndm-btn dndm-btn--small dndm-btn--icon"
                                 type="button"
                                 title="@(t.IconKind == TokenIconKind.Initial ? "Initial shown — click to use a solid circle" : "Solid circle — click to show initial")"
                                 @onclick="@(() => OnToggleIcon(t))"
                                 @onclick:stopPropagation="true"
                                 @ondblclick:stopPropagation="true">
-                            @TokenIcons.Eye(t.IconKind == TokenIconKind.Initial)
+                            @TokenIcons.Glyph(t.IconKind == TokenIconKind.Initial)
                         </button>
-                    </div>
-                    <button class="dndm-btn dndm-btn--small dndm-btn--icon dndm-btn--danger"
-                            type="button"
-                            title="Delete token"
-                            @onclick="@(() => OnDeleteRequest(t))"
-                            @onclick:stopPropagation="true"
-                            @ondblclick:stopPropagation="true">
-                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none"
-                             stroke="currentColor" stroke-width="2"
-                             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                            <polyline points="3 6 5 6 21 6" />
-                            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-                            <line x1="10" y1="11" x2="10" y2="17" />
-                            <line x1="14" y1="11" x2="14" y2="17" />
-                            <path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" />
-                        </svg>
-                    </button>
-                    <span class="dndm-tokenp-tag">@(t.Type == TokenType.PlayerToken ? "Player" : "NPC")</span>
-                </div>
-                <div @key="@($"{t.Id}-meta")" class="dndm-tokenp-meta">
-                    <button class="dndm-btn dndm-btn--small dndm-btn--icon dndm-tokenp-eyebtn"
-                            type="button"
-                            title="@(t.Hidden ? "Hidden — click to reveal" : "Visible — click to hide")"
-                            @onclick="@(() => OnToggleHidden(t))"
-                            @onclick:stopPropagation="true"
-                            @ondblclick:stopPropagation="true">
-                        @TokenIcons.Eye(!t.Hidden)
-                    </button>
-                    @{
-                        // Sheets already attached to a *different* token, and sheets owned
-                        // by a player (player sheets are managed automatically with that
-                        // player's PlayerToken), should not appear as picks for this NPC.
-                        // The currently-attached sheet always remains in the list so it
-                        // shows as selected.
-                        var attachedElsewhere = State.Maps
-                            .SelectMany(m => m.Tokens)
-                            .Where(other => other.Id != t.Id && other.SheetId is not null)
-                            .Select(other => other.SheetId!.Value)
-                            .ToHashSet();
-                        var pickableSheets = State.Sheets.Values
-                            .Where(s => s.Id == t.SheetId
-                                || (s.OwnerUserId is null && !attachedElsewhere.Contains(s.Id)))
-                            .OrderBy(s => s.CharacterName)
-                            .ToList();
-                    }
-                    <label class="dndm-tokenp-metalabel">
-                        <span>Sheet</span>
-                        <select class="dndm-select"
-                                @onchange="@(e => OnSheetChanged(t, (string?)e.Value))">
-                            <option value="">— none —</option>
-                            @foreach (var s in pickableSheets)
-                            {
-                                <option value="@s.Id" selected="@(t.SheetId == s.Id)">
-                                    @(string.IsNullOrEmpty(s.CharacterName) ? "(unnamed)" : s.CharacterName)
-                                </option>
-                            }
-                        </select>
-                    </label>
-                    <label class="dndm-tokenp-metalabel" title="Tag this NPC as standing in for a player (e.g. a DMPC)">
-                        <span>Represents</span>
-                        <select class="dndm-select"
-                                @onchange="@(e => OnRepresentsChanged(t, (string?)e.Value))">
-                            <option value="">— none —</option>
-                            @foreach (var p in State.Players)
-                            {
-                                <option value="@p.User.Id" selected="@(t.RepresentsUserId == p.User.Id)">@p.DisplayName</option>
-                            }
-                        </select>
-                    </label>
-                    @{
-                        // Skip players who already own a PlayerToken on this map or
-                        // already own a different sheet — the engine rejects both
-                        // cases, so showing them would resolve only to a toast error.
-                        var ownedHere = _activeMap.Tokens
-                            .Where(tk => tk.Type == TokenType.PlayerToken && tk.OwnerUserId is not null)
-                            .Select(tk => tk.OwnerUserId!)
-                            .ToHashSet();
-                        var hasOtherSheet = State.Sheets.Values
-                            .Where(s => s.OwnerUserId is not null && s.Id != t.SheetId)
-                            .Select(s => s.OwnerUserId!)
-                            .ToHashSet();
-                        var eligible = State.Players
-                            .Where(p => !ownedHere.Contains(p.User.Id) && !hasOtherSheet.Contains(p.User.Id))
-                            .ToList();
-                    }
-                    @if (eligible.Count > 0)
-                    {
-                        <label class="dndm-tokenp-metalabel" title="Assign this character (token + sheet) to a player">
-                            <span>Assign to</span>
-                            <select class="dndm-select"
-                                    value=""
-                                    @onchange="@(e => OnAssignToPlayer(t, (string?)e.Value))">
-                                <option value="">— give to player —</option>
-                                @foreach (var p in eligible)
-                                {
-                                    <option value="@p.User.Id">@p.DisplayName</option>
-                                }
-                            </select>
-                        </label>
-                    }
+                        <button class="dndm-btn dndm-btn--small dndm-btn--icon"
+                                type="button"
+                                title="@(t.Hidden ? "Hidden — click to reveal" : "Visible — click to hide")"
+                                @onclick="@(() => OnToggleHidden(t))"
+                                @onclick:stopPropagation="true"
+                                @ondblclick:stopPropagation="true">
+                            @TokenIcons.Eye(!t.Hidden)
+                        </button>
+                        <button class="dndm-btn dndm-btn--small dndm-btn--icon dndm-btn--danger"
+                                type="button"
+                                title="Delete token"
+                                disabled="@(t.Type == TokenType.PlayerToken)"
+                                @onclick="@(() => OnDeleteRequest(t))"
+                                @onclick:stopPropagation="true"
+                                @ondblclick:stopPropagation="true">
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none"
+                                 stroke="currentColor" stroke-width="2"
+                                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <polyline points="3 6 5 6 21 6" />
+                                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                                <line x1="10" y1="11" x2="10" y2="17" />
+                                <line x1="14" y1="11" x2="14" y2="17" />
+                                <path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" />
+                            </svg>
+                        </button>
+                    </RailActionsMenu>
                 </div>
             }
         }

@@ -3,6 +3,10 @@
     --dndm-rail-w-right: 320px;
     --dndm-rail-collapsed: 28px;
 
+    /* Height reserved for the QuickRollFooter bar pinned to the bottom of the
+       canvas area, so other bottom-anchored overlays can clear it. */
+    --dndm-rollfooter-h: 2.75rem;
+
     /* Effective rail-occupied widths, accounting for collapsed state and
        (for the left rail) host-only rendering. UI overlays use these so
        they don't tuck behind a rail. */
@@ -76,9 +80,14 @@
     flex-direction: column;
     gap: 0.6rem;
     padding: 0.5rem;
+    padding-bottom: 25rem;
     overflow: auto;
     flex: 1 1 auto;
     min-height: 0;
+    /* Anchor for the RailActionsMenu container queries (panels.css). At <=300px
+       the per-row action button strips collapse behind a ⋯ trigger + popover.
+       Each rail's content scrolls independently, so each gets its own container. */
+    container-type: inline-size;
 }
 
 .dnd-mapper-playing--left-collapsed .dndm-rail--left .dndm-rail-content,
@@ -168,9 +177,19 @@
     padding: 2rem;
 }
 
+/* Host session-actions panel (left rail): open display view + settings icon
+   buttons sit on a row with the Reset Session button. */
+.dndm-session-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+}
+
 .dndm-floating-actions {
     position: absolute;
-    bottom: 1rem;
+    /* Clear the QuickRollFooter bar pinned to the bottom of the canvas area. */
+    bottom: calc(1rem + var(--dndm-rollfooter-h));
     right: calc(1rem + var(--dndm-rail-pad-right));
     display: flex;
     gap: 0.5rem;

@@ -3,6 +3,7 @@ using KnockBox.Core.Services.State.Games.Shared;
 using KnockBox.Core.Services.State.Users;
 using KnockBox.DndMapper.Models;
 using KnockBox.DndMapper.Services.State.Games.Data;
+using KnockBox.DndMapper.Services.State.Games.Data.LoadedDice;
 
 namespace KnockBox.DndMapper.Services.State.Games
 {
@@ -15,19 +16,24 @@ namespace KnockBox.DndMapper.Services.State.Games
         public AttributeSchema AttributeSchema { get; private set; }
             = AttributeSchema.FromPreset(AttributePreset.DnD5eCore);
 
-        public ImmutableList<Map> Maps { get; internal set; } = ImmutableList<Map>.Empty;
+        public ImmutableArray<Map> Maps { get; internal set; } = ImmutableArray<Map>.Empty;
         public Guid? ActiveMapId { get; private set; }
 
         public ImmutableDictionary<Guid, CharacterSheet> Sheets { get; internal set; }
             = ImmutableDictionary<Guid, CharacterSheet>.Empty;
         public ImmutableDictionary<Guid, NamedTemplate> CustomTemplates { get; internal set; }
             = ImmutableDictionary<Guid, NamedTemplate>.Empty;
+        // RollLog stays an ImmutableList (not ImmutableArray): it is the one
+        // append-hot collection — AppendRoll runs on every roll — and
+        // ImmutableList.Add is O(log n) versus ImmutableArray's O(n) full-array
+        // copy. The other collections here are read/iterate-heavy and rarely
+        // mutated, so ImmutableArray is the right call for them.
         public ImmutableList<RollResult> RollLog { get; internal set; } = ImmutableList<RollResult>.Empty;
 
         // Host-managed roll templates that ride with the save slot and are
         // visible to every sheet. Players can't author or edit these.
-        public ImmutableList<RollTemplate> GlobalRollTemplates { get; internal set; }
-            = ImmutableList<RollTemplate>.Empty;
+        public ImmutableArray<RollTemplate> GlobalRollTemplates { get; internal set; }
+            = ImmutableArray<RollTemplate>.Empty;
 
         // Status-effect templates live as children of NamedTemplate
         // (attribute schemas). This id pins which schema the Effect Library
@@ -54,6 +60,19 @@ namespace KnockBox.DndMapper.Services.State.Games
         // Running total of bytes consumed by uploaded images on this state. Used to
         // enforce the per-room 1 GB cap. Mutated only by image verbs inside Execute.
         public long BytesUsed { get; private set; }
+
+        // Host-authored loaded-dice rules. Persisted with the library
+        // snapshot when Settings.LoadedDiceEnabled has ever been true; safe
+        // to keep populated even while the master toggle is off — the engine
+        // checks the toggle before evaluating.
+        public ImmutableArray<LoadedDiceRule> LoadedDiceRules { get; internal set; }
+            = ImmutableArray<LoadedDiceRule>.Empty;
+
+        // Live snapshot of keys the host's client reports as currently held.
+        // Ephemeral — process restarts clear it. Consumed only by
+        // HostKeyHeldCondition; updated via UpdateHostInputStateAsync.
+        public ImmutableHashSet<string> HostHeldKeys { get; internal set; }
+            = ImmutableHashSet<string>.Empty;
 
         // Deterministic IDs so library snapshots that reference built-ins by
         // name don't accidentally collide with user-saved templates.
@@ -167,6 +186,8 @@ namespace KnockBox.DndMapper.Services.State.Games
         internal void SetFocusRect(FocusRect? rect) => FocusRect = rect;
         internal void SetBytesUsed(long value) => BytesUsed = value < 0 ? 0 : value;
         internal void AdjustBytesUsed(long delta) => BytesUsed = Math.Max(0, BytesUsed + delta);
+        internal void SetLoadedDiceRules(ImmutableArray<LoadedDiceRule> rules) => LoadedDiceRules = rules;
+        internal void SetHostHeldKeys(ImmutableHashSet<string> keys) => HostHeldKeys = keys;
 
         internal void AppendRoll(RollResult result)
         {
@@ -226,21 +247,21 @@ namespace KnockBox.DndMapper.Services.State.Games
         // existing scaling rather than over-engineering with hash indexes.
         internal int IndexOfMap(Guid mapId)
         {
-            for (var i = 0; i < Maps.Count; i++)
+            for (var i = 0; i < Maps.Length; i++)
                 if (Maps[i].Id == mapId) return i;
             return -1;
         }
 
         internal static int IndexOfToken(Map map, Guid tokenId)
         {
-            for (var i = 0; i < map.Tokens.Count; i++)
+            for (var i = 0; i < map.Tokens.Length; i++)
                 if (map.Tokens[i].Id == tokenId) return i;
             return -1;
         }
 
         internal static int IndexOfImage(Map map, Guid imageId)
         {
-            for (var i = 0; i < map.Images.Count; i++)
+            for (var i = 0; i < map.Images.Length; i++)
                 if (map.Images[i].Id == imageId) return i;
             return -1;
         }

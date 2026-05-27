@@ -4,9 +4,27 @@
 
 @if (Compact)
 {
-    <label class="dndm-upload-compact @(_disabled ? "dndm-upload-compact--disabled" : null)"
-           title="Upload one or more images (PNG · JPEG · WebP · ≤ 100 MB each)">
-        @if (_uploading) { <span>Uploading…</span> } else { <span>+ Image</span> }
+    <label class="dndm-upload-compact dndm-upload-compact--icon @(_disabled ? "dndm-upload-compact--disabled" : null)"
+           title="Upload one or more images (PNG · JPEG · WebP · ≤ 100 MB each)"
+           aria-label="Upload image">
+        @if (_uploading)
+        {
+            <span class="dndm-upload-compact-busy" aria-hidden="true">…</span>
+        }
+        else
+        {
+            @* Picture-frame + plus glyph. Mirrors the "add an image layer" intent
+               without the textual "+ Image" label that crowded the panel header. *@
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none"
+                 stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect x="3" y="4" width="14" height="14" rx="2" />
+                <circle cx="8" cy="9" r="1.5" />
+                <path d="M3 15l4-4 4 4 3-3 3 3" />
+                <line x1="19" y1="3" x2="19" y2="9" />
+                <line x1="16" y1="6" x2="22" y2="6" />
+            </svg>
+        }
         <input type="file"
                @ref="_fileInput"
                @onchange="OnFileSelected"

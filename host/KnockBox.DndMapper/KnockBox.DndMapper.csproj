@@ -5,11 +5,27 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AddRazorSupportForMvc>true</AddRazorSupportForMvc>
+    <!-- Razor Class Libraries suppress CopyLocal for transitive NuGet refs by
+         default (the consumer app is expected to do the copying). This plugin
+         is loaded into its own AssemblyLoadContext at runtime, NOT linked into
+         the host's app graph, so its NuGet runtime assets must land in this
+         project's output folder. Without this, Markdig.dll is never copied
+         and the plugin throws FileNotFoundException on first render. -->
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
   </PropertyGroup>
 
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <ProjectReference Include="..\..\sdk\KnockBox.Core\KnockBox.Core.csproj" />
+    <!-- Markdig renders the character-sheet Notes markdown. Each plugin loads
+         into its own AssemblyLoadContext rooted at games/{TargetName}/, so
+         Markdig.dll must be staged into that folder for the plugin's ALC to
+         resolve it. The Razor SDK suppresses CopyLocal for transitive package
+         refs by default; Private=true forces Markdig.dll into $(TargetDir),
+         and the StageMarkdigForPlugin target below copies it into games/. -->
+    <PackageReference Include="Markdig" Version="0.42.0">
+      <Private>true</Private>
+    </PackageReference>
     <InternalsVisibleTo Include="KnockBox.DndMapperTests" />
   </ItemGroup>
 
@@ -18,5 +34,38 @@
   </ItemGroup>
 
   <Import Project="..\Directory.Plugin.targets" />
+
+  <!-- Stage Markdig.dll into the host's games/{TargetName}/ folder so the
+       plugin's ALC can resolve it at load time. Mirrors the pattern used for
+       KnockBox.Tooling in Directory.Plugin.targets but kept here because
+       Markdig is a DndMapper-only dep. Runs after the shared PublishPlugin
+       target so the destination folder already exists. -->
+  <Target Name="StageMarkdigForPlugin" AfterTargets="PublishPlugin">
+    <PropertyGroup>
+      <DndMapperGamesDir>$(MSBuildThisFileDirectory)..\KnockBox\bin\$(Configuration)\$(TargetFramework)\games\$(TargetName)\</DndMapperGamesDir>
+    </PropertyGroup>
+    <ItemGroup>
+      <DndMapperRuntimeDeps Include="$(TargetDir)Markdig.dll" Condition="Exists('$(TargetDir)Markdig.dll')" />
+    </ItemGroup>
+    <Copy SourceFiles="@(DndMapperRuntimeDeps)"
+          DestinationFolder="$(DndMapperGamesDir)"
+          Condition="'@(DndMapperRuntimeDeps)' != ''" />
+  </Target>
+
+  <!-- Same staging on Publish (Release / R2R) so packaged builds include the
+       dep. PublishDir holds the post-publish artifacts; the IL Markdig.dll
+       from the package is identical so we just re-stage from there. -->
+  <Target Name="StageMarkdigForPluginAfterPublish" AfterTargets="Publish">
+    <PropertyGroup>
+      <DndMapperGamesDir>$(MSBuildThisFileDirectory)..\KnockBox\bin\$(Configuration)\$(TargetFramework)\games\$(TargetName)\</DndMapperGamesDir>
+    </PropertyGroup>
+    <ItemGroup>
+      <DndMapperPublishedDeps Include="$(PublishDir)Markdig.dll" Condition="Exists('$(PublishDir)Markdig.dll')" />
+    </ItemGroup>
+    <Copy SourceFiles="@(DndMapperPublishedDeps)"
+          DestinationFolder="$(DndMapperGamesDir)"
+          OverwriteReadOnlyFiles="true"
+          Condition="'@(DndMapperPublishedDeps)' != ''" />
+  </Target>
 
 </Project>

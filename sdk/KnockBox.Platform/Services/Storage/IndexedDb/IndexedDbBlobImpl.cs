@@ -181,6 +181,14 @@ internal sealed class IndexedDbBlobImpl : IndexedDbBlob
             CacheControl = options?.CacheControl,
             AbsoluteExpiresAt = absoluteExpiry,
             SlidingExpiry = options?.SlidingExpiry,
+            // The interop is scoped per Blazor circuit, so its ScopeId
+            // identifies the originating circuit. BlobShareEndpoint uses
+            // it to gate concurrent JS-stream opens per circuit (one at a
+            // time) so a display view's parallel image fetches don't fan
+            // out N simultaneous streams that starve the JS dispatcher
+            // past Blazor's pipe-read timeout — which used to escalate
+            // to a fatal CircuitHost UnhandledException.
+            CircuitScopeId = _interop.ScopeId,
             // Capture `this` (the blob impl) via the lambda so the registry
             // entry can open a fresh SignalR-framed binary stream against
             // the originating circuit's blob each time a player fetches.

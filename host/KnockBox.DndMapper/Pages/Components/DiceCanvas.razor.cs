@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using KnockBox.Core.Components.Shared;
 using KnockBox.DndMapper.Helpers;
 using KnockBox.DndMapper.Services.Logic;
@@ -32,11 +33,25 @@ namespace KnockBox.DndMapper.Pages.Components
         // tick.
         private readonly HashSet<Guid> _seen = new();
 
-        // Most recent rollId we kicked off per user. Used to detect interrupts:
-        // when a new roll arrives for the same user while a previous one is
-        // still animating, settle the previous one immediately so the log
-        // doesn't permanently hide it.
-        private readonly Dictionary<string, Guid> _activeByUser = new();
+        // Most recent rollId we kicked off per dice-box-key. Used to detect
+        // interrupts: when a new roll arrives for the same key while a
+        // previous one is still animating, settle the previous one
+        // immediately so the log doesn't permanently hide it. The key is
+        // composite: "user:{id}" for user-attributed rolls and "token:{id}"
+        // for token-bound rolls (e.g. NPC initiative). Distinct keys mean
+        // distinct DiceBox instances in JS, which is what enables several
+        // NPC rolls to animate concurrently instead of clobbering each
+        // other under the host's user id.
+        private readonly Dictionary<string, Guid> _activeByKey = new();
+
+        // Token ids whose 3D dice scene has already been prewarmed for this
+        // circuit. The bulk NPC initiative roll appends N RollResults in one
+        // notification; without prewarming, each one's first ensureBox()
+        // call does a heavy Three.js initialize() and the burst saturates
+        // the main thread. We instead fire prewarmBox() per NPC as soon as
+        // we observe combat in WaitingForRolls, so by the time the host
+        // clicks "roll all" every box is a warm cache hit.
+        private readonly HashSet<Guid> _prewarmed = new();
 
         protected override void OnInitialized()
         {
@@ -57,6 +72,7 @@ namespace KnockBox.DndMapper.Pages.Components
                 foreach (var roll in State.RollLog) _seen.Add(roll.Id);
                 // Then try to animate any rolls that arrived between the first
                 // notification and the JS module being loaded.
+                await PrewarmNpcBoxesAsync();
                 await ProcessNewRollsAsync();
             }
             catch (JSDisconnectedException) { }
@@ -77,8 +93,64 @@ namespace KnockBox.DndMapper.Pages.Components
             {
                 Tracker.MarkAnimating(roll.Id);
             }
-            await InvokeAsync(ProcessNewRollsAsync);
+            await InvokeAsync(async () =>
+            {
+                await PrewarmNpcBoxesAsync();
+                await ProcessNewRollsAsync();
+            });
         }
+
+        // Queue prewarm for every unrolled NPC combatant whenever combat
+        // sits in WaitingForRolls. We send the full batch in a single JS
+        // round-trip; JS then serializes the heavy Three.js init through
+        // its internal initChain in the background. Awaiting each token's
+        // init from C# would block this circuit handler for the full warm
+        // duration — long enough for the host to click "Roll All" mid-warm
+        // and still hit the cold-init burst. The batch path returns to C#
+        // immediately. Idempotent via _prewarmed.
+        private async Task PrewarmNpcBoxesAsync()
+        {
+            if (_module is null) return;
+            var combat = State.ActiveCombat;
+            if (combat is null || combat.Phase != CombatPhase.WaitingForRolls) return;
+
+            var batch = new List<PrewarmConfig>();
+            var added = new List<Guid>();
+            foreach (var entry in combat.TurnOrder)
+            {
+                if (entry.OwnerUserId is not null) continue;     // players
+                if (entry.InitiativeRoll is not null) continue;  // already rolled
+                if (!_prewarmed.Add(entry.TokenId)) continue;    // already warmed this circuit
+
+                var color = DiceColorResolver.ResolveForToken(State, entry.TokenId);
+                batch.Add(new PrewarmConfig(
+                    BoxKey: "token:" + entry.TokenId.ToString("N"),
+                    Color: color,
+                    FontColor: TokenTextContrast.TextFillFor(color)));
+                added.Add(entry.TokenId);
+            }
+
+            if (batch.Count == 0) return;
+
+            try
+            {
+                await _module.InvokeVoidAsync("prewarmBoxes", _overlayRef, batch);
+            }
+            catch (JSDisconnectedException)
+            {
+                // Circuit gone — the lazy ensureBox path on the next roll
+                // will rebuild as needed. Drop the guards so a fresh
+                // circuit can retry.
+                foreach (var id in added) _prewarmed.Remove(id);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning(ex, "Dice prewarmBoxes batch failed ({Count} tokens)", batch.Count);
+                foreach (var id in added) _prewarmed.Remove(id);
+            }
+        }
+
+        private sealed record PrewarmConfig(string BoxKey, string Color, string FontColor);
 
         private async Task ProcessNewRollsAsync()
         {
@@ -87,20 +159,37 @@ namespace KnockBox.DndMapper.Pages.Components
             foreach (var roll in VisibleNewRolls())
             {
                 _seen.Add(roll.Id);
-                var color = DiceColorResolver.Resolve(State, roll.RollerUserId);
+
+                // Token-bound rolls (NPC initiative bulk-roll) get their own
+                // dice-box keyed by the token id, so several NPC rolls can
+                // animate side-by-side rather than the host's single box
+                // clobbering itself. Color comes from the token's resolved
+                // (sheet-aware) color instead of the host's gold.
+                string boxKey;
+                string color;
+                if (roll.TokenId is Guid tokenId)
+                {
+                    boxKey = "token:" + tokenId.ToString("N");
+                    color = DiceColorResolver.ResolveForToken(State, tokenId);
+                }
+                else
+                {
+                    boxKey = "user:" + roll.RollerUserId;
+                    color = DiceColorResolver.Resolve(State, roll.RollerUserId);
+                }
                 var fontColor = TokenTextContrast.TextFillFor(color);
                 var notation = DiceNotationBuilder.Build(roll);
                 if (string.IsNullOrEmpty(notation)) continue;
 
-                // Interrupt: if this user already had a roll animating, settle
-                // the previous one immediately so the log reveals it.
-                if (_activeByUser.TryGetValue(roll.RollerUserId, out var previousRollId)
+                // Interrupt: if this dice-box already has a roll animating,
+                // settle the previous one immediately so the log reveals it.
+                if (_activeByKey.TryGetValue(boxKey, out var previousRollId)
                     && previousRollId != roll.Id)
                 {
                     Tracker.MarkSettled(previousRollId);
                 }
 
-                _activeByUser[roll.RollerUserId] = roll.Id;
+                _activeByKey[boxKey] = roll.Id;
                 Tracker.MarkAnimating(roll.Id);
 
                 try
@@ -108,7 +197,7 @@ namespace KnockBox.DndMapper.Pages.Components
                     await _module.InvokeVoidAsync(
                         "rollFor",
                         _overlayRef,
-                        roll.RollerUserId,
+                        boxKey,
                         color,
                         fontColor,
                         notation,
@@ -137,13 +226,16 @@ namespace KnockBox.DndMapper.Pages.Components
             }
         }
 
+        // JS calls back with the same composite key we passed to rollFor —
+        // see boxKey construction above. JSInvokable binds positionally, so
+        // the parameter name can be whatever's most readable here.
         [JSInvokable]
-        public Task OnRollSettled(string userId, Guid rollId)
+        public Task OnRollSettled(string boxKey, Guid rollId)
         {
             Tracker.MarkSettled(rollId);
-            if (_activeByUser.TryGetValue(userId, out var current) && current == rollId)
+            if (_activeByKey.TryGetValue(boxKey, out var current) && current == rollId)
             {
-                _activeByUser.Remove(userId);
+                _activeByKey.Remove(boxKey);
             }
             return Task.CompletedTask;
         }

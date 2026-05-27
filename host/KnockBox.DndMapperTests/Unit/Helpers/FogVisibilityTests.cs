@@ -93,9 +93,14 @@ namespace KnockBox.DndMapperTests.Unit.Helpers
         // ── Image filter ─────────────────────────────────────────────────────
 
         [TestMethod]
-        public void Image_AllCornersFogged_NonHost_Filtered()
+        public void Image_EveryCellFogged_NonHost_Filtered()
         {
-            var map = Fog(Make(), (2, 3), (5, 3), (2, 6), (5, 6));
+            // Fog every cell the 4×4 image covers.
+            var cells = new List<(int, int)>();
+            for (int y = 3; y <= 6; y++)
+                for (int x = 2; x <= 5; x++)
+                    cells.Add((x, y));
+            var map = Fog(Make(), cells.ToArray());
             var img = Img(2, 3, 4, 4); // covers cells (2..5, 3..6)
 
             var result = ImageVisibilityFilter.VisibleImagesFor(new[] { img }, map, isHost: false).ToList();
@@ -109,6 +114,52 @@ namespace KnockBox.DndMapperTests.Unit.Helpers
             // (5, 6) deliberately revealed.
             var map = Fog(Make(), (2, 3), (5, 3), (2, 6));
             var img = Img(2, 3, 4, 4);
+
+            var result = ImageVisibilityFilter.VisibleImagesFor(new[] { img }, map, isHost: false).ToList();
+
+            CollectionAssert.AreEqual(new[] { img }, result);
+        }
+
+        [TestMethod]
+        public void Image_OnlyCenterCellRevealed_NonHost_StillVisible()
+        {
+            // Regression: previously the filter checked only the four corners,
+            // so a full-coverage image whose interior had revealed cells (but
+            // whose corners were still fogged) appeared blank on the display.
+            // Now any revealed cell within the AABB keeps the image visible.
+            var allFogged = new List<(int, int)>();
+            for (int y = 3; y <= 6; y++)
+                for (int x = 2; x <= 5; x++)
+                    allFogged.Add((x, y));
+            var map = Fog(Make(), allFogged.ToArray());
+            // Reveal a single interior cell.
+            map = map.WithCellFogged(3, 4, false);
+            var img = Img(2, 3, 4, 4);
+
+            var result = ImageVisibilityFilter.VisibleImagesFor(new[] { img }, map, isHost: false).ToList();
+
+            CollectionAssert.AreEqual(new[] { img }, result);
+        }
+
+        [TestMethod]
+        public void Image_FullMapSize_WithInteriorRevealed_NonHost_Visible()
+        {
+            // The user-reported scenario: a background image sized to exactly
+            // the map dimensions. The image's bounding box corners always land
+            // on the outermost cells, which are typically the last to be
+            // revealed. With the old 4-corners-only check the whole image was
+            // dropped from the projection (appearing blank).
+            var map = Make(w: 10, h: 10);
+            var allFogged = new List<(int, int)>();
+            for (int y = 0; y < 10; y++)
+                for (int x = 0; x < 10; x++)
+                    allFogged.Add((x, y));
+            map = Fog(map, allFogged.ToArray());
+            // Reveal a cluster of cells near the middle.
+            map = map.WithCellFogged(4, 4, false);
+            map = map.WithCellFogged(5, 5, false);
+
+            var img = Img(0, 0, 10, 10);
 
             var result = ImageVisibilityFilter.VisibleImagesFor(new[] { img }, map, isHost: false).ToList();
 

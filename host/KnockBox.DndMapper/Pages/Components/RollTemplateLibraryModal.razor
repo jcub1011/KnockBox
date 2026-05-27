@@ -33,7 +33,7 @@
 
             <section class="dndm-roll-library-section">
                 <h4 class="dndm-roll-library-section-title">Global (save slot)</h4>
-                @if (State.GlobalRollTemplates.Count == 0)
+                @if (State.GlobalRollTemplates.Length == 0)
                 {
                     <div class="dndm-panel-empty">No global templates yet.</div>
                 }
@@ -60,7 +60,7 @@
                 }
                 else
                 {
-                    @if (Sheet.RollTemplates.Count == 0)
+                    @if (Sheet.RollTemplates.Length == 0)
                     {
                         <div class="dndm-panel-empty">No templates for this sheet yet.</div>
                     }

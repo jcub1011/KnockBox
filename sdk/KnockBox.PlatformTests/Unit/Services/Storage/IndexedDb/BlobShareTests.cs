@@ -16,6 +16,7 @@ public sealed class BlobShareTests
             Token = token,
             ContentType = "application/octet-stream",
             Length = 4,
+            CircuitScopeId = Guid.NewGuid(),
             StreamOpener = _ => ValueTask.FromResult<Stream>(new MemoryStream(new byte[4], writable: false)),
         });
         var share = new BlobShare(registry, token, $"/blob-share/{token:D}", "application/octet-stream", 4);
@@ -35,6 +36,7 @@ public sealed class BlobShareTests
             Token = token,
             ContentType = "application/octet-stream",
             Length = 0,
+            CircuitScopeId = Guid.NewGuid(),
             StreamOpener = _ => ValueTask.FromResult<Stream>(Stream.Null),
         });
         var called = false;
@@ -54,6 +56,7 @@ public sealed class BlobShareTests
             Token = token,
             ContentType = "application/octet-stream",
             Length = 0,
+            CircuitScopeId = Guid.NewGuid(),
             StreamOpener = _ => ValueTask.FromResult<Stream>(Stream.Null),
         });
         var callCount = 0;

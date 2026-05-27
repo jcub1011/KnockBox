@@ -51,11 +51,6 @@
         if (!_npcPickerOpen)
         {
             <div class="dndm-panel-body">
-                <p class="dndm-initiative-host-blurb">
-                    Roll a turn order and run combat. The banner appears on every
-                    client; players see a <em>Roll&nbsp;Initiative!</em> button when
-                    it's their turn to roll.
-                </p>
                 <button class="dndm-btn dndm-btn--primary"
                         type="button"
                         @onclick="OpenNpcPicker">
@@ -86,7 +81,7 @@
                                            checked="@picked"
                                            @onchange="@(e => TogglePick(token.Id, (bool)(e.Value ?? false)))" />
                                     <span class="dndm-initiative-picker-swatch"
-                                          style="@($"background:{token.Color};")"></span>
+                                          style="@($"background:{token.ResolveColor(State.Sheets)};")"></span>
                                     <span class="dndm-initiative-picker-name">@token.Name</span>
                                 </label>
                             </li>
@@ -133,14 +128,20 @@
                     {
                         var isPlayer = entry.OwnerUserId is not null;
                         var rolled = entry.InitiativeRoll is not null;
-                        <div @key="entry.Id" class="dndm-initiative-host-row @(rolled ? "dndm-initiative-host-row--rolled" : null)">
+                        var animating = IsInitiativeAnimating(entry);
+                        <div @key="entry.Id" class="dndm-initiative-host-row @(rolled && !animating ? "dndm-initiative-host-row--rolled" : null)">
                             <span class="dndm-initiative-host-name">
                                 @entry.Name
                                 <span class="dndm-initiative-badge">@(isPlayer ? "PC" : "NPC")</span>
                             </span>
-                            @if (rolled)
+                            @if (rolled && !animating)
                             {
                                 <span class="dndm-initiative-host-roll">@entry.InitiativeRoll</span>
+                            }
+                            else if (rolled && animating)
+                            {
+                                @* Dice still tumbling — hide the value until the 3D dice settle. *@
+                                <span class="dndm-initiative-host-roll">—</span>
                             }
                             else if (isPlayer)
                             {
@@ -153,11 +154,26 @@
                             }
                             else
                             {
+                                @* Pre-fill from PendingInitiative so the host can see what
+                                   they previously Set (and re-Set with a different value
+                                   if needed). The "set" badge confirms the value is staged
+                                   but the dice haven't fired — they'll fire as a batch once
+                                   every NPC has a value or the host clicks Roll All Unset. *@
+                                var inputValue = _npcDrafts.TryGetValue(entry.Id, out var draftValue)
+                                    ? draftValue
+                                    : (entry.PendingInitiative?.ToString() ?? string.Empty);
                                 <div class="dndm-initiative-host-npc-actions">
+                                    @if (entry.PendingInitiative is not null)
+                                    {
+                                        <span class="dndm-initiative-badge"
+                                              title="Value staged. Dice will fire when every NPC is set or you click Roll All Unset.">
+                                            set
+                                        </span>
+                                    }
                                     <input type="number"
                                            class="dndm-input dndm-input--num"
                                            placeholder="roll"
-                                           value="@(_npcDrafts.GetValueOrDefault(entry.Id, ""))"
+                                           value="@inputValue"
                                            @oninput="@(e => OnNpcDraftInput(entry.Id, (string?)e.Value))"
                                            @onkeydown="@(e => OnNpcDraftKey(e, entry.Id))" />
                                     <button class="dndm-btn dndm-btn--small dndm-btn--primary"
@@ -179,10 +195,11 @@
                     @foreach (var (entry, idx) in combat.TurnOrder.Select((e, i) => (e, i)))
                     {
                         var current = idx == combat.CurrentTurnIndex;
+                        var animating = IsInitiativeAnimating(entry);
                         <div @key="entry.Id" class="dndm-initiative-host-row @(current ? "dndm-initiative-host-row--current" : null)">
                             <span class="dndm-initiative-host-order">@(idx + 1)</span>
                             <span class="dndm-initiative-host-name">@entry.Name</span>
-                            <span class="dndm-initiative-host-roll">@entry.InitiativeRoll</span>
+                            <span class="dndm-initiative-host-roll">@(animating ? "—" : entry.InitiativeRoll?.ToString())</span>
                             <button class="dndm-btn dndm-btn--small dndm-btn--ghost dndm-initiative-host-remove"
                                     type="button"
                                     title="Remove from combat"

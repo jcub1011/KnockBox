@@ -39,7 +39,14 @@ namespace KnockBox.DndMapper.Helpers
                 .OrderBy(i => i.LayerOrder)
                 .ToArray();
 
+            // Resolve sheet-derived color at projection time so the read-only
+            // display view doesn't need access to state.Sheets. When a token
+            // is linked to a sheet that carries a non-empty color, that wins;
+            // otherwise the token's own color is kept as-is.
             var tokens = TokenVisibilityFilter.VisibleTokensFor(map.Tokens, map, isHost: false)
+                .Select(t => t.ResolveColor(state.Sheets) is { Length: > 0 } resolved && resolved != t.Color
+                    ? t with { Color = resolved }
+                    : t)
                 .ToArray();
 
             // Treat the display as a player without an owner so the same
@@ -74,9 +81,9 @@ namespace KnockBox.DndMapper.Helpers
         {
             if (combat is null || combat.Phase != CombatPhase.Active) return null;
             var turn = combat.TurnOrder;
-            if (turn.Count == 0) return null;
+            if (turn.Length == 0) return null;
             var idx = combat.CurrentTurnIndex;
-            if (idx < 0 || idx >= turn.Count) return null;
+            if (idx < 0 || idx >= turn.Length) return null;
             var tokenId = turn[idx].TokenId;
             return tokenId == Guid.Empty ? null : tokenId;
         }

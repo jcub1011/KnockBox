@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using KnockBox.DndMapper.Models;
 using KnockBox.DndMapper.Services.State.Games.Data;
+using KnockBox.DndMapper.Services.State.Games.Data.LoadedDice;
 
 namespace KnockBox.DndMapper.Services.Library
 {
@@ -41,6 +42,11 @@ namespace KnockBox.DndMapper.Services.Library
         // Host-managed roll templates that ride with the save slot. Built-ins
         // are never serialized; sheet-scoped templates ride on SheetSnapshot.
         public List<RollTemplateSnapshot> GlobalRollTemplates { get; init; } = [];
+        // Host-authored loaded-dice rules. Polymorphic Condition/Modification
+        // subtypes round-trip via System.Text.Json's $kind discriminator.
+        // Older snapshots without this field deserialize to [] — no schema
+        // bump needed.
+        public List<LoadedDiceRule> LoadedDiceRules { get; init; } = [];
     }
 
     /// <summary>
@@ -60,6 +66,8 @@ namespace KnockBox.DndMapper.Services.Library
         public string? InitiativeAttributeName { get; init; }
         public List<NamedTemplateSnapshot> CustomTemplates { get; init; } = [];
         public List<RollTemplateSnapshot> GlobalRollTemplates { get; init; } = [];
+        // See LibrarySnapshot.LoadedDiceRules.
+        public List<LoadedDiceRule> LoadedDiceRules { get; init; } = [];
         // Ordered list of map ids. Mirrors Map.ListOrder so LoadSlotAsync can
         // fan out shard reads in display order without a second sort.
         public List<Guid> MapIds { get; init; } = [];
@@ -195,6 +203,13 @@ namespace KnockBox.DndMapper.Services.Library
         public string Notes { get; init; } = string.Empty;
         public int? Hp { get; init; }
         public int? MaxHp { get; init; }
+        // New 2026-05: nullable AC, persisted color, map scoping. Older
+        // snapshots without these keys deserialize to null / empty / null
+        // respectively — no schema bump needed because the runtime defaults
+        // match (AC unset, color falls back to token color, sheet is global).
+        public int? ArmorClass { get; init; }
+        public string Color { get; init; } = string.Empty;
+        public Guid? ScopedMapId { get; init; }
         public List<StatusEffectSnapshot> StatusEffects { get; init; } = [];
         public List<RollTemplateSnapshot> RollTemplates { get; init; } = [];
         // OwnerUserId not persisted (see TokenSnapshot rationale).
@@ -249,6 +264,7 @@ namespace KnockBox.DndMapper.Services.Library
                 Sheets = sheets,
                 CustomTemplates = core.CustomTemplates,
                 GlobalRollTemplates = core.GlobalRollTemplates,
+                LoadedDiceRules = core.LoadedDiceRules,
             };
         }
 
@@ -290,6 +306,7 @@ namespace KnockBox.DndMapper.Services.Library
                 GlobalRollTemplates = state.GlobalRollTemplates
                     .Select(ToRollTemplateSnapshot)
                     .ToList(),
+                LoadedDiceRules = state.LoadedDiceRules.ToList(),
                 MapIds = state.Maps
                     .OrderBy(m => m.ListOrder)
                     .Select(m => m.Id)
@@ -377,7 +394,7 @@ namespace KnockBox.DndMapper.Services.Library
             Name = s.Name,
             AttributeDeltas = s.AttributeDeltas
                 .Select(d => new AttributeDelta(d.AttributeName, d.Delta))
-                .ToImmutableList(),
+                .ToImmutableArray(),
             MaxHpDelta = s.MaxHpDelta,
             OnApplyHpDelta = s.OnApplyHpDelta,
             Notes = s.Notes,
@@ -389,7 +406,7 @@ namespace KnockBox.DndMapper.Services.Library
             Name = s.Name,
             AttributeDeltas = s.AttributeDeltas
                 .Select(d => new AttributeDelta(d.AttributeName, d.Delta))
-                .ToImmutableList(),
+                .ToImmutableArray(),
             MaxHpDelta = s.MaxHpDelta,
             OnApplyHpDelta = s.OnApplyHpDelta,
             Notes = s.Notes,
@@ -483,6 +500,9 @@ namespace KnockBox.DndMapper.Services.Library
             Notes = sheet.Notes,
             Hp = sheet.Hp,
             MaxHp = sheet.MaxHp,
+            ArmorClass = sheet.ArmorClass,
+            Color = sheet.Color,
+            ScopedMapId = sheet.ScopedMapId,
             StatusEffects = sheet.StatusEffects.Select(ToStatusEffectSnapshot).ToList(),
             RollTemplates = sheet.RollTemplates.Select(ToRollTemplateSnapshot).ToList(),
         };

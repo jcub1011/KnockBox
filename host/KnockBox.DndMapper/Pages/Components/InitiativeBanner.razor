@@ -29,8 +29,12 @@
             else
             {
                 <span class="dndm-initiative-meta">
+                    @* Count both committed rolls and host-staged Pending values
+                       so the progress reads "n/total set" the moment each NPC is
+                       Set, even though the dice (and the revealed value) are
+                       deferred until the whole batch fires. *@
                     <span class="dndm-initiative-progress">
-                        @combat.TurnOrder.Count(e => e.InitiativeRoll is not null) / @combat.TurnOrder.Count rolled
+                        @combat.TurnOrder.Count(e => e.InitiativeRoll is not null || e.PendingInitiative is not null) / @combat.TurnOrder.Length rolled
                     </span>
                 </span>
             }
@@ -42,7 +46,8 @@
                 {
                     var isCurrent = isActive && idx == combat.CurrentTurnIndex;
                     var isOwn = entry.OwnerUserId == CurrentUserId;
-                    var rolled = entry.InitiativeRoll is not null;
+                    var animating = IsInitiativeAnimating(entry);
+                    var rolled = entry.InitiativeRoll is not null && !animating;
                     <li @key="entry.Id"
                         class="dndm-initiative-entry
                                @(isCurrent ? " dndm-initiative-entry--current" : null)
@@ -71,7 +76,9 @@
                             }
                         </span>
                         <span class="dndm-initiative-roll">
-                            @(entry.InitiativeRoll?.ToString() ?? "—")
+                            @* While 3D dice are still tumbling for this entry's token, show the
+                               placeholder so the result isn't spoiled before the dice land. *@
+                            @(rolled ? entry.InitiativeRoll!.Value.ToString() : "—")
                         </span>
 
                         @if (combat.Phase == CombatPhase.WaitingForRolls && isOwn && !rolled)

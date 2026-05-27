@@ -1,0 +1,194 @@
+.dndm-loaded-dice .dndm-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.dndm-loaded-rule {
+    border: 1px solid var(--dndm-border, #5a4a3a);
+    border-radius: 4px;
+    padding: 0.5rem;
+    background: var(--dndm-bg-panel-2, rgba(0, 0, 0, 0.15));
+    margin-bottom: 0.5rem;
+}
+
+.dndm-loaded-rule-header {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-bottom: 0.4rem;
+}
+
+.dndm-loaded-rule-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-weight: 600;
+}
+
+.dndm-loaded-rule-disabled {
+    color: var(--dndm-text-dim, #888);
+    font-style: italic;
+    font-size: 0.85rem;
+}
+
+.dndm-loaded-rule-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.dndm-loaded-clause {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.dndm-loaded-keyword {
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-size: 0.7rem;
+    color: var(--dndm-text-dim, #aa8866);
+    min-width: 2.5rem;
+}
+
+.dndm-loaded-args {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.3rem;
+    flex: 1 1 auto;
+}
+
+.dndm-loaded-arg {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.15rem 0.35rem;
+    border: 1px solid var(--dndm-border, #5a4a3a);
+    border-radius: 3px;
+    background: var(--dndm-bg-panel, rgba(0, 0, 0, 0.1));
+    font-size: 0.85rem;
+}
+
+.dndm-loaded-arg-label {
+    color: var(--dndm-text-dim, #aa8866);
+    font-size: 0.75rem;
+}
+
+.dndm-loaded-arg-val {
+    font-weight: 600;
+}
+
+.dndm-loaded-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.15rem 0.35rem;
+    border: 1px solid var(--dndm-border, #5a4a3a);
+    border-radius: 10px;
+    background: var(--dndm-bg-panel, rgba(0, 0, 0, 0.1));
+    font-size: 0.8rem;
+}
+
+.dndm-loaded-allchip {
+    color: var(--dndm-text-dim, #aa8866);
+    font-style: italic;
+    font-size: 0.85rem;
+}
+
+.dndm-loaded-warn {
+    color: #d05050;
+    font-size: 0.8rem;
+}
+
+.dndm-loaded-and {
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-size: 0.7rem;
+    color: var(--dndm-text-dim, #aa8866);
+}
+
+.dndm-loaded-chip-x {
+    background: transparent;
+    border: 0;
+    color: inherit;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+    font-size: 1rem;
+    opacity: 0.7;
+}
+.dndm-loaded-chip-x:hover { opacity: 1; }
+
+.dndm-loaded-select,
+.dndm-loaded-input {
+    font-size: 0.85rem;
+    height: 1.6rem;
+    padding: 0 0.3rem;
+}
+
+.dndm-loaded-input { width: 7rem; }
+
+.dndm-toggle--inline {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+/* Composite (AllOf / AnyOf / Not) group container. Left border colour
+   signals the operator at a glance; the body is a nested .dndm-loaded-args
+   row that can in turn contain more groups. */
+.dndm-loaded-group {
+    display: inline-flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 0.25rem 0.35rem 0.3rem 0.45rem;
+    border: 1px solid var(--dndm-border, #5a4a3a);
+    border-left-width: 3px;
+    border-radius: 4px;
+    background: var(--dndm-bg-panel-2, rgba(0, 0, 0, 0.15));
+}
+.dndm-loaded-group--allOf { border-left-color: #6a8fb5; }
+.dndm-loaded-group--anyOf { border-left-color: #b58e6a; }
+.dndm-loaded-group--not { border-left-color: #b56a6a; }
+
+.dndm-loaded-group-header {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.dndm-loaded-group-op {
+    height: 1.4rem;
+    font-size: 0.75rem;
+}
+
+.dndm-loaded-group-op-readonly {
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-size: 0.7rem;
+    color: var(--dndm-text-dim, #aa8866);
+    font-weight: 600;
+}
+
+.dndm-loaded-group-body {
+    padding-left: 0.25rem;
+}
+
+/* Set-key button for HostKeyHeldCondition. Compact, monospace-keyed,
+   highlights while waiting for the next keypress. */
+.dndm-loaded-keybtn {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.8rem;
+    min-width: 5rem;
+}
+.dndm-loaded-keybtn--listening {
+    background: var(--dndm-accent, #b58e6a);
+    color: #1a1410;
+    animation: dndm-loaded-keybtn-pulse 1.2s ease-in-out infinite;
+}
+@keyframes dndm-loaded-keybtn-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.65; }
+}

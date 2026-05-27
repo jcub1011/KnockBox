@@ -9,6 +9,7 @@ using KnockBox.DndMapper.Services.Logic.Visibility;
 using KnockBox.DndMapper.Services.State.Games;
 using KnockBox.DndMapper.Services.State.Games.Data;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Web;
 
 namespace KnockBox.DndMapper.Pages.Components
 {
@@ -25,10 +26,6 @@ namespace KnockBox.DndMapper.Pages.Components
         [Parameter, EditorRequired] public DiceRollerConfig Config { get; set; } = default!;
         [Parameter] public string CurrentUserId { get; set; } = string.Empty;
         [Parameter] public bool IsHost { get; set; }
-        [Parameter] public EventCallback OnHeaderClick { get; set; }
-
-        private Task OnHeaderClickHandler() =>
-            OnHeaderClick.HasDelegate ? OnHeaderClick.InvokeAsync() : Task.CompletedTask;
 
         [Inject] protected DndMapperGameEngine Engine { get; set; } = default!;
         [Inject] protected IUserService UserService { get; set; } = default!;
@@ -39,8 +36,6 @@ namespace KnockBox.DndMapper.Pages.Components
         private Action? _trackerSub;
 
         private bool _historyOpen;
-        private List<RollResult> _historySnapshot = [];
-        private DateTime _historyCapturedAt;
 
         private List<CharacterSheet> _pickableSheets = [];
 
@@ -75,23 +70,6 @@ namespace KnockBox.DndMapper.Pages.Components
                 list.Reverse();
                 return list;
             }
-        }
-
-        private static string FormatTimestamp(DateTime utc) =>
-            utc.ToLocalTime().ToString("HH:mm:ss");
-
-        // d100 is rolled visually as a percentile pair (tens die 00-90 + units
-        // die 0-9) because dice-box-threejs has no 100-face geometry. The chip
-        // still shows the single 1-100 result; the tooltip explains the pair.
-        private static string DieTooltip(DieRoll d)
-        {
-            if (d.Sides == 100)
-            {
-                int tens = (d.Result == 100) ? 0 : (d.Result / 10) * 10;
-                int units = (d.Result == 100) ? 0 : (d.Result % 10);
-                return $"d100 (percentile dice: {tens:D2} + {units} = {d.Result})";
-            }
-            return $"d{d.Sides}";
         }
 
         private bool CanQuickRoll
@@ -130,32 +108,12 @@ namespace KnockBox.DndMapper.Pages.Components
             return $"{dice}{attr}{flat}{mode}";
         }
 
-        private string RollerName(string rollerUserId)
-        {
-            if (State.Host.Id == rollerUserId) return State.Host.Name;
-            var entry = State.Players.FirstOrDefault(p => p.User.Id == rollerUserId);
-            return entry.User is null ? "?" : entry.DisplayName;
-        }
-
         private Task QuickRoll() =>
             DiceRollSubmitter.SubmitAsync(Engine, State, UserService.CurrentUser, Config, Toasts);
 
-        private void OpenHistory()
-        {
-            var filtered = RollLogVisibilityFilter.VisibleTo(
-                State.RollLog, CurrentUserId, IsHost, State.Settings.RollsVisibleToPlayers);
-            var list = filtered.Where(r => !Tracker.IsAnimating(r.Id)).ToList();
-            list.Reverse();
-            _historySnapshot = list;
-            _historyCapturedAt = DateTime.Now;
-            _historyOpen = true;
-        }
+        private void OpenHistory() => _historyOpen = true;
 
-        private void CloseHistory()
-        {
-            _historyOpen = false;
-            _historySnapshot = [];
-        }
+        private void CloseHistory() => _historyOpen = false;
 
         // ── Dice configuration (folded in from the former DiceRollerModal) ──
 
@@ -174,7 +132,17 @@ namespace KnockBox.DndMapper.Pages.Components
                 ? [.. State.Sheets.Values.OrderBy(s => s.CharacterName)]
                 : [.. State.Sheets.Values.Where(s => s.OwnerUserId == CurrentUserId).OrderBy(s => s.CharacterName)];
 
-            if (Config.PickerSheetId is null || !_pickableSheets.Any(s => s.Id == Config.PickerSheetId))
+            // Host can intentionally pick "No sheet (GM)" — keep it null
+            // unless a previously-picked sheet has been deleted, in which
+            // case fall back to null (GM) rather than silently switching
+            // to an unrelated sheet. Players don't have the No-sheet
+            // option, so we auto-lock them to their assigned sheet.
+            if (IsHost)
+            {
+                if (Config.PickerSheetId is Guid id && !_pickableSheets.Any(s => s.Id == id))
+                    Config.PickerSheetId = null;
+            }
+            else if (Config.PickerSheetId is null || !_pickableSheets.Any(s => s.Id == Config.PickerSheetId))
             {
                 var fallback = _pickableSheets.FirstOrDefault(s => s.OwnerUserId == CurrentUserId)
                             ?? _pickableSheets.FirstOrDefault();
@@ -232,11 +200,17 @@ namespace KnockBox.DndMapper.Pages.Components
         }
 
         // Applies a template's configured dice / flat / mode / label / attribute
-        // into the shared Config. Missing-attribute resolution: if the active
-        // schema doesn't carry the template's AttributeName, leave the field
-        // unselected so the next roll uses no attribute mod. Restoring the
-        // schema later re-binds without data loss because the template's
-        // stored name is never mutated by a schema swap.
+        // into the shared Config.
+        //
+        // Attribute resolution rules:
+        // - Template carries a name AND the schema has it → bind it.
+        // - Template carries a name but the schema doesn't have it → leave the
+        //   user's current selection in place. (Earlier this branch silently
+        //   nulled, which produced a "looks selected but isn't" bug where the
+        //   dropdown displayed an attribute the engine had no way to bind to.)
+        // - Template carries no name (baseline d20 / 2d6 / etc.) → leave the
+        //   user's current selection in place. A bare die-roll preset
+        //   shouldn't clobber an attribute the user already picked.
         private void ApplyTemplate(RollTemplate t)
         {
             Config.Terms = [.. t.Dice];
@@ -249,10 +223,7 @@ namespace KnockBox.DndMapper.Pages.Components
             {
                 Config.AttributeName = t.AttributeName;
             }
-            else
-            {
-                Config.AttributeName = null;
-            }
+            // Both fallthrough branches intentionally leave Config.AttributeName.
         }
 
         private void OpenTemplateLibrary() => _libraryOpen = true;
@@ -272,24 +243,28 @@ namespace KnockBox.DndMapper.Pages.Components
 
         private void AddTerm() => Config.Terms.Add(new DiceTerm(1, 20));
 
+        // The Adv/Dis pills are visually disabled when !CanAdvDis (see the
+        // razor), but Config.Mode is intentionally preserved across temporary
+        // invalid configurations: a user who set Adv then bumps to 2d6 and
+        // back to 1d20 should keep their Adv selection. Submission paths
+        // coerce Mode → Normal when the dice config can't support Adv/Dis
+        // (see DiceRollSubmitter), so the engine never sees an inconsistent
+        // request.
         private void RemoveTerm(int idx)
         {
             if (idx >= 0 && idx < Config.Terms.Count) Config.Terms.RemoveAt(idx);
             if (Config.Terms.Count == 0) Config.Terms.Add(new DiceTerm(1, 20));
-            if (!CanAdvDis) Config.Mode = RollMode.Normal;
         }
 
         private void UpdateTermCount(int idx, int count)
         {
             count = Math.Clamp(count, 0, 20);
             Config.Terms[idx] = Config.Terms[idx] with { Count = count };
-            if (!CanAdvDis) Config.Mode = RollMode.Normal;
         }
 
         private void UpdateTermSides(int idx, int sides)
         {
             Config.Terms[idx] = Config.Terms[idx] with { Sides = sides };
-            if (!CanAdvDis) Config.Mode = RollMode.Normal;
         }
 
         private void OnAttributeChange(string? raw)
@@ -299,6 +274,16 @@ namespace KnockBox.DndMapper.Pages.Components
 
         private void OnSheetChange(string? raw)
         {
+            // Empty value ⇒ the "No sheet (GM)" option. Clear any picked
+            // attribute too — the attribute dropdown only lists rows from
+            // the picker sheet, so a stale AttributeName would dangle
+            // without a sheet to resolve it against.
+            if (string.IsNullOrEmpty(raw))
+            {
+                Config.PickerSheetId = null;
+                Config.AttributeName = null;
+                return;
+            }
             if (Guid.TryParse(raw, out var id) && _pickableSheets.Any(s => s.Id == id))
             {
                 Config.PickerSheetId = id;

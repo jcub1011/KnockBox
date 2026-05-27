@@ -1,6 +1,7 @@
 @using KnockBox.Core.Components.Shared
 @using KnockBox.DndMapper.Models
 @using KnockBox.DndMapper.Pages.Components
+@using KnockBox.DndMapper.Pages.Components.LoadedDice
 @using KnockBox.DndMapper.Services.State.Games
 @using KnockBox.DndMapper.Services.State.Games.Data
 @inherits DisposableComponent
@@ -28,7 +29,37 @@
                                     RoomCode="@RoomCode"
                                     SelectedImageId="_selectedImageId"
                                     SelectedImageIdChanged="OnSelectedImageIdChanged" />
+                    @if (State.Settings.LoadedDiceEnabled)
+                    {
+                        <LoadedDiceRulesPanel State="State" Editable="true" />
+                    }
                     <HostSavesPanel />
+                    <section class="dndm-panel dndm-session-panel">
+                        <header class="dndm-panel-header">
+                            <span>Session</span>
+                        </header>
+                        <div class="dndm-panel-body dndm-session-actions">
+                            <button class="dndm-btn dndm-btn--icon" type="button" @onclick="OnOpenDisplayClicked"
+                                    title="Open the read-only display view in a new tab and copy its URL."
+                                    aria-label="Open display view">
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
+                                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+                                    <line x1="8" y1="21" x2="16" y2="21" />
+                                    <line x1="12" y1="17" x2="12" y2="21" />
+                                </svg>
+                            </button>
+                            <button class="dndm-btn dndm-btn--icon" type="button" @onclick="TogglePerms"
+                                    title="Settings" aria-label="Settings">
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
+                                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <circle cx="12" cy="12" r="3" />
+                                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                                </svg>
+                            </button>
+                            <EndSessionButton State="State" />
+                        </div>
+                    </section>
                 </div>
                 @* Always render the resize handle so its JS bindings stay
                    attached to a stable DOM node across rail collapses /
@@ -83,7 +114,8 @@
                            IsHost="IsHost"
                            CurrentUserId="@CurrentUserId"
                            SelectedImageId="_selectedImageId"
-                           SelectedImageIdChanged="OnSelectedImageIdChanged" />
+                           SelectedImageIdChanged="OnSelectedImageIdChanged"
+                           OnTokenDoubleClick="OnTokenDoubleClick" />
 
                 @if (IsHost && _selectedImageId is Guid imgId && State.ActiveMapId is Guid mapId)
                 {
@@ -96,10 +128,10 @@
                 }
 
                 <DiceCanvas State="State" CurrentUserId="@CurrentUserId" IsHost="IsHost" />
-                <FloatingRollPanel State="State"
-                                   Config="_diceConfig"
-                                   CurrentUserId="@CurrentUserId"
-                                   IsHost="IsHost" />
+                <QuickRollFooter State="State"
+                                 Config="_diceConfig"
+                                 CurrentUserId="@CurrentUserId"
+                                 IsHost="IsHost" />
             }
         </main>
 
@@ -118,27 +150,25 @@
                 {
                     <HostInitiativePanel State="State" />
                 }
-                <CharacterSheetPanel State="State" CurrentUserId="@CurrentUserId" IsHost="IsHost" />
+                <CharacterSheetPanel @ref="_sheetPanel" State="State" CurrentUserId="@CurrentUserId" IsHost="IsHost" />
+                @if (ShouldShowPlayerLoadedDicePanel())
+                {
+                    <LoadedDiceRulesPanel State="State" Editable="false" />
+                }
             </div>
         </aside>
 
         @if (IsHost)
         {
-            <div class="dndm-floating-actions">
-                @if (_isSaving)
-                {
+            @if (_isSaving)
+            {
+                <div class="dndm-floating-actions">
                     <span class="dndm-save-indicator" title="A save is in progress.">
                         <span class="dndm-save-spinner" aria-hidden="true"></span>
                         Saving…
                     </span>
-                }
-                <button class="dndm-btn" type="button" @onclick="OnOpenDisplayClicked"
-                        title="Open the read-only display view in a new tab and copy its URL.">
-                    Open display view
-                </button>
-                <button class="dndm-btn" type="button" @onclick="TogglePerms">Settings</button>
-                <EndSessionButton State="State" />
-            </div>
+                </div>
+            }
         }
 
         @if (IsHost && _permsOpen)

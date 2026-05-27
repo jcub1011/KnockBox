@@ -1,0 +1,49 @@
+@using KnockBox.Core.Components.Shared
+@using KnockBox.DndMapper.Models
+@using KnockBox.DndMapper.Services.State.Games
+@using KnockBox.DndMapper.Services.State.Games.Data
+@inherits DisposableComponent
+
+<article class="dndm-rolllog-entry">
+    <header class="dndm-rolllog-meta">
+        <span class="dndm-rolllog-roller">@RollerName(Roll.RollerUserId)</span>
+        <span class="dndm-rolllog-formula" title="Dice formula">@Roll.Formula</span>
+        <span class="dndm-rolllog-label">@Roll.Label</span>
+        @if (Roll.Mode != RollMode.Normal)
+        {
+            <span class="dndm-rolllog-mode">@(Roll.Mode == RollMode.Advantage ? "ADV" : "DIS")</span>
+        }
+        @if (ShouldShowLoadedIndicator(Roll))
+        {
+            <span class="dndm-rolllog-loaded" title="@LoadedTooltip(Roll)" aria-label="Modified by loaded-dice rule">●</span>
+        }
+        <time class="dndm-rolllog-time"
+              datetime="@Roll.TimestampUtc.ToString("o")"
+              title="@Roll.TimestampUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")">@FormatTimestamp(Roll.TimestampUtc)</time>
+        @if (Roll.RollerUserId == CurrentUserId && Roll.TokenId is null)
+        {
+            var enabled = CanReRoll(Roll);
+            <button class="dndm-btn dndm-btn--small dndm-btn--icon dndm-rolllog-reroll"
+                    type="button"
+                    disabled="@(!enabled)"
+                    aria-label="Re-roll"
+                    title="@(enabled ? ReRollTitle(Roll) : "Re-roll isn't available for rolls saved before this feature shipped.")"
+                    @onclick="@(e => ReRoll(Roll, e))">↻</button>
+        }
+    </header>
+    <div class="dndm-rolllog-dice">
+        <span class="dndm-rolllog-total"><strong>@Roll.Total</strong></span>
+        <span class="dndm-rolllog-dice-detail">
+            @foreach (var d in Roll.Rolls)
+            {
+                <span class="@($"dndm-die{(d.Discarded ? " dndm-die--discarded" : "")}")"
+                      title="@DieTooltip(d)">@d.Result</span>
+            }
+            @if (Roll.FlatModifier != 0 || Roll.AttributeModifier is not null)
+            {
+                var mods = (Roll.FlatModifier) + (Roll.AttributeModifier ?? 0);
+                <span class="dndm-rolllog-mod">@(mods >= 0 ? "+" : "")@mods</span>
+            }
+        </span>
+    </div>
+</article>

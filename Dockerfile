@@ -13,14 +13,19 @@ RUN dotnet restore host/KnockBox/KnockBox.csproj
 WORKDIR /src/host/KnockBox
 RUN dotnet publish -c Release -o /app/publish /p:UseAppHost=false
 
-FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
+FROM mcr.microsoft.com/dotnet/aspnet:10.0-noble-chiseled AS runtime
 WORKDIR /app
 ENV ASPNETCORE_URLS=http://+:8080
+# Skip diagnostic IPC server startup. Remove this line if you need to attach
+# dotnet-counters / dotnet-dump to a running container.
+ENV DOTNET_EnableDiagnostics=0
 EXPOSE 8080
 EXPOSE 8081
 
-COPY --from=build /app/publish .
-RUN mkdir -p /app/data && chown -R $APP_UID:$APP_UID /app
+# Chiseled image has no shell, so we can't `RUN mkdir/chown` here. COPY --chown
+# applies ownership during copy; /app/data is created by the VOLUME directive
+# at container start and inherits the runtime user.
+COPY --chown=$APP_UID:$APP_UID --from=build /app/publish .
 
 # Persisted state: admin settings, rolling Serilog logs, per-plugin storage,
 # and operator-installed third-party plugins all live under /app/data. The

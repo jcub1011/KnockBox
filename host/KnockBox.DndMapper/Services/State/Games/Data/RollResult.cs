@@ -1,4 +1,6 @@
+using System.Collections.Immutable;
 using KnockBox.DndMapper.Models;
+using KnockBox.DndMapper.Services.State.Games.Data.LoadedDice;
 
 namespace KnockBox.DndMapper.Services.State.Games.Data
 {
@@ -23,5 +25,39 @@ namespace KnockBox.DndMapper.Services.State.Games.Data
         // Human-readable breakdown when status effects contributed to the
         // attribute modifier — e.g. "12 + 2 (INT) − 5 (Brain Fog) = 9". Null
         // when no effects contributed; rendering falls back to the plain total.
-        string? ModifierBreakdown = null);
+        string? ModifierBreakdown = null,
+        // Token whose dice these are when the roll is *for* a specific
+        // token rather than a user — used by NPC initiative rolls so each
+        // NPC gets its own concurrent 3D-dice instance (keyed by token id)
+        // and its dice render in the token's resolved color. Null for
+        // player rolls; the existing RollerUserId path handles those.
+        Guid? TokenId = null)
+    {
+        // Canonical label for initiative rolls. Shared by the engine (which
+        // stamps it onto the RollResult and the synthetic loaded-dice request)
+        // and InitiativeAnimationGate (which correlates a player's animating
+        // initiative roll by label). Kept as one constant so the gate's match
+        // can't silently drift from what the engine writes.
+        public const string InitiativeLabel = "Initiative";
+
+        // Loaded-dice audit: rules that fired during this roll. Empty when
+        // the master toggle was off or no rule matched. The list is what the
+        // roll log uses to render the "Loaded" badge — historical rolls keep
+        // their stamps even if the underlying rule is later edited or deleted.
+        public ImmutableArray<LoadedDiceRuleStamp> AppliedRules { get; init; }
+            = ImmutableArray<LoadedDiceRuleStamp>.Empty;
+
+        // Original dice composition from the inbound RollRequest, captured so
+        // the roll log's re-roll affordance can faithfully repeat the roll.
+        // Reconstructing this from Rolls is brittle: Adv/Dis adds a discarded
+        // twin that would have to be filtered back out. Empty list ⇒ the
+        // record was deserialized from a pre-feature save and re-roll is
+        // unavailable (button is rendered disabled).
+        public ImmutableArray<DiceTerm> OriginalDice { get; init; } = ImmutableArray<DiceTerm>.Empty;
+
+        // Sheet + attribute the request bound to, for the re-roll path. The
+        // resolved AttributeModifier above is enough for display but loses the
+        // sheet identity (needed by loaded-dice context and "rolling as X" UX).
+        public AttributeRef? OriginalAttributeRef { get; init; }
+    }
 }
