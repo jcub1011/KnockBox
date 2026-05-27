@@ -438,7 +438,7 @@
                                 }
                                 else
                                 {
-                                    @((MarkupString)Markdig.Markdown.ToHtml(_notesDraft, _markdownPipeline))
+                                    @((MarkupString)NotesMarkdownRenderer.ToSafeHtml(_notesDraft))
                                 }
                             </div>
                         }
@@ -451,7 +451,7 @@
                                 }
                                 else
                                 {
-                                    @((MarkupString)Markdig.Markdown.ToHtml(_notesDraft, _markdownPipeline))
+                                    @((MarkupString)NotesMarkdownRenderer.ToSafeHtml(_notesDraft))
                                 }
                             </div>
                         }

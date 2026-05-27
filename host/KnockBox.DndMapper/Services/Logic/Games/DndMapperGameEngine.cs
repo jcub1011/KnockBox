@@ -2057,7 +2057,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                 Mode: RollMode.Normal,
                 FlatModifier: 0,
                 AttributeModifier: dexModifier,
-                Label: "Initiative",
+                Label: RollResult.InitiativeLabel,
                 TimestampUtc: DateTime.UtcNow,
                 Formula: "1d20",
                 ModifierBreakdown: null,
@@ -2084,7 +2084,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                 AttributeRef: null,
                 FlatModifier: 0,
                 Mode: RollMode.Normal,
-                Label: "Initiative");
+                Label: RollResult.InitiativeLabel);
 
             var stamps = ApplyLoadedDiceToRolls(state, caller, request, rollerSheetId, rolls);
             return (rolls[0].Result, stamps);
@@ -2678,6 +2678,13 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             // player's assigned sheet) whether or not an attribute is
             // also selected, so a DM rolling AS a sheet with no attribute
             // still matches that sheet's rules.
+            //
+            // This reads state.LoadedDiceRules / state.HostHeldKeys outside the
+            // Execute lock — intentional, and consistent with the RNG above
+            // also running lock-free. Both are immutable snapshots mutated only
+            // by rare host actions, so the worst case is evaluating against a
+            // just-superseded rule set; the AppendRoll below is the only step
+            // that needs the lock for state consistency.
             var appliedRules = ApplyLoadedDiceToRolls(
                 state,
                 caller,

@@ -53,6 +53,49 @@ namespace KnockBox.DndMapperTests.Unit
         }
 
         [TestMethod]
+        public void Apply_DefaultCollections_TreatedAsEmptyAndStillFires()
+        {
+            // Simulates a corrupted / hand-edited save: the rule's ImmutableArray
+            // Conditions deserialized to default and its ImmutableHashSet
+            // TargetSheetIds to null. The processor must treat both as empty
+            // (rule fires on every die) rather than throw on .Count / iteration.
+            var rule = new LoadedDiceRule
+            {
+                Id = Guid.NewGuid(),
+                Name = "Defaulted",
+                Modifications = [new SetResultModification(20)],
+            } with
+            {
+                TargetSheetIds = null!,
+                Conditions = default,
+            };
+
+            var rolls = new List<DieRoll> { new(20, 3, false) };
+            var stamps = LoadedDiceProcessor.Apply(rolls, new[] { rule }, null, _ => ContextFor(20));
+            Assert.AreEqual(20, rolls[0].Result);
+            Assert.AreEqual(1, stamps.Length);
+        }
+
+        [TestMethod]
+        public void Apply_DefaultModifications_DoesNotThrowAndLeavesDie()
+        {
+            // A rule whose Modifications deserialized to default must not throw;
+            // with nothing to apply the die is left unchanged.
+            var rule = new LoadedDiceRule
+            {
+                Id = Guid.NewGuid(),
+                Name = "No mods",
+            } with
+            {
+                Modifications = default,
+            };
+
+            var rolls = new List<DieRoll> { new(20, 7, false) };
+            LoadedDiceProcessor.Apply(rolls, new[] { rule }, null, _ => ContextFor(20));
+            Assert.AreEqual(7, rolls[0].Result);
+        }
+
+        [TestMethod]
         public void HostKeyHeld_MatchesCaseInsensitively()
         {
             // Rule authored as uppercase "A"; the streamed held set carries

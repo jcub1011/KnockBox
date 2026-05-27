@@ -35,26 +35,37 @@ namespace KnockBox.DndMapper.Services.Logic.LoadedDice
                 {
                     if (!rule.Enabled) continue;
 
+                    // Normalize the rule's collections defensively. LoadedDiceRule
+                    // is the only runtime record persisted directly to the library
+                    // snapshot, so a corrupted or hand-edited save could deserialize
+                    // these to null (ImmutableHashSet) or default (ImmutableArray),
+                    // which would throw on .Count / iteration. Treat those as empty.
+                    var targetSheetIds = rule.TargetSheetIds ?? ImmutableHashSet<Guid>.Empty;
+                    var conditions = rule.Conditions.IsDefault
+                        ? ImmutableArray<LoadedDiceCondition>.Empty : rule.Conditions;
+                    var modifications = rule.Modifications.IsDefault
+                        ? ImmutableArray<LoadedDiceModification>.Empty : rule.Modifications;
+
                     // Target filter: empty set means "every roll"; non-empty
                     // requires either (a) the roll's sheet id be in the set
                     // or (b) the roll have no sheet and the set contain the
                     // GmTarget sentinel ("GM" = unattributed rolls).
-                    if (rule.TargetSheetIds.Count > 0)
+                    if (targetSheetIds.Count > 0)
                     {
                         bool matches =
-                            (rollerSheetId is Guid sid && rule.TargetSheetIds.Contains(sid))
-                            || (rollerSheetId is null && rule.TargetSheetIds.Contains(LoadedDiceRule.GmTarget));
+                            (rollerSheetId is Guid sid && targetSheetIds.Contains(sid))
+                            || (rollerSheetId is null && targetSheetIds.Contains(LoadedDiceRule.GmTarget));
                         if (!matches) continue;
                     }
 
                     bool conditionsPass = true;
-                    foreach (var condition in rule.Conditions)
+                    foreach (var condition in conditions)
                     {
                         if (!condition.Matches(ctx)) { conditionsPass = false; break; }
                     }
                     if (!conditionsPass) continue;
 
-                    foreach (var modification in rule.Modifications)
+                    foreach (var modification in modifications)
                     {
                         int next = modification.Apply(current, ctx);
                         // Clamp into the die's legal face range after every

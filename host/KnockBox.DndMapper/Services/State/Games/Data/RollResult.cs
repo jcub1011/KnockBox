@@ -33,6 +33,13 @@ namespace KnockBox.DndMapper.Services.State.Games.Data
         // player rolls; the existing RollerUserId path handles those.
         Guid? TokenId = null)
     {
+        // Canonical label for initiative rolls. Shared by the engine (which
+        // stamps it onto the RollResult and the synthetic loaded-dice request)
+        // and InitiativeAnimationGate (which correlates a player's animating
+        // initiative roll by label). Kept as one constant so the gate's match
+        // can't silently drift from what the engine writes.
+        public const string InitiativeLabel = "Initiative";
+
         // Loaded-dice audit: rules that fired during this roll. Empty when
         // the master toggle was off or no rule matched. The list is what the
         // roll log uses to render the "Loaded" badge — historical rolls keep

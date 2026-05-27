@@ -42,8 +42,8 @@ namespace KnockBox.DndMapper.Helpers
         // key per-NPC DiceBox instances; player initiative rolls
         // (Submit / Force) have a null TokenId and live under the
         // user-keyed DiceBox instead. Both flows tag their RollResult with
-        // Label = "Initiative" via BuildInitiativeRollResult — the label
-        // guard keeps a player's mid-combat attack roll from getting
+        // Label = RollResult.InitiativeLabel via BuildInitiativeRollResult —
+        // the label guard keeps a player's mid-combat attack roll from getting
         // confused with their initiative.
         private static bool IsInitiativeRollForEntry(RollResult r, CombatantEntry entry)
         {
@@ -53,7 +53,7 @@ namespace KnockBox.DndMapper.Helpers
             }
             return entry.OwnerUserId is { } owner
                 && r.RollerUserId == owner
-                && r.Label == "Initiative";
+                && r.Label == RollResult.InitiativeLabel;
         }
     }
 }

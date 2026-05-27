@@ -7,7 +7,6 @@ using KnockBox.DndMapper.Services.Logic.Games;
 using KnockBox.DndMapper.Services.Logic.Visibility;
 using KnockBox.DndMapper.Services.State.Games;
 using KnockBox.DndMapper.Services.State.Games.Data;
-using Markdig;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 
@@ -54,16 +53,6 @@ namespace KnockBox.DndMapper.Pages.Components
         private bool _notesEditing;
         private ElementReference _notesTextareaRef;
         private bool _notesFocusPending;
-
-        // Markdown → HTML pipeline. Built once per process. UseAdvancedExtensions
-        // gives tables/strikethrough/etc.; DisableHtml strips raw HTML before
-        // rendering so user notes can't inject scripts into the host panel via
-        // the MarkupString in the Razor.
-        private static readonly MarkdownPipeline _markdownPipeline =
-            new MarkdownPipelineBuilder()
-                .UseAdvancedExtensions()
-                .DisableHtml()
-                .Build();
 
         private bool _npcModalOpen;
         private string _npcNameDraft = string.Empty;

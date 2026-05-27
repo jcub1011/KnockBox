@@ -115,6 +115,24 @@ namespace KnockBox.DndMapperTests.Unit
         }
 
         [TestMethod]
+        public void RollAsync_DisadvantageWithSetToOne_KeepsOne()
+        {
+            EnableLoadedDice();
+            _engine.AddLoadedDiceRuleAsync(_state, _host, SetResultRule("Fumble", 20, 1));
+
+            // Both raw rolls become 1 after the rule; the disadvantage discard
+            // step keeps the lower (a tie — 1). Symmetric with the
+            // advantage-keeps-20 case above: a "set" rule must survive the
+            // keep-highest/keep-lowest step in both directions.
+            _rng.Enqueue(18);
+            _rng.Enqueue(5);
+            var req = new RollRequest([new DiceTerm(1, 20)], null, 0, RollMode.Disadvantage, "");
+            var result = _engine.RollAsync(_state, _host, req);
+            Assert.IsTrue(result.TryGetSuccess(out var roll));
+            Assert.AreEqual(1, roll.Total);
+        }
+
+        [TestMethod]
         public void UpdateHostInputState_NonHostIsIgnoredSilently()
         {
             var player = EngineTestFactory.RegisterPlayer(_state);
